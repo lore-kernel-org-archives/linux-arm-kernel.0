@@ -1,101 +1,60 @@
 From: k@japko.eu (Krzysztof Adamski)
-Date: Mon, 22 Feb 2016 14:03:28 +0100
-Subject: [PATCH v5 4/4] ARM: dts: sun8i: Add leds and switch on Orangepi Plus
- boards
-In-Reply-To: <1456146208-13890-1-git-send-email-k@japko.eu>
-References: <1456146208-13890-1-git-send-email-k@japko.eu>
-Message-ID: <1456146208-13890-5-git-send-email-k@japko.eu>
+Date: Mon, 22 Feb 2016 14:03:24 +0100
+Subject: [PATCH v5 0/4] pinctrl: sunxi: Add H3 R_PIO controller support
+Message-ID: <1456146208-13890-1-git-send-email-k@japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OrangePi Plus board has two leds - green ("pwr") and red ("status")
-and a switch ("sw4"). This patch describes them in a devicetree.
+This patch series is extension of my original single patch with the same
+subject. It adds support for R_PIO so that GPIO port L can be used in H3
+based devices. It was tested on OrangePi PC and OrangePi Plus where PL
+is connected amount others to an onboard led, a switch, an IR receiver
+and some VCC controllers.
 
-Signed-off-by: Krzysztof Adamski <k@japko.eu>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 63 ++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+Patchset is based on next-20160222.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index e67df59..5f159d0 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -45,6 +45,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
-@@ -58,6 +59,68 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_opc>;
-+
-+		status_led {
-+			label = "status:red:user";
-+			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_r_opc>;
-+
-+		tx {
-+			label = "pwr:green:user";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	r_gpio_keys {
-+		compatible = "gpio-keys";
-+		input-name = "sw4";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sw_r_opc>;
-+
-+		sw4 at 0 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&pio {
-+	leds_opc: led_pins at 0 {
-+		allwinner,pins = "PA15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_pio {
-+	leds_r_opc: led_pins at 0 {
-+		allwinner,pins = "PL10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	sw_r_opc: key_pins at 0 {
-+		allwinner,pins = "PL03";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
- };
- 
- &mmc0 {
+--- 
+
+Changes since v4:
+- remove patches that are alredy merged
+- add patch describing leds and switch in DT
+
+Changes since v3:
+- collect some acked-bys
+- fix r_pios #interrupt-cells
+
+Changes since v2:
+- fixed apb0 parrent clocks list
+- moved binding documentation change to the proper patch
+- simplified sunxi_pinctrl_gpio_get according to ChenYu suggestions
+- fixed ordering in sunxi binding documentation
+
+Changes since v1:
+- splited patch to two separate - dtsi and c files
+- added APB0 clocks a parent for R_PIO
+- added fix in sunxi_pinctrl_gpio_get for getting pin value when in irq
+  mode and on 2nd pinctrl
+- fixed a "pwn" > "pwm" typo
+- fixed order in allwinner,sunxi-pinctrl.txt
+
+
+Krzysztof Adamski (4):
+  clk: sunxi: Add apb0 gates for H3
+  dts: sun8i-h3: Add APB0 related clocks and resets
+  ARM: dts: sun8i-h3: Add R_PIO controller node to the dtsi
+  ARM: dts: sun8i: Add leds and switch on Orangepi Plus boards
+
+Krzysztof Adamski (4):
+  clk: sunxi: Add apb0 gates for H3
+  dts: sun8i-h3: Add APB0 related clocks and resets
+  ARM: dts: sun8i-h3: Add R_PIO controller node to the dtsi
+  ARM: dts: sun8i: Add leds and switch on Orangepi Plus boards
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |  2 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts      | 63 +++++++++++++++++++++++
+ arch/arm/boot/dts/sun8i-h3.dtsi                   | 37 +++++++++++++
+ drivers/clk/sunxi/clk-simple-gates.c              |  4 ++
+ 4 files changed, 106 insertions(+)
+
 -- 
 2.1.4
