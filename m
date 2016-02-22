@@ -1,43 +1,25 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Mon, 22 Feb 2016 11:05:50 +0800
-Subject: [PATCH] ASoC: mediatek: Add machine driver for ALC5650 codec
-In-Reply-To: <20160219153744.GP18327@sirena.org.uk>
-References: <1455849359-14581-1-git-send-email-pc.liao@mediatek.com>
- <20160219153744.GP18327@sirena.org.uk>
-Message-ID: <1456110350.7576.12.camel@mtksdaap41>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 22 Feb 2016 12:12:46 +0900
+Subject: [PATCH v7 0/2] ASoC: Add SPDIF support for Allwinner SoCs
+In-Reply-To: <1456053218-16325-1-git-send-email-codekipper@gmail.com>
+References: <1456053218-16325-1-git-send-email-codekipper@gmail.com>
+Message-ID: <20160222031246.GQ18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Fri, 2016-02-19 at 23:37 +0800, Mark Brown wrote:
-> On Fri, Feb 19, 2016 at 10:35:59AM +0800, PC Liao wrote:
+On Sun, Feb 21, 2016 at 12:13:36PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> > @@ -3,3 +3,4 @@ obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
-> >  # Machine support
-> >  obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
-> >  obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
-> > +obj-$(CONFIG_SND_SOC_MT8173_RT5650) += mt8173-rt5650.o
-> 
-> Why is this not covered by (or coverable by) the existinng RT5650-RT5657
-> driver?
+> For now just the SPDIF transmitter has been tested on a Mele A2000(A10)
+> and a Itead Ibox(A20).
 
-Thanks for your review.
-
-Because they are different boards and have some differences like HW
-configuration and mixer control, we want to separate machine driver
-clearly.
-
-Otherwise, I think I will upload this change to new version for more
-clearly.
-diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
-index bcdcb06..dcb1440 100644
---- a/sound/soc/mediatek/Makefile
-+++ b/sound/soc/mediatek/Makefile
-@@ -2,5 +2,5 @@
- obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
- # Machine support
- obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
--obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
- obj-$(CONFIG_SND_SOC_MT8173_RT5650) += mt8173-rt5650.o
-+obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
+This was already applied.  If any updates are required or you are
+submitting further changes they should be sent as incremental updates
+against current git, existing patches will not be replaced.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/9392c740/attachment.sig>
