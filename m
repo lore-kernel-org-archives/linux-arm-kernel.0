@@ -1,30 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 22 Feb 2016 19:19:18 +0900
-Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
-In-Reply-To: <E1aXlz4-000486-Pb@optimist>
-References: <E1aXlz4-000486-Pb@optimist>
-Message-ID: <20160222101918.GY18327@sirena.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 22 Feb 2016 10:20:13 +0000
+Subject: [PATCH v2 2/8] arm64: dts: qcom: apq8016-sbc: add usb support
+In-Reply-To: <20160222055124.GG21240@tuxbot>
+References: <1455104164-29356-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1455104202-10560-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160222055124.GG21240@tuxbot>
+Message-ID: <56CAE0DD.304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 08:36:46AM +0000, Build bot for Mark Brown wrote:
+Thanks for the review,
 
-Today's -next fails to build an arm allmodconfig due to:
+On 22/02/16 05:51, Bjorn Andersson wrote:
+> On Wed 10 Feb 03:36 PST 2016, Srinivas Kandagatla wrote:
+>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi | 15 ++++++++++
+>>   arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 35 ++++++++++++++++++++++
+>>   2 files changed, 50 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+>> index cbeee0b..4a79dd9 100644
+>> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+>> @@ -10,4 +10,19 @@
+>>   			output-low;
+>>   		};
+>>   	};
+>> +
+>> +	usb_id_default: usb_id_default {
+>
+> Labels are built with _, node names with -.
+>
+>> +		pinmux {
+>> +			function = "gpio";
+>> +			pins = "gpio121";
+>> +		};
+>
+> You don't need a separate node to specify function...
+>
+>> +
+>> +		pinconf {
+>> +			pins = "gpio121";
+>> +			function = "gpio";
+>
+> ...but if you really want it, then you shouldn't specify the function
+> here.
+Oops, Will remove this and resend the patch.
+>
+>> +			drive-strength = <8>;
+>> +			input-enable;
+>> +			bias-pull-up;
+>> +		};
+>> +	};
+>>   };
+>> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> [..]
+>> +
+>> +	usb_id: usb-id {
+>> +		interrupt-parent = <&msmgpio>;
+>
+> interrupt-parent is part of specifying an interrupt. You're not doing
+> that here, so no need to specify a parent.
+Yep, will clean this up in next version.
+>
+>> +		compatible = "linux,extcon-usb-gpio";
+>> +		id-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&usb_id_default>;
+>>   	};
+>>   };
+>
+> Apart from these two nits
+>
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-> 	arm-allmodconfig
-> ../drivers/net/ethernet/ti/netcp_core.c:1846:31: error: invalid type argument of '->' (have 'struct tc_to_netdev')
-> ../drivers/net/ethernet/ti/netcp_core.c:1851:35: error: invalid type argument of '->' (have 'struct tc_to_netdev')
-> ../drivers/net/ethernet/ti/netcp_core.c:1855:8: error: invalid type argument of '->' (have 'struct tc_to_netdev')
-> ../drivers/net/ethernet/ti/netcp_core.c:1856:28: error: invalid type argument of '->' (have 'struct tc_to_netdev')
-> ../drivers/net/ethernet/ti/netcp_core.c:1857:21: error: invalid type argument of '->' (have 'struct tc_to_netdev')
-
-caused by commit 16e5cc647173a (net: rework setup_tc ndo op to consume
-general tc operand) in the net-next tree which looks to have a missing *
-in the rewrite of the function arguments for that driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/87ece996/attachment-0001.sig>
+Thanks,
+srini
+>
+> Regards,
+> Bjorn
+>
