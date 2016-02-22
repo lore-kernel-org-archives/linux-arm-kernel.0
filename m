@@ -1,58 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 22 Feb 2016 09:01:53 -0300
-Subject: [PATCH] bus: imx-weim: Take the 'status' property value into account 
-Message-ID: <1456142513-12876-1-git-send-email-festevam@gmail.com>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Mon, 22 Feb 2016 12:07:31 +0000
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <56CAF868.5020406@arm.com>
+References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
+ <56CAE5E6.7030707@arm.com>
+ <20160222115243.GA5779@e106950-lin.cambridge.arm.com>
+ <56CAF868.5020406@arm.com>
+Message-ID: <20160222120730.GB5779@e106950-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Feb 22, 2016 at 12:00:40PM +0000, Marc Zyngier wrote:
+>On 22/02/16 11:52, Brian Starkey wrote:
+>>> This will create a new conflict, but will make the resolution 100% 
+>>> clear.
+>>
+>> I applied this, but arm64 defconfig wouldn't build until I uncommented
+>> the '#define kvm_call_hyp(...' line.
+>>
+>> Is that right?
+>
+>This patch is intended as a merge indication so that when you do the
+>merge with the arm64 tree, it conflicts and you can resolve it by going
+>the right thing (merging the non-comment version of this line).
 
-Currently we have an incorrect behaviour when multiple devices
-are present under the weim node. For example:
+Right, now I understand "make the resolution 100% clear" - I guess 100%
+clear isn't clear enough for me :-(
 
-&weim {
-	...
-	status = "okay";
-	
-	sram at 0,0 {
-		...
-        	status = "okay";
-	};
+I've not seen that used as notation before, thanks for explaining.
 
-	mram at 0,0 {
-		...
-        	status = "disabled";
-    	};
-};
+-Brian
 
-In this case only the 'sram' device should be probed and not 'mram'.
-
-However what happens currently is that the status variable is ignored,
-causing the 'sram' device to be disabled and 'mram' to be enabled.  
-
-Change the weim_parse_dt() function to use
-for_each_available_child_of_node()so that the devices marked with
-'status = disabled' are not probed.
-
-Cc: <stable@vger.kernel.org>
-Suggested-by: Wolfgang Netbal <wolfgang.netbal@sigmatek.at>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- drivers/bus/imx-weim.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index e98d15e..1827fc4 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -150,7 +150,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
- 			return ret;
- 	}
- 
--	for_each_child_of_node(pdev->dev.of_node, child) {
-+	for_each_available_child_of_node(pdev->dev.of_node, child) {
- 		if (!child->name)
- 			continue;
- 
--- 
-1.9.1
+>
+>So yes, uncommenting it is the right thing to do.
+>
+>Thanks,
+>
+>	M.
+>-- 
+>Jazz is not dead. It just smells funny...
+>
