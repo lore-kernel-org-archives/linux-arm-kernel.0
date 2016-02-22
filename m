@@ -1,62 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Feb 2016 16:49:58 +0000
-Subject: [PATCH v3 1/4] of/fdt: factor out assignment of
- initrd_start/initrd_end
-In-Reply-To: <1455289046-21321-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
- <1455289046-21321-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160222164958.GJ31168@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 22 Feb 2016 10:51:08 -0600
+Subject: [PATCH 2/2] ARM: omap2plus_defconfig: Enable AT24 eeprom
+In-Reply-To: <1456159868-32416-1-git-send-email-nm@ti.com>
+References: <1456159868-32416-1-git-send-email-nm@ti.com>
+Message-ID: <1456159868-32416-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 03:57:23PM +0100, Ard Biesheuvel wrote:
-> Since architectures may not yet have their linear mapping up and running
-> when the initrd address is discovered from the DT, factor out the
-> assignment of initrd_start and initrd_end, so that an architecture can
-> override it and use the translation it needs.
-> 
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/of/fdt.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+AT24 compatible eeproms are used in BB family and X15 boards.
 
-Mark, Rob, any comments on this?
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Will
-
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 1f98156f8996..3e90bce70545 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -760,6 +760,16 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
->  }
->  
->  #ifdef CONFIG_BLK_DEV_INITRD
-> +#ifndef __early_init_dt_declare_initrd
-> +static void __early_init_dt_declare_initrd(unsigned long start,
-> +					   unsigned long end)
-> +{
-> +	initrd_start = (unsigned long)__va(start);
-> +	initrd_end = (unsigned long)__va(end);
-> +	initrd_below_start_ok = 1;
-> +}
-> +#endif
-> +
->  /**
->   * early_init_dt_check_for_initrd - Decode initrd location from flat tree
->   * @node: reference to node containing initrd location ('chosen')
-> @@ -782,9 +792,7 @@ static void __init early_init_dt_check_for_initrd(unsigned long node)
->  		return;
->  	end = of_read_number(prop, len/4);
->  
-> -	initrd_start = (unsigned long)__va(start);
-> -	initrd_end = (unsigned long)__va(end);
-> -	initrd_below_start_ok = 1;
-> +	__early_init_dt_declare_initrd(start, end);
->  
->  	pr_debug("initrd_start=0x%llx  initrd_end=0x%llx\n",
->  		 (unsigned long long)start, (unsigned long long)end);
-> -- 
-> 2.5.0
-> 
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index d18d6b42fcf5..fa82f4e25d0e 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -145,6 +145,7 @@ CONFIG_BLK_DEV_RAM_SIZE=16384
+ CONFIG_SENSORS_TSL2550=m
+ CONFIG_BMP085_I2C=m
+ CONFIG_SRAM=y
++CONFIG_EEPROM_AT24=m
+ CONFIG_SENSORS_LIS3_I2C=m
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+-- 
+2.7.0
