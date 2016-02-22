@@ -1,53 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 22 Feb 2016 15:37:22 +0530
-Subject: [PATCH 3/5] ARM: davinci: dm365: Add dma_slave_map to edma
-In-Reply-To: <56CADBB1.9040908@ti.com>
-References: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
- <1454416997-14230-4-git-send-email-peter.ujfalusi@ti.com>
- <56CADBB1.9040908@ti.com>
-Message-ID: <56CADDDA.5070402@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 22 Feb 2016 19:08:32 +0900
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <E1aXlz4-000486-Pb@optimist>
+References: <E1aXlz4-000486-Pb@optimist>
+Message-ID: <20160222100832.GX18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 February 2016 03:28 PM, Sekhar Nori wrote:
-> On Tuesday 02 February 2016 06:13 PM, Peter Ujfalusi wrote:
->> Provide the dma_slave_map to edma which will allow us to move the drivers
->> to the new, simpler dmaengine API and we can remove the DMA resources also
->> for the devices.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
->> FIX: dm365
-> 
-> dropped this "note to self" :)
-> 
->> ---
->>  arch/arm/mach-davinci/dm365.c | 22 ++++++++++++++++++++++
->>  1 file changed, 22 insertions(+)
->>
->> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
->> index 01843fbcc9ea..d26dc2b4339a 100644
->> --- a/arch/arm/mach-davinci/dm365.c
->> +++ b/arch/arm/mach-davinci/dm365.c
->> @@ -17,6 +17,7 @@
->>  #include <linux/serial_8250.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/dma-mapping.h>
->> +#include <linux/dmaengine.h>
->>  #include <linux/spi/spi.h>
->>  #include <linux/platform_data/edma.h>
->>  #include <linux/platform_data/gpio-davinci.h>
->> @@ -862,9 +863,30 @@ static s8 dm365_queue_priority_mapping[][2] = {
->>  	{-1, -1},
->>  };
->>  
->> +static const struct dma_slave_map da365_edma_map[] = {
-> 
-> This should be "dm365_edma_map".
-> 
-> Fixed both locally while applying.
+On Mon, Feb 22, 2016 at 08:36:46AM +0000, Build bot for Mark Brown wrote:
 
-Similar fixes needed on patches 2,4,5 as well. Made those too.
+Today's -next fails to build on arm64 due to:
 
-Thanks,
-Sekhar
+> 	arm64-allnoconfig
+> ../arch/arm64/include/asm/kvm_host.h:338:2: error: implicit declaration of function 'kvm_call_hyp' [-Werror=implicit-function-declaration]
+> 
+> 	arm64-allmodconfig
+> ../arch/arm64/include/asm/kvm_host.h:338:2: error: implicit declaration of function 'kvm_call_hyp' [-Werror=implicit-function-declaration]
+
+> 	arm64-defconfig
+> ../arch/arm64/include/asm/kvm_host.h:338:2: error: implicit declaration of function 'kvm_call_hyp' [-Werror=implicit-function-declaration]
+
+triggered by the merge of the kvm-arm tree with -next today, it looks
+like changes in that tree and arm64 aren't playing nicely with each
+other (bisect came down to the merge and visual inspection of the
+changes didn't immediately show anything else though the issue is
+obvious in the code).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/c72925ef/attachment.sig>
