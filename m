@@ -1,241 +1,176 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Feb 2016 22:08:38 +0100
-Subject: [PATCH 4/8] drm: msm: split out GEM code into helper module
+Date: Mon, 22 Feb 2016 22:08:39 +0100
+Subject: [PATCH 5/8] drm: msm: move DSI into separate module
 In-Reply-To: <1456175331-714117-1-git-send-email-arnd@arndb.de>
 References: <1456175331-714117-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456175331-714117-5-git-send-email-arnd@arndb.de>
+Message-ID: <1456175331-714117-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GEM code is used by dsi, so it can't be part of
-the main module. This exports all functions that are called
-by other code, and puts it into the helper module.
+Moving around the Makefile for DSI caused a link error with
+the main driver referring to a builtin module that has no
+exported symbols:
+
+drivers/gpu/built-in.o: In function `msm_drm_register':
+:(.init.text+0x654): undefined reference to `msm_dsi_register'
+
+This changes the DSI symbol to a 'tristate' so we can build it
+as a module, and exports the symbols as necessary.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpu/drm/msm/Makefile  |  3 +--
- drivers/gpu/drm/msm/msm_gem.c | 29 +++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/msm/Makefile            |  4 ++--
+ drivers/gpu/drm/msm/dsi/Kconfig         |  7 ++++++-
+ drivers/gpu/drm/msm/dsi/Makefile        | 16 +++++++++-------
+ drivers/gpu/drm/msm/dsi/dsi.c           |  6 ++++--
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_kms.h |  2 +-
+ drivers/gpu/drm/msm/mdp/mdp5/mdp5_kms.h |  2 +-
+ drivers/gpu/drm/msm/msm_drv.h           |  2 +-
+ 7 files changed, 24 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/gpu/drm/msm/Makefile b/drivers/gpu/drm/msm/Makefile
-index acc02aef1b42..6817e9390153 100644
+index 6817e9390153..4b18a2c670b9 100644
 --- a/drivers/gpu/drm/msm/Makefile
 +++ b/drivers/gpu/drm/msm/Makefile
-@@ -25,7 +25,6 @@ drm-msm-y := \
- 	msm_atomic.o \
- 	msm_drv.o \
- 	msm_fb.o \
--	msm_gem.o \
- 	msm_gem_prime.o \
- 	msm_gem_submit.o \
- 	msm_gpu.o \
-@@ -46,4 +45,4 @@ obj-$(CONFIG_DRM_MSM_EDP) += edp/
+@@ -33,13 +33,13 @@ drm-msm-y := \
+ 	msm_rd.o \
+ 	msm_ringbuffer.o
  
- obj-$(CONFIG_DRM_MSM)	+= drm-msm.o drm_msm_helper.o
+-drm-msm-$(CONFIG_DRM_MSM_DSI) += mdp/mdp4/mdp4_dsi_encoder.o \
++drm-msm-$(CONFIG_DRM_MSM_DSI_MODULE) += mdp/mdp4/mdp4_dsi_encoder.o \
+ 				 mdp/mdp5/mdp5_cmd_encoder.o
  
--drm_msm_helper-y	+= msm_iotrace.o msm_fence.o
-+drm_msm_helper-y	+= msm_iotrace.o msm_fence.o msm_gem.o
-diff --git a/drivers/gpu/drm/msm/msm_gem.c b/drivers/gpu/drm/msm/msm_gem.c
-index 3cedb8d5c855..1d64febee274 100644
---- a/drivers/gpu/drm/msm/msm_gem.c
-+++ b/drivers/gpu/drm/msm/msm_gem.c
-@@ -143,11 +143,13 @@ struct page **msm_gem_get_pages(struct drm_gem_object *obj)
- 	mutex_unlock(&dev->struct_mutex);
- 	return p;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_get_pages);
+ drm-msm-$(CONFIG_DRM_FBDEV_EMULATION) += msm_fbdev.o
+ drm-msm-$(CONFIG_COMMON_CLK) += mdp/mdp4/mdp4_lvds_pll.o
  
- void msm_gem_put_pages(struct drm_gem_object *obj)
- {
- 	/* when we start tracking the pin count, then do something here */
- }
-+EXPORT_SYMBOL_GPL(msm_gem_put_pages);
+-obj-$(CONFIG_DRM_MSM_DSI) += dsi/
++obj-$(CONFIG_DRM_MSM_DSI_MODULE) += dsi/
+ obj-$(CONFIG_DRM_MSM_HDMI) += hdmi/
+ obj-$(CONFIG_DRM_MSM_EDP) += edp/
  
- int msm_gem_mmap_obj(struct drm_gem_object *obj,
- 		struct vm_area_struct *vma)
-@@ -177,6 +179,7 @@ int msm_gem_mmap_obj(struct drm_gem_object *obj,
+diff --git a/drivers/gpu/drm/msm/dsi/Kconfig b/drivers/gpu/drm/msm/dsi/Kconfig
+index 91dcf21bfc03..9cddaf0229f7 100644
+--- a/drivers/gpu/drm/msm/dsi/Kconfig
++++ b/drivers/gpu/drm/msm/dsi/Kconfig
+@@ -1,5 +1,5 @@
+ config DRM_MSM_DSI
+-	bool "Enable DSI support in MSM DRM driver"
++	tristate "Enable DSI support in MSM DRM driver"
+ 	depends on DRM_MSM
+ 	select DRM_PANEL
+ 	select DRM_MIPI_DSI
+@@ -8,6 +8,11 @@ config DRM_MSM_DSI
+ 	  Choose this option if you have a need for MIPI DSI connector
+ 	  support.
  
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_mmap_obj);
- 
- int msm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
- {
-@@ -190,6 +193,7 @@ int msm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
- 
- 	return msm_gem_mmap_obj(vma->vm_private_data, vma);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_mmap);
- 
- int msm_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
- {
-@@ -246,6 +250,7 @@ out:
- 		return VM_FAULT_SIGBUS;
- 	}
- }
-+EXPORT_SYMBOL_GPL(msm_gem_fault);
- 
- /** get mmap offset */
- static uint64_t mmap_offset(struct drm_gem_object *obj)
-@@ -274,6 +279,7 @@ uint64_t msm_gem_mmap_offset(struct drm_gem_object *obj)
- 	mutex_unlock(&obj->dev->struct_mutex);
- 	return offset;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_mmap_offset);
- 
- /* should be called under struct_mutex.. although it can be called
-  * from atomic context without struct_mutex to acquire an extra
-@@ -316,6 +322,7 @@ int msm_gem_get_iova_locked(struct drm_gem_object *obj, int id,
- 
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_get_iova_locked);
- 
- /* get iova, taking a reference.  Should have a matching put */
- int msm_gem_get_iova(struct drm_gem_object *obj, int id, uint32_t *iova)
-@@ -336,6 +343,7 @@ int msm_gem_get_iova(struct drm_gem_object *obj, int id, uint32_t *iova)
- 	mutex_unlock(&obj->dev->struct_mutex);
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_get_iova);
- 
- /* get iova without taking a reference, used in places where you have
-  * already done a 'msm_gem_get_iova()'.
-@@ -346,6 +354,7 @@ uint32_t msm_gem_iova(struct drm_gem_object *obj, int id)
- 	WARN_ON(!msm_obj->domain[id].iova);
- 	return msm_obj->domain[id].iova;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_iova);
- 
- void msm_gem_put_iova(struct drm_gem_object *obj, int id)
- {
-@@ -356,6 +365,7 @@ void msm_gem_put_iova(struct drm_gem_object *obj, int id)
- 	// if another _get_iova_locked() fails we can start unmapping
- 	// things that are no longer needed..
- }
-+EXPORT_SYMBOL_GPL(msm_gem_put_iova);
- 
- int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
- 		struct drm_mode_create_dumb *args)
-@@ -365,6 +375,7 @@ int msm_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
- 	return msm_gem_new_handle(dev, file, args->size,
- 			MSM_BO_SCANOUT | MSM_BO_WC, &args->handle);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_dumb_create);
- 
- int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
- 		uint32_t handle, uint64_t *offset)
-@@ -386,6 +397,7 @@ int msm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
- fail:
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_dumb_map_offset);
- 
- void *msm_gem_vaddr_locked(struct drm_gem_object *obj)
- {
-@@ -400,6 +412,7 @@ void *msm_gem_vaddr_locked(struct drm_gem_object *obj)
- 	}
- 	return msm_obj->vaddr;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_vaddr_locked);
- 
- void *msm_gem_vaddr(struct drm_gem_object *obj)
- {
-@@ -409,6 +422,7 @@ void *msm_gem_vaddr(struct drm_gem_object *obj)
- 	mutex_unlock(&obj->dev->struct_mutex);
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_vaddr);
- 
- /* setup callback for when bo is no longer busy..
-  * TODO probably want to differentiate read vs write..
-@@ -421,6 +435,7 @@ int msm_gem_queue_inactive_cb(struct drm_gem_object *obj,
- 			MSM_PREP_READ | MSM_PREP_WRITE);
- 	return msm_queue_fence_cb(obj->dev, cb, fence);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_queue_inactive_cb);
- 
- void msm_gem_move_to_active(struct drm_gem_object *obj,
- 		struct msm_gpu *gpu, bool write, uint32_t fence)
-@@ -434,6 +449,7 @@ void msm_gem_move_to_active(struct drm_gem_object *obj,
- 	list_del_init(&msm_obj->mm_list);
- 	list_add_tail(&msm_obj->mm_list, &gpu->active_list);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_move_to_active);
- 
- void msm_gem_move_to_inactive(struct drm_gem_object *obj)
- {
-@@ -449,6 +465,7 @@ void msm_gem_move_to_inactive(struct drm_gem_object *obj)
- 	list_del_init(&msm_obj->mm_list);
- 	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_move_to_inactive);
- 
- int msm_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op, ktime_t *timeout)
- {
-@@ -469,12 +486,14 @@ int msm_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op, ktime_t *timeout)
- 
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_cpu_prep);
- 
- int msm_gem_cpu_fini(struct drm_gem_object *obj)
- {
- 	/* TODO cache maintenance */
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_cpu_fini);
- 
- #ifdef CONFIG_DEBUG_FS
- void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
-@@ -490,6 +509,7 @@ void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m)
- 			obj->name, obj->refcount.refcount.counter,
- 			off, msm_obj->vaddr, obj->size);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_describe);
- 
- void msm_gem_describe_objects(struct list_head *list, struct seq_file *m)
- {
-@@ -507,6 +527,7 @@ void msm_gem_describe_objects(struct list_head *list, struct seq_file *m)
- 
- 	seq_printf(m, "Total %d objects, %zu bytes\n", count, size);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_describe_objects);
- #endif
- 
- void msm_gem_free_object(struct drm_gem_object *obj)
-@@ -554,6 +575,7 @@ void msm_gem_free_object(struct drm_gem_object *obj)
- 
- 	kfree(msm_obj);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_free_object);
- 
- /* convenience method to construct a GEM buffer object, and userspace handle */
- int msm_gem_new_handle(struct drm_device *dev, struct drm_file *file,
-@@ -580,6 +602,7 @@ int msm_gem_new_handle(struct drm_device *dev, struct drm_file *file,
- 
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(msm_gem_new_handle);
- 
- static int msm_gem_new_impl(struct drm_device *dev,
- 		uint32_t size, uint32_t flags,
-@@ -663,6 +686,7 @@ fail:
- 
- 	return ERR_PTR(ret);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_new);
- 
- struct drm_gem_object *msm_gem_import(struct drm_device *dev,
- 		uint32_t size, struct sg_table *sgt)
-@@ -707,3 +731,8 @@ fail:
- 
- 	return ERR_PTR(ret);
- }
-+EXPORT_SYMBOL_GPL(msm_gem_import);
++config DRM_MSM_DSI_MODULE
++	tristate
++	default y if DRM_MSM=y && DRM_MSM_DSI=m
++	default DRM_MSM_DSI
 +
-+MODULE_AUTHOR("Rob Clark <robdclark@gmail.com");
-+MODULE_DESCRIPTION("MSM DRM Driver GEM implementation");
-+MODULE_LICENSE("GPL");
+ if DRM_MSM_DSI
+ 
+ config DRM_MSM_DSI_PLL
+diff --git a/drivers/gpu/drm/msm/dsi/Makefile b/drivers/gpu/drm/msm/dsi/Makefile
+index 26c8fb689229..53d1cdc16748 100644
+--- a/drivers/gpu/drm/msm/dsi/Makefile
++++ b/drivers/gpu/drm/msm/dsi/Makefile
+@@ -1,13 +1,15 @@
+ ccflags-y := -Iinclude/drm -Idrivers/gpu/drm/msm -Idrivers/gpu/drm/msm/dsi
+ 
+-obj-y := dsi.o dsi_cfg.o dsi_host.o dsi_manager.o phy/dsi_phy.o
++obj-$(CONFIG_DRM_MSM_DSI_MODULE) += drm-msm-dsi.o
+ 
+-obj-$(CONFIG_DRM_MSM_DSI_28NM_PHY) += phy/dsi_phy_28nm.o
+-obj-$(CONFIG_DRM_MSM_DSI_20NM_PHY) += phy/dsi_phy_20nm.o
+-obj-$(CONFIG_DRM_MSM_DSI_28NM_8960_PHY) += phy/dsi_phy_28nm_8960.o
++drm-msm-dsi-y := dsi.o dsi_cfg.o dsi_host.o dsi_manager.o phy/dsi_phy.o
++
++drm-msm-dsi-$(CONFIG_DRM_MSM_DSI_28NM_PHY) += phy/dsi_phy_28nm.o
++drm-msm-dsi-$(CONFIG_DRM_MSM_DSI_20NM_PHY) += phy/dsi_phy_20nm.o
++drm-msm-dsi-$(CONFIG_DRM_MSM_DSI_28NM_8960_PHY) += phy/dsi_phy_28nm_8960.o
+ 
+ ifeq ($(CONFIG_DRM_MSM_DSI_PLL),y)
+-obj-y += pll/dsi_pll.o
+-obj-$(CONFIG_DRM_MSM_DSI_28NM_PHY) += pll/dsi_pll_28nm.o
+-obj-$(CONFIG_DRM_MSM_DSI_28NM_8960_PHY) += pll/dsi_pll_28nm_8960.o
++drm-msm-dsi-y += pll/dsi_pll.o
++drm-msm-dsi-$(CONFIG_DRM_MSM_DSI_28NM_PHY) += pll/dsi_pll_28nm.o
++drm-msm-dsi-$(CONFIG_DRM_MSM_DSI_28NM_8960_PHY) += pll/dsi_pll_28nm_8960.o
+ endif
+diff --git a/drivers/gpu/drm/msm/dsi/dsi.c b/drivers/gpu/drm/msm/dsi/dsi.c
+index 6edcd6f57e70..8523a7cdc419 100644
+--- a/drivers/gpu/drm/msm/dsi/dsi.c
++++ b/drivers/gpu/drm/msm/dsi/dsi.c
+@@ -10,7 +10,7 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-
++#include <linux/module.h>
+ #include "dsi.h"
+ 
+ struct drm_encoder *msm_dsi_get_encoder(struct msm_dsi *msm_dsi)
+@@ -178,6 +178,7 @@ void __init msm_dsi_register(void)
+ 	msm_dsi_phy_driver_register();
+ 	platform_driver_register(&dsi_driver);
+ }
++EXPORT_SYMBOL_GPL(msm_dsi_register);
+ 
+ void __exit msm_dsi_unregister(void)
+ {
+@@ -185,6 +186,7 @@ void __exit msm_dsi_unregister(void)
+ 	msm_dsi_phy_driver_unregister();
+ 	platform_driver_unregister(&dsi_driver);
+ }
++EXPORT_SYMBOL_GPL(msm_dsi_unregister);
+ 
+ int msm_dsi_modeset_init(struct msm_dsi *msm_dsi, struct drm_device *dev,
+ 		struct drm_encoder *encoders[MSM_DSI_ENCODER_NUM])
+@@ -262,4 +264,4 @@ fail:
+ 
+ 	return ret;
+ }
+-
++EXPORT_SYMBOL_GPL(msm_dsi_modeset_init);
+diff --git a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_kms.h b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_kms.h
+index b2828717be2a..3a9e7879d535 100644
+--- a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_kms.h
++++ b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_kms.h
+@@ -217,7 +217,7 @@ struct drm_encoder *mdp4_lcdc_encoder_init(struct drm_device *dev,
+ struct drm_connector *mdp4_lvds_connector_init(struct drm_device *dev,
+ 		struct device_node *panel_node, struct drm_encoder *encoder);
+ 
+-#ifdef CONFIG_DRM_MSM_DSI
++#if IS_ENABLED(CONFIG_DRM_MSM_DSI)
+ struct drm_encoder *mdp4_dsi_encoder_init(struct drm_device *dev);
+ #else
+ static inline struct drm_encoder *mdp4_dsi_encoder_init(struct drm_device *dev)
+diff --git a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_kms.h b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_kms.h
+index 9a25898239d3..6a1325fd71aa 100644
+--- a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_kms.h
++++ b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_kms.h
+@@ -224,7 +224,7 @@ int mdp5_encoder_set_split_display(struct drm_encoder *encoder,
+ int mdp5_encoder_get_linecount(struct drm_encoder *encoder);
+ u32 mdp5_encoder_get_framecount(struct drm_encoder *encoder);
+ 
+-#ifdef CONFIG_DRM_MSM_DSI
++#if IS_ENABLED(CONFIG_DRM_MSM_DSI)
+ struct drm_encoder *mdp5_cmd_encoder_init(struct drm_device *dev,
+ 		struct mdp5_interface *intf, struct mdp5_ctl *ctl);
+ int mdp5_cmd_encoder_set_split_display(struct drm_encoder *encoder,
+diff --git a/drivers/gpu/drm/msm/msm_drv.h b/drivers/gpu/drm/msm/msm_drv.h
+index b8bd88b66c9c..86df81b46eb0 100644
+--- a/drivers/gpu/drm/msm/msm_drv.h
++++ b/drivers/gpu/drm/msm/msm_drv.h
+@@ -294,7 +294,7 @@ enum msm_dsi_encoder_id {
+ 	MSM_DSI_CMD_ENCODER_ID = 1,
+ 	MSM_DSI_ENCODER_NUM = 2
+ };
+-#ifdef CONFIG_DRM_MSM_DSI
++#if IS_ENABLED(CONFIG_DRM_MSM_DSI)
+ void __init msm_dsi_register(void);
+ void __exit msm_dsi_unregister(void);
+ int msm_dsi_modeset_init(struct msm_dsi *msm_dsi, struct drm_device *dev,
 -- 
 2.7.0
