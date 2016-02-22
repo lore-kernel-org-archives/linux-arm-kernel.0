@@ -1,34 +1,41 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 22 Feb 2016 16:31:11 +0900
-Subject: [PATCH 0/6] ARM: decompressor: several cleanups
-Message-ID: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 22 Feb 2016 16:31:12 +0900
+Subject: [PATCH 1/6] ARM: decompressor: drop unneeded assignments to "targets"
+In-Reply-To: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1456126277-14633-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1456126277-14633-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The "targets" exists to specify which files need the corresponding
+".*_cmd" files to be included during the build.  In other words, it
+is used for files that need to detect the change of the command line
+by if_changed, if_changed_dep, and if_changed_rule.  While, these
+files are just copied by "$(call cmd,shipped)".  Adding them to the
+"targets" is meaningless because $(call cmd,...) never creates
+".*_cmd" files.  Such files as ".lib1funcs.S.cmd", ".ashldi3.S.cmd"
+do not exist in the first place.
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ arch/arm/boot/compressed/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Masahiro Yamada (6):
-  ARM: decompressor: drop unneeded assignments to "targets"
-  ARM: decompressor: drop more unneeded assignments to "targets"
-  ARM: decompressor: use clean-files instead of extra-y to clean files
-  ARM: decompressor: drop redundant FORCE in Makefile
-  ARM: decompressor: merge piggy.*.S and simplify Makefile
-  ARM: decompressor: rename suffix_y to compress-y
-
- arch/arm/boot/compressed/.gitignore                |  6 +----
- arch/arm/boot/compressed/Makefile                  | 31 ++++++++++------------
- arch/arm/boot/compressed/{piggy.gzip.S => piggy.S} |  2 +-
- arch/arm/boot/compressed/piggy.lz4.S               |  6 -----
- arch/arm/boot/compressed/piggy.lzma.S              |  6 -----
- arch/arm/boot/compressed/piggy.lzo.S               |  6 -----
- arch/arm/boot/compressed/piggy.xzkern.S            |  6 -----
- 7 files changed, 16 insertions(+), 47 deletions(-)
- rename arch/arm/boot/compressed/{piggy.gzip.S => piggy.S} (67%)
- delete mode 100644 arch/arm/boot/compressed/piggy.lz4.S
- delete mode 100644 arch/arm/boot/compressed/piggy.lzma.S
- delete mode 100644 arch/arm/boot/compressed/piggy.lzo.S
- delete mode 100644 arch/arm/boot/compressed/piggy.xzkern.S
-
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 7a6a58e..7090ad3 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -91,8 +91,8 @@ endif
+ 
+ targets       := vmlinux vmlinux.lds \
+ 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
+-		 lib1funcs.o lib1funcs.S ashldi3.o ashldi3.S bswapsdi2.o \
+-		 bswapsdi2.S font.o font.c head.o misc.o $(OBJS)
++		 lib1funcs.o ashldi3.o bswapsdi2.o \
++		 font.o head.o misc.o $(OBJS)
+ 
+ # Make sure files are removed during clean
+ extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern piggy.lz4 \
 -- 
 1.9.1
