@@ -1,45 +1,33 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Mon, 22 Feb 2016 15:56:54 +0800
-Subject: [PATCH v1 1/2] ASoC: rockchip: i2s: add default values for registers
-In-Reply-To: <1456127815-68575-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1456127815-68575-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <1456127815-68575-2-git-send-email-sugar.zhang@rock-chips.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 22 Feb 2016 09:05:22 +0100
+Subject: [PATCH] i2c: brcmstb: allocate correct amount of memory for regmap
+In-Reply-To: <CADtm3G7ZHfVyoEcAcFGC4oPX=XHyedSWDMvg6nKPLQ5_is=ZiQ@mail.gmail.com>
+References: <1456064238-6294-1-git-send-email-wsa@the-dreams.de>
+ <CADtm3G7ZHfVyoEcAcFGC4oPX=XHyedSWDMvg6nKPLQ5_is=ZiQ@mail.gmail.com>
+Message-ID: <20160222080522.GB1389@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch add default values for registers according description from TRM.
+On Sun, Feb 21, 2016 at 10:33:14PM -0800, Gregory Fong wrote:
+> On Sun, Feb 21, 2016 at 6:16 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> > We want the size of the struct, not of a pointer to it. To be future
+> > proof, just dereference the pointer to get the desired type.
+> 
+> This looks like it fixes like a fairly serious issue: before this
+> change, the driver may modify memory that wasn't allocated for this
+> struct.  Shouldn't this also have Cc: stable?
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
+Surely. I usually add the tag when committing, not when sending out.
 
- sound/soc/rockchip/rockchip_i2s.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 6561c4c..a0b0942 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -440,11 +440,21 @@ static bool rockchip_i2s_precious_reg(struct device *dev, unsigned int reg)
- 	}
- }
- 
-+static const struct reg_default rockchip_i2s_reg_defaults[] = {
-+	{0x00, 0x0000000f},
-+	{0x04, 0x0000000f},
-+	{0x08, 0x00071f1f},
-+	{0x10, 0x001f0000},
-+	{0x14, 0x01f00000},
-+};
-+
- static const struct regmap_config rockchip_i2s_regmap_config = {
- 	.reg_bits = 32,
- 	.reg_stride = 4,
- 	.val_bits = 32,
- 	.max_register = I2S_RXDR,
-+	.reg_defaults = rockchip_i2s_reg_defaults,
-+	.num_reg_defaults = ARRAY_SIZE(rockchip_i2s_reg_defaults),
- 	.writeable_reg = rockchip_i2s_wr_reg,
- 	.readable_reg = rockchip_i2s_rd_reg,
- 	.volatile_reg = rockchip_i2s_volatile_reg,
--- 
-1.9.1
+Thanks.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/544259df/attachment.sig>
