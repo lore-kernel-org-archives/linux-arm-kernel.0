@@ -1,33 +1,58 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Mon, 22 Feb 2016 13:45:14 +0100
-Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
-In-Reply-To: <20160218173428.GE16883@arm.com>
-References: <cover.1455810755.git.jglauber@cavium.com>
- <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
- <20160218173428.GE16883@arm.com>
-Message-ID: <20160222124514.GB766@hardcore>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 22 Feb 2016 13:47:24 +0100
+Subject: [GIT PULL] ARM: mediatek: dts updates for v4.6
+Message-ID: <CABuKBe+vk0E6-8ni5bHtyn6X3EbLoOxfjw0zqPRE_tLdp0AAXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 05:34:28PM +0000, Will Deacon wrote:
-> On Thu, Feb 18, 2016 at 05:50:13PM +0100, Jan Glauber wrote:
-> > With the long cycle counter bit (LC) disabled the cycle counter is not
-> > working on ThunderX SOC (ThunderX only implements Aarch64).
-> > Also, according to documentation LC == 0 is deprecated.
-> > 
-> > To keep the code simple the patch does not introduce 64 bit wide counter
-> > functions. Instead writing the cycle counter always sets the upper
-> > 32 bits so overflow interrupts are generated as before.
-> > 
-> > Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
-> 
-> What does this mean? Do we need Andrew's S-o-B, or is this a fresh patch?
+Hi Arnd and Olof,
 
-Hi Will,
+Please pull the following patches.
 
-Please let me know if I should repost or not, FWIW I got Andrew's S-o-B on the
-patch.
+Thanks,
+Matthias
 
-Thanks, Jan
+---
 
-> Will
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  https://github.com/mbgg/linux-mediatek.git tags/v4.5-next-dts
+
+for you to fetch changes up to 8ba671efdbe5be3e5d691a8b7f77b0d68459b874:
+
+  arm: dts: Add pinctrl/GPIO/EINT node for mt2701 (2016-02-11 11:39:56 +0100)
+
+----------------------------------------------------------------
+Add support for mt7623 SoC.
+Enable SMP support for mt7623.
+Enable SMP support for mt2701
+Add pinctrl for mt2701
+
+----------------------------------------------------------------
+Biao Huang (1):
+      arm: dts: Add pinctrl/GPIO/EINT node for mt2701
+
+John Crispin (3):
+      Document: DT: Add bindings for mediatek MT7623 SoC Platform
+      ARM: dts: mediatek: add MT7623 basic support
+      ARM: dts: mt7623: enable SMP bringup
+
+Louis Yu (1):
+      ARM: dts: mt2701: enable basic SMP bringup for mt2701
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+ .../bindings/timer/mediatek,mtk-timer.txt          |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/mt2701.dtsi                      |  31 +++++
+ arch/arm/boot/dts/mt7623-evb.dts                   |  33 +++++
+ arch/arm/boot/dts/mt7623.dtsi                      | 147 +++++++++++++++++++++
+ arch/arm/mach-mediatek/Kconfig                     |   4 +
+ arch/arm/mach-mediatek/mediatek.c                  |   1 +
+ 9 files changed, 223 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt7623-evb.dts
+ create mode 100644 arch/arm/boot/dts/mt7623.dtsi
