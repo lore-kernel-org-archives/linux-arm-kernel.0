@@ -1,114 +1,51 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 22 Feb 2016 11:48:47 -0800
-Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
-In-Reply-To: <56CB6471.3020400@broadcom.com>
-References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
- <20160218143617.GH9654@rob-hp-laptop>
- <CAAFb_vq6_uQbcWvwV8TZqVqH_C-ueUd+gBRA=mXUQrWqxoz=ww@mail.gmail.com>
- <20160222193604.GA26177@dtor-ws> <56CB6471.3020400@broadcom.com>
-Message-ID: <47ef2a75-3f97-644f-a817-c93e6b3bc658@broadcom.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 22 Feb 2016 11:55:35 -0800
+Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
+ mappings
+In-Reply-To: <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
+References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
+ <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
+Message-ID: <CAPcyv4gtzzSBTUdd6_5P0C=bJBgbb1q035bQX9OcxUUT1ifJeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2/22/2016 11:41 AM, Scott Branden wrote:
-> My comments below
->
-> On 16-02-22 11:36 AM, Dmitry Torokhov wrote:
->> On Fri, Feb 19, 2016 at 11:43:50AM +0530, Raveendra Padasalagi wrote:
->>> On Thu, Feb 18, 2016 at 8:06 PM, Rob Herring <robh@kernel.org> wrote:
->>>> On Wed, Feb 17, 2016 at 03:13:44PM +0530, Raveendra Padasalagi wrote:
->>>>> In Cygnus SOC touch screen controller registers are shared
->>>>> with ADC and flex timer. Using readl/writel could lead to
->>>>> race condition. So touch screen driver is enhanced to support
->>>>>
->>>>> 1. If touchscreen register's are not shared. Register access
->>>>> is handled through readl/writel if "brcm,iproc-touchscreen"
->>>>> compatible is provided in touchscreen dt node. This will help
->>>>> for future SOC's if comes with dedicated touchscreen IP register's.
->>>>>
->>>>> 2. If touchscreen register's are shared with other IP's, register
->>>>> access is handled through syscon framework API's to take care of
->>>>> mutually exclusive access. This feature can be enabled by selecting
->>>>> "brcm,iproc-touchscreen-syscon" compatible string in the touchscreen
->>>>> dt node.
->>>>>
->>>>> Hence touchscreen dt node bindings document is updated to take care
->>>>> of above changes in the touchscreen driver.
->>>>>
->>>>> Signed-off-by: Raveendra Padasalagi
->>>>> <raveendra.padasalagi@broadcom.com>
->>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>> ---
->>>>>   .../input/touchscreen/brcm,iproc-touchscreen.txt   | 57
->>>>> +++++++++++++++++++---
->>>>>   1 file changed, 51 insertions(+), 6 deletions(-)
->>>>>
->>>>> diff --git
->>>>> a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
->>>>> b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
->>>>>
->>>>> index 34e3382..f530c25 100644
->>>>> ---
->>>>> a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
->>>>>
->>>>> +++
->>>>> b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
->>>>>
->>>>> @@ -1,12 +1,30 @@
->>>>>   * Broadcom's IPROC Touchscreen Controller
->>>>>
->>>>>   Required properties:
->>>>> -- compatible: must be "brcm,iproc-touchscreen"
->>>>> -- reg: physical base address of the controller and length of
->>>>> memory mapped
->>>>> -  region.
->>>>> +- compatible: should be one of
->>>>> +        "brcm,iproc-touchscreen"
->>>>> +        "brcm,iproc-touchscreen-syscon"
->>>>
->>>> More specific and this is not how you do syscon. Either the block is or
->>>> isn't. You can't have it both ways.
+On Mon, Feb 22, 2016 at 11:17 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 22 February 2016 at 20:05, Dan Williams <dan.j.williams@intel.com> wrote:
+>> On Mon, Feb 22, 2016 at 6:02 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> Currently, the memremap code serves MEMREMAP_WB mappings directly from
+>>> the kernel direct mapping, unless the region is in high memory, in which
+>>> case it falls back to using ioremap_cache(). However, the semantics of
+>>> ioremap_cache() are not unambiguously defined, and on ARM, it will
+>>> actually result in a mapping type that differs from the attributes used
+>>> for the linear mapping, and for this reason, the ioremap_cache() call
+>>> fails if the region is part of the memory managed by the kernel.
 >>>
->>> Existing driver has support for reg, if we modify now to support only
->>> syscon
->>> then this driver will not work if some one wishes to use previous
->>> kernel version's
->>> dt and vice versa. Basically this breaks dt compatibility. Is that ok ?
+>>> So instead, implement an optional hook 'arch_memremap_wb' whose default
+>>> implementation calls ioremap_cache() as before, but which can be
+>>> overridden by the architecture to do what is appropriate for it.
+>>>
 >>
->> But the issue is that the driver does not actually work correctly with
->> direct register access on those systems, since the registers are
->> actually shared with other components. I am not quite sure if it is OK
->> to break DT binding in this case...
->
-> The driver does work correctly with direct register access on those
-> systems because the other components using those registers are not
-> active in those systems - so syscon is not needed in those cases.
->
-> I'm ok with not containing backwards compatibility though and always
-> using syscon.  There are no deployed systems using older versions of the
-> upstreamed kernel.
+>> Acked-by: Dan Williams <dan.j.williams@intel.com>
 >>
->> Thanks.
->>
+>> I still have patches pending to delete ioremap_cache() from ARM and
+>> require memremap() to be used for cacheable mappings.  Do you see any
+>> use for ioremap_cache() on ARM after this change?
 >
-> Regards,
-> Scott
+> I am not exactly sure why ioremap_cache() does not use MT_MEMORY_RW
+> attributes, but the ARM architecture simply does not allow mismatched
+> attributes, so we cannot simply replace each instance of
+> ioremap_cache() with memremap()
+>
+> Perhaps Russell can explain?
 
-The iproc touchscreen is currently activated in the "bcm9hmidc.dtsi" 
-that represents the optional daughter card installed on reference boards 
-bcm958300k and bcm958305k. While not maintaining backwards compatibility 
-*might not* be a serious issue, it would be nice if we can at least make 
-sure the driver change and DT are merged into the same kernel version so 
-they stay in sync.
+>From the x86 perspective mismatched mappings are also disallowed.  The
+goal of deprecating ioremap_cache() in favor of memremap() is simply
+that the __iomem annotation is misplaced [1], and to clean up the
+calling convention to be explicit without silent fallbacks to
+different mapping types.
 
-Going forward, if we are only going to support syscon based 
-implementation, the existing compatible string "brcm,iproc-touchscreen" 
-is preferred over "brcm,iproc-touchscreen-syscon".
-
-Thanks,
-
-Ray
+[1]: https://lwn.net/Articles/653585/
