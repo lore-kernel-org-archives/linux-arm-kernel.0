@@ -1,98 +1,33 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 22 Feb 2016 11:01:20 -0700
-Subject: [PATCH V2 3/6] stm class: provision for statically assigned
- masterIDs
-In-Reply-To: <CANLsYkz1nNYdcTXrkZ+HAMHexNandm93EpM7auvYE4CY43hy6w@mail.gmail.com>
-References: <1454487337-30184-1-git-send-email-zhang.chunyan@linaro.org>
- <1454487337-30184-4-git-send-email-zhang.chunyan@linaro.org>
- <87mvrf5ngl.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYky2twQ98u241YyHD=atYRp1N56YVHUQNY2E2Ljsq0cseA@mail.gmail.com>
- <87twlj49k7.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkw=mG+ch8QzxmbwWs9o+mndVNo1MuqXcrPrNJYj_SQcHQ@mail.gmail.com>
- <87r3gh3nd7.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkz1nNYdcTXrkZ+HAMHexNandm93EpM7auvYE4CY43hy6w@mail.gmail.com>
-Message-ID: <CANLsYkyaPv_F+TGdGyKMyszs+ocCC=FzfP+Rmqf+O1XT9Wib9w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Feb 2016 10:02:01 -0800
+Subject: [PATCH 1/2] ARM: OMAP1: DMA: Provide dma_slave_map to omap-dma
+In-Reply-To: <56CAB676.6080309@ti.com>
+References: <1454423227-31830-1-git-send-email-peter.ujfalusi@ti.com>
+ <1454423227-31830-2-git-send-email-peter.ujfalusi@ti.com>
+ <20160219214426.GK1640@darkstar.musicnaut.iki.fi>
+ <56CAB676.6080309@ti.com>
+Message-ID: <20160222180201.GK13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2016 at 13:33, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 12 February 2016 at 09:27, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->>
->>> On 8 February 2016 at 06:26, Alexander Shishkin
->>> <alexander.shishkin@linux.intel.com> wrote:
->>>> This $end==$start situation itself may be ambiguous and can be
->>>> interpreted either as having just one *static* master ID fixed for all
->>>> SW writers (what I assumed from your commit message) or as having a
->>>> floating master ID, which changes of its own accord and is not
->>>> controllable by software.
->>>
->>> Some clarification here.
->>>
->>> On ARM from a SW point of view $end == $start and that doesn't change
->>> (with regards to masterIDs) .  The ambiguity comes from the fact that
->>> on other platforms where masterID configuration does change and is
->>> important, the condition $end == $start could also be valid.
->>
->> Yes, that's what I was saying. The thing is, on the system-under-tracing
->> side these two situations are not very different from one
->> another. Master IDs are really just numbers without any semantics
->> attached to them in the sense that they are not covered by the mipi spec
->> or any other standard (to my knowledge).
->
-> We are definitely on the same page here, just using slightly different terms.
->
->>
->> The difference is in the way we map channels to masters. One way is to
->> allocate a distinct set of channels for each master (the way Intel Trace
->> Hub does it); another way is to share the same set of channels between
->> multiple masters.
->
-> We are in total agreement.
->
->> So we can describe this as "hardware implements the
->> same set of channels across multiple masters" or something along those
->> lines.
->
-> I suggest "Shared channels"?  In the end, that's really what it is...
->
-> The outstanding issue is still how to represent these to different way
-> of mapping things in the STM core.  I suggested a flag, called
-> "mstatic" (but that can be changed), and a representation of '-1' in
-> for masterIDs sysFS.  Whether we stick with that or not is irrelevant,
-> I'd be fine with another mechanism.  What I am keen on is that from
-> sysFS users can quickly tell which heuristic is enacted on that
-> specific architecture.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160221 23:19]:
+> On 2016-02-19 23:44, Aaro Koskinen wrote:
+> > On Tue, Feb 02, 2016 at 04:27:06PM +0200, Peter Ujfalusi wrote:
+> >> OMAP1 can not boot in DT mode and to be able to clean up the driver
+> >> regarding to the dmaengine API use (switching to the new API) the
+> >> device/slave -> filter mapping needs to be provided to the omap-dma driver.
+> >>
+> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > 
+> > Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> 
+> Thanks Aaro,
+> 
+> I believe the map covers all drivers using DMA, but in case I missed any we -
+> you ;) will notice it as they will fail to get the DMA channels. This only
+> going to be visible after I send the driver changes for 4.7. In such a case we
+> will need to add the given device to the list.
 
-Alex,
+Yeah makes sense. Applying both into omap-for-v4.6/soc thanks.
 
-How do you want to proceed with the above?  Do you agree with my
-current proposal or can you think of a better way?
-
-Thanks,
-Mathieu
-
-
->
->>
->> Actually, in the latter scheme of things you can also have multiple
->> masters, at least theoretically. Say, you have masters [0..15], each
->> with distinct set of channels, but depending on hardware state these
->> masters actually end up as $state*16+$masterID in the STP stream.
->>
->> So we might also think about differentiating between the hardware
->> masters (0 though 15 in the above example) and STP masters.
->
-> I'm not sure I get what you mean here.  On ARM the masterIDs assigned
-> in HW, which will depend on the state, will show up in the STP stream.
-> But again, I might be missing your point.
->
-> Thanks,
-> Mathieu
->
->>
->> Regards,
->> --
->> Alex
+Tony
