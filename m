@@ -1,25 +1,20 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 22 Feb 2016 15:52:21 -0500 (EST)
-Subject: [PATCH] netcp: fix typo in netcp_setup_tc
-In-Reply-To: <1456174246-293822-1-git-send-email-arnd@arndb.de>
-References: <1456174246-293822-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160222.155221.1930653393972032546.davem@davemloft.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 22 Feb 2016 17:53:41 -0300
+Subject: [PATCH v1] ARM: dts: nitrogen6x: add USB host 1 support
+In-Reply-To: <56CB7438.5030102@boundarydevices.com>
+References: <1456171421-10044-1-git-send-email-ps.report@gmx.net>
+ <56CB7438.5030102@boundarydevices.com>
+Message-ID: <CAOMZO5BoPtUfL6PVzqLkZvwvn4=zNTTYgR1u4TOe4268cu+WLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 22 Feb 2016 21:50:39 +0100
+On Mon, Feb 22, 2016 at 5:48 PM, Troy Kisky
+<troy.kisky@boundarydevices.com> wrote:
 
-> A change to the prototype of netcp_setup_tc() missed a '*'
-> character, which broke compilation of hte netcp driver:
-> 
-> drivers/net/ethernet/ti/netcp_core.c: In function 'netcp_setup_tc':
-> drivers/net/ethernet/ti/netcp_core.c:1839:31: error: invalid type argument of '->' (have 'struct tc_to_netdev')
-> drivers/net/ethernet/ti/netcp_core.c:1872:19: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 16e5cc647173 ("net: rework setup_tc ndo op to consume general tc operand")
+> I'm ok with this patch, but a more correct fix would be to add a
+> reset-gpios to usbh1 instead, as this is a reset pin for
+> a usb hub. So if nobody else has a problem,
 
-Should be fixed in my net-next tree already.
+The problem is that such solution does not exist today.
 
-Thanks.
+Peter Chen has been working on it lately.
