@@ -1,29 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Feb 2016 15:04:01 -0800
-Subject: [PATCH 0/4] Fix l4_ls interface clock and enable RTC
-Message-ID: <1456182245-1843-1-git-send-email-tony@atomide.com>
+Date: Mon, 22 Feb 2016 15:04:04 -0800
+Subject: [PATCH 3/4] ARM: dts: Add RTC entry for dm814x and dra62x
+In-Reply-To: <1456182245-1843-1-git-send-email-tony@atomide.com>
+References: <1456182245-1843-1-git-send-email-tony@atomide.com>
+Message-ID: <1456182245-1843-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add RTC entry for dm814x and dra62x.
 
-Here are few ti81xx related improvments for v4.6 merge window.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dm814x.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Regards,
-
-Tony
-
-
-Tony Lindgren (4):
-  ARM: OMAP2+: Fix hwmod clock for l4_ls
-  ARM: OMAP2+: Add rtc hwmod configuration for ti81xx
-  ARM: dts: Add RTC entry for dm814x and dra62x
-  ARM: dts: Add RTC entry for dm816x
-
- arch/arm/boot/dts/dm814x.dtsi              |  7 +++++
- arch/arm/boot/dts/dm816x.dtsi              |  7 +++++
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 47 ++++++++++++++++++++++++++++--
- 3 files changed, 59 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
+index 3fe68b1..f752ac1 100644
+--- a/arch/arm/boot/dts/dm814x.dtsi
++++ b/arch/arm/boot/dts/dm814x.dtsi
+@@ -305,6 +305,13 @@
+ 				reg = <0x60000 0x1000>;
+ 			};
+ 
++			rtc: rtc at c0000 {
++				compatible = "ti,am3352-rtc", "ti,da830-rtc";
++				reg = <0xc0000 0x1000>;
++				interrupts = <75 76>;
++				ti,hwmods = "rtc";
++			};
++
+ 			mmc2: mmc at 1d8000 {
+ 				compatible = "ti,omap4-hsmmc";
+ 				ti,hwmods = "mmc2";
 -- 
 2.7.0
