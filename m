@@ -1,32 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Feb 2016 13:41:05 +0000
-Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
-In-Reply-To: <20160222124514.GB766@hardcore>
-References: <cover.1455810755.git.jglauber@cavium.com>
- <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
- <20160218173428.GE16883@arm.com> <20160222124514.GB766@hardcore>
-Message-ID: <20160222134105.GD31168@arm.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 22 Feb 2016 19:11:08 +0530
+Subject: [PATCH V7 4/6] i2c: qup: Add bam dma capabilities
+In-Reply-To: <20160222123225.GC1392@katana>
+References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+ <1453197766-18976-5-git-send-email-sricharan@codeaurora.org>
+ <20160212183737.GA1520@katana>
+ <002a01d16d6c$0f790520$2e6b0f60$@codeaurora.org>
+ <20160222123225.GC1392@katana>
+Message-ID: <001c01d16d76$b43d2690$1cb773b0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 01:45:14PM +0100, Jan Glauber wrote:
-> On Thu, Feb 18, 2016 at 05:34:28PM +0000, Will Deacon wrote:
-> > On Thu, Feb 18, 2016 at 05:50:13PM +0100, Jan Glauber wrote:
-> > > With the long cycle counter bit (LC) disabled the cycle counter is not
-> > > working on ThunderX SOC (ThunderX only implements Aarch64).
-> > > Also, according to documentation LC == 0 is deprecated.
-> > > 
-> > > To keep the code simple the patch does not introduce 64 bit wide counter
-> > > functions. Instead writing the cycle counter always sets the upper
-> > > 32 bits so overflow interrupts are generated as before.
-> > > 
-> > > Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
-> > 
-> > What does this mean? Do we need Andrew's S-o-B, or is this a fresh patch?
+Hi Wolfram,
+
+> >   Regression and a fix is required on top of this series. So can I
+> > send a separate fix on top of this series ?
 > 
-> Please let me know if I should repost or not, FWIW I got Andrew's S-o-B on the
-> patch.
+> Yes, do it like this. And please quote only relevant parts of a mail.
+   Ok, will send a fix separately.   Sorry for the noisy reply previously ..
 
-I think it's fine. This should all be in -next as of last Friday anyhow.
 
-Will
+Regards,
+ Sricharan
