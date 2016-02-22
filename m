@@ -1,66 +1,72 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Feb 2016 15:02:07 +0100
-Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
- mappings
+Date: Mon, 22 Feb 2016 15:02:08 +0100
+Subject: [RFC PATCH 2/2] ARM: memremap: implement arch_memremap_wb()
 In-Reply-To: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456149728-16706-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the memremap code serves MEMREMAP_WB mappings directly from
-the kernel direct mapping, unless the region is in high memory, in which
-case it falls back to using ioremap_cache(). However, the semantics of
-ioremap_cache() are not unambiguously defined, and on ARM, it will
-actually result in a mapping type that differs from the attributes used
-for the linear mapping, and for this reason, the ioremap_cache() call
-fails if the region is part of the memory managed by the kernel.
+The generic memremap() falls back to using ioremap_cache() to create
+MEMREMAP_WB mappings if the requested region is not already covered
+by the linear mapping, unless the architecture provides an implementation
+of arch_memremap_wb().
 
-So instead, implement an optional hook 'arch_memremap_wb' whose default
-implementation calls ioremap_cache() as before, but which can be
-overridden by the architecture to do what is appropriate for it.
+Since ioremap_cache() is not appropriate on ARM to map memory with the
+same attributes used for the linear mapping, implement arch_memremap_wb()
+which does exactly that. Also, relax the WARN() check to allow MT_MEMORY_RW
+mappings of pfn_valid() pages.
 
-Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- kernel/memremap.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/io.h |  3 +++
+ arch/arm/mm/ioremap.c     | 11 +++++++++--
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/kernel/memremap.c b/kernel/memremap.c
-index 7a1b5c3ef14e..77c41648ba16 100644
---- a/kernel/memremap.c
-+++ b/kernel/memremap.c
-@@ -27,6 +27,13 @@ __weak void __iomem *ioremap_cache(resource_size_t offset, unsigned long size)
- }
- #endif
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 485982084fe9..7456638e6b3a 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -402,6 +402,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+ void iounmap(volatile void __iomem *iomem_cookie);
+ #define iounmap iounmap
  
-+#ifndef arch_memremap_wb
-+static void *arch_memremap_wb(resource_size_t offset, unsigned long size)
-+{
-+	return (__force void *)ioremap_cache(offset, size);
-+}
-+#endif
++void *arch_memremap_wb(phys_addr_t phys_addr, size_t size);
++#define arch_memremap_wb arch_memremap_wb
 +
- static void *try_ram_remap(resource_size_t offset, size_t size)
- {
- 	struct page *page = pfn_to_page(offset >> PAGE_SHIFT);
-@@ -34,7 +41,7 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
- 	/* In the simple case just return the existing linear address */
- 	if (!PageHighMem(page))
- 		return __va(offset);
--	return NULL; /* fallback to ioremap_cache */
-+	return arch_memremap_wb(offset, size);
- }
- 
- /**
-@@ -80,8 +87,6 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 		 */
- 		if (is_ram == REGION_INTERSECTS)
- 			addr = try_ram_remap(offset, size);
--		if (!addr)
--			addr = ioremap_cache(offset, size);
+ /*
+  * io{read,write}{16,32}be() macros
+  */
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index 66a978d05958..d3a2b028c614 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -297,9 +297,10 @@ static void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
  	}
  
  	/*
+-	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
++	 * Don't allow RAM to be mapped with mismatched attributes - this
++	 * causes problems with ARMv6+
+ 	 */
+-	if (WARN_ON(pfn_valid(pfn)))
++	if (WARN_ON(pfn_valid(pfn) && mtype != MT_MEMORY_RW))
+ 		return NULL;
+ 
+ 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
+@@ -414,6 +415,12 @@ __arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
+ 			__builtin_return_address(0));
+ }
+ 
++void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
++{
++	return __arm_ioremap_caller(phys_addr, size, MT_MEMORY_RW,
++			__builtin_return_address(0));
++}
++
+ void __iounmap(volatile void __iomem *io_addr)
+ {
+ 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
 -- 
 2.5.0
