@@ -1,77 +1,81 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 22 Feb 2016 17:41:37 +0200
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <CACRpkdaXFUCR5=5mS28_4Dx_LfzqV13zwT=vVeJwuOzm_rGRBQ@mail.gmail.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <56C438DA.5040109@ti.com>
- <CACRpkdZ+G17hmVP8AejL7NTqg7k0SBC5kgF55ASjD+kfuGFJhQ@mail.gmail.com>
- <20160217213250.GK19428@n2100.arm.linux.org.uk> <56C5B080.9090007@ti.com>
- <CACRpkdaXFUCR5=5mS28_4Dx_LfzqV13zwT=vVeJwuOzm_rGRBQ@mail.gmail.com>
-Message-ID: <56CB2C31.5040703@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 22 Feb 2016 15:43:15 +0000
+Subject: [PATCH] arm*: efi: drop permanent mapping of the UEFI System table
+In-Reply-To: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160222154314.GJ3435@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/02/16 00:39, Linus Walleij wrote:
-> On Thu, Feb 18, 2016 at 12:52 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+On Mon, Feb 22, 2016 at 03:59:39PM +0100, Ard Biesheuvel wrote:
+> The permanent, writable mapping of the UEFI System table is only
+> referenced during invocations of UEFI Runtime Services, at which time
+> the UEFI virtual mapping is available, which also covers the system
+> table (since the runtime services themselves need access to it)
+
+I'm not sure it's strictly true that the runtime services themselves
+need access to the system table. Why would that be necessary? Are
+runtime services mandated to indirect calls via the system table?
+
+I would expect that the EFI system table and EFI runtime services table
+are not in EfiConventionalMemory, but I'm not sure that we have the
+guarnatee that they're both in EfiRuntimeServices* memory..
+
+>From the spec, I couldn't find a mandate that the system table (nor the
+runtime services table) were in a region of EfiRuntimeServicesData
+memory. I suspect I'm looking in the wrong place...
+
+> So instead of creating this permanent mapping, record the virtual
+> address of the system table inside the UEFI virtual mapping, and
+> use that instead. This protects the contents of the system table
+> from inadvertent (or deliberate) modification.
 > 
->> For panels we need DT fragments. The question is where these fragments
->> are and, possibly, who who loads them.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 > 
-> I hacked something up that augments the device tree from the kernel,
-> given you have a node with all the props you want to augment, tell me
-> what you think of this and whether I should continue in this direction...
-> also the DT people need to be involved:
+> Something I spotted while working on the memory attribute table stuff.
+> Since this is low hanging fruit and otherwise completely unrelated to it,
+> I am posting it as a separate patch
+> 
+>  drivers/firmware/efi/arm-init.c    |  2 ++
+>  drivers/firmware/efi/arm-runtime.c | 24 ++++++++++----------
+>  2 files changed, 14 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+> index 022f11157acd..e995d61da747 100644
+> --- a/drivers/firmware/efi/arm-init.c
+> +++ b/drivers/firmware/efi/arm-init.c
+> @@ -85,6 +85,8 @@ static int __init uefi_init(void)
+>  			efi.systab->hdr.revision >> 16,
+>  			efi.systab->hdr.revision & 0xffff);
+>  
+> +	efi.runtime_version = efi.systab->hdr.revision;
+> +
+>  	/* Show what we know for posterity */
+>  	c16 = early_memremap_ro(efi_to_phys(efi.systab->fw_vendor),
+>  				sizeof(vendor) * sizeof(efi_char16_t));
+> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> index 848ede1587dc..6ce13d6b7122 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -64,6 +64,16 @@ static bool __init efi_virtmap_init(void)
+>  				&phys, ret);
+>  			return false;
+>  		}
+> +		/*
+> +		 * If this entry covers the address of the UEFI system table,
+> +		 * calculate and record its virtual address.
+> +		 */
+> +		if (efi_system_table >= phys &&
+> +		    efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
+> +			efi.systab = (void *)(efi_system_table - phys +
+> +					      md->virt_addr);
+> +			set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+> +		}
 
-What you have there is almost like a legacy board file, isn't it? It's
-just passing DT data forward, instead of device platform data. In fact,
-if the driver in question supports platform data too, you could as well
-generate platform data for it (but I'm not saying that's a better option).
+It seems very odd to me to set this given it's currently unused, and we
+don't have permanent access to the table. That sounds like we're just
+setting ourselves up for future fragility as users appear.
 
-After thinking this a bit and discussing it with Laurent P., generally
-speaking I still think that the only sane option is that the bootloader
-does any detection needed and provides the kernel a .dtb that contains
-the HW that is connected. No board specific drivers are needed on the
-kernel side.
-
-In some cases userspace loaded DT overlays may be fine, if the userspace
-can do the detection and the device in question is not somehow critical
-to operation. But I think displays are critical, and afaik in Versatile
-case the userspace can't even do the detection (?).
-
-The third option is to have board specific display handling code and the
-display HW data in the kernel, as you've done in the patches.
-
-But, of course, which option should be used for which board is not
-always clear...
-
-What bootloader is used on Versatile? If it's some proprietary loader
-which can't be changed, then the bootloader option is out, and I guess
-it points to the third option, i.e. either the version in this patch or
-the earlier version. If it's u-boot, I would suggest going for the
-bootloader option.
-
-Afaik u-boot doesn't support combining DT fragments yet. But (also
-afaik) the u-boot maintainer is ok with the idea. And I know there are
-others (for example TI) interested in the same functionality.
-
-Now, adding that support might take some time, and in the meantime it'd
-be good to get the HW working with kernel with a temporary solution. To
-do that, my suggestion is basically "any solution which requires no
-(temporary) changes to .dts".
-
-While I don't like too much the solution in the patch here, it's all
-inside kernel code and can be dropped easily, right? If we would merge
-the the multi-endpoint solution you had in the earlier patch, you would
-have to support that .dts in the future too.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160222/75449315/attachment.sig>
+Thanks,
+Mark.
