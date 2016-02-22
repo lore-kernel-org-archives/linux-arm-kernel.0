@@ -1,47 +1,50 @@
-From: mika.penttila@nextfour.com (=?UTF-8?Q?Mika_Penttil=c3=a4?=)
-Date: Mon, 22 Feb 2016 17:34:07 +0200
-Subject: arm: set_memory_xx fixes patch missing?
-In-Reply-To: <20160222150911.GA25429@luxor.wired.org>
-References: <20160222150911.GA25429@luxor.wired.org>
-Message-ID: <56CB2A6F.5060006@nextfour.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 22 Feb 2016 16:35:17 +0100
+Subject: [PATCH v1] arm: pxa: fix DT node name for PXA27X usb
+In-Reply-To: <1456139297-5854-1-git-send-email-ynvich@gmail.com> (Sergei
+ Ianovich's message of "Mon, 22 Feb 2016 14:08:17 +0300")
+References: <1456139297-5854-1-git-send-email-ynvich@gmail.com>
+Message-ID: <87oab8wyfe.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.02.2016 17:09, Paolo Pisati wrote:
-> What's happened to the arm side of this patch:
+Sergei Ianovich <ynvich@gmail.com> writes:
+
+> Without this patch I am getting an error:
+> ---8<---
+> [   15.709742] ohci-pxa27x: OHCI PXA27x/PXA3x driver
+> [   15.737150] pxa27x-ohci: probe of 4c000000.ohci failed with error -2
+> ---8<---
 >
-> http://lkml.iu.edu/hypermail/linux/kernel/1601.2/04934.html
+> The error is generated in drivers/usb/host/ohci-pxa27x.c at line 441:
+> ---8<---
+> 441:	usb_clk = devm_clk_get(&pdev->dev, NULL);
+> 442:	if (IS_ERR(usb_clk))
+> 443:		return PTR_ERR(usb_clk);
+> ---8<---
 >
-> the arm64 code is already in Linus's tree, while it seems like the arm part was
-> lost and forgotten, and i don't see it in rmk's patch queue.
+> The error is caused by different names for the same DT node in pxa2xx.dtsi
+> and pxa27x.dtsi.
+>
+> Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+> CC: Robert Jarzmik <robert.jarzmik@free.fr>
+Hi Sergei,
 
-Hi,
+You're right, I haven't seen the pxa2xx.dtsi statement before.
 
-Yes, it for sure should go in, please apply:
+As such, could you amend a bit your patch please to :
+ - add:
+Fixes: 0ec1939668e5 ("ARM: dts: pxa: add the usb host controller")
+ - make the same change in pxa3xx.dtsi, as the same error is there
+ - and more globally align pxa2xx.dtsi, pxa27x.dtsi and pxa3xx.dtsi
+ - remove the compatible, reg, interrupts and status from both pxa27x.dtsi and
+   pxa3xx.dtsi as they are redundant with the included pxa2xxx.dsti one
 
-----------------------------------------------------
-From: Mika Penttil? <mika.penttila@nextfour.com>
+I'm even wondering if the proper change wouldn't be to scrap the ohci
+declarations from pxa27x.dtsi and pxa3xx.dtsi, and only add the "clocks"
+property to pxa2xx.dtsi ...
 
-Allow zero size updates. This makes set_memory_xx() consistent with x86, s390 and arm64.
+Cheers.
 
-Signed-off-by: Mika Penttil? mika.penttila at nextfour.com
-
----
- arch/arm/mm/pageattr.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mm/pageattr.c b/arch/arm/mm/pageattr.c
-index be7fe4b..9edf6b0 100644
---- a/arch/arm/mm/pageattr.c
-+++ b/arch/arm/mm/pageattr.c
-@@ -49,6 +49,9 @@ static int change_memory_common(unsigned long addr, int numpages,
- 		WARN_ON_ONCE(1);
- 	}
- 
-+	if (!numpages)
-+		return 0;
-+
- 	if (start < MODULES_VADDR || start >= MODULES_END)
- 		return -EINVAL;
- 
--- 1.9.1
+--
+Robert
