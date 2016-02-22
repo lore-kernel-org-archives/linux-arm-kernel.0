@@ -1,67 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 22 Feb 2016 10:41:42 +0000
-Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
-In-Reply-To: <20160222100832.GX18327@sirena.org.uk>
-References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
-Message-ID: <56CAE5E6.7030707@arm.com>
+From: ilya@compulab.co.il (Ilya Ledvich)
+Date: Mon, 22 Feb 2016 12:53:14 +0200
+Subject: iMX7d cpu1 issue
+In-Reply-To: <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
+References: <56C2D63F.1030408@compulab.co.il> <20160218140913.GY6756@tiger>
+ <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C5F4D7.1070704@compulab.co.il>
+ <AMSPR04MB26334EB884FA8A4B565278188AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
+ <56C6CE36.6040503@compulab.co.il>
+ <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
+Message-ID: <56CAE89A.9070100@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/02/16 10:08, Mark Brown wrote:
-> On Mon, Feb 22, 2016 at 08:36:46AM +0000, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build on arm64 due to:
-> 
->> 	arm64-allnoconfig
->> ../arch/arm64/include/asm/kvm_host.h:338:2: error: implicit declaration of function 'kvm_call_hyp' [-Werror=implicit-function-declaration]
+Hi Fabio,
+To the best of my understanding imx7d SMP support is missing in the 
+mainline kernel.
+I currently use Freescale git repo 
+git://git.freescale.com/imx/linux-2.6-imx.git, branch imx_3.14.52_1.1.0_ga.
+Kind regards,
+Ilya.
+
+On 02/21/2016 05:22 PM, Fabio Estevam wrote:
+> Hi Ilya/Frank,
+>
+> On Fri, Feb 19, 2016 at 6:11 AM, Ilya Ledvich <ilya@compulab.co.il> wrote:
+>> Hi Frank,
+>> Thank you for so brilliant suggestion!!!
 >>
->> 	arm64-allmodconfig
->> ../arch/arm64/include/asm/kvm_host.h:338:2: error: implicit declaration of function 'kvm_call_hyp' [-Werror=implicit-function-declaration]
-> 
->> 	arm64-defconfig
->> ../arch/arm64/include/asm/kvm_host.h:338:2: error: implicit declaration of function 'kvm_call_hyp' [-Werror=implicit-function-declaration]
-> 
-> triggered by the merge of the kvm-arm tree with -next today, it looks
-> like changes in that tree and arm64 aren't playing nicely with each
-> other (bisect came down to the merge and visual inspection of the
-> changes didn't immediately show anything else though the issue is
-> obvious in the code).
-
-I'm about to push the following patch on top of the KVM tree:
-
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 43688d9..31fe7d6 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -333,11 +333,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 		     hyp_stack_ptr, vector_ptr);
- }
- 
--static inline void __cpu_init_stage2(void)
--{
--	kvm_call_hyp(__init_stage2_translation);
--}
--
- static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-@@ -349,4 +344,11 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
- 
-+/* #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__) */
-+
-+static inline void __cpu_init_stage2(void)
-+{
-+	kvm_call_hyp(__init_stage2_translation);
-+}
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-
-This will create a new conflict, but will make the resolution 100% clear.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>>> #define CONFIG_MX7_SEC
+>>
+>>
+>> Seems it works!
+>> The  CPU1 is brought up, and kernel can successfully boot!
+>
+> I changed U-boot as suggested:
+>
+> --- a/include/configs/mx7_common.h
+> +++ b/include/configs/mx7_common.h
+> @@ -94,10 +94,7 @@
+>   #define CONFIG_CMD_FUSE
+>   #define CONFIG_MXC_OCOTP
+>
+> -/*
+> - * Default boot linux kernel in no secure mode.
+> - * If want to boot kernel in secure mode, please define CONFIG_MX7_SEC
+> - */
+> +#define CONFIG_MX7_SEC
+>   #ifndef CONFIG_MX7_SEC
+>   #define CONFIG_ARMV7_NONSEC
+>   #define CONFIG_ARMV7_PSCI
+>
+>
+> but still see only one core brought up in the kernel:
+>
+> [    0.003051] /cpus/cpu at 0 missing clock-frequency property
+> [    0.003076] /cpus/cpu at 1 missing clock-frequency property
+> [    0.003092] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.003157] Setting up static identity map for 0x80008280 - 0x800082f0
+> [    0.005152] Brought up 1 CPUs
+> [    0.005169] SMP: Total of 1 processors activated (48.00 BogoMIPS).
+>
+> I am booting 4.5-rc5 on a imx7d-sdb board.
+>
+> Any ideas on how to bring up the second core?
+>
