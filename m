@@ -1,118 +1,88 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 22 Feb 2016 15:35:25 +0800
-Subject: [PATCH v11 16/21] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <20160208122643.GD620@cbox>
-References: <1454656456-11640-1-git-send-email-zhaoshenglong@huawei.com>
- <1454656456-11640-17-git-send-email-zhaoshenglong@huawei.com>
- <20160208122643.GD620@cbox>
-Message-ID: <56CABA3D.3090600@huawei.com>
+From: xuejiancheng@huawei.com (Jiancheng Xue)
+Date: Mon, 22 Feb 2016 15:47:54 +0800
+Subject: [PATCH v9 0/6] ARM: hisi: Add initial support including clock driver
+ for Hi3519 soc.
+Message-ID: <1456127280-23275-1-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+Hi3519 soc is mainly used for ip camera and sport DV solutions. This patchset adds initial support
+for Hi3519 soc. It includes clock driver, arch configuration, debug uart configuration and device tree.
+It has been tested on hi3519 reference board.
 
-On 2016/2/8 20:26, Christoffer Dall wrote:
-> On Fri, Feb 05, 2016 at 03:14:11PM +0800, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> When calling perf_event_create_kernel_counter to create perf_event,
->> assign a overflow handler. Then when the perf event overflows, set the
->> corresponding bit of guest PMOVSSET register. If this counter is enabled
->> and its interrupt is enabled as well, kick the vcpu to sync the
->> interrupt.
->>
->> On VM entry, if there is counter overflowed, inject the interrupt with
->> the level set to 1. Otherwise, inject the interrupt with the level set
->> to 0.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->> Reviewed-by: Andrew Jones <drjones@redhat.com>
->> ---
->>  arch/arm/kvm/arm.c    |  2 ++
->>  include/kvm/arm_pmu.h |  2 ++
->>  virt/kvm/arm/pmu.c    | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-
->>  3 files changed, 53 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index dda1959..f54264c 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/sched.h>
->>  #include <linux/kvm.h>
->>  #include <trace/events/kvm.h>
->> +#include <kvm/arm_pmu.h>
->>  
->>  #define CREATE_TRACE_POINTS
->>  #include "trace.h"
->> @@ -577,6 +578,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  		 * non-preemptible context.
->>  		 */
->>  		preempt_disable();
->> +		kvm_pmu_flush_hwstate(vcpu);
->>  		kvm_timer_flush_hwstate(vcpu);
->>  		kvm_vgic_flush_hwstate(vcpu);
->>  
->> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
->> index 1f4bfa2..44a3c75 100644
->> --- a/include/kvm/arm_pmu.h
->> +++ b/include/kvm/arm_pmu.h
->> @@ -44,6 +44,7 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
->>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
->> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->> @@ -67,6 +68,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
->>  static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
->> +static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
->>  static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
->> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
->> index c8ea825..5f983cb 100644
->> --- a/virt/kvm/arm/pmu.c
->> +++ b/virt/kvm/arm/pmu.c
->> @@ -21,6 +21,7 @@
->>  #include <linux/perf_event.h>
->>  #include <asm/kvm_emulate.h>
->>  #include <kvm/arm_pmu.h>
->> +#include <kvm/arm_vgic.h>
->>  
->>  /**
->>   * kvm_pmu_get_counter_value - get PMU counter value
->> @@ -180,6 +181,52 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
->>  }
->>  
->>  /**
->> + * kvm_pmu_flush_hwstate - flush pmu state to cpu
->> + * @vcpu: The vcpu pointer
->> + *
->> + * Inject virtual PMU IRQ if IRQ is pending for this cpu.
->> + */
->> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
->> +{
->> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> +	u64 overflow;
->> +
->> +	if (!kvm_arm_pmu_v3_ready(vcpu))
->> +		return;
->> +
->> +	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E))
->> +		return;
-> 
-> are we modeling the PMU interrupt as level-triggered?
-> 
-> In that case, shouldn't we lower the interrupt line on flush when
-> PMCR_EL0.E == 0 ?
-> 
-Rethink about this, I think you're right. :)
+Any comments will be appreciated!
 
-Thanks,
+Thanks!
+
+Change Log
+----------
+v9:
+--Fixed issues pointed by Michael Turquette.
+
+v8:
+--Made hi3519 clock driver can be compiled as a module
+--Fixed an issue in arch/arm/Kconfig.debug
+
+v7:
+--Rebased to v4.5-rc1
+
+v6:
+-Changed clock driver to a real platform driver
+
+v5:
+-Adjusted clock and reset controller driver code
+
+v4:
+-Rebased to v4.4-rc7
+-Divided patches according to Rob's comments
+-Added spi nodes in hi3519-demb.dts
+
+v3:
+-Rebased to v4.4-rc4
+-Adjusted according to Arnd's comments
+-Removed ARCH_HI3519, using ARCH_HISI directly
+
+v2:
+-Rebased to v4.4-rc3
+-Put dt-binding doc and header file in a separate patch.
+-Deleted unused clocks definitions.
+-Adjusted the ARCH_xxx order in Kconfig file
+-Renamed ARCH_HI3xxx to ARCH_36xx
+
+Jiancheng Xue (6):
+  clk: hisilicon: export some hisilicon APIs to modules
+  clk: hisilicon: add CRG driver for hi3519 soc
+  ARM: hisi: add compatible string for Hi3519 soc
+  ARM: debug: add hi3519 debug uart
+  ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
+  ARM: dts: add dts files for Hi3519
+
+ .../bindings/arm/hisilicon/hi3519-sysctrl.txt      |  14 ++
+ .../devicetree/bindings/clock/hi3519-crg.txt       |  46 +++++
+ arch/arm/Kconfig.debug                             |  10 ++
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
+ arch/arm/boot/dts/hi3519.dtsi                      | 187 +++++++++++++++++++++
+ arch/arm/mach-hisi/hisilicon.c                     |  23 +--
+ drivers/clk/hisilicon/Kconfig                      |  15 ++
+ drivers/clk/hisilicon/Makefile                     |   2 +
+ drivers/clk/hisilicon/clk-hi3519.c                 | 129 ++++++++++++++
+ drivers/clk/hisilicon/clk.c                        |  23 ++-
+ drivers/clk/hisilicon/clk.h                        |  14 +-
+ drivers/clk/hisilicon/reset.c                      | 124 ++++++++++++++
+ drivers/clk/hisilicon/reset.h                      |  32 ++++
+ include/dt-bindings/clock/hi3519-clock.h           |  40 +++++
+ 15 files changed, 669 insertions(+), 34 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
+ create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
+ create mode 100644 arch/arm/boot/dts/hi3519.dtsi
+ create mode 100644 drivers/clk/hisilicon/clk-hi3519.c
+ create mode 100644 drivers/clk/hisilicon/reset.c
+ create mode 100644 drivers/clk/hisilicon/reset.h
+ create mode 100644 include/dt-bindings/clock/hi3519-clock.h
+
 -- 
-Shannon
+1.9.1
