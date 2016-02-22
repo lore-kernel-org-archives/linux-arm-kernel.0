@@ -1,20 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 21 Feb 2016 19:34:42 -0800
-Subject: [PATCH] ARM: dts: sun4i: Enable USB DRC on Hyundai-a7hd
-In-Reply-To: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
-References: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
-Message-ID: <20160222033442.GG19169@lukather>
+Date: Sun, 21 Feb 2016 19:45:17 -0800
+Subject: [PATCH v2 0/3] clk: sunxi: error checking on clock setup
+In-Reply-To: <1455619568-1906-1-git-send-email-andre.przywara@arm.com>
+References: <1455619568-1906-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160222034517.GH19169@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi,
 
-On Tue, Feb 16, 2016 at 10:00:04PM +0100, Peter Korsgaard wrote:
-> Enable the OTG USB controller on the A7HD.
+On Tue, Feb 16, 2016 at 10:46:05AM +0000, Andre Przywara wrote:
+> Setting up the clocks properly is quite critical to the system's
+> operation, but currently our error handling is not very verbose.
+> This series adds error handling and reporting to the sunxi clocks,
+> so that any errors are correctly detected and reported. Also previous
+> actions are rolled back in case something went wrong.
+> This proves to be helpful in debugging clock tree issues,
+> especially when adding support for new SoCs.
+> I tested this on a BananaPi by deliberately misspelling
+> "clock-output-names". The resulting kernel crash in
+> sun4i_timer_interrupt is totally misleading, but now there is a line
+> in the dmesg before saying:
+> =======
+> sunxi_divider_clk_setup: could not read clock-output-names for "apb0"
+> =======
 > 
-> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
+> This applies on top of Maxime's sunxi/for-next branch.
 
-Applied, thanks!
+Applied all three, thanks!
 Maxime
 
 -- 
@@ -27,4 +40,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/97797048/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160221/2d339957/attachment.sig>
