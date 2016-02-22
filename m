@@ -1,58 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Feb 2016 14:09:45 +0100
-Subject: [PATCH 2/6] mtd: physmap_of: add a hook for Versatile write
- protection
-In-Reply-To: <CACRpkdY4fNfQWaKAZcak0yzJ2B17hbrqdU=Q4=NiwiWRNv_0yQ@mail.gmail.com>
-References: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
- <1453806725-4880-3-git-send-email-linus.walleij@linaro.org>
- <CACRpkdY4fNfQWaKAZcak0yzJ2B17hbrqdU=Q4=NiwiWRNv_0yQ@mail.gmail.com>
-Message-ID: <CACRpkdZusueSh99D2JQj5=JQqHAeedTS=X2vm48U58PLbhamcQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 23 Feb 2016 00:19:04 +1100
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <56CB029F.2060409@arm.com>
+References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
+ <56CAE5E6.7030707@arm.com>
+ <20160222115243.GA5779@e106950-lin.cambridge.arm.com>
+ <56CAF868.5020406@arm.com>
+ <20160222120730.GB5779@e106950-lin.cambridge.arm.com>
+ <56CB029F.2060409@arm.com>
+Message-ID: <20160223001904.3ed3e402@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 13, 2016 at 2:19 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Jan 26, 2016 at 12:12 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
->
->> In order to support device tree probing of Versatile NOR flash
->> chips, there must be a way to add the VPP (write protection)
->> enable/disable callback. The register in question is in the
->> system controllers of these machines. Apart from this quirk,
->> the ARM flash chips are standard CFI flash chips from various
->> vendors.
->>
->> Additionally, the Integrator/AP require you to set up the external
->> bus interface (EBI) to allow writes to the chip select where the
->> flash memory is connected.
->>
->> Solve this by looking for the arm,versatile-flash compatible
->> string in the flash device tree node. In the driver,
->> add a special hook to check for the various Versatile syscons and
->> register a callback for .set_vpp() if this compatible is present.
->>
->> Provide a special Kconfig entry for the addon hook so it will
->> not be compiled in if the Versatile boards are not supported.
->> Stubs in the header file make sure the impact will be zero on
->> other platforms. (Compilers optimze this out.)
->>
->> With this patch, a large slew of ARM board file code can be
->> removed.
->>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <robh@kernel.org>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Do you think my reply to this about reference counting and
-> subsequent (accepted) patch to update the documentation
-> to reflect 876fe76d793d03077
-> "mtd: maps: physmap: Add reference counter to set_vpp()"
-> is enough to warrant merging of this?
->
-> If you want the code developed in any special direction
-> just tell me.
+Hi Marc,
 
-Ping.
+On Mon, 22 Feb 2016 12:44:15 +0000 Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+> On 22/02/16 12:07, Brian Starkey wrote:
+> > On Mon, Feb 22, 2016 at 12:00:40PM +0000, Marc Zyngier wrote:  
+> >> On 22/02/16 11:52, Brian Starkey wrote:  
+> >>>> This will create a new conflict, but will make the resolution 100% 
+> >>>> clear.  
+> >>>
+> >>> I applied this, but arm64 defconfig wouldn't build until I uncommented
+> >>> the '#define kvm_call_hyp(...' line.
+> >>>
+> >>> Is that right?  
+> >>
+> >> This patch is intended as a merge indication so that when you do the
+> >> merge with the arm64 tree, it conflicts and you can resolve it by going
+> >> the right thing (merging the non-comment version of this line).  
+> > 
+> > Right, now I understand "make the resolution 100% clear" - I guess 100%
+> > clear isn't clear enough for me :-(  
+> 
+> It is not meant to be clear to you, but to whoever is actually performing the merge:
 
-Yours,
-Linus Walleij
+Excellent, thanks for that - hopefully I will get it right tomorrow.
+
+-- 
+Cheers,
+Stephen Rothwell
