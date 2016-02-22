@@ -1,40 +1,33 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 22 Feb 2016 09:17:13 -0800
-Subject: [PATCH 11/61] gpio: bcm-kona: Use devm_gpiochip_add_data() for
- gpio registration
-In-Reply-To: <1456150130-2668-12-git-send-email-ldewangan@nvidia.com>
-References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
- <1456150130-2668-12-git-send-email-ldewangan@nvidia.com>
-Message-ID: <67faee9e-e234-fc60-5465-3193bed4a7c3@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Feb 2016 18:17:40 +0100
+Subject: [PATCH v3 4/4] arm64: prevent __va() translations before
+ memstart_addr is assigned
+In-Reply-To: <20160222165209.GK31168@arm.com>
+References: <1455289046-21321-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455289046-21321-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20160222165209.GK31168@arm.com>
+Message-ID: <CAKv+Gu_BFK0cpSP1N7NC3brmfuHeXqTBxr-MGAkefLPfFSw6Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2/22/2016 6:08 AM, Laxman Dewangan wrote:
-> Use devm_gpiochip_add_data() for GPIO registration.
+On 22 February 2016 at 17:52, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Feb 12, 2016 at 03:57:26PM +0100, Ard Biesheuvel wrote:
+>> Since memstart_addr is assigned relatively late in the boot code,
+>> after generic code like DT parsing and memblock manipulation has
+>> already occurred, we need to ensure that no __va() translation occur
+>> until memstart_addr has been set to a meaningful value.
+>>
+>> So initialize memstart_addr to a value that cannot represent a valid
+>> physical address, and BUG() if memstart_addr is referenced while it
+>> still holds this value. Note that the > comparison against LLONG_MAX
+>> (not ULLONG_MAX) resolves to a single tbnz instruction that performs
+>> a conditional jump to a brk instruction that is emitted out of line.
 >
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> ---
->  drivers/gpio/gpio-bcm-kona.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-> index b6c5abe..2fd38d5 100644
-> --- a/drivers/gpio/gpio-bcm-kona.c
-> +++ b/drivers/gpio/gpio-bcm-kona.c
-> @@ -630,7 +630,7 @@ static int bcm_kona_gpio_probe(struct platform_device *pdev)
->
->  	bcm_kona_gpio_reset(kona_gpio);
->
-> -	ret = gpiochip_add_data(chip, kona_gpio);
-> +	ret = devm_gpiochip_add_data(dev, chip, kona_gpio);
->  	if (ret < 0) {
->  		dev_err(dev, "Couldn't add GPIO chip -- %d\n", ret);
->  		goto err_irq_domain;
+> Even so, I'd imagine that having a measurable impact on system
+> performance. Did you have a go at benchmarking this?
 >
 
-Acked-by: Ray Jui <ray.jui@broadcom.com>
-
-Thanks!
+So in what kind of workload would the __pa() translation be on a hot
+path? If you're dealing with DMA or other things that involve physical
+addresses, surely, the single predicted non-taken branch instruction
+shouldn't hurt?
