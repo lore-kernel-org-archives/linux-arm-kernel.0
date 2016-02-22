@@ -1,57 +1,47 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 22 Feb 2016 09:26:13 +0100
-Subject: [PATCH V2 3/4] ARM: dts: imx6ul: Add GPMI nand controller support
-In-Reply-To: <20160221112949.GB5387@panicking>
-References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
- <1455963652-24618-4-git-send-email-michael@amarulasolutions.com>
- <CAOMZO5DTmG7Umt+H20r+tZi9zZhsK=eoPbHOBO3iwvM2GXXLgg@mail.gmail.com>
- <20160220172127.GC24064@panicking>
- <20160221112949.GB5387@panicking>
-Message-ID: <20160222092613.3c32a4a0@ipc1.ka-ro>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 Feb 2016 09:31:02 +0100
+Subject: [PATCH] ARM: ux500: fix ureachable iounmap()
+Message-ID: <1456129862-3918-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The code was executing a return with a pointer before reaching
+iounmap().
 
-On Sun, 21 Feb 2016 12:29:53 +0100 Michael Trimarchi wrote:
-> Add support for GPMI nand controller.
-> 
-> Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
-> ---
-> Changes V2:
-> 	- drop special IMXUL type because seems that is compatible
-> 	  with IMX6Q
-> 
->  arch/arm/boot/dts/imx6ul.dtsi | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-> index f4daf97..1a486ac 100644
-> --- a/arch/arm/boot/dts/imx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> @@ -142,6 +142,39 @@
->  			reg = <0x00900000 0x20000>;
->  		};
->  
-> +		dma_apbh: dma-apbh at 01804000 {
-> +			compatible = "fsl,imx6ul-dma-apbh", "fsl,imx28-dma-apbh";
-> +			reg = <0x01804000 0x2000>;
-> +			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
-> +			#dma-cells = <1>;
-> +			dma-channels = <4>;
-> +			clocks = <&clks IMX6UL_CLK_APBHDMA>;
-> +		};
-> +
-> +		gpmi: gpmi-nand at 01806000 {
-> +			compatible = "fsl,imx6q-gpmi-nand";
->
-You should still add an imx6ul specific compatible (likewise to the
-dma_apbh).
+Reported-by: David Binderman <dcb314@hotmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: I have no other Ux500 patches queued, so can
+you please apply this patch directly for-next somewhere,
+thanks.
+---
+ arch/arm/mach-ux500/cpu-db8500.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-
-
-Lothar Wa?mann
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index a0ffaad1fb61..a557955472ea 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -76,17 +76,19 @@ static struct arm_pmu_platdata db8500_pmu_platdata = {
+ static const char *db8500_read_soc_id(void)
+ {
+ 	void __iomem *uid;
++	const char *retstr;
+ 
+ 	uid = ioremap(U8500_BB_UID_BASE, 0x20);
+ 	if (!uid)
+ 		return NULL;
+ 	/* Throw these device-specific numbers into the entropy pool */
+ 	add_device_randomness(uid, 0x14);
+-	return kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
++	retstr = kasprintf(GFP_KERNEL, "%08x%08x%08x%08x%08x",
+ 			 readl((u32 *)uid+0),
+ 			 readl((u32 *)uid+1), readl((u32 *)uid+2),
+ 			 readl((u32 *)uid+3), readl((u32 *)uid+4));
+ 	iounmap(uid);
++	return retstr;
+ }
+ 
+ static struct device * __init db8500_soc_device_init(void)
+-- 
+2.4.3
