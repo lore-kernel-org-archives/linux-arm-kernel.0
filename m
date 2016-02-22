@@ -1,55 +1,57 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 22 Feb 2016 19:38:39 +0530
-Subject: [PATCH 50/61] gpio: tps65912: Use devm_gpiochip_add_data() for gpio
+Date: Mon, 22 Feb 2016 19:38:41 +0530
+Subject: [PATCH 52/61] gpio: ts5500: Use devm_gpiochip_add_data() for gpio
  registration
 In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
 References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456150130-2668-51-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456150130-2668-53-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_gpiochip_add_data() for GPIO registration and remove the
-need of driver callback .remove.
+Use devm_gpiochip_add_data() for GPIO registration and clean the
+error path.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
- drivers/gpio/gpio-tps65912.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ drivers/gpio/gpio-ts5500.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpio/gpio-tps65912.c b/drivers/gpio/gpio-tps65912.c
-index 4f2029c..e72302d 100644
---- a/drivers/gpio/gpio-tps65912.c
-+++ b/drivers/gpio/gpio-tps65912.c
-@@ -106,7 +106,8 @@ static int tps65912_gpio_probe(struct platform_device *pdev)
- 	if (pdata && pdata->gpio_base)
- 		tps65912_gpio->gpio_chip.base = pdata->gpio_base;
+diff --git a/drivers/gpio/gpio-ts5500.c b/drivers/gpio/gpio-ts5500.c
+index 5f94508..6cfeba0 100644
+--- a/drivers/gpio/gpio-ts5500.c
++++ b/drivers/gpio/gpio-ts5500.c
+@@ -409,7 +409,7 @@ static int ts5500_dio_probe(struct platform_device *pdev)
+ 		break;
+ 	}
  
--	ret = gpiochip_add_data(&tps65912_gpio->gpio_chip, tps65912_gpio);
-+	ret = devm_gpiochip_add_data(&pdev->dev, &tps65912_gpio->gpio_chip,
-+				     tps65912_gpio);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Failed to register gpiochip, %d\n", ret);
+-	ret = gpiochip_add_data(&priv->gpio_chip, priv);
++	ret = devm_gpiochip_add_data(dev, &priv->gpio_chip, priv);
+ 	if (ret) {
+ 		dev_err(dev, "failed to register the gpio chip\n");
  		return ret;
-@@ -117,20 +118,11 @@ static int tps65912_gpio_probe(struct platform_device *pdev)
- 	return ret;
+@@ -418,13 +418,10 @@ static int ts5500_dio_probe(struct platform_device *pdev)
+ 	ret = ts5500_enable_irq(priv);
+ 	if (ret) {
+ 		dev_err(dev, "invalid interrupt %d\n", priv->hwirq);
+-		goto cleanup;
++		return ret;
+ 	}
+ 
+ 	return 0;
+-cleanup:
+-	gpiochip_remove(&priv->gpio_chip);
+-	return ret;
  }
  
--static int tps65912_gpio_remove(struct platform_device *pdev)
--{
--	struct tps65912_gpio_data  *tps65912_gpio = platform_get_drvdata(pdev);
--
--	gpiochip_remove(&tps65912_gpio->gpio_chip);
--	return 0;
--}
--
- static struct platform_driver tps65912_gpio_driver = {
- 	.driver = {
- 		.name = "tps65912-gpio",
- 	},
- 	.probe = tps65912_gpio_probe,
--	.remove = tps65912_gpio_remove,
- };
+ static int ts5500_dio_remove(struct platform_device *pdev)
+@@ -432,7 +429,7 @@ static int ts5500_dio_remove(struct platform_device *pdev)
+ 	struct ts5500_priv *priv = platform_get_drvdata(pdev);
  
- static int __init tps65912_gpio_init(void)
+ 	ts5500_disable_irq(priv);
+-	gpiochip_remove(&priv->gpio_chip);
++
+ 	return 0;
+ }
+ 
 -- 
 2.1.4
