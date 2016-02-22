@@ -1,45 +1,40 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 22 Feb 2016 16:46:55 +0300
-Subject: [PATCH 7/8] ACPI: enable ACPI_DBG2_TABLE on ARM64
+Date: Mon, 22 Feb 2016 16:46:56 +0300
+Subject: [PATCH 8/8] serial: pl011: add ACPI DBG2 serial port
 In-Reply-To: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1456148818-26257-8-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456148818-26257-9-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SBBR mentions DBG2 as a mandatory ACPI table.
-So enable it for ARM64
+Add a handler for ACPI DBG2 serial port of type ACPI_DBG2_ARM_PL011
+that sets up an earlycon on it.
 
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- arch/arm64/Kconfig       | 1 +
- arch/arm64/kernel/acpi.c | 2 ++
- 2 files changed, 3 insertions(+)
+ drivers/tty/serial/amba-pl011.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6bb21d8..27cb5d7 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -3,6 +3,7 @@ config ARM64
- 	select ACPI_CCA_REQUIRED if ACPI
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-+	select ACPI_DBG2_TABLE if ACPI
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 7a944f7..890d36f 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -213,6 +213,8 @@ void __init acpi_boot_table_init(void)
- 		if (!param_acpi_force)
- 			disable_acpi();
- 	}
-+
-+	acpi_probe_device_table(dbg2);
- }
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index c0da0cc..5633741 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -59,6 +59,7 @@
+ #include <linux/sizes.h>
+ #include <linux/io.h>
+ #include <linux/acpi.h>
++#include <linux/acpi_dbg2.h>
  
- #ifdef CONFIG_ACPI_APEI
+ #include "amba-pl011.h"
+ 
+@@ -2329,6 +2330,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+ }
+ EARLYCON_DECLARE(pl011, pl011_early_console_setup);
+ OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
++ACPI_DBG2_EARLYCON_DECLARE(pl011, ACPI_DBG2_ARM_PL011,
++			   pl011_early_console_setup);
+ 
+ #else
+ #define AMBA_CONSOLE	NULL
 -- 
 2.7.1
