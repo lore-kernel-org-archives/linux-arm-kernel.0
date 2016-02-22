@@ -1,66 +1,34 @@
-From: ilya@compulab.co.il (Ilya Ledvich)
-Date: Mon, 22 Feb 2016 12:53:14 +0200
-Subject: iMX7d cpu1 issue
-In-Reply-To: <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
-References: <56C2D63F.1030408@compulab.co.il> <20160218140913.GY6756@tiger>
- <AMSPR04MB263D00A3F8D9A8D9D3A536D88AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
- <56C5F4D7.1070704@compulab.co.il>
- <AMSPR04MB26334EB884FA8A4B565278188AF0@AMSPR04MB263.eurprd04.prod.outlook.com>
- <56C6CE36.6040503@compulab.co.il>
- <CAOMZO5Aa+veHWQCrKGz4rsvmjKWiitd81D8ncGnX8Fdk0aYe7Q@mail.gmail.com>
-Message-ID: <56CAE89A.9070100@compulab.co.il>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Mon, 22 Feb 2016 19:01:43 +0800
+Subject: [PATCH v2 1/2] dt-bindings: Add LG lp120up1 panel bindings
+Message-ID: <1456138904-15258-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-To the best of my understanding imx7d SMP support is missing in the 
-mainline kernel.
-I currently use Freescale git repo 
-git://git.freescale.com/imx/linux-2.6-imx.git, branch imx_3.14.52_1.1.0_ga.
-Kind regards,
-Ilya.
+Add documentation for lp120up1 panel
 
-On 02/21/2016 05:22 PM, Fabio Estevam wrote:
-> Hi Ilya/Frank,
->
-> On Fri, Feb 19, 2016 at 6:11 AM, Ilya Ledvich <ilya@compulab.co.il> wrote:
->> Hi Frank,
->> Thank you for so brilliant suggestion!!!
->>
->>> #define CONFIG_MX7_SEC
->>
->>
->> Seems it works!
->> The  CPU1 is brought up, and kernel can successfully boot!
->
-> I changed U-boot as suggested:
->
-> --- a/include/configs/mx7_common.h
-> +++ b/include/configs/mx7_common.h
-> @@ -94,10 +94,7 @@
->   #define CONFIG_CMD_FUSE
->   #define CONFIG_MXC_OCOTP
->
-> -/*
-> - * Default boot linux kernel in no secure mode.
-> - * If want to boot kernel in secure mode, please define CONFIG_MX7_SEC
-> - */
-> +#define CONFIG_MX7_SEC
->   #ifndef CONFIG_MX7_SEC
->   #define CONFIG_ARMV7_NONSEC
->   #define CONFIG_ARMV7_PSCI
->
->
-> but still see only one core brought up in the kernel:
->
-> [    0.003051] /cpus/cpu at 0 missing clock-frequency property
-> [    0.003076] /cpus/cpu at 1 missing clock-frequency property
-> [    0.003092] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.003157] Setting up static identity map for 0x80008280 - 0x800082f0
-> [    0.005152] Brought up 1 CPUs
-> [    0.005169] SMP: Total of 1 processors activated (48.00 BogoMIPS).
->
-> I am booting 4.5-rc5 on a imx7d-sdb board.
->
-> Any ideas on how to bring up the second core?
->
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes since v1:
+ - add Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/display/panel/lg,lp120up1.txt         |    7 +++++++
+ 1 file changed, 7 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/lg,lp120up1.txt
+
+diff --git a/Documentation/devicetree/bindings/display/panel/lg,lp120up1.txt b/Documentation/devicetree/bindings/display/panel/lg,lp120up1.txt
+new file mode 100644
+index 0000000..8c5de69
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/lg,lp120up1.txt
+@@ -0,0 +1,7 @@
++LG 12.0" (1920x1280 pixels) TFT LCD panel
++
++Required properties:
++- compatible: should be "lg,lp120up1"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+-- 
+1.7.9.5
