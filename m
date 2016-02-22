@@ -1,41 +1,62 @@
-From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Mon, 22 Feb 2016 15:47:59 +0800
-Subject: [PATCH v9 5/6] ARM: dt-bindings: add device tree bindings for Hi3519
- sysctrl
-In-Reply-To: <1456127280-23275-1-git-send-email-xuejiancheng@huawei.com>
-References: <1456127280-23275-1-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <1456127280-23275-6-git-send-email-xuejiancheng@huawei.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Mon, 22 Feb 2016 09:00:42 +0100
+Subject: [linux-sunxi] Re: [PATCH v3] Fix sun7i pin assignment for IRQ's
+In-Reply-To: <4cf9dbe3-faa6-4729-87fd-0e7d9ce463b0@googlegroups.com>
+References: <1456060845-20692-1-git-send-email-henry@nitronetworks.nl>
+ <20160221171830.GD19169@lukather>
+ <4cf9dbe3-faa6-4729-87fd-0e7d9ce463b0@googlegroups.com>
+Message-ID: <20160222080041.GF18745@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree bindings for Hi3519 system controller.
+On Sun, Feb 21, 2016 at 11:27:46AM -0800, Henry Paulissen wrote:
+>
+>Op zondag 21 februari 2016 18:18:37 UTC+1 schreef Maxime Ripard:
+>
+>>
+>> Your commit log is going to need some work. Which bugs? What tests did
+>> you make? Why are you making these changes while the datasheet says
+>> otherwise?
+>>
+>
+>Its a fix for a not yet existing bug. I was fiddling around with IRQ's and
+>couldn't get them to work.
+>I took a dumpster dive into it and found a shitload of contradicting
+>manuals and datasheets.
+>
+>
+>Take for example the A20 user manual:
+>http://dl.linux-sunxi.org/A20/A20%20user%20manual%20v1.3%2020141010.pdf
+>
+>(pin PI14)
+>Page 237: EINT26 is on mux *5* in the pin overview.
+>Page 288: EINT26 is on mux *6* in the registers.
+>
+>Page 233: EINT12 is on pin PC19 mux6 in the pin overview.
+>Page 236: EINT12 is on pin PH12 mux6 in the pin overview.
+>Page 253: EINT12 is *not* on pin PC19 on the registers.
+>Page 281: EINT12 is on pin PH12 mux6 in the registers.
+>
+>So manual may say otherwise, but I hope I have proven that the manual isn't
+>to be trusted.
+>
+>My patch is based onto testing from both me and Andre (apritzel).
+>He with a Banana PI M1 and me with a Cubietruck (both A20 soc).
+>
+>We did a basic test by connecting a pulsing signal to a port and configure
+>kernel to use irq.
+>
+>e.g.
+>echo pin# > /sys/class/gpio/export
+>echo in > /sys/class/gpio/gpio#/direction
+>echo rising > /sys/class/gpio/gpio#/edge
+>
+>and check on /proc/interrupts to see if a irq was attached and if it was
+>receiving.
+>
+>Im not sure what andre his pulse source was, but mine was a 1pps coming
+>from a gps.
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt   | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt b/Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
-new file mode 100644
-index 0000000..115c5be
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
-@@ -0,0 +1,14 @@
-+* Hisilicon Hi3519 System Controller Block
-+
-+This bindings use the following binding:
-+Documentation/devicetree/bindings/mfd/syscon.txt
-+
-+Required properties:
-+- compatible: "hisilicon,hi3519-sysctrl".
-+- reg: the register region of this block
-+
-+Examples:
-+sysctrl: system-controller at 12010000 {
-+	compatible = "hisilicon,hi3519-sysctrl", "syscon";
-+	reg = <0x12010000 0x1000>;
-+};
--- 
-1.9.1
+That's quite clear to anybody reading this mailinglist but it won't be 
+to anyone reading just commit message (and there will be many of them).  
+You should try to put some of this into the commit message.
