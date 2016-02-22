@@ -1,36 +1,83 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Feb 2016 15:04:05 -0800
-Subject: [PATCH 4/4] ARM: dts: Add RTC entry for dm816x
+Date: Mon, 22 Feb 2016 15:04:03 -0800
+Subject: [PATCH 2/4] ARM: OMAP2+: Add rtc hwmod configuration for ti81xx
 In-Reply-To: <1456182245-1843-1-git-send-email-tony@atomide.com>
 References: <1456182245-1843-1-git-send-email-tony@atomide.com>
-Message-ID: <1456182245-1843-5-git-send-email-tony@atomide.com>
+Message-ID: <1456182245-1843-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add RTC entry for dm816x.
+This allows RTC to work properly with the related DTS
+changes.
 
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dm816x.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 38 ++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
-index c3b8811..e850686 100644
---- a/arch/arm/boot/dts/dm816x.dtsi
-+++ b/arch/arm/boot/dts/dm816x.dtsi
-@@ -214,6 +214,13 @@
- 			reg = <0x48200000 0x1000>;
- 		};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+index f8cc400..39736ad 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+@@ -228,6 +228,42 @@ static struct omap_hwmod_ocp_if dm816x_mpu__alwon_l3_med = {
+ 	.user	= OCP_USER_MPU,
+ };
  
-+		rtc: rtc at 480c0000 {
-+			compatible = "ti,am3352-rtc", "ti,da830-rtc";
-+			reg = <0x480c0000 0x1000>;
-+			interrupts = <75 76>;
-+			ti,hwmods = "rtc";
-+		};
++/* RTC */
++static struct omap_hwmod_class_sysconfig ti81xx_rtc_sysc = {
++	.rev_offs	= 0x74,
++	.sysc_offs	= 0x78,
++	.sysc_flags	= SYSC_HAS_SIDLEMODE,
++	.idlemodes	= SIDLE_FORCE | SIDLE_NO |
++			  SIDLE_SMART | SIDLE_SMART_WKUP,
++	.sysc_fields	= &omap_hwmod_sysc_type3,
++};
 +
- 		mailbox: mailbox at 480c8000 {
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x480c8000 0x2000>;
++static struct omap_hwmod_class ti81xx_rtc_hwmod_class = {
++	.name		= "rtc",
++	.sysc		= &ti81xx_rtc_sysc,
++};
++
++struct omap_hwmod ti81xx_rtc_hwmod = {
++	.name		= "rtc",
++	.class		= &ti81xx_rtc_hwmod_class,
++	.clkdm_name	= "alwon_l3s_clkdm",
++	.flags		= HWMOD_NO_IDLEST,
++	.main_clk	= "sysclk18_ck",
++	.prcm		= {
++		.omap4	= {
++			.clkctrl_offs = DM81XX_CM_ALWON_RTC_CLKCTRL,
++			.modulemode = MODULEMODE_SWCTRL,
++		},
++	},
++};
++
++static struct omap_hwmod_ocp_if ti81xx_l4_ls__rtc = {
++	.master		= &dm81xx_l4_ls_hwmod,
++	.slave		= &ti81xx_rtc_hwmod,
++	.clk		= "sysclk6_ck",
++	.user		= OCP_USER_MPU,
++};
++
+ /* UART common */
+ static struct omap_hwmod_class_sysconfig uart_sysc = {
+ 	.rev_offs	= 0x50,
+@@ -1381,6 +1417,7 @@ static struct omap_hwmod_ocp_if *dm814x_hwmod_ocp_ifs[] __initdata = {
+ 	&dm81xx_l4_ls__mcspi1,
+ 	&dm814x_l4_ls__mmc1,
+ 	&dm814x_l4_ls__mmc2,
++	&ti81xx_l4_ls__rtc,
+ 	&dm81xx_alwon_l3_fast__tpcc,
+ 	&dm81xx_alwon_l3_fast__tptc0,
+ 	&dm81xx_alwon_l3_fast__tptc1,
+@@ -1420,6 +1457,7 @@ static struct omap_hwmod_ocp_if *dm816x_hwmod_ocp_ifs[] __initdata = {
+ 	&dm81xx_l4_ls__gpio1,
+ 	&dm81xx_l4_ls__gpio2,
+ 	&dm81xx_l4_ls__elm,
++	&ti81xx_l4_ls__rtc,
+ 	&dm816x_l4_ls__mmc1,
+ 	&dm816x_l4_ls__timer1,
+ 	&dm816x_l4_ls__timer2,
 -- 
 2.7.0
