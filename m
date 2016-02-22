@@ -1,54 +1,54 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 22 Feb 2016 19:38:38 +0530
-Subject: [PATCH 49/61] gpio: tps65910: Use devm_gpiochip_add_data() for gpio
- registration
-In-Reply-To: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456150130-2668-50-git-send-email-ldewangan@nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Feb 2016 15:25:53 +0100
+Subject: [PATCH 0/5] memory attribute table support
+Message-ID: <1456151158-25849-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_gpiochip_add_data() for GPIO registration and remove the
-need of driver callback .remove.
+This implements ARM/arm64 support for dealing with the UEFI memory attribute
+table, which allows the OS to map UEFI Runtime Services regions with stricter
+permissions.
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
- drivers/gpio/gpio-tps65910.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+I have tried to implement the early discovery and validation of the table
+as generically as possible. I think it should be reusable on x86 as well,
+but I haven't tried myself. Note that this also depends on the way we
+deal with the reservation of BootServicesData regions goind forward.
 
-diff --git a/drivers/gpio/gpio-tps65910.c b/drivers/gpio/gpio-tps65910.c
-index e81eee7..cdbd7c7 100644
---- a/drivers/gpio/gpio-tps65910.c
-+++ b/drivers/gpio/gpio-tps65910.c
-@@ -170,7 +170,8 @@ static int tps65910_gpio_probe(struct platform_device *pdev)
- 	}
- 
- skip_init:
--	ret = gpiochip_add_data(&tps65910_gpio->gpio_chip, tps65910_gpio);
-+	ret = devm_gpiochip_add_data(&pdev->dev, &tps65910_gpio->gpio_chip,
-+				     tps65910_gpio);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Could not register gpiochip, %d\n", ret);
- 		return ret;
-@@ -181,19 +182,10 @@ skip_init:
- 	return ret;
- }
- 
--static int tps65910_gpio_remove(struct platform_device *pdev)
--{
--	struct tps65910_gpio *tps65910_gpio = platform_get_drvdata(pdev);
--
--	gpiochip_remove(&tps65910_gpio->gpio_chip);
--	return 0;
--}
--
- static struct platform_driver tps65910_gpio_driver = {
- 	.driver.name    = "tps65910-gpio",
- 	.driver.owner   = THIS_MODULE,
- 	.probe		= tps65910_gpio_probe,
--	.remove		= tps65910_gpio_remove,
- };
- 
- static int __init tps65910_gpio_init(void)
+Note that for 32-bit ARM, this depends on [1], which addresses an issue
+with memremap() on that architecture
+
+Patches #1 and #2 implement support for the EFI_MEMORY_RO and EFI_MEMORY_XP
+attributes, and as it turns out, this code supports both the (obsolete)
+PropertiesTable and the new Memory Attributes table, so I moved them to the
+beginning of the series.
+
+Patch #3 adds the GUID and type definitions for the memory attributes table.
+
+Patch #4 implements the generic handling of the table.
+
+Patch #5 wires it up for ARM and arm64.
+
+[1] http://thread.gmane.org/gmane.linux.kernel/2157907
+
+Ard Biesheuvel (5):
+  ARM: efi: apply strict permissons for UEFI Runtime Services regions
+  arm64: efi: apply strict permissons for UEFI Runtime Services regions
+  efi: add support for the EFI_MEMORY_ATTRIBUTES_TABLE config table
+  efi: implement generic support for the Memory Attributes table
+  arm*: efi: take the Memory Attributes table into account
+
+ arch/arm/include/asm/efi.h         |   1 +
+ arch/arm/kernel/efi.c              |  41 ++++++
+ arch/arm64/include/asm/efi.h       |   2 +
+ arch/arm64/kernel/efi.c            |  27 +++-
+ drivers/firmware/efi/Makefile      |   2 +-
+ drivers/firmware/efi/arm-init.c    |   1 +
+ drivers/firmware/efi/arm-runtime.c |   3 +
+ drivers/firmware/efi/efi.c         |   2 +
+ drivers/firmware/efi/memattr.c     | 137 ++++++++++++++++++++
+ include/linux/efi.h                |  19 +++
+ 10 files changed, 229 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/firmware/efi/memattr.c
+
 -- 
-2.1.4
+2.5.0
