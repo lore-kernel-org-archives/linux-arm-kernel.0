@@ -1,53 +1,49 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 22 Feb 2016 23:38:56 +0100
-Subject: [PATCH 9/9] ARM: mmp: mark usb_dma_mask as __maybe_unused
-In-Reply-To: <1454076396-3563101-10-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Fri, 29 Jan 2016 15:06:33 +0100")
-References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
- <1454076396-3563101-10-git-send-email-arnd@arndb.de>
-Message-ID: <87bn78wetb.fsf@belgarion.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Feb 2016 23:44:09 +0100
+Subject: [PATCH 0/8] drm: msm: module rework
+In-Reply-To: <CAF6AEGuYQqsH9TEoc-_cgMRNRvB99SveTqW3gSwJJvsvhaqNmw@mail.gmail.com>
+References: <1456175331-714117-1-git-send-email-arnd@arndb.de>
+ <CAF6AEGuYQqsH9TEoc-_cgMRNRvB99SveTqW3gSwJJvsvhaqNmw@mail.gmail.com>
+Message-ID: <2809632.WiXCV6JuAB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Monday 22 February 2016 17:36:36 Rob Clark wrote:
+> On Mon, Feb 22, 2016 at 4:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > I saw some regressions on today's Linux-next kernel after
+> > the Makefiles got reworked and tried to come up with a quick
+> > fix. This ended up taking much longer, but the new version should
+> > be cleaner and I no longer get any build errors in this
+> > driver.
+> 
+> fyi, for the time being, I've already kicked out the kconfig/makefile
+> splitup patches..
+> 
+> I'll go ahead and pull in the hdmi symbol rename patch, since that is
+> a sane thing to do.
 
-> This variable may be used by some devices that each have their
-> on Kconfig symbol, or by none of them, and that causes a build
-> warning:
->
-> arch/arm/mach-mmp/devices.c:241:12: error: 'usb_dma_mask' defined but not used [-Werror=unused-variable]
->
-> Marking it __maybe_unused avoids the warning.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-mmp/devices.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Ok, thanks
 
-Hi Haojian,
+>  I'm less sure about splitting things up into separate .ko's.
 
-I still didn't get an ack on this one, do you want to carry it through your
-tree, or let Arnd carry it or let me carry it ?
+I think it's generally a good idea to split it up like that, though
+it could be taken a little further. Having one .ko file per
+platform_driver seems to be a very sensible split here, the
+main advantage being that you enforce a strict layering between
+the subdrivers.
 
-Cheers.
+>  And I think having the .ko name not match the drm
+> driver name (ie. what is passed in to drmOpen() in userspace) would
+> cause issues since libdrm could try to modprobe $drivername.ko.  (I
+> *think* that only matters in the non-udev case?  Which is at least not
+> a common case, but breaking userspace is breaking userspace...)
 
---
-Robert
+Ah, I see. Yes, that is unfortunate, but patch 2 then definitely has
+to be dropped even if you decide to take the others.
 
-[1] The patch
-> diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
-> index 3330ac7cfbef..671c7a09ab3d 100644
-> --- a/arch/arm/mach-mmp/devices.c
-> +++ b/arch/arm/mach-mmp/devices.c
-> @@ -238,7 +238,7 @@ void pxa_usb_phy_deinit(void __iomem *phy_reg)
->  #endif
->  
->  #if IS_ENABLED(CONFIG_USB_SUPPORT)
-> -static u64 usb_dma_mask = ~(u32)0;
-> +static u64 __maybe_unused usb_dma_mask = ~(u32)0;
->  
->  #if IS_ENABLED(CONFIG_USB_MV_UDC)
->  struct resource pxa168_u2o_resources[] = {
+With udev, the autoloading purely depends on the MODULE_DEVICE_TABLE
+in the top module, which should work fine, and without patch 2, all
+the other drivers get loaded automatically when the main driver
+gets probed.
 
--- 
-Robert
+	Arnd
