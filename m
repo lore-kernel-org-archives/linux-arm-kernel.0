@@ -1,40 +1,21 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Tue, 23 Feb 2016 01:31:25 -0800
-Subject: [PATCH 0/2] usb: dwc2: Remove host and gadget only code from core
-In-Reply-To: <cover.1456213319.git.johnyoun@synopsys.com>
-References: <cover.1456213319.git.johnyoun@synopsys.com>
-Message-ID: <56CC26ED.50004@synopsys.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Feb 2016 10:35:47 +0100
+Subject: [PATCH v2] MAINTAINERS: Extend info,
+ add wiki and ml for meson arch
+In-Reply-To: <CAOQ7t2Zrx7N3a=RKpr2M3R6QYDeC=8yUs61NrohvrbT=vvjLiQ@mail.gmail.com>
+References: <1455575651-16157-1-git-send-email-carlo@caione.org>
+ <CAOQ7t2Zrx7N3a=RKpr2M3R6QYDeC=8yUs61NrohvrbT=vvjLiQ@mail.gmail.com>
+Message-ID: <2635297.jXo9vSA2rm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/23/2016 12:35 AM, John Youn wrote:
-> This series moves the host/gadget-specific code from core.c to hcd.c
-> and gadget.c so that they will be compiled only when their respective
-> configurations are selected, or in DRD.
+On Tuesday 23 February 2016 09:58:37 Carlo Caione wrote:
 > 
-> This is mostly just a straight move of the code. I have also added
-> some comments to group related functions together.
-> 
-> Compiled and tested in all three modes.
-> 
-> This should also solve the issue reported here:
-> http://marc.info/?l=linux-usb&m=145591813410106&w=2
-> 
-> Although I wasn't able to test it... couldn't figure out how to
-> disable CONFIG_USB and enable DWC2 in gadget mode.
-> 
-> Felipe,
-> 
-> This should be applied after Doug's series on your testing/next
-> branch.
-> 
+> Hey Arnd,
+> Does this usually go through the armsoc tree?
 > 
 
-Hi Felipe,
+Yes, I've put it in my todo folder now, but maybe resend to arm at kernel.org
+anyway so Olof also sees it.
 
-Patch 2/2 is triggering our corporate mail filters however I try to
-send it. I'll look into this with IT tomorrow, maybe have to send it
-from another account.
-
-Regards,
-John
+	Arnd
