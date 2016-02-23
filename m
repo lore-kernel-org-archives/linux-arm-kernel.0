@@ -1,140 +1,121 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 23 Feb 2016 17:27:03 +0530
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56CADB23.8020202@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
- <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
- <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
- <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
- <56CAA82D.6000507@ti.com>
- <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
- <56CADB23.8020202@ti.com>
-Message-ID: <56CC490F.3040301@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 23 Feb 2016 11:58:05 +0000
+Subject: [PATCH v12 1/5] efi: ARM/arm64: ignore DT memory nodes instead
+ of removing them
+In-Reply-To: <1456192703-2274-2-git-send-email-ddaney.cavm@gmail.com>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160223115805.GB4989@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi,
 
-On Monday 22 February 2016 03:25 PM, Kishon Vijay Abraham I wrote:
-> Hi Paul,
+On Mon, Feb 22, 2016 at 05:58:19PM -0800, David Daney wrote:
+> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
-> On Monday 22 February 2016 12:01 PM, Paul Walmsley wrote:
->> Kishon,
->>
->> On Mon, 22 Feb 2016, Kishon Vijay Abraham I wrote:
->>
->>> Sekhar,
->>>
->>> On Thursday 18 February 2016 07:51 PM, Sekhar Nori wrote:
->>>> On Friday 12 February 2016 10:50 PM, Suman Anna wrote:
->>>>> Sekhar,
->>>>> Will you be following up with above suggestion since Kishon is gonna be out?
->>>>
->>>> Alright, noticed this action for me :) Went through the thread, and 
->>>> looks like this is what we want to see?
->>>>
->>>> Thanks,
->>>> Sekhar
->>>>
->>>> ---8<---
->>>> From e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19 Mon Sep 17 00:00:00 2001
->>>> Message-Id: <e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19.1455803758.git.nsekhar@ti.com>
->>>> From: Sekhar Nori <nsekhar@ti.com>
->>>> Date: Thu, 18 Feb 2016 16:49:56 +0530
->>>> Subject: [PATCH 1/1] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
->>>>
->>>> Add a custom reset handler for DRA7x PCIeSS. This
->>>> handler is required to deassert PCIe hardreset lines
->>>> after they have been asserted.
->>>>
->>>> This enables the PCIe driver to access registers after
->>>> PCIeSS has been runtime enabled without having to
->>>> deassert hardreset lines itself.
->>>>
->>>> With this patch applied, used lspci to make sure
->>>> connected PCIe device enumerates on DRA74x and DRA72x
->>>> EVMs.
->>>>
->>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>>> ---
->>>> Applies to tag for-v4.6/omap-hwmod-a of Paul W's tree.
->>>>
->>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
->>>>  1 file changed, 23 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>> index b61355e2a771..252b74633e31 100644
->>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>> @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
->>>>   *
->>>>   */
->>>>  
->>>> +/*
->>>> + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
->>>> + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
->>>> + * associated with an IP automatically leaving the driver to handle that
->>>> + * by itself. This does not work for PCIeSS which needs the reset lines
->>>> + * deasserted for the driver to start accessing registers.
->>>> + *
->>>> + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
->>>> + * lines after asserting them.
->>>> + */
->>>> +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
->>>> +{
->>>> +	int i;
->>>> +
->>>> +	for (i = 0; i < oh->rst_lines_cnt; i++) {
->>>> +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
->>>> +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
->>>> +	}
->>>> +
->>>> +	return 0;
->>>> +}
->>>> +
->>>>  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
->>>>  	.name	= "pcie",
->>>> +	.reset	= dra7xx_pciess_reset,
->>>>  };
->>>
->>> Thanks for the patch.
->>
->> Could you please test the bind/unbind functionality just to make sure it 
->> works?
+> There are two problems with the UEFI stub DT memory node removal
+> routine:
+> - it deletes nodes as it traverses the tree, which happens to work
+>   but is not supported, as deletion invalidates the node iterator;
+> - deleting memory nodes entirely may discard annotations in the form
+>   of additional properties on the nodes.
 > 
-> The pci-dra7xx driver neither expose the bind/unbind sysfs entry nor can be
-> built as module.
-> 
-> However I hacked the pci-dra7xx driver to be built as module [and reverted
-> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe error
-> and driver unbind")] and I don't see an abort when the PCI registers are
-> accessed after rmmod/modprobe cycle (that was the issue that Sekhar's patch
-> tried to solve). However PCI as such doesn't work after rmmod/modprobe cycle
-> [1], but this is a different issue most likely in PCIe core and has to debugged.
-> 
-> In summary, there are other issues in PCI across rmmod/modprobe cycle but the
-> reset of pci-dra7xx happens fine with this patch.
+> Since the discovery of DT memory nodes occurs strictly before the
+> UEFI init sequence, we can simply clear the memblock memory table
+> before parsing the UEFI memory map. This way, it is no longer
+> necessary to remove the nodes, so we can remove that logic from the
+> stub as well.
 
-Do you expect any other testing from me?
+This is a little bit scary, but I guess this works.
 
--Kishon
+My only concern is that when we get kexec, a subsequent kernel must also
+have EFI memory map support, or things go bad for the next EFI-aware
+kernel after that (as things like the runtime services may have been
+corrupted by the kernel in the middle). It's difficult to fix the
+general case later.
 
+A different option would be to support status="disabled" for the memory
+nodes, and ignore these in early_init_dt_scan_memory. That way a kernel
+cannot use memory without first having parsed the EFI memory map, and we
+can still get NUMA info from the disabled nodes.
+
+You'd still need a new kernel to take into account status, but at least
+we'd know all kernels would avoid using RAM that potentially needs to be
+preserved.
+
+Ard, Rob, thoughts?
+
+Mark.
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  drivers/firmware/efi/arm-init.c    |  8 ++++++++
+>  drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
+>  2 files changed, 9 insertions(+), 23 deletions(-)
 > 
-> Thanks
-> Kishon
-> 
-> [1] -> http://pastebin.ubuntu.com/15169387/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+> index 9e15d57..40c9d85 100644
+> --- a/drivers/firmware/efi/arm-init.c
+> +++ b/drivers/firmware/efi/arm-init.c
+> @@ -143,6 +143,14 @@ static __init void reserve_regions(void)
+>  	if (efi_enabled(EFI_DBG))
+>  		pr_info("Processing EFI memory map:\n");
+>  
+> +	/*
+> +	 * Discard memblocks discovered so far: if there are any at this
+> +	 * point, they originate from memory nodes in the DT, and UEFI
+> +	 * uses its own memory map instead.
+> +	 */
+> +	memblock_dump_all();
+> +	memblock_remove(0, ULLONG_MAX);
+> +
+>  	for_each_efi_memory_desc(&memmap, md) {
+>  		paddr = md->phys_addr;
+>  		npages = md->num_pages;
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index cf7b7d4..9df1560 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>  			unsigned long map_size, unsigned long desc_size,
+>  			u32 desc_ver)
+>  {
+> -	int node, prev, num_rsv;
+> +	int node, num_rsv;
+>  	int status;
+>  	u32 fdt_val32;
+>  	u64 fdt_val64;
+> @@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>  		goto fdt_set_fail;
+>  
+>  	/*
+> -	 * Delete any memory nodes present. We must delete nodes which
+> -	 * early_init_dt_scan_memory may try to use.
+> -	 */
+> -	prev = 0;
+> -	for (;;) {
+> -		const char *type;
+> -		int len;
+> -
+> -		node = fdt_next_node(fdt, prev, NULL);
+> -		if (node < 0)
+> -			break;
+> -
+> -		type = fdt_getprop(fdt, node, "device_type", &len);
+> -		if (type && strncmp(type, "memory", len) == 0) {
+> -			fdt_del_node(fdt, node);
+> -			continue;
+> -		}
+> -
+> -		prev = node;
+> -	}
+> -
+> -	/*
+>  	 * Delete all memory reserve map entries. When booting via UEFI,
+>  	 * kernel will use the UEFI memory map to find reserved regions.
+>  	 */
+> -- 
+> 1.8.3.1
 > 
