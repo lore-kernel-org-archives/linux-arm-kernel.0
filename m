@@ -1,79 +1,35 @@
 From: brad.mouring@ni.com (Brad Mouring)
-Date: Tue, 23 Feb 2016 16:03:38 -0600
-Subject: [PATCH 1/2] pl2x0: Add OF control of cache power management
+Date: Tue, 23 Feb 2016 16:03:39 -0600
+Subject: [PATCH 2/2] Documentation: devicetree: Add PL310 PM bindings
 In-Reply-To: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
 References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
-Message-ID: <1456265019-23900-2-git-send-email-brad.mouring@ni.com>
+Message-ID: <1456265019-23900-3-git-send-email-brad.mouring@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ability to override power management bits of 310 controllers
-through OF entries. As the saved register is only applied when
-working on a supported controller, it is safe to save the settings.
-
-Additionally, to control the actual configuration of the power
-control register, remove the unconditional enabling of features in
-the l2c310_enable function.
+Document the DT bindings for controlling ARM PL310 Power Control
+settings.
 
 Signed-off-by: Brad Mouring <brad.mouring@ni.com>
 Acked-by: Josh Cartwright <joshc@ni.com>
 ---
- arch/arm/mm/cache-l2x0.c | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index d6e43d8..42f4ad1 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -639,11 +639,6 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 		aux &= ~(L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP);
- 	}
+diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+index 2251dcc..4c2d764 100644
+--- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+@@ -72,6 +72,10 @@ Optional properties:
+ - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+   <1> (forcibly enable), property absent (retain settings set by
+   firmware)
++- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
++  disable), <1> (forcibly enable), property absent (retain firmware settings)
++- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
++  <1> (forcibly enable), property absent (retain firmware settings)
  
--	/* r3p0 or later has power control register */
--	if (rev >= L310_CACHE_ID_RTL_R3P0)
--		l2x0_saved_regs.pwr_ctrl = L310_DYNAMIC_CLK_GATING_EN |
--						L310_STNDBY_MODE_EN;
--
- 	/*
- 	 * Always enable non-secure access to the lockdown registers -
- 	 * we write to them as part of the L2C enable sequence so they
-@@ -1103,6 +1098,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	u32 filter[2] = { 0, 0 };
- 	u32 assoc;
- 	u32 prefetch;
-+	u32 power;
- 	u32 val;
- 	int ret;
+ Example:
  
-@@ -1220,6 +1216,29 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	}
- 
- 	l2x0_saved_regs.prefetch_ctrl = prefetch;
-+
-+	power = l2x0_saved_regs.pwr_ctrl;
-+
-+	ret = of_property_read_u32(np, "arm,dynamic-clock-gating", &val);
-+	if (ret == 0) {
-+		if (val)
-+			power |= L310_DYNAMIC_CLK_GATING_EN;
-+		else
-+			power &= ~L310_DYNAMIC_CLK_GATING_EN;
-+	} else if (ret != -EINVAL) {
-+		pr_err("L2C-310 OF dynamic-clock-gating property value is missing\n");
-+	}
-+	ret = of_property_read_u32(np, "arm,standby-mode", &val);
-+	if (ret == 0) {
-+		if (val)
-+			power |= L310_STNDBY_MODE_EN;
-+		else
-+			power &= ~L310_STNDBY_MODE_EN;
-+	} else if (ret != -EINVAL) {
-+		pr_err("L2C-310 OF standby-mode property value is missing\n");
-+	}
-+
-+	l2x0_saved_regs.pwr_ctrl = power;
- }
- 
- static const struct l2c_init_data of_l2c310_data __initconst = {
 -- 
 2.7.1
