@@ -1,43 +1,40 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Feb 2016 10:49:42 +0000
-Subject: [PATCH 00/13] arm-cci: PMU driver updates for 4.6
-Message-ID: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
+Date: Tue, 23 Feb 2016 10:49:44 +0000
+Subject: [PATCH 02/13] arm-cci: fix handling cpumask_any_but return value
+In-Reply-To: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
+References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1456224595-3282-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some fixes and updates for arm-cci pmu driver targeting v4.6,
-applies on top of v4.5-rc5.
+From: Andrzej Hajda <a.hajda@samsung.com>
 
-Highlights include :
- - Support for CoreLink CCI-550 PMU
- - Reliable writes to PMU Counter registers for CCI-500/550.
+cpumask_any_but returns value >= nr_cpu_ids if there are no more CPUs.
 
-All the patches have been Acked. Please let me know how this
-can be merged.
+The problem has been detected using proposed semantic patch
+scripts/coccinelle/tests/unsigned_lesser_than_zero.cocci [1].
 
-Andrzej Hajda (1):
-  arm-cci: fix handling cpumask_any_but return value
+[1]: http://permalink.gmane.org/gmane.linux.kernel/2038576
 
-Mark Rutland (1):
-  arm-cci: simplify sysfs attr handling
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/bus/arm-cci.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Suzuki K Poulose (11):
-  arm-cci: Group writes to counter
-  arm-cci: Refactor CCI PMU enable/disable methods
-  arm-cci: Delay PMU counter writes to pmu::pmu_enable
-  arm-cci: write_counter: Remove redundant check
-  arm-cci: Get the status of a counter
-  arm-cci: Add routines to save/restore all counters
-  arm-cci: Add helper to enable PMU without synchornising counters
-  arm-cci: Provide hook for writing to PMU counters
-  arm-cci: CCI-500: Work around PMU counter writes
-  arm-cci500: Rearrange PMU driver for code sharing with CCI-550 PMU
-  arm-cci: CoreLink CCI-550 PMU driver
-
- Documentation/devicetree/bindings/arm/cci.txt |    2 +
- drivers/bus/Kconfig                           |   10 +-
- drivers/bus/arm-cci.c                         |  612 +++++++++++++++++--------
- 3 files changed, 427 insertions(+), 197 deletions(-)
-
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index ee47e6b..5fb1c06 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -1270,7 +1270,7 @@ static int cci_pmu_cpu_notifier(struct notifier_block *self,
+ 		if (!cpumask_test_and_clear_cpu(cpu, &cci_pmu->cpus))
+ 			break;
+ 		target = cpumask_any_but(cpu_online_mask, cpu);
+-		if (target < 0) // UP, last CPU
++		if (target >= nr_cpu_ids) // UP, last CPU
+ 			break;
+ 		/*
+ 		 * TODO: migrate context once core races on event->ctx have
 -- 
 1.7.9.5
