@@ -1,47 +1,43 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Tue, 23 Feb 2016 14:47:31 +0100
-Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <20160217230253.2278.80903@quark.deferred.io>
-References: <1455312009-808-1-git-send-email-tony@atomide.com>
- <1455312009-808-3-git-send-email-tony@atomide.com>
- <20160217011930.2278.38316@quark.deferred.io>
- <20160217173949.GB21202@atomide.com>
- <20160217205257.2278.11639@quark.deferred.io>
- <20160217212045.GE21202@atomide.com>
- <20160217230253.2278.80903@quark.deferred.io>
-Message-ID: <CAALWOA-dA1r5Ac-y7d3yLhDR1fNM5WJvOmQ3YvvNM+6NP84VLw@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 23 Feb 2016 13:49:23 +0000
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <56CC546A.9070705@ti.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
+ <56CC546A.9070705@ti.com>
+Message-ID: <CAFEAcA-Y7rE_9CiOphgmae3FDApRznoBS7vsVN_+9hBqvAzEEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 February 2016 at 22:20, Tony Lindgren <tony@atomide.com> wrote:
->* Michael Turquette <mturquette@baylibre.com> [160217 12:53]:
->> Do you think you will ever have a driver that wants to gate these
->> clocks? Probably not for MPU/DDR, but the HAND_OFF flag is a better fit
->> if you do. It's the same as CRITICAL but transfers the prepare/enable
->> reference counting to the consumer driver after that driver calls
->> clk_get() and clk_prepare_enable() on the HAND_OFF clk.
->
-> OK I'll use CLK_ENABLE_HAND_OFF then. Who knows maybe somebody
-> somewhere has code running on one of the coprocessors in SRAM that
-> actually allows gating these :)
+On 23 February 2016 at 12:45, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> So, true, there's probing going on, but it's all board specific,
+> requiring a board specific driver to support it in the kernel. And I
+> think that makes the bootloader much better place for supporting it.
 
-An arrangement somewhat similar to the one the am335x has should
-indeed be doable, but note that it would be the coprocessor that would
-gate and ungate the clocks, not linux. The L3 clock is actually even
-more essential and can never be gated at all.
+This doesn't seem to me like a reason to put the requirement
+in the bootloader. A huge part of the purpose of the kernel
+is to support the hardware (whether that's completely generic
+and probeable, like PCI, or generic but not probeable, or
+completely specific to a particular board). The kernel has to
+support the hardware, and just because it happens to be board
+specific hardware rather than generic hardware doesn't seem to
+me to imply that the kernel gets to drop part of its core purpose.
 
-In the absence of help from a coprocessor linux could still put the L3
-and MPU PLLs into bypass for power saving, and DDR can be gated if
-it's first put into self-refresh and helper code in on-chip SRAM is
-used to manage the transitions.
+> I think one of the core questions here is: do we want to start adding
+> board specific drivers to the kernel, instead of dealing with it in the
+> bootloader when possible? My understanding is that we've been trying to
+> reduce board specific code from the kernel.
 
-On 18 February 2016 at 00:02, Michael Turquette <mturquette@baylibre.com> wrote:
-> Low power mp3 decoder executing out of ARM icache with DDR clock cut ;-)
+I think there's a difference between "reduce board specific code
+in the kernel by replacing it with the combination of generic
+or parameterisable code in the kernel plus a kernel data structure
+(DT) that supplies the parameterisation needed", and "reduce
+board specific code in the kernel by forcing the bootloader to
+do the kernel's job for it".
 
-L1 cache is rather tricky since you can't lock it. You can however
-lock 448 KB of the 512 KB L2 cache, which should be plenty of space.
-There's also quite a bit of SRAM on chip usable for buffering data.
-
-The C674x DSP would probably also be a good candidate for such an application.
-
-Matthijs
+thanks
+-- PMM
