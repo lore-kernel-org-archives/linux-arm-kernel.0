@@ -1,35 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 23 Feb 2016 15:52:20 -0600
-Subject: [PATCH 1/3 v2] irqchip: gic/realview: support more RealView DCC
- variants
-In-Reply-To: <1456149661-19118-1-git-send-email-linus.walleij@linaro.org>
-References: <1456149661-19118-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160223215219.GA26531@rob-hp-laptop>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 23 Feb 2016 14:56:53 -0700
+Subject: [PATCH] ARM: dts: tegra: correct Beaver pinmux
+In-Reply-To: <1456260543-18076-1-git-send-email-dev@lynxeye.de>
+References: <1456260543-18076-1-git-send-email-dev@lynxeye.de>
+Message-ID: <56CCD5A5.9080809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 03:01:01PM +0100, Linus Walleij wrote:
-> In the add-on file for the GIC dealing with the RealView family
-> we currently only handle the PB11MPCore, let's extend this to
-> manage the RealView EB ARM11MPCore as well. The Revision B of the
-> ARM11MPCore core tile is a bit special and needs special handling
-> as it moves a system control register around at random.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Detect syscon register location based on the syscon compatible
->   string instead of the GIC compatible string, just define one
->   compatible string for the 11mp test chip GIC.
-> - Consistently return -ENODEV
-> This can be applied in isolation from the other patches so Marc
-> one you're happy with it, please take it into the IRQchip tree.
-> ---
->  .../bindings/interrupt-controller/arm,gic.txt      |  1 +
->  drivers/irqchip/irq-gic-realview.c                 | 44 +++++++++++++++++++---
->  2 files changed, 39 insertions(+), 6 deletions(-)
+On 02/23/2016 01:49 PM, Lucas Stach wrote:
+> Update pinmux to get rid of invalid uses of the rsvd1 function and
+> add correct drive settings for SDIO1, which makes some more SD-cards
+> work.
 
-Acked-by: Rob Herring <robh@kernel.org>
+(Adding a variety of missing CCs)
+
+I think this patch looks OK. Looking at the kernel pinctrl driver, I 
+think that before this patch, because some of the mux settings were 
+deemed invalid by the pinctrl driver, the pinmux settings were not all 
+applied, and this change fixes it? Ouch! Luckily U-Boot programmed what 
+is hopefully the same table before the kernel booted!
+
+> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+
+... (many other fixes; see original email)
+
+> +			sdio1 {
+> +				nvidia,pins = "drive_sdio1";
+> +				nvidia,high-speed-mode = <TEGRA_PIN_DISABLE>;
+> +				nvidia,schmitt = <TEGRA_PIN_DISABLE>;
+> +				nvidia,pull-down-strength = <46>;
+> +				nvidia,pull-up-strength = <42>;
+> +				nvidia,slew-rate-rising = <1>;
+> +				nvidia,slew-rate-falling = <1>;
+> +			};
+
+I think it would be worth mentioning in the commit description where 
+this data came from.
