@@ -1,58 +1,67 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 23 Feb 2016 10:25:50 +0100
-Subject: [PATCH 2/3] clk: mvebu: add AP806 core clock driver
-In-Reply-To: <CAL_Jsq+iiUBcTdnqzFWLJ+5jPvq0rmWgBboab4xyj1dQyDQE+Q@mail.gmail.com>
-References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1455521698-7905-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160222025357.GE15973@rob-hp-laptop>
- <20160222091423.4756a579@free-electrons.com>
- <20160222141617.GA14970@lunn.ch>
- <20160222183203.2278.60153@quark.deferred.io>
- <CAL_Jsq+iiUBcTdnqzFWLJ+5jPvq0rmWgBboab4xyj1dQyDQE+Q@mail.gmail.com>
-Message-ID: <20160223102550.2e0cba04@free-electrons.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Tue, 23 Feb 2016 17:29:01 +0800
+Subject: [PATCH v12 03/21] KVM: ARM64: Add offset defines for PMU registers
+In-Reply-To: <56CBBA06.4040902@huawei.com>
+References: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
+ <1456133877-9584-4-git-send-email-zhaoshenglong@huawei.com>
+ <56CB4A98.2020403@arm.com> <56CBBA06.4040902@huawei.com>
+Message-ID: <56CC265D.9000406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Mon, 22 Feb 2016 13:42:49 -0600, Rob Herring wrote:
 
-> >> Maybe add a big fat warning that the bindings are unstable, and the DT
-> >> blob must be kept in sync with the kernel?
-> >
-> > +1 and feel free to blame the lack of documentation.  No one can expect
-> > bindings to be finalized when the chip topology is not fully understood.
+On 2016/2/23 9:46, Shannon Zhao wrote:
 > 
-> I can understand not understanding the full clock tree. I have "full"
-> documentation of a Marvell chip and don't understand the clock tree
-> fully. But I can't believe you don't have some sense of how many
-> clocks you have to deal with. 10? 100? 1000? What I see is 2 nodes of
-> a single register each for clocks at roughly the same address. That
-> tells me your binding is too fine grained. If you really don't know
-> what is right, then err on the side of a single clock provider node
-> and don't put the clock details in DT.
+> On 2016/2/23 1:51, Marc Zyngier wrote:
+>> > On 22/02/16 09:37, Shannon Zhao wrote:
+>>> >> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>> >>
+>>> >> We are about to trap and emulate accesses to each PMU register
+>>> >> individually. This adds the context offsets for the AArch64 PMU
+>>> >> registers.
+>>> >>
+>>> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> >> Reviewed-by: Andrew Jones <drjones@redhat.com>
+>>> >> ---
+>>> >>  arch/arm64/include/asm/kvm_host.h | 15 +++++++++++++++
+>>> >>  1 file changed, 15 insertions(+)
+>>> >>
+>>> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> >> index 6f0241f..6bab7fb 100644
+>>> >> --- a/arch/arm64/include/asm/kvm_host.h
+>>> >> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> >> @@ -115,6 +115,21 @@ enum vcpu_sysreg {
+>>> >>  	MDSCR_EL1,	/* Monitor Debug System Control Register */
+>>> >>  	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+>>> >>  
+>>> >> +	/* Performance Monitors Registers */
+>>> >> +	PMCR_EL0,	/* Control Register */
+>>> >> +	PMOVSSET_EL0,	/* Overflow Flag Status Set Register */
+>>> >> +	PMSELR_EL0,	/* Event Counter Selection Register */
+>>> >> +	PMEVCNTR0_EL0,	/* Event Counter Register (0-30) */
+>>> >> +	PMEVCNTR30_EL0 = PMEVCNTR0_EL0 + 30,
+>>> >> +	PMCCNTR_EL0,	/* Cycle Counter Register */
+>>> >> +	PMEVTYPER0_EL0,	/* Event Type Register (0-30) */
+>>> >> +	PMEVTYPER30_EL0 = PMEVTYPER0_EL0 + 30,
+>>> >> +	PMCCFILTR_EL0,	/* Cycle Count Filter Register */
+>>> >> +	PMCNTENSET_EL0,	/* Count Enable Set Register */
+>>> >> +	PMINTENSET_EL1,	/* Interrupt Enable Set Register */
+>>> >> +	PMUSERENR_EL0,	/* User Enable Register */
+>>> >> +	PMSWINC_EL0,	/* Software Increment Register */
+>>> >> +
+>> > 
+>> > I've just noticed a rather fundamental issue with this: this makes it
+>> > impossible to bisect the whole series.
+>> > 
+> Ah, sorry. Will fix this.
+> 
+I've fixed this problem and pushed this series to below place. You can
+fetch it from there.
 
-I don't quite understand the reasoning behind this conclusion. We know
-for sure that those two registers control only those core and ring
-clocks. Maybe there are other registers controlling other clocks,  that
-we don't know. But for sure, those two registers only give details
-about those core and ring clocks, so I don't see what would be the
-usefulness of merging that into a single DT node.
+https://git.linaro.org/people/shannon.zhao/linux-mainline.git/shortlog/refs/heads/KVM_ARM64_PMU_v13
 
-We would lose the fact that the relationship between the ring clocks
-and one of the core clock is represented in the DT. Instead of having a
-clear <&coreclk X> or <&ringclk Y> reference, we would have a
-mysterious <&allclk XYZ> reference, which doesn't tell immediately
-whether it's a core clock or ring clock.
-
-So, while I definitely agree that a syscon is probably in order to
-cover all the system registers, I don't see the point of having a
-single node to cover all the clocks.
-
-Best regards,
-
-Thomas
+Thanks,
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Shannon
