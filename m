@@ -1,207 +1,109 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Feb 2016 10:49:55 +0000
-Subject: [PATCH 13/13] arm-cci: CoreLink CCI-550 PMU driver
-In-Reply-To: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
-References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1456224595-3282-14-git-send-email-suzuki.poulose@arm.com>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Tue, 23 Feb 2016 12:59:50 +0200
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <CAHCN7xLo7q=Ts3WLvx_GzSBWt5r1SiU7vr+W==kUAaAvmwXJYA@mail.gmail.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAHCN7xLo7q=Ts3WLvx_GzSBWt5r1SiU7vr+W==kUAaAvmwXJYA@mail.gmail.com>
+Message-ID: <6A77838A-7F72-40C3-B279-710F305AEB40@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM CoreLink CCI-550  cache coherent interconnect PMU
-driver support. The CCI-550 PMU shares all the attributes of CCI-500
-PMU, except for an additional master interface (MI-6 - 0xe).
-CCI-550 requires the same work around as for CCI-500 to
-write to the PMU counter.
+Hi Adam,
 
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- Documentation/devicetree/bindings/arm/cci.txt |    2 +
- drivers/bus/Kconfig                           |    8 +--
- drivers/bus/arm-cci.c                         |   85 ++++++++++++++++++++++++-
- 3 files changed, 90 insertions(+), 5 deletions(-)
+> On Feb 23, 2016, at 12:32 , Adam Ford <aford173@gmail.com> wrote:
+> 
+> On Tue, Feb 23, 2016 at 3:58 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+>> (cc'ing a few more people as this is going into generic direction)
+>> 
+>> On 23/02/16 11:08, Linus Walleij wrote:
+>>> On Thu, Feb 4, 2016 at 3:04 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> 
+>>>> This moves the versatile CLCD configuration to the device tree by:
+>>> 
+>>> As this Schr?dinger's cat approach seems controversial, as well
+>>> as the alternative to manipulate the DT in memory at run-time,
+>>> I will respin the series without the full Versatile support, adding
+>>> plug-in for the other ARM boards and and half-baked support
+>>> for the Versatile supporting just VGA (like the other reference
+>>> designs from ARM).
+>>> 
+>>> The pluggable displays prove yet again to be a problem to the
+>>> world, sigh.
+>>> 
+>>> I will think of a better solution, if any, for this for v4.6, but will
+>>> put forward something that handles the Nomadik and all the
+>>> other ARM reference designs for now.
+>> 
+>> I had a chat with Tom Rini and Pantelis Antoniou yesterday.
+>> 
+>> Panto is about to send a new series for DT overlay management soon. I
+>> haven't had time to test that yet, but what it would give us is that you
+>> could build DT overlay binaries as "firmware" into the kernel image, and
+>> thus the panel DT data would be there even before rootfs is mounted. The
+>> DT overlays can be loaded from the rootfs or initramfs too, if it's not
+>> critical to get the display up early.
+>> 
+>> I'm not quite sure how it works if, as in versatile display case, there
+>> are multiple DT overlays of which one has to be enabled. I hope there's
+>> support to choose which one to use via kernel cmdline or similar.
+>> 
+>> I would personally like it much more if the bootloader would either
+>> compose a final dtb from DT fragments and pass it to the kernel, or
+>> alternatively the bootloader would pass the base dtb image and a bunch
+>> of DT overlays to the kernel, and the kernel would deal with the DT
+>> overlays.
+>> 
+> If there was a nice way to merge the device trees, I would love to
+> create device tree 'modules' that could be loaded at will and merged
+> just before the time of boot.  I could see this being useful beyond
+> just plugable displays.
+> 
 
-diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
-index aef1d20..a1a5a7e 100644
---- a/Documentation/devicetree/bindings/arm/cci.txt
-+++ b/Documentation/devicetree/bindings/arm/cci.txt
-@@ -34,6 +34,7 @@ specific to ARM.
- 		Definition: must contain one of the following:
- 			    "arm,cci-400"
- 			    "arm,cci-500"
-+			    "arm,cci-550"
- 
- 	- reg
- 		Usage: required
-@@ -101,6 +102,7 @@ specific to ARM.
- 				 "arm,cci-400-pmu"  - DEPRECATED, permitted only where OS has
- 						      secure acces to CCI registers
- 				 "arm,cci-500-pmu,r0"
-+				 "arm,cci-550-pmu,r0"
- 		- reg:
- 			Usage: required
- 			Value type: Integer cells. A register entry, expressed
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index e553834..d4a3a31 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -35,14 +35,14 @@ config ARM_CCI400_PORT_CTRL
- 	  interconnect for ARM platforms.
- 
- config ARM_CCI5xx_PMU
--	bool "ARM CCI500 PMU support"
-+	bool "ARM CCI-500/CCI-550 PMU support"
- 	depends on (ARM && CPU_V7) || ARM64
- 	depends on PERF_EVENTS
- 	select ARM_CCI_PMU
- 	help
--	  Support for PMU events monitoring on the ARM CCI-500 cache coherent
--	  interconnect. CCI-500 provides 8 independent event counters, which
--	  can count events pertaining to the slave/master interfaces as well
-+	  Support for PMU events monitoring on the ARM CCI-500/CCI-550 cache
-+	  coherent interconnects. Both of them provide 8 independent event counters,
-+	  which can count events pertaining to the slave/master interfaces as well
- 	  as the internal events to the CCI.
- 
- 	  If unsure, say Y
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 683e289..494bd39 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -54,6 +54,7 @@ static const struct of_device_id arm_cci_matches[] = {
- #endif
- #ifdef CONFIG_ARM_CCI5xx_PMU
- 	{ .compatible = "arm,cci-500", },
-+	{ .compatible = "arm,cci-550", },
- #endif
- 	{},
- };
-@@ -156,6 +157,7 @@ enum cci_models {
- #endif
- #ifdef CONFIG_ARM_CCI5xx_PMU
- 	CCI500_R0,
-+	CCI550_R0,
- #endif
- 	CCI_MODEL_MAX
- };
-@@ -451,6 +453,7 @@ static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev
- #define CCI5xx_PORT_M3			0xb
- #define CCI5xx_PORT_M4			0xc
- #define CCI5xx_PORT_M5			0xd
-+#define CCI5xx_PORT_M6			0xe
- 
- #define CCI5xx_PORT_GLOBAL		0xf
- 
-@@ -611,6 +614,58 @@ static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
- 	return -ENOENT;
- }
- 
-+/*
-+ * CCI550 provides 8 independent event counters that can count
-+ * any of the events available.
-+ * CCI550 PMU event source ids
-+ *	0x0-0x6 - Slave interfaces
-+ *	0x8-0xe - Master interfaces
-+ *	0xf     - Global Events
-+ *	0x7	- Reserved
-+ */
-+static int cci550_validate_hw_event(struct cci_pmu *cci_pmu,
-+					unsigned long hw_event)
-+{
-+	u32 ev_source = CCI5xx_PMU_EVENT_SOURCE(hw_event);
-+	u32 ev_code = CCI5xx_PMU_EVENT_CODE(hw_event);
-+	int if_type;
-+
-+	if (hw_event & ~CCI5xx_PMU_EVENT_MASK)
-+		return -ENOENT;
-+
-+	switch (ev_source) {
-+	case CCI5xx_PORT_S0:
-+	case CCI5xx_PORT_S1:
-+	case CCI5xx_PORT_S2:
-+	case CCI5xx_PORT_S3:
-+	case CCI5xx_PORT_S4:
-+	case CCI5xx_PORT_S5:
-+	case CCI5xx_PORT_S6:
-+		if_type = CCI_IF_SLAVE;
-+		break;
-+	case CCI5xx_PORT_M0:
-+	case CCI5xx_PORT_M1:
-+	case CCI5xx_PORT_M2:
-+	case CCI5xx_PORT_M3:
-+	case CCI5xx_PORT_M4:
-+	case CCI5xx_PORT_M5:
-+	case CCI5xx_PORT_M6:
-+		if_type = CCI_IF_MASTER;
-+		break;
-+	case CCI5xx_PORT_GLOBAL:
-+		if_type = CCI_IF_GLOBAL;
-+		break;
-+	default:
-+		return -ENOENT;
-+	}
-+
-+	if (ev_code >= cci_pmu->model->event_ranges[if_type].min &&
-+		ev_code <= cci_pmu->model->event_ranges[if_type].max)
-+		return hw_event;
-+
-+	return -ENOENT;
-+}
-+
- #endif	/* CONFIG_ARM_CCI5xx_PMU */
- 
- /*
-@@ -898,7 +953,7 @@ static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
- #ifdef CONFIG_ARM_CCI5xx_PMU
- 
- /*
-- * CCI-500 has advanced power saving policies, which could gate the
-+ * CCI-500/CCI-550 has advanced power saving policies, which could gate the
-  * clocks to the PMU counters, which makes the writes to them ineffective.
-  * The only way to write to those counters is when the global counters
-  * are enabled and the particular counter is enabled.
-@@ -1546,6 +1601,30 @@ static struct cci_pmu_model cci_pmu_models[] = {
- 		.validate_hw_event = cci500_validate_hw_event,
- 		.write_counters	= cci5xx_pmu_write_counters,
- 	},
-+	[CCI550_R0] = {
-+		.name = "CCI_550",
-+		.fixed_hw_cntrs = 0,
-+		.num_hw_cntrs = 8,
-+		.cntr_size = SZ_64K,
-+		.format_attrs = cci5xx_pmu_format_attrs,
-+		.event_attrs = cci5xx_pmu_event_attrs,
-+		.event_ranges = {
-+			[CCI_IF_SLAVE] = {
-+				CCI5xx_SLAVE_PORT_MIN_EV,
-+				CCI5xx_SLAVE_PORT_MAX_EV,
-+			},
-+			[CCI_IF_MASTER] = {
-+				CCI5xx_MASTER_PORT_MIN_EV,
-+				CCI5xx_MASTER_PORT_MAX_EV,
-+			},
-+			[CCI_IF_GLOBAL] = {
-+				CCI5xx_GLOBAL_PORT_MIN_EV,
-+				CCI5xx_GLOBAL_PORT_MAX_EV,
-+			},
-+		},
-+		.validate_hw_event = cci550_validate_hw_event,
-+		.write_counters	= cci5xx_pmu_write_counters,
-+	},
- #endif
- };
- 
-@@ -1569,6 +1648,10 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
- 		.compatible = "arm,cci-500-pmu,r0",
- 		.data = &cci_pmu_models[CCI500_R0],
- 	},
-+	{
-+		.compatible = "arm,cci-550-pmu,r0",
-+		.data = &cci_pmu_models[CCI550_R0],
-+	},
- #endif
- 	{},
- };
--- 
-1.7.9.5
+Looks like you would be happy by having a way to boot using a device tree
+blob + a number of device tree overlay blobs to be applied in sequence.
+
+You could append the dtbo?s to the device tree blob (where-ever that may be)
+and it should work.
+
+The good thing about this scheme is that it?s independent of the bootloader.
+
+An advanced bootloader (like u-boot) with DT smarts can create the appended
+DT blob itself, while a dumb one can just be given the appended blob as
+it was created outside of the device.
+
+>> In any case, I think the firmware solution is a good step forward, and
+>> will probably work fine for many users. Then again, I haven't tested it
+>> yet so I don't know the details, and it's not in the mainline.
+>> 
+> I am willing to test it, but I'll need the patch and some instructions
+> from Panto.
+> 
+
+The appended device tree blob thing does not exist yet, but it?s not such a big
+problem to add. I?d give it a shot this week.
+
+The standard device tree overlays are in my overlay branch at
+https://github.com/pantoniou/linux-beagle-track-mainline/tree/bbb-overlays
+
+The capemgr has options for parsing a kernel command line to apply an overlay:
+
+https://github.com/pantoniou/linux-beagle-track-mainline/blob/bbb-overlays/drivers/misc/bone_capemgr.c
+
+The command line options are enable_partno & disable_partno where you supply
+the part numbers of the capes you want enabled/disabled at boot.
+
+The capemgr is complicated due to the eeprom detection and the horrible kludges done with the
+variants (beaglebone white/beaglebone black), but I think you can figure out what?s going
+on with the command line options.
+
+
+>> Tomi
+>> 
+
+Regards
+
+? Pantelis
