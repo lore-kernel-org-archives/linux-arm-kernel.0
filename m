@@ -1,140 +1,147 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Tue, 23 Feb 2016 11:00:31 +0800
-Subject: [PATCH v5 11/11] arm64: dts: hisilicon: Add display subsystem DT
- nodes for hi6220
-In-Reply-To: <1456196431-19923-1-git-send-email-xinliang.liu@linaro.org>
-References: <1456196431-19923-1-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <1456196431-19923-12-git-send-email-xinliang.liu@linaro.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 23 Feb 2016 08:39:37 +0530
+Subject: [PATCH v2 2/4] dmaengine: xilinx_vdma: Simplify spin lock handling
+In-Reply-To: <1456120477-32134-2-git-send-email-appanad@xilinx.com>
+References: <1456120477-32134-1-git-send-email-appanad@xilinx.com>
+ <1456120477-32134-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20160223030937.GH17690@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ade, dsi and adv7533 DT nodes for hikey board.
+On Mon, Feb 22, 2016 at 11:24:35AM +0530, Kedareswara rao Appana wrote:
+> This patch simplifies the spin lock handling in the driver.
 
-Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 40 +++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 55 ++++++++++++++++++++++++++
- 2 files changed, 95 insertions(+)
+But sadly doesn't describe how?
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 818525197508..40239fba0572 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -39,3 +39,43 @@
- &uart3 {
- 	label = "LS-UART1";
- };
-+
-+&ade {
-+	status = "okay";
-+};
-+
-+&dsi {
-+	status = "ok";
-+
-+	ports {
-+		/* 1 for output port */
-+		port at 1 {
-+			reg = <1>;
-+
-+			dsi_out0: endpoint at 0 {
-+				remote-endpoint = <&adv7533_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	status = "ok";
-+
-+	adv7533: adv7533 at 39 {
-+		compatible = "adi,adv7533";
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <1 2>;
-+		pd-gpio = <&gpio0 4 0>;
-+		adi,dsi-lanes = <4>;
-+
-+		port {
-+			adv7533_in: endpoint {
-+				remote-endpoint = <&dsi_out0>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index ad1f1ebcb05c..920ea68e791d 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -162,6 +162,11 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		medianoc_ade: medianoc_ade at f4520000 {
-+			compatible = "syscon";
-+			reg = <0x0 0xf4520000 0x0 0x4000>;
-+		};
-+
- 		uart0: uart at f8015000 {	/* console */
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xf8015000 0x0 0x1000>;
-@@ -209,5 +214,55 @@
- 			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
-+
-+		ade: ade at f4100000 {
-+			compatible = "hisilicon,hi6220-ade";
-+			reg = <0x0 0xf4100000 0x0 0x7800>;
-+			reg-names = "ade_base";
-+			hisilicon,noc-syscon = <&medianoc_ade>;
-+			resets = <&media_ctrl MEDIA_ADE>;
-+			interrupts = <0 115 4>; /* ldi interrupt */
-+
-+			clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				 <&media_ctrl HI6220_CODEC_JPEG>,
-+				 <&media_ctrl HI6220_ADE_PIX_SRC>;
-+			/*clock name*/
-+			clock-names  = "clk_ade_core",
-+				       "clk_codec_jpeg",
-+				       "clk_ade_pix";
-+
-+			assigned-clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				<&media_ctrl HI6220_CODEC_JPEG>;
-+			assigned-clock-rates = <360000000>, <288000000>;
-+			dma-coherent;
-+			status = "disabled";
-+
-+			port {
-+				ade_out: endpoint {
-+					remote-endpoint = <&dsi_in>;
-+				};
-+			};
-+		};
-+
-+		dsi: dsi at f4107800 {
-+			compatible = "hisilicon,hi6220-dsi";
-+			reg = <0x0 0xf4107800 0x0 0x100>;
-+			clocks = <&media_ctrl  HI6220_DSI_PCLK>;
-+			clock-names = "pclk_dsi";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				/* 0 for input port */
-+				port at 0 {
-+					reg = <0>;
-+					dsi_in: endpoint {
-+						remote-endpoint = <&ade_out>;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
+> 
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v2:
+> ---> splitted the changes into multiple patches.
+> 
+>  drivers/dma/xilinx/xilinx_vdma.c | 27 ++++++++++-----------------
+>  1 file changed, 10 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+> index 06bffec..d646218 100644
+> --- a/drivers/dma/xilinx/xilinx_vdma.c
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
+> @@ -605,17 +605,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  {
+>  	struct xilinx_vdma_config *config = &chan->config;
+>  	struct xilinx_vdma_tx_descriptor *desc, *tail_desc;
+> -	unsigned long flags;
+>  	u32 reg;
+>  	struct xilinx_vdma_tx_segment *tail_segment;
+>  
+>  	if (chan->err)
+>  		return;
+>  
+> -	spin_lock_irqsave(&chan->lock, flags);
+> -
+
+It would help if you add a comment to this function taht we need to invoke
+this with lock held...
+
+>  	if (list_empty(&chan->pending_list))
+> -		goto out_unlock;
+> +		return;
+>  
+>  	desc = list_first_entry(&chan->pending_list,
+>  				struct xilinx_vdma_tx_descriptor, node);
+> @@ -629,7 +626,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  	if (chan->has_sg && xilinx_vdma_is_running(chan) &&
+>  	    !xilinx_vdma_is_idle(chan)) {
+>  		dev_dbg(chan->dev, "DMA controller still busy\n");
+> -		goto out_unlock;
+> +		return;
+>  	}
+>  
+>  	/*
+> @@ -676,7 +673,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  	xilinx_vdma_start(chan);
+>  
+>  	if (chan->err)
+> -		goto out_unlock;
+> +		return;
+>  
+>  	/* Start the transfer */
+>  	if (chan->has_sg) {
+> @@ -696,7 +693,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  		}
+>  
+>  		if (!last)
+> -			goto out_unlock;
+> +			return;
+>  
+>  		/* HW expects these parameters to be same for one transaction */
+>  		vdma_desc_write(chan, XILINX_VDMA_REG_HSIZE, last->hw.hsize);
+> @@ -707,9 +704,6 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  
+>  	list_splice_tail_init(&chan->pending_list, &chan->active_list);
+>  	chan->desc_pendingcount = 0;
+> -
+> -out_unlock:
+> -	spin_unlock_irqrestore(&chan->lock, flags);
+>  }
+>  
+>  /**
+> @@ -719,8 +713,11 @@ out_unlock:
+>  static void xilinx_vdma_issue_pending(struct dma_chan *dchan)
+>  {
+>  	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+> +	unsigned long flags;
+>  
+> +	spin_lock_irqsave(&chan->lock, flags);
+>  	xilinx_vdma_start_transfer(chan);
+> +	spin_unlock_irqrestore(&chan->lock, flags);
+>  }
+>  
+>  /**
+> @@ -732,21 +729,15 @@ static void xilinx_vdma_issue_pending(struct dma_chan *dchan)
+>  static void xilinx_vdma_complete_descriptor(struct xilinx_vdma_chan *chan)
+>  {
+>  	struct xilinx_vdma_tx_descriptor *desc, *next;
+> -	unsigned long flags;
+> -
+> -	spin_lock_irqsave(&chan->lock, flags);
+
+this one as well
+
+>  
+>  	if (list_empty(&chan->active_list))
+> -		goto out_unlock;
+> +		return;
+>  
+>  	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
+>  		list_del(&desc->node);
+>  		dma_cookie_complete(&desc->async_tx);
+>  		list_add_tail(&desc->node, &chan->done_list);
+>  	}
+> -
+> -out_unlock:
+> -	spin_unlock_irqrestore(&chan->lock, flags);
+>  }
+>  
+>  /**
+> @@ -857,8 +848,10 @@ static irqreturn_t xilinx_vdma_irq_handler(int irq, void *data)
+>  	}
+>  
+>  	if (status & XILINX_VDMA_DMASR_FRM_CNT_IRQ) {
+> +		spin_lock(&chan->lock);
+>  		xilinx_vdma_complete_descriptor(chan);
+>  		xilinx_vdma_start_transfer(chan);
+> +		spin_unlock(&chan->lock);
+>  	}
+>  
+>  	tasklet_schedule(&chan->tasklet);
+> -- 
+> 2.1.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.9.1
+~Vinod
