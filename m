@@ -1,85 +1,243 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 23 Feb 2016 16:49:56 +0000
-Subject: [PATCH v3 2/8] arm64: dts: qcom: apq8016-sbc: add usb support
+Date: Tue, 23 Feb 2016 16:50:05 +0000
+Subject: [PATCH v3 3/8] arm64: dts: qcom: add audio pinctrls
 In-Reply-To: <1456246153-18087-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1456246153-18087-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1456246196-18173-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1456246205-18215-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds pinctrls required for digital and analog audio via lpass.
+
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi | 14 +++++++++
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 34 ++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 216 +++++++++++++++++++++++++++++
+ 1 file changed, 216 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-index cbeee0b..ee828a8 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-@@ -10,4 +10,18 @@
- 			output-low;
+diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+index 8d05005..e9ea5ca 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+@@ -504,4 +504,220 @@
+ 			};
  		};
  	};
 +
-+	usb_id_default: usb-id-default {
-+		pinmux {
-+			function = "gpio";
-+			pins = "gpio121";
++	ext-codec-lines {
++		ext_codec_lines_act: lines_on {
++			pinmux {
++				function = "gpio";
++				pins = "gpio67";
++			};
++			pinconf {
++				pins = "gpio67";
++				drive-strength = <8>;
++				bias-disable;
++				output-high;
++			};
++		};
++		ext_codec_lines_sus: lines_off {
++			pinmux {
++				function = "gpio";
++				pins = "gpio67";
++			};
++			pinconf {
++				pins = "gpio67";
++				drive-strength = <2>;
++				bias-disable;
++			};
++		};
++	};
++
++	cdc-pdm-lines {
++		cdc_pdm_lines_act: pdm_lines_on {
++			pinmux {
++				function = "cdc_pdm0";
++				pins = "gpio63", "gpio64", "gpio65", "gpio66",
++				       "gpio67", "gpio68";
++			};
++			pinconf {
++				pins = "gpio63", "gpio64", "gpio65", "gpio66",
++				       "gpio67", "gpio68";
++				drive-strength = <8>;
++				bias-pull-none;
++			};
++		};
++		cdc_pdm_lines_sus: pdm_lines_off {
++			pinmux {
++				function = "cdc_pdm0";
++				pins = "gpio63", "gpio64", "gpio65", "gpio66",
++				       "gpio67", "gpio68";
++			};
++			pinconf {
++				pins = "gpio63", "gpio64", "gpio65", "gpio66",
++				       "gpio67", "gpio68";
++				drive-strength = <2>;
++				bias-disable;
++			};
++		};
++	};
++
++	ext-pri-tlmm-lines {
++		ext_pri_tlmm_lines_act: ext_pa_on {
++			pinmux {
++				function = "pri_mi2s";
++				pins = "gpio113", "gpio114", "gpio115",
++				       "gpio116";
++			};
++			pinconf {
++				pins = "gpio113", "gpio114", "gpio115",
++				       "gpio116";
++				drive-strength = <8>;
++				bias-pull-none;
++			};
 +		};
 +
-+		pinconf {
-+			pins = "gpio121";
-+			drive-strength = <8>;
-+			input-enable;
-+			bias-pull-up;
++		ext_pri_tlmm_lines_sus: ext_pa_off {
++			pinmux {
++				function = "pri_mi2s";
++				pins = "gpio113", "gpio114", "gpio115",
++				       "gpio116";
++			};
++			pinconf {
++				pins = "gpio113", "gpio114", "gpio115",
++				       "gpio116";
++				drive-strength = <2>;
++				bias-disable;
++			};
++		};
++	};
++
++	ext-pri-ws-line {
++		ext_pri_ws_act: ext_pa_on {
++			pinmux {
++				function = "pri_mi2s_ws";
++				pins = "gpio110";
++			};
++			pinconf {
++				pins = "gpio110";
++				drive-strength = <8>;
++				bias-pull-none;
++			};
++		};
++
++		ext_pri_ws_sus: ext_pa_off {
++			pinmux {
++				function = "pri_mi2s_ws";
++				pins = "gpio110";
++			};
++			pinconf {
++				pins = "gpio110";
++				drive-strength = <2>;
++				bias-disable;
++			};
++		};
++	};
++
++	ext-mclk-tlmm-lines {
++		ext_mclk_tlmm_lines_act: mclk_lines_on {
++			pinmux {
++				function = "pri_mi2s";
++				pins = "gpio116";
++			};
++			pinconf {
++				pins = "gpio116";
++				drive-strength = <8>;
++				bias-pull-none;
++			};
++		};
++		ext_mclk_tlmm_lines_sus: mclk_lines_off {
++			pinmux {
++				function = "pri_mi2s";
++				pins = "gpio116";
++			};
++			pinconf {
++				pins = "gpio116";
++				drive-strength = <2>;
++				bias-disable;
++			};
++		};
++	};
++
++	/* secondary Mi2S */
++	ext-sec-tlmm-lines {
++		ext_sec_tlmm_lines_act: tlmm_lines_on {
++			pinmux {
++				function = "sec_mi2s";
++				pins = "gpio112", "gpio117", "gpio118",
++				       "gpio119";
++			};
++			pinconf {
++				pins = "gpio112", "gpio117", "gpio118",
++					"gpio119";
++				drive-strength = <8>;
++				bias-pull-none;
++			};
++		};
++		ext_sec_tlmm_lines_sus: tlmm_lines_off {
++			pinmux {
++				function = "sec_mi2s";
++				pins = "gpio112", "gpio117", "gpio118",
++				       "gpio119";
++			};
++			pinconf {
++				pins = "gpio112", "gpio117", "gpio118",
++					"gpio119";
++				drive-strength = <2>;
++				bias-disable;
++			};
++		};
++	};
++
++	cdc-dmic-lines {
++		cdc_dmic_lines_act: dmic_lines_on {
++			pinmux_dmic0_clk {
++				function = "dmic0_clk";
++				pins = "gpio0";
++			};
++			pinmux_dmic0_data {
++				function = "dmic0_data";
++				pins = "gpio1";
++			};
++			pinconf {
++				pins = "gpio0", "gpio1";
++				drive-strength = <8>;
++			};
++		};
++		cdc_dmic_lines_sus: dmic_lines_off {
++			pinconf {
++				pins = "gpio0", "gpio1";
++				drive-strength = <2>;
++				bias-disable;
++			};
++		};
++	};
++
++	cross-conn-det {
++		cross_conn_det_act: lines_on {
++			pinmux {
++				function = "gpio";
++				pins = "gpio120";
++			};
++			pinconf {
++				pins = "gpio120";
++				drive-strength = <8>;
++				output-low;
++				bias-pull-down;
++			};
++		};
++		cross_conn_det_sus: lines_off {
++			pinmux {
++				function = "gpio";
++				pins = "gpio120";
++			};
++			pinconf {
++				pins = "gpio120";
++				drive-strength = <2>;
++				bias-disable;
++			};
 +		};
 +	};
  };
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index 8102929..15bb485 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -133,6 +133,40 @@
- 		sdhci at 07824000 {
- 			status = "okay";
- 		};
-+
-+		usb at 78d9000 {
-+			extcon = <&usb_id>, <&usb_id>;
-+			status = "okay";
-+		};
-+
-+		ehci at 78d9000 {
-+			status = "okay";
-+		};
-+
-+		phy at 78d9000 {
-+			v1p8-supply = <&pm8916_l7>;
-+			v3p3-supply = <&pm8916_l13>;
-+			vddcx-supply = <&pm8916_s1>;
-+			extcon = <&usb_id>, <&usb_id>;
-+			dr_mode = "otg";
-+			status = "okay";
-+			switch-gpio = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&usb_sw_sel_pm>;
-+		};
-+	};
-+
-+	usb2513 {
-+		compatible = "smsc,usb3503";
-+		reset-gpios = <&pm8916_gpios 3 GPIO_ACTIVE_LOW>;
-+		initial-mode = <1>;
-+	};
-+
-+	usb_id: usb-id {
-+		compatible = "linux,extcon-usb-gpio";
-+		id-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb_id_default>;
- 	};
- };
- 
 -- 
 1.9.1
