@@ -1,55 +1,46 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 23 Feb 2016 14:34:19 +0000
-Subject: [PATCH v4 01/10] dt-bindings: document the MPS2 timer bindings
+Date: Tue, 23 Feb 2016 14:34:21 +0000
+Subject: [PATCH v4 03/10] dt-bindings: document the MPS2 UART bindings
 In-Reply-To: <1456238068-25079-1-git-send-email-vladimir.murzin@arm.com>
 References: <1456238068-25079-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1456238068-25079-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1456238068-25079-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This adds documentation of device tree bindings for the
-timers found on ARM MPS2 platform.
+UART found on ARM MPS2 platform
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/timer/arm,mps2-timer.txt   |   28 ++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
+ .../devicetree/bindings/serial/arm,mps2-uart.txt   |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
 
-diff --git a/Documentation/devicetree/bindings/timer/arm,mps2-timer.txt b/Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
+diff --git a/Documentation/devicetree/bindings/serial/arm,mps2-uart.txt b/Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
 new file mode 100644
-index 0000000..48f84d7
+index 0000000..128cc6a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
-@@ -0,0 +1,28 @@
-+ARM MPS2 timer
-+
-+The MPS2 platform has simple general-purpose 32 bits timers.
++++ b/Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
+@@ -0,0 +1,19 @@
++ARM MPS2 UART
 +
 +Required properties:
-+- compatible	: Should be "arm,mps2-timer"
++- compatible	: Should be "arm,mps2-uart"
 +- reg		: Address and length of the register set
-+- interrupts	: Reference to the timer interrupt
++- interrupts	: Reference to the UART RX, TX and overrun interrupts
 +
-+Required clocking property, have to be one of:
-+- clocks	  : The input clock of the timer
-+- clock-frequency : The rate in HZ in input of the ARM MPS2 timer
++Required clocking property:
++- clocks	  : The input clock of the UART
++
 +
 +Examples:
 +
-+timer1: mps2-timer at 40000000 {
-+	compatible = "arm,mps2-timer";
-+	reg = <0x40000000 0x1000>;
-+	interrupts = <8>;
++uart0: serial at 40004000 {
++	compatible = "arm,mps2-uart";
++	reg = <0x40004000 0x1000>;
++	interrupts = <0 1 12>;
 +	clocks = <&sysclk>;
-+};
-+
-+timer2: mps2-timer at 40001000 {
-+	compatible = "arm,mps2-timer";
-+	reg = <0x40001000 0x1000>;
-+	interrupts = <9>;
-+	clock-frequency = <25000000>;
 +};
 -- 
 1.7.9.5
