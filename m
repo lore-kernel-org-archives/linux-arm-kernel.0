@@ -1,37 +1,93 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 23 Feb 2016 13:55:51 +0000
-Subject: [PATCH 00/13] arm-cci: PMU driver updates for 4.6
-In-Reply-To: <20160223114003.GF3966@arm.com>
-References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
- <20160223114003.GF3966@arm.com>
-Message-ID: <56CC64E7.3040407@arm.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Tue, 23 Feb 2016 13:57:31 +0000
+Subject: [PATCH 1/8] arm64: move acpi/dt decision earlier in boot process
+In-Reply-To: <56CB2D0D.3090408@gmail.com>
+References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
+ <56CB2D0D.3090408@gmail.com>
+Message-ID: <20160223135731.GA24781@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/16 11:40, Will Deacon wrote:
-> On Tue, Feb 23, 2016 at 10:49:42AM +0000, Suzuki K Poulose wrote:
->> Here are some fixes and updates for arm-cci pmu driver targeting v4.6,
->> applies on top of v4.5-rc5.
->>
->> Highlights include :
->>   - Support for CoreLink CCI-550 PMU
->>   - Reliable writes to PMU Counter registers for CCI-500/550.
->>
->> All the patches have been Acked. Please let me know how this
->> can be merged.
+On Mon, Feb 22, 2016 at 04:45:17PM +0100, Matthias Brugger wrote:
+> 
+> 
+> On 22/02/16 14:46, Aleksey Makarov wrote:
+> >From: Leif Lindholm <leif.lindholm@linaro.org>
+> >
+> >In order to support selecting earlycon via either ACPI or DT, move
+> >the decision on whether to attempt ACPI configuration into the
+> >early_param handling. Then make acpi_boot_table_init() bail out if
+> >acpi_disabled.
+> >
+> >Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> >---
+> >  arch/arm64/kernel/acpi.c | 54 ++++++++++++++++++++++++++----------------------
+> >  1 file changed, 29 insertions(+), 25 deletions(-)
+> >
+> >diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> >index d1ce8e2..7a944f7 100644
+> >--- a/arch/arm64/kernel/acpi.c
+> >+++ b/arch/arm64/kernel/acpi.c
+> >@@ -44,6 +44,19 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+> >  static bool param_acpi_off __initdata;
+> >  static bool param_acpi_force __initdata;
+> >
+> >+static int __init dt_scan_depth1_nodes(unsigned long node,
+> >+				       const char *uname, int depth,
+> >+				       void *data)
+> >+{
+> >+	/*
+> >+	 * Return 1 as soon as we encounter a node at depth 1 that is
+> >+	 * not the /chosen node.
+> >+	 */
+> >+	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> >+		return 1;
+> >+	return 0;
+> >+}
+> >+
+> >  static int __init parse_acpi(char *arg)
+> >  {
+> >  	if (!arg)
+> >@@ -57,23 +70,27 @@ static int __init parse_acpi(char *arg)
+> >  	else
+> >  		return -EINVAL;	/* Core will print when we return error */
+> >
+> >-	return 0;
+> >-}
+> >-early_param("acpi", parse_acpi);
+> >+	/*
+> >+	 * Enable ACPI instead of device tree unless
+> >+	 * - ACPI has been disabled explicitly (acpi=off), or
+> >+	 * - the device tree is not empty (it has more than just a /chosen node)
+> >+	 *   and ACPI has not been force enabled (acpi=force)
+> >+	 */
+> >+	if (param_acpi_off ||
+> >+	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+> >+		return 0;
+> >
+> >-static int __init dt_scan_depth1_nodes(unsigned long node,
+> >-				       const char *uname, int depth,
+> >-				       void *data)
+> >-{
+> >  	/*
+> >-	 * Return 1 as soon as we encounter a node at depth 1 that is
+> >-	 * not the /chosen node.
+> >+	 * ACPI is disabled at this point. Enable it in order to parse
+> >+	 * the ACPI tables and carry out sanity checks
+> >  	 */
+> >-	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> >-		return 1;
+> >+	enable_acpi();
+> >+
+> 
+> So we only enable ACPI if we pass acpi=force as kernel parameter?
+> I'm not sure if this is what you wanted to do.
+> 
 
->>
->>   Documentation/devicetree/bindings/arm/cci.txt |    2 +
->>   drivers/bus/Kconfig                           |   10 +-
->>   drivers/bus/arm-cci.c                         |  612 +++++++++++++++++--------
->>   3 files changed, 427 insertions(+), 197 deletions(-)
->
-> How do you plan to merge this? I can take it all onto a branch for
-> arm-soc, or I can include it on my perf/updates branch, or ...?
+The current preference from ARM64 maintainers was that is both ACPI
+tables and a DT were presented then DT should take precedence.
 
-Arnd, Olof,
+With no DT provided the code should use ACPI.
 
-What do you think would be the best route ?
-
-Cheers
-Suzuki
+Graeme
