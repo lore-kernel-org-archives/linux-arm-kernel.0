@@ -1,72 +1,47 @@
-From: trini@konsulko.com (Tom Rini)
-Date: Tue, 23 Feb 2016 08:45:20 -0500
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <20160223120101.GJ19428@n2100.arm.linux.org.uk>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
- <56CC2D39.80909@ti.com>
- <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
- <20160223120101.GJ19428@n2100.arm.linux.org.uk>
-Message-ID: <20160223134520.GJ23166@bill-the-cat>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Tue, 23 Feb 2016 14:47:31 +0100
+Subject: [PATCH 2/2] clk: ti: Add support for dm814x ADPLL
+In-Reply-To: <20160217230253.2278.80903@quark.deferred.io>
+References: <1455312009-808-1-git-send-email-tony@atomide.com>
+ <1455312009-808-3-git-send-email-tony@atomide.com>
+ <20160217011930.2278.38316@quark.deferred.io>
+ <20160217173949.GB21202@atomide.com>
+ <20160217205257.2278.11639@quark.deferred.io>
+ <20160217212045.GE21202@atomide.com>
+ <20160217230253.2278.80903@quark.deferred.io>
+Message-ID: <CAALWOA-dA1r5Ac-y7d3yLhDR1fNM5WJvOmQ3YvvNM+6NP84VLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 12:01:01PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 23, 2016 at 11:56:34AM +0000, Peter Maydell wrote:
-> > On 23 February 2016 at 09:58, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> > > I'm not quite sure how it works if, as in versatile display case, there
-> > > are multiple DT overlays of which one has to be enabled. I hope there's
-> > > support to choose which one to use via kernel cmdline or similar.
-> > >
-> > > I would personally like it much more if the bootloader would either
-> > > compose a final dtb from DT fragments and pass it to the kernel, or
-> > > alternatively the bootloader would pass the base dtb image and a bunch
-> > > of DT overlays to the kernel, and the kernel would deal with the DT
-> > > overlays.
-> > 
-> > Speaking as somebody who's written the "bootloader" code that's
-> > used for what I guess are the majority of versatile kernel boots,
-> > i.e. the one in QEMU, I think that requiring the bootloader to do this
-> > would be a significant worsening from the current state.
-> > 
-> > Right now the bootloader doesn't need to do much at all with device
-> > trees, except pass the kernel the DT that the user gave us, which
-> > is just the kernel's own data structures in a separate file for
-> > convenience. You need to do some very minor tweaks to the /chosen
-> > node, but these can be handled the same way for any board and aren't
-> > hardware specific. There's no need to worry about dt fragments
-> > either for the bootloader or for the user. Imposing a new requirement
-> > for the bootloader to have to probe hardware which it otherwise
-> > has no need to even care about, and then edit and update the DT
-> > in a board-specific manner, or have board-specific DT fragments,
-> > seems like a totally unnecessary imposition on both bootloader
-> > authors and end-users, and of course it would break booting newer
-> > kernels on the great mass of already existing boot loaders and
-> > QEMU installs.
-> > 
-> > The kernel is in a position to probe the display hardware and determine
-> > what is there, and do the right thing, and that's exactly what it
-> > does today. The kernel should continue to do this.
-> > The advantage of DT is that it allows moving information about
-> > non-probeable hardware that was previously hardwired in the kernel
-> > C sources into a separate data structure, but the versatile displays
-> > are not non-probeable. I can see no benefit at all from hardwiring into
-> > the dt something which the kernel has previously been successfully
-> > dynamically getting right without any bootloader intervention -- it just
-> > makes the kernel less flexible and less user-friendly.
-> 
-> +1.
+On 17 February 2016 at 22:20, Tony Lindgren <tony@atomide.com> wrote:
+>* Michael Turquette <mturquette@baylibre.com> [160217 12:53]:
+>> Do you think you will ever have a driver that wants to gate these
+>> clocks? Probably not for MPU/DDR, but the HAND_OFF flag is a better fit
+>> if you do. It's the same as CRITICAL but transfers the prepare/enable
+>> reference counting to the consumer driver after that driver calls
+>> clk_get() and clk_prepare_enable() on the HAND_OFF clk.
+>
+> OK I'll use CLK_ENABLE_HAND_OFF then. Who knows maybe somebody
+> somewhere has code running on one of the coprocessors in SRAM that
+> actually allows gating these :)
 
-+1 from me too.
+An arrangement somewhat similar to the one the am335x has should
+indeed be doable, but note that it would be the coprocessor that would
+gate and ungate the clocks, not linux. The L3 clock is actually even
+more essential and can never be gated at all.
 
--- 
-Tom
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160223/bfdb2434/attachment.sig>
+In the absence of help from a coprocessor linux could still put the L3
+and MPU PLLs into bypass for power saving, and DDR can be gated if
+it's first put into self-refresh and helper code in on-chip SRAM is
+used to manage the transitions.
+
+On 18 February 2016 at 00:02, Michael Turquette <mturquette@baylibre.com> wrote:
+> Low power mp3 decoder executing out of ARM icache with DDR clock cut ;-)
+
+L1 cache is rather tricky since you can't lock it. You can however
+lock 448 KB of the 512 KB L2 cache, which should be plenty of space.
+There's also quite a bit of SRAM on chip usable for buffering data.
+
+The C674x DSP would probably also be a good candidate for such an application.
+
+Matthijs
