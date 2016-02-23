@@ -1,31 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Feb 2016 10:08:05 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Tue, 23 Feb 2016 14:41:20 +0530
+Subject: [PATCH 2/3] ARM: EXYNOS: remove unused register offset definition
+In-Reply-To: <56CBA1BC.4050003@samsung.com>
+References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
+ <1456135396-17767-3-git-send-email-pankaj.dubey@samsung.com>
+ <56CBA1BC.4050003@samsung.com>
+Message-ID: <56CC2238.2040303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 4, 2016 at 3:04 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+Hi Krzysztof,
 
-> This moves the versatile CLCD configuration to the device tree by:
+On Tuesday 23 February 2016 05:33 AM, Krzysztof Kozlowski wrote:
+> On 22.02.2016 19:03, Pankaj Dubey wrote:
+>> This patch cleans up map.h by removing unused register offset
+>> and changing EXYNOS4 to EXYNOS in header comment section.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/include/mach/map.h | 9 +--------
+>>  1 file changed, 1 insertion(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+>> index 351e839..c48ba4f 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -2,7 +2,7 @@
+>>   * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+>>   *		http://www.samsung.com/
+>>   *
+>> - * EXYNOS4 - Memory map definitions
+>> + * EXYNOS - Memory map definitions
+>>   *
+>>   * This program is free software; you can redistribute it and/or modify
+>>   * it under the terms of the GNU General Public License version 2 as
+>> @@ -14,12 +14,6 @@
+>>  
+>>  #include <plat/map-base.h>
+>>  
+>> -/*
+>> - * EXYNOS4 UART offset is 0x10000 but the older S5P SoCs are 0x400.
+>> - * So need to define it, and here is to avoid redefinition warning.
+>> - */
+>> -#define S3C_UART_OFFSET			(0x10000)
+>> -
+>>  #include <plat/map-s5p.h>
+> 
+> This does not look good. The S3C_UART_OFFSET is used in plat/map-s5p.h.
+> 
 
-As this Schr?dinger's cat approach seems controversial, as well
-as the alternative to manipulate the DT in memory at run-time,
-I will respin the series without the full Versatile support, adding
-plug-in for the other ARM boards and and half-baked support
-for the Versatile supporting just VGA (like the other reference
-designs from ARM).
+Actually it's just defined there but not getting used anywhere. In fact
+we can remove it from there also. So I submitted another patch to
+cleanup such redundant register definitions from plat/map-s5p.h.
+Only platform using S3C_UART_OFFSET is s3c64xx and its using definition
+from map-s3c.h. I have compiled all related platform defconfigs and
+found no issues because of removal of S3C_UART_OFFSET from map-s5p.c and
+map.h.
 
-The pluggable displays prove yet again to be a problem to the
-world, sigh.
-
-I will think of a better solution, if any, for this for v4.6, but will
-put forward something that handles the Nomadik and all the
-other ARM reference designs for now.
-
-Yours,
-Linus Walleij
+Thanks,
+Pankaj Dubey
+> Best regards,
+> Krzysztof
+> 
