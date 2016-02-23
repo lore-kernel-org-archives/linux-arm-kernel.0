@@ -1,35 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Feb 2016 10:10:06 +0100
-Subject: [PATCH] ARM: realview: add EB syscon variants to bindings
-Message-ID: <1456218606-3749-1-git-send-email-linus.walleij@linaro.org>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 23 Feb 2016 14:31:08 +0530
+Subject: [PATCH 00/61] gpio: Add and use devm_gpiochip_add_data()
+In-Reply-To: <CACRpkdbt+RiWMA74e40MNZVnDM0t0futtFnbyu9sRhv7p93-Tg@mail.gmail.com>
+References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
+ <CACRpkdbt+RiWMA74e40MNZVnDM0t0futtFnbyu9sRhv7p93-Tg@mail.gmail.com>
+Message-ID: <56CC1FD4.1080905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two distinct RealView EB system controller that we need
-to detect and handle because their register layout differ
-slightly.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- Documentation/devicetree/bindings/arm/arm-boards | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+On Monday 22 February 2016 08:14 PM, Linus Walleij wrote:
+> On Mon, Feb 22, 2016 at 3:07 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+>
+>> Add resource management APIs for gpiochip_add_data() and
+>> gpiochip_remove() and use these APIs from different HW drivers.
+>>
+>> This is based on discussion on patch to use the new APIs.
+>>          gpio: Add devm_ apis for gpio_chip_add and remove
+> Awesome!
+>
+> Do you have a git I can just pull these off so I don't have to apply
+> then all one-by-one?
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-index 2daeabc519de..7b05fc936d23 100644
---- a/Documentation/devicetree/bindings/arm/arm-boards
-+++ b/Documentation/devicetree/bindings/arm/arm-boards
-@@ -131,7 +131,9 @@ Required nodes:
- 
- - syscon: some subnode of the RealView SoC node must be a
-   system controller node pointing to the control registers,
--  with the compatible string set to one of these tuples:
-+  with the compatible string set to one of these:
-+   "arm,realview-eb11mp-revb-syscon", "arm,realview-eb-syscon", "syscon"
-+   "arm,realview-eb11mp-revc-syscon", "arm,realview-eb-syscon", "syscon"
-    "arm,realview-eb-syscon", "syscon"
-    "arm,realview-pb1176-syscon", "syscon"
-    "arm,realview-pb11mp-syscon", "syscon"
--- 
-2.4.3
+
+Nop, I do not have the git repo for sharing as of now at this time.
+Trying to learn to how to create.
