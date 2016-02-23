@@ -1,17 +1,17 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 23 Feb 2016 09:25:33 +0100
-Subject: [PATCH 1/2] ARM: dts: r8a7790: use fallback etheravb
+Date: Tue, 23 Feb 2016 09:27:46 +0100
+Subject: [PATCH 2/2] arm64: dts: r8a7795: use fallback etheravb
  compatibility string
-In-Reply-To: <1456190266-3781-2-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1456190266-3781-3-git-send-email-horms+renesas@verge.net.au>
 References: <1456190266-3781-1-git-send-email-horms+renesas@verge.net.au>
- <1456190266-3781-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUJLQFTS9YWdm6RJOOAch6xTkkh=LprVbtumYwc4hKyqQ@mail.gmail.com>
+ <1456190266-3781-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdV-nrfcWGOW5aAiR2RTe-340ER=TcWgbfe4MEVU_iyYqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 23, 2016 at 2:17 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Use recently added fallback compatibility string in r8a7790 device tree.
+> Use recently added fallback compatibility string in r8a7795 device tree.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
