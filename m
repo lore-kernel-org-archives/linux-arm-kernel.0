@@ -1,75 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Feb 2016 11:10:33 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <3695074.sKSIyOjpjD@wuerfel>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
- <3695074.sKSIyOjpjD@wuerfel>
-Message-ID: <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 23 Feb 2016 11:15:59 +0100
+Subject: [PATCH 2/9] spi: imx: initialize usedma earlier
+In-Reply-To: <1456219438-21205-3-git-send-email-s.hauer@pengutronix.de>
+References: <1456219438-21205-1-git-send-email-s.hauer@pengutronix.de>
+ <1456219438-21205-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20160223111559.3c2cb641@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 10:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 23 February 2016 10:08:05 Linus Walleij wrote:
->> I will think of a better solution, if any, for this for v4.6, but will
->> put forward something that handles the Nomadik and all the
->> other ARM reference designs for now.
->>
+Hi,
+
+On Tue, 23 Feb 2016 10:23:51 +0100 Sascha Hauer wrote:
+> So that the SoC specific config function can know if we will do
+> DMA or not. Will be needed in following patches.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 >
-> How about still describing all known panels in the DT marked 'status="disabled"',
-> but then having a minimal piece of board specific code that just enables
-> whichever one gets detected at boot time?
+The first sentence of the commit log sounds silly unless you read it in
+conjunction with the subject header. I made this remark already in
+<20160219090846.3004de9d@ipc1.ka-ro>
 
-Close but no cigar :D
-
-It means that all panels (enabled and all disabled) have to have the same
-endpoint in the of_graph.
-
-I tried it:
-
-    panel at 0 {
-        compatible = "panel-dpi";
-        port {
-            clcd_panel: endpoint {
-                remote-endpoint = <&clcd_pads>;
-            };
-        };
-(...)
-
-    panel at 1 {
-        compatible = "panel-dpi";
-        port {
-            clcd_panel: endpoint {
-                remote-endpoint = <&clcd_pads>;
-            };
-        };
-(...)
+Is there any reason why this commit log is written as a continuation of
+the subject line (whithout making that obvious) while all the other
+commit logs in your patch set are self-contained?
 
 
-        display at 10120000 {
-(...)
-            port {
-(...)
-                clcd_pads: endpoint at 0 {
-                    reg = <0>;
-                    remote-endpoint = <&clcd_panel>;
-                    arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
-                };
-            };
-
-
-
-Building the device tree:
-
-ERROR (duplicate_label): ERROR (duplicate_label): Duplicate label
-'clcd_panel' on /panel at 1/port/endpoint and /panel at 0/port/endpoint
-Duplicate label 'clcd_panel' on /panel at 1/port/endpoint and
-/panel at 0/port/endpoint
-
-So the dtc does not allow duplicate node labels for the phandle
-even if the node it resides in is disabled. Tough luck...
-
-Yours,
-Linus Walleij
+Lothar Wa?mann
