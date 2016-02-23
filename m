@@ -1,70 +1,66 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 23 Feb 2016 14:04:36 +0800
-Subject: [PATCH v2 2/2] ARM: at91: sama5/dts: move hsmc_clk out of nfc node
-In-Reply-To: <1456207477-7946-1-git-send-email-wenyou.yang@atmel.com>
-References: <1456207477-7946-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1456207477-7946-3-git-send-email-wenyou.yang@atmel.com>
+From: jay.xu@rock-chips.com (jianqun.xu)
+Date: Tue, 23 Feb 2016 15:01:01 +0800
+Subject: [PATCH 1/4] soc: rockchip: add bindings for Rockchip grf
+In-Reply-To: <1456210864-29037-1-git-send-email-jay.xu@rock-chips.com>
+References: <1456210864-29037-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1456210864-29037-2-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Wu <josh.wu@atmel.com>
+From: Jianqun Xu <jay.xu@rock-chips.com>
 
-For SAMA5D3, SAMA5D4 SoC family, as PMECC is a part of HSMC, PMECC
-needs the HSMC clock, so move out hsmc_clk from the nfc node to
-the nand node.
+Add devicetree bindings for Rockchip grf which found on
+Rockchip SoCs.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 ---
+changes in v2:
+- add grf.txt (Heiko)
 
-Changes in v2:
- - add a patch to change SAMA5D3 nand node's compatible string
-   to "atmel,sama5d3-nand".
- - revert the mail address of Josh's Signed-off to the original.
+ .../devicetree/bindings/soc/rockchip/grf.txt       | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/rockchip/grf.txt
 
- arch/arm/boot/dts/sama5d3.dtsi |    2 +-
- arch/arm/boot/dts/sama5d4.dtsi |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index ee1b1a8..d20a38b 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -1474,6 +1474,7 @@
- 			atmel,nand-has-dma;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
-+			clocks = <&hsmc_clk>;
- 			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
- 			status = "disabled";
- 
-@@ -1486,7 +1487,6 @@
- 					0xffffc000 0x00000070	/* NFC HSMC regs */
- 					0x00200000 0x00100000	/* NFC SRAM banks */
- 					>;
--				clocks = <&hsmc_clk>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index b8032bc..1499b33 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -295,6 +295,7 @@
- 			atmel,nand-has-dma;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
-+			clocks = <&hsmc_clk>;
- 			status = "disabled";
- 
- 			nfc at 90000000 {
-@@ -306,7 +307,6 @@
- 					0xfc05c000 0x00000070	/* NFC HSMC regs */
- 					0x00100000 0x00100000	/* NFC SRAM banks */
-                                          >;
--				clocks = <&hsmc_clk>;
- 				atmel,write-by-sram;
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/grf.txt b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+new file mode 100644
+index 0000000..7fb0410
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+@@ -0,0 +1,35 @@
++* Rockchip General Register Files (GRF)
++
++The general register file will be used to do static set by software, which
++is composed of many registers for system control.
++
++From RK3368 SoCs, the GRF is divided into two sections,
++- GRF, used for general non-secure system,
++- PMUGRF, used for always on sysyem
++
++Required Properties:
++
++- compatible: GRF should be one of the followings
++   - "rockchip,rk3066-grf", "syscon": for rk3066
++   - "rockchip,rk3188-grf", "syscon": for rk3188
++   - "rockchip,rk3228-grf", "syscon": for rk3228
++   - "rockchip,rk3288-grf", "syscon": for rk3288
++   - "rockchip,rk3368-grf", "syscon": for rk3368
++   - "rockchip,rk3399-grf", "syscon": for rk3399
++- compatible: PMUGRF should be one of the followings
++   - "rockchip,rk3368-pmugrf", "syscon": for rk3368
++   - "rockchip,rk3399-pmugrf", "syscon": for rk3399
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
++Example: GRF and PMUGRF of RK3399 SoCs
++
++	pmugrf: syscon at ff320000 {
++		compatible = "rockchip,rk3399-pmugrf", "syscon";
++		reg = <0x0 0xff320000 0x0 0x1000>;
++	};
++
++	grf: syscon at ff770000 {
++		compatible = "rockchip,rk3399-grf", "syscon";
++		reg = <0x0 0xff770000 0x0 0x10000>;
++	};
 -- 
-1.7.9.5
+1.9.1
