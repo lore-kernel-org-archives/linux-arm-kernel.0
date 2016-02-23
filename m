@@ -1,35 +1,41 @@
-From: brad.mouring@ni.com (Brad Mouring)
-Date: Tue, 23 Feb 2016 16:03:39 -0600
-Subject: [PATCH 2/2] Documentation: devicetree: Add PL310 PM bindings
-In-Reply-To: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
-References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
-Message-ID: <1456265019-23900-3-git-send-email-brad.mouring@ni.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 23 Feb 2016 23:11:22 +0100
+Subject: [linux-sunxi] [PATCH v2] ARM: dts: sun7i: Add dts file for the
+ lamobo-r1 board
+In-Reply-To: <20160223221041.GA2992@excalibur.cnev.de>
+References: <1456260090-23635-1-git-send-email-hdegoede@redhat.com>
+ <20160223221041.GA2992@excalibur.cnev.de>
+Message-ID: <56CCD90A.5070908@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the DT bindings for controlling ARM PL310 Power Control
-settings.
+Hi,
 
-Signed-off-by: Brad Mouring <brad.mouring@ni.com>
-Acked-by: Josh Cartwright <joshc@ni.com>
----
- Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+On 02/23/2016 11:10 PM, Karsten Merker wrote:
+> On Tue, Feb 23, 2016 at 09:41:30PM +0100, Hans de Goede wrote:
+>> From: Jelle de Jong <jelledejong@powercraft.nl>
+>>
+>> The lamobo-r1 board, sometimes called the BPI-R1 but not labelled as such
+>> on the PCB, is meant as a A20 based router board. As such the board comes
+>> with a built-in switch chip giving it 5 gigabit ethernet boards, and it
+>
+> s/gigabit ethernet boards/gigabit ethernet ports/ ?
 
-diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-index 2251dcc..4c2d764 100644
---- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-+++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-@@ -72,6 +72,10 @@ Optional properties:
- - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
-   <1> (forcibly enable), property absent (retain settings set by
-   firmware)
-+- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
-+  disable), <1> (forcibly enable), property absent (retain firmware settings)
-+- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
-+  <1> (forcibly enable), property absent (retain firmware settings)
- 
- Example:
- 
--- 
-2.7.1
+Erm, yes.
+
+Regards,
+
+hans
+
+
+>
+>> has a large empty area on the pcb with mounting holes which will fit a
+>> 2.5 inch harddisk. To complete its networking features it has a
+>> Realtek RTL8192CU for WiFi 802.11 b/g/n.
+>>
+>> Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> Regards,
+> Karsten
+>
