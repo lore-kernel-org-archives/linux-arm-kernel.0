@@ -1,20 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Feb 2016 11:01:39 +0100
-Subject: [PATCH 2/7 v2] video: ARM CLCD: backlight support for OF
+Date: Tue, 23 Feb 2016 11:01:41 +0100
+Subject: [PATCH 4/7 v2] video: ARM CLCD: support pads connected in reverse
+ order
 In-Reply-To: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
 References: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1456221704-5792-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1456221704-5792-5-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the device is probed from device tree, we can support
-backlight. This is used with some systems such as the
-ST Microelectronics Nomadik.
-
-We have to add HAS_IOMEM to the dependencies of CLCD since
-the backlight class device will now be selected, and if it
-gets selected on an arch that does not have IOMEM,
-compilation will fail.
+There are CLCDs connected with the pads in BGR rather than RGB
+order. It really doesn't matter since the CLCD has a flag and
+a bit to switch the position of the RGB and BGR components.
+This is needed to put something logical into the
+arm,pl11x,tft-r0g0b0-pads property of the device tree on the
+Nomadik which will then be <16 8 0>.
 
 Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Rob Herring <robh@kernel.org>
@@ -24,130 +23,87 @@ Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ChangeLog v1->v2:
 - No changes. Just reposting.
 ---
- drivers/video/fbdev/Kconfig     |  4 +++-
- drivers/video/fbdev/amba-clcd.c | 40 ++++++++++++++++++++++++++++++++++++++++
- include/linux/amba/clcd.h       |  3 +++
- 3 files changed, 46 insertions(+), 1 deletion(-)
+ drivers/video/fbdev/amba-clcd.c |  8 ++++++++
+ include/linux/amba/clcd.h       | 31 ++++++++++++++++++++++++-------
+ 2 files changed, 32 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 8ea45a5cd806..6dcd91237551 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -284,12 +284,14 @@ config FB_PM2_FIFO_DISCONNECT
- config FB_ARMCLCD
- 	tristate "ARM PrimeCell PL110 support"
- 	depends on ARM || ARM64 || COMPILE_TEST
--	depends on FB && ARM_AMBA
-+	depends on FB && ARM_AMBA && HAS_IOMEM
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
- 	select FB_MODE_HELPERS if OF
- 	select VIDEOMODE_HELPERS if OF
-+	select BACKLIGHT_LCD_SUPPORT if OF
-+	select BACKLIGHT_CLASS_DEVICE if OF
- 	help
- 	  This framebuffer device driver is for the ARM PrimeCell PL110
- 	  Colour LCD controller.  ARM PrimeCells provide the building
 diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index f9ef06d0cd48..c5d1e9ca81ab 100644
+index 8903a42c4122..9a631a8e2c04 100644
 --- a/drivers/video/fbdev/amba-clcd.c
 +++ b/drivers/video/fbdev/amba-clcd.c
-@@ -30,6 +30,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_graph.h>
-+#include <linux/backlight.h>
- #include <video/display_timing.h>
- #include <video/of_display_timing.h>
- #include <video/videomode.h>
-@@ -73,6 +74,11 @@ static void clcdfb_disable(struct clcd_fb *fb)
- 	if (fb->board->disable)
- 		fb->board->disable(fb);
+@@ -681,6 +681,7 @@ static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
+ 	} panels[] = {
+ 		{ 0x110, 1,  7, 13, CLCD_CAP_5551 },
+ 		{ 0x110, 0,  8, 16, CLCD_CAP_888 },
++		{ 0x110, 16, 8, 0,  CLCD_CAP_888 },
+ 		{ 0x111, 4, 14, 20, CLCD_CAP_444 },
+ 		{ 0x111, 3, 11, 19, CLCD_CAP_444 | CLCD_CAP_5551 },
+ 		{ 0x111, 3, 10, 19, CLCD_CAP_444 | CLCD_CAP_5551 |
+@@ -708,6 +709,13 @@ static int clcdfb_of_init_tft_panel(struct clcd_fb *fb, u32 r0, u32 g0, u32 b0)
+ 			fb->panel->caps = panels[i].caps;
+ 	}
  
-+	if (fb->panel->backlight) {
-+		fb->panel->backlight->props.power = FB_BLANK_POWERDOWN;
-+		backlight_update_status(fb->panel->backlight);
-+	}
-+
- 	val = readl(fb->regs + fb->off_cntl);
- 	if (val & CNTL_LCDPWR) {
- 		val &= ~CNTL_LCDPWR;
-@@ -119,6 +125,14 @@ static void clcdfb_enable(struct clcd_fb *fb, u32 cntl)
- 	writel(cntl, fb->regs + fb->off_cntl);
- 
- 	/*
-+	 * Turn on backlight
-+	 */
-+	if (fb->panel->backlight) {
-+		fb->panel->backlight->props.power = FB_BLANK_UNBLANK;
-+		backlight_update_status(fb->panel->backlight);
-+	}
-+
 +	/*
- 	 * finally, enable the interface.
- 	 */
- 	if (fb->board->enable)
-@@ -578,6 +592,28 @@ static int clcdfb_snprintf_mode(char *buf, int size, struct fb_videomode *mode)
- 			mode->refresh);
++	 * If we actually physically connected the R lines to B and
++	 * vice versa
++	 */
++	if (r0 != 0 && b0 == 0)
++		fb->panel->bgr_connection = true;
++
+ 	return fb->panel->caps ? 0 : -EINVAL;
  }
  
-+static int clcdfb_of_get_backlight(struct device_node *endpoint,
-+				   struct clcd_panel *clcd_panel)
-+{
-+	struct device_node *panel;
-+	struct device_node *backlight;
-+
-+	panel = of_graph_get_remote_port_parent(endpoint);
-+	if (!panel)
-+		return -ENODEV;
-+
-+	/* Look up the optional backlight phandle */
-+	backlight = of_parse_phandle(panel, "backlight", 0);
-+	if (backlight) {
-+		clcd_panel->backlight = of_find_backlight_by_node(backlight);
-+		of_node_put(backlight);
-+
-+		if (!clcd_panel->backlight)
-+			return -EPROBE_DEFER;
-+	}
-+	return 0;
-+}
-+
- static int clcdfb_of_get_mode(struct device *dev, struct device_node *endpoint,
- 		struct fb_videomode *mode)
- {
-@@ -664,6 +700,10 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
- 	if (!endpoint)
- 		return -ENODEV;
- 
-+	err = clcdfb_of_get_backlight(endpoint, fb->panel);
-+	if (err)
-+		return err;
-+
- 	err = clcdfb_of_get_mode(&fb->dev->dev, endpoint, &fb->panel->mode);
- 	if (err)
- 		return err;
 diff --git a/include/linux/amba/clcd.h b/include/linux/amba/clcd.h
-index e82e3ee2c54a..e64c1ccebb76 100644
+index e64c1ccebb76..c60f32e23a83 100644
 --- a/include/linux/amba/clcd.h
 +++ b/include/linux/amba/clcd.h
-@@ -93,6 +93,8 @@ enum {
- 	CLCD_CAP_ALL		= CLCD_CAP_BGR | CLCD_CAP_RGB,
- };
- 
-+struct backlight_device;
-+
- struct clcd_panel {
- 	struct fb_videomode	mode;
- 	signed short		width;	/* width in mm */
-@@ -105,6 +107,7 @@ struct clcd_panel {
- 				fixedtimings:1,
+@@ -108,6 +108,12 @@ struct clcd_panel {
  				grayscale:1;
  	unsigned int		connector;
-+	struct backlight_device	*backlight;
+ 	struct backlight_device	*backlight;
++	/*
++	 * If the B/R lines are switched between the CLCD
++	 * and the panel we need to know this and not try to
++	 * compensate with the BGR bit in the control register.
++	 */
++	bool			bgr_connection;
  };
  
  struct clcd_regs {
+@@ -234,16 +240,27 @@ static inline void clcdfb_decode(struct clcd_fb *fb, struct clcd_regs *regs)
+ 	if (var->grayscale)
+ 		val |= CNTL_LCDBW;
+ 
+-	if (fb->panel->caps && fb->board->caps &&
+-	    var->bits_per_pixel >= 16) {
++	if (fb->panel->caps && fb->board->caps && var->bits_per_pixel >= 16) {
+ 		/*
+ 		 * if board and panel supply capabilities, we can support
+-		 * changing BGR/RGB depending on supplied parameters
++		 * changing BGR/RGB depending on supplied parameters. Here
++		 * we switch to what the framebuffer is providing if need
++		 * be, so if the framebuffer is BGR but the display connection
++		 * is RGB (first case) we switch it around. Vice versa mutatis
++		 * mutandis if the framebuffer is RGB but the display connection
++		 * is BGR, we flip it around.
+ 		 */
+-		if (var->red.offset == 0)
+-			val &= ~CNTL_BGR;
+-		else
+-			val |= CNTL_BGR;
++		if (!fb->panel->bgr_connection) {
++			if (var->red.offset == 0)
++				val &= ~CNTL_BGR;
++			else
++				val |= CNTL_BGR;
++		} else {
++			if (var->blue.offset == 0)
++				val &= ~CNTL_BGR;
++			else
++				val |= CNTL_BGR;
++		}
+ 	}
+ 
+ 	switch (var->bits_per_pixel) {
 -- 
 2.4.3
