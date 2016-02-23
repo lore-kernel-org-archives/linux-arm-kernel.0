@@ -1,120 +1,52 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 23 Feb 2016 14:10:04 +0100
-Subject: [PATCH] ARM: dts: stm32f429: Fix clocks referenced by GPIO banks
-Message-ID: <1456233004-17848-1-git-send-email-mcoquelin.stm32@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Feb 2016 14:16:08 +0100
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <56CC57FC.20707@ti.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <3695074.sKSIyOjpjD@wuerfel>
+ <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
+ <6859810.tb1t0IEONi@wuerfel> <56CC57FC.20707@ti.com>
+Message-ID: <CACRpkdYNaNtQQJ-tsBe5ksa4-z380ZQj-zN8ZnK0ED2kNPUwvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the clocks referenced by the GPIO banks were not the good ones.
+On Tue, Feb 23, 2016 at 2:00 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
 
-Reported-by: Bruno Herrera <bruherrera@gmail.com>
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- arch/arm/boot/dts/stm32f429.dtsi | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+> That would be almost the same as what's already in this patch, except
+> (if I'm not mistaken) the detection part could be in platform code, and
+> the fbdev driver itself would know nothing about board specific
+> detection or board specific panel lists.
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 35b2ab1..598362e 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -182,7 +182,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x0 0x400>;
--				clocks = <&rcc 0 256>;
-+				clocks = <&rcc 0 0>;
- 				st,bank-name = "GPIOA";
- 			};
- 
-@@ -190,7 +190,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x400 0x400>;
--				clocks = <&rcc 0 257>;
-+				clocks = <&rcc 0 1>;
- 				st,bank-name = "GPIOB";
- 			};
- 
-@@ -198,7 +198,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x800 0x400>;
--				clocks = <&rcc 0 258>;
-+				clocks = <&rcc 0 2>;
- 				st,bank-name = "GPIOC";
- 			};
- 
-@@ -206,7 +206,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0xc00 0x400>;
--				clocks = <&rcc 0 259>;
-+				clocks = <&rcc 0 3>;
- 				st,bank-name = "GPIOD";
- 			};
- 
-@@ -214,7 +214,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x1000 0x400>;
--				clocks = <&rcc 0 260>;
-+				clocks = <&rcc 0 4>;
- 				st,bank-name = "GPIOE";
- 			};
- 
-@@ -222,7 +222,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x1400 0x400>;
--				clocks = <&rcc 0 261>;
-+				clocks = <&rcc 0 5>;
- 				st,bank-name = "GPIOF";
- 			};
- 
-@@ -230,7 +230,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x1800 0x400>;
--				clocks = <&rcc 0 262>;
-+				clocks = <&rcc 0 6>;
- 				st,bank-name = "GPIOG";
- 			};
- 
-@@ -238,7 +238,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x1c00 0x400>;
--				clocks = <&rcc 0 263>;
-+				clocks = <&rcc 0 7>;
- 				st,bank-name = "GPIOH";
- 			};
- 
-@@ -246,7 +246,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x2000 0x400>;
--				clocks = <&rcc 0 264>;
-+				clocks = <&rcc 0 8>;
- 				st,bank-name = "GPIOI";
- 			};
- 
-@@ -254,7 +254,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x2400 0x400>;
--				clocks = <&rcc 0 265>;
-+				clocks = <&rcc 0 9>;
- 				st,bank-name = "GPIOJ";
- 			};
- 
-@@ -262,7 +262,7 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				reg = <0x2800 0x400>;
--				clocks = <&rcc 0 266>;
-+				clocks = <&rcc 0 10>;
- 				st,bank-name = "GPIOK";
- 			};
- 
--- 
-1.9.1
+In this patch set the board/platform-specific plugins are separated
+out adding the opaque .board_init() and .panel_init() to the driver.
+The platform-specific code is in completely separate files this way,
+and the CLCD driver itself just handles various versions of that
+IP block.
+
+> So maybe that would be a bit cleaner. Still ugly, I think =). I really
+> don't like having possible-panels in the Schr?dinger's DT data
+> (http://www.angryflower.com/387.html).
+
+OK I will focus my work on the DT-augment code instead.
+
+> That said, maybe this is the best way to deal with Versatile, without
+> requiring any change to the bootloader or the boot mechanism.
+
+Depends on if the OF core maintainers will accept my patches to
+dynamically alter DT properties at runtime. If I can't do that then
+I have to go back to the Schr?dinger patch.
+
+> What is the current status of Versatile? Have we had working display
+> with Versatile when booting with device tree? Or has the display been
+> supported only with legacy boot?
+
+Versatile is DT only as of kernel v4.5. The DT boot uses AUXDATA
+which is the Frankenstein solution, bolting on a boardfile piece
+to the DT boot and ignoring the existing panel bindings, and of
+course standing in the way of cleaning things up.
+
+IMO Schr?dinger > Frankenstein.
+
+Yours,
+Linus Walleij
