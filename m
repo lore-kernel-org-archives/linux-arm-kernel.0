@@ -1,191 +1,53 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 23 Feb 2016 14:21:48 -0800
-Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
- groups.
-In-Reply-To: <1456266111-2508-1-git-send-email-eric@anholt.net>
-References: <1456266111-2508-1-git-send-email-eric@anholt.net>
-Message-ID: <1456266111-2508-3-git-send-email-eric@anholt.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 23 Feb 2016 23:23:42 +0100
+Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
+ mappings
+In-Reply-To: <CAPcyv4h86uzieFV4HM-tZoWSVZ7GY2GKEUk334J+5sD_GyzWKg@mail.gmail.com>
+ (Dan Williams's message of "Tue, 23 Feb 2016 09:21:44 -0800")
+References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
+ <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
+ <20160222200227.GF19428@n2100.arm.linux.org.uk>
+ <CAKv+Gu9gwnuu7hnYpjv7ozuKYmC8ApMakSJmYvQMaevNEd5zvA@mail.gmail.com>
+ <20160223115835.GI19428@n2100.arm.linux.org.uk>
+ <CAKv+Gu8oCnu6kv5SxUAdWE_Z0V+PMAKDgM6MxTi4mTm5z6EFqA@mail.gmail.com>
+ <CAKv+Gu_iEOC6E+N28pp9eEJxWFYTgLaQcBYEy1SvTUHT=cybYA@mail.gmail.com>
+ <CAPcyv4h86uzieFV4HM-tZoWSVZ7GY2GKEUk334J+5sD_GyzWKg@mail.gmail.com>
+Message-ID: <87twkzukup.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all of these pins were documented, we can use their names to
-explain what's going on.
+Dan Williams <dan.j.williams@intel.com> writes:
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 17 ++++++++++-------
- arch/arm/boot/dts/bcm2835-rpi-a.dts      | 17 ++++++++++-------
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 17 ++++++++++-------
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 17 ++++++++++-------
- arch/arm/boot/dts/bcm2835-rpi-b.dts      | 10 +++++++++-
- arch/arm/boot/dts/bcm2835-rpi.dtsi       |  5 -----
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 17 ++++++++++-------
- 7 files changed, 59 insertions(+), 41 deletions(-)
+> On Tue, Feb 23, 2016 at 4:26 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 23 February 2016 at 13:03, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> On 23 February 2016 at 12:58, Russell King - ARM Linux
+>>> <linux@arm.linux.org.uk> wrote:
+>>>> On Mon, Feb 22, 2016 at 09:35:24PM +0100, Ard Biesheuvel wrote:
+>> OK, I see what you mean. I find it unfortunate that ioremap_cache()
+>> instances are blindly being replaced with memremap(), and I wonder if
+>> this wasted test by and/or cc'ed to people who can actually test this
+>> driver. Dan?
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index 228614f..0a8b92e 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -21,11 +21,14 @@
- };
- 
- &gpio {
--	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
--
--	/* I2S interface */
--	i2s_alt0: i2s_alt0 {
--		brcm,pins = <18 19 20 21>;
--		brcm,function = <BCM2835_FSEL_ALT0>;
--	};
-+	pinctrl-0 = <&i2c0_gpio0
-+		     &i2c1_gpio2
-+		     &gpclk0_gpio4
-+		     &gpclk1_gpio5
-+		     &spi0_gpio7
-+		     &pcm_gpio18
-+		     &pwm0_gpio40
-+		     &pwm1_gpio45
-+		     &gpioout
-+		     &alt3>;
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-index ddbbbbd..d093407 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-@@ -14,11 +14,14 @@
- };
- 
- &gpio {
--	pinctrl-0 = <&gpioout &alt0 &i2s_alt2 &alt3>;
--
--	/* I2S interface */
--	i2s_alt2: i2s_alt2 {
--		brcm,pins = <28 29 30 31>;
--		brcm,function = <BCM2835_FSEL_ALT2>;
--	};
-+	pinctrl-0 = <&i2c0_gpio0
-+		     &i2c1_gpio2
-+		     &gpclk0_gpio4
-+		     &gpclk1_gpio5
-+		     &spi0_gpio7
-+		     &pcm_gpio28
-+		     &pwm0_gpio40
-+		     &pwm1_gpio45
-+		     &gpioout
-+		     &alt3>;
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index ef54050..c26b81d 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -21,11 +21,14 @@
- };
- 
- &gpio {
--	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
--
--	/* I2S interface */
--	i2s_alt0: i2s_alt0 {
--		brcm,pins = <18 19 20 21>;
--		brcm,function = <BCM2835_FSEL_ALT0>;
--	};
-+	pinctrl-0 = <&i2c0_gpio0
-+		     &i2c1_gpio2
-+		     &gpclk0_gpio4
-+		     &gpclk1_gpio5
-+		     &spi0_gpio7
-+		     &pcm_gpio18
-+		     &pwm0_gpio40
-+		     &pwm1_gpio45
-+		     &gpioout
-+		     &alt3>;
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index 86f1f2f..a5b606e 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -14,11 +14,14 @@
- };
- 
- &gpio {
--	pinctrl-0 = <&gpioout &alt0 &i2s_alt2 &alt3>;
--
--	/* I2S interface */
--	i2s_alt2: i2s_alt2 {
--		brcm,pins = <28 29 30 31>;
--		brcm,function = <BCM2835_FSEL_ALT2>;
--	};
-+	pinctrl-0 = <&i2c0_gpio0
-+		     &i2c1_gpio2
-+		     &gpclk0_gpio4
-+		     &gpclk1_gpio5
-+		     &spi0_gpio7
-+		     &pcm_gpio28
-+		     &pwm0_gpio40
-+		     &pwm1_gpio45
-+		     &gpioout
-+		     &alt3>;
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 4859e9d..97e3c2f 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -14,5 +14,13 @@
- };
- 
- &gpio {
--	pinctrl-0 = <&gpioout &alt0 &alt3>;
-+	pinctrl-0 = <&i2c0_gpio0
-+		     &i2c1_gpio2
-+		     &gpclk0_gpio4
-+		     &gpclk1_gpio5
-+		     &spi0_gpio7
-+		     &pwm0_gpio40
-+		     &pwm1_gpio45
-+		     &gpioout
-+		     &alt3>;
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 76bdbca..141b18c 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -37,11 +37,6 @@
- 		brcm,function = <BCM2835_FSEL_GPIO_OUT>;
- 	};
- 
--	alt0: alt0 {
--		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 14 15 40 45>;
--		brcm,function = <BCM2835_FSEL_ALT0>;
--	};
--
- 	alt3: alt3 {
- 		brcm,pins = <48 49 50 51 52 53>;
- 		brcm,function = <BCM2835_FSEL_ALT3>;
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index ff94666..52798ca 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -25,11 +25,14 @@
- };
- 
- &gpio {
--	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
--
--	/* I2S interface */
--	i2s_alt0: i2s_alt0 {
--		brcm,pins = <18 19 20 21>;
--		brcm,function = <BCM2835_FSEL_ALT0>;
--	};
-+	pinctrl-0 = <&i2c0_gpio0
-+		     &i2c1_gpio2
-+		     &gpclk0_gpio4
-+		     &gpclk1_gpio5
-+		     &spi0_gpio7
-+		     &pcm_gpio18
-+		     &pwm0_gpio40
-+		     &pwm1_gpio45
-+		     &gpioout
-+		     &alt3>;
- };
--- 
-2.7.0
+Actually I have the hardware to test it.
+
+And I also know what is behind :
+ - it's a CFI NOR based memory
+ - these are Intel StrataFlash 28F128J3A chips
+ - as a CFI memory it is mapped on the system bus
+ - from a read perspective, it behaves like a normal memory
+ - but once the first write reaches the CFI, everything changes (the address
+   space layout doesn't have the same meaning, be that becoming a status code or
+   something else).
+   In these conditions reordering of writes versus reads, merging reads after
+   a write or coalescing writes is a recipe for disaster.
+
+All of this to say I can make a small discrete number of tests (less than 10
+write or erase ones to preserve the precious NOR).
+
+Cheers.
+
+--
+Robert
