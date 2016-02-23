@@ -1,41 +1,39 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 23 Feb 2016 10:32:04 -0800
-Subject: [PATCH] ARM64: dts: Mediatek: mt8173-evb: fix access MMC fail
- issue
-In-Reply-To: <56CC1E0E.4050400@gmail.com> (Matthias Brugger's message of "Tue,
- 23 Feb 2016 09:53:34 +0100")
-References: <1455861643-24307-1-git-send-email-eddie.huang@mediatek.com>
- <7h37skw9jd.fsf@baylibre.com> <56CC1E0E.4050400@gmail.com>
-Message-ID: <7hlh6bth0b.fsf@baylibre.com>
+From: Yuval.Mintz@qlogic.com (Yuval Mintz)
+Date: Tue, 23 Feb 2016 18:33:10 +0000
+Subject: [PATCH] bnx2x: add a separate GENEVE Kconfig symbol
+In-Reply-To: <1456223774-1383513-1-git-send-email-arnd@arndb.de>
+References: <1456223774-1383513-1-git-send-email-arnd@arndb.de>
+Message-ID: <CO2PR11MB0088CC09F328C0CFE10187BF97A40@CO2PR11MB0088.namprd11.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matthias Brugger <matthias.bgg@gmail.com> writes:
+> When CONFIG_GENEVE is built as a loadable module, and bnx2x is built-in,
+> we get this link error:
 
-> On 23/02/16 01:32, Kevin Hilman wrote:
->> Eddie Huang <eddie.huang@mediatek.com> writes:
->>
->>> MT8173 E1 chip has one bug that if turn off USB power domain, vcore
->>> power will also be off, thus cause modules using vcore power domain
->>> fail, like MMC. The E1 chip only found on MT8173-evb board and this
->>> board only has E1 chip, so implement this as a board specific
->>> workaround.
->>>
->>> Pwrapper use vcore power, so add pwrapper using USB power domain to
->>> keep USB power domain not to zero and disabled.
->>>
->>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->>
->> Tested-by: Kevin Hilman <khilman@baylibre.com>
->>
->
-> I send the patch in a pull request yesterday, so I won't be able to
-> add your tag.
+> drivers/net/built-in.o: In function `bnx2x_open':
+> :(.text+0x33322): undefined reference to `geneve_get_rx_port'
+> drivers/net/built-in.o: In function `bnx2x_sp_rtnl_task':
+> :(.text+0x3e632): undefined reference to `geneve_get_rx_port'
 
-No worries.  Was on vacation, so couldn't test sooner.
+> This avoids the problem by adding a separate Kconfig symbol named
+> CONFIG_BNX2X_GENEVE that is only enabled when the code is
+> reachable from the driver.
 
-> Thanks for testing and reporting this issue!
+> This is the same trick that BNX2X does for VXLAN support, and
+> is similar to how I40E handles both.
 
-You're welcome,
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 883ce97d25b0 ("bnx2x: Add Geneve inner-RSS support")
 
-Kevin
+Ouch. Thanks for fixing this one; I tried avoiding this solution
+since I don't think there's any reason to encumber the config
+file with needless options [I.e., what's the gain in the ability to
+disable a single offloaded protocol on a single network driver?],
+but obviously, I botched the job.
+
+BTW, if you want to handle this exactly like vxlan, you might
+consider using `defined(CONFIG_BNX2X_GENEVE)' instead of
+`IS_ENABLED(CONFIG_BNX2X_GENEVE)'  [It not a tristate].
+But that's truly insignificant.
+
+Acked-By: Yuval Mintz <Yuval.Mintz@qlogic.com>
