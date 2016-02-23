@@ -1,47 +1,89 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Feb 2016 10:49:45 +0000
-Subject: [PATCH 03/13] arm-cci: Group writes to counter
+Date: Tue, 23 Feb 2016 10:49:46 +0000
+Subject: [PATCH 04/13] arm-cci: Refactor CCI PMU enable/disable methods
 In-Reply-To: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
 References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1456224595-3282-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1456224595-3282-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to group the writes to PMU counter, this will be
-used to delay setting the event period to pmu::pmu_enable()
+This patch refactors the CCI PMU driver code a little bit to
+make it easier share the code for enabling/disabling the CCI
+PMU. This will be used by the hooks to work around the special cases
+where writing to a counter is not always that easy(e.g, CCI-500)
+
+No functional changes.
 
 Cc: Punit Agrawal <punit.agrawal@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/bus/arm-cci.c |   32 ++++++++++++++++++++++----------
+ 1 file changed, 22 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 5fb1c06..6a76ac7 100644
+index 6a76ac7..e42842b 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -771,6 +771,21 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
- 		pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
+@@ -606,6 +606,26 @@ static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
  }
+ #endif	/* CONFIG_ARM_CCI500_PMU */
  
-+static void __maybe_unused
-+pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
++/* Should be called with cci_pmu->hw_events->pmu_lock held */
++static void __cci_pmu_enable(void)
 +{
-+	int i;
-+	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
++	u32 val;
 +
-+	for_each_set_bit(i, mask, cci_pmu->num_cntrs) {
-+		struct perf_event *event = cci_hw->events[i];
-+
-+		if (WARN_ON(!event))
-+			continue;
-+		pmu_write_counter(event, local64_read(&event->hw.prev_count));
-+	}
++	/* Enable all the PMU counters. */
++	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
++	writel(val, cci_ctrl_base + CCI_PMCR);
 +}
 +
- static u64 pmu_event_update(struct perf_event *event)
++/* Should be called with cci_pmu->hw_events->pmu_lock held */
++static void __cci_pmu_disable(void)
++{
++	u32 val;
++
++	/* Disable all the PMU counters. */
++	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) & ~CCI_PMCR_CEN;
++	writel(val, cci_ctrl_base + CCI_PMCR);
++}
++
+ static ssize_t cci_pmu_format_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf)
  {
- 	struct hw_perf_event *hwc = &event->hw;
+@@ -895,16 +915,12 @@ static void cci_pmu_enable(struct pmu *pmu)
+ 	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
+ 	int enabled = bitmap_weight(hw_events->used_mask, cci_pmu->num_cntrs);
+ 	unsigned long flags;
+-	u32 val;
+ 
+ 	if (!enabled)
+ 		return;
+ 
+ 	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+-
+-	/* Enable all the PMU counters. */
+-	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
+-	writel(val, cci_ctrl_base + CCI_PMCR);
++	__cci_pmu_enable();
+ 	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+ 
+ }
+@@ -914,13 +930,9 @@ static void cci_pmu_disable(struct pmu *pmu)
+ 	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
+ 	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
+ 	unsigned long flags;
+-	u32 val;
+ 
+ 	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+-
+-	/* Disable all the PMU counters. */
+-	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) & ~CCI_PMCR_CEN;
+-	writel(val, cci_ctrl_base + CCI_PMCR);
++	__cci_pmu_disable();
+ 	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+ }
+ 
 -- 
 1.7.9.5
