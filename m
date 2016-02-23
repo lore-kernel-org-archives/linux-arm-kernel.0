@@ -1,38 +1,73 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 23 Feb 2016 08:13:57 +0100
-Subject: [PATCH v2 4/4] dmaengine: pxa_dma: fix the maximum requestor line
-In-Reply-To: <20160223031335.GJ17690@localhost> (Vinod Koul's message of "Tue,
- 23 Feb 2016 08:43:36 +0530")
-References: <1455569868-25017-1-git-send-email-robert.jarzmik@free.fr>
- <1455569868-25017-4-git-send-email-robert.jarzmik@free.fr>
- <20160223031335.GJ17690@localhost>
-Message-ID: <877fhvx5je.fsf@belgarion.home>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Tue, 23 Feb 2016 15:35:36 +0800
+Subject: [PATCH v11 1/2] Documentation: bridge: Add documentation for ps8640
+ DT properties
+Message-ID: <1456212937-7635-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-> On Mon, Feb 15, 2016 at 09:57:48PM +0100, Robert Jarzmik wrote:
->> The current number of requestor lines is limited to 31. This was an
->> error of a previous commit, as this number is platform dependent, and is
->> actually :
->>  - for pxa25x: 40 requestor lines
->>  - for pxa27x: 75 requestor lines
->>  - for pxa3xx: 100 requestor lines
->> 
->> The previous testing did not reveal the faulty constant as on pxa[23]xx
->> platforms, only camera, MSL and USB are above requestor 32, and in these
->> only the camera has a driver using dma.
->> 
->> Fixes: e87ffbdf0697 ("dmaengine: pxa_dma: fix the no-requestor case")
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
->
-> Which tree is this targetted thru?
-PXA for-next tree, my tree, once I gather the acks.
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Chnages since v10:
+ - set sleep reset pin as GPIO_ACTIVE_LOW
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-Cheers.
-
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..022b33f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_LOW>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
 -- 
-Robert
+1.7.9.5
