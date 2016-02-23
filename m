@@ -1,147 +1,137 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 23 Feb 2016 08:39:37 +0530
-Subject: [PATCH v2 2/4] dmaengine: xilinx_vdma: Simplify spin lock handling
-In-Reply-To: <1456120477-32134-2-git-send-email-appanad@xilinx.com>
+Date: Tue, 23 Feb 2016 08:41:30 +0530
+Subject: [PATCH v2 4/4] dmaengine: xilinx_vdma: Improve channel idle
+ checking
+In-Reply-To: <1456120477-32134-4-git-send-email-appanad@xilinx.com>
 References: <1456120477-32134-1-git-send-email-appanad@xilinx.com>
- <1456120477-32134-2-git-send-email-appanad@xilinx.com>
-Message-ID: <20160223030937.GH17690@localhost>
+ <1456120477-32134-4-git-send-email-appanad@xilinx.com>
+Message-ID: <20160223031130.GI17690@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 11:24:35AM +0530, Kedareswara rao Appana wrote:
-> This patch simplifies the spin lock handling in the driver.
+On Mon, Feb 22, 2016 at 11:24:37AM +0530, Kedareswara rao Appana wrote:
+> This patch improves the channel idle cheking by introduing
+				      ^^^^^^^^^
+typo
 
-But sadly doesn't describe how?
+> a new varibale in chan private structure.
+	^^^^^^^
+here too :(
 
+and there is no description how this improvement is achieved and why
 > 
 > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
 > Changes for v2:
 > ---> splitted the changes into multiple patches.
 > 
->  drivers/dma/xilinx/xilinx_vdma.c | 27 ++++++++++-----------------
->  1 file changed, 10 insertions(+), 17 deletions(-)
+>  drivers/dma/xilinx/xilinx_vdma.c | 41 ++++++++--------------------------------
+>  1 file changed, 8 insertions(+), 33 deletions(-)
 > 
 > diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-> index 06bffec..d646218 100644
+> index 8db07f7..51686d1 100644
 > --- a/drivers/dma/xilinx/xilinx_vdma.c
 > +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> @@ -605,17 +605,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
->  {
->  	struct xilinx_vdma_config *config = &chan->config;
->  	struct xilinx_vdma_tx_descriptor *desc, *tail_desc;
-> -	unsigned long flags;
->  	u32 reg;
->  	struct xilinx_vdma_tx_segment *tail_segment;
+> @@ -202,6 +202,7 @@ struct xilinx_vdma_tx_descriptor {
+>   * @has_sg: Support scatter transfers
+>   * @genlock: Support genlock mode
+>   * @err: Channel has errors
+> + * @idle: Check for channel idle
+>   * @tasklet: Cleanup work after irq
+>   * @config: Device configuration info
+>   * @flush_on_fsync: Flush on Frame sync
+> @@ -225,6 +226,7 @@ struct xilinx_vdma_chan {
+>  	bool has_sg;
+>  	bool genlock;
+>  	bool err;
+> +	bool idle;
+>  	struct tasklet_struct tasklet;
+>  	struct xilinx_vdma_config config;
+>  	bool flush_on_fsync;
+> @@ -519,32 +521,6 @@ static enum dma_status xilinx_vdma_tx_status(struct dma_chan *dchan,
+>  }
 >  
->  	if (chan->err)
+>  /**
+> - * xilinx_vdma_is_running - Check if VDMA channel is running
+> - * @chan: Driver specific VDMA channel
+> - *
+> - * Return: '1' if running, '0' if not.
+> - */
+> -static bool xilinx_vdma_is_running(struct xilinx_vdma_chan *chan)
+> -{
+> -	return !(vdma_ctrl_read(chan, XILINX_VDMA_REG_DMASR) &
+> -		 XILINX_VDMA_DMASR_HALTED) &&
+> -		(vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR) &
+> -		 XILINX_VDMA_DMACR_RUNSTOP);
+> -}
+> -
+> -/**
+> - * xilinx_vdma_is_idle - Check if VDMA channel is idle
+> - * @chan: Driver specific VDMA channel
+> - *
+> - * Return: '1' if idle, '0' if not.
+> - */
+> -static bool xilinx_vdma_is_idle(struct xilinx_vdma_chan *chan)
+> -{
+> -	return vdma_ctrl_read(chan, XILINX_VDMA_REG_DMASR) &
+> -		XILINX_VDMA_DMASR_IDLE;
+> -}
+> -
+> -/**
+>   * xilinx_vdma_halt - Halt VDMA channel
+>   * @chan: Driver specific VDMA channel
+>   */
+> @@ -614,6 +590,9 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  	if (list_empty(&chan->pending_list))
 >  		return;
 >  
-> -	spin_lock_irqsave(&chan->lock, flags);
-> -
-
-It would help if you add a comment to this function taht we need to invoke
-this with lock held...
-
->  	if (list_empty(&chan->pending_list))
-> -		goto out_unlock;
+> +	if (!chan->idle)
 > +		return;
->  
+> +
 >  	desc = list_first_entry(&chan->pending_list,
 >  				struct xilinx_vdma_tx_descriptor, node);
-> @@ -629,7 +626,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
->  	if (chan->has_sg && xilinx_vdma_is_running(chan) &&
->  	    !xilinx_vdma_is_idle(chan)) {
->  		dev_dbg(chan->dev, "DMA controller still busy\n");
-> -		goto out_unlock;
-> +		return;
->  	}
+>  	tail_desc = list_last_entry(&chan->pending_list,
+> @@ -622,13 +601,6 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  	tail_segment = list_last_entry(&tail_desc->segments,
+>  				       struct xilinx_vdma_tx_segment, node);
 >  
+> -	/* If it is SG mode and hardware is busy, cannot submit */
+> -	if (chan->has_sg && xilinx_vdma_is_running(chan) &&
+> -	    !xilinx_vdma_is_idle(chan)) {
+> -		dev_dbg(chan->dev, "DMA controller still busy\n");
+> -		return;
+> -	}
+> -
 >  	/*
-> @@ -676,7 +673,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
->  	xilinx_vdma_start(chan);
->  
->  	if (chan->err)
-> -		goto out_unlock;
-> +		return;
->  
->  	/* Start the transfer */
->  	if (chan->has_sg) {
-> @@ -696,7 +693,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
->  		}
->  
->  		if (!last)
-> -			goto out_unlock;
-> +			return;
->  
->  		/* HW expects these parameters to be same for one transaction */
->  		vdma_desc_write(chan, XILINX_VDMA_REG_HSIZE, last->hw.hsize);
-> @@ -707,9 +704,6 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+>  	 * If hardware is idle, then all descriptors on the running lists are
+>  	 * done, start new transfers
+> @@ -708,6 +680,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
 >  
 >  	list_splice_tail_init(&chan->pending_list, &chan->active_list);
 >  	chan->desc_pendingcount = 0;
-> -
-> -out_unlock:
-> -	spin_unlock_irqrestore(&chan->lock, flags);
+> +	chan->idle = false;
 >  }
 >  
 >  /**
-> @@ -719,8 +713,11 @@ out_unlock:
->  static void xilinx_vdma_issue_pending(struct dma_chan *dchan)
->  {
->  	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
-> +	unsigned long flags;
->  
-> +	spin_lock_irqsave(&chan->lock, flags);
->  	xilinx_vdma_start_transfer(chan);
-> +	spin_unlock_irqrestore(&chan->lock, flags);
->  }
->  
->  /**
-> @@ -732,21 +729,15 @@ static void xilinx_vdma_issue_pending(struct dma_chan *dchan)
->  static void xilinx_vdma_complete_descriptor(struct xilinx_vdma_chan *chan)
->  {
->  	struct xilinx_vdma_tx_descriptor *desc, *next;
-> -	unsigned long flags;
-> -
-> -	spin_lock_irqsave(&chan->lock, flags);
-
-this one as well
-
->  
->  	if (list_empty(&chan->active_list))
-> -		goto out_unlock;
-> +		return;
->  
->  	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
->  		list_del(&desc->node);
->  		dma_cookie_complete(&desc->async_tx);
->  		list_add_tail(&desc->node, &chan->done_list);
->  	}
-> -
-> -out_unlock:
-> -	spin_unlock_irqrestore(&chan->lock, flags);
->  }
->  
->  /**
-> @@ -857,8 +848,10 @@ static irqreturn_t xilinx_vdma_irq_handler(int irq, void *data)
->  	}
->  
+> @@ -854,6 +827,7 @@ static irqreturn_t xilinx_vdma_irq_handler(int irq, void *data)
 >  	if (status & XILINX_VDMA_DMASR_FRM_CNT_IRQ) {
-> +		spin_lock(&chan->lock);
+>  		spin_lock(&chan->lock);
 >  		xilinx_vdma_complete_descriptor(chan);
+> +		chan->idle = true;
 >  		xilinx_vdma_start_transfer(chan);
-> +		spin_unlock(&chan->lock);
+>  		spin_unlock(&chan->lock);
 >  	}
+> @@ -1212,6 +1186,7 @@ static int xilinx_vdma_chan_probe(struct xilinx_vdma_device *xdev,
 >  
->  	tasklet_schedule(&chan->tasklet);
+>  	list_add_tail(&chan->common.device_node, &xdev->common.channels);
+>  	xdev->chan[chan->id] = chan;
+> +	chan->idle = true;
+>  
+>  	/* Reset the channel */
+>  	err = xilinx_vdma_chan_reset(chan);
 > -- 
 > 2.1.2
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 ~Vinod
