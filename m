@@ -1,123 +1,31 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 23 Feb 2016 09:47:39 +0100
-Subject: [PATCH v5 0/8] Add MT8173 Video Encoder Driver and VPU Driver
-In-Reply-To: <1456215081-16858-1-git-send-email-tiffany.lin@mediatek.com>
-References: <1456215081-16858-1-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <56CC1CAB.1060409@xs4all.nl>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 Feb 2016 08:51:15 +0000
+Subject: [PATCH] irqchip/gicv3-its: Don't allow devices whose ID is
+ outside range
+In-Reply-To: <1456199868-9054-1-git-send-email-shankerd@codeaurora.org>
+References: <1456199868-9054-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <56CC1D83.4060503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/16 09:11, Tiffany Lin wrote:
-> ==============
->  Introduction
-> ==============
+On 23/02/16 03:57, Shanker Donthineni wrote:
+> We are not checking whether the requested device identifier fits into
+> table or not. The ITS MAPD command fails if 'Device ID' is outside of
+> device table range.
 > 
-> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
-> Mediatek Video Codec is able to handle video encoding of in a range of formats.
+> Add a simple validation check to avoid MAPD failures since we are
+> not handling ITS command errors. This change also helps to return an
+> error -ENOMEM instead of success to caller.
 > 
-> This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
-> communicate with VPU.
-> 
-> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI.
-> MTK IOMMU[1] and MTK SMI[2] have not yet been merged, but we wanted to start discussion about the driver
-> earlier so it could be merged sooner.
-> 
-> [1]https://patchwork.kernel.org/patch/8335461/
-> [2]https://patchwork.kernel.org/patch/7596181/
 
-<snip>
+In which circumstances do you see this failing? We allocate memory for
+the whole DevID range (as advertised by the ITS), so anything that comes
+up outside of that range cannot be handled anyway, and is a HW
+integration issue. You might as well pretend that these devices do not
+exist.
 
-> v4l2-compliance test output:
-> localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1
-> Driver Info:
->         Driver name   : mtk-vcodec-enc
->         Card type     : platform:mt8173
->         Bus info      : platform:mt8173
->         Driver version: 4.4.0
->         Capabilities  : 0x84204000
->                 Video Memory-to-Memory Multiplanar
->                 Streaming
->                 Extended Pix Format
->                 Device Capabilities
->         Device Caps   : 0x04204000
->                 Video Memory-to-Memory Multiplanar
->                 Streaming
->                 Extended Pix Format
-> 
-> Compliance test for device /dev/video1 (not using libv4l2):
-> 
-> Required ioctls:
->         test VIDIOC_QUERYCAP: OK
-> 
-> Allow for multiple opens:
->         test second video open: OK
->         test VIDIOC_QUERYCAP: OK
->         test VIDIOC_G/S_PRIORITY: OK
-> 
-> Debug ioctls:
->         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
->         test VIDIOC_LOG_STATUS: OK (Not Supported)
-> 
-> Input ioctls:
->         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
->         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
->         test VIDIOC_ENUMAUDIO: OK (Not Supported)
->         test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
->         test VIDIOC_G/S_AUDIO: OK (Not Supported)
->         Inputs: 0 Audio Inputs: 0 Tuners: 0
-> 
-> Output ioctls:
->         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
->         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
->         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
->         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
->         Outputs: 0 Audio Outputs: 0 Modulators: 0
-> 
-> Input/Output configuration ioctls:
->         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->         test VIDIOC_G/S_EDID: OK (Not Supported)
-> 
->         Control ioctls:
->                 test VIDIOC_QUERYCTRL/MENU: OK
->                 test VIDIOC_G/S_CTRL: OK
->                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK
->                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
->                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->                 Standard Controls: 12 Private Controls: 0
-> 
->         Format ioctls:
->                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->                 test VIDIOC_G/S_PARM: OK
->                 test VIDIOC_G_FBUF: OK (Not Supported)
->                 test VIDIOC_G_FMT: OK
->                 test VIDIOC_TRY_FMT: OK
->                 test VIDIOC_S_FMT: OK
->                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-> 
->         Codec ioctls:
->                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
->                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
->                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-> 
->         Buffer ioctls:
->                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->                 test VIDIOC_EXPBUF: OK
-> 
-> Total: 38, Succeeded: 38, Failed: 0, Warnings: 0
+Thanks,
 
-Nice!
-
-Can you try 'v4l2-compliance -s'? Note that this may not work since I know
-that v4l2-compliance doesn't work all that well with codecs, but I am
-curious what the output is when you try streaming.
-
-Don't bother trying to chase down reported failures, those are likely from
-v4l2-compliance itself. It is something I would like to improve, but -ENOTIME.
-
-Regards,
-
-	Hans
+	M.
+-- 
+Jazz is not dead. It just smells funny...
