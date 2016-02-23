@@ -1,53 +1,77 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 23 Feb 2016 23:23:42 +0100
-Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
- mappings
-In-Reply-To: <CAPcyv4h86uzieFV4HM-tZoWSVZ7GY2GKEUk334J+5sD_GyzWKg@mail.gmail.com>
- (Dan Williams's message of "Tue, 23 Feb 2016 09:21:44 -0800")
-References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
- <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
- <20160222200227.GF19428@n2100.arm.linux.org.uk>
- <CAKv+Gu9gwnuu7hnYpjv7ozuKYmC8ApMakSJmYvQMaevNEd5zvA@mail.gmail.com>
- <20160223115835.GI19428@n2100.arm.linux.org.uk>
- <CAKv+Gu8oCnu6kv5SxUAdWE_Z0V+PMAKDgM6MxTi4mTm5z6EFqA@mail.gmail.com>
- <CAKv+Gu_iEOC6E+N28pp9eEJxWFYTgLaQcBYEy1SvTUHT=cybYA@mail.gmail.com>
- <CAPcyv4h86uzieFV4HM-tZoWSVZ7GY2GKEUk334J+5sD_GyzWKg@mail.gmail.com>
-Message-ID: <87twkzukup.fsf@belgarion.home>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 23 Feb 2016 23:37:55 +0100
+Subject: [PATCH v2 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <1456240244-10275-3-git-send-email-alexandre.torgue@gmail.com>
+References: <1456240244-10275-1-git-send-email-alexandre.torgue@gmail.com>
+ <1456240244-10275-3-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <CAGhQ9VwsSb-Nb4nQ4Q9=b-Dj_8EhSi=LOK-r4JbKcE=nfODufw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dan Williams <dan.j.williams@intel.com> writes:
+Hi Alexandre,
 
-> On Tue, Feb 23, 2016 at 4:26 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 23 February 2016 at 13:03, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>> On 23 February 2016 at 12:58, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>>> On Mon, Feb 22, 2016 at 09:35:24PM +0100, Ard Biesheuvel wrote:
->> OK, I see what you mean. I find it unfortunate that ioremap_cache()
->> instances are blindly being replaced with memremap(), and I wonder if
->> this wasted test by and/or cc'ed to people who can actually test this
->> driver. Dan?
+You should copy 'devicetree at vger.kernel.org' on bindings doc. Adding cc here.
 
-Actually I have the hardware to test it.
+On 23 February 2016 at 16:10, Alexandre TORGUE
+<alexandre.torgue@gmail.com> wrote:
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+>
+> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> new file mode 100644
+> index 0000000..18734b3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> @@ -0,0 +1,41 @@
+> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
+> +
+> +This file documents platform glue layer for stmmac.
+> +Please see stmmac.txt for the other unchanged properties.
+> +
+> +The device node has following properties.
+> +
+> +Required properties:
+> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
+> +              "snps,dwmac-3.50a" to select IP vesrion.
+> +- clocks: Should contain the GMAC main clock, and tx clock
+> +- compatible:  Should be "st,stm32-dwmac" to select glue and
+> +              "snps,dwmac-3.50a" to select IP version.
+> +- clocks: Should contain the MAC main clock
+> +- clock-names: Should contain the clock names "stmmaceth".
+> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
+> +             encompases the glue register, and the offset of the control register.
+> +
+> +Optional properties:
+> +- clocks: Could contain:
+> +       - the tx clock,
+> +       - the rx clock
+> +- clock-names: Could contain the clock names "tx-clk", "rx-clk"
+> +
+> +Example:
+> +
+> +               ethernet0: dwmac at 40028000 {
+> +                       device_type = "network";
 
-And I also know what is behind :
- - it's a CFI NOR based memory
- - these are Intel StrataFlash 28F128J3A chips
- - as a CFI memory it is mapped on the system bus
- - from a read perspective, it behaves like a normal memory
- - but once the first write reaches the CFI, everything changes (the address
-   space layout doesn't have the same meaning, be that becoming a status code or
-   something else).
-   In these conditions reordering of writes versus reads, merging reads after
-   a write or coalescing writes is a recipe for disaster.
+What is this 'device_type = "network"' for?
+It seems to used in a lot of powerpc DTs, but only a couple of arm DTs.
 
-All of this to say I can make a small discrete number of tests (less than 10
-write or erase ones to preserve the precious NOR).
+Maybe Rob could enlighten us?
 
-Cheers.
+> +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
+> +                       status = "disabled";
+> +                       reg = <0x40028000 0x8000>;
+> +                       reg-names = "stmmaceth";
+> +                       interrupts = <0 61 0>, <0 62 0>;
+> +                       interrupt-names = "macirq", "eth_wake_irq";
+> +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
+> +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
+> +                       st,syscon = <&syscfg 0x4>;
+> +                       snps,pbl = <32>;
 
---
-Robert
+Regarding snps,pbl; using 32 here might not give you what you would except.
+See comment in dwmac1000_dma_init().
+
+The driver is hard coded to use PBL4X/PBL8X mode. Just a heads up.
+
+
+regards,
+Joachim Eastwood
