@@ -1,67 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Feb 2016 11:03:12 +0100
-Subject: [RFC PATCH 00/10] arm64: restrict __pa translation to linear
- virtual addresses
-In-Reply-To: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8mrgRZaK5c+AuZBS=XA-66P3=UqP-J3O0_vNck_iUQMA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Feb 2016 11:10:33 +0100
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <3695074.sKSIyOjpjD@wuerfel>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <3695074.sKSIyOjpjD@wuerfel>
+Message-ID: <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 February 2016 at 21:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> As pointed out by Will, performing non-trivial arithmetic in the implementation
-> of __pa() may affect performance. So instead of allowing __pa() to deal with
-> addresses that are either covered by the kernel mappin in the vmalloc area, or
-> by the linear region, let's restrict ourselves to the latter.
+On Tue, Feb 23, 2016 at 10:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 23 February 2016 10:08:05 Linus Walleij wrote:
+>> I will think of a better solution, if any, for this for v4.6, but will
+>> put forward something that handles the Nomadik and all the
+>> other ARM reference designs for now.
+>>
 >
-> This involves replacing some __pa() translations with a specific translation
-> for kernel symbols (__pa_symbol), but other than that it is fairly
-> straightforward (except KASAN is being a pain again, but for the purpose of this
-> discussion that should not matter too much)
->
+> How about still describing all known panels in the DT marked 'status="disabled"',
+> but then having a minimal piece of board specific code that just enables
+> whichever one gets detected at boot time?
 
-With some additional s/__pa/__pa_symbol/ replacements for SMP and KVM,
-this runs happily on my Seattle A0 (no kasan yet, though)
+Close but no cigar :D
+
+It means that all panels (enabled and all disabled) have to have the same
+endpoint in the of_graph.
+
+I tried it:
+
+    panel at 0 {
+        compatible = "panel-dpi";
+        port {
+            clcd_panel: endpoint {
+                remote-endpoint = <&clcd_pads>;
+            };
+        };
+(...)
+
+    panel at 1 {
+        compatible = "panel-dpi";
+        port {
+            clcd_panel: endpoint {
+                remote-endpoint = <&clcd_pads>;
+            };
+        };
+(...)
 
 
-> Patch #1 is a fix for a bug that I spotted  while working on this.
->
-> Patch #2 introduces the new translations __kimg_to_phys and __pa_symbol. They
-> do exactly the same but the former matches the existing __phys_to_kimg, and the
-> latter already exists on x86 as well for translating 'symbols visible to C code'
->
-> Patch #3 - #9 replace various instances of __pa() translations involving virtual
-> addresses pointing into the kernel image.
->
-> Patch #10 finally removes the comparison against PAGE_OFFSET from the
-> implementation of __virt_to_phys(), so that it can only be used for addresses
-> that are known to be in the linear region.
->
-> git://git.linaro.org/people/ard.biesheuvel/linux-arm.git arm64-pa-linear-mapping
->
-> Ard Biesheuvel (10):
->   arm64: mm: move assignment of 'high_memory' before its first use
->   arm64: introduce __kimg_to_phys() and __pa_symbol()
->   arm64: mm: avoid __pa translations in cpu_replace_ttbr1
->   arm64: mm: avoid __pa translations on empty_zero_page
->   arm64: mm: avoid __pa translations in early_fixmap_init
->   arm64: mm: use __pa_symbol() not __pa() for section boundary symbols
->   arm64: mm: avoid __pa translations for idmap_pg_dir and swapper_pg_dir
->   arm64: vdso: avoid __pa translations
->   arm64: insn: avoid __pa translations
->   arm64: mm: restrict __pa() translations to linear virtual addresses
->
->  arch/arm64/include/asm/memory.h      | 15 ++++++++----
->  arch/arm64/include/asm/mmu_context.h | 10 ++++----
->  arch/arm64/include/asm/pgalloc.h     |  2 --
->  arch/arm64/include/asm/pgtable.h     |  2 +-
->  arch/arm64/kernel/insn.c             |  2 +-
->  arch/arm64/kernel/setup.c            |  8 +++----
->  arch/arm64/kernel/vdso.c             |  5 ++--
->  arch/arm64/mm/init.c                 | 13 +++++++----
->  arch/arm64/mm/mmu.c                  | 24 ++++++++++----------
->  9 files changed, 43 insertions(+), 38 deletions(-)
->
-> --
-> 2.5.0
->
+        display at 10120000 {
+(...)
+            port {
+(...)
+                clcd_pads: endpoint at 0 {
+                    reg = <0>;
+                    remote-endpoint = <&clcd_panel>;
+                    arm,pl11x,tft-r0g0b0-pads = <1 7 13>;
+                };
+            };
+
+
+
+Building the device tree:
+
+ERROR (duplicate_label): ERROR (duplicate_label): Duplicate label
+'clcd_panel' on /panel at 1/port/endpoint and /panel at 0/port/endpoint
+Duplicate label 'clcd_panel' on /panel at 1/port/endpoint and
+/panel at 0/port/endpoint
+
+So the dtc does not allow duplicate node labels for the phandle
+even if the node it resides in is disabled. Tough luck...
+
+Yours,
+Linus Walleij
