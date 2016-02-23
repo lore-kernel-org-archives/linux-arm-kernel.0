@@ -1,43 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 16:01:06 +0100
-Subject: [PATCH] [RFC] ARM: keystone: possibly fix big-endian kernels
-In-Reply-To: <20160223145318.GK19428@n2100.arm.linux.org.uk>
-References: <1456238609-962461-1-git-send-email-arnd@arndb.de>
- <20160223145318.GK19428@n2100.arm.linux.org.uk>
-Message-ID: <3249746.5p1eRtyJ9a@wuerfel>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 23 Feb 2016 20:28:24 +0530
+Subject: [PATCH 10/61] gpio: ath79: Use devm_gpiochip_add_data() for gpio
+ registration
+In-Reply-To: <20160222211323.5c10533f@tock>
+References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>	<1456150130-2668-11-git-send-email-ldewangan@nvidia.com>
+ <20160222211323.5c10533f@tock>
+Message-ID: <56CC7390.6050805@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 February 2016 14:53:18 Russell King - ARM Linux wrote:
-> On Tue, Feb 23, 2016 at 03:43:21PM +0100, Arnd Bergmann wrote:
-> > While discussing a regressing in the netcp driver, I wondered
-> > whether Keystone can work with a big-endian kernel, and noticed
-> > that we don't switch endianess when we enter the kernel on the
-> > secondary CPU, or when we call into smc.
-> 
-> NAK.  Sorry Arnd, you're worringly wrong on this.
-> 
-> secondary_startup will do the setend if necessary, there's no need
-> to do this kind of junk in each and every platform.  It's been this
-> way since:
-> 
-> commit 97bcb0fea590d3d704f985bec08f342d28992634
-> Author: Ben Dooks <ben.dooks@codethink.co.uk>
-> Date:   Fri Feb 1 09:40:42 2013 +0000
-> 
-> So, I hope you've not been telling platform folk to do this.  Please
-> audit the arm-soc code to make sure, thanks.
-> 
 
-I see my mistake now: I looked at the secondary_startup() function
-by looking up the location in ctags, and that pointed me to
-arch/arm/kernel/head-nommu.S.
-
-I was surprised when I didn't see the setend() in there, but
-didn't realize that I was looking in the wrong place, but it
-made some sense when I found the setend in a couple of other
-platforms that all need a wrapper anyway.
-
-Sorry about the noise.
-
-	Arnd
+On Tuesday 23 February 2016 01:43 AM, Alban wrote:
+> On Mon, 22 Feb 2016 19:37:59 +0530
+> Laxman Dewangan <ldewangan@nvidia.com> wrote:
+>
+>> Use devm_gpiochip_add_data() for GPIO registration.
+>>
+>> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+>> Cc: Alban Bedel <albeu@free.fr>
+>> ---
+>>   drivers/gpio/gpio-ath79.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpio/gpio-ath79.c b/drivers/gpio/gpio-ath79.c
+>> index d13dd13..a6aad59 100644
+>> --- a/drivers/gpio/gpio-ath79.c
+>> +++ b/drivers/gpio/gpio-ath79.c
+>> @@ -182,7 +182,7 @@ static int ath79_gpio_probe(struct platform_device *pdev)
+>>   		ctrl->chip.direction_output = ar934x_gpio_direction_output;
+>>   	}
+>>   
+>> -	err = gpiochip_add_data(&ctrl->chip, ctrl);
+>> +	err = devm_gpiochip_add_data(&pdev->dev, &ctrl->chip, ctrl);
+>>   	if (err) {
+>>   		dev_err(&pdev->dev,
+>>   			"cannot add AR71xx GPIO chip, error=%d", err);
+> With the patches already applied to the devel branch a few more changes
+> will be needed to remove the calls to gpiochip_remove() in the probe
+> error path and the remove callback.
+>
+OK, I will drop this patch when provide the git pointer to Linus.
+We can work on this later.
