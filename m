@@ -1,38 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 15:06:39 +0100
-Subject: [PATCH 3/3] ARM: mvebu: mark mvebu_hwcc_pci_nb as __maybe_unused
+Date: Tue, 23 Feb 2016 15:06:38 +0100
+Subject: [PATCH 2/3] ARM: mv78xx0: avoid unused function warning
 In-Reply-To: <1456236403-115511-1-git-send-email-arnd@arndb.de>
 References: <1456236403-115511-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456236403-115511-4-git-send-email-arnd@arndb.de>
+Message-ID: <1456236403-115511-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coherency notifier block is only used when CONFIG_PCI
-is enabled, otherwise we get a warning:
+mv78xx0 produces a harmless warning when CONFIG_CACHE_FEROCEON_L2 is
+disabled:
 
-arch/arm/mach-mvebu/coherency.c:110:30: warning: 'mvebu_hwcc_pci_nb' defined but not used [-Wunused-variable]
+arch/arm/mach-mv78xx0/common.c:385:19: warning: 'is_l2_writethrough' defined but not used [-Wunused-function]
 
-There is no nice way to use an if(IS_ENABLED()) check here to
-let the compiler know that it might be used, so let's mark
-the structure as __maybe_unused.
+This avoids the warning by changing the #ifdef to an if(IS_ENABLED())
+check with the same resulting object code.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-mvebu/coherency.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-mv78xx0/common.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 55348ee5a352..7e989d61159c 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -107,7 +107,7 @@ static struct notifier_block mvebu_hwcc_nb = {
- 	.notifier_call = mvebu_hwcc_notifier,
- };
+diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+index a1a04df9c05c..99cc93900a24 100644
+--- a/arch/arm/mach-mv78xx0/common.c
++++ b/arch/arm/mach-mv78xx0/common.c
+@@ -405,9 +405,8 @@ void __init mv78xx0_init(void)
+ 	printk("HCLK = %dMHz, ", (hclk + 499999) / 1000000);
+ 	printk("TCLK = %dMHz\n", (get_tclk() + 499999) / 1000000);
  
--static struct notifier_block mvebu_hwcc_pci_nb = {
-+static struct notifier_block mvebu_hwcc_pci_nb __maybe_unused = {
- 	.notifier_call = mvebu_hwcc_notifier,
- };
+-#ifdef CONFIG_CACHE_FEROCEON_L2
+-	feroceon_l2_init(is_l2_writethrough());
+-#endif
++	if (IS_ENABLED(CONFIG_CACHE_FEROCEON_L2))
++		feroceon_l2_init(is_l2_writethrough());
  
+ 	/* Setup root of clk tree */
+ 	clk_init();
 -- 
 2.7.0
