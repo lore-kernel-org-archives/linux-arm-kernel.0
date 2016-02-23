@@ -1,59 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Feb 2016 18:47:14 +0000
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
- on PowerPC and ARM)
-In-Reply-To: <20160223191907.25719a4d@thinkpad>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name>
- <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
- <20160223103221.GA1418@node.shutemov.name>
- <20160223191907.25719a4d@thinkpad>
-Message-ID: <20160223184658.GA27281@arm.com>
+From: chris.brandt@renesas.com (Chris Brandt)
+Date: Tue, 23 Feb 2016 14:15:36 -0500
+Subject: [PATCH v2] ARM: Allow MULTIPLATFORM to select XIP
+In-Reply-To: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+References: <1455816310-11308-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <1456254936-28875-1-git-send-email-chris.brandt@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Steve, since he worked on THP for 32-bit ARM]
+As devices move to multiplatform only, you should not be restricted from
+selecting XIP. Whether it makes sense or not depends on how you configure
+the rest of the kernel (as in, removing individual platforms).
+While there is no easy way to guarantee success when XIP is selected,
+the MULTIPLATFORM_XIP_CAPABLE attribute at least provides a means to
+show what devices have been known to boot (when configured correctly).
 
-On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
-> On Tue, 23 Feb 2016 13:32:21 +0300
-> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
-> > The theory is that the splitting bit effetely masked bogus pmd_present():
-> > we had pmd_trans_splitting() in all code path and that prevented mm from
-> > touching the pmd. Once pmd_trans_splitting() has gone, mm proceed with the
-> > pmd where it shouldn't and here's a boom.
-> 
-> Well, I don't think pmd_present() == true is bogus for a trans_huge pmd under
-> splitting, after all there is a page behind the the pmd. Also, if it was
-> bogus, and it would need to be false, why should it be marked !pmd_present()
-> only at the pmdp_invalidate() step before the pmd_populate()? It clearly
-> is pmd_present() before that, on all architectures, and if there was any
-> problem/race with that, setting it to !pmd_present() at this stage would
-> only (marginally) reduce the race window.
-> 
-> BTW, PowerPC and Sparc seem to do the same thing in pmdp_invalidate(),
-> i.e. they do not set pmd_present() == false, only mark it so that it would
-> not generate a new TLB entry, just like on s390. After all, the function
-> is called pmdp_invalidate(), and I think the comment in mm/huge_memory.c
-> before that call is just a little ambiguous in its wording. When it says
-> "mark the pmd notpresent" it probably means "mark it so that it will not
-> generate a new TLB entry", which is also what the comment is really about:
-> prevent huge and small entries in the TLB for the same page at the same
-> time.
-> 
-> FWIW, and since the ARM arch-list is already on cc, I think there is
-> an issue with pmdp_invalidate() on ARM, since it also seems to clear
-> the trans_huge (and formerly trans_splitting) bit, which actually makes
-> the pmd !pmd_present(), but it violates the other requirement from the
-> comment:
-> "the pmd_trans_huge and pmd_trans_splitting must remain set at all times
-> on the pmd until the split is complete for this pmd"
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+---
+v2:
+* Added MULTIPLATFORM_XIP_CAPABLE because there is no good way to
+restrict that only 1 device can be selected at one time, so this at
+least narrows down the the exposure of XIP in multiplatform.
+---
+ arch/arm/Kconfig               | 7 +++++--
+ arch/arm/mach-shmobile/Kconfig | 1 +
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-I've only been testing this for arm64 (where I'm yet to see a problem),
-but we use the generic pmdp_invalidate implementation from
-mm/pgtable-generic.c there. On arm64, pmd_trans_huge will return true
-after pmd_mknotpresent. On arm, it does look to be buggy, since it nukes
-the entire entry... Steve?
-
-Will
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d67f1aa..0d838ed 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -226,6 +226,9 @@ config NEED_RET_TO_USER
+ config ARCH_MTD_XIP
+ 	bool
+ 
++config MULTIPLATFORM_XIP_CAPABLE
++	bool
++
+ config VECTORS_BASE
+ 	hex
+ 	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
+@@ -327,7 +330,7 @@ config ARCH_MULTIPLATFORM
+ 	depends on MMU
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_HAS_SG_CHAIN
+-	select ARM_PATCH_PHYS_VIRT
++	select ARM_PATCH_PHYS_VIRT if !XIP_KERNEL
+ 	select AUTO_ZRELADDR
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
+@@ -1918,7 +1921,7 @@ endchoice
+ 
+ config XIP_KERNEL
+ 	bool "Kernel Execute-In-Place from ROM"
+-	depends on !ARM_LPAE && !ARCH_MULTIPLATFORM
++	depends on (!ARM_LPAE && !ARCH_MULTIPLATFORM) || (!ARM_LPAE && MULTIPLATFORM_XIP_CAPABLE)
+ 	help
+ 	  Execute-In-Place allows the kernel to run from non-volatile storage
+ 	  directly addressable by the CPU, such as NOR flash. This saves RAM
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index cd5f171..b27661e 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -57,6 +57,7 @@ config ARCH_R7S72100
+ 	bool "RZ/A1H (R7S72100)"
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select SYS_SUPPORTS_SH_MTU2
++	select MULTIPLATFORM_XIP_CAPABLE
+ 
+ config ARCH_R8A73A4
+ 	bool "R-Mobile APE6 (R8A73A40)"
+-- 
+1.9.1
