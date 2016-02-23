@@ -1,250 +1,113 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 23 Feb 2016 19:14:48 +0100
-Subject: [PATCH v3 00/12] pwm: add support for atomic update
-In-Reply-To: <CAD=FV=UvxG3MYD4MKQJqN7W68uMjd-s+FH-e8tkrLCpS0RLmZQ@mail.gmail.com>
-References: <20151110173416.GB21727@ulmo>
- <CAD=FV=WL3jYEgVe-m6QcAyQwfJgdX4J5OtKisKwyoKOrTSpEQA@mail.gmail.com>
- <20160125170855.GA10182@ulmo>
- <CAD=FV=Xvxeqo3imUmjukC5iYk3EZkrJ04G7C1B-w4xyr-r6-2Q@mail.gmail.com>
- <20160203145337.GD9650@ulmo>
- <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
- <20160222175929.GA23899@ulmo>
- <CAD=FV=UCErW3EjYRtwt49_ztNR7cyY4U0o4R_dxdomer-Ac2Dg@mail.gmail.com>
- <20160223143859.GA27656@ulmo>
- <CAD=FV=UvxG3MYD4MKQJqN7W68uMjd-s+FH-e8tkrLCpS0RLmZQ@mail.gmail.com>
-Message-ID: <20160223181448.GA14754@ulmo.nvidia.com>
+From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
+Date: Tue, 23 Feb 2016 10:19:00 -0800
+Subject: [PATCH V3] iommu/arm-smmu-v2: Add support for 16 bit VMID
+Message-ID: <1456251540-1269-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 09:35:48AM -0800, Doug Anderson wrote:
-> On Tue, Feb 23, 2016 at 6:38 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
-[...]
-> > That's not quite what I was thinking. If hardware readout is supported
-> > then whatever we report back should be the current hardware state unless
-> > we're explicitly asked for something else. If we start mixing the state
-> > and legacy APIs this way, we'll get into a situation where drivers that
-> > support hardware readout behave differently than drivers that don't.
-> >
-> > For example: A PWM device that's controlled by a driver that supports
-> > hardware readout has a current period of 50000 ns and the firmware set
-> > the period to 25000 ns. pwm_get_period() for this PWM device will return
-> > 50000 ns. If you reconfigure the PWM to generate a PWM signal with a
-> > period of 30000 ns, pwm_get_period() would still return 50000 ns.
-> >
-> > A driver that doesn't support hardware readout, on the contrary, would
-> > return 50000 ns from pwm_get_period() on the first call, but after you
-> > have reconfigured it using pwm_config() it will return the new period.
-> 
-> Ah, right!  I forgot that the existing API will be updated if you've
-> reconfigured the period via pwm_config().  Ugh, you're right that's a
-> little ugly then.
-> 
-> So do we define it as:
-> 
-> pwm_get_state(): always get the hardware state w/ no caching (maybe
-> even pwm_get_raw_state() or pwm_get_hw_state())
+ARM-SMMUv2 supports upto 16 bit VMID. This patch enables
+16 bit VMID when HW supports.
 
-Caching vs. no caching should be irrelevant here. Unless PWM hardware is
-autonomous the current state will always match the hardware state after
-the initial hardware readout.
+Changes from V2:
+	- Bug fix.
+	- Removed not needed prints and comments.
 
-> pwm_get_period(): get the period of the PWM; if the PWM has not yet
-> been configured by software this gets the default period (possibly
-> specified by the device tree).
+changes from V1:
+	- Remove DT Property and enable 16 bit VMID if ID says.
 
-No. I think we'll need a different construct for the period defined by
-DT or board files. pwm_get_period() is the legacy API to retrieve the
-"current" period, even if it was lying a little before the atomic API.
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+---
+ drivers/iommu/arm-smmu.c | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 
-> Is that OK?  That is well defined and doesn't change the existing
-> behavior of pwm_get_period().
-
-pwm_get_period() is legacy API and in order to transition to the atomic
-API it should be implemented in terms of atomic API. So the goal is to
-get everything internally converted to deal with states only, then wrap
-the existing API around that concept. pwm_get_period() would become:
-
-	unsigned int pwm_get_period(struct pwm_device *pwm)
-	{
-		struct pwm_state state;
-
-		pwm_get_state(pwm, &state);
-
-		return state.period;
-	}
-
-If we don't do that, we'll never be able to get rid of the legacy API.
-
-> >> > That way if you want to get the current voltage in the regulator-pwm
-> >> > driver you'd simply do a pwm_get_state() and compute the voltage from
-> >> > the period and duty cycle. If the PWM driver that you happen to use
-> >> > doesn't support hardware readout, you'll get an initial output voltage
-> >> > of 0, which is as good as any, really.
-> >>
-> >> Sounds fine to me.  PWM regulator is in charge of calling
-> >> pwm_get_state(), which can return 0 (or an error?) if driver (or
-> >> underlying hardware) doesn't support hardware readout.  PWM regulator
-> >> is in charge of using the resulting period / duty cycle to calculate a
-> >> percentage.
-> >
-> > I'm not sure if pwm_get_state() should ever return an error. For drivers
-> > that support hardware readout, the resulting state should match what's
-> > programmed to the hardware.
-> >
-> > But for drivers without hardware readout support pwm_get_state() still
-> > makes sense because after a pwm_apply_state() the internal logical state
-> > would again match hardware.
-> 
-> I guess it depends on how you define things.  With my above
-> definitions it seems clearest if pwm_get_state() returns an error if
-> hardware readout is not supported.  If we call it pwm_get_hw_state()
-> it's even clearer that it should return an error.
-
-Again, if we do this, we'll have to keep the legacy API around forever
-and keep special-casing atomic vs. legacy API in every user. The goal is
-to converge on the atomic API as the standard API in users so that the
-legacy API can be removed when all users have been converted.
-
-> > To allow your use-case to work we'd need to deal with two states: the
-> > current hardware state and the "initial" state as defined by DT.
-> > Unfortunately the PWM specifier in DT is not a full definition, it is
-> > more like a partial initial configuration. The problem with that, and
-> > I think that's what Mark was originally objecting to, is that it isn't
-> > clear when to use the "initial" state and when to use the read hardware
-> > state. After the first pwm_apply_state() you wouldn't ever have to use
-> > the "initial" state again, because it's the same as the current state
-> > (modulo the duty cycle).
-> >
-> > Also for drivers such as clk-pwm the usefulness of the "initial" state
-> > is reduced even more, because it doesn't even need the period specified
-> > in DT. It uses only the flags (if at all).
-> >
-> > Perhaps to avoid this confusion a new type of object, e.g. pwm_args,
-> > could be introduced to hold configuration arguments given in the PWM
-> > specifier (in DT) or the PWM lookup table (in board files).
-> >
-> > It would then be the responsibility of the users to deal with that
-> > information in a sensible way. In (almost?) all cases I would expect
-> > that to be to program the PWM device in the user's ->probe(). In the
-> > case of regulator-pwm I'd expect that ->probe() would do something
-> > along these lines (error handling excluded):
-> >
-> >         struct pwm_state state;
-> >         struct pwm_args args;
-> >         unsigned int ratio;
-> >
-> >         pwm = pwm_get(...);
-> >
-> >         pwm_get_state(pwm, &state);
-> >         pwm_get_args(pwm, &args);
-> >
-> >         ratio = (state.duty_cycle * 100) / state.period;
-> >
-> >         state.duty_cycle = (ratio * args.period) / 100;
-> >         state.period = args.period;
-> >         state.flags = args.flags;
-> >
-> >         pwm_apply_state(pwm, &state);
-> >
-> > The ->set_voltage() implementation would then never need to care about
-> > the PWM args, but rather do something like this:
-> >
-> >         struct pwm_state state;
-> >         unsigned int ratio;
-> >
-> >         pwm_get_state(pwm, &state);
-> >
-> >         state.duty_cycle = (ratio * state.period) / 100;
-> >
-> >         pwm_apply_state(pwm, &state);
-> >
-> > Does that sound about right?
-> 
-> That should work with one minor problem.  If HW readout isn't
-> supported then pwm_get_state() in probe will presumably return 0 for
-> the duty cycle.  That means it will change the voltage.  That's in
-> contrast to how I think things work today where the voltage isn't
-> changed until the first set_voltage() call.  At least the last time I
-> tested things get_voltage() would simply report an incorrect value
-> until the first set_voltage().  I think existing behavior (reporting
-> the wrong value) is better than new behavior (change the value at
-> probe).
-
-That's exactly the point. Reporting a wrong value isn't really a good
-option. Changing the voltage on boot is the only way to make the logical
-state match the hardware state on boot. Chances are that if you don't
-have hardware readout support you probably don't care what state your
-regulator will be in.
-
-Then again, if we don't support hardware readout, setting up the logical
-state with data from DT (or board files) and defaulting the duty cycle
-to 0, we end up with exactly what we had before, even with the atomic
-API, right? Maybe that's okay, too.
-
-> I'm curious, though.  In your proposal, how does pwm_get_period()
-> behave?  To be backward compatible, I'd imagine that even in your
-> proposal we'd have the same definition as I had above:
-> 
-> pwm_get_period(): get the period of the PWM; if the PWM has not yet
-> been configured by software this gets the default period (possibly
-> specified by the device tree).
-
-It would simply return the logical period of the PWM. For drivers that
-support hardware readout it would always match the hardware period, but
-for drivers that don't it might be wrong until state is first applied.
-
-> If you have a different definition of pwm_get_period() in your
-> proposal, please let me know!  If my definition matches your thoughts
-> then I think we can actually just not touch the "set_voltage" call.
-> It can always use pwm_get_period() and always use pwm_config() just
-> like today.
-> 
-> ...and if set_voltage() remains untouched then we can solve my probe
-> problem by renaming pwm_get_state() to pwm_get_hw_state() and having
-> it return an error if HW readout is not supported.  Then we only call
-> pwm_get_args() / pwm_apply_state() when we support HW readout.
-
-The problem is that we make the API clumsy to use. If we don't sync the
-"initial" state (as defined by DT or board files) to hardware at any
-point, then we need to add the pwm_args construct and always stick to
-it. I think it weird to have to use the pwm_args.period instead of the
-current period.
-
-So we're back to square one, really. That's exactly what Mark brought up
-originally.
-
-> Thus, if HW readout:
-> 
-> * In probe, we read HW state (pwm_get_hw_state) and atomically adjust
-> (pwm_apply_state) based on arguments (pwm_get_args).
-> 
-> * In set_voltage we use pwm_get_period which will return the period we
-> applied in pwm_apply_state() and use pwm_config() to change the duty
-> cycle.
-> 
-> 
-> If no HW readout, no behavior change at all from today:
-> 
-> * In probe we don't do anything to change the PWM
-> 
-> * Upon the first set_voltage we use pwm_get_period() to get the period
-> as specified in DT and use pwm_config() to change the duty cycle.
-> 
-> 
-> That seems pretty sane to me.  What do you think?
-
-This has the big disadvantage of having to special case hardware readout
-vs. non-hardware readout providers. I think that makes the API really
-difficult to use. It requires too many details to be aware of.
-
-I guess this boils down to whether applying the "initial" state on probe
-really is problematic.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160223/8a7a7470/attachment.sig>
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 59ee4b8..247a469 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -93,6 +93,7 @@
+ #define sCR0_VMIDPNE			(1 << 11)
+ #define sCR0_PTM			(1 << 12)
+ #define sCR0_FB				(1 << 13)
++#define sCR0_VMID16EN			(1 << 31)
+ #define sCR0_BSU_SHIFT			14
+ #define sCR0_BSU_MASK			0x3
+ 
+@@ -140,6 +141,7 @@
+ #define ID2_PTFS_4K			(1 << 12)
+ #define ID2_PTFS_16K			(1 << 13)
+ #define ID2_PTFS_64K			(1 << 14)
++#define ID2_VMID16			(1 << 15)
+ 
+ /* Global TLB invalidation */
+ #define ARM_SMMU_GR0_TLBIVMID		0x64
+@@ -189,6 +191,8 @@
+ #define ARM_SMMU_GR1_CBA2R(n)		(0x800 + ((n) << 2))
+ #define CBA2R_RW64_32BIT		(0 << 0)
+ #define CBA2R_RW64_64BIT		(1 << 0)
++#define CBA2R_VMID_SHIFT		16
++#define CBA2R_VMID_MASK			0xffff
+ 
+ /* Translation context bank */
+ #define ARM_SMMU_CB_BASE(smmu)		((smmu)->base + ((smmu)->size >> 1))
+@@ -297,6 +301,7 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_TRANS_S2		(1 << 3)
+ #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
+ #define ARM_SMMU_FEAT_TRANS_OPS		(1 << 5)
++#define ARM_SMMU_FEAT_VMID16		(1 << 6)
+ 	u32				features;
+ 
+ #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
+@@ -726,16 +731,15 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+ 
+ 	if (smmu->version > ARM_SMMU_V1) {
+-		/*
+-		 * CBA2R.
+-		 * *Must* be initialised before CBAR thanks to VMID16
+-		 * architectural oversight affected some implementations.
+-		 */
+ #ifdef CONFIG_64BIT
+ 		reg = CBA2R_RW64_64BIT;
+ #else
+ 		reg = CBA2R_RW64_32BIT;
+ #endif
++		/* if 16bit VMID supported set VMID in CBA2R */
++		if (smmu->features & ARM_SMMU_FEAT_VMID16)
++			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
++
+ 		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
+ 	}
+ 
+@@ -751,7 +755,8 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 	if (stage1) {
+ 		reg |= (CBAR_S1_BPSHCFG_NSH << CBAR_S1_BPSHCFG_SHIFT) |
+ 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
+-	} else {
++	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
++		/*16 bit VMID is not supported set 8 bit VMID here */
+ 		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
+ 	}
+ 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
+@@ -1508,6 +1513,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	/* Don't upgrade barriers */
+ 	reg &= ~(sCR0_BSU_MASK << sCR0_BSU_SHIFT);
+ 
++	if (smmu->features & ARM_SMMU_FEAT_VMID16)
++		reg |= sCR0_VMID16EN;
++
+ 	/* Push the button */
+ 	__arm_smmu_tlb_sync(smmu);
+ 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+@@ -1658,6 +1666,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 	size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
+ 	smmu->pa_size = size;
+ 
++	/* See if 16bit VMID is supported */
++	if (id & ID2_VMID16)
++		smmu->features |= ARM_SMMU_FEAT_VMID16;
++
+ 	/*
+ 	 * What the page table walker can address actually depends on which
+ 	 * descriptor format is in use, but since a) we don't know that yet,
+-- 
+2.1.0
