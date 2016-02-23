@@ -1,95 +1,126 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 23 Feb 2016 09:46:46 +0800
-Subject: [PATCH v12 03/21] KVM: ARM64: Add offset defines for PMU registers
-In-Reply-To: <56CB4A98.2020403@arm.com>
-References: <1456133877-9584-1-git-send-email-zhaoshenglong@huawei.com>
- <1456133877-9584-4-git-send-email-zhaoshenglong@huawei.com>
- <56CB4A98.2020403@arm.com>
-Message-ID: <56CBBA06.4040902@huawei.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 22 Feb 2016 17:58:18 -0800
+Subject: [PATCH v12 0/5] arm64, numa: Add numa support for arm64 platforms
+Message-ID: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: David Daney <david.daney@cavium.com>
+
+v12:
+
+	- Replaced 6 patches from Ard Biesheuvel with new simpler, and
+          more correct, single patch, also from Ard.
+
+v11:
+	- Dropped cleanup patches for other architectures, they will be
+          submitted as a separate set after more testing.
+
+	- Added patch set from Ard Biesheuvel that are needed to make
+          the whole thing actually work.  Previously this was a
+          separate set.
+
+	- Kconfig and other fixes and simplifications as suggested by Rob Herring.
+
+	- Rearranged, refactored and reordered so that we don't patch
+          new files multiple times.
+
+	- Summary:
+
+		o 6 patches from Ard Biesheuvel to allow use of
+		  "memory" nodes with efi stub.
+
+		o 2 patches to document and add of_numa.c
+
+		o 1 patch to add arm64 NUMA support.
+
+		o 1 patch to add NUMA balancing support for arm64.
+
+v10:
+	- Incorporated review comments from Rob Herring.
+	- Moved numa binding and implementation to devicetree core.
+	- Added cleanup patch to remove redundant NODE_DATA macro from asm header files
+	- Include numa balancing support for arm64 patch in this series.
+	- Fix tile build issue reported by the kbuild robot(patch 7)
+
+v9:	- Added cleanup patch to reuse and avoid redefinition of cpumask_of_pcibus
+	  as suggested from Will Deacon and Bjorn Helgaas.
+	  - Including patch to Make pci-host-generic driver numa aware.
+	  - Incorporated comment from Shannon Zhao.
+
+v8:
+	- Incorporated review comments of Mark Rutland and Will Deacon.
+	- Added pci helper function and macro for numa.
+
+v7:
+	- managing numa memory mapping using memblock.
+	- Incorporated review comments of Mark Rutland.
+
+v6:
+	- defined and implemented the numa dt binding using
+	node property proximity and device node distance-map.
+	- renamed dt_numa to of_numa
+
+v5:
+        - created base verion of numa.c which creates dummy numa without using dt
+          on single socket platforms. Then added patches for dt support.
+        - Incorporated review comments from Hanjun Guo.
+
+v4:
+done changes as per Arnd review comments.
+
+v3:
+Added changes to support numa on arm64 based platforms.
+Tested these patches on cavium's multinode(2 node topology) platform.
+In this patchset, defined and implemented dt bindings for numa mapping
+for core and memory using device node property arm,associativity.
+
+v2:
+Defined and implemented numa map for memory, cores to node and
+proximity distance matrix of nodes.
+
+v1:
+Initial patchset to support numa on arm64 platforms.
+
+Note: 1. This patchset is tested for NUMA and without NUMA with dt
+        (both with and without NUMA bindings) on thunderx single
+        socket and dual socket boards.
 
 
-On 2016/2/23 1:51, Marc Zyngier wrote:
-> On 22/02/16 09:37, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> We are about to trap and emulate accesses to each PMU register
->> individually. This adds the context offsets for the AArch64 PMU
->> registers.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->> Reviewed-by: Andrew Jones <drjones@redhat.com>
->> ---
->>  arch/arm64/include/asm/kvm_host.h | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 6f0241f..6bab7fb 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -115,6 +115,21 @@ enum vcpu_sysreg {
->>  	MDSCR_EL1,	/* Monitor Debug System Control Register */
->>  	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
->>  
->> +	/* Performance Monitors Registers */
->> +	PMCR_EL0,	/* Control Register */
->> +	PMOVSSET_EL0,	/* Overflow Flag Status Set Register */
->> +	PMSELR_EL0,	/* Event Counter Selection Register */
->> +	PMEVCNTR0_EL0,	/* Event Counter Register (0-30) */
->> +	PMEVCNTR30_EL0 = PMEVCNTR0_EL0 + 30,
->> +	PMCCNTR_EL0,	/* Cycle Counter Register */
->> +	PMEVTYPER0_EL0,	/* Event Type Register (0-30) */
->> +	PMEVTYPER30_EL0 = PMEVTYPER0_EL0 + 30,
->> +	PMCCFILTR_EL0,	/* Cycle Count Filter Register */
->> +	PMCNTENSET_EL0,	/* Count Enable Set Register */
->> +	PMINTENSET_EL1,	/* Interrupt Enable Set Register */
->> +	PMUSERENR_EL0,	/* User Enable Register */
->> +	PMSWINC_EL0,	/* Software Increment Register */
->> +
-> 
-> I've just noticed a rather fundamental issue with this: this makes it
-> impossible to bisect the whole series.
-> 
-Ah, sorry. Will fix this.
+Ard Biesheuvel (1):
+  efi: ARM/arm64: ignore DT memory nodes instead of removing them
 
-> I was trying to pinpoint a performance regression with this series, and
-> started bisecting.
-You mean this series introduce a performance regression? Is there any
-method to measure that? Then I can have a look too.
+Ganapatrao Kulkarni (4):
+  Documentation, dt, numa: dt bindings for NUMA.
+  dt, numa: Add NUMA dt binding implementation.
+  arm64, numa: Add NUMA support for arm64 platforms.
+  arm64, mm, numa: Add NUMA balancing support for arm64.
 
-> Unfortunately, declaring these registers in one go
-> means that we end-up with uninitialized registers after this patch (and
-> probably until PMUSERENR is dealt with). The consequence of that is
-> something like this:
-> 
-> Kernel panic - not syncing: Didn't reset vcpu_sys_reg(25)
-> CPU: 1 PID: 1994 Comm: lkvm Tainted: G        W       4.5.0-rc5+ #5563
-> Hardware name: Default string Default string/Default string, BIOS
-> ROD0084E 09/03/2015
-> Call trace:
-> [<ffffffc000089a20>] dump_backtrace+0x0/0x1a8
-> [<ffffffc000089bdc>] show_stack+0x14/0x20
-> [<ffffffc00033490c>] dump_stack+0x94/0xb8
-> [<ffffffc00014ddbc>] panic+0x10c/0x250
-> [<ffffffc0000a9c94>] kvm_reset_sys_regs+0xec/0xf0
-> [<ffffffc0000a7878>] kvm_reset_vcpu+0x58/0x80
-> [<ffffffc0000a2c44>] kvm_arch_vcpu_ioctl+0x294/0x310
-> [<ffffffc00009d6b4>] kvm_vcpu_ioctl+0xcc/0x698
-> [<ffffffc0001cb184>] do_vfs_ioctl+0xa4/0x750
-> [<ffffffc0001cb8bc>] SyS_ioctl+0x8c/0xa0
-> [<ffffffc000085d30>] el0_svc_naked+0x24/0x28
-> 
-> The obvious fix would be to introduce each register with the patch that
-> handles it. At least, we'll be able to bisect it...
-> 
-> Thanks,
-> 
-> 	M.
-> 
+ Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++
+ arch/arm64/Kconfig                         |  27 ++
+ arch/arm64/include/asm/mmzone.h            |  12 +
+ arch/arm64/include/asm/numa.h              |  45 ++++
+ arch/arm64/include/asm/pgtable.h           |  15 ++
+ arch/arm64/include/asm/topology.h          |  10 +
+ arch/arm64/kernel/pci.c                    |  10 +
+ arch/arm64/kernel/setup.c                  |   4 +
+ arch/arm64/kernel/smp.c                    |   4 +
+ arch/arm64/mm/Makefile                     |   1 +
+ arch/arm64/mm/init.c                       |  34 ++-
+ arch/arm64/mm/mmu.c                        |   1 +
+ arch/arm64/mm/numa.c                       | 403 +++++++++++++++++++++++++++++
+ drivers/firmware/efi/arm-init.c            |   8 +
+ drivers/firmware/efi/libstub/fdt.c         |  24 +-
+ drivers/of/Kconfig                         |   3 +
+ drivers/of/Makefile                        |   1 +
+ drivers/of/of_numa.c                       | 211 +++++++++++++++
+ include/linux/of.h                         |   9 +
+ 19 files changed, 1066 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/numa.txt
+ create mode 100644 arch/arm64/include/asm/mmzone.h
+ create mode 100644 arch/arm64/include/asm/numa.h
+ create mode 100644 arch/arm64/mm/numa.c
+ create mode 100644 drivers/of/of_numa.c
 
-Thanks,
 -- 
-Shannon
+1.8.3.1
