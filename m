@@ -1,167 +1,105 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 23 Feb 2016 12:08:34 +0100
-Subject: [PATCH V4 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support generic Xilinx AXI PCIe Host Bridge IP driver
-In-Reply-To: <1455208091-15556-6-git-send-email-bharatku@xilinx.com>
-References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
- <1455208091-15556-6-git-send-email-bharatku@xilinx.com>
-Message-ID: <56CC3DB2.3080900@xilinx.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 23 Feb 2016 12:21:35 +0100
+Subject: [PATCH 1/4] net: ethernet: dwmac: add Ethernet glue logic for
+ stm32 chip
+In-Reply-To: <CAJgp7zxYhbQ4yQHBB3cu50TU9N9xvk3HxCp0NP5fxFbxrMsD_g@mail.gmail.com>
+References: <1454511275-9791-1-git-send-email-alexandre.torgue@gmail.com>
+ <1454511275-9791-2-git-send-email-alexandre.torgue@gmail.com>
+ <CAGhQ9VypZ5J0pQmrf1Mk-mNsv=XTXu7fhoLt_r2LHJ_Lsyj0yA@mail.gmail.com>
+ <CAJgp7zwOVEq=hnxfUt7eHZWSFUAwuK6MCVHdH591=xReRUsW8Q@mail.gmail.com>
+ <CAGhQ9VzPTgRqqLi4zjHkP-++v5smZ7s52drev1z-AvgXaLuC7Q@mail.gmail.com>
+ <CAJgp7zxYhbQ4yQHBB3cu50TU9N9xvk3HxCp0NP5fxFbxrMsD_g@mail.gmail.com>
+Message-ID: <CAGhQ9VxQ3nW+dr9pdj=H8UcsNHEATxVeAf8N_PsQA7-73uksTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.2.2016 17:28, Bharat Kumar Gogada wrote:
-> This patch does required modifications to microblaze PCI subsystem, to
-> work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
-> and Zynq.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> ---
-> Changes:
-> Removed pcibios_get_phb_of_node in pci-common.c, using generic version
-> instead.
-> Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
-> Modified pcibios_align_resource in pci-common.c, as per generic
-> architecuture, removed temporary variable.
-> Removed pci_domain_nr in pci-common.c, instead using generic code.
-> Added pcibios_add_device in pci-common.c, as per generic architecuture.
-> Adding Kernel configuration in arch/microblaze as required for generic PCI
-> domains.
-> Added kernel configuration for driver to support Microblaze.
-> ---
->  arch/microblaze/Kconfig          |  3 +++
->  arch/microblaze/pci/pci-common.c | 56 +++++++---------------------------------
->  drivers/pci/host/Kconfig         |  2 +-
->  3 files changed, 14 insertions(+), 47 deletions(-)
-> 
-> diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-> index 0bce820..c3702b9 100644
-> --- a/arch/microblaze/Kconfig
-> +++ b/arch/microblaze/Kconfig
-> @@ -271,6 +271,9 @@ config PCI
->  config PCI_DOMAINS
->  	def_bool PCI
->  
-> +config PCI_DOMAINS_GENERIC
-> +	def_bool PCI_DOMAINS
-> +
->  config PCI_SYSCALL
->  	def_bool PCI
->  
-> diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
-> index ae838ed..35654be 100644
-> --- a/arch/microblaze/pci/pci-common.c
-> +++ b/arch/microblaze/pci/pci-common.c
-> @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t address)
->  }
->  EXPORT_SYMBOL_GPL(pci_address_to_pio);
->  
-> -/*
-> - * Return the domain number for this bus.
-> - */
-> -int pci_domain_nr(struct pci_bus *bus)
-> -{
-> -	struct pci_controller *hose = pci_bus_to_host(bus);
-> -
-> -	return hose->global_number;
-> -}
-> -EXPORT_SYMBOL(pci_domain_nr);
-> -
->  /* This routine is meant to be used early during boot, when the
->   * PCI bus numbers have not yet been assigned, and you need to
->   * issue PCI config cycles to an OF device.
-> @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus *bus)
->  
->  void pcibios_fixup_bus(struct pci_bus *bus)
->  {
-> -	/* When called from the generic PCI probe, read PCI<->PCI bridge
-> -	 * bases. This is -not- called when generating the PCI tree from
-> -	 * the OF device-tree.
-> -	 */
-> -	if (bus->self != NULL)
-> -		pci_read_bridge_bases(bus);
-> -
-> -	/* Now fixup the bus bus */
-> -	pcibios_setup_bus_self(bus);
-> -
-> -	/* Now fixup devices on that bus */
-> -	pcibios_setup_bus_devices(bus);
-> +	/* nothing to do */
->  }
->  EXPORT_SYMBOL(pcibios_fixup_bus);
->  
-> -static int skip_isa_ioresource_align(struct pci_dev *dev)
-> -{
-> -	return 0;
-> -}
-> -
->  /*
->   * We need to avoid collisions with `mirrored' VGA ports
->   * and other strange ISA hardware, so we always want the
-> @@ -899,20 +872,18 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
->  resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->  				resource_size_t size, resource_size_t align)
->  {
-> -	struct pci_dev *dev = data;
-> -	resource_size_t start = res->start;
-> -
-> -	if (res->flags & IORESOURCE_IO) {
-> -		if (skip_isa_ioresource_align(dev))
-> -			return start;
-> -		if (start & 0x300)
-> -			start = (start + 0x3ff) & ~0x3ff;
-> -	}
-> -
-> -	return start;
-> +	return res->start;
->  }
->  EXPORT_SYMBOL(pcibios_align_resource);
->  
-> +int pcibios_add_device(struct pci_dev *dev)
-> +{
-> +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(pcibios_add_device);
-> +
->  /*
->   * Reparent resource children of pr that conflict with res
->   * under res, and make res replace those children.
-> @@ -1333,13 +1304,6 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
->  		 (unsigned long)hose->io_base_virt - _IO_BASE);
->  }
->  
-> -struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
-> -{
-> -	struct pci_controller *hose = bus->sysdata;
-> -
-> -	return of_node_get(hose->dn);
-> -}
-> -
->  static void pcibios_scan_phb(struct pci_controller *hose)
->  {
->  	LIST_HEAD(resources);
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index d5e58ba..7c56c2e 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -79,7 +79,7 @@ config PCI_KEYSTONE
->  
->  config PCIE_XILINX
->  	bool "Xilinx AXI PCIe host bridge support"
-> -	depends on ARCH_ZYNQ
-> +	depends on ARCH_ZYNQ || MICROBLAZE
->  	help
->  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
->  	  Host Bridge driver.
-> 
+On 23 February 2016 at 10:59, Alexandre Torgue
+<alexandre.torgue@gmail.com> wrote:
+> 2016-02-22 22:52 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
+>> On 22 February 2016 at 15:50, Alexandre Torgue
+>> <alexandre.torgue@gmail.com> wrote:
+>>> 2016-02-13 14:48 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
+>>>> On 3 February 2016 at 15:54, Alexandre TORGUE
+>>>> <alexandre.torgue@gmail.com> wrote:
+>>>>> +       plat_dat->bsp_priv = dwmac;
+>>>>> +       plat_dat->init = stm32_dwmac_init;
+>>>>> +       plat_dat->exit = stm32_dwmac_exit;
+>>>>
+>>>> Instead of using these callbacks could you rather implement the PM
+>>>> callbacks directly in this driver?
+>>>> I don't think it should add much code and it will make it look more
+>>>> like standard driver. This will also give you some more control and
+>>>> flexibility in your code.
+>>>
+>>> I prefer to keep the code as it is. Glue layer is directly linked to
+>>> stmmac driver and I don't want to brake the link between the glue and
+>>> the stmmac driver.
+>>
+>> What do you mean by break the link?
+>>
+>
+> I thought that you wanted to split stmmac_pltfr_supend (glue part and
+> stmamc part), but I well understood it is not the case (sorry for
+> mistake).
+>
+>> There has been numerous of patch sets to make the stmmac "glue"
+>> drivers into more standard platform drivers.
+>> http://marc.info/?l=linux-netdev&m=143159850631093&w=2
+>> http://marc.info/?l=linux-netdev&m=143708560009851&w=2
+>> http://marc.info/?l=linux-netdev&m=143812136600541&w=2
+>>
+>> Do you see any advantage by using the init and exit hooks in your
+>> driver instead of using the standard driver PM callbacks and remove
+>> function?
+>> The only "cost" I see is slightly more boilerplate code. But since you
+>> already have init/exit functions you could easily make them into PM
+>> resume/suspend so I doubt there would be much increase in code size.
+>>
+>
+> If I well understood you want to continue the stmmac glue driver
+> rework by moving stmmac_pltfr_suspend/resume/remove in each glue
+> driver (stm32, sun, sti ....).
 
-Less code in arch is better.
+At least I want to avoid the init/exit callbacks for new drivers like
+stm32-dwmac.
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-Bjorn: Please take this via your tree.
+> Each glue driver will call directly stmmac_suspend/resume/remove and
+> their own init/exit function.
+> If it is what you meant, I can do it.
 
-Thanks,
-Michal
+Yes, in your stm32 driver's suspend/resume/remove functions call
+stmmac_suspend/stmmac_resume/stmmac_dvr_remove directly. Then you
+shouldn't need to use the init/exit callbacks. Just put the need code
+in the driver's suspend/resume/remove functions instead of init/exit
+functions.
+
+For example:
+static int stm32_dwmac_resume(struct device *dev)
+{
+    struct net_device *ndev = dev_get_drvdata(dev);
+    struct plat_stmmacenet_data *plat_dat = get_stmmac_plat_data(ndev)
+    struct stm32_dwmac *dwmac =plat_dat->bsp_priv;
+
+    /* enable clocks */
+    /* set phy mode */
+
+    return stmmac_resume(ndev);
+}
+
+If it makes sense to have the enable clk/phy mode stuff in it's own
+function that is fine too.
+
+
+>> One other thing;
+>> Do you need to have the PHY mode setup code in the init function which
+>> is called each time on resume?
+>
+> I can't guarantee that after a suspend the sysconfig register will
+> contain same data than before suspend.
+
+I see.
+
+
+regards,
+Joachim Eastwood
