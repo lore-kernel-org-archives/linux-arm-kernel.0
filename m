@@ -1,81 +1,79 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 24 Feb 2016 08:47:16 +0900
-Subject: [PATCH 2/3] ARM: EXYNOS: remove unused register offset definition
-In-Reply-To: <56CC2238.2040303@samsung.com>
-References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
- <1456135396-17767-3-git-send-email-pankaj.dubey@samsung.com>
- <56CBA1BC.4050003@samsung.com> <56CC2238.2040303@samsung.com>
-Message-ID: <56CCEF84.6090502@samsung.com>
+From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
+Date: Tue, 23 Feb 2016 15:50:21 -0800
+Subject: [PATCH V2] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
+In-Reply-To: <20160223122616.GE4989@leverpostej>
+References: <1455820158-8529-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160223122616.GE4989@leverpostej>
+Message-ID: <56CCF03D.3000809@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.02.2016 18:11, pankaj.dubey wrote:
-> Hi Krzysztof,
-> 
-> On Tuesday 23 February 2016 05:33 AM, Krzysztof Kozlowski wrote:
->> On 22.02.2016 19:03, Pankaj Dubey wrote:
->>> This patch cleans up map.h by removing unused register offset
->>> and changing EXYNOS4 to EXYNOS in header comment section.
->>>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos/include/mach/map.h | 9 +--------
->>>  1 file changed, 1 insertion(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
->>> index 351e839..c48ba4f 100644
->>> --- a/arch/arm/mach-exynos/include/mach/map.h
->>> +++ b/arch/arm/mach-exynos/include/mach/map.h
->>> @@ -2,7 +2,7 @@
->>>   * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
->>>   *		http://www.samsung.com/
->>>   *
->>> - * EXYNOS4 - Memory map definitions
->>> + * EXYNOS - Memory map definitions
->>>   *
->>>   * This program is free software; you can redistribute it and/or modify
->>>   * it under the terms of the GNU General Public License version 2 as
->>> @@ -14,12 +14,6 @@
->>>  
->>>  #include <plat/map-base.h>
->>>  
->>> -/*
->>> - * EXYNOS4 UART offset is 0x10000 but the older S5P SoCs are 0x400.
->>> - * So need to define it, and here is to avoid redefinition warning.
->>> - */
->>> -#define S3C_UART_OFFSET			(0x10000)
->>> -
->>>  #include <plat/map-s5p.h>
+in Summary,
+
+if i change asid-base to cavium,asid-base and still use DT for supplying 
+base value, is this a solution that will be accepted, of course i will 
+do range check to see we are not supplying 16bit VMID for 8 bit systems 
+even though the property now indicates Cavium only.
+
+Thanks,
+Tirumalesh.
+
+On 02/23/2016 04:26 AM, Mark Rutland wrote:
+> On Thu, Feb 18, 2016 at 10:29:18AM -0800, tchalamarla at caviumnetworks.com wrote:
+>> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
 >>
->> This does not look good. The S3C_UART_OFFSET is used in plat/map-s5p.h.
+>> Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
+>> namespaces; specifically within a given node SMMU0 and SMMU1 share,
+>> as does SMMU2 and SMMU3.
 >>
-> 
-> Actually it's just defined there but not getting used anywhere. In fact
-> we can remove it from there also.
-
-The point is that your patch introduce changes. Before S3C_UART_OFFSET
-was defined to 0x10000, after (because of #ifndef) it will be 0x400.
-Description of "unused" is not accurate. Unused stuff does not impact
-anything.
-
-> So I submitted another patch to
-> cleanup such redundant register definitions from plat/map-s5p.h.
-
-That would be good.
-
-> Only platform using S3C_UART_OFFSET is s3c64xx and its using definition
-> from map-s3c.h. I have compiled all related platform defconfigs and
-> found no issues because of removal of S3C_UART_OFFSET from map-s5p.c and
-> map.h.
-
-The compilation is not a test. You compiled something like this:
--#define S3C_UART_OFFSET			(0x10000)
- #ifndef S3C_UART_OFFSET
- #define S3C_UART_OFFSET         (0x400)
- #endif
-
-... and found no errors. Of course there are no compilation errors! But
-the value has changed!
-
-Best regards,
-Krzysztof
+>> This patch tries to address these issuee by supplying asid and vmid
+>> base from devicetree.
+>>
+>> changes from V1:
+>> 	- rebased on top of 16 bit VMID patch
+>> 	- removed redundent options from DT
+>> 	- insted of transform, DT now supplies starting ASID/VMID
+>>
+>> Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
+>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>> ---
+>>   .../devicetree/bindings/iommu/arm,smmu.txt         |  8 +++++
+>>   drivers/iommu/arm-smmu.c                           | 37 +++++++++++++++-------
+>>   2 files changed, 34 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index bb7e569..80b8484 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -57,6 +57,14 @@ conditions.
+>>
+>>   - smmu-enable-vmid16 : Enable 16 bit VMID, if allowed.
+>>
+>> +- asid-base :	Buggy SMMUv2 implementations which doesn't satisfy the
+>> +		ASID namespace needs, use this field to specify starting
+>> +		ASID for the SMMU.
+>> +
+>> +- vmid-base :	Buggy SMMUv2 implementations which doesn't satisfy the VMID
+>> +		namespace needs, use this field to specify starting VMID
+>> +		for the SMMU.
+>
+> As has been pointed out, these are not strictly properties of the
+> hardware, and are insufficient to aovid the issue in general (adding an
+> arbitrary base does not enforce IDs fall within a particular range).
+>
+> So NAK for *-base properties alone.
+>
+>> +	if (of_property_read_u32(dev->of_node, "#asid-base",
+>> +				 &smmu->asid_base)) {
+>> +		smmu->asid_base = 0;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(dev->of_node, "#vmid-base",
+>> +				 &smmu->vmid_base)) {
+>> +		smmu->vmid_base = 1;
+>> +	}
+>
+> These do not match the documentation above.
+>
+> Mark.
+>
