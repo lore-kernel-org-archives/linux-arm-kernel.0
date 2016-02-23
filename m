@@ -1,95 +1,26 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 23 Feb 2016 08:48:01 +0800
-Subject: [PATCH 0/2] Add Rockchip display port phy driver support
-In-Reply-To: <56CAEDBE.2050808@ti.com>
-References: <1455534071-31230-1-git-send-email-ykk@rock-chips.com>
- <56CAEDBE.2050808@ti.com>
-Message-ID: <56CBAC41.9000400@rock-chips.com>
+From: sugar.zhang@rock-chips.com (sugar)
+Date: Tue, 23 Feb 2016 08:57:04 +0800
+Subject: [PATCH v1 0/2] patches to add support for rockchip rt5640 card
+In-Reply-To: <20160222110416.GC18327@sirena.org.uk>
+References: <1456127815-68575-1-git-send-email-sugar.zhang@rock-chips.com>
+ <20160222110416.GC18327@sirena.org.uk>
+Message-ID: <56CBAE60.6000806@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon,
 
-On 02/22/2016 07:15 PM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Monday 15 February 2016 04:31 PM, Yakir Yang wrote:
->> Hi Kison,
->>
->> This series is splited from Analogix DP DRM thread [0], and Heiko suggest this
->> should be an independent thread which may be easy for you to apply.
-> Indeed. Merged now thanks. (Changed the year to 2016 in the file header before
-> merging)
 
-Thanks a lot  ;)
+? 2/22/2016 19:04, Mark Brown ??:
+> On Mon, Feb 22, 2016 at 03:56:53PM +0800, Sugar Zhang wrote:
+>
+>> Sugar Zhang (2):
+>>    ASoC: rockchip: i2s: add default values for registers
+>>    ASoC: rt5640: add master clock handling for rt5640
+>
+> These appear to be commpletly unrelated patches so should each be sent
+> individually rather than as a series - that way there is no confusion
+> about them possibly depending on each other and they are easier to
+> review and apply.
+>
 
-Yakir
->
-> Thanks
-> Kishon
->
->> Best regards,
->> Yakir
->>
->> [0]: https://patchwork.kernel.org/patch/8086571/
->>
->>
->> Changes in v12:
->> - Re-order the include headers file alphabetically in phy-rockchip-dp.c (Jingoo)
->>
->> Changes in v11:
->> - Correct the title of this rockchip dp phy document(Rob)
->> - Add the ack from Rob Herring
->>
->> Changes in v10:
->> - Fix the wrong macro value of GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK
->>      BIT(4) -> BIT(20)
->>
->> Changes in v9:
->> - Removed the unused the variable "res" in probe function. (Heiko)
->> - Removed the unused head file.
->>
->> Changes in v8:
->> - Fix the mixed spacers on macro definitions. (Heiko)
->> - Remove the unnecessary empty line after clk_prepare_enable. (Heiko)
->> - Remove the specific address in the example node name. (Heiko)
->>
->> Changes in v7:
->> - Simply the commit message. (Kishon)
->> - Symmetrical enable/disbale the phy clock and power. (Kishon)
->> - Simplify the commit message. (Kishon)
->>
->> Changes in v5:
->> - Remove "reg" DT property, cause driver could poweron/poweroff phy via
->>    the exist "grf" syscon already. And rename the example DT node from
->>    "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
->> - Add deivce_node at the front of driver, update phy_ops type from "static
->>    struct" to "static const struct". And correct the input paramters of
->>    devm_phy_create() interfaces. (Heiko)
->> - Split binding doc's from driver changes. (Rob)
->> - Update the rockchip,grf explain in document, and correct the clock required
->>    elemets in document. (Rob & Heiko)
->>
->> Changes in v4:
->> - Add commit message, and remove the redundant rockchip_dp_phy_init()
->>    function, move those code to probe() method. And remove driver .owner
->>    number. (Kishon)
->>
->> Changes in v3:
->> - Suggest, add rockchip dp phy driver, collect the phy clocks and
->>    power control. (Heiko)
->>
->> Yakir Yang (2):
->>    phy: Add driver for rockchip Display Port PHY
->>    dt-bindings: add document for rockchip dp phy
->>
->>   .../devicetree/bindings/phy/rockchip-dp-phy.txt    |  22 +++
->>   drivers/phy/Kconfig                                |   7 +
->>   drivers/phy/Makefile                               |   1 +
->>   drivers/phy/phy-rockchip-dp.c                      | 151 +++++++++++++++++++++
->>   4 files changed, 181 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
->>   create mode 100644 drivers/phy/phy-rockchip-dp.c
->>
->
->
+Got it, thanks.
