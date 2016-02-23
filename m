@@ -1,44 +1,443 @@
 From: johnyoun@synopsys.com (John Youn)
-Date: Tue, 23 Feb 2016 13:33:17 -0800
-Subject: [PATCH RESEND 0/2] usb: dwc2: Remove host and gadget only code from
- core
-Message-ID: <cover.1456260533.git.johnyoun@synopsys.com>
+Date: Tue, 23 Feb 2016 13:33:22 -0800
+Subject: [PATCH RESEND 1/2] usb: dwc2: Move register save and restore functions
+In-Reply-To: <cover.1456260533.git.johnyoun@synopsys.com>
+References: <cover.1456260533.git.johnyoun@synopsys.com>
+Message-ID: <8cb0a09d08414388ad62f57320dc67bb2ee8d0f6.1456260533.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series moves the host/gadget-specific code from core.c to hcd.c
-and gadget.c so that they will be compiled only when their respective
-configurations are selected, or in DRD.
+Move the register save and restore functions into the host and gadget
+specific files.
 
-This is mostly just a straight move of the code. I have also added
-some comments to group related functions together.
+Signed-off-by: John Youn <johnyoun@synopsys.com>
+---
+ drivers/usb/dwc2/core.c   | 183 ----------------------------------------------
+ drivers/usb/dwc2/core.h   |  13 ++++
+ drivers/usb/dwc2/gadget.c | 102 ++++++++++++++++++++++++++
+ drivers/usb/dwc2/hcd.c    |  64 ++++++++++++++++
+ 4 files changed, 179 insertions(+), 183 deletions(-)
 
-Compiled and tested in all three modes.
-
-This should also solve the issue reported here:
-http://marc.info/?l=linux-usb&m=145591813410106&w=2
-
-Although I wasn't able to test it... couldn't figure out how to
-disable CONFIG_USB and enable DWC2 in gadget mode.
-
-Felipe,
-
-This should be applied after Doug's series on your testing/next
-branch.
-
-Regards,
-John
-
-John Youn (2):
-  usb: dwc2: Move register save and restore functions
-  usb: dwc2: Move host-specific core functions into hcd.c
-
- drivers/usb/dwc2/core.c   | 1959 ---------------------------------------------
- drivers/usb/dwc2/core.h   |   35 +-
- drivers/usb/dwc2/gadget.c |  102 +++
- drivers/usb/dwc2/hcd.c    | 1948 ++++++++++++++++++++++++++++++++++++++++++--
- drivers/usb/dwc2/hcd.h    |   10 +
- 5 files changed, 2024 insertions(+), 2030 deletions(-)
-
+diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
+index 3c9c0b2..dc60339 100644
+--- a/drivers/usb/dwc2/core.c
++++ b/drivers/usb/dwc2/core.c
+@@ -56,189 +56,6 @@
+ #include "core.h"
+ #include "hcd.h"
+ 
+-#if IS_ENABLED(CONFIG_USB_DWC2_HOST) || IS_ENABLED(CONFIG_USB_DWC2_DUAL_ROLE)
+-/**
+- * dwc2_backup_host_registers() - Backup controller host registers.
+- * When suspending usb bus, registers needs to be backuped
+- * if controller power is disabled once suspended.
+- *
+- * @hsotg: Programming view of the DWC_otg controller
+- */
+-static int dwc2_backup_host_registers(struct dwc2_hsotg *hsotg)
+-{
+-	struct dwc2_hregs_backup *hr;
+-	int i;
+-
+-	dev_dbg(hsotg->dev, "%s\n", __func__);
+-
+-	/* Backup Host regs */
+-	hr = &hsotg->hr_backup;
+-	hr->hcfg = dwc2_readl(hsotg->regs + HCFG);
+-	hr->haintmsk = dwc2_readl(hsotg->regs + HAINTMSK);
+-	for (i = 0; i < hsotg->core_params->host_channels; ++i)
+-		hr->hcintmsk[i] = dwc2_readl(hsotg->regs + HCINTMSK(i));
+-
+-	hr->hprt0 = dwc2_read_hprt0(hsotg);
+-	hr->hfir = dwc2_readl(hsotg->regs + HFIR);
+-	hr->valid = true;
+-
+-	return 0;
+-}
+-
+-/**
+- * dwc2_restore_host_registers() - Restore controller host registers.
+- * When resuming usb bus, device registers needs to be restored
+- * if controller power were disabled.
+- *
+- * @hsotg: Programming view of the DWC_otg controller
+- */
+-static int dwc2_restore_host_registers(struct dwc2_hsotg *hsotg)
+-{
+-	struct dwc2_hregs_backup *hr;
+-	int i;
+-
+-	dev_dbg(hsotg->dev, "%s\n", __func__);
+-
+-	/* Restore host regs */
+-	hr = &hsotg->hr_backup;
+-	if (!hr->valid) {
+-		dev_err(hsotg->dev, "%s: no host registers to restore\n",
+-				__func__);
+-		return -EINVAL;
+-	}
+-	hr->valid = false;
+-
+-	dwc2_writel(hr->hcfg, hsotg->regs + HCFG);
+-	dwc2_writel(hr->haintmsk, hsotg->regs + HAINTMSK);
+-
+-	for (i = 0; i < hsotg->core_params->host_channels; ++i)
+-		dwc2_writel(hr->hcintmsk[i], hsotg->regs + HCINTMSK(i));
+-
+-	dwc2_writel(hr->hprt0, hsotg->regs + HPRT0);
+-	dwc2_writel(hr->hfir, hsotg->regs + HFIR);
+-	hsotg->frame_number = 0;
+-
+-	return 0;
+-}
+-#else
+-static inline int dwc2_backup_host_registers(struct dwc2_hsotg *hsotg)
+-{ return 0; }
+-
+-static inline int dwc2_restore_host_registers(struct dwc2_hsotg *hsotg)
+-{ return 0; }
+-#endif
+-
+-#if IS_ENABLED(CONFIG_USB_DWC2_PERIPHERAL) || \
+-	IS_ENABLED(CONFIG_USB_DWC2_DUAL_ROLE)
+-/**
+- * dwc2_backup_device_registers() - Backup controller device registers.
+- * When suspending usb bus, registers needs to be backuped
+- * if controller power is disabled once suspended.
+- *
+- * @hsotg: Programming view of the DWC_otg controller
+- */
+-static int dwc2_backup_device_registers(struct dwc2_hsotg *hsotg)
+-{
+-	struct dwc2_dregs_backup *dr;
+-	int i;
+-
+-	dev_dbg(hsotg->dev, "%s\n", __func__);
+-
+-	/* Backup dev regs */
+-	dr = &hsotg->dr_backup;
+-
+-	dr->dcfg = dwc2_readl(hsotg->regs + DCFG);
+-	dr->dctl = dwc2_readl(hsotg->regs + DCTL);
+-	dr->daintmsk = dwc2_readl(hsotg->regs + DAINTMSK);
+-	dr->diepmsk = dwc2_readl(hsotg->regs + DIEPMSK);
+-	dr->doepmsk = dwc2_readl(hsotg->regs + DOEPMSK);
+-
+-	for (i = 0; i < hsotg->num_of_eps; i++) {
+-		/* Backup IN EPs */
+-		dr->diepctl[i] = dwc2_readl(hsotg->regs + DIEPCTL(i));
+-
+-		/* Ensure DATA PID is correctly configured */
+-		if (dr->diepctl[i] & DXEPCTL_DPID)
+-			dr->diepctl[i] |= DXEPCTL_SETD1PID;
+-		else
+-			dr->diepctl[i] |= DXEPCTL_SETD0PID;
+-
+-		dr->dieptsiz[i] = dwc2_readl(hsotg->regs + DIEPTSIZ(i));
+-		dr->diepdma[i] = dwc2_readl(hsotg->regs + DIEPDMA(i));
+-
+-		/* Backup OUT EPs */
+-		dr->doepctl[i] = dwc2_readl(hsotg->regs + DOEPCTL(i));
+-
+-		/* Ensure DATA PID is correctly configured */
+-		if (dr->doepctl[i] & DXEPCTL_DPID)
+-			dr->doepctl[i] |= DXEPCTL_SETD1PID;
+-		else
+-			dr->doepctl[i] |= DXEPCTL_SETD0PID;
+-
+-		dr->doeptsiz[i] = dwc2_readl(hsotg->regs + DOEPTSIZ(i));
+-		dr->doepdma[i] = dwc2_readl(hsotg->regs + DOEPDMA(i));
+-	}
+-	dr->valid = true;
+-	return 0;
+-}
+-
+-/**
+- * dwc2_restore_device_registers() - Restore controller device registers.
+- * When resuming usb bus, device registers needs to be restored
+- * if controller power were disabled.
+- *
+- * @hsotg: Programming view of the DWC_otg controller
+- */
+-static int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg)
+-{
+-	struct dwc2_dregs_backup *dr;
+-	u32 dctl;
+-	int i;
+-
+-	dev_dbg(hsotg->dev, "%s\n", __func__);
+-
+-	/* Restore dev regs */
+-	dr = &hsotg->dr_backup;
+-	if (!dr->valid) {
+-		dev_err(hsotg->dev, "%s: no device registers to restore\n",
+-				__func__);
+-		return -EINVAL;
+-	}
+-	dr->valid = false;
+-
+-	dwc2_writel(dr->dcfg, hsotg->regs + DCFG);
+-	dwc2_writel(dr->dctl, hsotg->regs + DCTL);
+-	dwc2_writel(dr->daintmsk, hsotg->regs + DAINTMSK);
+-	dwc2_writel(dr->diepmsk, hsotg->regs + DIEPMSK);
+-	dwc2_writel(dr->doepmsk, hsotg->regs + DOEPMSK);
+-
+-	for (i = 0; i < hsotg->num_of_eps; i++) {
+-		/* Restore IN EPs */
+-		dwc2_writel(dr->diepctl[i], hsotg->regs + DIEPCTL(i));
+-		dwc2_writel(dr->dieptsiz[i], hsotg->regs + DIEPTSIZ(i));
+-		dwc2_writel(dr->diepdma[i], hsotg->regs + DIEPDMA(i));
+-
+-		/* Restore OUT EPs */
+-		dwc2_writel(dr->doepctl[i], hsotg->regs + DOEPCTL(i));
+-		dwc2_writel(dr->doeptsiz[i], hsotg->regs + DOEPTSIZ(i));
+-		dwc2_writel(dr->doepdma[i], hsotg->regs + DOEPDMA(i));
+-	}
+-
+-	/* Set the Power-On Programming done bit */
+-	dctl = dwc2_readl(hsotg->regs + DCTL);
+-	dctl |= DCTL_PWRONPRGDONE;
+-	dwc2_writel(dctl, hsotg->regs + DCTL);
+-
+-	return 0;
+-}
+-#else
+-static inline int dwc2_backup_device_registers(struct dwc2_hsotg *hsotg)
+-{ return 0; }
+-
+-static inline int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg)
+-{ return 0; }
+-#endif
+-
+ /**
+  * dwc2_backup_global_registers() - Backup global controller registers.
+  * When suspending usb bus, registers needs to be backuped
+diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+index 1159259..606629a 100644
+--- a/drivers/usb/dwc2/core.h
++++ b/drivers/usb/dwc2/core.h
+@@ -1295,6 +1295,8 @@ extern void dwc2_hsotg_core_connect(struct dwc2_hsotg *hsotg);
+ extern void dwc2_hsotg_disconnect(struct dwc2_hsotg *dwc2);
+ extern int dwc2_hsotg_set_test_mode(struct dwc2_hsotg *hsotg, int testmode);
+ #define dwc2_is_device_connected(hsotg) (hsotg->connected)
++int dwc2_backup_device_registers(struct dwc2_hsotg *hsotg);
++int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg);
+ #else
+ static inline int dwc2_hsotg_remove(struct dwc2_hsotg *dwc2)
+ { return 0; }
+@@ -1312,6 +1314,10 @@ static inline int dwc2_hsotg_set_test_mode(struct dwc2_hsotg *hsotg,
+ 							int testmode)
+ { return 0; }
+ #define dwc2_is_device_connected(hsotg) (0)
++static inline int dwc2_backup_device_registers(struct dwc2_hsotg *hsotg)
++{ return 0; }
++static inline int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg)
++{ return 0; }
+ #endif
+ 
+ #if IS_ENABLED(CONFIG_USB_DWC2_HOST) || IS_ENABLED(CONFIG_USB_DWC2_DUAL_ROLE)
+@@ -1320,6 +1326,8 @@ extern int dwc2_hcd_get_future_frame_number(struct dwc2_hsotg *hsotg, int us);
+ extern void dwc2_hcd_connect(struct dwc2_hsotg *hsotg);
+ extern void dwc2_hcd_disconnect(struct dwc2_hsotg *hsotg, bool force);
+ extern void dwc2_hcd_start(struct dwc2_hsotg *hsotg);
++int dwc2_backup_host_registers(struct dwc2_hsotg *hsotg);
++int dwc2_restore_host_registers(struct dwc2_hsotg *hsotg);
+ #else
+ static inline int dwc2_hcd_get_frame_number(struct dwc2_hsotg *hsotg)
+ { return 0; }
+@@ -1332,6 +1340,11 @@ static inline void dwc2_hcd_start(struct dwc2_hsotg *hsotg) {}
+ static inline void dwc2_hcd_remove(struct dwc2_hsotg *hsotg) {}
+ static inline int dwc2_hcd_init(struct dwc2_hsotg *hsotg, int irq)
+ { return 0; }
++static inline int dwc2_backup_host_registers(struct dwc2_hsotg *hsotg)
++{ return 0; }
++static inline int dwc2_restore_host_registers(struct dwc2_hsotg *hsotg)
++{ return 0; }
++
+ #endif
+ 
+ #endif /* __DWC2_CORE_H__ */
+diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
+index 422ab7d..e9940dd 100644
+--- a/drivers/usb/dwc2/gadget.c
++++ b/drivers/usb/dwc2/gadget.c
+@@ -3668,3 +3668,105 @@ int dwc2_hsotg_resume(struct dwc2_hsotg *hsotg)
+ 
+ 	return 0;
+ }
++
++/**
++ * dwc2_backup_device_registers() - Backup controller device registers.
++ * When suspending usb bus, registers needs to be backuped
++ * if controller power is disabled once suspended.
++ *
++ * @hsotg: Programming view of the DWC_otg controller
++ */
++int dwc2_backup_device_registers(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_dregs_backup *dr;
++	int i;
++
++	dev_dbg(hsotg->dev, "%s\n", __func__);
++
++	/* Backup dev regs */
++	dr = &hsotg->dr_backup;
++
++	dr->dcfg = dwc2_readl(hsotg->regs + DCFG);
++	dr->dctl = dwc2_readl(hsotg->regs + DCTL);
++	dr->daintmsk = dwc2_readl(hsotg->regs + DAINTMSK);
++	dr->diepmsk = dwc2_readl(hsotg->regs + DIEPMSK);
++	dr->doepmsk = dwc2_readl(hsotg->regs + DOEPMSK);
++
++	for (i = 0; i < hsotg->num_of_eps; i++) {
++		/* Backup IN EPs */
++		dr->diepctl[i] = dwc2_readl(hsotg->regs + DIEPCTL(i));
++
++		/* Ensure DATA PID is correctly configured */
++		if (dr->diepctl[i] & DXEPCTL_DPID)
++			dr->diepctl[i] |= DXEPCTL_SETD1PID;
++		else
++			dr->diepctl[i] |= DXEPCTL_SETD0PID;
++
++		dr->dieptsiz[i] = dwc2_readl(hsotg->regs + DIEPTSIZ(i));
++		dr->diepdma[i] = dwc2_readl(hsotg->regs + DIEPDMA(i));
++
++		/* Backup OUT EPs */
++		dr->doepctl[i] = dwc2_readl(hsotg->regs + DOEPCTL(i));
++
++		/* Ensure DATA PID is correctly configured */
++		if (dr->doepctl[i] & DXEPCTL_DPID)
++			dr->doepctl[i] |= DXEPCTL_SETD1PID;
++		else
++			dr->doepctl[i] |= DXEPCTL_SETD0PID;
++
++		dr->doeptsiz[i] = dwc2_readl(hsotg->regs + DOEPTSIZ(i));
++		dr->doepdma[i] = dwc2_readl(hsotg->regs + DOEPDMA(i));
++	}
++	dr->valid = true;
++	return 0;
++}
++
++/**
++ * dwc2_restore_device_registers() - Restore controller device registers.
++ * When resuming usb bus, device registers needs to be restored
++ * if controller power were disabled.
++ *
++ * @hsotg: Programming view of the DWC_otg controller
++ */
++int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_dregs_backup *dr;
++	u32 dctl;
++	int i;
++
++	dev_dbg(hsotg->dev, "%s\n", __func__);
++
++	/* Restore dev regs */
++	dr = &hsotg->dr_backup;
++	if (!dr->valid) {
++		dev_err(hsotg->dev, "%s: no device registers to restore\n",
++			__func__);
++		return -EINVAL;
++	}
++	dr->valid = false;
++
++	dwc2_writel(dr->dcfg, hsotg->regs + DCFG);
++	dwc2_writel(dr->dctl, hsotg->regs + DCTL);
++	dwc2_writel(dr->daintmsk, hsotg->regs + DAINTMSK);
++	dwc2_writel(dr->diepmsk, hsotg->regs + DIEPMSK);
++	dwc2_writel(dr->doepmsk, hsotg->regs + DOEPMSK);
++
++	for (i = 0; i < hsotg->num_of_eps; i++) {
++		/* Restore IN EPs */
++		dwc2_writel(dr->diepctl[i], hsotg->regs + DIEPCTL(i));
++		dwc2_writel(dr->dieptsiz[i], hsotg->regs + DIEPTSIZ(i));
++		dwc2_writel(dr->diepdma[i], hsotg->regs + DIEPDMA(i));
++
++		/* Restore OUT EPs */
++		dwc2_writel(dr->doepctl[i], hsotg->regs + DOEPCTL(i));
++		dwc2_writel(dr->doeptsiz[i], hsotg->regs + DOEPTSIZ(i));
++		dwc2_writel(dr->doepdma[i], hsotg->regs + DOEPDMA(i));
++	}
++
++	/* Set the Power-On Programming done bit */
++	dctl = dwc2_readl(hsotg->regs + DCTL);
++	dctl |= DCTL_PWRONPRGDONE;
++	dwc2_writel(dctl, hsotg->regs + DCTL);
++
++	return 0;
++}
+diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
+index 2b5a706..b403f6a 100644
+--- a/drivers/usb/dwc2/hcd.c
++++ b/drivers/usb/dwc2/hcd.c
+@@ -3433,3 +3433,67 @@ void dwc2_hcd_remove(struct dwc2_hsotg *hsotg)
+ 	kfree(hsotg->frame_num_array);
+ #endif
+ }
++
++/**
++ * dwc2_backup_host_registers() - Backup controller host registers.
++ * When suspending usb bus, registers needs to be backuped
++ * if controller power is disabled once suspended.
++ *
++ * @hsotg: Programming view of the DWC_otg controller
++ */
++int dwc2_backup_host_registers(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_hregs_backup *hr;
++	int i;
++
++	dev_dbg(hsotg->dev, "%s\n", __func__);
++
++	/* Backup Host regs */
++	hr = &hsotg->hr_backup;
++	hr->hcfg = dwc2_readl(hsotg->regs + HCFG);
++	hr->haintmsk = dwc2_readl(hsotg->regs + HAINTMSK);
++	for (i = 0; i < hsotg->core_params->host_channels; ++i)
++		hr->hcintmsk[i] = dwc2_readl(hsotg->regs + HCINTMSK(i));
++
++	hr->hprt0 = dwc2_read_hprt0(hsotg);
++	hr->hfir = dwc2_readl(hsotg->regs + HFIR);
++	hr->valid = true;
++
++	return 0;
++}
++
++/**
++ * dwc2_restore_host_registers() - Restore controller host registers.
++ * When resuming usb bus, device registers needs to be restored
++ * if controller power were disabled.
++ *
++ * @hsotg: Programming view of the DWC_otg controller
++ */
++int dwc2_restore_host_registers(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_hregs_backup *hr;
++	int i;
++
++	dev_dbg(hsotg->dev, "%s\n", __func__);
++
++	/* Restore host regs */
++	hr = &hsotg->hr_backup;
++	if (!hr->valid) {
++		dev_err(hsotg->dev, "%s: no host registers to restore\n",
++			__func__);
++		return -EINVAL;
++	}
++	hr->valid = false;
++
++	dwc2_writel(hr->hcfg, hsotg->regs + HCFG);
++	dwc2_writel(hr->haintmsk, hsotg->regs + HAINTMSK);
++
++	for (i = 0; i < hsotg->core_params->host_channels; ++i)
++		dwc2_writel(hr->hcintmsk[i], hsotg->regs + HCINTMSK(i));
++
++	dwc2_writel(hr->hprt0, hsotg->regs + HPRT0);
++	dwc2_writel(hr->hfir, hsotg->regs + HFIR);
++	hsotg->frame_number = 0;
++
++	return 0;
++}
 -- 
 2.6.3
