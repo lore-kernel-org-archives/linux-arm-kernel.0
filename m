@@ -1,43 +1,41 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Tue, 23 Feb 2016 09:19:22 +0800
-Subject: [PATCH] ASoC: rockchip: i2s: add default values for registers
-Message-ID: <1456190362-15653-1-git-send-email-sugar.zhang@rock-chips.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Tue, 23 Feb 2016 09:25:01 +0800
+Subject: [PATCH v9 2/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <201602221742.MKAlpbcd%fengguang.wu@intel.com>
+References: <201602221742.MKAlpbcd%fengguang.wu@intel.com>
+Message-ID: <56CBB4ED.304@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch add default values for registers according description from TRM.
+Hi all,
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
+I'll fix this warning in next version.
 
- sound/soc/rockchip/rockchip_i2s.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Other comments will be appreciated!
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 6561c4c..a0b0942 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -440,11 +440,21 @@ static bool rockchip_i2s_precious_reg(struct device *dev, unsigned int reg)
- 	}
- }
- 
-+static const struct reg_default rockchip_i2s_reg_defaults[] = {
-+	{0x00, 0x0000000f},
-+	{0x04, 0x0000000f},
-+	{0x08, 0x00071f1f},
-+	{0x10, 0x001f0000},
-+	{0x14, 0x01f00000},
-+};
-+
- static const struct regmap_config rockchip_i2s_regmap_config = {
- 	.reg_bits = 32,
- 	.reg_stride = 4,
- 	.val_bits = 32,
- 	.max_register = I2S_RXDR,
-+	.reg_defaults = rockchip_i2s_reg_defaults,
-+	.num_reg_defaults = ARRAY_SIZE(rockchip_i2s_reg_defaults),
- 	.writeable_reg = rockchip_i2s_wr_reg,
- 	.readable_reg = rockchip_i2s_rd_reg,
- 	.volatile_reg = rockchip_i2s_volatile_reg,
--- 
-1.9.1
+Thank you!
+
+On 2016/2/22 18:01, kbuild test robot wrote:
+> Hi Jiancheng,
+> 
+> [auto build test WARNING on clk/clk-next]
+> [also build test WARNING on v4.5-rc5 next-20160222]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Jiancheng-Xue/ARM-hisi-Add-initial-support-including-clock-driver-for-Hi3519-soc/20160222-160736
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+> config: xtensa-allyesconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=xtensa 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+> warning: (COMMON_CLK_HI3519) selects RESET_HISI which has unmet direct dependencies (COMMON_CLK && ARCH_HISI)
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
