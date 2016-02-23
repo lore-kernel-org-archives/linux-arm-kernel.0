@@ -1,40 +1,65 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 23 Feb 2016 15:23:34 +0530
-Subject: [GIT PULL] DaVinci EDMA enhancements for v4.6
-In-Reply-To: <1456221214-18042-1-git-send-email-nsekhar@ti.com>
-References: <1456221214-18042-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1456221214-18042-2-git-send-email-nsekhar@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 23 Feb 2016 11:58:17 +0200
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+Message-ID: <56CC2D39.80909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+(cc'ing a few more people as this is going into generic direction)
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+On 23/02/16 11:08, Linus Walleij wrote:
+> On Thu, Feb 4, 2016 at 3:04 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+>> This moves the versatile CLCD configuration to the device tree by:
+> 
+> As this Schr?dinger's cat approach seems controversial, as well
+> as the alternative to manipulate the DT in memory at run-time,
+> I will respin the series without the full Versatile support, adding
+> plug-in for the other ARM boards and and half-baked support
+> for the Versatile supporting just VGA (like the other reference
+> designs from ARM).
+> 
+> The pluggable displays prove yet again to be a problem to the
+> world, sigh.
+> 
+> I will think of a better solution, if any, for this for v4.6, but will
+> put forward something that handles the Nomadik and all the
+> other ARM reference designs for now.
 
-are available in the git repository at:
+I had a chat with Tom Rini and Pantelis Antoniou yesterday.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.6/edma
+Panto is about to send a new series for DT overlay management soon. I
+haven't had time to test that yet, but what it would give us is that you
+could build DT overlay binaries as "firmware" into the kernel image, and
+thus the panel DT data would be there even before rootfs is mounted. The
+DT overlays can be loaded from the rootfs or initramfs too, if it's not
+critical to get the display up early.
 
-for you to fetch changes up to 2137d54d1643c1dcb1ff919f169b4542669a372e:
+I'm not quite sure how it works if, as in versatile display case, there
+are multiple DT overlays of which one has to be enabled. I hope there's
+support to choose which one to use via kernel cmdline or similar.
 
-  ARM: davinci: dm646x: Add dma_slave_map to edma (2016-02-22 15:55:27 +0530)
+I would personally like it much more if the bootloader would either
+compose a final dtb from DT fragments and pass it to the kernel, or
+alternatively the bootloader would pass the base dtb image and a bunch
+of DT overlays to the kernel, and the kernel would deal with the DT
+overlays.
 
-----------------------------------------------------------------
-Pass dma_slave_map data to EDMA driver. This will help
-migration to new DMA engine API for requesting
-slave channels dma_request_chan().
+In any case, I think the firmware solution is a good step forward, and
+will probably work fine for many users. Then again, I haven't tested it
+yet so I don't know the details, and it's not in the mainline.
 
-----------------------------------------------------------------
-Peter Ujfalusi (5):
-      ARM: davinci: devices-da8xx: Add dma_slave_map to edma
-      ARM: davinci: dm355: Add dma_slave_map to edma
-      ARM: davinci: dm365: Add dma_slave_map to edma
-      ARM: davinci: dm644x: Add dma_slave_map to edma
-      ARM: davinci: dm646x: Add dma_slave_map to edma
+ Tomi
 
- arch/arm/mach-davinci/devices-da8xx.c | 46 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-davinci/dm355.c         | 20 +++++++++++++++
- arch/arm/mach-davinci/dm365.c         | 22 +++++++++++++++++
- arch/arm/mach-davinci/dm644x.c        | 12 +++++++++
- arch/arm/mach-davinci/dm646x.c        | 11 +++++++++
- 5 files changed, 111 insertions(+)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160223/79e69ace/attachment.sig>
