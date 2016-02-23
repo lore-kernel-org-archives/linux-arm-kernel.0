@@ -1,44 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 15:34:45 +0100
-Subject: [PATCH] ARM: sa1100: make sa1100_register_uart_fns a function
-Message-ID: <1456238094-778916-1-git-send-email-arnd@arndb.de>
+Date: Tue, 23 Feb 2016 15:35:35 +0100
+Subject: [PATCH] ARM: rpc: rename RAM_SIZE macro
+Message-ID: <1456238141-794068-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling sa1100_register_uart_fns() leaves the port structure
-unused when CONFIG_SERIAL_SA1100 is disabled, and we get a
-compiler warning about that:
+The RAM_SIZE macro in mach/hardware.h conflicts with macros of
+the same name in multiple drivers, leading to annoying build warnings:
 
-arch/arm/mach-sa1100/badge4.c:317:31: warning: 'badge4_port_fns' defined but not used [-Wunused-variable]
- static struct sa1100_port_fns badge4_port_fns __initdata = {
+In file included from drivers/net/ethernet/cirrus/cs89x0.c:79:0:
+drivers/net/ethernet/cirrus/cs89x0.h:324:0: error: "RAM_SIZE" redefined [-Werror]
+ #define RAM_SIZE 0x1000       /*  The card has 4k bytes or RAM */
+ ^
+In file included from /git/arm-soc/arch/arm/mach-rpc/include/mach/io.h:16:0,
+                 from /git/arm-soc/arch/arm/include/asm/io.h:194,
+                 from /git/arm-soc/include/linux/scatterlist.h:8,
+                 from /git/arm-soc/include/linux/dmaengine.h:24,
+                 from /git/arm-soc/include/linux/netdevice.h:38,
+                 from /git/arm-soc/drivers/net/ethernet/cirrus/cs89x0.c:54:
+arch/arm/mach-rpc/include/mach/hardware.h:28:0: note: this is the location of the previous definition
+ #define RAM_SIZE  0x10000000
 
-This turns the two empty macros into empty inline functions,
-which has the same effect, but lets the compiler know that the
-variables are intentionally unused.
+We don't use RAM_SIZE/RAM_START at all, so we could just remove
+them, but it might be nice to leave them for documentation purposes,
+so this renames them to RPC_RAM_SIZE/RPC_RAM_START in order to
+avoid the build warnings
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/platform_data/sa11x0-serial.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-rpc/include/mach/hardware.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/platform_data/sa11x0-serial.h b/include/linux/platform_data/sa11x0-serial.h
-index 4504d5d592f0..009e1d83fe39 100644
---- a/include/linux/platform_data/sa11x0-serial.h
-+++ b/include/linux/platform_data/sa11x0-serial.h
-@@ -26,8 +26,12 @@ struct sa1100_port_fns {
- void sa1100_register_uart_fns(struct sa1100_port_fns *fns);
- void sa1100_register_uart(int idx, int port);
- #else
--#define sa1100_register_uart_fns(fns) do { } while (0)
--#define sa1100_register_uart(idx,port) do { } while (0)
-+static inline void sa1100_register_uart_fns(struct sa1100_port_fns *fns)
-+{
-+}
-+static inline void sa1100_register_uart(int idx, int port)
-+{
-+}
- #endif
+diff --git a/arch/arm/mach-rpc/include/mach/hardware.h b/arch/arm/mach-rpc/include/mach/hardware.h
+index 257166b21f3d..39459eed2973 100644
+--- a/arch/arm/mach-rpc/include/mach/hardware.h
++++ b/arch/arm/mach-rpc/include/mach/hardware.h
+@@ -25,8 +25,8 @@
+  *  *_SIZE  is the size of the region
+  *  *_BASE  is the virtual address
+  */
+-#define RAM_SIZE		0x10000000
+-#define RAM_START		0x10000000
++#define RPC_RAM_SIZE		0x10000000
++#define RPC_RAM_START		0x10000000
  
- #endif
+ #define EASI_SIZE		0x08000000	/* EASI I/O */
+ #define EASI_START		0x08000000
 -- 
 2.7.0
