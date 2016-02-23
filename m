@@ -1,52 +1,115 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Feb 2016 14:16:08 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <56CC57FC.20707@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <3695074.sKSIyOjpjD@wuerfel>
- <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
- <6859810.tb1t0IEONi@wuerfel> <56CC57FC.20707@ti.com>
-Message-ID: <CACRpkdYNaNtQQJ-tsBe5ksa4-z380ZQj-zN8ZnK0ED2kNPUwvg@mail.gmail.com>
+From: alexandre.torgue@gmail.com (Alexandre Torgue)
+Date: Tue, 23 Feb 2016 14:17:21 +0100
+Subject: [PATCH 1/4] net: ethernet: dwmac: add Ethernet glue logic for
+ stm32 chip
+In-Reply-To: <CAGhQ9VxQ3nW+dr9pdj=H8UcsNHEATxVeAf8N_PsQA7-73uksTA@mail.gmail.com>
+References: <1454511275-9791-1-git-send-email-alexandre.torgue@gmail.com>
+ <1454511275-9791-2-git-send-email-alexandre.torgue@gmail.com>
+ <CAGhQ9VypZ5J0pQmrf1Mk-mNsv=XTXu7fhoLt_r2LHJ_Lsyj0yA@mail.gmail.com>
+ <CAJgp7zwOVEq=hnxfUt7eHZWSFUAwuK6MCVHdH591=xReRUsW8Q@mail.gmail.com>
+ <CAGhQ9VzPTgRqqLi4zjHkP-++v5smZ7s52drev1z-AvgXaLuC7Q@mail.gmail.com>
+ <CAJgp7zxYhbQ4yQHBB3cu50TU9N9xvk3HxCp0NP5fxFbxrMsD_g@mail.gmail.com>
+ <CAGhQ9VxQ3nW+dr9pdj=H8UcsNHEATxVeAf8N_PsQA7-73uksTA@mail.gmail.com>
+Message-ID: <CAJgp7zxToxdKH_UU4UpF_jW2hTGvCxOPmxoDMLfphWEcKmsYHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 2:00 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+2016-02-23 12:21 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
+> On 23 February 2016 at 10:59, Alexandre Torgue
+> <alexandre.torgue@gmail.com> wrote:
+>> 2016-02-22 22:52 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
+>>> On 22 February 2016 at 15:50, Alexandre Torgue
+>>> <alexandre.torgue@gmail.com> wrote:
+>>>> 2016-02-13 14:48 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
+>>>>> On 3 February 2016 at 15:54, Alexandre TORGUE
+>>>>> <alexandre.torgue@gmail.com> wrote:
+>>>>>> +       plat_dat->bsp_priv = dwmac;
+>>>>>> +       plat_dat->init = stm32_dwmac_init;
+>>>>>> +       plat_dat->exit = stm32_dwmac_exit;
+>>>>>
+>>>>> Instead of using these callbacks could you rather implement the PM
+>>>>> callbacks directly in this driver?
+>>>>> I don't think it should add much code and it will make it look more
+>>>>> like standard driver. This will also give you some more control and
+>>>>> flexibility in your code.
+>>>>
+>>>> I prefer to keep the code as it is. Glue layer is directly linked to
+>>>> stmmac driver and I don't want to brake the link between the glue and
+>>>> the stmmac driver.
+>>>
+>>> What do you mean by break the link?
+>>>
+>>
+>> I thought that you wanted to split stmmac_pltfr_supend (glue part and
+>> stmamc part), but I well understood it is not the case (sorry for
+>> mistake).
+>>
+>>> There has been numerous of patch sets to make the stmmac "glue"
+>>> drivers into more standard platform drivers.
+>>> http://marc.info/?l=linux-netdev&m=143159850631093&w=2
+>>> http://marc.info/?l=linux-netdev&m=143708560009851&w=2
+>>> http://marc.info/?l=linux-netdev&m=143812136600541&w=2
+>>>
+>>> Do you see any advantage by using the init and exit hooks in your
+>>> driver instead of using the standard driver PM callbacks and remove
+>>> function?
+>>> The only "cost" I see is slightly more boilerplate code. But since you
+>>> already have init/exit functions you could easily make them into PM
+>>> resume/suspend so I doubt there would be much increase in code size.
+>>>
+>>
+>> If I well understood you want to continue the stmmac glue driver
+>> rework by moving stmmac_pltfr_suspend/resume/remove in each glue
+>> driver (stm32, sun, sti ....).
+>
+> At least I want to avoid the init/exit callbacks for new drivers like
+> stm32-dwmac.
+>
+>
+>> Each glue driver will call directly stmmac_suspend/resume/remove and
+>> their own init/exit function.
+>> If it is what you meant, I can do it.
+>
+> Yes, in your stm32 driver's suspend/resume/remove functions call
+> stmmac_suspend/stmmac_resume/stmmac_dvr_remove directly. Then you
+> shouldn't need to use the init/exit callbacks. Just put the need code
+> in the driver's suspend/resume/remove functions instead of init/exit
+> functions.
+>
+> For example:
+> static int stm32_dwmac_resume(struct device *dev)
+> {
+>     struct net_device *ndev = dev_get_drvdata(dev);
+>     struct plat_stmmacenet_data *plat_dat = get_stmmac_plat_data(ndev)
+>     struct stm32_dwmac *dwmac =plat_dat->bsp_priv;
+>
+>     /* enable clocks */
+>     /* set phy mode */
+>
+>     return stmmac_resume(ndev);
+> }
+>
+> If it makes sense to have the enable clk/phy mode stuff in it's own
+> function that is fine too.
 
-> That would be almost the same as what's already in this patch, except
-> (if I'm not mistaken) the detection part could be in platform code, and
-> the fbdev driver itself would know nothing about board specific
-> detection or board specific panel lists.
+Ok. I will send v2 with this approach. After this series I could
+provide a new series to change all glues with this approach ? (but I
+will not able to test on each platform).
 
-In this patch set the board/platform-specific plugins are separated
-out adding the opaque .board_init() and .panel_init() to the driver.
-The platform-specific code is in completely separate files this way,
-and the CLCD driver itself just handles various versions of that
-IP block.
+Best regards
 
-> So maybe that would be a bit cleaner. Still ugly, I think =). I really
-> don't like having possible-panels in the Schr?dinger's DT data
-> (http://www.angryflower.com/387.html).
-
-OK I will focus my work on the DT-augment code instead.
-
-> That said, maybe this is the best way to deal with Versatile, without
-> requiring any change to the bootloader or the boot mechanism.
-
-Depends on if the OF core maintainers will accept my patches to
-dynamically alter DT properties at runtime. If I can't do that then
-I have to go back to the Schr?dinger patch.
-
-> What is the current status of Versatile? Have we had working display
-> with Versatile when booting with device tree? Or has the display been
-> supported only with legacy boot?
-
-Versatile is DT only as of kernel v4.5. The DT boot uses AUXDATA
-which is the Frankenstein solution, bolting on a boardfile piece
-to the DT boot and ignoring the existing panel bindings, and of
-course standing in the way of cleaning things up.
-
-IMO Schr?dinger > Frankenstein.
-
-Yours,
-Linus Walleij
+Alexandre
+>
+>
+>>> One other thing;
+>>> Do you need to have the PHY mode setup code in the init function which
+>>> is called each time on resume?
+>>
+>> I can't guarantee that after a suspend the sysconfig register will
+>> contain same data than before suspend.
+>
+> I see.
+>
+>
+> regards,
+> Joachim Eastwood
