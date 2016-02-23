@@ -1,91 +1,91 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 24 Feb 2016 07:02:31 +0800
-Subject: [PATCH 1/2] iommu/io-pgtable: Add MTK 4GB mode in Short-descriptor
+Date: Wed, 24 Feb 2016 07:02:32 +0800
+Subject: [PATCH 2/2] iommu/mediatek: Add 4GB mode support
 In-Reply-To: <1456268552-16635-1-git-send-email-yong.wu@mediatek.com>
 References: <1456268552-16635-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1456268552-16635-2-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1456268552-16635-3-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mediatek extend bit9 in the lvl1 and lvl2 pgtable descriptor of the
-Short-descriptor as the 4GB mode in which the dram size will be
-over 4GB.
-
-We add a special quirk for this MTK-4GB mode, And in the standard
-spec, Bit9 in the lvl1 is "IMPLEMENTATION DEFINED", while it's AP[2]
-in the lvl2, therefore if this quirk is enabled, NO_PERMS is also
-expected.
+This patch add 4GB mode support for m4u.
 
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
-In arm_v7s_init_pte, We add bit9 if the 4GB mode is enabled no matter
-the current pa is over 4GB or not.
+In this patch I use the global "max_pfn" to check whether the current
+dram size is over 4GB, I am not sure this is proper.
 
- drivers/iommu/io-pgtable-arm-v7s.c | 14 +++++++++++++-
- drivers/iommu/io-pgtable.h         |  6 ++++++
- 2 files changed, 19 insertions(+), 1 deletion(-)
+If there is any other suggestions, please let me know.
+Thanks.
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 9fcceb1..bf6a6f0 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -121,6 +121,8 @@
- #define ARM_V7S_TEX_MASK		0x7
- #define ARM_V7S_ATTR_TEX(val)		(((val) & ARM_V7S_TEX_MASK) << ARM_V7S_TEX_SHIFT)
+ drivers/iommu/mtk_iommu.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index 721ffdb..5b1ddb5 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -11,6 +11,7 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
++#include <linux/bootmem.h>
+ #include <linux/bug.h>
+ #include <linux/clk.h>
+ #include <linux/component.h>
+@@ -56,7 +57,7 @@
+ #define F_MMU_TF_PROTECT_SEL(prot)		(((prot) & 0x3) << 5)
  
-+#define ARM_V7S_ATTR_MTK_4GB		BIT(9) /* MTK extend it for 4GB mode */
+ #define REG_MMU_IVRP_PADDR			0x114
+-#define F_MMU_IVRP_PA_SET(pa)			((pa) >> 1)
++#define F_MMU_IVRP_PA_SET(pa, ext)		(((pa) >> 1) | ((!!(ext)) << 31))
+ 
+ #define REG_MMU_INT_CONTROL0			0x120
+ #define F_L2_MULIT_HIT_EN			BIT(0)
+@@ -125,6 +126,7 @@ struct mtk_iommu_data {
+ 	struct mtk_iommu_domain		*m4u_dom;
+ 	struct iommu_group		*m4u_group;
+ 	struct mtk_smi_iommu		smi_imu;      /* SMI larb iommu info */
++	bool                            enable_4GB;
+ };
+ 
+ static struct iommu_ops mtk_iommu_ops;
+@@ -257,6 +259,9 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
+ 		.iommu_dev = data->dev,
+ 	};
+ 
++	if (data->enable_4GB)
++		dom->cfg.quirks |= IO_PGTABLE_QUIRK_MTK_4GB_EXT;
 +
- /* *well, except for TEX on level 2 large pages, of course :( */
- #define ARM_V7S_CONT_PAGE_TEX_SHIFT	6
- #define ARM_V7S_CONT_PAGE_TEX_MASK	(ARM_V7S_TEX_MASK << ARM_V7S_CONT_PAGE_TEX_SHIFT)
-@@ -364,6 +366,9 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
- 	if (lvl == 1 && (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS))
- 		pte |= ARM_V7S_ATTR_NS_SECTION;
+ 	dom->iop = alloc_io_pgtable_ops(ARM_V7S, &dom->cfg, data);
+ 	if (!dom->iop) {
+ 		dev_err(data->dev, "Failed to alloc io pgtable\n");
+@@ -530,7 +535,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 		F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
+ 	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
  
-+	if (cfg->quirks & IO_PGTABLE_QUIRK_MTK_4GB_EXT)
-+		pte |= ARM_V7S_ATTR_MTK_4GB;
+-	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base),
++	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
+ 		       data->base + REG_MMU_IVRP_PADDR);
+ 
+ 	writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
+@@ -592,6 +597,9 @@ static int mtk_iommu_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	data->protect_base = ALIGN(virt_to_phys(protect), MTK_PROTECT_PA_ALIGN);
+ 
++	/* Whether the current dram size is over 4GB */
++	data->enable_4GB = !!(max_pfn > (0xffffffffUL >> PAGE_SHIFT));
 +
- 	if (num_entries > 1)
- 		pte = arm_v7s_pte_to_cont(pte, lvl);
- 
-@@ -625,9 +630,16 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
- 
- 	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS |
- 			    IO_PGTABLE_QUIRK_NO_PERMS |
--			    IO_PGTABLE_QUIRK_TLBI_ON_MAP))
-+			    IO_PGTABLE_QUIRK_TLBI_ON_MAP |
-+			    IO_PGTABLE_QUIRK_MTK_4GB_EXT))
- 		return NULL;
- 
-+	/* If MTK_4GB_EXT is enabled, the NO_PERMS is also expected. */
-+	if (cfg->quirks & IO_PGTABLE_QUIRK_MTK_4GB_EXT) {
-+		if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_PERMS))
-+			return NULL;
-+	}
-+
- 	data = kmalloc(sizeof(*data), GFP_KERNEL);
- 	if (!data)
- 		return NULL;
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index d4f5027..a84a60a 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -60,10 +60,16 @@ struct io_pgtable_cfg {
- 	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
- 	 *	(unmapped) entries but the hardware might do so anyway, perform
- 	 *	TLB maintenance when mapping as well as when unmapping.
-+	 *
-+	 * IO_PGTABLE_QUIRK_MTK_4GB_EXT: Mediatek extend bit9 in the lvl1 and
-+	 *	lvl2 descriptor of the Short-descriptor as the 4GB mode.
-+	 *	Note that: Bit9 in the lvl1 is "IMPLEMENTATION DEFINED", while
-+	 *	it is AP[2] in the lvl2.
- 	 */
- 	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
- 	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
- 	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
-+	#define IO_PGTABLE_QUIRK_MTK_4GB_EXT	BIT(3)
- 	unsigned long			quirks;
- 	unsigned long			pgsize_bitmap;
- 	unsigned int			ias;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	data->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(data->base))
+@@ -691,7 +699,7 @@ static int mtk_iommu_resume(struct device *dev)
+ 	writel_relaxed(reg->ctrl_reg, base + REG_MMU_CTRL_REG);
+ 	writel_relaxed(reg->int_control0, base + REG_MMU_INT_CONTROL0);
+ 	writel_relaxed(reg->int_main_control, base + REG_MMU_INT_MAIN_CONTROL);
+-	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base),
++	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
+ 		       base + REG_MMU_IVRP_PADDR);
+ 	return 0;
+ }
 -- 
 1.8.1.1.dirty
