@@ -1,148 +1,43 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 23 Feb 2016 01:20:51 +0800
-Subject: [PATCH v10 5/5] dts: mt8173: Add iommu/smi nodes for mt8173
-In-Reply-To: <1456161651-6136-1-git-send-email-yong.wu@mediatek.com>
-References: <1456161651-6136-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1456161651-6136-6-git-send-email-yong.wu@mediatek.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Tue, 23 Feb 2016 09:19:22 +0800
+Subject: [PATCH] ASoC: rockchip: i2s: add default values for registers
+Message-ID: <1456190362-15653-1-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the iommu/larbs nodes for mt8173
+this patch add default values for registers according description from TRM.
 
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 81 ++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index ec135ea..8048811 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt8173-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/memory/mt8173-larb-port.h>
- #include <dt-bindings/phy/phy.h>
- #include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset/mt8173-resets.h>
-@@ -277,6 +278,17 @@
- 			reg = <0 0x10200620 0 0x20>;
- 		};
+ sound/soc/rockchip/rockchip_i2s.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 6561c4c..a0b0942 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -440,11 +440,21 @@ static bool rockchip_i2s_precious_reg(struct device *dev, unsigned int reg)
+ 	}
+ }
  
-+		iommu: iommu at 10205000 {
-+			compatible = "mediatek,mt8173-m4u";
-+			reg = <0 0x10205000 0 0x1000>;
-+			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_M4U>;
-+			clock-names = "bclk";
-+			mediatek,larbs = <&larb0 &larb1 &larb2
-+					  &larb3 &larb4 &larb5>;
-+			#iommu-cells = <1>;
-+		};
++static const struct reg_default rockchip_i2s_reg_defaults[] = {
++	{0x00, 0x0000000f},
++	{0x04, 0x0000000f},
++	{0x08, 0x00071f1f},
++	{0x10, 0x001f0000},
++	{0x14, 0x01f00000},
++};
 +
- 		apmixedsys: clock-controller at 10209000 {
- 			compatible = "mediatek,mt8173-apmixedsys";
- 			reg = <0 0x10209000 0 0x1000>;
-@@ -589,29 +601,98 @@
- 			status = "disabled";
- 		};
- 
-+		larb0: larb at 14021000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14021000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+				 <&mmsys CLK_MM_SMI_LARB0>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		smi_common: smi at 14022000 {
-+			compatible = "mediatek,mt8173-smi-common";
-+			reg = <0 0x14022000 0 0x1000>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_COMMON>,
-+				 <&mmsys CLK_MM_SMI_COMMON>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		larb4: larb at 14027000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14027000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB4>,
-+				 <&mmsys CLK_MM_SMI_LARB4>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		imgsys: clock-controller at 15000000 {
- 			compatible = "mediatek,mt8173-imgsys", "syscon";
- 			reg = <0 0x15000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb2: larb at 15001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x15001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_ISP>;
-+			clocks = <&imgsys CLK_IMG_LARB2_SMI>,
-+				 <&imgsys CLK_IMG_LARB2_SMI>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vdecsys: clock-controller at 16000000 {
- 			compatible = "mediatek,mt8173-vdecsys", "syscon";
- 			reg = <0 0x16000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb1: larb at 16010000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x16010000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-+			clocks = <&vdecsys CLK_VDEC_CKEN>,
-+				 <&vdecsys CLK_VDEC_LARB_CKEN>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencsys: clock-controller at 18000000 {
- 			compatible = "mediatek,mt8173-vencsys", "syscon";
- 			reg = <0 0x18000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb3: larb at 18001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x18001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
-+			clocks = <&vencsys CLK_VENC_CKE1>,
-+				 <&vencsys CLK_VENC_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencltsys: clock-controller at 19000000 {
- 			compatible = "mediatek,mt8173-vencltsys", "syscon";
- 			reg = <0 0x19000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
-+
-+		larb5: larb at 19001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x19001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC_LT>;
-+			clocks = <&vencltsys CLK_VENCLT_CKE1>,
-+				 <&vencltsys CLK_VENCLT_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
- 	};
- };
- 
+ static const struct regmap_config rockchip_i2s_regmap_config = {
+ 	.reg_bits = 32,
+ 	.reg_stride = 4,
+ 	.val_bits = 32,
+ 	.max_register = I2S_RXDR,
++	.reg_defaults = rockchip_i2s_reg_defaults,
++	.num_reg_defaults = ARRAY_SIZE(rockchip_i2s_reg_defaults),
+ 	.writeable_reg = rockchip_i2s_wr_reg,
+ 	.readable_reg = rockchip_i2s_rd_reg,
+ 	.volatile_reg = rockchip_i2s_volatile_reg,
 -- 
-1.8.1.1.dirty
+1.9.1
