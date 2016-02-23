@@ -1,41 +1,72 @@
-From: john@metanate.com (John Keeping)
-Date: Tue, 23 Feb 2016 13:41:00 +0000
-Subject: [PATCH 2/2] ARM: dts: rockchip: fix audio interrupts on rk3288
-In-Reply-To: <1456234860-18832-1-git-send-email-john@metanate.com>
-References: <1456234860-18832-1-git-send-email-john@metanate.com>
-Message-ID: <1456234860-18832-3-git-send-email-john@metanate.com>
+From: trini@konsulko.com (Tom Rini)
+Date: Tue, 23 Feb 2016 08:45:20 -0500
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <20160223120101.GJ19428@n2100.arm.linux.org.uk>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
+ <20160223120101.GJ19428@n2100.arm.linux.org.uk>
+Message-ID: <20160223134520.GJ23166@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These must be translated from the values in the TRM by subtracting 32,
-which has not been done.  The SPDIF interrupt is also off-by-one.
+On Tue, Feb 23, 2016 at 12:01:01PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 23, 2016 at 11:56:34AM +0000, Peter Maydell wrote:
+> > On 23 February 2016 at 09:58, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> > > I'm not quite sure how it works if, as in versatile display case, there
+> > > are multiple DT overlays of which one has to be enabled. I hope there's
+> > > support to choose which one to use via kernel cmdline or similar.
+> > >
+> > > I would personally like it much more if the bootloader would either
+> > > compose a final dtb from DT fragments and pass it to the kernel, or
+> > > alternatively the bootloader would pass the base dtb image and a bunch
+> > > of DT overlays to the kernel, and the kernel would deal with the DT
+> > > overlays.
+> > 
+> > Speaking as somebody who's written the "bootloader" code that's
+> > used for what I guess are the majority of versatile kernel boots,
+> > i.e. the one in QEMU, I think that requiring the bootloader to do this
+> > would be a significant worsening from the current state.
+> > 
+> > Right now the bootloader doesn't need to do much at all with device
+> > trees, except pass the kernel the DT that the user gave us, which
+> > is just the kernel's own data structures in a separate file for
+> > convenience. You need to do some very minor tweaks to the /chosen
+> > node, but these can be handled the same way for any board and aren't
+> > hardware specific. There's no need to worry about dt fragments
+> > either for the bootloader or for the user. Imposing a new requirement
+> > for the bootloader to have to probe hardware which it otherwise
+> > has no need to even care about, and then edit and update the DT
+> > in a board-specific manner, or have board-specific DT fragments,
+> > seems like a totally unnecessary imposition on both bootloader
+> > authors and end-users, and of course it would break booting newer
+> > kernels on the great mass of already existing boot loaders and
+> > QEMU installs.
+> > 
+> > The kernel is in a position to probe the display hardware and determine
+> > what is there, and do the right thing, and that's exactly what it
+> > does today. The kernel should continue to do this.
+> > The advantage of DT is that it allows moving information about
+> > non-probeable hardware that was previously hardwired in the kernel
+> > C sources into a separate data structure, but the versatile displays
+> > are not non-probeable. I can see no benefit at all from hardwiring into
+> > the dt something which the kernel has previously been successfully
+> > dynamically getting right without any bootloader intervention -- it just
+> > makes the kernel less flexible and less user-friendly.
+> 
+> +1.
 
-Signed-off-by: John Keeping <john@metanate.com>
----
- arch/arm/boot/dts/rk3288.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
++1 from me too.
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 5597105..a82d4b1 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -758,7 +758,7 @@
- 		clocks = <&cru HCLK_SPDIF8CH>, <&cru SCLK_SPDIF8CH>;
- 		dmas = <&dmac_bus_s 3>;
- 		dma-names = "tx";
--		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&spdif_tx>;
- 		rockchip,grf = <&grf>;
-@@ -768,7 +768,7 @@
- 	i2s: i2s at ff890000 {
- 		compatible = "rockchip,rk3288-i2s", "rockchip,rk3066-i2s";
- 		reg = <0xff890000 0x10000>;
--		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		dmas = <&dmac_bus_s 0>, <&dmac_bus_s 1>;
 -- 
-2.7.0.226.gfe986fe
+Tom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160223/bfdb2434/attachment.sig>
