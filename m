@@ -1,78 +1,64 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 23 Feb 2016 14:15:03 +0000
-Subject: [PATCH 11/12] ARM: dts: apq8064: add i2c6 device node.
-In-Reply-To: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1456236903-2878-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 23 Feb 2016 08:15:35 -0600
+Subject: [PATCH] irqchip/gicv3-its: Don't allow devices whose ID is
+ outside range
+In-Reply-To: <56CC1D83.4060503@arm.com>
+References: <1456199868-9054-1-git-send-email-shankerd@codeaurora.org>
+ <56CC1D83.4060503@arm.com>
+Message-ID: <56CC6987.1050107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds i2c6 device node and pinctrls required for IFC6410 on
-MIPI-CSI connector.
+Hi Marc,
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 25 +++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi      | 11 +++++++++++
- 2 files changed, 36 insertions(+)
+On 02/23/2016 02:51 AM, Marc Zyngier wrote:
+> On 23/02/16 03:57, Shanker Donthineni wrote:
+>> We are not checking whether the requested device identifier fits into
+>> table or not. The ITS MAPD command fails if 'Device ID' is outside of
+>> device table range.
+>>
+>> Add a simple validation check to avoid MAPD failures since we are
+>> not handling ITS command errors. This change also helps to return an
+>> error -ENOMEM instead of success to caller.
+>>
+> In which circumstances do you see this failing? We allocate memory for
+> the whole DevID range (as advertised by the ITS), so anything that comes
+> up outside of that range cannot be handled anyway, and is a HW
+> integration issue. You might as well pretend that these devices do not
+> exist.
+>
+> Thanks,
+>
+> 	M.
+We will try to allocate maximum memory as much as possible to cover 
+whole DevID.
+sparse. We may not always successful, sometimes we limit memory 
+allocation size
+for two reasons MAX_ORDER and ITS flat table capacity.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-index 0cb22cf..b57c59d 100644
---- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-@@ -153,6 +153,31 @@
- 		};
- 	};
- 
-+	i2c6_pins: i2c6 {
-+		mux {
-+			pins = "gpio16", "gpio17";
-+			function = "gsbi6";
-+		};
-+
-+		pinconf {
-+			pins = "gpio16", "gpio17";
-+			drive-strength = <16>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c6_pins_sleep: i2c6_pins_sleep {
-+		mux {
-+			pins = "gpio16", "gpio17";
-+			function = "gpio";
-+		};
-+		pinconf {
-+			pins = "gpio16", "gpio17";
-+			drive-strength = <2>;
-+			bias-disable = <0>;
-+		};
-+	};
-+
- 	gsbi6_uart_2pins: gsbi6_uart_2pins {
- 		mux {
- 			pins = "gpio14", "gpio15";
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 445297c..5540b34 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -365,6 +365,17 @@
- 				clock-names = "core", "iface";
- 				status = "disabled";
- 			};
-+
-+			gsbi6_i2c: i2c at 16580000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				pinctrl-0 = <&i2c6_pins &i2c6_pins_sleep>;
-+				pinctrl-names = "default", "sleep";
-+				reg = <0x16580000 0x1000>;
-+				interrupts = <GIC_SPI 157 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI6_QUP_CLK>,
-+					 <&gcc GSBI6_H_CLK>;
-+				clock-names = "core", "iface";
-+			};
- 		};
- 
- 		gsbi7: gsbi at 16600000 {
+1) According to ARM-GIC spec, ITS hw can access maximum of 256 (ITS-pages) *
+    64K (ITS-pageszie) bytes.
+
+     21bits = 16 MBytes / 8 (flat table size / device table entry size)
+
+Assuming: minimum device table entry size 8 Bytes
+
+2) On 4K page size kernel with default arch/arm64/defconfig.
+
+    19bits = 4 MBytes / 8 (flat table size / device table entry size)
+
+Assuming: minimum device table entry size 8 Bytes
+
+This is definitely a problem if DevID range is much more than 19Bits and 
+we fail to allocate
+enough memory. Our ITS hardware has capable of supporting all 32bits, so 
+it advertises
+DevID 32.
+
+I am preparing an another patch to support ITS-Indirection (two-level 
+table walk) feature.
+
 -- 
-1.9.1
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
