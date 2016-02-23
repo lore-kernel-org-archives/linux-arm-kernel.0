@@ -1,80 +1,51 @@
-From: alexandre.torgue@gmail.com (Alexandre Torgue)
-Date: Tue, 23 Feb 2016 10:59:15 +0100
-Subject: [PATCH 1/4] net: ethernet: dwmac: add Ethernet glue logic for
- stm32 chip
-In-Reply-To: <CAGhQ9VzPTgRqqLi4zjHkP-++v5smZ7s52drev1z-AvgXaLuC7Q@mail.gmail.com>
-References: <1454511275-9791-1-git-send-email-alexandre.torgue@gmail.com>
- <1454511275-9791-2-git-send-email-alexandre.torgue@gmail.com>
- <CAGhQ9VypZ5J0pQmrf1Mk-mNsv=XTXu7fhoLt_r2LHJ_Lsyj0yA@mail.gmail.com>
- <CAJgp7zwOVEq=hnxfUt7eHZWSFUAwuK6MCVHdH591=xReRUsW8Q@mail.gmail.com>
- <CAGhQ9VzPTgRqqLi4zjHkP-++v5smZ7s52drev1z-AvgXaLuC7Q@mail.gmail.com>
-Message-ID: <CAJgp7zxYhbQ4yQHBB3cu50TU9N9xvk3HxCp0NP5fxFbxrMsD_g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Feb 2016 11:01:37 +0100
+Subject: [PATCH 0/7] video: ARM CLCD: non-controversial parts
+Message-ID: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-22 22:52 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
-> On 22 February 2016 at 15:50, Alexandre Torgue
-> <alexandre.torgue@gmail.com> wrote:
->> 2016-02-13 14:48 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
->>> On 3 February 2016 at 15:54, Alexandre TORGUE
->>> <alexandre.torgue@gmail.com> wrote:
->>>> +       plat_dat->bsp_priv = dwmac;
->>>> +       plat_dat->init = stm32_dwmac_init;
->>>> +       plat_dat->exit = stm32_dwmac_exit;
->>>
->>> Instead of using these callbacks could you rather implement the PM
->>> callbacks directly in this driver?
->>> I don't think it should add much code and it will make it look more
->>> like standard driver. This will also give you some more control and
->>> flexibility in your code.
->>
->> I prefer to keep the code as it is. Glue layer is directly linked to
->> stmmac driver and I don't want to brake the link between the glue and
->> the stmmac driver.
->
-> What do you mean by break the link?
->
+This is a redux version of the previous patch set that strips out
+any attempts to auto-switch or rewrite the device tree to match
+the CLCD Versatile panel.
 
-I thought that you wanted to split stmmac_pltfr_supend (glue part and
-stmamc part), but I well understood it is not the case (sorry for
-mistake).
+Instead, it does detect it and COMPARE it to what was found in
+the device tree, prints a warning if those do not match, and
+continue anyway.
 
-> There has been numerous of patch sets to make the stmmac "glue"
-> drivers into more standard platform drivers.
-> http://marc.info/?l=linux-netdev&m=143159850631093&w=2
-> http://marc.info/?l=linux-netdev&m=143708560009851&w=2
-> http://marc.info/?l=linux-netdev&m=143812136600541&w=2
->
-> Do you see any advantage by using the init and exit hooks in your
-> driver instead of using the standard driver PM callbacks and remove
-> function?
-> The only "cost" I see is slightly more boilerplate code. But since you
-> already have init/exit functions you could easily make them into PM
-> resume/suspend so I doubt there would be much increase in code size.
->
+This patch series brings support for device tree-only boot with
+graphics to the Nomadik and all RealView platforms (so we can boot
+RealView with only device tree) so it is very useful still even
+if the Versatile is not yet fully supported.
 
-If I well understood you want to continue the stmmac glue driver
-rework by moving stmmac_pltfr_suspend/resume/remove in each glue
-driver (stm32, sun, sti ....).
-Each glue driver will call directly stmmac_suspend/resume/remove and
-their own init/exit function.
-If it is what you meant, I can do it.
+Please consider applying this for v4.6 if these parts look
+uncontroversial. Or applying partly from low to high patch
+numbers so I'm not sitting with too much out-of-tree code.
 
-> One other thing;
-> Do you need to have the PHY mode setup code in the init function which
-> is called each time on resume?
+Also resending a fix which has not yet landed upstream (1/7)
+I guess it was lost.
 
-I can't guarantee that after a suspend the sysconfig register will
-contain same data than before suspend.
+Linus Walleij (7):
+  video: ARM CLCD: runtime check for Versatile
+  video: ARM CLCD: backlight support for OF
+  video: ARM CLCD: support DT signal inversion flags
+  video: ARM CLCD: support pads connected in reverse order
+  video: ARM CLCD: support Nomadik variant
+  video: ARM CLCD: add special board and panel hooks for Nomadik
+  video: ARM CLCD: add special panel hook for Versatiles
 
-Best regards.
+ drivers/video/fbdev/Kconfig               |   6 +-
+ drivers/video/fbdev/Makefile              |   1 +
+ drivers/video/fbdev/amba-clcd-nomadik.c   | 257 ++++++++++++++++++++
+ drivers/video/fbdev/amba-clcd-nomadik.h   |  24 ++
+ drivers/video/fbdev/amba-clcd-versatile.c | 391 ++++++++++++++++++++++++++++++
+ drivers/video/fbdev/amba-clcd-versatile.h |  17 ++
+ drivers/video/fbdev/amba-clcd.c           | 218 +++++++++++++++--
+ include/linux/amba/clcd.h                 |  76 +++++-
+ 8 files changed, 958 insertions(+), 32 deletions(-)
+ create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.c
+ create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.h
+ create mode 100644 drivers/video/fbdev/amba-clcd-versatile.h
 
-Alex
-
-> If you could move it to probe you could drop the interface priv data
-> member and use plat_dat->interface as stmmac_probe_config_dt() has
-> already done of_get_phy_mode().
->
->
-> regards,
-> Joachim Eastwood
+-- 
+2.4.3
