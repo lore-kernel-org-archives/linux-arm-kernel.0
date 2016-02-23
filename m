@@ -1,139 +1,80 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 23 Feb 2016 10:14:38 +0100
-Subject: [PATCH v9 2/6] clk: hisilicon: add CRG driver for hi3519 soc
-In-Reply-To: <1456127280-23275-3-git-send-email-xuejiancheng@huawei.com>
-References: <1456127280-23275-1-git-send-email-xuejiancheng@huawei.com>
- <1456127280-23275-3-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <1456218878.3387.9.camel@pengutronix.de>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Tue, 23 Feb 2016 14:47:33 +0530
+Subject: [PATCH 3/3] ARM: EXYNOS: cleanup header files inclusion
+In-Reply-To: <56CBA32D.4020905@samsung.com>
+References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
+ <1456135396-17767-4-git-send-email-pankaj.dubey@samsung.com>
+ <56CBA32D.4020905@samsung.com>
+Message-ID: <56CC23AD.10103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Krzysztof,
 
-Am Montag, den 22.02.2016, 15:47 +0800 schrieb Jiancheng Xue:
-> The CRG(Clock and Reset Generator) block provides clock
-> and reset signals for other modules in hi3519 soc.
+On Tuesday 23 February 2016 05:39 AM, Krzysztof Kozlowski wrote:
+> On 22.02.2016 19:03, Pankaj Dubey wrote:
+>> This includes trivial cleanup in exynos files such as
+>>     - remove unused header files inclusion from exynos.c, s5p-dev-mfc.c,
+>>       firmware.c, pm.c.
+>>     - move inclusion of of.h from common.h to pm.c where it is really
+>>       required
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/common.h      | 1 -
+>>  arch/arm/mach-exynos/exynos.c      | 5 -----
+>>  arch/arm/mach-exynos/firmware.c    | 2 --
+>>  arch/arm/mach-exynos/platsmp.c     | 1 -
+>>  arch/arm/mach-exynos/pm.c          | 4 +---
+>>  arch/arm/mach-exynos/s5p-dev-mfc.c | 1 -
+>>  6 files changed, 1 insertion(+), 13 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+>> index e349a03..5365bf1 100644
+>> --- a/arch/arm/mach-exynos/common.h
+>> +++ b/arch/arm/mach-exynos/common.h
+>> @@ -12,7 +12,6 @@
+>>  #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
+>>  #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
+>>  
+>> -#include <linux/of.h>
+>>  #include <linux/platform_data/cpuidle-exynos.h>
+>>  
+>>  #define EXYNOS3250_SOC_ID	0xE3472000
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index 99947ad..54262a1 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -11,14 +11,10 @@
+>>  
+>>  #include <linux/init.h>
+>>  #include <linux/io.h>
+>> -#include <linux/kernel.h>
+>> -#include <linux/serial_s3c.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/of_fdt.h>
+>>  #include <linux/of_platform.h>
+>> -#include <linux/platform_device.h>
 > 
-> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-[...]
-> diff --git a/drivers/clk/hisilicon/reset.c b/drivers/clk/hisilicon/reset.c
-> new file mode 100644
-> index 0000000..50e00e7
-> --- /dev/null
-> +++ b/drivers/clk/hisilicon/reset.c
-> @@ -0,0 +1,124 @@
-> +/*
-> + * Hisilicon Reset Controller Driver
-> + *
-> + * Copyright (c) 2015-2016 HiSilicon Technologies Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +#define	HISI_RESET_BIT_MASK	0x1f
-> +#define	HISI_RESET_OFFSET_SHIFT	8
-> +#define	HISI_RESET_OFFSET_MASK	0xffff00
-> +
-> +struct hisi_reset_controller {
-> +	spinlock_t	lock;
-> +	void __iomem	*membase;
-> +	struct reset_controller_dev	rcdev;
-> +};
-> +
-> +
-> +#define to_hisi_reset_controller(rcdev)  \
-> +	container_of(rcdev, struct hisi_reset_controller, rcdev)
-> +
-> +static int hisi_reset_of_xlate(struct reset_controller_dev *rcdev,
-> +			const struct of_phandle_args *reset_spec)
-> +{
-> +	u32 offset;
-> +	u8 bit;
-> +
-> +	if (WARN_ON(reset_spec->args_count != rcdev->of_reset_n_cells))
-> +		return -EINVAL;
+> platform_device is actually used in that file. It looks unused because
+> it is pulled by of_platform, but it makes sense to include it here.
+>
+Thanks for review.
 
-This check now has been moved to the core in e677774f5026 ("reset: Move
-DT cell size check to the core"). It is not necessary anymore to check
-this in the .of_xlate callback.
+Well I tried to grep for of_platform.h and platform_device.h in
+arch/arm/ and out of 88 files including of_platform.h only 16 files are
+including platform_device.h also. So majority do not include both of
+them even do they need. So majority of files both are not included. So
+If we got with majority it's not required. What's your opinion?
 
-> +	offset = (reset_spec->args[0] << HISI_RESET_OFFSET_SHIFT)
-> +		& HISI_RESET_OFFSET_MASK;
-> +	bit = reset_spec->args[1] & HISI_RESET_BIT_MASK;
-> +	return (offset | bit);
-> +}
-> +
-> +static int hisi_reset_assert(struct reset_controller_dev *rcdev,
-> +			      unsigned long id)
-> +{
-> +	struct hisi_reset_controller *rstc = to_hisi_reset_controller(rcdev);
-> +	unsigned long flags;
-> +	u32 offset, reg;
-> +	u8 bit;
-> +
-> +	offset = (id & HISI_RESET_OFFSET_MASK) >> HISI_RESET_OFFSET_SHIFT;
-> +	bit = id & HISI_RESET_BIT_MASK;
-> +
-> +	spin_lock_irqsave(&rstc->lock, flags);
-> +
-> +	reg = readl(rstc->membase + offset);
-> +	writel(reg | BIT(bit), rstc->membase + offset);
-> +
-> +	spin_unlock_irqrestore(&rstc->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int hisi_reset_deassert(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-> +{
-> +	struct hisi_reset_controller *rstc = to_hisi_reset_controller(rcdev);
-> +	unsigned long flags;
-> +	u32 offset, reg;
-> +	u8 bit;
-> +
-> +	offset = (id & HISI_RESET_OFFSET_MASK) >> HISI_RESET_OFFSET_SHIFT;
-> +	bit = id & HISI_RESET_BIT_MASK;
-> +
-> +	spin_lock_irqsave(&rstc->lock, flags);
-> +
-> +	reg = readl(rstc->membase + offset);
-> +	writel(reg & ~BIT(bit), rstc->membase + offset);
-> +
-> +	spin_unlock_irqrestore(&rstc->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct reset_control_ops hisi_reset_ops = {
-> +	.assert		= hisi_reset_assert,
-> +	.deassert	= hisi_reset_deassert,
-> +};
+Thanks,
+Pankaj Dubey
 
-These can be made const after commit 203d4f347d86 ("reset: Make
-reset_control_ops const") is merged. Since this is to be merged through
-the clock tree, both change could be made later.
+> Rest looks good.
+> 
 
-For the reset driver part,
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-
-regards
-Philipp
+> BR,
+> Krzysztof
+> 
+> 
