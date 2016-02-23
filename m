@@ -1,193 +1,334 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 23 Feb 2016 21:32:13 +0100
-Subject: [PATCH] ARM: dts: vf610-zii-dev: Add ZII development board.
-In-Reply-To: <c67c93683d9440bd050386df0e200881@agner.ch>
-References: <1456084314-9871-1-git-send-email-andrew@lunn.ch>
- <c67c93683d9440bd050386df0e200881@agner.ch>
-Message-ID: <20160223203213.GA31401@lunn.ch>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 23 Feb 2016 21:41:30 +0100
+Subject: [PATCH v2] ARM: dts: sun7i: Add dts file for the lamobo-r1 board
+Message-ID: <1456260090-23635-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 11:36:49AM -0800, Stefan Agner wrote:
-> Hi Andrew,
-> 
-> Some comments below:
-> 
-> On 2016-02-21 11:51, Andrew Lunn wrote:
-> > From: Cory Tusar <cory.tusar@pid1solutions.com>
-> > 
-> > This commit adds support for Rev. B of a Zodiac Inflight Innovations
-> > development board, mainly intended for DSA and ARINC 429 development
-> > work.
-> > 
-> > Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  arch/arm/boot/dts/Makefile                |   3 +-
-> >  arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 683 ++++++++++++++++++++++++++++++
-> >  2 files changed, 685 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index a4a6d70e8b26..47c4c2ff41de 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -372,7 +372,8 @@ dtb-$(CONFIG_SOC_VF610) += \
-> >  	vf610m4-colibri.dtb \
-> >  	vf610-cosmic.dtb \
-> >  	vf610m4-cosmic.dtb \
-> > -	vf610-twr.dtb
-> > +	vf610-twr.dtb \
-> > +	vf610-zii-dev-rev-b.dtb
-> >  dtb-$(CONFIG_ARCH_MXS) += \
-> >  	imx23-evk.dtb \
-> >  	imx23-olinuxino.dtb \
-> > diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> > b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> > new file mode 100644
-> > index 000000000000..fafe0039ebce
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> > @@ -0,0 +1,683 @@
-> > +/*
-> > + * Copyright 2013 Freescale Semiconductor, Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> 
-> I recently changed the license of most Vybrid device trees to the new
-> dual license. Is it possible to change this device tree too?
+From: Jelle de Jong <jelledejong@powercraft.nl>
 
-Hi Stefan
+The lamobo-r1 board, sometimes called the BPI-R1 but not labelled as such
+on the PCB, is meant as a A20 based router board. As such the board comes
+with a built-in switch chip giving it 5 gigabit ethernet boards, and it
+has a large empty area on the pcb with mounting holes which will fit a
+2.5 inch harddisk. To complete its networking features it has a
+Realtek RTL8192CU for WiFi 802.11 b/g/n.
 
-I need to check with Cory about from which Freescale files this file
-was derived from. If those files have been relicenced, we can probably
-follow suit.
+Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Drop custom CPU operating points
+---
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 287 ++++++++++++++++++++++++++++++
+ 2 files changed, 288 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
 
-> > +	chosen {
-> > +		bootargs = "console=ttyLP0,115200n8";
-> > +		stdout-path = &uart0;
-> 
-> Is bootargs necessary?
-> 
-> For the stdout-path I would recommend to use the advanced format:
-> stdout-path = "serial0:115200n8";
-
-That probably works. I will test it.
-
-> > +	mdio-mux {
-> > +		compatible = "mdio-mux-gpio";
-> > +		pinctrl-0 = <&pinctrl_mdio_mux>;
-> > +		pinctrl-names = "default";
-> > +		gpios = <&gpio0 8  GPIO_ACTIVE_HIGH
-> > +			 &gpio0 9  GPIO_ACTIVE_HIGH
-> > +			 &gpio0 24 GPIO_ACTIVE_HIGH
-> > +			 &gpio0 25 GPIO_ACTIVE_HIGH>;
-> > +		mdio-parent-bus = <&mdio1>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		mdio_mux_1: mdio at 1 {
-> > +			reg = <1>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> 
-> Since there are no child nodes the #address- and #size-cells properties
-> are not necessary.
-
-Humm, i would want to test that. Plus, i know there will be patches in
-the next few months adding children.
-
-> > +	audio_ext: mclk-osc {
-> > +		compatible = "fixed-clock";
-> > +		#clock-cells = <0>;
-> > +		clock-frequency = <24576000>;
-> > +	};
-> 
-> This seems not to be used anywhere. Maybe needs to be assigned to the
-> clks node?
-> 
-> > +
-> > +	enet_ext: eth-osc {
-> > +		compatible = "fixed-clock";
-> > +		#clock-cells = <0>;
-> > +		clock-frequency = <50000000>;
-> > +	};
-> 
-> Same here...
-
-I'll let Cory comment on this.
- 
-> > +
-> > +	reg_3p3v: regulator at 0 {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "3P3V";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		regulator-always-on;
-> > +	};
-> 
-> Do not use the address format (@0) in node name if the regulator is not
-> part of a bus.
-> 
-> Use regulator-3p3v as node name.
-
-Yes. These used to be inside a simple bus, which i removed, but forgot
-to remove this part.
- 
-> > +	gpio5: pca9505 at 20 {
-> > +		compatible = "nxp,pca9554";
-> > +		reg = <0x20>;
-> > +		gpio-controller;
-> > +		#gpio-cells = <2>;
-> > +
-> > +	};
-> > +
-> > +	gpio6: pca9505 at 22 {
-> > +		compatible = "nxp,pca9554";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_pca9554_opt>;
-> > +		reg = <0x22>;
-> > +		interrupt-parent = <&gpio1>;
-> > +		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-> > +	};
-> 
-> Hm, any reason why one of this is a gpio-controller while the other
-> isn't?
-
-Humm, interesting. No idea. However, i have used the gpio6, but i'm
-not sure about gpio5. I will add the missing property and retest.
-
-> > +		i2c2_3:	 i2c at 3 {
-> 
-> There is an extra space between the colon and i2c at 3...
-
-O.K.
- 
-> > +&iomuxc {
-> 
-> We normally put the iomuxc node at the very end.
-
-O.K. I can move it.
- 
-> > +
-> > +&L2 {
-> > +	arm,data-latency = <2 1 2>;
-> > +	arm,tag-latency = <3 2 3>;
-> > +};
-> 
-> Are you sure about that?
-> 
-> With 9c17190595 ("ARM: dts: vf610: use reset values for L2 cache
-> latencies") we have reasonable values in the base device tree
-> vf610.dtsi, I think therefor this is not necessary anymore, even if you
-> use 500MHz as CPU clock.
-
-It is probably copy and paste from before that patch.
-
-Thanks for the review.
-
-       Andrew
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 04b90fc..ef39613 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -669,6 +669,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-itead-ibox.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-icnova-swac.dtb \
++	sun7i-a20-lamobo-r1.dtb \
+ 	sun7i-a20-m3.dtb \
+ 	sun7i-a20-mk808c.dtb \
+ 	sun7i-a20-olimex-som-evb.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+new file mode 100644
+index 0000000..5ee43d8
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+@@ -0,0 +1,287 @@
++/*
++ * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Lamobo R1";
++	compatible = "lamobo,lamobo-r1", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart3;
++		serial2 = &uart7;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_lamobo_r1>;
++
++		green {
++			label = "lamobo_r1:green:usr";
++			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gmac_power_pin_lamobo_r1>;
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
++	};
++};
++
++&ahci_pwr_pin_a {
++	allwinner,pins = "PB3";
++};
++
++&ahci {
++	target-supply = <&reg_ahci_5v>;
++	status = "okay";
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_rgmii_a>;
++	phy = <&phy1>;
++	phy-mode = "rgmii";
++	phy-supply = <&reg_gmac_3v3>;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
++&ir0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir0_rx_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_lamobo_r1>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&otg_sram {
++	status = "okay";
++};
++
++&pio {
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	mmc0_cd_pin_lamobo_r1: mmc0_cd_pin at 0 {
++		allwinner,pins = "PH10";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	gmac_power_pin_lamobo_r1: gmac_power_pin at 0 {
++		allwinner,pins = "PH23";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	led_pins_lamobo_r1: led_pins at 0 {
++		allwinner,pins = "PH24";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++#include "axp209.dtsi"
++
++&reg_ahci_5v {
++	gpio = <&pio 1 3 0>; /* PB3 */
++	status = "okay";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb0_vbus {
++	status = "okay";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>,
++		    <&spi0_cs0_pins_a>,
++		    <&spi0_cs1_pins_a>;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins_b>;
++	status = "okay";
++};
++
++&uart7 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart7_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb_power_supply {
++	status = "okay";
++};
++
++&usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
+-- 
+2.7.1
