@@ -1,27 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 12:22:34 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <3695074.sKSIyOjpjD@wuerfel>
- <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
-Message-ID: <6859810.tb1t0IEONi@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Feb 2016 11:30:59 +0000
+Subject: [PATCH] clk: gpio: Really allow an optional clock= DT property
+In-Reply-To: <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
+References: <20160219030731.GS4847@codeaurora.org>
+ <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20160223113059.GH19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 February 2016 11:10:33 Linus Walleij wrote:
-> 
-> ERROR (duplicate_label): ERROR (duplicate_label): Duplicate label
-> 'clcd_panel' on /panel at 1/port/endpoint and /panel at 0/port/endpoint
-> Duplicate label 'clcd_panel' on /panel at 1/port/endpoint and
-> /panel at 0/port/endpoint
-> 
-> So the dtc does not allow duplicate node labels for the phandle
-> even if the node it resides in is disabled. Tough luck...
+On Thu, Feb 18, 2016 at 07:12:05PM -0800, Stephen Boyd wrote:
+> We mis-merged the original patch from Russell here and so the
+> patch went almost all the way, except that we still failed to
+> probe when there wasn't a clocks property in the DT node. Allow
+> that case by making a negative value from
+> of_clk_get_parent_count() into "no parents", like the original
+> patch did.
 
-Ah, too bad. I guess we could still do it by also setting the
-remote-endpoint property to node->phandle, but then it's
-not as simple any more.
+So you apply it anyway, and ignore all further discussion.  I've
+no idea what kind of politics is going on here, but it has to stop.
 
-	Arnd
+I'm also still waiting for that apology from Mike - never apply a
+modified patch without stating in the commit log that it was modified.
+It's basically fraud.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
