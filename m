@@ -1,34 +1,114 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 23 Feb 2016 14:34:28 +0000
-Subject: [PATCH v4 10/10] MAINTAINERS: Update ARM Versatile Express platform
- entry
-In-Reply-To: <1456238068-25079-1-git-send-email-vladimir.murzin@arm.com>
-References: <1456238068-25079-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1456238068-25079-11-git-send-email-vladimir.murzin@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 23 Feb 2016 15:37:26 +0100
+Subject: [PATCH 1/8] arm64: move acpi/dt decision earlier in boot process
+In-Reply-To: <20160223135731.GA24781@xora-haswell.xora.org.uk>
+References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
+ <56CB2D0D.3090408@gmail.com>
+ <20160223135731.GA24781@xora-haswell.xora.org.uk>
+Message-ID: <56CC6EA6.4020909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update ARM Versatile Express entry to cover bits needed for
-Cortex-M Prototyping System (MPS2 platform). So patches for the latter
-are collected by existing Vexpress and Juno maintainers (Liviu, Sudeep,
-Lorenzo) and find their way upstream via Vexpess and/or Juno trees.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- MAINTAINERS |    1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4978dc1..e827e3b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1726,6 +1726,7 @@ F:	*/*/vexpress*
- F:	*/*/*/vexpress*
- F:	drivers/clk/versatile/clk-vexpress-osc.c
- F:	drivers/clocksource/versatile.c
-+N:	mps2
- 
- ARM/VFP SUPPORT
- M:	Russell King <linux@arm.linux.org.uk>
--- 
-1.7.9.5
+On 23/02/16 14:57, Graeme Gregory wrote:
+> On Mon, Feb 22, 2016 at 04:45:17PM +0100, Matthias Brugger wrote:
+>>
+>>
+>> On 22/02/16 14:46, Aleksey Makarov wrote:
+>>> From: Leif Lindholm <leif.lindholm@linaro.org>
+>>>
+>>> In order to support selecting earlycon via either ACPI or DT, move
+>>> the decision on whether to attempt ACPI configuration into the
+>>> early_param handling. Then make acpi_boot_table_init() bail out if
+>>> acpi_disabled.
+>>>
+>>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>>> ---
+>>>   arch/arm64/kernel/acpi.c | 54 ++++++++++++++++++++++++++----------------------
+>>>   1 file changed, 29 insertions(+), 25 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>>> index d1ce8e2..7a944f7 100644
+>>> --- a/arch/arm64/kernel/acpi.c
+>>> +++ b/arch/arm64/kernel/acpi.c
+>>> @@ -44,6 +44,19 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>>>   static bool param_acpi_off __initdata;
+>>>   static bool param_acpi_force __initdata;
+>>>
+>>> +static int __init dt_scan_depth1_nodes(unsigned long node,
+>>> +				       const char *uname, int depth,
+>>> +				       void *data)
+>>> +{
+>>> +	/*
+>>> +	 * Return 1 as soon as we encounter a node at depth 1 that is
+>>> +	 * not the /chosen node.
+>>> +	 */
+>>> +	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>>> +		return 1;
+>>> +	return 0;
+>>> +}
+>>> +
+>>>   static int __init parse_acpi(char *arg)
+>>>   {
+>>>   	if (!arg)
+>>> @@ -57,23 +70,27 @@ static int __init parse_acpi(char *arg)
+>>>   	else
+>>>   		return -EINVAL;	/* Core will print when we return error */
+
+If argument of parse_acpi is neither "off" nor "force" we return with 
+-EINVAL here. Actually parse_acpi will be only called if we pass "acpi=" 
+as kernel parameter. Therefor we can get rid of "acpi=off" as this is 
+the _new_ standard. IMHO we should introduce "acpi=on" if we really want 
+to change the standard behavior.
+
+>>>
+>>> -	return 0;
+>>> -}
+>>> -early_param("acpi", parse_acpi);
+>>> +	/*
+>>> +	 * Enable ACPI instead of device tree unless
+>>> +	 * - ACPI has been disabled explicitly (acpi=off), or
+>>> +	 * - the device tree is not empty (it has more than just a /chosen node)
+>>> +	 *   and ACPI has not been force enabled (acpi=force)
+>>> +	 */
+>>> +	if (param_acpi_off ||
+>>> +	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>>> +		return 0;
+
+Or param_acpi_off is true or param_acpi_force is true, the depth of the 
+DT has no influence.
+
+>>>
+>>> -static int __init dt_scan_depth1_nodes(unsigned long node,
+>>> -				       const char *uname, int depth,
+>>> -				       void *data)
+>>> -{
+>>>   	/*
+>>> -	 * Return 1 as soon as we encounter a node at depth 1 that is
+>>> -	 * not the /chosen node.
+>>> +	 * ACPI is disabled at this point. Enable it in order to parse
+>>> +	 * the ACPI tables and carry out sanity checks
+>>>   	 */
+>>> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>>> -		return 1;
+>>> +	enable_acpi();
+>>> +
+>>
+>> So we only enable ACPI if we pass acpi=force as kernel parameter?
+>> I'm not sure if this is what you wanted to do.
+>>
+>
+> The current preference from ARM64 maintainers was that is both ACPI
+> tables and a DT were presented then DT should take precedence.
+>
+> With no DT provided the code should use ACPI.
+
+ From my understanding in this patch that can never happen.
+
+On which version is this set based on?
+I'm looking on v4.5-rc5 ATM.
+
+Regards,
+Matthias
