@@ -1,25 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Feb 2016 16:15:08 -0800
-Subject: [PATCHv2] clk: ti: dpll: convert DPLL support code to use clk_hw
- instead of clk ptrs
-In-Reply-To: <1455967466-3812-1-git-send-email-t-kristo@ti.com>
-References: <1455967466-3812-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20160223001507.GC4847@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 23 Feb 2016 09:18:25 +0900
+Subject: [PATCH v2] ARM: dts: Move syscon reboot/poweroff to common dtsi
+ for Exynos
+In-Reply-To: <56C3D99C.3090403@osg.samsung.com>
+References: <1455636348-14277-1-git-send-email-javier@osg.samsung.com>
+ <56C3D745.7050904@samsung.com> <56C3D99C.3090403@osg.samsung.com>
+Message-ID: <56CBA551.4030205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20, Tero Kristo wrote:
-> Convert DPLL support code to use clk_hw pointers for reference and bypass
-> clocks. This allows us to use clk_hw_* APIs for accessing any required
-> parameters for these clocks, avoiding some locking problems at least with
-> DPLL enable code; this used clk_get_rate which uses mutex but isn't
-> good under clk_enable / clk_disable.
+On 17.02.2016 11:23, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
+> On 02/16/2016 11:13 PM, Krzysztof Kozlowski wrote:
+> 
+> [snip]
+> 
+>>> diff --git a/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+>>> b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+>>> new file mode 100644
+>>> index 000000000000..09a2040054ed
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+>>> @@ -0,0 +1,27 @@
+>>> +/*
+>>> + * Samsung's Exynos SoC syscon reboot/poweroff nodes common definition.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +/ {
+>>> +    soc {
+>>> +        compatible = "simple-bus";
+>>
+>> The exynos4 does not have soc node. I wonder whether we should provide
+>> here also address and size:
+>>                  #address-cells = <1>;
+>>                  #size-cells = <1>;
+>>         ranges;
+>>
+>> Without this it works fine but that does not look correct enough.
+>>
+>> A minor effect of this patch on Exynos4 is that syscon-poweroff/reboot
+>> are now the only children of "soc" simple-bus (rest of platform devices
+>> is not)... but this is not a problem.
+>>
+>> Works fine so only the question about cells/ranges remains. Any comments?
+>>
+> 
+> I in fact had the #address-cells and #size-cells at the beginning but then
+> realized that both the syscon-poweroff and syscon-reboot nodes didn't have
+> a reg property so it felt strange to me to have those.
+> 
+> Also, I thought that maybe a SoC dtsi may need a different #address-cells
+> and #size-cells for the other child nodes so having those in this dtsi
+> could override the values in the SoC dtsi depending where is included.
+> 
+> So I thought it could do more harm than good but I've no strong opinion
+> and can add those if you prefer.
 
-Applied to clk-next
+No comments from other people so I guess there are no objections.
+Applied for late v4.6.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+Krzysztof
