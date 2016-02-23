@@ -1,61 +1,67 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 23 Feb 2016 15:00:44 +0200
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Feb 2016 14:08:22 +0100
 Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
  tree
-In-Reply-To: <6859810.tb1t0IEONi@wuerfel>
+In-Reply-To: <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
 References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <3695074.sKSIyOjpjD@wuerfel>
- <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
- <6859810.tb1t0IEONi@wuerfel>
-Message-ID: <56CC57FC.20707@ti.com>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
+Message-ID: <CACRpkdZ9PQ5Wk2sADW5=ZQngAnx+mSfpOKpwV1-vz1XZtZ3Xkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 23/02/16 13:22, Arnd Bergmann wrote:
-> On Tuesday 23 February 2016 11:10:33 Linus Walleij wrote:
+On Tue, Feb 23, 2016 at 12:56 PM, Peter Maydell
+<peter.maydell@linaro.org> wrote:
+> On 23 February 2016 at 09:58, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+>> I'm not quite sure how it works if, as in versatile display case, there
+>> are multiple DT overlays of which one has to be enabled. I hope there's
+>> support to choose which one to use via kernel cmdline or similar.
 >>
->> ERROR (duplicate_label): ERROR (duplicate_label): Duplicate label
->> 'clcd_panel' on /panel at 1/port/endpoint and /panel at 0/port/endpoint
->> Duplicate label 'clcd_panel' on /panel at 1/port/endpoint and
->> /panel at 0/port/endpoint
->>
->> So the dtc does not allow duplicate node labels for the phandle
->> even if the node it resides in is disabled. Tough luck...
-> 
-> Ah, too bad. I guess we could still do it by also setting the
-> remote-endpoint property to node->phandle, but then it's
-> not as simple any more.
+>> I would personally like it much more if the bootloader would either
+>> compose a final dtb from DT fragments and pass it to the kernel, or
+>> alternatively the bootloader would pass the base dtb image and a bunch
+>> of DT overlays to the kernel, and the kernel would deal with the DT
+>> overlays.
+>
+> Speaking as somebody who's written the "bootloader" code that's
+> used for what I guess are the majority of versatile kernel boots,
+> i.e. the one in QEMU, I think that requiring the bootloader to do this
+> would be a significant worsening from the current state.
+>
+> Right now the bootloader doesn't need to do much at all with device
+> trees, except pass the kernel the DT that the user gave us, which
+> is just the kernel's own data structures in a separate file for
+> convenience. You need to do some very minor tweaks to the /chosen
+> node, but these can be handled the same way for any board and aren't
+> hardware specific. There's no need to worry about dt fragments
+> either for the bootloader or for the user. Imposing a new requirement
+> for the bootloader to have to probe hardware which it otherwise
+> has no need to even care about, and then edit and update the DT
+> in a board-specific manner, or have board-specific DT fragments,
+> seems like a totally unnecessary imposition on both bootloader
+> authors and end-users, and of course it would break booting newer
+> kernels on the great mass of already existing boot loaders and
+> QEMU installs.
+>
+> The kernel is in a position to probe the display hardware and determine
+> what is there, and do the right thing, and that's exactly what it
+> does today. The kernel should continue to do this.
+> The advantage of DT is that it allows moving information about
+> non-probeable hardware that was previously hardwired in the kernel
+> C sources into a separate data structure, but the versatile displays
+> are not non-probeable. I can see no benefit at all from hardwiring into
+> the dt something which the kernel has previously been successfully
+> dynamically getting right without any bootloader intervention -- it just
+> makes the kernel less flexible and less user-friendly.
 
-I think it could be done with all panels in an endpoint of their own, as
-it is currently in this patch. All the panels would be disabled by
-default, and one of them gets enabled at some early boot phase. The
-fbdev driver would then iterate the endpoints and pick the first panel
-that's enabled.
+I agree with Peter and Russell on this, as you could guess.
+Today the kernel knows about all the hardware and it
+JustWorks(TM) and that is so neat.
 
-That would be almost the same as what's already in this patch, except
-(if I'm not mistaken) the detection part could be in platform code, and
-the fbdev driver itself would know nothing about board specific
-detection or board specific panel lists.
+I'm still trying to appeal to the subsystem maintainer as well.
+Pretty tough deal.
 
-So maybe that would be a bit cleaner. Still ugly, I think =). I really
-don't like having possible-panels in the Schr?dinger's DT data
-(http://www.angryflower.com/387.html).
-
-That said, maybe this is the best way to deal with Versatile, without
-requiring any change to the bootloader or the boot mechanism.
-
-What is the current status of Versatile? Have we had working display
-with Versatile when booting with device tree? Or has the display been
-supported only with legacy boot?
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160223/39c3ae95/attachment.sig>
+Yours,
+Linus Walleij
