@@ -1,43 +1,37 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 23 Feb 2016 13:49:23 +0000
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <56CC546A.9070705@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
- <56CC2D39.80909@ti.com>
- <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
- <56CC546A.9070705@ti.com>
-Message-ID: <CAFEAcA-Y7rE_9CiOphgmae3FDApRznoBS7vsVN_+9hBqvAzEEA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 23 Feb 2016 13:55:51 +0000
+Subject: [PATCH 00/13] arm-cci: PMU driver updates for 4.6
+In-Reply-To: <20160223114003.GF3966@arm.com>
+References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
+ <20160223114003.GF3966@arm.com>
+Message-ID: <56CC64E7.3040407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2016 at 12:45, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> So, true, there's probing going on, but it's all board specific,
-> requiring a board specific driver to support it in the kernel. And I
-> think that makes the bootloader much better place for supporting it.
+On 23/02/16 11:40, Will Deacon wrote:
+> On Tue, Feb 23, 2016 at 10:49:42AM +0000, Suzuki K Poulose wrote:
+>> Here are some fixes and updates for arm-cci pmu driver targeting v4.6,
+>> applies on top of v4.5-rc5.
+>>
+>> Highlights include :
+>>   - Support for CoreLink CCI-550 PMU
+>>   - Reliable writes to PMU Counter registers for CCI-500/550.
+>>
+>> All the patches have been Acked. Please let me know how this
+>> can be merged.
 
-This doesn't seem to me like a reason to put the requirement
-in the bootloader. A huge part of the purpose of the kernel
-is to support the hardware (whether that's completely generic
-and probeable, like PCI, or generic but not probeable, or
-completely specific to a particular board). The kernel has to
-support the hardware, and just because it happens to be board
-specific hardware rather than generic hardware doesn't seem to
-me to imply that the kernel gets to drop part of its core purpose.
+>>
+>>   Documentation/devicetree/bindings/arm/cci.txt |    2 +
+>>   drivers/bus/Kconfig                           |   10 +-
+>>   drivers/bus/arm-cci.c                         |  612 +++++++++++++++++--------
+>>   3 files changed, 427 insertions(+), 197 deletions(-)
+>
+> How do you plan to merge this? I can take it all onto a branch for
+> arm-soc, or I can include it on my perf/updates branch, or ...?
 
-> I think one of the core questions here is: do we want to start adding
-> board specific drivers to the kernel, instead of dealing with it in the
-> bootloader when possible? My understanding is that we've been trying to
-> reduce board specific code from the kernel.
+Arnd, Olof,
 
-I think there's a difference between "reduce board specific code
-in the kernel by replacing it with the combination of generic
-or parameterisable code in the kernel plus a kernel data structure
-(DT) that supplies the parameterisation needed", and "reduce
-board specific code in the kernel by forcing the bootloader to
-do the kernel's job for it".
+What do you think would be the best route ?
 
-thanks
--- PMM
+Cheers
+Suzuki
