@@ -1,113 +1,92 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Tue, 23 Feb 2016 10:19:00 -0800
-Subject: [PATCH V3] iommu/arm-smmu-v2: Add support for 16 bit VMID
-Message-ID: <1456251540-1269-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
+Date: Tue, 23 Feb 2016 19:19:07 +0100
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
+ also on PowerPC and ARM)
+In-Reply-To: <20160223103221.GA1418@node.shutemov.name>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160223103221.GA1418@node.shutemov.name>
+Message-ID: <20160223191907.25719a4d@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM-SMMUv2 supports upto 16 bit VMID. This patch enables
-16 bit VMID when HW supports.
+On Tue, 23 Feb 2016 13:32:21 +0300
+"Kirill A. Shutemov" <kirill@shutemov.name> wrote:
 
-Changes from V2:
-	- Bug fix.
-	- Removed not needed prints and comments.
+> On Fri, Feb 12, 2016 at 06:16:40PM +0100, Gerald Schaefer wrote:
+> > On Fri, 12 Feb 2016 16:57:27 +0100
+> > Christian Borntraeger <borntraeger@de.ibm.com> wrote:
+> > 
+> > > > I'm also confused by pmd_none() is equal to !pmd_present() on s390. Hm?
+> > > 
+> > > Don't know, Gerald or Martin?
+> > 
+> > The implementation frequently changes depending on how many new bits Martin
+> > needs to squeeze out :-)
+> > We don't have a _PAGE_PRESENT bit for pmds, so pmd_present() just checks if the
+> > entry is not empty. pmd_none() of course does the opposite, it checks if it is
+> > empty.
+> 
+> I still worry about pmd_present(). It looks wrong to me. I wounder if
+> patch below makes a difference.
+> 
+> The theory is that the splitting bit effetely masked bogus pmd_present():
+> we had pmd_trans_splitting() in all code path and that prevented mm from
+> touching the pmd. Once pmd_trans_splitting() has gone, mm proceed with the
+> pmd where it shouldn't and here's a boom.
 
-changes from V1:
-	- Remove DT Property and enable 16 bit VMID if ID says.
+Well, I don't think pmd_present() == true is bogus for a trans_huge pmd under
+splitting, after all there is a page behind the the pmd. Also, if it was
+bogus, and it would need to be false, why should it be marked !pmd_present()
+only at the pmdp_invalidate() step before the pmd_populate()? It clearly
+is pmd_present() before that, on all architectures, and if there was any
+problem/race with that, setting it to !pmd_present() at this stage would
+only (marginally) reduce the race window.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
----
- drivers/iommu/arm-smmu.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+BTW, PowerPC and Sparc seem to do the same thing in pmdp_invalidate(),
+i.e. they do not set pmd_present() == false, only mark it so that it would
+not generate a new TLB entry, just like on s390. After all, the function
+is called pmdp_invalidate(), and I think the comment in mm/huge_memory.c
+before that call is just a little ambiguous in its wording. When it says
+"mark the pmd notpresent" it probably means "mark it so that it will not
+generate a new TLB entry", which is also what the comment is really about:
+prevent huge and small entries in the TLB for the same page at the same
+time.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 59ee4b8..247a469 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -93,6 +93,7 @@
- #define sCR0_VMIDPNE			(1 << 11)
- #define sCR0_PTM			(1 << 12)
- #define sCR0_FB				(1 << 13)
-+#define sCR0_VMID16EN			(1 << 31)
- #define sCR0_BSU_SHIFT			14
- #define sCR0_BSU_MASK			0x3
- 
-@@ -140,6 +141,7 @@
- #define ID2_PTFS_4K			(1 << 12)
- #define ID2_PTFS_16K			(1 << 13)
- #define ID2_PTFS_64K			(1 << 14)
-+#define ID2_VMID16			(1 << 15)
- 
- /* Global TLB invalidation */
- #define ARM_SMMU_GR0_TLBIVMID		0x64
-@@ -189,6 +191,8 @@
- #define ARM_SMMU_GR1_CBA2R(n)		(0x800 + ((n) << 2))
- #define CBA2R_RW64_32BIT		(0 << 0)
- #define CBA2R_RW64_64BIT		(1 << 0)
-+#define CBA2R_VMID_SHIFT		16
-+#define CBA2R_VMID_MASK			0xffff
- 
- /* Translation context bank */
- #define ARM_SMMU_CB_BASE(smmu)		((smmu)->base + ((smmu)->size >> 1))
-@@ -297,6 +301,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_TRANS_S2		(1 << 3)
- #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
- #define ARM_SMMU_FEAT_TRANS_OPS		(1 << 5)
-+#define ARM_SMMU_FEAT_VMID16		(1 << 6)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
-@@ -726,16 +731,15 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
- 
- 	if (smmu->version > ARM_SMMU_V1) {
--		/*
--		 * CBA2R.
--		 * *Must* be initialised before CBAR thanks to VMID16
--		 * architectural oversight affected some implementations.
--		 */
- #ifdef CONFIG_64BIT
- 		reg = CBA2R_RW64_64BIT;
- #else
- 		reg = CBA2R_RW64_32BIT;
- #endif
-+		/* if 16bit VMID supported set VMID in CBA2R */
-+		if (smmu->features & ARM_SMMU_FEAT_VMID16)
-+			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
-+
- 		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
- 	}
- 
-@@ -751,7 +755,8 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 	if (stage1) {
- 		reg |= (CBAR_S1_BPSHCFG_NSH << CBAR_S1_BPSHCFG_SHIFT) |
- 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
--	} else {
-+	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
-+		/*16 bit VMID is not supported set 8 bit VMID here */
- 		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
- 	}
- 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
-@@ -1508,6 +1513,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	/* Don't upgrade barriers */
- 	reg &= ~(sCR0_BSU_MASK << sCR0_BSU_SHIFT);
- 
-+	if (smmu->features & ARM_SMMU_FEAT_VMID16)
-+		reg |= sCR0_VMID16EN;
-+
- 	/* Push the button */
- 	__arm_smmu_tlb_sync(smmu);
- 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
-@@ -1658,6 +1666,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 	size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
- 	smmu->pa_size = size;
- 
-+	/* See if 16bit VMID is supported */
-+	if (id & ID2_VMID16)
-+		smmu->features |= ARM_SMMU_FEAT_VMID16;
-+
- 	/*
- 	 * What the page table walker can address actually depends on which
- 	 * descriptor format is in use, but since a) we don't know that yet,
--- 
-2.1.0
+FWIW, and since the ARM arch-list is already on cc, I think there is
+an issue with pmdp_invalidate() on ARM, since it also seems to clear
+the trans_huge (and formerly trans_splitting) bit, which actually makes
+the pmd !pmd_present(), but it violates the other requirement from the
+comment:
+"the pmd_trans_huge and pmd_trans_splitting must remain set at all times
+on the pmd until the split is complete for this pmd"
+
+> 
+> I'm not sure that the patch is correct wrt yound/old pmds and I have no
+> way to test it...
+> 
+> diff --git a/arch/s390/include/asm/pgtable.h b/arch/s390/include/asm/pgtable.h
+> index 64ead8091248..2eeb17ab68ac 100644
+> --- a/arch/s390/include/asm/pgtable.h
+> +++ b/arch/s390/include/asm/pgtable.h
+> @@ -490,7 +490,7 @@ static inline int pud_bad(pud_t pud)
+> 
+>  static inline int pmd_present(pmd_t pmd)
+>  {
+> -	return pmd_val(pmd) != _SEGMENT_ENTRY_INVALID;
+> +	return !(pmd_val(pmd) & _SEGMENT_ENTRY_INVALID);
+>  }
+> 
+>  static inline int pmd_none(pmd_t pmd)
+
+No, that would not work well with young rw and ro pmds. We do now
+have an extra free bit in the pmd on s390, after the removal of the
+splitting bit, so we could try to implement pmd_present() with that
+sw bit, but that would also require several not-so-trivial changes
+to the other code in arch/s390/include/asm/pgtable.h.
+
+I'll check with Martin, maybe it is actually trivial, then we can
+do a quick test it to rule that one out.
