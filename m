@@ -1,32 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Feb 2016 14:53:18 +0000
-Subject: [PATCH] [RFC] ARM: keystone: possibly fix big-endian kernels
-In-Reply-To: <1456238609-962461-1-git-send-email-arnd@arndb.de>
-References: <1456238609-962461-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160223145318.GK19428@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 23 Feb 2016 15:53:44 +0100
+Subject: [linux-sunxi] [PATCH] ARM: dts: sun4i: Enable USB DRC on
+ Hyundai-a7hd
+In-Reply-To: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
+References: <1455656404-31191-1-git-send-email-peter@korsgaard.com>
+Message-ID: <56CC7278.6060901@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 03:43:21PM +0100, Arnd Bergmann wrote:
-> While discussing a regressing in the netcp driver, I wondered
-> whether Keystone can work with a big-endian kernel, and noticed
-> that we don't switch endianess when we enter the kernel on the
-> secondary CPU, or when we call into smc.
+Hi,
 
-NAK.  Sorry Arnd, you're worringly wrong on this.
+On 02/16/2016 10:00 PM, Peter Korsgaard wrote:
+> Enable the OTG USB controller on the A7HD.
+>
+> Signed-off-by: Peter Korsgaard <peter@korsgaard.com>
 
-secondary_startup will do the setend if necessary, there's no need
-to do this kind of junk in each and every platform.  It's been this
-way since:
+Patch looks good to me:
 
-commit 97bcb0fea590d3d704f985bec08f342d28992634
-Author: Ben Dooks <ben.dooks@codethink.co.uk>
-Date:   Fri Feb 1 09:40:42 2013 +0000
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-So, I hope you've not been telling platform folk to do this.  Please
-audit the arm-soc code to make sure, thanks.
+Regards,
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Hans
+
+
+> ---
+>   arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts | 34 ++++++++++++++++++++++++++++
+>   1 file changed, 34 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+> index 43f58fb..9103864 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts
+> @@ -87,6 +87,30 @@
+>   	status = "okay";
+>   };
+>
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PH4";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
+> +		allwinner,pins = "PH5";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
+> +	};
+> +};
+> +
+> +&reg_usb0_vbus {
+> +	status = "okay";
+> +};
+> +
+>   &reg_usb2_vbus {
+>   	gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
+>   	status = "okay";
+> @@ -102,7 +126,17 @@
+>   	allwinner,pins = "PH6";
+>   };
+>
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+>   &usbphy {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
+> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+>   	usb2_vbus-supply = <&reg_usb2_vbus>;
+>   	status = "okay";
+>   };
+>
