@@ -1,66 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 23 Feb 2016 12:26:17 +0000
-Subject: [PATCH V2] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-In-Reply-To: <1455820158-8529-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1455820158-8529-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <20160223122616.GE4989@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 23 Feb 2016 13:29:21 +0100
+Subject: [RFC PATCH 10/10] arm64: mm: restrict __pa() translations to
+ linear virtual addresses
+In-Reply-To: <20160223122615.GJ3966@arm.com>
+References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456174472-30028-11-git-send-email-ard.biesheuvel@linaro.org>
+ <20160223122615.GJ3966@arm.com>
+Message-ID: <CAKv+Gu_zdt-sk_moCeF8u95DCZgcT26CDH1gL87Q4qXKA_hKrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 10:29:18AM -0800, tchalamarla at caviumnetworks.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> 
-> Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-> namespaces; specifically within a given node SMMU0 and SMMU1 share,
-> as does SMMU2 and SMMU3.
-> 
-> This patch tries to address these issuee by supplying asid and vmid
-> base from devicetree.
-> 
-> changes from V1:
-> 	- rebased on top of 16 bit VMID patch
-> 	- removed redundent options from DT
-> 	- insted of transform, DT now supplies starting ASID/VMID
-> 
-> Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> ---
->  .../devicetree/bindings/iommu/arm,smmu.txt         |  8 +++++
->  drivers/iommu/arm-smmu.c                           | 37 +++++++++++++++-------
->  2 files changed, 34 insertions(+), 11 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index bb7e569..80b8484 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -57,6 +57,14 @@ conditions.
->  
->  - smmu-enable-vmid16 : Enable 16 bit VMID, if allowed.
->  
-> +- asid-base :	Buggy SMMUv2 implementations which doesn't satisfy the
-> +		ASID namespace needs, use this field to specify starting
-> +		ASID for the SMMU.
-> +
-> +- vmid-base :	Buggy SMMUv2 implementations which doesn't satisfy the VMID
-> +		namespace needs, use this field to specify starting VMID
-> +		for the SMMU.
+On 23 February 2016 at 13:26, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Feb 22, 2016 at 09:54:32PM +0100, Ard Biesheuvel wrote:
+>> Now that we have replaced all occurrences of __pa() translations
+>> involving virtual addresses that are covered by the kernel text,
+>> we can redefine __virt_to_phys and __pa() etc to only take virtual
+>> address that are covered by the linear mapping. This means we can
+>> remove the comparison with PAGE_OFFSET in the definition of
+>> __virt_to_phys().
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/memory.h | 12 +++++++-----
+>>  1 file changed, 7 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> index 56d6739430f3..3b5dc5b243ac 100644
+>> --- a/arch/arm64/include/asm/memory.h
+>> +++ b/arch/arm64/include/asm/memory.h
+>> @@ -86,11 +86,14 @@
+>>   * private definitions which should NOT be used outside memory.h
+>>   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+>>   */
+>> -#define __virt_to_phys(x) ({                                         \
+>> +#ifndef CONFIG_DEBUG_VM
+>> +#define __virt_to_phys(x)    (((phys_addr_t)(x) & ~PAGE_OFFSET) + PHYS_OFFSET)
+>> +#else
+>> +#define __virt_to_phys(x)    ({                                      \
+>>       phys_addr_t __x = (phys_addr_t)(x);                             \
+>> -     __x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :   \
+>> -                              (__x - kimage_voffset); })
+>> -
+>> +     BUG_ON(__x < PAGE_OFFSET);                                      \
+>> +     (((phys_addr_t)__x & ~PAGE_OFFSET) + PHYS_OFFSET); })
+>
+> What's the #include-hell like if you try to use VM_BUG_ON instead?
+>
 
-As has been pointed out, these are not strictly properties of the
-hardware, and are insufficient to aovid the issue in general (adding an
-arbitrary base does not enforce IDs fall within a particular range).
+The #include hell would not change I think, since
 
-So NAK for *-base properties alone.
+include/linux/mmdebug.h:18:#define VM_BUG_ON(cond) BUG_ON(cond)
 
-> +	if (of_property_read_u32(dev->of_node, "#asid-base",
-> +				 &smmu->asid_base)) {
-> +		smmu->asid_base = 0;
-> +	}
-> +
-> +	if (of_property_read_u32(dev->of_node, "#vmid-base",
-> +				 &smmu->vmid_base)) {
-> +		smmu->vmid_base = 1;
-> +	}
-
-These do not match the documentation above.
-
-Mark.
+but it would certainly make this code look a lot cleaner.
