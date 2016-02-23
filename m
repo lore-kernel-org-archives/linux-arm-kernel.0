@@ -1,69 +1,89 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 23 Feb 2016 14:14:45 +0000
-Subject: [PATCH 07/12] ARM: dts: apq8064: add missing i2c2 pinctrl info
+Date: Tue, 23 Feb 2016 14:14:50 +0000
+Subject: [PATCH 09/12] ARM: dts: apq8064: add gsbi4 with i2c node.
 In-Reply-To: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1456236885-2741-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1456236890-2783-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing i2c2 pinctrl information in i2c2 node.
+This patch adds gsbi4 and i2c node.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 26 ++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi      |  2 ++
- 2 files changed, 28 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi      | 23 +++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-index 0b7b10e..0a342d3 100644
+index 0a342d3..0cb22cf 100644
 --- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-@@ -39,6 +39,32 @@
+@@ -90,6 +90,31 @@
  		};
  	};
  
-+	i2c2_pins: i2c2 {
++	i2c4_pins: i2c4 {
 +		mux {
-+			pins = "gpio24", "gpio25";
-+			function = "gsbi2";
++			pins = "gpio12", "gpio13";
++			function = "gsbi4";
 +		};
 +
 +		pinconf {
-+			pins = "gpio24", "gpio25";
++			pins = "gpio12", "gpio13";
 +			drive-strength = <16>;
 +			bias-disable;
 +		};
 +	};
 +
-+	i2c2_pins_sleep: i2c2_pins_sleep {
++	i2c4_pins_sleep: i2c4_pins_sleep {
 +		mux {
-+			pins = "gpio24", "gpio25";
++			pins = "gpio12", "gpio13";
 +			function = "gpio";
 +		};
-+
 +		pinconf {
-+			pins = "gpio24", "gpio25";
++			pins = "gpio12", "gpio13";
 +			drive-strength = <2>;
 +			bias-disable = <0>;
 +		};
 +	};
 +
- 	i2c3_pins: i2c3 {
- 		mux {
- 			pins = "gpio8", "gpio9";
+ 	spi5_default: spi5_default {
+ 		pinmux {
+ 			pins = "gpio51", "gpio52", "gpio54";
 diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 3fefb2e..2367adc 100644
+index 2367adc..445297c 100644
 --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -255,6 +255,8 @@
- 			gsbi2_i2c: i2c at 124a0000 {
- 				compatible = "qcom,i2c-qup-v1.1.1";
- 				reg = <0x124a0000 0x1000>;
-+				pinctrl-0 = <&i2c2_pins &i2c2_pins_sleep>;
+@@ -287,6 +287,29 @@
+ 			};
+ 		};
+ 
++		gsbi4: gsbi at 16300000 {
++			status = "disabled";
++			compatible = "qcom,gsbi-v1.0.0";
++			cell-index = <4>;
++			reg = <0x16300000 0x03>;
++			clocks = <&gcc GSBI4_H_CLK>;
++			clock-names = "iface";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			gsbi4_i2c: i2c at 16380000 {
++				compatible = "qcom,i2c-qup-v1.1.1";
++				pinctrl-0 = <&i2c4_pins &i2c4_pins_sleep>;
 +				pinctrl-names = "default", "sleep";
- 				interrupts = <0 196 IRQ_TYPE_NONE>;
- 				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
- 				clock-names = "core", "iface";
++				reg = <0x16380000 0x1000>;
++				interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
++				clocks = <&gcc GSBI4_QUP_CLK>,
++					 <&gcc GSBI4_H_CLK>;
++				clock-names = "core", "iface";
++			};
++		};
++
+ 		gsbi5: gsbi at 1a200000 {
+ 			status = "disabled";
+ 			compatible = "qcom,gsbi-v1.0.0";
 -- 
 1.9.1
