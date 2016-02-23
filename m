@@ -1,53 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Feb 2016 13:20:10 +0100
-Subject: [PATCH v12 1/5] efi: ARM/arm64: ignore DT memory nodes instead of
- removing them
-In-Reply-To: <20160223121648.GI3966@arm.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-2-git-send-email-ddaney.cavm@gmail.com>
- <20160223115805.GB4989@leverpostej> <20160223121648.GI3966@arm.com>
-Message-ID: <CAKv+Gu8fOKqLrnbre7sHko+hPd3wq_O6U5Ev27tN3zEc7W8Mww@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Feb 2016 12:26:15 +0000
+Subject: [RFC PATCH 10/10] arm64: mm: restrict __pa() translations to
+ linear virtual addresses
+In-Reply-To: <1456174472-30028-11-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456174472-30028-11-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160223122615.GJ3966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2016 at 13:16, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Feb 23, 2016 at 11:58:05AM +0000, Mark Rutland wrote:
->> On Mon, Feb 22, 2016 at 05:58:19PM -0800, David Daney wrote:
->> > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > There are two problems with the UEFI stub DT memory node removal
->> > routine:
->> > - it deletes nodes as it traverses the tree, which happens to work
->> >   but is not supported, as deletion invalidates the node iterator;
->> > - deleting memory nodes entirely may discard annotations in the form
->> >   of additional properties on the nodes.
->> >
->> > Since the discovery of DT memory nodes occurs strictly before the
->> > UEFI init sequence, we can simply clear the memblock memory table
->> > before parsing the UEFI memory map. This way, it is no longer
->> > necessary to remove the nodes, so we can remove that logic from the
->> > stub as well.
->>
->> This is a little bit scary, but I guess this works.
->>
->> My only concern is that when we get kexec, a subsequent kernel must also
->> have EFI memory map support, or things go bad for the next EFI-aware
->> kernel after that (as things like the runtime services may have been
->> corrupted by the kernel in the middle). It's difficult to fix the
->> general case later.
->>
->> A different option would be to support status="disabled" for the memory
->> nodes, and ignore these in early_init_dt_scan_memory. That way a kernel
->> cannot use memory without first having parsed the EFI memory map, and we
->> can still get NUMA info from the disabled nodes.
->
-> So in that case, the middle, non-EFI kernel would fail to boot?
-> Realistically, once you've kexec'd a non-EFI payload, I don't think you
-> can rely on the EFI state remaining intact for future EFI applications.
->
-> Is this really something we should be trying to police in the kernel?
->
+On Mon, Feb 22, 2016 at 09:54:32PM +0100, Ard Biesheuvel wrote:
+> Now that we have replaced all occurrences of __pa() translations
+> involving virtual addresses that are covered by the kernel text,
+> we can redefine __virt_to_phys and __pa() etc to only take virtual
+> address that are covered by the linear mapping. This means we can
+> remove the comparison with PAGE_OFFSET in the definition of
+> __virt_to_phys().
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/memory.h | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 56d6739430f3..3b5dc5b243ac 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -86,11 +86,14 @@
+>   * private definitions which should NOT be used outside memory.h
+>   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+>   */
+> -#define __virt_to_phys(x) ({						\
+> +#ifndef CONFIG_DEBUG_VM
+> +#define __virt_to_phys(x)	(((phys_addr_t)(x) & ~PAGE_OFFSET) + PHYS_OFFSET)
+> +#else
+> +#define __virt_to_phys(x)	({					\
+>  	phys_addr_t __x = (phys_addr_t)(x);				\
+> -	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
+> -				 (__x - kimage_voffset); })
+> -
+> +	BUG_ON(__x < PAGE_OFFSET);					\
+> +	(((phys_addr_t)__x & ~PAGE_OFFSET) + PHYS_OFFSET); })
 
-Well, we could add entries to /reserved-memory in the stub for all the
-regions UEFI cares about, that would probably be sufficient to fix
-this case.
+What's the #include-hell like if you try to use VM_BUG_ON instead?
+
+Will
