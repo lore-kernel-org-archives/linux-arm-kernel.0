@@ -1,157 +1,71 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 23 Feb 2016 14:14:07 +0000
-Subject: [PATCH 02/12] ARM: dts: apq8064: move pinctrls to dedicated dtsi
+Date: Tue, 23 Feb 2016 14:14:14 +0000
+Subject: [PATCH 03/12] ARM: dts: apq8064: add pci support in CM QS600
 In-Reply-To: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1456236847-2445-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1456236854-2511-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As there are more pinctrls to come, moving these to dedicated dtsi makes
-more sense.
+This patch adds PCIE support to APQ8064, tested with Ethernet on
+Compulab QS600 board.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 58 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi      | 57 +------------------------------
- 2 files changed, 59 insertions(+), 56 deletions(-)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-new file mode 100644
-index 0000000..c711aca
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-@@ -0,0 +1,58 @@
+diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+index 21095da..35f1d46 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+@@ -37,6 +37,18 @@
+ 					bias-disable;
+ 				};
+ 			};
 +
-+&tlmm_pinmux {
-+	sdc4_gpios: sdc4-gpios {
-+		pios {
-+			pins = "gpio63", "gpio64", "gpio65", "gpio66", "gpio67", "gpio68";
-+			function = "sdc4";
-+		};
-+	};
-+
-+	ps_hold: ps_hold {
-+		mux {
-+			pins = "gpio78";
-+			function = "ps_hold";
-+		};
-+	};
-+
-+	i2c1_pins: i2c1 {
-+		mux {
-+			pins = "gpio20", "gpio21";
-+			function = "gsbi1";
-+		};
-+	};
-+
-+	i2c3_pins: i2c3 {
-+		mux {
-+			pins = "gpio8", "gpio9";
-+			function = "gsbi3";
-+		};
-+	};
-+
-+	gsbi6_uart_2pins: gsbi6_uart_2pins {
-+		mux {
-+			pins = "gpio14", "gpio15";
-+			function = "gsbi6";
-+		};
-+	};
-+
-+	gsbi6_uart_4pins: gsbi6_uart_4pins {
-+		mux {
-+			pins = "gpio14", "gpio15", "gpio16", "gpio17";
-+			function = "gsbi6";
-+		};
-+	};
-+
-+	gsbi7_uart_2pins: gsbi7_uart_2pins {
-+		mux {
-+			pins = "gpio82", "gpio83";
-+			function = "gsbi7";
-+		};
-+	};
-+
-+	gsbi7_uart_4pins: gsbi7_uart_4pins {
-+		mux {
-+			pins = "gpio82", "gpio83", "gpio84", "gpio85";
-+			function = "gsbi7";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index a7af35d..3d95534b 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -142,62 +142,6 @@
- 
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&ps_hold>;
--
--			sdc4_gpios: sdc4-gpios {
--				pios {
--					pins = "gpio63", "gpio64", "gpio65", "gpio66", "gpio67", "gpio68";
--					function = "sdc4";
--				};
--			};
--
--			ps_hold: ps_hold {
--				mux {
--					pins = "gpio78";
--					function = "ps_hold";
--				};
--			};
--
--			i2c1_pins: i2c1 {
--				mux {
--					pins = "gpio20", "gpio21";
--					function = "gsbi1";
--				};
--			};
--
--			i2c3_pins: i2c3 {
--				mux {
--					pins = "gpio8", "gpio9";
--					function = "gsbi3";
--				};
--			};
--
--			gsbi6_uart_2pins: gsbi6_uart_2pins {
--				mux {
--					pins = "gpio14", "gpio15";
--					function = "gsbi6";
--				};
--			};
--
--			gsbi6_uart_4pins: gsbi6_uart_4pins {
--				mux {
--					pins = "gpio14", "gpio15", "gpio16", "gpio17";
--					function = "gsbi6";
--				};
--			};
--
--			gsbi7_uart_2pins: gsbi7_uart_2pins {
--				mux {
--					pins = "gpio82", "gpio83";
--					function = "gsbi7";
--				};
--			};
--
--			gsbi7_uart_4pins: gsbi7_uart_4pins {
--				mux {
--					pins = "gpio82", "gpio83", "gpio84", "gpio85";
--					function = "gsbi7";
--				};
--			};
++			pcie_pins: pcie_pinmux {
++				mux {
++					pins = "gpio27";
++					function = "gpio";
++				};
++				conf {
++					pins = "gpio27";
++					drive-strength = <12>;
++					bias-disable;
++				};
++			};
  		};
  
- 		sfpb_wrapper_mutex: syscon at 1200000 {
-@@ -828,3 +772,4 @@
+ 		rpm at 108000 {
+@@ -103,6 +115,11 @@
+ 					regulator-max-microvolt = <1900000>;
+ 					bias-pull-down;
+ 				};
++
++				pm8921_lvs6: lvs6 {
++					bias-pull-down;
++				};
++
+ 			};
  		};
- 	};
- };
-+#include "qcom-apq8064-pins.dtsi"
+ 
+@@ -195,6 +212,16 @@
+ 			};
+ 		};
+ 
++		pci at 1b500000 {
++			status = "ok";
++			vdda-supply = <&pm8921_s3>;
++			vdda_phy-supply = <&pm8921_lvs6>;
++			vdda_refclk-supply = <&v3p3_fixed>;
++			pinctrl-0 = <&pcie_pins>;
++			pinctrl-names = "default";
++			perst-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
++		};
++
+ 		amba {
+ 			/* eMMC */
+ 			sdcc1: sdcc at 12400000 {
 -- 
 1.9.1
