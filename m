@@ -1,31 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 23 Feb 2016 08:51:15 +0000
-Subject: [PATCH] irqchip/gicv3-its: Don't allow devices whose ID is
- outside range
-In-Reply-To: <1456199868-9054-1-git-send-email-shankerd@codeaurora.org>
-References: <1456199868-9054-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <56CC1D83.4060503@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 23 Feb 2016 09:53:34 +0100
+Subject: [PATCH] ARM64: dts: Mediatek: mt8173-evb: fix access MMC fail
+ issue
+In-Reply-To: <7h37skw9jd.fsf@baylibre.com>
+References: <1455861643-24307-1-git-send-email-eddie.huang@mediatek.com>
+ <7h37skw9jd.fsf@baylibre.com>
+Message-ID: <56CC1E0E.4050400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/16 03:57, Shanker Donthineni wrote:
-> We are not checking whether the requested device identifier fits into
-> table or not. The ITS MAPD command fails if 'Device ID' is outside of
-> device table range.
-> 
-> Add a simple validation check to avoid MAPD failures since we are
-> not handling ITS command errors. This change also helps to return an
-> error -ENOMEM instead of success to caller.
-> 
 
-In which circumstances do you see this failing? We allocate memory for
-the whole DevID range (as advertised by the ITS), so anything that comes
-up outside of that range cannot be handled anyway, and is a HW
-integration issue. You might as well pretend that these devices do not
-exist.
 
-Thanks,
+On 23/02/16 01:32, Kevin Hilman wrote:
+> Eddie Huang <eddie.huang@mediatek.com> writes:
+>
+>> MT8173 E1 chip has one bug that if turn off USB power domain, vcore
+>> power will also be off, thus cause modules using vcore power domain
+>> fail, like MMC. The E1 chip only found on MT8173-evb board and this
+>> board only has E1 chip, so implement this as a board specific
+>> workaround.
+>>
+>> Pwrapper use vcore power, so add pwrapper using USB power domain to
+>> keep USB power domain not to zero and disabled.
+>>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
+>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I send the patch in a pull request yesterday, so I won't be able to add 
+your tag.
+Thanks for testing and reporting this issue!
+
+Matthias
+
+> I verified that this gets my mt8173-evb booting again when I enable MMC
+> support.
+>
+> Thanks,
+>
+> Kevin
+>
