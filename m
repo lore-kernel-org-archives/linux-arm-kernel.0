@@ -1,119 +1,193 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 11:36:02 +0100
-Subject: [PATCH] bnx2x: add a separate GENEVE Kconfig symbol
-Message-ID: <1456223774-1383513-1-git-send-email-arnd@arndb.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 23 Feb 2016 11:40:05 +0100
+Subject: [PATCH] clk: rockchip: rk3368: fix section mismatches with new
+ child-clocks
+In-Reply-To: <1456214322-20161-1-git-send-email-zhangqing@rock-chips.com>
+References: <1456214322-20161-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1544165.HkeRmE5WOy@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_GENEVE is built as a loadable module, and bnx2x is built-in,
-we get this link error:
+Hi Elaine,
 
-drivers/net/built-in.o: In function `bnx2x_open':
-:(.text+0x33322): undefined reference to `geneve_get_rx_port'
-drivers/net/built-in.o: In function `bnx2x_sp_rtnl_task':
-:(.text+0x3e632): undefined reference to `geneve_get_rx_port'
+Am Dienstag, 23. Februar 2016, 15:58:42 schrieb Elaine Zhang:
+> To model the muxes downstream of fractional dividers we introduced the
+> child property, allowing to describe a direct child clock.
+> The first implementation seems to cause section warnings, as the core
+> clock-tree is marked as initdata while the data pointed to from the
+> child element is not.
+> 
+> While there may be some way to also set that missing property in the
+> inline notation I didn't find it, so to actually fix the issue for now
+> move the sub-definitions into separate declarations that can have
+> their own __initdata properties.
 
-This avoids the problem by adding a separate Kconfig symbol named
-CONFIG_BNX2X_GENEVE that is only enabled when the code is
-reachable from the driver.
+The change below is correct, but the patch message is wrong.
 
-This is the same trick that BNX2X does for VXLAN support, and
-is similar to how I40E handles both.
+The core change is commit 667464208989 ("clk: rockchip: include downstream 
+muxes into fractional dividers") with the second change being a fixup as the 
+first introduced issues. So your commit message should orient itself on the 
+other commit, like
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 883ce97d25b0 ("bnx2x: Add Geneve inner-RSS support")
----
- drivers/net/ethernet/broadcom/Kconfig            | 10 ++++++++++
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c | 14 +++++++-------
- 2 files changed, 17 insertions(+), 7 deletions(-)
+------
+clk: rockchip: include downstream muxes into fractional dividers on rk3368
 
-diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
-index 19f7cd02e085..18042c2460bd 100644
---- a/drivers/net/ethernet/broadcom/Kconfig
-+++ b/drivers/net/ethernet/broadcom/Kconfig
-@@ -149,6 +149,16 @@ config BNX2X_VXLAN
- 	  Say Y here if you want to enable hardware offload support for
- 	  Virtual eXtensible Local Area Network (VXLAN) in the driver.
- 
-+config BNX2X_GENEVE
-+	bool "Generic Network Virtualization Encapsulation (GENEVE) support"
-+	depends on BNX2X && GENEVE && !(BNX2X=y && GENEVE=m)
-+	---help---
-+          This allows one to create GENEVE virtual interfaces that provide
-+          Layer 2 Networks over Layer 3 Networks. GENEVE is often used
-+          to tunnel virtual network infrastructure in virtualized environments.
-+	  Say Y here if you want to enable hardware offload support for
-+	  Generic Network Virtualization Encapsulation (GENEVE) in the driver.
-+
- config BGMAC
- 	tristate "BCMA bus GBit core support"
- 	depends on BCMA && BCMA_HOST_SOC
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-index 81fc51c4ec2b..5c95d0c3b076 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-@@ -59,7 +59,7 @@
- #include <linux/semaphore.h>
- #include <linux/stringify.h>
- #include <linux/vmalloc.h>
--#if IS_ENABLED(CONFIG_GENEVE)
-+#if IS_ENABLED(CONFIG_BNX2X_GENEVE)
- #include <net/geneve.h>
- #endif
- #include "bnx2x.h"
-@@ -10078,7 +10078,7 @@ static void bnx2x_parity_recover(struct bnx2x *bp)
- 	}
- }
- 
--#if defined(CONFIG_BNX2X_VXLAN) || IS_ENABLED(CONFIG_GENEVE)
-+#if defined(CONFIG_BNX2X_VXLAN) || IS_ENABLED(CONFIG_BNX2X_GENEVE)
- static int bnx2x_udp_port_update(struct bnx2x *bp)
- {
- 	struct bnx2x_func_switch_update_params *switch_update_params;
-@@ -10201,7 +10201,7 @@ static void bnx2x_del_vxlan_port(struct net_device *netdev,
- }
- #endif
- 
--#if IS_ENABLED(CONFIG_GENEVE)
-+#if IS_ENABLED(CONFIG_BNX2X_GENEVE)
- static void bnx2x_add_geneve_port(struct net_device *netdev,
- 				  sa_family_t sa_family, __be16 port)
- {
-@@ -10327,7 +10327,7 @@ sp_rtnl_not_reset:
- 			       &bp->sp_rtnl_state))
- 		bnx2x_update_mng_version(bp);
- 
--#if defined(CONFIG_BNX2X_VXLAN) || IS_ENABLED(CONFIG_GENEVE)
-+#if defined(CONFIG_BNX2X_VXLAN) || IS_ENABLED(CONFIG_BNX2X_GENEVE)
- 	if (test_and_clear_bit(BNX2X_SP_RTNL_CHANGE_UDP_PORT,
- 			       &bp->sp_rtnl_state)) {
- 		if (bnx2x_udp_port_update(bp)) {
-@@ -10344,7 +10344,7 @@ sp_rtnl_not_reset:
- 			if (!bp->udp_tunnel_ports[BNX2X_UDP_PORT_VXLAN].count)
- 				vxlan_get_rx_port(bp->dev);
- #endif
--#if IS_ENABLED(CONFIG_GENEVE)
-+#if IS_ENABLED(CONFIG_BNX2X_GENEVE)
- 			if (!bp->udp_tunnel_ports[BNX2X_UDP_PORT_GENEVE].count)
- 				geneve_get_rx_port(bp->dev);
- #endif
-@@ -12557,7 +12557,7 @@ static int bnx2x_open(struct net_device *dev)
- 	if (IS_PF(bp))
- 		vxlan_get_rx_port(dev);
- #endif
--#if IS_ENABLED(CONFIG_GENEVE)
-+#if IS_ENABLED(CONFIG_BNX2X_GENEVE)
- 	if (IS_PF(bp))
- 		geneve_get_rx_port(dev);
- #endif
-@@ -13078,7 +13078,7 @@ static const struct net_device_ops bnx2x_netdev_ops = {
- 	.ndo_add_vxlan_port	= bnx2x_add_vxlan_port,
- 	.ndo_del_vxlan_port	= bnx2x_del_vxlan_port,
- #endif
--#if IS_ENABLED(CONFIG_GENEVE)
-+#if IS_ENABLED(CONFIG_BNX2X_GENEVE)
- 	.ndo_add_geneve_port	= bnx2x_add_geneve_port,
- 	.ndo_del_geneve_port	= bnx2x_del_geneve_port,
- #endif
--- 
-2.7.0
+During the initial conversion to the newly introduced combined fractional
+dividers+muxes the rk3368 clocks were left out, so convert them now.
+----
+
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  drivers/clk/rockchip/clk-rk3368.c | 97
+> ++++++++++++++++++++++++--------------- 1 file changed, 60 insertions(+),
+> 37 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3368.c
+> b/drivers/clk/rockchip/clk-rk3368.c index c2b0421..a2bb122 100644
+> --- a/drivers/clk/rockchip/clk-rk3368.c
+> +++ b/drivers/clk/rockchip/clk-rk3368.c
+> @@ -243,6 +243,34 @@ static struct rockchip_cpuclk_rate_table
+> rk3368_cpuclkl_rates[] __initdata = { RK3368_CPUCLKL_RATE( 312000000, 1,
+> 1, 1),
+>  };
+> 
+> +static struct rockchip_clk_branch rk3368_i2s_8ch_fracmux __initdata =
+> +	MUX(0, "i2s_8ch_pre", mux_i2s_8ch_pre_p, CLK_SET_RATE_PARENT,
+> +	    RK3368_CLKSEL_CON(27), 8, 2, MFLAGS);
+> +
+> +static struct rockchip_clk_branch rk3368_spdif_8ch_fracmux __initdata =
+> +	MUX(0, "spdif_8ch_pre", mux_spdif_8ch_p, CLK_SET_RATE_PARENT,
+> +	    RK3368_CLKSEL_CON(31), 8, 2, MFLAGS);
+> +
+> +static struct rockchip_clk_branch rk3368_i2s_2ch_fracmux __initdata =
+> +	MUX(0, "i2s_2ch_pre", mux_i2s_2ch_p, CLK_SET_RATE_PARENT,
+> +	    RK3368_CLKSEL_CON(53), 8, 2, MFLAGS);
+> +
+> +static struct rockchip_clk_branch rk3368_uart0_fracmux __initdata =
+> +	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
+> +	    RK3368_CLKSEL_CON(33), 8, 2, MFLAGS);
+> +
+> +static struct rockchip_clk_branch rk3368_uart1_fracmux __initdata =
+> +	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
+> +	    RK3368_CLKSEL_CON(35), 8, 2, MFLAGS);
+> +
+> +static struct rockchip_clk_branch rk3368_uart3_fracmux __initdata =
+> +	MUX(SCLK_UART3, "sclk_uart3", mux_uart3_p, CLK_SET_RATE_PARENT,
+> +	    RK3368_CLKSEL_CON(39), 8, 2, MFLAGS);
+> +
+> +static struct rockchip_clk_branch rk3368_uart4_fracmux __initdata =
+> +	MUX(SCLK_UART4, "sclk_uart4", mux_uart4_p, CLK_SET_RATE_PARENT,
+> +	    RK3368_CLKSEL_CON(41), 8, 2, MFLAGS);
+> +
+>  static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+>  	/*
+>  	 * Clock-Architecture Diagram 2
+> @@ -339,11 +367,10 @@ static struct rockchip_clk_branch
+> rk3368_clk_branches[] __initdata = { COMPOSITE(0, "i2s_8ch_src",
+> mux_pll_src_cpll_gpll_p, 0,
+>  			RK3368_CLKSEL_CON(27), 12, 1, MFLAGS, 0, 7, DFLAGS,
+>  			RK3368_CLKGATE_CON(6), 1, GFLAGS),
+> -	COMPOSITE_FRAC(0, "i2s_8ch_frac", "i2s_8ch_src", CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(28), 0,
+> -			RK3368_CLKGATE_CON(6), 2, GFLAGS),
+> -	MUX(0, "i2s_8ch_pre", mux_i2s_8ch_pre_p, CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(27), 8, 2, MFLAGS),
+> +	COMPOSITE_FRACMUX(0, "i2s_8ch_frac", "i2s_8ch_src", CLK_SET_RATE_PARENT,
+> +			  RK3368_CLKSEL_CON(28), 0,
+> +			  RK3368_CLKGATE_CON(6), 2, GFLAGS,
+> +			  &rk3368_i2s_8ch_fracmux),
+>  	COMPOSITE_NODIV(SCLK_I2S_8CH_OUT, "i2s_8ch_clkout",
+> mux_i2s_8ch_clkout_p, 0, RK3368_CLKSEL_CON(27), 15, 1, MFLAGS,
+>  			RK3368_CLKGATE_CON(6), 0, GFLAGS),
+> @@ -352,21 +379,21 @@ static struct rockchip_clk_branch
+> rk3368_clk_branches[] __initdata = { COMPOSITE(0, "spdif_8ch_src",
+> mux_pll_src_cpll_gpll_p, 0,
+>  			RK3368_CLKSEL_CON(31), 12, 1, MFLAGS, 0, 7, DFLAGS,
+>  			RK3368_CLKGATE_CON(6), 4, GFLAGS),
+> -	COMPOSITE_FRAC(0, "spdif_8ch_frac", "spdif_8ch_src",
+> CLK_SET_RATE_PARENT, -			RK3368_CLKSEL_CON(32), 0,
+> -			RK3368_CLKGATE_CON(6), 5, GFLAGS),
+> -	COMPOSITE_NODIV(SCLK_SPDIF_8CH, "sclk_spdif_8ch", mux_spdif_8ch_p,
+> CLK_SET_RATE_PARENT, -			RK3368_CLKSEL_CON(31), 8, 2, MFLAGS,
+> -			RK3368_CLKGATE_CON(6), 6, GFLAGS),
+> +	COMPOSITE_FRACMUX(0, "spdif_8ch_frac", "spdif_8ch_src",
+> CLK_SET_RATE_PARENT, +			  RK3368_CLKSEL_CON(32), 0,
+> +			  RK3368_CLKGATE_CON(6), 5, GFLAGS,
+> +			  &rk3368_spdif_8ch_fracmux),
+> +	GATE(SCLK_SPDIF_8CH, "sclk_spdif_8ch", "spdif_8ch_pre",
+> CLK_SET_RATE_PARENT, +	     RK3368_CLKGATE_CON(6), 6, GFLAGS),
+>  	COMPOSITE(0, "i2s_2ch_src", mux_pll_src_cpll_gpll_p, 0,
+>  			RK3368_CLKSEL_CON(53), 12, 1, MFLAGS, 0, 7, DFLAGS,
+>  			RK3368_CLKGATE_CON(5), 13, GFLAGS),
+> -	COMPOSITE_FRAC(0, "i2s_2ch_frac", "i2s_2ch_src", CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(54), 0,
+> -			RK3368_CLKGATE_CON(5), 14, GFLAGS),
+> -	COMPOSITE_NODIV(SCLK_I2S_2CH, "sclk_i2s_2ch", mux_i2s_2ch_p,
+> CLK_SET_RATE_PARENT, -			RK3368_CLKSEL_CON(53), 8, 2, MFLAGS,
+> -			RK3368_CLKGATE_CON(5), 15, GFLAGS),
+> +	COMPOSITE_FRACMUX(0, "i2s_2ch_frac", "i2s_2ch_src", CLK_SET_RATE_PARENT,
+> +			  RK3368_CLKSEL_CON(54), 0,
+> +			  RK3368_CLKGATE_CON(5), 14, GFLAGS,
+> +			  &rk3368_i2s_2ch_fracmux),
+> +	GATE(SCLK_I2S_2CH, "sclk_i2s_2ch", "i2s_2ch_pre", CLK_SET_RATE_PARENT,
+> +	     RK3368_CLKGATE_CON(5), 15, GFLAGS),
+> 
+>  	COMPOSITE(0, "sclk_tsp", mux_pll_src_cpll_gpll_npll_p, 0,
+>  			RK3368_CLKSEL_CON(46), 6, 2, MFLAGS, 0, 5, DFLAGS,
+> @@ -562,38 +589,34 @@ static struct rockchip_clk_branch
+> rk3368_clk_branches[] __initdata = { COMPOSITE(0, "uart0_src",
+> mux_pll_src_cpll_gpll_usb_usb_p, 0,
+>  			RK3368_CLKSEL_CON(33), 12, 2, MFLAGS, 0, 7, DFLAGS,
+>  			RK3368_CLKGATE_CON(2), 0, GFLAGS),
+> -	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(34), 0,
+> -			RK3368_CLKGATE_CON(2), 1, GFLAGS),
+> -	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(33), 8, 2, MFLAGS),
+> +	COMPOSITE_FRACMUX(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
+> +			  RK3368_CLKSEL_CON(34), 0,
+> +			  RK3368_CLKGATE_CON(2), 1, GFLAGS,
+> +			  &rk3368_uart0_fracmux),
+> 
+>  	COMPOSITE_NOMUX(0, "uart1_src", "uart_src", 0,
+>  			RK3368_CLKSEL_CON(35), 0, 7, DFLAGS,
+>  			RK3368_CLKGATE_CON(2), 2, GFLAGS),
+> -	COMPOSITE_FRAC(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(36), 0,
+> -			RK3368_CLKGATE_CON(2), 3, GFLAGS),
+> -	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(35), 8, 2, MFLAGS),
+> +	COMPOSITE_FRACMUX(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
+> +			  RK3368_CLKSEL_CON(36), 0,
+> +			  RK3368_CLKGATE_CON(2), 3, GFLAGS,
+> +			  &rk3368_uart1_fracmux),
+> 
+>  	COMPOSITE_NOMUX(0, "uart3_src", "uart_src", 0,
+>  			RK3368_CLKSEL_CON(39), 0, 7, DFLAGS,
+>  			RK3368_CLKGATE_CON(2), 6, GFLAGS),
+> -	COMPOSITE_FRAC(0, "uart3_frac", "uart3_src", CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(40), 0,
+> -			RK3368_CLKGATE_CON(2), 7, GFLAGS),
+> -	MUX(SCLK_UART3, "sclk_uart3", mux_uart3_p, CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(39), 8, 2, MFLAGS),
+> +	COMPOSITE_FRACMUX(0, "uart3_frac", "uart3_src", CLK_SET_RATE_PARENT,
+> +			  RK3368_CLKSEL_CON(40), 0,
+> +			  RK3368_CLKGATE_CON(2), 7, GFLAGS,
+> +			  &rk3368_uart3_fracmux),
+> 
+>  	COMPOSITE_NOMUX(0, "uart4_src", "uart_src", 0,
+>  			RK3368_CLKSEL_CON(41), 0, 7, DFLAGS,
+>  			RK3368_CLKGATE_CON(2), 8, GFLAGS),
+> -	COMPOSITE_FRAC(0, "uart4_frac", "uart4_src", CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(42), 0,
+> -			RK3368_CLKGATE_CON(2), 9, GFLAGS),
+> -	MUX(SCLK_UART4, "sclk_uart4", mux_uart4_p, CLK_SET_RATE_PARENT,
+> -			RK3368_CLKSEL_CON(41), 8, 2, MFLAGS),
+> +	COMPOSITE_FRACMUX(0, "uart4_frac", "uart4_src", CLK_SET_RATE_PARENT,
+> +			  RK3368_CLKSEL_CON(42), 0,
+> +			  RK3368_CLKGATE_CON(2), 9, GFLAGS,
+> +			  &rk3368_uart4_fracmux),
+> 
+>  	COMPOSITE(0, "mac_pll_src", mux_pll_src_npll_cpll_gpll_p, 0,
+>  			RK3368_CLKSEL_CON(43), 6, 2, MFLAGS, 0, 5, DFLAGS,
