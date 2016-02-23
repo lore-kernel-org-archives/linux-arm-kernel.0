@@ -1,181 +1,53 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 23 Feb 2016 12:19:20 +0000
-Subject: [PATCH V2] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-In-Reply-To: <1455820158-8529-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1455820158-8529-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <56CC4E48.1060103@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 23 Feb 2016 13:20:10 +0100
+Subject: [PATCH v12 1/5] efi: ARM/arm64: ignore DT memory nodes instead of
+ removing them
+In-Reply-To: <20160223121648.GI3966@arm.com>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160223115805.GB4989@leverpostej> <20160223121648.GI3966@arm.com>
+Message-ID: <CAKv+Gu8fOKqLrnbre7sHko+hPd3wq_O6U5Ev27tN3zEc7W8Mww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/02/16 18:29, tchalamarla at caviumnetworks.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+On 23 February 2016 at 13:16, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Feb 23, 2016 at 11:58:05AM +0000, Mark Rutland wrote:
+>> On Mon, Feb 22, 2016 at 05:58:19PM -0800, David Daney wrote:
+>> > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >
+>> > There are two problems with the UEFI stub DT memory node removal
+>> > routine:
+>> > - it deletes nodes as it traverses the tree, which happens to work
+>> >   but is not supported, as deletion invalidates the node iterator;
+>> > - deleting memory nodes entirely may discard annotations in the form
+>> >   of additional properties on the nodes.
+>> >
+>> > Since the discovery of DT memory nodes occurs strictly before the
+>> > UEFI init sequence, we can simply clear the memblock memory table
+>> > before parsing the UEFI memory map. This way, it is no longer
+>> > necessary to remove the nodes, so we can remove that logic from the
+>> > stub as well.
+>>
+>> This is a little bit scary, but I guess this works.
+>>
+>> My only concern is that when we get kexec, a subsequent kernel must also
+>> have EFI memory map support, or things go bad for the next EFI-aware
+>> kernel after that (as things like the runtime services may have been
+>> corrupted by the kernel in the middle). It's difficult to fix the
+>> general case later.
+>>
+>> A different option would be to support status="disabled" for the memory
+>> nodes, and ignore these in early_init_dt_scan_memory. That way a kernel
+>> cannot use memory without first having parsed the EFI memory map, and we
+>> can still get NUMA info from the disabled nodes.
 >
-> Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-> namespaces; specifically within a given node SMMU0 and SMMU1 share,
-> as does SMMU2 and SMMU3.
+> So in that case, the middle, non-EFI kernel would fail to boot?
+> Realistically, once you've kexec'd a non-EFI payload, I don't think you
+> can rely on the EFI state remaining intact for future EFI applications.
 >
-> This patch tries to address these issuee by supplying asid and vmid
-> base from devicetree.
+> Is this really something we should be trying to police in the kernel?
 >
-> changes from V1:
-> 	- rebased on top of 16 bit VMID patch
-> 	- removed redundent options from DT
-> 	- insted of transform, DT now supplies starting ASID/VMID
->
-> Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> ---
->   .../devicetree/bindings/iommu/arm,smmu.txt         |  8 +++++
->   drivers/iommu/arm-smmu.c                           | 37 +++++++++++++++-------
->   2 files changed, 34 insertions(+), 11 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index bb7e569..80b8484 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -57,6 +57,14 @@ conditions.
->
->   - smmu-enable-vmid16 : Enable 16 bit VMID, if allowed.
->
-> +- asid-base :	Buggy SMMUv2 implementations which doesn't satisfy the
-> +		ASID namespace needs, use this field to specify starting
-> +		ASID for the SMMU.
-> +
-> +- vmid-base :	Buggy SMMUv2 implementations which doesn't satisfy the VMID
-> +		namespace needs, use this field to specify starting VMID
-> +		for the SMMU.
-> +
 
- From how you've described the situation, this is still just some 
-arbitrary number for the sake of a driver workaround and not an actual 
-property of the hardware. Either way there should be a proper compatible 
-string for this implementation, e.g. something like "cavium,cn88xx-smmu".
-
-Given that, you then shouldn't actually need anything else, because you 
-can simply keep track of how many Cavium SMMUs have been probed and 
-automatically generate a suitable offset, e.g. (smmu->index * 
-ARM_SMMU_MAX_CBS) to ensure global ASID/VMID uniqueness.
-
-Robin.
-
->   Example:
->
->           smmu {
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 003c442..dc46b9a 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -320,6 +320,9 @@ struct arm_smmu_device {
->   	unsigned long			ipa_size;
->   	unsigned long			pa_size;
->
-> +	u32				asid_base;
-> +	u32				vmid_base;
-> +
->   	u32				num_global_irqs;
->   	u32				num_context_irqs;
->   	unsigned int			*irqs;
-> @@ -335,8 +338,8 @@ struct arm_smmu_cfg {
->   };
->   #define INVALID_IRPTNDX			0xff
->
-> -#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
-> -#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-> +#define ARM_SMMU_CB_ASID(smmu, cfg)	((u16)((smmu)->asid_base + (cfg)->cbndx))
-> +#define ARM_SMMU_CB_VMID(smmu, cfg)	((u16)((smmu)->vmid_base + (cfg)->cbndx))
->
->   enum arm_smmu_domain_stage {
->   	ARM_SMMU_DOMAIN_S1 = 0,
-> @@ -576,11 +579,11 @@ static void arm_smmu_tlb_inv_context(void *cookie)
->
->   	if (stage1) {
->   		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-> -		writel_relaxed(ARM_SMMU_CB_ASID(cfg),
-> +		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
->   			       base + ARM_SMMU_CB_S1_TLBIASID);
->   	} else {
->   		base = ARM_SMMU_GR0(smmu);
-> -		writel_relaxed(ARM_SMMU_CB_VMID(cfg),
-> +		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
->   			       base + ARM_SMMU_GR0_TLBIVMID);
->   	}
->
-> @@ -602,7 +605,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->
->   		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
->   			iova &= ~12UL;
-> -			iova |= ARM_SMMU_CB_ASID(cfg);
-> +			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
->   			do {
->   				writel_relaxed(iova, reg);
->   				iova += granule;
-> @@ -610,7 +613,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->   #ifdef CONFIG_64BIT
->   		} else {
->   			iova >>= 12;
-> -			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
-> +			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
->   			do {
->   				writeq_relaxed(iova, reg);
->   				iova += granule >> 12;
-> @@ -630,7 +633,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->   #endif
->   	} else {
->   		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
-> -		writel_relaxed(ARM_SMMU_CB_VMID(cfg), reg);
-> +		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
->   	}
->   }
->
-> @@ -744,7 +747,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->   #endif
->   		/* if 16bit VMID required set VMID in CBA2R */
->   		if (smmu->options & ARM_SMMU_OPT_ENABLE_VMID16)
-> -			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
-> +			reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
->
->   		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
->   	}
-> @@ -763,7 +766,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->   			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
->   	} else if (!(smmu->options & ARM_SMMU_OPT_ENABLE_VMID16)) {
->   		/*16 bit VMID is not enabled set 8 bit VMID here */
-> -		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
-> +		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
->   	}
->   	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
->
-> @@ -771,11 +774,11 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->   	if (stage1) {
->   		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
->
-> -		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-> +		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
->   		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
->
->   		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-> -		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-> +		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
->   		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
->   	} else {
->   		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-> @@ -1812,6 +1815,18 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->
->   	parse_driver_options(smmu);
->
-> +	if (of_property_read_u32(dev->of_node, "#asid-base",
-> +				 &smmu->asid_base)) {
-> +		smmu->asid_base = 0;
-> +	}
-> +
-> +	if (of_property_read_u32(dev->of_node, "#vmid-base",
-> +				 &smmu->vmid_base)) {
-> +		smmu->vmid_base = 1;
-> +	}
-> +	if (smmu->vmid_base == 0)
-> +		smmu->vmid_base = 1;
-> +
->   	if (smmu->version > ARM_SMMU_V1 &&
->   	    smmu->num_context_banks != smmu->num_context_irqs) {
->   		dev_err(dev,
->
+Well, we could add entries to /reserved-memory in the stub for all the
+regions UEFI cares about, that would probably be sufficient to fix
+this case.
