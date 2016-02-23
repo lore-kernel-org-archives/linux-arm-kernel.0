@@ -1,60 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Feb 2016 12:31:51 +0000
-Subject: [RFC PATCH 10/10] arm64: mm: restrict __pa() translations to
- linear virtual addresses
-In-Reply-To: <CAKv+Gu_zdt-sk_moCeF8u95DCZgcT26CDH1gL87Q4qXKA_hKrg@mail.gmail.com>
-References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456174472-30028-11-git-send-email-ard.biesheuvel@linaro.org>
- <20160223122615.GJ3966@arm.com>
- <CAKv+Gu_zdt-sk_moCeF8u95DCZgcT26CDH1gL87Q4qXKA_hKrg@mail.gmail.com>
-Message-ID: <20160223123151.GK3966@arm.com>
+Date: Tue, 23 Feb 2016 12:33:22 +0000
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.6
+Message-ID: <20160223123322.GL3966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 01:29:21PM +0100, Ard Biesheuvel wrote:
-> On 23 February 2016 at 13:26, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Feb 22, 2016 at 09:54:32PM +0100, Ard Biesheuvel wrote:
-> >> Now that we have replaced all occurrences of __pa() translations
-> >> involving virtual addresses that are covered by the kernel text,
-> >> we can redefine __virt_to_phys and __pa() etc to only take virtual
-> >> address that are covered by the linear mapping. This means we can
-> >> remove the comparison with PAGE_OFFSET in the definition of
-> >> __virt_to_phys().
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/include/asm/memory.h | 12 +++++++-----
-> >>  1 file changed, 7 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> >> index 56d6739430f3..3b5dc5b243ac 100644
-> >> --- a/arch/arm64/include/asm/memory.h
-> >> +++ b/arch/arm64/include/asm/memory.h
-> >> @@ -86,11 +86,14 @@
-> >>   * private definitions which should NOT be used outside memory.h
-> >>   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-> >>   */
-> >> -#define __virt_to_phys(x) ({                                         \
-> >> +#ifndef CONFIG_DEBUG_VM
-> >> +#define __virt_to_phys(x)    (((phys_addr_t)(x) & ~PAGE_OFFSET) + PHYS_OFFSET)
-> >> +#else
-> >> +#define __virt_to_phys(x)    ({                                      \
-> >>       phys_addr_t __x = (phys_addr_t)(x);                             \
-> >> -     __x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :   \
-> >> -                              (__x - kimage_voffset); })
-> >> -
-> >> +     BUG_ON(__x < PAGE_OFFSET);                                      \
-> >> +     (((phys_addr_t)__x & ~PAGE_OFFSET) + PHYS_OFFSET); })
-> >
-> > What's the #include-hell like if you try to use VM_BUG_ON instead?
-> >
-> 
-> The #include hell would not change I think, since
-> 
-> include/linux/mmdebug.h:18:#define VM_BUG_ON(cond) BUG_ON(cond)
-> 
-> but it would certainly make this code look a lot cleaner.
+Hi Joerg,
 
-Yup, and likewise for PHYS_OFFSET.
+Please pull the following arm-smmu updates for 4.6. This lays the
+foundations for a functional IOMMU_DOMAIN_DMA for the two drivers,
+although we haven't yet thrown the switch since we need to ensure
+that the DMA ops all point in the right direction first. Hopefully we'll
+get that going for 4.7.
 
 Will
+
+--->8
+
+The following changes since commit 18558cae0272f8fd9647e69d3fec1565a7949865:
+
+  Linux 4.5-rc4 (2016-02-14 13:05:20 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to cbf8277ef4562075eb4e3932ccd60cc11ee9454c:
+
+  iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass for now (2016-02-18 15:02:44 +0000)
+
+----------------------------------------------------------------
+Anup Patel (1):
+      of: iommu: Increment DT node refcount in of_iommu_set_ops()
+
+Robin Murphy (3):
+      iommu/arm-smmu: Treat all device transactions as unprivileged
+      iommu/arm-smmu: Support DMA-API domains
+      iommu/arm-smmu: Allow disabling unmatched stream bypass
+
+Will Deacon (2):
+      iommu/arm-smmu: Don't fail device attach if already attached to a domain
+      iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass for now
+
+ drivers/iommu/arm-smmu-v3.c | 50 +++++++++++++++-------------
+ drivers/iommu/arm-smmu.c    | 79 ++++++++++++++++++++++++++++-----------------
+ drivers/iommu/of_iommu.c    |  1 +
+ 3 files changed, 78 insertions(+), 52 deletions(-)
