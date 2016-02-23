@@ -1,51 +1,51 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Feb 2016 11:01:37 +0100
-Subject: [PATCH 0/7] video: ARM CLCD: non-controversial parts
-Message-ID: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 23 Feb 2016 11:01:38 +0100
+Subject: [PATCH 1/7 RESEND] video: ARM CLCD: runtime check for Versatile
+In-Reply-To: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
+References: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1456221704-5792-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a redux version of the previous patch set that strips out
-any attempts to auto-switch or rewrite the device tree to match
-the CLCD Versatile panel.
+The current compile-time check for inversed IENB/CNTL does not
+work in multiplatform boots: as soon as versatile is included
+in the build, the IENB/CNTL is switched and breaks graphics.
+Convert this to a runtime switch.
 
-Instead, it does detect it and COMPARE it to what was found in
-the device tree, prints a warning if those do not match, and
-continue anyway.
+Cc: stable at vger.kernel.org
+Cc: Rob Herring <robh@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Fixes: a29da136de34 ("ARM: versatile: convert to multi-platform")
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/video/fbdev/amba-clcd.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-This patch series brings support for device tree-only boot with
-graphics to the Nomadik and all RealView platforms (so we can boot
-RealView with only device tree) so it is very useful still even
-if the Versatile is not yet fully supported.
-
-Please consider applying this for v4.6 if these parts look
-uncontroversial. Or applying partly from low to high patch
-numbers so I'm not sitting with too much out-of-tree code.
-
-Also resending a fix which has not yet landed upstream (1/7)
-I guess it was lost.
-
-Linus Walleij (7):
-  video: ARM CLCD: runtime check for Versatile
-  video: ARM CLCD: backlight support for OF
-  video: ARM CLCD: support DT signal inversion flags
-  video: ARM CLCD: support pads connected in reverse order
-  video: ARM CLCD: support Nomadik variant
-  video: ARM CLCD: add special board and panel hooks for Nomadik
-  video: ARM CLCD: add special panel hook for Versatiles
-
- drivers/video/fbdev/Kconfig               |   6 +-
- drivers/video/fbdev/Makefile              |   1 +
- drivers/video/fbdev/amba-clcd-nomadik.c   | 257 ++++++++++++++++++++
- drivers/video/fbdev/amba-clcd-nomadik.h   |  24 ++
- drivers/video/fbdev/amba-clcd-versatile.c | 391 ++++++++++++++++++++++++++++++
- drivers/video/fbdev/amba-clcd-versatile.h |  17 ++
- drivers/video/fbdev/amba-clcd.c           | 218 +++++++++++++++--
- include/linux/amba/clcd.h                 |  76 +++++-
- 8 files changed, 958 insertions(+), 32 deletions(-)
- create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.c
- create mode 100644 drivers/video/fbdev/amba-clcd-nomadik.h
- create mode 100644 drivers/video/fbdev/amba-clcd-versatile.h
-
+diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
+index 9362424c2340..f9ef06d0cd48 100644
+--- a/drivers/video/fbdev/amba-clcd.c
++++ b/drivers/video/fbdev/amba-clcd.c
+@@ -440,13 +440,14 @@ static int clcdfb_register(struct clcd_fb *fb)
+ 		fb->off_ienb = CLCD_PL111_IENB;
+ 		fb->off_cntl = CLCD_PL111_CNTL;
+ 	} else {
+-#ifdef CONFIG_ARCH_VERSATILE
+-		fb->off_ienb = CLCD_PL111_IENB;
+-		fb->off_cntl = CLCD_PL111_CNTL;
+-#else
+-		fb->off_ienb = CLCD_PL110_IENB;
+-		fb->off_cntl = CLCD_PL110_CNTL;
+-#endif
++		if (of_machine_is_compatible("arm,versatile-ab") ||
++		    of_machine_is_compatible("arm,versatile-pb")) {
++			fb->off_ienb = CLCD_PL111_IENB;
++			fb->off_cntl = CLCD_PL111_CNTL;
++		} else {
++			fb->off_ienb = CLCD_PL110_IENB;
++			fb->off_cntl = CLCD_PL110_CNTL;
++		}
+ 	}
+ 
+ 	fb->clk = clk_get(&fb->dev->dev, NULL);
 -- 
 2.4.3
