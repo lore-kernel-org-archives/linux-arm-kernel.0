@@ -1,40 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 15:06:38 +0100
-Subject: [PATCH 2/3] ARM: mv78xx0: avoid unused function warning
-In-Reply-To: <1456236403-115511-1-git-send-email-arnd@arndb.de>
-References: <1456236403-115511-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456236403-115511-3-git-send-email-arnd@arndb.de>
+Date: Tue, 23 Feb 2016 15:08:42 +0100
+Subject: [PATCH] ARM: socfpga: hide unused functions
+Message-ID: <1456236527-189885-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mv78xx0 produces a harmless warning when CONFIG_CACHE_FEROCEON_L2 is
-disabled:
+The cpu_die and cpu_kill callbacks are only used when CONFIG_HOTPLUG_CPU
+is enabled, otherwise we get a warning about them:
 
-arch/arm/mach-mv78xx0/common.c:385:19: warning: 'is_l2_writethrough' defined but not used [-Wunused-function]
+arch/arm/mach-socfpga/platsmp.c:102:13: error: 'socfpga_cpu_die' defined but not used [-Werror=unused-function]
+arch/arm/mach-socfpga/platsmp.c:115:12: error: 'socfpga_cpu_kill' defined but not used [-Werror=unused-function]
 
-This avoids the warning by changing the #ifdef to an if(IS_ENABLED())
-check with the same resulting object code.
+This adds the appropriate #ifdef.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-mv78xx0/common.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-socfpga/platsmp.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index a1a04df9c05c..99cc93900a24 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -405,9 +405,8 @@ void __init mv78xx0_init(void)
- 	printk("HCLK = %dMHz, ", (hclk + 499999) / 1000000);
- 	printk("TCLK = %dMHz\n", (get_tclk() + 499999) / 1000000);
+diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+index cbb0a54df80a..07945748b571 100644
+--- a/arch/arm/mach-socfpga/platsmp.c
++++ b/arch/arm/mach-socfpga/platsmp.c
+@@ -94,6 +94,7 @@ static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
+ 	scu_enable(socfpga_scu_base_addr);
+ }
  
--#ifdef CONFIG_CACHE_FEROCEON_L2
--	feroceon_l2_init(is_l2_writethrough());
--#endif
-+	if (IS_ENABLED(CONFIG_CACHE_FEROCEON_L2))
-+		feroceon_l2_init(is_l2_writethrough());
++#ifdef CONFIG_HOTPLUG_CPU
+ /*
+  * platform-specific code to shutdown a CPU
+  *
+@@ -116,6 +117,7 @@ static int socfpga_cpu_kill(unsigned int cpu)
+ {
+ 	return 1;
+ }
++#endif
  
- 	/* Setup root of clk tree */
- 	clk_init();
+ static const struct smp_operations socfpga_smp_ops __initconst = {
+ 	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
 -- 
 2.7.0
