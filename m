@@ -1,118 +1,77 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 23 Feb 2016 16:33:17 +0100
-Subject: [PATCH] tty/serial: at91: fix bad offset for UART timeout register
-In-Reply-To: <1456150735-11635-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1456150735-11635-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <56CC7BBD.4000004@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 23 Feb 2016 16:56:03 +0100
+Subject: [PATCH 2/3] clk: mvebu: add AP806 core clock driver
+In-Reply-To: <20160223102550.2e0cba04@free-electrons.com>
+References: <1455521698-7905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1455521698-7905-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160222025357.GE15973@rob-hp-laptop>
+ <20160222091423.4756a579@free-electrons.com>
+ <20160222141617.GA14970@lunn.ch>
+ <20160222183203.2278.60153@quark.deferred.io>
+ <CAL_Jsq+iiUBcTdnqzFWLJ+5jPvq0rmWgBboab4xyj1dQyDQE+Q@mail.gmail.com>
+ <20160223102550.2e0cba04@free-electrons.com>
+Message-ID: <20160223165603.74576dca@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/02/2016 15:18, Ludovic Desroches a ?crit :
-> With SAMA5D2, the UART has hw timeout but the offset of the register to
-> define this value is not the same as the one for USART.
-> When using the new UART, the value of this register was 0 so we never
-> get timeout irqs. It involves that when using DMA, we were stuck until
-> the execution of the dma callback which happens when a buffer is full
-> (so after receiving 2048 bytes).
+Rob, Michael, Stephen,
+
+On Tue, 23 Feb 2016 10:25:50 +0100, Thomas Petazzoni wrote:
+
+> > >> Maybe add a big fat warning that the bindings are unstable, and the DT
+> > >> blob must be kept in sync with the kernel?
+> > >
+> > > +1 and feel free to blame the lack of documentation.  No one can expect
+> > > bindings to be finalized when the chip topology is not fully understood.
+> > 
+> > I can understand not understanding the full clock tree. I have "full"
+> > documentation of a Marvell chip and don't understand the clock tree
+> > fully. But I can't believe you don't have some sense of how many
+> > clocks you have to deal with. 10? 100? 1000? What I see is 2 nodes of
+> > a single register each for clocks at roughly the same address. That
+> > tells me your binding is too fine grained. If you really don't know
+> > what is right, then err on the side of a single clock provider node
+> > and don't put the clock details in DT.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-Yes, sure: it fixes my previous patch "[PATCH v2 2/2] serial: atmel: add
-support for new UART version" that Greg had already included in his
-tty-testing and tty-next branches. Greg, it could be interesting to
-stick this fix with the patch cited above.
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks, bye.
-
-
-> ---
->  drivers/tty/serial/atmel_serial.c | 19 +++++++++++++------
->  include/linux/atmel_serial.h      |  3 ++-
->  2 files changed, 15 insertions(+), 7 deletions(-)
+> I don't quite understand the reasoning behind this conclusion. We know
+> for sure that those two registers control only those core and ring
+> clocks. Maybe there are other registers controlling other clocks,  that
+> we don't know. But for sure, those two registers only give details
+> about those core and ring clocks, so I don't see what would be the
+> usefulness of merging that into a single DT node.
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index b30c93f..4b6f04a 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -159,6 +159,7 @@ struct atmel_uart_port {
->  	u32			rts_high;
->  	u32			rts_low;
->  	bool			ms_irq_enabled;
-> +	u32			rtor;	/* address of receiver timeout register if it exists */
->  	bool			has_hw_timer;
->  	struct timer_list	uart_timer;
->  
-> @@ -1718,12 +1719,16 @@ static void atmel_get_ip_name(struct uart_port *port)
->  
->  	atmel_port->has_hw_timer = false;
->  
-> -	if (name == usart || name == new_uart) {
-> -		dev_dbg(port->dev, "Usart or uart with hw timer\n");
-> +	if (name == new_uart) {
-> +		dev_dbg(port->dev, "Uart with hw timer");
->  		atmel_port->has_hw_timer = true;
-> +		atmel_port->rtor = ATMEL_UA_RTOR;
-> +	} else if (name == usart) {
-> +		dev_dbg(port->dev, "Usart\n");
-> +		atmel_port->has_hw_timer = true;
-> +		atmel_port->rtor = ATMEL_US_RTOR;
->  	} else if (name == dbgu_uart) {
->  		dev_dbg(port->dev, "Dbgu or uart without hw timer\n");
-> -		atmel_port->has_hw_timer = false;
->  	} else {
->  		/* fallback for older SoCs: use version field */
->  		version = atmel_uart_readl(port, ATMEL_US_VERSION);
-> @@ -1732,11 +1737,11 @@ static void atmel_get_ip_name(struct uart_port *port)
->  		case 0x10213:
->  			dev_dbg(port->dev, "This version is usart\n");
->  			atmel_port->has_hw_timer = true;
-> +			atmel_port->rtor = ATMEL_US_RTOR;
->  			break;
->  		case 0x203:
->  		case 0x10202:
->  			dev_dbg(port->dev, "This version is uart\n");
-> -			atmel_port->has_hw_timer = false;
->  			break;
->  		default:
->  			dev_err(port->dev, "Not supported ip name nor version, set to uart\n");
-> @@ -1841,7 +1846,8 @@ static int atmel_startup(struct uart_port *port)
->  					jiffies + uart_poll_timeout(port));
->  		/* set USART timeout */
->  		} else {
-> -			atmel_uart_writel(port, ATMEL_US_RTOR, PDC_RX_TIMEOUT);
-> +			atmel_uart_writel(port, atmel_port->rtor,
-> +					  PDC_RX_TIMEOUT);
->  			atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_STTTO);
->  
->  			atmel_uart_writel(port, ATMEL_US_IER,
-> @@ -1856,7 +1862,8 @@ static int atmel_startup(struct uart_port *port)
->  					jiffies + uart_poll_timeout(port));
->  		/* set USART timeout */
->  		} else {
-> -			atmel_uart_writel(port, ATMEL_US_RTOR, PDC_RX_TIMEOUT);
-> +			atmel_uart_writel(port, atmel_port->rtor,
-> +					  PDC_RX_TIMEOUT);
->  			atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_STTTO);
->  
->  			atmel_uart_writel(port, ATMEL_US_IER,
-> diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
-> index ee696d7..5a4d664 100644
-> --- a/include/linux/atmel_serial.h
-> +++ b/include/linux/atmel_serial.h
-> @@ -119,7 +119,8 @@
->  #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
->  #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
->  
-> -#define ATMEL_US_RTOR		0x24	/* Receiver Time-out Register */
-> +#define ATMEL_US_RTOR		0x24	/* Receiver Time-out Register for USART */
-> +#define ATMEL_UA_RTOR		0x28	/* Receiver Time-out Register for UART */
->  #define	ATMEL_US_TO		GENMASK(15, 0)	/* Time-out Value */
->  
->  #define ATMEL_US_TTGR		0x28	/* Transmitter Timeguard Register */
+> We would lose the fact that the relationship between the ring clocks
+> and one of the core clock is represented in the DT. Instead of having a
+> clear <&coreclk X> or <&ringclk Y> reference, we would have a
+> mysterious <&allclk XYZ> reference, which doesn't tell immediately
+> whether it's a core clock or ring clock.
 > 
+> So, while I definitely agree that a syscon is probably in order to
+> cover all the system registers, I don't see the point of having a
+> single node to cover all the clocks.
 
+So, I had a discussion with Marvell engineers and a closer look at the
+matter. It turns out that those two clock registers are in the middle
+of an area called DFX (Design for Testability), which contain registers
+to fine tune the silicon and detect manufacturing issues. This area of
+registers is most likely never going to be publicly documented, and the
+fact that those two clock-related registers were placed there was more
+an oversight than a real architecture choice.
 
+For this reason, there is in fact no real benefit in mapping the entire
+area using a syscon, and having the two DT nodes for the core clocks
+and ring clocks, mapping just their own registers is by far the
+simplest solution considering the register layout.
+
+We would prefer to keep things as proposed in terms of DT
+representation, with the understanding that the submission of the Linux
+support for this platform comes very early in the chip development
+cycle, and that as such, the DT bindings should be considered unstable.
+
+Thanks a lot,
+
+Thomas
 -- 
-Nicolas Ferre
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
