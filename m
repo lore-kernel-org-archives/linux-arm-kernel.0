@@ -1,42 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 15:08:42 +0100
-Subject: [PATCH] ARM: socfpga: hide unused functions
-Message-ID: <1456236527-189885-1-git-send-email-arnd@arndb.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 23 Feb 2016 14:10:39 +0000
+Subject: [PATCH 00/12] ARM: dts: apq8064: spi and i2c dt patches
+Message-ID: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu_die and cpu_kill callbacks are only used when CONFIG_HOTPLUG_CPU
-is enabled, otherwise we get a warning about them:
+Hi Andy, 
 
-arch/arm/mach-socfpga/platsmp.c:102:13: error: 'socfpga_cpu_die' defined but not used [-Werror=unused-function]
-arch/arm/mach-socfpga/platsmp.c:115:12: error: 'socfpga_cpu_kill' defined but not used [-Werror=unused-function]
+Here are some apq8064 dts patches which are mostly to do with spi and i2c.
 
-This adds the appropriate #ifdef.
+Most of the patches are additions of missing nodes required for ifc6410.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-socfpga/platsmp.c | 2 ++
- 1 file changed, 2 insertions(+)
+thanks,
+srini
 
-diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-index cbb0a54df80a..07945748b571 100644
---- a/arch/arm/mach-socfpga/platsmp.c
-+++ b/arch/arm/mach-socfpga/platsmp.c
-@@ -94,6 +94,7 @@ static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
- 	scu_enable(socfpga_scu_base_addr);
- }
- 
-+#ifdef CONFIG_HOTPLUG_CPU
- /*
-  * platform-specific code to shutdown a CPU
-  *
-@@ -116,6 +117,7 @@ static int socfpga_cpu_kill(unsigned int cpu)
- {
- 	return 1;
- }
-+#endif
- 
- static const struct smp_operations socfpga_smp_ops __initconst = {
- 	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
+Srinivas Kandagatla (12):
+  ARM: dts: qcom: fix i2c lables to be inline with others
+  ARM: dts: apq8064: move pinctrls to dedicated dtsi
+  ARM: dts: apq8064: add pci support in CM QS600
+  ARM: dts: apq8064: add i2c sleep pinctrl states.
+  ARM: dts: apq8064: add spi5 device node.
+  ARM: dts: ifc6410: enable spi device on expansion
+  ARM: dts: apq8064: add missing i2c2 pinctrl info
+  ARM: dts: ifc6410: enable i2c2 on expansion connector
+  ARM: dts: apq8064: add gsbi4 with i2c node.
+  ARM: dts: ifc6410: enable cam i2c device
+  ARM: dts: apq8064: add i2c6 device node.
+  ARM: dts: ifc6410: add correct aliases to the i2c and spi bus
+
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts |  27 ++++
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  |  35 ++++-
+ arch/arm/boot/dts/qcom-apq8064-pins.dtsi    | 208 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi         | 126 ++++++++---------
+ 4 files changed, 329 insertions(+), 67 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+
 -- 
-2.7.0
+1.9.1
