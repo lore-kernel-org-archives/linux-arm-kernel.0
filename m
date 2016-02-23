@@ -1,49 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 23 Feb 2016 21:12:25 +0100
-Subject: [PATCH v1] arm: pxa: fix DT node name for PXA27X usb
-In-Reply-To: <1456228901.23036.9.camel@gmail.com> (Sergei Ianovich's message
- of "Tue, 23 Feb 2016 15:01:41 +0300")
-References: <1456139297-5854-1-git-send-email-ynvich@gmail.com>
- <87oab8wyfe.fsf@belgarion.home> <1456228901.23036.9.camel@gmail.com>
-Message-ID: <87y4abuqxi.fsf@belgarion.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Feb 2016 20:22:33 +0000
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160223193345.GC21820@node.shutemov.name>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad>
+ <20160223193345.GC21820@node.shutemov.name>
+Message-ID: <20160223202233.GE27281@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Ianovich <ynvich@gmail.com> writes:
+On Tue, Feb 23, 2016 at 10:33:45PM +0300, Kirill A. Shutemov wrote:
+> On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
+> > I'll check with Martin, maybe it is actually trivial, then we can
+> > do a quick test it to rule that one out.
+> 
+> Oh. I found a bug in __split_huge_pmd_locked(). Although, not sure if it's
+> _the_ bug.
+> 
+> pmdp_invalidate() is called for the wrong address :-/
+> I guess that can be destructive on the architecture, right?
 
-> Hi Robert,?
->
-> On Mon, 2016-02-22 at 16:35 +0100, Robert Jarzmik wrote:
->> You're right, I haven't seen the pxa2xx.dtsi statement before.
->> 
->> As such, could you amend a bit your patch please to :
->> ?- add:
->> Fixes: 0ec1939668e5 ("ARM: dts: pxa: add the usb host controller")
->> ?- make the same change in pxa3xx.dtsi, as the same error is there
->> ?- and more globally align pxa2xx.dtsi, pxa27x.dtsi and pxa3xx.dtsi
->> ?- remove the compatible, reg, interrupts and status from both pxa27x.dtsi and
->> ???pxa3xx.dtsi as they are redundant with the included pxa2xxx.dsti one
->
-> No problem. Let's figure out the best approach.
->
->> I'm even wondering if the proper change wouldn't be to scrap the ohci
->> declarations from pxa27x.dtsi and pxa3xx.dtsi, and only add the "clocks"
->> property to pxa2xx.dtsi ...
->
-> Since clocks are declared in pxa27x.dtsi and?pxa3xx.dtsi, there is a
-> stronger ground to have node clocks properties set in pxa27x.dtsi
-> and?pxa3xx.dtsi as well. However, there is already nodes with clocks
-> properties in pxa2xx.dtsi.
->
-> I cannot choose, you should make a decision.
-I have checked my manuals, and pxa25x doesn't have an USB Host controller.
+FWIW, arm64 ignores the address parameter for set_pmd_at, so this would
+only result in the TLBI nuking the wrong entries, which is going to be
+tricky to observe in practice given that we install a table entry
+immediately afterwards that maps the same pages. If s390 does more here
+(I see some magic asm using the address), that could be the answer...
 
-So I'd rather have :
- - remove the usb0: ohci at 4c000000 node from pxa2xx.dtsi
- - add it completely to pxa27x.dtsi and pxa3xx.dtsi, with clocks and everything,
-   in "disabled" status.
-
-Cheers.
-
--- 
-Robert
+Will
