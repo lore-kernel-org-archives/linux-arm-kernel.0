@@ -1,62 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Feb 2016 10:26:11 +0000
-Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
-In-Reply-To: <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160223102610.GD3966@arm.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Tue, 23 Feb 2016 04:32:00 -0600
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <56CC2D39.80909@ti.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+Message-ID: <CAHCN7xLo7q=Ts3WLvx_GzSBWt5r1SiU7vr+W==kUAaAvmwXJYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 05:58:22PM -0800, David Daney wrote:
-> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> 
-> Attempt to get the memory and CPU NUMA node via of_numa.  If that
-> fails, default the dummy NUMA node and map all memory and CPUs to node
-> 0.
-> 
-> Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  arch/arm64/Kconfig                |  26 +++
->  arch/arm64/include/asm/mmzone.h   |  12 ++
->  arch/arm64/include/asm/numa.h     |  45 +++++
->  arch/arm64/include/asm/topology.h |  10 +
->  arch/arm64/kernel/pci.c           |  10 +
->  arch/arm64/kernel/setup.c         |   4 +
->  arch/arm64/kernel/smp.c           |   4 +
->  arch/arm64/mm/Makefile            |   1 +
->  arch/arm64/mm/init.c              |  34 +++-
->  arch/arm64/mm/mmu.c               |   1 +
->  arch/arm64/mm/numa.c              | 403 ++++++++++++++++++++++++++++++++++++++
->  11 files changed, 545 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm64/include/asm/mmzone.h
->  create mode 100644 arch/arm64/include/asm/numa.h
->  create mode 100644 arch/arm64/mm/numa.c
+On Tue, Feb 23, 2016 at 3:58 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> (cc'ing a few more people as this is going into generic direction)
+>
+> On 23/02/16 11:08, Linus Walleij wrote:
+>> On Thu, Feb 4, 2016 at 3:04 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>>> This moves the versatile CLCD configuration to the device tree by:
+>>
+>> As this Schr?dinger's cat approach seems controversial, as well
+>> as the alternative to manipulate the DT in memory at run-time,
+>> I will respin the series without the full Versatile support, adding
+>> plug-in for the other ARM boards and and half-baked support
+>> for the Versatile supporting just VGA (like the other reference
+>> designs from ARM).
+>>
+>> The pluggable displays prove yet again to be a problem to the
+>> world, sigh.
+>>
+>> I will think of a better solution, if any, for this for v4.6, but will
+>> put forward something that handles the Nomadik and all the
+>> other ARM reference designs for now.
+>
+> I had a chat with Tom Rini and Pantelis Antoniou yesterday.
+>
+> Panto is about to send a new series for DT overlay management soon. I
+> haven't had time to test that yet, but what it would give us is that you
+> could build DT overlay binaries as "firmware" into the kernel image, and
+> thus the panel DT data would be there even before rootfs is mounted. The
+> DT overlays can be loaded from the rootfs or initramfs too, if it's not
+> critical to get the display up early.
+>
+> I'm not quite sure how it works if, as in versatile display case, there
+> are multiple DT overlays of which one has to be enabled. I hope there's
+> support to choose which one to use via kernel cmdline or similar.
+>
+> I would personally like it much more if the bootloader would either
+> compose a final dtb from DT fragments and pass it to the kernel, or
+> alternatively the bootloader would pass the base dtb image and a bunch
+> of DT overlays to the kernel, and the kernel would deal with the DT
+> overlays.
+>
+If there was a nice way to merge the device trees, I would love to
+create device tree 'modules' that could be loaded at will and merged
+just before the time of boot.  I could see this being useful beyond
+just plugable displays.
 
-[...]
+> In any case, I think the firmware solution is a good step forward, and
+> will probably work fine for many users. Then again, I haven't tested it
+> yet so I don't know the details, and it's not in the mainline.
+>
+I am willing to test it, but I'll need the patch and some instructions
+from Panto.
 
-> diff --git a/arch/arm64/include/asm/mmzone.h b/arch/arm64/include/asm/mmzone.h
-> new file mode 100644
-> index 0000000..a0de9e6
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/mmzone.h
-> @@ -0,0 +1,12 @@
-> +#ifndef __ASM_MMZONE_H
-> +#define __ASM_MMZONE_H
-> +
-> +#ifdef CONFIG_NUMA
-> +
-> +#include <asm/numa.h>
-> +
-> +extern struct pglist_data *node_data[];
-> +#define NODE_DATA(nid)		(node_data[(nid)])
-> +
-> +#endif /* CONFIG_NUMA */
-> +#endif /* __ASM_MMZONE_H */
-
-What happened to the patch cleaning this up in generic code?
-
-Will
+>  Tomi
+>
