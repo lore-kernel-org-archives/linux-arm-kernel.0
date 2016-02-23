@@ -1,85 +1,45 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Feb 2016 17:22:50 +0000
-Subject: [RFC PATCH 10/10] arm64: mm: restrict __pa() translations to
- linear virtual addresses
-In-Reply-To: <CAKv+Gu_zdt-sk_moCeF8u95DCZgcT26CDH1gL87Q4qXKA_hKrg@mail.gmail.com>
+Date: Tue, 23 Feb 2016 17:26:26 +0000
+Subject: [RFC PATCH 05/10] arm64: mm: avoid __pa translations in
+ early_fixmap_init
+In-Reply-To: <CAKv+Gu-3VpzkVi8ygorRvW7E4XHqnV019VF0M1KZTy9Fu3yMBA@mail.gmail.com>
 References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456174472-30028-11-git-send-email-ard.biesheuvel@linaro.org>
- <20160223122615.GJ3966@arm.com>
- <CAKv+Gu_zdt-sk_moCeF8u95DCZgcT26CDH1gL87Q4qXKA_hKrg@mail.gmail.com>
-Message-ID: <20160223172250.GF4777@e104818-lin.cambridge.arm.com>
+ <1456174472-30028-6-git-send-email-ard.biesheuvel@linaro.org>
+ <20160223171241.GE4777@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-3VpzkVi8ygorRvW7E4XHqnV019VF0M1KZTy9Fu3yMBA@mail.gmail.com>
+Message-ID: <20160223172625.GG4777@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 01:29:21PM +0100, Ard Biesheuvel wrote:
-> On 23 February 2016 at 13:26, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Feb 22, 2016 at 09:54:32PM +0100, Ard Biesheuvel wrote:
-> >> Now that we have replaced all occurrences of __pa() translations
-> >> involving virtual addresses that are covered by the kernel text,
-> >> we can redefine __virt_to_phys and __pa() etc to only take virtual
-> >> address that are covered by the linear mapping. This means we can
-> >> remove the comparison with PAGE_OFFSET in the definition of
-> >> __virt_to_phys().
+On Tue, Feb 23, 2016 at 06:16:50PM +0100, Ard Biesheuvel wrote:
+> On 23 February 2016 at 18:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Feb 22, 2016 at 09:54:27PM +0100, Ard Biesheuvel wrote:
+> >> --- a/arch/arm64/mm/mmu.c
+> >> +++ b/arch/arm64/mm/mmu.c
+> >> @@ -679,7 +679,7 @@ void __init early_fixmap_init(void)
 > >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/include/asm/memory.h | 12 +++++++-----
-> >>  1 file changed, 7 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> >> index 56d6739430f3..3b5dc5b243ac 100644
-> >> --- a/arch/arm64/include/asm/memory.h
-> >> +++ b/arch/arm64/include/asm/memory.h
-> >> @@ -86,11 +86,14 @@
-> >>   * private definitions which should NOT be used outside memory.h
-> >>   * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-> >>   */
-> >> -#define __virt_to_phys(x) ({                                         \
-> >> +#ifndef CONFIG_DEBUG_VM
-> >> +#define __virt_to_phys(x)    (((phys_addr_t)(x) & ~PAGE_OFFSET) + PHYS_OFFSET)
-> >> +#else
-> >> +#define __virt_to_phys(x)    ({                                      \
-> >>       phys_addr_t __x = (phys_addr_t)(x);                             \
-> >> -     __x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :   \
-> >> -                              (__x - kimage_voffset); })
-> >> -
-> >> +     BUG_ON(__x < PAGE_OFFSET);                                      \
-> >> +     (((phys_addr_t)__x & ~PAGE_OFFSET) + PHYS_OFFSET); })
+> >>       pgd = pgd_offset_k(addr);
+> >>       if (CONFIG_PGTABLE_LEVELS > 3 &&
+> >> -         !(pgd_none(*pgd) || pgd_page_paddr(*pgd) == __pa(bm_pud))) {
+> >> +         !(pgd_none(*pgd) || pgd_page_paddr(*pgd) == __pa_symbol(bm_pud))) {
+> >>               /*
+> >>                * We only end up here if the kernel mapping and the fixmap
+> >>                * share the top level pgd entry, which should only happen on
 > >
-> > What's the #include-hell like if you try to use VM_BUG_ON instead?
+> > Do I miss any patches? The for-next/core branch has a pgd_none(*pgd)
+> > check here, so this patch does not apply.
 > >
 > 
-> The #include hell would not change I think, since
+> This is actually based on the kaslr branch, not for-next/core
 > 
-> include/linux/mmdebug.h:18:#define VM_BUG_ON(cond) BUG_ON(cond)
-> 
-> but it would certainly make this code look a lot cleaner.
+> I'm happy to rebase and resend.
 
-I just tried the fixup below on top of your PHYS_OFFSET patch from
-yesterday and it seems to work (I can fold it in once I finish testing
-more build configurations):
+That's fine, no need to resend. I plan to move those as well onto
+for-next/core but wanted some more testing first on the initial part.
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index d862c62a33b8..e02bfef18552 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -132,14 +132,11 @@
- 
- #ifndef __ASSEMBLY__
- #include <linux/bitops.h>
-+#include <linux/mmdebug.h>
- 
- extern phys_addr_t		memstart_addr;
- /* PHYS_OFFSET - the physical address of the start of memory. */
--#ifndef CONFIG_DEBUG_VM
--#define PHYS_OFFSET		({ memstart_addr; })
--#else
--#define PHYS_OFFSET		({ BUG_ON(memstart_addr & 1); memstart_addr; })
--#endif
-+#define PHYS_OFFSET		({ VM_BUG_ON(memstart_addr & 1); memstart_addr; })
- 
- /* the offset between the kernel virtual and physical mappings */
- extern u64			kimage_voffset;
+> I have added some patches for kasan, kvm and smp as well.
+
+Patches related to the __pa clean-up? Or something else?
 
 -- 
 Catalin
