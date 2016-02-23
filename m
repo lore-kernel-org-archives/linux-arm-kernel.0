@@ -1,21 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 10:35:47 +0100
-Subject: [PATCH v2] MAINTAINERS: Extend info,
- add wiki and ml for meson arch
-In-Reply-To: <CAOQ7t2Zrx7N3a=RKpr2M3R6QYDeC=8yUs61NrohvrbT=vvjLiQ@mail.gmail.com>
-References: <1455575651-16157-1-git-send-email-carlo@caione.org>
- <CAOQ7t2Zrx7N3a=RKpr2M3R6QYDeC=8yUs61NrohvrbT=vvjLiQ@mail.gmail.com>
-Message-ID: <2635297.jXo9vSA2rm@wuerfel>
+Date: Tue, 23 Feb 2016 10:34:46 +0100
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+Message-ID: <3695074.sKSIyOjpjD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 February 2016 09:58:37 Carlo Caione wrote:
-> 
-> Hey Arnd,
-> Does this usually go through the armsoc tree?
+On Tuesday 23 February 2016 10:08:05 Linus Walleij wrote:
+> I will think of a better solution, if any, for this for v4.6, but will
+> put forward something that handles the Nomadik and all the
+> other ARM reference designs for now.
 > 
 
-Yes, I've put it in my todo folder now, but maybe resend to arm at kernel.org
-anyway so Olof also sees it.
+How about still describing all known panels in the DT marked 'status="disabled"',
+but then having a minimal piece of board specific code that just enables
+whichever one gets detected at boot time?
 
 	Arnd
