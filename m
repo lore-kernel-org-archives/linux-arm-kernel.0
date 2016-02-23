@@ -1,61 +1,24 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Feb 2016 13:03:14 +0100
-Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
- mappings
-In-Reply-To: <20160223115835.GI19428@n2100.arm.linux.org.uk>
-References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
- <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
- <20160222200227.GF19428@n2100.arm.linux.org.uk>
- <CAKv+Gu9gwnuu7hnYpjv7ozuKYmC8ApMakSJmYvQMaevNEd5zvA@mail.gmail.com>
- <20160223115835.GI19428@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu8oCnu6kv5SxUAdWE_Z0V+PMAKDgM6MxTi4mTm5z6EFqA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Feb 2016 12:14:36 +0000
+Subject: [RFC PATCH 01/10] arm64: mm: move assignment of 'high_memory'
+ before its first use
+In-Reply-To: <1456174472-30028-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456174472-30028-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456174472-30028-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160223121435.GA4777@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2016 at 12:58, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Feb 22, 2016 at 09:35:24PM +0100, Ard Biesheuvel wrote:
->> OK, thanks for the historical context.
->>
->> So what is your opinion on this series, i.e., to wire up memremap() to
->> remap arbitrary memory regions into the vmalloc area with MT_MEMORY_RW
->> attributes, and at the same time lift the restriction that the region
->> must be disjoint from memory covered by lowmem or kmap?
->
-> The historical context is still present, because pxa2xx-flash has
-> been converted to use memremap() from ioremap_cache() - possibly
-> inappropriately.
->
-> I've already described the semantics of ioremap_cache(), which are
-> to always create a cacheable mapping irrespective of the system
-> memory mapping type.  However, memremap() says that MEMREMAP_WB
-> matches system RAM, which on ARM it doesn't right now.
->
+On Mon, Feb 22, 2016 at 09:54:23PM +0100, Ard Biesheuvel wrote:
+> The variable 'high_memory' ends up being referenced in the call to
+> dma_contiguous_reserve(). So move the assignment before that call.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Indeed. Hence this series, to decouple memremap(MEMREMAP_WB) from
-ioremap_cache() for ARM
+Does this need cc stable? It looks like we've had this issue for a while
+and it ends up being used in cma_declare_contiguous(). So we either get
+a high enough value to not affect this function or we don't trigger this
+code path very often.
 
-> Changing it to MT_MEMORY_RW would satisfy that comment against
-> memremap(), but at the same time changes what happens with
-> pxa2xx-flash - the memory region (which is not system RAM) then
-> changes with the cache status of system RAM.
->
-> So, I'm not that happy about the memremap() stuff right now, and
-> I don't like the idea of making memremap() conform to its stated
-> requirements without first preventing pxa2xx-flash being affected
-> by such a change.
->
-
-Actually, my change fixes this issue, since it will cause memremap()
-to always create MT_MEMORY_RW mappings, and not fallback to
-ioremap_cache() for ranges that are not covered by lowmem.
-
-> Perhaps we need to reinstate the original ioremap_cached() API for
-> pxa2xx-flash, and then switch memremap() to MT_MEMORY_RW - that
-> would seem to result in the expected behaviour by all parties.
->
-
-I think we can simply revert the change to pxa2xx-flash if it is
-deemed inappropriate.
+-- 
+Catalin
