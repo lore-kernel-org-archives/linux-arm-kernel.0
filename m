@@ -1,24 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 23 Feb 2016 08:07:12 -0800
-Subject: [PATCH 1/3] ARM: omap2: mark unused functions as __maybe_unused
-In-Reply-To: <1456235876-4088840-2-git-send-email-arnd@arndb.de>
+Date: Tue, 23 Feb 2016 08:10:04 -0800
+Subject: [PATCH 2/3] ARM: omap1: avoid unused variable warning
+In-Reply-To: <1456235876-4088840-3-git-send-email-arnd@arndb.de>
 References: <1456235876-4088840-1-git-send-email-arnd@arndb.de>
- <1456235876-4088840-2-git-send-email-arnd@arndb.de>
-Message-ID: <20160223160711.GX13417@atomide.com>
+ <1456235876-4088840-3-git-send-email-arnd@arndb.de>
+Message-ID: <20160223161003.GY13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Arnd Bergmann <arnd@arndb.de> [160223 05:58]:
-> The omap_generic_init() and omap_hwmod_init_postsetup() functions are
-> used in the initialization for all OMAP2+ SoC types, but in the
-> extreme case that those are all disabled, we get a warning about
-> unused code:
+> The osk_mistral_init() contains code that is only compiled when
+> CONFIG_PM is set, but it uses a variable that is declared outside
+> of the #ifdef:
 > 
-> arch/arm/mach-omap2/io.c:412:123: error: 'omap_hwmod_init_postsetup' defined but not used [-Werror=unused-function]
-> arch/arm/mach-omap2/board-generic.c:30:123: error: 'omap_generic_init' defined but not used [-Werror=unused-function]
+> arch/arm/mach-omap1/board-osk.c: In function 'osk_mistral_init':
+> arch/arm/mach-omap1/board-osk.c:513:7: warning: unused variable 'ret' [-Wunused-variable]
 > 
-> This annotates both as __maybe_unused to shut up that warning.
+> This puts the variable in the same #ifdef to avoid the warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-omap1/board-osk.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+> index 209aecb0df68..fcc5c0650429 100644
+> --- a/arch/arm/mach-omap1/board-osk.c
+> +++ b/arch/arm/mach-omap1/board-osk.c
+> @@ -510,7 +510,9 @@ static void __init osk_mistral_init(void)
+>  	 */
+>  	omap_cfg_reg(N15_1610_MPUIO2);
+>  	if (gpio_request(OMAP_MPUIO(2), "wakeup") == 0) {
+> +#ifdef	CONFIG_PM
+>  		int ret = 0;
+> +#endif
+>  		int irq = gpio_to_irq(OMAP_MPUIO(2));
+>  
+>  		gpio_direction_input(OMAP_MPUIO(2));
 
-Looks OK to me:
+Let's just remove the #ifdef CONFIG_PM in osk_mistral_init()
+instead. That's for the wake-up button and I'm not aware
+of any other use cases for that button.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
