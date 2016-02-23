@@ -1,43 +1,36 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 23 Feb 2016 10:43:11 +0100
-Subject: [PATCH v2] MAINTAINERS: Extend info, add wiki and ml for meson arch
-Message-ID: <1456220591-11901-1-git-send-email-carlo@caione.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 23 Feb 2016 15:23:33 +0530
+Subject: [GIT PULL] DaVinci fixes for v4.6
+Message-ID: <1456221214-18042-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-Update the maintainers info with wiki and mailing list for the meson
-platform. Fix a wrong file attribution and add maintainership for the
-generic meson platforms.
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- MAINTAINERS | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+are available in the git repository at:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2fa3303..e913098 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -920,12 +920,15 @@ M:	Emilio L?pez <emilio@elopez.com.ar>
- S:	Maintained
- F:	drivers/clk/sunxi/
- 
--ARM/Amlogic MesonX SoC support
-+ARM/Amlogic Meson SoC support
- M:	Carlo Caione <carlo@caione.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-meson at googlegroups.com
-+W:	http://linux-meson.com/
- S:	Maintained
--F:	drivers/media/rc/meson-ir.c
--N:	meson[x68]
-+F:	arch/arm/mach-meson/
-+F:	arch/arm/boot/dts/meson*
-+N:	meson
- 
- ARM/Annapurna Labs ALPINE ARCHITECTURE
- M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
--- 
-2.5.0
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.6/fixes
+
+for you to fetch changes up to 8e58041114319ad290e85a7a82077dc9e2f93613:
+
+  ARM: davinci: make I2C support optional (2016-02-17 19:20:05 +0530)
+
+----------------------------------------------------------------
+Warning fixes for DaVinci collected while testing
+randconfig builds.
+
+----------------------------------------------------------------
+Arnd Bergmann (4):
+      ARM: davinci: limit DT support to DA850
+      ARM: davinci: avoid unused mityomapl138_pn_info variable
+      ARM: davinci: DA8xx+DMx combined kernels need PATCH_PHYS_VIRT
+      ARM: davinci: make I2C support optional
+
+ arch/arm/Kconfig                           |  1 +
+ arch/arm/mach-davinci/Kconfig              | 22 ++++------------------
+ arch/arm/mach-davinci/board-dm644x-evm.c   |  8 ++++++--
+ arch/arm/mach-davinci/board-dm646x-evm.c   |  7 +++++++
+ arch/arm/mach-davinci/board-mityomapl138.c |  2 +-
+ 5 files changed, 19 insertions(+), 21 deletions(-)
