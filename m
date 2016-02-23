@@ -1,109 +1,167 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Tue, 23 Feb 2016 12:59:50 +0200
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <CAHCN7xLo7q=Ts3WLvx_GzSBWt5r1SiU7vr+W==kUAaAvmwXJYA@mail.gmail.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
- <56CC2D39.80909@ti.com>
- <CAHCN7xLo7q=Ts3WLvx_GzSBWt5r1SiU7vr+W==kUAaAvmwXJYA@mail.gmail.com>
-Message-ID: <6A77838A-7F72-40C3-B279-710F305AEB40@konsulko.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 23 Feb 2016 12:08:34 +0100
+Subject: [PATCH V4 5/5] Microblaze: Modifying microblaze PCI subsytem to
+ support generic Xilinx AXI PCIe Host Bridge IP driver
+In-Reply-To: <1455208091-15556-6-git-send-email-bharatku@xilinx.com>
+References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
+ <1455208091-15556-6-git-send-email-bharatku@xilinx.com>
+Message-ID: <56CC3DB2.3080900@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
-
-> On Feb 23, 2016, at 12:32 , Adam Ford <aford173@gmail.com> wrote:
+On 11.2.2016 17:28, Bharat Kumar Gogada wrote:
+> This patch does required modifications to microblaze PCI subsystem, to
+> work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
+> and Zynq.
 > 
-> On Tue, Feb 23, 2016 at 3:58 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
->> (cc'ing a few more people as this is going into generic direction)
->> 
->> On 23/02/16 11:08, Linus Walleij wrote:
->>> On Thu, Feb 4, 2016 at 3:04 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> 
->>>> This moves the versatile CLCD configuration to the device tree by:
->>> 
->>> As this Schr?dinger's cat approach seems controversial, as well
->>> as the alternative to manipulate the DT in memory at run-time,
->>> I will respin the series without the full Versatile support, adding
->>> plug-in for the other ARM boards and and half-baked support
->>> for the Versatile supporting just VGA (like the other reference
->>> designs from ARM).
->>> 
->>> The pluggable displays prove yet again to be a problem to the
->>> world, sigh.
->>> 
->>> I will think of a better solution, if any, for this for v4.6, but will
->>> put forward something that handles the Nomadik and all the
->>> other ARM reference designs for now.
->> 
->> I had a chat with Tom Rini and Pantelis Antoniou yesterday.
->> 
->> Panto is about to send a new series for DT overlay management soon. I
->> haven't had time to test that yet, but what it would give us is that you
->> could build DT overlay binaries as "firmware" into the kernel image, and
->> thus the panel DT data would be there even before rootfs is mounted. The
->> DT overlays can be loaded from the rootfs or initramfs too, if it's not
->> critical to get the display up early.
->> 
->> I'm not quite sure how it works if, as in versatile display case, there
->> are multiple DT overlays of which one has to be enabled. I hope there's
->> support to choose which one to use via kernel cmdline or similar.
->> 
->> I would personally like it much more if the bootloader would either
->> compose a final dtb from DT fragments and pass it to the kernel, or
->> alternatively the bootloader would pass the base dtb image and a bunch
->> of DT overlays to the kernel, and the kernel would deal with the DT
->> overlays.
->> 
-> If there was a nice way to merge the device trees, I would love to
-> create device tree 'modules' that could be loaded at will and merged
-> just before the time of boot.  I could see this being useful beyond
-> just plugable displays.
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> ---
+> Changes:
+> Removed pcibios_get_phb_of_node in pci-common.c, using generic version
+> instead.
+> Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
+> Modified pcibios_align_resource in pci-common.c, as per generic
+> architecuture, removed temporary variable.
+> Removed pci_domain_nr in pci-common.c, instead using generic code.
+> Added pcibios_add_device in pci-common.c, as per generic architecuture.
+> Adding Kernel configuration in arch/microblaze as required for generic PCI
+> domains.
+> Added kernel configuration for driver to support Microblaze.
+> ---
+>  arch/microblaze/Kconfig          |  3 +++
+>  arch/microblaze/pci/pci-common.c | 56 +++++++---------------------------------
+>  drivers/pci/host/Kconfig         |  2 +-
+>  3 files changed, 14 insertions(+), 47 deletions(-)
+> 
+> diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
+> index 0bce820..c3702b9 100644
+> --- a/arch/microblaze/Kconfig
+> +++ b/arch/microblaze/Kconfig
+> @@ -271,6 +271,9 @@ config PCI
+>  config PCI_DOMAINS
+>  	def_bool PCI
+>  
+> +config PCI_DOMAINS_GENERIC
+> +	def_bool PCI_DOMAINS
+> +
+>  config PCI_SYSCALL
+>  	def_bool PCI
+>  
+> diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
+> index ae838ed..35654be 100644
+> --- a/arch/microblaze/pci/pci-common.c
+> +++ b/arch/microblaze/pci/pci-common.c
+> @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t address)
+>  }
+>  EXPORT_SYMBOL_GPL(pci_address_to_pio);
+>  
+> -/*
+> - * Return the domain number for this bus.
+> - */
+> -int pci_domain_nr(struct pci_bus *bus)
+> -{
+> -	struct pci_controller *hose = pci_bus_to_host(bus);
+> -
+> -	return hose->global_number;
+> -}
+> -EXPORT_SYMBOL(pci_domain_nr);
+> -
+>  /* This routine is meant to be used early during boot, when the
+>   * PCI bus numbers have not yet been assigned, and you need to
+>   * issue PCI config cycles to an OF device.
+> @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus *bus)
+>  
+>  void pcibios_fixup_bus(struct pci_bus *bus)
+>  {
+> -	/* When called from the generic PCI probe, read PCI<->PCI bridge
+> -	 * bases. This is -not- called when generating the PCI tree from
+> -	 * the OF device-tree.
+> -	 */
+> -	if (bus->self != NULL)
+> -		pci_read_bridge_bases(bus);
+> -
+> -	/* Now fixup the bus bus */
+> -	pcibios_setup_bus_self(bus);
+> -
+> -	/* Now fixup devices on that bus */
+> -	pcibios_setup_bus_devices(bus);
+> +	/* nothing to do */
+>  }
+>  EXPORT_SYMBOL(pcibios_fixup_bus);
+>  
+> -static int skip_isa_ioresource_align(struct pci_dev *dev)
+> -{
+> -	return 0;
+> -}
+> -
+>  /*
+>   * We need to avoid collisions with `mirrored' VGA ports
+>   * and other strange ISA hardware, so we always want the
+> @@ -899,20 +872,18 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
+>  resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  				resource_size_t size, resource_size_t align)
+>  {
+> -	struct pci_dev *dev = data;
+> -	resource_size_t start = res->start;
+> -
+> -	if (res->flags & IORESOURCE_IO) {
+> -		if (skip_isa_ioresource_align(dev))
+> -			return start;
+> -		if (start & 0x300)
+> -			start = (start + 0x3ff) & ~0x3ff;
+> -	}
+> -
+> -	return start;
+> +	return res->start;
+>  }
+>  EXPORT_SYMBOL(pcibios_align_resource);
+>  
+> +int pcibios_add_device(struct pci_dev *dev)
+> +{
+> +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(pcibios_add_device);
+> +
+>  /*
+>   * Reparent resource children of pr that conflict with res
+>   * under res, and make res replace those children.
+> @@ -1333,13 +1304,6 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
+>  		 (unsigned long)hose->io_base_virt - _IO_BASE);
+>  }
+>  
+> -struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+> -{
+> -	struct pci_controller *hose = bus->sysdata;
+> -
+> -	return of_node_get(hose->dn);
+> -}
+> -
+>  static void pcibios_scan_phb(struct pci_controller *hose)
+>  {
+>  	LIST_HEAD(resources);
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index d5e58ba..7c56c2e 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -79,7 +79,7 @@ config PCI_KEYSTONE
+>  
+>  config PCIE_XILINX
+>  	bool "Xilinx AXI PCIe host bridge support"
+> -	depends on ARCH_ZYNQ
+> +	depends on ARCH_ZYNQ || MICROBLAZE
+>  	help
+>  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
+>  	  Host Bridge driver.
 > 
 
-Looks like you would be happy by having a way to boot using a device tree
-blob + a number of device tree overlay blobs to be applied in sequence.
+Less code in arch is better.
 
-You could append the dtbo?s to the device tree blob (where-ever that may be)
-and it should work.
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-The good thing about this scheme is that it?s independent of the bootloader.
+Bjorn: Please take this via your tree.
 
-An advanced bootloader (like u-boot) with DT smarts can create the appended
-DT blob itself, while a dumb one can just be given the appended blob as
-it was created outside of the device.
-
->> In any case, I think the firmware solution is a good step forward, and
->> will probably work fine for many users. Then again, I haven't tested it
->> yet so I don't know the details, and it's not in the mainline.
->> 
-> I am willing to test it, but I'll need the patch and some instructions
-> from Panto.
-> 
-
-The appended device tree blob thing does not exist yet, but it?s not such a big
-problem to add. I?d give it a shot this week.
-
-The standard device tree overlays are in my overlay branch at
-https://github.com/pantoniou/linux-beagle-track-mainline/tree/bbb-overlays
-
-The capemgr has options for parsing a kernel command line to apply an overlay:
-
-https://github.com/pantoniou/linux-beagle-track-mainline/blob/bbb-overlays/drivers/misc/bone_capemgr.c
-
-The command line options are enable_partno & disable_partno where you supply
-the part numbers of the capes you want enabled/disabled at boot.
-
-The capemgr is complicated due to the eeprom detection and the horrible kludges done with the
-variants (beaglebone white/beaglebone black), but I think you can figure out what?s going
-on with the command line options.
-
-
->> Tomi
->> 
-
-Regards
-
-? Pantelis
+Thanks,
+Michal
