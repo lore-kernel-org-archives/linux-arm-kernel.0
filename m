@@ -1,37 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 15:32:01 +0100
-Subject: [PATCH] ARM: sirf: mark sirfsoc_init_late as __maybe_unused
-Message-ID: <1456237925-727550-1-git-send-email-arnd@arndb.de>
+Date: Tue, 23 Feb 2016 15:34:45 +0100
+Subject: [PATCH] ARM: sa1100: make sa1100_register_uart_fns a function
+Message-ID: <1456238094-778916-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sirfsoc_init_late is called by each of the three individual
-SoC definitions, but in a randconfig build, we can encounter
-a situation where they are all disabled:
+Calling sa1100_register_uart_fns() leaves the port structure
+unused when CONFIG_SERIAL_SA1100 is disabled, and we get a
+compiler warning about that:
 
-arch/arm/mach-prima2/common.c:18:123: warning: 'sirfsoc_init_late' defined but not used [-Wunused-function]
+arch/arm/mach-sa1100/badge4.c:317:31: warning: 'badge4_port_fns' defined but not used [-Wunused-variable]
+ static struct sa1100_port_fns badge4_port_fns __initdata = {
 
-While that is not a useful configuration, the warning also
-doesn't help, so this patch marks the function as __maybe_unused
-to let the compiler know it is there intentionally.
+This turns the two empty macros into empty inline functions,
+which has the same effect, but lets the compiler know that the
+variables are intentionally unused.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-prima2/common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/platform_data/sa11x0-serial.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 8cadb302a7d2..ffe05c27087e 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -15,7 +15,7 @@
- #include <linux/of_platform.h>
- #include "common.h"
+diff --git a/include/linux/platform_data/sa11x0-serial.h b/include/linux/platform_data/sa11x0-serial.h
+index 4504d5d592f0..009e1d83fe39 100644
+--- a/include/linux/platform_data/sa11x0-serial.h
++++ b/include/linux/platform_data/sa11x0-serial.h
+@@ -26,8 +26,12 @@ struct sa1100_port_fns {
+ void sa1100_register_uart_fns(struct sa1100_port_fns *fns);
+ void sa1100_register_uart(int idx, int port);
+ #else
+-#define sa1100_register_uart_fns(fns) do { } while (0)
+-#define sa1100_register_uart(idx,port) do { } while (0)
++static inline void sa1100_register_uart_fns(struct sa1100_port_fns *fns)
++{
++}
++static inline void sa1100_register_uart(int idx, int port)
++{
++}
+ #endif
  
--static void __init sirfsoc_init_late(void)
-+static void __init __maybe_unused sirfsoc_init_late(void)
- {
- 	sirfsoc_pm_init();
- }
+ #endif
 -- 
 2.7.0
