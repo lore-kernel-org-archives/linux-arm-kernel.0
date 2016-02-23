@@ -1,63 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Feb 2016 12:01:01 +0000
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
- <56CC2D39.80909@ti.com>
- <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
-Message-ID: <20160223120101.GJ19428@n2100.arm.linux.org.uk>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Tue, 23 Feb 2016 15:01:41 +0300
+Subject: [PATCH v1] arm: pxa: fix DT node name for PXA27X usb
+In-Reply-To: <87oab8wyfe.fsf@belgarion.home>
+References: <1456139297-5854-1-git-send-email-ynvich@gmail.com>
+ <87oab8wyfe.fsf@belgarion.home>
+Message-ID: <1456228901.23036.9.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 11:56:34AM +0000, Peter Maydell wrote:
-> On 23 February 2016 at 09:58, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> > I'm not quite sure how it works if, as in versatile display case, there
-> > are multiple DT overlays of which one has to be enabled. I hope there's
-> > support to choose which one to use via kernel cmdline or similar.
-> >
-> > I would personally like it much more if the bootloader would either
-> > compose a final dtb from DT fragments and pass it to the kernel, or
-> > alternatively the bootloader would pass the base dtb image and a bunch
-> > of DT overlays to the kernel, and the kernel would deal with the DT
-> > overlays.
-> 
-> Speaking as somebody who's written the "bootloader" code that's
-> used for what I guess are the majority of versatile kernel boots,
-> i.e. the one in QEMU, I think that requiring the bootloader to do this
-> would be a significant worsening from the current state.
-> 
-> Right now the bootloader doesn't need to do much at all with device
-> trees, except pass the kernel the DT that the user gave us, which
-> is just the kernel's own data structures in a separate file for
-> convenience. You need to do some very minor tweaks to the /chosen
-> node, but these can be handled the same way for any board and aren't
-> hardware specific. There's no need to worry about dt fragments
-> either for the bootloader or for the user. Imposing a new requirement
-> for the bootloader to have to probe hardware which it otherwise
-> has no need to even care about, and then edit and update the DT
-> in a board-specific manner, or have board-specific DT fragments,
-> seems like a totally unnecessary imposition on both bootloader
-> authors and end-users, and of course it would break booting newer
-> kernels on the great mass of already existing boot loaders and
-> QEMU installs.
-> 
-> The kernel is in a position to probe the display hardware and determine
-> what is there, and do the right thing, and that's exactly what it
-> does today. The kernel should continue to do this.
-> The advantage of DT is that it allows moving information about
-> non-probeable hardware that was previously hardwired in the kernel
-> C sources into a separate data structure, but the versatile displays
-> are not non-probeable. I can see no benefit at all from hardwiring into
-> the dt something which the kernel has previously been successfully
-> dynamically getting right without any bootloader intervention -- it just
-> makes the kernel less flexible and less user-friendly.
+Hi Robert,?
 
-+1.
+On Mon, 2016-02-22 at 16:35 +0100, Robert Jarzmik wrote:
+> You're right, I haven't seen the pxa2xx.dtsi statement before.
+> 
+> As such, could you amend a bit your patch please to :
+> ?- add:
+> Fixes: 0ec1939668e5 ("ARM: dts: pxa: add the usb host controller")
+> ?- make the same change in pxa3xx.dtsi, as the same error is there
+> ?- and more globally align pxa2xx.dtsi, pxa27x.dtsi and pxa3xx.dtsi
+> ?- remove the compatible, reg, interrupts and status from both pxa27x.dtsi and
+> ???pxa3xx.dtsi as they are redundant with the included pxa2xxx.dsti one
+
+No problem. Let's figure out the best approach.
+
+> I'm even wondering if the proper change wouldn't be to scrap the ohci
+> declarations from pxa27x.dtsi and pxa3xx.dtsi, and only add the "clocks"
+> property to pxa2xx.dtsi ...
+
+Since clocks are declared in pxa27x.dtsi and?pxa3xx.dtsi, there is a
+stronger ground to have node clocks properties set in pxa27x.dtsi
+and?pxa3xx.dtsi as well. However, there is already nodes with clocks
+properties in pxa2xx.dtsi.
+
+I cannot choose, you should make a decision.
+
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Sergei Ianovich <ynvich@gmail.com>
