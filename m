@@ -1,170 +1,103 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 23 Feb 2016 04:21:32 +0000
-Subject: [PATCH v2 4/4] dmaengine: xilinx_vdma: Improve channel idle
- checking
-In-Reply-To: <20160223031130.GI17690@localhost>
-References: <1456120477-32134-1-git-send-email-appanad@xilinx.com>
- <1456120477-32134-4-git-send-email-appanad@xilinx.com>
- <20160223031130.GI17690@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A561D2C@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 23 Feb 2016 13:40:21 +0900
+Subject: [PATCH] arm64: dts: uniphier: rename PH1-LD10 to PH1-LD20
+Message-ID: <1456202421-10857-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Due to the company's awful projecting, this chip has been renamed to
+PH1-LD20.  It has not been shipped yet, this change would not give
+much impact on our customers.
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Tuesday, February 23, 2016 8:42 AM
-> To: Appana Durga Kedareswara Rao
-> Cc: dan.j.williams at intel.com; Michal Simek; Soren Brinkmann; Appana Durga
-> Kedareswara Rao; moritz.fischer at ettus.com;
-> laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Anirudha
-> Sarangi; dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v2 4/4] dmaengine: xilinx_vdma: Improve channel idle
-> checking
-> 
-> On Mon, Feb 22, 2016 at 11:24:37AM +0530, Kedareswara rao Appana wrote:
-> > This patch improves the channel idle cheking by introduing
-> 				      ^^^^^^^^^
-> typo
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Ok will fix.
+Olof, Arnd,
 
-> 
-> > a new varibale in chan private structure.
-> 	^^^^^^^
-> here too :(
+Please apply this patch along with my series
+"[PATCH 0/9] ARM: uniphier: UniPhier updates for Linux 4.6-rc1".
 
-Ok will fix.
+If it goes to a different branch, it will cause a big merge conflict later.
 
-> 
-> and there is no description how this improvement is achieved and why
 
-Ok will give detailed explanation in the next version of the patch.
+ arch/arm64/boot/dts/socionext/Makefile                            | 2 +-
+ .../{uniphier-ph1-ld10-ref.dts => uniphier-ph1-ld20-ref.dts}      | 8 ++++----
+ .../socionext/{uniphier-ph1-ld10.dtsi => uniphier-ph1-ld20.dtsi}  | 6 +++---
+ 3 files changed, 8 insertions(+), 8 deletions(-)
+ rename arch/arm64/boot/dts/socionext/{uniphier-ph1-ld10-ref.dts => uniphier-ph1-ld20-ref.dts} (92%)
+ rename arch/arm64/boot/dts/socionext/{uniphier-ph1-ld10.dtsi => uniphier-ph1-ld20.dtsi} (98%)
 
-Regards,
-Kedar.
-
-> >
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > ---
-> > Changes for v2:
-> > ---> splitted the changes into multiple patches.
-> >
-> >  drivers/dma/xilinx/xilinx_vdma.c | 41
-> > ++++++++--------------------------------
-> >  1 file changed, 8 insertions(+), 33 deletions(-)
-> >
-> > diff --git a/drivers/dma/xilinx/xilinx_vdma.c
-> > b/drivers/dma/xilinx/xilinx_vdma.c
-> > index 8db07f7..51686d1 100644
-> > --- a/drivers/dma/xilinx/xilinx_vdma.c
-> > +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> > @@ -202,6 +202,7 @@ struct xilinx_vdma_tx_descriptor {
-> >   * @has_sg: Support scatter transfers
-> >   * @genlock: Support genlock mode
-> >   * @err: Channel has errors
-> > + * @idle: Check for channel idle
-> >   * @tasklet: Cleanup work after irq
-> >   * @config: Device configuration info
-> >   * @flush_on_fsync: Flush on Frame sync @@ -225,6 +226,7 @@ struct
-> > xilinx_vdma_chan {
-> >  	bool has_sg;
-> >  	bool genlock;
-> >  	bool err;
-> > +	bool idle;
-> >  	struct tasklet_struct tasklet;
-> >  	struct xilinx_vdma_config config;
-> >  	bool flush_on_fsync;
-> > @@ -519,32 +521,6 @@ static enum dma_status
-> > xilinx_vdma_tx_status(struct dma_chan *dchan,  }
-> >
-> >  /**
-> > - * xilinx_vdma_is_running - Check if VDMA channel is running
-> > - * @chan: Driver specific VDMA channel
-> > - *
-> > - * Return: '1' if running, '0' if not.
-> > - */
-> > -static bool xilinx_vdma_is_running(struct xilinx_vdma_chan *chan) -{
-> > -	return !(vdma_ctrl_read(chan, XILINX_VDMA_REG_DMASR) &
-> > -		 XILINX_VDMA_DMASR_HALTED) &&
-> > -		(vdma_ctrl_read(chan, XILINX_VDMA_REG_DMACR) &
-> > -		 XILINX_VDMA_DMACR_RUNSTOP);
-> > -}
-> > -
-> > -/**
-> > - * xilinx_vdma_is_idle - Check if VDMA channel is idle
-> > - * @chan: Driver specific VDMA channel
-> > - *
-> > - * Return: '1' if idle, '0' if not.
-> > - */
-> > -static bool xilinx_vdma_is_idle(struct xilinx_vdma_chan *chan) -{
-> > -	return vdma_ctrl_read(chan, XILINX_VDMA_REG_DMASR) &
-> > -		XILINX_VDMA_DMASR_IDLE;
-> > -}
-> > -
-> > -/**
-> >   * xilinx_vdma_halt - Halt VDMA channel
-> >   * @chan: Driver specific VDMA channel
-> >   */
-> > @@ -614,6 +590,9 @@ static void xilinx_vdma_start_transfer(struct
-> xilinx_vdma_chan *chan)
-> >  	if (list_empty(&chan->pending_list))
-> >  		return;
-> >
-> > +	if (!chan->idle)
-> > +		return;
-> > +
-> >  	desc = list_first_entry(&chan->pending_list,
-> >  				struct xilinx_vdma_tx_descriptor, node);
-> >  	tail_desc = list_last_entry(&chan->pending_list,
-> > @@ -622,13 +601,6 @@ static void xilinx_vdma_start_transfer(struct
-> xilinx_vdma_chan *chan)
-> >  	tail_segment = list_last_entry(&tail_desc->segments,
-> >  				       struct xilinx_vdma_tx_segment, node);
-> >
-> > -	/* If it is SG mode and hardware is busy, cannot submit */
-> > -	if (chan->has_sg && xilinx_vdma_is_running(chan) &&
-> > -	    !xilinx_vdma_is_idle(chan)) {
-> > -		dev_dbg(chan->dev, "DMA controller still busy\n");
-> > -		return;
-> > -	}
-> > -
-> >  	/*
-> >  	 * If hardware is idle, then all descriptors on the running lists are
-> >  	 * done, start new transfers
-> > @@ -708,6 +680,7 @@ static void xilinx_vdma_start_transfer(struct
-> > xilinx_vdma_chan *chan)
-> >
-> >  	list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> >  	chan->desc_pendingcount = 0;
-> > +	chan->idle = false;
-> >  }
-> >
-> >  /**
-> > @@ -854,6 +827,7 @@ static irqreturn_t xilinx_vdma_irq_handler(int irq, void
-> *data)
-> >  	if (status & XILINX_VDMA_DMASR_FRM_CNT_IRQ) {
-> >  		spin_lock(&chan->lock);
-> >  		xilinx_vdma_complete_descriptor(chan);
-> > +		chan->idle = true;
-> >  		xilinx_vdma_start_transfer(chan);
-> >  		spin_unlock(&chan->lock);
-> >  	}
-> > @@ -1212,6 +1186,7 @@ static int xilinx_vdma_chan_probe(struct
-> > xilinx_vdma_device *xdev,
-> >
-> >  	list_add_tail(&chan->common.device_node, &xdev-
-> >common.channels);
-> >  	xdev->chan[chan->id] = chan;
-> > +	chan->idle = true;
-> >
-> >  	/* Reset the channel */
-> >  	err = xilinx_vdma_chan_reset(chan);
-> > --
-> > 2.1.2
-> >
-> 
-> --
-> ~Vinod
+diff --git a/arch/arm64/boot/dts/socionext/Makefile b/arch/arm64/boot/dts/socionext/Makefile
+index 8d72771..299b67e 100644
+--- a/arch/arm64/boot/dts/socionext/Makefile
++++ b/arch/arm64/boot/dts/socionext/Makefile
+@@ -1,4 +1,4 @@
+-dtb-$(CONFIG_ARCH_UNIPHIER) += uniphier-ph1-ld10-ref.dtb
++dtb-$(CONFIG_ARCH_UNIPHIER) += uniphier-ph1-ld20-ref.dtb
+ 
+ always		:= $(dtb-y)
+ clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
+similarity index 92%
+rename from arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
+rename to arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
+index e5c8a20..727ae5f 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for UniPhier PH1-LD10 Reference Board
++ * Device Tree Source for UniPhier PH1-LD20 Reference Board
+  *
+  * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+@@ -43,12 +43,12 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-ph1-ld10.dtsi"
++/include/ "uniphier-ph1-ld20.dtsi"
+ /include/ "uniphier-support-card.dtsi"
+ 
+ / {
+-	model = "UniPhier PH1-LD10 Reference Board";
+-	compatible = "socionext,ph1-ld10-ref", "socionext,ph1-ld10";
++	model = "UniPhier PH1-LD20 Reference Board";
++	compatible = "socionext,ph1-ld20-ref", "socionext,ph1-ld20";
+ 
+ 	memory {
+ 		device_type = "memory";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+similarity index 98%
+rename from arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi
+rename to arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+index 84637eb..65e9651 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for UniPhier PH1-LD10 SoC
++ * Device Tree Source for UniPhier PH1-LD20 SoC
+  *
+  * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+@@ -43,7 +43,7 @@
+  */
+ 
+ / {
+-	compatible = "socionext,ph1-ld10";
++	compatible = "socionext,ph1-ld20";
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 	interrupt-parent = <&gic>;
+@@ -268,7 +268,7 @@
+ 		};
+ 
+ 		pinctrl: pinctrl at 5f801000 {
+-			compatible = "socionext,ph1-ld10-pinctrl", "syscon";
++			compatible = "socionext,ph1-ld20-pinctrl", "syscon";
+ 			reg = <0x5f801000 0xe00>;
+ 		};
+ 
+-- 
+1.9.1
