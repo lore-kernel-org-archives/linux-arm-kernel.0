@@ -1,29 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Feb 2016 10:16:42 +0000
-Subject: [PATCH] arm64: move brk immediate argument definitions to
- separate header
-In-Reply-To: <1456214205-18743-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456214205-18743-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160223101642.GB3966@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Feb 2016 11:24:55 +0100
+Subject: [PATCH] spi: imx: initialize usedma earlier
+In-Reply-To: <20160223111559.3c2cb641@ipc1.ka-ro>
+References: <20160223111559.3c2cb641@ipc1.ka-ro>
+Message-ID: <1456223095-32185-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 08:56:45AM +0100, Ard Biesheuvel wrote:
-> Instead of reversing the header dependency between asm/bug.h and
-> asm/debug-monitors.h, split off the brk instruction immediate value
-> defines into a new header asm/brk-imm.h, and include it from both.
-> 
-> This solves the circular dependency issue that prevents BUG() from
-> being used in some header files, and keeps the definitions together.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/brk-imm.h        | 25 +++++++++++++++++++++++++
->  arch/arm64/include/asm/bug.h            |  2 +-
->  arch/arm64/include/asm/debug-monitors.h | 14 +-------------
->  3 files changed, 27 insertions(+), 14 deletions(-)
->  create mode 100644 arch/arm64/include/asm/brk-imm.h
+The SoC specific config function does not know if DMA will be used or
+not. This information will be useful to configure the SPI controller
+correctly for DMA in following patches, so initialize the usedma
+variable before calling into the SoC specific config function.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/spi/spi-imx.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-Will
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index a61b1b1..5792918 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -815,6 +815,11 @@ static int spi_imx_setupxfer(struct spi_device *spi,
+ 		spi_imx->tx = spi_imx_buf_tx_u32;
+ 	}
+ 
++	if (spi_imx_can_dma(spi_imx->bitbang.master, spi, t))
++		spi_imx->usedma = 1;
++	else
++		spi_imx->usedma = 0;
++
+ 	spi_imx->devtype_data->config(spi_imx, &config);
+ 
+ 	return 0;
+@@ -1040,14 +1045,10 @@ static int spi_imx_transfer(struct spi_device *spi,
+ {
+ 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+ 
+-	if (spi_imx->bitbang.master->can_dma &&
+-	    spi_imx_can_dma(spi_imx->bitbang.master, spi, transfer)) {
+-		spi_imx->usedma = true;
++	if (spi_imx->usedma)
+ 		return spi_imx_dma_transfer(spi_imx, transfer);
+-	}
+-	spi_imx->usedma = false;
+-
+-	return spi_imx_pio_transfer(spi, transfer);
++	else
++		return spi_imx_pio_transfer(spi, transfer);
+ }
+ 
+ static int spi_imx_setup(struct spi_device *spi)
+-- 
+2.7.0
