@@ -1,61 +1,73 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Feb 2016 10:49:52 +0000
-Subject: [PATCH 10/13] arm-cci: Provide hook for writing to PMU counters
+Date: Tue, 23 Feb 2016 10:49:51 +0000
+Subject: [PATCH 09/13] arm-cci: Add helper to enable PMU without synchornising
+ counters
 In-Reply-To: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
 References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1456224595-3282-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1456224595-3282-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a hook for writing to CCI PMU counters. This callback
-can be used for CCI models which requires some extra work
-to program the PMU counter values. To accommodate group writes
-and single counter writes, the call back accepts a bitmask
-of the counter indices which need to be programmed with the
-given value.
+On CCI-500 writing to a counter requires turning the PMU on. So,
+synchronising the counter state should not be performed for such special cases,
+while turning the PMU on. This patch adds a helper, __cci_pmu_enable_nosync(),
+without flushing the counter states.
 
 Cc: Punit Agrawal <punit.agrawal@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/bus/arm-cci.c |   15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index bcc4c59..f1d3f47 100644
+index 7ce7da0..bcc4c59 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -126,6 +126,7 @@ struct cci_pmu_model {
- 	struct event_range event_ranges[CCI_IF_MAX];
- 	int (*validate_hw_event)(struct cci_pmu *, unsigned long);
- 	int (*get_event_idx)(struct cci_pmu *, struct cci_pmu_hw_events *, unsigned long);
-+	void (*write_counters)(struct cci_pmu *, unsigned long *);
- };
- 
- static struct cci_pmu_model cci_pmu_models[];
-@@ -868,7 +869,7 @@ static void pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
- 	pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
+@@ -640,18 +640,23 @@ void cci_pmu_sync_counters(struct cci_pmu *cci_pmu)
  }
  
--static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
-+static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+ /* Should be called with cci_pmu->hw_events->pmu_lock held */
+-static void __cci_pmu_enable(struct cci_pmu *cci_pmu)
++static void __cci_pmu_enable_nosync(struct cci_pmu *cci_pmu)
  {
- 	int i;
- 	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
-@@ -882,6 +883,14 @@ static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
- 	}
+ 	u32 val;
+ 
+-	cci_pmu_sync_counters(cci_pmu);
+-
+ 	/* Enable all the PMU counters. */
+ 	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
+ 	writel(val, cci_ctrl_base + CCI_PMCR);
  }
  
-+static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+ /* Should be called with cci_pmu->hw_events->pmu_lock held */
++static void __cci_pmu_enable_sync(struct cci_pmu *cci_pmu)
 +{
-+	if (cci_pmu->model->write_counters)
-+		cci_pmu->model->write_counters(cci_pmu, mask);
-+	else
-+		__pmu_write_counters(cci_pmu, mask);
++	cci_pmu_sync_counters(cci_pmu);
++	__cci_pmu_enable_nosync(cci_pmu);
 +}
 +
- static u64 pmu_event_update(struct perf_event *event)
++/* Should be called with cci_pmu->hw_events->pmu_lock held */
+ static void __cci_pmu_disable(void)
  {
- 	struct hw_perf_event *hwc = &event->hw;
+ 	u32 val;
+@@ -960,7 +965,7 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
+ 	}
+ 
+ 	/* Enable the PMU and sync possibly overflowed counters */
+-	__cci_pmu_enable(cci_pmu);
++	__cci_pmu_enable_sync(cci_pmu);
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ 
+ 	return IRQ_RETVAL(handled);
+@@ -1004,7 +1009,7 @@ static void cci_pmu_enable(struct pmu *pmu)
+ 		return;
+ 
+ 	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+-	__cci_pmu_enable(cci_pmu);
++	__cci_pmu_enable_sync(cci_pmu);
+ 	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+ 
+ }
 -- 
 1.7.9.5
