@@ -1,71 +1,101 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 23 Feb 2016 14:14:14 +0000
-Subject: [PATCH 03/12] ARM: dts: apq8064: add pci support in CM QS600
+Date: Tue, 23 Feb 2016 14:14:26 +0000
+Subject: [PATCH 04/12] ARM: dts: apq8064: add i2c sleep pinctrl states.
 In-Reply-To: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1456236639-1379-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1456236854-2511-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1456236866-2588-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds PCIE support to APQ8064, tested with Ethernet on
-Compulab QS600 board.
+This patch adds missing i2c pinctrl sleep states.
+Also add 16mA drive strength to the pins so that we can detect wide
+range of i2c devices on the other side of level shifters.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 36 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi      |  8 +++----
+ 2 files changed, 40 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-index 21095da..35f1d46 100644
---- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -37,6 +37,18 @@
- 					bias-disable;
- 				};
- 			};
-+
-+			pcie_pins: pcie_pinmux {
-+				mux {
-+					pins = "gpio27";
-+					function = "gpio";
-+				};
-+				conf {
-+					pins = "gpio27";
-+					drive-strength = <12>;
-+					bias-disable;
-+				};
-+			};
+diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+index c711aca..ce15c67 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+@@ -19,6 +19,24 @@
+ 			pins = "gpio20", "gpio21";
+ 			function = "gsbi1";
  		};
- 
- 		rpm at 108000 {
-@@ -103,6 +115,11 @@
- 					regulator-max-microvolt = <1900000>;
- 					bias-pull-down;
- 				};
 +
-+				pm8921_lvs6: lvs6 {
-+					bias-pull-down;
-+				};
-+
- 			};
- 		};
- 
-@@ -195,6 +212,16 @@
- 			};
- 		};
- 
-+		pci at 1b500000 {
-+			status = "ok";
-+			vdda-supply = <&pm8921_s3>;
-+			vdda_phy-supply = <&pm8921_lvs6>;
-+			vdda_refclk-supply = <&v3p3_fixed>;
-+			pinctrl-0 = <&pcie_pins>;
-+			pinctrl-names = "default";
-+			perst-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
++		pinconf {
++			pins = "gpio20", "gpio21";
++			drive-strength = <16>;
++			bias-disable;
 +		};
++	};
 +
- 		amba {
- 			/* eMMC */
- 			sdcc1: sdcc at 12400000 {
++	i2c1_pins_sleep: i2c1_pins_sleep {
++		mux {
++			pins = "gpio20", "gpio21";
++			function = "gpio";
++		};
++		pinconf {
++			pins = "gpio20", "gpio21";
++			drive-strength = <2>;
++			bias-disable = <0>;
++		};
+ 	};
+ 
+ 	i2c3_pins: i2c3 {
+@@ -26,6 +44,24 @@
+ 			pins = "gpio8", "gpio9";
+ 			function = "gsbi3";
+ 		};
++
++		pinconf {
++			pins = "gpio8", "gpio9";
++			drive-strength = <16>;
++			bias-disable;
++		};
++	};
++
++	i2c3_pins_sleep: i2c3_pins_sleep {
++		mux {
++			pins = "gpio8", "gpio9";
++			function = "gpio";
++		};
++		pinconf {
++			pins = "gpio8", "gpio9";
++			drive-strength = <2>;
++			bias-disable = <0>;
++		};
+ 	};
+ 
+ 	gsbi6_uart_2pins: gsbi6_uart_2pins {
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 3d95534b..3fb66b9 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -227,8 +227,8 @@
+ 
+ 			gsbi1_i2c: i2c at 12460000 {
+ 				compatible = "qcom,i2c-qup-v1.1.1";
+-				pinctrl-0 = <&i2c1_pins>;
+-				pinctrl-names = "default";
++				pinctrl-0 = <&i2c1_pins &i2c1_pins_sleep>;
++				pinctrl-names = "default", "sleep";
+ 				reg = <0x12460000 0x1000>;
+ 				interrupts = <0 194 IRQ_TYPE_NONE>;
+ 				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
+@@ -274,8 +274,8 @@
+ 			ranges;
+ 			gsbi3_i2c: i2c at 16280000 {
+ 				compatible = "qcom,i2c-qup-v1.1.1";
+-				pinctrl-0 = <&i2c3_pins>;
+-				pinctrl-names = "default";
++				pinctrl-0 = <&i2c3_pins &i2c3_pins_sleep>;
++				pinctrl-names = "default", "sleep";
+ 				reg = <0x16280000 0x1000>;
+ 				interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
+ 				clocks = <&gcc GSBI3_QUP_CLK>,
 -- 
 1.9.1
