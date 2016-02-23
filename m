@@ -1,63 +1,61 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 23 Feb 2016 21:02:16 +0900
-Subject: [PATCH] ARM: dts: add support for gpio buttons for
- exynos5422-odroidxu3
-In-Reply-To: <CANAwSgTRu6pb9cdA50AzBSNLS+Y+sssyc_CX7FKuV=FDYWaOsA@mail.gmail.com>
-References: <1456214467-3344-1-git-send-email-linux.amoon@gmail.com>
- <56CC167A.8040303@samsung.com> <56CC194F.6080905@samsung.com>
- <CANAwSgTRu6pb9cdA50AzBSNLS+Y+sssyc_CX7FKuV=FDYWaOsA@mail.gmail.com>
-Message-ID: <CAJKOXPftm7P44Zxn9rHt1THJOX3Oxu-mg5GD7=T3se4iRe1DkA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 23 Feb 2016 13:03:14 +0100
+Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
+ mappings
+In-Reply-To: <20160223115835.GI19428@n2100.arm.linux.org.uk>
+References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
+ <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
+ <20160222200227.GF19428@n2100.arm.linux.org.uk>
+ <CAKv+Gu9gwnuu7hnYpjv7ozuKYmC8ApMakSJmYvQMaevNEd5zvA@mail.gmail.com>
+ <20160223115835.GI19428@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu8oCnu6kv5SxUAdWE_Z0V+PMAKDgM6MxTi4mTm5z6EFqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-23 18:17 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> Hi Krzysztof,
+On 23 February 2016 at 12:58, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 22, 2016 at 09:35:24PM +0100, Ard Biesheuvel wrote:
+>> OK, thanks for the historical context.
+>>
+>> So what is your opinion on this series, i.e., to wire up memremap() to
+>> remap arbitrary memory regions into the vmalloc area with MT_MEMORY_RW
+>> attributes, and at the same time lift the restriction that the region
+>> must be disjoint from memory covered by lowmem or kmap?
 >
-> On 23 February 2016 at 14:03, Krzysztof Kozlowski
->>>>      };
->>>> +
->>>> +    gpio_keys {
->>>> +            compatible = "gpio-keys";
->>>> +            pinctrl-names = "default";
->>>> +            pinctrl-0 = <&gpio_power_key>;
->>>> +
->>>> +            power_key {
->>>> +                    interrupt-parent = <&gpx0>;
->>>> +                    interrupts = <3 IRQ_TYPE_NONE>;
->>>
->>> Hmmm.... why you specify the interrupts?
->>>
->>>> +                    gpios = <&gpx0 3 GPIO_ACTIVE_LOW>;
->>
->> Please, explain it to me. The SW2 key is connected to PWRON of PMIC.
->> However you are adding a GPIO key for external interrupt source 3
->> (XE.INT3)... which comes from PMIC's ONOB.
->>
->> It's interesting.... how does it work? The PMIC will generate ONOB
->> interrupt on PWRON low->high change (when PWRHOLD is high)?
->>
->> Best regards,
->> Krzysztof
->>
+> The historical context is still present, because pxa2xx-flash has
+> been converted to use memremap() from ioremap_cache() - possibly
+> inappropriately.
 >
-> I have re-base my changes on HK dts.
-> I could not find much details for the schematic diagram.
-> I don't know much low level detains on this.
+> I've already described the semantics of ioremap_cache(), which are
+> to always create a cacheable mapping irrespective of the system
+> memory mapping type.  However, memremap() says that MEMREMAP_WB
+> matches system RAM, which on ARM it doesn't right now.
+>
 
-If I understand this correctly: you just took some vendor code,
-similar to existing code of Odroid U3, and without full understanding
-of the code nor checking with public schematics, you sent it.
+Indeed. Hence this series, to decouple memremap(MEMREMAP_WB) from
+ioremap_cache() for ARM
 
-Taking vendor stuff is okay but you need to think about it, use it as
-an example and deliver proper solution based on that. Not copy-paste.
+> Changing it to MT_MEMORY_RW would satisfy that comment against
+> memremap(), but at the same time changes what happens with
+> pxa2xx-flash - the memory region (which is not system RAM) then
+> changes with the cache status of system RAM.
+>
+> So, I'm not that happy about the memremap() stuff right now, and
+> I don't like the idea of making memremap() conform to its stated
+> requirements without first preventing pxa2xx-flash being affected
+> by such a change.
+>
 
-> How dose this works: This changes will initial the shudown/reboot on Ubuntu.
-> I have also tested this similar feature on Odroid U3.
+Actually, my change fixes this issue, since it will cause memremap()
+to always create MT_MEMORY_RW mappings, and not fallback to
+ioremap_cache() for ranges that are not covered by lowmem.
 
-Great :), yes it works because ONOB interrupt from PMIC is generated
-on key press. However this is not a strictly speaking key... I don't
-really know what to do with this commit and your explanation
-(Hardkernel has such code) is not sufficient to convince me.
+> Perhaps we need to reinstate the original ioremap_cached() API for
+> pxa2xx-flash, and then switch memremap() to MT_MEMORY_RW - that
+> would seem to result in the expected behaviour by all parties.
+>
 
-Best regards,
-Krzysztof
+I think we can simply revert the change to pxa2xx-flash if it is
+deemed inappropriate.
