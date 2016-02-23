@@ -1,50 +1,37 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 23 Feb 2016 09:22:47 -0600
-Subject: [PATCH] ARM: socfpga: hide unused functions
-In-Reply-To: <1456236527-189885-1-git-send-email-arnd@arndb.de>
-References: <1456236527-189885-1-git-send-email-arnd@arndb.de>
-Message-ID: <56CC7947.6000909@opensource.altera.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 23 Feb 2016 16:23:53 +0100
+Subject: [PATCH 2/2] ARM: dma-mapping: fix alloc/free for coherent + CMA
+ + gfp=0
+In-Reply-To: <20160219140600.GW19428@n2100.arm.linux.org.uk>
+References: <1455869524-13874-1-git-send-email-rabin.vincent@axis.com>
+ <1455869524-13874-2-git-send-email-rabin.vincent@axis.com>
+ <20160219140600.GW19428@n2100.arm.linux.org.uk>
+Message-ID: <20160223152353.GA22447@lnxrabinv.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 19, 2016 at 02:06:00PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 19, 2016 at 09:12:04AM +0100, Rabin Vincent wrote:
+> > Given a device which uses arm_coherent_dma_ops and on which
+> > dev_get_cma_area(dev) returns non-NULL, the following usage of the DMA
+> > API with gfp=0 results in a memory leak and memory corruption.
+> > 
+> >  p = dma_alloc_coherent(dev, sz, &dma, 0);
+> >  if (p)
+> >  	dma_free_coherent(dev, sz, p, dma);
+> > 
+> > The memory leak is because the alloc allocates using
+> > __alloc_simple_buffer() but the free attempts
+> > dma_release_from_contiguous(), which does not do free anything since the
+> > page is not in the CMA area.
+> 
+> I'd really like to see a better solution to this problem: over the course
+> of the years, I've seen a number of patches that rearrange the test order
+> at allocation time because of some problem or the other.
+> 
+> What we need is a better way to ensure that we use the correct release
+> functionality - having two independent set of tests where the order
+> matters is really not very good.
 
-
-On 02/23/2016 08:08 AM, Arnd Bergmann wrote:
-> The cpu_die and cpu_kill callbacks are only used when CONFIG_HOTPLUG_CPU
-> is enabled, otherwise we get a warning about them:
-> 
-> arch/arm/mach-socfpga/platsmp.c:102:13: error: 'socfpga_cpu_die' defined but not used [-Werror=unused-function]
-> arch/arm/mach-socfpga/platsmp.c:115:12: error: 'socfpga_cpu_kill' defined but not used [-Werror=unused-function]
-> 
-> This adds the appropriate #ifdef.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-socfpga/platsmp.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-> index cbb0a54df80a..07945748b571 100644
-> --- a/arch/arm/mach-socfpga/platsmp.c
-> +++ b/arch/arm/mach-socfpga/platsmp.c
-> @@ -94,6 +94,7 @@ static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
->  	scu_enable(socfpga_scu_base_addr);
->  }
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
->  /*
->   * platform-specific code to shutdown a CPU
->   *
-> @@ -116,6 +117,7 @@ static int socfpga_cpu_kill(unsigned int cpu)
->  {
->  	return 1;
->  }
-> +#endif
->  
->  static const struct smp_operations socfpga_smp_ops __initconst = {
->  	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
-> 
-
-Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-
-Dinh
+I've sent a v2 of this series which refactors the code so that we no
+longer have two independent sets of tests.
