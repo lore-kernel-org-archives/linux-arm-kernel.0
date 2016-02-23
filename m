@@ -1,80 +1,84 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Tue, 23 Feb 2016 14:47:33 +0530
-Subject: [PATCH 3/3] ARM: EXYNOS: cleanup header files inclusion
-In-Reply-To: <56CBA32D.4020905@samsung.com>
-References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
- <1456135396-17767-4-git-send-email-pankaj.dubey@samsung.com>
- <56CBA32D.4020905@samsung.com>
-Message-ID: <56CC23AD.10103@samsung.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Tue, 23 Feb 2016 14:47:18 +0530
+Subject: [PATCH] ARM: dts: add support for gpio buttons for
+ exynos5422-odroidxu3
+In-Reply-To: <56CC194F.6080905@samsung.com>
+References: <1456214467-3344-1-git-send-email-linux.amoon@gmail.com>
+ <56CC167A.8040303@samsung.com> <56CC194F.6080905@samsung.com>
+Message-ID: <CANAwSgTRu6pb9cdA50AzBSNLS+Y+sssyc_CX7FKuV=FDYWaOsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Krzysztof,
 
-On Tuesday 23 February 2016 05:39 AM, Krzysztof Kozlowski wrote:
-> On 22.02.2016 19:03, Pankaj Dubey wrote:
->> This includes trivial cleanup in exynos files such as
->>     - remove unused header files inclusion from exynos.c, s5p-dev-mfc.c,
->>       firmware.c, pm.c.
->>     - move inclusion of of.h from common.h to pm.c where it is really
->>       required
+On 23 February 2016 at 14:03, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 23.02.2016 17:21, Krzysztof Kozlowski wrote:
+>> On 23.02.2016 17:01, Anand Moon wrote:
+>>> Add support for gpio-based button on Odroid-XU3 boards
+>>> for reboot/poweroff feature.
+>>>
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>> ---
+>>> changes rebase based on linux next-20160222.
+>>>
+>>> Tested on Odroid-XU4
+>>>
+>>> dmesg output.
+>>> [    3.286068] of_get_named_gpiod_flags: parsed 'gpios' property of node '/gpio_keys/power_key[0]' - status (0)
+>>> [    3.286206] gpio-11 (power key): gpiod_set_debounce: missing set() or set_debounce() operations
+>>> [    3.286600] input: gpio_keys as /devices/platform/gpio_keys/input/input0
+>>> ---
+>>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 22 ++++++++++++++++++++++
+>>>  1 file changed, 22 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> index 1bd507b..db9770b 100644
+>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>> @@ -11,6 +11,7 @@
+>>>  */
+>>>
+>>>  #include <dt-bindings/clock/samsung,s2mps11.h>
+>>> +#include <dt-bindings/input/input.h>
+>>>  #include <dt-bindings/interrupt-controller/irq.h>
+>>>  #include <dt-bindings/gpio/gpio.h>
+>>>  #include <dt-bindings/sound/samsung-i2s.h>
+>>> @@ -54,6 +55,22 @@
+>>>              #cooling-cells = <2>;
+>>>              cooling-levels = <0 130 170 230>;
+>>>      };
+>>> +
+>>> +    gpio_keys {
+>>> +            compatible = "gpio-keys";
+>>> +            pinctrl-names = "default";
+>>> +            pinctrl-0 = <&gpio_power_key>;
+>>> +
+>>> +            power_key {
+>>> +                    interrupt-parent = <&gpx0>;
+>>> +                    interrupts = <3 IRQ_TYPE_NONE>;
 >>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-exynos/common.h      | 1 -
->>  arch/arm/mach-exynos/exynos.c      | 5 -----
->>  arch/arm/mach-exynos/firmware.c    | 2 --
->>  arch/arm/mach-exynos/platsmp.c     | 1 -
->>  arch/arm/mach-exynos/pm.c          | 4 +---
->>  arch/arm/mach-exynos/s5p-dev-mfc.c | 1 -
->>  6 files changed, 1 insertion(+), 13 deletions(-)
+>> Hmmm.... why you specify the interrupts?
 >>
->> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
->> index e349a03..5365bf1 100644
->> --- a/arch/arm/mach-exynos/common.h
->> +++ b/arch/arm/mach-exynos/common.h
->> @@ -12,7 +12,6 @@
->>  #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
->>  #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
->>  
->> -#include <linux/of.h>
->>  #include <linux/platform_data/cpuidle-exynos.h>
->>  
->>  #define EXYNOS3250_SOC_ID	0xE3472000
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index 99947ad..54262a1 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -11,14 +11,10 @@
->>  
->>  #include <linux/init.h>
->>  #include <linux/io.h>
->> -#include <linux/kernel.h>
->> -#include <linux/serial_s3c.h>
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->>  #include <linux/of_fdt.h>
->>  #include <linux/of_platform.h>
->> -#include <linux/platform_device.h>
-> 
-> platform_device is actually used in that file. It looks unused because
-> it is pulled by of_platform, but it makes sense to include it here.
+>>> +                    gpios = <&gpx0 3 GPIO_ACTIVE_LOW>;
 >
-Thanks for review.
-
-Well I tried to grep for of_platform.h and platform_device.h in
-arch/arm/ and out of 88 files including of_platform.h only 16 files are
-including platform_device.h also. So majority do not include both of
-them even do they need. So majority of files both are not included. So
-If we got with majority it's not required. What's your opinion?
-
-Thanks,
-Pankaj Dubey
-
-> Rest looks good.
-> 
-
-> BR,
+> Please, explain it to me. The SW2 key is connected to PWRON of PMIC.
+> However you are adding a GPIO key for external interrupt source 3
+> (XE.INT3)... which comes from PMIC's ONOB.
+>
+> It's interesting.... how does it work? The PMIC will generate ONOB
+> interrupt on PWRON low->high change (when PWRHOLD is high)?
+>
+> Best regards,
 > Krzysztof
-> 
-> 
+>
+
+I have re-base my changes on HK dts.
+I could not find much details for the schematic diagram.
+I don't know much low level detains on this.
+
+How dose this works: This changes will initial the shudown/reboot on Ubuntu.
+I have also tested this similar feature on Odroid U3.
+
+Best Regards.
+-Anand Moon
