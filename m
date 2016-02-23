@@ -1,182 +1,132 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 23 Feb 2016 18:22:39 +0000
-Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
-Message-ID: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 23 Feb 2016 18:28:36 +0000 (UTC)
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56CC490F.3040301@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+ <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
+ <56CAA82D.6000507@ti.com>
+ <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
+ <56CADB23.8020202@ti.com> <56CC490F.3040301@ti.com>
+Message-ID: <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is suspended (either through suspend-to-RAM or CPUidle),
-its PMU registers content can be lost, which means that counters
-registers values that were initialized on power down entry have to be
-reprogrammed on power-up to make sure the counters set-up is preserved
-(ie on power-up registers take the reset values on Cold or Warm reset,
-which can be architecturally UNKNOWN).
+Kishon
 
-To guarantee seamless profiling conditions across a core power down
-this patch adds a CPU PM notifier to ARM pmus, that upon CPU PM
-entry/exit from low-power states saves/restores the pmu registers
-set-up (by using the ARM perf API), so that the power-down/up cycle does
-not affect the perf behaviour (apart from a black-out period between
-power-up/down CPU PM notifications that is unavoidable).
+On Tue, 23 Feb 2016, Kishon Vijay Abraham I wrote:
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- drivers/perf/arm_pmu.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/perf/arm_pmu.h |  1 +
- 2 files changed, 96 insertions(+)
+> On Monday 22 February 2016 03:25 PM, Kishon Vijay Abraham I wrote:
+> > On Monday 22 February 2016 12:01 PM, Paul Walmsley wrote:
+> >> On Mon, 22 Feb 2016, Kishon Vijay Abraham I wrote:
+> >>> On Thursday 18 February 2016 07:51 PM, Sekhar Nori wrote:
+> >>>> On Friday 12 February 2016 10:50 PM, Suman Anna wrote:
+> >>>>> Will you be following up with above suggestion since Kishon is gonna be out?
+> >>>>
+> >>>> Alright, noticed this action for me :) Went through the thread, and 
+> >>>> looks like this is what we want to see?
+> >>>>
+> >>>> Thanks,
+> >>>> Sekhar
+> >>>>
+> >>>> ---8<---
+> >>>> From e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19 Mon Sep 17 00:00:00 2001
+> >>>> Message-Id: <e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19.1455803758.git.nsekhar@ti.com>
+> >>>> From: Sekhar Nori <nsekhar@ti.com>
+> >>>> Date: Thu, 18 Feb 2016 16:49:56 +0530
+> >>>> Subject: [PATCH 1/1] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+> >>>>
+> >>>> Add a custom reset handler for DRA7x PCIeSS. This
+> >>>> handler is required to deassert PCIe hardreset lines
+> >>>> after they have been asserted.
+> >>>>
+> >>>> This enables the PCIe driver to access registers after
+> >>>> PCIeSS has been runtime enabled without having to
+> >>>> deassert hardreset lines itself.
+> >>>>
+> >>>> With this patch applied, used lspci to make sure
+> >>>> connected PCIe device enumerates on DRA74x and DRA72x
+> >>>> EVMs.
+> >>>>
+> >>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> >>>> ---
+> >>>> Applies to tag for-v4.6/omap-hwmod-a of Paul W's tree.
+> >>>>
+> >>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
+> >>>>  1 file changed, 23 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> >>>> index b61355e2a771..252b74633e31 100644
+> >>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> >>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> >>>> @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+> >>>>   *
+> >>>>   */
+> >>>>  
+> >>>> +/*
+> >>>> + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
+> >>>> + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
+> >>>> + * associated with an IP automatically leaving the driver to handle that
+> >>>> + * by itself. This does not work for PCIeSS which needs the reset lines
+> >>>> + * deasserted for the driver to start accessing registers.
+> >>>> + *
+> >>>> + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
+> >>>> + * lines after asserting them.
+> >>>> + */
+> >>>> +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
+> >>>> +{
+> >>>> +	int i;
+> >>>> +
+> >>>> +	for (i = 0; i < oh->rst_lines_cnt; i++) {
+> >>>> +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
+> >>>> +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
+> >>>> +	}
+> >>>> +
+> >>>> +	return 0;
+> >>>> +}
+> >>>> +
+> >>>>  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
+> >>>>  	.name	= "pcie",
+> >>>> +	.reset	= dra7xx_pciess_reset,
+> >>>>  };
+> >>>
+> >>> Thanks for the patch.
+> >>
+> >> Could you please test the bind/unbind functionality just to make sure it 
+> >> works?
+> > 
+> > The pci-dra7xx driver neither expose the bind/unbind sysfs entry nor can be
+> > built as module.
+> > 
+> > However I hacked the pci-dra7xx driver to be built as module [and reverted
+> > Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe error
+> > and driver unbind")] and I don't see an abort when the PCI registers are
+> > accessed after rmmod/modprobe cycle (that was the issue that Sekhar's patch
+> > tried to solve). However PCI as such doesn't work after rmmod/modprobe cycle
+> > [1], but this is a different issue most likely in PCIe core and has to debugged.
+> > 
+> > In summary, there are other issues in PCI across rmmod/modprobe cycle but the
+> > reset of pci-dra7xx happens fine with this patch.
+> 
+> Do you expect any other testing from me?
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 166637f..12317a9 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/bitmap.h>
- #include <linux/cpumask.h>
-+#include <linux/cpu_pm.h>
- #include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/of_device.h>
-@@ -710,6 +711,93 @@ static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
- 	return NOTIFY_OK;
- }
- 
-+#ifdef CONFIG_CPU_PM
-+static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
-+{
-+	struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
-+	struct perf_event *event;
-+	int idx;
-+
-+	for (idx = 0; idx < armpmu->num_events; idx++) {
-+		/*
-+		 * If the counter is not used skip it, there is no
-+		 * need of stopping/restarting it.
-+		 */
-+		if (!test_bit(idx, hw_events->used_mask))
-+			continue;
-+
-+		event = hw_events->events[idx];
-+
-+		switch (cmd) {
-+		case CPU_PM_ENTER:
-+			/*
-+			 * Stop and update the counter
-+			 */
-+			armpmu_stop(event, PERF_EF_UPDATE);
-+			break;
-+		case CPU_PM_EXIT:
-+		case CPU_PM_ENTER_FAILED:
-+			 /* Restore and enable the counter */
-+			armpmu_start(event, PERF_EF_RELOAD);
-+			break;
-+		default:
-+			break;
-+		}
-+	}
-+}
-+
-+static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
-+			     void *v)
-+{
-+	struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
-+	struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
-+	int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
-+
-+	if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
-+		return NOTIFY_DONE;
-+
-+	/*
-+	 * Always reset the PMU registers on power-up even if
-+	 * there are no events running.
-+	 */
-+	if (cmd == CPU_PM_EXIT && armpmu->reset)
-+		armpmu->reset(armpmu);
-+
-+	if (!enabled)
-+		return NOTIFY_OK;
-+
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		armpmu->stop(armpmu);
-+		cpu_pm_pmu_setup(armpmu, cmd);
-+		break;
-+	case CPU_PM_EXIT:
-+		cpu_pm_pmu_setup(armpmu, cmd);
-+	case CPU_PM_ENTER_FAILED:
-+		armpmu->start(armpmu);
-+		break;
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu)
-+{
-+	cpu_pmu->cpu_pm_nb.notifier_call = cpu_pm_pmu_notify;
-+	return cpu_pm_register_notifier(&cpu_pmu->cpu_pm_nb);
-+}
-+
-+static void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu)
-+{
-+	cpu_pm_unregister_notifier(&cpu_pmu->cpu_pm_nb);
-+}
-+#else
-+static inline int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu) { return 0; }
-+static inline void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu) { }
-+#endif
-+
- static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int err;
-@@ -725,6 +813,10 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (err)
- 		goto out_hw_events;
- 
-+	err = cpu_pm_pmu_register(cpu_pmu);
-+	if (err)
-+		goto out_unregister;
-+
- 	for_each_possible_cpu(cpu) {
- 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
- 		raw_spin_lock_init(&events->pmu_lock);
-@@ -746,6 +838,8 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 
- 	return 0;
- 
-+out_unregister:
-+	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
- out_hw_events:
- 	free_percpu(cpu_hw_events);
- 	return err;
-@@ -753,6 +847,7 @@ out_hw_events:
- 
- static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
- {
-+	cpu_pm_pmu_unregister(cpu_pmu);
- 	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
- 	free_percpu(cpu_pmu->hw_events);
- }
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 83b5e34..9ffa316 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -107,6 +107,7 @@ struct arm_pmu {
- 	struct platform_device	*plat_device;
- 	struct pmu_hw_events	__percpu *hw_events;
- 	struct notifier_block	hotplug_nb;
-+	struct notifier_block	cpu_pm_nb;
- };
- 
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
--- 
-2.5.1
+No I think that's sufficient for the time being, thanks - but, two 
+questions:
+
+1. Can I add your Tested-by: ?
+
+2. Are you going to follow up with these PCIe core issues with the PCIe 
+core developers?
+
+
+- Paul
