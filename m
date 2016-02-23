@@ -1,118 +1,60 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 23 Feb 2016 02:47:22 +0000
-Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
- HiSilicon SoCs Host Controllers
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
-References: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
- <1455039260-6040-4-git-send-email-gabriele.paoloni@huawei.com>
- <20160209182429.GD4348@leverpostej>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1591@lhreml503-mbs>
- <20160210111234.GC2632@leverpostej>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 23 Feb 2016 08:32:35 +0530
+Subject: [PATCH] dma: mv_xor_v2: new driver
+In-Reply-To: <20160222101621.4f03ef8b@free-electrons.com>
+References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160222032730.GU19598@localhost>
+ <20160222101621.4f03ef8b@free-electrons.com>
+Message-ID: <20160223030235.GG17690@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark
+On Mon, Feb 22, 2016 at 10:16:21AM +0100, Thomas Petazzoni wrote:
 
-> -----Original Message-----
-> From: Gabriele Paoloni
-> Sent: 10 February 2016 22:45
-> To: Mark Rutland
-> Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
-> qiujiang; bhelgaas at google.com; arnd at arndb.de; Lorenzo.Pieralisi at arm.com;
-> tn at semihalf.com; linux-pci at vger.kernel.org; linux-
-> kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
-> HiSilicon SoCs Host Controllers
+> > So why should it depend on how kernel is configured?
 > 
-> > -----Original Message-----
-> > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> > owner at vger.kernel.org] On Behalf Of Mark Rutland
-> > Sent: 10 February 2016 11:13
-> > To: Gabriele Paoloni
-> > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
-> > qiujiang; bhelgaas at google.com; arnd at arndb.de;
-> > Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
-> > linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
-> > HiSilicon SoCs Host Controllers
-> >
-> > On Wed, Feb 10, 2016 at 09:52:36AM +0000, Gabriele Paoloni wrote:
-> > > Hi Mark
-> > >
-> > > > On Tue, Feb 09, 2016 at 05:34:20PM +0000, Gabriele Paoloni wrote:
-> > > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> > > > > +/*
-> > > > > + * Retrieve rc_dbi base and size from _DSD
-> > > > > + * Name (_DSD, Package () {
-> > > > > + *	ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-> > > > > + *	Package () {
-> > > > > + *	Package () {"rc-dbi", Package () { 0x0, 0xb0080000, 0x0,
-> > 0x10000
-> > > > }},
-> > > > > + *	}
-> > > > > + *	})
-> > > > > + */
-> > > >
-> > > > As above, this does not look right. ACPI has standard mechanisms
-> > for
-> > > > describing addresses. Making something up like this is not a good
-> > idea.
-> > >
-> > > I am quite new to ACPI, may I ask you to explain a bit?
-> >
-> > ACPI has standard mechanisms for describing certain resources, and
-> > these
-> > should not be described in _DSD. Memory or IO address regions are
-> such
-> > resources (in _CRS, IIRC), and should not be described in _DSD.
+> Because using upper_32_bits() on a 32-bits type seems wrong? You can do
+> a git grep for CONFIG_ARCH_DMA_ADDR_T_64BIT, and see that it is already
+> used in drivers/dma/sh/rcar-dmac.c, drivers/gpu/drm/tegra/dc.c or
+> drivers/iommu/tegra-smmu.c.
 > 
-> Hi Mark,
+> drivers/dma/sh/rcar-dmac.c uses it for exactly the same reason as me:
+> they need to know if dma_addr_t is 32 bits or 64 bits, and if it's 64
+> bits, then they need to take the upper 32 bits and feed them to some
+> register.
+
+So is the hardware capable of 32bit of 64bit?
+
+
+> > You don't want to check the source of interrupt?
 > 
-> In my case I think in need to look into the MCFG object as the problem
-> I have is RC using a different range than the rest of the hierarchy.
-> 
-> I'll investigate this and try to come with a solution in v4
+> To protect against what? An improper MSI message that ends up firing
+> this interrupt for now reason? But only kernel space stuff (or
+> privileged code in user-space) can write to the MSI triggering
+> registers, so we should be able to trust that such an improper MSI
+> message will not arrive.
 
-I have looked into this and in our case we cannot use the
-standard MCFG object to pass the RC config space addresses.
-
-The reason is that in our HW we have the config base addresses of the 
-root complex ports that are less than 0x100000 byte distant one from
-the other as we only map the first 0x10000 bytes.
-
-Now the MCFG acpi framework always fix the MCFG resource size to 0x100000
-for each bus; therefore if we pass our RC addresses through MCFG we end
-up with a resource conflict.
-
-To give you a practical example we are in a situation where we have:
-
-port0: [0x00000000b0080000 - 0x00000000b0080000 + 0x10000]
-port1: [0x00000000b0090000 - 0x00000000b0090000 + 0x10000]
-port2: [0x00000000b00A0000 - 0x00000000b00A0000 + 0x10000]
-port3: [0x00000000b00B0000 - 0x00000000b00B0000 + 0x10000]
-  
-So if we pass the base addresses through MCFG the resources
-will overlap as MCFG will consider 0x100000 size for each base
-address of the root complex (only the RC bus uses that address)
-
-So far I do not see many option other than using _DSD to pass
-these RC config base addresses.
-
-Thanks and Regards
-
-Gab 
+Your device might go bonkers or some erranious programming does cause
+interrupts. Its better to be safe than sorry :)
 
 > 
-> Many Thanks
+> That being said, I can add a read of the pending descriptors number,
+> and if it's 0, then bail out with IRQ_NONE. Is that what you were
+> thinking about?
+
+Sounds good
+
+
+> > why BUG_ON, is the system unusable after this?
 > 
-> Gab
+> Well, the XOR engine cannot do XOR with 0 source buffers, or with more
+> than MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF.
 > 
-> >
-> > Thanks,
-> > Mark.
+> But I see that I'm already setting max_xor in struct dma_device, so one
+> can assume that ->prep_dma_xor() will not be called with src_cnt == or
+> src_cnt > max_xor, so this BUG_ON can be removed.
+
+Okay, you should return NULL to caller if that is the case
+
+-- 
+~Vinod
