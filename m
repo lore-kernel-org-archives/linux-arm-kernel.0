@@ -1,121 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 23 Feb 2016 11:58:05 +0000
-Subject: [PATCH v12 1/5] efi: ARM/arm64: ignore DT memory nodes instead
- of removing them
-In-Reply-To: <1456192703-2274-2-git-send-email-ddaney.cavm@gmail.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-2-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160223115805.GB4989@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Feb 2016 11:58:35 +0000
+Subject: [RFC PATCH 1/2] memremap: add arch specific hook for MEMREMAP_WB
+ mappings
+In-Reply-To: <CAKv+Gu9gwnuu7hnYpjv7ozuKYmC8ApMakSJmYvQMaevNEd5zvA@mail.gmail.com>
+References: <1456149728-16706-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456149728-16706-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPcyv4ivN9c8PHBR77vd36ovB28OETJUr6VYf_8gNtXgqEmATw@mail.gmail.com>
+ <CAKv+Gu9OWVgo+Qm85jPjY7xJ1UELm-4LYORHKF8Yy+_HuzmtGw@mail.gmail.com>
+ <20160222200227.GF19428@n2100.arm.linux.org.uk>
+ <CAKv+Gu9gwnuu7hnYpjv7ozuKYmC8ApMakSJmYvQMaevNEd5zvA@mail.gmail.com>
+Message-ID: <20160223115835.GI19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Feb 22, 2016 at 05:58:19PM -0800, David Daney wrote:
-> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Mon, Feb 22, 2016 at 09:35:24PM +0100, Ard Biesheuvel wrote:
+> OK, thanks for the historical context.
 > 
-> There are two problems with the UEFI stub DT memory node removal
-> routine:
-> - it deletes nodes as it traverses the tree, which happens to work
->   but is not supported, as deletion invalidates the node iterator;
-> - deleting memory nodes entirely may discard annotations in the form
->   of additional properties on the nodes.
-> 
-> Since the discovery of DT memory nodes occurs strictly before the
-> UEFI init sequence, we can simply clear the memblock memory table
-> before parsing the UEFI memory map. This way, it is no longer
-> necessary to remove the nodes, so we can remove that logic from the
-> stub as well.
+> So what is your opinion on this series, i.e., to wire up memremap() to
+> remap arbitrary memory regions into the vmalloc area with MT_MEMORY_RW
+> attributes, and at the same time lift the restriction that the region
+> must be disjoint from memory covered by lowmem or kmap?
 
-This is a little bit scary, but I guess this works.
+The historical context is still present, because pxa2xx-flash has
+been converted to use memremap() from ioremap_cache() - possibly
+inappropriately.
 
-My only concern is that when we get kexec, a subsequent kernel must also
-have EFI memory map support, or things go bad for the next EFI-aware
-kernel after that (as things like the runtime services may have been
-corrupted by the kernel in the middle). It's difficult to fix the
-general case later.
+I've already described the semantics of ioremap_cache(), which are
+to always create a cacheable mapping irrespective of the system
+memory mapping type.  However, memremap() says that MEMREMAP_WB
+matches system RAM, which on ARM it doesn't right now.
 
-A different option would be to support status="disabled" for the memory
-nodes, and ignore these in early_init_dt_scan_memory. That way a kernel
-cannot use memory without first having parsed the EFI memory map, and we
-can still get NUMA info from the disabled nodes.
+Changing it to MT_MEMORY_RW would satisfy that comment against
+memremap(), but at the same time changes what happens with
+pxa2xx-flash - the memory region (which is not system RAM) then
+changes with the cache status of system RAM.
 
-You'd still need a new kernel to take into account status, but at least
-we'd know all kernels would avoid using RAM that potentially needs to be
-preserved.
+So, I'm not that happy about the memremap() stuff right now, and
+I don't like the idea of making memremap() conform to its stated
+requirements without first preventing pxa2xx-flash being affected
+by such a change.
 
-Ard, Rob, thoughts?
+Perhaps we need to reinstate the original ioremap_cached() API for
+pxa2xx-flash, and then switch memremap() to MT_MEMORY_RW - that
+would seem to result in the expected behaviour by all parties.
 
-Mark.
-
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/firmware/efi/arm-init.c    |  8 ++++++++
->  drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
->  2 files changed, 9 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index 9e15d57..40c9d85 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -143,6 +143,14 @@ static __init void reserve_regions(void)
->  	if (efi_enabled(EFI_DBG))
->  		pr_info("Processing EFI memory map:\n");
->  
-> +	/*
-> +	 * Discard memblocks discovered so far: if there are any at this
-> +	 * point, they originate from memory nodes in the DT, and UEFI
-> +	 * uses its own memory map instead.
-> +	 */
-> +	memblock_dump_all();
-> +	memblock_remove(0, ULLONG_MAX);
-> +
->  	for_each_efi_memory_desc(&memmap, md) {
->  		paddr = md->phys_addr;
->  		npages = md->num_pages;
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index cf7b7d4..9df1560 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  			unsigned long map_size, unsigned long desc_size,
->  			u32 desc_ver)
->  {
-> -	int node, prev, num_rsv;
-> +	int node, num_rsv;
->  	int status;
->  	u32 fdt_val32;
->  	u64 fdt_val64;
-> @@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  		goto fdt_set_fail;
->  
->  	/*
-> -	 * Delete any memory nodes present. We must delete nodes which
-> -	 * early_init_dt_scan_memory may try to use.
-> -	 */
-> -	prev = 0;
-> -	for (;;) {
-> -		const char *type;
-> -		int len;
-> -
-> -		node = fdt_next_node(fdt, prev, NULL);
-> -		if (node < 0)
-> -			break;
-> -
-> -		type = fdt_getprop(fdt, node, "device_type", &len);
-> -		if (type && strncmp(type, "memory", len) == 0) {
-> -			fdt_del_node(fdt, node);
-> -			continue;
-> -		}
-> -
-> -		prev = node;
-> -	}
-> -
-> -	/*
->  	 * Delete all memory reserve map entries. When booting via UEFI,
->  	 * kernel will use the UEFI memory map to find reserved regions.
->  	 */
-> -- 
-> 1.8.3.1
-> 
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
