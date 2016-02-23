@@ -1,74 +1,170 @@
-From: michael.hennerich@analog.com (Michael Hennerich)
-Date: Tue, 23 Feb 2016 08:49:47 +0100
-Subject: [PATCH 06/61] gpio: adp5520: Use devm_gpiochip_add_data() for
- gpio registration
-In-Reply-To: <1456150130-2668-7-git-send-email-ldewangan@nvidia.com>
-References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>
- <1456150130-2668-7-git-send-email-ldewangan@nvidia.com>
-Message-ID: <56CC0F1B.9040003@analog.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Tue, 23 Feb 2016 15:58:42 +0800
+Subject: [PATCH] clk: rockchip: rk3368: fix section mismatches with new
+ child-clocks
+Message-ID: <1456214322-20161-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2016 03:07 PM, Laxman Dewangan wrote:
-> Use devm_gpiochip_add_data() for GPIO registration and remove the
-> call for gpiochip_remove() from error path.
->
-> Also remove the need of driver callback .remove.
->
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+To model the muxes downstream of fractional dividers we introduced the
+child property, allowing to describe a direct child clock.
+The first implementation seems to cause section warnings, as the core
+clock-tree is marked as initdata while the data pointed to from the
+child element is not.
 
-Acked-by: Michael Hennerich <michael.hennerich@analog.com>
+While there may be some way to also set that missing property in the
+inline notation I didn't find it, so to actually fix the issue for now
+move the sub-definitions into separate declarations that can have
+their own __initdata properties.
 
-> Cc: Michael Hennerich <michael.hennerich@analog.com>
-> ---
->   drivers/gpio/gpio-adp5520.c | 13 +------------
->   1 file changed, 1 insertion(+), 12 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-adp5520.c b/drivers/gpio/gpio-adp5520.c
-> index 4fa7ff1..abf1996 100644
-> --- a/drivers/gpio/gpio-adp5520.c
-> +++ b/drivers/gpio/gpio-adp5520.c
-> @@ -153,7 +153,7 @@ static int adp5520_gpio_probe(struct platform_device *pdev)
->   		goto err;
->   	}
->
-> -	ret = gpiochip_add_data(&dev->gpio_chip, dev);
-> +	ret = devm_gpiochip_add_data(&pdev->dev, &dev->gpio_chip, dev);
->   	if (ret)
->   		goto err;
->
-> @@ -164,22 +164,11 @@ err:
->   	return ret;
->   }
->
-> -static int adp5520_gpio_remove(struct platform_device *pdev)
-> -{
-> -	struct adp5520_gpio *dev;
-> -
-> -	dev = platform_get_drvdata(pdev);
-> -	gpiochip_remove(&dev->gpio_chip);
-> -
-> -	return 0;
-> -}
-> -
->   static struct platform_driver adp5520_gpio_driver = {
->   	.driver	= {
->   		.name	= "adp5520-gpio",
->   	},
->   	.probe		= adp5520_gpio_probe,
-> -	.remove		= adp5520_gpio_remove,
->   };
->
->   module_platform_driver(adp5520_gpio_driver);
->
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3368.c | 97 ++++++++++++++++++++++++---------------
+ 1 file changed, 60 insertions(+), 37 deletions(-)
 
-
+diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
+index c2b0421..a2bb122 100644
+--- a/drivers/clk/rockchip/clk-rk3368.c
++++ b/drivers/clk/rockchip/clk-rk3368.c
+@@ -243,6 +243,34 @@ static struct rockchip_cpuclk_rate_table rk3368_cpuclkl_rates[] __initdata = {
+ 	RK3368_CPUCLKL_RATE( 312000000, 1, 1, 1),
+ };
+ 
++static struct rockchip_clk_branch rk3368_i2s_8ch_fracmux __initdata =
++	MUX(0, "i2s_8ch_pre", mux_i2s_8ch_pre_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(27), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_spdif_8ch_fracmux __initdata =
++	MUX(0, "spdif_8ch_pre", mux_spdif_8ch_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(31), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_i2s_2ch_fracmux __initdata =
++	MUX(0, "i2s_2ch_pre", mux_i2s_2ch_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(53), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart0_fracmux __initdata =
++	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(33), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart1_fracmux __initdata =
++	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(35), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart3_fracmux __initdata =
++	MUX(SCLK_UART3, "sclk_uart3", mux_uart3_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(39), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart4_fracmux __initdata =
++	MUX(SCLK_UART4, "sclk_uart4", mux_uart4_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(41), 8, 2, MFLAGS);
++
+ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	/*
+ 	 * Clock-Architecture Diagram 2
+@@ -339,11 +367,10 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "i2s_8ch_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(27), 12, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(6), 1, GFLAGS),
+-	COMPOSITE_FRAC(0, "i2s_8ch_frac", "i2s_8ch_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(28), 0,
+-			RK3368_CLKGATE_CON(6), 2, GFLAGS),
+-	MUX(0, "i2s_8ch_pre", mux_i2s_8ch_pre_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(27), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "i2s_8ch_frac", "i2s_8ch_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(28), 0,
++			  RK3368_CLKGATE_CON(6), 2, GFLAGS,
++			  &rk3368_i2s_8ch_fracmux),
+ 	COMPOSITE_NODIV(SCLK_I2S_8CH_OUT, "i2s_8ch_clkout", mux_i2s_8ch_clkout_p, 0,
+ 			RK3368_CLKSEL_CON(27), 15, 1, MFLAGS,
+ 			RK3368_CLKGATE_CON(6), 0, GFLAGS),
+@@ -352,21 +379,21 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "spdif_8ch_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(31), 12, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(6), 4, GFLAGS),
+-	COMPOSITE_FRAC(0, "spdif_8ch_frac", "spdif_8ch_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(32), 0,
+-			RK3368_CLKGATE_CON(6), 5, GFLAGS),
+-	COMPOSITE_NODIV(SCLK_SPDIF_8CH, "sclk_spdif_8ch", mux_spdif_8ch_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(31), 8, 2, MFLAGS,
+-			RK3368_CLKGATE_CON(6), 6, GFLAGS),
++	COMPOSITE_FRACMUX(0, "spdif_8ch_frac", "spdif_8ch_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(32), 0,
++			  RK3368_CLKGATE_CON(6), 5, GFLAGS,
++			  &rk3368_spdif_8ch_fracmux),
++	GATE(SCLK_SPDIF_8CH, "sclk_spdif_8ch", "spdif_8ch_pre", CLK_SET_RATE_PARENT,
++	     RK3368_CLKGATE_CON(6), 6, GFLAGS),
+ 	COMPOSITE(0, "i2s_2ch_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(53), 12, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(5), 13, GFLAGS),
+-	COMPOSITE_FRAC(0, "i2s_2ch_frac", "i2s_2ch_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(54), 0,
+-			RK3368_CLKGATE_CON(5), 14, GFLAGS),
+-	COMPOSITE_NODIV(SCLK_I2S_2CH, "sclk_i2s_2ch", mux_i2s_2ch_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(53), 8, 2, MFLAGS,
+-			RK3368_CLKGATE_CON(5), 15, GFLAGS),
++	COMPOSITE_FRACMUX(0, "i2s_2ch_frac", "i2s_2ch_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(54), 0,
++			  RK3368_CLKGATE_CON(5), 14, GFLAGS,
++			  &rk3368_i2s_2ch_fracmux),
++	GATE(SCLK_I2S_2CH, "sclk_i2s_2ch", "i2s_2ch_pre", CLK_SET_RATE_PARENT,
++	     RK3368_CLKGATE_CON(5), 15, GFLAGS),
+ 
+ 	COMPOSITE(0, "sclk_tsp", mux_pll_src_cpll_gpll_npll_p, 0,
+ 			RK3368_CLKSEL_CON(46), 6, 2, MFLAGS, 0, 5, DFLAGS,
+@@ -562,38 +589,34 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "uart0_src", mux_pll_src_cpll_gpll_usb_usb_p, 0,
+ 			RK3368_CLKSEL_CON(33), 12, 2, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 0, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(34), 0,
+-			RK3368_CLKGATE_CON(2), 1, GFLAGS),
+-	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(33), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(34), 0,
++			  RK3368_CLKGATE_CON(2), 1, GFLAGS,
++			  &rk3368_uart0_fracmux),
+ 
+ 	COMPOSITE_NOMUX(0, "uart1_src", "uart_src", 0,
+ 			RK3368_CLKSEL_CON(35), 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 2, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(36), 0,
+-			RK3368_CLKGATE_CON(2), 3, GFLAGS),
+-	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(35), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(36), 0,
++			  RK3368_CLKGATE_CON(2), 3, GFLAGS,
++			  &rk3368_uart1_fracmux),
+ 
+ 	COMPOSITE_NOMUX(0, "uart3_src", "uart_src", 0,
+ 			RK3368_CLKSEL_CON(39), 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 6, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart3_frac", "uart3_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(40), 0,
+-			RK3368_CLKGATE_CON(2), 7, GFLAGS),
+-	MUX(SCLK_UART3, "sclk_uart3", mux_uart3_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(39), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart3_frac", "uart3_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(40), 0,
++			  RK3368_CLKGATE_CON(2), 7, GFLAGS,
++			  &rk3368_uart3_fracmux),
+ 
+ 	COMPOSITE_NOMUX(0, "uart4_src", "uart_src", 0,
+ 			RK3368_CLKSEL_CON(41), 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 8, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart4_frac", "uart4_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(42), 0,
+-			RK3368_CLKGATE_CON(2), 9, GFLAGS),
+-	MUX(SCLK_UART4, "sclk_uart4", mux_uart4_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(41), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart4_frac", "uart4_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(42), 0,
++			  RK3368_CLKGATE_CON(2), 9, GFLAGS,
++			  &rk3368_uart4_fracmux),
+ 
+ 	COMPOSITE(0, "mac_pll_src", mux_pll_src_npll_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(43), 6, 2, MFLAGS, 0, 5, DFLAGS,
 -- 
-Greetings,
-Michael
-
---
-Analog Devices GmbH      Wilhelm-Wagenfeld-Str. 6      80807 Muenchen
-Sitz der Gesellschaft: Muenchen; Registergericht: Muenchen HRB 40368;
-Geschaeftsfuehrer:Dr.Carsten Suckrow, Thomas Wessel, William A. Martin,
-Margaret Seif
+1.9.1
