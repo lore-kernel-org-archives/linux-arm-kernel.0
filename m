@@ -1,90 +1,57 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Feb 2016 10:23:57 +0100
-Subject: [PATCH 8/9] spi: imx: set MX51_ECSPI_CTRL_SMC bit in setup function
+Date: Tue, 23 Feb 2016 10:23:53 +0100
+Subject: [PATCH 4/9] spi: imx: drop unncessary dma_is_inited variable
 In-Reply-To: <1456219438-21205-1-git-send-email-s.hauer@pengutronix.de>
 References: <1456219438-21205-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1456219438-21205-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1456219438-21205-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the config function knows whether we are doing DMA or not we
-can do the necessary register setup in the config function and no longer
-have to do this in the trigger function. With this the trigger function
-becomes a no-op for DMA, so instead of testing if we are doing DMA or
-not in the trigger function we simply no longer call it in the DMA case.
+There's no need for an extra dma_is_inited variable when we can
+equally well check for the existence of a DMA channel.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/spi/spi-imx.c | 21 ++++++---------------
- 1 file changed, 6 insertions(+), 15 deletions(-)
+ drivers/spi/spi-imx.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 96e32d4..91890b2 100644
+index ec03304..567a242 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -106,7 +106,6 @@ struct spi_imx_data {
+@@ -102,7 +102,6 @@ struct spi_imx_data {
  	unsigned int txfifo; /* number of words pushed in tx FIFO */
  
  	/* DMA */
--	unsigned int dma_finished;
+-	unsigned int dma_is_inited;
+ 	unsigned int dma_finished;
  	bool usedma;
  	u32 wml;
- 	struct completion dma_rx_completion;
-@@ -324,14 +323,10 @@ static void __maybe_unused mx51_ecspi_intctrl(struct spi_imx_data *spi_imx, int
- 
- static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
+@@ -205,7 +204,7 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
  {
--	u32 reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-+	u32 reg;
+ 	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
  
--	if (!spi_imx->usedma)
--		reg |= MX51_ECSPI_CTRL_XCH;
--	else if (!spi_imx->dma_finished)
--		reg |= MX51_ECSPI_CTRL_SMC;
--	else
--		reg &= ~MX51_ECSPI_CTRL_SMC;
-+	reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-+	reg |= MX51_ECSPI_CTRL_XCH;
- 	writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
+-	if (spi_imx->dma_is_inited && transfer->len >= spi_imx->wml &&
++	if (master->dma_rx && transfer->len >= spi_imx->wml &&
+ 	    (transfer->len % spi_imx->wml) == 0)
+ 		return true;
+ 	return false;
+@@ -827,8 +826,6 @@ static void spi_imx_sdma_exit(struct spi_imx_data *spi_imx)
+ 		dma_release_channel(master->dma_tx);
+ 		master->dma_tx = NULL;
+ 	}
+-
+-	spi_imx->dma_is_inited = 0;
  }
  
-@@ -371,6 +366,9 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 	if (config->mode & SPI_CS_HIGH)
- 		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+ static int spi_imx_sdma_init(struct device *dev, struct spi_imx_data *spi_imx,
+@@ -888,7 +885,6 @@ static int spi_imx_sdma_init(struct device *dev, struct spi_imx_data *spi_imx,
+ 	master->max_dma_len = MAX_SDMA_BD_BYTES;
+ 	spi_imx->bitbang.master->flags = SPI_MASTER_MUST_RX |
+ 					 SPI_MASTER_MUST_TX;
+-	spi_imx->dma_is_inited = 1;
  
-+	if (spi_imx->usedma)
-+		ctrl |= MX51_ECSPI_CTRL_SMC;
-+
- 	/* CTRL register always go first to bring out controller from reset */
- 	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
- 
-@@ -1012,9 +1010,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
- 	reinit_completion(&spi_imx->dma_rx_completion);
- 	reinit_completion(&spi_imx->dma_tx_completion);
- 
--	/* Trigger the cspi module. */
--	spi_imx->dma_finished = 0;
--
- 	/*
- 	 * Set these order to avoid potential RX overflow. The overflow may
- 	 * happen if we enable SPI HW before starting RX DMA due to rescheduling
-@@ -1025,7 +1020,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
- 	 */
- 	dma_async_issue_pending(master->dma_rx);
- 	dma_async_issue_pending(master->dma_tx);
--	spi_imx->devtype_data->trigger(spi_imx);
- 
- 	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
- 
-@@ -1046,9 +1040,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
- 		}
- 	}
- 
--	spi_imx->dma_finished = 1;
--	spi_imx->devtype_data->trigger(spi_imx);
--
- 	if (!timeout)
- 		ret = -ETIMEDOUT;
- 	else
+ 	return 0;
+ err:
 -- 
 2.7.0
