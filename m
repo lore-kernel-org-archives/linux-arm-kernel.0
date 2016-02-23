@@ -1,23 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Feb 2016 10:34:46 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
-Message-ID: <3695074.sKSIyOjpjD@wuerfel>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 23 Feb 2016 10:43:11 +0100
+Subject: [PATCH v2] MAINTAINERS: Extend info, add wiki and ml for meson arch
+Message-ID: <1456220591-11901-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 February 2016 10:08:05 Linus Walleij wrote:
-> I will think of a better solution, if any, for this for v4.6, but will
-> put forward something that handles the Nomadik and all the
-> other ARM reference designs for now.
-> 
+From: Carlo Caione <carlo@endlessm.com>
 
-How about still describing all known panels in the DT marked 'status="disabled"',
-but then having a minimal piece of board specific code that just enables
-whichever one gets detected at boot time?
+Update the maintainers info with wiki and mailing list for the meson
+platform. Fix a wrong file attribution and add maintainership for the
+generic meson platforms.
 
-	Arnd
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ MAINTAINERS | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2fa3303..e913098 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -920,12 +920,15 @@ M:	Emilio L?pez <emilio@elopez.com.ar>
+ S:	Maintained
+ F:	drivers/clk/sunxi/
+ 
+-ARM/Amlogic MesonX SoC support
++ARM/Amlogic Meson SoC support
+ M:	Carlo Caione <carlo@caione.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	linux-meson at googlegroups.com
++W:	http://linux-meson.com/
+ S:	Maintained
+-F:	drivers/media/rc/meson-ir.c
+-N:	meson[x68]
++F:	arch/arm/mach-meson/
++F:	arch/arm/boot/dts/meson*
++N:	meson
+ 
+ ARM/Annapurna Labs ALPINE ARCHITECTURE
+ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
+-- 
+2.5.0
