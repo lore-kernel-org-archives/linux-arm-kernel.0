@@ -1,94 +1,69 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 23 Feb 2016 17:21:14 +0900
-Subject: [PATCH] ARM: dts: add support for gpio buttons for
- exynos5422-odroidxu3
-In-Reply-To: <1456214467-3344-1-git-send-email-linux.amoon@gmail.com>
-References: <1456214467-3344-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <56CC167A.8040303@samsung.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Tue, 23 Feb 2016 16:20:24 +0800
+Subject: [PATCH] ASoC: mediatek: remove soft reset and add second I2S clock
+Message-ID: <1456215624-40383-1-git-send-email-pc.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.02.2016 17:01, Anand Moon wrote:
-> Add support for gpio-based button on Odroid-XU3 boards
-> for reboot/poweroff feature.
-> 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> changes rebase based on linux next-20160222.
-> 
-> Tested on Odroid-XU4
-> 
-> dmesg output.
-> [    3.286068] of_get_named_gpiod_flags: parsed 'gpios' property of node '/gpio_keys/power_key[0]' - status (0)
-> [    3.286206] gpio-11 (power key): gpiod_set_debounce: missing set() or set_debounce() operations
-> [    3.286600] input: gpio_keys as /devices/platform/gpio_keys/input/input0
-> ---
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> index 1bd507b..db9770b 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -11,6 +11,7 @@
->  */
->  
->  #include <dt-bindings/clock/samsung,s2mps11.h>
-> +#include <dt-bindings/input/input.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/sound/samsung-i2s.h>
-> @@ -54,6 +55,22 @@
->  		#cooling-cells = <2>;
->  		cooling-levels = <0 130 170 230>;
->  	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&gpio_power_key>;
-> +
-> +		power_key {
-> +			interrupt-parent = <&gpx0>;
-> +			interrupts = <3 IRQ_TYPE_NONE>;
+To improve I2S flow, this patch removes soft reset and adds second
+I2S clock to use.
 
-Hmmm.... why you specify the interrupts?
+Signed-off-by: PC Liao <pc.liao@mediatek.com>
+---
+ sound/soc/mediatek/mtk-afe-pcm.c |   14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-> +			gpios = <&gpx0 3 GPIO_ACTIVE_LOW>;
-> +			linux,code = <KEY_POWER>;
-> +			label = "power key";
-
-Just "power".
-
-> +			debounce-interval = <10>;
-> +			wakeup-source;
-> +		};
-> +	};
->  };
->  
->  &clock_audss {
-> @@ -362,6 +379,11 @@
->  };
->  
->  &pinctrl_0 {
-> +	gpio_power_key: power_key {
-
-The naming is mixed... Everything is GPIO here so don't add such prefix.
-Underscores only in label, not in name of node.
-
-	power_key_irq: power-key-irq {
-
-> +		samsung,pins = "gpx0-3";
-> +		samsung,pin-pud = <0>;
-
-Don't you want to set specific pin function? And what about drive strength?
-
-Best regards,
-Krzysztof
-
-> +	};
-> +
->  	hdmi_hpd_irq: hdmi-hpd-irq {
->  		samsung,pins = "gpx3-7";
->  		samsung,pin-function = <0>;
-> 
+diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+index 689c51f..3456bfa 100644
+--- a/sound/soc/mediatek/mtk-afe-pcm.c
++++ b/sound/soc/mediatek/mtk-afe-pcm.c
+@@ -283,20 +283,13 @@ static void mtk_afe_set_i2s_enable(struct mtk_afe *afe, bool enable)
+ 
+ 	regmap_read(afe->regmap, AFE_I2S_CON2, &val);
+ 	if (!!(val & AFE_I2S_CON2_EN) == enable)
+-		return; /* must skip soft reset */
+-
+-	/* I2S soft reset begin */
+-	regmap_update_bits(afe->regmap, AUDIO_TOP_CON1, 0x4, 0x4);
++		return;
+ 
+ 	/* input */
+ 	regmap_update_bits(afe->regmap, AFE_I2S_CON2, 0x1, enable);
+ 
+ 	/* output */
+ 	regmap_update_bits(afe->regmap, AFE_I2S_CON1, 0x1, enable);
+-
+-	/* I2S soft reset end */
+-	udelay(1);
+-	regmap_update_bits(afe->regmap, AUDIO_TOP_CON1, 0x4, 0);
+ }
+ 
+ static int mtk_afe_dais_enable_clks(struct mtk_afe *afe,
+@@ -365,6 +358,7 @@ static int mtk_afe_i2s_startup(struct snd_pcm_substream *substream,
+ 		return 0;
+ 
+ 	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
++	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+ 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
+ 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M, 0);
+ 	return 0;
+@@ -384,6 +378,7 @@ static void mtk_afe_i2s_shutdown(struct snd_pcm_substream *substream,
+ 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M,
+ 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M);
+ 	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
++	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+ }
+ 
+ static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
+@@ -397,6 +392,9 @@ static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
+ 	mtk_afe_dais_set_clks(afe,
+ 			      afe->clocks[MTK_CLK_I2S1_M], runtime->rate * 256,
+ 			      NULL, 0);
++	mtk_afe_dais_set_clks(afe,
++			      afe->clocks[MTK_CLK_I2S2_M], runtime->rate * 256,
++			      NULL, 0);
+ 	/* config I2S */
+ 	ret = mtk_afe_set_i2s(afe, substream->runtime->rate);
+ 	if (ret)
+-- 
+1.7.9.5
