@@ -1,50 +1,40 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 23 Feb 2016 09:58:37 +0100
-Subject: [PATCH v2] MAINTAINERS: Extend info,
- add wiki and ml for meson arch
-In-Reply-To: <1455575651-16157-1-git-send-email-carlo@caione.org>
-References: <1455575651-16157-1-git-send-email-carlo@caione.org>
-Message-ID: <CAOQ7t2Zrx7N3a=RKpr2M3R6QYDeC=8yUs61NrohvrbT=vvjLiQ@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 23 Feb 2016 14:36:13 +0530
+Subject: [PATCH] ARM: plat-samsung: remove unused register definitions
+Message-ID: <1456218373-23658-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 11:34 PM, Carlo Caione <carlo@caione.org> wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Update the maintainers info with wiki and mailing list for the meson
-> platform. Fix a wrong file attribution and add maintainership for the
-> generic meson platforms.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  MAINTAINERS | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 28eb61b..7f51744 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -920,12 +920,15 @@ M:        Emilio L?pez <emilio@elopez.com.ar>
->  S:     Maintained
->  F:     drivers/clk/sunxi/
->
-> -ARM/Amlogic MesonX SoC support
-> +ARM/Amlogic Meson SoC support
->  M:     Carlo Caione <carlo@caione.org>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +L:     linux-meson at googlegroups.com
-> +W:     http://linux-meson.com/
->  S:     Maintained
-> -F:     drivers/media/rc/meson-ir.c
-> -N:     meson[x68]
-> +F:     arch/arm/mach-meson/
-> +F:     arch/arm/boot/dts/meson*
-> +N:     meson
+This patch removes S5P_VA_TWD and S3C_UART_OFFSET as it is no more used
+by any platform which including this header file.
 
-Hey Arnd,
-Does this usually go through the armsoc tree?
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/map-s5p.h | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Thanks,
-
+diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+index e555769..b63aeeb 100644
+--- a/arch/arm/plat-samsung/include/plat/map-s5p.h
++++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+@@ -22,7 +22,6 @@
+ #define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
+ #define S5P_VA_COREPERI(x)	(S5P_VA_COREPERI_BASE + (x))
+ #define S5P_VA_SCU		S5P_VA_COREPERI(0x0)
+-#define S5P_VA_TWD		S5P_VA_COREPERI(0x600)
+ 
+ #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
+ #define VA_VIC0			VA_VIC(0)
+@@ -30,10 +29,6 @@
+ #define VA_VIC2			VA_VIC(2)
+ #define VA_VIC3			VA_VIC(3)
+ 
+-#ifndef S3C_UART_OFFSET
+-#define S3C_UART_OFFSET		(0x400)
+-#endif
+-
+ #include <plat/map-s3c.h>
+ 
+ #endif /* __ASM_PLAT_MAP_S5P_H */
 -- 
-Carlo Caione
+2.4.5
