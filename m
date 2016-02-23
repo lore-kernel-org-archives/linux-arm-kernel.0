@@ -1,74 +1,75 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Tue, 23 Feb 2016 08:01:07 +0000
-Subject: [PATCH] ARM: dts: add support for gpio buttons for
- exynos5422-odroidxu3
-Message-ID: <1456214467-3344-1-git-send-email-linux.amoon@gmail.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Tue, 23 Feb 2016 16:11:21 +0800
+Subject: [PATCH v5 8/8] arm64: dts: mediatek: Add Video Encoder for MT8173
+In-Reply-To: <1456215081-16858-8-git-send-email-tiffany.lin@mediatek.com>
+References: <1456215081-16858-1-git-send-email-tiffany.lin@mediatek.com>
+ <1456215081-16858-2-git-send-email-tiffany.lin@mediatek.com>
+ <1456215081-16858-3-git-send-email-tiffany.lin@mediatek.com>
+ <1456215081-16858-4-git-send-email-tiffany.lin@mediatek.com>
+ <1456215081-16858-5-git-send-email-tiffany.lin@mediatek.com>
+ <1456215081-16858-6-git-send-email-tiffany.lin@mediatek.com>
+ <1456215081-16858-7-git-send-email-tiffany.lin@mediatek.com>
+ <1456215081-16858-8-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1456215081-16858-9-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for gpio-based button on Odroid-XU3 boards
-for reboot/poweroff feature.
+Add video encoder node for MT8173
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 ---
-changes rebase based on linux next-20160222.
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   39 ++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-Tested on Odroid-XU4
-
-dmesg output.
-[    3.286068] of_get_named_gpiod_flags: parsed 'gpios' property of node '/gpio_keys/power_key[0]' - status (0)
-[    3.286206] gpio-11 (power key): gpiod_set_debounce: missing set() or set_debounce() operations
-[    3.286600] input: gpio_keys as /devices/platform/gpio_keys/input/input0
----
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 1bd507b..db9770b 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -11,6 +11,7 @@
- */
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 5b0b38a..26aeffe 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -1150,6 +1150,45 @@
+ 			clock-names = "apb", "smi";
+ 		};
  
- #include <dt-bindings/clock/samsung,s2mps11.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/sound/samsung-i2s.h>
-@@ -54,6 +55,22 @@
- 		#cooling-cells = <2>;
- 		cooling-levels = <0 130 170 230>;
- 	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gpio_power_key>;
-+
-+		power_key {
-+			interrupt-parent = <&gpx0>;
-+			interrupts = <3 IRQ_TYPE_NONE>;
-+			gpios = <&gpx0 3 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			label = "power key";
-+			debounce-interval = <10>;
-+			wakeup-source;
++		vcodec_enc: vcodec at 18002000 {
++			compatible = "mediatek,mt8173-vcodec-enc";
++			reg = <0 0x18002000 0 0x1000>,	/* VENC_SYS */
++			      <0 0x19002000 0 0x1000>;	/* VENC_LT_SYS */
++			interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
++				     <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
++			mediatek,larb = <&larb3>,
++					<&larb5>;
++			iommus = <&iommu M4U_PORT_VENC_RCPU>,
++				 <&iommu M4U_PORT_VENC_REC>,
++				 <&iommu M4U_PORT_VENC_BSDMA>,
++				 <&iommu M4U_PORT_VENC_SV_COMV>,
++				 <&iommu M4U_PORT_VENC_RD_COMV>,
++				 <&iommu M4U_PORT_VENC_CUR_LUMA>,
++				 <&iommu M4U_PORT_VENC_CUR_CHROMA>,
++				 <&iommu M4U_PORT_VENC_REF_LUMA>,
++				 <&iommu M4U_PORT_VENC_REF_CHROMA>,
++				 <&iommu M4U_PORT_VENC_NBM_RDMA>,
++				 <&iommu M4U_PORT_VENC_NBM_WDMA>,
++				 <&iommu M4U_PORT_VENC_RCPU_SET2>,
++				 <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
++				 <&iommu M4U_PORT_VENC_BSDMA_SET2>,
++				 <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
++				 <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
++				 <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
++				 <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
++				 <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
++				 <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
++			mediatek,vpu = <&vpu>;
++			clocks = <&topckgen CLK_TOP_VENCPLL_D2>,
++				 <&topckgen CLK_TOP_VENC_SEL>,
++				 <&topckgen CLK_TOP_UNIVPLL1_D2>,
++				 <&topckgen CLK_TOP_VENC_LT_SEL>;
++			clock-names = "venc_sel_src",
++				      "venc_sel",
++				      "venc_lt_sel_src",
++				      "venc_lt_sel";
 +		};
-+	};
- };
- 
- &clock_audss {
-@@ -362,6 +379,11 @@
- };
- 
- &pinctrl_0 {
-+	gpio_power_key: power_key {
-+		samsung,pins = "gpx0-3";
-+		samsung,pin-pud = <0>;
-+	};
 +
- 	hdmi_hpd_irq: hdmi-hpd-irq {
- 		samsung,pins = "gpx3-7";
- 		samsung,pin-function = <0>;
+ 		vencltsys: clock-controller at 19000000 {
+ 			compatible = "mediatek,mt8173-vencltsys", "syscon";
+ 			reg = <0 0x19000000 0 0x1000>;
 -- 
-2.1.4
+1.7.9.5
