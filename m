@@ -1,43 +1,44 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 23 Feb 2016 20:28:24 +0530
-Subject: [PATCH 10/61] gpio: ath79: Use devm_gpiochip_add_data() for gpio
- registration
-In-Reply-To: <20160222211323.5c10533f@tock>
-References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>	<1456150130-2668-11-git-send-email-ldewangan@nvidia.com>
- <20160222211323.5c10533f@tock>
-Message-ID: <56CC7390.6050805@nvidia.com>
+From: alexandre.torgue@gmail.com (Alexandre TORGUE)
+Date: Tue, 23 Feb 2016 16:10:40 +0100
+Subject: [PATCH v2 0/4] Add Ethernet support on STM32F429
+Message-ID: <1456240244-10275-1-git-send-email-alexandre.torgue@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+STM32F429 Chip embeds a Synopsys 3.50a MAC IP.
+This series:
+ -enhance current stmmac driver to control it (code already
+available) and adds basic glue for STM32F429 chip.
+ -Enable basic Net config in kernel.
 
-On Tuesday 23 February 2016 01:43 AM, Alban wrote:
-> On Mon, 22 Feb 2016 19:37:59 +0530
-> Laxman Dewangan <ldewangan@nvidia.com> wrote:
->
->> Use devm_gpiochip_add_data() for GPIO registration.
->>
->> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
->> Cc: Alban Bedel <albeu@free.fr>
->> ---
->>   drivers/gpio/gpio-ath79.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpio/gpio-ath79.c b/drivers/gpio/gpio-ath79.c
->> index d13dd13..a6aad59 100644
->> --- a/drivers/gpio/gpio-ath79.c
->> +++ b/drivers/gpio/gpio-ath79.c
->> @@ -182,7 +182,7 @@ static int ath79_gpio_probe(struct platform_device *pdev)
->>   		ctrl->chip.direction_output = ar934x_gpio_direction_output;
->>   	}
->>   
->> -	err = gpiochip_add_data(&ctrl->chip, ctrl);
->> +	err = devm_gpiochip_add_data(&pdev->dev, &ctrl->chip, ctrl);
->>   	if (err) {
->>   		dev_err(&pdev->dev,
->>   			"cannot add AR71xx GPIO chip, error=%d", err);
-> With the patches already applied to the devel branch a few more changes
-> will be needed to remove the calls to gpiochip_remove() in the probe
-> error path and the remove callback.
->
-OK, I will drop this patch when provide the git pointer to Linus.
-We can work on this later.
+Note that DT patches are not present because STM32 pinctrl code is not
+yet avalaible.
+
+Changes since v1:
+ -Fix Kbuild issue in Kconfig.
+ -Remove init/exit callbacks. Suspend/Resume and remove driver is no more
+driven in stmmac_pltfr but directly in dwmac-stm32 glue driver.
+ -Take into account Joachim review.
+
+Regards.
+
+Alexandre.
+
+Alexandre TORGUE (4):
+  net: ethernet: dwmac: add Ethernet glue logic for stm32 chip
+  Documentation: Bindings: Add STM32 DWMAC glue
+  net: ethernet: stmmac: add support of Synopsys 3.50a MAC IP
+  ARM: STM32: Enable Ethernet in stm32_defconfig
+
+ .../devicetree/bindings/net/stm32-dwmac.txt        |  41 ++++
+ arch/arm/configs/stm32_defconfig                   |   9 +
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c  | 208 +++++++++++++++++++++
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   1 +
+ 6 files changed, 272 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/stm32-dwmac.txt
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+
+-- 
+1.9.1
