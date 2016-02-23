@@ -1,55 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Feb 2016 11:24:55 +0100
-Subject: [PATCH] spi: imx: initialize usedma earlier
-In-Reply-To: <20160223111559.3c2cb641@ipc1.ka-ro>
-References: <20160223111559.3c2cb641@ipc1.ka-ro>
-Message-ID: <1456223095-32185-1-git-send-email-s.hauer@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Feb 2016 10:26:11 +0000
+Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
+In-Reply-To: <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160223102610.GD3966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC specific config function does not know if DMA will be used or
-not. This information will be useful to configure the SPI controller
-correctly for DMA in following patches, so initialize the usedma
-variable before calling into the SoC specific config function.
+On Mon, Feb 22, 2016 at 05:58:22PM -0800, David Daney wrote:
+> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> 
+> Attempt to get the memory and CPU NUMA node via of_numa.  If that
+> fails, default the dummy NUMA node and map all memory and CPUs to node
+> 0.
+> 
+> Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Reviewed-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  arch/arm64/Kconfig                |  26 +++
+>  arch/arm64/include/asm/mmzone.h   |  12 ++
+>  arch/arm64/include/asm/numa.h     |  45 +++++
+>  arch/arm64/include/asm/topology.h |  10 +
+>  arch/arm64/kernel/pci.c           |  10 +
+>  arch/arm64/kernel/setup.c         |   4 +
+>  arch/arm64/kernel/smp.c           |   4 +
+>  arch/arm64/mm/Makefile            |   1 +
+>  arch/arm64/mm/init.c              |  34 +++-
+>  arch/arm64/mm/mmu.c               |   1 +
+>  arch/arm64/mm/numa.c              | 403 ++++++++++++++++++++++++++++++++++++++
+>  11 files changed, 545 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/mmzone.h
+>  create mode 100644 arch/arm64/include/asm/numa.h
+>  create mode 100644 arch/arm64/mm/numa.c
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/spi/spi-imx.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+[...]
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index a61b1b1..5792918 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -815,6 +815,11 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 		spi_imx->tx = spi_imx_buf_tx_u32;
- 	}
- 
-+	if (spi_imx_can_dma(spi_imx->bitbang.master, spi, t))
-+		spi_imx->usedma = 1;
-+	else
-+		spi_imx->usedma = 0;
-+
- 	spi_imx->devtype_data->config(spi_imx, &config);
- 
- 	return 0;
-@@ -1040,14 +1045,10 @@ static int spi_imx_transfer(struct spi_device *spi,
- {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
- 
--	if (spi_imx->bitbang.master->can_dma &&
--	    spi_imx_can_dma(spi_imx->bitbang.master, spi, transfer)) {
--		spi_imx->usedma = true;
-+	if (spi_imx->usedma)
- 		return spi_imx_dma_transfer(spi_imx, transfer);
--	}
--	spi_imx->usedma = false;
--
--	return spi_imx_pio_transfer(spi, transfer);
-+	else
-+		return spi_imx_pio_transfer(spi, transfer);
- }
- 
- static int spi_imx_setup(struct spi_device *spi)
--- 
-2.7.0
+> diff --git a/arch/arm64/include/asm/mmzone.h b/arch/arm64/include/asm/mmzone.h
+> new file mode 100644
+> index 0000000..a0de9e6
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/mmzone.h
+> @@ -0,0 +1,12 @@
+> +#ifndef __ASM_MMZONE_H
+> +#define __ASM_MMZONE_H
+> +
+> +#ifdef CONFIG_NUMA
+> +
+> +#include <asm/numa.h>
+> +
+> +extern struct pglist_data *node_data[];
+> +#define NODE_DATA(nid)		(node_data[(nid)])
+> +
+> +#endif /* CONFIG_NUMA */
+> +#endif /* __ASM_MMZONE_H */
+
+What happened to the patch cleaning this up in generic code?
+
+Will
