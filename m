@@ -1,118 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Feb 2016 10:31:45 +0000
-Subject: [PATCH v5 7/7] arm64: Ensure the secondary CPUs have safe ASIDBits
- size
+Date: Tue, 23 Feb 2016 10:31:43 +0000
+Subject: [PATCH v5 5/7] arm64: Enable CPU capability verification
+ unconditionally
 In-Reply-To: <1456223505-2955-1-git-send-email-suzuki.poulose@arm.com>
 References: <1456223505-2955-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1456223505-2955-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1456223505-2955-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a hook for checking whether a secondary CPU has the
-features used already by the kernel during early boot, based
-on the boot CPU and plugs in the check for ASID size.
+We verify the capabilities of the secondary CPUs only when
+hotplug is enabled. The boot time activated CPUs do not
+go through the verification by checking whether the system
+wide capabilities were initialised or not.
 
-The ID_AA64MMFR0_EL1:ASIDBits determines the size of the mm context
-id and is used in the early boot to make decisions. The value is
-picked up from the Boot CPU and cannot be delayed until other CPUs
-are up. If a secondary CPU has a smaller size than that of the Boot
-CPU, things will break horribly and the usual SANITY check is not good
-enough to prevent the system from crashing. So, crash the system with
-enough information.
+This patch removes the capability check dependency on CONFIG_HOTPLUG_CPU,
+to make sure that all the secondary CPUs go through the check.
+The boot time activated CPUs will still skip the system wide
+capability check. The plan is to hook in a check for CPU features
+used by the kernel at early boot up, based on the Boot CPU values.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h |    2 ++
- arch/arm64/kernel/cpufeature.c       |   12 ++++++++++++
- arch/arm64/mm/context.c              |   18 ++++++++++++++++++
- 3 files changed, 32 insertions(+)
+ arch/arm64/include/asm/cpufeature.h |    6 ------
+ arch/arm64/kernel/cpufeature.c      |   10 ----------
+ 2 files changed, 16 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 2416578..bd8a0b9 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -147,4 +147,6 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
- #define deactivate_mm(tsk,mm)	do { } while (0)
- #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 8f271b8..26024c4 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -164,13 +164,7 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+ void check_local_cpu_errata(void);
  
-+void verify_cpu_asid_bits(void);
-+
- #endif
+-#ifdef CONFIG_HOTPLUG_CPU
+ void verify_local_cpu_capabilities(void);
+-#else
+-static inline void verify_local_cpu_capabilities(void)
+-{
+-}
+-#endif
+ 
+ u64 read_system_reg(u32 id);
+ 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 5ba3ef1..3614066 100644
+index 60c3f47..5ba3ef1 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -24,6 +24,7 @@
- #include <asm/cpu.h>
- #include <asm/cpufeature.h>
- #include <asm/cpu_ops.h>
-+#include <asm/mmu_context.h>
- #include <asm/processor.h>
- #include <asm/sysreg.h>
- 
-@@ -825,6 +826,15 @@ static u64 __raw_read_system_reg(u32 sys_id)
+@@ -768,8 +768,6 @@ enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ 			on_each_cpu(caps[i].enable, NULL, true);
  }
  
+-#ifdef CONFIG_HOTPLUG_CPU
+-
  /*
-+ * Check for CPU features that are used in early boot
-+ * based on the Boot CPU value.
-+ */
-+static void check_early_cpu_features(void)
-+{
-+	verify_cpu_asid_bits();
-+}
-+
-+/*
-  * Run through the enabled system capabilities and enable() it on this CPU.
-  * The capabilities were decided based on the available CPUs at the boot time.
-  * Any new CPU should match the system wide status of the capability. If the
-@@ -837,6 +847,8 @@ void verify_local_cpu_capabilities(void)
- 	int i;
- 	const struct arm64_cpu_capabilities *caps;
- 
-+	check_early_cpu_features();
-+
- 	/*
- 	 * If we haven't computed the system capabilities, there is nothing
- 	 * to verify.
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 643bf4b..3b23cb4 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -24,6 +24,7 @@
- 
- #include <asm/cpufeature.h>
- #include <asm/mmu_context.h>
-+#include <asm/smp.h>
- #include <asm/tlbflush.h>
- 
- static u32 asid_bits;
-@@ -62,6 +63,23 @@ static u32 get_cpu_asid_bits(void)
- 	return asid;
+  * Flag to indicate if we have computed the system wide
+  * capabilities based on the boot time active CPUs. This
+@@ -874,14 +872,6 @@ void verify_local_cpu_capabilities(void)
+ 	}
  }
  
-+/* Check if the current cpu's ASIDBits is compatible with asid_bits */
-+void verify_cpu_asid_bits(void)
-+{
-+	u32 asid = get_cpu_asid_bits();
-+
-+	if (asid < asid_bits) {
-+		/*
-+		 * We cannot decrease the ASID size@runtime, so panic if we support
-+		 * fewer ASID bits than the boot CPU.
-+		 */
-+		pr_crit("CPU%d: smaller ASID size(%u) than boot CPU (%u)\n",
-+				smp_processor_id(), asid, asid_bits);
-+		update_cpu_boot_status(CPU_PANIC_KERNEL);
-+		cpu_park_loop();
-+	}
-+}
-+
- static void flush_context(unsigned int cpu)
+-#else	/* !CONFIG_HOTPLUG_CPU */
+-
+-static inline void set_sys_caps_initialised(void)
+-{
+-}
+-
+-#endif	/* CONFIG_HOTPLUG_CPU */
+-
+ static void __init setup_feature_capabilities(void)
  {
- 	int i;
+ 	update_cpu_capabilities(arm64_features, "detected feature:");
 -- 
 1.7.9.5
