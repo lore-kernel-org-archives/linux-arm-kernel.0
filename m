@@ -1,60 +1,108 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 23 Feb 2016 08:32:35 +0530
-Subject: [PATCH] dma: mv_xor_v2: new driver
-In-Reply-To: <20160222101621.4f03ef8b@free-electrons.com>
-References: <1455523083-25506-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160222032730.GU19598@localhost>
- <20160222101621.4f03ef8b@free-electrons.com>
-Message-ID: <20160223030235.GG17690@localhost>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Tue, 23 Feb 2016 11:00:20 +0800
+Subject: [PATCH v5 00/11] Add DRM Driver for HiSilicon Kirin hi6220 SoC
+Message-ID: <1456196431-19923-1-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 10:16:21AM +0100, Thomas Petazzoni wrote:
+This patch set adds a new drm driver for HiSilicon Kirin hi6220 SoC.
+Current testing and support board is Hikey board which is one of Linaro
+96boards. It is an arm64 open source board. For more information about
+this board, please access https://www.96boards.org.
 
-> > So why should it depend on how kernel is configured?
-> 
-> Because using upper_32_bits() on a 32-bits type seems wrong? You can do
-> a git grep for CONFIG_ARCH_DMA_ADDR_T_64BIT, and see that it is already
-> used in drivers/dma/sh/rcar-dmac.c, drivers/gpu/drm/tegra/dc.c or
-> drivers/iommu/tegra-smmu.c.
-> 
-> drivers/dma/sh/rcar-dmac.c uses it for exactly the same reason as me:
-> they need to know if dma_addr_t is 32 bits or 64 bits, and if it's 64
-> bits, then they need to take the upper 32 bits and feed them to some
-> register.
+Hardware Detail
+---------------
+  The display subsystem of Hi6220 SoC is shown as bellow:
+ +-----+       +----------+     +-----+     +-------------+
+ |     |       |          |     |     |     |             |             	
+ | FB  |------>|   ADE    |---->| DSI |---->|   External  |
+ |     |       |          |     |     |     |  HDMI/panel |
+ +-----+       +----------+     +-----+     +-------------+
 
-So is the hardware capable of 32bit of 64bit?
+- ADE(Advanced Display Engine) is the display controller. It contains 7
+channels, 3 overlay compositors and a LDI.
+  - A channel looks like: DMA-->clip-->scale-->ctrans(or called csc).
+  - Overlay compositor is response to compose planes which come from 7
+  channels and pass composed image to LDI.
+  - LDI is response to generate timings and RGB data stream.
+- DSI converts the RGB data stream from ADE to DSI packets.
+- External HDMI/panel module is connected with DSI bus. Now Hikey use a
+  ADI's ADV7533 external HDMI chip.
 
+Change History
+-------------
+Changes in v5:
+- Remove endpoint unit address of dsi output port.
+- Use syscon to access ADE media NOC QoS registers instread of directly
+  writing registers.
+- Use reset controller to reset ADE instead of directly writing registers.
+Changes in v4:
+- Describe more specific of clocks and ports of binding docs.
+- Fix indentation of binding docs.
 
-> > You don't want to check the source of interrupt?
-> 
-> To protect against what? An improper MSI message that ends up firing
-> this interrupt for now reason? But only kernel space stuff (or
-> privileged code in user-space) can write to the MSI triggering
-> registers, so we should be able to trust that such an improper MSI
-> message will not arrive.
+Changes in v3:
+- Move and rename all the files to kirin sub-directory.
+  So that we could separate different seires SoCs' driver.
+- Make ade as the drm master node.
+- Replace drm_platform_init, load, unload implementation.
+- Use assigned-clocks to set clock rate.
+- Use ports to connect display relavant nodes.
+- Rename hisi_drm_dsi.c to dw_drm_dsi.c
+- Make encoder type as DRM_MODE_ENCODER_DSI.
+- A few cleanup on regs and code.
 
-Your device might go bonkers or some erranious programming does cause
-interrupts. Its better to be safe than sorry :)
+Changes in v2:
+- Remove abtraction layer of plane/crtc/encoder/connector.
+- Refactor atomic implementation according to Daniel Vetter's guides:
+http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
+http://blog.ffwll.ch/2015/09/xdc-2015-atomic-modesetting-for-drivers.html
+http://blog.ffwll.ch/2015/08/atomic-modesetting-design-overview.html
+- Use bridge instead of slave encoder to connect external HDMI.
+- Move dt binding docs to bindings/display/hisilicon directory. 
 
-> 
-> That being said, I can add a read of the pending descriptors number,
-> and if it's 0, then bail out with IRQ_NONE. Is that what you were
-> thinking about?
+Xinliang Liu (11):
+  drm/hisilicon: Add device tree binding for hi6220 display subsystem
+  drm/hisilicon: Add hisilicon kirin drm master driver
+  drm/hisilicon: Add crtc driver for ADE
+  drm/hisilicon: Add plane driver for ADE
+  drm/hisilicon: Add vblank driver for ADE
+  drm/hisilicon: Add cma fbdev and hotplug
+  drm/hisilicon: Add designware dsi encoder driver
+  drm/hisilicon: Add designware dsi host driver
+  drm/hisilicon: Add support for external bridge
+  MAINTAINERS: Add maintainer for hisilicon DRM driver
+  arm64: dts: hisilicon: Add display subsystem DT nodes for hi6220
 
-Sounds good
-
-
-> > why BUG_ON, is the system unusable after this?
-> 
-> Well, the XOR engine cannot do XOR with 0 source buffers, or with more
-> than MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF.
-> 
-> But I see that I'm already setting max_xor in struct dma_device, so one
-> can assume that ->prep_dma_xor() will not be called with src_cnt == or
-> src_cnt > max_xor, so this BUG_ON can be removed.
-
-Okay, you should return NULL to caller if that is the case
+ .../bindings/display/hisilicon/dw-dsi.txt          |   72 ++
+ .../bindings/display/hisilicon/hisi-ade.txt        |   64 ++
+ MAINTAINERS                                        |   10 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   40 +
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   55 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/hisilicon/Kconfig                  |    5 +
+ drivers/gpu/drm/hisilicon/Makefile                 |    5 +
+ drivers/gpu/drm/hisilicon/kirin/Kconfig            |   10 +
+ drivers/gpu/drm/hisilicon/kirin/Makefile           |    5 +
+ drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c       |  845 ++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h       |   83 ++
+ drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h    |  290 ++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c    | 1047 ++++++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c    |  382 +++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h    |   31 +
+ 17 files changed, 2947 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+ create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h
 
 -- 
-~Vinod
+1.9.1
