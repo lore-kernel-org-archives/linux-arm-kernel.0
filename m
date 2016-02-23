@@ -1,105 +1,128 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 23 Feb 2016 12:21:35 +0100
-Subject: [PATCH 1/4] net: ethernet: dwmac: add Ethernet glue logic for
- stm32 chip
-In-Reply-To: <CAJgp7zxYhbQ4yQHBB3cu50TU9N9xvk3HxCp0NP5fxFbxrMsD_g@mail.gmail.com>
-References: <1454511275-9791-1-git-send-email-alexandre.torgue@gmail.com>
- <1454511275-9791-2-git-send-email-alexandre.torgue@gmail.com>
- <CAGhQ9VypZ5J0pQmrf1Mk-mNsv=XTXu7fhoLt_r2LHJ_Lsyj0yA@mail.gmail.com>
- <CAJgp7zwOVEq=hnxfUt7eHZWSFUAwuK6MCVHdH591=xReRUsW8Q@mail.gmail.com>
- <CAGhQ9VzPTgRqqLi4zjHkP-++v5smZ7s52drev1z-AvgXaLuC7Q@mail.gmail.com>
- <CAJgp7zxYhbQ4yQHBB3cu50TU9N9xvk3HxCp0NP5fxFbxrMsD_g@mail.gmail.com>
-Message-ID: <CAGhQ9VxQ3nW+dr9pdj=H8UcsNHEATxVeAf8N_PsQA7-73uksTA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Feb 2016 11:22:19 +0000
+Subject: [PATCH V2] iommu/arm-smmu-v2: Add support for 16 bit VMID
+In-Reply-To: <1455906813-9721-1-git-send-email-tchalamarla@caviumnetworks.com>
+References: <1455906813-9721-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <20160223112219.GE3966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2016 at 10:59, Alexandre Torgue
-<alexandre.torgue@gmail.com> wrote:
-> 2016-02-22 22:52 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
->> On 22 February 2016 at 15:50, Alexandre Torgue
->> <alexandre.torgue@gmail.com> wrote:
->>> 2016-02-13 14:48 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
->>>> On 3 February 2016 at 15:54, Alexandre TORGUE
->>>> <alexandre.torgue@gmail.com> wrote:
->>>>> +       plat_dat->bsp_priv = dwmac;
->>>>> +       plat_dat->init = stm32_dwmac_init;
->>>>> +       plat_dat->exit = stm32_dwmac_exit;
->>>>
->>>> Instead of using these callbacks could you rather implement the PM
->>>> callbacks directly in this driver?
->>>> I don't think it should add much code and it will make it look more
->>>> like standard driver. This will also give you some more control and
->>>> flexibility in your code.
->>>
->>> I prefer to keep the code as it is. Glue layer is directly linked to
->>> stmmac driver and I don't want to brake the link between the glue and
->>> the stmmac driver.
->>
->> What do you mean by break the link?
->>
+Hi Tirumalesh,
+
+I still have some questions and comments about this.
+
+On Fri, Feb 19, 2016 at 10:33:33AM -0800, tchalamarla at caviumnetworks.com wrote:
+> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> 
+> ARM-SMMUv2 supports upto 16 bit VMID. This patch enables
+> 16 bit VMID when HW supports.
+> 
+> changes from V1:
+> 	- Remove DT Property and enable 16 bit VMID if ID says.
+
+Does this mean we can remove the comment from arm_smmu_init_context_bank
+about CBA2R initialisation, or is that behaviour still required by some
+parts? Further, what happens if we set CR0.VMID16EN on those
+implementations?
+
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 24 +++++++++++++++++++++++-
+>  1 file changed, 23 insertions(+), 1 deletion(-)
 >
-> I thought that you wanted to split stmmac_pltfr_supend (glue part and
-> stmamc part), but I well understood it is not the case (sorry for
-> mistake).
->
->> There has been numerous of patch sets to make the stmmac "glue"
->> drivers into more standard platform drivers.
->> http://marc.info/?l=linux-netdev&m=143159850631093&w=2
->> http://marc.info/?l=linux-netdev&m=143708560009851&w=2
->> http://marc.info/?l=linux-netdev&m=143812136600541&w=2
->>
->> Do you see any advantage by using the init and exit hooks in your
->> driver instead of using the standard driver PM callbacks and remove
->> function?
->> The only "cost" I see is slightly more boilerplate code. But since you
->> already have init/exit functions you could easily make them into PM
->> resume/suspend so I doubt there would be much increase in code size.
->>
->
-> If I well understood you want to continue the stmmac glue driver
-> rework by moving stmmac_pltfr_suspend/resume/remove in each glue
-> driver (stm32, sun, sti ....).
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 59ee4b8..92caab8 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -93,6 +93,7 @@
+>  #define sCR0_VMIDPNE			(1 << 11)
+>  #define sCR0_PTM			(1 << 12)
+>  #define sCR0_FB				(1 << 13)
+> +#define sCR0_VMID16EN			(1 << 31)
+>  #define sCR0_BSU_SHIFT			14
+>  #define sCR0_BSU_MASK			0x3
+>  
+> @@ -140,6 +141,7 @@
+>  #define ID2_PTFS_4K			(1 << 12)
+>  #define ID2_PTFS_16K			(1 << 13)
+>  #define ID2_PTFS_64K			(1 << 14)
+> +#define ID2_VMID16			(1 << 15)
+>  
+>  /* Global TLB invalidation */
+>  #define ARM_SMMU_GR0_TLBIVMID		0x64
+> @@ -189,6 +191,8 @@
+>  #define ARM_SMMU_GR1_CBA2R(n)		(0x800 + ((n) << 2))
+>  #define CBA2R_RW64_32BIT		(0 << 0)
+>  #define CBA2R_RW64_64BIT		(1 << 0)
+> +#define CBA2R_VMID_SHIFT		16
+> +#define CBA2R_VMID_MASK			0xffff
+>  
+>  /* Translation context bank */
+>  #define ARM_SMMU_CB_BASE(smmu)		((smmu)->base + ((smmu)->size >> 1))
+> @@ -297,6 +301,7 @@ struct arm_smmu_device {
+>  #define ARM_SMMU_FEAT_TRANS_S2		(1 << 3)
+>  #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
+>  #define ARM_SMMU_FEAT_TRANS_OPS		(1 << 5)
+> +#define ARM_SMMU_FEAT_VMID16		(1 << 6)
+>  	u32				features;
+>  
+>  #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
+> @@ -736,6 +741,10 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>  #else
+>  		reg = CBA2R_RW64_32BIT;
+>  #endif
+> +		/* if 16bit VMID supported set VMID in CBA2R */
+> +		if (smmu->features & ARM_SMMU_FEAT_VMID16)
+> +			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
+> +
+>  		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
+>  	}
+>  
+> @@ -751,7 +760,8 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+>  	if (stage1) {
+>  		reg |= (CBAR_S1_BPSHCFG_NSH << CBAR_S1_BPSHCFG_SHIFT) |
+>  			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
+> -	} else {
+> +	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
+> +		/*16 bit VMID is not supported set 8 bit VMID here */
+>  		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
+>  	}
+>  	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
+> @@ -1508,6 +1518,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+>  	/* Don't upgrade barriers */
+>  	reg &= ~(sCR0_BSU_MASK << sCR0_BSU_SHIFT);
+>  
+> +	if (smmu->features & ARM_SMMU_FEAT_VMID16)
+> +		reg |= sCR0_VMID16EN;
+> +
+>  	/* Push the button */
+>  	__arm_smmu_tlb_sync(smmu);
+>  	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+> @@ -1658,6 +1671,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>  	size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
+>  	smmu->pa_size = size;
+>  
+> +	/* See if 16bit VMID is supported */
+> +	if (id & ID2_VMID16)
+> +		smmu->features = ARM_SMMU_FEAT_VMID16;
 
-At least I want to avoid the init/exit callbacks for new drivers like
-stm32-dwmac.
+This should be |=
 
+> +
+>  	/*
+>  	 * What the page table walker can address actually depends on which
+>  	 * descriptor format is in use, but since a) we don't know that yet,
+> @@ -1696,6 +1713,11 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>  		dev_notice(smmu->dev, "\tStage-2: %lu-bit IPA -> %lu-bit PA\n",
+>  			   smmu->ipa_size, smmu->pa_size);
+>  
+> +	if (smmu->features & ARM_SMMU_FEAT_VMID16)
+> +		dev_notice(smmu->dev, "\t 16 bit VMID Supported.\n");
+> +	else
+> +		dev_notice(smmu->dev, "\t Only 8 bit VMID Supported.\n");
 
-> Each glue driver will call directly stmmac_suspend/resume/remove and
-> their own init/exit function.
-> If it is what you meant, I can do it.
+Supporting "only" 8-bit VMIDs is usually plenty ;) In fact, your patch
+doesn't change the allocator, so we'll still use a zero-extended 8-bit
+VMID, so this print is fairly useless.
 
-Yes, in your stm32 driver's suspend/resume/remove functions call
-stmmac_suspend/stmmac_resume/stmmac_dvr_remove directly. Then you
-shouldn't need to use the init/exit callbacks. Just put the need code
-in the driver's suspend/resume/remove functions instead of init/exit
-functions.
-
-For example:
-static int stm32_dwmac_resume(struct device *dev)
-{
-    struct net_device *ndev = dev_get_drvdata(dev);
-    struct plat_stmmacenet_data *plat_dat = get_stmmac_plat_data(ndev)
-    struct stm32_dwmac *dwmac =plat_dat->bsp_priv;
-
-    /* enable clocks */
-    /* set phy mode */
-
-    return stmmac_resume(ndev);
-}
-
-If it makes sense to have the enable clk/phy mode stuff in it's own
-function that is fine too.
-
-
->> One other thing;
->> Do you need to have the PHY mode setup code in the init function which
->> is called each time on resume?
->
-> I can't guarantee that after a suspend the sysconfig register will
-> contain same data than before suspend.
-
-I see.
-
-
-regards,
-Joachim Eastwood
+Will
