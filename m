@@ -1,28 +1,29 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 23 Feb 2016 11:15:59 +0100
-Subject: [PATCH 2/9] spi: imx: initialize usedma earlier
-In-Reply-To: <1456219438-21205-3-git-send-email-s.hauer@pengutronix.de>
-References: <1456219438-21205-1-git-send-email-s.hauer@pengutronix.de>
- <1456219438-21205-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160223111559.3c2cb641@ipc1.ka-ro>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Feb 2016 10:16:42 +0000
+Subject: [PATCH] arm64: move brk immediate argument definitions to
+ separate header
+In-Reply-To: <1456214205-18743-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456214205-18743-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160223101642.GB3966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, 23 Feb 2016 10:23:51 +0100 Sascha Hauer wrote:
-> So that the SoC specific config function can know if we will do
-> DMA or not. Will be needed in following patches.
+On Tue, Feb 23, 2016 at 08:56:45AM +0100, Ard Biesheuvel wrote:
+> Instead of reversing the header dependency between asm/bug.h and
+> asm/debug-monitors.h, split off the brk instruction immediate value
+> defines into a new header asm/brk-imm.h, and include it from both.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->
-The first sentence of the commit log sounds silly unless you read it in
-conjunction with the subject header. I made this remark already in
-<20160219090846.3004de9d@ipc1.ka-ro>
+> This solves the circular dependency issue that prevents BUG() from
+> being used in some header files, and keeps the definitions together.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/brk-imm.h        | 25 +++++++++++++++++++++++++
+>  arch/arm64/include/asm/bug.h            |  2 +-
+>  arch/arm64/include/asm/debug-monitors.h | 14 +-------------
+>  3 files changed, 27 insertions(+), 14 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/brk-imm.h
 
-Is there any reason why this commit log is written as a continuation of
-the subject line (whithout making that obvious) while all the other
-commit logs in your patch set are self-contained?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-
-Lothar Wa?mann
+Will
