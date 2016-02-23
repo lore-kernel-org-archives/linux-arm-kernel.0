@@ -1,92 +1,182 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Tue, 23 Feb 2016 19:19:07 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
- also on PowerPC and ARM)
-In-Reply-To: <20160223103221.GA1418@node.shutemov.name>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name>
- <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
- <20160223103221.GA1418@node.shutemov.name>
-Message-ID: <20160223191907.25719a4d@thinkpad>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 23 Feb 2016 18:22:39 +0000
+Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
+Message-ID: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Feb 2016 13:32:21 +0300
-"Kirill A. Shutemov" <kirill@shutemov.name> wrote:
+When a CPU is suspended (either through suspend-to-RAM or CPUidle),
+its PMU registers content can be lost, which means that counters
+registers values that were initialized on power down entry have to be
+reprogrammed on power-up to make sure the counters set-up is preserved
+(ie on power-up registers take the reset values on Cold or Warm reset,
+which can be architecturally UNKNOWN).
 
-> On Fri, Feb 12, 2016 at 06:16:40PM +0100, Gerald Schaefer wrote:
-> > On Fri, 12 Feb 2016 16:57:27 +0100
-> > Christian Borntraeger <borntraeger@de.ibm.com> wrote:
-> > 
-> > > > I'm also confused by pmd_none() is equal to !pmd_present() on s390. Hm?
-> > > 
-> > > Don't know, Gerald or Martin?
-> > 
-> > The implementation frequently changes depending on how many new bits Martin
-> > needs to squeeze out :-)
-> > We don't have a _PAGE_PRESENT bit for pmds, so pmd_present() just checks if the
-> > entry is not empty. pmd_none() of course does the opposite, it checks if it is
-> > empty.
-> 
-> I still worry about pmd_present(). It looks wrong to me. I wounder if
-> patch below makes a difference.
-> 
-> The theory is that the splitting bit effetely masked bogus pmd_present():
-> we had pmd_trans_splitting() in all code path and that prevented mm from
-> touching the pmd. Once pmd_trans_splitting() has gone, mm proceed with the
-> pmd where it shouldn't and here's a boom.
+To guarantee seamless profiling conditions across a core power down
+this patch adds a CPU PM notifier to ARM pmus, that upon CPU PM
+entry/exit from low-power states saves/restores the pmu registers
+set-up (by using the ARM perf API), so that the power-down/up cycle does
+not affect the perf behaviour (apart from a black-out period between
+power-up/down CPU PM notifications that is unavoidable).
 
-Well, I don't think pmd_present() == true is bogus for a trans_huge pmd under
-splitting, after all there is a page behind the the pmd. Also, if it was
-bogus, and it would need to be false, why should it be marked !pmd_present()
-only at the pmdp_invalidate() step before the pmd_populate()? It clearly
-is pmd_present() before that, on all architectures, and if there was any
-problem/race with that, setting it to !pmd_present() at this stage would
-only (marginally) reduce the race window.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ drivers/perf/arm_pmu.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/perf/arm_pmu.h |  1 +
+ 2 files changed, 96 insertions(+)
 
-BTW, PowerPC and Sparc seem to do the same thing in pmdp_invalidate(),
-i.e. they do not set pmd_present() == false, only mark it so that it would
-not generate a new TLB entry, just like on s390. After all, the function
-is called pmdp_invalidate(), and I think the comment in mm/huge_memory.c
-before that call is just a little ambiguous in its wording. When it says
-"mark the pmd notpresent" it probably means "mark it so that it will not
-generate a new TLB entry", which is also what the comment is really about:
-prevent huge and small entries in the TLB for the same page at the same
-time.
-
-FWIW, and since the ARM arch-list is already on cc, I think there is
-an issue with pmdp_invalidate() on ARM, since it also seems to clear
-the trans_huge (and formerly trans_splitting) bit, which actually makes
-the pmd !pmd_present(), but it violates the other requirement from the
-comment:
-"the pmd_trans_huge and pmd_trans_splitting must remain set at all times
-on the pmd until the split is complete for this pmd"
-
-> 
-> I'm not sure that the patch is correct wrt yound/old pmds and I have no
-> way to test it...
-> 
-> diff --git a/arch/s390/include/asm/pgtable.h b/arch/s390/include/asm/pgtable.h
-> index 64ead8091248..2eeb17ab68ac 100644
-> --- a/arch/s390/include/asm/pgtable.h
-> +++ b/arch/s390/include/asm/pgtable.h
-> @@ -490,7 +490,7 @@ static inline int pud_bad(pud_t pud)
-> 
->  static inline int pmd_present(pmd_t pmd)
->  {
-> -	return pmd_val(pmd) != _SEGMENT_ENTRY_INVALID;
-> +	return !(pmd_val(pmd) & _SEGMENT_ENTRY_INVALID);
->  }
-> 
->  static inline int pmd_none(pmd_t pmd)
-
-No, that would not work well with young rw and ro pmds. We do now
-have an extra free bit in the pmd on s390, after the removal of the
-splitting bit, so we could try to implement pmd_present() with that
-sw bit, but that would also require several not-so-trivial changes
-to the other code in arch/s390/include/asm/pgtable.h.
-
-I'll check with Martin, maybe it is actually trivial, then we can
-do a quick test it to rule that one out.
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 166637f..12317a9 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/bitmap.h>
+ #include <linux/cpumask.h>
++#include <linux/cpu_pm.h>
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/of_device.h>
+@@ -710,6 +711,93 @@ static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
+ 	return NOTIFY_OK;
+ }
+ 
++#ifdef CONFIG_CPU_PM
++static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
++{
++	struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
++	struct perf_event *event;
++	int idx;
++
++	for (idx = 0; idx < armpmu->num_events; idx++) {
++		/*
++		 * If the counter is not used skip it, there is no
++		 * need of stopping/restarting it.
++		 */
++		if (!test_bit(idx, hw_events->used_mask))
++			continue;
++
++		event = hw_events->events[idx];
++
++		switch (cmd) {
++		case CPU_PM_ENTER:
++			/*
++			 * Stop and update the counter
++			 */
++			armpmu_stop(event, PERF_EF_UPDATE);
++			break;
++		case CPU_PM_EXIT:
++		case CPU_PM_ENTER_FAILED:
++			 /* Restore and enable the counter */
++			armpmu_start(event, PERF_EF_RELOAD);
++			break;
++		default:
++			break;
++		}
++	}
++}
++
++static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
++			     void *v)
++{
++	struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
++	struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
++	int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
++
++	if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
++		return NOTIFY_DONE;
++
++	/*
++	 * Always reset the PMU registers on power-up even if
++	 * there are no events running.
++	 */
++	if (cmd == CPU_PM_EXIT && armpmu->reset)
++		armpmu->reset(armpmu);
++
++	if (!enabled)
++		return NOTIFY_OK;
++
++	switch (cmd) {
++	case CPU_PM_ENTER:
++		armpmu->stop(armpmu);
++		cpu_pm_pmu_setup(armpmu, cmd);
++		break;
++	case CPU_PM_EXIT:
++		cpu_pm_pmu_setup(armpmu, cmd);
++	case CPU_PM_ENTER_FAILED:
++		armpmu->start(armpmu);
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++
++	return NOTIFY_OK;
++}
++
++static int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu)
++{
++	cpu_pmu->cpu_pm_nb.notifier_call = cpu_pm_pmu_notify;
++	return cpu_pm_register_notifier(&cpu_pmu->cpu_pm_nb);
++}
++
++static void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu)
++{
++	cpu_pm_unregister_notifier(&cpu_pmu->cpu_pm_nb);
++}
++#else
++static inline int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu) { return 0; }
++static inline void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu) { }
++#endif
++
+ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int err;
+@@ -725,6 +813,10 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	if (err)
+ 		goto out_hw_events;
+ 
++	err = cpu_pm_pmu_register(cpu_pmu);
++	if (err)
++		goto out_unregister;
++
+ 	for_each_possible_cpu(cpu) {
+ 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
+ 		raw_spin_lock_init(&events->pmu_lock);
+@@ -746,6 +838,8 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 
+ 	return 0;
+ 
++out_unregister:
++	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
+ out_hw_events:
+ 	free_percpu(cpu_hw_events);
+ 	return err;
+@@ -753,6 +847,7 @@ out_hw_events:
+ 
+ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+ {
++	cpu_pm_pmu_unregister(cpu_pmu);
+ 	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
+ 	free_percpu(cpu_pmu->hw_events);
+ }
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 83b5e34..9ffa316 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -107,6 +107,7 @@ struct arm_pmu {
+ 	struct platform_device	*plat_device;
+ 	struct pmu_hw_events	__percpu *hw_events;
+ 	struct notifier_block	hotplug_nb;
++	struct notifier_block	cpu_pm_nb;
+ };
+ 
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+-- 
+2.5.1
