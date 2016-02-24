@@ -1,16 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 13:48:02 -0800
-Subject: [GIT PULL] STM32 SoC updates for v4.6 #1
-In-Reply-To: <56BC8AFD.7000800@gmail.com>
-References: <56BC8AFD.7000800@gmail.com>
-Message-ID: <20160224214802.GJ10126@localhost>
+Date: Wed, 24 Feb 2016 13:50:46 -0800
+Subject: [GIT PULL 1/4] rockchip soc-driver changes for 4.6
+In-Reply-To: <1734524.3yNt5L3F1F@phil>
+References: <1734524.3yNt5L3F1F@phil>
+Message-ID: <20160224215046.GK10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 02:22:05PM +0100, Maxime Coquelin wrote:
-> Hi Olof, Arnd and Kevin,
+On Thu, Feb 11, 2016 at 03:47:12PM +0100, Heiko Stuebner wrote:
+> Hi Arnd, Olof, Kevin,
 > 
-> Please consider this first round of STM32 SoC updates for v4.6:
+> please find below soc driver changes for Rockchip for 4.6
+> The tag describes the changes a little bit more.
+> 
+> 
+> Thanks
+> Heiko
+> 
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
@@ -18,14 +24,13 @@ On Thu, Feb 11, 2016 at 02:22:05PM +0100, Maxime Coquelin wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
-> tags/stm32-soc-for-v4.6-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.6-rockchip-drivers1
 > 
-> for you to fetch changes up to f64e980450027e15dce5e9ec4ee19bab98aee4c5:
+> for you to fetch changes up to 1d961f11a108af9f7fbe89cc950a8d16ddbdbb28:
 > 
->   ARM: mach-stm32: Select pinctrl (2016-01-27 19:45:57 +0100)
+>   soc: rockchip: power-domain: fix err handle while probing (2016-02-02 22:18:31 +0100)
 
-Thanks, merged.
+Merged, thanks.
 
 
 -Olof
