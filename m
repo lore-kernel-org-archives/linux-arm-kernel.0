@@ -1,149 +1,178 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 24 Feb 2016 11:51:21 +0530
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
- <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
- <56B900E9.9040306@ti.com>
- <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
- <56BA2495.9020407@ti.com>
- <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
- <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
- <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
- <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
- <56CAA82D.6000507@ti.com>
- <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
- <56CADB23.8020202@ti.com> <56CC490F.3040301@ti.com>
- <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
-Message-ID: <56CD4BE1.3010701@ti.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 24 Feb 2016 06:46:09 +0000
+Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+ HiSilicon SoCs Host Controllers
+In-Reply-To: <20160224011418.GB13026@localhost>
+References: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1455039260-6040-4-git-send-email-gabriele.paoloni@huawei.com>
+ <20160209182429.GD4348@leverpostej>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1591@lhreml503-mbs>
+ <20160210111234.GC2632@leverpostej>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
+ <20160224011418.GB13026@localhost>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECCAD6A@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
 
-On Tuesday 23 February 2016 11:58 PM, Paul Walmsley wrote:
-> Kishon
-> 
-> On Tue, 23 Feb 2016, Kishon Vijay Abraham I wrote:
-> 
->> On Monday 22 February 2016 03:25 PM, Kishon Vijay Abraham I wrote:
->>> On Monday 22 February 2016 12:01 PM, Paul Walmsley wrote:
->>>> On Mon, 22 Feb 2016, Kishon Vijay Abraham I wrote:
->>>>> On Thursday 18 February 2016 07:51 PM, Sekhar Nori wrote:
->>>>>> On Friday 12 February 2016 10:50 PM, Suman Anna wrote:
->>>>>>> Will you be following up with above suggestion since Kishon is gonna be out?
->>>>>>
->>>>>> Alright, noticed this action for me :) Went through the thread, and 
->>>>>> looks like this is what we want to see?
->>>>>>
->>>>>> Thanks,
->>>>>> Sekhar
->>>>>>
->>>>>> ---8<---
->>>>>> From e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19 Mon Sep 17 00:00:00 2001
->>>>>> Message-Id: <e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19.1455803758.git.nsekhar@ti.com>
->>>>>> From: Sekhar Nori <nsekhar@ti.com>
->>>>>> Date: Thu, 18 Feb 2016 16:49:56 +0530
->>>>>> Subject: [PATCH 1/1] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
->>>>>>
->>>>>> Add a custom reset handler for DRA7x PCIeSS. This
->>>>>> handler is required to deassert PCIe hardreset lines
->>>>>> after they have been asserted.
->>>>>>
->>>>>> This enables the PCIe driver to access registers after
->>>>>> PCIeSS has been runtime enabled without having to
->>>>>> deassert hardreset lines itself.
->>>>>>
->>>>>> With this patch applied, used lspci to make sure
->>>>>> connected PCIe device enumerates on DRA74x and DRA72x
->>>>>> EVMs.
->>>>>>
->>>>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>>>>> ---
->>>>>> Applies to tag for-v4.6/omap-hwmod-a of Paul W's tree.
->>>>>>
->>>>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
->>>>>>  1 file changed, 23 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>>>> index b61355e2a771..252b74633e31 100644
->>>>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>>>> @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
->>>>>>   *
->>>>>>   */
->>>>>>  
->>>>>> +/*
->>>>>> + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
->>>>>> + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
->>>>>> + * associated with an IP automatically leaving the driver to handle that
->>>>>> + * by itself. This does not work for PCIeSS which needs the reset lines
->>>>>> + * deasserted for the driver to start accessing registers.
->>>>>> + *
->>>>>> + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
->>>>>> + * lines after asserting them.
->>>>>> + */
->>>>>> +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
->>>>>> +{
->>>>>> +	int i;
->>>>>> +
->>>>>> +	for (i = 0; i < oh->rst_lines_cnt; i++) {
->>>>>> +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
->>>>>> +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
->>>>>> +	}
->>>>>> +
->>>>>> +	return 0;
->>>>>> +}
->>>>>> +
->>>>>>  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
->>>>>>  	.name	= "pcie",
->>>>>> +	.reset	= dra7xx_pciess_reset,
->>>>>>  };
->>>>>
->>>>> Thanks for the patch.
->>>>
->>>> Could you please test the bind/unbind functionality just to make sure it 
->>>> works?
->>>
->>> The pci-dra7xx driver neither expose the bind/unbind sysfs entry nor can be
->>> built as module.
->>>
->>> However I hacked the pci-dra7xx driver to be built as module [and reverted
->>> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe error
->>> and driver unbind")] and I don't see an abort when the PCI registers are
->>> accessed after rmmod/modprobe cycle (that was the issue that Sekhar's patch
->>> tried to solve). However PCI as such doesn't work after rmmod/modprobe cycle
->>> [1], but this is a different issue most likely in PCIe core and has to debugged.
->>>
->>> In summary, there are other issues in PCI across rmmod/modprobe cycle but the
->>> reset of pci-dra7xx happens fine with this patch.
->>
->> Do you expect any other testing from me?
-> 
-> No I think that's sufficient for the time being, thanks - but, two 
-> questions:
-> 
-> 1. Can I add your Tested-by: ?
+Hi Bjorn, many thanks for replying
 
-sure..
-Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: 24 February 2016 09:14
+> To: Gabriele Paoloni
+> Cc: 'Mark Rutland'; Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong
+> (C); Linuxarm; qiujiang; 'bhelgaas at google.com'; 'arnd at arndb.de';
+> 'Lorenzo.Pieralisi at arm.com'; 'tn at semihalf.com'; 'linux-
+> pci at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; xuwei (O);
+> 'linux-acpi at vger.kernel.org'; 'jcm at redhat.com'; zhangjukuo; Liguozhu
+> (Kenneth); 'linux-arm-kernel at lists.infradead.org'
+> Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+> HiSilicon SoCs Host Controllers
+> 
+> On Tue, Feb 23, 2016 at 02:47:22AM +0000, Gabriele Paoloni wrote:
+> > > -----Original Message-----
+> > > From: Gabriele Paoloni
+> > > Sent: 10 February 2016 22:45
+> > > To: Mark Rutland
+> > > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
+> > > qiujiang; bhelgaas at google.com; arnd at arndb.de;
+> Lorenzo.Pieralisi at arm.com;
+> > > tn at semihalf.com; linux-pci at vger.kernel.org; linux-
+> > > kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: RE: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support
+> for
+> > > HiSilicon SoCs Host Controllers
+> > >
+> > > > -----Original Message-----
+> > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > > > owner at vger.kernel.org] On Behalf Of Mark Rutland
+> > > > Sent: 10 February 2016 11:13
+> > > > To: Gabriele Paoloni
+> > > > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C);
+> Linuxarm;
+> > > > qiujiang; bhelgaas at google.com; arnd at arndb.de;
+> > > > Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-
+> pci at vger.kernel.org;
+> > > > linux-kernel at vger.kernel.org; xuwei (O); linux-
+> acpi at vger.kernel.org;
+> > > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
+> > > > kernel at lists.infradead.org
+> > > > Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support
+> for
+> > > > HiSilicon SoCs Host Controllers
+> > > >
+> > > > On Wed, Feb 10, 2016 at 09:52:36AM +0000, Gabriele Paoloni wrote:
+> > > > > Hi Mark
+> > > > >
+> > > > > > On Tue, Feb 09, 2016 at 05:34:20PM +0000, Gabriele Paoloni
+> wrote:
+> > > > > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> > > > > > > +/*
+> > > > > > > + * Retrieve rc_dbi base and size from _DSD
+> > > > > > > + * Name (_DSD, Package () {
+> > > > > > > + *	ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+> > > > > > > + *	Package () {
+> > > > > > > + *	Package () {"rc-dbi", Package () { 0x0, 0xb0080000,
+> 0x0,
+> > > > 0x10000
+> > > > > > }},
+> > > > > > > + *	}
+> > > > > > > + *	})
+> > > > > > > + */
+> > > > > >
+> > > > > > As above, this does not look right. ACPI has standard
+> mechanisms
+> > > > for
+> > > > > > describing addresses. Making something up like this is not a
+> good
+> > > > idea.
+> > > > >
+> > > > > I am quite new to ACPI, may I ask you to explain a bit?
+> > > >
+> > > > ACPI has standard mechanisms for describing certain resources,
+> and
+> > > > these
+> > > > should not be described in _DSD. Memory or IO address regions are
+> > > such
+> > > > resources (in _CRS, IIRC), and should not be described in _DSD.
+> > >
+> > > Hi Mark,
+> > >
+> > > In my case I think in need to look into the MCFG object as the
+> problem
+> > > I have is RC using a different range than the rest of the hierarchy.
+> > >
+> > > I'll investigate this and try to come with a solution in v4
+> >
+> > I have looked into this and in our case we cannot use the
+> > standard MCFG object to pass the RC config space addresses.
+> >
+> > The reason is that in our HW we have the config base addresses of the
+> > root complex ports that are less than 0x100000 byte distant one from
+> > the other as we only map the first 0x10000 bytes.
+> 
+> The ECAM spec requires 4096 bytes per function, 8 functions per
+> device, 32 devices per bus, which means you need 0x100000 bytes of
+> address space per bus.  If your device doesn't supply that, it doesn't
+> really implement ECAM, and you probably can't use the standard ways of
+> describing ECAM (MCFG, _CBA).
+
+Correct, our host bridge is non ECAM only for the RC bus config space;
+for any other bus underneath the root bus we support ECAM access, so
+we need a quirk for the RC config rd/wr  
 
 > 
-> 2. Are you going to follow up with these PCIe core issues with the PCIe 
-> core developers?
-
-yeah, I see efforts have already started to convert the PCI drivers from
-built-in to module [1] and issues arising out of that will be debugged.
-
-Thanks
-Kishon
-
-[1] -> http://lkml.iu.edu/hypermail/linux/kernel/1602.0/06011.html
+> > Now the MCFG acpi framework always fix the MCFG resource size to
+> 0x100000
+> > for each bus; therefore if we pass our RC addresses through MCFG we
+> end
+> > up with a resource conflict.
+> >
+> > To give you a practical example we are in a situation where we have:
+> >
+> > port0: [0x00000000b0080000 - 0x00000000b0080000 + 0x10000]
+> > port1: [0x00000000b0090000 - 0x00000000b0090000 + 0x10000]
+> > port2: [0x00000000b00A0000 - 0x00000000b00A0000 + 0x10000]
+> > port3: [0x00000000b00B0000 - 0x00000000b00B0000 + 0x10000]
+> >
+> > So if we pass the base addresses through MCFG the resources
+> > will overlap as MCFG will consider 0x100000 size for each base
+> > address of the root complex (only the RC bus uses that address)
+> >
+> > So far I do not see many option other than using _DSD to pass
+> > these RC config base addresses.
 > 
+> I don't want to take over Mark's discussion, but I really do not think
+> _DSD is the correct way to fix this.  _CRS is like a generalized PCI
+> BAR.  A PCI device is only allowed to respond to address space
+> reported via a BAR.  An ACPI device is only allowed to respond to
+> address space reported via _CRS.  Those are important rules because
+> they mean we can manage address space with generic code instead of
+> device-specific code.
+
+>From what I see in 
+http://lxr.free-electrons.com/source/drivers/acpi/pci_root.c#L723
+acpi_pci_probe_root_resources() parses the _CRS method and
+it only works for MEM and IO resources, so I don't think it is 
+right to pass a config space address by _CRS or to modify the 
+current ACPI framework to support this.
+
+On the other side, since this is an exception only for the config
+space address of our host controller (as said before all the buses
+below the root one support ECAM), I think that it is right to put
+this address as a device specific data (in fact the rest of the
+config space addresses will be parsed from MCFG).
+I thought the purpose of the quirks from Nowicki patchset were meant
+to handle this sort of special cases...
+
+
+Thanks and Regards
+
+Gab
+
 > 
-> - Paul
-> 
+> Bjorn
