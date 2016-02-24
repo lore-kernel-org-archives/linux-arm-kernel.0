@@ -1,25 +1,57 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 24 Feb 2016 11:48:46 -0800
-Subject: [PATCH v5 0/4] Mediatek MT2701 SCPSYS power domain support
-In-Reply-To: <1455692499-56828-1-git-send-email-jamesjj.liao@mediatek.com>
- (James Liao's message of "Wed, 17 Feb 2016 15:01:35 +0800")
-References: <1455692499-56828-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <7hmvqpsxcx.fsf@baylibre.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Wed, 24 Feb 2016 14:53:02 -0500
+Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
+In-Reply-To: <20160224173511.GF25385@red-moon>
+References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <CANLsYkzvB0GbPeYHrcLtUz8DMHJh4FA5RVwVZ-UAm3BCznB_3w@mail.gmail.com>
+ <20160224173511.GF25385@red-moon>
+Message-ID: <CAJ5Y-ea3gxxOEGdJMPZAh78Ap0GBvzGePhBKzQRVoJBwwY6NzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James Liao <jamesjj.liao@mediatek.com> writes:
+Hi Lorenzo,
 
-> This patchset is based on v4.5-rc4 and adds scpsys power domain support
-> for Mediatek MT2701.
+On 24 February 2016 at 12:35, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Feb 24, 2016 at 09:20:22AM -0700, Mathieu Poirier wrote:
+>> On 23 February 2016 at 11:22, Lorenzo Pieralisi
 >
-> To share the code between MT2701 and MT8173, this patchset also refined
-> original mtk-scpsys.c to separate common codes and platform codes, so
-> that mtk-scpsys.c can support new SoCs more easily.
+> [...]
+>
+>> > +static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
+>> > +                            void *v)
+>> > +{
+>> > +       struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
+>> > +       struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
+>> > +       int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
+>> > +
+>> > +       if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
+>> > +               return NOTIFY_DONE;
+>> > +
+>> > +       /*
+>> > +        * Always reset the PMU registers on power-up even if
+>> > +        * there are no events running.
+>> > +        */
+>> > +       if (cmd == CPU_PM_EXIT && armpmu->reset)
+>> > +               armpmu->reset(armpmu);
+>>
+>> I think this patch does the right thing but I can't get the above
+>> reset.  Wouldn't it be better to do the reset as part of the
+>> CPU_PM_EXIT case below?  At this point nothing tells us the CPU won't
+>> go back down before the event is enabled, wasting the cycle needed to
+>> reset the PMU.
+>
+> The logic goes, if the cpu is woken up and it has no events enabled,
+> if we do not reset it (mind, ->reset here sets the PMU register values
+> to a sane default, some of them are architecturally UNKNOWN on reset, it
+> does NOT reset the PMU) _and_ we subsequently install an event on it we
+> do have a problem, that's why whenever a core gets out of low-power we
+> have to reset its pmu.
 
-Thanks for refactoring to support multiple SoCs, I like this version
-much better.
+Dont we blow out the previous value in the counter when installing an
+event? Or has that changed lately? IIRC, there was some initial value
+we'd program into the counter to avoid missing the overflow event.
+(sorry its been too long) ;)
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-
-Kevin
+Cheers,
+Ashwin.
