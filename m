@@ -1,48 +1,100 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 24 Feb 2016 19:17:27 +0100
-Subject: [PATCH v9 0/2] power: act8945a: add charger driver for the
- sub-device of ACT8945A MFD
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D6428FF2@penmbx01>
-References: <1455524524-9359-1-git-send-email-wenyou.yang@atmel.com>
- <B256D81BAE5131468A838E5D7A243641D6428FF2@penmbx01>
-Message-ID: <20160224181727.GA19106@earth>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 24 Feb 2016 10:21:16 -0800
+Subject: [PATCH 01/50] pinctrl: Add devm_ apis for pinctrl_{register,
+ unregister}
+In-Reply-To: <1456319775-3216-2-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20160224182116.GP21240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed 24 Feb 05:15 PST 2016, Laxman Dewangan wrote:
 
-On Wed, Feb 24, 2016 at 09:33:13AM +0000, Yang, Wenyou wrote:
-> > -----Original Message-----
-> > From: Wenyou Yang [mailto:wenyou.yang at atmel.com]
-> > Sent: 2016?2?15? 16:22
-> > To: Sebastian Reichel <sre@kernel.org>; Dmitry Eremin-Solenikov
-> > <dbaryshkov@gmail.com>; David Woodhouse <dwmw2@infradead.org>; Rob
-> > Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Brown
-> > <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
-> > Gala <galak@codeaurora.org>
-> > Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>; Javier Martinez Canillas
-> > <javier@dowhile0.org>; Lee Jones <lee.jones@linaro.org>; Peter Korsgaard
-> > <jacmet@gmail.com>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
-> > kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
-> > pm at vger.kernel.org; Yang, Wenyou <Wenyou.Yang@atmel.com>
-> > Subject: [PATCH v9 0/2] power: act8945a: add charger driver for the sub-device
-> > of ACT8945A MFD
-> > 
-> > The ACT8945A is a Multi Function Device with the following subdevices:
-> >  - Regulator
-> >  - Charger
+> Add device managed APIs devm_pinctrl_register() and
+> devm_pinctrl_unregister() for the APIs pinctrl_register()
+> and pinctrl_unregister().
 > 
-> I would like to know if this patch set is okay to apply.
-> Or any comments?
+> This helps in reducing code in error path and sometimes
+> removal of .remove callback for driver unbind.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+>  drivers/pinctrl/core.c          | 69 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pinctrl/pinctrl.h |  6 ++++
+>  2 files changed, 75 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+[..]
+> +static int devm_pinctrl_dev_match(struct device *dev, void *res, void *data)
+> +{
+> +	struct pctldev **r = res;
+> +
+> +	if (!r || !*r) {
+> +		WARN_ON(!r || !*r);
+> +		return 0;
+> +	}
 
-No comments, I just queued it with "|| COMPILE_TEST" dependency
-added.
+The idiomatic way is to wrap your condition in the WARN_ON; i.e. 
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/9d0d7c5a/attachment.sig>
+if (WARN_ON(!r || !*r))
+	return 0;
+
+> +
+> +	return *r == data;
+> +}
+> +
+[..]
+> +
+> +/**
+> + * devm_pinctrl_unregister() - Resource manager of pinctrl_unregister()
+> + * @dev: device for which which resource was allocated
+> + * @pctldev: the pinctrl device to unregister.
+> + */
+> +void devm_pinctrl_unregister(struct device *dev, struct pinctrl_dev *pctldev)
+> +{
+> +	int ret;
+> +
+> +	ret = devres_release(dev, devm_pinctrl_dev_release,
+> +			     devm_pinctrl_dev_match, pctldev);
+> +	if (!ret)
+> +		WARN_ON(ret);
+
+ret is unlikely to be non-zero in a code path only taken when ret is
+zero.
+
+Do either:
+
+WARN_ON(devres_release(...));
+
+rc = devres_release(..);
+WARN_ON(rc);
+
+> +}
+> +EXPORT_SYMBOL_GPL(devm_pinctrl_unregister);
+> +
+>  static int __init pinctrl_init(void)
+>  {
+>  	pr_info("initialized pinctrl subsystem\n");
+> diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
+> index 9ba59fc..a42e57d 100644
+> --- a/include/linux/pinctrl/pinctrl.h
+> +++ b/include/linux/pinctrl/pinctrl.h
+> @@ -144,6 +144,12 @@ struct pinctrl_desc {
+>  extern struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
+>  				struct device *dev, void *driver_data);
+>  extern void pinctrl_unregister(struct pinctrl_dev *pctldev);
+> +extern struct pinctrl_dev *devm_pinctrl_register(struct device *dev,
+> +				struct pinctrl_desc *pctldesc,
+> +				void *driver_data);
+> +extern void devm_pinctrl_unregister(struct device *dev,
+> +				struct pinctrl_dev *pctldev);
+> +
+>  extern bool pin_is_valid(struct pinctrl_dev *pctldev, int pin);
+>  extern void pinctrl_add_gpio_range(struct pinctrl_dev *pctldev,
+>  				struct pinctrl_gpio_range *range);
+
+Apart from these style issues you have my ack.
+
+Regards,
+Bjorn
