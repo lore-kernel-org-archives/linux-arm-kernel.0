@@ -1,27 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Feb 2016 16:59:16 +0100
-Subject: [PATCH] ARM: realview: DT support for the PBA8
-In-Reply-To: <CACRpkdbQKZxMgYRUq6cjAXHq5q1EufVwcHG=wJ0QsDcqUVoRhQ@mail.gmail.com>
-References: <1456303714-31039-1-git-send-email-linus.walleij@linaro.org>
- <56CDA0F0.9050608@arm.com>
- <CACRpkdbQKZxMgYRUq6cjAXHq5q1EufVwcHG=wJ0QsDcqUVoRhQ@mail.gmail.com>
-Message-ID: <CACRpkdbYB8pkgiE9NevOgR2WJpwv03ng5ZUwCMt=4=BsTVokfw@mail.gmail.com>
+From: miles.chen@mediatek.com (miles.chen at mediatek.com)
+Date: Thu, 25 Feb 2016 00:01:48 +0800
+Subject: [PATCH] arm64/mm: fix virtual address boundary check
+Message-ID: <1456329708-2042-1-git-send-email-miles.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 4:52 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Feb 24, 2016 at 1:24 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+From: Miles Chen <miles.chen@mediatek.com>
 
->> Waiting for root device /dev/mmcblk0p1...
->>
->> It then fails to notice my SD card, even if I eject and reinsert it :(
->
-> Fixing a v2 as we speak.
+The MODULES_VADDR is not the lowest possible
+kernel virtual address. TASK_SIZE_64 may be larger than
+MODULES_VADDR, FIXADDR_TOP, and PCI_IO_START.
 
-Also notice: if you want working graphics, I have a pending CLCD patch
-set for that, and then there is a patch for reset too. I still hope to land
-it all for v4.6 and delete the board files but it depends on a few subsystem
-maintainers.
+Fix this by comparing TASK_SIZE_64 (highest user virtual address)
+with VA_START (lowest kernel virtual address).
 
-Yours,
-Linus Walleij
+ #define VA_BITS		(CONFIG_ARM64_VA_BITS)
+ #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+ #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+ #define MODULES_END		(PAGE_OFFSET)
+ #define MODULES_VADDR		(MODULES_END - SZ_64M)
+ #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+ #define TASK_SIZE_64		(UL(1) << VA_BITS)
+
+Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+---
+ arch/arm64/mm/init.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index f3b061e..7d75697 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -343,8 +343,8 @@ void __init mem_init(void)
+ #ifdef CONFIG_COMPAT
+ 	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
+ #endif
+-	BUILD_BUG_ON(TASK_SIZE_64			> MODULES_VADDR);
+-	BUG_ON(TASK_SIZE_64				> MODULES_VADDR);
++	BUILD_BUG_ON(TASK_SIZE_64			> VA_START);
++	BUG_ON(TASK_SIZE_64				> VA_START);
+ 
+ 	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
+ 		extern int sysctl_overcommit_memory;
+-- 
+1.9.1
