@@ -1,81 +1,77 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 24 Feb 2016 21:23:12 +0100
-Subject: [PATCH v3 0/7] irqchip: introduce the Alpine MSIX driver
-In-Reply-To: <20160220104019.21e425c6@arm.com>
-References: <1455895369-13187-1-git-send-email-antoine.tenart@free-electrons.com>
- <20160220104019.21e425c6@arm.com>
-Message-ID: <20160224202312.GC29884@kwain>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Wed, 24 Feb 2016 12:28:25 -0800
+Subject: [PATCH 13/50] pinctrl: mtk-common: Use devm_pinctrl_register()
+ for pinctrl registration
+In-Reply-To: <1456319775-3216-14-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-14-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456345705.14518.1.camel@mussux00>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Sat, Feb 20, 2016 at 10:40:19AM +0000, Marc Zyngier wrote:
-> On Fri, 19 Feb 2016 16:22:42 +0100
-> Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-> > 
-> > This series introduce the Alpine MSIX driver, and enables it in both
-> > the Alpine v1 and Alpine v2 device trees.
-> > 
-> > This series depends on "[PATCH v2 0/3] arm64: introduce the Alpine support":
-> > https://lkml.org/lkml/2016/2/10/83
-> > 
-> > You can find the series at:
-> > https://github.com/atenart/linux.git 4.5-rc1/alpinev2-msix
-> > 
-> > Antoine
-> > 
-> > Since v2:
-> >   - Updated the documentation (added a reference to the GIC documentation).
-> > 
-> > Since v1:
-> >   - Added an interrupt-parent property in the documentation example.
-> >   - Updated to use bitmap_*() instead of *_bit().
-> >   - Removed the static irq_set_affinity to use irq_chip_set_affinity_parent().
-> >   - Updated the address field to use phys_addr_t.
-> >   - Added a comment on why we're setting bit 16 in the address.
-> >   - Patched the gic_set_affinity() function in irqchip/gic-v3.
-> > 
-> > Antoine Tenart (7):
-> >   irqchip/gic-v3: always return IRQ_SET_MASK_OK_DONE in gic_set_affinity
-> >   irqchip: add the Alpine MSIX interrupt controller
-> >   Documentation: bindings: document the Alpine MSIX driver
-> >   arm64: dts: alpine: add the MSIX node in the Alpine v2 dtsi
-> >   ARM: dts: alpine: add the MSIX node
-> >   arm64: alpine: select the Alpine MSI controller driver
-> >   arm: alpine: select the Alpine MSI controller driver
-> > 
-> >  .../interrupt-controller/al,alpine-msix.txt        |  26 ++
-> >  arch/arm/boot/dts/alpine.dtsi                      |  10 +
-> >  arch/arm/mach-alpine/Kconfig                       |   1 +
-> >  arch/arm64/Kconfig.platforms                       |   1 +
-> >  arch/arm64/boot/dts/al/alpine-v2.dtsi              |  10 +
-> >  drivers/irqchip/Kconfig                            |   6 +
-> >  drivers/irqchip/Makefile                           |   1 +
-> >  drivers/irqchip/irq-alpine-msi.c                   | 293 +++++++++++++++++++++
-> >  drivers/irqchip/irq-gic-v3.c                       |   2 +-
-> >  9 files changed, 349 insertions(+), 1 deletion(-)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
-> >  create mode 100644 drivers/irqchip/irq-alpine-msi.c
-> > 
+On Wed, 2016-02-24 at 18:45 +0530, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration and clean
+> the error path.
 > 
-> I've queued the first three patches in my irq/gic-4.6 branch. I'd
-> expect the last 4 patches to be taken care off by armsoc once the code
-> has made it into Linus' tree.
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Cc: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
 
-I'm taking care of the Alpine patches for 4.6, so I'll take the last 4
-myself (and ensure their dependencies are met).
+Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-Antoine
+Thanks,
+Hongzhou
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/ba59590a/attachment.sig>
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 17 ++++++-----------
+>  1 file changed, 6 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index ddc9217..194413d 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -1390,17 +1390,16 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>  	pctl->pctl_desc.pmxops = &mtk_pmx_ops;
+>  	pctl->dev = &pdev->dev;
+>  
+> -	pctl->pctl_dev = pinctrl_register(&pctl->pctl_desc, &pdev->dev, pctl);
+> +	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, &pctl->pctl_desc,
+> +					       pctl);
+>  	if (IS_ERR(pctl->pctl_dev)) {
+>  		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+>  		return PTR_ERR(pctl->pctl_dev);
+>  	}
+>  
+>  	pctl->chip = devm_kzalloc(&pdev->dev, sizeof(*pctl->chip), GFP_KERNEL);
+> -	if (!pctl->chip) {
+> -		ret = -ENOMEM;
+> -		goto pctrl_error;
+> -	}
+> +	if (!pctl->chip)
+> +		return -ENOMEM;
+>  
+>  	*pctl->chip = mtk_gpio_chip;
+>  	pctl->chip->ngpio = pctl->devdata->npins;
+> @@ -1409,10 +1408,8 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>  	pctl->chip->base = -1;
+>  
+>  	ret = gpiochip_add_data(pctl->chip, pctl);
+> -	if (ret) {
+> -		ret = -EINVAL;
+> -		goto pctrl_error;
+> -	}
+> +	if (ret)
+> +		return -EINVAL;
+>  
+>  	/* Register the GPIO to pin mappings. */
+>  	ret = gpiochip_add_pin_range(pctl->chip, dev_name(&pdev->dev),
+> @@ -1490,8 +1487,6 @@ int mtk_pctrl_init(struct platform_device *pdev,
+>  
+>  chip_error:
+>  	gpiochip_remove(pctl->chip);
+> -pctrl_error:
+> -	pinctrl_unregister(pctl->pctl_dev);
+>  	return ret;
+>  }
+>  
