@@ -1,102 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Feb 2016 09:05:30 +0000
-Subject: [PATCH 5/8] arm64: kprobes instruction simulation support
-In-Reply-To: <56CD5434.30108@linaro.org>
-References: <1455839301-26464-1-git-send-email-dave.long@linaro.org>
- <1455839301-26464-6-git-send-email-dave.long@linaro.org>
- <56C720F0.9080108@arm.com> <56CD5434.30108@linaro.org>
-Message-ID: <20160224090530.5e86e867@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 24 Feb 2016 18:14:52 +0900
+Subject: [PATCH 2/3] ARM: EXYNOS: remove unused register offset definition
+In-Reply-To: <56CD6885.4060904@samsung.com>
+References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
+ <1456135396-17767-3-git-send-email-pankaj.dubey@samsung.com>
+ <56CBA1BC.4050003@samsung.com> <56CC2238.2040303@samsung.com>
+ <56CCEF84.6090502@samsung.com> <56CD6885.4060904@samsung.com>
+Message-ID: <56CD748C.7060007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Feb 2016 01:56:52 -0500
-David Long <dave.long@linaro.org> wrote:
-
-> On 02/19/2016 09:04 AM, Marc Zyngier wrote:
-> > Hi David,
-> >
-> > On 18/02/16 23:48, David Long wrote:
-> >> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> >>
-> >> Kprobes needs simulation of instructions that cannot be stepped
-> >> from different memory location, e.g.: those instructions
-> >> that uses PC-relative addressing. In simulation, the behaviour
-> >> of the instruction is implemented using a copy of pt_regs.
-> >>
-> >> Following instruction catagories are simulated:
-> >>   - All branching instructions(conditional, register, and immediate)
-> >>   - Literal access instructions(load-literal, adr/adrp)
-> >>
-> >> Conditional execution is limited to branching instructions in
-> >> ARM v8. If conditions at PSTATE do not match the condition fields
-> >> of opcode, the instruction is effectively NOP. Kprobes considers
-> >> this case as 'miss'.
-> >>
-> >> This code also replaces the use of arch/arm/opcodes.c for
-> >> arm_check_condition().
-> >>
-> >> Thanks to Will Cohen for assorted suggested changes.
-> >>
-> >> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> >> Signed-off-by: William Cohen <wcohen@redhat.com>
-> >> Signed-off-by: David A. Long <dave.long@linaro.org>
-
-[...]
-
-> >> +};
-> >> +
-> >> +asmlinkage unsigned int __kprobes arm_check_condition(u32 opcode, u32 psr)
-> >
-> > Why asmlinkage? This function is never called from assembly code on arm64.
-> >
+On 24.02.2016 17:23, pankaj.dubey wrote:
 > 
-> This comes from the 32-bit ARM code that tests the condition from 
-> entry.S.  We include arch/arm/include/asm/opcodes.h in 
-> arch/arm64/include/asm/opcodes.h so it gets declared there with 
-> asmlinkage. I can remove the asmlinkage in the actual function 
-> definition and it still compiles but I'm not sure that is kosher. 
-
-asmlinkage is only meaningful if you're calling it from assembly code.
-As you seem to only call it from C code, having asmlinkage is both
-pointless and confusing.
-
-> Will Deacon was advocating getting rid of the include of the 32-bit header 
-> file but it looked to me like this would mean a lot of duplicated 
-> defines and the work would be mostly unrelated to kprobes.
-
-Arguably, arm_check_condition() (which only matters to 32bit code,
-hence userspace) is also completely unrelated to kprobes. I still think
-Will's point stands.
-
 > 
-> >> +{
-> >> +	u32 cc_bits  = opcode >> 28;
-> >> +
-> >> +	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
-> >> +		if ((*opcode_condition_checks[cc_bits])(psr))
-> >> +			return ARM_OPCODE_CONDTEST_PASS;
-> >> +		else
-> >> +			return ARM_OPCODE_CONDTEST_FAIL;
-> >> +	}
-> >> +	return ARM_OPCODE_CONDTEST_UNCOND;
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(arm_check_condition);
-> >
-> > Why do we need this to be exported at all? Also, it'd be better located
-> > together with the deprecated instruction handling, possibly in a
-> > separate patch (nothing uses this function in this patch).
-> >
+> On Wednesday 24 February 2016 05:17 AM, Krzysztof Kozlowski wrote:
+>> On 23.02.2016 18:11, pankaj.dubey wrote:
+>>> Hi Krzysztof,
+>>>
+>>> On Tuesday 23 February 2016 05:33 AM, Krzysztof Kozlowski wrote:
+>>>> On 22.02.2016 19:03, Pankaj Dubey wrote:
+>>>>> This patch cleans up map.h by removing unused register offset
+>>>>> and changing EXYNOS4 to EXYNOS in header comment section.
+>>>>>
+>>>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>>>> ---
+>>>>>  arch/arm/mach-exynos/include/mach/map.h | 9 +--------
+>>>>>  1 file changed, 1 insertion(+), 8 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+>>>>> index 351e839..c48ba4f 100644
+>>>>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>>>>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>>>>> @@ -2,7 +2,7 @@
+>>>>>   * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+>>>>>   *		http://www.samsung.com/
+>>>>>   *
+>>>>> - * EXYNOS4 - Memory map definitions
+>>>>> + * EXYNOS - Memory map definitions
+>>>>>   *
+>>>>>   * This program is free software; you can redistribute it and/or modify
+>>>>>   * it under the terms of the GNU General Public License version 2 as
+>>>>> @@ -14,12 +14,6 @@
+>>>>>  
+>>>>>  #include <plat/map-base.h>
+>>>>>  
+>>>>> -/*
+>>>>> - * EXYNOS4 UART offset is 0x10000 but the older S5P SoCs are 0x400.
+>>>>> - * So need to define it, and here is to avoid redefinition warning.
+>>>>> - */
+>>>>> -#define S3C_UART_OFFSET			(0x10000)
+>>>>> -
+>>>>>  #include <plat/map-s5p.h>
+>>>>
+>>>> This does not look good. The S3C_UART_OFFSET is used in plat/map-s5p.h.
+>>>>
+>>>
+>>> Actually it's just defined there but not getting used anywhere. In fact
+>>> we can remove it from there also.
+>>
+>> The point is that your patch introduce changes. Before S3C_UART_OFFSET
+>> was defined to 0x10000, after (because of #ifndef) it will be 0x400.
+>> Description of "unused" is not accurate. Unused stuff does not impact
+>> anything.
+>>
+>>> So I submitted another patch to
+>>> cleanup such redundant register definitions from plat/map-s5p.h.
+>>
+>> That would be good.
+>>
+>>> Only platform using S3C_UART_OFFSET is s3c64xx and its using definition
+>>> from map-s3c.h. I have compiled all related platform defconfigs and
+>>> found no issues because of removal of S3C_UART_OFFSET from map-s5p.c and
+>>> map.h.
+>>
+>> The compilation is not a test. You compiled something like this:
+>> -#define S3C_UART_OFFSET			(0x10000)
+>>  #ifndef S3C_UART_OFFSET
+>>  #define S3C_UART_OFFSET         (0x400)
+>>  #endif
+>>
+>> ... and found no errors. Of course there are no compilation errors! But
+>> the value has changed!
+>>
 > 
-> I've made the function static and moved it to armv8_deprecated.  I have 
-> to leave the static functions that test the individual conditions and 
-> the global array of pointers to them outside of the conditionally 
-> compiled armv8_deprecated.c as they have to always be present for 
-> kprobes to simulate a conditional branch.
+> OK. I see, there are quite a few places these definitions are scattered
+> even though not used (not used in the sense what ever values these
+> macros are taking in code it's not used). Such as
+> mach-exynos/include/map.h, plat-samsung/include/plat/{map-s3c.h,
+> map-s5p.h} and mach-s3c24xx/include/mach/map.h. So I will remove all
+> these in one go.
+> Is this fine?
 
-I think that's fine.
+Except the used ones (s3c64xx) - yes, all at once. Some of them depend
+on previous ones (ifndef) so "unused" when patching this one-by-one is
+not accurate.
 
-Thanks,
+> Also I have one doubt in case I am touching files across various mach
+> files and preparing a single patch what should be commit message
+> heading? Is commit starting with "ARM: samsung" fine? or anything more
+> appropriate you would suggest.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+It is still the same Samsung tree and either way it would end in the
+same branch. ARM: SAMSUNG: is fine (I saw it in the log).
+
+Best regards,
+Krzysztof
