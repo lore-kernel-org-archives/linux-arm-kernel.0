@@ -1,11 +1,11 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 24 Feb 2016 10:09:13 -0800
-Subject: [PATCH 20/50] pinctrl: ssbi-mpp: Use devm_pinctrl_register() for
+Date: Wed, 24 Feb 2016 10:11:09 -0800
+Subject: [PATCH 21/50] pinctrl: msm: Use devm_pinctrl_register() for
  pinctrl registration
-In-Reply-To: <1456319775-3216-21-git-send-email-ldewangan@nvidia.com>
+In-Reply-To: <1456319775-3216-22-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-21-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160224180913.GN21240@tuxbot>
+ <1456319775-3216-22-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20160224181109.GO21240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,6 +16,9 @@ On Wed 24 Feb 05:15 PST 2016, Laxman Dewangan wrote:
 > 
 > Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 > Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
 > ---
 
 Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
@@ -23,55 +26,42 @@ Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Regards,
 Bjorn
 
->  drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
+>  drivers/pinctrl/qcom/pinctrl-msm.c | 8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-> index 54a5402..49cc734 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-> @@ -820,7 +820,7 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
->  	pctrl->desc.custom_conf_items = pm8xxx_conf_items;
->  #endif
->  
-> -	pctrl->pctrl = pinctrl_register(&pctrl->desc, &pdev->dev, pctrl);
-> +	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &pctrl->desc, pctrl);
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+> index 8777cf0..dc7bf77 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+> @@ -898,17 +898,16 @@ int msm_pinctrl_probe(struct platform_device *pdev,
+>  	msm_pinctrl_desc.name = dev_name(&pdev->dev);
+>  	msm_pinctrl_desc.pins = pctrl->soc->pins;
+>  	msm_pinctrl_desc.npins = pctrl->soc->npins;
+> -	pctrl->pctrl = pinctrl_register(&msm_pinctrl_desc, &pdev->dev, pctrl);
+> +	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &msm_pinctrl_desc,
+> +					     pctrl);
 >  	if (IS_ERR(pctrl->pctrl)) {
->  		dev_err(&pdev->dev, "couldn't register pm8xxx mpp driver\n");
+>  		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
 >  		return PTR_ERR(pctrl->pctrl);
-> @@ -836,7 +836,7 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
->  	ret = gpiochip_add_data(&pctrl->chip, pctrl);
->  	if (ret) {
->  		dev_err(&pdev->dev, "failed register gpiochip\n");
-> -		goto unregister_pinctrl;
-> +		return ret;
 >  	}
 >  
->  	ret = gpiochip_add_pin_range(&pctrl->chip,
-> @@ -856,9 +856,6 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
->  unregister_gpiochip:
+>  	ret = msm_gpio_init(pctrl);
+> -	if (ret) {
+> -		pinctrl_unregister(pctrl->pctrl);
+> +	if (ret)
+>  		return ret;
+> -	}
+>  
+>  	platform_set_drvdata(pdev, pctrl);
+>  
+> @@ -923,7 +922,6 @@ int msm_pinctrl_remove(struct platform_device *pdev)
+>  	struct msm_pinctrl *pctrl = platform_get_drvdata(pdev);
+>  
 >  	gpiochip_remove(&pctrl->chip);
->  
-> -unregister_pinctrl:
 > -	pinctrl_unregister(pctrl->pctrl);
-> -
->  	return ret;
->  }
 >  
-> @@ -868,8 +865,6 @@ static int pm8xxx_mpp_remove(struct platform_device *pdev)
->  
->  	gpiochip_remove(&pctrl->chip);
->  
-> -	pinctrl_unregister(pctrl->pctrl);
-> -
->  	return 0;
->  }
+>  	unregister_restart_handler(&pctrl->restart_nb);
 >  
 > -- 
 > 2.1.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
