@@ -1,98 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Feb 2016 17:33:42 +0000
-Subject: [PATCH 1/3] KVM: arm/arm64: vgic: Ensure bitmaps are long enough
-In-Reply-To: <1456335224-20603-1-git-send-email-marc.zyngier@arm.com>
-References: <1456335224-20603-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1456335224-20603-2-git-send-email-marc.zyngier@arm.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed, 24 Feb 2016 12:46:52 -0500
+Subject: [PATCH v3 0/6] watchdog: pnx4008: add restart handler
+Message-ID: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-When we allocate bitmaps in vgic_vcpu_init_maps, we divide the number of
-bits we need by 8 to figure out how many bytes to allocate. However,
-bitmap elements are always accessed as unsigned longs, and if we didn't
-happen to allocate a size such that size % sizeof(unsigned long) == 0,
-bitmap accesses may go past the end of the allocation.
+The LPC32xx provide the capability to perform a soft or hard reset;
+a soft reset will no reset the external peripheral
+(i.e. RESOUT_N output not asserted).
 
-When using KASAN (which does byte-granular access checks), this results
-in a continuous stream of BUGs whenever these bitmaps are accessed:
+This changeset migrate the restart code from the "mach-lpc32xx" to
+the "pnx-4008" watchdog driver and add the soft reset capability.
 
-=============================================================================
-BUG kmalloc-128 (Tainted: G    B          ): kasan: bad access detected
------------------------------------------------------------------------------
+The default behavior (i.e. hard reset) remain unchanged.
 
-INFO: Allocated in vgic_init.part.25+0x55c/0x990 age=7493 cpu=3 pid=1730
-INFO: Slab 0xffffffbde6d5da40 objects=16 used=15 fp=0xffffffc935769700 flags=0x4000000000000080
-INFO: Object 0xffffffc935769500 @offset=1280 fp=0x          (null)
+The core restart handler support added by this change:
+2165bf524da5f5e496d - "watchdog: core: add restart handler support"
+is not use in this changeset; it does not support the reboot mode.
 
-Bytes b4 ffffffc9357694f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769500: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769510: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769520: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769530: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769540: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769550: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769560: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Object ffffffc935769570: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Padding ffffffc9357695b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Padding ffffffc9357695c0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Padding ffffffc9357695d0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Padding ffffffc9357695e0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-Padding ffffffc9357695f0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
-CPU: 3 PID: 1740 Comm: kvm-vcpu-0 Tainted: G    B           4.4.0+ #17
-Hardware name: ARM Juno development board (r1) (DT)
-Call trace:
-[<ffffffc00008e770>] dump_backtrace+0x0/0x280
-[<ffffffc00008ea04>] show_stack+0x14/0x20
-[<ffffffc000726360>] dump_stack+0x100/0x188
-[<ffffffc00030d324>] print_trailer+0xfc/0x168
-[<ffffffc000312294>] object_err+0x3c/0x50
-[<ffffffc0003140fc>] kasan_report_error+0x244/0x558
-[<ffffffc000314548>] __asan_report_load8_noabort+0x48/0x50
-[<ffffffc000745688>] __bitmap_or+0xc0/0xc8
-[<ffffffc0000d9e44>] kvm_vgic_flush_hwstate+0x1bc/0x650
-[<ffffffc0000c514c>] kvm_arch_vcpu_ioctl_run+0x2ec/0xa60
-[<ffffffc0000b9a6c>] kvm_vcpu_ioctl+0x474/0xa68
-[<ffffffc00036b7b0>] do_vfs_ioctl+0x5b8/0xcb0
-[<ffffffc00036bf34>] SyS_ioctl+0x8c/0xa0
-[<ffffffc000086cb0>] el0_svc_naked+0x24/0x28
-Memory state around the buggy address:
- ffffffc935769400: 00 00 fc fc fc fc fc fc fc fc fc fc fc fc fc fc
- ffffffc935769480: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
->ffffffc935769500: 04 fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
-                   ^
- ffffffc935769580: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
- ffffffc935769600: 00 00 00 00 fc fc fc fc fc fc fc fc fc fc fc fc
-==================================================================
-
-Fix the issue by always allocating a multiple of sizeof(unsigned long),
-as we do elsewhere in the vgic code.
-
-Fixes: c1bfb577a ("arm/arm64: KVM: vgic: switch to dynamic allocation")
-Cc: stable at vger.kernel.org
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Note:
+The patch #6 was generated with the option "--unified=2" to ensure
+it can be apply before or after the following git pull request
+for the LPC32xx platform:
+- http://permalink.gmane.org/gmane.linux.ports.arm.kernel/477137
+- http://permalink.gmane.org/gmane.linux.ports.arm.kernel/477138
 ---
- virt/kvm/arm/vgic.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes from v2 to v3:
+* Update the patch as per the feedback received from:
+  Joachim: http://permalink.gmane.org/gmane.linux.watchdog/3303
+  - remove explicit clock enable from restart handler.
+  - verify "register_restart_handler" return value.
+  - add call to unregister_restart_handler".
+  - do the restart handling directly in "pnx4008_restart_handler".
+* Move the change to "phy3250.c" into a separate patch and generate
+  the new patch with the "--unified=2" option.
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 043032c..00429b3 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1875,8 +1875,8 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
- static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--
--	int sz = (nr_irqs - VGIC_NR_PRIVATE_IRQS) / 8;
-+	int nr_longs = BITS_TO_LONGS(nr_irqs - VGIC_NR_PRIVATE_IRQS);
-+	int sz = nr_longs * sizeof(unsigned long);
- 	vgic_cpu->pending_shared = kzalloc(sz, GFP_KERNEL);
- 	vgic_cpu->active_shared = kzalloc(sz, GFP_KERNEL);
- 	vgic_cpu->pend_act_shared = kzalloc(sz, GFP_KERNEL);
+Changes from v1 to v2:
+* Rename patch title;
+  was "arm: lpc32xx: restart: add support for soft reset"
+* Update the patch as per the feedback received from:
+  Joachim: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/479791
+  - migrate restart code from "mach-lpc32xx" to "pnx-4008" driver.
+* Add soft reset support to "pnx-4008" driver instead of "mach-lpc32xx".
+* Use define available in "pnx-4008" when writting to watchdog register.
+* Remove restart handler from "mach-lpc32xx".
+* Remove restart hook from "phy3250.c".
+* Update driver logging during power-on. 
+
+Sylvain Lemieux (6):
+  watchdog: pnx4008: update logging during power-on
+  watchdog: pnx4008: add restart handler
+  watchdog: pnx4008: add support for soft reset
+  watchdog: pnx4008: restart: support "cmd" from userspace
+  arm: lpc32xx: remove restart handler
+  arm: lpc32xx: phy3250 remove restart hook
+
+ arch/arm/mach-lpc32xx/common.c  | 15 ------------
+ arch/arm/mach-lpc32xx/common.h  |  1 -
+ arch/arm/mach-lpc32xx/phy3250.c |  1 -
+ drivers/watchdog/pnx4008_wdt.c  | 51 +++++++++++++++++++++++++++++++++++++++--
+ 4 files changed, 49 insertions(+), 19 deletions(-)
+
 -- 
-2.1.4
+1.8.3.1
