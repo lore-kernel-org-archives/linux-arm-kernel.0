@@ -1,41 +1,43 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 24 Feb 2016 12:46:58 -0500
-Subject: [PATCH v3 6/6] arm: lpc32xx: phy3250 remove restart hook
-In-Reply-To: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1456336018-6620-7-git-send-email-slemieux.tyco@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Feb 2016 17:52:48 +0000
+Subject: [PATCH v13 01/20] ARM64: Move PMU register related defines to
+ asm/perf_event.h
+In-Reply-To: <1456290520-10012-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
+ <1456290520-10012-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160224175247.GE12471@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+On Wed, Feb 24, 2016 at 01:08:21PM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> To use the ARMv8 PMU related register defines from the KVM code, we move
+> the relevant definitions to asm/perf_event.h header file and rename them
+> with prefix ARMV8_PMU_.
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
+> ---
+>  arch/arm64/include/asm/perf_event.h | 35 +++++++++++++++++++
+>  arch/arm64/kernel/perf_event.c      | 68 ++++++++++---------------------------
+>  2 files changed, 52 insertions(+), 51 deletions(-)
 
-Remove the restart hook assignment from phy3250;
-this functionality is now managed by
-the pnx4008 watchdog driver.
+Looks fine to me, but we're going to get some truly horrible conflicts
+in -next.
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
-Note:
-This patch was generated with the option "--unified=2" to ensure
-it can be apply before or after the following git pull request
-for the LPC32xx platform:
-- http://permalink.gmane.org/gmane.linux.ports.arm.kernel/477137
-- http://permalink.gmane.org/gmane.linux.ports.arm.kernel/477138
+I'm open to suggestions on the best way to handle this, but one way
+would be:
 
-Changes from v2 to v3:
-- new patch in v3.
+  1. Duplicate all the #defines privately in KVM (queue via kvm tree)
+  2. Rebase this patch onto my perf/updates branch [1] (queue via me)
+  3. Patch at -rc1 dropping the #defines from (1) and moving to the new
+     perf_event.h stuff
 
- arch/arm/mach-lpc32xx/phy3250.c | 1 -
- 1 file changed, 1 deletion(-)
+Thoughts?
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index 65ec92c..26de053 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -264,4 +264,3 @@ DT_MACHINE_START(LPC32XX_DT, "LPC32XX SoC (Flattened Device Tree)")
- 	.init_machine	= lpc3250_machine_init,
- 	.dt_compat	= lpc32xx_dt_compat,
--	.restart	= lpc23xx_restart,
- MACHINE_END
--- 
-1.8.3.1
+Will
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/updates
