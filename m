@@ -1,134 +1,83 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 24 Feb 2016 12:15:17 +0100
-Subject: [PATCH v3 2/2] ohci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1456312517-24211-1-git-send-email-hdegoede@redhat.com>
-References: <1456312517-24211-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1456312517-24211-3-git-send-email-hdegoede@redhat.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 24 Feb 2016 13:21:51 +0200
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <20160224104638.GL19428@n2100.arm.linux.org.uk>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
+ <56CC546A.9070705@ti.com> <20160224104638.GL19428@n2100.arm.linux.org.uk>
+Message-ID: <56CD924F.50108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
-reset lines, the controller will not initialize while the reset for
-its companion is still asserted, which means we need to de-assert
-2 resets for the controller to work.
+On 24/02/16 12:46, Russell King - ARM Linux wrote:
+> On Tue, Feb 23, 2016 at 02:45:30PM +0200, Tomi Valkeinen wrote:
+>> My opinion is that the bootloader should be responsible for telling the
+>> kernel what hardware there is on the board. For busses like PCI we have
+>> proper probing mechanism with global unique identifiers for the devices,
+>> and nothing is needed from the bootloader.
+> 
+> Exactly, but that is _NOT_ the case here, because we're not talking
+> about an on-board display.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--New patch in v2 of this patch-set, to complement the identical patch for
- the ehci-platform code
-Changes in v3:
--Adjust for changes to shared-reset reset-controller functions
----
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  2 +-
- drivers/usb/host/ohci-platform.c                   | 43 ++++++++++++----------
- 2 files changed, 24 insertions(+), 21 deletions(-)
+Ok, what is it then? I'm not familiar with the boards in question.
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 19233b7..9df4569 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -14,7 +14,7 @@ Optional properties:
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
--- resets : phandle + reset specifier pair
-+- resets : a list of phandle + reset specifier pairs
- 
- Example:
- 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index c2669f18..5fa5813 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -33,11 +33,12 @@
- 
- #define DRIVER_DESC "OHCI generic platform driver"
- #define OHCI_MAX_CLKS 3
-+#define OHCI_MAX_RESETS 2
- #define hcd_to_ohci_priv(h) ((struct ohci_platform_priv *)hcd_to_ohci(h)->priv)
- 
- struct ohci_platform_priv {
- 	struct clk *clks[OHCI_MAX_CLKS];
--	struct reset_control *rst;
-+	struct reset_control *resets[OHCI_MAX_RESETS];
- 	struct phy **phys;
- 	int num_phys;
- };
-@@ -117,7 +118,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
- 	struct ohci_hcd *ohci;
--	int err, irq, phy_num, clk = 0;
-+	int err, irq, phy_num, clk = 0, rst = 0;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -195,19 +196,21 @@ static int ohci_platform_probe(struct platform_device *dev)
- 				break;
- 			}
- 		}
--
--	}
--
--	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
--	if (IS_ERR(priv->rst)) {
--		err = PTR_ERR(priv->rst);
--		if (err == -EPROBE_DEFER)
--			goto err_put_clks;
--		priv->rst = NULL;
--	} else {
--		err = reset_control_deassert(priv->rst);
--		if (err)
--			goto err_put_clks;
-+		for (rst = 0; rst < OHCI_MAX_RESETS; rst++) {
-+			priv->resets[rst] =
-+				devm_reset_control_get_shared_by_index(
-+								&dev->dev, rst);
-+			if (IS_ERR(priv->resets[rst])) {
-+				err = PTR_ERR(priv->resets[rst]);
-+				if (err == -EPROBE_DEFER)
-+					goto err_reset;
-+				priv->resets[rst] = NULL;
-+				break;
-+			}
-+			err = reset_control_deassert(priv->resets[rst]);
-+			if (err)
-+				goto err_reset;
-+		}
- 	}
- 
- 	if (pdata->big_endian_desc)
-@@ -265,8 +268,8 @@ err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- err_reset:
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	while (--rst >= 0)
-+		reset_control_assert(priv->resets[rst]);
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
-@@ -284,15 +287,15 @@ static int ohci_platform_remove(struct platform_device *dev)
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
--	int clk;
-+	int clk, rst;
- 
- 	usb_remove_hcd(hcd);
- 
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- 
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	for (rst = 0; rst < OHCI_MAX_RESETS && priv->resets[rst]; rst++)
-+		reset_control_assert(priv->resets[rst]);
- 
- 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++)
- 		clk_put(priv->clks[clk]);
--- 
-2.7.1
+When does a display become an on-board display? All the panels I have
+can be disconnected quite easily, but I still consider them as on-board
+displays.
+
+>> In the Versatile case the panels are kind of probeable, but not in the
+>> same sense as PCI: all that can be probed on Versatile is a board
+>> specific ID, which in itself doesn't tell what kind of panel there is.
+>> In addition to the ID we need board specific tables listing the details
+>> of the panels.
+> 
+> That argument does not stack up.  Just because you've plugged in a
+> network device does not mean that the kernel can drive it: the kernel
+> needs a device specific driver, which is determined by looking at the
+> IDs.  There is no standard network driver PCI interface.
+
+Yes, but you can connect the network device to any board with a PCI bus
+and it works. Here, if I'm not mistaken, the displays are built for this
+single board, making them board specific.
+
+So sure, someone could build boards with the same connector, allowing
+you to connect the same displays. If that's the case, then CLCD should
+be taken out of this picture, as the board could have something else
+than CLCD as the display controller.
+
+>> I think one of the core questions here is: do we want to start adding
+>> board specific drivers to the kernel, instead of dealing with it in the
+>> bootloader when possible? My understanding is that we've been trying to
+>> reduce board specific code from the kernel.
+> 
+> That's not really the question, because that question assumes that it
+> isn't already present, which is not true.  The code is already present.
+> The question is how to deal with this from the DT perspective.
+
+Yes. As I commented in this (or the other thread), I'm looking for a
+proper generic solution which can be recommended for all new boards.
+When we know what that is, we can see if and how that could fit into
+Versatile's case. Versatile is not the only board with the exact same
+problem.
+
+I wouldn't be at all surprised if the final solution is to just go with
+Linus' current patches for Versatile, as everything else would break
+compatibility or be overly complex.
+
+But I cannot accept that as a general solution for all similar cases
+going forward, especially when moving to DRM world, that's just bad SW
+design.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/9d13a40f/attachment.sig>
