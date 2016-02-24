@@ -1,74 +1,116 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 24 Feb 2016 14:02:09 -0300
-Subject: [PATCH] rtc: mt6397: Add platform device ID table
-In-Reply-To: <3216713.qF8RyQVuPO@wuerfel>
-References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
- <2416670.q30ahHlzPm@wuerfel> <1455628747.2981.4.camel@mtksdaap41>
- <3216713.qF8RyQVuPO@wuerfel>
-Message-ID: <56CDE211.1000802@osg.samsung.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed, 24 Feb 2016 20:10:10 +0300
+Subject: [PATCH v2 1/8] arm64: move acpi/dt decision earlier in boot process
+In-Reply-To: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456333819-13482-2-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+From: Leif Lindholm <leif.lindholm@linaro.org>
 
-On 02/24/2016 01:56 PM, Arnd Bergmann wrote:
-> On Tuesday 16 February 2016 21:19:07 Eddie Huang wrote:
->> On Tue, 2016-02-16 at 12:37 +0100, Arnd Bergmann wrote:
->>> On Monday 15 February 2016 11:50:48 Javier Martinez Canillas wrote:
->>>>
->>>> On 02/14/2016 10:58 PM, Eddie Huang wrote:
->>>>
->>>> [snip]
->>>>
->>>>>> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
->>>>>>       },
->>>>>>       .probe  = mtk_rtc_probe,
->>>>>>       .remove = mtk_rtc_remove,
->>>>>> +    .id_table = mt6397_rtc_id,
->>>>>>    };
->>>>>>
->>>>>>    module_platform_driver(mtk_rtc_driver);
->>>>>> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
->>>>>>    MODULE_LICENSE("GPL v2");
->>>>>>    MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
->>>>>>    MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
->>>>>> -MODULE_ALIAS("platform:mt6397-rtc");
->>>>>
->>>>> This patch looks good to me, but I am wondering, since we tend to use
->>>>> device tree method to match driver, do we still need support platform
->>>>> device ID ?
->>>>>
->>>>
->>>> I'm not familiar with neither this IP block nor the SoC so it is up to
->>>> you. I just noticed this issue when reviewing a regulator driver for a
->>>> similar PMIC posted by someone from mediatek.
->>>>
->>>> I thought platform device was needed since the driver has a MODULE_ALIAS()
->>>> but please let me know what you prefer and I can re-spin the patch and
->>>> just remove the MODULE_ALIAS() if that makes more sense for this platform.
->>>>
->>>>
->>>
->>> I agree. We can alway add a MODULE_DEVICE_TABLE() if we get multiple
->>> users of this driver on architectures that don't use devicetree yet.
->>>
->>
->> Sure. Thanks the patch to add expandability to this driver.
->>
->> Acked-by: Eddie Huang <eddie.huang@mediatek.com>
->
-> I think we misunderstood one another. I think we can drop both the MODULE_DEVICE_TABLE and the MODULE_ALIAS: there is no need for another
-> driver ID when it is always probed using DT.
->
+In order to support selecting earlycon via either ACPI or DT, move
+the decision on whether to attempt ACPI configuration into the
+early_param handling. Then make acpi_boot_table_init() bail out if
+acpi_disabled.
 
-That's how I understood but then Eddie said the opposite so I got confused
-and was waiting for your clarification. I'll re-spin and remove the alias.
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+---
+ arch/arm64/kernel/acpi.c | 62 +++++++++++++++++++++++-------------------------
+ 1 file changed, 30 insertions(+), 32 deletions(-)
 
-> 	Arnd
->
-
-Best regards,
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..3faa323 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -41,26 +41,8 @@ EXPORT_SYMBOL(acpi_disabled);
+ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+ EXPORT_SYMBOL(acpi_pci_disabled);
+ 
+-static bool param_acpi_off __initdata;
+ static bool param_acpi_force __initdata;
+ 
+-static int __init parse_acpi(char *arg)
+-{
+-	if (!arg)
+-		return -EINVAL;
+-
+-	/* "acpi=off" disables both ACPI table parsing and interpreter */
+-	if (strcmp(arg, "off") == 0)
+-		param_acpi_off = true;
+-	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
+-		param_acpi_force = true;
+-	else
+-		return -EINVAL;	/* Core will print when we return error */
+-
+-	return 0;
+-}
+-early_param("acpi", parse_acpi);
+-
+ static int __init dt_scan_depth1_nodes(unsigned long node,
+ 				       const char *uname, int depth,
+ 				       void *data)
+@@ -74,6 +56,35 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+ 	return 0;
+ }
+ 
++static int __init parse_acpi(char *arg)
++{
++	if (!arg)
++		return -EINVAL;
++
++	/*
++	 * Enable ACPI instead of device tree unless
++	 * - ACPI has been disabled explicitly (acpi=off), or
++	 * - the device tree is not empty (it has more than just a /chosen node)
++	 *   and ACPI has not been force enabled (acpi=force)
++	 */
++	if (strcmp(arg, "off") == 0)
++		return 0;
++	else if (strcmp(arg, "force") == 0)
++		param_acpi_force = true;
++	else if (of_scan_flat_dt(dt_scan_depth1_nodes, NULL))
++		return 0;
++
++	/*
++	 * ACPI is disabled at this point. Enable it in order to parse
++	 * the ACPI tables and carry out sanity checks
++	 */
++	enable_acpi();
++
++	return 0;
++}
++
++early_param("acpi", parse_acpi);
++
+ /*
+  * __acpi_map_table() will be called before page_init(), so early_ioremap()
+  * or early_memremap() should be called here to for ACPI table mapping.
+@@ -181,23 +192,10 @@ out:
+  */
+ void __init acpi_boot_table_init(void)
+ {
+-	/*
+-	 * Enable ACPI instead of device tree unless
+-	 * - ACPI has been disabled explicitly (acpi=off), or
+-	 * - the device tree is not empty (it has more than just a /chosen node)
+-	 *   and ACPI has not been force enabled (acpi=force)
+-	 */
+-	if (param_acpi_off ||
+-	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
++	if (acpi_disabled)
+ 		return;
+ 
+ 	/*
+-	 * ACPI is disabled at this point. Enable it in order to parse
+-	 * the ACPI tables and carry out sanity checks
+-	 */
+-	enable_acpi();
+-
+-	/*
+ 	 * If ACPI tables are initialized and FADT sanity checks passed,
+ 	 * leave ACPI enabled and carry on booting; otherwise disable ACPI
+ 	 * on initialization error.
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.7.1
