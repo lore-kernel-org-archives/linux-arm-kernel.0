@@ -1,38 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 00:03:59 -0800
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.5 (#2)
-In-Reply-To: <874mdfxkjx.fsf@free-electrons.com>
-References: <874mdfxkjx.fsf@free-electrons.com>
-Message-ID: <20160224080359.GA30231@localhost>
+Date: Wed, 24 Feb 2016 00:05:42 -0800
+Subject: [GIT PULL] omap fixes against v4.5-rc3
+In-Reply-To: <20160212225018.GA3500@atomide.com>
+References: <20160212225018.GA3500@atomide.com>
+Message-ID: <20160224080542.GB30231@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 05:45:38PM +0100, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Feb 12, 2016 at 02:50:18PM -0800, Tony Lindgren wrote:
+> The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
 > 
-> Here is the second pull request for fixes for mvebu for v4.5.
-> 
-> Gregory
-> 
-> The following changes since commit ff61ee84e7aa5842d9e33c0b442f0b43a6a44eaf:
-> 
->   ARM: dts: orion5x: gpio pin fixes for linkstation lswtgl (2016-01-25 16:22:59 +0100)
+>   Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.5-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/fixes-rc3-v2
 > 
-> for you to fetch changes up to 44361a2cc13493fc41216d33bb9a562ec3a9cc4e:
+> for you to fetch changes up to cf26f1137333251f3515dea31f95775b99df0fd5:
 > 
->   ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl (2016-02-09 11:17:53 +0100)
-> 
-> ----------------------------------------------------------------
-> mvebu fixes for 4.5 (part 2)
-> 
-> - Fix the missing mtd flash on linkstation lswtgl
-> - Use unique machine name for the kirkwood ds112 (for Debian flash-kernel tool)
+>   ARM: OMAP2+: Fix omap_device for module reload on PM runtime forbid (2016-02-12 08:56:52 -0800)
 
-Merged now, apologies for the delay.
+Merged, thanks.
 
 
 -Olof
