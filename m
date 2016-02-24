@@ -1,74 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 24 Feb 2016 09:37:46 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
-In-Reply-To: <20160224080803.GD30231@localhost>
-References: <cover.1455859965.git.horms+renesas@verge.net.au>
- <20160224080803.GD30231@localhost>
-Message-ID: <CAMuHMdWxXFf0MFKP27y6g7CUc1MeG0PuJ-FdoSkV+2gB5NvQTA@mail.gmail.com>
+From: schwidefsky@de.ibm.com (Martin Schwidefsky)
+Date: Wed, 24 Feb 2016 09:39:15 +0100
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
+ also on PowerPC and ARM)
+In-Reply-To: <20160223193345.GC21820@node.shutemov.name>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad>
+ <20160223193345.GC21820@node.shutemov.name>
+Message-ID: <20160224093915.6e163a33@mschwide>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, 23 Feb 2016 22:33:45 +0300
+"Kirill A. Shutemov" <kirill@shutemov.name> wrote:
 
-On Wed, Feb 24, 2016 at 9:08 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Feb 19, 2016 at 03:09:46PM +0900, Simon Horman wrote:
->> Please consider these Renesas ARM based SoC fixes for v4.5.
->>
->> This pull request is comprised of patches from Geert Uytterhoeven to avoid
->> writing to .text.
->>
->> * "ARM: shmobile: Move shmobile_scu_base from .text to .bss"
->>
->>   Resolves a problem for XIP kernels as writing to .text is not allowed.
->>   For non-XIP kernels a problem does not manifst as the pages are mapped
->>   read-only during late kernel startup.
->>
->> * The remaining patches resolve a kernel-crash that occurs during system
->>   suspend for CONFIG_DEBUG_RODATA=y kernels.
->>
->>
->> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->>
->>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v4.5
->>
->> for you to fetch changes up to 901c5ffaaed117a38be9d0c29247c4888d6c8636:
->>
->>   ARM: shmobile: Remove shmobile_boot_arg (2016-02-17 18:27:21 +0900)
->
-> Hi Simon, Geert,
->
-> I don't think any of these fixes are for regressions, are they? I.e. this is
-> work to enable configs that never used to work (XIP, CONFIG_DEBUG_RODATA)?
+> On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
+> > I'll check with Martin, maybe it is actually trivial, then we can
+> > do a quick test it to rule that one out.
+> 
+> Oh. I found a bug in __split_huge_pmd_locked(). Although, not sure if it's
+> _the_ bug.
+> 
+> pmdp_invalidate() is called for the wrong address :-/
+> I guess that can be destructive on the architecture, right?
+> 
+> Could you check this?
+> 
+> diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+> index 1c317b85ea7d..4246bc70e55a 100644
+> --- a/mm/huge_memory.c
+> +++ b/mm/huge_memory.c
+> @@ -2865,7 +2865,7 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
+>  	pgtable = pgtable_trans_huge_withdraw(mm, pmd);
+>  	pmd_populate(mm, &_pmd, pgtable);
+> 
+> -	for (i = 0; i < HPAGE_PMD_NR; i++, haddr += PAGE_SIZE) {
+> +	for (i = 0; i < HPAGE_PMD_NR; i++) {
+>  		pte_t entry, *pte;
+>  		/*
+>  		 * Note that NUMA hinting access restrictions are not
+> @@ -2886,9 +2886,9 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
+>  		}
+>  		if (dirty)
+>  			SetPageDirty(page + i);
+> -		pte = pte_offset_map(&_pmd, haddr);
+> +		pte = pte_offset_map(&_pmd, haddr + i * PAGE_SIZE);
+>  		BUG_ON(!pte_none(*pte));
+> -		set_pte_at(mm, haddr, pte, entry);
+> +		set_pte_at(mm, haddr + i * PAGE_SIZE, pte, entry);
+>  		atomic_inc(&page[i]._mapcount);
+>  		pte_unmap(pte);
+>  	}
+> @@ -2938,7 +2938,7 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
+>  	pmd_populate(mm, pmd, pgtable);
+> 
+>  	if (freeze) {
+> -		for (i = 0; i < HPAGE_PMD_NR; i++, haddr += PAGE_SIZE) {
+> +		for (i = 0; i < HPAGE_PMD_NR; i++) {
+>  			page_remove_rmap(page + i, false);
+>  			put_page(page + i);
+>  		}
 
-These configs indeed never worked before.
+Test is running and it looks good so far. For the final assessment I defer
+to Gerald and Sebastian.
 
-However,
+-- 
+blue skies,
+   Martin.
 
-commit 25362dc496edaf17f714c0fecd8b3eb79670207b
-Author: Kees Cook <keescook@chromium.org>
-Date:   Tue Jan 26 01:19:36 2016 +0100
-
-    ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA
-
-in arm/for-next will enable CONFIG_DEBUG_RODATA by default.
-
-Not having the fixes in v4.5 means that if Russell's tree is merged
-into mainline
-for v4.6 before arm-soc, it will cause regressions and bisection issues.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+"Reality continues to ruin my life." - Calvin.
