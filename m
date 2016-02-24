@@ -1,38 +1,46 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 24 Feb 2016 14:26:20 -0300
-Subject: [PATCH] rtc: mt6397: Remove plaform module alias
-Message-ID: <1456334780-17380-1-git-send-email-javier@osg.samsung.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 24 Feb 2016 22:44:52 +0530
+Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
+ pinctrl_{register, unregister}
+In-Reply-To: <771728522.222286.b52ca77e-fe5e-4536-8e14-525e9a846cdc.open-xchange@email.1und1.de>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <771728522.222286.b52ca77e-fe5e-4536-8e14-525e9a846cdc.open-xchange@email.1und1.de>
+Message-ID: <56CDE50C.4050504@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver uses the MODULE_ALIAS() macro to export a platform module alias
-to allow the module to be autoloaded if the device is registered using the
-legacy platform registration mechanism but the driver is always used by OF
-only machines so the alias is not needed and should just be removed.
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+On Wednesday 24 February 2016 10:52 PM, Stefan Wahren wrote:
+> Hi Laxman,
+>
+>> Laxman Dewangan <ldewangan@nvidia.com> hat am 24. Februar 2016 um 14:15
+>> geschrieben:
+>>
+>>
+>> Add resource manageemnt APIs fro pinctrl_register() and pinctrl_unregister()
+>> and use these new APIs on hw driver to reduce the error path code and
+>> remove callback for driver.
+>>
+> just for interest: why didn't you patch freescale/pinctrl-mxs.c?
+>
 
----
-Hello,
 
-This patch supersedes "rtc: mt6397: Add platform device ID table":
-https://lkml.org/lkml/2016/2/9/192.
+The remove callback is implemented as:
 
-Best regards,
-Javier
+int mxs_pinctrl_remove(struct platform_device *pdev)
+{
+         struct mxs_pinctrl_data *d = platform_get_drvdata(pdev);
 
- drivers/rtc/rtc-mt6397.c | 1 -
- 1 file changed, 1 deletion(-)
+         pinctrl_unregister(d->pctl);
+         iounmap(d->base);
 
-diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-index 06a5c52b292f..44f622c3e048 100644
---- a/drivers/rtc/rtc-mt6397.c
-+++ b/drivers/rtc/rtc-mt6397.c
-@@ -419,4 +419,3 @@ module_platform_driver(mtk_rtc_driver);
- MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
- MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
--MODULE_ALIAS("platform:mt6397-rtc");
--- 
-2.5.0
+         return 0;
+}
+
+
+So if I use devm_pinctrl_register() then the sequence will be different like
+     iounmap()
+     pinctrl_unregister()
+
+And I did not want to change the sequence as dont know the side effect 
+until I test it on actual platform which is not there with me.
