@@ -1,100 +1,66 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Tue, 23 Feb 2016 16:00:31 -0800
-Subject: [PATCH V3] AHCI: Workaround for ThunderX Errata#22536
-In-Reply-To: <1455653329-4934-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1455653329-4934-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <56CCF29F.8030105@caviumnetworks.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 23 Feb 2016 16:03:32 -0800
+Subject: [PATCH V5 11/14] soc: tegra: pmc: Add generic PM domain support
+In-Reply-To: <56C5F1DA.2060705@nvidia.com> (Jon Hunter's message of "Thu, 18
+ Feb 2016 16:31:22 +0000")
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-12-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFpnUJA2pLSUOw8rkjyXLY6b__TM=38jsvYAZVhe+DS=zg@mail.gmail.com>
+ <7hh9hdzflv.fsf@baylibre.com> <56C1B62B.5060708@nvidia.com>
+ <CAPDyKFoPrFoMOFxC37zXX4L3VdLKknaw_LUTw7ycr9mfa_=7_A@mail.gmail.com>
+ <56C5F1DA.2060705@nvidia.com>
+Message-ID: <7h60xft1nv.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+Jon Hunter <jonathanh@nvidia.com> writes:
 
-Any more comments on this?
+> On 18/02/16 16:00, Ulf Hansson wrote:
+>> [...]
+>> 
+>>>>
+>>>> What about the pm_clk_* API which was built for tracking clocks
+>>>> associated with devices for runtime PM.
+>>>>
+>>>> IOW, you could pm_clk_add(pg->pmc->dev, pg->clks[i]) and then your
+>>>> _enable_clocks() would become pm_clk_suspend() an dyour
+>>>> _disable_clocks() would become pm_clk_resume().
+>>>
+>>> Very interesting, I was not aware of this.
+>>>
+>>>> I might not be following the mapping between PMC and PGs though so not
+>>>> sure pg->pmc->dev is the right struct device, but you get the idea.
+>>>
+>>> Yes, so this will not work here as-is, because the pmc->dev is common to
+>>> all pm-domains (it is the device that creates all the pm-domains). So to
+>>> make this work, I would need to create a device for each pm-domain and
+>>> add the clocks to that.
+>>>
+>>> I see that this works very well for normal drivers, but it does not feel
+>>> so natural for pm-domains where we don't have a device struct today. By
+>>> the way, the rockchip pm-domains implementation is very much in the same
+>>> boat as tegra, where there are multiple clocks per pm-domain and it is
+>>> handled by a simple list. So I am not sure if you think that we should
+>>> be turning all pm-domains registered by pm_genpd_init() into a device
+>>> and then we can make use of these pm_clk_XXXX() APIs?
+>>>
+>>> I have implemented the generic clk APIs that Ulf and I discussed for
+>>> handling multiple clocks, but if we think that this is a better way,
+>>> then I will hold off for now.
+>> 
+>> I think Kevin has a point that we already have PM clocks to build upon.
+>> Could we perhaps try to extend that API instead to suite this needs as well?
+>
+> We certainly could and I am not against it, however, it means that we
+> need to create a device structure for each pm-domain. If you and Kevin
+> are ok with me adding this to pm_genpd_init(), then I can give it a try.
 
-Thanks,
-Tirumalesh.
+At this point, I'm thinking that the added complexity of a per-pm-domain
+struct device isn't justified.  Managing simple lists of clocks in the
+SoC specific PM domains is quite easy to review and maintain, IMO.
 
+So I recommend just keeping it that way for now.  If it starts to get
+unwieldy for tegra, rockchip and any others, we can revisit a common way
+of doing it then.
 
-On 02/16/2016 12:08 PM, tchalamarla at caviumnetworks.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->
-> Due to Errata in ThunderX, HOST_IRQ_STAT should be
-> cleared before leaving the interrupt handler.
-> The patch attempts to satisfy the need.
->
-> Changes from V2:
-> 	- removed newfile
-> 	- code is now under CONFIG_ARM64
->
-> Changes from V1:
-> 	- Rebased on top of libata/for-4.6
->          - Moved ThunderX intr handler to new file
->
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> ---
->   drivers/ata/ahci.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 44 insertions(+)
->
-> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-> index 546a369..c8496fc 100644
-> --- a/drivers/ata/ahci.c
-> +++ b/drivers/ata/ahci.c
-> @@ -1325,6 +1325,44 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
->   {}
->   #endif
->
-> +#ifdef CONFIG_ARM64
-> +/* Due to ERRATA#22536, ThunderX need to handle
-> + * HOST_IRQ_STAT differently.
-> + * Work around is to make sure all pending IRQs
-> + * are served before leaving handler
-> + */
-> +static irqreturn_t ahci_thunderx_irq_handler(int irq, void *dev_instance)
-> +{
-> +	struct ata_host *host = dev_instance;
-> +	struct ahci_host_priv *hpriv;
-> +	unsigned int rc = 0;
-> +	void __iomem *mmio;
-> +	u32 irq_stat, irq_masked;
-> +	unsigned int handled = 1;
-> +
-> +	VPRINTK("ENTER\n");
-> +	hpriv = host->private_data;
-> +	mmio = hpriv->mmio;
-> +	irq_stat = readl(mmio + HOST_IRQ_STAT);
-> +	if (!irq_stat)
-> +		return IRQ_NONE;
-> +
-> +	do {
-> +		irq_masked = irq_stat & hpriv->port_map;
-> +		spin_lock(&host->lock);
-> +		rc = ahci_handle_port_intr(host, irq_masked);
-> +		if (!rc)
-> +			handled = 0;
-> +		writel(irq_stat, mmio + HOST_IRQ_STAT);
-> +		irq_stat = readl(mmio + HOST_IRQ_STAT);
-> +		spin_unlock(&host->lock);
-> +	} while (irq_stat);
-> +	VPRINTK("EXIT\n");
-> +
-> +	return IRQ_RETVAL(handled);
-> +}
-> +#endif
-> +
->   /*
->    * ahci_init_msix() - optionally enable per-port MSI-X otherwise defer
->    * to single msi.
-> @@ -1560,6 +1598,12 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->   	if (ahci_broken_devslp(pdev))
->   		hpriv->flags |= AHCI_HFLAG_NO_DEVSLP;
->
-> +#ifdef CONFIG_ARM64
-> +	/* this should be done before save config*/
-> +	if (pdev->vendor == 0x177d && pdev->device == 0xa01c)
-> +		hpriv->irq_handler = ahci_thunderx_irq_handler;
-> +#endif
-> +
->   	/* save initial config */
->   	ahci_pci_save_initial_config(pdev, hpriv);
->
->
+Kevin
