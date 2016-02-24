@@ -1,70 +1,128 @@
-From: kernel@tekno-soft.it (Roberto Fichera)
-Date: Wed, 24 Feb 2016 11:12:19 +0100
-Subject: iMX6q PCIe phy link never came up on kernel v4.4.x
-Message-ID: <56CD8203.8050209@tekno-soft.it>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 24 Feb 2016 15:41:04 +0530
+Subject: [PATCH] ARM: dts: DRA7: change address-cells and size-cells
+Message-ID: <1456308664-28308-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi There,
+DRA7 SoC has the capability to support DDR memory upto 4GB. In order to
+represent this in memory dt node, the address-cells and size cells
+should be 2. So, changing the address-cells and size-cells to 2 and
+updating the memory nodes accordingly.
 
-Working on a custom iMX6q board I'm getting a PCIe phy link never came up, even if uboot detect
-everything ok. My DTS is enabling PCIe with
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/boot/dts/am57xx-beagle-x15.dts   |  2 +-
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts |  2 +-
+ arch/arm/boot/dts/dra7-evm.dts            |  2 +-
+ arch/arm/boot/dts/dra7.dtsi               | 20 ++++++++++----------
+ arch/arm/boot/dts/dra72-evm.dts           |  2 +-
+ 5 files changed, 14 insertions(+), 14 deletions(-)
 
-&pcie {
-    pinctrl-names = "default";
-    pinctrl-0 = <&pinctrl_pcie_reset>;
-    reset-gpio = <&gpio7 12 0>;
-    status = "okay";
-};
-
-The PCIe is connected to a PCIe-to-PCI TI XIO2001, so I'd like to know if there is any other special
-setup to do in order to get it to work on a v4.4.x kernel.
-
-Any idea?
-
-Thanks in advance,
-Roberto Fichera.
-
-U-Boot 2014.04-imx_v2014.04_3.14.38_6qp_beta+g6e9282c (Feb 15 2016 - 10:02:31)
-
-CPU:   Freescale i.MX6Q rev1.5 at 792 MHz
-CPU:   Temperature 35 C, calibration data: 0x5664d569
-Reset cause: POR
-Board: Janas iMX6Q (ID:e315c064140749d4)
-I2C:   ready
-DRAM:  2 GiB
-MMC:   FSL_SDHC: 0, FSL_SDHC: 1
-*** Warning - bad CRC, using default environment
-
-  00:01.0     - 16c3:abcd - Bridge device
-   01:00.0    - 104c:8240 - Bridge device
-    02:04.0   - 1397:08b4 - Network controller
-In:    serial
-Out:   serial
-Err:   serial
-Found PFUZE100! deviceid=10,revid=21
-mmc1(part 0) is current device
-Net:   FEC [PRIME]
-Warning: failed to set MAC address
-
-Normal Boot
-....
-....
-[    0.236141] PCI host bridge /soc/pcie at 0x01000000 ranges:
-[    0.236162]   No bus range found for /soc/pcie at 0x01000000, using [bus 00-ff]
-[    0.236213]   err 0x01f00000..0x01f7ffff -> 0x01f00000
-[    0.236250]    IO 0x01f80000..0x01f8ffff -> 0x00000000
-[    0.236330]   MEM 0x01000000..0x01efffff -> 0x01000000
--->>> [    0.546690] imx6q-pcie 1ffc000.pcie: phy link never came up
-[    0.547263] imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00
-[    0.547287] pci_bus 0000:00: root bus resource [bus 00-ff]
-[    0.547304] pci_bus 0000:00: root bus resource [??? 0x01f00000-0x01f7ffff flags 0x0]
-[    0.547321] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-[    0.547335] pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
-[    0.548608] PCI: bus0: Fast back to back transfers disabled
-[    0.548950] PCI: bus1: Fast back to back transfers enabled
-[    0.549107] pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
-[    0.549137] pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
-[    0.549159] pci 0000:00:00.0: PCI bridge to [bus 01]
-[    0.549945] pcieport 0000:00:00.0: Signaling PME through PCIe PME interrupt
-...
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 50312f8..9b664c5 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -24,7 +24,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x80000000 0x80000000>;
++		reg = <0x0 0x80000000 0x0 0x80000000>;
+ 	};
+ 
+ 	vdd_3v3: fixedregulator-vdd_3v3 {
+diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+index c538826..e6c40db 100644
+--- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
++++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+@@ -21,7 +21,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x80000000 0x20000000>; /* 512 MB - minimal configuration */
++		reg = <0x0 0x80000000 0x0 0x20000000>; /* 512 MB - minimal configuration */
+ 	};
+ 
+ 	leds {
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index cfc24e5..2d1d3dd 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -18,7 +18,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x80000000 0x60000000>; /* 1536 MB */
++		reg = <0x0 0x80000000 0x0 0x60000000>; /* 1536 MB */
+ 	};
+ 
+ 	evm_3v3_sd: fixedregulator-sd {
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 8ea153a..5460a2a 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -15,8 +15,8 @@
+ #define MAX_SOURCES 400
+ 
+ / {
+-	#address-cells = <1>;
+-	#size-cells = <1>;
++	#address-cells = <2>;
++	#size-cells = <2>;
+ 
+ 	compatible = "ti,dra7xx";
+ 	interrupt-parent = <&crossbar_mpu>;
+@@ -57,10 +57,10 @@
+ 		compatible = "arm,cortex-a15-gic";
+ 		interrupt-controller;
+ 		#interrupt-cells = <3>;
+-		reg = <0x48211000 0x1000>,
+-		      <0x48212000 0x1000>,
+-		      <0x48214000 0x2000>,
+-		      <0x48216000 0x2000>;
++		reg = <0x0 0x48211000 0x0 0x1000>,
++		      <0x0 0x48212000 0x0 0x1000>,
++		      <0x0 0x48214000 0x0 0x2000>,
++		      <0x0 0x48216000 0x0 0x2000>;
+ 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		interrupt-parent = <&gic>;
+ 	};
+@@ -69,7 +69,7 @@
+ 		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
+ 		interrupt-controller;
+ 		#interrupt-cells = <3>;
+-		reg = <0x48281000 0x1000>;
++		reg = <0x0 0x48281000 0x0 0x1000>;
+ 		interrupt-parent = <&gic>;
+ 	};
+ 
+@@ -96,10 +96,10 @@
+ 		compatible = "ti,dra7-l3-noc", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		ranges;
++		ranges = <0x0 0x0 0x0 0xc0000000>;
+ 		ti,hwmods = "l3_main_1", "l3_main_2";
+-		reg = <0x44000000 0x1000000>,
+-		      <0x45000000 0x1000>;
++		reg = <0x0 0x44000000 0x0 0x1000000>,
++		      <0x0 0x45000000 0x0 0x1000>;
+ 		interrupts-extended = <&crossbar_mpu GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+ 				      <&wakeupgen GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 
+diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+index 00b1200..6a5b0c8 100644
+--- a/arch/arm/boot/dts/dra72-evm.dts
++++ b/arch/arm/boot/dts/dra72-evm.dts
+@@ -17,7 +17,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x80000000 0x40000000>; /* 1024 MB */
++		reg = <0x0 0x80000000 0x0 0x40000000>; /* 1024 MB */
+ 	};
+ 
+ 	aliases {
+-- 
+2.1.4
