@@ -1,67 +1,83 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed, 24 Feb 2016 20:25:16 +0300
-Subject: [PATCH v2 3/8] ACPI: add definitions of DBG2 subtypes
-In-Reply-To: <94F2FBAB4432B54E8AACC7DFDE6C92E37E44BCB5@ORSMSX110.amr.corp.intel.com>
-References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
- <1456333819-13482-4-git-send-email-aleksey.makarov@linaro.org>
- <94F2FBAB4432B54E8AACC7DFDE6C92E37E44BCB5@ORSMSX110.amr.corp.intel.com>
-Message-ID: <56CDE77C.2050301@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Feb 2016 17:25:46 +0000
+Subject: [PATCH 1/3] dt-bindings: arm/marvell: ABI unstability warning
+ about Marvell 7K/8K
+In-Reply-To: <1456327007-31008-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1456327007-31008-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160224172545.GC9137@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+[adding the device tree list to Cc]
 
-On 02/24/2016 08:17 PM, Moore, Robert wrote:
-> I've got these for the next release of ACPICA
+On Wed, Feb 24, 2016 at 04:16:45PM +0100, Thomas Petazzoni wrote:
+> Since we are still very early in the support of Marvell Armada 7/8K
+> chips and those chips are significantly different from earlier 32 bits
+> Armada SOCs, it is difficult to commit to Device Tree ABI stability at
+> this point.
 
-It have not been pulled to linux-next but is required for the patchset.
-So I included it here.
+I don't see why difference to an existing SoC means that we cannot
+guarantee support for this DT. Why does that contribute to instability?
 
+If there's something we're unsure about, we should be seeding the DT
+with sufficient information to do the right thing(TM) in future. What
+areas in particular do you think are likely to be problematic? Is there
+anything in particular that you think that approach doesn't work for?
+
+>From my PoV, if we're so uncertain about a DT binding that it cannot be
+kept supported, it is a prototype not yet fit for mainline.
+
+> Therefore, this commit adds a warning to the Marvell 7K/8K DT binding
+> documentation to indicate that the bindings are for the moment
+> unstable.
+
+As with the other thread, I'm strongly opposed to this mentality.
+
+This is really the last thing we want to see for new platforms which are
+DT from day one. The messy problems with platform data => DT don't
+apply, and I really can't see a compelling reason to not put the effort
+in here to do things "properly".
+
+Thanks.
+Mark.
+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/arm/marvell/armada-7k-8k.txt         | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt b/Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
+> index df98a9c..758b3ae 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
+> @@ -1,6 +1,18 @@
+>  Marvell Armada 7K/8K Platforms Device Tree Bindings
+>  ---------------------------------------------------
+>  
+> +Work in progress statement:
+> +
+> +Device tree files and bindings applying to Marvell Armada 7K and 8K
+> +SoCs and boards are considered "unstable". Any Marvell Armada 7K/8K
+> +device tree binding may change at any time. Be sure to use a device
+> +tree binary and a kernel image generated from the same source tree.
+> +
+> +Please refer to Documentation/devicetree/bindings/ABI.txt for a
+> +definition of a stable binding/ABI.
+> +
+> +---------------------------------------------------------------
+> +
+>  Boards using a SoC of the Marvell Armada 7K or 8K families must carry
+>  the following root node property:
+>  
+> -- 
+> 2.6.4
 > 
 > 
->> -----Original Message-----
->> From: Aleksey Makarov [mailto:aleksey.makarov at linaro.org]
->> Sent: Wednesday, February 24, 2016 9:10 AM
->> To: linux-acpi at vger.kernel.org
->> Cc: linux-serial at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; Aleksey Makarov; Russell King; Greg Kroah-
->> Hartman; Rafael J . Wysocki; Leif Lindholm; Graeme Gregory; Al Stone;
->> Christopher Covington; Len Brown; Moore, Robert; Zheng, Lv;
->> devel at acpica.org
->> Subject: [PATCH v2 3/8] ACPI: add definitions of DBG2 subtypes
->>
->> The recent version of Microsoft Debug Port Table 2 (DBG2) [1] specifies
->> additional serial debug port subtypes.  These constants are also referred
->> by Serial Port Console Redirection Table (SPCR) [2]
->>
->> Add these constants.
->>
->> [1] https://msdn.microsoft.com/en-
->> us/library/windows/hardware/dn639131(v=vs.85).aspx
->> [2] https://msdn.microsoft.com/en-
->> us/library/windows/hardware/dn639132(v=vs.85).aspx
->>
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->> ---
->>  include/acpi/actbl2.h | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h index
->> a4ef625..652f747 100644
->> --- a/include/acpi/actbl2.h
->> +++ b/include/acpi/actbl2.h
->> @@ -371,6 +371,11 @@ struct acpi_dbg2_device {
->>
->>  #define ACPI_DBG2_16550_COMPATIBLE  0x0000
->>  #define ACPI_DBG2_16550_SUBSET      0x0001
->> +#define ACPI_DBG2_ARM_PL011         0x0003
->> +#define ACPI_DBG2_ARM_SBSA_32BIT    0x000D
->> +#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000E
->> +#define ACPI_DBG2_ARM_DCC           0x000F
->> +#define ACPI_DBG2_BCM2835           0x0010
->>
->>  #define ACPI_DBG2_1394_STANDARD     0x0000
->>
->> --
->> 2.7.1
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
