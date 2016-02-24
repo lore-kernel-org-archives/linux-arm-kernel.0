@@ -1,55 +1,38 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Feb 2016 09:20:26 +0100
-Subject: [PATCH 2/9] spi: imx: initialize usedma earlier
-In-Reply-To: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
-References: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1456302033-25638-3-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 24 Feb 2016 09:20:24 +0100
+Subject: [PATCH v4] i.MX SPI DMA cleanup
+Message-ID: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC specific config function does not know if DMA will be used or
-not. This information will be useful to configure the SPI controller
-correctly for DMA in following patches, so initialize the usedma
-variable before calling into the SoC specific config function.
+Changes since v3:
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/spi/spi-imx.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+- improve commit description for "spi: imx: initialize usedma earlier"
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index a61b1b1..5792918 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -815,6 +815,11 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 		spi_imx->tx = spi_imx_buf_tx_u32;
- 	}
- 
-+	if (spi_imx_can_dma(spi_imx->bitbang.master, spi, t))
-+		spi_imx->usedma = 1;
-+	else
-+		spi_imx->usedma = 0;
-+
- 	spi_imx->devtype_data->config(spi_imx, &config);
- 
- 	return 0;
-@@ -1040,14 +1045,10 @@ static int spi_imx_transfer(struct spi_device *spi,
- {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
- 
--	if (spi_imx->bitbang.master->can_dma &&
--	    spi_imx_can_dma(spi_imx->bitbang.master, spi, transfer)) {
--		spi_imx->usedma = true;
-+	if (spi_imx->usedma)
- 		return spi_imx_dma_transfer(spi_imx, transfer);
--	}
--	spi_imx->usedma = false;
--
--	return spi_imx_pio_transfer(spi, transfer);
-+	else
-+		return spi_imx_pio_transfer(spi, transfer);
- }
- 
- static int spi_imx_setup(struct spi_device *spi)
--- 
-2.7.0
+Changes since v2:
+
+- Drop patches already applied
+- rebase on next
+
+Changes since v1:
+
+- Add missing Signed-off-by to Patch 3
+- Drop device tree change as it's already applied by Shawn
+- Add patch subject when referring to commits
+
+----------------------------------------------------------------
+Anton Bondarenko (1):
+      spi: imx: add support for all SPI word width for DMA
+
+Sascha Hauer (8):
+      spi: imx: drop fallback to PIO
+      spi: imx: initialize usedma earlier
+      spi: imx: drop unnecessary read/modify/write
+      spi: imx: drop unncessary dma_is_inited variable
+      spi: imx: remove unnecessary bit clearing in mx51_ecspi_config
+      spi: imx: make some register defines simpler
+      spi: imx: set MX51_ECSPI_CTRL_SMC bit in setup function
+      spi: imx: drop bogus tests for rx/tx bufs in DMA transfer
+
+ drivers/spi/spi-imx.c | 296 ++++++++++++++++++++++++++------------------------
+ 1 file changed, 153 insertions(+), 143 deletions(-)
