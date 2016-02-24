@@ -1,17 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 24 Feb 2016 10:11:09 -0700
-Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
- groups.
-In-Reply-To: <1456266111-2508-3-git-send-email-eric@anholt.net>
-References: <1456266111-2508-1-git-send-email-eric@anholt.net>
- <1456266111-2508-3-git-send-email-eric@anholt.net>
-Message-ID: <56CDE42D.4010907@wwwdotorg.org>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed, 24 Feb 2016 20:10:17 +0300
+Subject: [PATCH v2 8/8] serial: pl011: add ACPI DBG2 serial port
+In-Reply-To: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456333819-13482-9-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2016 03:21 PM, Eric Anholt wrote:
-> Since all of these pins were documented, we can use their names to
-> explain what's going on.
+Add a handler for ACPI DBG2 serial port of type ACPI_DBG2_ARM_PL011
+that sets up an earlycon on it.
 
-I only received patch 2/5, and e.g. the spinics.net email archive seems 
-to be in the same boat.
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 500232a..d38da86 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -59,6 +59,7 @@
+ #include <linux/sizes.h>
+ #include <linux/io.h>
+ #include <linux/acpi.h>
++#include <linux/acpi_dbg2.h>
+ 
+ #include "amba-pl011.h"
+ 
+@@ -2327,6 +2328,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+ 	return 0;
+ }
+ OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
++ACPI_DBG2_EARLYCON_DECLARE(pl011, ACPI_DBG2_ARM_PL011,
++			   pl011_early_console_setup);
+ 
+ #else
+ #define AMBA_CONSOLE	NULL
+-- 
+2.7.1
