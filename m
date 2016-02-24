@@ -1,166 +1,45 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed, 24 Feb 2016 20:10:15 +0300
-Subject: [PATCH v2 6/8] ACPI: serial: implement earlycon on ACPI DBG2 port
+Date: Wed, 24 Feb 2016 20:10:16 +0300
+Subject: [PATCH v2 7/8] ACPI: enable ACPI_DBG2_TABLE on ARM64
 In-Reply-To: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1456333819-13482-7-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456333819-13482-8-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ACPI_DBG2_EARLYCON_DECLARE() macros that declares
-an earlycon on the serial port specified in the DBG2 ACPI table.
-
-Pass the string "earlycon=acpi_dbg2" to the kernel to activate it.
-
-Callbacks for EARLYCON_DECLARE() and OF_EARLYCON_DECLARE()
-can also be used for this macros.
+SBBR mentions DBG2 as a mandatory ACPI table.
+So enable it for ARM64
 
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- Documentation/kernel-parameters.txt |  3 ++
- drivers/tty/serial/earlycon.c       | 60 +++++++++++++++++++++++++++++++++++++
- include/linux/acpi_dbg2.h           | 20 +++++++++++++
- 3 files changed, 83 insertions(+)
+ arch/arm64/Kconfig       | 1 +
+ arch/arm64/kernel/acpi.c | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 1fee970..22600e0 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -1069,6 +1069,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			A valid base address must be provided, and the serial
- 			port must already be setup and configured.
- 
-+		acpi_dbg2
-+			Use serial port specified by the DBG2 ACPI table.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 2ee5731..4ad33f8 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
++	select ACPI_DBG2_TABLE if ACPI
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 3faa323..bb93022 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -207,6 +207,8 @@ void __init acpi_boot_table_init(void)
+ 		if (!param_acpi_force)
+ 			disable_acpi();
+ 	}
 +
- 	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
- 			earlyprintk=vga
- 			earlyprintk=efi
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index d217366..9ba3a04 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -22,6 +22,7 @@
- #include <linux/sizes.h>
- #include <linux/of.h>
- #include <linux/of_fdt.h>
-+#include <linux/acpi.h>
- 
- #ifdef CONFIG_FIX_EARLYCON_MEM
- #include <asm/fixmap.h>
-@@ -200,6 +201,8 @@ int __init setup_earlycon(char *buf)
- 	return -ENOENT;
++	acpi_probe_device_table(dbg2);
  }
  
-+static bool setup_dbg2_earlycon;
-+
- /* early_param wrapper for setup_earlycon() */
- static int __init param_setup_earlycon(char *buf)
- {
-@@ -212,6 +215,11 @@ static int __init param_setup_earlycon(char *buf)
- 	if (!buf || !buf[0])
- 		return early_init_dt_scan_chosen_serial();
- 
-+	if (!strcmp(buf, "acpi_dbg2")) {
-+		setup_dbg2_earlycon = true;
-+		return 0;
-+	}
-+
- 	err = setup_earlycon(buf);
- 	if (err == -ENOENT || err == -EALREADY)
- 		return 0;
-@@ -286,3 +294,55 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
- }
- 
- #endif /* CONFIG_OF_EARLY_FLATTREE */
-+
-+#ifdef CONFIG_ACPI_DBG2_TABLE
-+
-+int __init acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d)
-+{
-+	int err;
-+	struct uart_port *port = &early_console_dev.port;
-+	int (*setup)(struct earlycon_device *, const char *) = d;
-+	struct acpi_generic_address *reg;
-+
-+	if (!setup_dbg2_earlycon)
-+		return -ENODEV;
-+
-+	if (device->register_count < 1)
-+		return -ENODEV;
-+
-+	if (device->base_address_offset >= device->length)
-+		return -EINVAL;
-+
-+	reg = (void *)device + device->base_address_offset;
-+
-+	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY &&
-+	    reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO)
-+		return -EINVAL;
-+
-+	spin_lock_init(&port->lock);
-+	port->uartclk = BASE_BAUD * 16;
-+
-+	if (reg->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
-+		if (device->port_type == ACPI_DBG2_ARM_SBSA_32BIT)
-+			port->iotype = UPIO_MEM32;
-+		else
-+			port->iotype = UPIO_MEM;
-+		port->mapbase = reg->address;
-+		port->membase = earlycon_map(reg->address, SZ_4K);
-+	} else {
-+		port->iotype = UPIO_PORT;
-+		port->iobase = reg->address;
-+	}
-+
-+	early_console_dev.con->data = &early_console_dev;
-+	err = setup(&early_console_dev, NULL);
-+	if (err < 0)
-+		return err;
-+	if (!early_console_dev.con->write)
-+		return -ENODEV;
-+
-+	register_console(early_console_dev.con);
-+	return 0;
-+}
-+
-+#endif /* CONFIG_ACPI_DBG2_TABLE */
-diff --git a/include/linux/acpi_dbg2.h b/include/linux/acpi_dbg2.h
-index 125ae7e..b653752 100644
---- a/include/linux/acpi_dbg2.h
-+++ b/include/linux/acpi_dbg2.h
-@@ -37,12 +37,32 @@ int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
- 	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
- 				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
- 
-+int acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d);
-+
-+/**
-+ * ACPI_DBG2_EARLYCON_DECLARE() - Define handler for ACPI GDB2 serial port
-+ * @name:		Identifier to compose name of table data
-+ * @subtype:		Subtype of the port
-+ * @console_setup:	Function to be called to setup the port
-+ *
-+ * Type of the console_setup() callback is
-+ * int (*setup)(struct earlycon_device *, const char *)
-+ * It's the type of callback of of_setup_earlycon().
-+ */
-+#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
-+	ACPI_DBG2_DECLARE(name, ACPI_DBG2_SERIAL_PORT, subtype,		\
-+			  acpi_setup_earlycon, console_setup)
-+
- #else
- 
- #define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
- 	static const void *__acpi_dbg_data_##name[]			\
- 		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
- 
-+#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
-+	static const void *__acpi_dbg_data_serial_##name[]		\
-+		__used __initdata = { (void *)console_setup }
-+
- #endif
- 
- #endif
+ #ifdef CONFIG_ACPI_APEI
 -- 
 2.7.1
