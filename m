@@ -1,31 +1,25 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Feb 2016 11:29:06 +0900
-Subject: [PATCH 2/2] ARM: dts: r8a7791: use fallback jpu compatibility string
-In-Reply-To: <1456280946-14859-1-git-send-email-horms+renesas@verge.net.au>
-References: <1456280946-14859-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1456280946-14859-3-git-send-email-horms+renesas@verge.net.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 Feb 2016 12:19:36 +0900
+Subject: [PATCH] spi: imx: initialize usedma earlier
+In-Reply-To: <1456223095-32185-1-git-send-email-s.hauer@pengutronix.de>
+References: <20160223111559.3c2cb641@ipc1.ka-ro>
+ <1456223095-32185-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20160224031936.GI18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added fallback compatibility string in r8a7791 device tree.
+On Tue, Feb 23, 2016 at 11:24:55AM +0100, Sascha Hauer wrote:
+> The SoC specific config function does not know if DMA will be used or
+> not. This information will be useful to configure the SPI controller
+> correctly for DMA in following patches, so initialize the usedma
+> variable before calling into the SoC specific config function.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 6439f0569fe2..9bfd1dc054b3 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1035,7 +1035,7 @@
- 	};
- 
- 	jpu: jpeg-codec at fe980000 {
--		compatible = "renesas,jpu-r8a7791";
-+		compatible = "renesas,jpu-r8a7791", "renesas,rcar-gen2-jpu";
- 		reg = <0 0xfe980000 0 0x10300>;
- 		interrupts = <GIC_SPI 272 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7791_CLK_JPU>;
--- 
-2.1.4
+Don't send new patches in reply to old serieses, especially not in the
+middle of them - it makes it confusing to follow what's going on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/e4e85b54/attachment-0001.sig>
