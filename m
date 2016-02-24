@@ -1,29 +1,28 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 24 Feb 2016 08:37:47 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7791: use fallback jpu compatibility
- string
-In-Reply-To: <1456280946-14859-3-git-send-email-horms+renesas@verge.net.au>
-References: <1456280946-14859-1-git-send-email-horms+renesas@verge.net.au>
- <1456280946-14859-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdX3fKAyqO=_2g78PJPf0ebgQ9n3qp4uJdXKRX=Tub7V-Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 Feb 2016 13:16:44 +0900
+Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
+In-Reply-To: <20160224144859.027a3564@canb.auug.org.au>
+References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
+ <56CAE5E6.7030707@arm.com> <20160224032842.GK18327@sirena.org.uk>
+ <20160224144859.027a3564@canb.auug.org.au>
+Message-ID: <20160224041644.GS18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 3:29 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use recently added fallback compatibility string in r8a7791 device tree.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Wed, Feb 24, 2016 at 02:48:59PM +1100, Stephen Rothwell wrote:
+> On Wed, 24 Feb 2016 12:28:42 +0900 Mark Brown <broonie@kernel.org> wrote:
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > That didn't work out unfortunately, the error is still there today.
 
-Gr{oetje,eeting}s,
+> Yeah, the patch didn't hit -next yesterday and I missed the opportunity
+> to fix in manually.  However, it should be fixed in today's linux-next
+> (out in a few hours, hopefully).
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Ah, good - it was just too late rather than not working.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/4b822083/attachment.sig>
