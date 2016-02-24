@@ -1,22 +1,79 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 24 Feb 2016 09:25:36 +0900
-Subject: [PATCH 2/2] arm64: dts: r8a7795: use fallback etheravb
- compatibility string
-In-Reply-To: <CAMuHMdV-nrfcWGOW5aAiR2RTe-340ER=TcWgbfe4MEVU_iyYqw@mail.gmail.com>
-References: <1456190266-3781-1-git-send-email-horms+renesas@verge.net.au>
- <1456190266-3781-3-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdV-nrfcWGOW5aAiR2RTe-340ER=TcWgbfe4MEVU_iyYqw@mail.gmail.com>
-Message-ID: <20160224002535.GC28853@verge.net.au>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 23 Feb 2016 16:38:22 -0800
+Subject: [PATCH v6 0/3] Add host controller drivers for Cavium ThunderX PCI
+In-Reply-To: <1454975731-13618-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1454975731-13618-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <56CCFB7E.6030307@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 09:27:46AM +0100, Geert Uytterhoeven wrote:
-> On Tue, Feb 23, 2016 at 2:17 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Use recently added fallback compatibility string in r8a7795 device tree.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Bjorn,
 
-Thanks, I have queued this up.
+I haven't seen any feedback on this revision of the patch set.
+
+Are there any remaining issues that you are aware of that are blocking 
+these?
+
+Thanks in advance,
+David Daney
+
+
+On 02/08/2016 03:55 PM, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> Some Cavium ThunderX processors require quirky access methods for the
+> config space of the PCIe bridge.
+>
+> There are now three patches:
+>
+> 1) Refactor code in pci-host-generic so that it can more easily be
+>     used by other drivers.  This splits the driver for CAM and ECAM
+>     access methods to a separate file from the common host driver code.
+>
+> 2) Add the ThunderX PCIe driver to external PCIe buses, which
+>     leverages the code in pci-host-generic
+>
+> 3) Add ThunderX PCI driver for internel SoC buses used on early
+>     ThunderX chip revisions.
+>
+> Changes from v5: Added Acked-by Rob Herring for the device tree
+> binding in 3/3.  Fixed typo and split large functions as suggested by
+> Bjorn Helgaas.
+>
+> Changes from v4: Added patch 3/3.  Stylistic changes to 2/3 suggested
+> by Bjorn Helgaas.  When expanding config write width to 32-bits, mask
+> out unintened writes to W1C bits, also suggested by Bjorn Helgaas.
+>
+> Changes from v3: Add some Acked-by, rebased to v4.5.0-rc1
+>
+> Changes from v2: Improve device tree binding example as noted by Rob
+> Herring.  Rename pcie-thunder-pem.* to pci-thunder-pem.* for better
+> consistency.  Update MAINTAINERS to reflect the changes.
+>
+> Changes from v1: Split CAM and ECAM code from common driver code as
+> suggested by Arnd Bergmann.  Fix spelling errors in
+> pcie-thunder-pem.txt
+>
+> David Daney (3):
+>    PCI: generic: Refactor code to enable reuse by other drivers.
+>    pci, pci-thunder-pem: Add PCIe host driver for ThunderX processors.
+>    pci, pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
+>
+>   .../devicetree/bindings/pci/pci-thunder-ecam.txt   |  30 ++
+>   .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 +++
+>   MAINTAINERS                                        |   9 +
+>   drivers/pci/host/Kconfig                           |  18 ++
+>   drivers/pci/host/Makefile                          |   3 +
+>   drivers/pci/host/pci-host-common.c                 | 194 +++++++++++
+>   drivers/pci/host/pci-host-common.h                 |  47 +++
+>   drivers/pci/host/pci-host-generic.c                | 181 +----------
+>   drivers/pci/host/pci-thunder-ecam.c                | 358 +++++++++++++++++++++
+>   drivers/pci/host/pci-thunder-pem.c                 | 347 ++++++++++++++++++++
+>   10 files changed, 1053 insertions(+), 177 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
+>   create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+>   create mode 100644 drivers/pci/host/pci-host-common.c
+>   create mode 100644 drivers/pci/host/pci-host-common.h
+>   create mode 100644 drivers/pci/host/pci-thunder-ecam.c
+>   create mode 100644 drivers/pci/host/pci-thunder-pem.c
+>
