@@ -1,65 +1,73 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:53 +0530
-Subject: [PATCH 28/50] pinctrl: ssbi-mpp: Use devm_pinctrl_register() for
+Date: Wed, 24 Feb 2016 18:45:50 +0530
+Subject: [PATCH 25/50] pinctrl: ish-pfc: Use devm_pinctrl_register() for
  pinctrl registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-29-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-26-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_pinctrl_register() for pin control registration and clean
-the error path.
+Use devm_pinctrl_register() for pin control registration.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: linux-renesas-soc at vger.kernel.org
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
+ drivers/pinctrl/sh-pfc/core.c    |  1 -
+ drivers/pinctrl/sh-pfc/core.h    |  1 -
+ drivers/pinctrl/sh-pfc/pinctrl.c | 12 +-----------
+ 3 files changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 4513550..8eb6de8 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -932,18 +932,15 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 	pctrl_desc->pctlops = &sunxi_pctrl_ops;
- 	pctrl_desc->pmxops =  &sunxi_pmx_ops;
+diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
+index 181ea98..4b28fbb 100644
+--- a/drivers/pinctrl/sh-pfc/core.c
++++ b/drivers/pinctrl/sh-pfc/core.c
+@@ -587,7 +587,6 @@ static int sh_pfc_remove(struct platform_device *pdev)
+ #ifdef CONFIG_GPIO_SH_PFC
+ 	sh_pfc_unregister_gpiochip(pfc);
+ #endif
+-	sh_pfc_unregister_pinctrl(pfc);
  
--	pctl->pctl_dev = pinctrl_register(pctrl_desc,
--					  &pdev->dev, pctl);
-+	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, pctrl_desc, pctl);
- 	if (IS_ERR(pctl->pctl_dev)) {
- 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
- 		return PTR_ERR(pctl->pctl_dev);
- 	}
- 
- 	pctl->chip = devm_kzalloc(&pdev->dev, sizeof(*pctl->chip), GFP_KERNEL);
--	if (!pctl->chip) {
--		ret = -ENOMEM;
--		goto pinctrl_error;
--	}
-+	if (!pctl->chip)
-+		return -ENOMEM;
- 
- 	last_pin = pctl->desc->pins[pctl->desc->npins - 1].pin.number;
- 	pctl->chip->owner = THIS_MODULE;
-@@ -965,7 +962,7 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 
- 	ret = gpiochip_add_data(pctl->chip, pctl);
- 	if (ret)
--		goto pinctrl_error;
-+		return ret;
- 
- 	for (i = 0; i < pctl->desc->npins; i++) {
- 		const struct sunxi_desc_pin *pin = pctl->desc->pins + i;
-@@ -1041,7 +1038,5 @@ clk_error:
- 	clk_disable_unprepare(clk);
- gpiochip_error:
- 	gpiochip_remove(pctl->chip);
--pinctrl_error:
--	pinctrl_unregister(pctl->pctl_dev);
- 	return ret;
+ 	return 0;
  }
+diff --git a/drivers/pinctrl/sh-pfc/core.h b/drivers/pinctrl/sh-pfc/core.h
+index 62f53b2..8272114 100644
+--- a/drivers/pinctrl/sh-pfc/core.h
++++ b/drivers/pinctrl/sh-pfc/core.h
+@@ -57,7 +57,6 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc);
+ int sh_pfc_unregister_gpiochip(struct sh_pfc *pfc);
+ 
+ int sh_pfc_register_pinctrl(struct sh_pfc *pfc);
+-int sh_pfc_unregister_pinctrl(struct sh_pfc *pfc);
+ 
+ u32 sh_pfc_read_raw_reg(void __iomem *mapped_reg, unsigned int reg_width);
+ void sh_pfc_write_raw_reg(void __iomem *mapped_reg, unsigned int reg_width,
+diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c b/drivers/pinctrl/sh-pfc/pinctrl.c
+index 87b0a59..f17b5fc 100644
+--- a/drivers/pinctrl/sh-pfc/pinctrl.c
++++ b/drivers/pinctrl/sh-pfc/pinctrl.c
+@@ -692,19 +692,9 @@ int sh_pfc_register_pinctrl(struct sh_pfc *pfc)
+ 	pmx->pctl_desc.pins = pmx->pins;
+ 	pmx->pctl_desc.npins = pfc->info->nr_pins;
+ 
+-	pmx->pctl = pinctrl_register(&pmx->pctl_desc, pfc->dev, pmx);
++	pmx->pctl = devm_pinctrl_register(pfc->dev, &pmx->pctl_desc, pmx);
+ 	if (IS_ERR(pmx->pctl))
+ 		return PTR_ERR(pmx->pctl);
+ 
+ 	return 0;
+ }
+-
+-int sh_pfc_unregister_pinctrl(struct sh_pfc *pfc)
+-{
+-	struct sh_pfc_pinctrl *pmx = pfc->pinctrl;
+-
+-	pinctrl_unregister(pmx->pctl);
+-
+-	pfc->pinctrl = NULL;
+-	return 0;
+-}
 -- 
 2.1.4
