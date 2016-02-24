@@ -1,103 +1,73 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Wed, 24 Feb 2016 13:53:33 +0530
-Subject: [PATCH 2/3] ARM: EXYNOS: remove unused register offset definition
-In-Reply-To: <56CCEF84.6090502@samsung.com>
-References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
- <1456135396-17767-3-git-send-email-pankaj.dubey@samsung.com>
- <56CBA1BC.4050003@samsung.com> <56CC2238.2040303@samsung.com>
- <56CCEF84.6090502@samsung.com>
-Message-ID: <56CD6885.4060904@samsung.com>
+From: schwidefsky@de.ibm.com (Martin Schwidefsky)
+Date: Wed, 24 Feb 2016 09:22:08 +0100
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
+ also on PowerPC and ARM)
+In-Reply-To: <20160223191907.25719a4d@thinkpad>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad>
+Message-ID: <20160224092208.49e013ff@mschwide>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 23 Feb 2016 19:19:07 +0100
+Gerald Schaefer <gerald.schaefer@de.ibm.com> wrote:
 
+> On Tue, 23 Feb 2016 13:32:21 +0300
+> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
+> 
+> > On Fri, Feb 12, 2016 at 06:16:40PM +0100, Gerald Schaefer wrote:
+> > > On Fri, 12 Feb 2016 16:57:27 +0100
+> > > Christian Borntraeger <borntraeger@de.ibm.com> wrote:
+> > > 
+> > > > > I'm also confused by pmd_none() is equal to !pmd_present() on s390. Hm?
+> > > > 
+> > > > Don't know, Gerald or Martin?
+> > > 
+> > > The implementation frequently changes depending on how many new bits Martin
+> > > needs to squeeze out :-)
+> > > We don't have a _PAGE_PRESENT bit for pmds, so pmd_present() just checks if the
+> > > entry is not empty. pmd_none() of course does the opposite, it checks if it is
+> > > empty.
+> > 
+> > I still worry about pmd_present(). It looks wrong to me. I wounder if
+> > patch below makes a difference.
+> > 
+> > The theory is that the splitting bit effetely masked bogus pmd_present():
+> > we had pmd_trans_splitting() in all code path and that prevented mm from
+> > touching the pmd. Once pmd_trans_splitting() has gone, mm proceed with the
+> > pmd where it shouldn't and here's a boom.
+> 
+> Well, I don't think pmd_present() == true is bogus for a trans_huge pmd under
+> splitting, after all there is a page behind the the pmd. Also, if it was
+> bogus, and it would need to be false, why should it be marked !pmd_present()
+> only at the pmdp_invalidate() step before the pmd_populate()? It clearly
+> is pmd_present() before that, on all architectures, and if there was any
+> problem/race with that, setting it to !pmd_present() at this stage would
+> only (marginally) reduce the race window.
+> 
+> BTW, PowerPC and Sparc seem to do the same thing in pmdp_invalidate(),
+> i.e. they do not set pmd_present() == false, only mark it so that it would
+> not generate a new TLB entry, just like on s390. After all, the function
+> is called pmdp_invalidate(), and I think the comment in mm/huge_memory.c
+> before that call is just a little ambiguous in its wording. When it says
+> "mark the pmd notpresent" it probably means "mark it so that it will not
+> generate a new TLB entry", which is also what the comment is really about:
+> prevent huge and small entries in the TLB for the same page at the same
+> time.
 
-On Wednesday 24 February 2016 05:17 AM, Krzysztof Kozlowski wrote:
-> On 23.02.2016 18:11, pankaj.dubey wrote:
->> Hi Krzysztof,
->>
->> On Tuesday 23 February 2016 05:33 AM, Krzysztof Kozlowski wrote:
->>> On 22.02.2016 19:03, Pankaj Dubey wrote:
->>>> This patch cleans up map.h by removing unused register offset
->>>> and changing EXYNOS4 to EXYNOS in header comment section.
->>>>
->>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>> ---
->>>>  arch/arm/mach-exynos/include/mach/map.h | 9 +--------
->>>>  1 file changed, 1 insertion(+), 8 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
->>>> index 351e839..c48ba4f 100644
->>>> --- a/arch/arm/mach-exynos/include/mach/map.h
->>>> +++ b/arch/arm/mach-exynos/include/mach/map.h
->>>> @@ -2,7 +2,7 @@
->>>>   * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
->>>>   *		http://www.samsung.com/
->>>>   *
->>>> - * EXYNOS4 - Memory map definitions
->>>> + * EXYNOS - Memory map definitions
->>>>   *
->>>>   * This program is free software; you can redistribute it and/or modify
->>>>   * it under the terms of the GNU General Public License version 2 as
->>>> @@ -14,12 +14,6 @@
->>>>  
->>>>  #include <plat/map-base.h>
->>>>  
->>>> -/*
->>>> - * EXYNOS4 UART offset is 0x10000 but the older S5P SoCs are 0x400.
->>>> - * So need to define it, and here is to avoid redefinition warning.
->>>> - */
->>>> -#define S3C_UART_OFFSET			(0x10000)
->>>> -
->>>>  #include <plat/map-s5p.h>
->>>
->>> This does not look good. The S3C_UART_OFFSET is used in plat/map-s5p.h.
->>>
->>
->> Actually it's just defined there but not getting used anywhere. In fact
->> we can remove it from there also.
-> 
-> The point is that your patch introduce changes. Before S3C_UART_OFFSET
-> was defined to 0x10000, after (because of #ifndef) it will be 0x400.
-> Description of "unused" is not accurate. Unused stuff does not impact
-> anything.
-> 
->> So I submitted another patch to
->> cleanup such redundant register definitions from plat/map-s5p.h.
-> 
-> That would be good.
-> 
->> Only platform using S3C_UART_OFFSET is s3c64xx and its using definition
->> from map-s3c.h. I have compiled all related platform defconfigs and
->> found no issues because of removal of S3C_UART_OFFSET from map-s5p.c and
->> map.h.
-> 
-> The compilation is not a test. You compiled something like this:
-> -#define S3C_UART_OFFSET			(0x10000)
->  #ifndef S3C_UART_OFFSET
->  #define S3C_UART_OFFSET         (0x400)
->  #endif
-> 
-> ... and found no errors. Of course there are no compilation errors! But
-> the value has changed!
-> 
+If I am not mistaken this is true for x86 as well. The generic implementation
+for pmdp_invalidate sets a new pmd that has been modified with
+pmd_mknotpresent. For x86 this function removes the _PAGE_PRESENT and
+_PAGE_PROTNONE bits from the entry. The _PAGE_PSE bit stays set and that
+makes pmd_present return true.
 
-OK. I see, there are quite a few places these definitions are scattered
-even though not used (not used in the sense what ever values these
-macros are taking in code it's not used). Such as
-mach-exynos/include/map.h, plat-samsung/include/plat/{map-s3c.h,
-map-s5p.h} and mach-s3c24xx/include/mach/map.h. So I will remove all
-these in one go.
-Is this fine?
-Also I have one doubt in case I am touching files across various mach
-files and preparing a single patch what should be commit message
-heading? Is commit starting with "ARM: samsung" fine? or anything more
-appropriate you would suggest.
+-- 
+blue skies,
+   Martin.
 
-Thanks,
-Pankaj Dubey
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
+"Reality continues to ruin my life." - Calvin.
