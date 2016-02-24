@@ -1,92 +1,81 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Wed, 24 Feb 2016 09:31:59 +0530
-Subject: [PATCH 3/3] ARM: EXYNOS: cleanup header files inclusion
-In-Reply-To: <56CD0143.2010909@samsung.com>
-References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
- <1456135396-17767-4-git-send-email-pankaj.dubey@samsung.com>
- <56CBA32D.4020905@samsung.com> <56CC23AD.10103@samsung.com>
- <56CD0143.2010909@samsung.com>
-Message-ID: <56CD2B37.1080008@samsung.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 24 Feb 2016 13:08:24 +0800
+Subject: [PATCH v13 04/20] KVM: ARM64: Add access handler for PMSELR register
+In-Reply-To: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1456290520-10012-5-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
+Since the reset value of PMSELR_EL0 is UNKNOWN, use reset_unknown for
+its reset handler. When reading PMSELR, return the PMSELR.SEL field to
+guest.
 
-On Wednesday 24 February 2016 06:32 AM, Krzysztof Kozlowski wrote:
-> On 23.02.2016 18:17, pankaj.dubey wrote:
->> Hi Krzysztof,
->>
->> On Tuesday 23 February 2016 05:39 AM, Krzysztof Kozlowski wrote:
->>> On 22.02.2016 19:03, Pankaj Dubey wrote:
->>>> This includes trivial cleanup in exynos files such as
->>>>     - remove unused header files inclusion from exynos.c, s5p-dev-mfc.c,
->>>>       firmware.c, pm.c.
->>>>     - move inclusion of of.h from common.h to pm.c where it is really
->>>>       required
->>>>
->>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>> ---
->>>>  arch/arm/mach-exynos/common.h      | 1 -
->>>>  arch/arm/mach-exynos/exynos.c      | 5 -----
->>>>  arch/arm/mach-exynos/firmware.c    | 2 --
->>>>  arch/arm/mach-exynos/platsmp.c     | 1 -
->>>>  arch/arm/mach-exynos/pm.c          | 4 +---
->>>>  arch/arm/mach-exynos/s5p-dev-mfc.c | 1 -
->>>>  6 files changed, 1 insertion(+), 13 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
->>>> index e349a03..5365bf1 100644
->>>> --- a/arch/arm/mach-exynos/common.h
->>>> +++ b/arch/arm/mach-exynos/common.h
->>>> @@ -12,7 +12,6 @@
->>>>  #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
->>>>  #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
->>>>  
->>>> -#include <linux/of.h>
->>>>  #include <linux/platform_data/cpuidle-exynos.h>
->>>>  
->>>>  #define EXYNOS3250_SOC_ID	0xE3472000
->>>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->>>> index 99947ad..54262a1 100644
->>>> --- a/arch/arm/mach-exynos/exynos.c
->>>> +++ b/arch/arm/mach-exynos/exynos.c
->>>> @@ -11,14 +11,10 @@
->>>>  
->>>>  #include <linux/init.h>
->>>>  #include <linux/io.h>
->>>> -#include <linux/kernel.h>
->>>> -#include <linux/serial_s3c.h>
->>>>  #include <linux/of.h>
->>>>  #include <linux/of_address.h>
->>>>  #include <linux/of_fdt.h>
->>>>  #include <linux/of_platform.h>
->>>> -#include <linux/platform_device.h>
->>>
->>> platform_device is actually used in that file. It looks unused because
->>> it is pulled by of_platform, but it makes sense to include it here.
->>>
->> Thanks for review.
->>
->> Well I tried to grep for of_platform.h and platform_device.h in
->> arch/arm/ and out of 88 files including of_platform.h only 16 files are
->> including platform_device.h also. So majority do not include both of
->> them even do they need. So majority of files both are not included. So
->> If we got with majority it's not required. What's your opinion?
-> 
-> Actually most of files including of_platform.h and not including
-> platform_device.h just do not require the second one (I checked like 20
-> of them and only one was referring to platform device function... of
-> course maybe my random selection of 20 files was not random enough :) ).
-> They do not directly reference platform device stuff.
-> 
-> In that file the platform_device is used so the header may stay.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+---
+ arch/arm64/include/asm/kvm_host.h |  1 +
+ arch/arm64/kvm/sys_regs.c         | 20 ++++++++++++++++++--
+ 2 files changed, 19 insertions(+), 2 deletions(-)
 
-OK. will resend this again with keeping back platform_device.h in
-exynos.c file.
-
-Thanks,
-Pankaj Dubey
-> 
-> Best regards,
-> Krzysztof
-> 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 1f3ca98..e342b48 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -117,6 +117,7 @@ enum vcpu_sysreg {
+ 
+ 	/* Performance Monitors Registers */
+ 	PMCR_EL0,	/* Control Register */
++	PMSELR_EL0,	/* Event Counter Selection Register */
+ 
+ 	/* 32bit specific registers. Keep them at the end of the range */
+ 	DACR32_EL2,	/* Domain Access Control Register */
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index e88ae2d..b05e20f 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -477,6 +477,22 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	return true;
+ }
+ 
++static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			  const struct sys_reg_desc *r)
++{
++	if (!kvm_arm_pmu_v3_ready(vcpu))
++		return trap_raz_wi(vcpu, p, r);
++
++	if (p->is_write)
++		vcpu_sys_reg(vcpu, PMSELR_EL0) = p->regval;
++	else
++		/* return PMSELR.SEL field */
++		p->regval = vcpu_sys_reg(vcpu, PMSELR_EL0)
++			    & ARMV8_PMU_COUNTER_MASK;
++
++	return true;
++}
++
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -676,7 +692,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  trap_raz_wi },
+ 	/* PMSELR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+-	  trap_raz_wi },
++	  access_pmselr, reset_unknown, PMSELR_EL0 },
+ 	/* PMCEID0_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+ 	  trap_raz_wi },
+@@ -927,7 +943,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
+-- 
+2.0.4
