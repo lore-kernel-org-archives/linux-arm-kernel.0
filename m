@@ -1,85 +1,75 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Wed, 24 Feb 2016 08:18:16 +0800
-Subject: [PATCH 1/4] soc: rockchip: add bindings for Rockchip grf
-In-Reply-To: <20160223221555.GA7531@rob-hp-laptop>
-References: <1456210864-29037-1-git-send-email-jay.xu@rock-chips.com>
- <1456210864-29037-2-git-send-email-jay.xu@rock-chips.com>
- <20160223221555.GA7531@rob-hp-laptop>
-Message-ID: <56CCF6C8.6010602@rock-chips.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 23 Feb 2016 16:22:16 -0800
+Subject: [PATCH RESEND 2/2] usb: dwc2: Move host-specific core functions
+ into hcd.c
+In-Reply-To: <8c76999579912385f7aa371960e5321864d5d86c.1456260533.git.johnyoun@synopsys.com>
+References: <cover.1456260533.git.johnyoun@synopsys.com>
+ <8c76999579912385f7aa371960e5321864d5d86c.1456260533.git.johnyoun@synopsys.com>
+Message-ID: <CAD=FV=VXJdEH0+h2UWmh5++N9uax4NLujXStqS2fgWB-qw2UgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+John,
 
-? 24/02/2016 06:15, Rob Herring ??:
-> On Tue, Feb 23, 2016 at 03:01:01PM +0800, jianqun.xu wrote:
->> From: Jianqun Xu <jay.xu@rock-chips.com>
->>
->> Add devicetree bindings for Rockchip grf which found on
->> Rockchip SoCs.
->>
->> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
->> ---
->> changes in v2:
->> - add grf.txt (Heiko)
->>
->>   .../devicetree/bindings/soc/rockchip/grf.txt       | 35 ++++++++++++++++++++++
->>   1 file changed, 35 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/soc/rockchip/grf.txt
->>
->> diff --git a/Documentation/devicetree/bindings/soc/rockchip/grf.txt b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
->> new file mode 100644
->> index 0000000..7fb0410
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
->> @@ -0,0 +1,35 @@
->> +* Rockchip General Register Files (GRF)
->> +
->> +The general register file will be used to do static set by software, which
->> +is composed of many registers for system control.
->> +
->> +From RK3368 SoCs, the GRF is divided into two sections,
->> +- GRF, used for general non-secure system,
->> +- PMUGRF, used for always on sysyem
->
-> s/sysyem/system/
->
-> Otherwise:
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
-ok, thanks
->> +
->> +Required Properties:
->> +
->> +- compatible: GRF should be one of the followings
->> +   - "rockchip,rk3066-grf", "syscon": for rk3066
->> +   - "rockchip,rk3188-grf", "syscon": for rk3188
->> +   - "rockchip,rk3228-grf", "syscon": for rk3228
->> +   - "rockchip,rk3288-grf", "syscon": for rk3288
->> +   - "rockchip,rk3368-grf", "syscon": for rk3368
->> +   - "rockchip,rk3399-grf", "syscon": for rk3399
->> +- compatible: PMUGRF should be one of the followings
->> +   - "rockchip,rk3368-pmugrf", "syscon": for rk3368
->> +   - "rockchip,rk3399-pmugrf", "syscon": for rk3399
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region.
->> +
->> +Example: GRF and PMUGRF of RK3399 SoCs
->> +
->> +	pmugrf: syscon at ff320000 {
->> +		compatible = "rockchip,rk3399-pmugrf", "syscon";
->> +		reg = <0x0 0xff320000 0x0 0x1000>;
->> +	};
->> +
->> +	grf: syscon at ff770000 {
->> +		compatible = "rockchip,rk3399-grf", "syscon";
->> +		reg = <0x0 0xff770000 0x0 0x10000>;
->> +	};
->> --
->> 1.9.1
->>
->>
->
->
->
+On Tue, Feb 23, 2016 at 1:33 PM, John Youn <johnyoun@synopsys.com> wrote:
+
+> +u32 dwc2_calc_frame_interval(struct dwc2_hsotg *hsotg)
+
+You seem to have lost the function comments for
+dwc2_calc_frame_interval().  Was that intentional?  If not, can you
+add them back?
+
+
+> +/**
+> + * dwc2_hc_do_ping() - Starts a PING transfer
+> + *
+> + * @hsotg: Programming view of DWC_otg controller
+> + * @chan:  Information needed to initialize the host channel
+> + *
+> + * This function should only be called in Slave mode. The Do Ping bit is set in
+> + * the HCTSIZ register, then the channel is enabled.
+> + */
+> +void dwc2_hc_do_ping(struct dwc2_hsotg *hsotg, struct dwc2_host_chan *chan)
+
+Presumably can be static?  ...and remove prototype from "core.h"?
+
+
+> +/**
+> + * dwc2_core_init() - Initializes the DWC_otg controller registers and
+> + * prepares the core for device mode or host mode operation
+> + *
+> + * @hsotg:         Programming view of the DWC_otg controller
+> + * @initial_setup: If true then this is the first init for this instance.
+> + */
+> +int dwc2_core_init(struct dwc2_hsotg *hsotg, bool initial_setup)
+
+Presumably can be static?  ...and remove prototype from "core.h"?
+
+
+> +/**
+> + * dwc2_core_host_init() - Initializes the DWC_otg controller registers for
+> + * Host mode
+> + *
+> + * @hsotg: Programming view of DWC_otg controller
+> + *
+> + * This function flushes the Tx and Rx FIFOs and flushes any entries in the
+> + * request queues. Host channels are reset to ensure that they are ready for
+> + * performing transfers.
+> + */
+> +void dwc2_core_host_init(struct dwc2_hsotg *hsotg)
+
+Presumably can be static?  ...and remove prototype from "core.h"?
+
+
+Other than those nits, things look good.  I didn't analyze exactly
+where you placed all the functions but a quick glance shows that they
+seem sanely organized.  :)
+
+I picked these back to my chromeos-3.14 kernel (with many many dwc2
+backports) and I confirmed that I can still compile the kernel, boot
+it, and use USB.  I also confirmed no warnings were introduced for me.
+I'm only testing HOST, not gadget mode.
+
+Feel free to add my Reviewed-by and Tested-by once nits are fixed up.
+
+-Doug
