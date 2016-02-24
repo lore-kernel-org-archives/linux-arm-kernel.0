@@ -1,41 +1,44 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 24 Feb 2016 18:14:25 +0800
-Subject: [PATCH v1 3/4] clk: rockchip: add the new clock ids for RK3228 HDMI
-In-Reply-To: <1456308303-29706-1-git-send-email-ykk@rock-chips.com>
-References: <1456308303-29706-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1456308865-30876-1-git-send-email-ykk@rock-chips.com>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Wed, 24 Feb 2016 11:16:34 +0100
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160223202233.GE27281@arm.com>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name> <56BE00E7.1010303@de.ibm.com>
+ <20160212181640.4eabb85f@thinkpad> <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad>
+ <20160223193345.GC21820@node.shutemov.name> <20160223202233.GE27281@arm.com>
+Message-ID: <56CD8302.9080202@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- include/dt-bindings/clock/rk3228-cru.h | 4 ++++
- 1 file changed, 4 insertions(+)
+On 02/23/2016 09:22 PM, Will Deacon wrote:
+> On Tue, Feb 23, 2016 at 10:33:45PM +0300, Kirill A. Shutemov wrote:
+>> On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
+>>> I'll check with Martin, maybe it is actually trivial, then we can
+>>> do a quick test it to rule that one out.
+>>
+>> Oh. I found a bug in __split_huge_pmd_locked(). Although, not sure if it's
+>> _the_ bug.
+>>
+>> pmdp_invalidate() is called for the wrong address :-/
+>> I guess that can be destructive on the architecture, right?
+> 
+> FWIW, arm64 ignores the address parameter for set_pmd_at, so this would
+> only result in the TLBI nuking the wrong entries, which is going to be
+> tricky to observe in practice given that we install a table entry
+> immediately afterwards that maps the same pages. If s390 does more here
+> (I see some magic asm using the address), that could be the answer...
 
-diff --git a/include/dt-bindings/clock/rk3228-cru.h b/include/dt-bindings/clock/rk3228-cru.h
-index 5656bf6..fda9308 100644
---- a/include/dt-bindings/clock/rk3228-cru.h
-+++ b/include/dt-bindings/clock/rk3228-cru.h
-@@ -50,9 +50,11 @@
- #define SCLK_SDIO_SAMPLE	119
- #define SCLK_EMMC_SAMPLE	121
- #define SCLK_VOP		122
-+#define SCLK_HDMI_HDCP		123
+This patch does not change the address for set_pmd_at, it does that for the 
+pmdp_invalidate here (by keeping haddr at the start of the pmd)
+
+--->    pmdp_invalidate(vma, haddr, pmd);
+        pmd_populate(mm, pmd, pgtable);
  
- /* dclk gates */
- #define DCLK_VOP		190
-+#define DCLK_HDMI_PHY		191
- 
- /* aclk gates */
- #define ACLK_DMAC		194
-@@ -76,6 +78,8 @@
- #define PCLK_PWM		350
- #define PCLK_TIMER		353
- #define PCLK_PERI		363
-+#define PCLK_HDMI_CTRL		364
-+#define PCLK_HDMI_PHY		365
- 
- /* hclk gates */
- #define HCLK_VOP		452
--- 
-1.9.1
+
+
+
+Without that fix we would clearly have stale tlb entries, no?
