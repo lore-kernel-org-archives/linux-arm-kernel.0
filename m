@@ -1,121 +1,51 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 23 Feb 2016 19:14:18 -0600
-Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
- HiSilicon SoCs Host Controllers
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
-References: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
- <1455039260-6040-4-git-send-email-gabriele.paoloni@huawei.com>
- <20160209182429.GD4348@leverpostej>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1591@lhreml503-mbs>
- <20160210111234.GC2632@leverpostej>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
-Message-ID: <20160224011418.GB13026@localhost>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 24 Feb 2016 10:20:50 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.6
+Message-ID: <cover.1456275967.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 02:47:22AM +0000, Gabriele Paoloni wrote:
-> > -----Original Message-----
-> > From: Gabriele Paoloni
-> > Sent: 10 February 2016 22:45
-> > To: Mark Rutland
-> > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
-> > qiujiang; bhelgaas at google.com; arnd at arndb.de; Lorenzo.Pieralisi at arm.com;
-> > tn at semihalf.com; linux-pci at vger.kernel.org; linux-
-> > kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: RE: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
-> > HiSilicon SoCs Host Controllers
-> > 
-> > > -----Original Message-----
-> > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> > > owner at vger.kernel.org] On Behalf Of Mark Rutland
-> > > Sent: 10 February 2016 11:13
-> > > To: Gabriele Paoloni
-> > > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
-> > > qiujiang; bhelgaas at google.com; arnd at arndb.de;
-> > > Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
-> > > linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
-> > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
-> > > kernel at lists.infradead.org
-> > > Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
-> > > HiSilicon SoCs Host Controllers
-> > >
-> > > On Wed, Feb 10, 2016 at 09:52:36AM +0000, Gabriele Paoloni wrote:
-> > > > Hi Mark
-> > > >
-> > > > > On Tue, Feb 09, 2016 at 05:34:20PM +0000, Gabriele Paoloni wrote:
-> > > > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> > > > > > +/*
-> > > > > > + * Retrieve rc_dbi base and size from _DSD
-> > > > > > + * Name (_DSD, Package () {
-> > > > > > + *	ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-> > > > > > + *	Package () {
-> > > > > > + *	Package () {"rc-dbi", Package () { 0x0, 0xb0080000, 0x0,
-> > > 0x10000
-> > > > > }},
-> > > > > > + *	}
-> > > > > > + *	})
-> > > > > > + */
-> > > > >
-> > > > > As above, this does not look right. ACPI has standard mechanisms
-> > > for
-> > > > > describing addresses. Making something up like this is not a good
-> > > idea.
-> > > >
-> > > > I am quite new to ACPI, may I ask you to explain a bit?
-> > >
-> > > ACPI has standard mechanisms for describing certain resources, and
-> > > these
-> > > should not be described in _DSD. Memory or IO address regions are
-> > such
-> > > resources (in _CRS, IIRC), and should not be described in _DSD.
-> > 
-> > Hi Mark,
-> > 
-> > In my case I think in need to look into the MCFG object as the problem
-> > I have is RC using a different range than the rest of the hierarchy.
-> > 
-> > I'll investigate this and try to come with a solution in v4
-> 
-> I have looked into this and in our case we cannot use the
-> standard MCFG object to pass the RC config space addresses.
-> 
-> The reason is that in our HW we have the config base addresses of the 
-> root complex ports that are less than 0x100000 byte distant one from
-> the other as we only map the first 0x10000 bytes.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The ECAM spec requires 4096 bytes per function, 8 functions per
-device, 32 devices per bus, which means you need 0x100000 bytes of
-address space per bus.  If your device doesn't supply that, it doesn't
-really implement ECAM, and you probably can't use the standard ways of
-describing ECAM (MCFG, _CBA).
+Please consider these second round of Renesas ARM based SoC cleanups for v4.6.
 
-> Now the MCFG acpi framework always fix the MCFG resource size to 0x100000
-> for each bus; therefore if we pass our RC addresses through MCFG we end
-> up with a resource conflict.
-> 
-> To give you a practical example we are in a situation where we have:
-> 
-> port0: [0x00000000b0080000 - 0x00000000b0080000 + 0x10000]
-> port1: [0x00000000b0090000 - 0x00000000b0090000 + 0x10000]
-> port2: [0x00000000b00A0000 - 0x00000000b00A0000 + 0x10000]
-> port3: [0x00000000b00B0000 - 0x00000000b00B0000 + 0x10000]
->   
-> So if we pass the base addresses through MCFG the resources
-> will overlap as MCFG will consider 0x100000 size for each base
-> address of the root complex (only the RC bus uses that address)
-> 
-> So far I do not see many option other than using _DSD to pass
-> these RC config base addresses.
+This pull request is based on "Renesas ARM Based SoC Fixes for v4.5",
+tagged as renesas-soc-fixes-for-v4.5, which I have already sent a
+pull-request for.
 
-I don't want to take over Mark's discussion, but I really do not think
-_DSD is the correct way to fix this.  _CRS is like a generalized PCI
-BAR.  A PCI device is only allowed to respond to address space
-reported via a BAR.  An ACPI device is only allowed to respond to
-address space reported via _CRS.  Those are important rules because
-they mean we can manage address space with generic code instead of
-device-specific code.
+The reason for that base is that the SCU cleanup depends on a change
+in the fixes pull request.
 
-Bjorn
+
+The following changes since commit 901c5ffaaed117a38be9d0c29247c4888d6c8636:
+
+  ARM: shmobile: Remove shmobile_boot_arg (2016-02-17 18:27:21 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v4.6
+
+for you to fetch changes up to cf77db5165b606fca7d1d59735528ee43202392e:
+
+  ARM: shmobile: Kconfig: Get rid of old comment (2016-02-17 21:24:29 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Cleanup for v4.6
+
+* Remove stale comment from Kconfig
+* Consolidate SCU mapping code
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: Consolidate SCU mapping code
+
+Magnus Damm (1):
+      ARM: shmobile: Kconfig: Get rid of old comment
+
+ arch/arm/mach-shmobile/Kconfig       |  2 --
+ arch/arm/mach-shmobile/common.h      |  5 ++---
+ arch/arm/mach-shmobile/platsmp-scu.c | 10 +++++++---
+ arch/arm/mach-shmobile/smp-emev2.c   |  3 +--
+ arch/arm/mach-shmobile/smp-r8a7779.c |  3 +--
+ arch/arm/mach-shmobile/smp-sh73a0.c  |  3 +--
+ 6 files changed, 12 insertions(+), 14 deletions(-)
