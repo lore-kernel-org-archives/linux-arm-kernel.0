@@ -1,48 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Feb 2016 10:46:38 +0000
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <56CC546A.9070705@ti.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
- <56CC2D39.80909@ti.com>
- <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
- <56CC546A.9070705@ti.com>
-Message-ID: <20160224104638.GL19428@n2100.arm.linux.org.uk>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Wed, 24 Feb 2016 11:51:47 +0100
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160224104139.GC28310@arm.com>
+References: <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name> <56BE00E7.1010303@de.ibm.com>
+ <20160212181640.4eabb85f@thinkpad> <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad>
+ <20160223193345.GC21820@node.shutemov.name> <20160223202233.GE27281@arm.com>
+ <56CD8302.9080202@de.ibm.com> <20160224104139.GC28310@arm.com>
+Message-ID: <56CD8B43.9070509@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 02:45:30PM +0200, Tomi Valkeinen wrote:
-> My opinion is that the bootloader should be responsible for telling the
-> kernel what hardware there is on the board. For busses like PCI we have
-> proper probing mechanism with global unique identifiers for the devices,
-> and nothing is needed from the bootloader.
+On 02/24/2016 11:41 AM, Will Deacon wrote:
+> On Wed, Feb 24, 2016 at 11:16:34AM +0100, Christian Borntraeger wrote:
+>> On 02/23/2016 09:22 PM, Will Deacon wrote:
+>>> On Tue, Feb 23, 2016 at 10:33:45PM +0300, Kirill A. Shutemov wrote:
+>>>> On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
+>>>>> I'll check with Martin, maybe it is actually trivial, then we can
+>>>>> do a quick test it to rule that one out.
+>>>>
+>>>> Oh. I found a bug in __split_huge_pmd_locked(). Although, not sure if it's
+>>>> _the_ bug.
+>>>>
+>>>> pmdp_invalidate() is called for the wrong address :-/
+>>>> I guess that can be destructive on the architecture, right?
+>>>
+>>> FWIW, arm64 ignores the address parameter for set_pmd_at, so this would
+>>> only result in the TLBI nuking the wrong entries, which is going to be
+>>> tricky to observe in practice given that we install a table entry
+>>> immediately afterwards that maps the same pages. If s390 does more here
+>>> (I see some magic asm using the address), that could be the answer...
+>>
+>> This patch does not change the address for set_pmd_at, it does that for the 
+>> pmdp_invalidate here (by keeping haddr at the start of the pmd)
+>>
+>> --->    pmdp_invalidate(vma, haddr, pmd);
+>>         pmd_populate(mm, pmd, pgtable);
+> 
+> On arm64, pmdp_invalidate looks like:
+> 
+> void pmdp_invalidate(struct vm_area_struct *vma, unsigned long address,
+> 		     pmd_t *pmdp)
+> {
+> 	pmd_t entry = *pmdp;
+> 	set_pmd_at(vma->vm_mm, address, pmdp, pmd_mknotpresent(entry));
+> 	flush_pmd_tlb_range(vma, address, address + hpage_pmd_size);
+> }
+> 
+> so that's the set_pmd_at call I was referring to.
+> 
+> On s390, that address ends up in __pmdp_idte[_local], but I don't know
+> what .insn rrf,0xb98e0000,%2,%3,0,{0,1} do ;)
 
-Exactly, but that is _NOT_ the case here, because we're not talking
-about an on-board display.
+It does invalidation of the pmd entry and tlb clearing for this entry.
 
-> In the Versatile case the panels are kind of probeable, but not in the
-> same sense as PCI: all that can be probed on Versatile is a board
-> specific ID, which in itself doesn't tell what kind of panel there is.
-> In addition to the ID we need board specific tables listing the details
-> of the panels.
+> 
+>> Without that fix we would clearly have stale tlb entries, no?
+> 
+> Yes, but AFAIU the sequence on arm64 is:
+> 
+> 1.  trans huge mapping (block mapping in arm64 speak)
+> 2.  faulting entry (pmd_mknotpresent)
+> 3.  tlb invalidation
+> 4.  table entry mapping the same pages as (1).
+> 
+> so if the microarchitecture we're on can tolerate a mixture of block
+> mappings and page mappings mapping the same VA to the same PA, then the
+> lack of TLB maintenance would go unnoticed. There are certainly systems
+> where that could cause an issue, but I believe the one I've been testing
+> on would be ok.
 
-That argument does not stack up.  Just because you've plugged in a
-network device does not mean that the kernel can drive it: the kernel
-needs a device specific driver, which is determined by looking at the
-IDs.  There is no standard network driver PCI interface.
-
-> I think one of the core questions here is: do we want to start adding
-> board specific drivers to the kernel, instead of dealing with it in the
-> bootloader when possible? My understanding is that we've been trying to
-> reduce board specific code from the kernel.
-
-That's not really the question, because that question assumes that it
-isn't already present, which is not true.  The code is already present.
-The question is how to deal with this from the DT perspective.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+So in essence you say it does not matter that you flush the wrong range in 
+flush_pmd_tlb_range as long as it will be flushed later on when the pages
+really go away. Yes, then it really might be ok for arm64.
