@@ -1,40 +1,51 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed, 24 Feb 2016 20:10:17 +0300
-Subject: [PATCH v2 8/8] serial: pl011: add ACPI DBG2 serial port
-In-Reply-To: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1456333819-13482-9-git-send-email-aleksey.makarov@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Feb 2016 17:12:18 +0000
+Subject: [PATCH 00/13] arm-cci: PMU driver updates for 4.6
+In-Reply-To: <20160224165814.GA10126@localhost>
+References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
+ <20160223114003.GF3966@arm.com> <56CC64E7.3040407@arm.com>
+ <20160224165814.GA10126@localhost>
+Message-ID: <20160224171218.GC12471@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for ACPI DBG2 serial port of type ACPI_DBG2_ARM_PL011
-that sets up an earlycon on it.
+On Wed, Feb 24, 2016 at 08:58:14AM -0800, Olof Johansson wrote:
+> On Tue, Feb 23, 2016 at 01:55:51PM +0000, Suzuki K. Poulose wrote:
+> > On 23/02/16 11:40, Will Deacon wrote:
+> > >On Tue, Feb 23, 2016 at 10:49:42AM +0000, Suzuki K Poulose wrote:
+> > >>Here are some fixes and updates for arm-cci pmu driver targeting v4.6,
+> > >>applies on top of v4.5-rc5.
+> > >>
+> > >>Highlights include :
+> > >>  - Support for CoreLink CCI-550 PMU
+> > >>  - Reliable writes to PMU Counter registers for CCI-500/550.
+> > >>
+> > >>All the patches have been Acked. Please let me know how this
+> > >>can be merged.
+> > 
+> > >>
+> > >>  Documentation/devicetree/bindings/arm/cci.txt |    2 +
+> > >>  drivers/bus/Kconfig                           |   10 +-
+> > >>  drivers/bus/arm-cci.c                         |  612 +++++++++++++++++--------
+> > >>  3 files changed, 427 insertions(+), 197 deletions(-)
+> > >
+> > >How do you plan to merge this? I can take it all onto a branch for
+> > >arm-soc, or I can include it on my perf/updates branch, or ...?
+> > 
+> > Arnd, Olof,
+> > 
+> > What do you think would be the best route ?
+> 
+> Traditionally we've been picking these up in arm-soc in our drivers branch.
+> 
+> Will, unless you want them in your tree for some reason that's what I'll do
+> here as well.
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 3 +++
- 1 file changed, 3 insertions(+)
+Just that I already have some CPU PMU patches that I planned to send, so
+I could bundle these in with those if necessary. I have no preference
+either way though, as long as they get queued someplace.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 500232a..d38da86 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -59,6 +59,7 @@
- #include <linux/sizes.h>
- #include <linux/io.h>
- #include <linux/acpi.h>
-+#include <linux/acpi_dbg2.h>
- 
- #include "amba-pl011.h"
- 
-@@ -2327,6 +2328,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
-+ACPI_DBG2_EARLYCON_DECLARE(pl011, ACPI_DBG2_ARM_PL011,
-+			   pl011_early_console_setup);
- 
- #else
- #define AMBA_CONSOLE	NULL
--- 
-2.7.1
+At some point, those drivers should be largely moved from drivers/bus/
+to drivers/perf/, but that's a separate issue.
+
+Will
