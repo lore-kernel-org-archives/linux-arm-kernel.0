@@ -1,35 +1,34 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:32 +0530
-Subject: [PATCH 07/50] pinctrl: nsp-gpio: Use devm_pinctrl_register() for
+Date: Wed, 24 Feb 2016 18:45:33 +0530
+Subject: [PATCH 08/50] pinctrl: berlin: Use devm_pinctrl_register() for
  pinctrl registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-8-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-9-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use devm_pinctrl_register() for pin control registration.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Jon Mason <jonmason@broadcom.com>
+Cc: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- drivers/pinctrl/bcm/pinctrl-nsp-gpio.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/berlin/berlin.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-index ac90043..2873f73 100644
---- a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-+++ b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-@@ -609,7 +609,7 @@ static int nsp_gpio_register_pinconf(struct nsp_gpio *chip)
- 	pctldesc->npins = gc->ngpio;
- 	pctldesc->confops = &nsp_pconf_ops;
+diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
+index 46f2b48..2d58166 100644
+--- a/drivers/pinctrl/berlin/berlin.c
++++ b/drivers/pinctrl/berlin/berlin.c
+@@ -316,7 +316,8 @@ int berlin_pinctrl_probe_regmap(struct platform_device *pdev,
+ 		return ret;
+ 	}
  
--	chip->pctl = pinctrl_register(pctldesc, chip->dev, chip);
-+	chip->pctl = devm_pinctrl_register(chip->dev, pctldesc, chip);
- 	if (IS_ERR(chip->pctl)) {
- 		dev_err(chip->dev, "unable to register pinctrl device\n");
- 		return PTR_ERR(chip->pctl);
+-	pctrl->pctrl_dev = pinctrl_register(&berlin_pctrl_desc, dev, pctrl);
++	pctrl->pctrl_dev = devm_pinctrl_register(dev, &berlin_pctrl_desc,
++						 pctrl);
+ 	if (IS_ERR(pctrl->pctrl_dev)) {
+ 		dev_err(dev, "failed to register pinctrl driver\n");
+ 		return PTR_ERR(pctrl->pctrl_dev);
 -- 
 2.1.4
