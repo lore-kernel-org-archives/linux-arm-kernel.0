@@ -1,65 +1,88 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 24 Feb 2016 13:08:30 +0800
-Subject: [PATCH v13 10/20] KVM: ARM64: Add access handler for PMINTENSET and
- PMINTENCLR register
+Date: Wed, 24 Feb 2016 13:08:23 +0800
+Subject: [PATCH v13 03/20] KVM: ARM64: Add access handler for PMCR register
 In-Reply-To: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1456290520-10012-11-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1456290520-10012-4-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Since the reset value of PMINTENSET and PMINTENCLR is UNKNOWN, use
-reset_unknown for its reset handler. Add a handler to emulate writing
-PMINTENSET or PMINTENCLR register.
+Add reset handler which gets host value of PMCR_EL0 and make writable
+bits architecturally UNKNOWN except PMCR.E which is zero. Add an access
+handler for PMCR.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/kvm/sys_regs.c         | 32 ++++++++++++++++++++++++++++----
- 2 files changed, 29 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |  3 +++
+ arch/arm64/kvm/sys_regs.c         | 42 +++++++++++++++++++++++++++++++++++++--
+ include/kvm/arm_pmu.h             |  4 ++++
+ 3 files changed, 47 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index bf97e79..c7642de 100644
+index 6f0241f..1f3ca98 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -125,6 +125,7 @@ enum vcpu_sysreg {
- 	PMEVTYPER30_EL0 = PMEVTYPER0_EL0 + 30,
- 	PMCCFILTR_EL0,	/* Cycle Count Filter Register */
- 	PMCNTENSET_EL0,	/* Count Enable Set Register */
-+	PMINTENSET_EL1,	/* Interrupt Enable Set Register */
+@@ -115,6 +115,9 @@ enum vcpu_sysreg {
+ 	MDSCR_EL1,	/* Monitor Debug System Control Register */
+ 	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
  
++	/* Performance Monitors Registers */
++	PMCR_EL0,	/* Control Register */
++
  	/* 32bit specific registers. Keep them at the end of the range */
  	DACR32_EL2,	/* Domain Access Control Register */
+ 	IFSR32_EL2,	/* Instruction Fault Status Register */
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 4faf324..bfc70b2 100644
+index 2e90371..e88ae2d 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -626,6 +626,30 @@ static bool access_pmcnten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
+@@ -34,6 +34,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_host.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/perf_event.h>
+ 
+ #include <trace/events/kvm.h>
+ 
+@@ -439,6 +440,43 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ 	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
  }
  
-+static bool access_pminten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			   const struct sys_reg_desc *r)
++static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
 +{
-+	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
++	u64 pmcr, val;
++
++	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
++	/* Writable bits of PMCR_EL0 (ARMV8_PMU_PMCR_MASK) is reset to UNKNOWN
++	 * except PMCR.E resetting to zero.
++	 */
++	val = ((pmcr & ~ARMV8_PMU_PMCR_MASK)
++	       | (ARMV8_PMU_PMCR_MASK & 0xdecafbad)) & (~ARMV8_PMU_PMCR_E);
++	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
++}
++
++static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			const struct sys_reg_desc *r)
++{
++	u64 val;
 +
 +	if (!kvm_arm_pmu_v3_ready(vcpu))
 +		return trap_raz_wi(vcpu, p, r);
 +
 +	if (p->is_write) {
-+		u64 val = p->regval & mask;
-+
-+		if (r->Op2 & 0x1)
-+			/* accessing PMINTENSET_EL1 */
-+			vcpu_sys_reg(vcpu, PMINTENSET_EL1) |= val;
-+		else
-+			/* accessing PMINTENCLR_EL1 */
-+			vcpu_sys_reg(vcpu, PMINTENSET_EL1) &= ~val;
++		/* Only update writeable bits of PMCR */
++		val = vcpu_sys_reg(vcpu, PMCR_EL0);
++		val &= ~ARMV8_PMU_PMCR_MASK;
++		val |= p->regval & ARMV8_PMU_PMCR_MASK;
++		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
 +	} else {
-+		p->regval = vcpu_sys_reg(vcpu, PMINTENSET_EL1) & mask;
++		/* PMCR.P & PMCR.C are RAZ */
++		val = vcpu_sys_reg(vcpu, PMCR_EL0)
++		      & ~(ARMV8_PMU_PMCR_P | ARMV8_PMU_PMCR_C);
++		p->regval = val;
 +	}
 +
 +	return true;
@@ -68,29 +91,41 @@ index 4faf324..bfc70b2 100644
  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
  	/* DBGBVRn_EL1 */						\
-@@ -784,10 +808,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+@@ -623,7 +661,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
  
- 	/* PMINTENSET_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+ 	/* PMCR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
 -	  trap_raz_wi },
-+	  access_pminten, reset_unknown, PMINTENSET_EL1 },
- 	/* PMINTENCLR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
--	  trap_raz_wi },
-+	  access_pminten, NULL, PMINTENSET_EL1 },
++	  access_pmcr, reset_pmcr, },
+ 	/* PMCNTENSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+ 	  trap_raz_wi },
+@@ -885,7 +923,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
  
- 	/* MAIR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
-@@ -1182,8 +1206,8 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pminten },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pminten },
+ 	/* PMU */
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 3c2fd56..8157fe5 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -34,9 +34,13 @@ struct kvm_pmu {
+ 	struct kvm_pmc pmc[ARMV8_PMU_MAX_COUNTERS];
+ 	bool ready;
+ };
++
++#define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
+ #else
+ struct kvm_pmu {
+ };
++
++#define kvm_arm_pmu_v3_ready(v)		(false)
+ #endif
  
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+ #endif
 -- 
 2.0.4
