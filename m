@@ -1,33 +1,43 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 24 Feb 2016 21:42:03 +0100
-Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
-In-Reply-To: <CAL9uMOG2gnGnxv9RmmKuHjc72xyyyEu3AW6pTyM2oA=aM171eQ@mail.gmail.com>
-References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
- <CAOQ7t2aqZj3STFsdTSQZMTK5U+8Oem8oFroxHKWkt=AeP+Zczg@mail.gmail.com>
- <CAD8Lp47LGUc3-MFpU+3iNjXJL0i4nLTY_49NUxFXeZ2SokDuaQ@mail.gmail.com>
- <3072897.5MMsyiojns@wuerfel>
- <CAL9uMOG2gnGnxv9RmmKuHjc72xyyyEu3AW6pTyM2oA=aM171eQ@mail.gmail.com>
-Message-ID: <CAOQ7t2YXRwxvOpYBPYh7as94ZJSM3z44M2RR3vzG=mJY7ktZAg@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 24 Feb 2016 20:55:08 +0000
+Subject: [PATCH v3 2/2] iio: dac: vf610_dac: Add IIO DAC driver for Vybrid
+ SoC
+In-Reply-To: <20160223205437.GA27366@rob-hp-laptop>
+References: <cover.1456121233.git.maitysanchayan@gmail.com>
+ <1a70acdd3ffae273bbfe2f80c5e3952d152921df.1456121233.git.maitysanchayan@gmail.com>
+ <20160223205437.GA27366@rob-hp-laptop>
+Message-ID: <56CE18AC.6020603@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 2:25 PM, Carlo Caione <carlo@endlessm.com> wrote:
+On 23/02/16 20:54, Rob Herring wrote:
+> On Mon, Feb 22, 2016 at 11:48:37AM +0530, Sanchayan Maity wrote:
+>> Add driver support for DAC peripheral on Vybrid SoC.
+>>
+>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> ---
+>>  Documentation/ABI/testing/sysfs-bus-iio-vf610      |   9 +
+>>  .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
+> 
+> For the binding:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+Applied to the togreg branch of iio.git - initially pushed out as testing
+for the autobuilders to play with it.
 
->> Maybe the best way is to make it compatible with both syscon and
->> simple-bus and put the other nodes underneath. That is still rather
->> ugly, but at least it works and can be extended.
->
-> This is a good idea actually. I'll prepare a patch.
-> Thank you for having spent time on this.
+Note the dts change probably wants to go via the relevant arch trees.
+I can take it with an appropriate ack if not.
 
-Apparently I talked too soon. The problem is the pinctrl driver where
-one of the bank (ao-bank) is mapped into the aobus not cbus
-http://lxr.free-electrons.com/source/arch/arm/boot/dts/meson8b.dtsi#L169
-If you don't have a better idea probably I should try to decouple the
-two banks so that we have two different pinctrl devices for each bus
-(aobus and cbus).
-
-Cheers,
-
--- 
-Carlo Caione
+Jonathan
+> 
+>>  drivers/iio/dac/Kconfig                            |  10 +
+>>  drivers/iio/dac/Makefile                           |   1 +
+>>  drivers/iio/dac/vf610_dac.c                        | 298 +++++++++++++++++++++
+>>  5 files changed, 338 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/iio/dac/vf610-dac.txt
+>>  create mode 100644 drivers/iio/dac/vf610_dac.c
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
