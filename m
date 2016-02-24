@@ -1,58 +1,50 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 24 Feb 2016 13:47:06 -0800
-Subject: [PATCH] clk: gpio: Really allow an optional clock= DT property
-In-Reply-To: <20160223113059.GH19428@n2100.arm.linux.org.uk>
-References: <20160219030731.GS4847@codeaurora.org>
- <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
- <20160223113059.GH19428@n2100.arm.linux.org.uk>
-Message-ID: <20160224214706.2278.79643@quark.deferred.io>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Wed, 24 Feb 2016 17:06:03 -0500
+Subject: USB_GADGETFS in kernel vs module
+Message-ID: <CAF_dkJBmwCjjneqiynEiRyC5UuOzkS=2H=uyawxc4V2whySneA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Yes, I know it's archaic, and possibly even obsolete, but I have code
+that uses it.
 
-Quoting Russell King - ARM Linux (2016-02-23 03:30:59)
-> On Thu, Feb 18, 2016 at 07:12:05PM -0800, Stephen Boyd wrote:
-> > We mis-merged the original patch from Russell here and so the
-> > patch went almost all the way, except that we still failed to
-> > probe when there wasn't a clocks property in the DT node. Allow
-> > that case by making a negative value from
-> > of_clk_get_parent_count() into "no parents", like the original
-> > patch did.
-> 
-> So you apply it anyway, and ignore all further discussion.  I've
-> no idea what kind of politics is going on here, but it has to stop.
+I have a _defconfig file that sets CONFIG_USB_GADGETFS to "y".
 
-Stephen fixed the bug, and I didn't ask you to test because you made it
-clear that you did not have the time (understandable). Stephen
-reproduced the issue locally and insured that his version of the fix
-does actually fix it.
+If I do the following:
 
-He is an equal co-maintainer so of course I support him to merge the
-fix, plus I find his version more readable.
+$ cp path/to/my/defconfig .config
+$ yes "" | make -k ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- oldconfig
 
-> 
-> I'm also still waiting for that apology from Mike - never apply a
+I get a .config file with CONFIG_USB_GADGETFS set to "m".
+(This is what buildroot does, which is where I found this.)
 
-No thematics please. When you wrongly accused me of merging code outside
-of the merge window[0] did I ask for an apology?
+Is there any way I can hand-tweak my _defconfig file so that
+CONFIG_USB_GADGETFS remains "y"?
 
-> modified patch without stating in the commit log that it was modified.
-> It's basically fraud.
+If you want to play along at home (with the linux-at91 kernel, if that
+makes a difference, which I doubt), you can do the following to see
+the problem:
 
-An oversight for which we are both equally guilty. The "change" was the
-resolution of a merge conflict, and I posted the resolved version of the
-patch to the thread[0]. You said, "Looks fine, thanks."
+$ echo CONFIG_MODULES=y > .config
+$ echo CONFIG_USB_GADGET=y >> .config
+$ echo CONFIG_USB_GADGETFS=y >> .config
+$ yes "" | make -k ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- oldconfig
+...
+$ grep CONFIG_USB_GADGET .config
+CONFIG_USB_GADGET=y
+# CONFIG_USB_GADGET_DEBUG_FILES is not set
+CONFIG_USB_GADGET_VBUS_DRAW=2
+CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS=2
+# CONFIG_USB_GADGET_XILINX is not set
+CONFIG_USB_GADGETFS=m
 
-In summary: bugs happen. Let's please just move on and get back to work.
 
-[0] http://lkml.kernel.org/r/<20160103105319.GB5779@n2100.arm.linux.org.uk>
+After some amount of experimentation and bisection, I have learned
+that CONFIG_USB_GADGETFS defaults to "m" when CONFIG_MODULES=y,
+despite the fact that I set it to "y" in my config file fragment.
 
-Regards,
-Mike
+Why is that?  Any clues?
 
-> 
-> -- 
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Thanks.
+
+--wpd
