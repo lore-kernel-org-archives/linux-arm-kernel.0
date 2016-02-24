@@ -1,46 +1,52 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 22:44:52 +0530
-Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
- pinctrl_{register, unregister}
-In-Reply-To: <771728522.222286.b52ca77e-fe5e-4536-8e14-525e9a846cdc.open-xchange@email.1und1.de>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <771728522.222286.b52ca77e-fe5e-4536-8e14-525e9a846cdc.open-xchange@email.1und1.de>
-Message-ID: <56CDE50C.4050504@nvidia.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 24 Feb 2016 18:29:43 +0100 (CET)
+Subject: [PATCH] i2c: bcm2835: Don't complain on -EPROBE_DEFER from
+ getting our clock
+In-Reply-To: <1455844375-15019-1-git-send-email-eric@anholt.net>
+References: <1455844375-15019-1-git-send-email-eric@anholt.net>
+Message-ID: <1956465948.222514.b52ca77e-fe5e-4536-8e14-525e9a846cdc.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Eric,
 
-On Wednesday 24 February 2016 10:52 PM, Stefan Wahren wrote:
-> Hi Laxman,
+> Eric Anholt <eric@anholt.net> hat am 19. Februar 2016 um 02:12 geschrieben:
 >
->> Laxman Dewangan <ldewangan@nvidia.com> hat am 24. Februar 2016 um 14:15
->> geschrieben:
->>
->>
->> Add resource manageemnt APIs fro pinctrl_register() and pinctrl_unregister()
->> and use these new APIs on hw driver to reduce the error path code and
->> remove callback for driver.
->>
-> just for interest: why didn't you patch freescale/pinctrl-mxs.c?
 >
+> Fixes dmesg spam when we just need to wait a moment for the clock
+> driver to probe.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+> drivers/i2c/busses/i2c-bcm2835.c | 3 ++-
+> 1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-bcm2835.c
+> b/drivers/i2c/busses/i2c-bcm2835.c
+> index 818b051..d4f3239 100644
+> --- a/drivers/i2c/busses/i2c-bcm2835.c
+> +++ b/drivers/i2c/busses/i2c-bcm2835.c
+> @@ -253,7 +253,8 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
+>
+> i2c_dev->clk = devm_clk_get(&pdev->dev, NULL);
+> if (IS_ERR(i2c_dev->clk)) {
+> - dev_err(&pdev->dev, "Could not get clock\n");
+> + if (PTR_ERR(i2c_dev->clk) != -EPROBE_DEFER)
+> + dev_err(&pdev->dev, "Could not get clock\n");
 
+i know it's something different, but how about printing the error code here?
 
-The remove callback is implemented as:
+Regards
+Stefan
 
-int mxs_pinctrl_remove(struct platform_device *pdev)
-{
-         struct mxs_pinctrl_data *d = platform_get_drvdata(pdev);
-
-         pinctrl_unregister(d->pctl);
-         iounmap(d->base);
-
-         return 0;
-}
-
-
-So if I use devm_pinctrl_register() then the sequence will be different like
-     iounmap()
-     pinctrl_unregister()
-
-And I did not want to change the sequence as dont know the side effect 
-until I test it on actual platform which is not there with me.
+> return PTR_ERR(i2c_dev->clk);
+> }
+>
+> --
+> 2.7.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
