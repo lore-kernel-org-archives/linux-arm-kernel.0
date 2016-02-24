@@ -1,97 +1,76 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Wed, 24 Feb 2016 18:28:57 +0000
-Subject: [PATCH 3/3] arm64: dts: register Hi6220's thermal zone for power
- allocator
-In-Reply-To: <1455983529-9559-4-git-send-email-leo.yan@linaro.org>
-References: <1455983529-9559-1-git-send-email-leo.yan@linaro.org>
- <1455983529-9559-4-git-send-email-leo.yan@linaro.org>
-Message-ID: <20160224182856.GD3006@e104805>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 24 Feb 2016 10:29:52 -0800
+Subject: [PATCH 06/50] pinctrl: iproc-gpio: Use devm_pinctrl_register()
+ for pinctrl registration
+In-Reply-To: <1456319775-3216-7-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-7-git-send-email-ldewangan@nvidia.com>
+Message-ID: <fccabf34-d5a7-e176-f8a8-cb9657d36450@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2016 at 11:52:09PM +0800, Leo Yan wrote:
-> With profiling Hi6220's power modeling so get dynamic coefficient and
-> sustainable power. So pass these parameters from DT.
-> 
-> Now enable power allocator wit only one actor for CPU part, so directly
-> use cluster0's thermal sensor for monitoring temperature.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+
+
+On 2/24/2016 5:15 AM, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration and clean
+> the error path.
+>
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: Jon Mason <jonmason@broadcom.com>
 > ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 36 +++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 50ba1b0..3608a3e 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -6,6 +6,7 @@
->  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/clock/hi6220-clock.h>
-> +#include <dt-bindings/thermal/thermal.h>
->  
->  / {
->  	compatible = "hisilicon,hi6220";
-> @@ -87,6 +88,7 @@
->  			cooling-max-level = <0>;
->  			#cooling-cells = <2>; /* min followed by max */
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
-> +			dynamic-power-coefficient = <311>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -322,5 +324,39 @@
->  			clock-names = "thermal_clk";
->  			#thermal-sensor-cells = <1>;
->  		};
-> +
-> +		thermal-zones {
-> +
-> +			cls0: cls0 {
-> +				polling-delay = <1000>;
-> +				polling-delay-passive = <100>;
-> +				sustainable-power = <3326>;
-> +
-> +				/* sensor ID */
-> +				thermal-sensors = <&tsensor 2>;
-> +
-> +				trips {
-> +					threshold: trip-point at 0 {
-> +						temperature = <65000>;
-> +						hysteresis = <1000>;
+>  drivers/pinctrl/bcm/pinctrl-iproc-gpio.c | 12 ++----------
+>  1 file changed, 2 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
+> index d530ab4..e753af3 100644
+> --- a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
+> +++ b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
+> @@ -623,7 +623,7 @@ static int iproc_gpio_register_pinconf(struct iproc_gpio *chip)
+>  	pctldesc->npins = gc->ngpio;
+>  	pctldesc->confops = &iproc_pconf_ops;
+>
+> -	chip->pctl = pinctrl_register(pctldesc, chip->dev, chip);
+> +	chip->pctl = devm_pinctrl_register(chip->dev, pctldesc, chip);
+>  	if (IS_ERR(chip->pctl)) {
+>  		dev_err(chip->dev, "unable to register pinctrl device\n");
+>  		return PTR_ERR(chip->pctl);
+> @@ -632,11 +632,6 @@ static int iproc_gpio_register_pinconf(struct iproc_gpio *chip)
+>  	return 0;
+>  }
+>
+> -static void iproc_gpio_unregister_pinconf(struct iproc_gpio *chip)
+> -{
+> -	pinctrl_unregister(chip->pctl);
+> -}
+> -
+>  static const struct of_device_id iproc_gpio_of_match[] = {
+>  	{ .compatible = "brcm,cygnus-ccm-gpio" },
+>  	{ .compatible = "brcm,cygnus-asiu-gpio" },
+> @@ -720,7 +715,7 @@ static int iproc_gpio_probe(struct platform_device *pdev)
+>  					   handle_simple_irq, IRQ_TYPE_NONE);
+>  		if (ret) {
+>  			dev_err(dev, "no GPIO irqchip\n");
+> -			goto err_unregister_pinconf;
+> +			goto err_rm_gpiochip;
+>  		}
+>
+>  		gpiochip_set_chained_irqchip(gc, &iproc_gpio_irq_chip, irq,
+> @@ -729,9 +724,6 @@ static int iproc_gpio_probe(struct platform_device *pdev)
+>
+>  	return 0;
+>
+> -err_unregister_pinconf:
+> -	iproc_gpio_unregister_pinconf(chip);
+> -
+>  err_rm_gpiochip:
+>  	gpiochip_remove(gc);
+>
+>
 
-As far as I know, hysteresis is ignored in the thermal subsystem right
-now, so you could remove it from both trip points.
+Acked-by: Ray Jui <ray.jui@broadcom.com>
 
-> +						type = "passive";
-> +					};
-> +
-> +					target: trip-point at 1 {
-> +						temperature = <75000>;
-> +						hysteresis = <1000>;
-> +						type = "passive";
-> +					};
-> +				};
-> +
-> +				cooling-maps {
-> +					map0 {
-> +						trip = <&target>;
-> +						contribution = <1024>;
+Thanks!
 
-As Hikey has only one voltage domain, you only have one cpu cooling
-device.  "contribution" is only useful when you have more than one
-cooling device, as it's relative to the other cooling device's
-contribution.  You can remove contribution from here.
-
-Other than this minor stuff, it looks good to me. FWIW,
-
-Reviewed-by: Javi Merino <javi.merino@arm.com>
-
-> +						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +					};
-> +				};
-> +			};
-> +		};
->  	};
->  };
+Ray
