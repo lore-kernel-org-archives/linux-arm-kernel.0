@@ -1,57 +1,96 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 24 Feb 2016 12:46:56 -0500
-Subject: [PATCH v3 4/6] watchdog: pnx4008: restart: support "cmd" from
- userspace
+Date: Wed, 24 Feb 2016 12:46:54 -0500
+Subject: [PATCH v3 2/6] watchdog: pnx4008: add restart handler
 In-Reply-To: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
 References: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1456336018-6620-5-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <1456336018-6620-3-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylvain Lemieux <slemieux@tycoint.com>
 
-Added support to verify if a "cmd" is passed from the userspace program rebooting the system;
-- if a valid "cmd" is available, handle it;
-- If the received "cmd" is not supported, use the default reboot mode.
+Add restart handler capability to the driver;
+the restart handler implementation was taken from
+"mach-lpc32xx" ("lpc23xx_restart" function).
 
 Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 ---
 Changes from v2 to v3:
-- no logical change; updated to work with new revision of patch #2.
+- remove explicit clock enable from restart handler.
+- verify "register_restart_handler" return value.
+- add call to unregister_restart_handler".
+- do the restart handling directly in "pnx4008_restart_handler".
 
 Changes from v1 to v2:
-- Rename patch title;
-  was "arm: lpc32xx: restart: support "cmd" from userspace"
-- Add change to "pnx-4008" driver instead of "mach-lpc32xx".
+- new patch in v2.
 
- drivers/watchdog/pnx4008_wdt.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/watchdog/pnx4008_wdt.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-index fbf027e..e97b611 100644
+index 88264a2..80ee4af 100644
 --- a/drivers/watchdog/pnx4008_wdt.c
 +++ b/drivers/watchdog/pnx4008_wdt.c
-@@ -130,6 +130,21 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
- static int pnx4008_restart_handler(struct notifier_block *this,
- 				   unsigned long mode, void *cmd)
- {
-+	const char *boot_cmd = (const char *)cmd;
+@@ -31,6 +31,8 @@
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
++#include <linux/delay.h>
++#include <linux/reboot.h>
+ #include <mach/hardware.h>
+ 
+ /* WatchDog Timer - Chapter 23 Page 207 */
+@@ -77,6 +79,7 @@
+ 
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static unsigned int heartbeat = DEFAULT_HEARTBEAT;
++static struct notifier_block restart_handler;
+ 
+ static DEFINE_SPINLOCK(io_lock);
+ static void __iomem	*wdt_base;
+@@ -124,6 +127,19 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+ 	return 0;
+ }
+ 
++static int pnx4008_restart_handler(struct notifier_block *this,
++				   unsigned long mode, void *cmd)
++{
++	/* Instant assert of RESETOUT_N with pulse length 1mS */
++	writel(13000, WDTIM_PULSE(wdt_base));
++	writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
 +
-+	/*
-+	 * Verify if a "cmd" passed from the userspace program rebooting
-+	 * the system; if available, handle it.
-+	 * - For details, see the 'reboot' syscall in kernel/reboot.c
-+	 * - If the received "cmd" is not supported, use the default mode.
-+	 */
-+	if (boot_cmd) {
-+		if (boot_cmd[0] == 'h')
-+			mode = (unsigned long)REBOOT_HARD;
-+		else if (boot_cmd[0] == 's')
-+			mode = (unsigned long)REBOOT_SOFT;
++	/* Wait for watchdog to reset system */
++	mdelay(1000);
++
++	return NOTIFY_DONE;
++}
++
+ static const struct watchdog_info pnx4008_wdt_ident = {
+ 	.options = WDIOF_CARDRESET | WDIOF_MAGICCLOSE |
+ 	    WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+@@ -157,6 +173,15 @@ static int pnx4008_wdt_probe(struct platform_device *pdev)
+ 	if (IS_ERR(wdt_base))
+ 		return PTR_ERR(wdt_base);
+ 
++	/* Register restart handler. */
++	restart_handler.notifier_call = pnx4008_restart_handler;
++	restart_handler.priority = 128;
++	ret = register_restart_handler(&restart_handler);
++	if (ret) {
++		dev_warn(&pdev->dev, "cannot register restart handler\n");
++		return ret;
 +	}
 +
- 	if (mode == (unsigned long)REBOOT_SOFT) {
- 		/* Force match output active */
- 		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
+ 	wdt_clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(wdt_clk))
+ 		return PTR_ERR(wdt_clk);
+@@ -189,6 +214,7 @@ disable_clk:
+ 
+ static int pnx4008_wdt_remove(struct platform_device *pdev)
+ {
++	unregister_restart_handler(&restart_handler);
+ 	watchdog_unregister_device(&pnx4008_wdd);
+ 
+ 	clk_disable_unprepare(wdt_clk);
 -- 
 1.8.3.1
