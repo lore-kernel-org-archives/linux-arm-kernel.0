@@ -1,43 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Feb 2016 11:02:22 +0000
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
- on PowerPC and ARM)
-In-Reply-To: <56CD8B43.9070509@de.ibm.com>
-References: <20160212154116.GA15142@node.shutemov.name>
- <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
- <20160223103221.GA1418@node.shutemov.name>
- <20160223191907.25719a4d@thinkpad>
- <20160223193345.GC21820@node.shutemov.name>
- <20160223202233.GE27281@arm.com> <56CD8302.9080202@de.ibm.com>
- <20160224104139.GC28310@arm.com> <56CD8B43.9070509@de.ibm.com>
-Message-ID: <20160224110221.GF28310@arm.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Wed, 24 Feb 2016 16:40:50 +0530
+Subject: [PATCH] net: thunderx: Fix for Qset error due to CQ full
+Message-ID: <1456312250-25694-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 11:51:47AM +0100, Christian Borntraeger wrote:
-> On 02/24/2016 11:41 AM, Will Deacon wrote:
-> > On Wed, Feb 24, 2016 at 11:16:34AM +0100, Christian Borntraeger wrote:
-> >> Without that fix we would clearly have stale tlb entries, no?
-> > 
-> > Yes, but AFAIU the sequence on arm64 is:
-> > 
-> > 1.  trans huge mapping (block mapping in arm64 speak)
-> > 2.  faulting entry (pmd_mknotpresent)
-> > 3.  tlb invalidation
-> > 4.  table entry mapping the same pages as (1).
-> > 
-> > so if the microarchitecture we're on can tolerate a mixture of block
-> > mappings and page mappings mapping the same VA to the same PA, then the
-> > lack of TLB maintenance would go unnoticed. There are certainly systems
-> > where that could cause an issue, but I believe the one I've been testing
-> > on would be ok.
-> 
-> So in essence you say it does not matter that you flush the wrong range in 
-> flush_pmd_tlb_range as long as it will be flushed later on when the pages
-> really go away. Yes, then it really might be ok for arm64.
+From: Sunil Goutham <sgoutham@cavium.com>
 
-Indeed, although that's a property of the microarchitecture I'm using
-rather than an architectural guarantee so the code should certainly be
-fixed!
+On Thunderx pass 1.x and pass2 due to a HW errata default CQ
+DROP_LEVEL of 0x80 is not sufficient to avoid CQ_WR_FULL Qset
+error when packets are being received at >20Mpps resulting in
+complete stall of packet reception.
 
-Will
+This patch will configure it to 0x100 which is what is expected
+by HW on Thunderx. On future passes of thunderx and other chips
+HW default/reset value will be 0x100 or higher hence not overwritten.
+
+Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/nic.h      |    9 +++++++++
+ drivers/net/ethernet/cavium/thunder/nic_main.c |    6 ++++++
+ drivers/net/ethernet/cavium/thunder/nic_reg.h  |    2 +-
+ 3 files changed, 16 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 6888288..34e9ace 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -116,6 +116,15 @@
+ #define NIC_PF_INTR_ID_MBOX0		8
+ #define NIC_PF_INTR_ID_MBOX1		9
+ 
++/* Minimum FIFO level before all packets for the CQ are dropped
++ *
++ * This value ensures that once a packet has been "accepted"
++ * for reception it will not get dropped due to non-availability
++ * of CQ descriptor. An errata in HW mandates this value to be
++ * atleast 0x100.
++ */
++#define NICPF_CQM_MIN_DROP_LEVEL       0x100
++
+ /* Global timer for CQ timer thresh interrupts
+  * Calculated for SCLK of 700Mhz
+  * value written should be a 1/16th of what is expected
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index 4dded90..95f17f8 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -304,6 +304,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
+ static void nic_init_hw(struct nicpf *nic)
+ {
+ 	int i;
++	u64 cqm_cfg;
+ 
+ 	/* Enable NIC HW block */
+ 	nic_reg_write(nic, NIC_PF_CFG, 0x3);
+@@ -340,6 +341,11 @@ static void nic_init_hw(struct nicpf *nic)
+ 	/* Enable VLAN ethertype matching and stripping */
+ 	nic_reg_write(nic, NIC_PF_RX_ETYPE_0_7,
+ 		      (2 << 19) | (ETYPE_ALG_VLAN_STRIP << 16) | ETH_P_8021Q);
++
++	/* Check if HW expected value is higher (could be in future chips) */
++	cqm_cfg = nic_reg_read(nic, NIC_PF_CQM_CFG);
++	if (cqm_cfg < NICPF_CQM_MIN_DROP_LEVEL)
++		nic_reg_write(nic, NIC_PF_CQM_CFG, NICPF_CQM_MIN_DROP_LEVEL);
+ }
+ 
+ /* Channel parse index configuration */
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_reg.h b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+index dd536be..afb10e3 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_reg.h
++++ b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+@@ -21,7 +21,7 @@
+ #define   NIC_PF_TCP_TIMER			(0x0060)
+ #define   NIC_PF_BP_CFG				(0x0080)
+ #define   NIC_PF_RRM_CFG			(0x0088)
+-#define   NIC_PF_CQM_CF				(0x00A0)
++#define   NIC_PF_CQM_CFG			(0x00A0)
+ #define   NIC_PF_CNM_CF				(0x00A8)
+ #define   NIC_PF_CNM_STATUS			(0x00B0)
+ #define   NIC_PF_CQ_AVG_CFG			(0x00C0)
+-- 
+1.7.1
