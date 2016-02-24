@@ -1,54 +1,60 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 24 Feb 2016 15:40:32 +0200
-Subject: [PATCH 0/2] usb: dwc2: Remove host and gadget only code from core
-In-Reply-To: <56CC26ED.50004@synopsys.com>
-References: <cover.1456213319.git.johnyoun@synopsys.com>
- <56CC26ED.50004@synopsys.com>
-Message-ID: <87mvqqjkfj.fsf@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 24 Feb 2016 15:42:19 +0200
+Subject: [PATCH 38/50] pinctrl: digicolor: Use devm_pinctrl_register()
+ for pinctrl registration
+In-Reply-To: <1456319775-3216-39-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-39-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20160224134219.GI2225@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laxman Dewangan,
 
-Hi,
+On Wed, Feb 24, 2016 at 06:46:03PM +0530, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration and clean
+> error path.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  drivers/pinctrl/pinctrl-digicolor.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-digicolor.c b/drivers/pinctrl/pinctrl-digicolor.c
+> index f1343d6..c18014d 100644
+> --- a/drivers/pinctrl/pinctrl-digicolor.c
+> +++ b/drivers/pinctrl/pinctrl-digicolor.c
+> @@ -326,17 +326,15 @@ static int dc_pinctrl_probe(struct platform_device *pdev)
+>  
+>  	pmap->dev = &pdev->dev;
+>  
+> -	pmap->pctl = pinctrl_register(pctl_desc, &pdev->dev, pmap);
+> +	pmap->pctl = devm_pinctrl_register(&pdev->dev, pctl_desc, pmap);
+>  	if (IS_ERR(pmap->pctl)) {
+>  		dev_err(&pdev->dev, "pinctrl driver registration failed\n");
+>  		return PTR_ERR(pmap->pctl);
+>  	}
+>  
+>  	ret = dc_gpiochip_add(pmap, pdev->dev.of_node);
+> -	if (ret < 0) {
+> -		pinctrl_unregister(pmap->pctl);
+> +	if (ret < 0)
+>  		return ret;
+> -	}
+>  
+>  	return 0;
 
-John Youn <John.Youn@synopsys.com> writes:
-> On 2/23/2016 12:35 AM, John Youn wrote:
->> This series moves the host/gadget-specific code from core.c to hcd.c
->> and gadget.c so that they will be compiled only when their respective
->> configurations are selected, or in DRD.
->> 
->> This is mostly just a straight move of the code. I have also added
->> some comments to group related functions together.
->> 
->> Compiled and tested in all three modes.
->> 
->> This should also solve the issue reported here:
->> http://marc.info/?l=linux-usb&m=145591813410106&w=2
->> 
->> Although I wasn't able to test it... couldn't figure out how to
->> disable CONFIG_USB and enable DWC2 in gadget mode.
->> 
->> Felipe,
->> 
->> This should be applied after Doug's series on your testing/next
->> branch.
->> 
->> 
->
-> Hi Felipe,
->
-> Patch 2/2 is triggering our corporate mail filters however I try to
-> send it. I'll look into this with IT tomorrow, maybe have to send it
-> from another account.
+Please simplify even more to just:
 
-okay, I don't have patch 2/2. 1/2 is now in testing/next
+   return dc_gpiochip_add(pmap, pdev->dev.of_node);
+
+and remove the no longer used 'ret' variable.
+
+Thanks,
+baruch
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/0164cfa4/attachment-0001.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
