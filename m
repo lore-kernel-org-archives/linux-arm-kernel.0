@@ -1,80 +1,56 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:55 +0530
-Subject: [PATCH 30/50] pinctrl: tegra-xusb: Use devm_pinctrl_register() for
+Date: Wed, 24 Feb 2016 18:46:06 +0530
+Subject: [PATCH 41/50] pinctrl: palmas: Use devm_pinctrl_register() for
  pinctrl registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-31-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-42-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_pinctrl_register() for pin control registration and clean
-the error path.
+Use devm_pinctrl_register() for pin control registration and
+remove the need of .remove callback.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/pinctrl/tegra/pinctrl-tegra-xusb.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ drivers/pinctrl/pinctrl-palmas.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/pinctrl/tegra/pinctrl-tegra-xusb.c b/drivers/pinctrl/tegra/pinctrl-tegra-xusb.c
-index 2f06029..19f16f4 100644
---- a/drivers/pinctrl/tegra/pinctrl-tegra-xusb.c
-+++ b/drivers/pinctrl/tegra/pinctrl-tegra-xusb.c
-@@ -914,7 +914,8 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
- 	padctl->desc.confops = &tegra_xusb_padctl_pinconf_ops;
- 	padctl->desc.owner = THIS_MODULE;
- 
--	padctl->pinctrl = pinctrl_register(&padctl->desc, &pdev->dev, padctl);
-+	padctl->pinctrl = devm_pinctrl_register(&pdev->dev, &padctl->desc,
-+						padctl);
- 	if (IS_ERR(padctl->pinctrl)) {
- 		dev_err(&pdev->dev, "failed to register pincontrol\n");
- 		err = PTR_ERR(padctl->pinctrl);
-@@ -924,7 +925,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
- 	phy = devm_phy_create(&pdev->dev, NULL, &pcie_phy_ops);
- 	if (IS_ERR(phy)) {
- 		err = PTR_ERR(phy);
--		goto unregister;
-+		goto reset;
- 	}
- 
- 	padctl->phys[TEGRA_XUSB_PADCTL_PCIE] = phy;
-@@ -933,7 +934,7 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
- 	phy = devm_phy_create(&pdev->dev, NULL, &sata_phy_ops);
- 	if (IS_ERR(phy)) {
- 		err = PTR_ERR(phy);
--		goto unregister;
-+		goto reset;
- 	}
- 
- 	padctl->phys[TEGRA_XUSB_PADCTL_SATA] = phy;
-@@ -944,13 +945,11 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
- 	if (IS_ERR(padctl->provider)) {
- 		err = PTR_ERR(padctl->provider);
- 		dev_err(&pdev->dev, "failed to register PHYs: %d\n", err);
--		goto unregister;
-+		goto reset;
- 	}
- 
+diff --git a/drivers/pinctrl/pinctrl-palmas.c b/drivers/pinctrl/pinctrl-palmas.c
+index f7e1680..07b952b 100644
+--- a/drivers/pinctrl/pinctrl-palmas.c
++++ b/drivers/pinctrl/pinctrl-palmas.c
+@@ -1043,7 +1043,8 @@ static int palmas_pinctrl_probe(struct platform_device *pdev)
+ 	palmas_pinctrl_desc.name = dev_name(&pdev->dev);
+ 	palmas_pinctrl_desc.pins = palmas_pins_desc;
+ 	palmas_pinctrl_desc.npins = ARRAY_SIZE(palmas_pins_desc);
+-	pci->pctl = pinctrl_register(&palmas_pinctrl_desc, &pdev->dev, pci);
++	pci->pctl = devm_pinctrl_register(&pdev->dev, &palmas_pinctrl_desc,
++					  pci);
+ 	if (IS_ERR(pci->pctl)) {
+ 		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
+ 		return PTR_ERR(pci->pctl);
+@@ -1051,21 +1052,12 @@ static int palmas_pinctrl_probe(struct platform_device *pdev)
  	return 0;
+ }
  
--unregister:
--	pinctrl_unregister(padctl->pinctrl);
- reset:
- 	reset_control_assert(padctl->rst);
- 	return err;
-@@ -961,8 +960,6 @@ static int tegra_xusb_padctl_remove(struct platform_device *pdev)
- 	struct tegra_xusb_padctl *padctl = platform_get_drvdata(pdev);
- 	int err;
- 
--	pinctrl_unregister(padctl->pinctrl);
+-static int palmas_pinctrl_remove(struct platform_device *pdev)
+-{
+-	struct palmas_pctrl_chip_info *pci = platform_get_drvdata(pdev);
 -
- 	err = reset_control_assert(padctl->rst);
- 	if (err < 0)
- 		dev_err(&pdev->dev, "failed to assert reset: %d\n", err);
+-	pinctrl_unregister(pci->pctl);
+-	return 0;
+-}
+-
+ static struct platform_driver palmas_pinctrl_driver = {
+ 	.driver = {
+ 		.name = "palmas-pinctrl",
+ 		.of_match_table = palmas_pinctrl_of_match,
+ 	},
+ 	.probe = palmas_pinctrl_probe,
+-	.remove = palmas_pinctrl_remove,
+ };
+ 
+ module_platform_driver(palmas_pinctrl_driver);
 -- 
 2.1.4
