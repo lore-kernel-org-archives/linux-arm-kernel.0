@@ -1,65 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Feb 2016 17:33:44 +0000
-Subject: [PATCH 3/3] arm64: KVM: vgic-v3: Restore ICH_APR0Rn_EL2 before
- ICH_APR1Rn_EL2
-In-Reply-To: <1456335224-20603-1-git-send-email-marc.zyngier@arm.com>
-References: <1456335224-20603-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1456335224-20603-4-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 24 Feb 2016 17:33:41 +0000
+Subject: [PULL] KVM/ARM fixes for 4.5-rc6
+Message-ID: <1456335224-20603-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv3 architecture spec says:
+Hi Paolo,
 
-Writing to the active priority registers in any order other than
-the following order will result in UNPREDICTABLE behavior:
-- ICH_AP0R<n>_EL2.
-- ICH_AP1R<n>_EL2.
+This is hopefully the last batch of fixes for 4.5. One case of bitmap
+going overboard, another case of uninitialized memory, and a fix for
+an unpredictable behaviour.
 
-So let's not pointlessly go against the rule...
+Please pull!
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
+Thanks,
+
+	M.
+
+The following changes since commit 3c5b1d92b3b02be07873d611a27950addff544d3:
+
+  arm64: KVM: Configure TCR_EL2.PS at runtime (2016-02-11 13:16:47 +0000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc6
+
+for you to fetch changes up to fd451b90e78c4178bcfc5072f2b2b637500c109a:
+
+  arm64: KVM: vgic-v3: Restore ICH_APR0Rn_EL2 before ICH_APR1Rn_EL2 (2016-02-24 17:25:58 +0000)
+
+----------------------------------------------------------------
+KVM/ARM fixes for 4.5-rc6
+
+- Fix per-vcpu vgic bitmap allocation
+- Do not give copy random memory on MMIO read
+- Fix GICv3 APR register restore order
+
+----------------------------------------------------------------
+Marc Zyngier (2):
+      arm/arm64: KVM: Feed initialized memory to MMIO accesses
+      arm64: KVM: vgic-v3: Restore ICH_APR0Rn_EL2 before ICH_APR1Rn_EL2
+
+Mark Rutland (1):
+      KVM: arm/arm64: vgic: Ensure bitmaps are long enough
+
+ arch/arm/kvm/mmio.c             |  3 ++-
  arch/arm64/kvm/hyp/vgic-v3-sr.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index 9142e082..5dd2a26 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -149,16 +149,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 
- 	switch (nr_pri_bits) {
- 	case 7:
--		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
--		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
--	case 6:
--		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
--	default:
--		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
--	}	 	                           
--		 	                           
--	switch (nr_pri_bits) {
--	case 7:
- 		 write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
- 		 write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
- 	case 6:
-@@ -167,6 +157,16 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		 write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
- 	}
- 
-+	switch (nr_pri_bits) {
-+	case 7:
-+		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
-+		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
-+	case 6:
-+		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
-+	default:
-+		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
-+	}
-+
- 	switch (max_lr_idx) {
- 	case 15:
- 		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(15)], ICH_LR15_EL2);
--- 
-2.1.4
+ virt/kvm/arm/vgic.c             |  4 ++--
+ 3 files changed, 14 insertions(+), 13 deletions(-)
