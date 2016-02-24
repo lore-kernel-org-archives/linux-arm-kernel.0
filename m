@@ -1,89 +1,59 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 24 Feb 2016 11:50:37 -0500
-Subject: [PATCH] ASoC: trace: fix printing jack name
-In-Reply-To: <1456331903-3999234-1-git-send-email-arnd@arndb.de>
-References: <1456331903-3999234-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160224115037.40772a90@gandalf.local.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Feb 2016 17:56:57 +0100
+Subject: [PATCH] rtc: mt6397: Add platform device ID table
+In-Reply-To: <1455628747.2981.4.camel@mtksdaap41>
+References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
+ <2416670.q30ahHlzPm@wuerfel> <1455628747.2981.4.camel@mtksdaap41>
+Message-ID: <3216713.qF8RyQVuPO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Feb 2016 17:38:14 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> After a change to the snd_jack structure, the 'name' member
-> is no longer available in all configurations, which results in a
-> build failure in the tracing code:
+On Tuesday 16 February 2016 21:19:07 Eddie Huang wrote:
+> On Tue, 2016-02-16 at 12:37 +0100, Arnd Bergmann wrote:
+> > On Monday 15 February 2016 11:50:48 Javier Martinez Canillas wrote:
+> > > 
+> > > On 02/14/2016 10:58 PM, Eddie Huang wrote:
+> > > 
+> > > [snip]
+> > > 
+> > > >> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
+> > > >>      },
+> > > >>      .probe  = mtk_rtc_probe,
+> > > >>      .remove = mtk_rtc_remove,
+> > > >> +    .id_table = mt6397_rtc_id,
+> > > >>   };
+> > > >>
+> > > >>   module_platform_driver(mtk_rtc_driver);
+> > > >> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
+> > > >>   MODULE_LICENSE("GPL v2");
+> > > >>   MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
+> > > >>   MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
+> > > >> -MODULE_ALIAS("platform:mt6397-rtc");
+> > > >
+> > > > This patch looks good to me, but I am wondering, since we tend to use
+> > > > device tree method to match driver, do we still need support platform
+> > > > device ID ?
+> > > >
+> > > 
+> > > I'm not familiar with neither this IP block nor the SoC so it is up to
+> > > you. I just noticed this issue when reviewing a regulator driver for a
+> > > similar PMIC posted by someone from mediatek.
+> > > 
+> > > I thought platform device was needed since the driver has a MODULE_ALIAS()
+> > > but please let me know what you prefer and I can re-spin the patch and
+> > > just remove the MODULE_ALIAS() if that makes more sense for this platform.
+> > >   
+> > > 
+> > 
+> > I agree. We can alway add a MODULE_DEVICE_TABLE() if we get multiple
+> > users of this driver on architectures that don't use devicetree yet.
+> > 
 > 
-> include/trace/events/asoc.h: In function 'trace_event_raw_event_snd_soc_jack_report':
-> include/trace/events/asoc.h:240:32: error: 'struct snd_jack' has no member named 'name'
+> Sure. Thanks the patch to add expandability to this driver.
 > 
-> The name field is normally initialized from the card shortname and
-> the jack "id" field:
-> 
->         snprintf(jack->name, sizeof(jack->name), "%s %s",
->                  card->shortname, jack->id);
-> 
-> This changes the tracing output to just contain the 'id' by
-> itself, which slightly changes the output format but avoids the
-> link error and is hopefully still enough to see what is going on.
+> Acked-by: Eddie Huang <eddie.huang@mediatek.com>
 
-If people would like name if available, we could do:
+I think we misunderstood one another. I think we can drop both the MODULE_DEVICE_TABLE and the MODULE_ALIAS: there is no need for another
+driver ID when it is always probed using DT.
 
-#ifdef CONFIG_SND_JACK_INPUT_DEV
-# define JACK_NAME(jk)		(jk)->jack->name
-#else
-# define JACK_NAME(jk)		(jk)->jack->id
-#endif
-
-And then below have:
-
-	__string(	name,	JACK_NAME(jack)	)
-
-
-The #ifdef can stay in the events/asoc.h file.
-
--- Steve
-
-
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: fe0d128c57bf ("ALSA: jack: Allow building the jack layer without input device")
-> ---
->  include/trace/events/asoc.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/include/trace/events/asoc.h b/include/trace/events/asoc.h
-> index 317a1ed2f4ac..9130dd5a184a 100644
-> --- a/include/trace/events/asoc.h
-> +++ b/include/trace/events/asoc.h
-> @@ -231,13 +231,13 @@ TRACE_EVENT(snd_soc_jack_report,
->  	TP_ARGS(jack, mask, val),
->  
->  	TP_STRUCT__entry(
-> -		__string(	name,		jack->jack->name	)
-> +		__string(	name,		jack->jack->id		)
->  		__field(	int,		mask			)
->  		__field(	int,		val			)
->  	),
->  
->  	TP_fast_assign(
-> -		__assign_str(name, jack->jack->name);
-> +		__assign_str(name, jack->jack->id);
->  		__entry->mask = mask;
->  		__entry->val = val;
->  	),
-> @@ -253,12 +253,12 @@ TRACE_EVENT(snd_soc_jack_notify,
->  	TP_ARGS(jack, val),
->  
->  	TP_STRUCT__entry(
-> -		__string(	name,		jack->jack->name	)
-> +		__string(	name,		jack->jack->id		)
->  		__field(	int,		val			)
->  	),
->  
->  	TP_fast_assign(
-> -		__assign_str(name, jack->jack->name);
-> +		__assign_str(name, jack->jack->id);
->  		__entry->val = val;
->  	),
->  
+	Arnd
