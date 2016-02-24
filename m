@@ -1,23 +1,24 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 24 Feb 2016 15:35:31 +0100
-Subject: [PATCH 1/4] soc: rockchip: add bindings for Rockchip grf
-In-Reply-To: <1456210864-29037-2-git-send-email-jay.xu@rock-chips.com>
-References: <1456210864-29037-1-git-send-email-jay.xu@rock-chips.com>
- <1456210864-29037-2-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1832389.c46G87NAnj@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Feb 2016 15:51:10 +0100
+Subject: [PATCH] ARM: realview: add EB syscon variants to bindings
+In-Reply-To: <1456218606-3749-1-git-send-email-linus.walleij@linaro.org>
+References: <1456218606-3749-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <3716654.ki0irAFpjQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 23. Februar 2016, 15:01:01 schrieb jianqun.xu:
-> From: Jianqun Xu <jay.xu@rock-chips.com>
+On Tuesday 23 February 2016 10:10:06 Linus Walleij wrote:
+> There are two distinct RealView EB system controller that we need
+> to detect and handle because their register layout differ
+> slightly.
 > 
-> Add devicetree bindings for Rockchip grf which found on
-> Rockchip SoCs.
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 
-applied to my dts32 branch for 4.6 with Rob's Ack.
+Looks ok.
 
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks
-Heiko
+	Arnd
