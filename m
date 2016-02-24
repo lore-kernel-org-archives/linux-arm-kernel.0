@@ -1,81 +1,121 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 24 Feb 2016 10:02:59 +0900
-Subject: [PATCH 3/3] ARM: EXYNOS: cleanup header files inclusion
-In-Reply-To: <56CC23AD.10103@samsung.com>
-References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
- <1456135396-17767-4-git-send-email-pankaj.dubey@samsung.com>
- <56CBA32D.4020905@samsung.com> <56CC23AD.10103@samsung.com>
-Message-ID: <56CD0143.2010909@samsung.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 23 Feb 2016 19:14:18 -0600
+Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+ HiSilicon SoCs Host Controllers
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
+References: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1455039260-6040-4-git-send-email-gabriele.paoloni@huawei.com>
+ <20160209182429.GD4348@leverpostej>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1591@lhreml503-mbs>
+ <20160210111234.GC2632@leverpostej>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
+Message-ID: <20160224011418.GB13026@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.02.2016 18:17, pankaj.dubey wrote:
-> Hi Krzysztof,
+On Tue, Feb 23, 2016 at 02:47:22AM +0000, Gabriele Paoloni wrote:
+> > -----Original Message-----
+> > From: Gabriele Paoloni
+> > Sent: 10 February 2016 22:45
+> > To: Mark Rutland
+> > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
+> > qiujiang; bhelgaas at google.com; arnd at arndb.de; Lorenzo.Pieralisi at arm.com;
+> > tn at semihalf.com; linux-pci at vger.kernel.org; linux-
+> > kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: RE: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+> > HiSilicon SoCs Host Controllers
+> > 
+> > > -----Original Message-----
+> > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > > owner at vger.kernel.org] On Behalf Of Mark Rutland
+> > > Sent: 10 February 2016 11:13
+> > > To: Gabriele Paoloni
+> > > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C); Linuxarm;
+> > > qiujiang; bhelgaas at google.com; arnd at arndb.de;
+> > > Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-pci at vger.kernel.org;
+> > > linux-kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+> > > HiSilicon SoCs Host Controllers
+> > >
+> > > On Wed, Feb 10, 2016 at 09:52:36AM +0000, Gabriele Paoloni wrote:
+> > > > Hi Mark
+> > > >
+> > > > > On Tue, Feb 09, 2016 at 05:34:20PM +0000, Gabriele Paoloni wrote:
+> > > > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> > > > > > +/*
+> > > > > > + * Retrieve rc_dbi base and size from _DSD
+> > > > > > + * Name (_DSD, Package () {
+> > > > > > + *	ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+> > > > > > + *	Package () {
+> > > > > > + *	Package () {"rc-dbi", Package () { 0x0, 0xb0080000, 0x0,
+> > > 0x10000
+> > > > > }},
+> > > > > > + *	}
+> > > > > > + *	})
+> > > > > > + */
+> > > > >
+> > > > > As above, this does not look right. ACPI has standard mechanisms
+> > > for
+> > > > > describing addresses. Making something up like this is not a good
+> > > idea.
+> > > >
+> > > > I am quite new to ACPI, may I ask you to explain a bit?
+> > >
+> > > ACPI has standard mechanisms for describing certain resources, and
+> > > these
+> > > should not be described in _DSD. Memory or IO address regions are
+> > such
+> > > resources (in _CRS, IIRC), and should not be described in _DSD.
+> > 
+> > Hi Mark,
+> > 
+> > In my case I think in need to look into the MCFG object as the problem
+> > I have is RC using a different range than the rest of the hierarchy.
+> > 
+> > I'll investigate this and try to come with a solution in v4
 > 
-> On Tuesday 23 February 2016 05:39 AM, Krzysztof Kozlowski wrote:
->> On 22.02.2016 19:03, Pankaj Dubey wrote:
->>> This includes trivial cleanup in exynos files such as
->>>     - remove unused header files inclusion from exynos.c, s5p-dev-mfc.c,
->>>       firmware.c, pm.c.
->>>     - move inclusion of of.h from common.h to pm.c where it is really
->>>       required
->>>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos/common.h      | 1 -
->>>  arch/arm/mach-exynos/exynos.c      | 5 -----
->>>  arch/arm/mach-exynos/firmware.c    | 2 --
->>>  arch/arm/mach-exynos/platsmp.c     | 1 -
->>>  arch/arm/mach-exynos/pm.c          | 4 +---
->>>  arch/arm/mach-exynos/s5p-dev-mfc.c | 1 -
->>>  6 files changed, 1 insertion(+), 13 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
->>> index e349a03..5365bf1 100644
->>> --- a/arch/arm/mach-exynos/common.h
->>> +++ b/arch/arm/mach-exynos/common.h
->>> @@ -12,7 +12,6 @@
->>>  #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
->>>  #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
->>>  
->>> -#include <linux/of.h>
->>>  #include <linux/platform_data/cpuidle-exynos.h>
->>>  
->>>  #define EXYNOS3250_SOC_ID	0xE3472000
->>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->>> index 99947ad..54262a1 100644
->>> --- a/arch/arm/mach-exynos/exynos.c
->>> +++ b/arch/arm/mach-exynos/exynos.c
->>> @@ -11,14 +11,10 @@
->>>  
->>>  #include <linux/init.h>
->>>  #include <linux/io.h>
->>> -#include <linux/kernel.h>
->>> -#include <linux/serial_s3c.h>
->>>  #include <linux/of.h>
->>>  #include <linux/of_address.h>
->>>  #include <linux/of_fdt.h>
->>>  #include <linux/of_platform.h>
->>> -#include <linux/platform_device.h>
->>
->> platform_device is actually used in that file. It looks unused because
->> it is pulled by of_platform, but it makes sense to include it here.
->>
-> Thanks for review.
+> I have looked into this and in our case we cannot use the
+> standard MCFG object to pass the RC config space addresses.
 > 
-> Well I tried to grep for of_platform.h and platform_device.h in
-> arch/arm/ and out of 88 files including of_platform.h only 16 files are
-> including platform_device.h also. So majority do not include both of
-> them even do they need. So majority of files both are not included. So
-> If we got with majority it's not required. What's your opinion?
+> The reason is that in our HW we have the config base addresses of the 
+> root complex ports that are less than 0x100000 byte distant one from
+> the other as we only map the first 0x10000 bytes.
 
-Actually most of files including of_platform.h and not including
-platform_device.h just do not require the second one (I checked like 20
-of them and only one was referring to platform device function... of
-course maybe my random selection of 20 files was not random enough :) ).
-They do not directly reference platform device stuff.
+The ECAM spec requires 4096 bytes per function, 8 functions per
+device, 32 devices per bus, which means you need 0x100000 bytes of
+address space per bus.  If your device doesn't supply that, it doesn't
+really implement ECAM, and you probably can't use the standard ways of
+describing ECAM (MCFG, _CBA).
 
-In that file the platform_device is used so the header may stay.
+> Now the MCFG acpi framework always fix the MCFG resource size to 0x100000
+> for each bus; therefore if we pass our RC addresses through MCFG we end
+> up with a resource conflict.
+> 
+> To give you a practical example we are in a situation where we have:
+> 
+> port0: [0x00000000b0080000 - 0x00000000b0080000 + 0x10000]
+> port1: [0x00000000b0090000 - 0x00000000b0090000 + 0x10000]
+> port2: [0x00000000b00A0000 - 0x00000000b00A0000 + 0x10000]
+> port3: [0x00000000b00B0000 - 0x00000000b00B0000 + 0x10000]
+>   
+> So if we pass the base addresses through MCFG the resources
+> will overlap as MCFG will consider 0x100000 size for each base
+> address of the root complex (only the RC bus uses that address)
+> 
+> So far I do not see many option other than using _DSD to pass
+> these RC config base addresses.
 
-Best regards,
-Krzysztof
+I don't want to take over Mark's discussion, but I really do not think
+_DSD is the correct way to fix this.  _CRS is like a generalized PCI
+BAR.  A PCI device is only allowed to respond to address space
+reported via a BAR.  An ACPI device is only allowed to respond to
+address space reported via _CRS.  Those are important rules because
+they mean we can manage address space with generic code instead of
+device-specific code.
+
+Bjorn
