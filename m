@@ -1,26 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Feb 2016 14:07:14 +0000
-Subject: [PATCH v3] arm64: Add workaround for Cavium erratum 27456
-In-Reply-To: <20160224134016.GH28310@arm.com>
-References: <1456272534-21692-1-git-send-email-ddaney.cavm@gmail.com>
- <20160224134016.GH28310@arm.com>
-Message-ID: <56CDB912.6000300@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 24 Feb 2016 15:07:16 +0100
+Subject: [PATCH 15/50] pinctrl: mvebu: Use devm_pinctrl_register() for
+ pinctrl registration
+In-Reply-To: <1456319775-3216-16-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-16-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20160224150716.3a2781af@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/16 13:40, Will Deacon wrote:
+Dear Laxman Dewangan,
 
-[...]
+On Wed, 24 Feb 2016 18:45:40 +0530, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration and remove
+> need of .remove callback.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Cc: Fabian Frederick <fabf@skynet.be>
+> Cc: Andrew Andrianov <andrew@ncrmnt.org>
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-armada-370.c | 6 ------
+>  drivers/pinctrl/mvebu/pinctrl-armada-375.c | 6 ------
+>  drivers/pinctrl/mvebu/pinctrl-armada-38x.c | 6 ------
+>  drivers/pinctrl/mvebu/pinctrl-armada-39x.c | 6 ------
+>  drivers/pinctrl/mvebu/pinctrl-armada-xp.c  | 6 ------
+>  drivers/pinctrl/mvebu/pinctrl-dove.c       | 5 +----
+>  drivers/pinctrl/mvebu/pinctrl-kirkwood.c   | 6 ------
+>  drivers/pinctrl/mvebu/pinctrl-mvebu.c      | 9 +--------
+>  8 files changed, 2 insertions(+), 48 deletions(-)
 
-> (and Catalin, if you pick this up, watch out for the conflicts in
-> cpufeature.h)
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Yup, that one is about to become a minefield (ARM64_HAS_NO_HW_PREFETCH,
-ARM64_HAS_UAO, ARM64_ALT_PAN_NOT_UAO and ARM64_HAS_VIRT_HOST_EXTN are
-already happily clashing into -next). But hey, the more the merrier! ;-)
+Thanks!
 
-Thanks,
-
-	M.
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
