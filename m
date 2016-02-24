@@ -1,67 +1,48 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 24 Feb 2016 10:11:09 -0800
-Subject: [PATCH 21/50] pinctrl: msm: Use devm_pinctrl_register() for
- pinctrl registration
-In-Reply-To: <1456319775-3216-22-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-22-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160224181109.GO21240@tuxbot>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 24 Feb 2016 19:17:27 +0100
+Subject: [PATCH v9 0/2] power: act8945a: add charger driver for the
+ sub-device of ACT8945A MFD
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D6428FF2@penmbx01>
+References: <1455524524-9359-1-git-send-email-wenyou.yang@atmel.com>
+ <B256D81BAE5131468A838E5D7A243641D6428FF2@penmbx01>
+Message-ID: <20160224181727.GA19106@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 24 Feb 05:15 PST 2016, Laxman Dewangan wrote:
+Hi,
 
-> Use devm_pinctrl_register() for pin control registration and clean
-> the error path.
+On Wed, Feb 24, 2016 at 09:33:13AM +0000, Yang, Wenyou wrote:
+> > -----Original Message-----
+> > From: Wenyou Yang [mailto:wenyou.yang at atmel.com]
+> > Sent: 2016?2?15? 16:22
+> > To: Sebastian Reichel <sre@kernel.org>; Dmitry Eremin-Solenikov
+> > <dbaryshkov@gmail.com>; David Woodhouse <dwmw2@infradead.org>; Rob
+> > Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Brown
+> > <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
+> > Gala <galak@codeaurora.org>
+> > Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>; Javier Martinez Canillas
+> > <javier@dowhile0.org>; Lee Jones <lee.jones@linaro.org>; Peter Korsgaard
+> > <jacmet@gmail.com>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
+> > kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> > pm at vger.kernel.org; Yang, Wenyou <Wenyou.Yang@atmel.com>
+> > Subject: [PATCH v9 0/2] power: act8945a: add charger driver for the sub-device
+> > of ACT8945A MFD
+> > 
+> > The ACT8945A is a Multi Function Device with the following subdevices:
+> >  - Regulator
+> >  - Charger
 > 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+> I would like to know if this patch set is okay to apply.
+> Or any comments?
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+No comments, I just queued it with "|| COMPILE_TEST" dependency
+added.
 
-Regards,
-Bjorn
-
->  drivers/pinctrl/qcom/pinctrl-msm.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-> index 8777cf0..dc7bf77 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-> @@ -898,17 +898,16 @@ int msm_pinctrl_probe(struct platform_device *pdev,
->  	msm_pinctrl_desc.name = dev_name(&pdev->dev);
->  	msm_pinctrl_desc.pins = pctrl->soc->pins;
->  	msm_pinctrl_desc.npins = pctrl->soc->npins;
-> -	pctrl->pctrl = pinctrl_register(&msm_pinctrl_desc, &pdev->dev, pctrl);
-> +	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &msm_pinctrl_desc,
-> +					     pctrl);
->  	if (IS_ERR(pctrl->pctrl)) {
->  		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
->  		return PTR_ERR(pctrl->pctrl);
->  	}
->  
->  	ret = msm_gpio_init(pctrl);
-> -	if (ret) {
-> -		pinctrl_unregister(pctrl->pctrl);
-> +	if (ret)
->  		return ret;
-> -	}
->  
->  	platform_set_drvdata(pdev, pctrl);
->  
-> @@ -923,7 +922,6 @@ int msm_pinctrl_remove(struct platform_device *pdev)
->  	struct msm_pinctrl *pctrl = platform_get_drvdata(pdev);
->  
->  	gpiochip_remove(&pctrl->chip);
-> -	pinctrl_unregister(pctrl->pctrl);
->  
->  	unregister_restart_handler(&pctrl->restart_nb);
->  
-> -- 
-> 2.1.4
-> 
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/9d0d7c5a/attachment.sig>
