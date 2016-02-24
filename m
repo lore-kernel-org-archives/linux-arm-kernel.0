@@ -1,73 +1,145 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Wed, 24 Feb 2016 09:22:08 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe
- also on PowerPC and ARM)
-In-Reply-To: <20160223191907.25719a4d@thinkpad>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name>
- <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
- <20160223103221.GA1418@node.shutemov.name>
- <20160223191907.25719a4d@thinkpad>
-Message-ID: <20160224092208.49e013ff@mschwide>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Wed, 24 Feb 2016 16:23:43 +0800
+Subject: [PATCH v5 0/8] Add MT8173 Video Encoder Driver and VPU Driver
+In-Reply-To: <56CC1CAB.1060409@xs4all.nl>
+References: <1456215081-16858-1-git-send-email-tiffany.lin@mediatek.com>
+ <56CC1CAB.1060409@xs4all.nl>
+Message-ID: <1456302223.15077.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Feb 2016 19:19:07 +0100
-Gerald Schaefer <gerald.schaefer@de.ibm.com> wrote:
+Hi Hans,
 
-> On Tue, 23 Feb 2016 13:32:21 +0300
-> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
-> 
-> > On Fri, Feb 12, 2016 at 06:16:40PM +0100, Gerald Schaefer wrote:
-> > > On Fri, 12 Feb 2016 16:57:27 +0100
-> > > Christian Borntraeger <borntraeger@de.ibm.com> wrote:
-> > > 
-> > > > > I'm also confused by pmd_none() is equal to !pmd_present() on s390. Hm?
-> > > > 
-> > > > Don't know, Gerald or Martin?
-> > > 
-> > > The implementation frequently changes depending on how many new bits Martin
-> > > needs to squeeze out :-)
-> > > We don't have a _PAGE_PRESENT bit for pmds, so pmd_present() just checks if the
-> > > entry is not empty. pmd_none() of course does the opposite, it checks if it is
-> > > empty.
+On Tue, 2016-02-23 at 09:47 +0100, Hans Verkuil wrote:
+> On 02/23/16 09:11, Tiffany Lin wrote:
+> > ==============
+> >  Introduction
+> > ==============
 > > 
-> > I still worry about pmd_present(). It looks wrong to me. I wounder if
-> > patch below makes a difference.
+> > The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+> > Mediatek Video Codec is able to handle video encoding of in a range of formats.
 > > 
-> > The theory is that the splitting bit effetely masked bogus pmd_present():
-> > we had pmd_trans_splitting() in all code path and that prevented mm from
-> > touching the pmd. Once pmd_trans_splitting() has gone, mm proceed with the
-> > pmd where it shouldn't and here's a boom.
+> > This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
+> > communicate with VPU.
+> > 
+> > Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI.
+> > MTK IOMMU[1] and MTK SMI[2] have not yet been merged, but we wanted to start discussion about the driver
+> > earlier so it could be merged sooner.
+> > 
+> > [1]https://patchwork.kernel.org/patch/8335461/
+> > [2]https://patchwork.kernel.org/patch/7596181/
 > 
-> Well, I don't think pmd_present() == true is bogus for a trans_huge pmd under
-> splitting, after all there is a page behind the the pmd. Also, if it was
-> bogus, and it would need to be false, why should it be marked !pmd_present()
-> only at the pmdp_invalidate() step before the pmd_populate()? It clearly
-> is pmd_present() before that, on all architectures, and if there was any
-> problem/race with that, setting it to !pmd_present() at this stage would
-> only (marginally) reduce the race window.
+> <snip>
 > 
-> BTW, PowerPC and Sparc seem to do the same thing in pmdp_invalidate(),
-> i.e. they do not set pmd_present() == false, only mark it so that it would
-> not generate a new TLB entry, just like on s390. After all, the function
-> is called pmdp_invalidate(), and I think the comment in mm/huge_memory.c
-> before that call is just a little ambiguous in its wording. When it says
-> "mark the pmd notpresent" it probably means "mark it so that it will not
-> generate a new TLB entry", which is also what the comment is really about:
-> prevent huge and small entries in the TLB for the same page at the same
-> time.
+> > v4l2-compliance test output:
+> > localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1
+> > Driver Info:
+> >         Driver name   : mtk-vcodec-enc
+> >         Card type     : platform:mt8173
+> >         Bus info      : platform:mt8173
+> >         Driver version: 4.4.0
+> >         Capabilities  : 0x84204000
+> >                 Video Memory-to-Memory Multiplanar
+> >                 Streaming
+> >                 Extended Pix Format
+> >                 Device Capabilities
+> >         Device Caps   : 0x04204000
+> >                 Video Memory-to-Memory Multiplanar
+> >                 Streaming
+> >                 Extended Pix Format
+> > 
+> > Compliance test for device /dev/video1 (not using libv4l2):
+> > 
+> > Required ioctls:
+> >         test VIDIOC_QUERYCAP: OK
+> > 
+> > Allow for multiple opens:
+> >         test second video open: OK
+> >         test VIDIOC_QUERYCAP: OK
+> >         test VIDIOC_G/S_PRIORITY: OK
+> > 
+> > Debug ioctls:
+> >         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+> >         test VIDIOC_LOG_STATUS: OK (Not Supported)
+> > 
+> > Input ioctls:
+> >         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+> >         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> >         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+> >         test VIDIOC_ENUMAUDIO: OK (Not Supported)
+> >         test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
+> >         test VIDIOC_G/S_AUDIO: OK (Not Supported)
+> >         Inputs: 0 Audio Inputs: 0 Tuners: 0
+> > 
+> > Output ioctls:
+> >         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+> >         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> >         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+> >         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+> >         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+> >         Outputs: 0 Audio Outputs: 0 Modulators: 0
+> > 
+> > Input/Output configuration ioctls:
+> >         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+> >         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+> >         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+> >         test VIDIOC_G/S_EDID: OK (Not Supported)
+> > 
+> >         Control ioctls:
+> >                 test VIDIOC_QUERYCTRL/MENU: OK
+> >                 test VIDIOC_G/S_CTRL: OK
+> >                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+> >                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+> >                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> >                 Standard Controls: 12 Private Controls: 0
+> > 
+> >         Format ioctls:
+> >                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+> >                 test VIDIOC_G/S_PARM: OK
+> >                 test VIDIOC_G_FBUF: OK (Not Supported)
+> >                 test VIDIOC_G_FMT: OK
+> >                 test VIDIOC_TRY_FMT: OK
+> >                 test VIDIOC_S_FMT: OK
+> >                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+> > 
+> >         Codec ioctls:
+> >                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+> >                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+> >                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+> > 
+> >         Buffer ioctls:
+> >                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+> >                 test VIDIOC_EXPBUF: OK
+> > 
+> > Total: 38, Succeeded: 38, Failed: 0, Warnings: 0
+> 
+> Nice!
+> 
+> Can you try 'v4l2-compliance -s'? Note that this may not work since I know
+> that v4l2-compliance doesn't work all that well with codecs, but I am
+> curious what the output is when you try streaming.
+> 
+> Don't bother trying to chase down reported failures, those are likely from
+> v4l2-compliance itself. It is something I would like to improve, but -ENOTIME.
+> 
 
-If I am not mistaken this is true for x86 as well. The generic implementation
-for pmdp_invalidate sets a new pmd that has been modified with
-pmd_mknotpresent. For x86 this function removes the _PAGE_PRESENT and
-_PAGE_PROTNONE bits from the entry. The _PAGE_PSE bit stays set and that
-makes pmd_present return true.
+When I try to run 'v4l2-compliance -d /dev/video1 -s, I got follow
+output.
+I use v4.4-rc5 kernel and v4l-utils 1.6 version.
 
--- 
-blue skies,
-   Martin.
+Streaming ioctls:
+        test read/write: OK (Not Supported)
+fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(332): buf.querybuf(node, i) fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(868): testQueryBuf(node, cur_fmt.type, q.g_buffers())
+        test MMAP: FAIL
+fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(923): ret && ret != ENOTTY
 
-"Reality continues to ruin my life." - Calvin.
+fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(988): setupUserPtr(node, q)
+        test USERPTR: FAIL
+        test DMABUF: Cannot test, specify --expbuf-device
+
+best regards,
+Tiffany
+
+> Regards,
+> 
+> 	Hans
