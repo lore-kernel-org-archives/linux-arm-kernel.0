@@ -1,57 +1,67 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 24 Feb 2016 12:46:55 -0500
-Subject: [PATCH v3 3/6] watchdog: pnx4008: add support for soft reset
+Date: Wed, 24 Feb 2016 12:46:57 -0500
+Subject: [PATCH v3 5/6] arm: lpc32xx: remove restart handler
 In-Reply-To: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
 References: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1456336018-6620-4-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <1456336018-6620-6-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylvain Lemieux <slemieux@tycoint.com>
 
-Add support for explicit soft reset using the reboot mode.
-
-The default reboot mode behavior is unchanged;
-you can overwrite the default reboot type in the board specific file
-"DT_MACHINE_START" definition using the "reboot_mode" parameter.
+Remove the restart handler from "mach-lpc32xx";
+this functionality is now available in the
+pnx4008 watchdog driver.
 
 Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 ---
 Changes from v2 to v3:
-- no logical change; updated to work with new revision of patch #2.
+- move the change to "phy3250.c" into a separate patch.
 
 Changes from v1 to v2:
-- Rename patch title;
-  was "arm: lpc32xx: restart: add support for soft reset"
-- Add change to "pnx-4008" driver instead of "mach-lpc32xx".
-- Use define available in "pnx-4008" when writting to watchdog register.
+- new patch in v2.
 
- drivers/watchdog/pnx4008_wdt.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+ arch/arm/mach-lpc32xx/common.c | 15 ---------------
+ arch/arm/mach-lpc32xx/common.h |  1 -
+ 2 files changed, 16 deletions(-)
 
-diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-index 80ee4af..fbf027e 100644
---- a/drivers/watchdog/pnx4008_wdt.c
-+++ b/drivers/watchdog/pnx4008_wdt.c
-@@ -130,9 +130,16 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
- static int pnx4008_restart_handler(struct notifier_block *this,
- 				   unsigned long mode, void *cmd)
- {
--	/* Instant assert of RESETOUT_N with pulse length 1mS */
--	writel(13000, WDTIM_PULSE(wdt_base));
--	writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
-+	if (mode == (unsigned long)REBOOT_SOFT) {
-+		/* Force match output active */
-+		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
-+		/* Internal reset on match output (RESOUT_N not asserted) */
-+		writel(M_RES1, WDTIM_MCTRL(wdt_base));
-+	} else {
-+		/* Instant assert of RESETOUT_N with pulse length 1mS */
-+		writel(13000, WDTIM_PULSE(wdt_base));
-+		writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
-+	}
+diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
+index 716e83e..5b7a1e7 100644
+--- a/arch/arm/mach-lpc32xx/common.c
++++ b/arch/arm/mach-lpc32xx/common.c
+@@ -194,21 +194,6 @@ void __init lpc32xx_map_io(void)
+ 	iotable_init(lpc32xx_io_desc, ARRAY_SIZE(lpc32xx_io_desc));
+ }
  
- 	/* Wait for watchdog to reset system */
- 	mdelay(1000);
+-void lpc23xx_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	/* Make sure WDT clocks are enabled */
+-	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
+-		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
+-
+-	/* Instant assert of RESETOUT_N with pulse length 1mS */
+-	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
+-	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
+-
+-	/* Wait for watchdog to reset system */
+-	while (1)
+-		;
+-}
+-
+ static int __init lpc32xx_check_uid(void)
+ {
+ 	u32 uid[4];
+diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+index 1cd8853..2d90801 100644
+--- a/arch/arm/mach-lpc32xx/common.h
++++ b/arch/arm/mach-lpc32xx/common.h
+@@ -30,7 +30,6 @@ extern void lpc32xx_timer_init(void);
+ extern void __init lpc32xx_init_irq(void);
+ extern void __init lpc32xx_map_io(void);
+ extern void __init lpc32xx_serial_init(void);
+-extern void lpc23xx_restart(enum reboot_mode, const char *);
+ 
+ 
+ /*
 -- 
 1.8.3.1
