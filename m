@@ -1,140 +1,110 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Wed, 24 Feb 2016 14:59:32 +0530
-Subject: [PATCH v4 1/3] ARM: hwmod: RTC: Add lock and unlock functions
-In-Reply-To: <alpine.DEB.2.02.1602072209460.2182@utopia.booyaka.com>
-References: <1454650952-20154-1-git-send-email-lokeshvutla@ti.com>
- <1454650952-20154-2-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1602072209460.2182@utopia.booyaka.com>
-Message-ID: <56CD77FC.8030103@ti.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Wed, 24 Feb 2016 09:33:13 +0000
+Subject: [PATCH v9 0/2] power: act8945a: add charger driver for the
+ sub-device of ACT8945A MFD
+In-Reply-To: <1455524524-9359-1-git-send-email-wenyou.yang@atmel.com>
+References: <1455524524-9359-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D6428FF2@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hello Sebastian,
 
-On Monday 08 February 2016 03:54 AM, Paul Walmsley wrote:
-> Hi Lokesh
+> -----Original Message-----
+> From: Wenyou Yang [mailto:wenyou.yang at atmel.com]
+> Sent: 2016?2?15? 16:22
+> To: Sebastian Reichel <sre@kernel.org>; Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com>; David Woodhouse <dwmw2@infradead.org>; Rob
+> Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Brown
+> <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
+> Gala <galak@codeaurora.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>; Javier Martinez Canillas
+> <javier@dowhile0.org>; Lee Jones <lee.jones@linaro.org>; Peter Korsgaard
+> <jacmet@gmail.com>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> pm at vger.kernel.org; Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Subject: [PATCH v9 0/2] power: act8945a: add charger driver for the sub-device
+> of ACT8945A MFD
 > 
-> I apologize for the delay.
-> 
-> A few comments:
-> 
-> On Fri, 5 Feb 2016, Lokesh Vutla wrote:
-> 
->> RTC IP have kicker feature which prevents spurious writes to its registers.
->> In order to write into any of the RTC registers, KICK values has to be
->> written to KICK registers.
->> Introduce omap_hwmod_rtc_unlock/lock functions, which  writes into these
->> KICK registers inorder to lock and unlock RTC registers.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
-> 
-> ...
-> 
->> +/**
->> + * omap_rtc_wait_not_busy - Wait for the RTC BUSY flag
->> + * @oh: struct omap_hwmod *
->> + *
->> + * For updating certain RTC registers, the MPU must wait
->> + * for the BUSY status in OMAP_RTC_STATUS_REG to become zero.
->> + * Once the BUSY status is zero, there is a 15-?s access
-> 
-> Probably best just to write out "microseconds" or "us" here to avoid the 
-> high-bit character problem.
-> 
->> + * period in which the MPU can program.
->> + */
->> +static void omap_rtc_wait_not_busy(struct omap_hwmod *oh)
->> +{
->> +	int i;
->> +
->> +	/* BUSY may stay active for 1/32768 second (~30 usec) */
->> +	omap_test_timeout(omap_hwmod_read(oh, OMAP_RTC_STATUS_REG)
->> +			  & OMAP_RTC_STATUS_REG, OMAP_RTC_MAX_READY_TIME, i);
-> 
-> This test looks bogus.  Shouldn't it AND the register value with 
-> OMAP_RTC_STATUS_BUSY?  Right now the code is AND-ing with 0x44, which 
-> doesn't include the BUSY bit.  So I guess the tests that you mentioned in 
-> the first message of the series don't cover the BUSY case?
-> 
->> +	/* now we have ~15 usec to read/write various registers */
->> +}
->> +
->> +/**
->> + * omap_hwmod_rtc_unlock - Unlock the Kicker mechanism.
->> + * @oh: struct omap_hwmod *
->> + *
->> + * RTC IP have kicker feature. This prevents spurious writes to its registers.
->> + * In order to write into any of the RTC registers, KICK values has te be
->> + * written in respective KICK registers. This is needed for hwmod to write into
->> + * sysconfig register.
->> + */
->> +void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
->> +{
->> +	local_irq_disable();
->> +	omap_rtc_wait_not_busy(oh);
->> +	omap_hwmod_write(OMAP_RTC_KICK0_VALUE, oh, OMAP_RTC_KICK0_REG);
->> +	omap_hwmod_write(OMAP_RTC_KICK1_VALUE, oh, OMAP_RTC_KICK1_REG);
->> +	local_irq_enable();
-> 
-> Finally, could you ask the IP block maintainer to confirm the 
-> interpretation that, for any STATUS_REG read where the BUSY bit is 0, that 
-> we are guaranteed to have at least 15 microseconds from that point in time 
-> to access the IP block?  It appears to be this way from my reading of the 
-> TRM; but to me, the phrasing is not explicit.  Another interpretation 
-> could be that the BUSY bit reflects the IP block's current status.  If 
-> this latter case is true, then to ensure that the IP block accesses 
-> complete inside the access window, we'll either need to test the BUSY bit 
-> after the writes to ensure that it is still 0, and otherwise repeat the 
-> busy test and writes; or we'll need to wait for a 0->1 BUSY transition 
-> before we wait for a 1->0 BUSY transition.
+> The ACT8945A is a Multi Function Device with the following subdevices:
+>  - Regulator
+>  - Charger
 
-As per the HW folks, once SW sees the transistion from 1->0, it is
-guaranteed that SW has 15.25 us to do all the write transactions for all
-the TC updates.
+I would like to know if this patch set is okay to apply.  Or any comments?
 
-Also as per TRM, in RTC there are three types of registers:
--> TC registers and TC alarm registers:
--> General registers
--> Compensation registers.
-
-MPU must wait for the BUSY bit for accessing the TC registers and  MPU
-can access the general registers at any point of time. SYSCONFIG, KICK
-registers comes under general registers. Since hwmod modifies only the
-sysconfig register, this omap_rtc_wait_not_busy() is not required here.
-We can directly write into sysconfig and KICK registers. Does this sound
-fine to you?
-Shall I resend this patch without omap_rtc_wait_not_busy()?
-
-
-Thanks and regards,
-Lokesh
-
+Thanks.
 
 > 
->> +}
->> +
->> +/**
->> + * omap_hwmod_rtc_lock - Lock the Kicker mechanism.
->> + * @oh: struct omap_hwmod *
->> + *
->> + * RTC IP have kicker feature. This prevents spurious writes to its registers.
->> + * Once the RTC registers are written, KICK mechanism needs to be locked,
->> + * in order to prevent any spurious writes. This function locks back the RTC
->> + * registers once hwmod completes its write into sysconfig register.
->> + */
->> +void omap_hwmod_rtc_lock(struct omap_hwmod *oh)
->> +{
->> +	local_irq_disable();
->> +	omap_rtc_wait_not_busy(oh);
->> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK0_REG);
->> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK1_REG);
->> +	local_irq_enable();
->> +}
->> -- 
->> 2.1.4
->>
+> This patch set is to add regulator driver for ACT8945A.
+> It is based on the patch set:
+> 	http://lists.infradead.org/pipermail/linux-arm-kernel/2016-
+> February/405258.html
 > 
+> Changes in v9:
+>  - add check if charger->regmap is a NULL pointer.
+>  - collect Reviewed-by tag.
 > 
-> - Paul
+> Changes in v8:
+>  - remove the OF table.
+>  - due to the mfd cell .of_compatible removal, use the platform
+>    device's parent of_node to read the property and assign it
+>    to the psy_cfg.of_node.
+>  - fix the typo.
+>  - due the mfd cell .of_compatible removal, update the compatibe
+>    description and example.
 > 
+> Changes in v7:
+>  - use the helper dev_get_regmap(pdev->dev.parent, NULL) to get regmap.
+>  - remove *act8945a_dev member from struct act8945a_charger.
+>  - remove *psy member from struct act8945a_charger.
+>  - merge _parse_dt() and _charger_config() functions, remove relevent
+>    members from struct act8945a_charger.
+>  - remove unused platform_set_drvdata(pdev, charger) statement.
+> 
+> Changes in v6:
+>  - change the type value to unsigned int.
+> 
+> Changes in v5:
+>  - remove spare spaces after #define.
+>  - add OF match table.
+>  - collect Reviewed-by from Krzysztof.
+> 
+> Changes in v4:
+>  - use spaces after #define, not tabs.
+>  - use BIT(n) macros to substitute (0x01 << x).
+>  - change dt properties with more legible name.
+>  - change the properties with more legible name, clearer description.
+> 
+> Changes in v3:
+>  - update the file header with short version license and author line.
+>  - remove unused member of struct act8945a_charger, dev.
+>  - action due to removing the member of stuct act8945a_dev, dev.
+>  - remove the unnecessary print out.
+>  - remove the unnecessary act8945a_charger_remove().
+>  - fix align of the code-style.
+> 
+> Changes in v2:
+>  1./ Substitute of_property_read_bool() for of_get_property().
+>  2./ Substitute devm_power_supply_register() for power_supply_register().
+>  3./ Use module_platform_driver(), instead of subsys_initcall().
+>  4./ Substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+> 
+> Wenyou Yang (2):
+>   power: act8945a: add charger driver for ACT8945A
+>   power: add documentation for ACT8945A's charger DT bindings
+> 
+>  .../devicetree/bindings/power/act8945a-charger.txt |   35 ++
+>  drivers/power/Kconfig                              |    7 +
+>  drivers/power/Makefile                             |    1 +
+>  drivers/power/act8945a_charger.c                   |  359 ++++++++++++++++++++
+>  4 files changed, 402 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/act8945a-
+> charger.txt
+>  create mode 100644 drivers/power/act8945a_charger.c
+> 
+> --
+> 1.7.9.5
+
+
+Best Regards,
+Wenyou Yang
