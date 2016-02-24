@@ -1,77 +1,90 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Feb 2016 16:16:46 +0100
-Subject: [PATCH 2/3] arm64: marvell: update Armada AP806 clock description
-In-Reply-To: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1456327007-31008-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Feb 2016 15:21:15 +0000
+Subject: [PATCH 5/8] arm64: kprobes instruction simulation support
+In-Reply-To: <56CDC734.4000201@linaro.org>
+References: <1455839301-26464-1-git-send-email-dave.long@linaro.org>
+ <1455839301-26464-6-git-send-email-dave.long@linaro.org>
+ <56C720F0.9080108@arm.com> <56CD5434.30108@linaro.org>
+ <20160224090530.5e86e867@arm.com> <56CDC734.4000201@linaro.org>
+Message-ID: <56CDCA6B.7000207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the review from the DT maintainers, the DT binding for the
-clocks has changed, and we now use a DFX server node exposing a
-syscon, with the clock nodes being subnodes of the DFX server
-node. This commit therefore updates the AP806 Device Tree file to use
-this new DT binding.
+On 24/02/16 15:07, David Long wrote:
+> On 02/24/2016 04:05 AM, Marc Zyngier wrote:
+>> On Wed, 24 Feb 2016 01:56:52 -0500
+>> David Long <dave.long@linaro.org> wrote:
+>>
+>>> On 02/19/2016 09:04 AM, Marc Zyngier wrote:
+>>>> Hi David,
+>>>>
+>>>> On 18/02/16 23:48, David Long wrote:
+>>>>> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>>>>>
+>>>>> Kprobes needs simulation of instructions that cannot be stepped
+>>>>> from different memory location, e.g.: those instructions
+>>>>> that uses PC-relative addressing. In simulation, the behaviour
+>>>>> of the instruction is implemented using a copy of pt_regs.
+>>>>>
+>>>>> Following instruction catagories are simulated:
+>>>>>    - All branching instructions(conditional, register, and immediate)
+>>>>>    - Literal access instructions(load-literal, adr/adrp)
+>>>>>
+>>>>> Conditional execution is limited to branching instructions in
+>>>>> ARM v8. If conditions at PSTATE do not match the condition fields
+>>>>> of opcode, the instruction is effectively NOP. Kprobes considers
+>>>>> this case as 'miss'.
+>>>>>
+>>>>> This code also replaces the use of arch/arm/opcodes.c for
+>>>>> arm_check_condition().
+>>>>>
+>>>>> Thanks to Will Cohen for assorted suggested changes.
+>>>>>
+>>>>> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>>>>> Signed-off-by: William Cohen <wcohen@redhat.com>
+>>>>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>>
+>> [...]
+>>
+>>>>> +};
+>>>>> +
+>>>>> +asmlinkage unsigned int __kprobes arm_check_condition(u32 opcode, u32 psr)
+>>>>
+>>>> Why asmlinkage? This function is never called from assembly code on arm64.
+>>>>
+>>>
+>>> This comes from the 32-bit ARM code that tests the condition from
+>>> entry.S.  We include arch/arm/include/asm/opcodes.h in
+>>> arch/arm64/include/asm/opcodes.h so it gets declared there with
+>>> asmlinkage. I can remove the asmlinkage in the actual function
+>>> definition and it still compiles but I'm not sure that is kosher.
+>>
+>> asmlinkage is only meaningful if you're calling it from assembly code.
+>> As you seem to only call it from C code, having asmlinkage is both
+>> pointless and confusing.
+>>
+>>> Will Deacon was advocating getting rid of the include of the 32-bit header
+>>> file but it looked to me like this would mean a lot of duplicated
+>>> defines and the work would be mostly unrelated to kprobes.
+>>
+>> Arguably, arm_check_condition() (which only matters to 32bit code,
+>> hence userspace) is also completely unrelated to kprobes. I still think
+>> Will's point stands.
+>>
+> 
+> Yes, I would not argue about that cross-architecture include needing to 
+> be fixed.  Can I assume you agree that need not be a part of this 
+> kprobes patch though, nor a prerequisite patch for it?
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 37 +++++++++++++++------------
- 1 file changed, 20 insertions(+), 17 deletions(-)
+My usual stand on this kind of issue is that if you start digging in the
+middle of the road, you're also responsible for cleaning the pavement
+(sorry if that's a bad analogy).
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 63f25ce..88e3348 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -179,23 +179,6 @@
- 
- 			};
- 
--			coreclk: clk at 0x6F8204 {
--				compatible = "marvell,armada-ap806-core-clock";
--				reg = <0x6F8204 0x04>;
--				#clock-cells = <1>;
--				clock-output-names = "ddr", "ring", "cpu";
--			};
--
--			ringclk: clk at 0x6F8250 {
--				compatible = "marvell,armada-ap806-ring-clock";
--				reg = <0x6F8250 0x04>;
--				#clock-cells = <1>;
--				clock-output-names = "ring-0", "ring-2",
--						     "ring-3", "ring-4",
--						     "ring-5";
--				clocks = <&coreclk 1>;
--			};
--
- 			xor0 at 400000 {
- 				compatible = "marvell,mv-xor-v2";
- 				reg = <0x400000 0x1000>,
-@@ -227,6 +210,26 @@
- 				msi-parent = <&gic_v2m0>;
- 				dma-coherent;
- 			};
-+
-+			dfx-server at 6f8000 {
-+				compatible = "simple-mfd", "syscon";
-+				reg = <0x6f8000 0x70000>;
-+
-+				coreclk: clk at 204 {
-+					compatible = "marvell,armada-ap806-core-clock";
-+					#clock-cells = <1>;
-+					clock-output-names = "ddr", "ring", "cpu";
-+				};
-+
-+				ringclk: clk at 250 {
-+					compatible = "marvell,armada-ap806-ring-clock";
-+					#clock-cells = <1>;
-+					clock-output-names = "ring-0", "ring-2",
-+							     "ring-3", "ring-4",
-+							     "ring-5";
-+					clocks = <&coreclk 1>;
-+				};
-+			};
- 		};
- 	};
- 
+In the end, this is the arm64 maintainers that decide what they want to
+see, and by the look of it, Will has made his point clear...
+
+Thanks,
+
+	M.
 -- 
-2.6.4
+Jazz is not dead. It just smells funny...
