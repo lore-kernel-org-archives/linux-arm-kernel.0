@@ -1,36 +1,33 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 24 Feb 2016 10:18:33 +0000
-Subject: [PATCH] ARM: realview: DT support for the PBA8
-In-Reply-To: <1456303714-31039-1-git-send-email-linus.walleij@linaro.org>
-References: <1456303714-31039-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAFEAcA8hH2Q0LXp_vDiyTCLYX4xFff_fkp7=saPmi-ET104SHw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 24 Feb 2016 11:19:49 +0100
+Subject: [RESEND PATCH V7 4/6] i2c: qup: Add bam dma capabilities
+In-Reply-To: <1456142895-32646-1-git-send-email-sricharan@codeaurora.org>
+References: <1456142895-32646-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160224101949.GB1391@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2016 at 08:48, Linus Walleij <linus.walleij@linaro.org> wrote:
-> This adds a devicetree for the ARM RealView PBA8 platform,
-> also known as HBI-0178, "RealView(R) Platform Baseboard for
-> Cortex(TM)-A8".
->
-> Tested in QEMU with -M realview-pb-a8 and works like a charm,
-> however with these annoying boot messages:
->
-> of_amba_device_create(): amba_device_add()
->     failed (-19) for /soc/sysctl at 10001000
-> of_amba_device_create(): amba_device_add()
->     failed (-19) for /soc/ssp at 1000d000
-> of_amba_device_create(): amba_device_add()
->     failed (-19) for /soc/timer at 10018000
-> of_amba_device_create(): amba_device_add()
->     failed (-19) for /soc/timer at 10019000
-> of_amba_device_create(): amba_device_add()
->     failed (-19) for /soc/sysctl at 1001a000
+On Mon, Feb 22, 2016 at 05:38:15PM +0530, Sricharan R wrote:
+> QUP cores can be attached to a BAM module, which acts as
+> a dma engine for the QUP core. When DMA with BAM is enabled,
+> the BAM consumer pipe transmitted data is written to the
+> output FIFO and the BAM producer pipe received data is read
+> from the input FIFO.
+> 
+> With BAM capabilities, qup-i2c core can transfer more than
+> 256 bytes, without a 'stop' which is not possible otherwise.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Reviewed-by: Andy Gross <andy.gross@linaro.org>
+> Tested-by: Archit Taneja <architt@codeaurora.org>
+> Tested-by: Telkar Nagender <ntelkar@codeaurora.org>
 
-The missing timers would be a two-line QEMU patch,
-as would the ssp, since we have SP804 and PL022 device
-models. We have no model of the SP810 but it would probably
-not be too hard to write a "mostly does nothing" version.
-Patches welcome :-)
+Applied to for-next, thanks!
 
-thanks
--- PMM
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/096b241c/attachment.sig>
