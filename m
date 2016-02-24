@@ -1,63 +1,34 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Wed, 24 Feb 2016 15:57:46 +0100
-Subject: [PATCH 1/2] ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
-Message-ID: <1456325867-5309-1-git-send-email-m.grzeschik@pengutronix.de>
+Date: Wed, 24 Feb 2016 15:57:47 +0100
+Subject: [PATCH 2/2] ARM: imx_v4_v5_defconfig: Enable initramfs support
+In-Reply-To: <1456325867-5309-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1456325867-5309-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1456325867-5309-2-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jan Luebbe <jlu@pengutronix.de>
 
-Regenerate imx_v4_v5_defconfig by running:
-make imx_v4_v5_defconfig
-make savedefconfig
-mv defconfig arch/arm/configs/imx_v4_v5_defconfig
+This makes it possible to automatically boot-test this defconfig with
+kernelci.org.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
- arch/arm/configs/imx_v4_v5_defconfig | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/configs/imx_v4_v5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index d3a8018..f23b3ba 100644
+index f23b3ba..cb7b0f5 100644
 --- a/arch/arm/configs/imx_v4_v5_defconfig
 +++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -24,14 +24,12 @@ CONFIG_ARCH_MXC=y
- CONFIG_MACH_SCB9328=y
- CONFIG_MACH_APF9328=y
- CONFIG_MACH_MX21ADS=y
--CONFIG_MACH_EUKREA_CPUIMX25SD=y
--CONFIG_SOC_IMX25=y
- CONFIG_MACH_MX27ADS=y
- CONFIG_MACH_MX27_3DS=y
- CONFIG_MACH_IMX27_VISSTRIM_M10=y
- CONFIG_MACH_PCA100=y
--CONFIG_MACH_MXT_TD60=y
- CONFIG_MACH_IMX27_DT=y
-+CONFIG_SOC_IMX25=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -169,12 +167,11 @@ CONFIG_RTC_DRV_IMXDI=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
--CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
-+CONFIG_IMX_SDMA=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--CONFIG_EXT4_FS=y
- # CONFIG_DNOTIFY is not set
- CONFIG_VFAT_FS=y
- # CONFIG_PROC_PAGE_MONITOR is not set
-@@ -187,6 +184,5 @@ CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_CODEPAGE_850=m
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
- CONFIG_FONTS=y
- CONFIG_FONT_8x8=y
+@@ -6,6 +6,7 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_CGROUPS=y
++CONFIG_BLK_DEV_INITRD=y
+ CONFIG_EXPERT=y
+ # CONFIG_COMPAT_BRK is not set
+ CONFIG_SLAB=y
 -- 
 2.7.0
