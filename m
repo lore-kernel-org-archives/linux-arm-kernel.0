@@ -1,72 +1,89 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 08:48:08 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
-In-Reply-To: <CAMuHMdWxXFf0MFKP27y6g7CUc1MeG0PuJ-FdoSkV+2gB5NvQTA@mail.gmail.com>
-References: <cover.1455859965.git.horms+renesas@verge.net.au>
- <20160224080803.GD30231@localhost>
- <CAMuHMdWxXFf0MFKP27y6g7CUc1MeG0PuJ-FdoSkV+2gB5NvQTA@mail.gmail.com>
-Message-ID: <CAOesGMhab6SX5o-1CXKt-FNOrg+Nk9w1ccR=Co1DVXrJUKN4cw@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 24 Feb 2016 11:50:37 -0500
+Subject: [PATCH] ASoC: trace: fix printing jack name
+In-Reply-To: <1456331903-3999234-1-git-send-email-arnd@arndb.de>
+References: <1456331903-3999234-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160224115037.40772a90@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 12:37 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Olof,
->
-> On Wed, Feb 24, 2016 at 9:08 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Fri, Feb 19, 2016 at 03:09:46PM +0900, Simon Horman wrote:
->>> Please consider these Renesas ARM based SoC fixes for v4.5.
->>>
->>> This pull request is comprised of patches from Geert Uytterhoeven to avoid
->>> writing to .text.
->>>
->>> * "ARM: shmobile: Move shmobile_scu_base from .text to .bss"
->>>
->>>   Resolves a problem for XIP kernels as writing to .text is not allowed.
->>>   For non-XIP kernels a problem does not manifst as the pages are mapped
->>>   read-only during late kernel startup.
->>>
->>> * The remaining patches resolve a kernel-crash that occurs during system
->>>   suspend for CONFIG_DEBUG_RODATA=y kernels.
->>>
->>>
->>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->>>
->>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v4.5
->>>
->>> for you to fetch changes up to 901c5ffaaed117a38be9d0c29247c4888d6c8636:
->>>
->>>   ARM: shmobile: Remove shmobile_boot_arg (2016-02-17 18:27:21 +0900)
->>
->> Hi Simon, Geert,
->>
->> I don't think any of these fixes are for regressions, are they? I.e. this is
->> work to enable configs that never used to work (XIP, CONFIG_DEBUG_RODATA)?
->
-> These configs indeed never worked before.
->
-> However,
->
-> commit 25362dc496edaf17f714c0fecd8b3eb79670207b
-> Author: Kees Cook <keescook@chromium.org>
-> Date:   Tue Jan 26 01:19:36 2016 +0100
->
->     ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA
->
-> in arm/for-next will enable CONFIG_DEBUG_RODATA by default.
->
-> Not having the fixes in v4.5 means that if Russell's tree is merged
-> into mainline
-> for v4.6 before arm-soc, it will cause regressions and bisection issues.
+On Wed, 24 Feb 2016 17:38:14 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Ok, either way there'll be windows in which bisect will fail since the
-changes are on independent branches.
+> After a change to the snd_jack structure, the 'name' member
+> is no longer available in all configurations, which results in a
+> build failure in the tracing code:
+> 
+> include/trace/events/asoc.h: In function 'trace_event_raw_event_snd_soc_jack_report':
+> include/trace/events/asoc.h:240:32: error: 'struct snd_jack' has no member named 'name'
+> 
+> The name field is normally initialized from the card shortname and
+> the jack "id" field:
+> 
+>         snprintf(jack->name, sizeof(jack->name), "%s %s",
+>                  card->shortname, jack->id);
+> 
+> This changes the tracing output to just contain the 'id' by
+> itself, which slightly changes the output format but avoids the
+> link error and is hopefully still enough to see what is going on.
 
-Based on that, and looking at the patches, I'll pick it up now for fixes.
+If people would like name if available, we could do:
+
+#ifdef CONFIG_SND_JACK_INPUT_DEV
+# define JACK_NAME(jk)		(jk)->jack->name
+#else
+# define JACK_NAME(jk)		(jk)->jack->id
+#endif
+
+And then below have:
+
+	__string(	name,	JACK_NAME(jack)	)
 
 
--Olof
+The #ifdef can stay in the events/asoc.h file.
+
+-- Steve
+
+
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: fe0d128c57bf ("ALSA: jack: Allow building the jack layer without input device")
+> ---
+>  include/trace/events/asoc.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/include/trace/events/asoc.h b/include/trace/events/asoc.h
+> index 317a1ed2f4ac..9130dd5a184a 100644
+> --- a/include/trace/events/asoc.h
+> +++ b/include/trace/events/asoc.h
+> @@ -231,13 +231,13 @@ TRACE_EVENT(snd_soc_jack_report,
+>  	TP_ARGS(jack, mask, val),
+>  
+>  	TP_STRUCT__entry(
+> -		__string(	name,		jack->jack->name	)
+> +		__string(	name,		jack->jack->id		)
+>  		__field(	int,		mask			)
+>  		__field(	int,		val			)
+>  	),
+>  
+>  	TP_fast_assign(
+> -		__assign_str(name, jack->jack->name);
+> +		__assign_str(name, jack->jack->id);
+>  		__entry->mask = mask;
+>  		__entry->val = val;
+>  	),
+> @@ -253,12 +253,12 @@ TRACE_EVENT(snd_soc_jack_notify,
+>  	TP_ARGS(jack, val),
+>  
+>  	TP_STRUCT__entry(
+> -		__string(	name,		jack->jack->name	)
+> +		__string(	name,		jack->jack->id		)
+>  		__field(	int,		val			)
+>  	),
+>  
+>  	TP_fast_assign(
+> -		__assign_str(name, jack->jack->name);
+> +		__assign_str(name, jack->jack->id);
+>  		__entry->val = val;
+>  	),
+>  
