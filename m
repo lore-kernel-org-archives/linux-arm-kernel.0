@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 13:47:22 -0800
-Subject: [GIT PULL] STM32 DT updates for v4.6 #1
-In-Reply-To: <56BC8AD7.30607@gmail.com>
-References: <56BC8AD7.30607@gmail.com>
-Message-ID: <20160224214722.GI10126@localhost>
+Date: Wed, 24 Feb 2016 13:48:02 -0800
+Subject: [GIT PULL] STM32 SoC updates for v4.6 #1
+In-Reply-To: <56BC8AFD.7000800@gmail.com>
+References: <56BC8AFD.7000800@gmail.com>
+Message-ID: <20160224214802.GJ10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 02:21:27PM +0100, Maxime Coquelin wrote:
-> Hi Olof, Anrd and Kevin,
+On Thu, Feb 11, 2016 at 02:22:05PM +0100, Maxime Coquelin wrote:
+> Hi Olof, Arnd and Kevin,
 > 
-> Please consider this first round of STM32 DT updates for v4.6:
+> Please consider this first round of STM32 SoC updates for v4.6:
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
@@ -19,12 +19,11 @@ On Thu, Feb 11, 2016 at 02:21:27PM +0100, Maxime Coquelin wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
-> tags/stm32-dt-for-v4.6-1
+> tags/stm32-soc-for-v4.6-1
 > 
-> for you to fetch changes up to b2aa7f7741f511c6a1ea266d62d203662f121ea7:
+> for you to fetch changes up to f64e980450027e15dce5e9ec4ee19bab98aee4c5:
 > 
->   ARM: dts: stm32f429: Boost perfs by remapping SDRAM Bank 1 to 0x0
-> (2016-02-11 12:02:59 +0100)
+>   ARM: mach-stm32: Select pinctrl (2016-01-27 19:45:57 +0100)
 
 Thanks, merged.
 
