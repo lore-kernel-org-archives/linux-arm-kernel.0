@@ -1,89 +1,140 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 24 Feb 2016 13:14:34 +0000
-Subject: [PATCH] dmaengine: pl330: Fix some race conditions in residue
- calculation
-Message-ID: <1456319674.2867.15.camel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Feb 2016 13:19:57 +0000
+Subject: [PATCH v13 15/20] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <20160224122718.GD18451@cbox>
+References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
+ <1456290520-10012-16-git-send-email-zhaoshenglong@huawei.com>
+ <20160224122718.GD18451@cbox>
+Message-ID: <56CDADFD.10805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The residue calculation in pl330_tx_status doesn't handle transitional
-states that occur at the time one descriptor (A) is completed and the
-next (B) is started. Specifically, both A and B can simultaneously be in
-the BUSY state and at this time the thread's 'req_running' may (or may
-not) be -1.
+On 24/02/16 12:27, Christoffer Dall wrote:
+> On Wed, Feb 24, 2016 at 01:08:35PM +0800, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> When calling perf_event_create_kernel_counter to create perf_event,
+>> assign a overflow handler. Then when the perf event overflows, set the
+>> corresponding bit of guest PMOVSSET register. If this counter is enabled
+>> and its interrupt is enabled as well, kick the vcpu to sync the
+>> interrupt.
+>>
+>> On VM entry, if there is counter overflowed, inject the interrupt with
+>> the level set to 1. Otherwise, inject the interrupt with the level set
+>> to 0.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Reviewed-by: Andrew Jones <drjones@redhat.com>
+>> ---
+>>  arch/arm/kvm/arm.c    |  2 ++
+>>  include/kvm/arm_pmu.h |  3 +++
+>>  virt/kvm/arm/pmu.c    | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>>  3 files changed, 55 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index dda1959..f54264c 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -28,6 +28,7 @@
+>>  #include <linux/sched.h>
+>>  #include <linux/kvm.h>
+>>  #include <trace/events/kvm.h>
+>> +#include <kvm/arm_pmu.h>
+>>  
+>>  #define CREATE_TRACE_POINTS
+>>  #include "trace.h"
+>> @@ -577,6 +578,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  		 * non-preemptible context.
+>>  		 */
+>>  		preempt_disable();
+>> +		kvm_pmu_flush_hwstate(vcpu);
+>>  		kvm_timer_flush_hwstate(vcpu);
+>>  		kvm_vgic_flush_hwstate(vcpu);
+>>  
+>> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+>> index 8bc92d1..0aed4d4 100644
+>> --- a/include/kvm/arm_pmu.h
+>> +++ b/include/kvm/arm_pmu.h
+>> @@ -35,6 +35,7 @@ struct kvm_pmu {
+>>  	int irq_num;
+>>  	struct kvm_pmc pmc[ARMV8_PMU_MAX_COUNTERS];
+>>  	bool ready;
+>> +	bool irq_level;
+>>  };
+>>  
+>>  #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
+>> @@ -44,6 +45,7 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
+>>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+>>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+>>  void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+>> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+>>  void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
+>>  void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
+>>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>> @@ -67,6 +69,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>>  static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>>  static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>>  static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
+>> +static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+>>  static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
+>>  static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
+>>  static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
+>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+>> index cda869c..1cd4214 100644
+>> --- a/virt/kvm/arm/pmu.c
+>> +++ b/virt/kvm/arm/pmu.c
+>> @@ -21,6 +21,7 @@
+>>  #include <linux/perf_event.h>
+>>  #include <asm/kvm_emulate.h>
+>>  #include <kvm/arm_pmu.h>
+>> +#include <kvm/arm_vgic.h>
+>>  
+>>  /**
+>>   * kvm_pmu_get_counter_value - get PMU counter value
+>> @@ -181,6 +182,53 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
+>>  }
+>>  
+>>  /**
+>> + * kvm_pmu_flush_hwstate - flush pmu state to cpu
+>> + * @vcpu: The vcpu pointer
+>> + *
+>> + * Inject virtual PMU IRQ if IRQ is pending for this cpu.
+>> + */
+>> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+>> +	bool overflow;
+>> +
+>> +	if (!kvm_arm_pmu_v3_ready(vcpu))
+>> +		return;
+>> +
+>> +	overflow = !!kvm_pmu_overflow_status(vcpu);
+>> +	if (pmu->irq_level != overflow) {
+>> +		pmu->irq_level = overflow;
+>> +		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+>> +				    pmu->irq_num, overflow);
+>> +	}
+> 
+> a consequence of only doing this on flush and not checking if the input
+> to the vgic should be adjusted on sync is that if you exit the guest
+> because the guest does a 'wfi', for example, and you entered with the
+> overflow interrupt set, then kvm_arch_vcpu_runnable() will return true,
+> and the VCPU will not block but will run anyway.
+> 
+> Maybe not a big deal, but I think we might as well check the overflow
+> status on sync (coming back from the VM) and reset the line at that time
+> so that we have a 'more up to date' view of the interrupt line after
+> exiting a vcpu.
 
-To cope with this situation we change the code to ensure A is treated as
-complete and B as having not yet started. Prior to the change, the code
-would calculate a transferred byte count as if both A and B had
-completed.
+That's a very good point. I can definitely imagine pathological
+behaviours if the guest otherwise relies on the overflow interrupt
+triggering.
 
-Fixes: aee4d1fac887 ("dmaengine: pl330: improve pl330_tx_status() function")
+Shannon, can you please address this?
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+Thanks,
 
-I discovered this issue when trying to work out why audio stopped
-working on ARM's Juno platform and bisected it to commit aee4d1fac887.
-Whilst this patch seems to fix the problems I was seeing, I can't help
-but think there are more race conditions with this code. E.g. if the
-running descriptor changes under us, pl330_get_current_xferred_count
-can end up reading values from hardware that relate to a different
-descriptor. And if we're really unlucky, the reading of the 'val' and
-'addr' values in pl330_get_current_xferred_count can come from different
-descriptors. I don't know if there is any locks we can use to prevent
-such races or if we need to try and detect when things have changed and
-redo/abort the residue calculation...
-
- drivers/dma/pl330.c | 24 ++++++++++++++++++++----
- 1 file changed, 20 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 17ee758..55e3c5f 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2240,6 +2240,7 @@ pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 	struct dma_pl330_desc *desc, *running = NULL;
- 	struct dma_pl330_chan *pch = to_pchan(chan);
- 	unsigned int transferred, residual = 0;
-+	bool first_busy;
- 
- 	ret = dma_cookie_status(chan, cookie, txstate);
- 
-@@ -2253,16 +2254,31 @@ pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 
- 	if (pch->thread->req_running != -1)
- 		running = pch->thread->req[pch->thread->req_running].desc;
-+	first_busy = true;
- 
- 	/* Check in pending list */
- 	list_for_each_entry(desc, &pch->work_list, node) {
- 		if (desc->status == DONE)
- 			transferred = desc->bytes_requested;
--		else if (running && desc == running)
--			transferred =
--				pl330_get_current_xferred_count(pch, desc);
--		else
-+		else if (desc->status == BUSY && first_busy) {
-+			first_busy = false;
-+			if (running && desc == running) {
-+				transferred =
-+					pl330_get_current_xferred_count(pch, desc);
-+			} else {
-+				/* BUSY but not running means it's just completed */
-+				transferred = desc->bytes_requested;
-+			}
-+		} else {
-+			/*
-+			 * Descriptor is either in PREP state queued for future
-+			 * transfer or it is the second BUSY descriptor we have
-+			 * seen. The latter case means it has just, or is about
-+			 * to be, started, so treat it as having not yet
-+			 * transferred any bytes, the same as PREP.
-+			 */
- 			transferred = 0;
-+		}
- 		residual += desc->bytes_requested - transferred;
- 		if (desc->txd.cookie == cookie) {
- 			switch (desc->status) {
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
