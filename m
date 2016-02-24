@@ -1,23 +1,92 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 24 Feb 2016 14:48:59 +1100
-Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
-In-Reply-To: <20160224032842.GK18327@sirena.org.uk>
-References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
- <56CAE5E6.7030707@arm.com> <20160224032842.GK18327@sirena.org.uk>
-Message-ID: <20160224144859.027a3564@canb.auug.org.au>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Wed, 24 Feb 2016 09:31:59 +0530
+Subject: [PATCH 3/3] ARM: EXYNOS: cleanup header files inclusion
+In-Reply-To: <56CD0143.2010909@samsung.com>
+References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
+ <1456135396-17767-4-git-send-email-pankaj.dubey@samsung.com>
+ <56CBA32D.4020905@samsung.com> <56CC23AD.10103@samsung.com>
+ <56CD0143.2010909@samsung.com>
+Message-ID: <56CD2B37.1080008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On Wed, 24 Feb 2016 12:28:42 +0900 Mark Brown <broonie@kernel.org> wrote:
->
-> That didn't work out unfortunately, the error is still there today.
 
-Yeah, the patch didn't hit -next yesterday and I missed the opportunity
-to fix in manually.  However, it should be fixed in today's linux-next
-(out in a few hours, hopefully).
+On Wednesday 24 February 2016 06:32 AM, Krzysztof Kozlowski wrote:
+> On 23.02.2016 18:17, pankaj.dubey wrote:
+>> Hi Krzysztof,
+>>
+>> On Tuesday 23 February 2016 05:39 AM, Krzysztof Kozlowski wrote:
+>>> On 22.02.2016 19:03, Pankaj Dubey wrote:
+>>>> This includes trivial cleanup in exynos files such as
+>>>>     - remove unused header files inclusion from exynos.c, s5p-dev-mfc.c,
+>>>>       firmware.c, pm.c.
+>>>>     - move inclusion of of.h from common.h to pm.c where it is really
+>>>>       required
+>>>>
+>>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>>> ---
+>>>>  arch/arm/mach-exynos/common.h      | 1 -
+>>>>  arch/arm/mach-exynos/exynos.c      | 5 -----
+>>>>  arch/arm/mach-exynos/firmware.c    | 2 --
+>>>>  arch/arm/mach-exynos/platsmp.c     | 1 -
+>>>>  arch/arm/mach-exynos/pm.c          | 4 +---
+>>>>  arch/arm/mach-exynos/s5p-dev-mfc.c | 1 -
+>>>>  6 files changed, 1 insertion(+), 13 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+>>>> index e349a03..5365bf1 100644
+>>>> --- a/arch/arm/mach-exynos/common.h
+>>>> +++ b/arch/arm/mach-exynos/common.h
+>>>> @@ -12,7 +12,6 @@
+>>>>  #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
+>>>>  #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
+>>>>  
+>>>> -#include <linux/of.h>
+>>>>  #include <linux/platform_data/cpuidle-exynos.h>
+>>>>  
+>>>>  #define EXYNOS3250_SOC_ID	0xE3472000
+>>>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>>>> index 99947ad..54262a1 100644
+>>>> --- a/arch/arm/mach-exynos/exynos.c
+>>>> +++ b/arch/arm/mach-exynos/exynos.c
+>>>> @@ -11,14 +11,10 @@
+>>>>  
+>>>>  #include <linux/init.h>
+>>>>  #include <linux/io.h>
+>>>> -#include <linux/kernel.h>
+>>>> -#include <linux/serial_s3c.h>
+>>>>  #include <linux/of.h>
+>>>>  #include <linux/of_address.h>
+>>>>  #include <linux/of_fdt.h>
+>>>>  #include <linux/of_platform.h>
+>>>> -#include <linux/platform_device.h>
+>>>
+>>> platform_device is actually used in that file. It looks unused because
+>>> it is pulled by of_platform, but it makes sense to include it here.
+>>>
+>> Thanks for review.
+>>
+>> Well I tried to grep for of_platform.h and platform_device.h in
+>> arch/arm/ and out of 88 files including of_platform.h only 16 files are
+>> including platform_device.h also. So majority do not include both of
+>> them even do they need. So majority of files both are not included. So
+>> If we got with majority it's not required. What's your opinion?
+> 
+> Actually most of files including of_platform.h and not including
+> platform_device.h just do not require the second one (I checked like 20
+> of them and only one was referring to platform device function... of
+> course maybe my random selection of 20 files was not random enough :) ).
+> They do not directly reference platform device stuff.
+> 
+> In that file the platform_device is used so the header may stay.
 
--- 
-Cheers,
-Stephen Rothwell
+OK. will resend this again with keeping back platform_device.h in
+exynos.c file.
+
+Thanks,
+Pankaj Dubey
+> 
+> Best regards,
+> Krzysztof
+> 
