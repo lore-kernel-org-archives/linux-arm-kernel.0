@@ -1,46 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 00:08:03 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
-In-Reply-To: <cover.1455859965.git.horms+renesas@verge.net.au>
-References: <cover.1455859965.git.horms+renesas@verge.net.au>
-Message-ID: <20160224080803.GD30231@localhost>
+Date: Wed, 24 Feb 2016 00:06:13 -0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.5
+In-Reply-To: <20160214085852.GT6756@tiger>
+References: <20160214085852.GT6756@tiger>
+Message-ID: <20160224080613.GC30231@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 03:09:46PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC fixes for v4.5.
-> 
-> This pull request is comprised of patches from Geert Uytterhoeven to avoid
-> writing to .text.
-> 
-> * "ARM: shmobile: Move shmobile_scu_base from .text to .bss"
-> 
->   Resolves a problem for XIP kernels as writing to .text is not allowed.
->   For non-XIP kernels a problem does not manifst as the pages are mapped
->   read-only during late kernel startup.
-> 
-> * The remaining patches resolve a kernel-crash that occurs during system
->   suspend for CONFIG_DEBUG_RODATA=y kernels.
-> 
-> 
+On Sun, Feb 14, 2016 at 04:58:52PM +0800, Shawn Guo wrote:
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
 >   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v4.5
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.5
 > 
-> for you to fetch changes up to 901c5ffaaed117a38be9d0c29247c4888d6c8636:
+> for you to fetch changes up to f5d0ca224a071d7077bbdae347cb514949d64fd9:
 > 
->   ARM: shmobile: Remove shmobile_boot_arg (2016-02-17 18:27:21 +0900)
+>   ARM: dts: imx6: remove bogus interrupt-parent from CAAM node (2016-01-28 16:48:15 +0800)
+> 
+> ----------------------------------------------------------------
+> The i.MX fixes for v4.5:
+>  - Drop the bogus interrupt-parent from i.MX6 CAAM node, which leads to
+>    the CAAM IRQs not getting unmasked at the GPC level.
+> 
+> ----------------------------------------------------------------
+> Lucas Stach (1):
+>       ARM: dts: imx6: remove bogus interrupt-parent from CAAM node
 
-Hi Simon, Geert,
-
-I don't think any of these fixes are for regressions, are they? I.e. this is
-work to enable configs that never used to work (XIP, CONFIG_DEBUG_RODATA)?
+Merged, thanks.
 
 
 -Olof
