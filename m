@@ -1,11 +1,11 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 24 Feb 2016 10:27:13 -0800
-Subject: [PATCH 05/50] pinctrl: cygnus-mux: Use devm_pinctrl_register()
- for pinctrl registration
-In-Reply-To: <1456319775-3216-6-git-send-email-ldewangan@nvidia.com>
+Date: Wed, 24 Feb 2016 10:27:59 -0800
+Subject: [PATCH 04/50] pinctrl: bcm2835: Use devm_pinctrl_register() for
+ pinctrl registration
+In-Reply-To: <1456319775-3216-5-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-6-git-send-email-ldewangan@nvidia.com>
-Message-ID: <f0a27367-6b6d-602d-fd8f-c6b08fe6a1a9@broadcom.com>
+ <1456319775-3216-5-git-send-email-ldewangan@nvidia.com>
+Message-ID: <d3e4a7ae-6c51-1a2f-8344-8f8b2ff3f5ec@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,29 +16,34 @@ On 2/24/2016 5:15 AM, Laxman Dewangan wrote:
 >
 > Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 > Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: Jon Mason <jonmason@broadcom.com>
 > ---
->  drivers/pinctrl/bcm/pinctrl-cygnus-mux.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/pinctrl/bcm/pinctrl-bcm2835.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> diff --git a/drivers/pinctrl/bcm/pinctrl-cygnus-mux.c b/drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
-> index 9728f3d..9382a0a 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-cygnus-mux.c
-> @@ -987,7 +987,7 @@ static int cygnus_pinmux_probe(struct platform_device *pdev)
->  	cygnus_pinctrl_desc.pins = pins;
->  	cygnus_pinctrl_desc.npins = num_pins;
+> diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+> index 0f5997c..25bc4a2 100644
+> --- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+> +++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+> @@ -1027,7 +1027,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
+>  		return err;
+>  	}
 >
-> -	pinctrl->pctl = pinctrl_register(&cygnus_pinctrl_desc, &pdev->dev,
-> +	pinctrl->pctl = devm_pinctrl_register(&pdev->dev, &cygnus_pinctrl_desc,
->  			pinctrl);
->  	if (IS_ERR(pinctrl->pctl)) {
->  		dev_err(&pdev->dev, "unable to register Cygnus IOMUX pinctrl\n");
+> -	pc->pctl_dev = pinctrl_register(&bcm2835_pinctrl_desc, dev, pc);
+> +	pc->pctl_dev = devm_pinctrl_register(dev, &bcm2835_pinctrl_desc, pc);
+>  	if (IS_ERR(pc->pctl_dev)) {
+>  		gpiochip_remove(&pc->gpio_chip);
+>  		return PTR_ERR(pc->pctl_dev);
+> @@ -1045,7 +1045,6 @@ static int bcm2835_pinctrl_remove(struct platform_device *pdev)
+>  {
+>  	struct bcm2835_pinctrl *pc = platform_get_drvdata(pdev);
+>
+> -	pinctrl_unregister(pc->pctl_dev);
+>  	gpiochip_remove(&pc->gpio_chip);
+>
+>  	return 0;
 >
 
-
-Acked-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 
 Thanks!
 
