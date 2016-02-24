@@ -1,18 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 14:22:54 -0800
-Subject: [GIT PULL 3/7] drivers: soc: EXYNOS drivers for v4.6
-In-Reply-To: <1455496446-23779-4-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 24 Feb 2016 14:23:19 -0800
+Subject: [GIT PULL 2/7] ARM: dts: Exynos DT dependency for v4.6
+In-Reply-To: <1455496446-23779-3-git-send-email-k.kozlowski@samsung.com>
 References: <1455496446-23779-1-git-send-email-k.kozlowski@samsung.com>
- <1455496446-23779-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160224222254.GT10126@localhost>
+ <1455496446-23779-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160224222319.GU10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 09:34:02AM +0900, Krzysztof Kozlowski wrote:
+On Mon, Feb 15, 2016 at 09:34:01AM +0900, Krzysztof Kozlowski wrote:
 > Hi Arnd, Kevin and Olof,
 > 
-> This finally moves SROM controller and PMU code to separate
-> driver under drivers/soc/samsung.
+> Early DT changes for v4.6, needed before removal of SROM support
+> from mach-exynos.
 > 
 > Kind regards,
 > Krzysztof
@@ -24,32 +24,34 @@ On Mon, Feb 15, 2016 at 09:34:02AM +0900, Krzysztof Kozlowski wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-soc-srom-pmu-4.6
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-srom-4.6
 > 
-> for you to fetch changes up to 74a6659e8bf193066ba6bf365de66baa897aebb1:
+> for you to fetch changes up to d2deef6c61e65d1e0cee40c1d74fa99007da8c84:
 > 
->   drivers: soc: Add support for Exynos PMU driver (2016-01-25 10:46:59 +0900)
+>   ARM: dts: Add SROM to exynos5410 (2016-01-25 10:32:07 +0900)
 > 
 > ----------------------------------------------------------------
-> A set of changes adding new drivers under drivers/soc/samsung:
+> Device Tree changes for v4.6 adding the nodes for Exynos SROM controller
+> driver. The driver saves and restores SROM registers during suspend to RAM.
+> DT changes should go in before removal of SROM support from mach-exynos.
 > 
-> 1. Split code for handling SROM registers out of arm/mach-exynos
->    in to separate SROM controller driver under drivers/soc/samsung.
->    The driver will save and restore SROM registers during Suspend
->    to RAM.
+> ----------------------------------------------------------------
+> Pankaj Dubey (2):
+>       ARM: dts: Add SROM device node for exynos4
+>       ARM: dts: Add SROM device node for exynos5
 > 
-> 2. Add to this SROM controller driver support for bank configuration
->    used by child devices. This allows usage of SMSC9115 Ethernet chip
->    on SMDK5410 (Exynos5410) directly connected to SROM controller.
+> Pavel Fedin (1):
+>       ARM: dts: Add SROM to exynos5410
 
 Hi,
 
-OMAP has GPMC drivers under drivers/memory. I wonder if SROM should go there
-too, since it's a quite similar bus.
+Please use the format:
 
-Feel free to respin this without SROM now, so we can get the other pieces in
-sooner and then revisit the SROM asyncronously. That'll remove the dependencies
-on DT as well.
+ARM: dts: exynos: ...
+
+in the future.
+
+Merged for now.
 
 
 -Olof
