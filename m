@@ -1,30 +1,35 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Wed, 24 Feb 2016 17:20:46 +0100
-Subject: [PATCH v2] clocksource: atmel-pit: register as a sched_clock
-In-Reply-To: <1456329882-20709-1-git-send-email-romain.izard.pro@gmail.com>
-References: <1456329882-20709-1-git-send-email-romain.izard.pro@gmail.com>
-Message-ID: <20160224162046.GA28743@finsecur.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 24 Feb 2016 17:21:30 +0100
+Subject: [RFC PATCH 3/6] arm64: mm: free __init memory via the linear mapping
+In-Reply-To: <1456330893-19228-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456330893-19228-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456330893-19228-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The implementation of free_initmem_default() expects __init_begin
+and __init_end to be covered by the linear mapping, which is no
+longer the case. So open code it instead, using addresses that are
+explicitly translated from kernel virtual to linear virtual.
 
-On Wed, Feb 24, 2016 at 05:04:42PM +0100, Romain Izard wrote:
-> Register the counter of the Periodic Interval Timer as a possible source
-> for sched_clock. Keep the timer running even if the related clockevent
-> is disabled.
-> 
-> This provides a better precision than the jiffies-based default. The
-> TCB clocksource does not work, as it is registered too late in the
-> initialization sequence.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/init.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-I have mixed feelings about that, but this is probably just a 
-misunderstanding from my part.
-
-The PIT timer should not be used for systems with PM_SUSPEND enabled and 
-used because it takes ages to synchronize on resume, how does this patch 
-affect that ?
-
-Ref: commit ac34ad27fc ("clockevents: Do not suspend/resume if unused")
-
-Sylvain
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 88046b94fa87..e286716848af 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -398,7 +398,8 @@ void __init mem_init(void)
+ 
+ void free_initmem(void)
+ {
+-	free_initmem_default(0);
++	free_reserved_area(__va(__pa(__init_begin)), __va(__pa(__init_end)),
++			   0, "unused kernel");
+ 	fixup_init();
+ }
+ 
+-- 
+2.5.0
