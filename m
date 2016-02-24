@@ -1,77 +1,44 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 24 Feb 2016 12:28:25 -0800
-Subject: [PATCH 13/50] pinctrl: mtk-common: Use devm_pinctrl_register()
- for pinctrl registration
-In-Reply-To: <1456319775-3216-14-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-14-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456345705.14518.1.camel@mussux00>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 24 Feb 2016 13:38:32 -0700
+Subject: [PATCH net-next V2 7/8] net: fec: don't transfer ownership until
+ descriptor write is complete
+In-Reply-To: <20160205170347.45a91314@jclayton-pc>
+References: <1454709170-19527-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1454709170-19527-8-git-send-email-troy.kisky@boundarydevices.com>
+ <20160205170347.45a91314@jclayton-pc>
+Message-ID: <56CE14C8.70708@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-02-24 at 18:45 +0530, Laxman Dewangan wrote:
-> Use devm_pinctrl_register() for pin control registration and clean
-> the error path.
+On 2/5/2016 6:03 PM, Joshua Clayton wrote:
+> On Fri,  5 Feb 2016 14:52:49 -0700
+> Troy Kisky <troy.kisky@boundarydevices.com> wrote:
 > 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> Cc: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
-
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-
-Thanks,
-Hongzhou
-
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 17 ++++++-----------
->  1 file changed, 6 insertions(+), 11 deletions(-)
+>> If you don't own it, you shouldn't write to it.
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> ---
+>>  drivers/net/ethernet/freescale/fec_main.c | 14 +++++++++++++-
+>>  1 file changed, 13 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>> b/drivers/net/ethernet/freescale/fec_main.c index ca2708d..97ca72a
+>> 100644 --- a/drivers/net/ethernet/freescale/fec_main.c
+>> +++ b/drivers/net/ethernet/freescale/fec_main.c
+>> @@ -390,6 +390,10 @@ fec_enet_txq_submit_frag_skb(struct
+>> fec_enet_priv_tx_q *txq, 
+>>  		bdp->cbd_bufaddr = cpu_to_fec32(addr);
+>>  		bdp->cbd_datlen = cpu_to_fec16(frag_len);
+>> +		/* Make sure the updates to rest of the descriptor
+>> are
+>> +		 * performed before transferring ownership.
+>> +		 */
+>> +		wmb();
+>>  		bdp->cbd_sc = cpu_to_fec16(status);
+> You use almost exactly the same code in each place.
+> I'd prefer to have wmb(); bdp->cbd_sc = cpu_to_fec16(status) wrapped in
+> a function or function like macro, and put the comment in one place.
 > 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index ddc9217..194413d 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -1390,17 +1390,16 @@ int mtk_pctrl_init(struct platform_device *pdev,
->  	pctl->pctl_desc.pmxops = &mtk_pmx_ops;
->  	pctl->dev = &pdev->dev;
->  
-> -	pctl->pctl_dev = pinctrl_register(&pctl->pctl_desc, &pdev->dev, pctl);
-> +	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, &pctl->pctl_desc,
-> +					       pctl);
->  	if (IS_ERR(pctl->pctl_dev)) {
->  		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
->  		return PTR_ERR(pctl->pctl_dev);
->  	}
->  
->  	pctl->chip = devm_kzalloc(&pdev->dev, sizeof(*pctl->chip), GFP_KERNEL);
-> -	if (!pctl->chip) {
-> -		ret = -ENOMEM;
-> -		goto pctrl_error;
-> -	}
-> +	if (!pctl->chip)
-> +		return -ENOMEM;
->  
->  	*pctl->chip = mtk_gpio_chip;
->  	pctl->chip->ngpio = pctl->devdata->npins;
-> @@ -1409,10 +1408,8 @@ int mtk_pctrl_init(struct platform_device *pdev,
->  	pctl->chip->base = -1;
->  
->  	ret = gpiochip_add_data(pctl->chip, pctl);
-> -	if (ret) {
-> -		ret = -EINVAL;
-> -		goto pctrl_error;
-> -	}
-> +	if (ret)
-> +		return -EINVAL;
->  
->  	/* Register the GPIO to pin mappings. */
->  	ret = gpiochip_add_pin_range(pctl->chip, dev_name(&pdev->dev),
-> @@ -1490,8 +1487,6 @@ int mtk_pctrl_init(struct platform_device *pdev,
->  
->  chip_error:
->  	gpiochip_remove(pctl->chip);
-> -pctrl_error:
-> -	pinctrl_unregister(pctl->pctl_dev);
->  	return ret;
->  }
->  
+
+Thanks for the review. I added a patch to the end of the series to create a common
+"trigger_tx" subroutine which should address this.
