@@ -1,45 +1,72 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Wed, 24 Feb 2016 17:44:59 +0100
-Subject: [PATCH v2] clocksource: atmel-pit: register as a sched_clock
-In-Reply-To: <20160224162046.GA28743@finsecur.com>
-References: <1456329882-20709-1-git-send-email-romain.izard.pro@gmail.com>
- <20160224162046.GA28743@finsecur.com>
-Message-ID: <CAGkQfmPpyhU025nt+tcnsjWK3V+K3_7oiXxeqa7mPuHT08sLig@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Feb 2016 08:48:08 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
+In-Reply-To: <CAMuHMdWxXFf0MFKP27y6g7CUc1MeG0PuJ-FdoSkV+2gB5NvQTA@mail.gmail.com>
+References: <cover.1455859965.git.horms+renesas@verge.net.au>
+ <20160224080803.GD30231@localhost>
+ <CAMuHMdWxXFf0MFKP27y6g7CUc1MeG0PuJ-FdoSkV+2gB5NvQTA@mail.gmail.com>
+Message-ID: <CAOesGMhab6SX5o-1CXKt-FNOrg+Nk9w1ccR=Co1DVXrJUKN4cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-24 17:20 GMT+01:00 Sylvain Rochet <sylvain.rochet@finsecur.com>:
-> Hi,
+On Wed, Feb 24, 2016 at 12:37 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Olof,
 >
-> On Wed, Feb 24, 2016 at 05:04:42PM +0100, Romain Izard wrote:
->> Register the counter of the Periodic Interval Timer as a possible
->> source for sched_clock. Keep the timer running even if the related
->> clockevent is disabled.
+> On Wed, Feb 24, 2016 at 9:08 AM, Olof Johansson <olof@lixom.net> wrote:
+>> On Fri, Feb 19, 2016 at 03:09:46PM +0900, Simon Horman wrote:
+>>> Please consider these Renesas ARM based SoC fixes for v4.5.
+>>>
+>>> This pull request is comprised of patches from Geert Uytterhoeven to avoid
+>>> writing to .text.
+>>>
+>>> * "ARM: shmobile: Move shmobile_scu_base from .text to .bss"
+>>>
+>>>   Resolves a problem for XIP kernels as writing to .text is not allowed.
+>>>   For non-XIP kernels a problem does not manifst as the pages are mapped
+>>>   read-only during late kernel startup.
+>>>
+>>> * The remaining patches resolve a kernel-crash that occurs during system
+>>>   suspend for CONFIG_DEBUG_RODATA=y kernels.
+>>>
+>>>
+>>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>>
+>>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v4.5
+>>>
+>>> for you to fetch changes up to 901c5ffaaed117a38be9d0c29247c4888d6c8636:
+>>>
+>>>   ARM: shmobile: Remove shmobile_boot_arg (2016-02-17 18:27:21 +0900)
 >>
->> This provides a better precision than the jiffies-based default. The
->> TCB clocksource does not work, as it is registered too late in the
->> initialization sequence.
+>> Hi Simon, Geert,
+>>
+>> I don't think any of these fixes are for regressions, are they? I.e. this is
+>> work to enable configs that never used to work (XIP, CONFIG_DEBUG_RODATA)?
 >
-> I have mixed feelings about that, but this is probably just a
-> misunderstanding from my part.
+> These configs indeed never worked before.
 >
-My goal is to get a better precision on my printk and trace logs,
-because the precision of jiffies is really very bad compared to
-everything else I have encountered until now. But it looks like reading
-a timer is quite complicated on AT91...
-
-> The PIT timer should not be used for systems with PM_SUSPEND enabled
-> and used because it takes ages to synchronize on resume, how does this
-> patch affect that ?
+> However,
 >
-> Ref: commit ac34ad27fc ("clockevents: Do not suspend/resume if
-> unused")
+> commit 25362dc496edaf17f714c0fecd8b3eb79670207b
+> Author: Kees Cook <keescook@chromium.org>
+> Date:   Tue Jan 26 01:19:36 2016 +0100
+>
+>     ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA
+>
+> in arm/for-next will enable CONFIG_DEBUG_RODATA by default.
+>
+> Not having the fixes in v4.5 means that if Russell's tree is merged
+> into mainline
+> for v4.6 before arm-soc, it will cause regressions and bisection issues.
 
-So your advice would be to stay clear of the PIT, because it is
-(globally) useless.
+Ok, either way there'll be windows in which bisect will fail since the
+changes are on independent branches.
 
-I'll keep it in mind.
+Based on that, and looking at the patches, I'll pick it up now for fixes.
 
-Best regards,
--- 
-Romain Izard
+
+-Olof
