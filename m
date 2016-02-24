@@ -1,69 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Feb 2016 10:04:57 +0100
-Subject: [PATCH 0/5] Modularize PCI_DW related drivers.
-In-Reply-To: <56CD4916.3050904@ti.com>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
- <56CD4916.3050904@ti.com>
-Message-ID: <6350001.oOdGGcH81x@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Feb 2016 09:05:30 +0000
+Subject: [PATCH 5/8] arm64: kprobes instruction simulation support
+In-Reply-To: <56CD5434.30108@linaro.org>
+References: <1455839301-26464-1-git-send-email-dave.long@linaro.org>
+ <1455839301-26464-6-git-send-email-dave.long@linaro.org>
+ <56C720F0.9080108@arm.com> <56CD5434.30108@linaro.org>
+Message-ID: <20160224090530.5e86e867@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 February 2016 11:39:26 Kishon Vijay Abraham I wrote:
-> Hi,
+On Wed, 24 Feb 2016 01:56:52 -0500
+David Long <dave.long@linaro.org> wrote:
+
+> On 02/19/2016 09:04 AM, Marc Zyngier wrote:
+> > Hi David,
+> >
+> > On 18/02/16 23:48, David Long wrote:
+> >> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> >>
+> >> Kprobes needs simulation of instructions that cannot be stepped
+> >> from different memory location, e.g.: those instructions
+> >> that uses PC-relative addressing. In simulation, the behaviour
+> >> of the instruction is implemented using a copy of pt_regs.
+> >>
+> >> Following instruction catagories are simulated:
+> >>   - All branching instructions(conditional, register, and immediate)
+> >>   - Literal access instructions(load-literal, adr/adrp)
+> >>
+> >> Conditional execution is limited to branching instructions in
+> >> ARM v8. If conditions at PSTATE do not match the condition fields
+> >> of opcode, the instruction is effectively NOP. Kprobes considers
+> >> this case as 'miss'.
+> >>
+> >> This code also replaces the use of arch/arm/opcodes.c for
+> >> arm_check_condition().
+> >>
+> >> Thanks to Will Cohen for assorted suggested changes.
+> >>
+> >> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> >> Signed-off-by: William Cohen <wcohen@redhat.com>
+> >> Signed-off-by: David A. Long <dave.long@linaro.org>
+
+[...]
+
+> >> +};
+> >> +
+> >> +asmlinkage unsigned int __kprobes arm_check_condition(u32 opcode, u32 psr)
+> >
+> > Why asmlinkage? This function is never called from assembly code on arm64.
+> >
 > 
-> On Monday 08 February 2016 05:30 AM, Paul Gortmaker wrote:
-> > In a recent patch series that aimed to remove code related to module
-> > unload for PCI support that was simply non modular, the discussion
-> > led to people wanting to keep the code and push towards taking the
-> > steps needed to support moving it towards tristate instead[1].
-> > 
-> > Here, we take step one, which is simply making the Kconfig change
-> > and then dealing with any build fallout or modpost fallout.  What
-> > amounts to essentially a sanity build test.  To be clear, these
-> > have not been runtime validated; that will need to be done by those
-> > with access to real hardware.  However, the changes are not anything
-> > that should disrupt any existing built-in validation, so real world
-> > users should not be impacted by this change.
-> > 
-> > We start with a smaller family of drivers; those that actively select
-> > PCI_DW, as a nice self contained group to test the waters and see if
-> > everyone is still good with this approach before investing more time
-> > on a wider scale to other pci/host/ code blocks.
-> > 
-> > As such the drivers here share a dependency on having the same group
-> > of functions exported in order to successfully complete modpost.
-> > 
-> > In addition, we have to stray outside drivers/pci to add exports
-> > in two places; once for an ARM fault handler, and once for an OF
-> > variable.
-> > 
-> > The pci-keystone-dw.c instance was handled separately because it
-> > consists of two source files that need their own group of driver
-> > specific exports above and beyond the "shared" ones.
-> > 
-> > Then we convert the Kconfig for all remaining at once; we could have
-> > done it on a per driver basis for ease of revert if anyone really
-> > objects, but since it would be a one line change, that seemed like
-> > not a real concern.
-> > 
-> > Build testing was done on the linux-next tree for arm allmodconfig.
+> This comes from the 32-bit ARM code that tests the condition from 
+> entry.S.  We include arch/arm/include/asm/opcodes.h in 
+> arch/arm64/include/asm/opcodes.h so it gets declared there with 
+> asmlinkage. I can remove the asmlinkage in the actual function 
+> definition and it still compiles but I'm not sure that is kosher. 
+
+asmlinkage is only meaningful if you're calling it from assembly code.
+As you seem to only call it from C code, having asmlinkage is both
+pointless and confusing.
+
+> Will Deacon was advocating getting rid of the include of the 32-bit header 
+> file but it looked to me like this would mean a lot of duplicated 
+> defines and the work would be mostly unrelated to kprobes.
+
+Arguably, arm_check_condition() (which only matters to 32bit code,
+hence userspace) is also completely unrelated to kprobes. I still think
+Will's point stands.
+
 > 
-> I took these patches and gave a test with DRA7xx board. As expected there was
-> no issues when the driver was built-in. However when I tried to rmmod/modprobe
-> I got this error [2].
+> >> +{
+> >> +	u32 cc_bits  = opcode >> 28;
+> >> +
+> >> +	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
+> >> +		if ((*opcode_condition_checks[cc_bits])(psr))
+> >> +			return ARM_OPCODE_CONDTEST_PASS;
+> >> +		else
+> >> +			return ARM_OPCODE_CONDTEST_FAIL;
+> >> +	}
+> >> +	return ARM_OPCODE_CONDTEST_UNCOND;
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(arm_check_condition);
+> >
+> > Why do we need this to be exported at all? Also, it'd be better located
+> > together with the deprecated instruction handling, possibly in a
+> > separate patch (nothing uses this function in this patch).
+> >
+> 
+> I've made the function static and moved it to armv8_deprecated.  I have 
+> to leave the static functions that test the individual conditions and 
+> the global array of pointers to them outside of the conditionally 
+> compiled armv8_deprecated.c as they have to always be present for 
+> kprobes to simulate a conditional branch.
 
-Thanks for testing this!
+I think that's fine.
 
-> [2] -> http://pastebin.ubuntu.com/15185894/
+Thanks,
 
-It looks like you are hitting the BUG_ON() in ioremap_pte_range()
-that checks if a virtual address already has a page table entry,
-which in turn is probably a result of dw_pcie_host_init()
-calling pci_remap_iospace() again for the same memory area
-it has called the last time, and no cleanup done inbetween.
-
-Could you try adding a pci_unmap_iospace() and calling that
-in the device remove function? Let me know if you need help
-implementing it.
-
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny.
