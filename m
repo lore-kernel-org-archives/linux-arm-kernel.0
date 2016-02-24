@@ -1,79 +1,162 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 23 Feb 2016 16:38:22 -0800
-Subject: [PATCH v6 0/3] Add host controller drivers for Cavium ThunderX PCI
-In-Reply-To: <1454975731-13618-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1454975731-13618-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <56CCFB7E.6030307@caviumnetworks.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Wed, 24 Feb 2016 08:44:11 +0800
+Subject: [RESEND PATCH] clk: rockchip: include downstream muxes into
+ fractional dividers on rk3368
+Message-ID: <1456274651-23202-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+During the initial conversion to the newly introduced combined fractional
+dividers+muxes the rk3368 clocks were left out, so convert them now.
 
-I haven't seen any feedback on this revision of the patch set.
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3368.c | 97 ++++++++++++++++++++++++---------------
+ 1 file changed, 60 insertions(+), 37 deletions(-)
 
-Are there any remaining issues that you are aware of that are blocking 
-these?
-
-Thanks in advance,
-David Daney
-
-
-On 02/08/2016 03:55 PM, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> Some Cavium ThunderX processors require quirky access methods for the
-> config space of the PCIe bridge.
->
-> There are now three patches:
->
-> 1) Refactor code in pci-host-generic so that it can more easily be
->     used by other drivers.  This splits the driver for CAM and ECAM
->     access methods to a separate file from the common host driver code.
->
-> 2) Add the ThunderX PCIe driver to external PCIe buses, which
->     leverages the code in pci-host-generic
->
-> 3) Add ThunderX PCI driver for internel SoC buses used on early
->     ThunderX chip revisions.
->
-> Changes from v5: Added Acked-by Rob Herring for the device tree
-> binding in 3/3.  Fixed typo and split large functions as suggested by
-> Bjorn Helgaas.
->
-> Changes from v4: Added patch 3/3.  Stylistic changes to 2/3 suggested
-> by Bjorn Helgaas.  When expanding config write width to 32-bits, mask
-> out unintened writes to W1C bits, also suggested by Bjorn Helgaas.
->
-> Changes from v3: Add some Acked-by, rebased to v4.5.0-rc1
->
-> Changes from v2: Improve device tree binding example as noted by Rob
-> Herring.  Rename pcie-thunder-pem.* to pci-thunder-pem.* for better
-> consistency.  Update MAINTAINERS to reflect the changes.
->
-> Changes from v1: Split CAM and ECAM code from common driver code as
-> suggested by Arnd Bergmann.  Fix spelling errors in
-> pcie-thunder-pem.txt
->
-> David Daney (3):
->    PCI: generic: Refactor code to enable reuse by other drivers.
->    pci, pci-thunder-pem: Add PCIe host driver for ThunderX processors.
->    pci, pci-thunder-ecam: Add driver for ThunderX-pass1 on-chip devices
->
->   .../devicetree/bindings/pci/pci-thunder-ecam.txt   |  30 ++
->   .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 +++
->   MAINTAINERS                                        |   9 +
->   drivers/pci/host/Kconfig                           |  18 ++
->   drivers/pci/host/Makefile                          |   3 +
->   drivers/pci/host/pci-host-common.c                 | 194 +++++++++++
->   drivers/pci/host/pci-host-common.h                 |  47 +++
->   drivers/pci/host/pci-host-generic.c                | 181 +----------
->   drivers/pci/host/pci-thunder-ecam.c                | 358 +++++++++++++++++++++
->   drivers/pci/host/pci-thunder-pem.c                 | 347 ++++++++++++++++++++
->   10 files changed, 1053 insertions(+), 177 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
->   create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
->   create mode 100644 drivers/pci/host/pci-host-common.c
->   create mode 100644 drivers/pci/host/pci-host-common.h
->   create mode 100644 drivers/pci/host/pci-thunder-ecam.c
->   create mode 100644 drivers/pci/host/pci-thunder-pem.c
->
+diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
+index c2b0421..a2bb122 100644
+--- a/drivers/clk/rockchip/clk-rk3368.c
++++ b/drivers/clk/rockchip/clk-rk3368.c
+@@ -243,6 +243,34 @@ static struct rockchip_cpuclk_rate_table rk3368_cpuclkl_rates[] __initdata = {
+ 	RK3368_CPUCLKL_RATE( 312000000, 1, 1, 1),
+ };
+ 
++static struct rockchip_clk_branch rk3368_i2s_8ch_fracmux __initdata =
++	MUX(0, "i2s_8ch_pre", mux_i2s_8ch_pre_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(27), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_spdif_8ch_fracmux __initdata =
++	MUX(0, "spdif_8ch_pre", mux_spdif_8ch_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(31), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_i2s_2ch_fracmux __initdata =
++	MUX(0, "i2s_2ch_pre", mux_i2s_2ch_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(53), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart0_fracmux __initdata =
++	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(33), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart1_fracmux __initdata =
++	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(35), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart3_fracmux __initdata =
++	MUX(SCLK_UART3, "sclk_uart3", mux_uart3_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(39), 8, 2, MFLAGS);
++
++static struct rockchip_clk_branch rk3368_uart4_fracmux __initdata =
++	MUX(SCLK_UART4, "sclk_uart4", mux_uart4_p, CLK_SET_RATE_PARENT,
++	    RK3368_CLKSEL_CON(41), 8, 2, MFLAGS);
++
+ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	/*
+ 	 * Clock-Architecture Diagram 2
+@@ -339,11 +367,10 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "i2s_8ch_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(27), 12, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(6), 1, GFLAGS),
+-	COMPOSITE_FRAC(0, "i2s_8ch_frac", "i2s_8ch_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(28), 0,
+-			RK3368_CLKGATE_CON(6), 2, GFLAGS),
+-	MUX(0, "i2s_8ch_pre", mux_i2s_8ch_pre_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(27), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "i2s_8ch_frac", "i2s_8ch_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(28), 0,
++			  RK3368_CLKGATE_CON(6), 2, GFLAGS,
++			  &rk3368_i2s_8ch_fracmux),
+ 	COMPOSITE_NODIV(SCLK_I2S_8CH_OUT, "i2s_8ch_clkout", mux_i2s_8ch_clkout_p, 0,
+ 			RK3368_CLKSEL_CON(27), 15, 1, MFLAGS,
+ 			RK3368_CLKGATE_CON(6), 0, GFLAGS),
+@@ -352,21 +379,21 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "spdif_8ch_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(31), 12, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(6), 4, GFLAGS),
+-	COMPOSITE_FRAC(0, "spdif_8ch_frac", "spdif_8ch_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(32), 0,
+-			RK3368_CLKGATE_CON(6), 5, GFLAGS),
+-	COMPOSITE_NODIV(SCLK_SPDIF_8CH, "sclk_spdif_8ch", mux_spdif_8ch_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(31), 8, 2, MFLAGS,
+-			RK3368_CLKGATE_CON(6), 6, GFLAGS),
++	COMPOSITE_FRACMUX(0, "spdif_8ch_frac", "spdif_8ch_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(32), 0,
++			  RK3368_CLKGATE_CON(6), 5, GFLAGS,
++			  &rk3368_spdif_8ch_fracmux),
++	GATE(SCLK_SPDIF_8CH, "sclk_spdif_8ch", "spdif_8ch_pre", CLK_SET_RATE_PARENT,
++	     RK3368_CLKGATE_CON(6), 6, GFLAGS),
+ 	COMPOSITE(0, "i2s_2ch_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(53), 12, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(5), 13, GFLAGS),
+-	COMPOSITE_FRAC(0, "i2s_2ch_frac", "i2s_2ch_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(54), 0,
+-			RK3368_CLKGATE_CON(5), 14, GFLAGS),
+-	COMPOSITE_NODIV(SCLK_I2S_2CH, "sclk_i2s_2ch", mux_i2s_2ch_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(53), 8, 2, MFLAGS,
+-			RK3368_CLKGATE_CON(5), 15, GFLAGS),
++	COMPOSITE_FRACMUX(0, "i2s_2ch_frac", "i2s_2ch_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(54), 0,
++			  RK3368_CLKGATE_CON(5), 14, GFLAGS,
++			  &rk3368_i2s_2ch_fracmux),
++	GATE(SCLK_I2S_2CH, "sclk_i2s_2ch", "i2s_2ch_pre", CLK_SET_RATE_PARENT,
++	     RK3368_CLKGATE_CON(5), 15, GFLAGS),
+ 
+ 	COMPOSITE(0, "sclk_tsp", mux_pll_src_cpll_gpll_npll_p, 0,
+ 			RK3368_CLKSEL_CON(46), 6, 2, MFLAGS, 0, 5, DFLAGS,
+@@ -562,38 +589,34 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "uart0_src", mux_pll_src_cpll_gpll_usb_usb_p, 0,
+ 			RK3368_CLKSEL_CON(33), 12, 2, MFLAGS, 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 0, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(34), 0,
+-			RK3368_CLKGATE_CON(2), 1, GFLAGS),
+-	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(33), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(34), 0,
++			  RK3368_CLKGATE_CON(2), 1, GFLAGS,
++			  &rk3368_uart0_fracmux),
+ 
+ 	COMPOSITE_NOMUX(0, "uart1_src", "uart_src", 0,
+ 			RK3368_CLKSEL_CON(35), 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 2, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(36), 0,
+-			RK3368_CLKGATE_CON(2), 3, GFLAGS),
+-	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(35), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(36), 0,
++			  RK3368_CLKGATE_CON(2), 3, GFLAGS,
++			  &rk3368_uart1_fracmux),
+ 
+ 	COMPOSITE_NOMUX(0, "uart3_src", "uart_src", 0,
+ 			RK3368_CLKSEL_CON(39), 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 6, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart3_frac", "uart3_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(40), 0,
+-			RK3368_CLKGATE_CON(2), 7, GFLAGS),
+-	MUX(SCLK_UART3, "sclk_uart3", mux_uart3_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(39), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart3_frac", "uart3_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(40), 0,
++			  RK3368_CLKGATE_CON(2), 7, GFLAGS,
++			  &rk3368_uart3_fracmux),
+ 
+ 	COMPOSITE_NOMUX(0, "uart4_src", "uart_src", 0,
+ 			RK3368_CLKSEL_CON(41), 0, 7, DFLAGS,
+ 			RK3368_CLKGATE_CON(2), 8, GFLAGS),
+-	COMPOSITE_FRAC(0, "uart4_frac", "uart4_src", CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(42), 0,
+-			RK3368_CLKGATE_CON(2), 9, GFLAGS),
+-	MUX(SCLK_UART4, "sclk_uart4", mux_uart4_p, CLK_SET_RATE_PARENT,
+-			RK3368_CLKSEL_CON(41), 8, 2, MFLAGS),
++	COMPOSITE_FRACMUX(0, "uart4_frac", "uart4_src", CLK_SET_RATE_PARENT,
++			  RK3368_CLKSEL_CON(42), 0,
++			  RK3368_CLKGATE_CON(2), 9, GFLAGS,
++			  &rk3368_uart4_fracmux),
+ 
+ 	COMPOSITE(0, "mac_pll_src", mux_pll_src_npll_cpll_gpll_p, 0,
+ 			RK3368_CLKSEL_CON(43), 6, 2, MFLAGS, 0, 5, DFLAGS,
+-- 
+1.9.1
