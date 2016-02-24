@@ -1,45 +1,43 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 24 Feb 2016 10:50:15 -0600
-Subject: [PATCH] dts: add specific compatible type for Terasic DE0-NANO-SoC
- Board
-In-Reply-To: <8416439.76b9YNhpgR@dabox>
-References: <8416439.76b9YNhpgR@dabox>
-Message-ID: <alpine.DEB.2.02.1602241048100.3815@linux-builds1>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Feb 2016 08:58:14 -0800
+Subject: [PATCH 00/13] arm-cci: PMU driver updates for 4.6
+In-Reply-To: <56CC64E7.3040407@arm.com>
+References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
+ <20160223114003.GF3966@arm.com> <56CC64E7.3040407@arm.com>
+Message-ID: <20160224165814.GA10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
-
-On Fri, 12 Feb 2016, Tim Sander wrote:
-
-> From: Tim Sander <tim@krieglstein.org>
+On Tue, Feb 23, 2016 at 01:55:51PM +0000, Suzuki K. Poulose wrote:
+> On 23/02/16 11:40, Will Deacon wrote:
+> >On Tue, Feb 23, 2016 at 10:49:42AM +0000, Suzuki K Poulose wrote:
+> >>Here are some fixes and updates for arm-cci pmu driver targeting v4.6,
+> >>applies on top of v4.5-rc5.
+> >>
+> >>Highlights include :
+> >>  - Support for CoreLink CCI-550 PMU
+> >>  - Reliable writes to PMU Counter registers for CCI-500/550.
+> >>
+> >>All the patches have been Acked. Please let me know how this
+> >>can be merged.
 > 
-> Add a more specific compatible string:"terasic,de0-nano-soc" for respective board.
-> Background: when checking for bootspec entries, some board specific fixups
->                          are not apropriate for board of the same platform ("altr,socfpga-cyclone5").
->                         The same aproach is taken with the EBV-Socrates board.
->
-
-Please fix up the spacing in the commit message.
-
-> Signed-off-by: Tim Sander <tim@krieglstein.org>
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >>  Documentation/devicetree/bindings/arm/cci.txt |    2 +
+> >>  drivers/bus/Kconfig                           |   10 +-
+> >>  drivers/bus/arm-cci.c                         |  612 +++++++++++++++++--------
+> >>  3 files changed, 427 insertions(+), 197 deletions(-)
+> >
+> >How do you plan to merge this? I can take it all onto a branch for
+> >arm-soc, or I can include it on my perf/updates branch, or ...?
 > 
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> index 555e9caf21e1..3a427423168e 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> @@ -18,7 +18,7 @@
->  
->  / {
->         model = "Terasic DE-0(Atlas)";
-> -       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> +       compatible = "terasic,de0-nano-soc"," altr,socfpga-cyclone5", "altr,socfpga";
+> Arnd, Olof,
 > 
+> What do you think would be the best route ?
 
-"terasic" is not listed in Documentation/devicetree/bindings/vendor-prefixes.txt.
- 
-BR,
-Dinh
+Traditionally we've been picking these up in arm-soc in our drivers branch.
+
+Will, unless you want them in your tree for some reason that's what I'll do
+here as well.
+
+
+-Olof
