@@ -1,100 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Feb 2016 22:18:18 +0000
-Subject: [PATCH] clk: gpio: Really allow an optional clock= DT property
-In-Reply-To: <20160224214706.2278.79643@quark.deferred.io>
-References: <20160219030731.GS4847@codeaurora.org>
- <1455851525-18972-1-git-send-email-sboyd@codeaurora.org>
- <20160223113059.GH19428@n2100.arm.linux.org.uk>
- <20160224214706.2278.79643@quark.deferred.io>
-Message-ID: <20160224221818.GO19428@n2100.arm.linux.org.uk>
+From: dhdang@apm.com (Duc Dang)
+Date: Wed, 24 Feb 2016 14:28:10 -0800
+Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
+ for X-Gene v1
+In-Reply-To: <56CDD767.6020103@arm.com>
+References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+ <1456330151.5681.46.camel@redhat.com> <56CDD767.6020103@arm.com>
+Message-ID: <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 01:47:06PM -0800, Michael Turquette wrote:
-> Hi Russell,
-> 
-> Quoting Russell King - ARM Linux (2016-02-23 03:30:59)
-> > On Thu, Feb 18, 2016 at 07:12:05PM -0800, Stephen Boyd wrote:
-> > > We mis-merged the original patch from Russell here and so the
-> > > patch went almost all the way, except that we still failed to
-> > > probe when there wasn't a clocks property in the DT node. Allow
-> > > that case by making a negative value from
-> > > of_clk_get_parent_count() into "no parents", like the original
-> > > patch did.
-> > 
-> > So you apply it anyway, and ignore all further discussion.  I've
-> > no idea what kind of politics is going on here, but it has to stop.
-> 
-> Stephen fixed the bug, and I didn't ask you to test because you made it
-> clear that you did not have the time (understandable). Stephen
-> reproduced the issue locally and insured that his version of the fix
-> does actually fix it.
+On Wed, Feb 24, 2016 at 8:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 24/02/16 16:09, Mark Salter wrote:
+>> On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
+>>> This patch makes pci-xgene-msi driver ACPI-aware and provides
+>>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+>>>
+>>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>>> ---
+>>>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
+>>>  1 file changed, 32 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+>>> index a6456b5..466aa93 100644
+>>> --- a/drivers/pci/host/pci-xgene-msi.c
+>>> +++ b/drivers/pci/host/pci-xgene-msi.c
+>>> @@ -24,6 +24,7 @@
+>>>  #include <linux/pci.h>
+>>>  #include <linux/platform_device.h>
+>>>  #include <linux/of_pci.h>
+>>> +#include <linux/acpi.h>
+>>>
+>>>  #define MSI_IR0                     0x000000
+>>>  #define MSI_INT0            0x800000
+>>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+>>>  };
+>>>
+>>>  struct xgene_msi {
+>>> -    struct device_node      *node;
+>>> +    struct fwnode_handle    *fwnode;
+>>>      struct irq_domain       *inner_domain;
+>>>      struct irq_domain       *msi_domain;
+>>>      u64                     msi_addr;
+>>> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
+>>>      .free   = xgene_irq_domain_free,
+>>>  };
+>>>
+>>> +#ifdef CONFIG_ACPI
+>>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+>>> +{
+>>> +    return xgene_msi_ctrl.fwnode;
+>>> +}
+>>> +#endif
+>>> +
+>>>  static int xgene_allocate_domains(struct xgene_msi *msi)
+>>>  {
+>>>      msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+>>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+>>>      if (!msi->inner_domain)
+>>>              return -ENOMEM;
+>>>
+>>> -    msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+>>> +    msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+>>>                                                  &xgene_msi_domain_info,
+>>>                                                  msi->inner_domain);
+>>
+>> This doesn't work for me (ACPI probing on Mustang) unless I change this
+>> to be pci_msi_create_default_irq_domain(). The problem seems to be that
+>> the MSI probe happens after the PCIe RC is probed so there is no MSI domain
+>> at the time the PCIe root is initialized by ACPI.
+>
+> pci_msi_create_default_irq_domain is the wrong thing do use, specially
+> if you have multiple MSI controllers in the system. I certainly wouldn't
+> want to see it being used on arm64.
+>
+> This is the usual dependency hell. You try moving the probing earlier,
+> but that may break something else in the process.
 
-Right, so let's go back shall we.
+Hi Mark and Marc,
 
-The reason this bug happened is because you changed fully tested code
-as a result of a merge conflict.  The result was not tested.
+I have modified Tianocore firmware to have MSI node declared before
+PCIe node in Dsdt table. With this modification, the MSI driver will
+be loaded before PCIe driver and MSI domain is available at the time
+PCIe root is initialized.
 
-Now, rather than going back to the tested patch, you maintainers decide
-to create yet another change, which is also untested and merge it
-immediately into mainline.
+So we will need a UEFI firmware update to work with this patch.
 
-That's really insane - you had a choice to do the sane thing: you could
-have gone back and looked at my patch, realised that my patch resolves
-the same problem that the conflicting patch did, and therefore the
-correct resolution would be to make the code look the same after both
-patches have been applied, as if it would have done if only my patch
-had been applied.
+Regards,
+Duc Dang.
 
-And the resulting code would have been tested by implication of the
-fact that the original code plus my patch was what I tested here.
-
-But no, you guys think it's better to create some other solution to the
-fuck up.
-
-> He is an equal co-maintainer so of course I support him to merge the
-> fix, plus I find his version more readable.
-
-I really detest this maintainer shite - it seems anyone can walk up and
-take 
-
-> > I'm also still waiting for that apology from Mike - never apply a
-> 
-> No thematics please. When you wrongly accused me of merging code outside
-> of the merge window[0] did I ask for an apology?
-> 
-> > modified patch without stating in the commit log that it was modified.
-> > It's basically fraud.
-> 
-> An oversight for which we are both equally guilty.
-
-Sorry, I disagree.  I'm not guilty of doing that, because when I apply
-patches, they come straight from the patch system and are applied to
-my tree unmodified.  There's no intermediate modification step possible.
-Any changes I want to make are done in a separate commit.
-
-So that's another apology you now owe me.
-
-> The "change" was the
-> resolution of a merge conflict, and I posted the resolved version of the
-> patch to the thread[0]. You said, "Looks fine, thanks."
-
-Yes, it _looked_ fine for a quick read, and I didn't test it.  I
-trusted you to be competent at merge resolution, but I now see that
-trust was misplaced.  I'll try to remember to pay more attention to
-any changes you make in the future - or I'll merge them through my
-tree.
-
-Trust is something I initially give without earning - break that
-trust and you've got to work really hard to regain it.
-
-I'll also remind you that _I_ used to look after the clk code, until
-you walked onto the scene and effectively took it away from me - I
-didn't say a word about that (or all the other stuff that Linaro
-"took" from me without asking.)  So you won't mind if I do a bit of
-that myself by merging my own fixes through my tree.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
