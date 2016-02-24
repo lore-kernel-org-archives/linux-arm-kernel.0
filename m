@@ -1,47 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Feb 2016 10:21:27 +0900
-Subject: [PATCH 2/6] ARM: shmobile: r8a7740: Remove mapping of L2 cache
- controller registers
+Date: Wed, 24 Feb 2016 10:21:28 +0900
+Subject: [PATCH 3/6] ARM: shmobile: r8a7740: Remove legacy
+ machine_desc.map_io() callback
 In-Reply-To: <cover.1456275652.git.horms+renesas@verge.net.au>
 References: <cover.1456275652.git.horms+renesas@verge.net.au>
-Message-ID: <c4be044abc6292f392c286b599e260f0c1bbb8ba.1456275652.git.horms+renesas@verge.net.au>
+Message-ID: <f5757b9af80af1ecf229bac6ba9ecb143a724aa0.1456275652.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Now all r8a7740-based platforms have been migrated to the generic l2c OF
-initialization, it's no longer needed to map the L2 cache controller
-registers from .map_io().
+Commit 37201ba5c99d0be8 ("ARM: shmobile: r8a7740: Migrate to generic l2c
+OF initialization") removed the last user of the legacy "IOMEM()" macro
+on r8a7740-based systems. Hence there's no longer a need to set up a
+transparent mapping of system I/O registers. Remove the mapping and the
+legacy machine_desc.map_io() callback.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 12 ------------
- 1 file changed, 12 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c | 20 --------------------
+ 1 file changed, 20 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index bf221e05c8dc..3e71cd4168dd 100644
+index 3e71cd4168dd..db6dbfbaf9f1 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7740.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -37,18 +37,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
- 		.length		= 160 << 20,
- 		.type		= MT_DEVICE_NONSHARED
- 	},
--#ifdef CONFIG_CACHE_L2X0
--	/*
--	 * for l2x0_init()
--	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
--	 */
+@@ -26,25 +26,6 @@
+ 
+ #include "common.h"
+ 
+-static struct map_desc r8a7740_io_desc[] __initdata = {
+-	 /*
+-	  * for CPGA/INTC/PFC
+-	  * 0xe6000000-0xefffffff -> 0xe6000000-0xefffffff
+-	  */
 -	{
--		.virtual	= 0xf0002000,
--		.pfn		= __phys_to_pfn(0xf0100000),
--		.length		= PAGE_SIZE,
+-		.virtual	= 0xe6000000,
+-		.pfn		= __phys_to_pfn(0xe6000000),
+-		.length		= 160 << 20,
 -		.type		= MT_DEVICE_NONSHARED
 -	},
--#endif
- };
- 
- static void __init r8a7740_map_io(void)
+-};
+-
+-static void __init r8a7740_map_io(void)
+-{
+-	debug_ll_io_init();
+-	iotable_init(r8a7740_io_desc, ARRAY_SIZE(r8a7740_io_desc));
+-}
+-
+ /*
+  * r8a7740 chip has lasting errata on MERAM buffer.
+  * this is work-around for it.
+@@ -108,7 +89,6 @@ static const char *const r8a7740_boards_compat_dt[] __initconst = {
+ DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+-	.map_io		= r8a7740_map_io,
+ 	.init_early	= shmobile_init_delay,
+ 	.init_irq	= r8a7740_init_irq_of,
+ 	.init_machine	= r8a7740_generic_init,
 -- 
 2.1.4
