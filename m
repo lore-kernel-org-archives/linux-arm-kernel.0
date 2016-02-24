@@ -1,118 +1,126 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 24 Feb 2016 13:08:33 +0800
-Subject: [PATCH v13 13/20] KVM: ARM64: Add helper to handle PMCR register bits
+Date: Wed, 24 Feb 2016 13:08:22 +0800
+Subject: [PATCH v13 02/20] KVM: ARM64: Define PMU data structure for each vcpu
 In-Reply-To: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1456290520-10012-14-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1456290520-10012-3-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-According to ARMv8 spec, when writing 1 to PMCR.E, all counters are
-enabled by PMCNTENSET, while writing 0 to PMCR.E, all counters are
-disabled. When writing 1 to PMCR.P, reset all event counters, not
-including PMCCNTR, to zero. When writing 1 to PMCR.C, reset PMCCNTR to
-zero.
+Here we plan to support virtual PMU for guest by full software
+emulation, so define some basic structs and functions preparing for
+futher steps. Define struct kvm_pmc for performance monitor counter and
+struct kvm_pmu for performance monitor unit for each vcpu. According to
+ARMv8 spec, the PMU contains at most 32(ARMV8_PMU_MAX_COUNTERS)
+counters.
+
+Since this only supports ARM64 (or PMUv3), add a separate config symbol
+for it.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
 ---
- arch/arm64/include/asm/perf_event.h |  2 ++
- arch/arm64/kvm/sys_regs.c           |  1 +
- include/kvm/arm_pmu.h               |  2 ++
- virt/kvm/arm/pmu.c                  | 34 ++++++++++++++++++++++++++++++++++
- 4 files changed, 39 insertions(+)
+ arch/arm64/include/asm/kvm_host.h |  2 ++
+ arch/arm64/kvm/Kconfig            |  7 +++++++
+ include/kvm/arm_pmu.h             | 42 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 include/kvm/arm_pmu.h
 
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index ceb14a1..c3f5937 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -29,6 +29,8 @@
- #define ARMV8_PMU_PMCR_D	(1 << 3) /* CCNT counts every 64th cpu cycle */
- #define ARMV8_PMU_PMCR_X	(1 << 4) /* Export to ETM */
- #define ARMV8_PMU_PMCR_DP	(1 << 5) /* Disable CCNT if non-invasive debug*/
-+/* Determines which bit of PMCCNTR_EL0 generates an overflow */
-+#define ARMV8_PMU_PMCR_LC	(1 << 6)
- #define	ARMV8_PMU_PMCR_N_SHIFT	11	 /* Number of counters supported */
- #define	ARMV8_PMU_PMCR_N_MASK	0x1f
- #define	ARMV8_PMU_PMCR_MASK	0x3f	 /* Mask for writable bits */
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 10e5379..12f36ef 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -467,6 +467,7 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		val &= ~ARMV8_PMU_PMCR_MASK;
- 		val |= p->regval & ARMV8_PMU_PMCR_MASK;
- 		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
-+		kvm_pmu_handle_pmcr(vcpu, val);
- 	} else {
- 		/* PMCR.P & PMCR.C are RAZ */
- 		val = vcpu_sys_reg(vcpu, PMCR_EL0)
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 348c4c9..8bc92d1 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -45,6 +45,7 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
-+void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx);
- #else
-@@ -67,6 +68,7 @@ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
-+static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
- 						  u64 data, u64 select_idx) {}
- #endif
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 9fc775e..cda869c 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -210,6 +210,40 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
- 	}
- }
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 689d4c9..6f0241f 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -36,6 +36,7 @@
  
-+/**
-+ * kvm_pmu_handle_pmcr - handle PMCR register
-+ * @vcpu: The vcpu pointer
-+ * @val: the value guest writes to PMCR register
+ #include <kvm/arm_vgic.h>
+ #include <kvm/arm_arch_timer.h>
++#include <kvm/arm_pmu.h>
+ 
+ #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+ 
+@@ -211,6 +212,7 @@ struct kvm_vcpu_arch {
+ 	/* VGIC state */
+ 	struct vgic_cpu vgic_cpu;
+ 	struct arch_timer_cpu timer_cpu;
++	struct kvm_pmu pmu;
+ 
+ 	/*
+ 	 * Anything that is not used directly from assembly code goes
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index a5272c0..de7450d 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -36,6 +36,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select KVM_ARM_VGIC_V3
++	select KVM_ARM_PMU if HW_PERF_EVENTS
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+ 	  We don't support KVM with 16K page tables yet, due to the multiple
+@@ -48,6 +49,12 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
+ 
++config KVM_ARM_PMU
++	bool
++	---help---
++	  Adds support for a virtual Performance Monitoring Unit (PMU) in
++	  virtual machines.
++
+ source drivers/vhost/Kconfig
+ 
+ endif # VIRTUALIZATION
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+new file mode 100644
+index 0000000..3c2fd56
+--- /dev/null
++++ b/include/kvm/arm_pmu.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd.
++ * Author: Shannon Zhao <shannon.zhao@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc;
-+	u64 mask;
-+	int i;
 +
-+	mask = kvm_pmu_valid_counter_mask(vcpu);
-+	if (val & ARMV8_PMU_PMCR_E) {
-+		kvm_pmu_enable_counter(vcpu,
-+				vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask);
-+	} else {
-+		kvm_pmu_disable_counter(vcpu, mask);
-+	}
++#ifndef __ASM_ARM_KVM_PMU_H
++#define __ASM_ARM_KVM_PMU_H
 +
-+	if (val & ARMV8_PMU_PMCR_C)
-+		kvm_pmu_set_counter_value(vcpu, ARMV8_PMU_CYCLE_IDX, 0);
++#ifdef CONFIG_KVM_ARM_PMU
 +
-+	if (val & ARMV8_PMU_PMCR_P) {
-+		for (i = 0; i < ARMV8_PMU_CYCLE_IDX; i++)
-+			kvm_pmu_set_counter_value(vcpu, i, 0);
-+	}
++#include <linux/perf_event.h>
++#include <asm/perf_event.h>
 +
-+	if (val & ARMV8_PMU_PMCR_LC) {
-+		pmc = &pmu->pmc[ARMV8_PMU_CYCLE_IDX];
-+		pmc->bitmask = 0xffffffffffffffffUL;
-+	}
-+}
++struct kvm_pmc {
++	u8 idx;	/* index into the pmu->pmc array */
++	struct perf_event *perf_event;
++	u64 bitmask;
++};
 +
- static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
- {
- 	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) &&
++struct kvm_pmu {
++	int irq_num;
++	struct kvm_pmc pmc[ARMV8_PMU_MAX_COUNTERS];
++	bool ready;
++};
++#else
++struct kvm_pmu {
++};
++#endif
++
++#endif
 -- 
 2.0.4
