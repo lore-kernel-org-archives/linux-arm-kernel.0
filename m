@@ -1,120 +1,121 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 24 Feb 2016 11:09:11 -0500
-Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
- for X-Gene v1
-In-Reply-To: <1455069384-22323-1-git-send-email-dhdang@apm.com>
-References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
-Message-ID: <1456330151.5681.46.camel@redhat.com>
+From: amakarov.linux@gmail.com (Aleksey Makarov)
+Date: Wed, 24 Feb 2016 19:09:59 +0300
+Subject: [PATCH 1/8] arm64: move acpi/dt decision earlier in boot process
+In-Reply-To: <56CC6EA6.4020909@gmail.com>
+References: <1456148818-26257-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456148818-26257-2-git-send-email-aleksey.makarov@linaro.org>
+ <56CB2D0D.3090408@gmail.com>
+ <20160223135731.GA24781@xora-haswell.xora.org.uk>
+ <56CC6EA6.4020909@gmail.com>
+Message-ID: <56CDD5D7.5070703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
-> This patch makes pci-xgene-msi driver ACPI-aware and provides
-> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
-> 
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> ---
-> ?drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
-> ?1 file changed, 32 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-> index a6456b5..466aa93 100644
-> --- a/drivers/pci/host/pci-xgene-msi.c
-> +++ b/drivers/pci/host/pci-xgene-msi.c
-> @@ -24,6 +24,7 @@
-> ?#include <linux/pci.h>
-> ?#include <linux/platform_device.h>
-> ?#include <linux/of_pci.h>
-> +#include <linux/acpi.h>
-> ?
-> ?#define MSI_IR0			0x000000
-> ?#define MSI_INT0		0x800000
-> @@ -39,7 +40,7 @@ struct xgene_msi_group {
-> ?};
-> ?
-> ?struct xgene_msi {
-> -	struct device_node	*node;
-> +	struct fwnode_handle	*fwnode;
-> ?	struct irq_domain	*inner_domain;
-> ?	struct irq_domain	*msi_domain;
-> ?	u64			msi_addr;
-> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
-> ?	.free???= xgene_irq_domain_free,
-> ?};
-> ?
-> +#ifdef CONFIG_ACPI
-> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
-> +{
-> +	return xgene_msi_ctrl.fwnode;
-> +}
-> +#endif
-> +
-> ?static int xgene_allocate_domains(struct xgene_msi *msi)
-> ?{
-> ?	msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
-> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
-> ?	if (!msi->inner_domain)
-> ?		return -ENOMEM;
-> ?
-> -	msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
-> +	msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
-> ?						????&xgene_msi_domain_info,
-> ?						????msi->inner_domain);
+Hi Matthias,
 
-This doesn't work for me (ACPI probing on Mustang) unless I change this
-to be?pci_msi_create_default_irq_domain(). The problem seems to be that
-the MSI probe happens after the PCIe RC is probed so there is no MSI domain
-at the time the PCIe root is initialized by ACPI.
+Thank you for review.  The bug is fixed in the next version of the patchset.
 
-> ?
-> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
-> ?		return -ENOMEM;
-> ?	}
-> ?
-> +#ifdef CONFIG_ACPI
-> +	pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
-> +#endif
-> ?	return 0;
-> ?}
-> ?
-> @@ -473,6 +484,13 @@ static const struct of_device_id xgene_msi_match_table[] = {
-> ?	{},
-> ?};
-> ?
-> +#ifdef CONFIG_ACPI
-> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
-> +	{"APMC0D0E", 0},
-> +	{ },
-> +};
-> +#endif
-> +
-> ?static int xgene_msi_probe(struct platform_device *pdev)
-> ?{
-> ?	struct resource *res;
-> @@ -494,7 +512,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
-> ?		goto error;
-> ?	}
-> ?	xgene_msi->msi_addr = res->start;
-> -	xgene_msi->node = pdev->dev.of_node;
-> +
-> +	xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
-> +	if (!xgene_msi->fwnode) {
-> +		xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
-> +		if (!xgene_msi->fwnode) {
-> +			dev_err(&pdev->dev, "Failed to create fwnode\n");
-> +			rc = ENOMEM;
-> +			goto error;
-> +		}
-> +	}
-> +
-> ?	xgene_msi->num_cpus = num_possible_cpus();
-> ?
-> ?	rc = xgene_msi_init_allocator(xgene_msi);
-> @@ -571,6 +599,7 @@ static struct platform_driver xgene_msi_driver = {
-> ?	.driver = {
-> ?		.name = "xgene-msi",
-> ?		.of_match_table = xgene_msi_match_table,
-> +		.acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
-> ?	},
-> ?	.probe = xgene_msi_probe,
-> ?	.remove = xgene_msi_remove,
+Aleksey Makarov
+
+On 02/23/2016 05:37 PM, Matthias Brugger wrote:
+> 
+> 
+> On 23/02/16 14:57, Graeme Gregory wrote:
+>> On Mon, Feb 22, 2016 at 04:45:17PM +0100, Matthias Brugger wrote:
+>>>
+>>>
+>>> On 22/02/16 14:46, Aleksey Makarov wrote:
+>>>> From: Leif Lindholm <leif.lindholm@linaro.org>
+>>>>
+>>>> In order to support selecting earlycon via either ACPI or DT, move
+>>>> the decision on whether to attempt ACPI configuration into the
+>>>> early_param handling. Then make acpi_boot_table_init() bail out if
+>>>> acpi_disabled.
+>>>>
+>>>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>>>> ---
+>>>>   arch/arm64/kernel/acpi.c | 54 ++++++++++++++++++++++++++----------------------
+>>>>   1 file changed, 29 insertions(+), 25 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>>>> index d1ce8e2..7a944f7 100644
+>>>> --- a/arch/arm64/kernel/acpi.c
+>>>> +++ b/arch/arm64/kernel/acpi.c
+>>>> @@ -44,6 +44,19 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>>>>   static bool param_acpi_off __initdata;
+>>>>   static bool param_acpi_force __initdata;
+>>>>
+>>>> +static int __init dt_scan_depth1_nodes(unsigned long node,
+>>>> +                       const char *uname, int depth,
+>>>> +                       void *data)
+>>>> +{
+>>>> +    /*
+>>>> +     * Return 1 as soon as we encounter a node at depth 1 that is
+>>>> +     * not the /chosen node.
+>>>> +     */
+>>>> +    if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>>>> +        return 1;
+>>>> +    return 0;
+>>>> +}
+>>>> +
+>>>>   static int __init parse_acpi(char *arg)
+>>>>   {
+>>>>       if (!arg)
+>>>> @@ -57,23 +70,27 @@ static int __init parse_acpi(char *arg)
+>>>>       else
+>>>>           return -EINVAL;    /* Core will print when we return error */
+> 
+> If argument of parse_acpi is neither "off" nor "force" we return with -EINVAL here. Actually parse_acpi will be only called if we pass "acpi=" as kernel parameter. Therefor we can get rid of "acpi=off" as this is the _new_ standard. IMHO we should introduce "acpi=on" if we really want to change the standard behavior.
+> 
+>>>>
+>>>> -    return 0;
+>>>> -}
+>>>> -early_param("acpi", parse_acpi);
+>>>> +    /*
+>>>> +     * Enable ACPI instead of device tree unless
+>>>> +     * - ACPI has been disabled explicitly (acpi=off), or
+>>>> +     * - the device tree is not empty (it has more than just a /chosen node)
+>>>> +     *   and ACPI has not been force enabled (acpi=force)
+>>>> +     */
+>>>> +    if (param_acpi_off ||
+>>>> +        (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>>>> +        return 0;
+> 
+> Or param_acpi_off is true or param_acpi_force is true, the depth of the DT has no influence.
+> 
+>>>>
+>>>> -static int __init dt_scan_depth1_nodes(unsigned long node,
+>>>> -                       const char *uname, int depth,
+>>>> -                       void *data)
+>>>> -{
+>>>>       /*
+>>>> -     * Return 1 as soon as we encounter a node at depth 1 that is
+>>>> -     * not the /chosen node.
+>>>> +     * ACPI is disabled at this point. Enable it in order to parse
+>>>> +     * the ACPI tables and carry out sanity checks
+>>>>        */
+>>>> -    if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>>>> -        return 1;
+>>>> +    enable_acpi();
+>>>> +
+>>>
+>>> So we only enable ACPI if we pass acpi=force as kernel parameter?
+>>> I'm not sure if this is what you wanted to do.
+>>>
+>>
+>> The current preference from ARM64 maintainers was that is both ACPI
+>> tables and a DT were presented then DT should take precedence.
+>>
+>> With no DT provided the code should use ACPI.
+> 
+> From my understanding in this patch that can never happen.
+> 
+> On which version is this set based on?
+> I'm looking on v4.5-rc5 ATM.
+> 
+> Regards,
+> Matthias
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
