@@ -1,183 +1,122 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:25 +0530
-Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for pinctrl_{register,
+Date: Wed, 24 Feb 2016 18:45:26 +0530
+Subject: [PATCH 01/50] pinctrl: Add devm_ apis for pinctrl_{register,
  unregister}
-Message-ID: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-2-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add resource manageemnt APIs fro pinctrl_register() and pinctrl_unregister()
-and use these new APIs on hw driver to reduce the error path code and
-remove callback for driver.
+Add device managed APIs devm_pinctrl_register() and
+devm_pinctrl_unregister() for the APIs pinctrl_register()
+and pinctrl_unregister().
 
-Laxman Dewangan (50):
-  pinctrl: Add devm_ apis for pinctrl_{register, unregister}
-  pinctrl: Add resource management devm_pinctrl_{register, unregister}
-  pinctrl: bcm281xx: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: bcm2835: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: cygnus-mux: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: iproc-gpio: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: nsp-gpio: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: berlin: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: imx: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: imxl: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: cherryview: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: intel: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: mtk-common: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: meson: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: mvebu: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: nomadic: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: spmi-gpio: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: spmi: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: ssbi-gpi: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: ssbi-mpp: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: msm: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: pxa: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: exynos5440: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: samsung: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: ish-pfc: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: spear: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: stm32: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: ssbi-mpp: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: tegra: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: tegra-xusb: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: uniphier: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: vt8500: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: adi2: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: amd: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: as3722: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: at91-pio4: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: at91: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: digicolor: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: lantiq: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: lpc18xx: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: palmas: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: pic32: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: pistachio: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: rockchip: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: st: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: tb10x: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: tz1090-pdc: Use devm_pinctrl_register() for pinctrl
-    registration
-  pinctrl: tz1090 Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: u300: Use devm_pinctrl_register() for pinctrl registration
-  pinctrl: zynq: Use devm_pinctrl_register() for pinctrl registration
+This helps in reducing code in error path and sometimes
+removal of .remove callback for driver unbind.
 
- Documentation/driver-model/devres.txt            |  2 +
- drivers/pinctrl/bcm/pinctrl-bcm281xx.c           |  4 +-
- drivers/pinctrl/bcm/pinctrl-bcm2835.c            |  3 +-
- drivers/pinctrl/bcm/pinctrl-cygnus-mux.c         |  2 +-
- drivers/pinctrl/bcm/pinctrl-iproc-gpio.c         | 12 +----
- drivers/pinctrl/bcm/pinctrl-nsp-gpio.c           |  2 +-
- drivers/pinctrl/berlin/berlin.c                  |  3 +-
- drivers/pinctrl/core.c                           | 69 ++++++++++++++++++++++++
- drivers/pinctrl/freescale/pinctrl-imx.c          | 11 +---
- drivers/pinctrl/freescale/pinctrl-imx.h          |  1 -
- drivers/pinctrl/freescale/pinctrl-imx1-core.c    | 11 +---
- drivers/pinctrl/freescale/pinctrl-imx1.c         |  1 -
- drivers/pinctrl/freescale/pinctrl-imx1.h         |  1 -
- drivers/pinctrl/freescale/pinctrl-imx21.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx25.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx27.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx35.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx50.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx51.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx53.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx6dl.c       |  1 -
- drivers/pinctrl/freescale/pinctrl-imx6q.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-imx6sl.c       |  1 -
- drivers/pinctrl/freescale/pinctrl-imx6sx.c       |  1 -
- drivers/pinctrl/freescale/pinctrl-imx6ul.c       |  1 -
- drivers/pinctrl/freescale/pinctrl-imx7d.c        |  1 -
- drivers/pinctrl/freescale/pinctrl-vf610.c        |  1 -
- drivers/pinctrl/intel/pinctrl-cherryview.c       |  4 +-
- drivers/pinctrl/intel/pinctrl-intel.c            |  4 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c    | 17 +++---
- drivers/pinctrl/meson/pinctrl-meson.c            |  2 +-
- drivers/pinctrl/mvebu/pinctrl-armada-370.c       |  6 ---
- drivers/pinctrl/mvebu/pinctrl-armada-375.c       |  6 ---
- drivers/pinctrl/mvebu/pinctrl-armada-38x.c       |  6 ---
- drivers/pinctrl/mvebu/pinctrl-armada-39x.c       |  6 ---
- drivers/pinctrl/mvebu/pinctrl-armada-xp.c        |  6 ---
- drivers/pinctrl/mvebu/pinctrl-dove.c             |  5 +-
- drivers/pinctrl/mvebu/pinctrl-kirkwood.c         |  6 ---
- drivers/pinctrl/mvebu/pinctrl-mvebu.c            |  9 +---
- drivers/pinctrl/nomadik/pinctrl-abx500.c         |  3 +-
- drivers/pinctrl/nomadik/pinctrl-nomadik.c        |  2 +-
- drivers/pinctrl/pinctrl-adi2.c                   | 13 +----
- drivers/pinctrl/pinctrl-amd.c                    |  9 ++--
- drivers/pinctrl/pinctrl-as3722.c                 |  9 ++--
- drivers/pinctrl/pinctrl-at91-pio4.c              | 26 ++++-----
- drivers/pinctrl/pinctrl-at91.c                   | 13 +----
- drivers/pinctrl/pinctrl-digicolor.c              |  7 +--
- drivers/pinctrl/pinctrl-lantiq.c                 |  2 +-
- drivers/pinctrl/pinctrl-lpc18xx.c                |  3 +-
- drivers/pinctrl/pinctrl-palmas.c                 | 12 +----
- drivers/pinctrl/pinctrl-pic32.c                  |  3 +-
- drivers/pinctrl/pinctrl-pistachio.c              |  4 +-
- drivers/pinctrl/pinctrl-rockchip.c               |  2 +-
- drivers/pinctrl/pinctrl-st.c                     |  2 +-
- drivers/pinctrl/pinctrl-tb10x.c                  |  3 +-
- drivers/pinctrl/pinctrl-tz1090-pdc.c             | 13 +----
- drivers/pinctrl/pinctrl-tz1090.c                 | 13 +----
- drivers/pinctrl/pinctrl-u300.c                   | 12 +----
- drivers/pinctrl/pinctrl-zynq.c                   | 12 +----
- drivers/pinctrl/pxa/pinctrl-pxa2xx.c             | 10 +---
- drivers/pinctrl/qcom/pinctrl-msm.c               |  8 ++-
- drivers/pinctrl/qcom/pinctrl-spmi-gpio.c         |  7 +--
- drivers/pinctrl/qcom/pinctrl-spmi-mpp.c          |  7 +--
- drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c         |  9 +---
- drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c          |  9 +---
- drivers/pinctrl/samsung/pinctrl-exynos5440.c     |  2 +-
- drivers/pinctrl/samsung/pinctrl-samsung.c        |  3 +-
- drivers/pinctrl/sh-pfc/core.c                    |  1 -
- drivers/pinctrl/sh-pfc/core.h                    |  1 -
- drivers/pinctrl/sh-pfc/pinctrl.c                 | 12 +----
- drivers/pinctrl/spear/pinctrl-spear.c            | 11 +---
- drivers/pinctrl/spear/pinctrl-spear.h            |  1 -
- drivers/pinctrl/spear/pinctrl-spear1310.c        |  6 ---
- drivers/pinctrl/spear/pinctrl-spear1340.c        |  6 ---
- drivers/pinctrl/spear/pinctrl-spear300.c         |  6 ---
- drivers/pinctrl/spear/pinctrl-spear310.c         |  6 ---
- drivers/pinctrl/spear/pinctrl-spear320.c         |  6 ---
- drivers/pinctrl/stm32/pinctrl-stm32.c            |  7 +--
- drivers/pinctrl/sunxi/pinctrl-sunxi.c            | 13 ++---
- drivers/pinctrl/tegra/pinctrl-tegra-xusb.c       | 13 ++---
- drivers/pinctrl/tegra/pinctrl-tegra.c            | 12 +----
- drivers/pinctrl/tegra/pinctrl-tegra.h            |  2 -
- drivers/pinctrl/tegra/pinctrl-tegra114.c         |  1 -
- drivers/pinctrl/tegra/pinctrl-tegra124.c         |  1 -
- drivers/pinctrl/tegra/pinctrl-tegra20.c          |  1 -
- drivers/pinctrl/tegra/pinctrl-tegra210.c         |  1 -
- drivers/pinctrl/tegra/pinctrl-tegra30.c          |  1 -
- drivers/pinctrl/uniphier/pinctrl-ph1-ld4.c       |  1 -
- drivers/pinctrl/uniphier/pinctrl-ph1-ld6b.c      |  1 -
- drivers/pinctrl/uniphier/pinctrl-ph1-pro4.c      |  1 -
- drivers/pinctrl/uniphier/pinctrl-ph1-pro5.c      |  1 -
- drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c      |  1 -
- drivers/pinctrl/uniphier/pinctrl-proxstream2.c   |  1 -
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 12 +----
- drivers/pinctrl/uniphier/pinctrl-uniphier.h      |  2 -
- drivers/pinctrl/vt8500/pinctrl-wmt.c             |  7 +--
- include/linux/pinctrl/pinctrl.h                  |  6 +++
- 97 files changed, 179 insertions(+), 393 deletions(-)
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ drivers/pinctrl/core.c          | 69 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/pinctrl/pinctrl.h |  6 ++++
+ 2 files changed, 75 insertions(+)
 
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 2686a44..ea4a7e6 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -1861,6 +1861,75 @@ void pinctrl_unregister(struct pinctrl_dev *pctldev)
+ }
+ EXPORT_SYMBOL_GPL(pinctrl_unregister);
+ 
++static void devm_pinctrl_dev_release(struct device *dev, void *res)
++{
++	struct pinctrl_dev *pctldev = *(struct pinctrl_dev **)res;
++
++	pinctrl_unregister(pctldev);
++}
++
++static int devm_pinctrl_dev_match(struct device *dev, void *res, void *data)
++{
++	struct pctldev **r = res;
++
++	if (!r || !*r) {
++		WARN_ON(!r || !*r);
++		return 0;
++	}
++
++	return *r == data;
++}
++
++/**
++ * devm_pinctrl_register() - Resource manager pinctrl_register()
++ * @dev: parent device for this pin controller
++ * @pctldesc: descriptor for this pin controller
++ * @driver_data: private pin controller data for this pin controller
++ *
++ * Returns an error pointer if pincontrol register failed. Otherwise
++ * it returns valid pinctrl handle.
++ *
++ * The pinctrl device will be automatically released when the device is unbound.
++ */
++struct pinctrl_dev *devm_pinctrl_register(struct device *dev,
++					  struct pinctrl_desc *pctldesc,
++					  void *driver_data)
++{
++	struct pinctrl_dev **ptr, *pctldev;
++
++	ptr = devres_alloc(devm_pinctrl_dev_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	pctldev = pinctrl_register(pctldesc, dev, driver_data);
++	if (IS_ERR(pctldev)) {
++		devres_free(ptr);
++		return pctldev;
++	}
++
++	*ptr = pctldev;
++	devres_add(dev, ptr);
++
++	return pctldev;
++}
++EXPORT_SYMBOL_GPL(devm_pinctrl_register);
++
++/**
++ * devm_pinctrl_unregister() - Resource manager of pinctrl_unregister()
++ * @dev: device for which which resource was allocated
++ * @pctldev: the pinctrl device to unregister.
++ */
++void devm_pinctrl_unregister(struct device *dev, struct pinctrl_dev *pctldev)
++{
++	int ret;
++
++	ret = devres_release(dev, devm_pinctrl_dev_release,
++			     devm_pinctrl_dev_match, pctldev);
++	if (!ret)
++		WARN_ON(ret);
++}
++EXPORT_SYMBOL_GPL(devm_pinctrl_unregister);
++
+ static int __init pinctrl_init(void)
+ {
+ 	pr_info("initialized pinctrl subsystem\n");
+diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
+index 9ba59fc..a42e57d 100644
+--- a/include/linux/pinctrl/pinctrl.h
++++ b/include/linux/pinctrl/pinctrl.h
+@@ -144,6 +144,12 @@ struct pinctrl_desc {
+ extern struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
+ 				struct device *dev, void *driver_data);
+ extern void pinctrl_unregister(struct pinctrl_dev *pctldev);
++extern struct pinctrl_dev *devm_pinctrl_register(struct device *dev,
++				struct pinctrl_desc *pctldesc,
++				void *driver_data);
++extern void devm_pinctrl_unregister(struct device *dev,
++				struct pinctrl_dev *pctldev);
++
+ extern bool pin_is_valid(struct pinctrl_dev *pctldev, int pin);
+ extern void pinctrl_add_gpio_range(struct pinctrl_dev *pctldev,
+ 				struct pinctrl_gpio_range *range);
 -- 
 2.1.4
