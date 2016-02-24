@@ -1,44 +1,56 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Wed, 24 Feb 2016 11:16:34 +0100
-Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
- on PowerPC and ARM)
-In-Reply-To: <20160223202233.GE27281@arm.com>
-References: <20160211192223.4b517057@thinkpad>
- <20160211190942.GA10244@node.shutemov.name>
- <20160211205702.24f0d17a@thinkpad>
- <20160212154116.GA15142@node.shutemov.name> <56BE00E7.1010303@de.ibm.com>
- <20160212181640.4eabb85f@thinkpad> <20160223103221.GA1418@node.shutemov.name>
- <20160223191907.25719a4d@thinkpad>
- <20160223193345.GC21820@node.shutemov.name> <20160223202233.GE27281@arm.com>
-Message-ID: <56CD8302.9080202@de.ibm.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 24 Feb 2016 18:16:28 +0800
+Subject: [PATCH v1 4/4] clk: rockchip: set the clock ids for RK3228 HDMI
+In-Reply-To: <1456308303-29706-1-git-send-email-ykk@rock-chips.com>
+References: <1456308303-29706-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1456308988-30974-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2016 09:22 PM, Will Deacon wrote:
-> On Tue, Feb 23, 2016 at 10:33:45PM +0300, Kirill A. Shutemov wrote:
->> On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
->>> I'll check with Martin, maybe it is actually trivial, then we can
->>> do a quick test it to rule that one out.
->>
->> Oh. I found a bug in __split_huge_pmd_locked(). Although, not sure if it's
->> _the_ bug.
->>
->> pmdp_invalidate() is called for the wrong address :-/
->> I guess that can be destructive on the architecture, right?
-> 
-> FWIW, arm64 ignores the address parameter for set_pmd_at, so this would
-> only result in the TLBI nuking the wrong entries, which is going to be
-> tricky to observe in practice given that we install a table entry
-> immediately afterwards that maps the same pages. If s390 does more here
-> (I see some magic asm using the address), that could be the answer...
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3228.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-This patch does not change the address for set_pmd_at, it does that for the 
-pmdp_invalidate here (by keeping haddr at the start of the pmd)
-
---->    pmdp_invalidate(vma, haddr, pmd);
-        pmd_populate(mm, pmd, pgtable);
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index 8747b25..a8a6be2 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -285,7 +285,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 			RK2928_CLKSEL_CON(23), 14, 2, MFLAGS, 8, 6, DFLAGS,
+ 			RK2928_CLKGATE_CON(3), 5, GFLAGS),
  
-
-
-
-Without that fix we would clearly have stale tlb entries, no?
+-	GATE(0, "sclk_hdmi_hdcp", "xin24m", 0,
++	GATE(SCLK_HDMI_HDCP, "sclk_hdmi_hdcp", "xin24m", 0,
+ 			RK2928_CLKGATE_CON(3), 7, GFLAGS),
+ 
+ 	COMPOSITE(0, "sclk_hdmi_cec", mux_sclk_hdmi_cec_p, 0,
+@@ -364,7 +364,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 			RK2928_CLKGATE_CON(3), 1, GFLAGS),
+ 	MUX(0, "sclk_vop_src", mux_sclk_vop_src_p, 0,
+ 			RK2928_CLKSEL_CON(27), 0, 1, MFLAGS),
+-	DIV(0, "dclk_hdmiphy", "sclk_vop_src", 0,
++	DIV(DCLK_HDMI_PHY, "dclk_hdmiphy", "sclk_vop_src", 0,
+ 			RK2928_CLKSEL_CON(29), 0, 3, DFLAGS),
+ 	DIV(0, "sclk_vop_pre", "sclk_vop_src", 0,
+ 			RK2928_CLKSEL_CON(27), 8, 8, DFLAGS),
+@@ -517,7 +517,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 	GATE(0, "hclk_vop_noc", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 13, GFLAGS),
+ 	GATE(0, "hclk_vio_h2p", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 7, GFLAGS),
+ 	GATE(0, "hclk_hdcp_mmu", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 12, GFLAGS),
+-	GATE(0, "pclk_hdmi_ctrl", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 6, GFLAGS),
++	GATE(PCLK_HDMI_CTRL, "pclk_hdmi_ctrl", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 6, GFLAGS),
+ 	GATE(0, "pclk_vio_h2p", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 8, GFLAGS),
+ 	GATE(0, "pclk_hdcp", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 11, GFLAGS),
+ 
+@@ -590,7 +590,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 
+ 	GATE(0, "pclk_ddrphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 3, GFLAGS),
+ 	GATE(0, "pclk_acodecphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 5, GFLAGS),
+-	GATE(0, "pclk_hdmiphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 7, GFLAGS),
++	GATE(PCLK_HDMI_PHY, "pclk_hdmiphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 7, GFLAGS),
+ 	GATE(0, "pclk_vdacphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 8, GFLAGS),
+ 	GATE(0, "pclk_phy_noc", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 9, GFLAGS),
+ 
+-- 
+1.9.1
