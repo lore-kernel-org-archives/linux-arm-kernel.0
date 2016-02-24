@@ -1,21 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Feb 2016 12:37:08 +0900
-Subject: [PATCH] ASoC: rockchip: i2s: add default values for registers
-In-Reply-To: <1456190362-15653-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1456190362-15653-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <20160224033708.GM18327@sirena.org.uk>
+From: johnyoun@synopsys.com (John Youn)
+Date: Tue, 23 Feb 2016 19:54:54 -0800
+Subject: [PATCH v2 0/2] usb: dwc2: Remove host and gadget only code from core
+Message-ID: <cover.1456285777.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 09:19:22AM +0800, Sugar Zhang wrote:
-> this patch add default values for registers according description from TRM.
+This series moves the host/gadget-specific code from core.c to hcd.c
+and gadget.c so that they will be compiled only when their respective
+configurations are selected, or in DRD.
 
-This patch has already been applied, please send incremental changes if
-any are required.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/dcc533fc/attachment.sig>
+This is mostly just a straight move of the code. I have also added
+some comments to group related functions together.
+
+Compiled and tested in all three modes.
+
+This should also solve the issue reported here:
+http://marc.info/?l=linux-usb&m=145591813410106&w=2
+
+Although I wasn't able to test it... couldn't figure out how to
+disable CONFIG_USB and enable DWC2 in gadget mode.
+
+Felipe,
+
+This should be applied after Doug's series on your testing/next
+branch.
+
+Regards,
+John
+
+v2:
+* Addressed issues from Douglas Anderson
+* Restored comments on dwc2_calc_frame_interval()
+* Made some functions static and removed their prototypes from headers
+* Added tags
+
+John Youn (2):
+  usb: dwc2: Move register save and restore functions
+  usb: dwc2: Move host-specific core functions into hcd.c
+
+ drivers/usb/dwc2/core.c   | 1959 ---------------------------------------------
+ drivers/usb/dwc2/core.h   |   37 +-
+ drivers/usb/dwc2/gadget.c |  102 +++
+ drivers/usb/dwc2/hcd.c    | 1959 +++++++++++++++++++++++++++++++++++++++++++--
+ drivers/usb/dwc2/hcd.h    |    8 +
+ 5 files changed, 2033 insertions(+), 2032 deletions(-)
+
+-- 
+2.6.3
