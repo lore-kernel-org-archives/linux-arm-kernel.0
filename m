@@ -1,11 +1,11 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 24 Feb 2016 10:08:41 -0800
-Subject: [PATCH 19/50] pinctrl: ssbi-gpi: Use devm_pinctrl_register() for
+Date: Wed, 24 Feb 2016 10:09:13 -0800
+Subject: [PATCH 20/50] pinctrl: ssbi-mpp: Use devm_pinctrl_register() for
  pinctrl registration
-In-Reply-To: <1456319775-3216-20-git-send-email-ldewangan@nvidia.com>
+In-Reply-To: <1456319775-3216-21-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-20-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160224180841.GM21240@tuxbot>
+ <1456319775-3216-21-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20160224180913.GN21240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,23 +23,23 @@ Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Regards,
 Bjorn
 
->  drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c | 9 ++-------
+>  drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c | 9 ++-------
 >  1 file changed, 2 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-> index cd8580d..f71dda6 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-> @@ -729,7 +729,7 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+> diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+> index 54a5402..49cc734 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+> @@ -820,7 +820,7 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
 >  	pctrl->desc.custom_conf_items = pm8xxx_conf_items;
 >  #endif
 >  
 > -	pctrl->pctrl = pinctrl_register(&pctrl->desc, &pdev->dev, pctrl);
 > +	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &pctrl->desc, pctrl);
 >  	if (IS_ERR(pctrl->pctrl)) {
->  		dev_err(&pdev->dev, "couldn't register pm8xxx gpio driver\n");
+>  		dev_err(&pdev->dev, "couldn't register pm8xxx mpp driver\n");
 >  		return PTR_ERR(pctrl->pctrl);
-> @@ -745,7 +745,7 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+> @@ -836,7 +836,7 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
 >  	ret = gpiochip_add_data(&pctrl->chip, pctrl);
 >  	if (ret) {
 >  		dev_err(&pdev->dev, "failed register gpiochip\n");
@@ -48,7 +48,7 @@ Bjorn
 >  	}
 >  
 >  	ret = gpiochip_add_pin_range(&pctrl->chip,
-> @@ -765,9 +765,6 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+> @@ -856,9 +856,6 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
 >  unregister_gpiochip:
 >  	gpiochip_remove(&pctrl->chip);
 >  
@@ -58,7 +58,7 @@ Bjorn
 >  	return ret;
 >  }
 >  
-> @@ -777,8 +774,6 @@ static int pm8xxx_gpio_remove(struct platform_device *pdev)
+> @@ -868,8 +865,6 @@ static int pm8xxx_mpp_remove(struct platform_device *pdev)
 >  
 >  	gpiochip_remove(&pctrl->chip);
 >  
@@ -70,3 +70,8 @@ Bjorn
 > -- 
 > 2.1.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
