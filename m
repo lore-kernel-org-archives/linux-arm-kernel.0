@@ -1,34 +1,27 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Wed, 24 Feb 2016 16:04:51 +0100
-Subject: [PATCH 2/2] ARM: mxs_defconfig: Enable initramfs support
-In-Reply-To: <1456326291-20618-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1456326291-20618-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1456326291-20618-2-git-send-email-m.grzeschik@pengutronix.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 24 Feb 2016 16:06:02 +0100
+Subject: [PATCH 40/50] pinctrl: lpc18xx: Use devm_pinctrl_register() for
+ pinctrl registration
+In-Reply-To: <1456319775-3216-41-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-41-git-send-email-ldewangan@nvidia.com>
+Message-ID: <CAGhQ9Vzoosj=SpSn-fj1thL9bdfW+cay_truUR9VF8nP9HUwbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Luebbe <jlu@pengutronix.de>
+Hi Laxman,
 
-This makes it possible to automatically boot-test this defconfig with
-kernelci.org.
+On 24 February 2016 at 14:16, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+> Use devm_pinctrl_register() for pin control registration.
+>
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  drivers/pinctrl/pinctrl-lpc18xx.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
- arch/arm/configs/mxs_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Joachim Eastwood <manabian@gmail.com>
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 5e7b7df..dc498cd 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -12,6 +12,7 @@ CONFIG_IKCONFIG_PROC=y
- # CONFIG_IPC_NS is not set
- # CONFIG_PID_NS is not set
- # CONFIG_NET_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
- CONFIG_PERF_EVENTS=y
- # CONFIG_COMPAT_BRK is not set
- CONFIG_MODULES=y
--- 
-2.7.0
+
+regards,
+Joachim Eastwood
