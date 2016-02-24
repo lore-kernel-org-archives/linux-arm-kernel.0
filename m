@@ -1,168 +1,74 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 24 Feb 2016 09:30:47 +0100
-Subject: [PATCH v5 0/8] Add MT8173 Video Encoder Driver and VPU Driver
-In-Reply-To: <1456302223.15077.8.camel@mtksdaap41>
-References: <1456215081-16858-1-git-send-email-tiffany.lin@mediatek.com>
- <56CC1CAB.1060409@xs4all.nl> <1456302223.15077.8.camel@mtksdaap41>
-Message-ID: <56CD6A37.2040700@xs4all.nl>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 24 Feb 2016 09:37:46 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
+In-Reply-To: <20160224080803.GD30231@localhost>
+References: <cover.1455859965.git.horms+renesas@verge.net.au>
+ <20160224080803.GD30231@localhost>
+Message-ID: <CAMuHMdWxXFf0MFKP27y6g7CUc1MeG0PuJ-FdoSkV+2gB5NvQTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tiffany,
+Hi Olof,
 
-On 02/24/16 09:23, tiffany lin wrote:
-> Hi Hans,
-> 
-> On Tue, 2016-02-23 at 09:47 +0100, Hans Verkuil wrote:
->> On 02/23/16 09:11, Tiffany Lin wrote:
->>> ==============
->>>  Introduction
->>> ==============
->>>
->>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
->>> Mediatek Video Codec is able to handle video encoding of in a range of formats.
->>>
->>> This patch series also include VPU driver. Mediatek Video Codec driver rely on VPU driver to load,
->>> communicate with VPU.
->>>
->>> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI.
->>> MTK IOMMU[1] and MTK SMI[2] have not yet been merged, but we wanted to start discussion about the driver
->>> earlier so it could be merged sooner.
->>>
->>> [1]https://patchwork.kernel.org/patch/8335461/
->>> [2]https://patchwork.kernel.org/patch/7596181/
+On Wed, Feb 24, 2016 at 9:08 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Feb 19, 2016 at 03:09:46PM +0900, Simon Horman wrote:
+>> Please consider these Renesas ARM based SoC fixes for v4.5.
 >>
->> <snip>
+>> This pull request is comprised of patches from Geert Uytterhoeven to avoid
+>> writing to .text.
 >>
->>> v4l2-compliance test output:
->>> localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1
->>> Driver Info:
->>>         Driver name   : mtk-vcodec-enc
->>>         Card type     : platform:mt8173
->>>         Bus info      : platform:mt8173
->>>         Driver version: 4.4.0
->>>         Capabilities  : 0x84204000
->>>                 Video Memory-to-Memory Multiplanar
->>>                 Streaming
->>>                 Extended Pix Format
->>>                 Device Capabilities
->>>         Device Caps   : 0x04204000
->>>                 Video Memory-to-Memory Multiplanar
->>>                 Streaming
->>>                 Extended Pix Format
->>>
->>> Compliance test for device /dev/video1 (not using libv4l2):
->>>
->>> Required ioctls:
->>>         test VIDIOC_QUERYCAP: OK
->>>
->>> Allow for multiple opens:
->>>         test second video open: OK
->>>         test VIDIOC_QUERYCAP: OK
->>>         test VIDIOC_G/S_PRIORITY: OK
->>>
->>> Debug ioctls:
->>>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
->>>         test VIDIOC_LOG_STATUS: OK (Not Supported)
->>>
->>> Input ioctls:
->>>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
->>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
->>>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
->>>         test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
->>>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
->>>         Inputs: 0 Audio Inputs: 0 Tuners: 0
->>>
->>> Output ioctls:
->>>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
->>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
->>>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
->>>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
->>>         Outputs: 0 Audio Outputs: 0 Modulators: 0
->>>
->>> Input/Output configuration ioctls:
->>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->>>         test VIDIOC_G/S_EDID: OK (Not Supported)
->>>
->>>         Control ioctls:
->>>                 test VIDIOC_QUERYCTRL/MENU: OK
->>>                 test VIDIOC_G/S_CTRL: OK
->>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK
->>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
->>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->>>                 Standard Controls: 12 Private Controls: 0
->>>
->>>         Format ioctls:
->>>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->>>                 test VIDIOC_G/S_PARM: OK
->>>                 test VIDIOC_G_FBUF: OK (Not Supported)
->>>                 test VIDIOC_G_FMT: OK
->>>                 test VIDIOC_TRY_FMT: OK
->>>                 test VIDIOC_S_FMT: OK
->>>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
->>>
->>>         Codec ioctls:
->>>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
->>>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
->>>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
->>>
->>>         Buffer ioctls:
->>>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->>>                 test VIDIOC_EXPBUF: OK
->>>
->>> Total: 38, Succeeded: 38, Failed: 0, Warnings: 0
+>> * "ARM: shmobile: Move shmobile_scu_base from .text to .bss"
 >>
->> Nice!
+>>   Resolves a problem for XIP kernels as writing to .text is not allowed.
+>>   For non-XIP kernels a problem does not manifst as the pages are mapped
+>>   read-only during late kernel startup.
 >>
->> Can you try 'v4l2-compliance -s'? Note that this may not work since I know
->> that v4l2-compliance doesn't work all that well with codecs, but I am
->> curious what the output is when you try streaming.
+>> * The remaining patches resolve a kernel-crash that occurs during system
+>>   suspend for CONFIG_DEBUG_RODATA=y kernels.
 >>
->> Don't bother trying to chase down reported failures, those are likely from
->> v4l2-compliance itself. It is something I would like to improve, but -ENOTIME.
 >>
-> 
-> When I try to run 'v4l2-compliance -d /dev/video1 -s, I got follow
-> output.
-> I use v4.4-rc5 kernel and v4l-utils 1.6 version.
+>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>
+>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-fixes-for-v4.5
+>>
+>> for you to fetch changes up to 901c5ffaaed117a38be9d0c29247c4888d6c8636:
+>>
+>>   ARM: shmobile: Remove shmobile_boot_arg (2016-02-17 18:27:21 +0900)
+>
+> Hi Simon, Geert,
+>
+> I don't think any of these fixes are for regressions, are they? I.e. this is
+> work to enable configs that never used to work (XIP, CONFIG_DEBUG_RODATA)?
 
-Can you compile v4l2-compliance straight from the v4l-utils.git master branch?
-Version 1.6 is too old, and for proper compliance testing you should always use
-the master branch. It probably won't matter for this -s test, but for the
-regular test (without -s) it does make a difference.
+These configs indeed never worked before.
 
-If nothing else, using the master branch will make it easier for me to match up
-the line numbers that v4l2-compliance reports to the actual source.
+However,
+
+commit 25362dc496edaf17f714c0fecd8b3eb79670207b
+Author: Kees Cook <keescook@chromium.org>
+Date:   Tue Jan 26 01:19:36 2016 +0100
+
+    ARM: 8501/1: mm: flip priority of CONFIG_DEBUG_RODATA
+
+in arm/for-next will enable CONFIG_DEBUG_RODATA by default.
+
+Not having the fixes in v4.5 means that if Russell's tree is merged
+into mainline
+for v4.6 before arm-soc, it will cause regressions and bisection issues.
 
 Thanks!
 
-	Hans
+Gr{oetje,eeting}s,
 
-> 
-> Streaming ioctls:
->         test read/write: OK (Not Supported)
-> fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(332): buf.querybuf(node, i) fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(868): testQueryBuf(node, cur_fmt.type, q.g_buffers())
->         test MMAP: FAIL
-> fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(923): ret && ret != ENOTTY
-> 
-> fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(988): setupUserPtr(node, q)
->         test USERPTR: FAIL
->         test DMABUF: Cannot test, specify --expbuf-device
-> 
-> best regards,
-> Tiffany
-> 
->> Regards,
->>
->> 	Hans
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
