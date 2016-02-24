@@ -1,140 +1,120 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Feb 2016 13:19:57 +0000
-Subject: [PATCH v13 15/20] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <20160224122718.GD18451@cbox>
-References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
- <1456290520-10012-16-git-send-email-zhaoshenglong@huawei.com>
- <20160224122718.GD18451@cbox>
-Message-ID: <56CDADFD.10805@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 24 Feb 2016 14:22:05 +0100
+Subject: [PATCH v3 1/2] ehci-platform: Add support for controllers with
+ multiple reset lines
+In-Reply-To: <56CD960D.3000900@ti.com>
+References: <1456312517-24211-1-git-send-email-hdegoede@redhat.com>
+ <1456312517-24211-2-git-send-email-hdegoede@redhat.com>
+ <56CD960D.3000900@ti.com>
+Message-ID: <56CDAE7D.6000204@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/16 12:27, Christoffer Dall wrote:
-> On Wed, Feb 24, 2016 at 01:08:35PM +0800, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
+Hi,
+
+On 24-02-16 12:37, Roger Quadros wrote:
+> Hi,
+>
+> On 24/02/16 13:15, Hans de Goede wrote:
+>> From: Reinder de Haan <patchesrdh@mveas.com>
 >>
->> When calling perf_event_create_kernel_counter to create perf_event,
->> assign a overflow handler. Then when the perf event overflows, set the
->> corresponding bit of guest PMOVSSET register. If this counter is enabled
->> and its interrupt is enabled as well, kick the vcpu to sync the
->> interrupt.
+>> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+>> reset lines, the controller will not initialize while the reset for
+>> its companion is still asserted, which means we need to de-assert
+>> 2 resets for the controller to work.
 >>
->> On VM entry, if there is counter overflowed, inject the interrupt with
->> the level set to 1. Otherwise, inject the interrupt with the level set
->> to 0.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->> Reviewed-by: Andrew Jones <drjones@redhat.com>
+>> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 >> ---
->>  arch/arm/kvm/arm.c    |  2 ++
->>  include/kvm/arm_pmu.h |  3 +++
->>  virt/kvm/arm/pmu.c    | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++-
->>  3 files changed, 55 insertions(+), 1 deletion(-)
+>> Changes in v2:
+>> -Use the new reset_control_[de]assert_shared reset-controller functions
+>> Changes in v3:
+>> -Adjust for changes to shared-reset reset-controller functions
+>> ---
+>>   Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
+>>   drivers/usb/host/ehci-platform.c                   | 41 ++++++++++++----------
+>>   2 files changed, 24 insertions(+), 19 deletions(-)
 >>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index dda1959..f54264c 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/sched.h>
->>  #include <linux/kvm.h>
->>  #include <trace/events/kvm.h>
->> +#include <kvm/arm_pmu.h>
->>  
->>  #define CREATE_TRACE_POINTS
->>  #include "trace.h"
->> @@ -577,6 +578,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  		 * non-preemptible context.
->>  		 */
->>  		preempt_disable();
->> +		kvm_pmu_flush_hwstate(vcpu);
->>  		kvm_timer_flush_hwstate(vcpu);
->>  		kvm_vgic_flush_hwstate(vcpu);
->>  
->> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
->> index 8bc92d1..0aed4d4 100644
->> --- a/include/kvm/arm_pmu.h
->> +++ b/include/kvm/arm_pmu.h
->> @@ -35,6 +35,7 @@ struct kvm_pmu {
->>  	int irq_num;
->>  	struct kvm_pmc pmc[ARMV8_PMU_MAX_COUNTERS];
->>  	bool ready;
->> +	bool irq_level;
->>  };
->>  
->>  #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
->> @@ -44,6 +45,7 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
->>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
->> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
->>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->> @@ -67,6 +69,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
->>  static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
->> +static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
->>  static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
->>  static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
->> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
->> index cda869c..1cd4214 100644
->> --- a/virt/kvm/arm/pmu.c
->> +++ b/virt/kvm/arm/pmu.c
->> @@ -21,6 +21,7 @@
->>  #include <linux/perf_event.h>
->>  #include <asm/kvm_emulate.h>
->>  #include <kvm/arm_pmu.h>
->> +#include <kvm/arm_vgic.h>
->>  
->>  /**
->>   * kvm_pmu_get_counter_value - get PMU counter value
->> @@ -181,6 +182,53 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
->>  }
->>  
->>  /**
->> + * kvm_pmu_flush_hwstate - flush pmu state to cpu
->> + * @vcpu: The vcpu pointer
->> + *
->> + * Inject virtual PMU IRQ if IRQ is pending for this cpu.
->> + */
->> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
->> +{
->> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> +	bool overflow;
->> +
->> +	if (!kvm_arm_pmu_v3_ready(vcpu))
->> +		return;
->> +
->> +	overflow = !!kvm_pmu_overflow_status(vcpu);
->> +	if (pmu->irq_level != overflow) {
->> +		pmu->irq_level = overflow;
->> +		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
->> +				    pmu->irq_num, overflow);
->> +	}
-> 
-> a consequence of only doing this on flush and not checking if the input
-> to the vgic should be adjusted on sync is that if you exit the guest
-> because the guest does a 'wfi', for example, and you entered with the
-> overflow interrupt set, then kvm_arch_vcpu_runnable() will return true,
-> and the VCPU will not block but will run anyway.
-> 
-> Maybe not a big deal, but I think we might as well check the overflow
-> status on sync (coming back from the VM) and reset the line at that time
-> so that we have a 'more up to date' view of the interrupt line after
-> exiting a vcpu.
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> index a12d601..0701812 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> @@ -18,7 +18,7 @@ Optional properties:
+>>    - clocks : a list of phandle + clock specifier pairs
+>>    - phys : phandle + phy specifier pair
+>>    - phy-names : "usb"
+>> - - resets : phandle + reset specifier pair
+>> + - resets : a list of phandle + reset specifier pairs
+>>
+>>   Example (Sequoia 440EPx):
+>>       ehci at e0000300 {
+>> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+>> index bd7082f2..3f195ba 100644
+>> --- a/drivers/usb/host/ehci-platform.c
+>> +++ b/drivers/usb/host/ehci-platform.c
+>> @@ -39,11 +39,12 @@
+>>
+>>   #define DRIVER_DESC "EHCI generic platform driver"
+>>   #define EHCI_MAX_CLKS 3
+>> +#define EHCI_MAX_RESETS 2
+>>   #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
+>>
+>>   struct ehci_platform_priv {
+>>   	struct clk *clks[EHCI_MAX_CLKS];
+>> -	struct reset_control *rst;
+>> +	struct reset_control *resets[EHCI_MAX_RESETS];
+>>   	struct phy **phys;
+>>   	int num_phys;
+>>   	bool reset_on_resume;
+>> @@ -149,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+>>   	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+>>   	struct ehci_platform_priv *priv;
+>>   	struct ehci_hcd *ehci;
+>> -	int err, irq, phy_num, clk = 0;
+>> +	int err, irq, phy_num, clk = 0, rst = 0;
+>>
+>>   	if (usb_disabled())
+>>   		return -ENODEV;
+>> @@ -232,18 +233,22 @@ static int ehci_platform_probe(struct platform_device *dev)
+>>   				break;
+>>   			}
+>>   		}
+>> -	}
+>>
+>> -	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
+>> -	if (IS_ERR(priv->rst)) {
+>> -		err = PTR_ERR(priv->rst);
+>> -		if (err == -EPROBE_DEFER)
+>> -			goto err_put_clks;
+>> -		priv->rst = NULL;
+>> -	} else {
+>> -		err = reset_control_deassert(priv->rst);
+>> -		if (err)
+>> -			goto err_put_clks;
+>> +		for (rst = 0; rst < EHCI_MAX_RESETS; rst++) {
+>> +			priv->resets[rst] =
+>> +				devm_reset_control_get_shared_by_index(
+>> +								&dev->dev, rst);
+>> +			if (IS_ERR(priv->resets[rst])) {
+>> +				err = PTR_ERR(priv->resets[rst]);
+>> +				if (err == -EPROBE_DEFER)
+>> +					goto err_reset;
+>> +				priv->resets[rst] = NULL;
+>> +				break;
+>> +			}
+>> +			err = reset_control_deassert(priv->resets[rst]);
+>> +			if (err)
+>> +				goto err_reset;
+>> +		}
+>
+> Why is this code within "if (dev->of.node)" ?
+> Previous code looked like it worked for non-DT boots as well.
 
-That's a very good point. I can definitely imagine pathological
-behaviours if the guest otherwise relies on the overflow interrupt
-triggering.
+Because devm_reset_control_get_shared_by_index() only works for DT platforms
+(it is safe to call on non DT platforms, it will just always return -EINVAL
+there) and the old reset paths were ever only used / only ever worked with
+DT too.
 
-Shannon, can you please address this?
+Regards,
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Hans
