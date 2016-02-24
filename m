@@ -1,40 +1,38 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 24 Feb 2016 15:52:46 +0100
-Subject: [PATCH] ARM: dts: imx6q: add missing links between ipu2 and mipi dsi
-Message-ID: <1456325566-20375-1-git-send-email-p.zabel@pengutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 24 Feb 2016 08:53:46 -0600
+Subject: [PATCH v4 16/17] FDT: Add a helper to get specified name subnode
+In-Reply-To: <56CC3ED9.5000101@huawei.com>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
+ <CAL_JsqK8F6PQX2kC_+CtDk1-ykKRB3YB54o4FaypsRY_tNzK5w@mail.gmail.com>
+ <56CC3ED9.5000101@huawei.com>
+Message-ID: <CAL_JsqJJx_agcQRa=vU25Db33t8LtaoBw+dZB5jS2N7LA2KX2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The backlinks are already there since commit 4520e69238b3 ("ARM: dts:
-imx6qdl: Add IPU DI ports and endpoints, move imx-drm node to dtsi")
-and were moved by commit 70c2652c6c5b ("ARM: dts: imx6qdl: Move existing
-MIPI DSI ports into a new 'ports' node"), but the links from IPU2 DI0/1
-to the MIPI DSI mux are missing. Fix this.
+On Tue, Feb 23, 2016 at 5:13 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>
+>
+> On 2016/2/9 13:04, Rob Herring wrote:
+>> On Thu, Feb 4, 2016 at 9:05 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>
+>>> Sometimes it needs to check if there is a node in FDT by full path.
+>>
+>> I'm confused. Are you searching by full path or...
+>>
+>>> Introduce this helper to get the specified name subnode if it exists.
+>>
+>> name of sub node?
+>>
+> get the offset of sub node by specified name.
+>
+>> Either way, fdt_subnode_offset or fdt_path_offset doesn't work?
+>>
+> Ah?right?both of them should work. Does it need to add a wrapper in
+> drivers/of/fdt.c for them or directly use them with the parameter
+> initial_boot_params?
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6q.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Add a wrapper in fdt.c.
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 0d93c0e..26418f9 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -162,6 +162,7 @@
- 				};
- 
- 				ipu2_di0_mipi: endpoint at 2 {
-+					remote-endpoint = <&mipi_mux_2>;
- 				};
- 
- 				ipu2_di0_lvds0: endpoint at 3 {
-@@ -183,6 +184,7 @@
- 				};
- 
- 				ipu2_di1_mipi: endpoint at 2 {
-+					remote-endpoint = <&mipi_mux_3>;
- 				};
- 
- 				ipu2_di1_lvds0: endpoint at 3 {
--- 
-2.7.0
+Rob
