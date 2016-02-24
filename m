@@ -1,74 +1,145 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 24 Feb 2016 13:35:56 +0200
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <20160224105304.GM19428@n2100.arm.linux.org.uk>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <3695074.sKSIyOjpjD@wuerfel>
- <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
- <6859810.tb1t0IEONi@wuerfel> <56CC57FC.20707@ti.com>
- <CACRpkdYNaNtQQJ-tsBe5ksa4-z380ZQj-zN8ZnK0ED2kNPUwvg@mail.gmail.com>
- <56CC60C4.6040908@ti.com> <20160224105304.GM19428@n2100.arm.linux.org.uk>
-Message-ID: <56CD959C.9050007@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 24 Feb 2016 13:37:49 +0200
+Subject: [PATCH v3 1/2] ehci-platform: Add support for controllers with
+ multiple reset lines
+In-Reply-To: <1456312517-24211-2-git-send-email-hdegoede@redhat.com>
+References: <1456312517-24211-1-git-send-email-hdegoede@redhat.com>
+ <1456312517-24211-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <56CD960D.3000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/16 12:53, Russell King - ARM Linux wrote:
-> On Tue, Feb 23, 2016 at 03:38:12PM +0200, Tomi Valkeinen wrote:
->> Ok. I feel everyone is trying to push the ugly part out of their domain.
->> I want the board specific hacks out of fbdev. Bootloader people don't
->> want it there. arch/arm/ people don't want it there. =)
+Hi,
+
+On 24/02/16 13:15, Hans de Goede wrote:
+> From: Reinder de Haan <patchesrdh@mveas.com>
 > 
-> I think that is really really unfair.  No one is trying to push ugly
-> bits out of their domain - this is being driven by Linus, who is
-> trying to convert Versatile to DT.  There is no other agenda here.
+> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+> reset lines, the controller will not initialize while the reset for
+> its companion is still asserted, which means we need to de-assert
+> 2 resets for the controller to work.
 > 
-> Remember, I was the one who wrote the CLCD driver, and it was written
-> to support the boards at the time using the best methods at the time.
-> Things change, people's ideas of what's acceptable change.  What was
-> acceptable when classes of boards were separate is no longer acceptable
-> with single zImage.
+> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Use the new reset_control_[de]assert_shared reset-controller functions
+> Changes in v3:
+> -Adjust for changes to shared-reset reset-controller functions
+> ---
+>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
+>  drivers/usb/host/ehci-platform.c                   | 41 ++++++++++++----------
+>  2 files changed, 24 insertions(+), 19 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> index a12d601..0701812 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+> @@ -18,7 +18,7 @@ Optional properties:
+>   - clocks : a list of phandle + clock specifier pairs
+>   - phys : phandle + phy specifier pair
+>   - phy-names : "usb"
+> - - resets : phandle + reset specifier pair
+> + - resets : a list of phandle + reset specifier pairs
+>  
+>  Example (Sequoia 440EPx):
+>      ehci at e0000300 {
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index bd7082f2..3f195ba 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -39,11 +39,12 @@
+>  
+>  #define DRIVER_DESC "EHCI generic platform driver"
+>  #define EHCI_MAX_CLKS 3
+> +#define EHCI_MAX_RESETS 2
+>  #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
+>  
+>  struct ehci_platform_priv {
+>  	struct clk *clks[EHCI_MAX_CLKS];
+> -	struct reset_control *rst;
+> +	struct reset_control *resets[EHCI_MAX_RESETS];
+>  	struct phy **phys;
+>  	int num_phys;
+>  	bool reset_on_resume;
+> @@ -149,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+>  	struct ehci_platform_priv *priv;
+>  	struct ehci_hcd *ehci;
+> -	int err, irq, phy_num, clk = 0;
+> +	int err, irq, phy_num, clk = 0, rst = 0;
+>  
+>  	if (usb_disabled())
+>  		return -ENODEV;
+> @@ -232,18 +233,22 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  				break;
+>  			}
+>  		}
+> -	}
+>  
+> -	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
+> -	if (IS_ERR(priv->rst)) {
+> -		err = PTR_ERR(priv->rst);
+> -		if (err == -EPROBE_DEFER)
+> -			goto err_put_clks;
+> -		priv->rst = NULL;
+> -	} else {
+> -		err = reset_control_deassert(priv->rst);
+> -		if (err)
+> -			goto err_put_clks;
+> +		for (rst = 0; rst < EHCI_MAX_RESETS; rst++) {
+> +			priv->resets[rst] =
+> +				devm_reset_control_get_shared_by_index(
+> +								&dev->dev, rst);
+> +			if (IS_ERR(priv->resets[rst])) {
+> +				err = PTR_ERR(priv->resets[rst]);
+> +				if (err == -EPROBE_DEFER)
+> +					goto err_reset;
+> +				priv->resets[rst] = NULL;
+> +				break;
+> +			}
+> +			err = reset_control_deassert(priv->resets[rst]);
+> +			if (err)
+> +				goto err_reset;
+> +		}
 
-That's fine. I've done the same. The point here is where should we aim
-for with today's kernel? What's the good solution for the future boards?
+Why is this code within "if (dev->of.node)" ?
+Previous code looked like it worked for non-DT boots as well.
 
-> The board specific parts of CLCD were in arch/arm for a very long time,
-> but that gets in the way of single zImage, and the solution adopted by
-> the newly interested parties has been to move them to drivers/video
-> to keep things working.
+>  	}
+>  
+>  	if (pdata->big_endian_desc)
+> @@ -300,8 +305,8 @@ err_power:
+>  	if (pdata->power_off)
+>  		pdata->power_off(dev);
+>  err_reset:
+> -	if (priv->rst)
+> -		reset_control_assert(priv->rst);
+> +	while (--rst >= 0)
+> +		reset_control_assert(priv->resets[rst]);
+>  err_put_clks:
+>  	while (--clk >= 0)
+>  		clk_put(priv->clks[clk]);
+> @@ -319,15 +324,15 @@ static int ehci_platform_remove(struct platform_device *dev)
+>  	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+>  	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+> -	int clk;
+> +	int clk, rst;
+>  
+>  	usb_remove_hcd(hcd);
+>  
+>  	if (pdata->power_off)
+>  		pdata->power_off(dev);
+>  
+> -	if (priv->rst)
+> -		reset_control_assert(priv->rst);
+> +	for (rst = 0; rst < EHCI_MAX_RESETS && priv->resets[rst]; rst++)
+> +		reset_control_assert(priv->resets[rst]);
+>  
+>  	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+>  		clk_put(priv->clks[clk]);
+> 
 
-And I'm fine with having board specific parts in drivers/video when
-needed. That's the only option when we really need a driver for the
-board specific parts, i.e. we need to do something with the board
-specific HW at runtime.
-
-But that's not really the case with Versatile. Correct me if I'm wrong,
-but there's just one panel connected to the board at a time and the
-panel cannot be changed at runtime. We need to do the board specific
-panel probing once at boot time, but other than that, there's no
-difference to a single on-board panel.
-
-To me it sounds that the cleanest solution to this is that the
-bootloader does the detection (it's a trivial detection, isn't it? no
-complex busses need to be used?), and just passes the kernel the correct
-HW setup with DT.
-
-Again, I understand there are lots of board out there without bootloader
-doing that, so we may not get there with Versatile. But if someone comes
-with patches for a new board, I'd like to have a good suggestion how to
-handle similar cases the best way.
-
-> That's how we're here: there isn't a conspiracy as you seem to be
-> thinking.
-
-I wasn't exactly serious there, as the smiley tried to imply...
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/6b6f3241/attachment.sig>
+cheers,
+-roger
