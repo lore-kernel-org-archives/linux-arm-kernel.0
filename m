@@ -1,60 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Feb 2016 18:13:08 +0100
-Subject: [PATCH v2] clocksource: atmel-pit: register as a sched_clock
-In-Reply-To: <CAGkQfmPpyhU025nt+tcnsjWK3V+K3_7oiXxeqa7mPuHT08sLig@mail.gmail.com>
-References: <1456329882-20709-1-git-send-email-romain.izard.pro@gmail.com>
- <20160224162046.GA28743@finsecur.com>
- <CAGkQfmPpyhU025nt+tcnsjWK3V+K3_7oiXxeqa7mPuHT08sLig@mail.gmail.com>
-Message-ID: <56CDE4A4.7080508@atmel.com>
+From: robert.moore@intel.com (Moore, Robert)
+Date: Wed, 24 Feb 2016 17:17:54 +0000
+Subject: [PATCH v2 3/8] ACPI: add definitions of DBG2 subtypes
+In-Reply-To: <1456333819-13482-4-git-send-email-aleksey.makarov@linaro.org>
+References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456333819-13482-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37E44BCB5@ORSMSX110.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 24/02/2016 17:44, Romain Izard a ?crit :
-> 2016-02-24 17:20 GMT+01:00 Sylvain Rochet <sylvain.rochet@finsecur.com>:
->> Hi,
->>
->> On Wed, Feb 24, 2016 at 05:04:42PM +0100, Romain Izard wrote:
->>> Register the counter of the Periodic Interval Timer as a possible
->>> source for sched_clock. Keep the timer running even if the related
->>> clockevent is disabled.
->>>
->>> This provides a better precision than the jiffies-based default. The
->>> TCB clocksource does not work, as it is registered too late in the
->>> initialization sequence.
->>
->> I have mixed feelings about that, but this is probably just a
->> misunderstanding from my part.
->>
-> My goal is to get a better precision on my printk and trace logs,
-> because the precision of jiffies is really very bad compared to
-> everything else I have encountered until now. But it looks like reading
-> a timer is quite complicated on AT91...
+I've got these for the next release of ACPICA
+
+
+> -----Original Message-----
+> From: Aleksey Makarov [mailto:aleksey.makarov at linaro.org]
+> Sent: Wednesday, February 24, 2016 9:10 AM
+> To: linux-acpi at vger.kernel.org
+> Cc: linux-serial at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Aleksey Makarov; Russell King; Greg Kroah-
+> Hartman; Rafael J . Wysocki; Leif Lindholm; Graeme Gregory; Al Stone;
+> Christopher Covington; Len Brown; Moore, Robert; Zheng, Lv;
+> devel at acpica.org
+> Subject: [PATCH v2 3/8] ACPI: add definitions of DBG2 subtypes
 > 
->> The PIT timer should not be used for systems with PM_SUSPEND enabled
->> and used because it takes ages to synchronize on resume, how does this
->> patch affect that ?
->>
->> Ref: commit ac34ad27fc ("clockevents: Do not suspend/resume if
->> unused")
+> The recent version of Microsoft Debug Port Table 2 (DBG2) [1] specifies
+> additional serial debug port subtypes.  These constants are also referred
+> by Serial Port Console Redirection Table (SPCR) [2]
 > 
-> So your advice would be to stay clear of the PIT, because it is
-> (globally) useless.
+> Add these constants.
 > 
-> I'll keep it in mind.
-
-I tend to think like this as well.
-
-I would like to simplify our timer handling on AT91 and stick with TC
-for this purpose.
-It has de disadvantage of being obliged to use a TC(block) for
-clockevent/clocksource and loose it if we want to do something else with
-it but I do think that it's worth it.
-
-If you want a modified TC driver that registers sched_clock, we can
-provide you one as a workaround before that we rework the TC driver
-completely. It has it's own flaws (like re-using a compatible string or
-preventing the use of the "tclib") but is certainly handy.
-
-Bye,
--- 
-Nicolas Ferre
+> [1] https://msdn.microsoft.com/en-
+> us/library/windows/hardware/dn639131(v=vs.85).aspx
+> [2] https://msdn.microsoft.com/en-
+> us/library/windows/hardware/dn639132(v=vs.85).aspx
+> 
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  include/acpi/actbl2.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h index
+> a4ef625..652f747 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+> @@ -371,6 +371,11 @@ struct acpi_dbg2_device {
+> 
+>  #define ACPI_DBG2_16550_COMPATIBLE  0x0000
+>  #define ACPI_DBG2_16550_SUBSET      0x0001
+> +#define ACPI_DBG2_ARM_PL011         0x0003
+> +#define ACPI_DBG2_ARM_SBSA_32BIT    0x000D
+> +#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000E
+> +#define ACPI_DBG2_ARM_DCC           0x000F
+> +#define ACPI_DBG2_BCM2835           0x0010
+> 
+>  #define ACPI_DBG2_1394_STANDARD     0x0000
+> 
+> --
+> 2.7.1
