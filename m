@@ -1,75 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Feb 2016 17:18:58 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <s5h1t8b65n7.wl-tiwai@suse.de>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <s5h8u2j6749.wl-tiwai@suse.de> <s5h1t8b65n7.wl-tiwai@suse.de>
-Message-ID: <3238725.1iS2dg6EkI@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 24 Feb 2016 16:19:44 +0000
+Subject: [PATCH] arm64/mm: fix virtual address boundary check
+In-Reply-To: <1456329708-2042-1-git-send-email-miles.chen@mediatek.com>
+References: <1456329708-2042-1-git-send-email-miles.chen@mediatek.com>
+Message-ID: <20160224161944.GJ4777@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 February 2016 10:35:40 Takashi Iwai wrote:
-> On Wed, 17 Feb 2016 10:03:50 +0100,
-> +	const char *id;
-> +#ifdef CONFIG_SND_JACK_INPUT_DEV
-> +	struct input_dev *input_dev;
->  	int registered;
->  	int type;
-> -	const char *id;
->  	char name[100];
->  	unsigned int key[6];   /* Keep in sync with definitions above */
-> +#endif /* CONFIG_SND_JACK_INPUT_DEV */
->  	void *private_data;
->  	void (*private_free)(struct snd_jack *);
->  };
+On Thu, Feb 25, 2016 at 12:01:48AM +0800, miles.chen at mediatek.com wrote:
+> From: Miles Chen <miles.chen@mediatek.com>
+> 
+> The MODULES_VADDR is not the lowest possible
+> kernel virtual address. TASK_SIZE_64 may be larger than
+> MODULES_VADDR, FIXADDR_TOP, and PCI_IO_START.
+> 
+> Fix this by comparing TASK_SIZE_64 (highest user virtual address)
+> with VA_START (lowest kernel virtual address).
+> 
+>  #define VA_BITS		(CONFIG_ARM64_VA_BITS)
+>  #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+>  #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+>  #define MODULES_END		(PAGE_OFFSET)
+>  #define MODULES_VADDR		(MODULES_END - SZ_64M)
+>  #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+>  #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+>  #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+>  #define TASK_SIZE_64		(UL(1) << VA_BITS)
 
-I got a build error from this today, as the trace event tries to print
-the jack "name" field. I've managed to get it to build again by printing
-the "id" field in place of the "name". The name is normally assigned
-from id in snd_jack_dev_register using
+We should remove these checks altogether. There is a huge gap between
+the user and kernel addresses that they would never overlap (we don't
+have enough levels of page tables to cover 64-bit VA space).
 
-        snprintf(jack->name, sizeof(jack->name), "%s %s",
-                 card->shortname, jack->id);
-
-but that code is not called here at all. My patch will slightly
-alter the output as a consequence, but I don't know if this change
-is critical or not.
-
-	Arnd
-
-diff --git a/include/trace/events/asoc.h b/include/trace/events/asoc.h
-index 317a1ed2f4ac..9130dd5a184a 100644
---- a/include/trace/events/asoc.h
-+++ b/include/trace/events/asoc.h
-@@ -231,13 +231,13 @@ TRACE_EVENT(snd_soc_jack_report,
- 	TP_ARGS(jack, mask, val),
- 
- 	TP_STRUCT__entry(
--		__string(	name,		jack->jack->name	)
-+		__string(	name,		jack->jack->id		)
- 		__field(	int,		mask			)
- 		__field(	int,		val			)
- 	),
- 
- 	TP_fast_assign(
--		__assign_str(name, jack->jack->name);
-+		__assign_str(name, jack->jack->id);
- 		__entry->mask = mask;
- 		__entry->val = val;
- 	),
-@@ -253,12 +253,12 @@ TRACE_EVENT(snd_soc_jack_notify,
- 	TP_ARGS(jack, val),
- 
- 	TP_STRUCT__entry(
--		__string(	name,		jack->jack->name	)
-+		__string(	name,		jack->jack->id		)
- 		__field(	int,		val			)
- 	),
- 
- 	TP_fast_assign(
--		__assign_str(name, jack->jack->name);
-+		__assign_str(name, jack->jack->id);
- 		__entry->val = val;
- 	),
- 
+-- 
+Catalin
