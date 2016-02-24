@@ -1,59 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Feb 2016 17:56:57 +0100
-Subject: [PATCH] rtc: mt6397: Add platform device ID table
-In-Reply-To: <1455628747.2981.4.camel@mtksdaap41>
-References: <1455016095-13724-1-git-send-email-javier@osg.samsung.com>
- <2416670.q30ahHlzPm@wuerfel> <1455628747.2981.4.camel@mtksdaap41>
-Message-ID: <3216713.qF8RyQVuPO@wuerfel>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 24 Feb 2016 10:50:15 -0600
+Subject: [PATCH] dts: add specific compatible type for Terasic DE0-NANO-SoC
+ Board
+In-Reply-To: <8416439.76b9YNhpgR@dabox>
+References: <8416439.76b9YNhpgR@dabox>
+Message-ID: <alpine.DEB.2.02.1602241048100.3815@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 February 2016 21:19:07 Eddie Huang wrote:
-> On Tue, 2016-02-16 at 12:37 +0100, Arnd Bergmann wrote:
-> > On Monday 15 February 2016 11:50:48 Javier Martinez Canillas wrote:
-> > > 
-> > > On 02/14/2016 10:58 PM, Eddie Huang wrote:
-> > > 
-> > > [snip]
-> > > 
-> > > >> @@ -412,6 +418,7 @@ static struct platform_driver mtk_rtc_driver = {
-> > > >>      },
-> > > >>      .probe  = mtk_rtc_probe,
-> > > >>      .remove = mtk_rtc_remove,
-> > > >> +    .id_table = mt6397_rtc_id,
-> > > >>   };
-> > > >>
-> > > >>   module_platform_driver(mtk_rtc_driver);
-> > > >> @@ -419,4 +426,3 @@ module_platform_driver(mtk_rtc_driver);
-> > > >>   MODULE_LICENSE("GPL v2");
-> > > >>   MODULE_AUTHOR("Tianping Fang <tianping.fang@mediatek.com>");
-> > > >>   MODULE_DESCRIPTION("RTC Driver for MediaTek MT6397 PMIC");
-> > > >> -MODULE_ALIAS("platform:mt6397-rtc");
-> > > >
-> > > > This patch looks good to me, but I am wondering, since we tend to use
-> > > > device tree method to match driver, do we still need support platform
-> > > > device ID ?
-> > > >
-> > > 
-> > > I'm not familiar with neither this IP block nor the SoC so it is up to
-> > > you. I just noticed this issue when reviewing a regulator driver for a
-> > > similar PMIC posted by someone from mediatek.
-> > > 
-> > > I thought platform device was needed since the driver has a MODULE_ALIAS()
-> > > but please let me know what you prefer and I can re-spin the patch and
-> > > just remove the MODULE_ALIAS() if that makes more sense for this platform.
-> > >   
-> > > 
-> > 
-> > I agree. We can alway add a MODULE_DEVICE_TABLE() if we get multiple
-> > users of this driver on architectures that don't use devicetree yet.
-> > 
-> 
-> Sure. Thanks the patch to add expandability to this driver.
-> 
-> Acked-by: Eddie Huang <eddie.huang@mediatek.com>
+Hi Tim,
 
-I think we misunderstood one another. I think we can drop both the MODULE_DEVICE_TABLE and the MODULE_ALIAS: there is no need for another
-driver ID when it is always probed using DT.
+On Fri, 12 Feb 2016, Tim Sander wrote:
 
-	Arnd
+> From: Tim Sander <tim@krieglstein.org>
+> 
+> Add a more specific compatible string:"terasic,de0-nano-soc" for respective board.
+> Background: when checking for bootspec entries, some board specific fixups
+>                          are not apropriate for board of the same platform ("altr,socfpga-cyclone5").
+>                         The same aproach is taken with the EBV-Socrates board.
+>
+
+Please fix up the spacing in the commit message.
+
+> Signed-off-by: Tim Sander <tim@krieglstein.org>
+> ---
+>  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+> index 555e9caf21e1..3a427423168e 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+> @@ -18,7 +18,7 @@
+>  
+>  / {
+>         model = "Terasic DE-0(Atlas)";
+> -       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+> +       compatible = "terasic,de0-nano-soc"," altr,socfpga-cyclone5", "altr,socfpga";
+> 
+
+"terasic" is not listed in Documentation/devicetree/bindings/vendor-prefixes.txt.
+ 
+BR,
+Dinh
