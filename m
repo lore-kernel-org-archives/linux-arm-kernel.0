@@ -1,50 +1,43 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Wed, 24 Feb 2016 17:06:03 -0500
-Subject: USB_GADGETFS in kernel vs module
-Message-ID: <CAF_dkJBmwCjjneqiynEiRyC5UuOzkS=2H=uyawxc4V2whySneA@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 25 Feb 2016 09:07:02 +1100
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+Message-ID: <20160225090702.6f090bcf@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, I know it's archaic, and possibly even obsolete, but I have code
-that uses it.
+Hi Simon,
 
-I have a _defconfig file that sets CONFIG_USB_GADGETFS to "y".
+Today's linux-next merge of the renesas tree got a conflict in:
 
-If I do the following:
+  arch/arm64/configs/defconfig
 
-$ cp path/to/my/defconfig .config
-$ yes "" | make -k ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- oldconfig
+between commit:
 
-I get a .config file with CONFIG_USB_GADGETFS set to "m".
-(This is what buildroot does, which is where I found this.)
+  efdda175c07f ("arm64: defconfig: add spmi and usb related configs")
 
-Is there any way I can hand-tweak my _defconfig file so that
-CONFIG_USB_GADGETFS remains "y"?
+from the arm-soc tree and commit:
 
-If you want to play along at home (with the linux-at91 kernel, if that
-makes a difference, which I doubt), you can do the following to see
-the problem:
+  a9c42f02387c ("arm64: defconfig: Add Renesas R-Car Gen3 USB 2.0 phy driver support")
 
-$ echo CONFIG_MODULES=y > .config
-$ echo CONFIG_USB_GADGET=y >> .config
-$ echo CONFIG_USB_GADGETFS=y >> .config
-$ yes "" | make -k ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- oldconfig
-...
-$ grep CONFIG_USB_GADGET .config
-CONFIG_USB_GADGET=y
-# CONFIG_USB_GADGET_DEBUG_FILES is not set
-CONFIG_USB_GADGET_VBUS_DRAW=2
-CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS=2
-# CONFIG_USB_GADGET_XILINX is not set
-CONFIG_USB_GADGETFS=m
+from the renesas tree.
 
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-After some amount of experimentation and bisection, I have learned
-that CONFIG_USB_GADGETFS defaults to "m" when CONFIG_MODULES=y,
-despite the fact that I set it to "y" in my config file fragment.
+-- 
+Cheers,
+Stephen Rothwell
 
-Why is that?  Any clues?
-
-Thanks.
-
---wpd
+diff --cc arch/arm64/configs/defconfig
+index 7fddb2188f5c,eaf738a59927..000000000000
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@@ -230,7 -213,7 +230,8 @@@ CONFIG_QCOM_SMD_RPM=
+  CONFIG_ARCH_TEGRA_132_SOC=y
+  CONFIG_ARCH_TEGRA_210_SOC=y
+  CONFIG_HISILICON_IRQ_MBIGEN=y
+ +CONFIG_EXTCON_USB_GPIO=y
++ CONFIG_PHY_RCAR_GEN3_USB2=y
+  CONFIG_PHY_XGENE=y
+  CONFIG_EXT2_FS=y
+  CONFIG_EXT3_FS=y
