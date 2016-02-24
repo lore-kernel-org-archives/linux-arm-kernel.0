@@ -1,42 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 12:18:08 -0800
-Subject: [GIT PULL] RealView defconfig reduction
-In-Reply-To: <CACRpkdYUPFm=s6mZbU8xTHqQBtcvmdCzaTCfSBPfBQ1qQi2f5Q@mail.gmail.com>
-References: <CACRpkdYUPFm=s6mZbU8xTHqQBtcvmdCzaTCfSBPfBQ1qQi2f5Q@mail.gmail.com>
-Message-ID: <20160224201808.GB10126@localhost>
+Date: Wed, 24 Feb 2016 12:18:55 -0800
+Subject: [GIT PULL v2] ARM: mvebu: dt for v4.6 (#1)
+In-Reply-To: <87twliyzb2.fsf@free-electrons.com>
+References: <87twliyzb2.fsf@free-electrons.com>
+Message-ID: <20160224201855.GC10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 10:49:38AM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Tue, Feb 09, 2016 at 11:04:49AM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> this cuts the RealView SMP-specific defconfig. It is just confusing and
-> hard to handle now that we can do SMP on UP.
+> Here is the second version of the first pull request for dt for mvebu
+> for v4.6.  This one is based on v4.5-rc3 because it depends on fixes
+> merged previously.
 > 
-> Tested on RealView PB11MPcore (SMP) and PB1176JZF-S (UP).
+> As requested by Olof, I aligned the commit title.
 > 
-> I don't know if people's autobuild systems are made to handled the case
-> where a defconfig disappears, so heads up to Kevin & Olof.
+> Gregory
 > 
-> Please pull this in for this or the next kernel cycle whatever suits you
-> best.
+> The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
 > 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-> 
->   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>   Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/realview-defconfig-redux
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.6-1
 > 
-> for you to fetch changes up to 52abf1eff88d291c5ba092dc93fc8065efd94236:
+> for you to fetch changes up to 5dda254d0cc5cbdcc81dbce0985c35b68dd5e3b1:
 > 
->   ARM: realview: enable USB storage in the defconfig (2016-02-09 10:39:38 +0100)
+>   ARM: dts: kirkwood: add device tree for buffalo linkstation ls-qvl (2016-02-09 11:00:26 +0100)
+> 
+> ----------------------------------------------------------------
+> mvebu dt for 4.6 (part 1)
+> 
+> - Improve Armada 38x device tree (SATA and XHCI)
+> - Fix SD Card and audio support for OpenRD board
+> - Provide template for RS-232/485 configuration for the same board
+> - Use a common dtsi file for linkstation boards
+> - Add support for Buffalo Linkstation LS-QVL
 
-Thanks, merged!
+Thanks, merged.
+
 
 -Olof
