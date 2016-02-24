@@ -1,51 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Feb 2016 17:12:18 +0000
-Subject: [PATCH 00/13] arm-cci: PMU driver updates for 4.6
-In-Reply-To: <20160224165814.GA10126@localhost>
-References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
- <20160223114003.GF3966@arm.com> <56CC64E7.3040407@arm.com>
- <20160224165814.GA10126@localhost>
-Message-ID: <20160224171218.GC12471@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 24 Feb 2016 18:13:08 +0100
+Subject: [PATCH v2] clocksource: atmel-pit: register as a sched_clock
+In-Reply-To: <CAGkQfmPpyhU025nt+tcnsjWK3V+K3_7oiXxeqa7mPuHT08sLig@mail.gmail.com>
+References: <1456329882-20709-1-git-send-email-romain.izard.pro@gmail.com>
+ <20160224162046.GA28743@finsecur.com>
+ <CAGkQfmPpyhU025nt+tcnsjWK3V+K3_7oiXxeqa7mPuHT08sLig@mail.gmail.com>
+Message-ID: <56CDE4A4.7080508@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 08:58:14AM -0800, Olof Johansson wrote:
-> On Tue, Feb 23, 2016 at 01:55:51PM +0000, Suzuki K. Poulose wrote:
-> > On 23/02/16 11:40, Will Deacon wrote:
-> > >On Tue, Feb 23, 2016 at 10:49:42AM +0000, Suzuki K Poulose wrote:
-> > >>Here are some fixes and updates for arm-cci pmu driver targeting v4.6,
-> > >>applies on top of v4.5-rc5.
-> > >>
-> > >>Highlights include :
-> > >>  - Support for CoreLink CCI-550 PMU
-> > >>  - Reliable writes to PMU Counter registers for CCI-500/550.
-> > >>
-> > >>All the patches have been Acked. Please let me know how this
-> > >>can be merged.
-> > 
-> > >>
-> > >>  Documentation/devicetree/bindings/arm/cci.txt |    2 +
-> > >>  drivers/bus/Kconfig                           |   10 +-
-> > >>  drivers/bus/arm-cci.c                         |  612 +++++++++++++++++--------
-> > >>  3 files changed, 427 insertions(+), 197 deletions(-)
-> > >
-> > >How do you plan to merge this? I can take it all onto a branch for
-> > >arm-soc, or I can include it on my perf/updates branch, or ...?
-> > 
-> > Arnd, Olof,
-> > 
-> > What do you think would be the best route ?
+Le 24/02/2016 17:44, Romain Izard a ?crit :
+> 2016-02-24 17:20 GMT+01:00 Sylvain Rochet <sylvain.rochet@finsecur.com>:
+>> Hi,
+>>
+>> On Wed, Feb 24, 2016 at 05:04:42PM +0100, Romain Izard wrote:
+>>> Register the counter of the Periodic Interval Timer as a possible
+>>> source for sched_clock. Keep the timer running even if the related
+>>> clockevent is disabled.
+>>>
+>>> This provides a better precision than the jiffies-based default. The
+>>> TCB clocksource does not work, as it is registered too late in the
+>>> initialization sequence.
+>>
+>> I have mixed feelings about that, but this is probably just a
+>> misunderstanding from my part.
+>>
+> My goal is to get a better precision on my printk and trace logs,
+> because the precision of jiffies is really very bad compared to
+> everything else I have encountered until now. But it looks like reading
+> a timer is quite complicated on AT91...
 > 
-> Traditionally we've been picking these up in arm-soc in our drivers branch.
+>> The PIT timer should not be used for systems with PM_SUSPEND enabled
+>> and used because it takes ages to synchronize on resume, how does this
+>> patch affect that ?
+>>
+>> Ref: commit ac34ad27fc ("clockevents: Do not suspend/resume if
+>> unused")
 > 
-> Will, unless you want them in your tree for some reason that's what I'll do
-> here as well.
+> So your advice would be to stay clear of the PIT, because it is
+> (globally) useless.
+> 
+> I'll keep it in mind.
 
-Just that I already have some CPU PMU patches that I planned to send, so
-I could bundle these in with those if necessary. I have no preference
-either way though, as long as they get queued someplace.
+I tend to think like this as well.
 
-At some point, those drivers should be largely moved from drivers/bus/
-to drivers/perf/, but that's a separate issue.
+I would like to simplify our timer handling on AT91 and stick with TC
+for this purpose.
+It has de disadvantage of being obliged to use a TC(block) for
+clockevent/clocksource and loose it if we want to do something else with
+it but I do think that it's worth it.
 
-Will
+If you want a modified TC driver that registers sched_clock, we can
+provide you one as a workaround before that we rework the TC driver
+completely. It has it's own flaws (like re-using a compatible string or
+preventing the use of the "tclib") but is certainly handy.
+
+Bye,
+-- 
+Nicolas Ferre
