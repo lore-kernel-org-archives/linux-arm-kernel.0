@@ -1,10 +1,10 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:46 +0530
-Subject: [PATCH 21/50] pinctrl: msm: Use devm_pinctrl_register() for pinctrl
- registration
+Date: Wed, 24 Feb 2016 18:45:44 +0530
+Subject: [PATCH 19/50] pinctrl: ssbi-gpi: Use devm_pinctrl_register() for
+ pinctrl registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-22-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-20-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,45 +13,50 @@ the error path.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/pinctrl/qcom/pinctrl-msm.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-index 8777cf0..dc7bf77 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -898,17 +898,16 @@ int msm_pinctrl_probe(struct platform_device *pdev,
- 	msm_pinctrl_desc.name = dev_name(&pdev->dev);
- 	msm_pinctrl_desc.pins = pctrl->soc->pins;
- 	msm_pinctrl_desc.npins = pctrl->soc->npins;
--	pctrl->pctrl = pinctrl_register(&msm_pinctrl_desc, &pdev->dev, pctrl);
-+	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &msm_pinctrl_desc,
-+					     pctrl);
+diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
+index cd8580d..f71dda6 100644
+--- a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
++++ b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
+@@ -729,7 +729,7 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+ 	pctrl->desc.custom_conf_items = pm8xxx_conf_items;
+ #endif
+ 
+-	pctrl->pctrl = pinctrl_register(&pctrl->desc, &pdev->dev, pctrl);
++	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &pctrl->desc, pctrl);
  	if (IS_ERR(pctrl->pctrl)) {
- 		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
+ 		dev_err(&pdev->dev, "couldn't register pm8xxx gpio driver\n");
  		return PTR_ERR(pctrl->pctrl);
+@@ -745,7 +745,7 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+ 	ret = gpiochip_add_data(&pctrl->chip, pctrl);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed register gpiochip\n");
+-		goto unregister_pinctrl;
++		return ret;
  	}
  
- 	ret = msm_gpio_init(pctrl);
--	if (ret) {
--		pinctrl_unregister(pctrl->pctrl);
-+	if (ret)
- 		return ret;
--	}
+ 	ret = gpiochip_add_pin_range(&pctrl->chip,
+@@ -765,9 +765,6 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+ unregister_gpiochip:
+ 	gpiochip_remove(&pctrl->chip);
  
- 	platform_set_drvdata(pdev, pctrl);
+-unregister_pinctrl:
+-	pinctrl_unregister(pctrl->pctrl);
+-
+ 	return ret;
+ }
  
-@@ -923,7 +922,6 @@ int msm_pinctrl_remove(struct platform_device *pdev)
- 	struct msm_pinctrl *pctrl = platform_get_drvdata(pdev);
+@@ -777,8 +774,6 @@ static int pm8xxx_gpio_remove(struct platform_device *pdev)
  
  	gpiochip_remove(&pctrl->chip);
--	pinctrl_unregister(pctrl->pctrl);
  
- 	unregister_restart_handler(&pctrl->restart_nb);
+-	pinctrl_unregister(pctrl->pctrl);
+-
+ 	return 0;
+ }
  
 -- 
 2.1.4
