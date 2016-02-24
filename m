@@ -1,22 +1,16 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Feb 2016 17:39:02 +0100
-Subject: [PATCH] sound: hdmi: avoid dereferencing uninitialized 'jack'
- pointer
-In-Reply-To: <s5hziuqcby1.wl-tiwai@suse.de>
-References: <1455634059-1896914-1-git-send-email-arnd@arndb.de>
- <3238725.1iS2dg6EkI@wuerfel> <s5hziuqcby1.wl-tiwai@suse.de>
-Message-ID: <2576612.maDBOzAeKt@wuerfel>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 24 Feb 2016 09:41:42 -0700
+Subject: [PATCH 30/50] pinctrl: tegra-xusb: Use devm_pinctrl_register()
+ for pinctrl registration
+In-Reply-To: <1456319775-3216-31-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-31-git-send-email-ldewangan@nvidia.com>
+Message-ID: <56CDDD46.1060907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 February 2016 17:25:42 Takashi Iwai wrote:
-> 
-> Thanks for catching this.  Yes, your fix is correct.  This must have
-> been a wrong pick up when converting from the standalone hda jack to
-> unified jack stuff.
-> 
-> Could you send a proper patch for inclusion?
+On 02/24/2016 06:15 AM, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration and clean
+> the error path.
 
-Ok, done.
-
-	Arnd
+Acked-by: Stephen Warren <swarren@nvidia.com>
