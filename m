@@ -1,102 +1,63 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 24 Feb 2016 14:57:50 +0100
-Subject: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
-In-Reply-To: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
-References: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20160224145750.21050def@bbrezillon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 24 Feb 2016 14:59:44 +0100
+Subject: [PATCH 25/50] pinctrl: ish-pfc: Use devm_pinctrl_register() for
+ pinctrl registration
+In-Reply-To: <1456319775-3216-26-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-26-git-send-email-ldewangan@nvidia.com>
+Message-ID: <CAMuHMdVBjn02J1tAwXb7XQKQa3jk=D4LX-f-1cZ2wsjc3Gfxqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+Hi Laxman,
 
-On Sun, 21 Feb 2016 13:52:06 +0100
-Markus Pargmann <mpa@pengutronix.de> wrote:
+On Wed, Feb 24, 2016 at 2:15 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+> Use devm_pinctrl_register() for pin control registration.
+>
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: linux-renesas-soc at vger.kernel.org
 
-> ECC is only calculated for written pages. As erased pages are not
-> actively written the ECC is always invalid. For this purpose the
-> Hardware BCH unit is able to check for erased pages and does not raise
-> an ECC error in this case. This behaviour can be influenced using the
-> BCH_MODE register which sets the number of allowed bitflips in an erased
-> page. Unfortunately the unit is not capable of fixing the bitflips in
-> memory.
-> 
-> To avoid complete software checks for erased pages, we can simply check
-> buffers with uncorrectable ECC errors because we know that any erased
-> page with errors is uncorrectable by the BCH unit.
-> 
-> This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
-> to correct erased pages. To have the valid data in the buffer before
-> using them, this patch moves the read_page_swap_end() call before the
-> ECC status checking for-loop.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 49 ++++++++++++++++++++++++++++++----
->  1 file changed, 44 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index 235ddcb58f39..ce5a21252102 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -1035,14 +1035,58 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
->  	/* Loop over status bytes, accumulating ECC status. */
->  	status = auxiliary_virt + nfc_geo->auxiliary_status_offset;
->  
-> +	read_page_swap_end(this, buf, nfc_geo->payload_size,
-> +			   this->payload_virt, this->payload_phys,
-> +			   nfc_geo->payload_size,
-> +			   payload_virt, payload_phys);
-> +
->  	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
->  		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
->  			continue;
->  
->  		if (*status == STATUS_UNCORRECTABLE) {
-> +			int flips;
-> +
-> +			/*
-> +			 * The ECC hardware has an uncorrectable ECC status
-> +			 * code in case we have bitflips in an erased page. As
-> +			 * nothing was written into this subpage the ECC is
-> +			 * obviously wrong and we can not trust it. We assume
-> +			 * at this point that we are reading an erased page and
-> +			 * try to correct the bitflips in buffer up to
-> +			 * ecc_strength bitflips. If this is a page with random
-> +			 * data, we exceed this number of bitflips and have a
-> +			 * ECC failure. Otherwise we use the corrected buffer.
-> +			 */
-> +			if (i == 0) {
-> +				/* The first block includes metadata */
-> +				flips = nand_check_erased_ecc_chunk(
-> +						buf + i * nfc_geo->ecc_chunk_size,
-> +						nfc_geo->ecc_chunk_size,
-> +						NULL, 0,
-> +						auxiliary_virt,
-> +						nfc_geo->metadata_size,
-> +						nfc_geo->ecc_strength);
-> +			} else {
-> +				flips = nand_check_erased_ecc_chunk(
-> +						buf + i * nfc_geo->ecc_chunk_size,
-> +						nfc_geo->ecc_chunk_size,
-> +						NULL, 0,
-> +						NULL, 0,
-> +						nfc_geo->ecc_strength);
-> +			}
+Thanks for your patch!
 
-You're not checking ECC bytes. I know it's a bit more complicated to
-implement, but as Brian stated several times, you should always check
-ECC bytes along with data bytes when testing for an erased chunk.
+> index 87b0a59..f17b5fc 100644
+> --- a/drivers/pinctrl/sh-pfc/pinctrl.c
+> +++ b/drivers/pinctrl/sh-pfc/pinctrl.c
+> @@ -692,19 +692,9 @@ int sh_pfc_register_pinctrl(struct sh_pfc *pfc)
+>         pmx->pctl_desc.pins = pmx->pins;
+>         pmx->pctl_desc.npins = pfc->info->nr_pins;
+>
+> -       pmx->pctl = pinctrl_register(&pmx->pctl_desc, pfc->dev, pmx);
+> +       pmx->pctl = devm_pinctrl_register(pfc->dev, &pmx->pctl_desc, pmx);
+>         if (IS_ERR(pmx->pctl))
+>                 return PTR_ERR(pmx->pctl);
+>
+>         return 0;
+>  }
+> -
+> -int sh_pfc_unregister_pinctrl(struct sh_pfc *pfc)
+> -{
+> -       struct sh_pfc_pinctrl *pmx = pfc->pinctrl;
+> -
+> -       pinctrl_unregister(pmx->pctl);
+> -
+> -       pfc->pinctrl = NULL;
+> -       return 0;
+> -}
 
-Indeed, it might appear that the user really programmed ff on the page,
-and in this case you don't want to consider the page as erased.
-In this case, the ECC bytes will be different from ff, and you'll
-be able to identify it by checking those ECC bytes.
+There's no longer a need to have sh_pfc.pinctrl, so please remove that field
+while you're at it.
 
-Best Regards,
+Thanks!
 
-Boris
+Gr{oetje,eeting}s,
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
