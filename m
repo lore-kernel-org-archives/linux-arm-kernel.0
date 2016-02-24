@@ -1,72 +1,39 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 24 Feb 2016 10:07:27 -0800
-Subject: [PATCH 18/50] pinctrl: spmi: Use devm_pinctrl_register() for
- pinctrl registration
-In-Reply-To: <1456319775-3216-19-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-19-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160224180727.GL21240@tuxbot>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 24 Feb 2016 10:07:44 -0800
+Subject: [PATCH v3] arm64: Add workaround for Cavium erratum 27456
+In-Reply-To: <20160224180626.GF12471@arm.com>
+References: <1456272534-21692-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160224134016.GH28310@arm.com> <56CDB912.6000300@arm.com>
+ <56CDF056.8020408@caviumnetworks.com> <20160224180626.GF12471@arm.com>
+Message-ID: <56CDF170.30509@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 24 Feb 05:15 PST 2016, Laxman Dewangan wrote:
+On 02/24/2016 10:06 AM, Will Deacon wrote:
+> On Wed, Feb 24, 2016 at 10:03:02AM -0800, David Daney wrote:
+>> On 02/24/2016 06:07 AM, Marc Zyngier wrote:
+>>> On 24/02/16 13:40, Will Deacon wrote:
+>>>
+>>> [...]
+>>>
+>>>> (and Catalin, if you pick this up, watch out for the conflicts in
+>>>> cpufeature.h)
+>>>
+>>> Yup, that one is about to become a minefield (ARM64_HAS_NO_HW_PREFETCH,
+>>> ARM64_HAS_UAO, ARM64_ALT_PAN_NOT_UAO and ARM64_HAS_VIRT_HOST_EXTN are
+>>> already happily clashing into -next). But hey, the more the merrier! ;-)
+>>>
+>>
+>> Would you like me to rebase it to for-next/core ?
+>
+> I think ARM64_HAS_VIRT_HOST_EXTN is in the KVM tree, so you're probably
+> best off looking at linux-next and choosing your feature number based on
+> that, whilst basing the patch on either for-next/core or mainline.
+>
 
-> Use devm_pinctrl_register() for pin control registration and clean
-> the error path.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Jonas Gorski <jogo@openwrt.org>
+OK, I will do that now.
 
-Reviewed-by: Bjorn Andersson <bjorn.anderss@linaro.org>
+David.
 
-Regards,
-Bjorn
-
-> ---
->  drivers/pinctrl/qcom/pinctrl-spmi-mpp.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-> index 2a3e549..418367e 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-> @@ -877,14 +877,14 @@ static int pmic_mpp_probe(struct platform_device *pdev)
->  	state->chip.of_gpio_n_cells = 2;
->  	state->chip.can_sleep = false;
->  
-> -	state->ctrl = pinctrl_register(pctrldesc, dev, state);
-> +	state->ctrl = devm_pinctrl_register(dev, pctrldesc, state);
->  	if (IS_ERR(state->ctrl))
->  		return PTR_ERR(state->ctrl);
->  
->  	ret = gpiochip_add_data(&state->chip, state);
->  	if (ret) {
->  		dev_err(state->dev, "can't add gpio chip\n");
-> -		goto err_chip;
-> +		return ret;
->  	}
->  
->  	ret = gpiochip_add_pin_range(&state->chip, dev_name(dev), 0, 0, npins);
-> @@ -897,8 +897,6 @@ static int pmic_mpp_probe(struct platform_device *pdev)
->  
->  err_range:
->  	gpiochip_remove(&state->chip);
-> -err_chip:
-> -	pinctrl_unregister(state->ctrl);
->  	return ret;
->  }
->  
-> @@ -907,7 +905,6 @@ static int pmic_mpp_remove(struct platform_device *pdev)
->  	struct pmic_mpp_state *state = platform_get_drvdata(pdev);
->  
->  	gpiochip_remove(&state->chip);
-> -	pinctrl_unregister(state->ctrl);
->  	return 0;
->  }
->  
-> -- 
-> 2.1.4
-> 
+> Will
+>
