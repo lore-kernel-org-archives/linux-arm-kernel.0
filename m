@@ -1,44 +1,56 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 24 Feb 2016 10:30:34 -0800
-Subject: [PATCH 07/50] pinctrl: nsp-gpio: Use devm_pinctrl_register() for
- pinctrl registration
-In-Reply-To: <1456319775-3216-8-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-8-git-send-email-ldewangan@nvidia.com>
-Message-ID: <dbd2ae89-1e62-e7d3-58f0-681d26fee2c9@broadcom.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 24 Feb 2016 21:34:09 +0300
+Subject: [PATCH v2 0/5] all: s390: make compat wrappers the generic solution
+Message-ID: <1456338854-14901-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The problem that makes us use wrappers is that some compat
+architectures allows user code to access top halves of registers.
+This is not a problem for syscalls that are already handled by compat
+code, or for that who has types of the same size in kernel and
+userspace. In case of s390 and lp64/ilp32 the problem is in pointer
+types, long, unsigned long.
 
+S390 folks already have the solution for it. In this patchset,
+it is turned to be general, as arm64/ilp32 needs it too.
 
-On 2/24/2016 5:15 AM, Laxman Dewangan wrote:
-> Use devm_pinctrl_register() for pin control registration.
->
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: Jon Mason <jonmason@broadcom.com>
-> ---
->  drivers/pinctrl/bcm/pinctrl-nsp-gpio.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> index ac90043..2873f73 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> @@ -609,7 +609,7 @@ static int nsp_gpio_register_pinconf(struct nsp_gpio *chip)
->  	pctldesc->npins = gc->ngpio;
->  	pctldesc->confops = &nsp_pconf_ops;
->
-> -	chip->pctl = pinctrl_register(pctldesc, chip->dev, chip);
-> +	chip->pctl = devm_pinctrl_register(chip->dev, pctldesc, chip);
->  	if (IS_ERR(chip->pctl)) {
->  		dev_err(chip->dev, "unable to register pinctrl device\n");
->  		return PTR_ERR(chip->pctl);
->
+This patchset is created as the part of the work of enabling arm64
+with ILP32 user mode. See details here:
+http://thread.gmane.org/gmane.linux.kernel/2126946
 
-Acked-by: Ray Jui <ray.jui@broadcom.com>
+This is the implementation of one of two possible approaches. First
+one defines new syscall handler declaration macro, that creates both compat and
+non-compat handlers, see [1]. This one declares all wrappers in separated file
+kernel/compat_wrapper.c
 
-Thanks!
+Build-tested on s390.
 
-Ray
+[1] http://www.spinics.net/lists/linux-s390/msg11593.html
+
+Yury Norov (5):
+  all: syscall wrappers: add documentation
+  all: introduce COMPAT_WRAPPER option and enable it for s390
+  all: s390: move wrapper infrastructure to generic headers
+  all: s390: move compat_wrappers.c from arch/s390/kernel to kernel/
+  all: wrap needed syscalls in generic unistd
+
+ Documentation/adding-syscalls.txt |  32 +++++
+ arch/Kconfig                      |   4 +
+ arch/s390/Kconfig                 |   1 +
+ arch/s390/include/asm/compat.h    |  17 ++-
+ arch/s390/kernel/Makefile         |   2 +-
+ arch/s390/kernel/compat_wrapper.c | 180 ------------------------
+ include/linux/compat.h            | 278 ++++++++++++++++++++++++++++++++++++++
+ include/linux/syscalls.h          |  57 +-------
+ include/linux/syscalls_structs.h  |  60 ++++++++
+ include/uapi/asm-generic/unistd.h | 231 +++++++++++++++----------------
+ kernel/Makefile                   |   1 +
+ kernel/compat_wrapper.c           | 170 +++++++++++++++++++++++
+ 12 files changed, 680 insertions(+), 353 deletions(-)
+ delete mode 100644 arch/s390/kernel/compat_wrapper.c
+ create mode 100644 include/linux/syscalls_structs.h
+ create mode 100644 kernel/compat_wrapper.c
+
+-- 
+2.5.0
