@@ -1,39 +1,58 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 24 Feb 2016 20:07:12 +0100
-Subject: [PATCH 1/2] ARM: mvebu: change order of ethernet DT nodes on
- Armada 38x
-In-Reply-To: <op.ydcptvss2s3iss@ecaz>
-References: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453907300-28283-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160127193143.GF10826@n2100.arm.linux.org.uk>
- <20160127194512.GA16638@1wt.eu>
- <20160129114853.GQ10826@n2100.arm.linux.org.uk>
- <20160224184114.GB2292@1wt.eu> <op.ydcptvss2s3iss@ecaz>
-Message-ID: <20160224190712.GA2333@1wt.eu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Feb 2016 19:10:00 +0000
+Subject: [PATCH V2] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
+In-Reply-To: <1452D0BB-4AF3-4A19-983A-3A54E94A4F2F@caviumnetworks.com>
+References: <1455820158-8529-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160223122616.GE4989@leverpostej>
+ <56CCF03D.3000809@caviumnetworks.com>
+ <20160224113227.GB11579@leverpostej>
+ <1452D0BB-4AF3-4A19-983A-3A54E94A4F2F@caviumnetworks.com>
+Message-ID: <20160224190628.GA9003@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 08:02:09PM +0100, Imre Kaloz wrote:
-> >>I've checked, and we believe not many people are using mainline kernels
-> >>on clearfog.  I'll have to adjust my debian jessie setup to fix the
-> >>resulting carnage though.  On the plus side, it means that mainline
-> >>matches Marvell's kernel for interface naming.
-> >
-> >Well, now I'm one of these and I confirm that it's really painful to
-> >have a different ordering between the DTB provided in mainline and the
-> >DTB provided with the board. The worst thing is that using mainline,
-> >eth0 corresponds to the switch and appears up, so you don't immediately
-> >realize that it's not where your cable is connected :-/
-> >
-> >Thus could we please get Thomas' patch to ensure that the board boots
-> >with similar interface naming with both the original and mainline kernel  
-> >?
+On Wed, Feb 24, 2016 at 03:54:48PM +0000, Chalamarla, Tirumalesh wrote:
 > 
-> Shouldn't this change be device specific then instead of messing up the  
-> dtsi?
+> On 2/24/16, 3:32 AM, "Mark Rutland" <mark.rutland@arm.com> wrote:
+> 
+> >On Tue, Feb 23, 2016 at 03:50:21PM -0800, Tirumalesh Chalamarla wrote:
+> >> in Summary,
+> >> 
+> >> if i change asid-base to cavium,asid-base and still use DT for
+> >> supplying base value, is this a solution that will be accepted, 
+> >
+> >No. The property is _insufficient_, regardless of its name. This has
+> >been pointed out more than once.
+> >
+> >A base alone does not tell you what set of IDs it is valid to use
+> >without risking a clash. The OS is well within its rights to allocate
+> >_any_ ID above that base. It is not a requirement of the hardware nor
+> >the binding that the OS allocate a contiguous set of IDs starting at the
+> >base.
+> >
+> >Consider:
+> >
+> >smmu_a {
+> >	whatver,*id-base = <128>;
+> >};
+> >
+> >smmu_b {
+> >	whatever,*id-base = <64>;
+> >};
+> >
+> >In both cases, the *IDs 129+ could be allocated on both SMMUs.
+> 
+> Does adding a check to see if base + number of contexts supported will not overlap with each other
+> Make it acceptable. 
+> Or do you want the size be provided from DT also?
 
-According to what Thomas explained, it's related to the ordering of
-the NICs in the SoC's datasheet, so there are little chances that
-anyone would see them enumerated differently on their board.
+At this point I think Robin's suggestion of giving the ThunderX SMMU a
+different compatible string and treating that as a separate case
+entirely is the best thing to do.
 
-Willy
+Then the only requirement is that _all_ the ThunderX SMMUs with shared
+TLBs are under the control of the OS, and it can allocate IDs as it
+chooses, so long as it ensures that there are no conflicts across all
+the SMMUs it is in control of.
+
+Mark.
