@@ -1,131 +1,44 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Wed, 24 Feb 2016 19:22:12 +0100
-Subject: [PATCH v2 1/8] arm64: move acpi/dt decision earlier in boot
- process
-In-Reply-To: <1456333819-13482-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
- <1456333819-13482-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <56CDF4D4.6000506@suse.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 24 Feb 2016 10:25:38 -0800
+Subject: [PATCH 03/50] pinctrl: bcm281xx: Use devm_pinctrl_register() for
+ pinctrl registration
+In-Reply-To: <1456319775-3216-4-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-4-git-send-email-ldewangan@nvidia.com>
+Message-ID: <d5eeb969-8c51-e716-ff21-084feed01183@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 24/02/16 18:10, Aleksey Makarov wrote:
-> From: Leif Lindholm <leif.lindholm@linaro.org>
+On 2/24/2016 5:15 AM, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration.
 >
-> In order to support selecting earlycon via either ACPI or DT, move
-> the decision on whether to attempt ACPI configuration into the
-> early_param handling. Then make acpi_boot_table_init() bail out if
-> acpi_disabled.
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Ray Jui <rjui@broadcom.com>
 > ---
->   arch/arm64/kernel/acpi.c | 62 +++++++++++++++++++++++-------------------------
->   1 file changed, 30 insertions(+), 32 deletions(-)
+>  drivers/pinctrl/bcm/pinctrl-bcm281xx.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 >
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index d1ce8e2..3faa323 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -41,26 +41,8 @@ EXPORT_SYMBOL(acpi_disabled);
->   int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
->   EXPORT_SYMBOL(acpi_pci_disabled);
+> diff --git a/drivers/pinctrl/bcm/pinctrl-bcm281xx.c b/drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+> index c3c692e..0c0c0f0 100644
+> --- a/drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+> +++ b/drivers/pinctrl/bcm/pinctrl-bcm281xx.c
+> @@ -1422,9 +1422,7 @@ static int __init bcm281xx_pinctrl_probe(struct platform_device *pdev)
+>  	bcm281xx_pinctrl_desc.pins = bcm281xx_pinctrl.pins;
+>  	bcm281xx_pinctrl_desc.npins = bcm281xx_pinctrl.npins;
 >
-> -static bool param_acpi_off __initdata;
->   static bool param_acpi_force __initdata;
+> -	pctl = pinctrl_register(&bcm281xx_pinctrl_desc,
+> -				&pdev->dev,
+> -				pdata);
+> +	pctl = devm_pinctrl_register(&pdev->dev, &bcm281xx_pinctrl_desc, pdata);
+>  	if (IS_ERR(pctl)) {
+>  		dev_err(&pdev->dev, "Failed to register pinctrl\n");
+>  		return PTR_ERR(pctl);
 >
-> -static int __init parse_acpi(char *arg)
-> -{
-> -	if (!arg)
-> -		return -EINVAL;
-> -
-> -	/* "acpi=off" disables both ACPI table parsing and interpreter */
-> -	if (strcmp(arg, "off") == 0)
-> -		param_acpi_off = true;
-> -	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
-> -		param_acpi_force = true;
-> -	else
-> -		return -EINVAL;	/* Core will print when we return error */
-> -
-> -	return 0;
-> -}
-> -early_param("acpi", parse_acpi);
-> -
->   static int __init dt_scan_depth1_nodes(unsigned long node,
->   				       const char *uname, int depth,
->   				       void *data)
-> @@ -74,6 +56,35 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->   	return 0;
->   }
->
-> +static int __init parse_acpi(char *arg)
-> +{
-> +	if (!arg)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Enable ACPI instead of device tree unless
-> +	 * - ACPI has been disabled explicitly (acpi=off), or
-> +	 * - the device tree is not empty (it has more than just a /chosen node)
-> +	 *   and ACPI has not been force enabled (acpi=force)
-> +	 */
-> +	if (strcmp(arg, "off") == 0)
-> +		return 0;
-> +	else if (strcmp(arg, "force") == 0)
-> +		param_acpi_force = true;
-> +	else if (of_scan_flat_dt(dt_scan_depth1_nodes, NULL))
 
-I think we should strcmp for "on" here and return an error on other 
-values. IMHO an update to Documentation/kernel-parameters.txt would be 
-convenient.
+Acked-by: Ray Jui <ray.jui@broadcom.com>
 
-I still wonder if we really want to change the default to ACPI disabled.
-But that's a decision the maintainers have to take.
+Thanks!
 
-Regards,
-Matthias
-
-> +		return 0;
-> +
-> +	/*
-> +	 * ACPI is disabled at this point. Enable it in order to parse
-> +	 * the ACPI tables and carry out sanity checks
-> +	 */
-> +	enable_acpi();
-> +
-> +	return 0;
-> +}
-> +
-> +early_param("acpi", parse_acpi);
-> +
->   /*
->    * __acpi_map_table() will be called before page_init(), so early_ioremap()
->    * or early_memremap() should be called here to for ACPI table mapping.
-> @@ -181,23 +192,10 @@ out:
->    */
->   void __init acpi_boot_table_init(void)
->   {
-> -	/*
-> -	 * Enable ACPI instead of device tree unless
-> -	 * - ACPI has been disabled explicitly (acpi=off), or
-> -	 * - the device tree is not empty (it has more than just a /chosen node)
-> -	 *   and ACPI has not been force enabled (acpi=force)
-> -	 */
-> -	if (param_acpi_off ||
-> -	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-> +	if (acpi_disabled)
->   		return;
->
->   	/*
-> -	 * ACPI is disabled at this point. Enable it in order to parse
-> -	 * the ACPI tables and carry out sanity checks
-> -	 */
-> -	enable_acpi();
-> -
-> -	/*
->   	 * If ACPI tables are initialized and FADT sanity checks passed,
->   	 * leave ACPI enabled and carry on booting; otherwise disable ACPI
->   	 * on initialization error.
->
+Ray
