@@ -1,48 +1,41 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 24 Feb 2016 14:57:36 -0800
-Subject: [PATCH] MAINTAINERS: unify email addrs for Kevin Hilman
-Message-ID: <1456354656-23179-1-git-send-email-khilman@baylibre.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Feb 2016 14:18:29 -0800
+Subject: [GIT PULL 1/7] ARM: EXYNOS: Non-critical fixes for v4.6
+In-Reply-To: <1455496446-23779-2-git-send-email-k.kozlowski@samsung.com>
+References: <1455496446-23779-1-git-send-email-k.kozlowski@samsung.com>
+ <1455496446-23779-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160224221829.GS10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have a couple different emails in here.  It's time to make them all
-the same.
+On Mon, Feb 15, 2016 at 09:34:00AM +0900, Krzysztof Kozlowski wrote:
+> Hi Arnd, Kevin and Olof,
+> 
+> Few fixes from Arnd.
+> 
+> BTW, I did not apply one fix from his set because I had few comments
+> (not resolved yet).
+> 
+> Kind regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> 
+>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-non-critical-4.6
+> 
+> for you to fetch changes up to dc7eb9d589e595954792cc192bcbb92932e5c2ff:
+> 
+>   ARM: EXYNOS: select THERMAL_OF (2016-02-01 10:29:20 +0900)
+> 
+> ----------------------------------------------------------------
+> Fixes from Arnd for harmless warnings for Exynos and S3C platforms.
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- MAINTAINERS | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Thanks, merged.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2fa3303ea625..d489445d6d08 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7828,7 +7828,7 @@ S:	Maintained
- F:	arch/arm/*omap*/*clock*
- 
- OMAP POWER MANAGEMENT SUPPORT
--M:	Kevin Hilman <khilman@deeprootsystems.com>
-+M:	Kevin Hilman <khilman@kernel.org>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
- F:	arch/arm/*omap*/*pm*
-@@ -7934,7 +7934,7 @@ F:	arch/arm/*omap*/usb*
- OMAP GPIO DRIVER
- M:	Grygorii Strashko <grygorii.strashko@ti.com>
- M:	Santosh Shilimkar <ssantosh@kernel.org>
--M:	Kevin Hilman <khilman@deeprootsystems.com>
-+M:	Kevin Hilman <khilman@kernel.org>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/gpio/gpio-omap.txt
-@@ -9945,7 +9945,7 @@ F:	arch/arm/mach-s3c24xx/bast-irq.c
- 
- TI DAVINCI MACHINE SUPPORT
- M:	Sekhar Nori <nsekhar@ti.com>
--M:	Kevin Hilman <khilman@deeprootsystems.com>
-+M:	Kevin Hilman <khilman@kernel.org>
- T:	git git://gitorious.org/linux-davinci/linux-davinci.git
- Q:	http://patchwork.kernel.org/project/linux-davinci/list/
- S:	Supported
--- 
-2.7.0
+
+-Olof
