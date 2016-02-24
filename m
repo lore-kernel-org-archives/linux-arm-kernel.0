@@ -1,55 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Feb 2016 10:21:26 +0900
-Subject: [PATCH 1/6] ARM: shmobile: r8a7740: Migrate to generic l2c OF
- initialization
+Date: Wed, 24 Feb 2016 10:21:27 +0900
+Subject: [PATCH 2/6] ARM: shmobile: r8a7740: Remove mapping of L2 cache
+ controller registers
 In-Reply-To: <cover.1456275652.git.horms+renesas@verge.net.au>
 References: <cover.1456275652.git.horms+renesas@verge.net.au>
-Message-ID: <4a6cc501511f68c9aafb4985231eaa932d97cff4.1456275652.git.horms+renesas@verge.net.au>
+Message-ID: <c4be044abc6292f392c286b599e260f0c1bbb8ba.1456275652.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Migrate the generic r8a7740 platform from calling l2x0_of_init() to the
-generic l2c OF initialization.
+Now all r8a7740-based platforms have been migrated to the generic l2c OF
+initialization, it's no longer needed to map the L2 cache controller
+registers from .map_io().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 0c8f80c5b04d..bf221e05c8dc 100644
+index bf221e05c8dc..3e71cd4168dd 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7740.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -23,7 +23,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
--#include <asm/hardware/cache-l2x0.h>
- 
- #include "common.h"
- 
-@@ -110,10 +109,6 @@ static void __init r8a7740_generic_init(void)
- {
- 	r8a7740_meram_workaround();
- 
+@@ -37,18 +37,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
+ 		.length		= 160 << 20,
+ 		.type		= MT_DEVICE_NONSHARED
+ 	},
 -#ifdef CONFIG_CACHE_L2X0
--	/* Shared attribute override enable, 32K*8way */
--	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
+-	/*
+-	 * for l2x0_init()
+-	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
+-	 */
+-	{
+-		.virtual	= 0xf0002000,
+-		.pfn		= __phys_to_pfn(0xf0100000),
+-		.length		= PAGE_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
+-	},
 -#endif
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-@@ -123,6 +118,8 @@ static const char *const r8a7740_boards_compat_dt[] __initconst = {
  };
  
- DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.map_io		= r8a7740_map_io,
- 	.init_early	= shmobile_init_delay,
- 	.init_irq	= r8a7740_init_irq_of,
+ static void __init r8a7740_map_io(void)
 -- 
 2.1.4
