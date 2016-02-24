@@ -1,48 +1,124 @@
-From: miles.chen@mediatek.com (miles.chen at mediatek.com)
-Date: Thu, 25 Feb 2016 00:01:48 +0800
-Subject: [PATCH] arm64/mm: fix virtual address boundary check
-Message-ID: <1456329708-2042-1-git-send-email-miles.chen@mediatek.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Wed, 24 Feb 2016 17:04:42 +0100
+Subject: [PATCH v2] clocksource: atmel-pit: register as a sched_clock
+Message-ID: <1456329882-20709-1-git-send-email-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Miles Chen <miles.chen@mediatek.com>
+Register the counter of the Periodic Interval Timer as a possible source
+for sched_clock. Keep the timer running even if the related clockevent
+is disabled.
 
-The MODULES_VADDR is not the lowest possible
-kernel virtual address. TASK_SIZE_64 may be larger than
-MODULES_VADDR, FIXADDR_TOP, and PCI_IO_START.
+This provides a better precision than the jiffies-based default. The
+TCB clocksource does not work, as it is registered too late in the
+initialization sequence.
 
-Fix this by comparing TASK_SIZE_64 (highest user virtual address)
-with VA_START (lowest kernel virtual address).
-
- #define VA_BITS		(CONFIG_ARM64_VA_BITS)
- #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
- #define MODULES_END		(PAGE_OFFSET)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
- #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
- #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
-
-Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- arch/arm64/mm/init.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changelog:
+v2:
+- Keep the tick counter updated when the clocksource is disabled
+- Ensure that sched_clock is a 64 bit counter
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f3b061e..7d75697 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -343,8 +343,8 @@ void __init mem_init(void)
- #ifdef CONFIG_COMPAT
- 	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
- #endif
--	BUILD_BUG_ON(TASK_SIZE_64			> MODULES_VADDR);
--	BUG_ON(TASK_SIZE_64				> MODULES_VADDR);
-+	BUILD_BUG_ON(TASK_SIZE_64			> VA_START);
-+	BUG_ON(TASK_SIZE_64				> VA_START);
+ drivers/clocksource/timer-atmel-pit.c | 31 ++++++++++++++++---------------
+ 1 file changed, 16 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index d911c5dca8f1..609892bbf9da 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -21,6 +21,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
++#include <linux/sched_clock.h>
  
- 	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
- 		extern int sysctl_overcommit_memory;
+ #define AT91_PIT_MR		0x00			/* Mode Register */
+ #define AT91_PIT_PITIEN			BIT(25)			/* Timer Interrupt Enable */
+@@ -44,7 +45,7 @@ struct pit_data {
+ 
+ 	void __iomem	*base;
+ 	u32		cycle;
+-	u32		cnt;
++	u64		cnt;
+ 	unsigned int	irq;
+ 	struct clk	*mck;
+ };
+@@ -77,7 +78,7 @@ static cycle_t read_pit_clk(struct clocksource *cs)
+ {
+ 	struct pit_data *data = clksrc_to_pit_data(cs);
+ 	unsigned long flags;
+-	u32 elapsed;
++	u64 elapsed;
+ 	u32 t;
+ 
+ 	raw_local_irq_save(flags);
+@@ -90,15 +91,6 @@ static cycle_t read_pit_clk(struct clocksource *cs)
+ 	return elapsed;
+ }
+ 
+-static int pit_clkevt_shutdown(struct clock_event_device *dev)
+-{
+-	struct pit_data *data = clkevt_to_pit_data(dev);
+-
+-	/* disable irq, leaving the clocksource active */
+-	pit_write(data->base, AT91_PIT_MR, (data->cycle - 1) | AT91_PIT_PITEN);
+-	return 0;
+-}
+-
+ /*
+  * Clockevent device:  interrupts every 1/HZ (== pit_cycles * MCK/16)
+  */
+@@ -156,15 +148,15 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ 	WARN_ON_ONCE(!irqs_disabled());
+ 
+ 	/* The PIT interrupt may be disabled, and is shared */
+-	if (clockevent_state_periodic(&data->clkevt) &&
+-	    (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS)) {
++	if (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS) {
+ 		unsigned nr_ticks;
+ 
+ 		/* Get number of ticks performed before irq, and ack it */
+ 		nr_ticks = PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
+ 		do {
+ 			data->cnt += data->cycle;
+-			data->clkevt.event_handler(&data->clkevt);
++			if (clockevent_state_periodic(&data->clkevt))
++				data->clkevt.event_handler(&data->clkevt);
+ 			nr_ticks--;
+ 		} while (nr_ticks);
+ 
+@@ -174,6 +166,13 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
++static struct clocksource *pit_sched_clock;
++
++static u64 pit_sched_clock_read(void)
++{
++	return read_pit_clk(pit_sched_clock);
++}
++
+ /*
+  * Set up both clocksource and clockevent support.
+  */
+@@ -206,6 +205,9 @@ static void __init at91sam926x_pit_common_init(struct pit_data *data)
+ 	data->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
+ 	clocksource_register_hz(&data->clksrc, pit_rate);
+ 
++	pit_sched_clock = &data->clksrc;
++	sched_clock_register(pit_sched_clock_read, bits, pit_rate);
++
+ 	/* Set up irq handler */
+ 	ret = request_irq(data->irq, at91sam926x_pit_interrupt,
+ 			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+@@ -221,7 +223,6 @@ static void __init at91sam926x_pit_common_init(struct pit_data *data)
+ 	data->clkevt.rating = 100;
+ 	data->clkevt.cpumask = cpumask_of(0);
+ 
+-	data->clkevt.set_state_shutdown = pit_clkevt_shutdown;
+ 	data->clkevt.set_state_periodic = pit_clkevt_set_periodic;
+ 	data->clkevt.resume = at91sam926x_pit_resume;
+ 	data->clkevt.suspend = at91sam926x_pit_suspend;
 -- 
-1.9.1
+2.5.0
