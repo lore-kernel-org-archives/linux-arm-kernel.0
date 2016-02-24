@@ -1,47 +1,43 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 24 Feb 2016 18:54:18 +0800
-Subject: [PATCH v1 2/4] clk: rockchip: set the clock ids for RK3228 VOP
-In-Reply-To: <1456308303-29706-1-git-send-email-ykk@rock-chips.com>
-References: <1456308303-29706-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1456311258-4311-1-git-send-email-ykk@rock-chips.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Feb 2016 11:02:22 +0000
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <56CD8B43.9070509@de.ibm.com>
+References: <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad>
+ <20160223193345.GC21820@node.shutemov.name>
+ <20160223202233.GE27281@arm.com> <56CD8302.9080202@de.ibm.com>
+ <20160224104139.GC28310@arm.com> <56CD8B43.9070509@de.ibm.com>
+Message-ID: <20160224110221.GF28310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- drivers/clk/rockchip/clk-rk3228.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+On Wed, Feb 24, 2016 at 11:51:47AM +0100, Christian Borntraeger wrote:
+> On 02/24/2016 11:41 AM, Will Deacon wrote:
+> > On Wed, Feb 24, 2016 at 11:16:34AM +0100, Christian Borntraeger wrote:
+> >> Without that fix we would clearly have stale tlb entries, no?
+> > 
+> > Yes, but AFAIU the sequence on arm64 is:
+> > 
+> > 1.  trans huge mapping (block mapping in arm64 speak)
+> > 2.  faulting entry (pmd_mknotpresent)
+> > 3.  tlb invalidation
+> > 4.  table entry mapping the same pages as (1).
+> > 
+> > so if the microarchitecture we're on can tolerate a mixture of block
+> > mappings and page mappings mapping the same VA to the same PA, then the
+> > lack of TLB maintenance would go unnoticed. There are certainly systems
+> > where that could cause an issue, but I believe the one I've been testing
+> > on would be ok.
+> 
+> So in essence you say it does not matter that you flush the wrong range in 
+> flush_pmd_tlb_range as long as it will be flushed later on when the pages
+> really go away. Yes, then it really might be ok for arm64.
 
-diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
-index 981a502..8747b25 100644
---- a/drivers/clk/rockchip/clk-rk3228.c
-+++ b/drivers/clk/rockchip/clk-rk3228.c
-@@ -368,7 +368,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
- 			RK2928_CLKSEL_CON(29), 0, 3, DFLAGS),
- 	DIV(0, "sclk_vop_pre", "sclk_vop_src", 0,
- 			RK2928_CLKSEL_CON(27), 8, 8, DFLAGS),
--	MUX(0, "dclk_vop", mux_dclk_vop_p, 0,
-+	MUX(DCLK_VOP, "dclk_vop", mux_dclk_vop_p, 0,
- 			RK2928_CLKSEL_CON(27), 1, 1, MFLAGS),
- 
- 	COMPOSITE(0, "i2s0_src", mux_pll_src_2plls_p, 0,
-@@ -503,7 +503,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
- 	GATE(0, "aclk_iep", "aclk_iep_pre", 0, RK2928_CLKGATE_CON(13), 2, GFLAGS),
- 	GATE(0, "aclk_iep_noc", "aclk_iep_pre", 0, RK2928_CLKGATE_CON(13), 9, GFLAGS),
- 
--	GATE(0, "aclk_vop", "aclk_vop_pre", 0, RK2928_CLKGATE_CON(13), 5, GFLAGS),
-+	GATE(ACLK_VOP, "aclk_vop", "aclk_vop_pre", 0, RK2928_CLKGATE_CON(13), 5, GFLAGS),
- 	GATE(0, "aclk_vop_noc", "aclk_vop_pre", 0, RK2928_CLKGATE_CON(13), 12, GFLAGS),
- 
- 	GATE(0, "aclk_hdcp", "aclk_hdcp_pre", 0, RK2928_CLKGATE_CON(14), 10, GFLAGS),
-@@ -511,7 +511,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
- 
- 	GATE(0, "hclk_rga", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 1, GFLAGS),
- 	GATE(0, "hclk_iep", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 3, GFLAGS),
--	GATE(0, "hclk_vop", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 6, GFLAGS),
-+	GATE(HCLK_VOP, "hclk_vop", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 6, GFLAGS),
- 	GATE(0, "hclk_vio_ahb_arbi", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 7, GFLAGS),
- 	GATE(0, "hclk_vio_noc", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 8, GFLAGS),
- 	GATE(0, "hclk_vop_noc", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 13, GFLAGS),
--- 
-1.9.1
+Indeed, although that's a property of the microarchitecture I'm using
+rather than an architectural guarantee so the code should certainly be
+fixed!
+
+Will
