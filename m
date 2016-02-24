@@ -1,94 +1,79 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Wed, 24 Feb 2016 14:28:10 -0800
-Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
- for X-Gene v1
-In-Reply-To: <56CDD767.6020103@arm.com>
-References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
- <1456330151.5681.46.camel@redhat.com> <56CDD767.6020103@arm.com>
-Message-ID: <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 24 Feb 2016 22:31:28 +0000
+Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
+In-Reply-To: <CAJ5Y-ea3gxxOEGdJMPZAh78Ap0GBvzGePhBKzQRVoJBwwY6NzA@mail.gmail.com>
+References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <CANLsYkzvB0GbPeYHrcLtUz8DMHJh4FA5RVwVZ-UAm3BCznB_3w@mail.gmail.com>
+ <20160224173511.GF25385@red-moon>
+ <CAJ5Y-ea3gxxOEGdJMPZAh78Ap0GBvzGePhBKzQRVoJBwwY6NzA@mail.gmail.com>
+Message-ID: <20160224223128.GA30750@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 8:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 24/02/16 16:09, Mark Salter wrote:
->> On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
->>> This patch makes pci-xgene-msi driver ACPI-aware and provides
->>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
->>>
->>> Signed-off-by: Duc Dang <dhdang@apm.com>
->>> ---
->>>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
->>>  1 file changed, 32 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
->>> index a6456b5..466aa93 100644
->>> --- a/drivers/pci/host/pci-xgene-msi.c
->>> +++ b/drivers/pci/host/pci-xgene-msi.c
->>> @@ -24,6 +24,7 @@
->>>  #include <linux/pci.h>
->>>  #include <linux/platform_device.h>
->>>  #include <linux/of_pci.h>
->>> +#include <linux/acpi.h>
->>>
->>>  #define MSI_IR0                     0x000000
->>>  #define MSI_INT0            0x800000
->>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
->>>  };
->>>
->>>  struct xgene_msi {
->>> -    struct device_node      *node;
->>> +    struct fwnode_handle    *fwnode;
->>>      struct irq_domain       *inner_domain;
->>>      struct irq_domain       *msi_domain;
->>>      u64                     msi_addr;
->>> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
->>>      .free   = xgene_irq_domain_free,
->>>  };
->>>
->>> +#ifdef CONFIG_ACPI
->>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
->>> +{
->>> +    return xgene_msi_ctrl.fwnode;
->>> +}
->>> +#endif
->>> +
->>>  static int xgene_allocate_domains(struct xgene_msi *msi)
->>>  {
->>>      msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
->>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->>>      if (!msi->inner_domain)
->>>              return -ENOMEM;
->>>
->>> -    msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
->>> +    msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
->>>                                                  &xgene_msi_domain_info,
->>>                                                  msi->inner_domain);
->>
->> This doesn't work for me (ACPI probing on Mustang) unless I change this
->> to be pci_msi_create_default_irq_domain(). The problem seems to be that
->> the MSI probe happens after the PCIe RC is probed so there is no MSI domain
->> at the time the PCIe root is initialized by ACPI.
->
-> pci_msi_create_default_irq_domain is the wrong thing do use, specially
-> if you have multiple MSI controllers in the system. I certainly wouldn't
-> want to see it being used on arm64.
->
-> This is the usual dependency hell. You try moving the probing earlier,
-> but that may break something else in the process.
+On Wed, Feb 24, 2016 at 02:53:02PM -0500, Ashwin Chaugule wrote:
+> Hi Lorenzo,
+> 
+> On 24 February 2016 at 12:35, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Wed, Feb 24, 2016 at 09:20:22AM -0700, Mathieu Poirier wrote:
+> >> On 23 February 2016 at 11:22, Lorenzo Pieralisi
+> >
+> > [...]
+> >
+> >> > +static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
+> >> > +                            void *v)
+> >> > +{
+> >> > +       struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
+> >> > +       struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
+> >> > +       int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
+> >> > +
+> >> > +       if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
+> >> > +               return NOTIFY_DONE;
+> >> > +
+> >> > +       /*
+> >> > +        * Always reset the PMU registers on power-up even if
+> >> > +        * there are no events running.
+> >> > +        */
+> >> > +       if (cmd == CPU_PM_EXIT && armpmu->reset)
+> >> > +               armpmu->reset(armpmu);
+> >>
+> >> I think this patch does the right thing but I can't get the above
+> >> reset.  Wouldn't it be better to do the reset as part of the
+> >> CPU_PM_EXIT case below?  At this point nothing tells us the CPU won't
+> >> go back down before the event is enabled, wasting the cycle needed to
+> >> reset the PMU.
+> >
+> > The logic goes, if the cpu is woken up and it has no events enabled,
+> > if we do not reset it (mind, ->reset here sets the PMU register values
+> > to a sane default, some of them are architecturally UNKNOWN on reset, it
+> > does NOT reset the PMU) _and_ we subsequently install an event on it we
+> > do have a problem, that's why whenever a core gets out of low-power we
+> > have to reset its pmu.
+> 
+> Dont we blow out the previous value in the counter when installing an
+> event? Or has that changed lately? IIRC, there was some initial value
+> we'd program into the counter to avoid missing the overflow event.
+> (sorry its been too long) ;)
 
-Hi Mark and Marc,
+If you mean there is no need of resetting the value since we are
+overwriting it anyway you should see ->reset from a PMU unit POW
+not just an event. If you look at the ->reset method for eg v8, you
+will see that the reset method operates on all counters and the PMU
+unit as a whole, that's the only sane way of setting up the PMU unit
+before enabling single counters (some registers are UNKNOWN at reset).
 
-I have modified Tianocore firmware to have MSI node declared before
-PCIe node in Dsdt table. With this modification, the MSI driver will
-be loaded before PCIe driver and MSI domain is available at the time
-PCIe root is initialized.
+To make my reply to Mathieu clearer, the ->reset method contains
+operations (eg writing PMCR counters reset bits) that do carry out
+counters reset, what I wanted to say is that the ->reset method
+does not by itself drive the PMU HW reset signal, that's what the
+power controller does when it resets the CPU on power up.
 
-So we will need a UEFI firmware update to work with this patch.
+The PMU ->reset method must be called on a cpu on power-up, to make
+sure PMU HW is set-up to sane default values and ready to be used (ie
+install counters), for instance on v8 all counters must be disabled
+(irq inclusive) and reset, that's what armv8pmu_reset() does.
 
-Regards,
-Duc Dang.
+I hope this makes things clearer.
 
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+Thanks,
+Lorenzo
