@@ -1,76 +1,58 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 24 Feb 2016 10:29:52 -0800
-Subject: [PATCH 06/50] pinctrl: iproc-gpio: Use devm_pinctrl_register()
- for pinctrl registration
-In-Reply-To: <1456319775-3216-7-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-7-git-send-email-ldewangan@nvidia.com>
-Message-ID: <fccabf34-d5a7-e176-f8a8-cb9657d36450@broadcom.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 25 Feb 2016 02:28:45 +0800
+Subject: [PATCH 15/50] pinctrl: mvebu: Use devm_pinctrl_register() for
+ pinctrl registration
+In-Reply-To: <1456319775-3216-16-git-send-email-ldewangan@nvidia.com>
+Message-ID: <201602250248.psr4kejZ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laxman,
 
+[auto build test ERROR on pinctrl/for-next]
+[also build test ERROR on v4.5-rc5 next-20160224]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-On 2/24/2016 5:15 AM, Laxman Dewangan wrote:
-> Use devm_pinctrl_register() for pin control registration and clean
-> the error path.
->
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: Jon Mason <jonmason@broadcom.com>
-> ---
->  drivers/pinctrl/bcm/pinctrl-iproc-gpio.c | 12 ++----------
->  1 file changed, 2 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
-> index d530ab4..e753af3 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
-> @@ -623,7 +623,7 @@ static int iproc_gpio_register_pinconf(struct iproc_gpio *chip)
->  	pctldesc->npins = gc->ngpio;
->  	pctldesc->confops = &iproc_pconf_ops;
->
-> -	chip->pctl = pinctrl_register(pctldesc, chip->dev, chip);
-> +	chip->pctl = devm_pinctrl_register(chip->dev, pctldesc, chip);
->  	if (IS_ERR(chip->pctl)) {
->  		dev_err(chip->dev, "unable to register pinctrl device\n");
->  		return PTR_ERR(chip->pctl);
-> @@ -632,11 +632,6 @@ static int iproc_gpio_register_pinconf(struct iproc_gpio *chip)
->  	return 0;
->  }
->
-> -static void iproc_gpio_unregister_pinconf(struct iproc_gpio *chip)
-> -{
-> -	pinctrl_unregister(chip->pctl);
-> -}
-> -
->  static const struct of_device_id iproc_gpio_of_match[] = {
->  	{ .compatible = "brcm,cygnus-ccm-gpio" },
->  	{ .compatible = "brcm,cygnus-asiu-gpio" },
-> @@ -720,7 +715,7 @@ static int iproc_gpio_probe(struct platform_device *pdev)
->  					   handle_simple_irq, IRQ_TYPE_NONE);
->  		if (ret) {
->  			dev_err(dev, "no GPIO irqchip\n");
-> -			goto err_unregister_pinconf;
-> +			goto err_rm_gpiochip;
->  		}
->
->  		gpiochip_set_chained_irqchip(gc, &iproc_gpio_irq_chip, irq,
-> @@ -729,9 +724,6 @@ static int iproc_gpio_probe(struct platform_device *pdev)
->
->  	return 0;
->
-> -err_unregister_pinconf:
-> -	iproc_gpio_unregister_pinconf(chip);
-> -
->  err_rm_gpiochip:
->  	gpiochip_remove(gc);
->
->
+url:    https://github.com/0day-ci/linux/commits/Laxman-Dewangan/pinctrl-Add-and-use-devm_-apis-for-pinctrl_-register-unregister/20160225-002237
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git for-next
+config: arm-multi_v5_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Acked-by: Ray Jui <ray.jui@broadcom.com>
+All errors (new ones prefixed by >>):
 
-Thanks!
+   drivers/built-in.o: In function `orion_pinctrl_remove':
+>> drivers/pinctrl/mvebu/pinctrl-orion.c:244: undefined reference to `mvebu_pinctrl_remove'
 
-Ray
+vim +244 drivers/pinctrl/mvebu/pinctrl-orion.c
+
+fd67f884 Thomas Petazzoni 2014-04-22  238  
+fd67f884 Thomas Petazzoni 2014-04-22  239  	return mvebu_pinctrl_probe(pdev);
+fd67f884 Thomas Petazzoni 2014-04-22  240  }
+fd67f884 Thomas Petazzoni 2014-04-22  241  
+fd67f884 Thomas Petazzoni 2014-04-22  242  static int orion_pinctrl_remove(struct platform_device *pdev)
+fd67f884 Thomas Petazzoni 2014-04-22  243  {
+fd67f884 Thomas Petazzoni 2014-04-22 @244  	return mvebu_pinctrl_remove(pdev);
+fd67f884 Thomas Petazzoni 2014-04-22  245  }
+fd67f884 Thomas Petazzoni 2014-04-22  246  
+fd67f884 Thomas Petazzoni 2014-04-22  247  static struct platform_driver orion_pinctrl_driver = {
+
+:::::: The code at line 244 was first introduced by commit
+:::::: fd67f884782a281eb033e40b0f8eae623416035e pinctrl: mvebu: new driver for Orion platforms
+
+:::::: TO: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+:::::: CC: Linus Walleij <linus.walleij@linaro.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22481 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/2aca0525/attachment-0001.obj>
