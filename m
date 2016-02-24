@@ -1,63 +1,61 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:57 +0530
-Subject: [PATCH 32/50] pinctrl: vt8500: Use devm_pinctrl_register() for
- pinctrl registration
+Date: Wed, 24 Feb 2016 18:46:15 +0530
+Subject: [PATCH 50/50] pinctrl: zynq: Use devm_pinctrl_register() for pinctrl
+ registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-33-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-51-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_pinctrl_register() for pin control registration and clean
-the error path.
+Use devm_pinctrl_register() for pin control registration and
+remove the need of .remove callback.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
-Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Cc: linux-gpio at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/pinctrl/vt8500/pinctrl-wmt.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/pinctrl/pinctrl-zynq.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/drivers/pinctrl/vt8500/pinctrl-wmt.c b/drivers/pinctrl/vt8500/pinctrl-wmt.c
-index 5c261bf..159672b 100644
---- a/drivers/pinctrl/vt8500/pinctrl-wmt.c
-+++ b/drivers/pinctrl/vt8500/pinctrl-wmt.c
-@@ -583,7 +583,7 @@ int wmt_pinctrl_probe(struct platform_device *pdev,
+diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+index 76f1abd..5bbf94c0 100644
+--- a/drivers/pinctrl/pinctrl-zynq.c
++++ b/drivers/pinctrl/pinctrl-zynq.c
+@@ -1195,7 +1195,7 @@ static int zynq_pinctrl_probe(struct platform_device *pdev)
+ 	pctrl->funcs = zynq_pmux_functions;
+ 	pctrl->nfuncs = ARRAY_SIZE(zynq_pmux_functions);
  
- 	data->dev = &pdev->dev;
+-	pctrl->pctrl = pinctrl_register(&zynq_desc, &pdev->dev, pctrl);
++	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &zynq_desc, pctrl);
+ 	if (IS_ERR(pctrl->pctrl))
+ 		return PTR_ERR(pctrl->pctrl);
  
--	data->pctl_dev = pinctrl_register(&wmt_desc, &pdev->dev, data);
-+	data->pctl_dev = devm_pinctrl_register(&pdev->dev, &wmt_desc, data);
- 	if (IS_ERR(data->pctl_dev)) {
- 		dev_err(&pdev->dev, "Failed to register pinctrl\n");
- 		return PTR_ERR(data->pctl_dev);
-@@ -592,7 +592,7 @@ int wmt_pinctrl_probe(struct platform_device *pdev,
- 	err = gpiochip_add_data(&data->gpio_chip, data);
- 	if (err) {
- 		dev_err(&pdev->dev, "could not add GPIO chip\n");
--		goto fail_gpio;
-+		return ret;
- 	}
- 
- 	err = gpiochip_add_pin_range(&data->gpio_chip, dev_name(data->dev),
-@@ -606,8 +606,6 @@ int wmt_pinctrl_probe(struct platform_device *pdev,
- 
- fail_range:
- 	gpiochip_remove(&data->gpio_chip);
--fail_gpio:
--	pinctrl_unregister(data->pctl_dev);
- 	return err;
- }
- 
-@@ -616,7 +614,6 @@ int wmt_pinctrl_remove(struct platform_device *pdev)
- 	struct wmt_pinctrl_data *data = platform_get_drvdata(pdev);
- 
- 	gpiochip_remove(&data->gpio_chip);
--	pinctrl_unregister(data->pctl_dev);
- 
+@@ -1206,15 +1206,6 @@ static int zynq_pinctrl_probe(struct platform_device *pdev)
  	return 0;
  }
+ 
+-static int zynq_pinctrl_remove(struct platform_device *pdev)
+-{
+-	struct zynq_pinctrl *pctrl = platform_get_drvdata(pdev);
+-
+-	pinctrl_unregister(pctrl->pctrl);
+-
+-	return 0;
+-}
+-
+ static const struct of_device_id zynq_pinctrl_of_match[] = {
+ 	{ .compatible = "xlnx,pinctrl-zynq" },
+ 	{ }
+@@ -1227,7 +1218,6 @@ static struct platform_driver zynq_pinctrl_driver = {
+ 		.of_match_table = zynq_pinctrl_of_match,
+ 	},
+ 	.probe = zynq_pinctrl_probe,
+-	.remove = zynq_pinctrl_remove,
+ };
+ 
+ static int __init zynq_pinctrl_init(void)
 -- 
 2.1.4
