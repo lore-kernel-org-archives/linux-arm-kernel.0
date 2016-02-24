@@ -1,18 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 14:31:54 -0800
-Subject: [GIT PULL 6/7] ARM: dts: Exynos stuff for v4.6
-In-Reply-To: <1455496446-23779-7-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 24 Feb 2016 14:33:01 -0800
+Subject: [GIT PULL 7/7] ARM: EXYNOS: Defconfig changes for v4.6
+In-Reply-To: <1455496446-23779-8-git-send-email-k.kozlowski@samsung.com>
 References: <1455496446-23779-1-git-send-email-k.kozlowski@samsung.com>
- <1455496446-23779-7-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160224223154.GX10126@localhost>
+ <1455496446-23779-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160224223301.GY10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 09:34:05AM +0900, Krzysztof Kozlowski wrote:
+On Mon, Feb 15, 2016 at 09:34:06AM +0900, Krzysztof Kozlowski wrote:
 > Hi Arnd, Kevin and Olof,
 > 
-> Rest of DTS changes for v4.6. This also pulls early DT changes (related
-> to SROM controller) because rest of patches depend on it.
+> Defconfig changes, pulling also a tag from RTC tree (merge
+> of max77802 into max77686 RTC driver).
 > 
 > Kind regards,
 > Krzysztof
@@ -24,24 +24,23 @@ On Mon, Feb 15, 2016 at 09:34:05AM +0900, Krzysztof Kozlowski wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.6
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.6
 > 
-> for you to fetch changes up to 36a0282a41493400428d7df8c99701fb4ee344c2:
+> for you to fetch changes up to 5d51f1dde207f2d5d43158da75c6608f7bfcec03:
 > 
->   ARM: dts: Replace legacy *,wakeup property with wakeup-source for exynos boards (2016-01-29 09:09:49 +0900)
+>   ARM: multi_v7_defconfig: Remove MAX77802 RTC Kconfig symbol (2016-02-05 09:11:32 +0900)
 > 
 > ----------------------------------------------------------------
-> Samsung DeviceTree updates and improvements for v4.6:
-> 1. Add SROM controller device nodes.
-> 2. Add Ethernet chip as child of SROM controller on SMDK5410.
-> 3. Allow simultaneous usage exynos-rng and s5p-sss drivers on Exynos5.
-> 4. Cleanup CPU configuration on Exynos542x/5800.
-> 5. Add necessary nodes for cpufreq-dt driver on Exynos542x/5800 (OPPs,
->    regulator supplies) which allows frequency and voltage scalling
->    of this SoC.
-> 6. Minor cleanups.
+> Defconfig (exynos and multi_v7) changes for Exynos based boards for v4.6:
+> 1. exynos defconfig:
+>    a. Enable NEON and accelerated crypto,
+>    b. Enable s5p-secss driver (Security SubSystem block for accelerating
+>       some cryptographic operations),
+> 2. exynos and multi_v7: Remove MAX77802 RTC Kconfig because the driver
+>    was combined into existing rtc-max77686 driver. This depends on changes
+>    from RTC tree.
 
-Merged, thanks. See feedback on the other dt branch regarding subjects.
+Merged, thanks.
 
 
 -Olof
