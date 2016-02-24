@@ -1,57 +1,28 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Wed, 24 Feb 2016 14:53:02 -0500
-Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
-In-Reply-To: <20160224173511.GF25385@red-moon>
-References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
- <CANLsYkzvB0GbPeYHrcLtUz8DMHJh4FA5RVwVZ-UAm3BCznB_3w@mail.gmail.com>
- <20160224173511.GF25385@red-moon>
-Message-ID: <CAJ5Y-ea3gxxOEGdJMPZAh78Ap0GBvzGePhBKzQRVoJBwwY6NzA@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 24 Feb 2016 21:03:45 +0100
+Subject: [PATCH v2 3/8] ACPI: add definitions of DBG2 subtypes
+In-Reply-To: <56CDE77C.2050301@linaro.org>
+References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456333819-13482-4-git-send-email-aleksey.makarov@linaro.org>
+ <94F2FBAB4432B54E8AACC7DFDE6C92E37E44BCB5@ORSMSX110.amr.corp.intel.com>
+ <56CDE77C.2050301@linaro.org>
+Message-ID: <CAJZ5v0hO0pD+N5y5au4mgMj0YQrO3A0cvFwNVOsvE9i353K6iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 24 February 2016 at 12:35, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Feb 24, 2016 at 09:20:22AM -0700, Mathieu Poirier wrote:
->> On 23 February 2016 at 11:22, Lorenzo Pieralisi
+On Wed, Feb 24, 2016 at 6:25 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
 >
-> [...]
 >
->> > +static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
->> > +                            void *v)
->> > +{
->> > +       struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
->> > +       struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
->> > +       int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
->> > +
->> > +       if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
->> > +               return NOTIFY_DONE;
->> > +
->> > +       /*
->> > +        * Always reset the PMU registers on power-up even if
->> > +        * there are no events running.
->> > +        */
->> > +       if (cmd == CPU_PM_EXIT && armpmu->reset)
->> > +               armpmu->reset(armpmu);
->>
->> I think this patch does the right thing but I can't get the above
->> reset.  Wouldn't it be better to do the reset as part of the
->> CPU_PM_EXIT case below?  At this point nothing tells us the CPU won't
->> go back down before the event is enabled, wasting the cycle needed to
->> reset the PMU.
+> On 02/24/2016 08:17 PM, Moore, Robert wrote:
+>> I've got these for the next release of ACPICA
 >
-> The logic goes, if the cpu is woken up and it has no events enabled,
-> if we do not reset it (mind, ->reset here sets the PMU register values
-> to a sane default, some of them are architecturally UNKNOWN on reset, it
-> does NOT reset the PMU) _and_ we subsequently install an event on it we
-> do have a problem, that's why whenever a core gets out of low-power we
-> have to reset its pmu.
+> It have not been pulled to linux-next but is required for the patchset.
 
-Dont we blow out the previous value in the counter when installing an
-event? Or has that changed lately? IIRC, there was some initial value
-we'd program into the counter to avoid missing the overflow event.
-(sorry its been too long) ;)
+No, it hasn't.
 
-Cheers,
-Ashwin.
+It will go to linux-next when I get ACPICA patches for the next
+release from the upstream.
+
+Thanks,
+Rafael
