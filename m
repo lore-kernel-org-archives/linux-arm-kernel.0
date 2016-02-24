@@ -1,39 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Feb 2016 16:14:24 +0100
-Subject: [PATCH v2 4/6] clk: unconditionally recurse into clk/mvebu/
+Date: Wed, 24 Feb 2016 16:14:23 +0100
+Subject: [PATCH v2 3/6] dt-bindings: clock: add DT bindings for AP806 ring
+ clocks
 In-Reply-To: <1456326866-30854-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1456326866-30854-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1456326866-30854-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1456326866-30854-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drivers/clk/mvebu directory is only being built when
-CONFIG_PLAT_ORION=y. As we are going to support additional mvebu
-platforms in drivers/clk/mvebu, which don't have CONFIG_PLAT_ORION=y,
-we need to recurse into this directory regardless of the value of
-CONFIG_PLAT_ORION.
+This commit adds the Device Tree binding description for the AP806
+ring clocks, used on Marvell Armada 7K/8K SOCs.
 
-Since all files in drivers/clk/mvebu/ are already conditionally
-compiled depending on various Kconfig options, we can recurse
-unconditionally into drivers/clk/mvebu without any other change.
+Since the AP806 ring clocks register is part of the "DFX Server"
+register area, the DT binding is meant to be used as a sub-node of the
+DFX Server DT binding, which is described separately.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/clk/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../clock/mvebu-armada-ap806-ring-clock.txt        | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index b038e36..e08bb0e 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -61,7 +61,7 @@ obj-$(CONFIG_ARCH_MEDIATEK)		+= mediatek/
- ifeq ($(CONFIG_COMMON_CLK), y)
- obj-$(CONFIG_ARCH_MMP)			+= mmp/
- endif
--obj-$(CONFIG_PLAT_ORION)		+= mvebu/
-+obj-y					+= mvebu/
- obj-$(CONFIG_ARCH_MESON)		+= meson/
- obj-$(CONFIG_ARCH_MXS)			+= mxs/
- obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
+new file mode 100644
+index 0000000..8c8030a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/mvebu-armada-ap806-ring-clock.txt
+@@ -0,0 +1,36 @@
++* Clock bindings for Marvell MVEBU AP806 Ring clocks
++
++The Marvell MVEBU Armada 7K/8K SoCs contain a block called AP806,
++hosting the CPU and other core components of the CPU. This Device Tree
++binding allows to describe the ring clocks of the AP806, which are
++derived from the Ring Core clock, after a dividing factor.
++
++The register giving the dividing factors is part of the DFX server
++register area, covered by the DT binding described at
++Documentation/devicetree/bindings/arm/marvell/marvell,ap806-dfx-server.txt. Therefore,
++the DT node for the AP806 Ring clocks must appear as a child node of
++the DFX server Device Tree node.
++
++The following is a list of provided IDs and clock names on Armada
++AP806 RING dividers:
++
++ 0 = Ring 0
++ 1 = Ring 2
++ 2 = Ring 3
++ 3 = Ring 4
++ 4 = Ring 5
++
++Required properties:
++- compatible: must be one of the following:
++	"marvell,armada-ap806-ring-clock"
++- #clock-cells : from common clock binding; shall be set to 1
++- clock-output-names: name of the output clocks
++
++Example:
++
++	ringclk: clk at 250 {
++		compatible = "marvell,armada-ap806-ring-clock";
++		#clock-cells = <1>;
++		clock-output-names = "ring-0", "ring-2", "ring-3", "ring-4", "ring-5";
++		clocks = <&coreclk 1>;
++	};
 -- 
 2.6.4
