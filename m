@@ -1,80 +1,103 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Feb 2016 09:20:27 +0100
-Subject: [PATCH 3/9] spi: imx: drop unnecessary read/modify/write
-In-Reply-To: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
-References: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1456302033-25638-4-git-send-email-s.hauer@pengutronix.de>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Wed, 24 Feb 2016 13:53:33 +0530
+Subject: [PATCH 2/3] ARM: EXYNOS: remove unused register offset definition
+In-Reply-To: <56CCEF84.6090502@samsung.com>
+References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
+ <1456135396-17767-3-git-send-email-pankaj.dubey@samsung.com>
+ <56CBA1BC.4050003@samsung.com> <56CC2238.2040303@samsung.com>
+ <56CCEF84.6090502@samsung.com>
+Message-ID: <56CD6885.4060904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the MX51_ECSPI_DMA is configured we control every single bit
-of the register, so there's no need to read/modify/write it. Instead
-just write the value we want to have in the register. Also, drop
-unnecessary check if we are actually doing DMA. The values written
-to the register have no effect in PIO mode and value written there
-during the last DMA transfer is still in the register, so we can
-equally well always write a value.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/spi/spi-imx.c | 31 ++++++++++---------------------
- 1 file changed, 10 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 5792918..ec03304 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -240,9 +240,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
- #define MX51_ECSPI_DMA_RXT_WML_OFFSET	24
- #define MX51_ECSPI_DMA_RXT_WML_MASK	(0x3F << 24)
- 
--#define MX51_ECSPI_DMA_TEDEN_OFFSET	7
--#define MX51_ECSPI_DMA_RXDEN_OFFSET	23
--#define MX51_ECSPI_DMA_RXTDEN_OFFSET	31
-+#define MX51_ECSPI_DMA_TEDEN		(1 << 7)
-+#define MX51_ECSPI_DMA_RXDEN		(1 << 23)
-+#define MX51_ECSPI_DMA_RXTDEN		(1 << 31)
- 
- #define MX51_ECSPI_STAT		0x18
- #define MX51_ECSPI_STAT_RR		(1 <<  3)
-@@ -318,8 +318,7 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
- static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 		struct spi_imx_config *config)
- {
--	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
--	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
-+	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
- 	u32 clk = config->speed_hz, delay, reg;
- 
- 	/*
-@@ -392,22 +391,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 	 * Configure the DMA register: setup the watermark
- 	 * and enable DMA request.
- 	 */
--	if (spi_imx->dma_is_inited) {
--		dma = readl(spi_imx->base + MX51_ECSPI_DMA);
--
--		rx_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_RX_WML_OFFSET;
--		tx_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_TX_WML_OFFSET;
--		rxt_wml_cfg = spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET;
--		dma = (dma & ~MX51_ECSPI_DMA_TX_WML_MASK
--			   & ~MX51_ECSPI_DMA_RX_WML_MASK
--			   & ~MX51_ECSPI_DMA_RXT_WML_MASK)
--			   | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
--			   |(1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
--			   |(1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
--			   |(1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
--
--		writel(dma, spi_imx->base + MX51_ECSPI_DMA);
--	}
-+
-+	writel(spi_imx->wml << MX51_ECSPI_DMA_RX_WML_OFFSET |
-+		spi_imx->wml << MX51_ECSPI_DMA_TX_WML_OFFSET |
-+		spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET |
-+		MX51_ECSPI_DMA_TEDEN | MX51_ECSPI_DMA_RXDEN |
-+		MX51_ECSPI_DMA_RXTDEN, spi_imx->base + MX51_ECSPI_DMA);
- 
- 	return 0;
- }
--- 
-2.7.0
+On Wednesday 24 February 2016 05:17 AM, Krzysztof Kozlowski wrote:
+> On 23.02.2016 18:11, pankaj.dubey wrote:
+>> Hi Krzysztof,
+>>
+>> On Tuesday 23 February 2016 05:33 AM, Krzysztof Kozlowski wrote:
+>>> On 22.02.2016 19:03, Pankaj Dubey wrote:
+>>>> This patch cleans up map.h by removing unused register offset
+>>>> and changing EXYNOS4 to EXYNOS in header comment section.
+>>>>
+>>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>>> ---
+>>>>  arch/arm/mach-exynos/include/mach/map.h | 9 +--------
+>>>>  1 file changed, 1 insertion(+), 8 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+>>>> index 351e839..c48ba4f 100644
+>>>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>>>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>>>> @@ -2,7 +2,7 @@
+>>>>   * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+>>>>   *		http://www.samsung.com/
+>>>>   *
+>>>> - * EXYNOS4 - Memory map definitions
+>>>> + * EXYNOS - Memory map definitions
+>>>>   *
+>>>>   * This program is free software; you can redistribute it and/or modify
+>>>>   * it under the terms of the GNU General Public License version 2 as
+>>>> @@ -14,12 +14,6 @@
+>>>>  
+>>>>  #include <plat/map-base.h>
+>>>>  
+>>>> -/*
+>>>> - * EXYNOS4 UART offset is 0x10000 but the older S5P SoCs are 0x400.
+>>>> - * So need to define it, and here is to avoid redefinition warning.
+>>>> - */
+>>>> -#define S3C_UART_OFFSET			(0x10000)
+>>>> -
+>>>>  #include <plat/map-s5p.h>
+>>>
+>>> This does not look good. The S3C_UART_OFFSET is used in plat/map-s5p.h.
+>>>
+>>
+>> Actually it's just defined there but not getting used anywhere. In fact
+>> we can remove it from there also.
+> 
+> The point is that your patch introduce changes. Before S3C_UART_OFFSET
+> was defined to 0x10000, after (because of #ifndef) it will be 0x400.
+> Description of "unused" is not accurate. Unused stuff does not impact
+> anything.
+> 
+>> So I submitted another patch to
+>> cleanup such redundant register definitions from plat/map-s5p.h.
+> 
+> That would be good.
+> 
+>> Only platform using S3C_UART_OFFSET is s3c64xx and its using definition
+>> from map-s3c.h. I have compiled all related platform defconfigs and
+>> found no issues because of removal of S3C_UART_OFFSET from map-s5p.c and
+>> map.h.
+> 
+> The compilation is not a test. You compiled something like this:
+> -#define S3C_UART_OFFSET			(0x10000)
+>  #ifndef S3C_UART_OFFSET
+>  #define S3C_UART_OFFSET         (0x400)
+>  #endif
+> 
+> ... and found no errors. Of course there are no compilation errors! But
+> the value has changed!
+> 
+
+OK. I see, there are quite a few places these definitions are scattered
+even though not used (not used in the sense what ever values these
+macros are taking in code it's not used). Such as
+mach-exynos/include/map.h, plat-samsung/include/plat/{map-s3c.h,
+map-s5p.h} and mach-s3c24xx/include/mach/map.h. So I will remove all
+these in one go.
+Is this fine?
+Also I have one doubt in case I am touching files across various mach
+files and preparing a single patch what should be commit message
+heading? Is commit starting with "ARM: samsung" fine? or anything more
+appropriate you would suggest.
+
+Thanks,
+Pankaj Dubey
+> Best regards,
+> Krzysztof
+> 
+> 
+> 
