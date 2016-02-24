@@ -1,53 +1,120 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 24 Feb 2016 16:05:52 +0000
-Subject: [PATCH] arm*: efi: drop permanent mapping of the UEFI System table
-In-Reply-To: <CAKv+Gu_pnjL557dE1xez_y2tESOjZj9_2XEbNtm_b4yAA-WdYg@mail.gmail.com>
-References: <1456153179-27214-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160222154314.GJ3435@leverpostej>
- <CAKv+Gu_pnjL557dE1xez_y2tESOjZj9_2XEbNtm_b4yAA-WdYg@mail.gmail.com>
-Message-ID: <20160224160552.GB2603@codeblueprint.co.uk>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 24 Feb 2016 11:09:11 -0500
+Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
+ for X-Gene v1
+In-Reply-To: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+Message-ID: <1456330151.5681.46.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Feb, at 04:56:57PM, Ard Biesheuvel wrote:
-> On 22 February 2016 at 16:43, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Feb 22, 2016 at 03:59:39PM +0100, Ard Biesheuvel wrote:
-> >> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> >> index 848ede1587dc..6ce13d6b7122 100644
-> >> --- a/drivers/firmware/efi/arm-runtime.c
-> >> +++ b/drivers/firmware/efi/arm-runtime.c
-> >> @@ -64,6 +64,16 @@ static bool __init efi_virtmap_init(void)
-> >>                               &phys, ret);
-> >>                       return false;
-> >>               }
-> >> +             /*
-> >> +              * If this entry covers the address of the UEFI system table,
-> >> +              * calculate and record its virtual address.
-> >> +              */
-> >> +             if (efi_system_table >= phys &&
-> >> +                 efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
-> >> +                     efi.systab = (void *)(efi_system_table - phys +
-> >> +                                           md->virt_addr);
-> >> +                     set_bit(EFI_SYSTEM_TABLES, &efi.flags);
-> >> +             }
-> >
-> > It seems very odd to me to set this given it's currently unused, and we
-> > don't have permanent access to the table. That sounds like we're just
-> > setting ourselves up for future fragility as users appear.
-> >
+On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
+> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
 > 
-> I wondered about the purpose as well. It is only ever set, and never
-> tested (until this patch)
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> ---
+> ?drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
+> ?1 file changed, 32 insertions(+), 3 deletions(-)
 > 
-> @Matt: any thoughts?
+> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+> index a6456b5..466aa93 100644
+> --- a/drivers/pci/host/pci-xgene-msi.c
+> +++ b/drivers/pci/host/pci-xgene-msi.c
+> @@ -24,6 +24,7 @@
+> ?#include <linux/pci.h>
+> ?#include <linux/platform_device.h>
+> ?#include <linux/of_pci.h>
+> +#include <linux/acpi.h>
+> ?
+> ?#define MSI_IR0			0x000000
+> ?#define MSI_INT0		0x800000
+> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+> ?};
+> ?
+> ?struct xgene_msi {
+> -	struct device_node	*node;
+> +	struct fwnode_handle	*fwnode;
+> ?	struct irq_domain	*inner_domain;
+> ?	struct irq_domain	*msi_domain;
+> ?	u64			msi_addr;
+> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
+> ?	.free???= xgene_irq_domain_free,
+> ?};
+> ?
+> +#ifdef CONFIG_ACPI
+> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+> +{
+> +	return xgene_msi_ctrl.fwnode;
+> +}
+> +#endif
+> +
+> ?static int xgene_allocate_domains(struct xgene_msi *msi)
+> ?{
+> ?	msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> ?	if (!msi->inner_domain)
+> ?		return -ENOMEM;
+> ?
+> -	msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+> +	msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+> ?						????&xgene_msi_domain_info,
+> ?						????msi->inner_domain);
 
-Good question. EFI_SYSTEM_TABLES was introduced over 4 years ago, but
-it looks like it has never had any users. I don't remember why I added
-it, probably just be to be "complete" since we had bits for all the
-other tables.
+This doesn't work for me (ACPI probing on Mustang) unless I change this
+to be?pci_msi_create_default_irq_domain(). The problem seems to be that
+the MSI probe happens after the PCIe RC is probed so there is no MSI domain
+at the time the PCIe root is initialized by ACPI.
 
-If somebody wants to rip it out, I wouldn't object.
-
-To be fair, we don't have permanent access to any of the tables - you
-always have to switch to the dedicated EFI page tables before
-accessing regions.
+> ?
+> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> ?		return -ENOMEM;
+> ?	}
+> ?
+> +#ifdef CONFIG_ACPI
+> +	pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
+> +#endif
+> ?	return 0;
+> ?}
+> ?
+> @@ -473,6 +484,13 @@ static const struct of_device_id xgene_msi_match_table[] = {
+> ?	{},
+> ?};
+> ?
+> +#ifdef CONFIG_ACPI
+> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
+> +	{"APMC0D0E", 0},
+> +	{ },
+> +};
+> +#endif
+> +
+> ?static int xgene_msi_probe(struct platform_device *pdev)
+> ?{
+> ?	struct resource *res;
+> @@ -494,7 +512,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
+> ?		goto error;
+> ?	}
+> ?	xgene_msi->msi_addr = res->start;
+> -	xgene_msi->node = pdev->dev.of_node;
+> +
+> +	xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
+> +	if (!xgene_msi->fwnode) {
+> +		xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
+> +		if (!xgene_msi->fwnode) {
+> +			dev_err(&pdev->dev, "Failed to create fwnode\n");
+> +			rc = ENOMEM;
+> +			goto error;
+> +		}
+> +	}
+> +
+> ?	xgene_msi->num_cpus = num_possible_cpus();
+> ?
+> ?	rc = xgene_msi_init_allocator(xgene_msi);
+> @@ -571,6 +599,7 @@ static struct platform_driver xgene_msi_driver = {
+> ?	.driver = {
+> ?		.name = "xgene-msi",
+> ?		.of_match_table = xgene_msi_match_table,
+> +		.acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
+> ?	},
+> ?	.probe = xgene_msi_probe,
+> ?	.remove = xgene_msi_remove,
