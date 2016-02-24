@@ -1,57 +1,80 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 24 Feb 2016 19:32:33 +0800
-Subject: [PATCH v3 1/2] ehci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1456312517-24211-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <201602241959.92PQx0Sd%fengguang.wu@intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Feb 2016 11:35:49 +0000
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <56CD924F.50108@ti.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
+ <56CC546A.9070705@ti.com>
+ <20160224104638.GL19428@n2100.arm.linux.org.uk>
+ <56CD924F.50108@ti.com>
+Message-ID: <20160224113549.GN19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Reinder,
+On Wed, Feb 24, 2016 at 01:21:51PM +0200, Tomi Valkeinen wrote:
+> On 24/02/16 12:46, Russell King - ARM Linux wrote:
+> > On Tue, Feb 23, 2016 at 02:45:30PM +0200, Tomi Valkeinen wrote:
+> >> My opinion is that the bootloader should be responsible for telling the
+> >> kernel what hardware there is on the board. For busses like PCI we have
+> >> proper probing mechanism with global unique identifiers for the devices,
+> >> and nothing is needed from the bootloader.
+> > 
+> > Exactly, but that is _NOT_ the case here, because we're not talking
+> > about an on-board display.
+> 
+> Ok, what is it then? I'm not familiar with the boards in question.
+> 
+> When does a display become an on-board display? All the panels I have
+> can be disconnected quite easily, but I still consider them as on-board
+> displays.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.5-rc5 next-20160223]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+The difference to me is quite clear.
 
-url:    https://github.com/0day-ci/linux/commits/Hans-de-Goede/ehci-platform-Add-support-for-controllers-with-multiple-reset-lines/20160224-191812
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: x86_64-randconfig-x004-201608 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+If the connector is a flexi-strip or LVDS connector designed to be
+connected directly to a panel, it is not designed as a user connector,
+and the display can be regarded as part of the board: the connector
+probably isn't rated for a large number of mating cycles.
 
-All error/warnings (new ones prefixed by >>):
+If the connector is a board-edge external-unit connector, then the
+panel is not part of the board.
 
-   drivers/usb/host/ehci-platform.c: In function 'ehci_platform_probe':
->> drivers/usb/host/ehci-platform.c:239:5: error: implicit declaration of function 'devm_reset_control_get_shared_by_index' [-Werror=implicit-function-declaration]
-        devm_reset_control_get_shared_by_index(
-        ^
->> drivers/usb/host/ehci-platform.c:238:22: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-       priv->resets[rst] =
-                         ^
-   cc1: some warnings being treated as errors
+In the case of Versatile, it's the latter: the connector is situated
+at the board edge, next to the serial port connectors, and is designed
+to connect to an external box housing the display.
 
-vim +/devm_reset_control_get_shared_by_index +239 drivers/usb/host/ehci-platform.c
+> > That argument does not stack up.  Just because you've plugged in a
+> > network device does not mean that the kernel can drive it: the kernel
+> > needs a device specific driver, which is determined by looking at the
+> > IDs.  There is no standard network driver PCI interface.
+> 
+> Yes, but you can connect the network device to any board with a PCI bus
+> and it works. Here, if I'm not mistaken, the displays are built for this
+> single board, making them board specific.
 
-   232					priv->clks[clk] = NULL;
-   233					break;
-   234				}
-   235			}
-   236	
-   237			for (rst = 0; rst < EHCI_MAX_RESETS; rst++) {
- > 238				priv->resets[rst] =
- > 239					devm_reset_control_get_shared_by_index(
-   240									&dev->dev, rst);
-   241				if (IS_ERR(priv->resets[rst])) {
-   242					err = PTR_ERR(priv->resets[rst]);
+It only works because Linux has a rich array of network drivers supporting
+all that hardware, and the appropriate network driver is bound depending
+on the hardware ID of the card.  If a new PCI network device comes out,
+it'll more likely than not require an update to a network driver to make
+it work.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 24241 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/733e3be9/attachment-0001.obj>
+The displays are not built for "this single board" but for a family of
+boards: not only Versatile PB/AB, but also the Realview family of boards
+too.
+
+> But I cannot accept that as a general solution for all similar cases
+> going forward, especially when moving to DRM world, that's just bad SW
+> design.
+
+I think that's a matter of personal opinion, perspective and situation.
+What is good design today is not necessary good design yesterday or
+tomorrow.  I thought we already ascertained that earlier in this
+discussion. :)
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
