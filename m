@@ -1,43 +1,58 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 14:01:57 -0800
-Subject: [PATCH] dtb: amd: Fix-up for ccn504 and kcs nodes
-In-Reply-To: <1455236443-23949-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1455236443-23949-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20160224220157.GP10126@localhost>
+Date: Wed, 24 Feb 2016 14:04:07 -0800
+Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for v4.6 -
+ part1
+In-Reply-To: <CADaLNDk3n3WQyRZ3rCwDQBhT4QDAycTaqhSbe4P4MMhxUxCdUA@mail.gmail.com>
+References: <CADaLNDk3n3WQyRZ3rCwDQBhT4QDAycTaqhSbe4P4MMhxUxCdUA@mail.gmail.com>
+Message-ID: <20160224220407.GR10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 07:20:43AM +0700, Suravee Suthikulpanit wrote:
-> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+On Sun, Feb 14, 2016 at 11:13:21AM -0800, Duc Dang wrote:
+> [Resend in plain text format]
 > 
-> This is a fix-up patch based on the review comment from
-> Arnd regarding:
->     * fix ccn504 address in the node name
->     * remove kcs interrupt-name
+> Hi Arnd, Olof,
 > 
-> Signed-off-by: Brijesh Singh <brijesh.singh@amd.com>
-> Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> ---
+> This is the first part of DT changes for X-Gene platforms queued for
+> 4.6. This includes only 1 change in compatible string for X-Gene v2
+> SOC PLL.
 > 
-> Hi Olof,
+> Regards,
+> Duc Dang.
+> -------
 > 
-> Here are the changes from the V3 that I sent earlier. Sorry for confusion.
-> Would you please pull this into the next tree?
+> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
-> Thank you,
-> Suravee
+>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.6-part1
+> 
+> for you to fetch changes up to a8618b52bca015be7ae342423ba9b6d2e9a8037b:
+> 
+>   arm64: Update Merlin DT PCP PLL clock node for v2 hardware
+> (2016-02-09 18:25:02 -0800)
+> 
+> ----------------------------------------------------------------
+> First part of X-Gene DT changes queued for v4.6
+> 
+> This includes a change in compatible string of
+> X-Gene v2 SOC PLL DT node to reflect the v2 hardware.
+> This change is part of Loc's series
+> http://www.spinics.net/lists/arm-kernel/msg475481.html
+> 
+> ----------------------------------------------------------------
+> Loc Ho (1):
+>       arm64: Update Merlin DT PCP PLL clock node for v2 hardware
 
-Applied.
+Hi,
 
-I also noticed that the patch subjects were nonstandard the last time around.
-In the future, please use:
+Please use the following patch subject format:
 
-arm64: dts: amd: ...
+arm64: dts: apm: ... 
 
-as prefix, instead of just dtb (which is the binary format). I fixed it up for
-this patch, and the others, well, they're already applied. So let's try to
-remember it for the future.
+(Respin and send a fresh pull request, please)
 
 
 -Olof
