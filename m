@@ -1,67 +1,49 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:31 +0530
-Subject: [PATCH 06/50] pinctrl: iproc-gpio: Use devm_pinctrl_register() for
+Date: Wed, 24 Feb 2016 18:45:41 +0530
+Subject: [PATCH 16/50] pinctrl: nomadic: Use devm_pinctrl_register() for
  pinctrl registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-7-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-17-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_pinctrl_register() for pin control registration and clean
-the error path.
+Use devm_pinctrl_register() for pin control registration.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Jon Mason <jonmason@broadcom.com>
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/pinctrl/bcm/pinctrl-iproc-gpio.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ drivers/pinctrl/nomadik/pinctrl-abx500.c  | 3 ++-
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c | 2 +-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
-index d530ab4..e753af3 100644
---- a/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
-+++ b/drivers/pinctrl/bcm/pinctrl-iproc-gpio.c
-@@ -623,7 +623,7 @@ static int iproc_gpio_register_pinconf(struct iproc_gpio *chip)
- 	pctldesc->npins = gc->ngpio;
- 	pctldesc->confops = &iproc_pconf_ops;
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index 1f7469c..d488124 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -1212,7 +1212,8 @@ static int abx500_gpio_probe(struct platform_device *pdev)
  
--	chip->pctl = pinctrl_register(pctldesc, chip->dev, chip);
-+	chip->pctl = devm_pinctrl_register(chip->dev, pctldesc, chip);
- 	if (IS_ERR(chip->pctl)) {
- 		dev_err(chip->dev, "unable to register pinctrl device\n");
- 		return PTR_ERR(chip->pctl);
-@@ -632,11 +632,6 @@ static int iproc_gpio_register_pinconf(struct iproc_gpio *chip)
- 	return 0;
- }
+ 	abx500_pinctrl_desc.pins = pct->soc->pins;
+ 	abx500_pinctrl_desc.npins = pct->soc->npins;
+-	pct->pctldev = pinctrl_register(&abx500_pinctrl_desc, &pdev->dev, pct);
++	pct->pctldev = devm_pinctrl_register(&pdev->dev, &abx500_pinctrl_desc,
++					     pct);
+ 	if (IS_ERR(pct->pctldev)) {
+ 		dev_err(&pdev->dev,
+ 			"could not register abx500 pinctrl driver\n");
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index 3524061..ca5e9ea 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -2044,7 +2044,7 @@ static int nmk_pinctrl_probe(struct platform_device *pdev)
+ 	nmk_pinctrl_desc.npins = npct->soc->npins;
+ 	npct->dev = &pdev->dev;
  
--static void iproc_gpio_unregister_pinconf(struct iproc_gpio *chip)
--{
--	pinctrl_unregister(chip->pctl);
--}
--
- static const struct of_device_id iproc_gpio_of_match[] = {
- 	{ .compatible = "brcm,cygnus-ccm-gpio" },
- 	{ .compatible = "brcm,cygnus-asiu-gpio" },
-@@ -720,7 +715,7 @@ static int iproc_gpio_probe(struct platform_device *pdev)
- 					   handle_simple_irq, IRQ_TYPE_NONE);
- 		if (ret) {
- 			dev_err(dev, "no GPIO irqchip\n");
--			goto err_unregister_pinconf;
-+			goto err_rm_gpiochip;
- 		}
- 
- 		gpiochip_set_chained_irqchip(gc, &iproc_gpio_irq_chip, irq,
-@@ -729,9 +724,6 @@ static int iproc_gpio_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err_unregister_pinconf:
--	iproc_gpio_unregister_pinconf(chip);
--
- err_rm_gpiochip:
- 	gpiochip_remove(gc);
- 
+-	npct->pctl = pinctrl_register(&nmk_pinctrl_desc, &pdev->dev, npct);
++	npct->pctl = devm_pinctrl_register(&pdev->dev, &nmk_pinctrl_desc, npct);
+ 	if (IS_ERR(npct->pctl)) {
+ 		dev_err(&pdev->dev, "could not register Nomadik pinctrl driver\n");
+ 		return PTR_ERR(npct->pctl);
 -- 
 2.1.4
