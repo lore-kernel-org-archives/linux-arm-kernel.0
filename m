@@ -1,39 +1,73 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Feb 2016 10:23:52 +0000
-Subject: [PATCH] arm64: Fix misspellings in comments.
-In-Reply-To: <1456270006-26035-1-git-send-email-adam.buchbinder@gmail.com>
-References: <1456270006-26035-1-git-send-email-adam.buchbinder@gmail.com>
-Message-ID: <20160224102351.GB28310@arm.com>
+Date: Wed, 24 Feb 2016 10:41:40 +0000
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <56CD8302.9080202@de.ibm.com>
+References: <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad>
+ <20160223193345.GC21820@node.shutemov.name>
+ <20160223202233.GE27281@arm.com> <56CD8302.9080202@de.ibm.com>
+Message-ID: <20160224104139.GC28310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 03:26:46PM -0800, Adam Buchbinder wrote:
-> Signed-off-by: Adam Buchbinder <adam.buchbinder@gmail.com>
-> ---
->  arch/arm64/boot/dts/nvidia/tegra132.dtsi | 2 +-
->  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 2 +-
->  arch/arm64/include/asm/ftrace.h          | 2 +-
->  arch/arm64/include/asm/kvm_arm.h         | 2 +-
->  arch/arm64/include/asm/kvm_host.h        | 4 ++--
->  arch/arm64/kernel/fpsimd.c               | 2 +-
->  arch/arm64/kernel/kgdb.c                 | 4 ++--
->  arch/arm64/kernel/signal32.c             | 2 +-
->  arch/arm64/lib/memcmp.S                  | 2 +-
->  9 files changed, 11 insertions(+), 11 deletions(-)
+On Wed, Feb 24, 2016 at 11:16:34AM +0100, Christian Borntraeger wrote:
+> On 02/23/2016 09:22 PM, Will Deacon wrote:
+> > On Tue, Feb 23, 2016 at 10:33:45PM +0300, Kirill A. Shutemov wrote:
+> >> On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
+> >>> I'll check with Martin, maybe it is actually trivial, then we can
+> >>> do a quick test it to rule that one out.
+> >>
+> >> Oh. I found a bug in __split_huge_pmd_locked(). Although, not sure if it's
+> >> _the_ bug.
+> >>
+> >> pmdp_invalidate() is called for the wrong address :-/
+> >> I guess that can be destructive on the architecture, right?
+> > 
+> > FWIW, arm64 ignores the address parameter for set_pmd_at, so this would
+> > only result in the TLBI nuking the wrong entries, which is going to be
+> > tricky to observe in practice given that we install a table entry
+> > immediately afterwards that maps the same pages. If s390 does more here
+> > (I see some magic asm using the address), that could be the answer...
+> 
+> This patch does not change the address for set_pmd_at, it does that for the 
+> pmdp_invalidate here (by keeping haddr at the start of the pmd)
+> 
+> --->    pmdp_invalidate(vma, haddr, pmd);
+>         pmd_populate(mm, pmd, pgtable);
 
-[...]
+On arm64, pmdp_invalidate looks like:
 
-> diff --git a/arch/arm64/lib/memcmp.S b/arch/arm64/lib/memcmp.S
-> index ffbdec0..dc5f17c 100644
-> --- a/arch/arm64/lib/memcmp.S
-> +++ b/arch/arm64/lib/memcmp.S
-> @@ -211,7 +211,7 @@ CPU_LE( lsr	tmp2, tmp2, tmp1 )
->  .Lunequal_proc:
->  	cbz	diff, .Lremain8
->  
-> -/*There is differnence occured in the latest comparison.*/
-> +/*There is differnence occurred in the latest comparison.*/
+void pmdp_invalidate(struct vm_area_struct *vma, unsigned long address,
+		     pmd_t *pmdp)
+{
+	pmd_t entry = *pmdp;
+	set_pmd_at(vma->vm_mm, address, pmdp, pmd_mknotpresent(entry));
+	flush_pmd_tlb_range(vma, address, address + hpage_pmd_size);
+}
 
-If you insist on doing this, please do it properly.
+so that's the set_pmd_at call I was referring to.
+
+On s390, that address ends up in __pmdp_idte[_local], but I don't know
+what .insn rrf,0xb98e0000,%2,%3,0,{0,1} do ;)
+
+> Without that fix we would clearly have stale tlb entries, no?
+
+Yes, but AFAIU the sequence on arm64 is:
+
+1.  trans huge mapping (block mapping in arm64 speak)
+2.  faulting entry (pmd_mknotpresent)
+3.  tlb invalidation
+4.  table entry mapping the same pages as (1).
+
+so if the microarchitecture we're on can tolerate a mixture of block
+mappings and page mappings mapping the same VA to the same PA, then the
+lack of TLB maintenance would go unnoticed. There are certainly systems
+where that could cause an issue, but I believe the one I've been testing
+on would be ok.
 
 Will
