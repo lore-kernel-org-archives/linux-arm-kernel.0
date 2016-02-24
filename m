@@ -1,50 +1,97 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 24 Feb 2016 10:27:59 -0800
-Subject: [PATCH 04/50] pinctrl: bcm2835: Use devm_pinctrl_register() for
- pinctrl registration
-In-Reply-To: <1456319775-3216-5-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-5-git-send-email-ldewangan@nvidia.com>
-Message-ID: <d3e4a7ae-6c51-1a2f-8344-8f8b2ff3f5ec@broadcom.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Wed, 24 Feb 2016 18:28:57 +0000
+Subject: [PATCH 3/3] arm64: dts: register Hi6220's thermal zone for power
+ allocator
+In-Reply-To: <1455983529-9559-4-git-send-email-leo.yan@linaro.org>
+References: <1455983529-9559-1-git-send-email-leo.yan@linaro.org>
+ <1455983529-9559-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <20160224182856.GD3006@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2/24/2016 5:15 AM, Laxman Dewangan wrote:
-> Use devm_pinctrl_register() for pin control registration.
->
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Ray Jui <rjui@broadcom.com>
+On Sat, Feb 20, 2016 at 11:52:09PM +0800, Leo Yan wrote:
+> With profiling Hi6220's power modeling so get dynamic coefficient and
+> sustainable power. So pass these parameters from DT.
+> 
+> Now enable power allocator wit only one actor for CPU part, so directly
+> use cluster0's thermal sensor for monitoring temperature.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
->  drivers/pinctrl/bcm/pinctrl-bcm2835.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> index 0f5997c..25bc4a2 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> @@ -1027,7 +1027,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
->  		return err;
->  	}
->
-> -	pc->pctl_dev = pinctrl_register(&bcm2835_pinctrl_desc, dev, pc);
-> +	pc->pctl_dev = devm_pinctrl_register(dev, &bcm2835_pinctrl_desc, pc);
->  	if (IS_ERR(pc->pctl_dev)) {
->  		gpiochip_remove(&pc->gpio_chip);
->  		return PTR_ERR(pc->pctl_dev);
-> @@ -1045,7 +1045,6 @@ static int bcm2835_pinctrl_remove(struct platform_device *pdev)
->  {
->  	struct bcm2835_pinctrl *pc = platform_get_drvdata(pdev);
->
-> -	pinctrl_unregister(pc->pctl_dev);
->  	gpiochip_remove(&pc->gpio_chip);
->
->  	return 0;
->
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 36 +++++++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 50ba1b0..3608a3e 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -6,6 +6,7 @@
+>  
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/clock/hi6220-clock.h>
+> +#include <dt-bindings/thermal/thermal.h>
+>  
+>  / {
+>  	compatible = "hisilicon,hi6220";
+> @@ -87,6 +88,7 @@
+>  			cooling-max-level = <0>;
+>  			#cooling-cells = <2>; /* min followed by max */
+>  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			dynamic-power-coefficient = <311>;
+>  		};
+>  
+>  		cpu1: cpu at 1 {
+> @@ -322,5 +324,39 @@
+>  			clock-names = "thermal_clk";
+>  			#thermal-sensor-cells = <1>;
+>  		};
+> +
+> +		thermal-zones {
+> +
+> +			cls0: cls0 {
+> +				polling-delay = <1000>;
+> +				polling-delay-passive = <100>;
+> +				sustainable-power = <3326>;
+> +
+> +				/* sensor ID */
+> +				thermal-sensors = <&tsensor 2>;
+> +
+> +				trips {
+> +					threshold: trip-point at 0 {
+> +						temperature = <65000>;
+> +						hysteresis = <1000>;
 
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+As far as I know, hysteresis is ignored in the thermal subsystem right
+now, so you could remove it from both trip points.
 
-Thanks!
+> +						type = "passive";
+> +					};
+> +
+> +					target: trip-point at 1 {
+> +						temperature = <75000>;
+> +						hysteresis = <1000>;
+> +						type = "passive";
+> +					};
+> +				};
+> +
+> +				cooling-maps {
+> +					map0 {
+> +						trip = <&target>;
+> +						contribution = <1024>;
 
-Ray
+As Hikey has only one voltage domain, you only have one cpu cooling
+device.  "contribution" is only useful when you have more than one
+cooling device, as it's relative to the other cooling device's
+contribution.  You can remove contribution from here.
+
+Other than this minor stuff, it looks good to me. FWIW,
+
+Reviewed-by: Javi Merino <javi.merino@arm.com>
+
+> +						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +					};
+> +				};
+> +			};
+> +		};
+>  	};
+>  };
