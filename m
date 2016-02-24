@@ -1,28 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Feb 2016 13:16:44 +0900
-Subject: next-20160222 build: 5 failures 9 warnings (next-20160222)
-In-Reply-To: <20160224144859.027a3564@canb.auug.org.au>
-References: <E1aXlz4-000486-Pb@optimist> <20160222100832.GX18327@sirena.org.uk>
- <56CAE5E6.7030707@arm.com> <20160224032842.GK18327@sirena.org.uk>
- <20160224144859.027a3564@canb.auug.org.au>
-Message-ID: <20160224041644.GS18327@sirena.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Feb 2016 00:03:59 -0800
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.5 (#2)
+In-Reply-To: <874mdfxkjx.fsf@free-electrons.com>
+References: <874mdfxkjx.fsf@free-electrons.com>
+Message-ID: <20160224080359.GA30231@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 02:48:59PM +1100, Stephen Rothwell wrote:
-> On Wed, 24 Feb 2016 12:28:42 +0900 Mark Brown <broonie@kernel.org> wrote:
+On Thu, Feb 11, 2016 at 05:45:38PM +0100, Gregory CLEMENT wrote:
+> Hi,
+> 
+> Here is the second pull request for fixes for mvebu for v4.5.
+> 
+> Gregory
+> 
+> The following changes since commit ff61ee84e7aa5842d9e33c0b442f0b43a6a44eaf:
+> 
+>   ARM: dts: orion5x: gpio pin fixes for linkstation lswtgl (2016-01-25 16:22:59 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.5-2
+> 
+> for you to fetch changes up to 44361a2cc13493fc41216d33bb9a562ec3a9cc4e:
+> 
+>   ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl (2016-02-09 11:17:53 +0100)
+> 
+> ----------------------------------------------------------------
+> mvebu fixes for 4.5 (part 2)
+> 
+> - Fix the missing mtd flash on linkstation lswtgl
+> - Use unique machine name for the kirkwood ds112 (for Debian flash-kernel tool)
 
-> > That didn't work out unfortunately, the error is still there today.
+Merged now, apologies for the delay.
 
-> Yeah, the patch didn't hit -next yesterday and I missed the opportunity
-> to fix in manually.  However, it should be fixed in today's linux-next
-> (out in a few hours, hopefully).
 
-Ah, good - it was just too late rather than not working.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/4b822083/attachment.sig>
+-Olof
