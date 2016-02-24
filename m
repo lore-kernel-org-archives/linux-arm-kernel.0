@@ -1,59 +1,149 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 24 Feb 2016 11:39:26 +0530
-Subject: [PATCH 0/5] Modularize PCI_DW related drivers.
-In-Reply-To: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <56CD4916.3050904@ti.com>
+Date: Wed, 24 Feb 2016 11:51:21 +0530
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+ <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
+ <56CAA82D.6000507@ti.com>
+ <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
+ <56CADB23.8020202@ti.com> <56CC490F.3040301@ti.com>
+ <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
+Message-ID: <56CD4BE1.3010701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-On Monday 08 February 2016 05:30 AM, Paul Gortmaker wrote:
-> In a recent patch series that aimed to remove code related to module
-> unload for PCI support that was simply non modular, the discussion
-> led to people wanting to keep the code and push towards taking the
-> steps needed to support moving it towards tristate instead[1].
+On Tuesday 23 February 2016 11:58 PM, Paul Walmsley wrote:
+> Kishon
 > 
-> Here, we take step one, which is simply making the Kconfig change
-> and then dealing with any build fallout or modpost fallout.  What
-> amounts to essentially a sanity build test.  To be clear, these
-> have not been runtime validated; that will need to be done by those
-> with access to real hardware.  However, the changes are not anything
-> that should disrupt any existing built-in validation, so real world
-> users should not be impacted by this change.
+> On Tue, 23 Feb 2016, Kishon Vijay Abraham I wrote:
 > 
-> We start with a smaller family of drivers; those that actively select
-> PCI_DW, as a nice self contained group to test the waters and see if
-> everyone is still good with this approach before investing more time
-> on a wider scale to other pci/host/ code blocks.
+>> On Monday 22 February 2016 03:25 PM, Kishon Vijay Abraham I wrote:
+>>> On Monday 22 February 2016 12:01 PM, Paul Walmsley wrote:
+>>>> On Mon, 22 Feb 2016, Kishon Vijay Abraham I wrote:
+>>>>> On Thursday 18 February 2016 07:51 PM, Sekhar Nori wrote:
+>>>>>> On Friday 12 February 2016 10:50 PM, Suman Anna wrote:
+>>>>>>> Will you be following up with above suggestion since Kishon is gonna be out?
+>>>>>>
+>>>>>> Alright, noticed this action for me :) Went through the thread, and 
+>>>>>> looks like this is what we want to see?
+>>>>>>
+>>>>>> Thanks,
+>>>>>> Sekhar
+>>>>>>
+>>>>>> ---8<---
+>>>>>> From e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19 Mon Sep 17 00:00:00 2001
+>>>>>> Message-Id: <e3ba368f2235e1bf38a22ba8ea4e5c12aaafda19.1455803758.git.nsekhar@ti.com>
+>>>>>> From: Sekhar Nori <nsekhar@ti.com>
+>>>>>> Date: Thu, 18 Feb 2016 16:49:56 +0530
+>>>>>> Subject: [PATCH 1/1] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+>>>>>>
+>>>>>> Add a custom reset handler for DRA7x PCIeSS. This
+>>>>>> handler is required to deassert PCIe hardreset lines
+>>>>>> after they have been asserted.
+>>>>>>
+>>>>>> This enables the PCIe driver to access registers after
+>>>>>> PCIeSS has been runtime enabled without having to
+>>>>>> deassert hardreset lines itself.
+>>>>>>
+>>>>>> With this patch applied, used lspci to make sure
+>>>>>> connected PCIe device enumerates on DRA74x and DRA72x
+>>>>>> EVMs.
+>>>>>>
+>>>>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>>>>> ---
+>>>>>> Applies to tag for-v4.6/omap-hwmod-a of Paul W's tree.
+>>>>>>
+>>>>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
+>>>>>>  1 file changed, 23 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>>>>> index b61355e2a771..252b74633e31 100644
+>>>>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>>>>> @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+>>>>>>   *
+>>>>>>   */
+>>>>>>  
+>>>>>> +/*
+>>>>>> + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
+>>>>>> + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
+>>>>>> + * associated with an IP automatically leaving the driver to handle that
+>>>>>> + * by itself. This does not work for PCIeSS which needs the reset lines
+>>>>>> + * deasserted for the driver to start accessing registers.
+>>>>>> + *
+>>>>>> + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
+>>>>>> + * lines after asserting them.
+>>>>>> + */
+>>>>>> +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
+>>>>>> +{
+>>>>>> +	int i;
+>>>>>> +
+>>>>>> +	for (i = 0; i < oh->rst_lines_cnt; i++) {
+>>>>>> +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
+>>>>>> +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>>  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
+>>>>>>  	.name	= "pcie",
+>>>>>> +	.reset	= dra7xx_pciess_reset,
+>>>>>>  };
+>>>>>
+>>>>> Thanks for the patch.
+>>>>
+>>>> Could you please test the bind/unbind functionality just to make sure it 
+>>>> works?
+>>>
+>>> The pci-dra7xx driver neither expose the bind/unbind sysfs entry nor can be
+>>> built as module.
+>>>
+>>> However I hacked the pci-dra7xx driver to be built as module [and reverted
+>>> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe error
+>>> and driver unbind")] and I don't see an abort when the PCI registers are
+>>> accessed after rmmod/modprobe cycle (that was the issue that Sekhar's patch
+>>> tried to solve). However PCI as such doesn't work after rmmod/modprobe cycle
+>>> [1], but this is a different issue most likely in PCIe core and has to debugged.
+>>>
+>>> In summary, there are other issues in PCI across rmmod/modprobe cycle but the
+>>> reset of pci-dra7xx happens fine with this patch.
+>>
+>> Do you expect any other testing from me?
 > 
-> As such the drivers here share a dependency on having the same group
-> of functions exported in order to successfully complete modpost.
+> No I think that's sufficient for the time being, thanks - but, two 
+> questions:
 > 
-> In addition, we have to stray outside drivers/pci to add exports
-> in two places; once for an ARM fault handler, and once for an OF
-> variable.
-> 
-> The pci-keystone-dw.c instance was handled separately because it
-> consists of two source files that need their own group of driver
-> specific exports above and beyond the "shared" ones.
-> 
-> Then we convert the Kconfig for all remaining at once; we could have
-> done it on a per driver basis for ease of revert if anyone really
-> objects, but since it would be a one line change, that seemed like
-> not a real concern.
-> 
-> Build testing was done on the linux-next tree for arm allmodconfig.
+> 1. Can I add your Tested-by: ?
 
-I took these patches and gave a test with DRA7xx board. As expected there was
-no issues when the driver was built-in. However when I tried to rmmod/modprobe
-I got this error [2].
+sure..
+Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
+
+> 
+> 2. Are you going to follow up with these PCIe core issues with the PCIe 
+> core developers?
+
+yeah, I see efforts have already started to convert the PCI drivers from
+built-in to module [1] and issues arising out of that will be debugged.
 
 Thanks
 Kishon
 
-[2] -> http://pastebin.ubuntu.com/15185894/
+[1] -> http://lkml.iu.edu/hypermail/linux/kernel/1602.0/06011.html
 > 
-> [1] https://lkml.kernel.org/r/20160108203102.GH5354 at localhost
+> 
+> - Paul
 > 
