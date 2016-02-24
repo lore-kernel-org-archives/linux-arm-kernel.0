@@ -1,56 +1,66 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 24 Feb 2016 19:41:14 +0100
-Subject: [PATCH 1/2] ARM: mvebu: change order of ethernet DT nodes on
- Armada 38x
-In-Reply-To: <20160129114853.GQ10826@n2100.arm.linux.org.uk>
-References: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453907300-28283-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160127193143.GF10826@n2100.arm.linux.org.uk>
- <20160127194512.GA16638@1wt.eu>
- <20160129114853.GQ10826@n2100.arm.linux.org.uk>
-Message-ID: <20160224184114.GB2292@1wt.eu>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Feb 2016 10:46:09 -0800
+Subject: [PATCH 00/13] arm-cci: PMU driver updates for 4.6
+In-Reply-To: <20160224171218.GC12471@arm.com>
+References: <1456224595-3282-1-git-send-email-suzuki.poulose@arm.com>
+ <20160223114003.GF3966@arm.com> <56CC64E7.3040407@arm.com>
+ <20160224165814.GA10126@localhost> <20160224171218.GC12471@arm.com>
+Message-ID: <CAOesGMhYP8tQXVYX70_U2EYnvOdTtE2xgDi77dKRkJsyjypgDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Feb 24, 2016 at 9:12 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Feb 24, 2016 at 08:58:14AM -0800, Olof Johansson wrote:
+>> On Tue, Feb 23, 2016 at 01:55:51PM +0000, Suzuki K. Poulose wrote:
+>> > On 23/02/16 11:40, Will Deacon wrote:
+>> > >On Tue, Feb 23, 2016 at 10:49:42AM +0000, Suzuki K Poulose wrote:
+>> > >>Here are some fixes and updates for arm-cci pmu driver targeting v4.6,
+>> > >>applies on top of v4.5-rc5.
+>> > >>
+>> > >>Highlights include :
+>> > >>  - Support for CoreLink CCI-550 PMU
+>> > >>  - Reliable writes to PMU Counter registers for CCI-500/550.
+>> > >>
+>> > >>All the patches have been Acked. Please let me know how this
+>> > >>can be merged.
+>> >
+>> > >>
+>> > >>  Documentation/devicetree/bindings/arm/cci.txt |    2 +
+>> > >>  drivers/bus/Kconfig                           |   10 +-
+>> > >>  drivers/bus/arm-cci.c                         |  612 +++++++++++++++++--------
+>> > >>  3 files changed, 427 insertions(+), 197 deletions(-)
+>> > >
+>> > >How do you plan to merge this? I can take it all onto a branch for
+>> > >arm-soc, or I can include it on my perf/updates branch, or ...?
+>> >
+>> > Arnd, Olof,
+>> >
+>> > What do you think would be the best route ?
+>>
+>> Traditionally we've been picking these up in arm-soc in our drivers branch.
+>>
+>> Will, unless you want them in your tree for some reason that's what I'll do
+>> here as well.
+>
+> Just that I already have some CPU PMU patches that I planned to send, so
+> I could bundle these in with those if necessary. I have no preference
+> either way though, as long as they get queued someplace.
 
-On Fri, Jan 29, 2016 at 11:48:53AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 27, 2016 at 08:45:12PM +0100, Willy Tarreau wrote:
-> > On Wed, Jan 27, 2016 at 07:31:44PM +0000, Russell King - ARM Linux wrote:
-> > (...)
-> > > > For example, on the Armada 388 GP, the board has two ports, labelled
-> > > > GE0 and GE1. One has to know that GE0 is eth1 and GE1 is eth0, which
-> > > > isn't really obvious.
-> > > > 
-> > > > In order to solve this, this patch proposes to exceptionaly violate
-> > > > the rule of "order DT nodes by register address", and put the 0x70000
-> > > > node before the 0x30000 node, so that network interfaces get named in
-> > > > a more natural way.
-> > > 
-> > > The danger is that this will completely mess up people's existing
-> > > scripts/distro configuration which are now used to the current
-> > > labelling of the network ports.
-> > > 
-> > > Not every distro provides a sane way to deal with this...
-> > 
-> > Well, may be that's one more reason for fixing it before boards start to
-> > ship and run distro kernels. If some boards are already in the wild running
-> > on a BSP kernel, people will complain that mainline reorders their network
-> > ports and will stick to the BSP kernel instead.
-> 
-> I've checked, and we believe not many people are using mainline kernels
-> on clearfog.  I'll have to adjust my debian jessie setup to fix the
-> resulting carnage though.  On the plus side, it means that mainline
-> matches Marvell's kernel for interface naming.
+Ok, I'm alright with you queueing these if that makes it easier. Feel
+free to add:
 
-Well, now I'm one of these and I confirm that it's really painful to
-have a different ordering between the DTB provided in mainline and the
-DTB provided with the board. The worst thing is that using mainline,
-eth0 corresponds to the switch and appears up, so you don't immediately
-realize that it's not where your cable is connected :-/
+Acked-by: Olof Johansson <olof@lixom.net>
 
-Thus could we please get Thomas' patch to ensure that the board boots
-with similar interface naming with both the original and mainline kernel ?
+Only concern is if we cause confusion on where people should send
+these patches down the road, but there aren't that many authors of
+them so it's not a huge problem.
 
-Thanks in advance,
-Willy
+> At some point, those drivers should be largely moved from drivers/bus/
+> to drivers/perf/, but that's a separate issue.
+
+And with a maintainer on that, that'd resolve the "where do I send
+this" issue. The maintainer, of course, needs to know where to feed
+things next, but that's easier to solve.
+
+
+-Olof
