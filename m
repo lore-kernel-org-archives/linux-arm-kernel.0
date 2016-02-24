@@ -1,20 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 14:02:53 -0800
-Subject: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.6
-In-Reply-To: <cover.1455303422.git.horms+renesas@verge.net.au>
-References: <cover.1455303422.git.horms+renesas@verge.net.au>
-Message-ID: <20160224220253.GQ10126@localhost>
+Date: Wed, 24 Feb 2016 13:51:23 -0800
+Subject: [GIT PULL 2/4] rockchip arm64 changes for 4.6
+In-Reply-To: <2157996.gfpT01ltKJ@phil>
+References: <1734524.3yNt5L3F1F@phil>
+ <2157996.gfpT01ltKJ@phil>
+Message-ID: <20160224215123.GL10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 08:05:46PM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Feb 11, 2016 at 03:50:51PM +0100, Heiko Stuebner wrote:
+> Hi Arnd, Olof, Kevin,
 > 
-> Please consider these Renesas ARM based SoC DT updates for v4.6.
+> This one change enables the rockchip timer driver on 64bit socs as well,
+> after it got fixed to actually work on 64bit in 4.5-rc1.
 > 
+> This time I actually also updated the subject from my previous send-attempt, 
+> so here it is again.
 > 
-> Changes since v1 of this pull-request:
-> * Drop two non-DT patches
+> Thanks
+> Heiko
 > 
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
@@ -23,26 +27,13 @@ On Fri, Feb 12, 2016 at 08:05:46PM +0100, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.6
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git 
+> tags/v4.6-rockchip-soc64-1
 > 
-> for you to fetch changes up to c3373b09ba0391bcd9e992b0a2ce52d48d33e47b:
+> for you to fetch changes up to c840f28bbf643c361c463bcb8fb815d0b2dad4e8:
 > 
->   ARM: dts: silk: Enable SCIF_CLK frequency and pins (2016-02-09 19:43:28 +0100)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Updates for v4.6
-> 
-> * Use SCIF and USBHS fallback compatibility strings
-> * Add Baud Rate Generator (BRG) support for (H)SCIF
-> * Enable SCIF_CLK frequency and pins
-> * Use GIC_* defines
-> * Enable audio on r8a7793/gose
-> * Enable HDMI vidio out on r8a7793
-> * Enable i2c on r8a7793/gose
-> * Enable QSPI on alt
-> * Enable GPIO keys and leds on gise
-> * Enable audio on porter
-> * Enable DU on porter
+>   arm64: Enable the timer on Rockchip architecture (2016-01-24 23:33:14 
+> +0100)
 
 Merged, thanks.
 
