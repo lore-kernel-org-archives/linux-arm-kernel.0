@@ -1,109 +1,140 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 24 Feb 2016 17:22:52 +0800
-Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
-In-Reply-To: <CAL_Jsq+rqv1NBSUToX5BsbnBp_goUWhdczU7ETSxOrJ5D4D1rw@mail.gmail.com>
-References: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
- <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
- <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
- <CAL_Jsq+P8SBmWzNURrmNgz8soCn4QPOPid4SXF0a3TYL_SH27A@mail.gmail.com>
- <20160106032027.GA23726@shlinux2>
- <CAL_Jsq+rqv1NBSUToX5BsbnBp_goUWhdczU7ETSxOrJ5D4D1rw@mail.gmail.com>
-Message-ID: <20160224092252.GA9297@shlinux2.ap.freescale.net>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Wed, 24 Feb 2016 14:59:32 +0530
+Subject: [PATCH v4 1/3] ARM: hwmod: RTC: Add lock and unlock functions
+In-Reply-To: <alpine.DEB.2.02.1602072209460.2182@utopia.booyaka.com>
+References: <1454650952-20154-1-git-send-email-lokeshvutla@ti.com>
+ <1454650952-20154-2-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1602072209460.2182@utopia.booyaka.com>
+Message-ID: <56CD77FC.8030103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 08:18:02AM -0600, Rob Herring wrote:
-> On Tue, Jan 5, 2016 at 9:20 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > On Tue, Jan 05, 2016 at 08:36:31AM -0600, Rob Herring wrote:
-> >> > 2. There are MFD USB devices, which includes several interfaces under
-> >> > USB device,
-> >> > like i2c, gpios, etc. Due to lack of device tree support, USB
-> >> > class/device driver doesn't know
-> >> > which kinds of interfaces are needed for this board.
-> >>
-> >> Are you talking about a device hard wired on the same board or
-> >> something like GPIOs on FTDI chip which could be hot-plugged in any
-> >> host (including non-DT based)?
-> >
-> > I talked about the case that the device hard wired on the board.
-> > Hot-plug device's bus topology is unknown, we can't describe it
-> > statically at dts.
+Hi Paul,
+
+On Monday 08 February 2016 03:54 AM, Paul Walmsley wrote:
+> Hi Lokesh
 > 
-> Correct, upstream (the USB side) can't be described, but it is the
-> downstream side we care about describing.
+> I apologize for the delay.
 > 
-> >> For the hotplug case, we will need a way to associate a DT overlay
-> >> with the USB device and there may not even be a base DT to map the
-> >> overlay into. In this case, the USB device's driver will need to load
-> >> the overlay and trigger enumerating the child devices. Anyway, this is
-> >> a separate issue from your problem.
-> >>
-> >
-> > Since both you and Alan agree with my problem should be fixed at
-> > bootloader, I give the kernel solution up.
+> A few comments:
 > 
-> Surprising, no one ever seems to agree with that solution... There
-> will be people with this problem and unable to update their
-> bootloader.
+> On Fri, 5 Feb 2016, Lokesh Vutla wrote:
 > 
+>> RTC IP have kicker feature which prevents spurious writes to its registers.
+>> In order to write into any of the RTC registers, KICK values has to be
+>> written to KICK registers.
+>> Introduce omap_hwmod_rtc_unlock/lock functions, which  writes into these
+>> KICK registers inorder to lock and unlock RTC registers.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+> 
+> ...
+> 
+>> +/**
+>> + * omap_rtc_wait_not_busy - Wait for the RTC BUSY flag
+>> + * @oh: struct omap_hwmod *
+>> + *
+>> + * For updating certain RTC registers, the MPU must wait
+>> + * for the BUSY status in OMAP_RTC_STATUS_REG to become zero.
+>> + * Once the BUSY status is zero, there is a 15-?s access
+> 
+> Probably best just to write out "microseconds" or "us" here to avoid the 
+> high-bit character problem.
+> 
+>> + * period in which the MPU can program.
+>> + */
+>> +static void omap_rtc_wait_not_busy(struct omap_hwmod *oh)
+>> +{
+>> +	int i;
+>> +
+>> +	/* BUSY may stay active for 1/32768 second (~30 usec) */
+>> +	omap_test_timeout(omap_hwmod_read(oh, OMAP_RTC_STATUS_REG)
+>> +			  & OMAP_RTC_STATUS_REG, OMAP_RTC_MAX_READY_TIME, i);
+> 
+> This test looks bogus.  Shouldn't it AND the register value with 
+> OMAP_RTC_STATUS_BUSY?  Right now the code is AND-ing with 0x44, which 
+> doesn't include the BUSY bit.  So I guess the tests that you mentioned in 
+> the first message of the series don't cover the BUSY case?
+> 
+>> +	/* now we have ~15 usec to read/write various registers */
+>> +}
+>> +
+>> +/**
+>> + * omap_hwmod_rtc_unlock - Unlock the Kicker mechanism.
+>> + * @oh: struct omap_hwmod *
+>> + *
+>> + * RTC IP have kicker feature. This prevents spurious writes to its registers.
+>> + * In order to write into any of the RTC registers, KICK values has te be
+>> + * written in respective KICK registers. This is needed for hwmod to write into
+>> + * sysconfig register.
+>> + */
+>> +void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
+>> +{
+>> +	local_irq_disable();
+>> +	omap_rtc_wait_not_busy(oh);
+>> +	omap_hwmod_write(OMAP_RTC_KICK0_VALUE, oh, OMAP_RTC_KICK0_REG);
+>> +	omap_hwmod_write(OMAP_RTC_KICK1_VALUE, oh, OMAP_RTC_KICK1_REG);
+>> +	local_irq_enable();
+> 
+> Finally, could you ask the IP block maintainer to confirm the 
+> interpretation that, for any STATUS_REG read where the BUSY bit is 0, that 
+> we are guaranteed to have at least 15 microseconds from that point in time 
+> to access the IP block?  It appears to be this way from my reading of the 
+> TRM; but to me, the phrasing is not explicit.  Another interpretation 
+> could be that the BUSY bit reflects the IP block's current status.  If 
+> this latter case is true, then to ensure that the IP block accesses 
+> complete inside the access window, we'll either need to test the BUSY bit 
+> after the writes to ensure that it is still 0, and otherwise repeat the 
+> busy test and writes; or we'll need to wait for a 0->1 BUSY transition 
+> before we wait for a 1->0 BUSY transition.
 
-Hi Rob, I noticed there are still some platform needs to this solution,
-I would like to see if I can move this on, please review below dts
-solution. In below case, there are two ports on the root hub, one is
-USB HUB, the another is a USB wifi. Both of these devices need to have
-power control before they can work.
+As per the HW folks, once SW sees the transistion from 1->0, it is
+guaranteed that SW has 15.25 us to do all the write transactions for all
+the TC updates.
 
-At USB hcd driver, it will try to look-up all USB devices on this
-controller, if the usb-pwr-ops is existed, it will try to get its
-phandle, and do gpio and clock operations.
+Also as per TRM, in RTC there are three types of registers:
+-> TC registers and TC alarm registers:
+-> General registers
+-> Compensation registers.
 
-Optional properties:
-- usb-pwr-ops: the power operations which need to do before this USB device
-  can work.
+MPU must wait for the BUSY bit for accessing the TC registers and  MPU
+can access the general registers at any point of time. SYSCONFIG, KICK
+registers comes under general registers. Since hwmod modifies only the
+sysconfig register, this omap_rtc_wait_not_busy() is not required here.
+We can directly write into sysconfig and KICK registers. Does this sound
+fine to you?
+Shall I resend this patch without omap_rtc_wait_not_busy()?
 
-Example:
 
-/ {
-	...
+Thanks and regards,
+Lokesh
 
-	hub_genesys_1_pwr_ops: hub_genesys_1_pwr_ops {
-		compatible = "usb-pwrseq-simple";
-		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-		reset-duration-us = <10>;
-		clocks = <&clks IMX6QDL_CLK_CKO>;
-	};
 
-	wifi_nxp_2_pwr_ops: wifi_nxp_2_pwr_ops {
-		compatible = "usb-pwrseq-simple";
-		reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>, /* wifi_rst */
-				<&gpio4 7 GPIO_ACTIVE_LOW>; /* wifi_en */
-		reset-duration-us = <10>;
-		clocks = <&clks IMX6QDL_CLK_CKO1>;
-	};
-
-	...
-};
-
-&usb1 {
-	status = "okay";
-
-	#address-cells = <1>;
-	#size-cells = <0>;
-
-	hub: genesys at 1 {
-		compatible = "usb5e3,608";
-		reg = <1>;
-		usb-pwr-ops = <&hub_genesys_1_pwr_ops>
-	};
-
-	wifi: nxp at 2 {
-		compatible = "usb5e3,608";
-		reg = <2>;
-		usb-pwr-ops = <&wifi_nxp_2_pwr_ops>
-	};
-}
-
--- 
-
-Best Regards,
-Peter Chen
+> 
+>> +}
+>> +
+>> +/**
+>> + * omap_hwmod_rtc_lock - Lock the Kicker mechanism.
+>> + * @oh: struct omap_hwmod *
+>> + *
+>> + * RTC IP have kicker feature. This prevents spurious writes to its registers.
+>> + * Once the RTC registers are written, KICK mechanism needs to be locked,
+>> + * in order to prevent any spurious writes. This function locks back the RTC
+>> + * registers once hwmod completes its write into sysconfig register.
+>> + */
+>> +void omap_hwmod_rtc_lock(struct omap_hwmod *oh)
+>> +{
+>> +	local_irq_disable();
+>> +	omap_rtc_wait_not_busy(oh);
+>> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK0_REG);
+>> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK1_REG);
+>> +	local_irq_enable();
+>> +}
+>> -- 
+>> 2.1.4
+>>
+> 
+> 
+> - Paul
+> 
