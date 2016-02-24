@@ -1,107 +1,109 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 24 Feb 2016 18:14:52 +0900
-Subject: [PATCH 2/3] ARM: EXYNOS: remove unused register offset definition
-In-Reply-To: <56CD6885.4060904@samsung.com>
-References: <1456135396-17767-1-git-send-email-pankaj.dubey@samsung.com>
- <1456135396-17767-3-git-send-email-pankaj.dubey@samsung.com>
- <56CBA1BC.4050003@samsung.com> <56CC2238.2040303@samsung.com>
- <56CCEF84.6090502@samsung.com> <56CD6885.4060904@samsung.com>
-Message-ID: <56CD748C.7060007@samsung.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 24 Feb 2016 17:22:52 +0800
+Subject: [PATCH v2 0/3] USB: add generic onboard USB HUB driver
+In-Reply-To: <CAL_Jsq+rqv1NBSUToX5BsbnBp_goUWhdczU7ETSxOrJ5D4D1rw@mail.gmail.com>
+References: <CAL411-rK6qfkbQsSjvXH5VPAQAm4tMyD6fVTEgFQrpLHNGMXeA@mail.gmail.com>
+ <Pine.LNX.4.44L0.1512181030590.1682-100000@iolanthe.rowland.org>
+ <CAL411-qKE=12VZAN9=tUWPqkC5BfSgpQb9aNgCU6rmPLasXNHQ@mail.gmail.com>
+ <CAL_Jsq+P8SBmWzNURrmNgz8soCn4QPOPid4SXF0a3TYL_SH27A@mail.gmail.com>
+ <20160106032027.GA23726@shlinux2>
+ <CAL_Jsq+rqv1NBSUToX5BsbnBp_goUWhdczU7ETSxOrJ5D4D1rw@mail.gmail.com>
+Message-ID: <20160224092252.GA9297@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.02.2016 17:23, pankaj.dubey wrote:
+On Thu, Jan 07, 2016 at 08:18:02AM -0600, Rob Herring wrote:
+> On Tue, Jan 5, 2016 at 9:20 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
+> > On Tue, Jan 05, 2016 at 08:36:31AM -0600, Rob Herring wrote:
+> >> > 2. There are MFD USB devices, which includes several interfaces under
+> >> > USB device,
+> >> > like i2c, gpios, etc. Due to lack of device tree support, USB
+> >> > class/device driver doesn't know
+> >> > which kinds of interfaces are needed for this board.
+> >>
+> >> Are you talking about a device hard wired on the same board or
+> >> something like GPIOs on FTDI chip which could be hot-plugged in any
+> >> host (including non-DT based)?
+> >
+> > I talked about the case that the device hard wired on the board.
+> > Hot-plug device's bus topology is unknown, we can't describe it
+> > statically at dts.
 > 
+> Correct, upstream (the USB side) can't be described, but it is the
+> downstream side we care about describing.
 > 
-> On Wednesday 24 February 2016 05:17 AM, Krzysztof Kozlowski wrote:
->> On 23.02.2016 18:11, pankaj.dubey wrote:
->>> Hi Krzysztof,
->>>
->>> On Tuesday 23 February 2016 05:33 AM, Krzysztof Kozlowski wrote:
->>>> On 22.02.2016 19:03, Pankaj Dubey wrote:
->>>>> This patch cleans up map.h by removing unused register offset
->>>>> and changing EXYNOS4 to EXYNOS in header comment section.
->>>>>
->>>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>>> ---
->>>>>  arch/arm/mach-exynos/include/mach/map.h | 9 +--------
->>>>>  1 file changed, 1 insertion(+), 8 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
->>>>> index 351e839..c48ba4f 100644
->>>>> --- a/arch/arm/mach-exynos/include/mach/map.h
->>>>> +++ b/arch/arm/mach-exynos/include/mach/map.h
->>>>> @@ -2,7 +2,7 @@
->>>>>   * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
->>>>>   *		http://www.samsung.com/
->>>>>   *
->>>>> - * EXYNOS4 - Memory map definitions
->>>>> + * EXYNOS - Memory map definitions
->>>>>   *
->>>>>   * This program is free software; you can redistribute it and/or modify
->>>>>   * it under the terms of the GNU General Public License version 2 as
->>>>> @@ -14,12 +14,6 @@
->>>>>  
->>>>>  #include <plat/map-base.h>
->>>>>  
->>>>> -/*
->>>>> - * EXYNOS4 UART offset is 0x10000 but the older S5P SoCs are 0x400.
->>>>> - * So need to define it, and here is to avoid redefinition warning.
->>>>> - */
->>>>> -#define S3C_UART_OFFSET			(0x10000)
->>>>> -
->>>>>  #include <plat/map-s5p.h>
->>>>
->>>> This does not look good. The S3C_UART_OFFSET is used in plat/map-s5p.h.
->>>>
->>>
->>> Actually it's just defined there but not getting used anywhere. In fact
->>> we can remove it from there also.
->>
->> The point is that your patch introduce changes. Before S3C_UART_OFFSET
->> was defined to 0x10000, after (because of #ifndef) it will be 0x400.
->> Description of "unused" is not accurate. Unused stuff does not impact
->> anything.
->>
->>> So I submitted another patch to
->>> cleanup such redundant register definitions from plat/map-s5p.h.
->>
->> That would be good.
->>
->>> Only platform using S3C_UART_OFFSET is s3c64xx and its using definition
->>> from map-s3c.h. I have compiled all related platform defconfigs and
->>> found no issues because of removal of S3C_UART_OFFSET from map-s5p.c and
->>> map.h.
->>
->> The compilation is not a test. You compiled something like this:
->> -#define S3C_UART_OFFSET			(0x10000)
->>  #ifndef S3C_UART_OFFSET
->>  #define S3C_UART_OFFSET         (0x400)
->>  #endif
->>
->> ... and found no errors. Of course there are no compilation errors! But
->> the value has changed!
->>
+> >> For the hotplug case, we will need a way to associate a DT overlay
+> >> with the USB device and there may not even be a base DT to map the
+> >> overlay into. In this case, the USB device's driver will need to load
+> >> the overlay and trigger enumerating the child devices. Anyway, this is
+> >> a separate issue from your problem.
+> >>
+> >
+> > Since both you and Alan agree with my problem should be fixed at
+> > bootloader, I give the kernel solution up.
 > 
-> OK. I see, there are quite a few places these definitions are scattered
-> even though not used (not used in the sense what ever values these
-> macros are taking in code it's not used). Such as
-> mach-exynos/include/map.h, plat-samsung/include/plat/{map-s3c.h,
-> map-s5p.h} and mach-s3c24xx/include/mach/map.h. So I will remove all
-> these in one go.
-> Is this fine?
+> Surprising, no one ever seems to agree with that solution... There
+> will be people with this problem and unable to update their
+> bootloader.
+> 
 
-Except the used ones (s3c64xx) - yes, all at once. Some of them depend
-on previous ones (ifndef) so "unused" when patching this one-by-one is
-not accurate.
+Hi Rob, I noticed there are still some platform needs to this solution,
+I would like to see if I can move this on, please review below dts
+solution. In below case, there are two ports on the root hub, one is
+USB HUB, the another is a USB wifi. Both of these devices need to have
+power control before they can work.
 
-> Also I have one doubt in case I am touching files across various mach
-> files and preparing a single patch what should be commit message
-> heading? Is commit starting with "ARM: samsung" fine? or anything more
-> appropriate you would suggest.
+At USB hcd driver, it will try to look-up all USB devices on this
+controller, if the usb-pwr-ops is existed, it will try to get its
+phandle, and do gpio and clock operations.
 
-It is still the same Samsung tree and either way it would end in the
-same branch. ARM: SAMSUNG: is fine (I saw it in the log).
+Optional properties:
+- usb-pwr-ops: the power operations which need to do before this USB device
+  can work.
 
-Best regards,
-Krzysztof
+Example:
+
+/ {
+	...
+
+	hub_genesys_1_pwr_ops: hub_genesys_1_pwr_ops {
+		compatible = "usb-pwrseq-simple";
+		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+		reset-duration-us = <10>;
+		clocks = <&clks IMX6QDL_CLK_CKO>;
+	};
+
+	wifi_nxp_2_pwr_ops: wifi_nxp_2_pwr_ops {
+		compatible = "usb-pwrseq-simple";
+		reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>, /* wifi_rst */
+				<&gpio4 7 GPIO_ACTIVE_LOW>; /* wifi_en */
+		reset-duration-us = <10>;
+		clocks = <&clks IMX6QDL_CLK_CKO1>;
+	};
+
+	...
+};
+
+&usb1 {
+	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	hub: genesys at 1 {
+		compatible = "usb5e3,608";
+		reg = <1>;
+		usb-pwr-ops = <&hub_genesys_1_pwr_ops>
+	};
+
+	wifi: nxp at 2 {
+		compatible = "usb5e3,608";
+		reg = <2>;
+		usb-pwr-ops = <&wifi_nxp_2_pwr_ops>
+	};
+}
+
+-- 
+
+Best Regards,
+Peter Chen
