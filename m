@@ -1,69 +1,59 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Wed, 24 Feb 2016 14:33:24 -0800
-Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for v4.6 -
- part1
-In-Reply-To: <20160224220407.GR10126@localhost>
-References: <CADaLNDk3n3WQyRZ3rCwDQBhT4QDAycTaqhSbe4P4MMhxUxCdUA@mail.gmail.com>
- <20160224220407.GR10126@localhost>
-Message-ID: <CADaLNDk2HEkxV1=2rPj4FGR915Z-9vZmrD_T1aQFK1LmhHaX7w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Feb 2016 22:33:50 +0000
+Subject: [PATCH 1/2] ARM: mvebu: change order of ethernet DT nodes on
+ Armada 38x
+In-Reply-To: <20160224184114.GB2292@1wt.eu>
+References: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1453907300-28283-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160127193143.GF10826@n2100.arm.linux.org.uk>
+ <20160127194512.GA16638@1wt.eu>
+ <20160129114853.GQ10826@n2100.arm.linux.org.uk>
+ <20160224184114.GB2292@1wt.eu>
+Message-ID: <20160224223350.GP19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 2:04 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sun, Feb 14, 2016 at 11:13:21AM -0800, Duc Dang wrote:
->> [Resend in plain text format]
->>
->> Hi Arnd, Olof,
->>
->> This is the first part of DT changes for X-Gene platforms queued for
->> 4.6. This includes only 1 change in compatible string for X-Gene v2
->> SOC PLL.
->>
->> Regards,
->> Duc Dang.
->> -------
->>
->> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->>
->>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->>
->> are available in the git repository at:
->>
->>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.6-part1
->>
->> for you to fetch changes up to a8618b52bca015be7ae342423ba9b6d2e9a8037b:
->>
->>   arm64: Update Merlin DT PCP PLL clock node for v2 hardware
->> (2016-02-09 18:25:02 -0800)
->>
->> ----------------------------------------------------------------
->> First part of X-Gene DT changes queued for v4.6
->>
->> This includes a change in compatible string of
->> X-Gene v2 SOC PLL DT node to reflect the v2 hardware.
->> This change is part of Loc's series
->> http://www.spinics.net/lists/arm-kernel/msg475481.html
->>
->> ----------------------------------------------------------------
->> Loc Ho (1):
->>       arm64: Update Merlin DT PCP PLL clock node for v2 hardware
->
-> Hi,
->
-> Please use the following patch subject format:
->
-> arm64: dts: apm: ...
->
-> (Respin and send a fresh pull request, please)
+On Wed, Feb 24, 2016 at 07:41:14PM +0100, Willy Tarreau wrote:
+> Hi Russell,
+> Well, now I'm one of these and I confirm that it's really painful to
+> have a different ordering between the DTB provided in mainline and the
+> DTB provided with the board. The worst thing is that using mainline,
+> eth0 corresponds to the switch and appears up, so you don't immediately
+> realize that it's not where your cable is connected :-/
+> 
+> Thus could we please get Thomas' patch to ensure that the board boots
+> with similar interface naming with both the original and mainline kernel ?
 
-Hi Olof,
+I didn't say no to it, I merely asked a few pertinent questions and
+made some pertinent points.
 
-I will send another fresh pull request with fixed patch subject soon.
-I have several other patches queued, so I will include them as well in
-the new pull request.
+Let me restate:
 
-Regards,
-Duc Dang.
->
->
-> -Olof
+* Today, people who switch between mainline and vendor kernels
+  experience some pain due to the NIC order changing.
+
+* Mainline has had support for Armada 38x for 2 years now, which is
+  long enough for it to have gained users.  AFAICS, there haven't been
+  any complaints about the different NIC ordering.  Changing the NIC
+  ordering is going to cause breakage to these users when they migrate
+  across the change.
+
+By making the change, we're effectively telling these mainline-only
+users "we don't care about your setups, we're going to break them"
+because that's exactly what we're going to do.
+
+Of course, if no one complains about the change, you've got away
+with it.
+
+I think the folk who want to make this change should be prepared for
+userspace breakage reports: Linus feels very strongly about zero
+userspace regressions, as we all should know.
+
+What I'm saying, therefore, is make the change, but if you have one
+report that someone's userspace setup has broken as a result of the
+change, the change must be reverted.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
