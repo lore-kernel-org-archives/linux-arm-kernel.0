@@ -1,33 +1,35 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:27 +0530
-Subject: [PATCH 02/50] pinctrl: Add resource management devm_pinctrl_{register,
- unregister}
+Date: Wed, 24 Feb 2016 18:45:32 +0530
+Subject: [PATCH 07/50] pinctrl: nsp-gpio: Use devm_pinctrl_register() for
+ pinctrl registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-3-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-8-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new member of devm wrappers for the pinctrl_register and
-pinctrl_unregister in list of managed interfaces.
+Use devm_pinctrl_register() for pin control registration.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: Jon Mason <jonmason@broadcom.com>
 ---
- Documentation/driver-model/devres.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pinctrl/bcm/pinctrl-nsp-gpio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
-index 831a536..eed5e56 100644
---- a/Documentation/driver-model/devres.txt
-+++ b/Documentation/driver-model/devres.txt
-@@ -323,6 +323,8 @@ PHY
- PINCTRL
-   devm_pinctrl_get()
-   devm_pinctrl_put()
-+  devm_pinctrl_register()
-+  devm_pinctrl_unregister()
+diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
+index ac90043..2873f73 100644
+--- a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
++++ b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
+@@ -609,7 +609,7 @@ static int nsp_gpio_register_pinconf(struct nsp_gpio *chip)
+ 	pctldesc->npins = gc->ngpio;
+ 	pctldesc->confops = &nsp_pconf_ops;
  
- PWM
-   devm_pwm_get()
+-	chip->pctl = pinctrl_register(pctldesc, chip->dev, chip);
++	chip->pctl = devm_pinctrl_register(chip->dev, pctldesc, chip);
+ 	if (IS_ERR(chip->pctl)) {
+ 		dev_err(chip->dev, "unable to register pinctrl device\n");
+ 		return PTR_ERR(chip->pctl);
 -- 
 2.1.4
