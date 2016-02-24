@@ -1,185 +1,73 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Wed, 24 Feb 2016 11:37:00 -0800
-Subject: [PATCH V3] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-Message-ID: <1456342620-3138-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Feb 2016 19:38:07 +0000
+Subject: [PATCH v12 1/5] efi: ARM/arm64: ignore DT memory nodes instead
+ of removing them
+In-Reply-To: <20160223221202.GA32031@rob-hp-laptop>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160223115805.GB4989@leverpostej>
+ <20160223221202.GA32031@rob-hp-laptop>
+Message-ID: <20160224193807.GC9003@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-namespaces; specifically within a given node SMMU0 and SMMU1 share,
-as does SMMU2 and SMMU3.
+On Tue, Feb 23, 2016 at 04:12:02PM -0600, Rob Herring wrote:
+> On Tue, Feb 23, 2016 at 11:58:05AM +0000, Mark Rutland wrote:
+> > Hi,
+> > 
+> > On Mon, Feb 22, 2016 at 05:58:19PM -0800, David Daney wrote:
+> > > From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > > 
+> > > There are two problems with the UEFI stub DT memory node removal
+> > > routine:
+> > > - it deletes nodes as it traverses the tree, which happens to work
+> > >   but is not supported, as deletion invalidates the node iterator;
+> > > - deleting memory nodes entirely may discard annotations in the form
+> > >   of additional properties on the nodes.
+> > > 
+> > > Since the discovery of DT memory nodes occurs strictly before the
+> > > UEFI init sequence, we can simply clear the memblock memory table
+> > > before parsing the UEFI memory map. This way, it is no longer
+> > > necessary to remove the nodes, so we can remove that logic from the
+> > > stub as well.
+> > 
+> > This is a little bit scary, but I guess this works.
+> 
+> The way it is worded/implemented is, I agree. But if we simply say both 
+> can be present and the kernel will default to UEFI memory map, that 
+> seems sufficient to me.
+>  
+> > My only concern is that when we get kexec, a subsequent kernel must also
+> > have EFI memory map support, or things go bad for the next EFI-aware
+> > kernel after that (as things like the runtime services may have been
+> > corrupted by the kernel in the middle). It's difficult to fix the
+> > general case later.
+> > 
+> > A different option would be to support status="disabled" for the memory
+> > nodes, and ignore these in early_init_dt_scan_memory. That way a kernel
+> > cannot use memory without first having parsed the EFI memory map, and we
+> > can still get NUMA info from the disabled nodes.
+> 
+> That would be a bit strange that the node is disabled, but still used. 
 
-This patch tries to address these issuee by supplying asid and vmid
-base from devicetree.
+I agree this would be strange, and not necessarily a precedent we'd want
+to see copied elsewhere.
 
-changes from V2:
-	- removed *_base from DT, and replaced with compatible string
+Per ePAPR, a "disabled" node can be enabled in a binding-specific
+manner, so having the presence of a UEFI memory map "enable" the NUMA
+information would appear to be permitted.
 
-changes from V1:
-	- rebased on top of 16 bit VMID patch
-	- removed redundent options from DT
-	- insted of transform, DT now supplies starting ASID/VMID
+> What if DT and UEFI tables are out of sync somehow? RAM is multiple 
+> mapped and different addresses were picked for example.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
----
- .../devicetree/bindings/iommu/arm,smmu.txt         |  1 +
- drivers/iommu/arm-smmu.c                           | 48 +++++++++++++++++-----
- 2 files changed, 38 insertions(+), 11 deletions(-)
+That applies regardless of the status of the memory nodes.
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index 7180745..19fe6f2 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -16,6 +16,7 @@ conditions.
-                         "arm,mmu-400"
-                         "arm,mmu-401"
-                         "arm,mmu-500"
-+                        "cavium,smmu-v2"
+My suggestion was only that we acquired the NUMA node information, and
+added this node information (and not any additional extent of memory) to
+the UEFI memory map.
 
-                   depending on the particular implementation and/or the
-                   version of the architecture implemented.
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 247a469..f2287a5 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -326,6 +326,12 @@ struct arm_smmu_device {
+This is precisely what we do with Ard's code, with the exception that in
+the absence of a UEFI memory map the kernel would know it was not
+permitted to access memory.
 
- 	struct list_head		list;
- 	struct rb_root			masters;
-+	/*
-+	 *The follwoing fields are specific to Cavium, Thunder
-+	 */
-+	u32				cavium_smmu_id;
-+	u32				cavium_id_base;
-+
- };
-
- struct arm_smmu_cfg {
-@@ -335,8 +341,8 @@ struct arm_smmu_cfg {
- };
- #define INVALID_IRPTNDX			0xff
-
--#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
--#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-+#define ARM_SMMU_CB_ASID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx)
-+#define ARM_SMMU_CB_VMID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx + 1)
-
- enum arm_smmu_domain_stage {
- 	ARM_SMMU_DOMAIN_S1 = 0,
-@@ -364,6 +370,8 @@ struct arm_smmu_option_prop {
- 	const char *prop;
- };
-
-+static int cavium_smmu_count;
-+
- static struct arm_smmu_option_prop arm_smmu_options[] = {
- 	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
- 	{ 0, NULL},
-@@ -575,11 +583,11 @@ static void arm_smmu_tlb_inv_context(void *cookie)
-
- 	if (stage1) {
- 		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
--		writel_relaxed(ARM_SMMU_CB_ASID(cfg),
-+		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
- 			       base + ARM_SMMU_CB_S1_TLBIASID);
- 	} else {
- 		base = ARM_SMMU_GR0(smmu);
--		writel_relaxed(ARM_SMMU_CB_VMID(cfg),
-+		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
- 			       base + ARM_SMMU_GR0_TLBIVMID);
- 	}
-
-@@ -601,7 +609,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
-
- 		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
- 			iova &= ~12UL;
--			iova |= ARM_SMMU_CB_ASID(cfg);
-+			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
- 			do {
- 				writel_relaxed(iova, reg);
- 				iova += granule;
-@@ -609,7 +617,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- #ifdef CONFIG_64BIT
- 		} else {
- 			iova >>= 12;
--			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
-+			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
- 			do {
- 				writeq_relaxed(iova, reg);
- 				iova += granule >> 12;
-@@ -629,7 +637,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- #endif
- 	} else {
- 		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
--		writel_relaxed(ARM_SMMU_CB_VMID(cfg), reg);
-+		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
- 	}
- }
-
-@@ -738,7 +746,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- #endif
- 		/* if 16bit VMID supported set VMID in CBA2R */
- 		if (smmu->features & ARM_SMMU_FEAT_VMID16)
--			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
-+			reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
-
- 		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
- 	}
-@@ -757,7 +765,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
- 	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
- 		/*16 bit VMID is not supported set 8 bit VMID here */
--		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
-+		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
- 	}
- 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
-
-@@ -765,11 +773,11 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 	if (stage1) {
- 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-
--		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
- 		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
-
- 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
- 		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
- 	} else {
- 		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-@@ -1717,6 +1725,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,mmu-400", .data = (void *)ARM_SMMU_V1 },
- 	{ .compatible = "arm,mmu-401", .data = (void *)ARM_SMMU_V1 },
- 	{ .compatible = "arm,mmu-500", .data = (void *)ARM_SMMU_V2 },
-+	{ .compatible = "cavium,smmu-v2", .data = (void *)ARM_SMMU_V2 },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
-@@ -1827,6 +1836,23 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		}
- 	}
-
-+	/*
-+	 * Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-+	 * namespaces; specifically within a given node SMMU0 and SMMU1 share,
-+	 * as does SMMU2 and SMMU3. see if this is a Cavium SMMU, if so
-+	 * set asid and vmid base such that each SMMU gets unique
-+	 * asid/vmid space.
-+	 */
-+	if (!strcasecmp(of_id->compatible, "cavium,smmu-v2")) {
-+		/* VMID16 must be present on Cavium SMMUv2*/
-+		if (!(smmu->features & ARM_SMMU_FEAT_VMID16))
-+			goto out_free_irqs;
-+		smmu->cavium_smmu_id = cavium_smmu_count;
-+		cavium_smmu_count++;
-+		smmu->cavium_id_base =
-+			(smmu->cavium_smmu_id * ARM_SMMU_MAX_CBS);
-+	}
-+
- 	INIT_LIST_HEAD(&smmu->list);
- 	spin_lock(&arm_smmu_devices_lock);
- 	list_add(&smmu->list, &arm_smmu_devices);
---
-2.1.0
+Mark.
