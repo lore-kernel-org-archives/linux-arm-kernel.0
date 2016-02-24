@@ -1,38 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 24 Feb 2016 08:53:46 -0600
-Subject: [PATCH v4 16/17] FDT: Add a helper to get specified name subnode
-In-Reply-To: <56CC3ED9.5000101@huawei.com>
-References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
- <1454641552-12576-17-git-send-email-zhaoshenglong@huawei.com>
- <CAL_JsqK8F6PQX2kC_+CtDk1-ykKRB3YB54o4FaypsRY_tNzK5w@mail.gmail.com>
- <56CC3ED9.5000101@huawei.com>
-Message-ID: <CAL_JsqJJx_agcQRa=vU25Db33t8LtaoBw+dZB5jS2N7LA2KX2g@mail.gmail.com>
+From: per.hallsmark@windriver.com (per.hallsmark at windriver.com)
+Date: Wed, 24 Feb 2016 15:54:59 +0100
+Subject: [PATCH] arm64: ni_syscall should be similar to other archs
+Message-ID: <1456325699-25849-1-git-send-email-per.hallsmark@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 5:13 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->
->
-> On 2016/2/9 13:04, Rob Herring wrote:
->> On Thu, Feb 4, 2016 at 9:05 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>
->>> Sometimes it needs to check if there is a node in FDT by full path.
->>
->> I'm confused. Are you searching by full path or...
->>
->>> Introduce this helper to get the specified name subnode if it exists.
->>
->> name of sub node?
->>
-> get the offset of sub node by specified name.
->
->> Either way, fdt_subnode_offset or fdt_path_offset doesn't work?
->>
-> Ah?right?both of them should work. Does it need to add a wrapper in
-> drivers/of/fdt.c for them or directly use them with the parameter
-> initial_boot_params?
+From: Per Hallsmark <per.hallsmark@windriver.com>
 
-Add a wrapper in fdt.c.
+Today arm64 have it's own variant when a userspace app is doing a
+non-implemented syscall in that it dumps on console process name,
+registers and such. This makes a different behaviour on arm64 than
+on all other archs.
 
-Rob
+This patch propose to get inline with other archs.
+
+If we want to have a note on console, syslog or so when doing a
+nonimplemented syscall, it would be better to add a variable
+show_nonimplemented_syscalls and sense on it in the generic
+kernel/sys_ni.c::sys_ni_syscall() which could dump info (and then
+it would be generic for all archs). But that is another discussion
+alltogether, lets first synchronize the archs to behave similar.
+
+Signed-off-by: Per Hallsmark <per.hallsmark@windriver.com>
+---
+ arch/arm64/kernel/traps.c | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index cbedd72..980ff63 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -403,14 +403,6 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+ 	}
+ #endif
+ 
+-	if (show_unhandled_signals_ratelimited()) {
+-		pr_info("%s[%d]: syscall %d\n", current->comm,
+-			task_pid_nr(current), (int)regs->syscallno);
+-		dump_instr("", regs);
+-		if (user_mode(regs))
+-			__show_regs(regs);
+-	}
+-
+ 	return sys_ni_syscall();
+ }
+ 
+-- 
+2.5.0
