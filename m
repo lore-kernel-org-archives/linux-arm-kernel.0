@@ -1,10 +1,10 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 24 Feb 2016 18:45:42 +0530
-Subject: [PATCH 17/50] pinctrl: spmi-gpio: Use devm_pinctrl_register() for
+Date: Wed, 24 Feb 2016 18:45:38 +0530
+Subject: [PATCH 13/50] pinctrl: mtk-common: Use devm_pinctrl_register() for
  pinctrl registration
 In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
 References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1456319775-3216-18-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456319775-3216-14-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,51 +12,59 @@ Use devm_pinctrl_register() for pin control registration and clean
 the error path.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: "Bj?rn Andersson" <bjorn.andersson@sonymobile.com>
-Cc: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Jonas Gorski <jogo@openwrt.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Cc: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- drivers/pinctrl/qcom/pinctrl-spmi-gpio.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-index 4e12ded..330e822 100644
---- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-+++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-@@ -764,14 +764,14 @@ static int pmic_gpio_probe(struct platform_device *pdev)
- 	state->chip.of_gpio_n_cells = 2;
- 	state->chip.can_sleep = false;
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index ddc9217..194413d 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -1390,17 +1390,16 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 	pctl->pctl_desc.pmxops = &mtk_pmx_ops;
+ 	pctl->dev = &pdev->dev;
  
--	state->ctrl = pinctrl_register(pctrldesc, dev, state);
-+	state->ctrl = devm_pinctrl_register(dev, pctrldesc, state);
- 	if (IS_ERR(state->ctrl))
- 		return PTR_ERR(state->ctrl);
- 
- 	ret = gpiochip_add_data(&state->chip, state);
- 	if (ret) {
- 		dev_err(state->dev, "can't add gpio chip\n");
--		goto err_chip;
-+		return ret;
+-	pctl->pctl_dev = pinctrl_register(&pctl->pctl_desc, &pdev->dev, pctl);
++	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, &pctl->pctl_desc,
++					       pctl);
+ 	if (IS_ERR(pctl->pctl_dev)) {
+ 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
+ 		return PTR_ERR(pctl->pctl_dev);
  	}
  
- 	ret = gpiochip_add_pin_range(&state->chip, dev_name(dev), 0, 0, npins);
-@@ -784,8 +784,6 @@ static int pmic_gpio_probe(struct platform_device *pdev)
+ 	pctl->chip = devm_kzalloc(&pdev->dev, sizeof(*pctl->chip), GFP_KERNEL);
+-	if (!pctl->chip) {
+-		ret = -ENOMEM;
+-		goto pctrl_error;
+-	}
++	if (!pctl->chip)
++		return -ENOMEM;
  
- err_range:
- 	gpiochip_remove(&state->chip);
--err_chip:
--	pinctrl_unregister(state->ctrl);
+ 	*pctl->chip = mtk_gpio_chip;
+ 	pctl->chip->ngpio = pctl->devdata->npins;
+@@ -1409,10 +1408,8 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 	pctl->chip->base = -1;
+ 
+ 	ret = gpiochip_add_data(pctl->chip, pctl);
+-	if (ret) {
+-		ret = -EINVAL;
+-		goto pctrl_error;
+-	}
++	if (ret)
++		return -EINVAL;
+ 
+ 	/* Register the GPIO to pin mappings. */
+ 	ret = gpiochip_add_pin_range(pctl->chip, dev_name(&pdev->dev),
+@@ -1490,8 +1487,6 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 
+ chip_error:
+ 	gpiochip_remove(pctl->chip);
+-pctrl_error:
+-	pinctrl_unregister(pctl->pctl_dev);
  	return ret;
- }
- 
-@@ -794,7 +792,6 @@ static int pmic_gpio_remove(struct platform_device *pdev)
- 	struct pmic_gpio_state *state = platform_get_drvdata(pdev);
- 
- 	gpiochip_remove(&state->chip);
--	pinctrl_unregister(state->ctrl);
- 	return 0;
  }
  
 -- 
