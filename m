@@ -1,61 +1,73 @@
-From: petr@barix.com (Petr Kulhavy)
-Date: Wed, 24 Feb 2016 16:41:49 +0100
-Subject: [PATCH v2] ARM: DaVinci USB: removed deprecated properties from MUSB
- config
-Message-ID: <1456328509-17839-1-git-send-email-petr@barix.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 24 Feb 2016 15:48:57 +0000
+Subject: [PATCH] ARM: realview: DT support for the PBA8
+In-Reply-To: <56CDA0F0.9050608@arm.com>
+References: <1456303714-31039-1-git-send-email-linus.walleij@linaro.org>
+ <56CDA0F0.9050608@arm.com>
+Message-ID: <56CDD0E9.70504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following properties of the musb_hdrc_config structure
-are deprecated and no longer required/used by the MUSB driver:
+On 24/02/16 12:24, Robin Murphy wrote:
+> Hi Linus,
+>
+> On 24/02/16 08:48, Linus Walleij wrote:
+>> This adds a devicetree for the ARM RealView PBA8 platform,
+>> also known as HBI-0178, "RealView(R) Platform Baseboard for
+>> Cortex(TM)-A8".
+>>
+>> Tested in QEMU with -M realview-pb-a8 and works like a charm,
+>> however with these annoying boot messages:
+>>
+>> of_amba_device_create(): amba_device_add()
+>>      failed (-19) for /soc/sysctl at 10001000
+>> of_amba_device_create(): amba_device_add()
+>>      failed (-19) for /soc/ssp at 1000d000
+>> of_amba_device_create(): amba_device_add()
+>>      failed (-19) for /soc/timer at 10018000
+>> of_amba_device_create(): amba_device_add()
+>>      failed (-19) for /soc/timer at 10019000
+>> of_amba_device_create(): amba_device_add()
+>>      failed (-19) for /soc/sysctl at 1001a000
+>>
+>> I think this is because these PrimeCells do not exist in the
+>> QEMU machine model but would work fine on the real hardware.
+>> QEMU still works, because the SP810 clocks will anyway probe,
+>> as they are not amba_devices but use the special CLK_OF_DECLARE()
+>> probing macro.
+>
+> And here I thought that big black box on the far corner of my desk was
+> only good for taking up space. I have no idea of its provenance, but
+> here's what it had to say (using appended dtb and a hack in the
+> decompressor to set r1=-1, r2=0 because I can't be bothered faffing with
+> a 2010-vintage u-boot):
+>
+> RealView PBA8 #go 0x7fc0
+> ## Starting application at 0x00007FC0 ...
+> Uncompressing Linux... done, booting the kernel.
+> Booting Linux on physical CPU 0x0
 
-.dyn_fifo
-.soft_con
-.dma
-.dma_channels
-.eps_bits
+[...]
 
-Signed-off-by: Petr Kulhavy <petr@barix.com>
----
-v1: <initial>
+> pl061_gpio 10013000.gpio: PL061 GPIO chip @0x10013000 registered
+> pl061_gpio 10014000.gpio: PL061 GPIO chip @0x10014000 registered
+> pl061_gpio 10015000.gpio: PL061 GPIO chip @0x10015000 registered
 
-v2:
- - patch recreated for the 4.5-rc2 tree
+[...]
 
- arch/arm/mach-davinci/usb.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+> mmci-pl18x 10005000.mmcsd: Got CD GPIO
+> mmci-pl18x 10005000.mmcsd: Got WP GPIO
 
-diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
-index b0a6b52..6ed5a54 100644
---- a/arch/arm/mach-davinci/usb.c
-+++ b/arch/arm/mach-davinci/usb.c
-@@ -19,27 +19,11 @@
- #define DA8XX_USB1_BASE 	0x01e25000
- 
- #if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
--static struct musb_hdrc_eps_bits musb_eps[] = {
--	{ "ep1_tx", 8, },
--	{ "ep1_rx", 8, },
--	{ "ep2_tx", 8, },
--	{ "ep2_rx", 8, },
--	{ "ep3_tx", 5, },
--	{ "ep3_rx", 5, },
--	{ "ep4_tx", 5, },
--	{ "ep4_rx", 5, },
--};
--
- static struct musb_hdrc_config musb_config = {
- 	.multipoint	= true,
--	.dyn_fifo	= true,
--	.soft_con	= true,
--	.dma		= true,
- 
- 	.num_eps	= 5,
--	.dma_channels	= 8,
- 	.ram_bits	= 10,
--	.eps_bits	= musb_eps,
- };
- 
- static struct musb_hdrc_platform_data usb_data = {
--- 
-1.9.1
+[...]
+
+> Waiting for root device /dev/mmcblk0p1...
+>
+>
+> It then fails to notice my SD card, even if I eject and reinsert it :(
+
+Ah, it's because it's requesting those GPIOS from &gpio1, rather than 
+&gpio2 where they really are. With that fixed up the card detect now 
+works, but apparently nothing I have around my desk actually supports 
+3.3V...
+
+Robin.
