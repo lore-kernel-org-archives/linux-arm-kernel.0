@@ -1,58 +1,40 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 24 Feb 2016 18:28:59 +0100
-Subject: [PATCH 08/50] pinctrl: berlin: Use devm_pinctrl_register() for
- pinctrl registration
-In-Reply-To: <1456319775-3216-9-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-9-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160224172859.GB29884@kwain>
+From: colin.king@canonical.com (Colin King)
+Date: Wed, 24 Feb 2016 17:32:50 +0000
+Subject: [PATCH] pinctrl: lpc18xx: ensure ngroups is initialized at correct
+ place
+Message-ID: <1456335170-20718-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Colin Ian King <colin.king@canonical.com>
 
-On Wed, Feb 24, 2016 at 06:45:33PM +0530, Laxman Dewangan wrote:
-> Use devm_pinctrl_register() for pin control registration.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+The initialization of ngroups is occurring at the end of the
+first iteration of the outer loop, which means that the
+assignment  pins[ngroups++] = i is potentially indexing into
+a region outside of array pins because ngroups is not initialized.
+Instead, initialize ngroups in the inner loop before the first
+inner loop iteration.
 
-Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/pinctrl/pinctrl-lpc18xx.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Thanks!
-
-Antoine
-
-> Cc: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/pinctrl/berlin/berlin.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/berlin/berlin.c b/drivers/pinctrl/berlin/berlin.c
-> index 46f2b48..2d58166 100644
-> --- a/drivers/pinctrl/berlin/berlin.c
-> +++ b/drivers/pinctrl/berlin/berlin.c
-> @@ -316,7 +316,8 @@ int berlin_pinctrl_probe_regmap(struct platform_device *pdev,
->  		return ret;
->  	}
->  
-> -	pctrl->pctrl_dev = pinctrl_register(&berlin_pctrl_desc, dev, pctrl);
-> +	pctrl->pctrl_dev = devm_pinctrl_register(dev, &berlin_pctrl_desc,
-> +						 pctrl);
->  	if (IS_ERR(pctrl->pctrl_dev)) {
->  		dev_err(dev, "failed to register pinctrl driver\n");
->  		return PTR_ERR(pctrl->pctrl_dev);
-> -- 
-> 2.1.4
-> 
-
+diff --git a/drivers/pinctrl/pinctrl-lpc18xx.c b/drivers/pinctrl/pinctrl-lpc18xx.c
+index f0bebbe..ed1cfa7 100644
+--- a/drivers/pinctrl/pinctrl-lpc18xx.c
++++ b/drivers/pinctrl/pinctrl-lpc18xx.c
+@@ -1170,9 +1170,8 @@ static int lpc18xx_create_group_func_map(struct device *dev,
+ 	u16 pins[ARRAY_SIZE(lpc18xx_pins)];
+ 	int func, ngroups, i;
+ 
+-	for (func = 0; func < FUNC_MAX; ngroups = 0, func++) {
+-
+-		for (i = 0; i < ARRAY_SIZE(lpc18xx_pins); i++) {
++	for (func = 0; func < FUNC_MAX; func++) {
++		for (ngroups = 0, i = 0; i < ARRAY_SIZE(lpc18xx_pins); i++) {
+ 			if (lpc18xx_valid_pin_function(i, func))
+ 				pins[ngroups++] = i;
+ 		}
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/88b78011/attachment-0001.sig>
+2.7.0
