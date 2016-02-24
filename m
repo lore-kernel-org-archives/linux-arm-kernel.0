@@ -1,145 +1,46 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Feb 2016 13:37:49 +0200
-Subject: [PATCH v3 1/2] ehci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1456312517-24211-2-git-send-email-hdegoede@redhat.com>
-References: <1456312517-24211-1-git-send-email-hdegoede@redhat.com>
- <1456312517-24211-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <56CD960D.3000900@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 24 Feb 2016 12:40:44 +0100
+Subject: [PATCH] arm/arm64: KVM: Feed initialized memory to MMIO accesses
+In-Reply-To: <1455723260-23793-1-git-send-email-marc.zyngier@arm.com>
+References: <1455723260-23793-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160224114044.GA18451@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Feb 17, 2016 at 03:34:20PM +0000, Marc Zyngier wrote:
+> On an MMIO access, we always copy the on-stack buffer info
+> the shared "run" structure, even if this is a read access.
+> This ends up leaking up to 8 bytes of uninitialized memory
+> into userspace.
 
-On 24/02/16 13:15, Hans de Goede wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
+I think it only leaks 'len' bytes to userspace ;)
+
 > 
-> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
-> reset lines, the controller will not initialize while the reset for
-> its companion is still asserted, which means we need to de-assert
-> 2 resets for the controller to work.
+> An obvious fix for this one is to only perform the copy if
+> this is an actual write.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
 > 
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> Changes in v2:
-> -Use the new reset_control_[de]assert_shared reset-controller functions
-> Changes in v3:
-> -Adjust for changes to shared-reset reset-controller functions
-> ---
->  Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
->  drivers/usb/host/ehci-platform.c                   | 41 ++++++++++++----------
->  2 files changed, 24 insertions(+), 19 deletions(-)
+>  arch/arm/kvm/mmio.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> index a12d601..0701812 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> @@ -18,7 +18,7 @@ Optional properties:
->   - clocks : a list of phandle + clock specifier pairs
->   - phys : phandle + phy specifier pair
->   - phy-names : "usb"
-> - - resets : phandle + reset specifier pair
-> + - resets : a list of phandle + reset specifier pairs
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 7f33b20..0f6600f 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -206,7 +206,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  	run->mmio.is_write	= is_write;
+>  	run->mmio.phys_addr	= fault_ipa;
+>  	run->mmio.len		= len;
+> -	memcpy(run->mmio.data, data_buf, len);
+> +	if (is_write)
+> +		memcpy(run->mmio.data, data_buf, len);
 >  
->  Example (Sequoia 440EPx):
->      ehci at e0000300 {
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index bd7082f2..3f195ba 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -39,11 +39,12 @@
->  
->  #define DRIVER_DESC "EHCI generic platform driver"
->  #define EHCI_MAX_CLKS 3
-> +#define EHCI_MAX_RESETS 2
->  #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
->  
->  struct ehci_platform_priv {
->  	struct clk *clks[EHCI_MAX_CLKS];
-> -	struct reset_control *rst;
-> +	struct reset_control *resets[EHCI_MAX_RESETS];
->  	struct phy **phys;
->  	int num_phys;
->  	bool reset_on_resume;
-> @@ -149,7 +150,7 @@ static int ehci_platform_probe(struct platform_device *dev)
->  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
->  	struct ehci_platform_priv *priv;
->  	struct ehci_hcd *ehci;
-> -	int err, irq, phy_num, clk = 0;
-> +	int err, irq, phy_num, clk = 0, rst = 0;
->  
->  	if (usb_disabled())
->  		return -ENODEV;
-> @@ -232,18 +233,22 @@ static int ehci_platform_probe(struct platform_device *dev)
->  				break;
->  			}
->  		}
-> -	}
->  
-> -	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-> -	if (IS_ERR(priv->rst)) {
-> -		err = PTR_ERR(priv->rst);
-> -		if (err == -EPROBE_DEFER)
-> -			goto err_put_clks;
-> -		priv->rst = NULL;
-> -	} else {
-> -		err = reset_control_deassert(priv->rst);
-> -		if (err)
-> -			goto err_put_clks;
-> +		for (rst = 0; rst < EHCI_MAX_RESETS; rst++) {
-> +			priv->resets[rst] =
-> +				devm_reset_control_get_shared_by_index(
-> +								&dev->dev, rst);
-> +			if (IS_ERR(priv->resets[rst])) {
-> +				err = PTR_ERR(priv->resets[rst]);
-> +				if (err == -EPROBE_DEFER)
-> +					goto err_reset;
-> +				priv->resets[rst] = NULL;
-> +				break;
-> +			}
-> +			err = reset_control_deassert(priv->resets[rst]);
-> +			if (err)
-> +				goto err_reset;
-> +		}
-
-Why is this code within "if (dev->of.node)" ?
-Previous code looked like it worked for non-DT boots as well.
-
->  	}
->  
->  	if (pdata->big_endian_desc)
-> @@ -300,8 +305,8 @@ err_power:
->  	if (pdata->power_off)
->  		pdata->power_off(dev);
->  err_reset:
-> -	if (priv->rst)
-> -		reset_control_assert(priv->rst);
-> +	while (--rst >= 0)
-> +		reset_control_assert(priv->resets[rst]);
->  err_put_clks:
->  	while (--clk >= 0)
->  		clk_put(priv->clks[clk]);
-> @@ -319,15 +324,15 @@ static int ehci_platform_remove(struct platform_device *dev)
->  	struct usb_hcd *hcd = platform_get_drvdata(dev);
->  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
->  	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
-> -	int clk;
-> +	int clk, rst;
->  
->  	usb_remove_hcd(hcd);
->  
->  	if (pdata->power_off)
->  		pdata->power_off(dev);
->  
-> -	if (priv->rst)
-> -		reset_control_assert(priv->rst);
-> +	for (rst = 0; rst < EHCI_MAX_RESETS && priv->resets[rst]; rst++)
-> +		reset_control_assert(priv->resets[rst]);
->  
->  	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
->  		clk_put(priv->clks[clk]);
+>  	if (!ret) {
+>  		/* We handled the access successfully in the kernel. */
+> -- 
+> 2.1.4
 > 
-
-cheers,
--roger
