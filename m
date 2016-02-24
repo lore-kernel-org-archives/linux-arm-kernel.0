@@ -1,58 +1,25 @@
-From: robert.moore@intel.com (Moore, Robert)
-Date: Wed, 24 Feb 2016 17:17:54 +0000
-Subject: [PATCH v2 3/8] ACPI: add definitions of DBG2 subtypes
-In-Reply-To: <1456333819-13482-4-git-send-email-aleksey.makarov@linaro.org>
-References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
- <1456333819-13482-4-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37E44BCB5@ORSMSX110.amr.corp.intel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 24 Feb 2016 18:22:06 +0100 (CET)
+Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
+ pinctrl_{register, unregister}
+In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <771728522.222286.b52ca77e-fe5e-4536-8e14-525e9a846cdc.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've got these for the next release of ACPICA
+Hi Laxman,
 
+> Laxman Dewangan <ldewangan@nvidia.com> hat am 24. Februar 2016 um 14:15
+> geschrieben:
+>
+>
+> Add resource manageemnt APIs fro pinctrl_register() and pinctrl_unregister()
+> and use these new APIs on hw driver to reduce the error path code and
+> remove callback for driver.
+>
 
-> -----Original Message-----
-> From: Aleksey Makarov [mailto:aleksey.makarov at linaro.org]
-> Sent: Wednesday, February 24, 2016 9:10 AM
-> To: linux-acpi at vger.kernel.org
-> Cc: linux-serial at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Aleksey Makarov; Russell King; Greg Kroah-
-> Hartman; Rafael J . Wysocki; Leif Lindholm; Graeme Gregory; Al Stone;
-> Christopher Covington; Len Brown; Moore, Robert; Zheng, Lv;
-> devel at acpica.org
-> Subject: [PATCH v2 3/8] ACPI: add definitions of DBG2 subtypes
-> 
-> The recent version of Microsoft Debug Port Table 2 (DBG2) [1] specifies
-> additional serial debug port subtypes.  These constants are also referred
-> by Serial Port Console Redirection Table (SPCR) [2]
-> 
-> Add these constants.
-> 
-> [1] https://msdn.microsoft.com/en-
-> us/library/windows/hardware/dn639131(v=vs.85).aspx
-> [2] https://msdn.microsoft.com/en-
-> us/library/windows/hardware/dn639132(v=vs.85).aspx
-> 
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> ---
->  include/acpi/actbl2.h | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h index
-> a4ef625..652f747 100644
-> --- a/include/acpi/actbl2.h
-> +++ b/include/acpi/actbl2.h
-> @@ -371,6 +371,11 @@ struct acpi_dbg2_device {
-> 
->  #define ACPI_DBG2_16550_COMPATIBLE  0x0000
->  #define ACPI_DBG2_16550_SUBSET      0x0001
-> +#define ACPI_DBG2_ARM_PL011         0x0003
-> +#define ACPI_DBG2_ARM_SBSA_32BIT    0x000D
-> +#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000E
-> +#define ACPI_DBG2_ARM_DCC           0x000F
-> +#define ACPI_DBG2_BCM2835           0x0010
-> 
->  #define ACPI_DBG2_1394_STANDARD     0x0000
-> 
-> --
-> 2.7.1
+just for interest: why didn't you patch freescale/pinctrl-mxs.c?
+
+Regards
+Stefan
