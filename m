@@ -1,78 +1,175 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 24 Feb 2016 13:08:25 +0800
-Subject: [PATCH v13 05/20] KVM: ARM64: Add access handler for PMCEID0 and
- PMCEID1 register
+Date: Wed, 24 Feb 2016 13:08:39 +0800
+Subject: [PATCH v13 19/20] KVM: ARM: Introduce per-vcpu kvm device controls
 In-Reply-To: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1456290520-10012-6-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1456290520-10012-20-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add access handler which gets host value of PMCEID0 or PMCEID1 when
-guest access these registers. Writing action to PMCEID0 or PMCEID1 is
-UNDEFINED.
+In some cases it needs to get/set attributes specific to a vcpu and so
+needs something else than ONE_REG.
+
+Let's copy the KVM_DEVICE approach, and define the respective ioctls
+for the vcpu file descriptor.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Peter Maydell <peter.maydell@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+ Documentation/virtual/kvm/api.txt          | 10 +++---
+ Documentation/virtual/kvm/devices/vcpu.txt |  8 +++++
+ arch/arm/kvm/arm.c                         | 55 ++++++++++++++++++++++++++++++
+ arch/arm64/kvm/reset.c                     |  1 +
+ include/uapi/linux/kvm.h                   |  1 +
+ 5 files changed, 71 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/vcpu.txt
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index b05e20f..ca8cdf6 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -493,6 +493,26 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 9684f8d..cb2ef0b 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2507,8 +2507,9 @@ struct kvm_create_device {
+ 
+ 4.80 KVM_SET_DEVICE_ATTR/KVM_GET_DEVICE_ATTR
+ 
+-Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device
+-Type: device ioctl, vm ioctl
++Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device,
++  KVM_CAP_VCPU_ATTRIBUTES for vcpu device
++Type: device ioctl, vm ioctl, vcpu ioctl
+ Parameters: struct kvm_device_attr
+ Returns: 0 on success, -1 on error
+ Errors:
+@@ -2533,8 +2534,9 @@ struct kvm_device_attr {
+ 
+ 4.81 KVM_HAS_DEVICE_ATTR
+ 
+-Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device
+-Type: device ioctl, vm ioctl
++Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device,
++  KVM_CAP_VCPU_ATTRIBUTES for vcpu device
++Type: device ioctl, vm ioctl, vcpu ioctl
+ Parameters: struct kvm_device_attr
+ Returns: 0 on success, -1 on error
+ Errors:
+diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+new file mode 100644
+index 0000000..3cc59c5
+--- /dev/null
++++ b/Documentation/virtual/kvm/devices/vcpu.txt
+@@ -0,0 +1,8 @@
++Generic vcpu interface
++====================================
++
++The virtual cpu "device" also accepts the ioctls KVM_SET_DEVICE_ATTR,
++KVM_GET_DEVICE_ATTR, and KVM_HAS_DEVICE_ATTR. The interface uses the same struct
++kvm_device_attr as other devices, but targets VCPU-wide settings and controls.
++
++The groups and attributes per virtual cpu, if any, are architecture specific.
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d2c2cc3..34d7395 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -826,11 +826,51 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+ 	return 0;
  }
  
-+static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			  const struct sys_reg_desc *r)
++static int kvm_arm_vcpu_set_attr(struct kvm_vcpu *vcpu,
++				 struct kvm_device_attr *attr)
 +{
-+	u64 pmceid;
++	int ret = -ENXIO;
 +
-+	if (!kvm_arm_pmu_v3_ready(vcpu))
-+		return trap_raz_wi(vcpu, p, r);
++	switch (attr->group) {
++	default:
++		break;
++	}
 +
-+	BUG_ON(p->is_write);
-+
-+	if (!(p->Op2 & 1))
-+		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
-+	else
-+		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
-+
-+	p->regval = pmceid;
-+
-+	return true;
++	return ret;
 +}
 +
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -695,10 +715,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmselr, reset_unknown, PMSELR_EL0 },
- 	/* PMCEID0_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
--	  trap_raz_wi },
-+	  access_pmceid },
- 	/* PMCEID1_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
--	  trap_raz_wi },
-+	  access_pmceid },
- 	/* PMCCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
- 	  trap_raz_wi },
-@@ -944,8 +964,8 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
++static int kvm_arm_vcpu_get_attr(struct kvm_vcpu *vcpu,
++				 struct kvm_device_attr *attr)
++{
++	int ret = -ENXIO;
++
++	switch (attr->group) {
++	default:
++		break;
++	}
++
++	return ret;
++}
++
++static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
++				 struct kvm_device_attr *attr)
++{
++	int ret = -ENXIO;
++
++	switch (attr->group) {
++	default:
++		break;
++	}
++
++	return ret;
++}
++
+ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 			 unsigned int ioctl, unsigned long arg)
+ {
+ 	struct kvm_vcpu *vcpu = filp->private_data;
+ 	void __user *argp = (void __user *)arg;
++	struct kvm_device_attr attr;
+ 
+ 	switch (ioctl) {
+ 	case KVM_ARM_VCPU_INIT: {
+@@ -873,6 +913,21 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 			return -E2BIG;
+ 		return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
+ 	}
++	case KVM_SET_DEVICE_ATTR: {
++		if (copy_from_user(&attr, argp, sizeof(attr)))
++			return -EFAULT;
++		return kvm_arm_vcpu_set_attr(vcpu, &attr);
++	}
++	case KVM_GET_DEVICE_ATTR: {
++		if (copy_from_user(&attr, argp, sizeof(attr)))
++			return -EFAULT;
++		return kvm_arm_vcpu_get_attr(vcpu, &attr);
++	}
++	case KVM_HAS_DEVICE_ATTR: {
++		if (copy_from_user(&attr, argp, sizeof(attr)))
++			return -EFAULT;
++		return kvm_arm_vcpu_has_attr(vcpu, &attr);
++	}
+ 	default:
+ 		return -EINVAL;
+ 	}
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index cf4f28a..9677bf0 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -81,6 +81,7 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
++	case KVM_CAP_VCPU_ATTRIBUTES:
+ 		r = 1;
+ 		break;
+ 	default:
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index dc16d30..50f44a2 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -851,6 +851,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_HYPERV_SYNIC 123
+ #define KVM_CAP_S390_RI 124
+ #define KVM_CAP_ARM_PMU_V3 125
++#define KVM_CAP_VCPU_ATTRIBUTES 126
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
 2.0.4
