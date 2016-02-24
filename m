@@ -1,60 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 24 Feb 2016 10:21:29 +0900
-Subject: [PATCH 4/6] ARM: shmobile: emev2: Remove legacy machine_desc.map_io()
- callback
+Date: Wed, 24 Feb 2016 10:21:30 +0900
+Subject: [PATCH 5/6] ARM: shmobile: emev2: Move declaration of emev2_smp_ops
+ to emev2.h
 In-Reply-To: <cover.1456275652.git.horms+renesas@verge.net.au>
 References: <cover.1456275652.git.horms+renesas@verge.net.au>
-Message-ID: <247ac89b99102f79483f7e08b9a94911f9b482d9.1456275652.git.horms+renesas@verge.net.au>
+Message-ID: <c58b31aa46b4c1197acd3503e8c07da79b6bc1c2.1456275652.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Commit FIXME ("ARM: shmobile: Consolidate SCU mapping code") removed the
-last user of the static mapping on emev2-based systems.  Remove the
-mapping and the legacy machine_desc.map_io() callback.
+make C=1:
+
+    arch/arm/mach-shmobile/smp-emev2.c:51:29: warning: symbol 'emev2_smp_ops' was not declared. Should it be static?
+
+To fix this, move the forward declaration of emev2_smp_ops to a header
+file, and include it where appropriate.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-emev2.c | 18 ------------------
- 1 file changed, 18 deletions(-)
+ arch/arm/mach-shmobile/emev2.h       | 6 ++++++
+ arch/arm/mach-shmobile/setup-emev2.c | 4 ++--
+ arch/arm/mach-shmobile/smp-emev2.c   | 2 ++
+ 3 files changed, 10 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/emev2.h
 
+diff --git a/arch/arm/mach-shmobile/emev2.h b/arch/arm/mach-shmobile/emev2.h
+new file mode 100644
+index 000000000000..916d25f6780e
+--- /dev/null
++++ b/arch/arm/mach-shmobile/emev2.h
+@@ -0,0 +1,6 @@
++#ifndef __ASM_EMEV2_H__
++#define __ASM_EMEV2_H__
++
++extern const struct smp_operations emev2_smp_ops;
++
++#endif /* __ASM_EMEV2_H__ */
 diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 10b7cb5dcb3a..0829d0215c38 100644
+index 0829d0215c38..3c99aaf65325 100644
 --- a/arch/arm/mach-shmobile/setup-emev2.c
 +++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -20,23 +20,6 @@
+@@ -18,15 +18,15 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  #include <asm/mach/map.h>
++
  #include "common.h"
++#include "emev2.h"
  
--static struct map_desc emev2_io_desc[] __initdata = {
--#ifdef CONFIG_SMP
--	/* 2M mapping for SCU + L2 controller */
--	{
--		.virtual	= 0xf0000000,
--		.pfn		= __phys_to_pfn(0x1e000000),
--		.length		= SZ_2M,
--		.type		= MT_DEVICE
--	},
--#endif
--};
--
--static void __init emev2_map_io(void)
--{
--	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
--}
--
  static const char *const emev2_boards_compat_dt[] __initconst = {
  	"renesas,emev2",
  	NULL,
-@@ -46,7 +29,6 @@ extern const struct smp_operations emev2_smp_ops;
+ };
  
+-extern const struct smp_operations emev2_smp_ops;
+-
  DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
  	.smp		= smp_ops(emev2_smp_ops),
--	.map_io		= emev2_map_io,
  	.init_early	= shmobile_init_delay,
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= emev2_boards_compat_dt,
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index adbac6963f2b..871220bf5870 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -21,7 +21,9 @@
+ #include <linux/delay.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
++
+ #include "common.h"
++#include "emev2.h"
+ 
+ #define EMEV2_SCU_BASE 0x1e000000
+ #define EMEV2_SMU_BASE 0xe0110000
 -- 
 2.1.4
