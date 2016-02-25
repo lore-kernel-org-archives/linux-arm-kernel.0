@@ -1,43 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 16:47:49 -0800
-Subject: [PATCH v4 12/12] arm64: defconfig: enable Armada 3700 related
- config
-In-Reply-To: <1455646502-23834-13-git-send-email-gregory.clement@free-electrons.com>
-References: <1455646502-23834-1-git-send-email-gregory.clement@free-electrons.com>
- <1455646502-23834-13-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160225004749.GF10126@localhost>
+Date: Wed, 24 Feb 2016 17:18:23 -0800
+Subject: [GIT PULL] at91: drivers for 4.6 #1
+In-Reply-To: <20160218020608.GA31682@piout.net>
+References: <20160218020608.GA31682@piout.net>
+Message-ID: <20160225011823.GD29055@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 07:15:02PM +0100, Gregory CLEMENT wrote:
-> This patch enables the configuration for the Armada 3700 family and for
-> the related driver it uses.
+On Thu, Feb 18, 2016 at 03:06:08AM +0100, Alexandre Belloni wrote:
+> Arnd, Olof, Kevin,
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm64/configs/defconfig | 5 +++++
->  1 file changed, 5 insertions(+)
+> This is a rework of the PMC driver. It touches multiple subsystems so
+> the easiest path is through arm-soc.
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 18ca9fb9e65f..7ca2f0247ec5 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -31,6 +31,7 @@ CONFIG_MODULES=y
->  CONFIG_MODULE_UNLOAD=y
->  # CONFIG_BLK_DEV_BSG is not set
->  # CONFIG_IOSCHED_DEADLINE is not set
-> +CONFIG_ARCH_MVEBU=y
->  CONFIG_ARCH_BCM_IPROC=y
->  CONFIG_ARCH_BERLIN=y
->  CONFIG_ARCH_EXYNOS7=y
+> Thanks,
+> 
+> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> 
+>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-drivers
+> 
+> for you to fetch changes up to 0002ca168f16e5b6ac67415a4e0198cc39af2b7f:
+> 
+>   clk: at91: remove useless includes (2016-02-17 17:53:04 +0100)
 
-How did this end up here? It's in alphabetical order in the Kconfig, and here
-you're inserting it first. Savedefconfig inserts it at the expected location.
+Merged into next/drivers.
 
 
-I've fixed it up in the merge now, which isn't ideal. Maybe you edited
-the defconfig by hand?
+Thanks!
 
 
 -Olof
