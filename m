@@ -1,32 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 08:51:57 +0900
-Subject: [PATCH] arm64: defconfig: Add Renesas R-Car Gen3 USB 2.0 phy driver
- support
-In-Reply-To: <cover.1456442918.git.horms+renesas@verge.net.au>
-References: <cover.1456442918.git.horms+renesas@verge.net.au>
-Message-ID: <a9c42f02387ce8a231bce7c0901ef15fe4bfc3b4.1456442918.git.horms+renesas@verge.net.au>
+Date: Fri, 26 Feb 2016 08:52:55 +0900
+Subject: [GIT PULL] Renesas ARM64 Based SoC SoC Updates for v4.6
+Message-ID: <cover.1456442718.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Please consider these Renesas ARM64 based SoC SoC updates for v4.6.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 86581f793e39..eaf738a59927 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -213,6 +213,7 @@ CONFIG_QCOM_SMD_RPM=y
- CONFIG_ARCH_TEGRA_132_SOC=y
- CONFIG_ARCH_TEGRA_210_SOC=y
- CONFIG_HISILICON_IRQ_MBIGEN=y
-+CONFIG_PHY_RCAR_GEN3_USB2=y
- CONFIG_PHY_XGENE=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-2.7.0.rc3.207.g0ac5344
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-soc-for-v4.6
+
+for you to fetch changes up to 2ee98234b88174f2bcafefb7918e2794a1fdbc98:
+
+  arm64: renesas: Enable PM and PM_GENERIC_DOMAINS for SoCs with PM Domains (2016-02-19 14:55:18 +0900)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC SoC Updates for v4.6
+
+* Enable RENESAS_IRQC, and PM and PM_GENERIC_DOMAINS for SoCs with PM Domains
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      arm64: renesas: Enable PM and PM_GENERIC_DOMAINS for SoCs with PM Domains
+
+Magnus Damm (1):
+      arm64: renesas: Enable RENESAS_IRQC
+
+ arch/arm64/Kconfig.platforms | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
