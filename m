@@ -1,92 +1,110 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 25 Feb 2016 09:52:48 +0000
-Subject: [PATCH v2 8/8] arm64: kvm: Check support for AArch32 for 32bit guests
-In-Reply-To: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
-References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1456393968-17386-9-git-send-email-suzuki.poulose@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 25 Feb 2016 11:01:07 +0100
+Subject: [PATCH v2] tty/serial: at91: restore dynamic driver binding
+In-Reply-To: <1456392221-30401-1-git-send-email-romain.izard.pro@gmail.com>
+References: <1456392221-30401-1-git-send-email-romain.izard.pro@gmail.com>
+Message-ID: <56CED0E3.5070308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a check to make sure the system supports AArch32 state
-before initialising a 32bit guest.
+Le 25/02/2016 10:23, Romain Izard a ?crit :
+> In commit c39dfebc7798956fd2140ae6321786ff35da30c3, the modular support
+> code for atmel_serial was removed, as the driver cannot be built as a
+> module. Because no use case was proposed, the dynamic driver binding
+> support was removed as well.
+> 
+> The atmel_serial driver can manage up to 7 serial controllers, which are
+> multiplexed with other functions. For example, in the Atmel SAMA5D2, the
+> Flexcom controllers can work as USART, SPI or I2C controllers, and on
+> all Atmel devices serial lines can be reconfigured as GPIOs.
+> 
+> My use case uses GPIOs to transfer a firmware update using a custom
+> protocol on the lines used as a serial port during the normal life of
+> the device. If it is not possible to unbind the atmel_serial driver, the
+> GPIO lines remain reserved and prevent this case from working.
+> 
+> This patch reinstates the atmel_serial_remove function, and fixes it as
+> it failed to clear the "clk" field on removal, triggering an oops when
+> a device was bound again after being unbound.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Even if you didn't follow my advice for not including unneeded changes
+in of the last patch chunk, there's no use delaying the patch just for
+this. So, here is my:
 
----
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I really wanted to pass kvm_vcpu down to the helpers. But then, I can't
-define the arch specific helper in asm/kvm_host.h due to lack of kvm_vcpu's
-definition yet:
+Thanks, bye.
 
- In file included from include/linux/kvm_host.h:35:0,
-                  from arch/arm64/kernel/asm-offsets.c:24:
- ./arch/arm64/include/asm/kvm_host.h: In function ?kvm_arch_vcpu_validate_features?:
- ./arch/arm64/include/asm/kvm_host.h:344:48: error: dereferencing pointer to incomplete type
-   return  !test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features) ||
----
- arch/arm/include/asm/kvm_host.h   |    5 +++++
- arch/arm/kvm/arm.c                |    3 +++
- arch/arm64/include/asm/kvm_host.h |    8 ++++++++
- 3 files changed, 16 insertions(+)
+PS: another advice: please include linux-arm-kernel as well in your CC
+list for work on the AT91 platforms: most of the reviewers are there.
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index f9f2779..945c23a 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -238,6 +238,11 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- 
-+static inline bool kvm_arch_vcpu_validate_features(struct kvm_vcpu_arch *arch_vcpu)
-+{
-+	return true;
-+}
-+
- static inline void kvm_arm_init_debug(void) {}
- static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index dda1959..fc4ea37 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -787,6 +787,9 @@ static int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
- 			set_bit(i, vcpu->arch.features);
- 	}
- 
-+	if (!kvm_arch_vcpu_validate_features(&vcpu->arch))
-+		return -EINVAL;
-+
- 	vcpu->arch.target = phys_target;
- 
- 	/* Now we know what it is, we can reset it. */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 689d4c9..9d60a6c 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -24,6 +24,8 @@
- 
- #include <linux/types.h>
- #include <linux/kvm_types.h>
-+#include <asm/cpufeature.h>
-+#include <asm/kvm_arm.h>
- #include <asm/kvm.h>
- #include <asm/kvm_mmio.h>
- 
-@@ -338,6 +340,12 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- 
-+static inline bool kvm_arch_vcpu_validate_features(struct kvm_vcpu_arch *arch_vcpu)
-+{
-+	return  !test_bit(KVM_ARM_VCPU_EL1_32BIT, arch_vcpu->features) ||
-+		system_supports_32bit_el0();
-+}
-+
- void kvm_arm_init_debug(void);
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+> ---
+> Changelog:
+> v2: Add the rationale for keeping the "remove" function as a comment.
+> 
+> 
+>  drivers/tty/serial/atmel_serial.c | 39 ++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 36 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 1c0884d8ef32..b1f3a5b26830 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2759,14 +2759,47 @@ err:
+>  	return ret;
+>  }
+>  
+> +/*
+> + * Even if the driver is not modular, it makes sense to be able to
+> + * unbind a device: there can be many bound devices, and there are
+> + * situations where dynamic binding and unbinding can be useful.
+> + *
+> + * For example, a connected device can require a specific firmware update
+> + * protocol that needs bitbanging on IO lines, but use the regular serial
+> + * port in the normal case.
+> + */
+> +static int atmel_serial_remove(struct platform_device *pdev)
+> +{
+> +	struct uart_port *port = platform_get_drvdata(pdev);
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	int ret = 0;
+> +
+> +	tasklet_kill(&atmel_port->tasklet);
+> +
+> +	device_init_wakeup(&pdev->dev, 0);
+> +
+> +	ret = uart_remove_one_port(&atmel_uart, port);
+> +
+> +	kfree(atmel_port->rx_ring.buf);
+> +
+> +	/* "port" is allocated statically, so we shouldn't free it */
+> +
+> +	clear_bit(port->line, atmel_ports_in_use);
+> +
+> +	clk_put(atmel_port->clk);
+> +	atmel_port->clk = NULL;
+> +
+> +	return ret;
+> +}
+> +
+>  static struct platform_driver atmel_serial_driver = {
+>  	.probe		= atmel_serial_probe,
+> +	.remove		= atmel_serial_remove,
+>  	.suspend	= atmel_serial_suspend,
+>  	.resume		= atmel_serial_resume,
+>  	.driver		= {
+> -		.name			= "atmel_usart",
+> -		.of_match_table		= of_match_ptr(atmel_serial_dt_ids),
+> -		.suppress_bind_attrs    = true,
+> +		.name	= "atmel_usart",
+> +		.of_match_table	= of_match_ptr(atmel_serial_dt_ids),
+>  	},
+>  };
+>  
+> 
+
+
 -- 
-1.7.9.5
+Nicolas Ferre
