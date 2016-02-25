@@ -1,76 +1,59 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 25 Feb 2016 13:43:48 +0530
-Subject: [PATCH 0/5] Modularize PCI_DW related drivers.
-In-Reply-To: <6350001.oOdGGcH81x@wuerfel>
-References: <1454889644-27830-1-git-send-email-paul.gortmaker@windriver.com>
- <56CD4916.3050904@ti.com> <6350001.oOdGGcH81x@wuerfel>
-Message-ID: <56CEB7BC.7010803@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 25 Feb 2016 10:28:59 +0200
+Subject: [PATCH] dmaengine: omap-dma: Do not call omap_dma_callback() from
+ tx_status()
+Message-ID: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+When based on the CCR_ENABLE bit the channel is stopped we should not call
+omap_dma_callback(), only change the return value to DMA_COMPLETE. Client
+drivers will do the right thing to clean up the channel after the transfer
+has been completed.
+Check the CCR_ENABLE only if the channel is not paused since pause in sDMA
+means that the channel is stopped.
+This will fix one hard to reproduce race condition when the channel is
+terminated during transfer (affecting cyclic operation).
 
-On Wednesday 24 February 2016 02:34 PM, Arnd Bergmann wrote:
-> On Wednesday 24 February 2016 11:39:26 Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Monday 08 February 2016 05:30 AM, Paul Gortmaker wrote:
->>> In a recent patch series that aimed to remove code related to module
->>> unload for PCI support that was simply non modular, the discussion
->>> led to people wanting to keep the code and push towards taking the
->>> steps needed to support moving it towards tristate instead[1].
->>>
->>> Here, we take step one, which is simply making the Kconfig change
->>> and then dealing with any build fallout or modpost fallout.  What
->>> amounts to essentially a sanity build test.  To be clear, these
->>> have not been runtime validated; that will need to be done by those
->>> with access to real hardware.  However, the changes are not anything
->>> that should disrupt any existing built-in validation, so real world
->>> users should not be impacted by this change.
->>>
->>> We start with a smaller family of drivers; those that actively select
->>> PCI_DW, as a nice self contained group to test the waters and see if
->>> everyone is still good with this approach before investing more time
->>> on a wider scale to other pci/host/ code blocks.
->>>
->>> As such the drivers here share a dependency on having the same group
->>> of functions exported in order to successfully complete modpost.
->>>
->>> In addition, we have to stray outside drivers/pci to add exports
->>> in two places; once for an ARM fault handler, and once for an OF
->>> variable.
->>>
->>> The pci-keystone-dw.c instance was handled separately because it
->>> consists of two source files that need their own group of driver
->>> specific exports above and beyond the "shared" ones.
->>>
->>> Then we convert the Kconfig for all remaining at once; we could have
->>> done it on a per driver basis for ease of revert if anyone really
->>> objects, but since it would be a one line change, that seemed like
->>> not a real concern.
->>>
->>> Build testing was done on the linux-next tree for arm allmodconfig.
->>
->> I took these patches and gave a test with DRA7xx board. As expected there was
->> no issues when the driver was built-in. However when I tried to rmmod/modprobe
->> I got this error [2].
-> 
-> Thanks for testing this!
-> 
->> [2] -> http://pastebin.ubuntu.com/15185894/
-> 
-> It looks like you are hitting the BUG_ON() in ioremap_pte_range()
-> that checks if a virtual address already has a page table entry,
-> which in turn is probably a result of dw_pcie_host_init()
-> calling pci_remap_iospace() again for the same memory area
-> it has called the last time, and no cleanup done inbetween.
-> 
-> Could you try adding a pci_unmap_iospace() and calling that
-> in the device remove function? Let me know if you need help
-> implementing it.
+Fixes: 1a7cf7b26f25 ("dmaengine: omap-dma: Handle cases when the channel is polled for completion")
 
-That didn't look straight forward to me :-( I'll try to see this next week. Any
-help from you will make it simpler for me.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/omap-dma.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
-Thanks
-Kishon
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index f6bef0d93998..a6b189fdbbe6 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -671,18 +671,22 @@ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
+ 	struct omap_chan *c = to_omap_dma_chan(chan);
+ 	struct virt_dma_desc *vd;
+ 	enum dma_status ret;
+-	uint32_t ccr;
+ 	unsigned long flags;
+ 
+-	ccr = omap_dma_chan_read(c, CCR);
+-	/* The channel is no longer active, handle the completion right away */
+-	if (!(ccr & CCR_ENABLE))
+-		omap_dma_callback(c->dma_ch, 0, c);
+-
+ 	ret = dma_cookie_status(chan, cookie, txstate);
+ 	if (ret == DMA_COMPLETE || !txstate)
+ 		return ret;
+ 
++	if (!c->paused) {
++		uint32_t ccr = omap_dma_chan_read(c, CCR);
++		/*
++		 * The channel is no longer active, set the return value
++		 * accordingly
++		 */
++		if (!(ccr & CCR_ENABLE))
++			ret = DMA_COMPLETE;
++	}
++
+ 	spin_lock_irqsave(&c->vc.lock, flags);
+ 	vd = vchan_find_desc(&c->vc, cookie);
+ 	if (vd) {
+-- 
+2.7.1
