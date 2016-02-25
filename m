@@ -1,42 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 15:49:13 +0100
-Subject: [PATCH 01/14] pinctrl: sunxi: Add A83T R_PIO controller support
-In-Reply-To: <20160225005644.GC4736@lukather>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
- <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
- <20160211123648.GN31506@lukather>
- <CACRpkdaGZ4-S1A9zUUaBXXEazyJf_uZ4ESiBhw-CpozXMxfDHg@mail.gmail.com>
- <20160211151246.GO31506@lukather>
- <CACRpkdb7=x2bJP1nXpF2bP3U0t+NUHiuw_aeTAhbR8OXOrHn6A@mail.gmail.com>
- <20160225005644.GC4736@lukather>
-Message-ID: <CACRpkdYQasUpLhJU16F3_GG7-wKt=wvb1Qqu2cJ62pCHLSii=g@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 25 Feb 2016 16:50:17 +0200
+Subject: [PATCH 01/11] ARM: DTS: dra7: Move the sDMA crossbar node under
+ l4_cfg/scm
+In-Reply-To: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1456411827-23962-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 1:56 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+Move the sDMA xbar nodes under the L4 interconnect node.
 
-> Hi Linus,
-> On Tue, Feb 16, 2016 at 12:23:37AM +0100, Linus Walleij wrote:
->> On Thu, Feb 11, 2016 at 4:12 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Thu, Feb 11, 2016 at 02:47:57PM +0100, Linus Walleij wrote:
->>
->> >> Can you guys supply a MAINTAINERS entry for the sunxi
->> >> stuff?
->> >
->> > We have one, and Chen-Yu is listed as co-maintainer:
->> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/MAINTAINERS#n911
->>
->> Modified request:
->> can you put in F: wildcards there to match the files pertaining to
->> the sunxi platform, so that scripts/find-maintainer.pl finds them.
->
-> I don't really know what you mean, on my laptop, if I run it, I get
-> the following result:
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-OK the file is listed under SoC support, that works too.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 8ea153aa46f6..114286dbee25 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -161,6 +161,15 @@
+ 					compatible = "syscon";
+ 					reg = <0x1c24 0x0024>;
+ 				};
++
++				sdma_xbar: dma-router at b78 {
++					compatible = "ti,dra7-dma-crossbar";
++					reg = <0xb78 0xfc>;
++					#dma-cells = <1>;
++					dma-requests = <205>;
++					ti,dma-safe-map = <0>;
++					dma-masters = <&sdma>;
++				};
+ 			};
+ 
+ 			cm_core_aon: cm_core_aon at 5000 {
+@@ -315,15 +324,6 @@
+ 			dma-requests = <127>;
+ 		};
+ 
+-		sdma_xbar: dma-router at 4a002b78 {
+-			compatible = "ti,dra7-dma-crossbar";
+-			reg = <0x4a002b78 0xfc>;
+-			#dma-cells = <1>;
+-			dma-requests = <205>;
+-			ti,dma-safe-map = <0>;
+-			dma-masters = <&sdma>;
+-		};
+-
+ 		gpio1: gpio at 4ae10000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4ae10000 0x200>;
+-- 
+2.7.1
