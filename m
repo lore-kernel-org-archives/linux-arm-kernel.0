@@ -1,46 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 25 Feb 2016 11:14:50 +0100
-Subject: [PATCH 0/7] arm/arm64: Alpine patches for 4.6
-Message-ID: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Thu, 25 Feb 2016 11:14:54 +0100
+Subject: [PATCH 4/7] arm64: dts: alpine: add the MSIX node in the Alpine v2
+ dtsi
+In-Reply-To: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1456395297-6505-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof and Kevin,
+Following the addition of the Alpine MSIX controller driver, add the
+corresponding node in the Alpine v2 device tree.
 
-Here are the Alpine patches for 4.6. As seen with Olof these patches are
-sent to you as a series as there are only 7 of them. I'll get my gpg key
-signed and setup a git tree somewhere for next time.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+---
+ arch/arm64/boot/dts/al/alpine-v2.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-The first 3 patches introduce a basic arm64 Alpine support, by adding
-the Alpine v2 EVP board. The last 4 patches add an MSIX node in both
-Alpine v1 (arm) and Alpine v2 (arm64) dtsi and select the Alpine MSI
-controller driver.
-
-Thanks!
-
-Antoine
-
-Antoine Tenart (7):
-  arm64: add Alpine SoC family
-  arm64: dts: add the Alpine v2 EVP
-  arm64: defconfig: enable the Alpine family
-  arm64: dts: alpine: add the MSIX node in the Alpine v2 dtsi
-  ARM: dts: alpine: add the MSIX node
-  arm64: alpine: select the Alpine MSI controller driver
-  ARM: alpine: select the Alpine MSI controller driver
-
- arch/arm/boot/dts/alpine.dtsi            |  10 ++
- arch/arm/mach-alpine/Kconfig             |   1 +
- arch/arm64/Kconfig.platforms             |   7 +
- arch/arm64/boot/dts/Makefile             |   1 +
- arch/arm64/boot/dts/al/Makefile          |   5 +
- arch/arm64/boot/dts/al/alpine-v2-evp.dts |  53 +++++++
- arch/arm64/boot/dts/al/alpine-v2.dtsi    | 236 +++++++++++++++++++++++++++++++
- arch/arm64/configs/defconfig             |   1 +
- 8 files changed, 314 insertions(+)
- create mode 100644 arch/arm64/boot/dts/al/Makefile
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2-evp.dts
- create mode 100644 arch/arm64/boot/dts/al/alpine-v2.dtsi
-
+diff --git a/arch/arm64/boot/dts/al/alpine-v2.dtsi b/arch/arm64/boot/dts/al/alpine-v2.dtsi
+index c021e077343b..5b7bef684256 100644
+--- a/arch/arm64/boot/dts/al/alpine-v2.dtsi
++++ b/arch/arm64/boot/dts/al/alpine-v2.dtsi
+@@ -139,6 +139,16 @@
+ 			/* 32 bit non prefetchable memory space */
+ 			ranges = <0x2000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
+ 			bus-range = <0x00 0x00>;
++			msi-parent = <&msix>;
++		};
++
++		msix: msix at fbe00000 {
++			compatible = "al,alpine-msix";
++			reg = <0x0 0xfbe00000 0x0 0x100000>;
++			interrupt-controller;
++			msi-controller;
++			al,msi-base-spi = <160>;
++			al,msi-num-spis = <160>;
+ 		};
+ 
+ 		io-fabric {
 -- 
 2.7.1
