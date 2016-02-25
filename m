@@ -1,81 +1,89 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 25 Feb 2016 14:24:37 +0800
-Subject: [PATCH v6 4/7] clk: mediatek: Add MT2701 clock support
-In-Reply-To: <20160224212533.2278.7597@quark.deferred.io>
-References: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
- <1454665050-37776-5-git-send-email-jamesjj.liao@mediatek.com>
- <20160210200853.26445.15165@quark.deferred.io>
- <1455527982.29688.8.camel@mtksdaap41>
- <20160224212533.2278.7597@quark.deferred.io>
-Message-ID: <1456381477.22545.24.camel@mtksdaap41>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 25 Feb 2016 08:02:00 +0100
+Subject: [RFC PATCH 1/6] arm64: vmemmap: use virtual projection of linear
+ region
+In-Reply-To: <1456330893-19228-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456330893-19228-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456330893-19228-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9M6QukGqLWYgDqAp6xaa7RPVW36E591LOPf6xP_TH48w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 24 February 2016 at 17:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Commit dd006da21646 ("arm64: mm: increase VA range of identity map") made
+> some changes to the memory mapping code to allow physical memory to reside
+> at an offset that exceeds the size of the virtual address space.
+>
+> However, since the size of the vmemmap area is proportional to the size of
+> the VA area, but it is populated relative to the physical space, we may
+> end up with the struct page array being mapped outside of the vmemmap
+> region. For instance, on my Seattle A0 box, I can see the following output
+> in the dmesg log.
+>
+>    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+>              0xffffffbfc0000000 - 0xffffffbfd0000000   (   256 MB actual)
+>
+> We can fix this by deciding that the vmemmap region is not a projection of
+> the physical space, but of the virtual space above PAGE_OFFSET, i.e., the
+> linear region. This way, we are guaranteed that the vmemmap region is of
+> sufficient size, and we can also reduce its size by half.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/pgtable.h | 7 ++++---
+>  arch/arm64/mm/init.c             | 4 ++--
+>  2 files changed, 6 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index a440f5a85d08..8e6baea0ff61 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -34,18 +34,19 @@
+>  /*
+>   * VMALLOC and SPARSEMEM_VMEMMAP ranges.
+>   *
+> - * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
+> + * VMEMAP_SIZE: allows the whole linear region to be covered by a struct page array
+>   *     (rounded up to PUD_SIZE).
+>   * VMALLOC_START: beginning of the kernel vmalloc space
+>   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
+>   *     fixed mappings and modules
+>   */
+> -#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
+> +#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
+>
+>  #define VMALLOC_START          (MODULES_END)
+>  #define VMALLOC_END            (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+>
+> -#define vmemmap                        ((struct page *)(VMALLOC_END + SZ_64K))
+> +#define VMEMMAP_START          (VMALLOC_END + SZ_64K)
+> +#define vmemmap                        ((struct page *)(VMEMMAP_START - memstart_addr / sizeof(struct page)))
+>
 
-On Wed, 2016-02-24 at 13:25 -0800, Michael Turquette wrote:
-> Hi James,
-> 
-> Quoting James Liao (2016-02-15 01:19:42)
-> > Hi Mike,
-> > 
-> > On Wed, 2016-02-10 at 12:08 -0800, Michael Turquette wrote:
-> > > Quoting James Liao (2016-02-05 01:37:27)
-> > > > +CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt2701-topckgen", mtk_topckgen_init);
-> > > > +CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
-> > > > +CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
-> > > > +CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt2701-mmsys", mtk_mmsys_init);
-> > > > +CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt2701-imgsys", mtk_imgsys_init);
-> > > > +CLK_OF_DECLARE(mtk_vdecsys, "mediatek,mt2701-vdecsys", mtk_vdecsys_init);
-> > > > +CLK_OF_DECLARE(mtk_hifsys, "mediatek,mt2701-hifsys", mtk_hifsys_init);
-> > > > +CLK_OF_DECLARE(mtk_ethsys, "mediatek,mt2701-ethsys", mtk_ethsys_init);
-> > > > +CLK_OF_DECLARE(mtk_bdpsys, "mediatek,mt2701-bdpsys", mtk_bdpsys_init);
-> > > > +CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
-> > > 
-> > > :-/
-> > > 
-> > > This is way too much CLK_OF_DECLARE and not enough Linux Driver Model.
-> > > 
-> > > I understand that some platforms really must initialize some clocks very
-> > > early, but can we please separate those into one table and call
-> > > CLK_OF_DECLARE on only that set, and then register the rest through a
-> > > platform_driver later on?
-> > 
-> > I know CLK_OF_DECLARE is much earlier than platform_driver, so it can
-> > ensure all drivers lookup their clocks successfully during
-> > platform_driver probe. Is there anything different to init these clock
-> > providers in CLK_OF_DECLARE and platform_driver?
-> 
-> This a common pattern we're seeing right now. Joachim did a nice job of
-> supporting early clocks with CLK_OF_DECLARE, and also using a proper
-> driver in his lpc18xx implementation:
-> 
-> http://marc.info/?l=devicetree&m=145618160610001
+Note that with the linear region randomization which is now in -next,
+this division needs to be signed (since memstart_addr can wrap).
 
-Do you mean we should keep most clock init in platform_driver_probe and
-use CLK_OF_DECLARE for some early clocks only?
-
-Using CLK_OF_DECLARE() for all clock providers is convenient. The
-convenience includes coding structure and driver init order. The coding
-structure means we can use a consistency way to add clock providers, so
-we can reduce errors and apply code generator on clock drivers.
-
-The driver init order is another issue. In lpc18xx driver you mentioned
-in [1], it uses ERR_PTR(-EPROBE_DEFER) to be the place holder for
-non-early clocks in arch_init (CLK_OF_DECLARE), and then register early
-and non-early clocks again in module_init. The EPROBE_DEFER place holder
-is an interesting idea to resolve init order issue. But to register
-clocks twice on the same clock provider seems not a good idea, although
-it can still work in current CCF implementation.
-
-Is it important to move clock init into platform_driver? If not, I
-prefer to keep current implementation on MT2701, and look for a better
-way to init clocks in platform_driver in new SoCs.
+So I should either update the definition of memstart_addr to s64 in
+this patch, or cast to (s64) in the expression above
 
 
-[1] http://marc.info/?l=devicetree&m=145618160610001
-
-
-Best regards,
-
-James
+>  #define FIRST_USER_ADDRESS     0UL
+>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index c0ea54bd9995..88046b94fa87 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -363,8 +363,8 @@ void __init mem_init(void)
+>                   MLK_ROUNDUP(_text, _etext),
+>                   MLK_ROUNDUP(_sdata, _edata),
+>  #ifdef CONFIG_SPARSEMEM_VMEMMAP
+> -                 MLG((unsigned long)vmemmap,
+> -                     (unsigned long)vmemmap + VMEMMAP_SIZE),
+> +                 MLG(VMEMMAP_START,
+> +                     VMEMMAP_START + VMEMMAP_SIZE),
+>                   MLM((unsigned long)virt_to_page(PAGE_OFFSET),
+>                       (unsigned long)virt_to_page(high_memory)),
+>  #endif
+> --
+> 2.5.0
+>
