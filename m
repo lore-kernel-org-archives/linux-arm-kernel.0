@@ -1,22 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Feb 2016 14:27:10 -0800
-Subject: [PATCHv2 13/16] clk: imx: whitespace cleanup; no functional change
-In-Reply-To: <1453284549-16363-14-git-send-email-LW@KARO-electronics.de>
-References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
- <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
- <1453284549-16363-14-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20160225222710.GM4847@codeaurora.org>
+From: colin.king@canonical.com (Colin King)
+Date: Thu, 25 Feb 2016 22:28:59 +0000
+Subject: [PATCH] mt7601u: do not free dma_buf when ivp allocation fails
+Message-ID: <1456439339-18458-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20, Lothar Wa?mann wrote:
-> remove whitespace before TAB.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
+From: Colin Ian King <colin.king@canonical.com>
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+If the allocation of ivp fails the error handling attempts to
+free an uninitialized dma_buf; this data structure just contains
+garbage on the stack, so the freeing will cause issues when the
+urb, buf and dma fields are cleaned. Fix this by handling the
+ivp check and
 
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/net/wireless/mediatek/mt7601u/mcu.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/wireless/mediatek/mt7601u/mcu.c b/drivers/net/wireless/mediatek/mt7601u/mcu.c
+index fbb1986..06ac657 100644
+--- a/drivers/net/wireless/mediatek/mt7601u/mcu.c
++++ b/drivers/net/wireless/mediatek/mt7601u/mcu.c
+@@ -359,13 +359,13 @@ mt7601u_upload_firmware(struct mt7601u_dev *dev, const struct mt76_fw *fw)
+ 	struct mt7601u_dma_buf dma_buf;
+ 	void *ivb;
+ 	u32 ilm_len, dlm_len;
+-	int i, ret;
++	int i, ret = -ENOMEM;
+ 
+ 	ivb = kmemdup(fw->ivb, sizeof(fw->ivb), GFP_KERNEL);
+-	if (!ivb || mt7601u_usb_alloc_buf(dev, MCU_FW_URB_SIZE, &dma_buf)) {
+-		ret = -ENOMEM;
++	if (!ivb)
++		goto error_ivb;
++	if (mt7601u_usb_alloc_buf(dev, MCU_FW_URB_SIZE, &dma_buf))
+ 		goto error;
+-	}
+ 
+ 	ilm_len = le32_to_cpu(fw->hdr.ilm_len) - sizeof(fw->ivb);
+ 	dev_dbg(dev->dev, "loading FW - ILM %u + IVB %zu\n",
+@@ -396,8 +396,9 @@ mt7601u_upload_firmware(struct mt7601u_dev *dev, const struct mt76_fw *fw)
+ 
+ 	dev_dbg(dev->dev, "Firmware running!\n");
+ error:
+-	kfree(ivb);
+ 	mt7601u_usb_free_buf(dev, &dma_buf);
++error_ivb:
++	kfree(ivb);
+ 
+ 	return ret;
+ }
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.0
