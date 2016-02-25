@@ -1,56 +1,41 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 25 Feb 2016 09:52:40 +0000
-Subject: [PATCH v2 0/8] arm64: Support for systems without AArch32 state
-Message-ID: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+Date: Thu, 25 Feb 2016 09:52:46 +0000
+Subject: [PATCH v2 6/8] arm64: Add a wrapper for personality() syscall
+In-Reply-To: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1456393968-17386-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add checks to make sure that the AArch32 state is
-supported before we process the 32bit ID registers. Also
-checks the same for COMPAT binary execution.
+In order to prevent setting PER_LINUX32 on systems without
+32bit EL0 support, add a wrapper for personality() syscall.
 
-(Painfully) applies on top of 4.5-rc5 + [1] + [2].
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/sys.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Or it is available here :
-  git://linux-arm.org/linux-skp.git noaarch32/v2-4.5-rc5
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/410556.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401913.html
-
-Changes since V1:
-  - Prevent changing the personality to PER_LINUX32 by adding
-    wrapper for personality() syscall.
-  - Add the check to KVM before initialising a AArch32 vcpu
-  - Tested on hardware.
-
-Btw, linux32 doesn't complain when the personality() syscall fails to change
-to PER_LINUX32. You can verify the personality by running 
- $ cat /proc/cpuinfo
- which would still list the 64bit features for the CPUs.
-
-
-Suzuki K Poulose (7):
-  arm64: hwcaps: Cleanup naming
-  arm64: HWCAP: Split COMPAT HWCAP table entries
-  arm64: Add helpers for detecting AArch32 support at EL0
-  arm64: cpufeature: Check availability of AArch32
-  arm64: cpufeature: Track 32bit EL0 support
-  arm64: Add a wrapper for personality() syscall
-  arm64: kvm: Check support for AArch32 for 32bit guests
-
-Yury Norov (1):
-  arm64: compat: Check for AArch32 state
-
- arch/arm/include/asm/kvm_host.h     |    5 +
- arch/arm/kvm/arm.c                  |    3 +
- arch/arm64/include/asm/cpufeature.h |   15 ++-
- arch/arm64/include/asm/elf.h        |    3 +-
- arch/arm64/include/asm/kvm_host.h   |    8 ++
- arch/arm64/include/asm/sysreg.h     |    1 +
- arch/arm64/kernel/cpufeature.c      |  184 +++++++++++++++++++++--------------
- arch/arm64/kernel/cpuinfo.c         |   37 +++----
- arch/arm64/kernel/sys.c             |   10 ++
- 9 files changed, 173 insertions(+), 93 deletions(-)
-
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index 75151aa..817d860 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -36,11 +36,17 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+ 	return sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
+ }
+ 
++SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
++{
++	return sys_personality(personality);
++}
++
+ /*
+  * Wrappers to pass the pt_regs argument.
+  */
+ asmlinkage long sys_rt_sigreturn_wrapper(void);
+ #define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
++#define sys_personality		sys_arm64_personality
+ 
+ #undef __SYSCALL
+ #define __SYSCALL(nr, sym)	[nr] = sym,
 -- 
 1.7.9.5
