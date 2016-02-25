@@ -1,90 +1,56 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 25 Feb 2016 09:52:41 +0000
-Subject: [PATCH v2 1/8] arm64: hwcaps: Cleanup naming
-In-Reply-To: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
-References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1456393968-17386-2-git-send-email-suzuki.poulose@arm.com>
+Date: Thu, 25 Feb 2016 09:52:40 +0000
+Subject: [PATCH v2 0/8] arm64: Support for systems without AArch32 state
+Message-ID: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use hwcaps for referring to ELF hwcaps capability information.
-However this can be confusing with 'cpu_hwcaps' which stands for the
-CPU capability bit field. This patch cleans up the names to make it
-a bit more readable.
+This series add checks to make sure that the AArch32 state is
+supported before we process the 32bit ID registers. Also
+checks the same for COMPAT binary execution.
 
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpufeature.c |   18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+(Painfully) applies on top of 4.5-rc5 + [1] + [2].
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index f29d63c..a3c254b 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -682,7 +682,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.hwcap = cap,					\
- 	}
- 
--static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
-+static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_PMULL),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_AES),
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA1),
-@@ -701,7 +701,7 @@ static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
- 	{},
- };
- 
--static void __init cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
-+static void __init cap_set_elf_hwcap(const struct arm64_cpu_capabilities *cap)
- {
- 	switch (cap->hwcap_type) {
- 	case CAP_HWCAP:
-@@ -722,7 +722,7 @@ static void __init cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
- }
- 
- /* Check if we have a particular HWCAP enabled */
--static bool __maybe_unused cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
-+static bool cpus_have_elf_hwcap(const struct arm64_cpu_capabilities *cap)
- {
- 	bool rc;
- 
-@@ -746,14 +746,14 @@ static bool __maybe_unused cpus_have_hwcap(const struct arm64_cpu_capabilities *
- 	return rc;
- }
- 
--static void __init setup_cpu_hwcaps(void)
-+static void __init setup_elf_hwcaps(void)
- {
- 	int i;
--	const struct arm64_cpu_capabilities *hwcaps = arm64_hwcaps;
-+	const struct arm64_cpu_capabilities *hwcaps = arm64_elf_hwcaps;
- 
- 	for (i = 0; hwcaps[i].desc; i++)
- 		if (hwcaps[i].matches(&hwcaps[i]))
--			cap_set_hwcap(&hwcaps[i]);
-+			cap_set_elf_hwcap(&hwcaps[i]);
- }
- 
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-@@ -889,8 +889,8 @@ void verify_local_cpu_capabilities(void)
- 			caps[i].enable(NULL);
- 	}
- 
--	for (i = 0, caps = arm64_hwcaps; caps[i].desc; i++) {
--		if (!cpus_have_hwcap(&caps[i]))
-+	for (i = 0, caps = arm64_elf_hwcaps; caps[i].desc; i++) {
-+		if (!cpus_have_elf_hwcap(&caps[i]))
- 			continue;
- 		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
- 			pr_crit("CPU%d: missing HWCAP: %s\n",
-@@ -913,7 +913,7 @@ void __init setup_cpu_features(void)
- 
- 	/* Set the CPU feature capabilies */
- 	setup_feature_capabilities();
--	setup_cpu_hwcaps();
-+	setup_elf_hwcaps();
- 
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
+Or it is available here :
+  git://linux-arm.org/linux-skp.git noaarch32/v2-4.5-rc5
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/410556.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401913.html
+
+Changes since V1:
+  - Prevent changing the personality to PER_LINUX32 by adding
+    wrapper for personality() syscall.
+  - Add the check to KVM before initialising a AArch32 vcpu
+  - Tested on hardware.
+
+Btw, linux32 doesn't complain when the personality() syscall fails to change
+to PER_LINUX32. You can verify the personality by running 
+ $ cat /proc/cpuinfo
+ which would still list the 64bit features for the CPUs.
+
+
+Suzuki K Poulose (7):
+  arm64: hwcaps: Cleanup naming
+  arm64: HWCAP: Split COMPAT HWCAP table entries
+  arm64: Add helpers for detecting AArch32 support at EL0
+  arm64: cpufeature: Check availability of AArch32
+  arm64: cpufeature: Track 32bit EL0 support
+  arm64: Add a wrapper for personality() syscall
+  arm64: kvm: Check support for AArch32 for 32bit guests
+
+Yury Norov (1):
+  arm64: compat: Check for AArch32 state
+
+ arch/arm/include/asm/kvm_host.h     |    5 +
+ arch/arm/kvm/arm.c                  |    3 +
+ arch/arm64/include/asm/cpufeature.h |   15 ++-
+ arch/arm64/include/asm/elf.h        |    3 +-
+ arch/arm64/include/asm/kvm_host.h   |    8 ++
+ arch/arm64/include/asm/sysreg.h     |    1 +
+ arch/arm64/kernel/cpufeature.c      |  184 +++++++++++++++++++++--------------
+ arch/arm64/kernel/cpuinfo.c         |   37 +++----
+ arch/arm64/kernel/sys.c             |   10 ++
+ 9 files changed, 173 insertions(+), 93 deletions(-)
+
 -- 
 1.7.9.5
