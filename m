@@ -1,43 +1,46 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Thu, 25 Feb 2016 08:42:57 +0800
-Subject: [PATCH 3/4] clk: rockchip: add dt-binding header for rk3399
-In-Reply-To: <4483822.0pRK7cKepF@phil>
-References: <1456210864-29037-1-git-send-email-jay.xu@rock-chips.com>
- <1456210864-29037-4-git-send-email-jay.xu@rock-chips.com>
- <4483822.0pRK7cKepF@phil>
-Message-ID: <56CE4E11.7090808@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 24 Feb 2016 16:54:12 -0800
+Subject: [PATCH v6] Fix sun7i pin assignment for IRQ's
+In-Reply-To: <1456161251-2303-1-git-send-email-henry@nitronetworks.nl>
+References: <1456161251-2303-1-git-send-email-henry@nitronetworks.nl>
+Message-ID: <20160225005412.GB4736@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
+Hi,
 
-? 24/02/2016 21:27, Heiko Stuebner ??:
-> Hi Jianqun,
->
-> Am Dienstag, 23. Februar 2016, 15:01:03 schrieb jianqun.xu:
->> From: Xing Zheng <zhengxing@rock-chips.com>
->>
->> Add the dt-bindings header for the rk3399, that gets shared between
->> the clock controller and the clock references in the dts.
->>
->> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
->
-> looks ok so far, do you have an estimate when the revised clk driver will be
-> sent? Before committing to support this binding header forever I'd like to
-> take a look over the clock-tree itself, just to be sure ;-)
->
-No problem, since the cru head file is needed by many drivers, so it 
-must be pushed as
-soon as possible.
+Usually, the patch title should be prefixed by the subsystem it
+applies to so that maintainer and reviewers can spot it more
+easily. In this case, it would be something like
 
-It's better to send the clk driver by Xing in a separate patch. I will 
-co-work with xing.
+pinctrl: sunxi: Fix sun7i pin assignment for IRQ's
 
-Thanks
->
-> Thanks
-> Heiko
->
->
->
+On Mon, Feb 22, 2016 at 06:14:07PM +0100, Henry Paulissen wrote:
+> After testing IRQ pins we found some bugs in the pinctrl declaration.
+> Both PI* and PC* pins didn't work. PI* pins seemed to be connected
+> to the wrong mux and PC* pins waren't working at all.
+> 
+> Please note that the A20 soc manual is contradicting between version
+> and even within the same document for both the PI and PC pins.
+
+Which sections are in contradiction?
+
+> Patch is based on testing with the hardware itself.
+
+How did you test it? Using the sysfs API, or did you have any hardware
+connected to it?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/8bfcd770/attachment.sig>
