@@ -1,106 +1,263 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Wed, 24 Feb 2016 18:52:44 -0800
-Subject: [PATCH net-next V2 00/16] net: fec: cleanup and fixes
-In-Reply-To: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <5514193.TiF8b6rKpj@diplodocus>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 25 Feb 2016 03:01:19 +0000
+Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+ HiSilicon SoCs Host Controllers
+In-Reply-To: <20160224152538.GA19700@localhost>
+References: <1455039260-6040-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1455039260-6040-4-git-send-email-gabriele.paoloni@huawei.com>
+ <20160209182429.GD4348@leverpostej>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1591@lhreml503-mbs>
+ <20160210111234.GC2632@leverpostej>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
+ <20160224011418.GB13026@localhost>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ECCAD6A@lhreml503-mbs>
+ <20160224152538.GA19700@localhost>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ECCD209@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Troy,
-I'm replying here instead of to a particular commit because several of
-the commit messages seem inadequate.
+Hi Bjorn
 
-The first line summaries all look good.
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: 24 February 2016 23:26
+> To: Gabriele Paoloni
+> Cc: 'Mark Rutland'; Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong
+> (C); Linuxarm; qiujiang; 'bhelgaas at google.com'; 'arnd at arndb.de';
+> 'Lorenzo.Pieralisi at arm.com'; 'tn at semihalf.com'; 'linux-
+> pci at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; xuwei (O);
+> 'linux-acpi at vger.kernel.org'; 'jcm at redhat.com'; zhangjukuo; Liguozhu
+> (Kenneth); 'linux-arm-kernel at lists.infradead.org'
+> Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
+> HiSilicon SoCs Host Controllers
+> 
+> On Wed, Feb 24, 2016 at 06:46:09AM +0000, Gabriele Paoloni wrote:
+> >
+> > Hi Bjorn, many thanks for replying
+> >
+> > > -----Original Message-----
+> > > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> > > Sent: 24 February 2016 09:14
+> > > To: Gabriele Paoloni
+> > > Cc: 'Mark Rutland'; Guohanjun (Hanjun Guo); Wangzhou (B);
+> liudongdong
+> > > (C); Linuxarm; qiujiang; 'bhelgaas at google.com'; 'arnd at arndb.de';
+> > > 'Lorenzo.Pieralisi at arm.com'; 'tn at semihalf.com'; 'linux-
+> > > pci at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; xuwei (O);
+> > > 'linux-acpi at vger.kernel.org'; 'jcm at redhat.com'; zhangjukuo;
+> Liguozhu
+> > > (Kenneth); 'linux-arm-kernel at lists.infradead.org'
+> > > Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support
+> for
+> > > HiSilicon SoCs Host Controllers
+> > >
+> > > On Tue, Feb 23, 2016 at 02:47:22AM +0000, Gabriele Paoloni wrote:
+> > > > > -----Original Message-----
+> > > > > From: Gabriele Paoloni
+> > > > > Sent: 10 February 2016 22:45
+> > > > > To: Mark Rutland
+> > > > > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C);
+> Linuxarm;
+> > > > > qiujiang; bhelgaas at google.com; arnd at arndb.de;
+> > > Lorenzo.Pieralisi at arm.com;
+> > > > > tn at semihalf.com; linux-pci at vger.kernel.org; linux-
+> > > > > kernel at vger.kernel.org; xuwei (O); linux-acpi at vger.kernel.org;
+> > > > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
+> > > > > kernel at lists.infradead.org
+> > > > > Subject: RE: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI
+> support
+> > > for
+> > > > > HiSilicon SoCs Host Controllers
+> > > > >
+> > > > > > -----Original Message-----
+> > > > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-
+> kernel-
+> > > > > > owner at vger.kernel.org] On Behalf Of Mark Rutland
+> > > > > > Sent: 10 February 2016 11:13
+> > > > > > To: Gabriele Paoloni
+> > > > > > Cc: Guohanjun (Hanjun Guo); Wangzhou (B); liudongdong (C);
+> > > Linuxarm;
+> > > > > > qiujiang; bhelgaas at google.com; arnd at arndb.de;
+> > > > > > Lorenzo.Pieralisi at arm.com; tn at semihalf.com; linux-
+> > > pci at vger.kernel.org;
+> > > > > > linux-kernel at vger.kernel.org; xuwei (O); linux-
+> > > acpi at vger.kernel.org;
+> > > > > > jcm at redhat.com; zhangjukuo; Liguozhu (Kenneth); linux-arm-
+> > > > > > kernel at lists.infradead.org
+> > > > > > Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI
+> support
+> > > for
+> > > > > > HiSilicon SoCs Host Controllers
+> > > > > >
+> > > > > > On Wed, Feb 10, 2016 at 09:52:36AM +0000, Gabriele Paoloni
+> wrote:
+> > > > > > > Hi Mark
+> > > > > > >
+> > > > > > > > On Tue, Feb 09, 2016 at 05:34:20PM +0000, Gabriele
+> Paoloni
+> > > wrote:
+> > > > > > > > > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> > > > > > > > > +/*
+> > > > > > > > > + * Retrieve rc_dbi base and size from _DSD
+> > > > > > > > > + * Name (_DSD, Package () {
+> > > > > > > > > + *	ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+> > > > > > > > > + *	Package () {
+> > > > > > > > > + *	Package () {"rc-dbi", Package () { 0x0,
+> 0xb0080000,
+> > > 0x0,
+> > > > > > 0x10000
+> > > > > > > > }},
+> > > > > > > > > + *	}
+> > > > > > > > > + *	})
+> > > > > > > > > + */
+> > > > > > > >
+> > > > > > > > As above, this does not look right. ACPI has standard
+> > > mechanisms
+> > > > > > for
+> > > > > > > > describing addresses. Making something up like this is
+> not a
+> > > good
+> > > > > > idea.
+> > > > > > >
+> > > > > > > I am quite new to ACPI, may I ask you to explain a bit?
+> > > > > >
+> > > > > > ACPI has standard mechanisms for describing certain resources,
+> > > and
+> > > > > > these
+> > > > > > should not be described in _DSD. Memory or IO address regions
+> are
+> > > > > such
+> > > > > > resources (in _CRS, IIRC), and should not be described in
+> _DSD.
+> > > > >
+> > > > > Hi Mark,
+> > > > >
+> > > > > In my case I think in need to look into the MCFG object as the
+> > > problem
+> > > > > I have is RC using a different range than the rest of the
+> hierarchy.
+> > > > >
+> > > > > I'll investigate this and try to come with a solution in v4
+> > > >
+> > > > I have looked into this and in our case we cannot use the
+> > > > standard MCFG object to pass the RC config space addresses.
+> > > >
+> > > > The reason is that in our HW we have the config base addresses of
+> the
+> > > > root complex ports that are less than 0x100000 byte distant one
+> from
+> > > > the other as we only map the first 0x10000 bytes.
+> > >
+> > > The ECAM spec requires 4096 bytes per function, 8 functions per
+> > > device, 32 devices per bus, which means you need 0x100000 bytes of
+> > > address space per bus.  If your device doesn't supply that, it
+> doesn't
+> > > really implement ECAM, and you probably can't use the standard ways
+> of
+> > > describing ECAM (MCFG, _CBA).
+> >
+> > Correct, our host bridge is non ECAM only for the RC bus config space;
+> > for any other bus underneath the root bus we support ECAM access, so
+> > we need a quirk for the RC config rd/wr
+> 
+> MCFG can specify a bus number range, so you might be able to use it
+> to describe the ECAM space for buses below the root bus, e.g.,
+> [bus 01-ff].
 
-The descriptions should each also include the "user visible impact" of
-the patch and the justification for it (i.e. why you made the change).
+Yes, for this patchset we use MCFG for buses [01-ff] and _DSD for bus 0
 
-For instance, patch 3 doesn't include either what will change
- (nothing, I'm guessing?) or why we now pass in the structures
-instead of a queue_id. 
+> 
+> > > > Now the MCFG acpi framework always fix the MCFG resource size to
+> > > 0x100000
+> > > > for each bus; therefore if we pass our RC addresses through MCFG
+> we
+> > > end
+> > > > up with a resource conflict.
+> > > >
+> > > > To give you a practical example we are in a situation where we
+> have:
+> > > >
+> > > > port0: [0x00000000b0080000 - 0x00000000b0080000 + 0x10000]
+> > > > port1: [0x00000000b0090000 - 0x00000000b0090000 + 0x10000]
+> > > > port2: [0x00000000b00A0000 - 0x00000000b00A0000 + 0x10000]
+> > > > port3: [0x00000000b00B0000 - 0x00000000b00B0000 + 0x10000]
+> > > >
+> > > > So if we pass the base addresses through MCFG the resources
+> > > > will overlap as MCFG will consider 0x100000 size for each base
+> > > > address of the root complex (only the RC bus uses that address)
+> > > >
+> > > > So far I do not see many option other than using _DSD to pass
+> > > > these RC config base addresses.
+> > >
+> > > I don't want to take over Mark's discussion, but I really do not
+> think
+> > > _DSD is the correct way to fix this.  _CRS is like a generalized
+> PCI
+> > > BAR.  A PCI device is only allowed to respond to address space
+> > > reported via a BAR.  An ACPI device is only allowed to respond to
+> > > address space reported via _CRS.  Those are important rules because
+> > > they mean we can manage address space with generic code instead of
+> > > device-specific code.
+> >
+> > From what I see in
+> > http://lxr.free-electrons.com/source/drivers/acpi/pci_root.c#L723
+> > acpi_pci_probe_root_resources() parses the _CRS method and
+> > it only works for MEM and IO resources, so I don't think it is
+> > right to pass a config space address by _CRS or to modify the
+> > current ACPI framework to support this.
+> 
+> Config space addresses are made up of [bus, device, function, register
+> offset], and you're right that _CRS doesn't contain those addresses
+> directly; _CRS only describes memory, I/O, and bus number ranges.
+> 
+> But part of the function of a host bridge is to convert memory or I/O
+> accesses on the primary (CPU) side to PCI config accesses on the
+> secondary (PCI) side, and this CPU-side memory or I/O region should be
+> reported via _CRS.
 
-You've also got a few (e.g. patch 9, patch 14) where the substance
-of the patch is in the summary,
+Yes the memory and I/O ranges are specified in the _CRS method of the
+root complex PCI device
 
-but missing from the message.
+> 
+> I think the relevant spec is the PCI Firmware Spec, r3.0, sec 4.1.2.
+> Note 2 in that section says the address range of an MMCFG region
+> must be reserved by declaring a motherboard resource, i.e., included
+> in the _CRS of a PNP0C02 or similar device.
 
-These kind of descriptions are very hard to review since the expression
-is split between the subject of the email and the body of the email, which
-are not close
-together in some email programs.
+I had a look a this. So yes the specs says that we should use the 
+PNP0C02 device if MCFG is not supported. 
+So probably I can use acpi_get_devices("PNP0C02",...) to retrieve it
+from the quirk match function, I will look into this... 
 
-Better to reiterate or elaborate on the summary in the message.
-In patch 9, for instance, it would be more clear to say:
+> 
+> > On the other side, since this is an exception only for the config
+> > space address of our host controller (as said before all the buses
+> > below the root one support ECAM), I think that it is right to put
+> > this address as a device specific data (in fact the rest of the
+> > config space addresses will be parsed from MCFG).
+> 
+> A kernel with no support for your host controller (and thus no
+> knowledge of its _DSD) should still be able to operate the rest of the
+> system correctly.  That means we must have a generic way to learn what
+> address space is consumed by the host controller so we don't try to
+> assign it to other devices.
 
-Move restart test to earlier in fec_txq() which saves one comparison. 
+This is something I don't understand much...
+Are you talking about a scenario where we have a Kernel image compiled
+without our host controller support and running on our platform?
 
-On Wednesday, February 24, 2016 05:36:43 PM Troy Kisky wrote:
-> V2 is a rebase on top of johannes endian-safe patch and
-> this set is only the next 16 patches.
-> The testing for this series was done on a nitrogen6x.
-> The base commit was
-> commit f5461c27631672b9e95282812ee521c53f502eca
->     Merge branch 'dsa-pass-bridge-to-drivers'
-> 
-> Testing showed no change in performance.
-> Testing used imx_v6_v7_defconfig + CONFIG_MICREL_PHY.
-> The processor was running at 996Mhz.
-> The following commands were used to get the transfer rates.
-> 
-> On an x86 ubunto system,
-> iperf -s -i.5 -u
-> 
-> 
-> On a nitrogen6x board, running via SD Card.
-> I first stopped some background processes
-> 
-> stop cron
-> stop upstart-file-bridge
-> stop upstart-socket-bridge
-> stop upstart-udev-bridge
-> stop rsyslog
-> stop dbus
-> killall dhclient
-> echo performance >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-> 
-> taskset 0x2 iperf -c 192.168.0.201 -u -t60 -b500M -r
-> 
-> There is a branch available on github with this series, and the rest of
-> my fec patches, for those who would like to test it.
-> https://github.com:boundarydevices/linux-imx6.git branch net-next_master
-> 
-> 
-> 
-> Troy Kisky (16):
-> SDCard
->  TX/RX
-> 379/402	Before any patches
-> 376/402  net: fec: only check queue 0 if RXF_0/TXF_0 interrupt is set
-> 379/399  net: fec: pass rxq to fec_enet_rx_queue instead of queue_id
-> 379/401  net: fec: pass txq to fec_enet_tx_queue instead of queue_id
-> 389/409  net: fec: reduce interrupts
-> 393/411  net: fec: split off napi routine with 3 queues
-> 386/415  net: fec: don't clear all rx queue bits when just one is being checked
-> 387/412  net: fec: set cbd_sc without relying on previous value
-> 385/415  net: fec: eliminate calls to fec_enet_get_prevdesc
-> 389/414  net: fec: move restart test for efficiency
-> 386/412  net: fec: clear cbd_sc after transmission to help with debugging
-> 387/415  net: fec: dump all tx queues in fec_dump
-> 380/418  net: fec: detect tx int lost
-> 385/417  net: fec: print more debug info in fec_timeout
-> 388/417  net: fec: create subroutine reset_tx_queue
-> 389/418  net: fec: call dma_unmap_single on mapped tx buffers at restart
-> 381/414  net: fec: don't set cbd_bufaddr unless no mapping error
-> 
->  drivers/net/ethernet/freescale/fec.h      |   7 +-
->  drivers/net/ethernet/freescale/fec_main.c | 420 ++++++++++++++++--------------
->  2 files changed, 224 insertions(+), 203 deletions(-)
-> 
-> 
+In this case the quirk is not called and the standard acpi pci root
+driver will run and probably the config rd/wr for bus 0 will fail...
 
-Hope this helps,
-Joshua
+I don't see in this case how the physical address that we specify in the
+_DSD can be assigned to other devices...
 
-P.S I'm a little confused, as I came looking for a v3 of the first 8 patches
-and found these instead. I'll try to give your first 8 a look when they show up.
+maybe I misunderstood something here...
+
+Many Thanks
+
+Gab 
+
+> 
+> Bjorn
