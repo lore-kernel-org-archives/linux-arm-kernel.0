@@ -1,44 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 15:29:08 +0100
-Subject: [PATCH 0/4] RealView boardfile endgame
-In-Reply-To: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
-References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <5411123.nOOnE7uo7z@wuerfel>
+Date: Thu, 25 Feb 2016 15:33:46 +0100
+Subject: [PATCH] serial: sa1100: make sa1100_register_uart_fns a function
+Message-ID: <1456410835-3808962-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 February 2016 14:15:07 Linus Walleij wrote:
-> This patch set deletes the RealView board files and moves it
-> over to a pure Device Tree boot, deleting ~3500 LoC.
-> 
-> Prerequisites:
-> - The MTD driver patch handling the flash memory write
->   protection and VPP enable must go into the MTD subsystem.
->   http://marc.info/?l=linux-arm-kernel&m=145380689210787&w=2
-> 
-> - The CLCD device tree support patches (uncontroversial set)
->   must go into the FBDEV subsystem.
->   http://marc.info/?l=linux-fbdev&m=145622172219039&w=2
-> 
-> - I must queue the device tree patches for the Evaluation
->   Boards and Platform Baseboard and Platform Baseboard
->   Explore before these patches.
-> 
-> However this is how it will look once the above is in place,
-> and it will support everything the kernel already supports
-> today.
-> 
-> Tested on the real hardware for PB1176JZF-S and PB11MPCore.
-> Tested on QEMU for 1136, 1176, 11MPCore and Cortex-A9 EB,
-> Platform Baseboard for Cortex-A8 and Platform Baseboard Explore
-> for Cortex-A9 variants.
-> 
+Calling sa1100_register_uart_fns() leaves the port structure
+unused when CONFIG_SERIAL_SA1100 is disabled, and we get a
+compiler warning about that:
 
-Awesome!
+arch/arm/mach-sa1100/badge4.c:317:31: warning: 'badge4_port_fns' defined but not used [-Wunused-variable]
+ static struct sa1100_port_fns badge4_port_fns __initdata = {
 
-This leaves the question whether we should do all the preparation
-in 4.6 and then only take these for 4.7, or do them all at
-once. I can see good reasons either way, but none of them
-particularly strong. What did you have in mind here?
+This turns the two empty macros into empty inline functions,
+which has the same effect, but lets the compiler know that the
+variables are intentionally unused.
 
-	Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/linux/platform_data/sa11x0-serial.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/platform_data/sa11x0-serial.h b/include/linux/platform_data/sa11x0-serial.h
+index 4504d5d592f0..009e1d83fe39 100644
+--- a/include/linux/platform_data/sa11x0-serial.h
++++ b/include/linux/platform_data/sa11x0-serial.h
+@@ -26,8 +26,12 @@ struct sa1100_port_fns {
+ void sa1100_register_uart_fns(struct sa1100_port_fns *fns);
+ void sa1100_register_uart(int idx, int port);
+ #else
+-#define sa1100_register_uart_fns(fns) do { } while (0)
+-#define sa1100_register_uart(idx,port) do { } while (0)
++static inline void sa1100_register_uart_fns(struct sa1100_port_fns *fns)
++{
++}
++static inline void sa1100_register_uart(int idx, int port)
++{
++}
+ #endif
+ 
+ #endif
+-- 
+2.7.0
