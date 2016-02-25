@@ -1,43 +1,34 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 25 Feb 2016 11:21:56 +0000
-Subject: [PATCH v3 6/8] arm64: dts: qcom: fix usb digital voltage levels
-In-Reply-To: <56CE3780.5060408@codeaurora.org>
-References: <1456246153-18087-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1456246236-18341-1-git-send-email-srinivas.kandagatla@linaro.org>
- <56CE3780.5060408@codeaurora.org>
-Message-ID: <56CEE3D4.3030407@linaro.org>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Thu, 25 Feb 2016 12:24:00 +0100
+Subject: [PATCH v2 2/2] ARM: mxs_defconfig: Enable initramfs support
+In-Reply-To: <1456399440-3646-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1456399440-3646-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1456399440-3646-2-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jan Luebbe <jlu@pengutronix.de>
 
+This makes it possible to automatically boot-test this defconfig with
+kernelci.org.
 
-On 24/02/16 23:06, Stephen Boyd wrote:
-> On 02/23/2016 08:50 AM, Srinivas Kandagatla wrote:
->> This patch updates the digital voltage levels from corner values to
->> microvolts as we are going to use s1 regulator directly for vddcx
->> instead of s1_corner.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->
-> What's the plan for corners? Maybe we should remove the voltage setting
-> from the usb driver or drop the usb node entirely on msm8916 until we
-> resolve how we're going to handle corners. I'd like to avoid getting
-> stuck into some DT binding ABI mess here.
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ arch/arm/configs/mxs_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Andy/Bjorn, any comments on plans on corner regulators?
-
-Please note, that this is a patch to fix what is already in the 
-mainline. Without this patch the regulator would be configured with 1uV 
-or 5uV or 7uV which would obviously fail.
-
-THB, it does not make sense to drop feature which is functional, and I 
-also agree that we should cleanup some of this mess at some point in 
-time once we all the bits and pieces ready.
-
-I was surprised to see these usb bindings(qcom,vdd-levels) existed even 
-before we had concept of corner regulators in mainline kernel. Which 
-also suggests that this driver needs a proper relook once again.
-
-Thanks,
-srini
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 3bd7cad..6c2550e 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -12,6 +12,7 @@ CONFIG_IKCONFIG_PROC=y
+ # CONFIG_IPC_NS is not set
+ # CONFIG_PID_NS is not set
+ # CONFIG_NET_NS is not set
++CONFIG_BLK_DEV_INITRD=y
+ CONFIG_PERF_EVENTS=y
+ # CONFIG_COMPAT_BRK is not set
+ CONFIG_MODULES=y
+-- 
+2.7.0
