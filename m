@@ -1,35 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Feb 2016 16:22:33 +0000
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <CACRpkdZd8TLdsi7_cOrqzcqWKJrfdp4Vz2sx5ozpwJXOj0fa+Q@mail.gmail.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <3695074.sKSIyOjpjD@wuerfel>
- <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
- <6859810.tb1t0IEONi@wuerfel> <56CC57FC.20707@ti.com>
- <CACRpkdYNaNtQQJ-tsBe5ksa4-z380ZQj-zN8ZnK0ED2kNPUwvg@mail.gmail.com>
- <56CC60C4.6040908@ti.com>
- <CACRpkdZd8TLdsi7_cOrqzcqWKJrfdp4Vz2sx5ozpwJXOj0fa+Q@mail.gmail.com>
-Message-ID: <20160225162232.GS19428@n2100.arm.linux.org.uk>
+From: cory.tusar@pid1solutions.com (Cory Tusar)
+Date: Thu, 25 Feb 2016 11:24:43 -0500
+Subject: [PATCH] ARM: dts: vf610-zii-dev: Add ZII development board.
+In-Reply-To: <c67c93683d9440bd050386df0e200881@agner.ch>
+References: <1456084314-9871-1-git-send-email-andrew@lunn.ch>
+ <c67c93683d9440bd050386df0e200881@agner.ch>
+Message-ID: <56CF2ACB.7080301@pid1solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 03:04:52PM +0100, Linus Walleij wrote:
-> HOWEVER: the ARM Versatile is the *only* platform I have
-> seen of these that have plug'n'play for the display.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-And Realview, at least Realview EB, which is the same format board as
-Versatile and carries the same LCD connector.
+On 02/23/2016 02:36 PM, Stefan Agner wrote:
+> Hi Andrew,
+> 
+> Some comments below:
+> 
+> On 2016-02-21 11:51, Andrew Lunn wrote:
+>> From: Cory Tusar <cory.tusar@pid1solutions.com>
+>>
+>> This commit adds support for Rev. B of a Zodiac Inflight Innovations
+>> development board, mainly intended for DSA and ARINC 429 development
+>> work.
+>>
+>> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-> *All* the others
-> will be very happy with *ONE* display defined as panel in the
-> device tree, and off they go. Usually VGA. And that will look
-> much like arch/arm/boot/dts/vexpress-v2m.dtsi already look
-> like today, using "panel-dpi" to define their displays.
+[snip]
 
-Versatile Express only has a DVI connector.
+>> +&L2 {
+>> +	arm,data-latency = <2 1 2>;
+>> +	arm,tag-latency = <3 2 3>;
+>> +};
+> 
+> Are you sure about that?
+> 
+> With 9c17190595 ("ARM: dts: vf610: use reset values for L2 cache
+> latencies") we have reasonable values in the base device tree
+> vf610.dtsi, I think therefor this is not necessary anymore, even if you
+> use 500MHz as CPU clock.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Hi Stefan,
+
+We'd had some pretty serious instability on our platform with the older
+values (prior to the commit mentioned above).  I recall seeing that
+change go in, and reviewed the discussion on Freescale's support forum,
+but left things as they were pending official comment from Freescale.
+
+"If it isn't broken...."
+
+We can certainly try the new defaults and see if it crops up again.
+
+FWIW, yes, we're running at 500 MHz.
+
+Best regards,
+- -Cory
+
+
+- -- 
+Cory Tusar
+Principal
+PID 1 Solutions, Inc.
+
+
+"There are two ways of constructing a software design.  One way is to
+ make it so simple that there are obviously no deficiencies, and the
+ other way is to make it so complicated that there are no obvious
+ deficiencies."  --Sir Charles Anthony Richard Hoare
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iEYEARECAAYFAlbPKssACgkQHT1tsfGwHJ8acwCbB0/2AZrfGzRlIrr01igdDbGH
+Q7QAoKtZcm0eyQNQxO3IlZUA6dSY+GEf
+=sdAe
+-----END PGP SIGNATURE-----
