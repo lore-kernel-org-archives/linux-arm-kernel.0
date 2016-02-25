@@ -1,65 +1,41 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 25 Feb 2016 14:37:14 +0100
-Subject: [PATCH 6/9] clocksource/drivers/arm_global_timer: Register delay timer
+Date: Thu, 25 Feb 2016 14:37:16 +0100
+Subject: [PATCH 8/9] clockevents/drivers/arm_global_timer: Implement
+ ->set_state_oneshot_stopped()
 In-Reply-To: <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
 References: <56CF00F6.9010301@linaro.org>
  <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1456407438-6131-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1456407438-6131-8-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin.vincent@axis.com>
+From: Viresh Kumar <viresh.kumar@linaro.org>
 
-Provide a delay timer using the lower 32-bits of the global timer so
-that we can use that instead of having to calibrating delays.
+set_state_oneshot_stopped() is called by the clkevt core, when the next
+event is required at an expiry time of 'KTIME_MAX'. This normally
+happens with NO_HZ_{IDLE|FULL} in both LOWRES/HIGHRES modes.
 
-Signed-off-by: Rabin Vincent <rabin.vincent@axis.com>
+This patch makes the clockevent device to stop on such an event, to
+avoid spurious interrupts, as explained by: commit 8fff52fd5093
+("clockevents: Introduce CLOCK_EVT_STATE_ONESHOT_STOPPED state").
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/arm_global_timer.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/clocksource/arm_global_timer.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index d189d8c..36998fa 100644
+index 36998fa..9df0d16 100644
 --- a/drivers/clocksource/arm_global_timer.c
 +++ b/drivers/clocksource/arm_global_timer.c
-@@ -16,6 +16,7 @@
- #include <linux/clockchips.h>
- #include <linux/cpu.h>
- #include <linux/clk.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of.h>
-@@ -221,6 +222,21 @@ static u64 notrace gt_sched_clock_read(void)
- }
- #endif
- 
-+static unsigned long gt_read_long(void)
-+{
-+	return readl_relaxed(gt_base + GT_COUNTER0);
-+}
-+
-+static struct delay_timer gt_delay_timer = {
-+	.read_current_timer = gt_read_long,
-+};
-+
-+static void __init gt_delay_timer_init(void)
-+{
-+	gt_delay_timer.freq = gt_clk_rate;
-+	register_current_timer_delay(&gt_delay_timer);
-+}
-+
- static void __init gt_clocksource_init(void)
- {
- 	writel(0, gt_base + GT_CONTROL);
-@@ -317,6 +333,7 @@ static void __init global_timer_of_register(struct device_node *np)
- 	/* Immediately configure the timer on the boot CPU */
- 	gt_clocksource_init();
- 	gt_clockevents_init(this_cpu_ptr(gt_evt));
-+	gt_delay_timer_init();
- 
- 	return;
- 
+@@ -175,6 +175,7 @@ static int gt_clockevents_init(struct clock_event_device *clk)
+ 	clk->set_state_shutdown = gt_clockevent_shutdown;
+ 	clk->set_state_periodic = gt_clockevent_set_periodic;
+ 	clk->set_state_oneshot = gt_clockevent_shutdown;
++	clk->set_state_oneshot_stopped = gt_clockevent_shutdown;
+ 	clk->set_next_event = gt_clockevent_set_next_event;
+ 	clk->cpumask = cpumask_of(cpu);
+ 	clk->rating = 300;
 -- 
 1.9.1
