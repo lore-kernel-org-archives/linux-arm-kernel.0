@@ -1,31 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 16:29:31 +0100
-Subject: [PATCH 0/4] RealView boardfile endgame
-In-Reply-To: <5411123.nOOnE7uo7z@wuerfel>
-References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
- <5411123.nOOnE7uo7z@wuerfel>
-Message-ID: <CACRpkdZ_oyJNTzC6Ji+19aRy3Ex47u2Khqd7_RwuGdK+TLTy_A@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Feb 2016 16:27:26 +0100
+Subject: [PATCH 1/3] dt-bindings: arm/marvell: ABI unstability warning
+ about Marvell 7K/8K
+In-Reply-To: <87h9gwompa.fsf@free-electrons.com>
+References: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1456327007-31008-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160224172545.GC9137@leverpostej>
+ <20160224211045.379352d3@free-electrons.com>
+ <CAL_JsqLevrujSeYNBvSJA-5T0Ho8y7c0fKid7QvVm8LLvYLotw@mail.gmail.com>
+ <20160225090927.13492cfb@free-electrons.com>
+ <87h9gwompa.fsf@free-electrons.com>
+Message-ID: <20160225162726.6ad4a224@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 3:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 25 February 2016 14:15:07 Linus Walleij wrote:
->> This patch set deletes the RealView board files and moves it
->> over to a pure Device Tree boot, deleting ~3500 LoC.
-(...)
-> This leaves the question whether we should do all the preparation
-> in 4.6 and then only take these for 4.7, or do them all at
-> once. I can see good reasons either way, but none of them
-> particularly strong. What did you have in mind here?
+Hello,
 
-If the dependencies in CLCD and MTD make it in we'll just
-merge the whole thing IMO.
+On Thu, 25 Feb 2016 16:04:49 +0100, Gregory CLEMENT wrote:
 
-If these drag out, we merge the device trees and wait with
-removing the board files until v4.7.
+> > Gregory, can you skip patch 1/3, and merge patches 2/3 and 3/3, once
+> > the new clock DT binding has been approved.
+> 
+> I applied patch 2 and 3 on mvebu/dt64 and I amended the title by using
+> "arm64: dts : marvell:" instead of "arm64: marvell:" as requested by
+> Olof on ly first mvebu/dt64 pull request.
 
-I will still have some remaining cleanup for Integrator, Versatile
-and also Versatile Express however, but that is for later.
+Thanks, I'll try to remember this convention for the next patches!
 
-Yours,
-Linus Walleij
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
