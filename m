@@ -1,34 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 25 Feb 2016 15:54:52 +0100
-Subject: [PATCH 0/3] ARM: mvebu: randconfig warning fixes
-In-Reply-To: <1456236403-115511-1-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Tue, 23 Feb 2016 15:06:36 +0100")
-References: <1456236403-115511-1-git-send-email-arnd@arndb.de>
-Message-ID: <87lh68on5v.fsf@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Feb 2016 15:58:58 +0100
+Subject: [PATCH 3/4] ARM: realview: imply Device Tree config
+In-Reply-To: <2805017.I27kg8jfk6@wuerfel>
+References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
+ <1456406111-18579-4-git-send-email-linus.walleij@linaro.org>
+ <2805017.I27kg8jfk6@wuerfel>
+Message-ID: <CACRpkdZCqNH-cuoXbZaJ2Uw5-0UvLZ+vo0Lz9Nq+7AaawEp6-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mar., f?vr. 23 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Feb 25, 2016 at 3:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> Here are three more warning fixes for orion/mv78xx0/mvebu. All
-> are really harmless and I'm just shutting up the warnings
-> as the current code is basically ok.
-
-Applied on mvebu/soc with the Reviewed-by flag by Andrew Lunn and the
-Acked-by flag by Jason Cooper.
-
-Thanks,
-
-Gregory
-
+> On Thursday 25 February 2016 14:15:10 Linus Walleij wrote:
+>> @@ -32,8 +24,9 @@ config REALVIEW_DT
+>>         select USE_OF
+>>         select ZONE_DMA
 >
-> 	Arnd
+> The 'select USE_OF' can now be dropped, I guess this was left over
+> from the multiplatform patches, but also fits in here.
 >
+>>         help
+>> -         Include support for booting the ARM(R) RealView(R) evaluation
+>> -         boards using a device tree machine description.
+>> +         This enables support for ARM Ltd RealView boards.
+>> +
+>> +if ARCH_REALVIEW
+>>
+>>  config REALVIEW_HIGH_PHYS_OFFSET
+>>         bool "High physical base address for the RealView platform"
+>>
+>
+> REALVIEW_HIGH_PHYS_OFFSET can go away as well, as it is only used
+> in 'realview_fixup', which in turn is called by the removed board
+> files.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+OK I updated the patch cutting these too.
+
+Yours,
+Linus Walleij
