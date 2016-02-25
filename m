@@ -1,104 +1,59 @@
-From: tim@krieglstein.org (Tim Sander)
-Date: Fri, 26 Feb 2016 00:34:59 +0100
-Subject: [PATCH v2] dts: add specific compatible type for Terasic
- DE0-NANO-SoC Board
-In-Reply-To: <56CF323C.90202@opensource.altera.com>
-References: <8416439.76b9YNhpgR@dabox> <20160225103820.GB747@pengutronix.de>
- <56CF323C.90202@opensource.altera.com>
-Message-ID: <1595377.ZIYnBnVf5Q@virgo>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Feb 2016 15:37:10 -0800
+Subject: [PATCH v2 1/6] dt-bindings: arm/marvell: add DT bindings for
+ AP806 DFX Server
+In-Reply-To: <1456326866-30854-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1456326866-30854-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1456326866-30854-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160225233710.GJ28849@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh
+On 02/24, Thomas Petazzoni wrote:
+> +Marvell AP806 DFX Server
+> +------------------------
+> +
+> +The Marvell AP806 HW block (which is a core component of the Marvell
+> +Armada 7K and 8K SOCs) has a set of registers called "DFX
+> +Server". This set of registers contains miscellaneous registers, most
+> +of them being used for silicon fine-tuning and manufacturing testing,
+> +and as such are not publicly documented. However, this DFX server
+> +register range also contains a few documented and useful registers,
+> +for example for clock control.
+> +
+> +This Device Tree binding allows to represent the entire DFX server
+> +register space as one single DT node.
+> +
+> +Required properties:
+> +- compatible: the first and second values must be:
+> +	"simple-mfd", "syscon"
+> +- reg: address and length of following register sets for the DFX
+> +  server
 
-On Thursday 25 February 2016 10:56:28 Dinh Nguyen wrote:
-> On 02/25/2016 04:38 AM, Steffen Trumtrar wrote:
-> > Hi Tim!
-> > 
-> > On Thu, Feb 25, 2016 at 11:05:05AM +0100, Tim Sander wrote:
-> >> From: Tim Sander <tim@krieglstein.org>
-> >> 
-> >> Add a more specific compatible string:"terasic,de0-nano-soc" for
-> >> respective board. Background: when checking for bootspec entries, some
-> >> board specific fixups are not apropriate for board of the same platform
-> >> ("altr,socfpga-cyclone5"). The same aproach is taken with the
-> >> EBV-Socrates board.
-> >> 
-> >> Signed-off-by: Tim Sander <tim@krieglstein.org>
-> >> ---
-> >> 
-> >>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
-> >>  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts     | 2 +-
-> >>  2 files changed, 2 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> >> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
-> >> 72e2c5a..d1f7803 100644
-> >> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> >> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> >> @@ -230,6 +230,7 @@ synology	Synology, Inc.
-> >> 
-> >>  tbs	TBS Technologies
-> >>  tcl	Toby Churchill Ltd.
-> >>  technologic	Technologic Systems
-> >> 
-> >> +terasic	Terasic Inc.
-> >> 
-> >>  thine	THine Electronics, Inc.
-> >>  ti	Texas Instruments
-> >>  tlm	Trusted Logic Mobility
-> > 
-> > You should IMHO split this up in two patches.
-> > First patch: add terasic
-> 
-> That's right. That patch will go through the DTS maintainer's tree.
-Ah well for such a simple patch it turns out more complicated than thought :-)
-Will do as soon as there is agreement on a name which does not seem that 
-easy...
-> 
-> >> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> >> b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts index
-> >> afea364..704aa9d 100644
-> >> --- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> >> +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> >> @@ -18,7 +18,7 @@
-> >> 
-> >>  / {
-> >>  
-> >>  	model = "Terasic DE-0(Atlas)";
-> >> 
-> >> -	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> >> +	compatible = "terasic,de0-nano-soc","altr,socfpga-cyclone5",
-> >> "altr,socfpga";
-> So perhaps, "terasic,de0-sockit"?
-> 
-> > Second patch: this.
-> 
-> And I can take this one.
-> 
-> >>  	chosen {
-> >>  	
-> >>  		bootargs = "earlyprintk";
-> > 
-> > The naming of this board still confuses me though.
-> > 
-> > It has 3 different names now:
-> > 	- de0_sockit.dts
-> > 	- Terasic DE-0(Atlas)
-> > 	- de0-nano-soc
-> > 
-> > And according to Terasic DE0-Nano-SoC is the same as Atlas-SoC with a
-> > different software?! So all three names are actually correct ?! Weird.
-> 
-> I had a hard time understanding this myself. But from what I gather
-> from[1], I just name the file de0_sockit.
-As far as i remember there are different de0 and different sockit boards, so 
-the name does not seem to be as concise? I don't care but i would say that
-de0-nano-soc is the most concise and easier to search for than atlas which
-might turn up more false postives?
+Example?
 
-But as long as there is a more selective name than cyclone5 everthing is fine
-with me.
+I would think the binding would be done in a way that we don't
+have to describe every little register in this misc register
+block. Instead, dfx server has a compatible:
 
-Best regards
-Tim
+ node at f00 {
+ 	reg = <0xf00 0x100>;
+	compatible = "marvell,dfx-ap806";
+	#clock-cells = <1>;
+ };
+
+And then a driver that probes this compatible string and
+registers a handful of clks. If we ever get into a situation
+where we want to expose non-clk functionality from this device
+node, we would make some sort of mfd driver that probes based on
+the same compatible string and creates platform devices in
+software to register the clk device component and whatever other
+device type is used. In that situation, we could assign a regmap
+to the mfd device and the clk device would be a child of the mfd
+and get a regmap through the dev->parent pointer.
+
+TL;DR I'm still lost why we have to describe each clk in DT.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
