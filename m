@@ -1,296 +1,297 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 25 Feb 2016 16:36:33 -0600
-Subject: [PATCH v3 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+Date: Thu, 25 Feb 2016 16:36:32 -0600
+Subject: [PATCH v3 1/5] pwms: pwm-ti*: Remove support for local clock gating
 In-Reply-To: <1456439796-28546-1-git-send-email-fcooper@ti.com>
 References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
-Message-ID: <1456439796-28546-3-git-send-email-fcooper@ti.com>
+Message-ID: <1456439796-28546-2-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vignesh R <vigneshr@ti.com>
+The PWMSS local clock gating registers have no real purpose on OMAP ARM
+devices. These registers were left over registers from DSP IP where the
+PRCM doesn't exist. There is a silicon bug where gating and ungating clocks
+don't function properly. TRMs will be update to indicate that these
+registers shouldn't be touched.
 
-Add hwmod entries for the PWMSS on DRA7.
+Therefore, all code that accesses the PWMSS_CLKCONFIG or PWMSS_CLKSTATUS
+will be removed by this patch with zero loss of functionality by the ECAP
+and EPWM drivers.
 
-Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
-equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
-As per AM57x TRM SPRUHZ6[1], October 2014, Section 29.1.3 Table 29-4,
-clock source to PWMSS is L4PER2_L3_GICLK. But it is actually
-L4PER2_L3_GICLK/2. The TRM does not show the division by 2.
-
-[1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
-
-Signed-off-by: Vignesh R <vigneshr@ti.com>
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
 Version 3 changes:
-Switch from SYSC_HAS_RESET_STATUS to SYSC_HAS_SOFTRESET which is the
-correct bitfield for that register.
+New patch
 
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 239 ++++++++++++++++++++++++++++++
- 1 file changed, 239 insertions(+)
+ drivers/pwm/pwm-tiecap.c   | 28 --------------------------
+ drivers/pwm/pwm-tiehrpwm.c | 29 ---------------------------
+ drivers/pwm/pwm-tipwmss.c  | 49 ----------------------------------------------
+ drivers/pwm/pwm-tipwmss.h  | 39 ------------------------------------
+ 4 files changed, 145 deletions(-)
+ delete mode 100644 drivers/pwm/pwm-tipwmss.h
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 848356e..4b2d68b 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -383,6 +383,149 @@ static struct omap_hwmod dra7xx_dcan2_hwmod = {
- 	},
- };
+diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+index 616af76..9e0865d7 100644
+--- a/drivers/pwm/pwm-tiecap.c
++++ b/drivers/pwm/pwm-tiecap.c
+@@ -27,8 +27,6 @@
+ #include <linux/pwm.h>
+ #include <linux/of_device.h>
  
-+/* pwmss  */
-+static struct omap_hwmod_class_sysconfig dra7xx_epwmss_sysc = {
-+	.rev_offs	= 0x0,
-+	.sysc_offs	= 0x4,
-+	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET,
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
-+
-+struct omap_hwmod_class dra7xx_epwmss_hwmod_class = {
-+	.name		= "epwmss",
-+	.sysc		= &dra7xx_epwmss_sysc,
-+};
-+
-+static struct omap_hwmod_class dra7xx_ecap_hwmod_class = {
-+	.name		= "ecap",
-+};
-+
-+static struct omap_hwmod_class dra7xx_eqep_hwmod_class = {
-+	.name		= "eqep",
-+};
-+
-+struct omap_hwmod_class dra7xx_ehrpwm_hwmod_class = {
-+	.name		= "ehrpwm",
-+};
-+
-+/* epwmss0 */
-+struct omap_hwmod dra7xx_epwmss0_hwmod = {
-+	.name		= "epwmss0",
-+	.class		= &dra7xx_epwmss_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm		= {
-+		.omap4	= {
-+			.modulemode	= MODULEMODE_SWCTRL,
-+			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS1_CLKCTRL_OFFSET,
-+			.context_offs	= DRA7XX_RM_L4PER2_PWMSS1_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* ecap0 */
-+struct omap_hwmod dra7xx_ecap0_hwmod = {
-+	.name		= "ecap0",
-+	.class		= &dra7xx_ecap_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* eqep0 */
-+struct omap_hwmod dra7xx_eqep0_hwmod = {
-+	.name		= "eqep0",
-+	.class		= &dra7xx_eqep_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* ehrpwm0 */
-+struct omap_hwmod dra7xx_ehrpwm0_hwmod = {
-+	.name		= "ehrpwm0",
-+	.class		= &dra7xx_ehrpwm_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* epwmss1 */
-+struct omap_hwmod dra7xx_epwmss1_hwmod = {
-+	.name		= "epwmss1",
-+	.class		= &dra7xx_epwmss_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm		= {
-+		.omap4	= {
-+			.modulemode	= MODULEMODE_SWCTRL,
-+			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS2_CLKCTRL_OFFSET,
-+			.context_offs	= DRA7XX_RM_L4PER2_PWMSS2_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* ecap1 */
-+struct omap_hwmod dra7xx_ecap1_hwmod = {
-+	.name		= "ecap1",
-+	.class		= &dra7xx_ecap_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* eqep1 */
-+struct omap_hwmod dra7xx_eqep1_hwmod = {
-+	.name		= "eqep1",
-+	.class		= &dra7xx_eqep_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* ehrpwm1 */
-+struct omap_hwmod dra7xx_ehrpwm1_hwmod = {
-+	.name		= "ehrpwm1",
-+	.class		= &dra7xx_ehrpwm_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* epwmss2 */
-+struct omap_hwmod dra7xx_epwmss2_hwmod = {
-+	.name		= "epwmss2",
-+	.class		= &dra7xx_epwmss_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+	.prcm		= {
-+		.omap4	= {
-+			.modulemode	= MODULEMODE_SWCTRL,
-+			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS3_CLKCTRL_OFFSET,
-+			.context_offs	= DRA7XX_RM_L4PER2_PWMSS3_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/* ecap2 */
-+struct omap_hwmod dra7xx_ecap2_hwmod = {
-+	.name		= "ecap2",
-+	.class		= &dra7xx_ecap_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* eqep2 */
-+struct omap_hwmod dra7xx_eqep2_hwmod = {
-+	.name		= "eqep2",
-+	.class		= &dra7xx_eqep_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
-+/* ehrpwm2 */
-+struct omap_hwmod dra7xx_ehrpwm2_hwmod = {
-+	.name		= "ehrpwm2",
-+	.class		= &dra7xx_ehrpwm_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "l4_root_clk_div",
-+};
-+
- /*
-  * 'dma' class
-  *
-@@ -2676,6 +2819,90 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__gpio6 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
+-#include "pwm-tipwmss.h"
+-
+ /* ECAP registers and bits definitions */
+ #define CAP1			0x08
+ #define CAP2			0x0C
+@@ -206,7 +204,6 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+ 	struct resource *r;
+ 	struct clk *clk;
+ 	struct ecap_pwm_chip *pc;
+-	u16 status;
  
-+struct omap_hwmod_ocp_if dra7xx_l4_per2__epwmss0 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_epwmss0_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss0__ecap0 = {
-+	.master		= &dra7xx_epwmss0_hwmod,
-+	.slave		= &dra7xx_ecap0_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss0__eqep0 = {
-+	.master		= &dra7xx_epwmss0_hwmod,
-+	.slave		= &dra7xx_eqep0_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss0__ehrpwm0 = {
-+	.master		= &dra7xx_epwmss0_hwmod,
-+	.slave		= &dra7xx_ehrpwm0_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_l4_per2__epwmss1 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_epwmss1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss1__ecap1 = {
-+	.master		= &dra7xx_epwmss1_hwmod,
-+	.slave		= &dra7xx_ecap1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss1__eqep1 = {
-+	.master		= &dra7xx_epwmss1_hwmod,
-+	.slave		= &dra7xx_eqep1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss1__ehrpwm1 = {
-+	.master		= &dra7xx_epwmss1_hwmod,
-+	.slave		= &dra7xx_ehrpwm1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_l4_per2__epwmss2 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_epwmss2_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss2__ecap2 = {
-+	.master		= &dra7xx_epwmss2_hwmod,
-+	.slave		= &dra7xx_ecap2_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss2__eqep2 = {
-+	.master		= &dra7xx_epwmss2_hwmod,
-+	.slave		= &dra7xx_eqep2_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+struct omap_hwmod_ocp_if dra7xx_epwmss2__ehrpwm2 = {
-+	.master		= &dra7xx_epwmss2_hwmod,
-+	.slave		= &dra7xx_ehrpwm2_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
- /* l4_per1 -> gpio7 */
- static struct omap_hwmod_ocp_if dra7xx_l4_per1__gpio7 = {
- 	.master		= &dra7xx_l4_per1_hwmod,
-@@ -3452,6 +3679,18 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l3_main_1__vcp2,
- 	&dra7xx_l4_per2__vcp2,
- 	&dra7xx_l4_wkup__wd_timer2,
-+	&dra7xx_l4_per2__epwmss0,
-+	&dra7xx_epwmss0__ecap0,
-+	&dra7xx_epwmss0__eqep0,
-+	&dra7xx_epwmss0__ehrpwm0,
-+	&dra7xx_l4_per2__epwmss1,
-+	&dra7xx_epwmss1__ecap1,
-+	&dra7xx_epwmss1__eqep1,
-+	&dra7xx_epwmss1__ehrpwm1,
-+	&dra7xx_l4_per2__epwmss2,
-+	&dra7xx_epwmss2__ecap2,
-+	&dra7xx_epwmss2__eqep2,
-+	&dra7xx_epwmss2__ehrpwm2,
- 	NULL,
- };
+ 	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+ 	if (!pc)
+@@ -243,40 +240,15 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+ 	}
  
+ 	pm_runtime_enable(&pdev->dev);
+-	pm_runtime_get_sync(&pdev->dev);
+-
+-	status = pwmss_submodule_state_change(pdev->dev.parent,
+-			PWMSS_ECAPCLK_EN);
+-	if (!(status & PWMSS_ECAPCLK_EN_ACK)) {
+-		dev_err(&pdev->dev, "PWMSS config space clock enable failed\n");
+-		ret = -EINVAL;
+-		goto pwmss_clk_failure;
+-	}
+-
+-	pm_runtime_put_sync(&pdev->dev);
+ 
+ 	platform_set_drvdata(pdev, pc);
+ 	return 0;
+-
+-pwmss_clk_failure:
+-	pm_runtime_put_sync(&pdev->dev);
+-	pm_runtime_disable(&pdev->dev);
+-	pwmchip_remove(&pc->chip);
+-	return ret;
+ }
+ 
+ static int ecap_pwm_remove(struct platform_device *pdev)
+ {
+ 	struct ecap_pwm_chip *pc = platform_get_drvdata(pdev);
+ 
+-	pm_runtime_get_sync(&pdev->dev);
+-	/*
+-	 * Due to hardware misbehaviour, acknowledge of the stop_req
+-	 * is missing. Hence checking of the status bit skipped.
+-	 */
+-	pwmss_submodule_state_change(pdev->dev.parent, PWMSS_ECAPCLK_STOP_REQ);
+-	pm_runtime_put_sync(&pdev->dev);
+-
+ 	pm_runtime_disable(&pdev->dev);
+ 	return pwmchip_remove(&pc->chip);
+ }
+diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
+index 6a41e66..e09b1f0 100644
+--- a/drivers/pwm/pwm-tiehrpwm.c
++++ b/drivers/pwm/pwm-tiehrpwm.c
+@@ -27,8 +27,6 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/of_device.h>
+ 
+-#include "pwm-tipwmss.h"
+-
+ /* EHRPWM registers and bits definitions */
+ 
+ /* Time base module registers */
+@@ -437,7 +435,6 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+ 	struct resource *r;
+ 	struct clk *clk;
+ 	struct ehrpwm_pwm_chip *pc;
+-	u16 status;
+ 
+ 	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+ 	if (!pc)
+@@ -487,27 +484,9 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	pm_runtime_enable(&pdev->dev);
+-	pm_runtime_get_sync(&pdev->dev);
+-
+-	status = pwmss_submodule_state_change(pdev->dev.parent,
+-			PWMSS_EPWMCLK_EN);
+-	if (!(status & PWMSS_EPWMCLK_EN_ACK)) {
+-		dev_err(&pdev->dev, "PWMSS config space clock enable failed\n");
+-		ret = -EINVAL;
+-		goto pwmss_clk_failure;
+-	}
+-
+-	pm_runtime_put_sync(&pdev->dev);
+ 
+ 	platform_set_drvdata(pdev, pc);
+ 	return 0;
+-
+-pwmss_clk_failure:
+-	pm_runtime_put_sync(&pdev->dev);
+-	pm_runtime_disable(&pdev->dev);
+-	pwmchip_remove(&pc->chip);
+-	clk_unprepare(pc->tbclk);
+-	return ret;
+ }
+ 
+ static int ehrpwm_pwm_remove(struct platform_device *pdev)
+@@ -516,14 +495,6 @@ static int ehrpwm_pwm_remove(struct platform_device *pdev)
+ 
+ 	clk_unprepare(pc->tbclk);
+ 
+-	pm_runtime_get_sync(&pdev->dev);
+-	/*
+-	 * Due to hardware misbehaviour, acknowledge of the stop_req
+-	 * is missing. Hence checking of the status bit skipped.
+-	 */
+-	pwmss_submodule_state_change(pdev->dev.parent, PWMSS_EPWMCLK_STOP_REQ);
+-	pm_runtime_put_sync(&pdev->dev);
+-
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 	return pwmchip_remove(&pc->chip);
+diff --git a/drivers/pwm/pwm-tipwmss.c b/drivers/pwm/pwm-tipwmss.c
+index 5cf65a1..829f499 100644
+--- a/drivers/pwm/pwm-tipwmss.c
++++ b/drivers/pwm/pwm-tipwmss.c
+@@ -22,32 +22,6 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/of_device.h>
+ 
+-#include "pwm-tipwmss.h"
+-
+-#define PWMSS_CLKCONFIG		0x8	/* Clock gating reg */
+-#define PWMSS_CLKSTATUS		0xc	/* Clock gating status reg */
+-
+-struct pwmss_info {
+-	void __iomem	*mmio_base;
+-	struct mutex	pwmss_lock;
+-	u16		pwmss_clkconfig;
+-};
+-
+-u16 pwmss_submodule_state_change(struct device *dev, int set)
+-{
+-	struct pwmss_info *info = dev_get_drvdata(dev);
+-	u16 val;
+-
+-	mutex_lock(&info->pwmss_lock);
+-	val = readw(info->mmio_base + PWMSS_CLKCONFIG);
+-	val |= set;
+-	writew(val , info->mmio_base + PWMSS_CLKCONFIG);
+-	mutex_unlock(&info->pwmss_lock);
+-
+-	return readw(info->mmio_base + PWMSS_CLKSTATUS);
+-}
+-EXPORT_SYMBOL(pwmss_submodule_state_change);
+-
+ static const struct of_device_id pwmss_of_match[] = {
+ 	{ .compatible	= "ti,am33xx-pwmss" },
+ 	{},
+@@ -57,24 +31,10 @@ MODULE_DEVICE_TABLE(of, pwmss_of_match);
+ static int pwmss_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+-	struct resource *r;
+-	struct pwmss_info *info;
+ 	struct device_node *node = pdev->dev.of_node;
+ 
+-	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+-	if (!info)
+-		return -ENOMEM;
+-
+-	mutex_init(&info->pwmss_lock);
+-
+-	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	info->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+-	if (IS_ERR(info->mmio_base))
+-		return PTR_ERR(info->mmio_base);
+-
+ 	pm_runtime_enable(&pdev->dev);
+ 	pm_runtime_get_sync(&pdev->dev);
+-	platform_set_drvdata(pdev, info);
+ 
+ 	/* Populate all the child nodes here... */
+ 	ret = of_platform_populate(node, NULL, NULL, &pdev->dev);
+@@ -86,30 +46,21 @@ static int pwmss_probe(struct platform_device *pdev)
+ 
+ static int pwmss_remove(struct platform_device *pdev)
+ {
+-	struct pwmss_info *info = platform_get_drvdata(pdev);
+-
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+-	mutex_destroy(&info->pwmss_lock);
+ 	return 0;
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+ static int pwmss_suspend(struct device *dev)
+ {
+-	struct pwmss_info *info = dev_get_drvdata(dev);
+-
+-	info->pwmss_clkconfig = readw(info->mmio_base + PWMSS_CLKCONFIG);
+ 	pm_runtime_put_sync(dev);
+ 	return 0;
+ }
+ 
+ static int pwmss_resume(struct device *dev)
+ {
+-	struct pwmss_info *info = dev_get_drvdata(dev);
+-
+ 	pm_runtime_get_sync(dev);
+-	writew(info->pwmss_clkconfig, info->mmio_base + PWMSS_CLKCONFIG);
+ 	return 0;
+ }
+ #endif
+diff --git a/drivers/pwm/pwm-tipwmss.h b/drivers/pwm/pwm-tipwmss.h
+deleted file mode 100644
+index 10ad804..0000000
+--- a/drivers/pwm/pwm-tipwmss.h
++++ /dev/null
+@@ -1,39 +0,0 @@
+-/*
+- * TI PWM Subsystem driver
+- *
+- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef __TIPWMSS_H
+-#define __TIPWMSS_H
+-
+-/* PWM substem clock gating */
+-#define PWMSS_ECAPCLK_EN	BIT(0)
+-#define PWMSS_ECAPCLK_STOP_REQ	BIT(1)
+-#define PWMSS_EPWMCLK_EN	BIT(8)
+-#define PWMSS_EPWMCLK_STOP_REQ	BIT(9)
+-
+-#define PWMSS_ECAPCLK_EN_ACK	BIT(0)
+-#define PWMSS_EPWMCLK_EN_ACK	BIT(8)
+-
+-#ifdef CONFIG_PWM_TIPWMSS
+-extern u16 pwmss_submodule_state_change(struct device *dev, int set);
+-#else
+-static inline u16 pwmss_submodule_state_change(struct device *dev, int set)
+-{
+-	/* return success status value */
+-	return 0xFFFF;
+-}
+-#endif
+-#endif	/* __TIPWMSS_H */
 -- 
 2.7.0
