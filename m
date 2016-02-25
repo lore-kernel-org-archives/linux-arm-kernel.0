@@ -1,73 +1,118 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 25 Feb 2016 12:20:35 +0000
-Subject: [PATCH 2/2] PCI: generic: add description of property
- "interrupt-skip-mask"
-In-Reply-To: <1456401208-10136-2-git-send-email-thunder.leizhen@huawei.com>
-References: <1456401208-10136-1-git-send-email-thunder.leizhen@huawei.com>
- <1456401208-10136-2-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20160225122035.GB10593@leverpostej>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 25 Feb 2016 13:26:17 +0100
+Subject: [RFC 3/3] iommu: dma-iommu: use common implementation also on ARM
+ architecture
+In-Reply-To: <2724572.qtPjgumFDJ@wuerfel>
+References: <1455870164-25337-1-git-send-email-m.szyprowski@samsung.com>
+ <1455870164-25337-4-git-send-email-m.szyprowski@samsung.com>
+ <2724572.qtPjgumFDJ@wuerfel>
+Message-ID: <56CEF2E9.5040706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-In future, please send the binding document first in a series, per point
-3 of Documentation/devicetree/bindings/submitting-patches.txt. It makes
-review easier/faster.
+On 2016-02-19 11:30, Arnd Bergmann wrote:
+> On Friday 19 February 2016 09:22:44 Marek Szyprowski wrote:
+>> This patch replaces ARM-specific IOMMU-based DMA-mapping implementation
+>> with generic IOMMU DMA-mapping code shared with ARM64 architecture. The
+>> side-effect of this change is a switch from bitmap-based IO address space
+>> management to tree-based code. There should be no functional changes
+>> for drivers, which rely on initialization from generic arch_setup_dna_ops()
+>> interface. Code, which used old arm_iommu_* functions must be updated to
+>> new interface.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> I like the overall idea. However, this interface from the iommu
+> subsystem into architecture specific code:
+>
+>> +/*
+>> + * The DMA API is built upon the notion of "buffer ownership".  A buffer
+>> + * is either exclusively owned by the CPU (and therefore may be accessed
+>> + * by it) or exclusively owned by the DMA device.  These helper functions
+>> + * represent the transitions between these two ownership states.
+>> + *
+>> + * Note, however, that on later ARMs, this notion does not work due to
+>> + * speculative prefetches.  We model our approach on the assumption that
+>> + * the CPU does do speculative prefetches, which means we clean caches
+>> + * before transfers and delay cache invalidation until transfer completion.
+>> + *
+>> + */
+>> +extern void __dma_page_cpu_to_dev(struct page *, unsigned long, size_t,
+>> +				  enum dma_data_direction);
+>> +extern void __dma_page_dev_to_cpu(struct page *, unsigned long, size_t,
+>> +				  enum dma_data_direction);
+>> +
+>> +static inline void arch_flush_page(struct device *dev, const void *virt,
+>> +			    phys_addr_t phys)
+>> +{
+>> +	dmac_flush_range(virt, virt + PAGE_SIZE);
+>> +	outer_flush_range(phys, phys + PAGE_SIZE);
+>> +}
+>> +
+>> +static inline void arch_dma_map_area(phys_addr_t phys, size_t size,
+>> +				     enum dma_data_direction dir)
+>> +{
+>> +	unsigned int offset = phys & ~PAGE_MASK;
+>> +	__dma_page_cpu_to_dev(phys_to_page(phys & PAGE_MASK), offset, size, dir);
+>> +}
+>> +
+>> +static inline void arch_dma_unmap_area(phys_addr_t phys, size_t size,
+>> +				       enum dma_data_direction dir)
+>> +{
+>> +	unsigned int offset = phys & ~PAGE_MASK;
+>> +	__dma_page_dev_to_cpu(phys_to_page(phys & PAGE_MASK), offset, size, dir);
+>> +}
+>> +
+>> +static inline pgprot_t arch_get_dma_pgprot(struct dma_attrs *attrs,
+>> +					pgprot_t prot, bool coherent)
+>> +{
+>> +	if (coherent)
+>> +		return prot;
+>> +
+>> +	prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
+>> +			    pgprot_writecombine(prot) :
+>> +			    pgprot_dmacoherent(prot);
+>> +	return prot;
+>> +}
+>> +
+>> +extern void *arch_alloc_from_atomic_pool(size_t size, struct page **ret_page,
+>> +					 gfp_t flags);
+>> +extern bool arch_in_atomic_pool(void *start, size_t size);
+>> +extern int arch_free_from_atomic_pool(void *start, size_t size);
+>> +
+>> +
+> doesn't feel completely right yet. In particular the arch_flush_page()
+> interface is probably still too specific to ARM/ARM64 and won't work
+> that way on other architectures.
+>
+> I think it would be better to do this either more generic, or less generic:
+>
+> a) leave the iommu_dma_map_ops definition in the architecture specific
+>     code, but make it call helper functions in the drivers/iommu to do all
+>     of the really generic parts.
+>
+> b) clarify that this is only applicable to arch/arm and arch/arm64, and
+>     unify things further between these two, as they have very similar
+>     requirements in the CPU architecture.
 
-On Thu, Feb 25, 2016 at 07:53:28PM +0800, Zhen Lei wrote:
-> Interrupt Pin register is read-only and optional. Some pci devices may use
-> msi/msix but leave the value of Interrupt Pin non-zero.
+Some really generic parts are already in iommu/dma-iommu.c and one can build
+it's own, non-ARM CPU architecture based IOMMU/DMA-mapping code. Initially I
+also wanted to use that generic code on both ARM and ARM64, but it 
+turned out
+that both archs, ARM and ARM64 will duplicate 99% of code, which use this
+'generic' functions. This was the reason why I dedided to move all that
+common code from arch/{arm,arm64}/mm/dma-mapping.c to
+drivers/iommu/dma-iommu-ops.c
 
-Is that permitted by the spec? Surely 'optional' means it must be zero
-if not implemented?
+I'm not sure if I can design all the changes that need to be made to
+drivers/iommu/dma-iommu-ops.c to make it more generic. Maybe when one will
+try to use that code with other, non-ARM architecture based arch glue code,
+a better abstraction can be developed. For now I would like to keep all this
+code in a common place so both arm and arm64 will benefit from improvements
+done there.
 
-> In this case, the driver will print information as below: pci
-> 0000:40:00.0: of_irq_parse_pci() failed with rc=-22
-> 
-> It's easily lead to misinterpret.
-
-If this is limited to a subset of devices which we know are broken in
-this regard, can we not handle these cases explicitly?
-
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  Documentation/devicetree/bindings/pci/host-generic-pci.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> index 3f1d3fc..0f10978 100644
-> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> @@ -70,6 +70,8 @@ Practice: Interrupt Mapping' and requires the following properties:
-> 
->  - interrupt-map-mask : <see aforementioned specification>
-> 
-> +- interrupt-skip-mask: Explicitly declare which pci devices only use msi/msix
-> +but leave the value of Interrupt Pin non-zero.
-
-Unlike the rest of the interrupt mapping properties, this is not
-described in  `Open Firmware Recommended Practice: Interrupt Mapping'.
-
-This needs a far more complete description.
-
-This also doesn't strike me as th right approach. The interrupt-map-mask
-property describe as relationship between the host-controller-provided
-interrupt lines and endpoints, while this seems to be a bug completely
-contained within an endpoint.
-
-Thanks,
-Mark.
-
-> 
->  Example:
-> 
-> --
-> 2.5.0
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
