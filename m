@@ -1,9 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 25 Feb 2016 16:50:22 +0200
-Subject: [PATCH 06/11] ARM: DTS: dra72-evm: Enable AFIFO use for McASP3
+Date: Thu, 25 Feb 2016 16:50:24 +0200
+Subject: [PATCH 08/11] ARM: DTS: am57xx-beagle-x15: Enable AFIFO use for McASP3
 In-Reply-To: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1456411827-23962-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1456411827-23962-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,15 +12,15 @@ This will reduce the chance of McASP level under/overflow.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/dra72-evm.dts | 2 ++
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index 00b12002c07c..18711124616a 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -831,6 +831,8 @@
- 	serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 86351372174f..7e1d11177732 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -813,6 +813,8 @@
+ 	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
  		1 2 0 0
  	>;
 +	tx-num-evt = <32>;
