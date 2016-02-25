@@ -1,117 +1,96 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 25 Feb 2016 11:22:54 +0900
-Subject: [PATCH 2/9] ARM: dts: uniphier: rework UniPhier System Bus nodes
-In-Reply-To: <20160225002641.GC10126@localhost>
-References: <1455588911-9827-1-git-send-email-yamada.masahiro@socionext.com>
- <1455588911-9827-3-git-send-email-yamada.masahiro@socionext.com>
- <20160225002641.GC10126@localhost>
-Message-ID: <CAK7LNARSXAw42bU4x+rgbWVmoru_5C8CMUHvTN22qm4eCDSvKA@mail.gmail.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Thu, 25 Feb 2016 10:16:32 +0800
+Subject: [PATCH v3 6/6] dt/bindings: rockchip: modify document of Rockchip
+ power domains
+In-Reply-To: <1456366337-10808-1-git-send-email-zhangqing@rock-chips.com>
+References: <1456366337-10808-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1456366592-10982-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Add binding documentation for the power domains
+found on Rockchip RK3399 SoCs
 
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ .../bindings/soc/rockchip/power_domain.txt         | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-2016-02-25 9:26 GMT+09:00 Olof Johansson <olof@lixom.net>:
-> Hi,
->
-> On Tue, Feb 16, 2016 at 11:15:04AM +0900, Masahiro Yamada wrote:
->
->> diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
->> index e1cfc1d..b53a8d9 100644
->> --- a/arch/arm/mach-uniphier/platsmp.c
->> +++ b/arch/arm/mach-uniphier/platsmp.c
->> @@ -30,7 +30,7 @@
->>   * The secondary CPUs check this register from the boot ROM for the jump
->>   * destination.  After that, it can be reused as a scratch register.
->>   */
->> -#define UNIPHIER_SBC_ROM_BOOT_RSV2   0x1208
->> +#define UNIPHIER_SMPCTRL_ROM_BOOT_RSV2       0x208
->>
->>  static void __iomem *uniphier_smp_rom_boot_rsv2;
->>  static unsigned int uniphier_smp_max_cpus;
->> @@ -98,15 +98,14 @@ static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
->>       phys_addr_t rom_rsv2_phys;
->>       int ret;
->>
->> -     np = of_find_compatible_node(NULL, NULL,
->> -                             "socionext,uniphier-system-bus-controller");
->> -     ret = of_address_to_resource(np, 1, &res);
->> +     np = of_find_compatible_node(NULL, NULL, "socionext,uniphier-smpctrl");
->> +     ret = of_address_to_resource(np, 0, &res);
->>       if (ret) {
->> -             pr_err("failed to get resource of system-bus-controller\n");
->> +             pr_err("failed to get resource of uniphier-smpctrl\n");
->>               return ret;
->>       }
->>
->> -     rom_rsv2_phys = res.start + UNIPHIER_SBC_ROM_BOOT_RSV2;
->> +     rom_rsv2_phys = res.start + UNIPHIER_SMPCTRL_ROM_BOOT_RSV2;
->>
->>       ret = uniphier_smp_copy_trampoline(rom_rsv2_phys);
->>       if (ret)
->
-> The previous binding has already been released. You can update, but your driver
-> should be able to handle the previous binding.
->
-> So, you still need to keep the old code around.
->
-> This has the benefit of breaking the dependency between the code change and the
-> DT change, so you no longer have to change your platform code at the same time
-> as the DT to avoid regressions.
->
->
-> Please adjust and resend. I'll hold off applying the series until then, so we
-> don't have a partially applied series.
-
-
-
-How long do I have to keep the support for the old binding?
-
-
-[1]
-Everyone makes mistakes.
-The constraint for the DT-binding is really really painful.
-
-This is how it happened.
-
-At first, I implemented uniphier-system-bus.c based on the old binding.
-Then, during the review, Mark suggested me to change the driver design:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/387938.html
-
-I followed his suggestion, but I needed to changed the DT-binding as well.
-Before that time, the DT and other support code for UniPhier had been
-partially merged
-in the mainline.  So, in the current tree exist two bindings that are
-not compatible to
-each other.  This situation is really a mess.
-I want to clean up the code as soon as possible.
-
-
-
-[2]
-For now, DT is mostly developed in the kernel tree in practice,
-while DT is not theoretically only for Linux.
-Everybody (at least every user of UniPhier SoCs) uses the combination
-of a DTB and a kernel image
-generated from the same Linux tree.
-I see no reason to use a new DTB + an old kernel image, or vice versa.
-
-
-[3]
-This binding is UniPhier-specific.  No impact on other SoC vendors.
-Everything is under my control.
-
-
-
-For now, I will prepare the logic to support the old binding,
-but for the reasons above, please let me drop the support for the old
-one some time later.
-
-
-
-
-
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 13dc6a3..9eb43fa 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -7,6 +7,7 @@ Required properties for power domain controller:
+ - compatible: Should be one of the following.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
++	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
+ - #power-domain-cells: Number of cells in a power-domain specifier.
+ 	Should be 1 for multiple PM domains.
+ - #address-cells: Should be 1.
+@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
+ - clocks (optional): phandles to clocks which need to be enabled while power domain
+ 	switches state.
+ 
+@@ -45,12 +47,45 @@ Example:
+                 };
+         };
+ 
++Example 2:
++
++	power: power-controller {
++		compatible = "rockchip,rk3399-power-controller";
++		#power-domain-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/*parent domain*/
++		pd_vio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <RK3399_PD_VIO>;
++
++			/*child domain of pd_vio*/
++			pd_vo {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <RK3399_PD_VO>;
++
++				/*child domain of pd_vo*/
++				pd_vopb {
++					reg = <RK3399_PD_VOPB>;
++				};
++
++				pd_vopl {
++					reg = <RK3399_PD_VOPL>;
++				};
++			};
++		};
++	};
++
+ Node of a device using power domains must have a power-domains property,
+ containing a phandle to the power device node and an index specifying which
+ power domain to use.
+ The index should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
+ 
+ Example of the node using power domain:
+ 
+@@ -65,3 +100,9 @@ Example of the node using power domain:
+                 power-domains = <&power RK3368_PD_GPU_1>;
+                 /* ... */
+         };
++
++	node {
++		/* ... */
++		power-domains = <&power RK3399_PD_VOPB>;
++		/* ... */
++	};
 -- 
-Best Regards
-Masahiro Yamada
+1.9.1
