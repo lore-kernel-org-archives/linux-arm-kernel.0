@@ -1,51 +1,31 @@
-From: tim@krieglstein.org (Tim Sander)
-Date: Thu, 25 Feb 2016 11:05:05 +0100
-Subject: [PATCH v2] dts: add specific compatible type for Terasic DE0-NANO-SoC
- Board
-In-Reply-To: <alpine.DEB.2.02.1602241048100.3815@linux-builds1>
-References: <8416439.76b9YNhpgR@dabox>
- <alpine.DEB.2.02.1602241048100.3815@linux-builds1>
-Message-ID: <2186741.ZYdHdfu2ug@dabox>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 25 Feb 2016 11:14:53 +0100
+Subject: [PATCH 3/7] arm64: defconfig: enable the Alpine family
+In-Reply-To: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1456395297-6505-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tim Sander <tim@krieglstein.org>
+Enable the Alpine SoC family in the arm64 defconfig.
 
-Add a more specific compatible string:"terasic,de0-nano-soc" for respective board.
-Background: when checking for bootspec entries, some board specific fixups are
-not apropriate for board of the same platform ("altr,socfpga-cyclone5").
-The same aproach is taken with the EBV-Socrates board.
-
-Signed-off-by: Tim Sander <tim@krieglstein.org>
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts     | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 72e2c5a..d1f7803 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -230,6 +230,7 @@ synology	Synology, Inc.
- tbs	TBS Technologies
- tcl	Toby Churchill Ltd.
- technologic	Technologic Systems
-+terasic	Terasic Inc.
- thine	THine Electronics, Inc.
- ti	Texas Instruments
- tlm	Trusted Logic Mobility
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-index afea364..704aa9d 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -18,7 +18,7 @@
- 
- / {
- 	model = "Terasic DE-0(Atlas)";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "terasic,de0-nano-soc","altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 18ca9fb9e65f..10387947a164 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -31,6 +31,7 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
++CONFIG_ARCH_ALPINE=y
+ CONFIG_ARCH_BCM_IPROC=y
+ CONFIG_ARCH_BERLIN=y
+ CONFIG_ARCH_EXYNOS7=y
 -- 
-1.9.1
+2.7.1
