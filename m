@@ -1,68 +1,39 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 25 Feb 2016 14:33:53 -0800
-Subject: [PATCH v6 3/3] arm64: dts: mailbox device tree node for APM
- X-Gene platform.
-In-Reply-To: <eeac516f6daa15b22a1c448160ed40991833035a.1455333720.git.dhdang@apm.com>
-References: <CANLsYkxPnFCuJLyKsHnXKdbvAwNurtgQgJ-WF+bD26+8EjkfJw@mail.gmail.com>
- <cover.1455333720.git.dhdang@apm.com>
- <eeac516f6daa15b22a1c448160ed40991833035a.1455333720.git.dhdang@apm.com>
-Message-ID: <CADaLNDkswDHbgX1T52ivniHojTpscGvF+vLinhTT3h_P20OMzw@mail.gmail.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Thu, 25 Feb 2016 16:36:35 -0600
+Subject: [PATCH v3 4/5] clk: ti: DRA7: Add tbclk data for ehrpwm
+In-Reply-To: <1456439796-28546-1-git-send-email-fcooper@ti.com>
+References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
+Message-ID: <1456439796-28546-5-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 7:39 PM, Duc Dang <dhdang@apm.com> wrote:
->
-> Mailbox device tree node for APM X-Gene platform.
+From: Vignesh R <vigneshr@ti.com>
 
-Hi Jassi,
+tbclk is needed by ehrpwm to generate pwm waveforms. Hence, register
+the required clock information.
 
-Will you take this patch to your mailbox tree or you want me to
-include it into my git pull request to Olof/Arnd (arm-soc tree)?
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+Acked-by: Michael Turquette <mturquette@baylibre.com>
+---
+Version 3 changes:
+None
 
-Regards,
-Duc Dang.
->
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> ---
-> Changes since v5:
->         - None
->
-> Changes since v4:
->         - Rebase over v4.5-rc1
->         - Change node name to mailbox at 10540000
->
-> Changes since v3:
->         - Rebase over v4.4
->
->  arch/arm64/boot/dts/apm/apm-storm.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index fe30f76..d91338a 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -691,6 +691,20 @@
->                         msi-parent = <&msi>;
->                 };
->
-> +               mailbox: mailbox at 10540000 {
-> +                       compatible = "apm,xgene-slimpro-mbox";
-> +                       reg = <0x0 0x10540000 0x0 0xa000>;
-> +                       #mbox-cells = <1>;
-> +                       interrupts =    <0x0 0x0 0x4>,
-> +                                       <0x0 0x1 0x4>,
-> +                                       <0x0 0x2 0x4>,
-> +                                       <0x0 0x3 0x4>,
-> +                                       <0x0 0x4 0x4>,
-> +                                       <0x0 0x5 0x4>,
-> +                                       <0x0 0x6 0x4>,
-> +                                       <0x0 0x7 0x4>;
-> +               };
-> +
->                 serial0: serial at 1c020000 {
->                         status = "disabled";
->                         device_type = "serial";
-> --
-> 1.9.1
->
+ drivers/clk/ti/clk-7xx.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+index a911d7d..7fcf818 100644
+--- a/drivers/clk/ti/clk-7xx.c
++++ b/drivers/clk/ti/clk-7xx.c
+@@ -304,6 +304,9 @@ static struct ti_dt_clk dra7xx_clks[] = {
+ 	DT_CLK("4882a000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK("4882c000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK("4882e000.timer", "timer_sys_ck", "timer_sys_clk_div"),
++	DT_CLK("4843e200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
++	DT_CLK("48440200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
++	DT_CLK("48442200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
+ 	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
+ 	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
+ 	{ .node_name = NULL },
+-- 
+2.7.0
