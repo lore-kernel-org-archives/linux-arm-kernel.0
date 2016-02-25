@@ -1,60 +1,43 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu, 25 Feb 2016 13:31:37 -0500
-Subject: [PATCH v4 3/6] watchdog: pnx4008: add support for soft reset
+Date: Thu, 25 Feb 2016 13:31:39 -0500
+Subject: [PATCH v4 5/6] arm: lpc32xx: phy3250 remove restart hook
 In-Reply-To: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
 References: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1456425100-28136-4-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <1456425100-28136-6-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylvain Lemieux <slemieux@tycoint.com>
 
-Add support for explicit soft reset using the reboot mode.
-
-The default reboot mode behavior is unchanged;
-you can overwrite the default reboot type in the board specific file
-"DT_MACHINE_START" definition using the "reboot_mode" parameter.
+Remove the restart hook assignment from phy3250;
+this functionality is now managed by
+the pnx4008 watchdog driver.
 
 Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 ---
+Note:
+This patch was generated with the option "--unified=2" to ensure
+it can be apply before or after the changes for the new 
+LPC32xx irqchip driver:
+- http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
+
 Changes from v3 to v4:
-- none.
+- Switch patch #5 and #6 order.
 
 Changes from v2 to v3:
-- no logical change; updated to work with new revision of patch #2.
+- new patch in v3.
 
-Changes from v1 to v2:
-- Rename patch title;
-  was "arm: lpc32xx: restart: add support for soft reset"
-- Add change to "pnx-4008" driver instead of "mach-lpc32xx".
-- Use define available in "pnx-4008" when writting to watchdog register.
+ arch/arm/mach-lpc32xx/phy3250.c | 1 -
+ 1 file changed, 1 deletion(-)
 
- drivers/watchdog/pnx4008_wdt.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-index 80ee4af..fbf027e 100644
---- a/drivers/watchdog/pnx4008_wdt.c
-+++ b/drivers/watchdog/pnx4008_wdt.c
-@@ -130,9 +130,16 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
- static int pnx4008_restart_handler(struct notifier_block *this,
- 				   unsigned long mode, void *cmd)
- {
--	/* Instant assert of RESETOUT_N with pulse length 1mS */
--	writel(13000, WDTIM_PULSE(wdt_base));
--	writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
-+	if (mode == (unsigned long)REBOOT_SOFT) {
-+		/* Force match output active */
-+		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
-+		/* Internal reset on match output (RESOUT_N not asserted) */
-+		writel(M_RES1, WDTIM_MCTRL(wdt_base));
-+	} else {
-+		/* Instant assert of RESETOUT_N with pulse length 1mS */
-+		writel(13000, WDTIM_PULSE(wdt_base));
-+		writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
-+	}
- 
- 	/* Wait for watchdog to reset system */
- 	mdelay(1000);
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+index a19071a..9e5c3db 100644
+--- a/arch/arm/mach-lpc32xx/phy3250.c
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -211,4 +211,3 @@ DT_MACHINE_START(LPC32XX_DT, "LPC32XX SoC (Flattened Device Tree)")
+ 	.init_machine	= lpc3250_machine_init,
+ 	.dt_compat	= lpc32xx_dt_compat,
+-	.restart	= lpc23xx_restart,
+ MACHINE_END
 -- 
 1.8.3.1
