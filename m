@@ -1,58 +1,89 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Feb 2016 15:37:10 -0800
-Subject: [PATCH v2 1/6] dt-bindings: arm/marvell: add DT bindings for
- AP806 DFX Server
-In-Reply-To: <1456326866-30854-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1456326866-30854-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1456326866-30854-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160225233710.GJ28849@codeaurora.org>
+Date: Thu, 25 Feb 2016 15:42:15 -0800
+Subject: [PATCH v9 2/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <1456127280-23275-3-git-send-email-xuejiancheng@huawei.com>
+References: <1456127280-23275-1-git-send-email-xuejiancheng@huawei.com>
+ <1456127280-23275-3-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20160225234215.GK28849@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24, Thomas Petazzoni wrote:
-> +Marvell AP806 DFX Server
-> +------------------------
+On 02/22, Jiancheng Xue wrote:
+> diff --git a/Documentation/devicetree/bindings/clock/hi3519-crg.txt b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+> new file mode 100644
+> index 0000000..2d23950
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
+> @@ -0,0 +1,46 @@
+> +Example: CRG nodes
+> +CRG: clock-reset-controller at 12010000 {
+> +	compatible = "hisilicon,hi3519-crg";
+
+Indentation is off here.
+
+> +        reg = <0x12010000 0x10000>;
+> +        #clock-cells = <1>;
+> +        #reset-cells = <2>;
+> +};
 > +
-> +The Marvell AP806 HW block (which is a core component of the Marvell
-> +Armada 7K and 8K SOCs) has a set of registers called "DFX
-> +Server". This set of registers contains miscellaneous registers, most
-> +of them being used for silicon fine-tuning and manufacturing testing,
-> +and as such are not publicly documented. However, this DFX server
-> +register range also contains a few documented and useful registers,
-> +for example for clock control.
+> +Example: consumer nodes
+> +i2c0: i2c at 12110000 {
+> +	compatible = "hisilicon,hi3519-i2c";
+> +        reg = <0x12110000 0x1000>;
+> +        clocks = <&CRG HI3519_I2C0_RST>;*/
+> +        resets = <&CRG 0xe4 0>;
+> +};
+> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+> index e434854..296371f 100644
+> --- a/drivers/clk/hisilicon/Kconfig
+> +++ b/drivers/clk/hisilicon/Kconfig
+> @@ -1,3 +1,11 @@
+> +config COMMON_CLK_HI3519
+> +	tristate "Hi3519 Clock Driver"
+> +	depends on ARCH_HISI || COMPILE_TEST
+> +	select RESET_HISI
+> +	default y
+
+default ARCH_HISI
+
+> +	help
+> +	  Build the clock driver for hi3519.
 > +
-> +This Device Tree binding allows to represent the entire DFX server
-> +register space as one single DT node.
+> diff --git a/drivers/clk/hisilicon/reset.c b/drivers/clk/hisilicon/reset.c
+> new file mode 100644
+> index 0000000..50e00e7
+> --- /dev/null
+> +++ b/drivers/clk/hisilicon/reset.c
 > +
-> +Required properties:
-> +- compatible: the first and second values must be:
-> +	"simple-mfd", "syscon"
-> +- reg: address and length of following register sets for the DFX
-> +  server
+> +int hisi_reset_init(struct device_node *np)
+> +{
+> +	struct hisi_reset_controller *rstc;
+> +
+> +	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
+> +	if (!rstc)
+> +		return -ENOMEM;
+> +
+> +	rstc->membase = of_iomap(np, 0);
 
-Example?
+Any reason why we can't pass the platform device here and map the
+register space with platform device APIs?
 
-I would think the binding would be done in a way that we don't
-have to describe every little register in this misc register
-block. Instead, dfx server has a compatible:
+> +	if (!rstc->membase)
+> +		return -EINVAL;
+> +
+> +	spin_lock_init(&rstc->lock);
+> +
+> +	rstc->rcdev.owner = THIS_MODULE;
+> +	rstc->rcdev.ops = &hisi_reset_ops;
+> +	rstc->rcdev.of_node = np;
+> +	rstc->rcdev.of_reset_n_cells = 2;
+> +	rstc->rcdev.of_xlate = hisi_reset_of_xlate;
+> +
+> +	return reset_controller_register(&rstc->rcdev);
+> +}
+> +EXPORT_SYMBOL(hisi_reset_init);
 
- node at f00 {
- 	reg = <0xf00 0x100>;
-	compatible = "marvell,dfx-ap806";
-	#clock-cells = <1>;
- };
-
-And then a driver that probes this compatible string and
-registers a handful of clks. If we ever get into a situation
-where we want to expose non-clk functionality from this device
-node, we would make some sort of mfd driver that probes based on
-the same compatible string and creates platform devices in
-software to register the clk device component and whatever other
-device type is used. In that situation, we could assign a regmap
-to the mfd device and the clk device would be a child of the mfd
-and get a regmap through the dev->parent pointer.
-
-TL;DR I'm still lost why we have to describe each clk in DT.
+Why not GPL?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
