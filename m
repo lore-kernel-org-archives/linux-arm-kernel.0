@@ -1,142 +1,88 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 25 Feb 2016 09:52:42 +0000
-Subject: [PATCH v2 2/8] arm64: HWCAP: Split COMPAT HWCAP table entries
+Date: Thu, 25 Feb 2016 09:52:41 +0000
+Subject: [PATCH v2 1/8] arm64: hwcaps: Cleanup naming
 In-Reply-To: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
 References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1456393968-17386-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1456393968-17386-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to handle systems which do not support 32bit at EL0,
-split the COMPAT HWCAP entries into a separate table which can
-be processed, only if the support is available.
+We use hwcaps for referring to ELF hwcaps capability information.
+However this can be confusing with 'cpu_hwcaps' which stands for the
+CPU capability bit field. This patch cleans up the names to make it
+a bit more readable.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c |   78 ++++++++++++++++++++++++----------------
- 1 file changed, 47 insertions(+), 31 deletions(-)
+ arch/arm64/kernel/cpufeature.c |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a3c254b..b88cbef 100644
+index f29d63c..a3c254b 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -691,6 +691,10 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
- 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_ATOMICS),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
-+	{},
-+};
-+
-+static const struct arm64_cpu_capabilities compat_elf_hwcaps[] = {
- #ifdef CONFIG_COMPAT
- 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, FTR_UNSIGNED, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
- 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, FTR_UNSIGNED, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
-@@ -746,10 +750,9 @@ static bool cpus_have_elf_hwcap(const struct arm64_cpu_capabilities *cap)
+@@ -682,7 +682,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.hwcap = cap,					\
+ 	}
+ 
+-static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
++static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_PMULL),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_AES),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA1),
+@@ -701,7 +701,7 @@ static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
+ 	{},
+ };
+ 
+-static void __init cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
++static void __init cap_set_elf_hwcap(const struct arm64_cpu_capabilities *cap)
+ {
+ 	switch (cap->hwcap_type) {
+ 	case CAP_HWCAP:
+@@ -722,7 +722,7 @@ static void __init cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
+ }
+ 
+ /* Check if we have a particular HWCAP enabled */
+-static bool __maybe_unused cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
++static bool cpus_have_elf_hwcap(const struct arm64_cpu_capabilities *cap)
+ {
+ 	bool rc;
+ 
+@@ -746,14 +746,14 @@ static bool __maybe_unused cpus_have_hwcap(const struct arm64_cpu_capabilities *
  	return rc;
  }
  
--static void __init setup_elf_hwcaps(void)
-+static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
+-static void __init setup_cpu_hwcaps(void)
++static void __init setup_elf_hwcaps(void)
  {
  	int i;
--	const struct arm64_cpu_capabilities *hwcaps = arm64_elf_hwcaps;
+-	const struct arm64_cpu_capabilities *hwcaps = arm64_hwcaps;
++	const struct arm64_cpu_capabilities *hwcaps = arm64_elf_hwcaps;
  
  	for (i = 0; hwcaps[i].desc; i++)
  		if (hwcaps[i].matches(&hwcaps[i]))
-@@ -850,29 +853,26 @@ static void check_early_cpu_features(void)
- 	verify_cpu_asid_bits();
+-			cap_set_hwcap(&hwcaps[i]);
++			cap_set_elf_hwcap(&hwcaps[i]);
  }
  
--/*
-- * Run through the enabled system capabilities and enable() it on this CPU.
-- * The capabilities were decided based on the available CPUs at the boot time.
-- * Any new CPU should match the system wide status of the capability. If the
-- * new CPU doesn't have a capability which the system now has enabled, we
-- * cannot do anything to fix it up and could cause unexpected failures. So
-- * we park the CPU.
-- */
--void verify_local_cpu_capabilities(void)
-+static void
-+verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
- {
- 	int i;
--	const struct arm64_cpu_capabilities *caps;
- 
--	check_early_cpu_features();
--
--	/*
--	 * If we haven't computed the system capabilities, there is nothing
--	 * to verify.
--	 */
--	if (!sys_caps_initialised)
--		return;
-+	for (i = 0; caps[i].desc; i++) {
-+		if (!cpus_have_elf_hwcap(&caps[i]))
-+			continue;
-+		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
-+			pr_crit("CPU%d: missing HWCAP: %s\n",
-+					smp_processor_id(), caps[i].desc);
-+			cpu_die_early();
-+		}
-+	}
-+}
- 
--	caps = arm64_features;
-+static void
-+verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
-+{
-+	int i;
- 	for (i = 0; caps[i].desc; i++) {
- 		if (!cpus_have_cap(caps[i].capability) || !caps[i].sys_reg)
- 			continue;
-@@ -888,16 +888,31 @@ void verify_local_cpu_capabilities(void)
- 		if (caps[i].enable)
+ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+@@ -889,8 +889,8 @@ void verify_local_cpu_capabilities(void)
  			caps[i].enable(NULL);
  	}
-+}
  
--	for (i = 0, caps = arm64_elf_hwcaps; caps[i].desc; i++) {
--		if (!cpus_have_elf_hwcap(&caps[i]))
--			continue;
--		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
--			pr_crit("CPU%d: missing HWCAP: %s\n",
--					smp_processor_id(), caps[i].desc);
--			cpu_die_early();
--		}
--	}
-+/*
-+ * Run through the enabled system capabilities and enable() it on this CPU.
-+ * The capabilities were decided based on the available CPUs at the boot time.
-+ * Any new CPU should match the system wide status of the capability. If the
-+ * new CPU doesn't have a capability which the system now has enabled, we
-+ * cannot do anything to fix it up and could cause unexpected failures. So
-+ * we park the CPU.
-+ */
-+void verify_local_cpu_capabilities(void)
-+{
-+
-+	check_early_cpu_features();
-+
-+	/*
-+	 * If we haven't computed the system capabilities, there is nothing
-+	 * to verify.
-+	 */
-+	if (!sys_caps_initialised)
-+		return;
-+
-+	verify_local_cpu_features(arm64_features);
-+	verify_local_elf_hwcaps(arm64_elf_hwcaps);
-+	verify_local_elf_hwcaps(compat_elf_hwcaps);
- }
- 
- static void __init setup_feature_capabilities(void)
-@@ -913,7 +928,8 @@ void __init setup_cpu_features(void)
+-	for (i = 0, caps = arm64_hwcaps; caps[i].desc; i++) {
+-		if (!cpus_have_hwcap(&caps[i]))
++	for (i = 0, caps = arm64_elf_hwcaps; caps[i].desc; i++) {
++		if (!cpus_have_elf_hwcap(&caps[i]))
+ 			continue;
+ 		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
+ 			pr_crit("CPU%d: missing HWCAP: %s\n",
+@@ -913,7 +913,7 @@ void __init setup_cpu_features(void)
  
  	/* Set the CPU feature capabilies */
  	setup_feature_capabilities();
--	setup_elf_hwcaps();
-+	setup_elf_hwcaps(arm64_elf_hwcaps);
-+	setup_elf_hwcaps(compat_elf_hwcaps);
+-	setup_cpu_hwcaps();
++	setup_elf_hwcaps();
  
  	/* Advertise that we have computed the system capabilities */
  	set_sys_caps_initialised();
