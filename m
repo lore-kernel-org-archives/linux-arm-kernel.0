@@ -1,36 +1,45 @@
-From: miles.chen@mediatek.com (miles.chen at mediatek.com)
-Date: Thu, 25 Feb 2016 11:44:34 +0800
-Subject: [PATCH] arm64/mm: remove unnecessary boundary check
-Message-ID: <1456371874-19826-1-git-send-email-miles.chen@mediatek.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 24 Feb 2016 22:49:20 -0500 (EST)
+Subject: [PATCH] bnx2x: add a separate GENEVE Kconfig symbol
+In-Reply-To: <CO2PR11MB0088CC09F328C0CFE10187BF97A40@CO2PR11MB0088.namprd11.prod.outlook.com>
+References: <1456223774-1383513-1-git-send-email-arnd@arndb.de>
+ <CO2PR11MB0088CC09F328C0CFE10187BF97A40@CO2PR11MB0088.namprd11.prod.outlook.com>
+Message-ID: <20160224.224920.1224016653458748974.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Miles Chen <miles.chen@mediatek.com>
+From: Yuval Mintz <Yuval.Mintz@qlogic.com>
+Date: Tue, 23 Feb 2016 18:33:10 +0000
 
-Remove the unnecessary boundary check since there is a huge
-gap between user and kernel address that they would never overlap.
-(arm64 does not have enough levels of page tables to cover 64-bit
-virtual address)
+>> When CONFIG_GENEVE is built as a loadable module, and bnx2x is built-in,
+>> we get this link error:
+> 
+>> drivers/net/built-in.o: In function `bnx2x_open':
+>> :(.text+0x33322): undefined reference to `geneve_get_rx_port'
+>> drivers/net/built-in.o: In function `bnx2x_sp_rtnl_task':
+>> :(.text+0x3e632): undefined reference to `geneve_get_rx_port'
+> 
+>> This avoids the problem by adding a separate Kconfig symbol named
+>> CONFIG_BNX2X_GENEVE that is only enabled when the code is
+>> reachable from the driver.
+> 
+>> This is the same trick that BNX2X does for VXLAN support, and
+>> is similar to how I40E handles both.
+> 
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes: 883ce97d25b0 ("bnx2x: Add Geneve inner-RSS support")
+> 
+> Ouch. Thanks for fixing this one; I tried avoiding this solution
+> since I don't think there's any reason to encumber the config
+> file with needless options [I.e., what's the gain in the ability to
+> disable a single offloaded protocol on a single network driver?],
+> but obviously, I botched the job.
+> 
+> BTW, if you want to handle this exactly like vxlan, you might
+> consider using `defined(CONFIG_BNX2X_GENEVE)' instead of
+> `IS_ENABLED(CONFIG_BNX2X_GENEVE)'  [It not a tristate].
+> But that's truly insignificant.
+> 
+> Acked-By: Yuval Mintz <Yuval.Mintz@qlogic.com>
 
-See Documentation/arm64/memory.txt
-
-Signed-off-by: Miles Chen <miles.chen@mediatek.com>
----
- arch/arm64/mm/init.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f3b061e..4579604 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -343,8 +343,6 @@ void __init mem_init(void)
- #ifdef CONFIG_COMPAT
- 	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
- #endif
--	BUILD_BUG_ON(TASK_SIZE_64			> MODULES_VADDR);
--	BUG_ON(TASK_SIZE_64				> MODULES_VADDR);
- 
- 	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
- 		extern int sysctl_overcommit_memory;
--- 
-1.9.1
+Applied, thanks everyone.
