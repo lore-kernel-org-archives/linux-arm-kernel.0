@@ -1,43 +1,60 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu, 25 Feb 2016 13:31:39 -0500
-Subject: [PATCH v4 5/6] arm: lpc32xx: phy3250 remove restart hook
+Date: Thu, 25 Feb 2016 13:31:38 -0500
+Subject: [PATCH v4 4/6] watchdog: pnx4008: restart: support "cmd" from
+ userspace
 In-Reply-To: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
 References: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1456425100-28136-6-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <1456425100-28136-5-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylvain Lemieux <slemieux@tycoint.com>
 
-Remove the restart hook assignment from phy3250;
-this functionality is now managed by
-the pnx4008 watchdog driver.
+Added support to verify if a "cmd" is passed from the userspace program rebooting the system;
+- if a valid "cmd" is available, handle it;
+- If the received "cmd" is not supported, use the default reboot mode.
 
 Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 ---
-Note:
-This patch was generated with the option "--unified=2" to ensure
-it can be apply before or after the changes for the new 
-LPC32xx irqchip driver:
-- http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
-
 Changes from v3 to v4:
-- Switch patch #5 and #6 order.
+- none.
 
 Changes from v2 to v3:
-- new patch in v3.
+- no logical change; updated to work with new revision of patch #2.
 
- arch/arm/mach-lpc32xx/phy3250.c | 1 -
- 1 file changed, 1 deletion(-)
+Changes from v1 to v2:
+- Rename patch title;
+  was "arm: lpc32xx: restart: support "cmd" from userspace"
+- Add change to "pnx-4008" driver instead of "mach-lpc32xx".
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index a19071a..9e5c3db 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -211,4 +211,3 @@ DT_MACHINE_START(LPC32XX_DT, "LPC32XX SoC (Flattened Device Tree)")
- 	.init_machine	= lpc3250_machine_init,
- 	.dt_compat	= lpc32xx_dt_compat,
--	.restart	= lpc23xx_restart,
- MACHINE_END
+ drivers/watchdog/pnx4008_wdt.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+index fbf027e..e97b611 100644
+--- a/drivers/watchdog/pnx4008_wdt.c
++++ b/drivers/watchdog/pnx4008_wdt.c
+@@ -130,6 +130,21 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+ static int pnx4008_restart_handler(struct notifier_block *this,
+ 				   unsigned long mode, void *cmd)
+ {
++	const char *boot_cmd = (const char *)cmd;
++
++	/*
++	 * Verify if a "cmd" passed from the userspace program rebooting
++	 * the system; if available, handle it.
++	 * - For details, see the 'reboot' syscall in kernel/reboot.c
++	 * - If the received "cmd" is not supported, use the default mode.
++	 */
++	if (boot_cmd) {
++		if (boot_cmd[0] == 'h')
++			mode = (unsigned long)REBOOT_HARD;
++		else if (boot_cmd[0] == 's')
++			mode = (unsigned long)REBOOT_SOFT;
++	}
++
+ 	if (mode == (unsigned long)REBOOT_SOFT) {
+ 		/* Force match output active */
+ 		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
 -- 
 1.8.3.1
