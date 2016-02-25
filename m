@@ -1,34 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 15:23:27 +0100
-Subject: [PATCH 3/4] ARM: realview: imply Device Tree config
-In-Reply-To: <1456406111-18579-4-git-send-email-linus.walleij@linaro.org>
-References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
- <1456406111-18579-4-git-send-email-linus.walleij@linaro.org>
-Message-ID: <2805017.I27kg8jfk6@wuerfel>
+From: blogic@openwrt.org (John Crispin)
+Date: Thu, 25 Feb 2016 15:24:49 +0100
+Subject: [PATCH 39/50] pinctrl: lantiq: Use devm_pinctrl_register() for
+ pinctrl registration
+In-Reply-To: <1456319775-3216-40-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-40-git-send-email-ldewangan@nvidia.com>
+Message-ID: <56CF0EB1.304@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 February 2016 14:15:10 Linus Walleij wrote:
-> @@ -32,8 +24,9 @@ config REALVIEW_DT
->         select USE_OF
->         select ZONE_DMA
 
-The 'select USE_OF' can now be dropped, I guess this was left over
-from the multiplatform patches, but also fits in here.
 
->         help
-> -         Include support for booting the ARM(R) RealView(R) evaluation
-> -         boards using a device tree machine description.
-> +         This enables support for ARM Ltd RealView boards.
-> +
-> +if ARCH_REALVIEW
->  
->  config REALVIEW_HIGH_PHYS_OFFSET
->         bool "High physical base address for the RealView platform"
+On 24/02/2016 14:16, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration.
 > 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 
-REALVIEW_HIGH_PHYS_OFFSET can go away as well, as it is only used
-in 'realview_fixup', which in turn is called by the removed board
-files.
+Acked-by: John Crispin <blogic@openwrt.org>
 
-	Arnd
+
+
+
+> ---
+>  drivers/pinctrl/pinctrl-lantiq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-lantiq.c b/drivers/pinctrl/pinctrl-lantiq.c
+> index fc38a85..a4d6474 100644
+> --- a/drivers/pinctrl/pinctrl-lantiq.c
+> +++ b/drivers/pinctrl/pinctrl-lantiq.c
+> @@ -336,7 +336,7 @@ int ltq_pinctrl_register(struct platform_device *pdev,
+>  	desc->pmxops = &ltq_pmx_ops;
+>  	info->dev = &pdev->dev;
+>  
+> -	info->pctrl = pinctrl_register(desc, &pdev->dev, info);
+> +	info->pctrl = devm_pinctrl_register(&pdev->dev, desc, info);
+>  	if (IS_ERR(info->pctrl)) {
+>  		dev_err(&pdev->dev, "failed to register LTQ pinmux driver\n");
+>  		return PTR_ERR(info->pctrl);
+> 
