@@ -1,56 +1,25 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu, 25 Feb 2016 18:08:19 +0100
-Subject: [PATCH v2] tty/serial: at91: restore dynamic driver binding
-In-Reply-To: <20160225160929.GA20373@kroah.com>
-References: <1456392221-30401-1-git-send-email-romain.izard.pro@gmail.com>
- <56CED0E3.5070308@atmel.com> <20160225160929.GA20373@kroah.com>
-Message-ID: <CAGkQfmOYEiXbQbe14iybu_4BFQYtoAj4QWoxdhPvUJOCOm6sbw@mail.gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Thu, 25 Feb 2016 20:09:43 +0300
+Subject: [PATCH] spi: lp-8841: return correct error code from probe
+In-Reply-To: <1456400265-3068525-1-git-send-email-arnd@arndb.de>
+References: <1456400265-3068525-1-git-send-email-arnd@arndb.de>
+Message-ID: <1456420183.23036.40.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-25 17:09 GMT+01:00 Greg Kroah-Hartman
-<gregkh@linuxfoundation.org>:
-> On Thu, Feb 25, 2016 at 11:01:07AM +0100, Nicolas Ferre wrote:
->> Le 25/02/2016 10:23, Romain Izard a ?crit :
->> > In commit c39dfebc7798956fd2140ae6321786ff35da30c3, the modular
->> > support code for atmel_serial was removed, as the driver cannot be
->> > built as a module. Because no use case was proposed, the dynamic
->> > driver binding support was removed as well.
->> >
->> > The atmel_serial driver can manage up to 7 serial controllers,
->> > which are multiplexed with other functions. For example, in the
->> > Atmel SAMA5D2, the Flexcom controllers can work as USART, SPI or
->> > I2C controllers, and on all Atmel devices serial lines can be
->> > reconfigured as GPIOs.
->> >
->> > My use case uses GPIOs to transfer a firmware update using a custom
->> > protocol on the lines used as a serial port during the normal life
->> > of the device. If it is not possible to unbind the atmel_serial
->> > driver, the GPIO lines remain reserved and prevent this case from
->> > working.
->> >
->> > This patch reinstates the atmel_serial_remove function, and fixes
->> > it as it failed to clear the "clk" field on removal, triggering an
->> > oops when a device was bound again after being unbound.
->> >
->> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
->>
->> Even if you didn't follow my advice for not including unneeded
->> changes in of the last patch chunk, there's no use delaying the patch
->> just for this. So, here is my:
->
-> Yes there is, I'm not going to take this, Romain please fix it
-> properly.
+On Thu, 2016-02-25 at 12:37 +0100, Arnd Bergmann wrote:
+> The spi_lp8841_rtc_probe() function misses an initialization of the
+> return code when it fails to get its memory resource, as gcc notices:
+> 
+> drivers/spi/spi-lp8841-rtc.c: In function 'spi_lp8841_rtc_probe':
+> drivers/spi/spi-lp8841-rtc.c:239:9: error: 'ret' may be used
+> uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> This changes the code to propagate the error from
+> devm_ioremap_resource().
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 7ecbfff6711f ("spi: master driver to enable RTC on ICPDAS LP-
+> 8841")
 
-Are we really arguing about the alignement of of_match_table in the
-platform_driver initializer?
-
-Among other things, Paul's patch changed the alignment to match the
-width of the "suppress_bind_attrs" member. As I simply used 'git revert
--p' to revert the parts of the patch that bothered me, the alignment
-returned to what it was before.
-
-Or am I missing something else ?
-
--- 
-Romain Izard
+Tested-by: Sergei Ianovich <ynvich@gmail.com>
