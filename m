@@ -1,149 +1,117 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Thu, 25 Feb 2016 10:21:26 +0800
-Subject: [PATCH v5 01/11] drm/hisilicon: Add device tree binding for
- hi6220 display subsystem
-In-Reply-To: <20160223183726.GA10246@leverpostej>
-References: <1456196431-19923-1-git-send-email-xinliang.liu@linaro.org>
- <1456196431-19923-2-git-send-email-xinliang.liu@linaro.org>
- <20160223183726.GA10246@leverpostej>
-Message-ID: <CAGd==06LUCn74K18njP8+R-83tJ6OOjmwqmx9MFS=AQyVioFZQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 25 Feb 2016 11:22:54 +0900
+Subject: [PATCH 2/9] ARM: dts: uniphier: rework UniPhier System Bus nodes
+In-Reply-To: <20160225002641.GC10126@localhost>
+References: <1455588911-9827-1-git-send-email-yamada.masahiro@socionext.com>
+ <1455588911-9827-3-git-send-email-yamada.masahiro@socionext.com>
+ <20160225002641.GC10126@localhost>
+Message-ID: <CAK7LNARSXAw42bU4x+rgbWVmoru_5C8CMUHvTN22qm4eCDSvKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2016 at 02:37, Mark Rutland <mark.rutland@arm.com> wrote:
-Hi Mark, thanks for review.
+Hi Olof,
 
-> On Tue, Feb 23, 2016 at 11:00:21AM +0800, Xinliang Liu wrote:
->> Add ADE display controller binding doc.
->> Add DesignWare DSI Host Controller v1.20a binding doc.
+
+2016-02-25 9:26 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> Hi,
+>
+> On Tue, Feb 16, 2016 at 11:15:04AM +0900, Masahiro Yamada wrote:
+>
+>> diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
+>> index e1cfc1d..b53a8d9 100644
+>> --- a/arch/arm/mach-uniphier/platsmp.c
+>> +++ b/arch/arm/mach-uniphier/platsmp.c
+>> @@ -30,7 +30,7 @@
+>>   * The secondary CPUs check this register from the boot ROM for the jump
+>>   * destination.  After that, it can be reused as a scratch register.
+>>   */
+>> -#define UNIPHIER_SBC_ROM_BOOT_RSV2   0x1208
+>> +#define UNIPHIER_SMPCTRL_ROM_BOOT_RSV2       0x208
 >>
->> v5:
->> - Remove endpoint unit address of dsi output port.
->> - Add "hisilicon,noc-syscon" property for ADE NOC QoS syscon.
->> - Add "resets" property for ADE reset.
->> v4:
->> - Describe more specific of clocks and ports.
->> - Fix indentation.
->> v3:
->> - Make ade as the drm master node.
->> - Use assigned-clocks to set clock rate.
->> - Use ports to connect display relavant nodes.
->> v2:
->> - Move dt binding docs to bindings/display/hisilicon directory.
+>>  static void __iomem *uniphier_smp_rom_boot_rsv2;
+>>  static unsigned int uniphier_smp_max_cpus;
+>> @@ -98,15 +98,14 @@ static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
+>>       phys_addr_t rom_rsv2_phys;
+>>       int ret;
 >>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> ---
->>  .../bindings/display/hisilicon/dw-dsi.txt          | 72 ++++++++++++++++++++++
->>  .../bindings/display/hisilicon/hisi-ade.txt        | 64 +++++++++++++++++++
->>  2 files changed, 136 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
->>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+>> -     np = of_find_compatible_node(NULL, NULL,
+>> -                             "socionext,uniphier-system-bus-controller");
+>> -     ret = of_address_to_resource(np, 1, &res);
+>> +     np = of_find_compatible_node(NULL, NULL, "socionext,uniphier-smpctrl");
+>> +     ret = of_address_to_resource(np, 0, &res);
+>>       if (ret) {
+>> -             pr_err("failed to get resource of system-bus-controller\n");
+>> +             pr_err("failed to get resource of uniphier-smpctrl\n");
+>>               return ret;
+>>       }
 >>
->> diff --git a/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt b/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
->> new file mode 100644
->> index 000000000000..0d234b5e19af
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
->> @@ -0,0 +1,72 @@
->> +Device-Tree bindings for DesignWare DSI Host Controller v1.20a driver
->> +
->> +A DSI Host Controller resides in the middle of display controller and external
->> +HDMI converter or panel.
->> +
->> +Required properties:
->> +- compatible: value should be "hisilicon,hi6220-dsi".
->> +- reg: physical base address and length of dsi controller's registers.
->> +- clocks: the clocks needed.
->> +- clock-names: the name of the clocks.
+>> -     rom_rsv2_phys = res.start + UNIPHIER_SBC_ROM_BOOT_RSV2;
+>> +     rom_rsv2_phys = res.start + UNIPHIER_SMPCTRL_ROM_BOOT_RSV2;
+>>
+>>       ret = uniphier_smp_copy_trampoline(rom_rsv2_phys);
+>>       if (ret)
 >
-> You _must_ specify the precise set of clock names you expect here.
+> The previous binding has already been released. You can update, but your driver
+> should be able to handle the previous binding.
 >
-> Per the example, you seem to expect "pclk_dsi".
+> So, you still need to keep the old code around.
 >
-> Is that the name given in the DSI controller manual? Or is it just
-> "pclk"? It's already specific to the DSI controller...
+> This has the benefit of breaking the dependency between the code change and the
+> DT change, so you no longer have to change your platform code at the same time
+> as the DT to avoid regressions.
 >
+>
+> Please adjust and resend. I'll hold off applying the series until then, so we
+> don't have a partially applied series.
 
-I have read the SoC manual again, and it is the configuration clock.
-Maybe we can call it "cfg_clk".
 
->> diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->> new file mode 100644
->> index 000000000000..c1844b3ff878
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->> @@ -0,0 +1,64 @@
->> +Device-Tree bindings for hisilicon ADE display controller driver
->> +
->> +ADE (Advanced Display Engine) is the display controller which grab image
->> +data from memory, do composition, do post image processing, generate RGB
->> +timing stream and transfer to DSI.
->> +
->> +Required properties:
->> +- compatible: value should be "hisilicon,hi6220-ade".
->> +- reg: physical base address and length of the ADE controller's registers.
->> +  Value should be "<0x0 0xf4100000 0x0 0x7800>".
->
-> Get rid of the "Value should be ... " part. It is nonsensical to
-> describe this in the binding. Just describe what this is with relation
-> to _this_ IP block.
 
-OK, will fix all these parts in next version.
+How long do I have to keep the support for the old binding?
 
->
->> +- reg-names: name of physical base. Value should be "ade_base".
->
-> That obviously doesn't apply to *-names propertiesm which must all be
-> specified in the binding (they're local to the device rather than
-> remote).
->
->> +- hisilicon,noc-syscon: ADE NOC QoS syscon. Value should be "<&medianoc_ade>"
->> +- resets: The ADE reset controller node. Value should be "<&media_ctrl
->> +  MEDIA_ADE>".
->
-> Likewise.
->
->> +- interrupt: the ldi vblank interrupt number used.
->> +- clocks: the clocks needed. Three clocks are used in ADE driver:
->> +  ADE core clock, value should be "<&media_ctrl HI6220_ADE_CORE>";
->> +  ADE pixel clok, value should be "<&media_ctrl HI6220_ADE_PIX_SRC>";
->> +  media NOC QoS clock, value should be "<&media_ctrl HI6220_CODEC_JPEG>".
->> +- clock-names: the name of the clocks. Values should be "clk_ade_core",
->> +  "clk_codec_jpeg" and "clk_ade_pix".
->
-> Likewise, don't specify the value.
->
-> Jsut define clocks in terms of clock-names, e.g.
->
-> - clocks: a list of phandle + clock-specifier pairs, one for each entry
->   in clock-names.
-> - clock-names: should contain:
->   * "clk_ade_core" for the ADE ciore clock
->   * ...
->   * ...
 
-All right, got it. Thanks for teaching me how to to.
+[1]
+Everyone makes mistakes.
+The constraint for the DT-binding is really really painful.
 
->
->> +- assigned-clocks: clocks to be assigned rate.
->> +- assigned-clock-rates: clock rates which are assigned to assigned-clocks.
->> +  The rate of <&media_ctrl HI6220_ADE_CORE> could be "360000000" or
->> +  "180000000";
->> +  The rate of <&media_ctrl HI6220_CODEC_JPEG> could be less than "1440000000".
->
-> Is this strictly necessary? Why can the druiver not configure this?
->
-> Does this have to match some pre-existing boot-time configuration?
+This is how it happened.
 
-This is the maximum configuration value due to the parent clk and divider.
-And there is no pre-existing boot-time configuration about this.
-Driver could configure the value according to the performance and
-power consumption.
+At first, I implemented uniphier-system-bus.c based on the old binding.
+Then, during the review, Mark suggested me to change the driver design:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/387938.html
 
-Thanks,
--xinliang
+I followed his suggestion, but I needed to changed the DT-binding as well.
+Before that time, the DT and other support code for UniPhier had been
+partially merged
+in the mainline.  So, in the current tree exist two bindings that are
+not compatible to
+each other.  This situation is really a mess.
+I want to clean up the code as soon as possible.
 
->
-> Thanks,
-> Mark.
+
+
+[2]
+For now, DT is mostly developed in the kernel tree in practice,
+while DT is not theoretically only for Linux.
+Everybody (at least every user of UniPhier SoCs) uses the combination
+of a DTB and a kernel image
+generated from the same Linux tree.
+I see no reason to use a new DTB + an old kernel image, or vice versa.
+
+
+[3]
+This binding is UniPhier-specific.  No impact on other SoC vendors.
+Everything is under my control.
+
+
+
+For now, I will prepare the logic to support the old binding,
+but for the reasons above, please let me drop the support for the old
+one some time later.
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
