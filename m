@@ -1,63 +1,88 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 25 Feb 2016 14:12:53 +0100
-Subject: [GIT PULL] ARM64: Xilinx ZynqMP DT changes for v4.6
-Message-ID: <56CEFDD5.2090704@monstr.eu>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Feb 2016 14:15:07 +0100
+Subject: [PATCH 0/4] RealView boardfile endgame
+Message-ID: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch set deletes the RealView board files and moves it
+over to a pure Device Tree boot, deleting ~3500 LoC.
 
-please pull these two patches to your tree.
+Prerequisites:
+- The MTD driver patch handling the flash memory write
+  protection and VPP enable must go into the MTD subsystem.
+  http://marc.info/?l=linux-arm-kernel&m=145380689210787&w=2
 
-Thanks,
-Michal
+- The CLCD device tree support patches (uncontroversial set)
+  must go into the FBDEV subsystem.
+  http://marc.info/?l=linux-fbdev&m=145622172219039&w=2
 
+- I must queue the device tree patches for the Evaluation
+  Boards and Platform Baseboard and Platform Baseboard
+  Explore before these patches.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+However this is how it will look once the above is in place,
+and it will support everything the kernel already supports
+today.
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+Tested on the real hardware for PB1176JZF-S and PB11MPCore.
+Tested on QEMU for 1136, 1176, 11MPCore and Cortex-A9 EB,
+Platform Baseboard for Cortex-A8 and Platform Baseboard Explore
+for Cortex-A9 variants.
 
-are available in the git repository at:
+Linus Walleij (4):
+  ARM: realview: delete the RealView board files
+  ARM: realview: reduce the RealView Kconfig
+  ARM: realview: imply Device Tree config
+  ARM: realview: cut board options from defconfig
 
-  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.6
-
-for you to fetch changes up to 5087bccb2f184bad0abfb0b5840279f1540ed44c:
-
-  ARM64: zynqmp: Extract clock information from EP108 (2016-02-25
-14:01:03 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx ZynqMP dt patches for v4.6
-
-- Extract clock information from EP108
-- Sort GPIO node
-
-----------------------------------------------------------------
-Michal Simek (2):
-      ARM64: zynqmp: Keep gpio node alphabetically sorted
-      ARM64: zynqmp: Extract clock information from EP108
-
- arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi | 88
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts      |  1 +
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi           | 61
-++++++++++---------------------------------------------------
- 3 files changed, 99 insertions(+), 51 deletions(-)
- create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
-
+ arch/arm/configs/realview_defconfig      |  11 -
+ arch/arm/mach-realview/Kconfig           | 144 +--------
+ arch/arm/mach-realview/Makefile          |  12 +-
+ arch/arm/mach-realview/board-eb.h        |  94 ------
+ arch/arm/mach-realview/board-pb1176.h    |  81 -----
+ arch/arm/mach-realview/board-pb11mp.h    |  96 ------
+ arch/arm/mach-realview/board-pba8.h      |  71 -----
+ arch/arm/mach-realview/board-pbx.h       | 106 -------
+ arch/arm/mach-realview/core.c            | 404 -------------------------
+ arch/arm/mach-realview/core.h            |  58 ----
+ arch/arm/mach-realview/hardware.h        |  40 ---
+ arch/arm/mach-realview/hotplug.h         |   1 +
+ arch/arm/mach-realview/irqs-eb.h         | 114 -------
+ arch/arm/mach-realview/irqs-pb1176.h     |  77 -----
+ arch/arm/mach-realview/irqs-pb11mp.h     |  97 ------
+ arch/arm/mach-realview/irqs-pba8.h       |  71 -----
+ arch/arm/mach-realview/irqs-pbx.h        |  87 ------
+ arch/arm/mach-realview/platform.h        | 247 ----------------
+ arch/arm/mach-realview/platsmp-dt.c      |   3 +-
+ arch/arm/mach-realview/platsmp.c         |  86 ------
+ arch/arm/mach-realview/realview_eb.c     | 492 -------------------------------
+ arch/arm/mach-realview/realview_pb1176.c | 395 -------------------------
+ arch/arm/mach-realview/realview_pb11mp.c | 385 ------------------------
+ arch/arm/mach-realview/realview_pba8.c   | 307 -------------------
+ arch/arm/mach-realview/realview_pbx.c    | 402 -------------------------
+ 25 files changed, 16 insertions(+), 3865 deletions(-)
+ delete mode 100644 arch/arm/mach-realview/board-eb.h
+ delete mode 100644 arch/arm/mach-realview/board-pb1176.h
+ delete mode 100644 arch/arm/mach-realview/board-pb11mp.h
+ delete mode 100644 arch/arm/mach-realview/board-pba8.h
+ delete mode 100644 arch/arm/mach-realview/board-pbx.h
+ delete mode 100644 arch/arm/mach-realview/core.c
+ delete mode 100644 arch/arm/mach-realview/core.h
+ delete mode 100644 arch/arm/mach-realview/hardware.h
+ create mode 100644 arch/arm/mach-realview/hotplug.h
+ delete mode 100644 arch/arm/mach-realview/irqs-eb.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pb1176.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pb11mp.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pba8.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pbx.h
+ delete mode 100644 arch/arm/mach-realview/platform.h
+ delete mode 100644 arch/arm/mach-realview/platsmp.c
+ delete mode 100644 arch/arm/mach-realview/realview_eb.c
+ delete mode 100644 arch/arm/mach-realview/realview_pb1176.c
+ delete mode 100644 arch/arm/mach-realview/realview_pb11mp.c
+ delete mode 100644 arch/arm/mach-realview/realview_pba8.c
+ delete mode 100644 arch/arm/mach-realview/realview_pbx.c
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/23dd89da/attachment-0001.sig>
+2.4.3
