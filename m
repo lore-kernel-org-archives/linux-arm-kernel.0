@@ -1,37 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 25 Feb 2016 14:23:12 +0100
-Subject: [PATCH v2] soc: dove: Make reset_control_ops const
-Message-ID: <1456406592-24733-1-git-send-email-p.zabel@pengutronix.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 25 Feb 2016 14:23:20 +0100
+Subject: [GIT PULL] ARM32: Xilinx Zynq DT changes for v4.6
+Message-ID: <56CF0048.7060601@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the pmu_reset_ops structure is never modified, we can make it const
-Since commit 203d4f347d86 ("reset: Make reset_control_ops const") marked
-the ops pointer in struct reset_controller_dev as const, the pmu_reset_ops
-structure, which is never modified, can be made const, too.
+Hi,
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
----
-The prerequisite commit is currently sitting in the arm-soc/for-next branch.
-Changes since v1:
- - Improved commit message.
----
- drivers/soc/dove/pmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+please pull these two patches to your tree.
 
-diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
-index 039374e..95d77ec 100644
---- a/drivers/soc/dove/pmu.c
-+++ b/drivers/soc/dove/pmu.c
-@@ -87,7 +87,7 @@ static int pmu_reset_deassert(struct reset_controller_dev *rc, unsigned long id)
- 	return 0;
- }
- 
--static struct reset_control_ops pmu_reset_ops = {
-+static const struct reset_control_ops pmu_reset_ops = {
- 	.reset = pmu_reset_reset,
- 	.assert = pmu_reset_assert,
- 	.deassert = pmu_reset_deassert,
+Thanks,
+Michal
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.6
+
+for you to fetch changes up to 07bf429da13dfa3f0b40dce4ef2a1437544a6096:
+
+  ARM: zynq: Use earlycon instead of earlyprintk (2016-02-25 14:01:34 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq dt patches for v4.5
+
+- Add usb phy for Zybo
+- Use earlycon instead of earlyprintk
+
+----------------------------------------------------------------
+Michal Simek (1):
+      ARM: zynq: Use earlycon instead of earlyprintk
+
+Nathan Rossi (1):
+      ARM: dts: zynq: Enable USB and USB PHY for ZYBO
+
+ arch/arm/boot/dts/zynq-parallella.dts |  2 +-
+ arch/arm/boot/dts/zynq-zc702.dts      |  2 +-
+ arch/arm/boot/dts/zynq-zc706.dts      |  2 +-
+ arch/arm/boot/dts/zynq-zed.dts        |  2 +-
+ arch/arm/boot/dts/zynq-zybo.dts       | 13 ++++++++++++-
+ 5 files changed, 16 insertions(+), 5 deletions(-)
+
+
 -- 
-2.7.0
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/db667228/attachment.sig>
