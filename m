@@ -1,85 +1,85 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Thu, 25 Feb 2016 09:08:18 +0200
-Subject: [PATCH 0/2] usb: dwc2: Remove host and gadget only code from core
-In-Reply-To: <CAD=FV=WsBM-50gnDWq7AsXnSQPOu3ELabtbDRYjejAbN4h8b1Q@mail.gmail.com>
-References: <cover.1456213319.git.johnyoun@synopsys.com>
- <56CC26ED.50004@synopsys.com> <87mvqqjkfj.fsf@ti.com>
- <CAD=FV=WsBM-50gnDWq7AsXnSQPOu3ELabtbDRYjejAbN4h8b1Q@mail.gmail.com>
-Message-ID: <87r3g1i7x9.fsf@ti.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Thu, 25 Feb 2016 15:12:33 +0800
+Subject: [PATCH] ASoC: mediatek: Add I03/I04 widgets and corresponding routes
+Message-ID: <1456384353-13041-1-git-send-email-pc.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Koro Chen <koro.chen@mediatek.com>
 
-Hi,
+Add these widgets to allow another path from I2S input.
 
-Doug Anderson <dianders@chromium.org> writes:
->> John Youn <John.Youn@synopsys.com> writes:
->>> On 2/23/2016 12:35 AM, John Youn wrote:
->>>> This series moves the host/gadget-specific code from core.c to hcd.c
->>>> and gadget.c so that they will be compiled only when their respective
->>>> configurations are selected, or in DRD.
->>>>
->>>> This is mostly just a straight move of the code. I have also added
->>>> some comments to group related functions together.
->>>>
->>>> Compiled and tested in all three modes.
->>>>
->>>> This should also solve the issue reported here:
->>>> http://marc.info/?l=linux-usb&m=145591813410106&w=2
->>>>
->>>> Although I wasn't able to test it... couldn't figure out how to
->>>> disable CONFIG_USB and enable DWC2 in gadget mode.
->>>>
->>>> Felipe,
->>>>
->>>> This should be applied after Doug's series on your testing/next
->>>> branch.
->>>>
->>>>
->>>
->>> Hi Felipe,
->>>
->>> Patch 2/2 is triggering our corporate mail filters however I try to
->>> send it. I'll look into this with IT tomorrow, maybe have to send it
->>> from another account.
->>
->> okay, I don't have patch 2/2. 1/2 is now in testing/next
->
-> Perhaps John's solution for working around his company's mail filters
-> somehow sent it to your SPAM folder?  I saw his repost of v1 at on
-> patchwork.  GMail put them in my inbox but marked them slightly
-> different, saying they were from "John Youn via messagingengine.com"
->
-> 8396481 New          [RESEND,1/2] usb: dwc2: Move register save and
-> restore functions
-> 8396491 New          [RESEND,2/2] usb: dwc2: Move host-specific core
-> functions into hcd.c
->
-> ...I reviewed both 1/2 and 2/2.  For 1/2 I added my reviewed-by /
-> tested-by.  For 2/2 I requested some nitfixes.  John posted v2 at:
->
-> 8398461 New          [v2,1/2] usb: dwc2: Move register save and
-> restore functions
-> 8398471 New          [v2,2/2] usb: dwc2: Move host-specific core
-> functions into hcd.c
->
-> v2 of 2/2 looks good to me.  All patches can be found at
-> <https://patchwork.kernel.org/patch/<PATCHNUM>/>, like:
->
-> https://patchwork.kernel.org/patch/8398461/
-> https://patchwork.kernel.org/patch/8398471/
+Change-Id: Ib6804bbbde388830d8359245fe13bbb0f2bb36ba
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+Signed-off-by: PC Liao <pc.liao@mediatek.com>
+---
+ sound/soc/mediatek/mtk-afe-pcm.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-thanks, after I replied here I refreshed my inbox and there they were
-:-) they're both in my testing/next.
-
-cheers
-
+diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+index 689c51f..5de878f 100644
+--- a/sound/soc/mediatek/mtk-afe-pcm.c
++++ b/sound/soc/mediatek/mtk-afe-pcm.c
+@@ -40,6 +40,7 @@
+ 
+ #define AFE_CONN1		0x0024
+ #define AFE_CONN2		0x0028
++#define AFE_CONN3		0x002c
+ #define AFE_CONN7		0x0460
+ #define AFE_CONN8		0x0464
+ #define AFE_HDMI_CONN0		0x0390
+@@ -63,6 +64,7 @@
+ #define AFE_HDMI_OUT_CUR	0x0378
+ #define AFE_HDMI_OUT_END	0x037c
+ 
++#define AFE_ADDA_TOP_CON0	0x0120
+ #define AFE_ADDA2_TOP_CON0	0x0600
+ 
+ #define AFE_HDMI_OUT_CON0	0x0370
+@@ -259,6 +261,7 @@ static int mtk_afe_set_i2s(struct mtk_afe *afe, unsigned int rate)
+ 		return -EINVAL;
+ 
+ 	/* from external ADC */
++	regmap_update_bits(afe->regmap, AFE_ADDA_TOP_CON0, 0x1, 0x1);
+ 	regmap_update_bits(afe->regmap, AFE_ADDA2_TOP_CON0, 0x1, 0x1);
+ 
+ 	/* set input */
+@@ -903,15 +906,19 @@ static const struct snd_kcontrol_new mtk_afe_o04_mix[] = {
+ };
+ 
+ static const struct snd_kcontrol_new mtk_afe_o09_mix[] = {
++	SOC_DAPM_SINGLE_AUTODISABLE("I03 Switch", AFE_CONN3, 0, 1, 0),
+ 	SOC_DAPM_SINGLE_AUTODISABLE("I17 Switch", AFE_CONN7, 30, 1, 0),
+ };
+ 
+ static const struct snd_kcontrol_new mtk_afe_o10_mix[] = {
++	SOC_DAPM_SINGLE_AUTODISABLE("I04 Switch", AFE_CONN3, 3, 1, 0),
+ 	SOC_DAPM_SINGLE_AUTODISABLE("I18 Switch", AFE_CONN8, 0, 1, 0),
+ };
+ 
+ static const struct snd_soc_dapm_widget mtk_afe_pcm_widgets[] = {
+ 	/* inter-connections */
++	SND_SOC_DAPM_MIXER("I03", SND_SOC_NOPM, 0, 0, NULL, 0),
++	SND_SOC_DAPM_MIXER("I04", SND_SOC_NOPM, 0, 0, NULL, 0),
+ 	SND_SOC_DAPM_MIXER("I05", SND_SOC_NOPM, 0, 0, NULL, 0),
+ 	SND_SOC_DAPM_MIXER("I06", SND_SOC_NOPM, 0, 0, NULL, 0),
+ 	SND_SOC_DAPM_MIXER("I17", SND_SOC_NOPM, 0, 0, NULL, 0),
+@@ -934,12 +941,16 @@ static const struct snd_soc_dapm_route mtk_afe_pcm_routes[] = {
+ 	{"I2S Playback", NULL, "O04"},
+ 	{"VUL", NULL, "O09"},
+ 	{"VUL", NULL, "O10"},
++	{"I03", NULL, "I2S Capture"},
++	{"I04", NULL, "I2S Capture"},
+ 	{"I17", NULL, "I2S Capture"},
+ 	{"I18", NULL, "I2S Capture"},
+ 	{ "O03", "I05 Switch", "I05" },
+ 	{ "O04", "I06 Switch", "I06" },
+ 	{ "O09", "I17 Switch", "I17" },
++	{ "O09", "I03 Switch", "I03" },
+ 	{ "O10", "I18 Switch", "I18" },
++	{ "O10", "I04 Switch", "I04" },
+ };
+ 
+ static const struct snd_soc_dapm_route mtk_afe_hdmi_routes[] = {
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/c7f15a0d/attachment.sig>
+1.7.9.5
