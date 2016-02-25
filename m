@@ -1,156 +1,39 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 25 Feb 2016 16:36:36 -0600
-Subject: [PATCH v3 5/5] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <1456439796-28546-1-git-send-email-fcooper@ti.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
-Message-ID: <1456439796-28546-6-git-send-email-fcooper@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 26 Feb 2016 06:54:29 +0800
+Subject: [PATCH v2] ARM: dts: sun8i: Add leds and switch on Orangepi Plus
+ boards
+In-Reply-To: <20160225204234.GA31610@box2.japko.eu>
+Message-ID: <201602260632.mOdfvVuL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vignesh R <vigneshr@ti.com>
+Hi Krzysztof,
 
-Add PWMSS device tree nodes for DRA7 SoC family and add documentation
-for dt bindings.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.5-rc5 next-20160225]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
+url:    https://github.com/0day-ci/linux/commits/Krzysztof-Adamski/ARM-dts-sun8i-Add-leds-and-switch-on-Orangepi-Plus-boards/20160226-044640
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: arm-sunxi_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts:104.1-7 Label or path r_pio not found
+   FATAL ERROR: Syntax error parsing input tree
+
 ---
-Version 3 changes:
-None
-
- .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  8 +++
- .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 17 +++++-
- arch/arm/boot/dts/dra7.dtsi                        | 64 ++++++++++++++++++++++
- 3 files changed, 88 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-index 9c100b2..25d91ae 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible: Must be "ti,<soc>-ehrpwm".
-   for am33xx - compatible = "ti,am33xx-ehrpwm";
-   for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+  for dra7xx - compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
- - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
-   the cells format. The only third cell flag supported by this binding is
-   PWM_POLARITY_INVERTED.
-@@ -27,3 +28,10 @@ ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
- 	#pwm-cells = <3>;
- 	reg = <0x300000 0x2000>;
- };
-+
-+ehrpwm0: ehrpwm at 0 { /* EHRPWM on dra7xx */
-+	compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
-+	#pwm-cells = <3>;
-+	reg = <0x48440200 0x80>;
-+	ti,hwmods = "ehrpwm0";
-+};
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
-index f7eae77..9270ce6 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
-@@ -1,7 +1,9 @@
- TI SOC based PWM Subsystem
- 
- Required properties:
--- compatible: Must be "ti,am33xx-pwmss";
-+- compatible: Must be "ti,<soc>-pwmss".
-+  for am33xx - compatible = "ti,am33xx-pwmss"
-+  for dra7xx - compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss"
- - reg: physical base address and size of the registers map.
- - address-cells: Specify the number of u32 entries needed in child nodes.
- 		  Should set to 1.
-@@ -29,3 +31,16 @@ pwmss0: pwmss at 48300000 {
- 
- 	/* child nodes go here */
- };
-+
-+epwmss0: epwmss at 4843e000 { /* On DRA7xx */
-+	compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
-+	reg = <0x4843e000 0x30>;
-+	ti,hwmods = "epwmss0";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges = <0x4843e100  0x4843e100 0x80	/* ECAP */
-+		  0x4843e180  0x4843e180 0x80	/* EQEP */
-+		  0x4843e200  0x4843e200 0x80>; /* EHRPWM */
-+
-+	/* child nodes go here */
-+};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index c4d9175..9143db0 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1597,6 +1597,70 @@
- 				clock-names = "fck", "sys_clk";
- 			};
- 		};
-+
-+		epwmss0: epwmss at 4843e000 {
-+			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
-+			reg = <0x4843e000 0x30>;
-+			ti,hwmods = "epwmss0";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status = "disabled";
-+			ranges = <0x4843e100  0x4843e100 0x80  /* ECAP */
-+				  0x4843e180  0x4843e180 0x80  /* EQEP */
-+				  0x4843e200  0x4843e200 0x80>;/* EHRPWM */
-+
-+			ehrpwm0: ehrpwm at 4843e200 {
-+				compatible = "ti,dra7xx-ehrpwm",
-+					     "ti,am33xx-ehrpwm";
-+				#pwm-cells = <3>;
-+				reg = <0x4843e200 0x80>;
-+				ti,hwmods = "ehrpwm0";
-+				status = "disabled";
-+			};
-+		};
-+
-+		epwmss1: epwmss at 48440000 {
-+			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
-+			reg = <0x48440000 0x30>;
-+			ti,hwmods = "epwmss1";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status = "disabled";
-+			ranges = <0x48440100  0x48440100  0x80   /* ECAP */
-+				  0x48440180  0x48440180  0x80   /* EQEP */
-+				  0x48440200  0x48440200  0x80>; /* EHRPWM */
-+
-+			ehrpwm1: ehrpwm at 48440200 {
-+				compatible = "ti,dra7xx-ehrpwm",
-+					     "ti,am33xx-ehrpwm";
-+				#pwm-cells = <3>;
-+				reg = <0x48440200 0x80>;
-+				ti,hwmods = "ehrpwm1";
-+				status = "disabled";
-+			};
-+		};
-+
-+		epwmss2: epwmss at 48442000 {
-+			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
-+			reg = <0x48442000 0x30>;
-+			ti,hwmods = "epwmss2";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			status = "disabled";
-+
-+			ranges = <0x48442100  0x48442100  0x80   /* ECAP */
-+				  0x48442180  0x48442180  0x80   /* EQEP */
-+				  0x48442200  0x48442200  0x80>; /* EHRPWM */
-+
-+			ehrpwm2: ehrpwm at 48442200 {
-+				compatible = "ti,dra7xx-ehrpwm",
-+					     "ti,am33xx-ehrpwm";
-+				#pwm-cells = <3>;
-+				reg = <0x48442200 0x80>;
-+				ti,hwmods = "ehrpwm2";
-+				status = "disabled";
-+			};
-+		};
- 	};
- 
- 	thermal_zones: thermal-zones {
--- 
-2.7.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 17442 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/de271787/attachment-0001.obj>
