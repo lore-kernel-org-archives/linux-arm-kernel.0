@@ -1,41 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 14:15:11 +0100
-Subject: [PATCH 4/4] ARM: realview: cut board options from defconfig
-In-Reply-To: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
-References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1456406111-18579-5-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 25 Feb 2016 14:18:44 +0100
+Subject: [PATCH] ARM: sa1100: make sa1100_register_uart_fns a function
+In-Reply-To: <1456238094-778916-1-git-send-email-arnd@arndb.de>
+References: <1456238094-778916-1-git-send-email-arnd@arndb.de>
+Message-ID: <CACRpkdbJpYD2Ke-f2QP+-fy_LcxhiV99OEH_D=CMtSvedEveVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This kills off the now unused board configuration symbols for
-the different RealView boards from the RealView defconfig.
+On Tue, Feb 23, 2016 at 3:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/realview_defconfig | 11 -----------
- 1 file changed, 11 deletions(-)
+> Calling sa1100_register_uart_fns() leaves the port structure
+> unused when CONFIG_SERIAL_SA1100 is disabled, and we get a
+> compiler warning about that:
+>
+> arch/arm/mach-sa1100/badge4.c:317:31: warning: 'badge4_port_fns' defined but not used [-Wunused-variable]
+>  static struct sa1100_port_fns badge4_port_fns __initdata = {
+>
+> This turns the two empty macros into empty inline functions,
+> which has the same effect, but lets the compiler know that the
+> variables are intentionally unused.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
-index 9e77dc7b828f..7824b8bf9894 100644
---- a/arch/arm/configs/realview_defconfig
-+++ b/arch/arm/configs/realview_defconfig
-@@ -11,17 +11,6 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_MULTI_V6=y
- CONFIG_ARCH_REALVIEW=y
--CONFIG_REALVIEW_DT=y
--CONFIG_MACH_REALVIEW_EB=y
--CONFIG_REALVIEW_EB_ARM1136=y
--CONFIG_REALVIEW_EB_ARM1176=y
--CONFIG_REALVIEW_EB_A9MP=y
--CONFIG_REALVIEW_EB_ARM11MP=y
--CONFIG_REALVIEW_EB_ARM11MP_REVB=y
--CONFIG_MACH_REALVIEW_PB11MP=y
--CONFIG_MACH_REALVIEW_PB1176=y
--CONFIG_MACH_REALVIEW_PBA8=y
--CONFIG_MACH_REALVIEW_PBX=y
- CONFIG_SMP=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
--- 
-2.4.3
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+>  include/linux/platform_data/sa11x0-serial.h | 8 ++++++--
+
+It looks like you should send this to Greg?
+
+Yours,
+Linus Walleij
