@@ -1,73 +1,41 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu, 25 Feb 2016 09:14:34 -0500
-Subject: [GIT PULL] NXP LPC32xx Platform Updates for v4.6 #1
-In-Reply-To: <20160224213633.GF10126@localhost>
-References: <56BBE6E6.4080802@mleia.com>  <20160224213633.GF10126@localhost>
-Message-ID: <1456409674.25197.9.camel@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Feb 2016 15:16:46 +0100
+Subject: [PATCH v6] Fix sun7i pin assignment for IRQ's
+In-Reply-To: <20160225005412.GB4736@lukather>
+References: <1456161251-2303-1-git-send-email-henry@nitronetworks.nl>
+ <20160225005412.GB4736@lukather>
+Message-ID: <CACRpkdYmf8-ZPV5q9H3cdZtQDUkbx=bcrVg9a8M3zEAifXxF9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Thu, Feb 25, 2016 at 1:54 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+>
+> Usually, the patch title should be prefixed by the subsystem it
+> applies to so that maintainer and reviewers can spot it more
+> easily. In this case, it would be something like
+>
+> pinctrl: sunxi: Fix sun7i pin assignment for IRQ's
+>
+> On Mon, Feb 22, 2016 at 06:14:07PM +0100, Henry Paulissen wrote:
+>> After testing IRQ pins we found some bugs in the pinctrl declaration.
+>> Both PI* and PC* pins didn't work. PI* pins seemed to be connected
+>> to the wrong mux and PC* pins waren't working at all.
+>>
+>> Please note that the A20 soc manual is contradicting between version
+>> and even within the same document for both the PI and PC pins.
+>
+> Which sections are in contradiction?
+>
+>> Patch is based on testing with the hardware itself.
+>
+> How did you test it? Using the sysfs API, or did you have any hardware
+> connected to it?
 
-On Wed, 2016-02-24 at 13:36 -0800, Olof Johansson wrote:
-> Hi!
-> 
-> On Thu, Feb 11, 2016 at 03:41:58AM +0200, Vladimir Zapolskiy wrote:
-> > Hi Arnd, Olof, Kevin,
-> > 
-> > please consider to include NXP LPC32xx platfrom updates (#1) for v4.6.
-> > 
-> > The main change is a switchover to a common clock framework driver
-> > for LPC32xx, this also allows to reuse a shared LPC32xx clockevent
-> > driver, and hence remove legacy clock and timer drivers from
-> > arch/arm/mach-lpc32xx.
-> > 
-> > I'm adding an official LPC32xx maintainer Roland to Cc, however
-> > he seems to be unresponsive for a quite long time (since 2014).
-> > 
-> > ----------------------------------------------------------------
-> > 
-> > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-> > 
-> >   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://github.com/vzapolskiy/linux.git lpc32xx/soc
-> > 
-> > for you to fetch changes up to 0ac1a101f5dd28c3894be3c0230ee7ea2e05e8aa:
-> > 
-> >   arm: lpc32xx: remove direct control of GPIOs from shared mach file (2016-02-11 02:27:04 +0200)
-> 
-> In the future, please use the decription you wrote above as part of a tag
-> description, and sign your tags. For extra credit, get other kernel developers
-> to sign your key (easiest done at conferences, but maybe there are other
-> developers in your local area that you can meet up with).
-> 
-> It indeed seems like Roland has gone silent lately. This happens from time to
-> time, but it's always good to know if it's intentional (and if he's coming
-> back) or not. Meanwhile, we can merge patches after review but I don't have
-> hardware to test on so I'd have to rely on you getting that right. If we get
-> regression reports we'll have to re-evaluate the approach. :)
-> 
-I am running this patchset and the LPC32xx DT update patchset on a 
-custom LPC32xx board; I did have any problem while running 
-those changes.
+I'm taking this patch out of my tree now following Maxime's comments.
 
-I am trying to run the major changes for the LPC32xx platform before 
-the pull request take place; see the 2 link below:
-http://permalink.gmane.org/gmane.linux.drivers.devicetree/155413
-http://permalink.gmane.org/gmane.linux.drivers.devicetree/155560
+I'm a bit annoyed that it is iterating too quickly as well, I will
+wait and see for a while.
 
-
-Sylvain Lemieux
-
-> Roland, any chance we can get a word from you on this? Thanks!
-> 
-> 
-> -Olof
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yours,
+Linus Walleij
