@@ -1,26 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 25 Feb 2016 13:26:59 +0900
-Subject: [PATCH v2 0/2] ARM: EXYNOS: Trivial cleanup samsung mach files
-In-Reply-To: <1456373400-10633-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1456373400-10633-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <56CE8293.2050901@samsung.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 25 Feb 2016 10:17:32 +0530
+Subject: [PATCH] ARM: dts: dra7: Support QSPI MODE-0 operation at 64MHz
+Message-ID: <1456375652-14071-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.02.2016 13:09, Pankaj Dubey wrote:
-> This patch series cleans up mach-exynos, mach-s3c24xx, plat-samsung include
-> header files with resepct to unused header file inclusion, removes redundant
-> register offset definition. Also corrects comment section at few places.
-> 
-> Changes since v1:
->  - Keeping back inclusion of header "platform_device.h" in exynos.c.
->  - Removing all unused instances of S3C_UART_OFFSET from mach-exynos,
->    mach-s3c24xx, and plat-samsung, in single patch.
->  - Patch 1/3 is already merged in maintainer tree so not included in v2. 
+According to Data Manual(SPRS915P) of AM57x, TI QSPI controller on
+DRA74(rev 1.1+) can support up to 64MHz in MODE-0, whereas MODE-3 is
+limited to 48MHz. Hence, switch to MODE-0 for better throughput.
 
-Thanks for the changes. I appreciate that!
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Applied both patches.
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index cfc24e52244e..15f10bdc8c31 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -653,15 +653,13 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&qspi1_pins>;
+ 
+-	spi-max-frequency = <48000000>;
++	spi-max-frequency = <64000000>;
+ 	m25p80 at 0 {
+ 		compatible = "s25fl256s1";
+-		spi-max-frequency = <48000000>;
++		spi-max-frequency = <64000000>;
+ 		reg = <0>;
+ 		spi-tx-bus-width = <1>;
+ 		spi-rx-bus-width = <4>;
+-		spi-cpol;
+-		spi-cpha;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 
+-- 
+2.7.1
