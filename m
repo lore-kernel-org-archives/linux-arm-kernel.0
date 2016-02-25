@@ -1,23 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 10:27:55 +0100
-Subject: [PATCH] pinctrl: sunxi: Add missing H3 R_PIO binding documentation
-In-Reply-To: <20160218194931.GA16393@box2.japko.eu>
-References: <CACRpkdbfNeh7_=3ReQtJc7OxkkQEn+BUhZ0O0SKnFsRD=WZiUQ@mail.gmail.com>
- <20160218194931.GA16393@box2.japko.eu>
-Message-ID: <CACRpkdaOpjhqUBSvYrCcZQgtTtFs79FwvKO5f4z07CCzNA44PA@mail.gmail.com>
+Date: Thu, 25 Feb 2016 10:31:29 +0100
+Subject: [PATCH v5 3/4] ARM: dts: sun8i-h3: Add R_PIO controller node to
+ the dtsi
+In-Reply-To: <1456146208-13890-4-git-send-email-k@japko.eu>
+References: <1456146208-13890-1-git-send-email-k@japko.eu>
+ <1456146208-13890-4-git-send-email-k@japko.eu>
+Message-ID: <CACRpkdaoNwmf93ut1Nk83N5j+rGjmUX5TTrKjWyfhEMUwXyeJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 8:49 PM, Krzysztof Adamski <k@japko.eu> wrote:
+On Mon, Feb 22, 2016 at 2:03 PM, Krzysztof Adamski <k@japko.eu> wrote:
 
-> allwinner,sun8i-h3-r-pinctrl was added by
-> commit ba83a11104ae ("pinctrl: sunxi: Add H3 R_PIO controller support")
-> but the patch was missing proper binding documentation. This patch fixes
-> this issue.
+> Add the corresponding device node for R_PIO on H3 to the dtsi. Support
+> for the controller was added in earlier commit.
 >
 > Signed-off-by: Krzysztof Adamski <k@japko.eu>
 
-Patch applied with Chen-Yu's ACK.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Please funnel this through the ARM SoC tree.
 
 Yours,
 Linus Walleij
