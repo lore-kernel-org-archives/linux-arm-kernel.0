@@ -1,32 +1,45 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 25 Feb 2016 16:50:24 +0200
-Subject: [PATCH 08/11] ARM: DTS: am57xx-beagle-x15: Enable AFIFO use for McASP3
+Date: Thu, 25 Feb 2016 16:50:23 +0200
+Subject: [PATCH 07/11] ARM: DTS: am57xx-beagle-x15: Move clkout2 source
+ selection to codec node
 In-Reply-To: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1456411827-23962-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1456411827-23962-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we switched to use eDMA we can now safely enable the FIFO in McASP.
-This will reduce the chance of McASP level under/overflow.
+The assigned-clock* needs to be in the root of the device's node. If it is
+in the sub-node the CCF will ignore it.
+Since the clkout2 is used by the codec as MCLK, move the clock parent
+selection to that node.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 86351372174f..7e1d11177732 100644
+index b25d68496c7d..86351372174f 100644
 --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
 +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -813,6 +813,8 @@
- 	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
- 		1 2 0 0
- 	>;
-+	tx-num-evt = <32>;
-+	rx-num-evt = <32>;
- };
+@@ -173,8 +173,6 @@
  
- &mailbox5 {
+ 		sound0_master: simple-audio-card,codec {
+ 			sound-dai = <&tlv320aic3104>;
+-			assigned-clocks = <&clkoutmux2_clk_mux>;
+-			assigned-clock-parents = <&sys_clk2_dclk_div>;
+ 			clocks = <&clkout2_clk>;
+ 		};
+ 	};
+@@ -584,6 +582,9 @@
+ 		pinctrl-names = "default", "sleep";
+ 		pinctrl-0 = <&clkout2_pins_default>;
+ 		pinctrl-1 = <&clkout2_pins_sleep>;
++		assigned-clocks = <&clkoutmux2_clk_mux>;
++		assigned-clock-parents = <&sys_clk2_dclk_div>;
++
+ 		status = "okay";
+ 		adc-settle-ms = <40>;
+ 
 -- 
 2.7.1
