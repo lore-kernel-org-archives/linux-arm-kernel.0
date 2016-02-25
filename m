@@ -1,19 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 10:26:34 +0100
-Subject: [PATCH v4] Fix sun7i pin assignment for IRQ's
-In-Reply-To: <1456096638-21961-1-git-send-email-henry@nitronetworks.nl>
-References: <1456096638-21961-1-git-send-email-henry@nitronetworks.nl>
-Message-ID: <CACRpkdbh8Svn4Y8XfoXVBzTuePufoZGaRVe8AALT31uK-aawWQ@mail.gmail.com>
+Date: Thu, 25 Feb 2016 10:27:55 +0100
+Subject: [PATCH] pinctrl: sunxi: Add missing H3 R_PIO binding documentation
+In-Reply-To: <20160218194931.GA16393@box2.japko.eu>
+References: <CACRpkdbfNeh7_=3ReQtJc7OxkkQEn+BUhZ0O0SKnFsRD=WZiUQ@mail.gmail.com>
+ <20160218194931.GA16393@box2.japko.eu>
+Message-ID: <CACRpkdaOpjhqUBSvYrCcZQgtTtFs79FwvKO5f4z07CCzNA44PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 12:17 AM, Henry Paulissen <draakje197@gmail.com> wrote:
+On Thu, Feb 18, 2016 at 8:49 PM, Krzysztof Adamski <k@japko.eu> wrote:
 
-> After testing IRQ pins we found some bugs in the pinctrl declaration.
+> allwinner,sun8i-h3-r-pinctrl was added by
+> commit ba83a11104ae ("pinctrl: sunxi: Add H3 R_PIO controller support")
+> but the patch was missing proper binding documentation. This patch fixes
+> this issue.
 >
-> Signed-off-by: Henry Paulissen <henry@nitronetworks.nl>
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
 
-This v4 patch applied with Chen-Yu's ACK.
+Patch applied with Chen-Yu's ACK.
 
 Yours,
 Linus Walleij
