@@ -1,21 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 17:21:21 -0800
-Subject: [GIT PULL] Reset controller changes for v4.6
-In-Reply-To: <1455874787.13163.7.camel@pengutronix.de>
-References: <1455874787.13163.7.camel@pengutronix.de>
-Message-ID: <20160225012121.GF29055@localhost>
+Date: Wed, 24 Feb 2016 17:24:18 -0800
+Subject: [GIT PULL] SoCFPGA defconfig for v4.6
+In-Reply-To: <1455876126-26635-1-git-send-email-dinguyen@kernel.org>
+References: <1455876126-26635-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <20160225012418.GG29055@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 10:39:47AM +0100, Philipp Zabel wrote:
-> Dear arm-soc maintainers,
+On Fri, Feb 19, 2016 at 04:02:06AM -0600, Dinh Nguyen wrote:
+> Hi Arnd, Kevin, and Olof:
 > 
-> this tag adds reset support for Pistachio, makes
-> struct reset_control_ops const, and moves the DT
-> cell size check into the core.
+> Please consider pulling this defconfig update for v4.6.
 > 
-> best regards
-> Philipp
+> Thanks,
+> Dinh
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
@@ -23,19 +21,22 @@ On Fri, Feb 19, 2016 at 10:39:47AM +0100, Philipp Zabel wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.6
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_defconfig_for_v4.6
 > 
-> for you to fetch changes up to f673ed4d5fdc123b1552525de30741cd8dfde53f:
+> for you to fetch changes up to 31d74b2bf0c921276a1e987ca5371e2f79a783c2:
 > 
->   reset: sti: Make reset_control_ops const (2016-02-10 10:53:38 +0100)
+>   ARM: socfpga_defconfig: enable support for initramfs/initrd support (2016-02-19 03:48:20 -0600)
 > 
 > ----------------------------------------------------------------
-> Reset controller changes for v4.6
+> SoCFPGA defconfig update for v4.6
+> -Enable initrd/initramfs support
 > 
-> - add support for the imgtec Pistachio SoC reset controller
-> - make struct reset_control_ops const
-> - move DT cell size check into the core to avoid code duplication
->   in the drivers
+> ----------------------------------------------------------------
+> Dinh Nguyen (1):
+>       ARM: socfpga_defconfig: enable support for initramfs/initrd support
+> 
+>  arch/arm/configs/socfpga_defconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Merged, thanks!
 
