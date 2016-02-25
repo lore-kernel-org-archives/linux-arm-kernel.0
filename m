@@ -1,89 +1,56 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 25 Feb 2016 10:56:28 -0600
-Subject: [PATCH v2] dts: add specific compatible type for Terasic
- DE0-NANO-SoC Board
-In-Reply-To: <20160225103820.GB747@pengutronix.de>
-References: <8416439.76b9YNhpgR@dabox>
- <alpine.DEB.2.02.1602241048100.3815@linux-builds1> <2186741.ZYdHdfu2ug@dabox>
- <20160225103820.GB747@pengutronix.de>
-Message-ID: <56CF323C.90202@opensource.altera.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Thu, 25 Feb 2016 18:08:19 +0100
+Subject: [PATCH v2] tty/serial: at91: restore dynamic driver binding
+In-Reply-To: <20160225160929.GA20373@kroah.com>
+References: <1456392221-30401-1-git-send-email-romain.izard.pro@gmail.com>
+ <56CED0E3.5070308@atmel.com> <20160225160929.GA20373@kroah.com>
+Message-ID: <CAGkQfmOYEiXbQbe14iybu_4BFQYtoAj4QWoxdhPvUJOCOm6sbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2016 04:38 AM, Steffen Trumtrar wrote:
-> Hi Tim!
-> 
-> On Thu, Feb 25, 2016 at 11:05:05AM +0100, Tim Sander wrote:
->> From: Tim Sander <tim@krieglstein.org>
+2016-02-25 17:09 GMT+01:00 Greg Kroah-Hartman
+<gregkh@linuxfoundation.org>:
+> On Thu, Feb 25, 2016 at 11:01:07AM +0100, Nicolas Ferre wrote:
+>> Le 25/02/2016 10:23, Romain Izard a ?crit :
+>> > In commit c39dfebc7798956fd2140ae6321786ff35da30c3, the modular
+>> > support code for atmel_serial was removed, as the driver cannot be
+>> > built as a module. Because no use case was proposed, the dynamic
+>> > driver binding support was removed as well.
+>> >
+>> > The atmel_serial driver can manage up to 7 serial controllers,
+>> > which are multiplexed with other functions. For example, in the
+>> > Atmel SAMA5D2, the Flexcom controllers can work as USART, SPI or
+>> > I2C controllers, and on all Atmel devices serial lines can be
+>> > reconfigured as GPIOs.
+>> >
+>> > My use case uses GPIOs to transfer a firmware update using a custom
+>> > protocol on the lines used as a serial port during the normal life
+>> > of the device. If it is not possible to unbind the atmel_serial
+>> > driver, the GPIO lines remain reserved and prevent this case from
+>> > working.
+>> >
+>> > This patch reinstates the atmel_serial_remove function, and fixes
+>> > it as it failed to clear the "clk" field on removal, triggering an
+>> > oops when a device was bound again after being unbound.
+>> >
+>> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 >>
->> Add a more specific compatible string:"terasic,de0-nano-soc" for respective board.
->> Background: when checking for bootspec entries, some board specific fixups are
->> not apropriate for board of the same platform ("altr,socfpga-cyclone5").
->> The same aproach is taken with the EBV-Socrates board.
->>
->> Signed-off-by: Tim Sander <tim@krieglstein.org>
->> ---
->>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts     | 2 +-
->>  2 files changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 72e2c5a..d1f7803 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -230,6 +230,7 @@ synology	Synology, Inc.
->>  tbs	TBS Technologies
->>  tcl	Toby Churchill Ltd.
->>  technologic	Technologic Systems
->> +terasic	Terasic Inc.
->>  thine	THine Electronics, Inc.
->>  ti	Texas Instruments
->>  tlm	Trusted Logic Mobility
-> 
-> You should IMHO split this up in two patches.
-> First patch: add terasic
-> 
+>> Even if you didn't follow my advice for not including unneeded
+>> changes in of the last patch chunk, there's no use delaying the patch
+>> just for this. So, here is my:
+>
+> Yes there is, I'm not going to take this, Romain please fix it
+> properly.
 
-That's right. That patch will go through the DTS maintainer's tree.
+Are we really arguing about the alignement of of_match_table in the
+platform_driver initializer?
 
->> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
->> index afea364..704aa9d 100644
->> --- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
->> +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
->> @@ -18,7 +18,7 @@
->>  
->>  / {
->>  	model = "Terasic DE-0(Atlas)";
->> -	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
->> +	compatible = "terasic,de0-nano-soc","altr,socfpga-cyclone5", "altr,socfpga";
-> 
+Among other things, Paul's patch changed the alignment to match the
+width of the "suppress_bind_attrs" member. As I simply used 'git revert
+-p' to revert the parts of the patch that bothered me, the alignment
+returned to what it was before.
 
-So perhaps, "terasic,de0-sockit"?
+Or am I missing something else ?
 
-> Second patch: this.
-> 
-
-And I can take this one.
-
->>  
->>  	chosen {
->>  		bootargs = "earlyprintk";
-> 
-> The naming of this board still confuses me though.
-> It has 3 different names now:
-> 
-> 	- de0_sockit.dts
-> 	- Terasic DE-0(Atlas)
-> 	- de0-nano-soc
-> 
-> And according to Terasic DE0-Nano-SoC is the same as Atlas-SoC with a different software?!
-> So all three names are actually correct ?! Weird.
-> 
-
-I had a hard time understanding this myself. But from what I gather
-from[1], I just name the file de0_sockit.
-
-Dinh
-
-[1]
-http://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&CategoryNo=13&List=Simple#Category167
+-- 
+Romain Izard
