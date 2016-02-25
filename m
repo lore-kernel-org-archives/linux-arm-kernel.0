@@ -1,33 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Feb 2016 11:34:05 -0800
-Subject: [PATCH v5 3/4] ARM: dts: sun8i-h3: Add R_PIO controller node to
- the dtsi
-In-Reply-To: <1456146208-13890-4-git-send-email-k@japko.eu>
-References: <1456146208-13890-1-git-send-email-k@japko.eu>
- <1456146208-13890-4-git-send-email-k@japko.eu>
-Message-ID: <20160225193405.GN4736@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Feb 2016 20:35:31 +0100
+Subject: [PATCH 0/7] video: ARM CLCD: non-controversial parts
+In-Reply-To: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
+References: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbGDXTbenOY_bsiuGqS3oBP3CKyjsOJuMPStaMFi=u3hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 02:03:27PM +0100, Krzysztof Adamski wrote:
-> Add the corresponding device node for R_PIO on H3 to the dtsi. Support
-> for the controller was added in earlier commit.
-> 
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+On Tue, Feb 23, 2016 at 11:01 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
-Applied with Linus Ack.
+> This is a redux version of the previous patch set that strips out
+> any attempts to auto-switch or rewrite the device tree to match
+> the CLCD Versatile panel.
 
-Thanks!
-Maxime
+It seems patch #4 didn't make it out so I re-sent it.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/3715941b/attachment-0001.sig>
+Tell me if you want me to resend the entire v2 patch set.
+
+This stuff would be really neat to get in as a starter.
+
+Yours,
+Linus Walleij
