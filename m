@@ -1,154 +1,67 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Thu, 25 Feb 2016 14:35:16 +0530
-Subject: [RESPIN/PATCH] arm64: dts: Add tmu node for exynos7
-Message-ID: <1456391116-11553-1-git-send-email-alim.akhtar@samsung.com>
+From: lars.persson@axis.com (Lars Persson)
+Date: Thu, 25 Feb 2016 10:11:56 +0100
+Subject: [PATCH] ARM: dts: artpec: dual-license on artpec6.dtsi
+Message-ID: <1456391516-10561-1-git-send-email-larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds tmu node, related temprature sensor and triping
-point data for Atlas cpu core found on exynos7 SoC.
+Relaxed the license on the dtsi to permit use in other projects.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+Signed-off-by: Lars Persson <larper@axis.com>
 ---
-Change log:
-* no changes, just sending back from my email id.
+ arch/arm/boot/dts/artpec6.dtsi | 40 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
- .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +++++++++
- .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   55 ++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 +++++++
- 3 files changed, 100 insertions(+)
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
-new file mode 100644
-index 0000000..1d6dcf2
---- /dev/null
-+++ b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
-@@ -0,0 +1,25 @@
-+/*
-+ * Device tree sources for Exynos7 TMU sensor configuration
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+index f2a7e4a..3043016 100644
+--- a/arch/arm/boot/dts/artpec6.dtsi
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -1,9 +1,43 @@
+ /*
+  * Device Tree Source for the Axis ARTPEC-6 SoC
+  *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
 + *
-+ */
-+
-+#include <dt-bindings/thermal/thermal_exynos.h>
-+
-+#thermal-sensor-cells = <0>;
-+samsung,tmu_gain = <9>;
-+samsung,tmu_reference_voltage = <17>;
-+samsung,tmu_noise_cancel_mode = <4>;
-+samsung,tmu_efuse_value = <75>;
-+samsung,tmu_min_efuse_value = <15>;
-+samsung,tmu_max_efuse_value = <100>;
-+samsung,tmu_first_point_trim = <25>;
-+samsung,tmu_second_point_trim = <85>;
-+samsung,tmu_default_temp_offset = <50>;
-+samsung,tmu_cal_type = <TYPE_ONE_POINT_TRIMMING>;
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-new file mode 100644
-index 0000000..3970545
---- /dev/null
-+++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-@@ -0,0 +1,55 @@
-+/*
-+ * Device tree sources for default Exynos7 thermal zone definition
++ * Or, alternatively,
 + *
-+ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
 + *
-+ */
-+
-+trips {
-+	cpu-alert-0 {
-+		temperature = <75000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-1 {
-+		temperature = <80000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-2 {
-+		temperature = <85000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-3 {
-+		temperature = <90000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-4 {
-+		temperature = <95000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-5 {
-+		temperature = <100000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-6 {
-+		temperature = <110000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	/* HW Trip point */
-+	cpu-crit-0 {
-+		temperature = <115000>; /* millicelsius */
-+		hysteresis = <0>; /* millicelsius */
-+		type = "critical";
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index c662f98..fc9d130 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -27,6 +27,7 @@
- 		pinctrl6 = &pinctrl_fsys0;
- 		pinctrl7 = &pinctrl_fsys1;
- 		pinctrl8 = &pinctrl_bus1;
-+		tmuctrl0 = &tmuctrl_0;
- 	};
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
+  */
  
- 	cpus {
-@@ -538,6 +539,25 @@
- 			clocks = <&clock_peric0 PCLK_PWM>;
- 			clock-names = "timers";
- 		};
-+
-+		tmuctrl_0: tmu at 10060000 {
-+			compatible = "samsung,exynos7-tmu";
-+			reg = <0x10060000 0x200>;
-+			interrupts = <0 108 0>;
-+			clocks = <&clock_peris PCLK_TMU>,
-+				 <&clock_peris SCLK_TMU>;
-+			clock-names = "tmu_apbif", "tmu_sclk";
-+			#include "exynos7-tmu-sensor-conf.dtsi"
-+		};
-+
-+		thermal-zones {
-+			atlas_thermal: atlas-thermal {
-+				polling-delay-passive = <0>; /* milliseconds */
-+				polling-delay = <0>; /* milliseconds */
-+				thermal-sensors = <&tmuctrl_0>;
-+				#include "exynos7-trip-points.dtsi"
-+			};
-+		};
- 	};
- };
- 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
 -- 
-1.7.10.4
+2.1.4
