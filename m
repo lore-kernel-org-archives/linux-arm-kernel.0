@@ -1,63 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 08:52:59 +0900
-Subject: [PATCH 10/19] ARM: dts: r8a73a4: Add L2 cache-controller nodes
+Date: Fri, 26 Feb 2016 08:52:51 +0900
+Subject: [PATCH 02/19] ARM: dts: r8a7791: use fallback pcie compatibility
+ string
 In-Reply-To: <cover.1456443769.git.horms+renesas@verge.net.au>
 References: <cover.1456443769.git.horms+renesas@verge.net.au>
-Message-ID: <c86a4b621994dbe9361185362c4be6887f04b1a4.1456443769.git.horms+renesas@verge.net.au>
+Message-ID: <bbb45f69f7ae68f422a6aafccdc48e3637669c39.1456443769.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Use recently added fallback compatibility string in r8a7791 device tree.
 
-Add device nodes for the L2 caches, and link the CPU node to its L2
-cache node.
-
-The L2 cache for the Cortex-A15 CPU cores is 1 MiB large (organized as
-64 KiB x 16 ways), and located in PM domain A3SM.
-
-The L2 cache for the Cortex-A7 CPU cores is 512 KiB large (organized as
-64 KiB x 8 ways), and located in PM domain A3KM.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 138414a7d170..6583a1dfca1f 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -29,6 +29,7 @@
- 			reg = <0>;
- 			clock-frequency = <1500000000>;
- 			power-domains = <&pd_a2sl>;
-+			next-level-cache = <&L2_CA15>;
- 		};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 14aa62539ff2..4456f54a5005 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1600,7 +1600,7 @@
  	};
  
-@@ -45,6 +46,22 @@
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
-+	L2_CA15: cache-controller at 0 {
-+		compatible = "cache";
-+		clocks = <&cpg_clocks R8A73A4_CLK_Z>;
-+		power-domains = <&pd_a3sm>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
-+	L2_CA7: cache-controller at 1 {
-+		compatible = "cache";
-+		clocks = <&cpg_clocks R8A73A4_CLK_Z2>;
-+		power-domains = <&pd_a3km>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	dbsc1: memory-controller at e6790000 {
- 		compatible = "renesas,dbsc-r8a73a4";
- 		reg = <0 0xe6790000 0 0x10000>;
+ 	pciec: pcie at fe000000 {
+-		compatible = "renesas,pcie-r8a7791";
++		compatible = "renesas,pcie-r8a7791", "renesas,pcie-rcar-gen2";
+ 		reg = <0 0xfe000000 0 0x80000>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
 -- 
 2.7.0.rc3.207.g0ac5344
