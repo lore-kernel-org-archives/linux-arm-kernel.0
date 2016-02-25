@@ -1,64 +1,37 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 25 Feb 2016 14:19:34 +0100
-Subject: [GIT PULL] ARM32: Xilinx Zynq SoC changes for v4.6
-Message-ID: <56CEFF66.2090907@monstr.eu>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 25 Feb 2016 14:23:12 +0100
+Subject: [PATCH v2] soc: dove: Make reset_control_ops const
+Message-ID: <1456406592-24733-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since the pmu_reset_ops structure is never modified, we can make it const
+Since commit 203d4f347d86 ("reset: Make reset_control_ops const") marked
+the ops pointer in struct reset_controller_dev as const, the pmu_reset_ops
+structure, which is never modified, can be made const, too.
 
-Please pull these patches to your tree.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+---
+The prerequisite commit is currently sitting in the arm-soc/for-next branch.
+Changes since v1:
+ - Improved commit message.
+---
+ drivers/soc/dove/pmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Michal
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.6
-
-for you to fetch changes up to 8fff2f752f2c9d31414f83170157701b59aec4c1:
-
-  ARM: zynq: Move early printk virtual address to vmalloc area
-(2016-02-25 14:06:03 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq patches for v4.6
-
-- SLCR early init
-- Fix L2 cache data corruption
-- Fix early printk uart setting
-
-----------------------------------------------------------------
-Josh Cartwright (2):
-      ARM: zynq: initialize slcr mapping earlier
-      ARM: zynq: address L2 cache data corruption
-
-Michal Simek (1):
-      ARM: zynq: Move early printk virtual address to vmalloc area
-
- arch/arm/include/debug/zynq.S | 4 ++--
- arch/arm/mach-zynq/common.c   | 3 +--
- arch/arm/mach-zynq/slcr.c     | 4 ++++
- 3 files changed, 7 insertions(+), 4 deletions(-)
-
-
-
+diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
+index 039374e..95d77ec 100644
+--- a/drivers/soc/dove/pmu.c
++++ b/drivers/soc/dove/pmu.c
+@@ -87,7 +87,7 @@ static int pmu_reset_deassert(struct reset_controller_dev *rc, unsigned long id)
+ 	return 0;
+ }
+ 
+-static struct reset_control_ops pmu_reset_ops = {
++static const struct reset_control_ops pmu_reset_ops = {
+ 	.reset = pmu_reset_reset,
+ 	.assert = pmu_reset_assert,
+ 	.deassert = pmu_reset_deassert,
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/68e5151c/attachment.sig>
+2.7.0
