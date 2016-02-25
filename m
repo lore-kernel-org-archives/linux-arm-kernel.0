@@ -1,40 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 15:58:58 +0100
-Subject: [PATCH 3/4] ARM: realview: imply Device Tree config
-In-Reply-To: <2805017.I27kg8jfk6@wuerfel>
-References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
- <1456406111-18579-4-git-send-email-linus.walleij@linaro.org>
- <2805017.I27kg8jfk6@wuerfel>
-Message-ID: <CACRpkdZCqNH-cuoXbZaJ2Uw5-0UvLZ+vo0Lz9Nq+7AaawEp6-A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Feb 2016 15:00:54 +0000
+Subject: RFC: extend IOMMU attributes
+In-Reply-To: <20160225143855.GD16675@8bytes.org>
+References: <HE1PR04MB1641F22E38710B68F4ED891F8DAF0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+ <20160225143855.GD16675@8bytes.org>
+Message-ID: <20160225150053.GA15330@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 3:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Feb 25, 2016 at 03:38:55PM +0100, joro at 8bytes.org wrote:
+> On Thu, Feb 18, 2016 at 04:16:26PM +0000, Stuart Yoder wrote:
+> >  #define IOMMU_READ            (1 << 0)
+> >  #define IOMMU_WRITE           (1 << 1)
+> > -#define IOMMU_CACHE           (1 << 2) /* DMA cache coherency */
+> > +#define IOMMU_CACHE_COHERENT  (1 << 2) /* cacheable and coherent */
+> >  #define IOMMU_NOEXEC          (1 << 3)
+> >  #define IOMMU_MMIO            (1 << 4) /* e.g. things like MSI doorbells */
+> > +#define IOMMU_CACHEABLE       (1 << 5) /* cacheable, not coherent */
+> > +#define IOMMU_CACHE_ALLOCATE  (1 << 6) /* hint to allocate in the cache */
+> 
+> Hmm, this might be a valid use-case to introduce the
+> map_attr()/unmap_attr() calls to the IOMMU-API. I have been resistant to
+> these functions until now because the proposed use-cases were not
+> convincing, but for hardware-specific map-attributes like this one it
+> could make sense.
 
-> On Thursday 25 February 2016 14:15:10 Linus Walleij wrote:
->> @@ -32,8 +24,9 @@ config REALVIEW_DT
->>         select USE_OF
->>         select ZONE_DMA
->
-> The 'select USE_OF' can now be dropped, I guess this was left over
-> from the multiplatform patches, but also fits in here.
->
->>         help
->> -         Include support for booting the ARM(R) RealView(R) evaluation
->> -         boards using a device tree machine description.
->> +         This enables support for ARM Ltd RealView boards.
->> +
->> +if ARCH_REALVIEW
->>
->>  config REALVIEW_HIGH_PHYS_OFFSET
->>         bool "High physical base address for the RealView platform"
->>
->
-> REALVIEW_HIGH_PHYS_OFFSET can go away as well, as it is only used
-> in 'realview_fixup', which in turn is called by the removed board
-> files.
+So this particular use-case is completely insane, but something like
+read/write allocation hints could make sense for arm-smmu systems.
 
-OK I updated the patch cutting these too.
-
-Yours,
-Linus Walleij
+Will
