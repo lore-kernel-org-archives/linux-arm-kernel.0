@@ -1,70 +1,41 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 24 Feb 2016 17:36:43 -0700
-Subject: [PATCH net-next V2 00/16] net: fec: cleanup and fixes
-Message-ID: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+Date: Wed, 24 Feb 2016 17:36:44 -0700
+Subject: [PATCH net-next V2 01/16] net: fec: only check queue 0 if RXF_0/TXF_0
+ interrupt is set
+In-Reply-To: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1456360619-24390-2-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V2 is a rebase on top of johannes endian-safe patch and
-this set is only the next 16 patches.
-The testing for this series was done on a nitrogen6x.
-The base commit was
-commit f5461c27631672b9e95282812ee521c53f502eca
-    Merge branch 'dsa-pass-bridge-to-drivers'
+Before queue 0 was always checked if any queue caused an interrupt.
+It is better to just mark queue 0 if queue 0 has caused an interrupt.
 
-Testing showed no change in performance.
-Testing used imx_v6_v7_defconfig + CONFIG_MICREL_PHY.
-The processor was running at 996Mhz.
-The following commands were used to get the transfer rates.
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+---
+ drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On an x86 ubunto system,
-iperf -s -i.5 -u
-
-
-On a nitrogen6x board, running via SD Card.
-I first stopped some background processes
-
-stop cron
-stop upstart-file-bridge
-stop upstart-socket-bridge
-stop upstart-udev-bridge
-stop rsyslog
-stop dbus
-killall dhclient
-echo performance >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-
-taskset 0x2 iperf -c 192.168.0.201 -u -t60 -b500M -r
-
-There is a branch available on github with this series, and the rest of
-my fec patches, for those who would like to test it.
-https://github.com:boundarydevices/linux-imx6.git branch net-next_master
-
-
-
-Troy Kisky (16):
-SDCard
- TX/RX
-379/402	Before any patches
-376/402  net: fec: only check queue 0 if RXF_0/TXF_0 interrupt is set
-379/399  net: fec: pass rxq to fec_enet_rx_queue instead of queue_id
-379/401  net: fec: pass txq to fec_enet_tx_queue instead of queue_id
-389/409  net: fec: reduce interrupts
-393/411  net: fec: split off napi routine with 3 queues
-386/415  net: fec: don't clear all rx queue bits when just one is being checked
-387/412  net: fec: set cbd_sc without relying on previous value
-385/415  net: fec: eliminate calls to fec_enet_get_prevdesc
-389/414  net: fec: move restart test for efficiency
-386/412  net: fec: clear cbd_sc after transmission to help with debugging
-387/415  net: fec: dump all tx queues in fec_dump
-380/418  net: fec: detect tx int lost
-385/417  net: fec: print more debug info in fec_timeout
-388/417  net: fec: create subroutine reset_tx_queue
-389/418  net: fec: call dma_unmap_single on mapped tx buffers at restart
-381/414  net: fec: don't set cbd_bufaddr unless no mapping error
-
- drivers/net/ethernet/freescale/fec.h      |   7 +-
- drivers/net/ethernet/freescale/fec_main.c | 420 ++++++++++++++++--------------
- 2 files changed, 224 insertions(+), 203 deletions(-)
-
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index bad0ba2..dbac975 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1534,14 +1534,14 @@ fec_enet_collect_events(struct fec_enet_private *fep, uint int_events)
+ 	if (int_events == 0)
+ 		return false;
+ 
+-	if (int_events & FEC_ENET_RXF)
++	if (int_events & FEC_ENET_RXF_0)
+ 		fep->work_rx |= (1 << 2);
+ 	if (int_events & FEC_ENET_RXF_1)
+ 		fep->work_rx |= (1 << 0);
+ 	if (int_events & FEC_ENET_RXF_2)
+ 		fep->work_rx |= (1 << 1);
+ 
+-	if (int_events & FEC_ENET_TXF)
++	if (int_events & FEC_ENET_TXF_0)
+ 		fep->work_tx |= (1 << 2);
+ 	if (int_events & FEC_ENET_TXF_1)
+ 		fep->work_tx |= (1 << 0);
 -- 
 2.5.0
