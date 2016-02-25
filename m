@@ -1,32 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 14:18:44 +0100
-Subject: [PATCH] ARM: sa1100: make sa1100_register_uart_fns a function
-In-Reply-To: <1456238094-778916-1-git-send-email-arnd@arndb.de>
-References: <1456238094-778916-1-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdbJpYD2Ke-f2QP+-fy_LcxhiV99OEH_D=CMtSvedEveVA@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 25 Feb 2016 14:19:34 +0100
+Subject: [GIT PULL] ARM32: Xilinx Zynq SoC changes for v4.6
+Message-ID: <56CEFF66.2090907@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 3:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
 
-> Calling sa1100_register_uart_fns() leaves the port structure
-> unused when CONFIG_SERIAL_SA1100 is disabled, and we get a
-> compiler warning about that:
->
-> arch/arm/mach-sa1100/badge4.c:317:31: warning: 'badge4_port_fns' defined but not used [-Wunused-variable]
->  static struct sa1100_port_fns badge4_port_fns __initdata = {
->
-> This turns the two empty macros into empty inline functions,
-> which has the same effect, but lets the compiler know that the
-> variables are intentionally unused.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Please pull these patches to your tree.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks,
+Michal
 
->  include/linux/platform_data/sa11x0-serial.h | 8 ++++++--
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-It looks like you should send this to Greg?
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-Yours,
-Linus Walleij
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.6
+
+for you to fetch changes up to 8fff2f752f2c9d31414f83170157701b59aec4c1:
+
+  ARM: zynq: Move early printk virtual address to vmalloc area
+(2016-02-25 14:06:03 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq patches for v4.6
+
+- SLCR early init
+- Fix L2 cache data corruption
+- Fix early printk uart setting
+
+----------------------------------------------------------------
+Josh Cartwright (2):
+      ARM: zynq: initialize slcr mapping earlier
+      ARM: zynq: address L2 cache data corruption
+
+Michal Simek (1):
+      ARM: zynq: Move early printk virtual address to vmalloc area
+
+ arch/arm/include/debug/zynq.S | 4 ++--
+ arch/arm/mach-zynq/common.c   | 3 +--
+ arch/arm/mach-zynq/slcr.c     | 4 ++++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
+
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/68e5151c/attachment.sig>
