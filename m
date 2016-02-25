@@ -1,49 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 25 Feb 2016 14:37:17 +0100
-Subject: [PATCH 9/9] clockevents/drivers/exynos_mct: Implement
- ->set_state_oneshot_stopped()
-In-Reply-To: <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
-References: <56CF00F6.9010301@linaro.org>
- <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1456407438-6131-9-git-send-email-daniel.lezcano@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Feb 2016 14:43:46 +0100
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <B8A82546-46C7-4A21-92D8-62418E49FBB6@konsulko.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
+ <56CC546A.9070705@ti.com>
+ <20160224104638.GL19428@n2100.arm.linux.org.uk>
+ <56CD924F.50108@ti.com>
+ <B8A82546-46C7-4A21-92D8-62418E49FBB6@konsulko.com>
+Message-ID: <CACRpkdZ=PR6O28NQusUEipCYwRZyuhbeAJO_ZK80+4H7Zakt=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viresh Kumar <viresh.kumar@linaro.org>
+On Wed, Feb 24, 2016 at 1:13 PM, Pantelis Antoniou
+<pantelis.antoniou@konsulko.com> wrote:
 
-set_state_oneshot_stopped() is called by the clkevt core, when the next
-event is required at an expiry time of 'KTIME_MAX'. This normally
-happens with NO_HZ_{IDLE|FULL} in both LOWRES/HIGHRES modes.
+> IMHO DT+overlays handle all your cases just fine.
+>
+> As far as I see these are the cases which we need to handle:
+>
+> 1) The expansion board in question has some means of identification, whether it?s an
+> EEPROM or a GPIO keying combination etc. In that case it is the kernel?s job to match this
+> id value with a dtbo firmware file and apply it. The blob is located via means of request_firmware().
 
-This patch makes the clockevent device to stop on such an event, to
-avoid spurious interrupts, as explained by: commit 8fff52fd5093
-("clockevents: Introduce CLOCK_EVT_STATE_ONESHOT_STOPPED state").
+Since the dawn of time the x86 people used that console to display
+the early boot crawl and collect crash data. What you're suggesting
+is that we can't get the console up until after the filesystems and mounts
+are up so the kernel can read firmware files.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/exynos_mct.c | 2 ++
- 1 file changed, 2 insertions(+)
+This kills of early boot graphics and getting crash logs on the fbdev
+console until that has happened.
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index ff44082..be09bc0 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -313,6 +313,7 @@ static struct clock_event_device mct_comp_device = {
- 	.set_state_periodic	= mct_set_state_periodic,
- 	.set_state_shutdown	= mct_set_state_shutdown,
- 	.set_state_oneshot	= mct_set_state_shutdown,
-+	.set_state_oneshot_stopped = mct_set_state_shutdown,
- 	.tick_resume		= mct_set_state_shutdown,
- };
- 
-@@ -452,6 +453,7 @@ static int exynos4_local_timer_setup(struct mct_clock_event_device *mevt)
- 	evt->set_state_periodic = set_state_periodic;
- 	evt->set_state_shutdown = set_state_shutdown;
- 	evt->set_state_oneshot = set_state_shutdown;
-+	evt->set_state_oneshot_stopped = set_state_shutdown;
- 	evt->tick_resume = set_state_shutdown;
- 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
- 	evt->rating = 450;
--- 
-1.9.1
+It also means there is no way to get the console up without the right
+firmware files in the filesystem. I think that is really crap compared
+to what we have today where the display will always come up, and
+basically a regression.
+
+I understand the stance with respect to things like add-on hardware
+like a Bluetooth board or WLAN or whatnot. But the fbdev console
+is just too basic, like a serial port IMO.
+
+Sure in the ARM world we usually have a serial console, but this is
+seriously breaking current practice.
+
+Yours,
+Linus Walleij
