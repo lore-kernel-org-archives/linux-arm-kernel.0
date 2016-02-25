@@ -1,116 +1,78 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 25 Feb 2016 14:37:12 +0100
-Subject: [PATCH 4/9] clocksource/drivers/lpc32xx: Support periodic mode
+Date: Thu, 25 Feb 2016 14:37:13 +0100
+Subject: [PATCH 5/9] clocksource/drivers/lpc32xx: Support timer-based ARM delay
 In-Reply-To: <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
 References: <56CF00F6.9010301@linaro.org>
  <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1456407438-6131-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1456407438-6131-5-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 
-This commit adds the support for periodic mode. This is done by not
-setting the MR0S (Stop on TnMR0) bit on MCR, thus allowing
-interrupts to be periodically generated on MR0 matches.
+This commit implements the ARM timer-based delay timer for the
+LPC32xx, LPC18xx, LPC43xx family of SoCs.
 
-In order to do this, move the initial configuration that is specific to
-the one-shot mode to set_state_oneshot().
+Also, add a dependency to restrict compiling this driver for
+the ARM architecture.
 
 Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Joachim Eastwood <manabian@gmail.com>
 Tested-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/clocksource/time-lpc32xx.c | 39 +++++++++++++++++++++++++++++++++-----
- 1 file changed, 34 insertions(+), 5 deletions(-)
+ drivers/clocksource/Kconfig        |  1 +
+ drivers/clocksource/time-lpc32xx.c | 12 ++++++++++++
+ 2 files changed, 13 insertions(+)
 
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 56777f0..c9c4db6 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -153,6 +153,7 @@ config CLKSRC_EFM32
+ config CLKSRC_LPC32XX
+ 	bool "Clocksource for LPC32XX" if COMPILE_TEST
+ 	depends on GENERIC_CLOCKEVENTS && HAS_IOMEM
++	depends on ARM
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+ 	help
 diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
-index 50d1a63..5694edd 100644
+index 5694edd..daae61e 100644
 --- a/drivers/clocksource/time-lpc32xx.c
 +++ b/drivers/clocksource/time-lpc32xx.c
-@@ -43,6 +43,7 @@
- struct lpc32xx_clock_event_ddata {
- 	struct clock_event_device evtdev;
- 	void __iomem *base;
-+	u32 ticks_per_jiffy;
- };
- 
- /* Needed for the sched clock */
-@@ -85,11 +86,39 @@ static int lpc32xx_clkevt_shutdown(struct clock_event_device *evtdev)
- 
- static int lpc32xx_clkevt_oneshot(struct clock_event_device *evtdev)
- {
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
- 	/*
- 	 * When using oneshot, we must also disable the timer
- 	 * to wait for the first call to set_next_event().
- 	 */
--	return lpc32xx_clkevt_shutdown(evtdev);
-+	writel_relaxed(0, ddata->base + LPC32XX_TIMER_TCR);
-+
-+	/* Enable interrupt, reset on match and stop on match (MCR). */
-+	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
-+		       LPC32XX_TIMER_MCR_MR0S, ddata->base + LPC32XX_TIMER_MCR);
-+	return 0;
-+}
-+
-+static int lpc32xx_clkevt_periodic(struct clock_event_device *evtdev)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
-+	/* Enable interrupt and reset on match. */
-+	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R,
-+		       ddata->base + LPC32XX_TIMER_MCR);
-+
-+	/*
-+	 * Place timer in reset and program the delta in the match
-+	 * channel 0 (MR0).
-+	 */
-+	writel_relaxed(LPC32XX_TIMER_TCR_CRST, ddata->base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(ddata->ticks_per_jiffy, ddata->base + LPC32XX_TIMER_MR0);
-+	writel_relaxed(LPC32XX_TIMER_TCR_CEN, ddata->base + LPC32XX_TIMER_TCR);
-+
-+	return 0;
+@@ -18,6 +18,7 @@
+ #include <linux/clk.h>
+ #include <linux/clockchips.h>
+ #include <linux/clocksource.h>
++#include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+@@ -54,6 +55,15 @@ static u64 notrace lpc32xx_read_sched_clock(void)
+ 	return readl(clocksource_timer_counter);
  }
  
- static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
-@@ -107,11 +136,13 @@ static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
- static struct lpc32xx_clock_event_ddata lpc32xx_clk_event_ddata = {
- 	.evtdev = {
- 		.name			= "lpc3220 clockevent",
--		.features		= CLOCK_EVT_FEAT_ONESHOT,
-+		.features		= CLOCK_EVT_FEAT_ONESHOT |
-+					  CLOCK_EVT_FEAT_PERIODIC,
- 		.rating			= 300,
- 		.set_next_event		= lpc32xx_clkevt_next_event,
- 		.set_state_shutdown	= lpc32xx_clkevt_shutdown,
- 		.set_state_oneshot	= lpc32xx_clkevt_oneshot,
-+		.set_state_periodic	= lpc32xx_clkevt_periodic,
- 	},
- };
++static unsigned long lpc32xx_delay_timer_read(void)
++{
++	return readl(clocksource_timer_counter);
++}
++
++static struct delay_timer lpc32xx_delay_timer = {
++	.read_current_timer = lpc32xx_delay_timer_read,
++};
++
+ static int lpc32xx_clkevt_next_event(unsigned long delta,
+ 				     struct clock_event_device *evtdev)
+ {
+@@ -192,6 +202,8 @@ static int __init lpc32xx_clocksource_init(struct device_node *np)
+ 	}
  
-@@ -210,17 +241,15 @@ static int __init lpc32xx_clockevent_init(struct device_node *np)
- 	/*
- 	 * Disable timer and clear any pending interrupt (IR) on match
- 	 * channel 0 (MR0). Clear the prescaler as it's not used.
--	 * Enable interrupt, reset on match and stop on match (MCR).
- 	 */
- 	writel_relaxed(0, base + LPC32XX_TIMER_TCR);
- 	writel_relaxed(0, base + LPC32XX_TIMER_PR);
- 	writel_relaxed(0, base + LPC32XX_TIMER_CTCR);
- 	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, base + LPC32XX_TIMER_IR);
--	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
--		       LPC32XX_TIMER_MCR_MR0S, base + LPC32XX_TIMER_MCR);
+ 	clocksource_timer_counter = base + LPC32XX_TIMER_TC;
++	lpc32xx_delay_timer.freq = rate;
++	register_current_timer_delay(&lpc32xx_delay_timer);
+ 	sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
  
- 	rate = clk_get_rate(clk);
- 	lpc32xx_clk_event_ddata.base = base;
-+	lpc32xx_clk_event_ddata.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
- 	clockevents_config_and_register(&lpc32xx_clk_event_ddata.evtdev,
- 					rate, 1, -1);
- 
+ 	return 0;
 -- 
 1.9.1
