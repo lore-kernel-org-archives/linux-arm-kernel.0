@@ -1,94 +1,58 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 25 Feb 2016 14:46:54 -0600
-Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
-In-Reply-To: <20160225161630.GB16546@arm.com>
-References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
- <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
- <20160225161630.GB16546@arm.com>
-Message-ID: <56CF683D.30003@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Feb 2016 21:47:57 +0100
+Subject: [PATCH] serial: ifx6x60: avoid uninitialized variable use
+Message-ID: <1456433283-3761559-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2016 10:16 AM, Will Deacon wrote:
-> On Fri, Feb 19, 2016 at 11:46:23AM -0600, Jeremy Linton wrote:
+gcc warns about a potential use of an uninitialized variable in this driver:
 
-(trimming)
+drivers/tty/serial/ifx6x60.c: In function 'ifx_spi_complete':
+drivers/tty/serial/ifx6x60.c:713:6: warning: 'more' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   if (more || ifx_dev->spi_more || queue_length > 0 ||
 
->> +static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
->> +{
->> +	int i;
->> +
->> +	pte -= CONT_RANGE_OFFSET(addr);
->> +	for (i = 0; i < CONT_PTES; i++) {
->> +		if (pte_cont(*pte))
->> +			set_pte(pte, pte_mknoncont(*pte));
->> +		pte++;
->> +	}
->> +	flush_tlb_all();
->
-> Do you still need this invalidation? I thought the table weren't even
-> live at this point?
+Unlike a lot of other such warnings, this one is correct and describes
+an actual problem in the handling of the "IFX_SPI_HEADER_F" result code.
 
-Well it continues to match the calls in alloc_init_p*.
-	
-I guess the worry is the extra flush that happens at 
-create_mapping_late(), if mapping ranges aren't cont aligned? (because 
-the loop won't actually be doing any set_pte's)
+This appears to be a result from a restructuring of the driver that
+dates back to before it was merged in the kernel, so it's impossible
+to know where it went wrong. I also don't know what that result code
+means, so I have no idea if setting 'more' to zero is the correct
+solution, but at least it makes the behavior reproducible rather than
+depending on whatever happens to be on the kernel stack.
 
-If this and the alloc_init_p* flushes are to be removed, there should 
-probably be a way to detect any cases where the splits are happening 
-after the tables have been activated. This might be a little less 
-straightforward given efi_create_mapping().
->
->> +}
->> +
->> +/*
->> + * Given a range of PTEs set the pfn and provided page protection flags
->> + */
->> +static void __populate_init_pte(pte_t *pte, unsigned long addr,
->> +			       unsigned long end, phys_addr_t phys,
->> +			       pgprot_t prot)
->> +{
->> +	unsigned long pfn = __phys_to_pfn(phys);
->> +
->> +	do {
->> +		/* clear all the bits except the pfn, then apply the prot */
->> +		set_pte(pte, pfn_pte(pfn, prot));
->> +		pte++;
->> +		pfn++;
->> +		addr += PAGE_SIZE;
->> +	} while (addr != end);
->> +}
->> +
-(trimming)
->> +
->>   	do {
->> -		set_pte(pte, pfn_pte(pfn, prot));
->> -		pfn++;
->> -	} while (pte++, addr += PAGE_SIZE, addr != end);
->> +		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
->> +		if (((addr | next | phys) & ~CONT_MASK) == 0) {
->> +			/* a block of CONT_PTES	 */
->> +			__populate_init_pte(pte, addr, next, phys,
->> +					    prot | __pgprot(PTE_CONT));
->> +		} else {
->> +			/*
->> +			 * If the range being split is already inside of a
->> +			 * contiguous range but this PTE isn't going to be
->> +			 * contiguous, then we want to unmark the adjacent
->> +			 * ranges, then update the portion of the range we
->> +			 * are interested in.
->> +			 */
->> +			clear_cont_pte_range(pte, addr);
->> +			__populate_init_pte(pte, addr, next, phys, prot);
->
-> I don't understand the comment or the code here... the splitting is now
-> done seperately, and I can't think of a scenario where you need to clear
-> the cont hint explicitly for adjacent ptes.
+This patch initializes the 'more' variable to zero in each of the
+three code paths that could result in undefined behavior before,
+which is more explicit than initializing it at the start of the
+function.
 
-	
-My understanding is that splitting is initially running this code path 
-(via map_kernel_chunk, then again via create_mapping_late where splits 
-won't happen). So, split_pmd() is creating cont ranges. When the ranges 
-aren't sufficiently aligned then this is wiping out the cont mapping 
-immediately after their creation.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/tty/serial/ifx6x60.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/tty/serial/ifx6x60.c b/drivers/tty/serial/ifx6x60.c
+index 88246f7e435a..2085a6cfa44b 100644
+--- a/drivers/tty/serial/ifx6x60.c
++++ b/drivers/tty/serial/ifx6x60.c
+@@ -395,8 +395,10 @@ static int ifx_spi_decode_spi_header(unsigned char *buffer, int *length,
+ 
+ 	if (h1 == 0 && h2 == 0) {
+ 		*received_cts = 0;
++		*more = 0;
+ 		return IFX_SPI_HEADER_0;
+ 	} else if (h1 == 0xffff && h2 == 0xffff) {
++		*more = 0;
+ 		/* spi_slave_cts remains as it was */
+ 		return IFX_SPI_HEADER_F;
+ 	}
+@@ -688,6 +690,7 @@ static void ifx_spi_complete(void *ctx)
+ 			ifx_dev->rx_buffer + IFX_SPI_HEADER_OVERHEAD,
+ 			(size_t)actual_length);
+ 	} else {
++		more = 0;
+ 		dev_dbg(&ifx_dev->spi_dev->dev, "SPI transfer error %d",
+ 		       ifx_dev->spi_msg.status);
+ 	}
+-- 
+2.7.0
