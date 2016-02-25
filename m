@@ -1,56 +1,102 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 24 Feb 2016 17:36:56 -0700
-Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
- fec_timeout
+Date: Wed, 24 Feb 2016 17:36:57 -0700
+Subject: [PATCH net-next V2 14/16] net: fec: create subroutine reset_tx_queue
 In-Reply-To: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1456360619-24390-15-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print the current interrupt flags and mask and
-the interrupt state during the last interrupt in
-fec_timeout.
+This creates one place to release any queued
+tx skbs.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec.h      | 1 +
- drivers/net/ethernet/freescale/fec_main.c | 4 ++++
- 2 files changed, 5 insertions(+)
+ drivers/net/ethernet/freescale/fec_main.c | 50 +++++++++++++++----------------
+ 1 file changed, 25 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index 001200b..615cca1 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -506,6 +506,7 @@ struct fec_enet_private {
- 	unsigned int total_tx_ring_size;
- 	unsigned int total_rx_ring_size;
- 	uint	events;
-+	uint	last_ievents;
- 
- 	struct	platform_device *pdev;
- 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index afd4060..9a3136b 100644
+index 9a3136b..8711196 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1107,6 +1107,9 @@ fec_timeout(struct net_device *ndev)
- 	int i;
- 	uint events = 0;
+@@ -752,12 +752,33 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	return NETDEV_TX_OK;
+ }
  
-+	pr_err("%s: last=%x %x, mask %x\n", __func__, fep->last_ievents,
-+	       readl(fep->hwp + FEC_IEVENT), readl(fep->hwp + FEC_IMASK));
++static void reset_tx_queue(struct fec_enet_private *fep,
++			   struct fec_enet_priv_tx_q *txq)
++{
++	struct bufdesc *bdp = txq->bd.base;
++	unsigned int i;
 +
- 	for (i = 0; i < fep->num_tx_queues; i++) {
- 		struct fec_enet_priv_tx_q *txq = fep->tx_queue[i];
- 		int index;
-@@ -1514,6 +1517,7 @@ fec_enet_interrupt(int irq, void *dev_id)
++	txq->bd.cur = bdp;
++	for (i = 0; i < txq->bd.ring_size; i++) {
++		/* Initialize the BD for every fragment in the page. */
++		if (txq->tx_skbuff[i]) {
++			dev_kfree_skb_any(txq->tx_skbuff[i]);
++			txq->tx_skbuff[i] = NULL;
++		}
++		bdp->cbd_bufaddr = cpu_to_fec32(0);
++		bdp->cbd_sc = cpu_to_fec16((bdp == txq->bd.last) ?
++					   BD_SC_WRAP : 0);
++		bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
++	}
++	bdp = fec_enet_get_prevdesc(bdp, &txq->bd);
++	txq->dirty_tx = bdp;
++}
++
+ /* Init RX & TX buffer descriptors
+  */
+ static void fec_enet_bd_init(struct net_device *dev)
+ {
+ 	struct fec_enet_private *fep = netdev_priv(dev);
+-	struct fec_enet_priv_tx_q *txq;
+ 	struct fec_enet_priv_rx_q *rxq;
+ 	struct bufdesc *bdp;
+ 	unsigned int i;
+@@ -780,26 +801,8 @@ static void fec_enet_bd_init(struct net_device *dev)
+ 		rxq->bd.cur = rxq->bd.base;
+ 	}
  
- 	if (!int_events)
- 		return IRQ_NONE;
-+	fep->last_ievents = int_events;
+-	for (q = 0; q < fep->num_tx_queues; q++) {
+-		/* ...and the same for transmit */
+-		txq = fep->tx_queue[q];
+-		bdp = txq->bd.base;
+-		txq->bd.cur = bdp;
+-
+-		for (i = 0; i < txq->bd.ring_size; i++) {
+-			/* Initialize the BD for every fragment in the page. */
+-			if (txq->tx_skbuff[i]) {
+-				dev_kfree_skb_any(txq->tx_skbuff[i]);
+-				txq->tx_skbuff[i] = NULL;
+-			}
+-			bdp->cbd_bufaddr = cpu_to_fec32(0);
+-			bdp->cbd_sc = cpu_to_fec16((bdp == txq->bd.last) ?
+-					BD_SC_WRAP : 0);
+-			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+-		}
+-		bdp = fec_enet_get_prevdesc(bdp, &txq->bd);
+-		txq->dirty_tx = bdp;
+-	}
++	for (q = 0; q < fep->num_tx_queues; q++)
++		reset_tx_queue(fep, fep->tx_queue[q]);
+ }
  
- 	if (int_events & (FEC_ENET_RXF | FEC_ENET_TXF)) {
- 		if (napi_schedule_prep(&fep->napi)) {
+ static void fec_enet_active_rxring(struct net_device *ndev)
+@@ -2652,13 +2655,10 @@ static void fec_enet_free_buffers(struct net_device *ndev)
+ 
+ 	for (q = 0; q < fep->num_tx_queues; q++) {
+ 		txq = fep->tx_queue[q];
+-		bdp = txq->bd.base;
++		reset_tx_queue(fep, txq);
+ 		for (i = 0; i < txq->bd.ring_size; i++) {
+ 			kfree(txq->tx_bounce[i]);
+ 			txq->tx_bounce[i] = NULL;
+-			skb = txq->tx_skbuff[i];
+-			txq->tx_skbuff[i] = NULL;
+-			dev_kfree_skb(skb);
+ 		}
+ 	}
+ }
 -- 
 2.5.0
