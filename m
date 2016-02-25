@@ -1,34 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Feb 2016 16:27:26 +0100
-Subject: [PATCH 1/3] dt-bindings: arm/marvell: ABI unstability warning
- about Marvell 7K/8K
-In-Reply-To: <87h9gwompa.fsf@free-electrons.com>
-References: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1456327007-31008-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160224172545.GC9137@leverpostej>
- <20160224211045.379352d3@free-electrons.com>
- <CAL_JsqLevrujSeYNBvSJA-5T0Ho8y7c0fKid7QvVm8LLvYLotw@mail.gmail.com>
- <20160225090927.13492cfb@free-electrons.com>
- <87h9gwompa.fsf@free-electrons.com>
-Message-ID: <20160225162726.6ad4a224@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 25 Feb 2016 15:33:05 +0000
+Subject: [PATCH -next] mm: fix build for arm64 hugetlbpage
+Message-ID: <1456414385-13775-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Commit ("mm: cleanup *pte_alloc* interfaces") redefined pte_alloc_map()
+using pte_alloc() and fixed all the callsites. However arm64 callsite
+seem to have got missed. This patch fixes the same and thereby fixing
+the following build error.
 
-On Thu, 25 Feb 2016 16:04:49 +0100, Gregory CLEMENT wrote:
+arch/arm64/mm/hugetlbpage.c: In function 'huge_pte_alloc':
+arch/arm64/mm/hugetlbpage.c:127:42: error: macro "pte_alloc_map" passed 4 arguments, but takes just 3
+   pte = pte_alloc_map(mm, NULL, pmd, addr);
+                                          ^
+arch/arm64/mm/hugetlbpage.c:127:9: error: 'pte_alloc_map' undeclared (first use in this function)
+   pte = pte_alloc_map(mm, NULL, pmd, addr);
+         ^
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> > Gregory, can you skip patch 1/3, and merge patches 2/3 and 3/3, once
-> > the new clock DT binding has been approved.
-> 
-> I applied patch 2 and 3 on mvebu/dt64 and I amended the title by using
-> "arm64: dts : marvell:" instead of "arm64: marvell:" as requested by
-> Olof on ly first mvebu/dt64 pull request.
+Hi,
 
-Thanks, I'll try to remember this convention for the next patches!
+Since it's from -mm tree, I have not put the commit id causing the
+breakage. Also since I don't have the original patch in my inbox, I am
+posting this separately. It would be good to squash this into original
+commit.
 
-Thomas
+Regards,
+Sudeep
+
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 82d607c3614e..bb6b4c7bfab3 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -124,7 +124,7 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
+ 		 * will be no pte_unmap() to correspond with this
+ 		 * pte_alloc_map().
+ 		 */
+-		pte = pte_alloc_map(mm, NULL, pmd, addr);
++		pte = pte_alloc_map(mm, pmd, addr);
+ 	} else if (sz == PMD_SIZE) {
+ 		if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
+ 		    pud_none(*pud))
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
