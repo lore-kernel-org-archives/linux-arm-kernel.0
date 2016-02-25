@@ -1,39 +1,153 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 25 Feb 2016 16:50:07 +0100
-Subject: [PATCH v10 0/5] MT8173 IOMMU SUPPORT
-In-Reply-To: <1456161651-6136-1-git-send-email-yong.wu@mediatek.com>
-References: <1456161651-6136-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20160225155007.GA19092@8bytes.org>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Thu, 25 Feb 2016 18:53:35 +0300
+Subject: [PATCH v2 1/8] arm64: move acpi/dt decision earlier in boot
+ process
+In-Reply-To: <56CDF4D4.6000506@suse.com>
+References: <1456333819-13482-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456333819-13482-2-git-send-email-aleksey.makarov@linaro.org>
+ <56CDF4D4.6000506@suse.com>
+Message-ID: <56CF237F.6090706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 23, 2016 at 01:20:46AM +0800, Yong Wu wrote:
-> Yong Wu (5):
->   dt-bindings: iommu: Add binding for mediatek IOMMU
->   dt-bindings: mediatek: Add smi dts binding
->   memory: mediatek: Add SMI driver
->   iommu/mediatek: Add mt8173 IOMMU driver
->   dts: mt8173: Add iommu/smi nodes for mt8173
-> 
->  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  68 ++
->  .../memory-controllers/mediatek,smi-common.txt     |  24 +
->  .../memory-controllers/mediatek,smi-larb.txt       |  25 +
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  81 +++
->  drivers/iommu/Kconfig                              |  16 +
->  drivers/iommu/Makefile                             |   1 +
->  drivers/iommu/mtk_iommu.c                          | 737 +++++++++++++++++++++
->  drivers/memory/Kconfig                             |   8 +
->  drivers/memory/Makefile                            |   1 +
->  drivers/memory/mtk-smi.c                           | 273 ++++++++
->  include/dt-bindings/memory/mt8173-larb-port.h      | 111 ++++
->  include/soc/mediatek/smi.h                         |  58 ++
->  12 files changed, 1403 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
->  create mode 100644 drivers/iommu/mtk_iommu.c
->  create mode 100644 drivers/memory/mtk-smi.c
->  create mode 100644 include/dt-bindings/memory/mt8173-larb-port.h
->  create mode 100644 include/soc/mediatek/smi.h
+Hi Matthias,
 
-Applied all, thanks.
+On 02/24/2016 09:22 PM, Matthias Brugger wrote:
+> 
+> 
+> On 24/02/16 18:10, Aleksey Makarov wrote:
+>> From: Leif Lindholm <leif.lindholm@linaro.org>
+>>
+>> In order to support selecting earlycon via either ACPI or DT, move
+>> the decision on whether to attempt ACPI configuration into the
+>> early_param handling. Then make acpi_boot_table_init() bail out if
+>> acpi_disabled.
+>>
+>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>> ---
+>>   arch/arm64/kernel/acpi.c | 62 +++++++++++++++++++++++-------------------------
+>>   1 file changed, 30 insertions(+), 32 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index d1ce8e2..3faa323 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -41,26 +41,8 @@ EXPORT_SYMBOL(acpi_disabled);
+>>   int acpi_pci_disabled = 1;    /* skip ACPI PCI scan and IRQ initialization */
+>>   EXPORT_SYMBOL(acpi_pci_disabled);
+>>
+>> -static bool param_acpi_off __initdata;
+>>   static bool param_acpi_force __initdata;
+>>
+>> -static int __init parse_acpi(char *arg)
+>> -{
+>> -    if (!arg)
+>> -        return -EINVAL;
+>> -
+>> -    /* "acpi=off" disables both ACPI table parsing and interpreter */
+>> -    if (strcmp(arg, "off") == 0)
+>> -        param_acpi_off = true;
+>> -    else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
+>> -        param_acpi_force = true;
+>> -    else
+>> -        return -EINVAL;    /* Core will print when we return error */
+>> -
+>> -    return 0;
+>> -}
+>> -early_param("acpi", parse_acpi);
+>> -
+>>   static int __init dt_scan_depth1_nodes(unsigned long node,
+>>                          const char *uname, int depth,
+>>                          void *data)
+>> @@ -74,6 +56,35 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>>       return 0;
+>>   }
+>>
+>> +static int __init parse_acpi(char *arg)
+>> +{
+>> +    if (!arg)
+>> +        return -EINVAL;
+>> +
+>> +    /*
+>> +     * Enable ACPI instead of device tree unless
+>> +     * - ACPI has been disabled explicitly (acpi=off), or
+>> +     * - the device tree is not empty (it has more than just a /chosen node)
+>> +     *   and ACPI has not been force enabled (acpi=force)
+>> +     */
+>> +    if (strcmp(arg, "off") == 0)
+>> +        return 0;
+>> +    else if (strcmp(arg, "force") == 0)
+>> +        param_acpi_force = true;
+>> +    else if (of_scan_flat_dt(dt_scan_depth1_nodes, NULL))
+> 
+> I think we should strcmp for "on" here and return an error on other values. IMHO an update to Documentation/kernel-parameters.txt would be convenient.
+
+Actually this patch is not correct at all.
+
+on x86:
+- if default is off then "acpi=force" enables it.
+- if default is on  then "acpi=off"   disables it.
+
+on ARM64 by default OF is preferred to ACPI, but ACPI is used if OF does not provide any nontrivial data.
+So we need both "force" and "off"
+- "acpi=force" forces ACPI,
+- "acpi=off" disables ACPI
+
+The patch makes incorrect code transformation, it changes the default behaviour.
+
+This patch should just be dropped.  The rest of the patchset does not depend on it.
+
+> I still wonder if we really want to change the default to ACPI disabled.
+> But that's a decision the maintainers have to take.
+
+I did not realize that the patch changes default.
+
+Thank you
+Aleksey Makarov
+
+> Regards,
+> Matthias
+> 
+>> +        return 0;
+>> +
+>> +    /*
+>> +     * ACPI is disabled at this point. Enable it in order to parse
+>> +     * the ACPI tables and carry out sanity checks
+>> +     */
+>> +    enable_acpi();
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +early_param("acpi", parse_acpi);
+>> +
+>>   /*
+>>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>    * or early_memremap() should be called here to for ACPI table mapping.
+>> @@ -181,23 +192,10 @@ out:
+>>    */
+>>   void __init acpi_boot_table_init(void)
+>>   {
+>> -    /*
+>> -     * Enable ACPI instead of device tree unless
+>> -     * - ACPI has been disabled explicitly (acpi=off), or
+>> -     * - the device tree is not empty (it has more than just a /chosen node)
+>> -     *   and ACPI has not been force enabled (acpi=force)
+>> -     */
+>> -    if (param_acpi_off ||
+>> -        (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>> +    if (acpi_disabled)
+>>           return;
+>>
+>>       /*
+>> -     * ACPI is disabled at this point. Enable it in order to parse
+>> -     * the ACPI tables and carry out sanity checks
+>> -     */
+>> -    enable_acpi();
+>> -
+>> -    /*
+>>        * If ACPI tables are initialized and FADT sanity checks passed,
+>>        * leave ACPI enabled and carry on booting; otherwise disable ACPI
+>>        * on initialization error.
+>>
