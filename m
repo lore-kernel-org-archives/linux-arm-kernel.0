@@ -1,73 +1,26 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Wed, 24 Feb 2016 20:19:22 -0800
-Subject: [GIT PULL] ARM: Keystone DTS for 4.6
-In-Reply-To: <20160225012815.GH29055@localhost>
-References: <1455959351-11524-1-git-send-email-ssantosh@kernel.org>
- <20160225012815.GH29055@localhost>
-Message-ID: <56CE80CA.80407@oracle.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 25 Feb 2016 13:26:59 +0900
+Subject: [PATCH v2 0/2] ARM: EXYNOS: Trivial cleanup samsung mach files
+In-Reply-To: <1456373400-10633-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1456373400-10633-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <56CE8293.2050901@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/24/2016 5:28 PM, Olof Johansson wrote:
-> Hi,
->
-> On Sat, Feb 20, 2016 at 01:09:10AM -0800, Santosh Shilimkar wrote:
->> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->>
->>    Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.6
->>
->> for you to fetch changes up to 5f67dae54262adeb0bfd98fa4c7a9b62548c9f25:
->>
->>    ARM: dts: keystone: Add minimum support for K2G evm (2016-02-20 00:56:06 -0800)
->>
->> ----------------------------------------------------------------
->> ARM: DTS: Add new bindings for K2G and the K2G evm
->>
->> K2G SoC family is the newest version of the Keystone family of processors.
->>
->> The technical reference manual for K2G can be found here:
->> http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
->> ----------------------------------------------------------------
->> Nishanth Menon (1):
->>        ARM: keystone: Create new binding for K2G SoC
->>
->> Vitaly Andrianov (2):
->>        ARM: dts: keystone: Add Initial DT support for TI K2G SoC family
->>        ARM: dts: keystone: Add minimum support for K2G evm
->>
->>   .../devicetree/bindings/arm/keystone/keystone.txt  |  5 ++
->>   arch/arm/boot/dts/Makefile                         |  3 +-
->>   arch/arm/boot/dts/k2g-evm.dts                      | 32 ++++++++
->>   arch/arm/boot/dts/k2g.dtsi                         | 89 ++++++++++++++++++++++
->>   arch/arm/mach-keystone/keystone.c                  |  1 +
->>   5 files changed, 129 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/boot/dts/k2g-evm.dts
->>   create mode 100644 arch/arm/boot/dts/k2g.dtsi
->
-> We've been asking people to prefix the DTS files with vendor or platform
-> prefixes, so that the namespace under arch/arm/boot/dts/ somewhat gets
-> partitioned.
->
-Sounds good though it will be hard to rename existing files now
-assuming they have been already in use.
+On 25.02.2016 13:09, Pankaj Dubey wrote:
+> This patch series cleans up mach-exynos, mach-s3c24xx, plat-samsung include
+> header files with resepct to unused header file inclusion, removes redundant
+> register offset definition. Also corrects comment section at few places.
+> 
+> Changes since v1:
+>  - Keeping back inclusion of header "platform_device.h" in exynos.c.
+>  - Removing all unused instances of S3C_UART_OFFSET from mach-exynos,
+>    mach-s3c24xx, and plat-samsung, in single patch.
+>  - Patch 1/3 is already merged in maintainer tree so not included in v2. 
 
-> It's really unfortunate that we didn't notice this when the other k2?-* entries
-> were added, especially since there's a keystone* set of files too.
->
-I missed as well about the nomenclature followed across.
+Thanks for the changes. I appreciate that!
 
-> How do you feel about moving things around and prefixing with keystone*
-> instead?  We can argue whether users are affected by a rename of already
-> existing files, or if those can be renamed too. I'll leave that up to you, but
-> k2? seems like too short a prefix here.
->
-I will definitely rename these new ones and resend the pull request.
-For older ones, let me RFC it in next merge window and if no one
-complains, will rename them too.
+Applied both patches.
 
-Regards,
-Santosh
+Best regards,
+Krzysztof
