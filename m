@@ -1,34 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Feb 2016 12:31:59 +0000
-Subject: [PATCH] soc: dove: Make reset_control_ops const
-In-Reply-To: <1456393568-28363-1-git-send-email-p.zabel@pengutronix.de>
-References: <1456393568-28363-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20160225123159.GB7219@io.lakedaemon.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 25 Feb 2016 14:04:23 +0100
+Subject: [PATCH v2] serial: xuartps: Enable OF earlycon support
+In-Reply-To: <56C5F670.50005@hurleysoftware.com>
+References: <09f2c419994281fca7968142e52d969542370d1c.1455782238.git.michal.simek@xilinx.com>
+ <56C5F670.50005@hurleysoftware.com>
+Message-ID: <56CEFBD7.40008@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi Greg,
 
-On Thu, Feb 25, 2016 at 10:46:08AM +0100, Philipp Zabel wrote:
-> The pmu_reset_ops structure is never modified. Make it const.
+On 18.2.2016 17:50, Peter Hurley wrote:
+> On 02/17/2016 11:57 PM, Michal Simek wrote:
+>> Support early console setup via DT for all listed compatible strings.
+>> Remove EARLYCON_DECLARE which was done by:
+>> "Use common framework for earlycon declarations"
+>> (sha1: 2eaa790989e03900298ad24f77f1086dbbc1aebd)
+>> when OF_EARLYCON_DECLARE is defined.
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> Since commit 203d4f347d86 ("reset: Make reset_control_ops const") marked
-> the ops pointer in struct reset_controller_dev as const, this struct can
-> be made const, too. The commit is currently sitting in the
-> arm-soc/for-next branch.
+> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
 
-Please include this in the commit body.  All except the last sentence.
+Can you please add it your queue for 4.6?
+Or can we merge it via arm-soc tree as was suggested by Arnd here?
+https://lkml.org/lkml/2016/2/16/315
 
-> ---
->  drivers/soc/dove/pmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
+Michal
 
-With that,
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-thx,
-
-Jason.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/a8164c32/attachment.sig>
