@@ -1,73 +1,203 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 25 Feb 2016 17:10:18 +0800
-Subject: [PATCH] i2c: mediatek: i2c multi transfer optimization
-In-Reply-To: <1456358467-529-1-git-send-email-liguo.zhang@mediatek.com>
-Message-ID: <201602251730.JTaXPXHL%fengguang.wu@intel.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Thu, 25 Feb 2016 14:46:03 +0530
+Subject: [PATCH] arm64: dts: Add tmu node for exynos7
+In-Reply-To: <20160225095803.719122ae@amdc2363>
+References: <1456370865-10086-1-git-send-email-pankaj.dubey@samsung.com>
+ <56CE7DAC.4000803@samsung.com> <56CE7FF3.4030101@samsung.com>
+ <20160225095803.719122ae@amdc2363>
+Message-ID: <56CEC653.4010004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liguo,
+Hi Lukasz,
 
-[auto build test WARNING on wsa/i2c/for-next]
-[also build test WARNING on next-20160224]
-[cannot apply to v4.5-rc5]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On 02/25/2016 02:28 PM, Lukasz Majewski wrote:
+> Hi pankaj.dubey,
+>
+>> Hi Krzysztof,
+>>
+>> On Thursday 25 February 2016 09:36 AM, Krzysztof Kozlowski wrote:
+>>> On 25.02.2016 12:27, Pankaj Dubey wrote:
+>>>> From: Alim Akhtar <alim.akhtar@samsung.com>
+>>>>
+>>>> This patch adds tmu node, related temprature sensor and triping
+>>>> point data for Atlas cpu core found on exynos7 SoC.
+>>>>
+>>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>>
+>>> Yours Sob is missing.
+>>>
+>>> Cc-ed Lukasz Majewski.
+>>>
+>>
+>> Due to some technical difficulty Alim posted via my account. He will
+>> re-spin this patch via his account soon.
+>
+> Looking forward to see your patches. :-)
+>
+I have resend the patch..please review.
+Thanks for your time.
 
-url:    https://github.com/0day-ci/linux/commits/Liguo-Zhang/i2c-mediatek-i2c-multi-transfer-optimization/20160225-160535
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux i2c/for-next
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All warnings (new ones prefixed by >>):
-
-   drivers/i2c/busses/i2c-mt65xx.c: In function 'mtk_i2c_transfer':
->> drivers/i2c/busses/i2c-mt65xx.c:556:6: warning: unused variable 'left_num' [-Wunused-variable]
-     int left_num = num;
-         ^
-
-vim +/left_num +556 drivers/i2c/busses/i2c-mt65xx.c
-
-173b77e8d Liguo Zhang 2015-11-09  540  	if (!i2c->auto_restart) {
-b2ed11e22 Eddie Huang 2015-05-21  541  		start_reg = I2C_TRANSAC_START;
-b2ed11e22 Eddie Huang 2015-05-21  542  	} else {
-b2ed11e22 Eddie Huang 2015-05-21  543  		start_reg = I2C_TRANSAC_START | I2C_RS_MUL_TRIG;
-b2ed11e22 Eddie Huang 2015-05-21  544  		if (left_num >= 1)
-b2ed11e22 Eddie Huang 2015-05-21  545  			start_reg |= I2C_RS_MUL_CNFG;
-b2ed11e22 Eddie Huang 2015-05-21  546  	}
-b2ed11e22 Eddie Huang 2015-05-21  547  	writew(start_reg, i2c->base + OFFSET_START);
-ce38815d3 Xudong Chen 2015-05-21  548  
-ce38815d3 Xudong Chen 2015-05-21  549  	return 0;
-ce38815d3 Xudong Chen 2015-05-21  550  }
-ce38815d3 Xudong Chen 2015-05-21  551  
-ce38815d3 Xudong Chen 2015-05-21  552  static int mtk_i2c_transfer(struct i2c_adapter *adap,
-ce38815d3 Xudong Chen 2015-05-21  553  			    struct i2c_msg msgs[], int num)
-ce38815d3 Xudong Chen 2015-05-21  554  {
-ce38815d3 Xudong Chen 2015-05-21  555  	int ret;
-ce38815d3 Xudong Chen 2015-05-21 @556  	int left_num = num;
-ce38815d3 Xudong Chen 2015-05-21  557  	struct mtk_i2c *i2c = i2c_get_adapdata(adap);
-cc7e965fd Liguo Zhang 2016-02-25  558  	struct mtk_i2c_transaction *i2c_transac = &i2c->transac;
-cc7e965fd Liguo Zhang 2016-02-25  559  
-cc7e965fd Liguo Zhang 2016-02-25  560  	i2c_transac->num = num;
-cc7e965fd Liguo Zhang 2016-02-25  561  	i2c_transac->index = 0;
-cc7e965fd Liguo Zhang 2016-02-25  562  	i2c_transac->msgs = msgs;
-cc7e965fd Liguo Zhang 2016-02-25  563  	i2c_transac->result = 0;
-cc7e965fd Liguo Zhang 2016-02-25  564  
-
-:::::: The code at line 556 was first introduced by commit
-:::::: ce38815d39eac9c73d37dd4b0039c87f15dcbe18 I2C: mediatek: Add driver for MediaTek I2C controller
-
-:::::: TO: Xudong Chen <xudong.chen@mediatek.com>
-:::::: CC: Wolfram Sang <wsa@the-dreams.de>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 53458 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/63b14e49/attachment-0001.obj>
+> Best regards,
+> ?ukasz Majewski
+>
+>>
+>> Thanks,
+>> Pankaj Dubey
+>>> Lukasz,
+>>> Your review or ack would be appreciated.
+>>>
+>>>
+>>>> ---
+>>>>   .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25
+>>>> +++++++++ .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |
+>>>> 55 ++++++++++++++++++++
+>>>> arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 +++++++
+>>>> 3 files changed, 100 insertions(+) create mode 100644
+>>>> arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi create
+>>>> mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+>>>>
+>>>> diff --git
+>>>> a/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+>>>> b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi new file
+>>>> mode 100644 index 0000000..1d6dcf2 --- /dev/null
+>>>> +++ b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+>>>> @@ -0,0 +1,25 @@
+>>>> +/*
+>>>> + * Device tree sources for Exynos7 TMU sensor configuration
+>>>> + *
+>>>> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+>>>> + *		http://www.samsung.com
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or
+>>>> modify
+>>>> + * it under the terms of the GNU General Public License version 2
+>>>> as
+>>>> + * published by the Free Software Foundation.
+>>>> + *
+>>>> + */
+>>>> +
+>>>> +#include <dt-bindings/thermal/thermal_exynos.h>
+>>>> +
+>>>> +#thermal-sensor-cells = <0>;
+>>>> +samsung,tmu_gain = <9>;
+>>>> +samsung,tmu_reference_voltage = <17>;
+>>>> +samsung,tmu_noise_cancel_mode = <4>;
+>>>> +samsung,tmu_efuse_value = <75>;
+>>>> +samsung,tmu_min_efuse_value = <15>;
+>>>> +samsung,tmu_max_efuse_value = <100>;
+>>>> +samsung,tmu_first_point_trim = <25>;
+>>>> +samsung,tmu_second_point_trim = <85>;
+>>>> +samsung,tmu_default_temp_offset = <50>;
+>>>> +samsung,tmu_cal_type = <TYPE_ONE_POINT_TRIMMING>;
+>>>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+>>>> b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi new file
+>>>> mode 100644 index 0000000..3970545
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+>>>> @@ -0,0 +1,55 @@
+>>>> +/*
+>>>> + * Device tree sources for default Exynos7 thermal zone definition
+>>>> + *
+>>>> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+>>>> + *		http://www.samsung.com
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or
+>>>> modify
+>>>> + * it under the terms of the GNU General Public License version 2
+>>>> as
+>>>> + * published by the Free Software Foundation.
+>>>> + *
+>>>> + */
+>>>> +
+>>>> +trips {
+>>>> +	cpu-alert-0 {
+>>>> +		temperature = <75000>; /* millicelsius */
+>>>> +		hysteresis = <10000>; /* millicelsius */
+>>>> +		type = "passive";
+>>>> +	};
+>>>> +	cpu-alert-1 {
+>>>> +		temperature = <80000>; /* millicelsius */
+>>>> +		hysteresis = <10000>; /* millicelsius */
+>>>> +		type = "passive";
+>>>> +	};
+>>>> +	cpu-alert-2 {
+>>>> +		temperature = <85000>; /* millicelsius */
+>>>> +		hysteresis = <10000>; /* millicelsius */
+>>>> +		type = "passive";
+>>>> +	};
+>>>> +	cpu-alert-3 {
+>>>> +		temperature = <90000>; /* millicelsius */
+>>>> +		hysteresis = <10000>; /* millicelsius */
+>>>> +		type = "passive";
+>>>> +	};
+>>>> +	cpu-alert-4 {
+>>>> +		temperature = <95000>; /* millicelsius */
+>>>> +		hysteresis = <10000>; /* millicelsius */
+>>>> +		type = "passive";
+>>>> +	};
+>>>> +	cpu-alert-5 {
+>>>> +		temperature = <100000>; /* millicelsius */
+>>>> +		hysteresis = <10000>; /* millicelsius */
+>>>> +		type = "passive";
+>>>> +	};
+>>>> +	cpu-alert-6 {
+>>>> +		temperature = <110000>; /* millicelsius */
+>>>> +		hysteresis = <10000>; /* millicelsius */
+>>>> +		type = "passive";
+>>>> +	};
+>>>> +	/* HW Trip point */
+>>>
+>>> The comment looks unnecessary, all of these are HW trip points,
+>>> right?
+>>>
+>>>> +	cpu-crit-0 {
+>>>> +		temperature = <115000>; /* millicelsius */
+>>>> +		hysteresis = <0>; /* millicelsius */
+>>>> +		type = "critical";
+>>>> +	};
+>>>> +};
+>>>> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>>>> b/arch/arm64/boot/dts/exynos/exynos7.dtsi index c662f98..fc9d130
+>>>> 100644 --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>>>> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>>>> @@ -27,6 +27,7 @@
+>>>>   		pinctrl6 = &pinctrl_fsys0;
+>>>>   		pinctrl7 = &pinctrl_fsys1;
+>>>>   		pinctrl8 = &pinctrl_bus1;
+>>>> +		tmuctrl0 = &tmuctrl_0;
+>>>
+>>> Why the alias is needed?
+>>>
+>>>>   	};
+>>>>
+>>>>   	cpus {
+>>>> @@ -538,6 +539,25 @@
+>>>>   			clocks = <&clock_peric0 PCLK_PWM>;
+>>>>   			clock-names = "timers";
+>>>>   		};
+>>>> +
+>>>> +		tmuctrl_0: tmu at 10060000 {
+>>>> +			compatible = "samsung,exynos7-tmu";
+>>>> +			reg = <0x10060000 0x200>;
+>>>> +			interrupts = <0 108 0>;
+>>>> +			clocks = <&clock_peris PCLK_TMU>,
+>>>> +				 <&clock_peris SCLK_TMU>;
+>>>> +			clock-names = "tmu_apbif", "tmu_sclk";
+>>>> +			#include "exynos7-tmu-sensor-conf.dtsi"
+>>>> +		};
+>>>> +
+>>>> +		thermal-zones {
+>>>> +			atlas_thermal: atlas-thermal {
+>>>
+>>> The atlas is a Exynos7 specific codename. The name of node should
+>>> be a general class of the device, so maybe:
+>>> 	atlas_thermal: cluster0-thermal
+>>> ?
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>>
+>
+>
+>
