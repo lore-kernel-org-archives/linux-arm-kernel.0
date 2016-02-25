@@ -1,70 +1,48 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu, 25 Feb 2016 13:31:40 -0500
-Subject: [PATCH v4 6/6] arm: lpc32xx: remove restart handler
-In-Reply-To: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1456425100-28136-7-git-send-email-slemieux.tyco@gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 25 Feb 2016 19:32:55 +0100
+Subject: [PATCH] pinctrl: lpc18xx: ensure ngroups is initialized at
+ correct place
+In-Reply-To: <1456335170-20718-1-git-send-email-colin.king@canonical.com>
+References: <1456335170-20718-1-git-send-email-colin.king@canonical.com>
+Message-ID: <CAGhQ9VykdYLA-ey2pzDVtccLPZvHNYLzmLHKyOnKr2TLLV+2yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+Hi Colin,
 
-Remove the restart handler from "mach-lpc32xx";
-this functionality is now available in the
-pnx4008 watchdog driver.
+On 24 February 2016 at 18:32, Colin King <colin.king@canonical.com> wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+>
+> The initialization of ngroups is occurring at the end of the
+> first iteration of the outer loop, which means that the
+> assignment  pins[ngroups++] = i is potentially indexing into
+> a region outside of array pins because ngroups is not initialized.
+> Instead, initialize ngroups in the inner loop before the first
+> inner loop iteration.
+>
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/pinctrl/pinctrl-lpc18xx.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-lpc18xx.c b/drivers/pinctrl/pinctrl-lpc18xx.c
+> index f0bebbe..ed1cfa7 100644
+> --- a/drivers/pinctrl/pinctrl-lpc18xx.c
+> +++ b/drivers/pinctrl/pinctrl-lpc18xx.c
+> @@ -1170,9 +1170,8 @@ static int lpc18xx_create_group_func_map(struct device *dev,
+>         u16 pins[ARRAY_SIZE(lpc18xx_pins)];
+>         int func, ngroups, i;
+>
+> -       for (func = 0; func < FUNC_MAX; ngroups = 0, func++) {
+> -
+> -               for (i = 0; i < ARRAY_SIZE(lpc18xx_pins); i++) {
+> +       for (func = 0; func < FUNC_MAX; func++) {
+> +               for (ngroups = 0, i = 0; i < ARRAY_SIZE(lpc18xx_pins); i++) {
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
-Changes from v3 to v4:
-- Switch patch #5 and #6 order.
+Good catch!
 
-Changes from v2 to v3:
-- move the change to "phy3250.c" into a separate patch.
+Reviewed-by: Joachim Eastwood <manabian@gmail.com>
 
-Changes from v1 to v2:
-- new patch in v2.
 
- arch/arm/mach-lpc32xx/common.c | 15 ---------------
- arch/arm/mach-lpc32xx/common.h |  1 -
- 2 files changed, 16 deletions(-)
-
-diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-index 716e83e..5b7a1e7 100644
---- a/arch/arm/mach-lpc32xx/common.c
-+++ b/arch/arm/mach-lpc32xx/common.c
-@@ -194,21 +194,6 @@ void __init lpc32xx_map_io(void)
- 	iotable_init(lpc32xx_io_desc, ARRAY_SIZE(lpc32xx_io_desc));
- }
- 
--void lpc23xx_restart(enum reboot_mode mode, const char *cmd)
--{
--	/* Make sure WDT clocks are enabled */
--	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
--		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
--
--	/* Instant assert of RESETOUT_N with pulse length 1mS */
--	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
--	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
--
--	/* Wait for watchdog to reset system */
--	while (1)
--		;
--}
--
- static int __init lpc32xx_check_uid(void)
- {
- 	u32 uid[4];
-diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
-index 1cd8853..2d90801 100644
---- a/arch/arm/mach-lpc32xx/common.h
-+++ b/arch/arm/mach-lpc32xx/common.h
-@@ -30,7 +30,6 @@ extern void lpc32xx_timer_init(void);
- extern void __init lpc32xx_init_irq(void);
- extern void __init lpc32xx_map_io(void);
- extern void __init lpc32xx_serial_init(void);
--extern void lpc23xx_restart(enum reboot_mode, const char *);
- 
- 
- /*
--- 
-1.8.3.1
+regards,
+Joachim Eastwood
