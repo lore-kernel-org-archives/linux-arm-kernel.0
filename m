@@ -1,87 +1,116 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 25 Feb 2016 14:37:10 +0100
-Subject: [PATCH 2/9] clocksource/drivers/rockchip: Add err handle for
- rk_timer_init
+Date: Thu, 25 Feb 2016 14:37:12 +0100
+Subject: [PATCH 4/9] clocksource/drivers/lpc32xx: Support periodic mode
 In-Reply-To: <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
 References: <56CF00F6.9010301@linaro.org>
  <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1456407438-6131-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1456407438-6131-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Lin <shawn.lin@rock-chips.com>
+From: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 
-Currently rockchip_timer doesn't do some basic cleanup work when
-failing to init the timer. Let's add err handle routine to deal
-with all the err cases.
+This commit adds the support for periodic mode. This is done by not
+setting the MR0S (Stop on TnMR0) bit on MCR, thus allowing
+interrupts to be periodically generated on MR0 matches.
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+In order to do this, move the initial configuration that is specific to
+the one-shot mode to set_state_oneshot().
+
+Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Joachim Eastwood <manabian@gmail.com>
+Tested-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/clocksource/rockchip_timer.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ drivers/clocksource/time-lpc32xx.c | 39 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 34 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 8c77a52..b991b28 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -122,23 +122,23 @@ static void __init rk_timer_init(struct device_node *np)
- 	pclk = of_clk_get_by_name(np, "pclk");
- 	if (IS_ERR(pclk)) {
- 		pr_err("Failed to get pclk for '%s'\n", TIMER_NAME);
--		return;
-+		goto out_unmap;
- 	}
+diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+index 50d1a63..5694edd 100644
+--- a/drivers/clocksource/time-lpc32xx.c
++++ b/drivers/clocksource/time-lpc32xx.c
+@@ -43,6 +43,7 @@
+ struct lpc32xx_clock_event_ddata {
+ 	struct clock_event_device evtdev;
+ 	void __iomem *base;
++	u32 ticks_per_jiffy;
+ };
  
- 	if (clk_prepare_enable(pclk)) {
- 		pr_err("Failed to enable pclk for '%s'\n", TIMER_NAME);
--		return;
-+		goto out_unmap;
- 	}
+ /* Needed for the sched clock */
+@@ -85,11 +86,39 @@ static int lpc32xx_clkevt_shutdown(struct clock_event_device *evtdev)
  
- 	timer_clk = of_clk_get_by_name(np, "timer");
- 	if (IS_ERR(timer_clk)) {
- 		pr_err("Failed to get timer clock for '%s'\n", TIMER_NAME);
--		return;
-+		goto out_timer_clk;
- 	}
- 
- 	if (clk_prepare_enable(timer_clk)) {
- 		pr_err("Failed to enable timer clock\n");
--		return;
-+		goto out_timer_clk;
- 	}
- 
- 	bc_timer.freq = clk_get_rate(timer_clk);
-@@ -146,7 +146,7 @@ static void __init rk_timer_init(struct device_node *np)
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
- 		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
--		return;
-+		goto out_irq;
- 	}
- 
- 	ce->name = TIMER_NAME;
-@@ -164,10 +164,19 @@ static void __init rk_timer_init(struct device_node *np)
- 	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
- 	if (ret) {
- 		pr_err("Failed to initialize '%s': %d\n", TIMER_NAME, ret);
--		return;
-+		goto out_irq;
- 	}
- 
- 	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+ static int lpc32xx_clkevt_oneshot(struct clock_event_device *evtdev)
+ {
++	struct lpc32xx_clock_event_ddata *ddata =
++		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
 +
-+	return;
+ 	/*
+ 	 * When using oneshot, we must also disable the timer
+ 	 * to wait for the first call to set_next_event().
+ 	 */
+-	return lpc32xx_clkevt_shutdown(evtdev);
++	writel_relaxed(0, ddata->base + LPC32XX_TIMER_TCR);
 +
-+out_irq:
-+	clk_disable_unprepare(timer_clk);
-+out_timer_clk:
-+	clk_disable_unprepare(pclk);
-+out_unmap:
-+	iounmap(bc_timer.base);
++	/* Enable interrupt, reset on match and stop on match (MCR). */
++	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
++		       LPC32XX_TIMER_MCR_MR0S, ddata->base + LPC32XX_TIMER_MCR);
++	return 0;
++}
++
++static int lpc32xx_clkevt_periodic(struct clock_event_device *evtdev)
++{
++	struct lpc32xx_clock_event_ddata *ddata =
++		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
++
++	/* Enable interrupt and reset on match. */
++	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R,
++		       ddata->base + LPC32XX_TIMER_MCR);
++
++	/*
++	 * Place timer in reset and program the delta in the match
++	 * channel 0 (MR0).
++	 */
++	writel_relaxed(LPC32XX_TIMER_TCR_CRST, ddata->base + LPC32XX_TIMER_TCR);
++	writel_relaxed(ddata->ticks_per_jiffy, ddata->base + LPC32XX_TIMER_MR0);
++	writel_relaxed(LPC32XX_TIMER_TCR_CEN, ddata->base + LPC32XX_TIMER_TCR);
++
++	return 0;
  }
  
- CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+ static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
+@@ -107,11 +136,13 @@ static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
+ static struct lpc32xx_clock_event_ddata lpc32xx_clk_event_ddata = {
+ 	.evtdev = {
+ 		.name			= "lpc3220 clockevent",
+-		.features		= CLOCK_EVT_FEAT_ONESHOT,
++		.features		= CLOCK_EVT_FEAT_ONESHOT |
++					  CLOCK_EVT_FEAT_PERIODIC,
+ 		.rating			= 300,
+ 		.set_next_event		= lpc32xx_clkevt_next_event,
+ 		.set_state_shutdown	= lpc32xx_clkevt_shutdown,
+ 		.set_state_oneshot	= lpc32xx_clkevt_oneshot,
++		.set_state_periodic	= lpc32xx_clkevt_periodic,
+ 	},
+ };
+ 
+@@ -210,17 +241,15 @@ static int __init lpc32xx_clockevent_init(struct device_node *np)
+ 	/*
+ 	 * Disable timer and clear any pending interrupt (IR) on match
+ 	 * channel 0 (MR0). Clear the prescaler as it's not used.
+-	 * Enable interrupt, reset on match and stop on match (MCR).
+ 	 */
+ 	writel_relaxed(0, base + LPC32XX_TIMER_TCR);
+ 	writel_relaxed(0, base + LPC32XX_TIMER_PR);
+ 	writel_relaxed(0, base + LPC32XX_TIMER_CTCR);
+ 	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, base + LPC32XX_TIMER_IR);
+-	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
+-		       LPC32XX_TIMER_MCR_MR0S, base + LPC32XX_TIMER_MCR);
+ 
+ 	rate = clk_get_rate(clk);
+ 	lpc32xx_clk_event_ddata.base = base;
++	lpc32xx_clk_event_ddata.ticks_per_jiffy = DIV_ROUND_CLOSEST(rate, HZ);
+ 	clockevents_config_and_register(&lpc32xx_clk_event_ddata.evtdev,
+ 					rate, 1, -1);
+ 
 -- 
 1.9.1
