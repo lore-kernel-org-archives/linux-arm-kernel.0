@@ -1,46 +1,68 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu, 25 Feb 2016 11:50:23 -0500
-Subject: [PATCH v3 6/6] arm: lpc32xx: phy3250 remove restart hook
-In-Reply-To: <2913764.6ZXbKHTUYJ@wuerfel>
-References: <1456336018-6620-1-git-send-email-slemieux.tyco@gmail.com>
- <1456336018-6620-7-git-send-email-slemieux.tyco@gmail.com>
- <2913764.6ZXbKHTUYJ@wuerfel>
-Message-ID: <1456419023.25197.16.camel@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Feb 2016 16:56:01 +0000
+Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
+In-Reply-To: <CAKv+Gu_dXEQ1U2XY2=xX7R8MoPB0jKM7Vh3zgZB9tBuMfQYuGg@mail.gmail.com>
+References: <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160225160714.GA16546@arm.com>
+ <CAKv+Gu94LAAwj2f9Sj9imn68V0VTF+NOtUPsE3tQnVzNDhAATw@mail.gmail.com>
+ <20160225162622.GC16546@arm.com>
+ <CAKv+Gu8Qx21M=ymne1S4CQUFrXKHTnWFygGBLtXbxiUD9GkiWw@mail.gmail.com>
+ <20160225164208.GD16546@arm.com>
+ <CAKv+Gu-REUdVJF-_wGU=LRaVRZqsD9bgny9S52pMLp+Es4E-1A@mail.gmail.com>
+ <20160225164630.GF16546@arm.com>
+ <CAKv+Gu8GYhPeXvgpAoHxYTYfqEHLqqLHVU9U6o3nvxew8dGo6A@mail.gmail.com>
+ <CAKv+Gu_dXEQ1U2XY2=xX7R8MoPB0jKM7Vh3zgZB9tBuMfQYuGg@mail.gmail.com>
+Message-ID: <20160225165601.GG16546@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wed, 2016-02-24 at 22:20 +0100, Arnd Bergmann wrote:
-> On Wednesday 24 February 2016 12:46:58 Sylvain Lemieux wrote:
-> > From: Sylvain Lemieux <slemieux@tycoint.com>
-> > 
-> > Remove the restart hook assignment from phy3250;
-> > this functionality is now managed by
-> > the pnx4008 watchdog driver.
-> > 
-> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
-> > ---
-> > Note:
-> > This patch was generated with the option "--unified=2" to ensure
-> > it can be apply before or after the following git pull request
-> > for the LPC32xx platform:
-> > - http://permalink.gmane.org/gmane.linux.ports.arm.kernel/477137
-> > - http://permalink.gmane.org/gmane.linux.ports.arm.kernel/477138
+On Thu, Feb 25, 2016 at 05:50:17PM +0100, Ard Biesheuvel wrote:
+> On 25 February 2016 at 17:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 25 February 2016 at 17:46, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Thu, Feb 25, 2016 at 05:43:35PM +0100, Ard Biesheuvel wrote:
+> >>> On 25 February 2016 at 17:42, Will Deacon <will.deacon@arm.com> wrote:
+> >>> > On Thu, Feb 25, 2016 at 05:33:25PM +0100, Ard Biesheuvel wrote:
+> >>> >> AFAIK, gcc never uses x18 (the platform register) so we may be able to
+> >>> >> use that instead. We'd need confirmation from the toolchain guys,
+> >>> >> though ...
+> >>> >
+> >>> > In fact, a better thing to do is probably for the atomic code to
+> >>> > save/restore those register explicitly and then remove them from the
+> >>> > cflags above.
+> >>> >
+> >>> > I'll try hacking something together...
+> >>> >
+> >>>
+> >>> That would be more correct, indeed. Also, the PLT can only use br
+> >>> <reg> so it will always enter the callee with the preserved value
+> >>> stacked, and so the callee needs to be modified in any case.
+> >>
+> >> Wait -- why does the callee need to be modified here? It has no idea
+> >> about whether or not it was invoked via a PLT.
+> >>
+> >
+> > No, it doesn't, and that is exactly the problem: the PLT must end in a
+> > br <reg> instruction because that is the only branch instruction with
+> > unlimited range. That means you will always enter the callee with its
+> > address in some register rather than the value that should have been
+> > preserved. I don't see a way to manage that from the callee
+> >
 > 
-> This patch really needs to come before patch 5 in the series, or
-> you could combine the two into a single patch.
-> 
-There is more change coming to the LPC32xx platform that will 
-modify "phy3250.c" (LPC32xx irqchip driver).
+> *caller! dammit
 
-You can refer to the following link for details:
-http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
+The caller can do:
 
-I prefer to keep the change for "phy3250.c" in a separate patch.
-I will submit a new revision later today to reverse patch order.
+save x16, 17
+bl plt
+restore x16, x17
 
+the plt will do:
 
-Sylvain Lemieux
+get_addr_of_callee_into_x16_and_clobber_x17_or_something
+br callee
 
-> 	Arnd
+then the callee will be compiled with all those weird options, but *not*
+the ones specifying x16 and x17. That means it can happily use those guys
+as scratch, because the caller will take care of them.
+
+Will
