@@ -1,41 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 15:16:46 +0100
-Subject: [PATCH v6] Fix sun7i pin assignment for IRQ's
-In-Reply-To: <20160225005412.GB4736@lukather>
-References: <1456161251-2303-1-git-send-email-henry@nitronetworks.nl>
- <20160225005412.GB4736@lukather>
-Message-ID: <CACRpkdYmf8-ZPV5q9H3cdZtQDUkbx=bcrVg9a8M3zEAifXxF9A@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 25 Feb 2016 15:22:26 +0100
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.6 (#1)
+In-Reply-To: <20160225005543.GA29055@localhost> (Olof Johansson's message of
+ "Wed, 24 Feb 2016 16:55:43 -0800")
+References: <878u2js4cn.fsf@free-electrons.com>
+ <20160225005543.GA29055@localhost>
+Message-ID: <87wppsoonx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 1:54 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
->
-> Usually, the patch title should be prefixed by the subsystem it
-> applies to so that maintainer and reviewers can spot it more
-> easily. In this case, it would be something like
->
-> pinctrl: sunxi: Fix sun7i pin assignment for IRQ's
->
-> On Mon, Feb 22, 2016 at 06:14:07PM +0100, Henry Paulissen wrote:
->> After testing IRQ pins we found some bugs in the pinctrl declaration.
->> Both PI* and PC* pins didn't work. PI* pins seemed to be connected
->> to the wrong mux and PC* pins waren't working at all.
->>
->> Please note that the A20 soc manual is contradicting between version
->> and even within the same document for both the PI and PC pins.
->
-> Which sections are in contradiction?
->
->> Patch is based on testing with the hardware itself.
->
-> How did you test it? Using the sysfs API, or did you have any hardware
-> connected to it?
+Hi Olof,
+ 
+ On jeu., f?vr. 25 2016, Olof Johansson <olof@lixom.net> wrote:
 
-I'm taking this patch out of my tree now following Maxime's comments.
+> On Wed, Feb 17, 2016 at 05:12:40PM +0100, Gregory CLEMENT wrote:
+>> Hi,
+>> 
+>> Here is the first pull request for arm64 for mvebu for v4.6. It is even
+>> the first pull request ever for arm64 for us. Let me know if I am doing
+>> it wrong.
+>> 
+>> I split my initial series[1] in two parts: device tree related and non
+>> device tree related. I will also let the driver maintainers directly
+>> take the related patch for ATA and serial.
+>> 
+>> For this non device tree part I have a dependency with the irchip
+>> subsystem. For this I based on the irqchip/mvebu immutable branch form
+>> Jason Cooper located at git://git.infradead.org/users/jcooper/linux.git.
+>> 
+>> Thanks,
+>> 
+>> Gregory
+>> 
+>> [1]: https://lkml.org/lkml/2016/2/16/735
+>> 
+>> The following changes since commit 63131b636a0ec969e8b98122c1a928b5a2649d3b:
+>> 
+>>   irqchip/armada-370-xp: Do not enable it by default when ARCH_MVEBU is selected (2016-02-16 18:11:39 +0000)
+>
+> PLease do this by explicit merge instead in the future, so it's obvious that
+> there is an external branch merged in history later.
+>
+> That way, doing the full diffstat including the merge is just fine too.
 
-I'm a bit annoyed that it is iterating too quickly as well, I will
-wait and see for a while.
+Actually I did an explicite merge but my start commit for the pull
+request was the last commit of the merged branch. So if I undrestand
+well, I sould have used the v4.5-rc2 here as start commit.
 
-Yours,
-Linus Walleij
+Thanks,
+
+Gregory
+>
+>
+>> are available in the git repository at:
+>> 
+>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.6-1
+>> 
+>> for you to fetch changes up to e772ca05cceb1480bdc7a7579e042b18558d0959:
+>> 
+>>   arm64: defconfig: enable Armada 3700 related config (2016-02-17 16:23:20 +0100)
+>
+> Merged, thanks!
+>
+>
+> -Olof
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
