@@ -1,88 +1,137 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 25 Feb 2016 16:50:19 +0200
-Subject: [PATCH 03/11] ARM: DTS: dra7: Enable eDMA
+Date: Thu, 25 Feb 2016 16:50:18 +0200
+Subject: [PATCH 02/11] ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1
 In-Reply-To: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1456411827-23962-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1456411827-23962-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7 family has eDMA available along with the sDMA and in some cases it is
-better suited for servicing peripherals.
+Add hwmod data for the eDMA blocks:
+ - TPCC: Third-party channel controller
+ - TPTC0: Third-party transfer controller 0
+ - TPTC1: Third-party transfer controller 1
 
-Add the needed nodes for eDMA to be usable:
-edma-tpcc, edma-tptc0/1 and the edma-xbar.
+The TPCC is following it's clock and power domain. This means that
+the hwmod can not control it's status.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 48 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 88 +++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 114286dbee25..d2d2568b5695 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -170,6 +170,15 @@
- 					ti,dma-safe-map = <0>;
- 					dma-masters = <&sdma>;
- 				};
-+
-+				edma_xbar: dma-router at c78 {
-+					compatible = "ti,dra7-dma-crossbar";
-+					reg = <0xc78 0x7c>;
-+					#dma-cells = <2>;
-+					dma-requests = <204>;
-+					ti,dma-safe-map = <0>;
-+					dma-masters = <&edma>;
-+				};
- 			};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index b61355e2a771..3953ad031c43 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -430,6 +430,67 @@ static struct omap_hwmod dra7xx_dma_system_hwmod = {
+ };
  
- 			cm_core_aon: cm_core_aon at 5000 {
-@@ -324,6 +333,45 @@
- 			dma-requests = <127>;
- 		};
+ /*
++ * 'tpcc' class
++ *
++ */
++static struct omap_hwmod_class dra7xx_tpcc_hwmod_class = {
++	.name		= "tpcc",
++};
++
++static struct omap_hwmod dra7xx_tpcc_hwmod = {
++	.name		= "tpcc",
++	.class		= &dra7xx_tpcc_hwmod_class,
++	.clkdm_name	= "l3main1_clkdm",
++	.main_clk	= "l3_iclk_div",
++	.prcm		= {
++		.omap4	= {
++			.clkctrl_offs = DRA7XX_CM_L3MAIN1_TPCC_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L3MAIN1_TPCC_CONTEXT_OFFSET,
++		},
++	},
++};
++
++/*
++ * 'tptc' class
++ *
++ */
++static struct omap_hwmod_class dra7xx_tptc_hwmod_class = {
++	.name		= "tptc",
++};
++
++/* tptc0 */
++static struct omap_hwmod dra7xx_tptc0_hwmod = {
++	.name		= "tptc0",
++	.class		= &dra7xx_tptc_hwmod_class,
++	.clkdm_name	= "l3main1_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
++	.main_clk	= "l3_iclk_div",
++	.prcm		= {
++		.omap4	= {
++			.clkctrl_offs = DRA7XX_CM_L3MAIN1_TPTC1_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L3MAIN1_TPTC1_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
++/* tptc1 */
++static struct omap_hwmod dra7xx_tptc1_hwmod = {
++	.name		= "tptc1",
++	.class		= &dra7xx_tptc_hwmod_class,
++	.clkdm_name	= "l3main1_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
++	.main_clk	= "l3_iclk_div",
++	.prcm		= {
++		.omap4	= {
++			.clkctrl_offs = DRA7XX_CM_L3MAIN1_TPTC2_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L3MAIN1_TPTC2_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
++/*
+  * 'dss' class
+  *
+  */
+@@ -2563,6 +2624,30 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__dma_system = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
  
-+		edma: edma at 43300000 {
-+			compatible = "ti,edma3-tpcc";
-+			ti,hwmods = "tpcc";
-+			reg = <0x43300000 0x100000>;
-+			reg-names = "edma3_cc";
-+			interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "edma3_ccint", "emda3_mperr",
-+					  "edma3_ccerrint";
-+			dma-requests = <64>;
-+			#dma-cells = <2>;
++/* l3_main_1 -> tpcc */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__tpcc = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_tpcc_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU,
++};
 +
-+			ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 0>;
++/* l3_main_1 -> tptc0 */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__tptc0 = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_tptc0_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU,
++};
 +
-+			/*
-+			 * memcpy is disabled, can be enabled with:
-+			 * ti,edma-memcpy-channels = <20 21>;
-+			 * for example. Note that these channels need to be
-+			 * masked in the xbar as well.
-+			 */
-+		};
++/* l3_main_1 -> tptc1 */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__tptc1 = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_tptc1_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU,
++};
 +
-+		edma_tptc0: tptc at 43400000 {
-+			compatible = "ti,edma3-tptc";
-+			ti,hwmods = "tptc0";
-+			reg =	<0x43400000 0x100000>;
-+			interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "edma3_tcerrint";
-+		};
-+
-+		edma_tptc1: tptc at 43500000 {
-+			compatible = "ti,edma3-tptc";
-+			ti,hwmods = "tptc1";
-+			reg =	<0x43500000 0x100000>;
-+			interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "edma3_tcerrint";
-+		};
-+
- 		gpio1: gpio at 4ae10000 {
- 			compatible = "ti,omap4-gpio";
- 			reg = <0x4ae10000 0x200>;
+ static struct omap_hwmod_addr_space dra7xx_dss_addrs[] = {
+ 	{
+ 		.name		= "family",
+@@ -3380,6 +3465,9 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l3_main_1__mcasp3,
+ 	&dra7xx_gmac__mdio,
+ 	&dra7xx_l4_cfg__dma_system,
++	&dra7xx_l3_main_1__tpcc,
++	&dra7xx_l3_main_1__tptc0,
++	&dra7xx_l3_main_1__tptc1,
+ 	&dra7xx_l3_main_1__dss,
+ 	&dra7xx_l3_main_1__dispc,
+ 	&dra7xx_l3_main_1__hdmi,
 -- 
 2.7.1
