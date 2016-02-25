@@ -1,77 +1,151 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 25 Feb 2016 17:33:25 +0100
-Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
-In-Reply-To: <20160225162622.GC16546@arm.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160225160714.GA16546@arm.com>
- <CAKv+Gu94LAAwj2f9Sj9imn68V0VTF+NOtUPsE3tQnVzNDhAATw@mail.gmail.com>
- <20160225162622.GC16546@arm.com>
-Message-ID: <CAKv+Gu8Qx21M=ymne1S4CQUFrXKHTnWFygGBLtXbxiUD9GkiWw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 25 Feb 2016 09:37:16 -0700
+Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
+In-Reply-To: <20160224173511.GF25385@red-moon>
+References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <CANLsYkzvB0GbPeYHrcLtUz8DMHJh4FA5RVwVZ-UAm3BCznB_3w@mail.gmail.com>
+ <20160224173511.GF25385@red-moon>
+Message-ID: <CANLsYkwYjPeQ=syGk7ofb_yWtzDYoNK6Yf8MLPxhMkN31+xE3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2016 at 17:26, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Feb 25, 2016 at 05:12:01PM +0100, Ard Biesheuvel wrote:
->> On 25 February 2016 at 17:07, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
->> >> +struct plt_entry {
->> >> +     /*
->> >> +      * A program that conforms to the AArch64 Procedure Call Standard
->> >> +      * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
->> >> +      * IP1 (x17) may be inserted at any branch instruction that is
->> >> +      * exposed to a relocation that supports long branches. Since that
->> >> +      * is exactly what we are dealing with here, we are free to use x16
->> >> +      * as a scratch register in the PLT veneers.
->> >> +      */
->> >> +     __le32  mov0;   /* movn x16, #0x....                    */
->> >> +     __le32  mov1;   /* movk x16, #0x...., lsl #16           */
->> >> +     __le32  mov2;   /* movk x16, #0x...., lsl #32           */
->> >> +     __le32  br;     /* br   x16                             */
->> >> +};
->> >
->> > I'm worried about this code when CONFIG_ARM64_LSE_ATOMICS=y, but we don't
->> > detect them on the CPU at runtime. In this case, all atomic operations
->> > are moved out-of-line and called using a bl instruction from inline asm.
->> >
->> > The out-of-line code is compiled with magic GCC options
+On 24 February 2016 at 10:35, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Feb 24, 2016 at 09:20:22AM -0700, Mathieu Poirier wrote:
+>> On 23 February 2016 at 11:22, Lorenzo Pieralisi
+>
+> [...]
+>
+>> > +static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
+>> > +                            void *v)
+>> > +{
+>> > +       struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
+>> > +       struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
+>> > +       int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
+>> > +
+>> > +       if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
+>> > +               return NOTIFY_DONE;
+>> > +
+>> > +       /*
+>> > +        * Always reset the PMU registers on power-up even if
+>> > +        * there are no events running.
+>> > +        */
+>> > +       if (cmd == CPU_PM_EXIT && armpmu->reset)
+>> > +               armpmu->reset(armpmu);
 >>
->> Which options are those exactly?
+>> I think this patch does the right thing but I can't get the above
+>> reset.  Wouldn't it be better to do the reset as part of the
+>> CPU_PM_EXIT case below?  At this point nothing tells us the CPU won't
+>> go back down before the event is enabled, wasting the cycle needed to
+>> reset the PMU.
 >
-> # Tell the compiler to treat all general purpose registers as
-> # callee-saved, which allows for efficient runtime patching of the bl
-> # instruction in the caller with an atomic instruction when supported by
-> # the CPU. Result and argument registers are handled correctly, based on
-> # the function prototype.
-> lib-$(CONFIG_ARM64_LSE_ATOMICS) += atomic_ll_sc.o
-> CFLAGS_atomic_ll_sc.o   := -fcall-used-x0 -ffixed-x1 -ffixed-x2         \
->                    -ffixed-x3 -ffixed-x4 -ffixed-x5 -ffixed-x6          \
->                    -ffixed-x7 -fcall-saved-x8 -fcall-saved-x9           \
->                    -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12   \
->                    -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15   \
->                    -fcall-saved-x16 -fcall-saved-x17 -fcall-saved-x18
+> The logic goes, if the cpu is woken up and it has no events enabled,
+> if we do not reset it (mind, ->reset here sets the PMU register values
+> to a sane default, some of them are architecturally UNKNOWN on reset, it
+> does NOT reset the PMU) _and_ we subsequently install an event on it we
+> do have a problem, that's why whenever a core gets out of low-power we
+> have to reset its pmu.
 >
+> Does it make sense ?
 
-Yikes. Is that safe?
+Ok, I understand the context and your solution will work.
 
->> > to force the
->> > explicit save/restore of all used registers (see arch/arm64/lib/Makefile),
->> > otherwise we'd have to clutter the inline asm with constraints that
->> > wouldn't be needed had we managed to patch the bl with an LSE atomic
->> > instruction.
+Isn't there a flag somewhere in the PMU registers that indicate the
+status has been lost due a loss of power?  If so I think the best
+solution is to probe that flag when an event gets installed.  If the
+unit has gone through a power down the reset can be done before
+installing the event.
+
+Mathieu
+
+>
+> Thanks,
+> Lorenzo
+>
+>>
+>> Thanks,
+>> Mathieu
+>>
+>> > +
+>> > +       if (!enabled)
+>> > +               return NOTIFY_OK;
+>> > +
+>> > +       switch (cmd) {
+>> > +       case CPU_PM_ENTER:
+>> > +               armpmu->stop(armpmu);
+>> > +               cpu_pm_pmu_setup(armpmu, cmd);
+>> > +               break;
+>> > +       case CPU_PM_EXIT:
+>> > +               cpu_pm_pmu_setup(armpmu, cmd);
+>> > +       case CPU_PM_ENTER_FAILED:
+>> > +               armpmu->start(armpmu);
+>> > +               break;
+>> > +       default:
+>> > +               return NOTIFY_DONE;
+>> > +       }
+>> > +
+>> > +       return NOTIFY_OK;
+>> > +}
+>> > +
+>> > +static int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu)
+>> > +{
+>> > +       cpu_pmu->cpu_pm_nb.notifier_call = cpu_pm_pmu_notify;
+>> > +       return cpu_pm_register_notifier(&cpu_pmu->cpu_pm_nb);
+>> > +}
+>> > +
+>> > +static void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu)
+>> > +{
+>> > +       cpu_pm_unregister_notifier(&cpu_pmu->cpu_pm_nb);
+>> > +}
+>> > +#else
+>> > +static inline int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu) { return 0; }
+>> > +static inline void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu) { }
+>> > +#endif
+>> > +
+>> >  static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>> >  {
+>> >         int err;
+>> > @@ -725,6 +813,10 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>> >         if (err)
+>> >                 goto out_hw_events;
 >> >
->> > If you're emitting a PLT, couldn't we end up with silent corruption of
->> > x16 for modules using out-of-line atomics like this?
+>> > +       err = cpu_pm_pmu_register(cpu_pmu);
+>> > +       if (err)
+>> > +               goto out_unregister;
+>> > +
+>> >         for_each_possible_cpu(cpu) {
+>> >                 struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
+>> >                 raw_spin_lock_init(&events->pmu_lock);
+>> > @@ -746,6 +838,8 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>> >
+>> >         return 0;
+>> >
+>> > +out_unregister:
+>> > +       unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
+>> >  out_hw_events:
+>> >         free_percpu(cpu_hw_events);
+>> >         return err;
+>> > @@ -753,6 +847,7 @@ out_hw_events:
+>> >
+>> >  static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+>> >  {
+>> > +       cpu_pm_pmu_unregister(cpu_pmu);
+>> >         unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
+>> >         free_percpu(cpu_pmu->hw_events);
+>> >  }
+>> > diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+>> > index 83b5e34..9ffa316 100644
+>> > --- a/include/linux/perf/arm_pmu.h
+>> > +++ b/include/linux/perf/arm_pmu.h
+>> > @@ -107,6 +107,7 @@ struct arm_pmu {
+>> >         struct platform_device  *plat_device;
+>> >         struct pmu_hw_events    __percpu *hw_events;
+>> >         struct notifier_block   hotplug_nb;
+>> > +       struct notifier_block   cpu_pm_nb;
+>> >  };
+>> >
+>> >  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+>> > --
+>> > 2.5.1
 >> >
 >>
->> If you violate the AAPCS64 ABI, then obviously the claim above does not hold.
->
-> Indeed, but this is what mainline is doing today and I'm not keen on
-> breaking it. One way to fix it would be to generate a different type of
-> plt for branches to the atomic functions that would use the stack
-> instead of x16.
->
-
-AFAIK, gcc never uses x18 (the platform register) so we may be able to
-use that instead. We'd need confirmation from the toolchain guys,
-though ...
