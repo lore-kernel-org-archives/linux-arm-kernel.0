@@ -1,54 +1,41 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 25 Feb 2016 15:34:03 +0100
-Subject: [PATCH v2 00/13] SYSMMU driver update and support for Exynos 5433
-In-Reply-To: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
-References: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20160225143403.GC16675@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Feb 2016 15:34:37 +0100
+Subject: [PATCH] ARM: sa1100: make sa1100_register_uart_fns a function
+In-Reply-To: <CACRpkdbJpYD2Ke-f2QP+-fy_LcxhiV99OEH_D=CMtSvedEveVA@mail.gmail.com>
+References: <1456238094-778916-1-git-send-email-arnd@arndb.de>
+ <CACRpkdbJpYD2Ke-f2QP+-fy_LcxhiV99OEH_D=CMtSvedEveVA@mail.gmail.com>
+Message-ID: <133317017.7Cfvjc5WMX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 03:12:47PM +0100, Marek Szyprowski wrote:
-> Marek Szyprowski (13):
->   iommu: exynos: rework iommu group initialization
->   iommu: exynos: add support for IOMMU_DOMAIN_DMA domain type
->   iommu: exynos: remove ARM-specific cache flush interface
->   iommu: exynos: simplify master clock operations
->   iommu: exynos: refactor code (no direct register access)
->   iommu: exynos: refactor fault handling code
->   iommu: exynos: refactor init config code
->   iommu: exynos: unify code for fldp cache invalidation
->   iommu: exynos: add support for SYSMMU controller with bogus version
->     reg
->   iommu: exynos: update device tree documentation
->   iommu: exynos: add support for v5 SYSMMU
->   iommu: exynos: add Maintainers entry for Exynos SYSMMU driver
->   iommu: exynos: support multiple attach_device calls
+On Thursday 25 February 2016 14:18:44 Linus Walleij wrote:
+> On Tue, Feb 23, 2016 at 3:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
->  .../devicetree/bindings/iommu/samsung,sysmmu.txt   |  22 +-
->  MAINTAINERS                                        |   6 +
->  drivers/iommu/Kconfig                              |   2 +-
->  drivers/iommu/exynos-iommu.c                       | 598 ++++++++++++---------
->  4 files changed, 372 insertions(+), 256 deletions(-)
+> > Calling sa1100_register_uart_fns() leaves the port structure
+> > unused when CONFIG_SERIAL_SA1100 is disabled, and we get a
+> > compiler warning about that:
+> >
+> > arch/arm/mach-sa1100/badge4.c:317:31: warning: 'badge4_port_fns' defined but not used [-Wunused-variable]
+> >  static struct sa1100_port_fns badge4_port_fns __initdata = {
+> >
+> > This turns the two empty macros into empty inline functions,
+> > which has the same effect, but lets the compiler know that the
+> > variables are intentionally unused.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> >  include/linux/platform_data/sa11x0-serial.h | 8 ++++++--
+> 
+> It looks like you should send this to Greg?
 
-Applied all patches and changed the subjects to:
+Yes, good point.
 
-Marek Szyprowski (13):
-      iommu/exynos: Rework iommu group initialization
-      iommu/exynos: Add support for IOMMU_DOMAIN_DMA domain type
-      iommu/exynos: Remove ARM-specific cache flush interface
-      iommu/exynos: Simplify master clock operations
-      iommu/exynos: Refactor code (no direct register access)
-      iommu/exynos: Refactor fault handling code
-      iommu/exynos: Refactor init config code
-      iommu/exynos: Unify code for fldp cache invalidation
-      iommu/exynos: Add support for SYSMMU controller with bogus version reg
-      iommu/exynos: Update device tree documentation
-      iommu/exynos: Add support for v5 SYSMMU
-      iommu/exynos: Add Maintainers entry for Exynos SYSMMU driver
-      iommu/exynos: Support multiple attach_device calls
+The file was traditionally under arch/arm (or include/asm-arm before
+that), but considering it as part of the driver makes slightly
+more sense now.
 
-Please make sure you follow this sheme for future iommu patches too.
+Sent out with a modified subject and your Ack to Greg now.
 
-Thanks,
-
-	Joerg
+	Arnd
