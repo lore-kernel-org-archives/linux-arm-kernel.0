@@ -1,70 +1,46 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 25 Feb 2016 10:12:13 +0800
-Subject: [PATCH v3 2/6] power-domain: allow domains only handling idle requests
+Date: Thu, 25 Feb 2016 10:12:12 +0800
+Subject: [PATCH v3 1/6] rockchip: power-domain: make idle handling optional
 In-Reply-To: <1456366337-10808-1-git-send-email-zhangqing@rock-chips.com>
 References: <1456366337-10808-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1456366337-10808-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1456366337-10808-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Rockchip SoC there exist child-domains only handling their
-idle state with the actual power-state handled by a parent-domain.
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-in a correct, without adding more checks.
+Not all new socs need to handle idle states on domain state changes,
+so add the possibility to make them optional.
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/soc/rockchip/pm_domains.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/soc/rockchip/pm_domains.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 50c0641..d0990a3 100644
+index 18aee6b..50c0641 100644
 --- a/drivers/soc/rockchip/pm_domains.c
 +++ b/drivers/soc/rockchip/pm_domains.c
-@@ -66,8 +66,8 @@ struct rockchip_pmu {
- 
- #define DOMAIN(pwr, status, req, idle, ack)	\
+@@ -68,9 +68,9 @@ struct rockchip_pmu {
  {						\
--	.pwr_mask = BIT(pwr),			\
--	.status_mask = BIT(status),		\
-+	.pwr_mask = (pwr >= 0) ? BIT(pwr) : 0,		\
-+	.status_mask = (status >= 0) ? BIT(status) : 0,	\
- 	.req_mask = (req >= 0) ? BIT(req) : 0,		\
- 	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
- 	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
-@@ -119,6 +119,10 @@ static bool rockchip_pmu_domain_is_on(struct rockchip_pm_domain *pd)
+ 	.pwr_mask = BIT(pwr),			\
+ 	.status_mask = BIT(status),		\
+-	.req_mask = BIT(req),			\
+-	.idle_mask = BIT(idle),			\
+-	.ack_mask = BIT(ack),			\
++	.req_mask = (req >= 0) ? BIT(req) : 0,		\
++	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
++	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
+ }
+ 
+ #define DOMAIN_RK3288(pwr, status, req)		\
+@@ -96,6 +96,9 @@ static int rockchip_pmu_set_idle_request(struct rockchip_pm_domain *pd,
  	struct rockchip_pmu *pmu = pd->pmu;
  	unsigned int val;
  
-+	/* check idle status for idle-only domains */
-+	if (pd->info->status_mask <= 0)
-+		return !rockchip_pmu_domain_is_idle(pd);
++	if (pd_info->req_mask <= 0)
++		return 0;
 +
- 	regmap_read(pmu->regmap, pmu->info->status_offset, &val);
- 
- 	/* 1'b0: power on, 1'b1: power off */
-@@ -130,6 +134,9 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
- {
- 	struct rockchip_pmu *pmu = pd->pmu;
- 
-+	if (pd->info->pwr_mask <= 0)
-+		return;
-+
- 	regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
- 			   pd->info->pwr_mask, on ? 0 : -1U);
+ 	regmap_update_bits(pmu->regmap, pmu->info->req_offset,
+ 			   pd_info->req_mask, idle ? -1U : 0);
  
 -- 
 1.9.1
