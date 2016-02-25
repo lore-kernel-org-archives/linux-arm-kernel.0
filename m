@@ -1,24 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 16:07:25 -0800
-Subject: [GIT PULL] firmware: SCPI driver updates for v4.6
-In-Reply-To: <56C33625.5030903@arm.com>
-References: <56C33625.5030903@arm.com>
-Message-ID: <20160225000725.GB10126@localhost>
+Date: Wed, 24 Feb 2016 16:06:28 -0800
+Subject: [GIT PULL] plat-versatile clock.c and generic clkdev.h
+In-Reply-To: <CACRpkdbJPPR8jADF1p++w60jZre3tpCAECsaqkzAk4-Y4+N-SA@mail.gmail.com>
+References: <CACRpkdbJPPR8jADF1p++w60jZre3tpCAECsaqkzAk4-Y4+N-SA@mail.gmail.com>
+Message-ID: <20160225000628.GA10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 16, 2016 at 02:45:57PM +0000, Sudeep Holla wrote:
-> Hi ARM-SoC team,
+On Mon, Feb 15, 2016 at 10:15:33AM +0100, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Here is the set of minor updates to SCPI firmware driver for v4.6
-> There's a change in HWMON driver which Guenter Roeck has Acked and
-> agreed to take it via arm-soc tree.
+> these are Stephen Boyds changes to remove a stale clock implementation
+> and move to the generic clkdev.h that I queued at Arnd's request, it turns
+> out I will not have any busines changing stuff in arch/arm/plat-versatile
+> for this merge window (however a few changes around mach-*) so
+> this can be pulled in separately.
 > 
-> -- 
-> Regards,
-> Sudeep
+> Please pull this in!
 > 
-> -->8
+> Yours,
+> Linus Walleij
+> 
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
@@ -26,17 +28,14 @@ On Tue, Feb 16, 2016 at 02:45:57PM +0000, Sudeep Holla wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/scpi-for-v4.6/updates
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/plat-versatile-cleanup
 > 
-> for you to fetch changes up to fb3b07ef399bd6984f3361a709829618b75e98d8:
+> for you to fetch changes up to 34d2f4d3a4d6a6b204ebfd12d1d2c159360d41a4:
 > 
->   hwmon: (scpi) add energy meter support (2016-02-16 09:26:27 +0000)
+>   ARM: Use generic clkdev.h header (2016-02-10 09:22:35 +0100)
 
-Merged into next/drivers.
-
-
-Thanks
+Merged into next/cleanup. Thanks!
 
 
 -Olof
