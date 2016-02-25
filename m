@@ -1,78 +1,65 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 25 Feb 2016 14:37:13 +0100
-Subject: [PATCH 5/9] clocksource/drivers/lpc32xx: Support timer-based ARM delay
+Date: Thu, 25 Feb 2016 14:37:14 +0100
+Subject: [PATCH 6/9] clocksource/drivers/arm_global_timer: Register delay timer
 In-Reply-To: <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
 References: <56CF00F6.9010301@linaro.org>
  <1456407438-6131-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1456407438-6131-5-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1456407438-6131-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+From: Rabin Vincent <rabin.vincent@axis.com>
 
-This commit implements the ARM timer-based delay timer for the
-LPC32xx, LPC18xx, LPC43xx family of SoCs.
+Provide a delay timer using the lower 32-bits of the global timer so
+that we can use that instead of having to calibrating delays.
 
-Also, add a dependency to restrict compiling this driver for
-the ARM architecture.
-
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+Signed-off-by: Rabin Vincent <rabin.vincent@axis.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Joachim Eastwood <manabian@gmail.com>
-Tested-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/clocksource/Kconfig        |  1 +
- drivers/clocksource/time-lpc32xx.c | 12 ++++++++++++
- 2 files changed, 13 insertions(+)
+ drivers/clocksource/arm_global_timer.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 56777f0..c9c4db6 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -153,6 +153,7 @@ config CLKSRC_EFM32
- config CLKSRC_LPC32XX
- 	bool "Clocksource for LPC32XX" if COMPILE_TEST
- 	depends on GENERIC_CLOCKEVENTS && HAS_IOMEM
-+	depends on ARM
- 	select CLKSRC_MMIO
- 	select CLKSRC_OF
- 	help
-diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
-index 5694edd..daae61e 100644
---- a/drivers/clocksource/time-lpc32xx.c
-+++ b/drivers/clocksource/time-lpc32xx.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index d189d8c..36998fa 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -16,6 +16,7 @@
  #include <linux/clockchips.h>
- #include <linux/clocksource.h>
+ #include <linux/cpu.h>
+ #include <linux/clk.h>
 +#include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
-@@ -54,6 +55,15 @@ static u64 notrace lpc32xx_read_sched_clock(void)
- 	return readl(clocksource_timer_counter);
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+@@ -221,6 +222,21 @@ static u64 notrace gt_sched_clock_read(void)
  }
+ #endif
  
-+static unsigned long lpc32xx_delay_timer_read(void)
++static unsigned long gt_read_long(void)
 +{
-+	return readl(clocksource_timer_counter);
++	return readl_relaxed(gt_base + GT_COUNTER0);
 +}
 +
-+static struct delay_timer lpc32xx_delay_timer = {
-+	.read_current_timer = lpc32xx_delay_timer_read,
++static struct delay_timer gt_delay_timer = {
++	.read_current_timer = gt_read_long,
 +};
 +
- static int lpc32xx_clkevt_next_event(unsigned long delta,
- 				     struct clock_event_device *evtdev)
++static void __init gt_delay_timer_init(void)
++{
++	gt_delay_timer.freq = gt_clk_rate;
++	register_current_timer_delay(&gt_delay_timer);
++}
++
+ static void __init gt_clocksource_init(void)
  {
-@@ -192,6 +202,8 @@ static int __init lpc32xx_clocksource_init(struct device_node *np)
- 	}
+ 	writel(0, gt_base + GT_CONTROL);
+@@ -317,6 +333,7 @@ static void __init global_timer_of_register(struct device_node *np)
+ 	/* Immediately configure the timer on the boot CPU */
+ 	gt_clocksource_init();
+ 	gt_clockevents_init(this_cpu_ptr(gt_evt));
++	gt_delay_timer_init();
  
- 	clocksource_timer_counter = base + LPC32XX_TIMER_TC;
-+	lpc32xx_delay_timer.freq = rate;
-+	register_current_timer_delay(&lpc32xx_delay_timer);
- 	sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
+ 	return;
  
- 	return 0;
 -- 
 1.9.1
