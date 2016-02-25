@@ -1,19 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 16:56:37 -0800
-Subject: [GIT PULL] at91: defconfig for 4.6 #1
-In-Reply-To: <20160218015634.GA31609@piout.net>
-References: <20160218015634.GA31609@piout.net>
-Message-ID: <20160225005637.GC29055@localhost>
+Date: Wed, 24 Feb 2016 16:56:08 -0800
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.6 (#1)
+In-Reply-To: <877fi3s48z.fsf@free-electrons.com>
+References: <877fi3s48z.fsf@free-electrons.com>
+Message-ID: <20160225005608.GB29055@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 02:56:34AM +0100, Alexandre Belloni wrote:
-> Arnd, Olof, Kevin,
+On Wed, Feb 17, 2016 at 05:14:52PM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> A defconfig update, adding the sama5d2 ADC to sama5_defconfig.
+> Here is the first pull request for dt64 for mvebu for v4.6.
+> 
+> This is the second part of the Armada 3700 series[1]. This part is
+> easier to handle as there is no dependency. As for the other one, let me
+> know if I should do it in a different way.
 > 
 > Thanks,
 > 
+> Gregory
+> 
+> [1]: https://lkml.org/lkml/2016/2/16/735
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
@@ -21,24 +28,30 @@ On Thu, Feb 18, 2016 at 02:56:34AM +0100, Alexandre Belloni wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-defconfig
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.6-1
 > 
-> for you to fetch changes up to 48a2e12adb7f4d1a03720d3923bedbc13ab96143:
+> for you to fetch changes up to adbc3695d9e487fa07214140a46b68ac3156fb78:
 > 
->   ARM: at91/defconfig: add sama5d2 adc support in sama5_defconfig (2016-02-17 22:51:48 +0100)
-> 
-> ----------------------------------------------------------------
-> defconfig update for 4.6:
->  - Addition of sama5d2 ADC to sama5_defconfig
+>   arm64: dts: add the Marvell Armada 3700 family and a development board (2016-02-17 16:09:55 +0100)
 > 
 > ----------------------------------------------------------------
-> Ludovic Desroches (1):
->       ARM: at91/defconfig: add sama5d2 adc support in sama5_defconfig
+> mvebu dt64 for 4.6 (part 1)
 > 
->  arch/arm/configs/sama5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> Device tree part of the Armada 3700 support:
+> - binding for the Armada 3700 SoCs
+> - device tree files for the SoCs and a board
+> - tidy up the Marvell related files
+> 
+> ----------------------------------------------------------------
+> Gregory CLEMENT (4):
+>       Documentation: dt-bindings: Add a new compatible for the Armada 3700
+>       Documentation: dt: Tidy up the Marvell related files
+>       devicetree: bindings: add DT binding for the Marvell Armada 3700 SoC family
+>       arm64: dts: add the Marvell Armada 3700 family and a development board
 
 Merged, thanks.
+
+In the future, please use arm64: dts: marvell: ...
 
 
 -Olof
