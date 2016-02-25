@@ -1,47 +1,39 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Thu, 25 Feb 2016 12:23:59 +0100
-Subject: [PATCH v2 1/2] ARM: mxs_defconfig: Cleanup mxs_defconfig
-Message-ID: <1456399440-3646-1-git-send-email-m.grzeschik@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Feb 2016 12:37:40 +0100
+Subject: [PATCH] spi: lp-8841: return correct error code from probe
+Message-ID: <1456400265-3068525-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Luebbe <jlu@pengutronix.de>
+The spi_lp8841_rtc_probe() function misses an initialization of the
+return code when it fails to get its memory resource, as gcc notices:
 
-Regenerate mxs_defconfig by running:
-make mxs_defconfig
-- Manually disable EXT2_FS and EXT3_FS
-make savedefconfig
-mv defconfig arch/arm/configs/mxs_defconfig
+drivers/spi/spi-lp8841-rtc.c: In function 'spi_lp8841_rtc_probe':
+drivers/spi/spi-lp8841-rtc.c:239:9: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+This changes the code to propagate the error from devm_ioremap_resource().
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 7ecbfff6711f ("spi: master driver to enable RTC on ICPDAS LP-8841")
 ---
-v2: Disabled EXT2_FS and EXT3_FS instead of EXT4_FS
+ drivers/spi/spi-lp8841-rtc.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
- arch/arm/configs/mxs_defconfig | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index b47e7c6..3bd7cad 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -141,9 +141,6 @@ CONFIG_IIO=y
- CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_PWM=y
- CONFIG_PWM_MXS=y
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS=y
- # CONFIG_DNOTIFY is not set
- CONFIG_FSCACHE=m
-@@ -178,7 +175,6 @@ CONFIG_PROVE_LOCKING=y
- CONFIG_BLK_DEV_IO_TRACE=y
- CONFIG_STRICT_DEVMEM=y
- CONFIG_DEBUG_USER=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
- CONFIG_CRYPTO_DEV_MXS_DCP=y
- CONFIG_CRC_ITU_T=m
- CONFIG_CRC7=m
+diff --git a/drivers/spi/spi-lp8841-rtc.c b/drivers/spi/spi-lp8841-rtc.c
+index 44bb69c3f1d6..faa577d282c0 100644
+--- a/drivers/spi/spi-lp8841-rtc.c
++++ b/drivers/spi/spi-lp8841-rtc.c
+@@ -217,8 +217,9 @@ spi_lp8841_rtc_probe(struct platform_device *pdev)
+ 	data = spi_master_get_devdata(master);
+ 
+ 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	data->iomem =  devm_ioremap_resource(&pdev->dev, iomem);
+-	if (IS_ERR(data->iomem)) {
++	data->iomem = devm_ioremap_resource(&pdev->dev, iomem);
++	ret = PTR_ERR_OR_ZERO(data->iomem);
++	if (ret) {
+ 		dev_err(&pdev->dev, "failed to get IO address\n");
+ 		goto err_put_master;
+ 	}
 -- 
 2.7.0
