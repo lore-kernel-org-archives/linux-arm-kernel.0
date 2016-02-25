@@ -1,34 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 Feb 2016 16:54:12 -0800
-Subject: [PATCH v6] Fix sun7i pin assignment for IRQ's
-In-Reply-To: <1456161251-2303-1-git-send-email-henry@nitronetworks.nl>
-References: <1456161251-2303-1-git-send-email-henry@nitronetworks.nl>
-Message-ID: <20160225005412.GB4736@lukather>
+Date: Wed, 24 Feb 2016 16:56:44 -0800
+Subject: [PATCH 01/14] pinctrl: sunxi: Add A83T R_PIO controller support
+In-Reply-To: <CACRpkdb7=x2bJP1nXpF2bP3U0t+NUHiuw_aeTAhbR8OXOrHn6A@mail.gmail.com>
+References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1454203266-4450-2-git-send-email-vishnupatekar0510@gmail.com>
+ <CACRpkdbCgOBQw28d=qc1fAURY3x8UdoWqiMtXMZ=uWLaQj-nbg@mail.gmail.com>
+ <20160211123648.GN31506@lukather>
+ <CACRpkdaGZ4-S1A9zUUaBXXEazyJf_uZ4ESiBhw-CpozXMxfDHg@mail.gmail.com>
+ <20160211151246.GO31506@lukather>
+ <CACRpkdb7=x2bJP1nXpF2bP3U0t+NUHiuw_aeTAhbR8OXOrHn6A@mail.gmail.com>
+Message-ID: <20160225005644.GC4736@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-Usually, the patch title should be prefixed by the subsystem it
-applies to so that maintainer and reviewers can spot it more
-easily. In this case, it would be something like
-
-pinctrl: sunxi: Fix sun7i pin assignment for IRQ's
-
-On Mon, Feb 22, 2016 at 06:14:07PM +0100, Henry Paulissen wrote:
-> After testing IRQ pins we found some bugs in the pinctrl declaration.
-> Both PI* and PC* pins didn't work. PI* pins seemed to be connected
-> to the wrong mux and PC* pins waren't working at all.
+On Tue, Feb 16, 2016 at 12:23:37AM +0100, Linus Walleij wrote:
+> On Thu, Feb 11, 2016 at 4:12 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Thu, Feb 11, 2016 at 02:47:57PM +0100, Linus Walleij wrote:
 > 
-> Please note that the A20 soc manual is contradicting between version
-> and even within the same document for both the PI and PC pins.
+> >> Can you guys supply a MAINTAINERS entry for the sunxi
+> >> stuff?
+> >
+> > We have one, and Chen-Yu is listed as co-maintainer:
+> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/MAINTAINERS#n911
+> 
+> Modified request:
+> can you put in F: wildcards there to match the files pertaining to
+> the sunxi platform, so that scripts/find-maintainer.pl finds them.
 
-Which sections are in contradiction?
+I don't really know what you mean, on my laptop, if I run it, I get
+the following result:
 
-> Patch is based on testing with the hardware itself.
+$ ./scripts/get_maintainer.pl -f drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
+Linus Walleij <linus.walleij@linaro.org> (maintainer:PIN CONTROL SUBSYSTEM,commit_signer:2/2=100%)
+Maxime Ripard <maxime.ripard@free-electrons.com> (maintainer:ARM/Allwinner sunXi SoC support,commit_signer:1/2=50%)
+Chen-Yu Tsai <wens@csie.org> (maintainer:ARM/Allwinner sunXi SoC support)
+Fabian Frederick <fabf@skynet.be> (commit_signer:1/2=50%,authored:1/2=50%)
+Vishnu Patekar <vishnupatekar0510@gmail.com> (commit_signer:1/2=50%,authored:1/2=50%)
+Hongzhou Yang <hongzhou.yang@mediatek.com> (commit_signer:1/2=50%)
+linux-gpio at vger.kernel.org (open list:PIN CONTROL SUBSYSTEM)
+linux-arm-kernel at lists.infradead.org (moderated list:ARM/Allwinner sunXi SoC support)
+linux-kernel at vger.kernel.org (open list)
 
-How did you test it? Using the sysfs API, or did you have any hardware
-connected to it?
+With both Chen-Yu and I listed as maintainers.
 
 Thanks!
 Maxime
@@ -43,4 +59,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/8bfcd770/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160224/f137e911/attachment-0001.sig>
