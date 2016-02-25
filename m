@@ -1,98 +1,128 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 25 Feb 2016 17:13:07 +0100
-Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
-In-Reply-To: <CAKv+Gu94LAAwj2f9Sj9imn68V0VTF+NOtUPsE3tQnVzNDhAATw@mail.gmail.com>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160225160714.GA16546@arm.com>
- <CAKv+Gu94LAAwj2f9Sj9imn68V0VTF+NOtUPsE3tQnVzNDhAATw@mail.gmail.com>
-Message-ID: <CAKv+Gu93wj9P8Bxie7Yry5HO3pM2dL=-mLgd9tV=0UhdCbpVBw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Feb 2016 16:16:30 +0000
+Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
+In-Reply-To: <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
+References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
+ <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160225161630.GB16546@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2016 at 17:12, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 25 February 2016 at 17:07, Will Deacon <will.deacon@arm.com> wrote:
->> Hi Ard,
->>
->> On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
->>> This adds support for emitting PLTs at module load time for relative
->>> branches that are out of range. This is a prerequisite for KASLR, which
->>> may place the kernel and the modules anywhere in the vmalloc area,
->>> making it more likely that branch target offsets exceed the maximum
->>> range of +/- 128 MB.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>
->>> In this version, I removed the distinction between relocations against
->>> .init executable sections and ordinary executable sections. The reason
->>> is that it is hardly worth the trouble, given that .init.text usually
->>> does not contain that many far branches, and this version now only
->>> reserves PLT entry space for jump and call relocations against undefined
->>> symbols (since symbols defined in the same module can be assumed to be
->>> within +/- 128 MB)
->>>
->>> For example, the mac80211.ko module (which is fairly sizable at ~400 KB)
->>> built with -mcmodel=large gives the following relocation counts:
->>>
->>>                     relocs    branches   unique     !local
->>>   .text              3925       3347       518        219
->>>   .init.text           11          8         7          1
->>>   .exit.text            4          4         4          1
->>>   .text.unlikely       81         67        36         17
->>>
->>> ('unique' means branches to unique type/symbol/addend combos, of which
->>> !local is the subset referring to undefined symbols)
->>>
->>> IOW, we are only emitting a single PLT entry for the .init sections, and
->>> we are better off just adding it to the core PLT section instead.
->>> ---
->>>  arch/arm64/Kconfig              |   9 +
->>>  arch/arm64/Makefile             |   6 +-
->>>  arch/arm64/include/asm/module.h |  11 ++
->>>  arch/arm64/kernel/Makefile      |   1 +
->>>  arch/arm64/kernel/module-plts.c | 201 ++++++++++++++++++++
->>>  arch/arm64/kernel/module.c      |  12 ++
->>>  arch/arm64/kernel/module.lds    |   3 +
->>>  7 files changed, 242 insertions(+), 1 deletion(-)
->>
->> [...]
->>
->>> +struct plt_entry {
->>> +     /*
->>> +      * A program that conforms to the AArch64 Procedure Call Standard
->>> +      * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
->>> +      * IP1 (x17) may be inserted at any branch instruction that is
->>> +      * exposed to a relocation that supports long branches. Since that
->>> +      * is exactly what we are dealing with here, we are free to use x16
->>> +      * as a scratch register in the PLT veneers.
->>> +      */
->>> +     __le32  mov0;   /* movn x16, #0x....                    */
->>> +     __le32  mov1;   /* movk x16, #0x...., lsl #16           */
->>> +     __le32  mov2;   /* movk x16, #0x...., lsl #32           */
->>> +     __le32  br;     /* br   x16                             */
->>> +};
->>
->> I'm worried about this code when CONFIG_ARM64_LSE_ATOMICS=y, but we don't
->> detect them on the CPU at runtime. In this case, all atomic operations
->> are moved out-of-line and called using a bl instruction from inline asm.
->>
->> The out-of-line code is compiled with magic GCC options
->
-> Which options are those exactly?
->
->> to force the
->> explicit save/restore of all used registers (see arch/arm64/lib/Makefile),
->> otherwise we'd have to clutter the inline asm with constraints that
->> wouldn't be needed had we managed to patch the bl with an LSE atomic
->> instruction.
->>
->> If you're emitting a PLT, couldn't we end up with silent corruption of
->> x16 for modules using out-of-line atomics like this?
->>
->
-> If you violate the AAPCS64 ABI, then obviously the claim above does not hold.
+On Fri, Feb 19, 2016 at 11:46:23AM -0600, Jeremy Linton wrote:
+> With 64k pages, the next larger segment size is 512M. The linux
+> kernel also uses different protection flags to cover its code and data.
+> Because of these requirements, the vast majority of the kernel code and
+> data structures end up being mapped with 64k pages instead of the larger
+> pages common with a 4k page kernel.
+> 
+> Recent ARM processors support a contiguous bit in the
+> page tables which allows a TLB to cover a range larger than a
+> single PTE if that range is mapped into physically contiguous
+> RAM.
+> 
+> So, for the kernel its a good idea to set this flag. Some basic
+> micro benchmarks show it can significantly reduce the number of
+> L1 dTLB refills.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/mm/mmu.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 58 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 7711554..ab69a99 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -1,3 +1,4 @@
+> +
+>  /*
+>   * Based on arch/arm/mm/mmu.c
+>   *
+> @@ -103,17 +104,49 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+>  		 * Need to have the least restrictive permissions available
+>  		 * permissions will be fixed up later
+>  		 */
+> -		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
+> +		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
+>  		pfn++;
+>  	} while (pte++, i++, i < PTRS_PER_PTE);
+>  }
+>  
+> +static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
+> +{
+> +	int i;
+> +
+> +	pte -= CONT_RANGE_OFFSET(addr);
+> +	for (i = 0; i < CONT_PTES; i++) {
+> +		if (pte_cont(*pte))
+> +			set_pte(pte, pte_mknoncont(*pte));
+> +		pte++;
+> +	}
+> +	flush_tlb_all();
 
-IOW, yes, x16 will be corrupted unexpectedly if it you are expecting
-it to be preserved across a bl or b instruction that is exposed to a
-jump/call relocation
+Do you still need this invalidation? I thought the table weren't even
+live at this point?
+
+> +}
+> +
+> +/*
+> + * Given a range of PTEs set the pfn and provided page protection flags
+> + */
+> +static void __populate_init_pte(pte_t *pte, unsigned long addr,
+> +			       unsigned long end, phys_addr_t phys,
+> +			       pgprot_t prot)
+> +{
+> +	unsigned long pfn = __phys_to_pfn(phys);
+> +
+> +	do {
+> +		/* clear all the bits except the pfn, then apply the prot */
+> +		set_pte(pte, pfn_pte(pfn, prot));
+> +		pte++;
+> +		pfn++;
+> +		addr += PAGE_SIZE;
+> +	} while (addr != end);
+> +}
+> +
+>  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+> -				  unsigned long end, unsigned long pfn,
+> +				  unsigned long end, phys_addr_t phys,
+>  				  pgprot_t prot,
+>  				  phys_addr_t (*pgtable_alloc)(void))
+>  {
+>  	pte_t *pte;
+> +	unsigned long next;
+>  
+>  	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+>  		phys_addr_t pte_phys = pgtable_alloc();
+> @@ -127,10 +160,29 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>  	BUG_ON(pmd_bad(*pmd));
+>  
+>  	pte = pte_set_fixmap_offset(pmd, addr);
+> +
+>  	do {
+> -		set_pte(pte, pfn_pte(pfn, prot));
+> -		pfn++;
+> -	} while (pte++, addr += PAGE_SIZE, addr != end);
+> +		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
+> +		if (((addr | next | phys) & ~CONT_MASK) == 0) {
+> +			/* a block of CONT_PTES	 */
+> +			__populate_init_pte(pte, addr, next, phys,
+> +					    prot | __pgprot(PTE_CONT));
+> +		} else {
+> +			/*
+> +			 * If the range being split is already inside of a
+> +			 * contiguous range but this PTE isn't going to be
+> +			 * contiguous, then we want to unmark the adjacent
+> +			 * ranges, then update the portion of the range we
+> +			 * are interrested in.
+> +			 */
+> +			clear_cont_pte_range(pte, addr);
+> +			__populate_init_pte(pte, addr, next, phys, prot);
+
+I don't understand the comment or the code here... the splitting is now
+done seperately, and I can't think of a scenario where you need to clear
+the cont hint explicitly for adjacent ptes.
+
+What am I missing?
+
+Will
