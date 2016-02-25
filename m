@@ -1,30 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 10:36:35 +0100
-Subject: [PATCH v5] Fix sun7i pin assignment for IRQ's
-In-Reply-To: <1456129208-11490-1-git-send-email-henry@nitronetworks.nl>
-References: <1456129208-11490-1-git-send-email-henry@nitronetworks.nl>
-Message-ID: <CACRpkdbbOyp-=5n64QBhigtAebKV5BmFcnvFumjXv3f8bj8pbg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 25 Feb 2016 11:39:35 +0200
+Subject: [PATCH 3/5] ARM: davinci: dm365: Add dma_slave_map to edma
+In-Reply-To: <56CADBB1.9040908@ti.com>
+References: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
+ <1454416997-14230-4-git-send-email-peter.ujfalusi@ti.com>
+ <56CADBB1.9040908@ti.com>
+Message-ID: <56CECBD7.1020101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 9:20 AM, Henry Paulissen <draakje197@gmail.com> wrote:
+On 02/22/2016 11:58 AM, Sekhar Nori wrote:
+> On Tuesday 02 February 2016 06:13 PM, Peter Ujfalusi wrote:
+>> Provide the dma_slave_map to edma which will allow us to move the drivers
+>> to the new, simpler dmaengine API and we can remove the DMA resources also
+>> for the devices.
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> 
+>> FIX: dm365
+> 
+> dropped this "note to self" :)
 
-> After testing IRQ pins we found some bugs in the pinctrl declaration.
-> Both PI* and PC* pins didn't work. PI* pins seemed to be connected
-> to the wrong mux and PC* pins waren't working at all.
->
-> Please note that the A20 soc manual is contradicting between version
-> and even within the same document for both the PI and PC pins.
->
-> Patch is based on testing with the hardware itself.
->
-> Signed-off-by: Henry Paulissen <henry@nitronetworks.nl>
-(...)
-> Changes in v5:
->     Added a more detailed description.
+Oh, yes, thanks. I needed to fix up things while addressing the core support
+comments and the struct changed on the way several times.
+Sorry about it.
 
-Aha there is a v5. I took out the v4 and applied this
-instead.
+> 
+>> ---
+>>  arch/arm/mach-davinci/dm365.c | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+>> index 01843fbcc9ea..d26dc2b4339a 100644
+>> --- a/arch/arm/mach-davinci/dm365.c
+>> +++ b/arch/arm/mach-davinci/dm365.c
+>> @@ -17,6 +17,7 @@
+>>  #include <linux/serial_8250.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/dma-mapping.h>
+>> +#include <linux/dmaengine.h>
+>>  #include <linux/spi/spi.h>
+>>  #include <linux/platform_data/edma.h>
+>>  #include <linux/platform_data/gpio-davinci.h>
+>> @@ -862,9 +863,30 @@ static s8 dm365_queue_priority_mapping[][2] = {
+>>  	{-1, -1},
+>>  };
+>>  
+>> +static const struct dma_slave_map da365_edma_map[] = {
+> 
+> This should be "dm365_edma_map".
+> 
+> Fixed both locally while applying.
+> 
+> Regards,
+> Sekhar
+> 
 
-Yours,
-Linus Walleij
+
+-- 
+P?ter
