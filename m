@@ -1,43 +1,45 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Thu, 25 Feb 2016 21:00:45 +0530
-Subject: [PATCH v3 2/2] iio: dac: vf610_dac: Add IIO DAC driver for
- Vybrid SoC
-In-Reply-To: <56CE18AC.6020603@kernel.org>
-References: <cover.1456121233.git.maitysanchayan@gmail.com>
- <1a70acdd3ffae273bbfe2f80c5e3952d152921df.1456121233.git.maitysanchayan@gmail.com>
- <20160223205437.GA27366@rob-hp-laptop>
- <56CE18AC.6020603@kernel.org>
-Message-ID: <20160225153045.GA15913@Sanchayan-Arch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Feb 2016 16:36:17 +0100
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <DF3259B0-8A3A-4AB0-A805-F5A8F7295E5C@konsulko.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
+ <56CC2D39.80909@ti.com>
+ <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
+ <56CC546A.9070705@ti.com>
+ <20160224104638.GL19428@n2100.arm.linux.org.uk>
+ <56CD924F.50108@ti.com>
+ <B8A82546-46C7-4A21-92D8-62418E49FBB6@konsulko.com>
+ <CACRpkdZ=PR6O28NQusUEipCYwRZyuhbeAJO_ZK80+4H7Zakt=g@mail.gmail.com>
+ <DF3259B0-8A3A-4AB0-A805-F5A8F7295E5C@konsulko.com>
+Message-ID: <CACRpkdbi+cJFP8gUvuLKEWVVU_LScZDvnWH59RC7ug-xt2PK4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Feb 25, 2016 at 3:35 PM, Pantelis Antoniou
+<pantelis.antoniou@konsulko.com> wrote:
+>> On Feb 25, 2016, at 15:43 , Linus Walleij <linus.walleij@linaro.org> wrote:
 
-On 16-02-24 20:55:08, Jonathan Cameron wrote:
-> On 23/02/16 20:54, Rob Herring wrote:
-> > On Mon, Feb 22, 2016 at 11:48:37AM +0530, Sanchayan Maity wrote:
-> >> Add driver support for DAC peripheral on Vybrid SoC.
-> >>
-> >> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> >> ---
-> >>  Documentation/ABI/testing/sysfs-bus-iio-vf610      |   9 +
-> >>  .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
-> > 
-> > For the binding:
-> > 
-> > Acked-by: Rob Herring <robh@kernel.org>
-> Applied to the togreg branch of iio.git - initially pushed out as testing
-> for the autobuilders to play with it.
+>> It also means there is no way to get the console up without the right
+>> firmware files in the filesystem. I think that is really crap compared
+>> to what we have today where the display will always come up, and
+>> basically a regression.
+>>
+>> I understand the stance with respect to things like add-on hardware
+>> like a Bluetooth board or WLAN or whatnot. But the fbdev console
+>> is just too basic, like a serial port IMO.
+>>
+>> Sure in the ARM world we usually have a serial console, but this is
+>> seriously breaking current practice.
+>
+> As Tomi mentioned firmware files can be located in the kernel image; there is no
+> requirement to be in a filesystem, and that application can be performed really
+> early, before even early init.
 
-Thanks Jonathan.
+Are you thinking about exploiting an appended DT with
+CONFIG_ARM_APPENDED_DTB or something else?
 
-> 
-> Note the dts change probably wants to go via the relevant arch trees.
-> I can take it with an appropriate ack if not.
-
-Generally shawn picks up the device tree changes once the driver makes
-it to his for-next branch. I will ping shawn to pick this up once the
-driver lands in shawn's for-next branch.
-
-Regards,
-Sanchayan.
+Yours,
+Linus Walleij
