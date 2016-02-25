@@ -1,30 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 16:26:21 +0100
-Subject: [PATCH] pinctrl: mediatek/7623: delete unnecessary .owner
-Message-ID: <1456413981-26089-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 25 Feb 2016 16:29:31 +0100
+Subject: [PATCH 0/4] RealView boardfile endgame
+In-Reply-To: <5411123.nOOnE7uo7z@wuerfel>
+References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
+ <5411123.nOOnE7uo7z@wuerfel>
+Message-ID: <CACRpkdZ_oyJNTzC6Ji+19aRy3Ex47u2Khqd7_RwuGdK+TLTy_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is set by the device core.
+On Thu, Feb 25, 2016 at 3:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 25 February 2016 14:15:07 Linus Walleij wrote:
+>> This patch set deletes the RealView board files and moves it
+>> over to a pure Device Tree boot, deleting ~3500 LoC.
+(...)
+> This leaves the question whether we should do all the preparation
+> in 4.6 and then only take these for 4.7, or do them all at
+> once. I can see good reasons either way, but none of them
+> particularly strong. What did you have in mind here?
 
-Cc: John Crispin <blogic@openwrt.org>
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/mediatek/pinctrl-mt7623.c | 1 -
- 1 file changed, 1 deletion(-)
+If the dependencies in CLCD and MTD make it in we'll just
+merge the whole thing IMO.
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7623.c b/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-index bf0d05b6e7dc..67895f8234e3 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-@@ -367,7 +367,6 @@ static struct platform_driver mtk_pinctrl_driver = {
- 	.probe = mt7623_pinctrl_probe,
- 	.driver = {
- 		.name = "mediatek-mt7623-pinctrl",
--		.owner = THIS_MODULE,
- 		.of_match_table = mt7623_pctrl_match,
- 	},
- };
--- 
-2.4.3
+If these drag out, we merge the device trees and wait with
+removing the board files until v4.7.
+
+I will still have some remaining cleanup for Integrator, Versatile
+and also Versatile Express however, but that is for later.
+
+Yours,
+Linus Walleij
