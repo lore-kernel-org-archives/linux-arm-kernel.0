@@ -1,85 +1,105 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Feb 2016 16:07:15 +0000
-Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
-In-Reply-To: <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160225160714.GA16546@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 25 Feb 2016 16:08:28 +0000
+Subject: [BUG] random kernel crashes after THP rework on s390 (maybe also
+ on PowerPC and ARM)
+In-Reply-To: <20160225160111.GB19707@node.shutemov.name>
+References: <20160211192223.4b517057@thinkpad>
+ <20160211190942.GA10244@node.shutemov.name>
+ <20160211205702.24f0d17a@thinkpad>
+ <20160212154116.GA15142@node.shutemov.name>
+ <56BE00E7.1010303@de.ibm.com> <20160212181640.4eabb85f@thinkpad>
+ <20160223103221.GA1418@node.shutemov.name>
+ <20160223191907.25719a4d@thinkpad> <20160223184658.GA27281@arm.com>
+ <CAPvkgC3gfmgA9aCvCeqReKhjpkT5Y-qk-2fNO8puDjUs9EWzVw@mail.gmail.com>
+ <20160225160111.GB19707@node.shutemov.name>
+Message-ID: <CAPvkgC3vbAG9f-MnVoZ_VwQMZNTbhS6Vx0FgcVGSCcOKgmqWkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 25 February 2016 at 16:01, Kirill A. Shutemov <kirill@shutemov.name> wrote:
+> On Thu, Feb 25, 2016 at 03:49:33PM +0000, Steve Capper wrote:
+>> On 23 February 2016 at 18:47, Will Deacon <will.deacon@arm.com> wrote:
+>> > [adding Steve, since he worked on THP for 32-bit ARM]
+>>
+>> Apologies for my late reply...
+>>
+>> >
+>> > On Tue, Feb 23, 2016 at 07:19:07PM +0100, Gerald Schaefer wrote:
+>> >> On Tue, 23 Feb 2016 13:32:21 +0300
+>> >> "Kirill A. Shutemov" <kirill@shutemov.name> wrote:
+>> >> > The theory is that the splitting bit effetely masked bogus pmd_present():
+>> >> > we had pmd_trans_splitting() in all code path and that prevented mm from
+>> >> > touching the pmd. Once pmd_trans_splitting() has gone, mm proceed with the
+>> >> > pmd where it shouldn't and here's a boom.
+>> >>
+>> >> Well, I don't think pmd_present() == true is bogus for a trans_huge pmd under
+>> >> splitting, after all there is a page behind the the pmd. Also, if it was
+>> >> bogus, and it would need to be false, why should it be marked !pmd_present()
+>> >> only at the pmdp_invalidate() step before the pmd_populate()? It clearly
+>> >> is pmd_present() before that, on all architectures, and if there was any
+>> >> problem/race with that, setting it to !pmd_present() at this stage would
+>> >> only (marginally) reduce the race window.
+>> >>
+>> >> BTW, PowerPC and Sparc seem to do the same thing in pmdp_invalidate(),
+>> >> i.e. they do not set pmd_present() == false, only mark it so that it would
+>> >> not generate a new TLB entry, just like on s390. After all, the function
+>> >> is called pmdp_invalidate(), and I think the comment in mm/huge_memory.c
+>> >> before that call is just a little ambiguous in its wording. When it says
+>> >> "mark the pmd notpresent" it probably means "mark it so that it will not
+>> >> generate a new TLB entry", which is also what the comment is really about:
+>> >> prevent huge and small entries in the TLB for the same page at the same
+>> >> time.
+>> >>
+>> >> FWIW, and since the ARM arch-list is already on cc, I think there is
+>> >> an issue with pmdp_invalidate() on ARM, since it also seems to clear
+>> >> the trans_huge (and formerly trans_splitting) bit, which actually makes
+>> >> the pmd !pmd_present(), but it violates the other requirement from the
+>> >> comment:
+>> >> "the pmd_trans_huge and pmd_trans_splitting must remain set at all times
+>> >> on the pmd until the split is complete for this pmd"
+>> >
+>> > I've only been testing this for arm64 (where I'm yet to see a problem),
+>> > but we use the generic pmdp_invalidate implementation from
+>> > mm/pgtable-generic.c there. On arm64, pmd_trans_huge will return true
+>> > after pmd_mknotpresent. On arm, it does look to be buggy, since it nukes
+>> > the entire entry... Steve?
+>>
+>> pmd_mknotpresent on arm looks inconsistent with the other
+>> architectures and can be changed.
+>>
+>> Having had a look at the usage, I can't see it causing an immediate
+>> problem (that needs to be addressed by an emergency patch).
+>> We don't have a notion of splitting pmds (so there is no splitting
+>> information to lose), and the only usage I could see of
+>> pmd_mknotpresent was:
+>>
+>> pmdp_invalidate(vma, haddr, pmd);
+>> pmd_populate(mm, pmd, pgtable);
+>>
+>> In mm/huge_memory.c, around line 3588.
+>>
+>> So we invalidate the entry (which puts down a faulting entry from
+>> pmd_mknotpresent and invalidates tlb), then immediately put down a
+>> table entry with pmd_populate.
+>>
+>> I have run a 32-bit ARM test kernel and exacerbated THP splits (that's
+>> what took me time), and I didn't notice any problems with 4.5-rc5.
+>
+> If I read code correctly, your pmd_mknotpresent() makes the pmd
+> pmd_none(), right? If yes, it's a problem.
+>
+> It introduces race I've described here:
+>
+> https://marc.info/?l=linux-mm&m=144723658100512&w=4
+>
+> Basically, if zap_pmd_range() would see pmd_none() between
+> pmdp_mknotpresent() and pmd_populate(), we're screwed.
+>
+> The race window is small, but it's there.
 
-On Mon, Feb 01, 2016 at 02:09:31PM +0100, Ard Biesheuvel wrote:
-> This adds support for emitting PLTs at module load time for relative
-> branches that are out of range. This is a prerequisite for KASLR, which
-> may place the kernel and the modules anywhere in the vmalloc area,
-> making it more likely that branch target offsets exceed the maximum
-> range of +/- 128 MB.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> In this version, I removed the distinction between relocations against
-> .init executable sections and ordinary executable sections. The reason
-> is that it is hardly worth the trouble, given that .init.text usually
-> does not contain that many far branches, and this version now only
-> reserves PLT entry space for jump and call relocations against undefined
-> symbols (since symbols defined in the same module can be assumed to be
-> within +/- 128 MB)
-> 
-> For example, the mac80211.ko module (which is fairly sizable at ~400 KB)
-> built with -mcmodel=large gives the following relocation counts:
-> 
->                     relocs    branches   unique     !local
->   .text              3925       3347       518        219
->   .init.text           11          8         7          1
->   .exit.text            4          4         4          1
->   .text.unlikely       81         67        36         17
-> 
-> ('unique' means branches to unique type/symbol/addend combos, of which
-> !local is the subset referring to undefined symbols)
-> 
-> IOW, we are only emitting a single PLT entry for the .init sections, and
-> we are better off just adding it to the core PLT section instead.
-> ---
->  arch/arm64/Kconfig              |   9 +
->  arch/arm64/Makefile             |   6 +-
->  arch/arm64/include/asm/module.h |  11 ++
->  arch/arm64/kernel/Makefile      |   1 +
->  arch/arm64/kernel/module-plts.c | 201 ++++++++++++++++++++
->  arch/arm64/kernel/module.c      |  12 ++
->  arch/arm64/kernel/module.lds    |   3 +
->  7 files changed, 242 insertions(+), 1 deletion(-)
+Ahhhh, okay, thank you Kirill.
+I agree, I'll get a patch out.
 
-[...]
-
-> +struct plt_entry {
-> +	/*
-> +	 * A program that conforms to the AArch64 Procedure Call Standard
-> +	 * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
-> +	 * IP1 (x17) may be inserted at any branch instruction that is
-> +	 * exposed to a relocation that supports long branches. Since that
-> +	 * is exactly what we are dealing with here, we are free to use x16
-> +	 * as a scratch register in the PLT veneers.
-> +	 */
-> +	__le32	mov0;	/* movn	x16, #0x....			*/
-> +	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
-> +	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
-> +	__le32	br;	/* br	x16				*/
-> +};
-
-I'm worried about this code when CONFIG_ARM64_LSE_ATOMICS=y, but we don't
-detect them on the CPU at runtime. In this case, all atomic operations
-are moved out-of-line and called using a bl instruction from inline asm.
-
-The out-of-line code is compiled with magic GCC options to force the
-explicit save/restore of all used registers (see arch/arm64/lib/Makefile),
-otherwise we'd have to clutter the inline asm with constraints that
-wouldn't be needed had we managed to patch the bl with an LSE atomic
-instruction.
-
-If you're emitting a PLT, couldn't we end up with silent corruption of
-x16 for modules using out-of-line atomics like this?
-
-Will
+Cheers,
+--
+Steve
