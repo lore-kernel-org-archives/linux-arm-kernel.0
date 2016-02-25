@@ -1,53 +1,143 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 15:44:44 +0100
-Subject: [RFC 3/3] iommu: dma-iommu: use common implementation also on ARM
- architecture
-In-Reply-To: <56CEF2E9.5040706@samsung.com>
-References: <1455870164-25337-1-git-send-email-m.szyprowski@samsung.com>
- <2724572.qtPjgumFDJ@wuerfel> <56CEF2E9.5040706@samsung.com>
-Message-ID: <4895295.FP9RzJmAYS@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 25 Feb 2016 15:46:50 +0100
+Subject: [PATCH 01/50] pinctrl: Add devm_ apis for pinctrl_{register,
+ unregister}
+In-Reply-To: <1456319775-3216-2-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1456411610.3268.13.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 February 2016 13:26:17 Marek Szyprowski wrote:
-> >> +}
-> >> +
-> >> +extern void *arch_alloc_from_atomic_pool(size_t size, struct page **ret_page,
-> >> +                                     gfp_t flags);
-> >> +extern bool arch_in_atomic_pool(void *start, size_t size);
-> >> +extern int arch_free_from_atomic_pool(void *start, size_t size);
-> >> +
-> >> +
-> > doesn't feel completely right yet. In particular the arch_flush_page()
-> > interface is probably still too specific to ARM/ARM64 and won't work
-> > that way on other architectures.
-> >
-> > I think it would be better to do this either more generic, or less generic:
-> >
-> > a) leave the iommu_dma_map_ops definition in the architecture specific
-> >     code, but make it call helper functions in the drivers/iommu to do all
-> >     of the really generic parts.
-> >
-> > b) clarify that this is only applicable to arch/arm and arch/arm64, and
-> >     unify things further between these two, as they have very similar
-> >     requirements in the CPU architecture.
-> 
-> Some really generic parts are already in iommu/dma-iommu.c and one can build
-> it's own, non-ARM CPU architecture based IOMMU/DMA-mapping code. Initially I
-> also wanted to use that generic code on both ARM and ARM64, but it 
-> turned out
-> that both archs, ARM and ARM64 will duplicate 99% of code, which use this
-> 'generic' functions. This was the reason why I dedided to move all that
-> common code from arch/{arm,arm64}/mm/dma-mapping.c to
-> drivers/iommu/dma-iommu-ops.c
-> 
-> I'm not sure if I can design all the changes that need to be made to
-> drivers/iommu/dma-iommu-ops.c to make it more generic. Maybe when one will
-> try to use that code with other, non-ARM architecture based arch glue code,
-> a better abstraction can be developed. For now I would like to keep all this
-> code in a common place so both arm and arm64 will benefit from improvements
-> done there.
+Hi Laxman,
 
-Fair enough. Let's stay with your approach then.
+Am Mittwoch, den 24.02.2016, 18:45 +0530 schrieb Laxman Dewangan:
+> Add device managed APIs devm_pinctrl_register() and
+> devm_pinctrl_unregister() for the APIs pinctrl_register()
+> and pinctrl_unregister().
+> 
+> This helps in reducing code in error path and sometimes
+> removal of .remove callback for driver unbind.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> ---
+>  drivers/pinctrl/core.c          | 69 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pinctrl/pinctrl.h |  6 ++++
+>  2 files changed, 75 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+> index 2686a44..ea4a7e6 100644
+> --- a/drivers/pinctrl/core.c
+> +++ b/drivers/pinctrl/core.c
+> @@ -1861,6 +1861,75 @@ void pinctrl_unregister(struct pinctrl_dev *pctldev)
+>  }
+>  EXPORT_SYMBOL_GPL(pinctrl_unregister);
+>  
+> +static void devm_pinctrl_dev_release(struct device *dev, void *res)
+> +{
+> +	struct pinctrl_dev *pctldev = *(struct pinctrl_dev **)res;
+> +
+> +	pinctrl_unregister(pctldev);
+> +}
+> +
+> +static int devm_pinctrl_dev_match(struct device *dev, void *res, void *data)
+> +{
+> +	struct pctldev **r = res;
+> +
+> +	if (!r || !*r) {
+> +		WARN_ON(!r || !*r);
+> +		return 0;
+> +	}
 
-	Arnd
+
+This could be simplified to
+
+	if (WARN_ON(!r || !*r))
+		return 0;
+
+> +
+> +	return *r == data;
+> +}
+> +
+> +/**
+> + * devm_pinctrl_register() - Resource manager pinctrl_register()
+
+Should that be "Resource managed" ?
+
+> + * @dev: parent device for this pin controller
+> + * @pctldesc: descriptor for this pin controller
+> + * @driver_data: private pin controller data for this pin controller
+> + *
+> + * Returns an error pointer if pincontrol register failed. Otherwise
+> + * it returns valid pinctrl handle.
+> + *
+> + * The pinctrl device will be automatically released when the device is unbound.
+> + */
+> +struct pinctrl_dev *devm_pinctrl_register(struct device *dev,
+> +					  struct pinctrl_desc *pctldesc,
+> +					  void *driver_data)
+> +{
+> +	struct pinctrl_dev **ptr, *pctldev;
+> +
+> +	ptr = devres_alloc(devm_pinctrl_dev_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	pctldev = pinctrl_register(pctldesc, dev, driver_data);
+> +	if (IS_ERR(pctldev)) {
+> +		devres_free(ptr);
+> +		return pctldev;
+> +	}
+> +
+> +	*ptr = pctldev;
+> +	devres_add(dev, ptr);
+> +
+> +	return pctldev;
+> +}
+> +EXPORT_SYMBOL_GPL(devm_pinctrl_register);
+> +
+> +/**
+> + * devm_pinctrl_unregister() - Resource manager of pinctrl_unregister()
+
+Should that be "Resource managed version of" ?
+
+> + * @dev: device for which which resource was allocated
+> + * @pctldev: the pinctrl device to unregister.
+> + */
+> +void devm_pinctrl_unregister(struct device *dev, struct pinctrl_dev *pctldev)
+> +{
+> +	int ret;
+> +
+> +	ret = devres_release(dev, devm_pinctrl_dev_release,
+> +			     devm_pinctrl_dev_match, pctldev);
+> +	if (!ret)
+> +		WARN_ON(ret);
+> +}
+> +EXPORT_SYMBOL_GPL(devm_pinctrl_unregister);
+> +
+>  static int __init pinctrl_init(void)
+>  {
+>  	pr_info("initialized pinctrl subsystem\n");
+> diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
+> index 9ba59fc..a42e57d 100644
+> --- a/include/linux/pinctrl/pinctrl.h
+> +++ b/include/linux/pinctrl/pinctrl.h
+> @@ -144,6 +144,12 @@ struct pinctrl_desc {
+>  extern struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
+>  				struct device *dev, void *driver_data);
+>  extern void pinctrl_unregister(struct pinctrl_dev *pctldev);
+> +extern struct pinctrl_dev *devm_pinctrl_register(struct device *dev,
+> +				struct pinctrl_desc *pctldesc,
+> +				void *driver_data);
+> +extern void devm_pinctrl_unregister(struct device *dev,
+> +				struct pinctrl_dev *pctldev);
+> +
+>  extern bool pin_is_valid(struct pinctrl_dev *pctldev, int pin);
+>  extern void pinctrl_add_gpio_range(struct pinctrl_dev *pctldev,
+>  				struct pinctrl_gpio_range *range);
+
+With those addressed,
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
