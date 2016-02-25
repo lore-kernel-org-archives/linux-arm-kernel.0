@@ -1,83 +1,73 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Thu, 25 Feb 2016 09:49:13 +0530
-Subject: [GIT PULL 3/7] drivers: soc: EXYNOS drivers for v4.6
-In-Reply-To: <56CE4E14.2050701@samsung.com>
-References: <1455496446-23779-1-git-send-email-k.kozlowski@samsung.com>
- <1455496446-23779-4-git-send-email-k.kozlowski@samsung.com>
- <20160224222254.GT10126@localhost> <56CE4E14.2050701@samsung.com>
-Message-ID: <56CE80C1.8040801@samsung.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 24 Feb 2016 20:19:22 -0800
+Subject: [GIT PULL] ARM: Keystone DTS for 4.6
+In-Reply-To: <20160225012815.GH29055@localhost>
+References: <1455959351-11524-1-git-send-email-ssantosh@kernel.org>
+ <20160225012815.GH29055@localhost>
+Message-ID: <56CE80CA.80407@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-On Thursday 25 February 2016 06:13 AM, Krzysztof Kozlowski wrote:
-> On 25.02.2016 07:22, Olof Johansson wrote:
->> On Mon, Feb 15, 2016 at 09:34:02AM +0900, Krzysztof Kozlowski wrote:
->>> Hi Arnd, Kevin and Olof,
->>>
->>> This finally moves SROM controller and PMU code to separate
->>> driver under drivers/soc/samsung.
->>>
->>> Kind regards,
->>> Krzysztof
->>>
->>>
->>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
->>>
->>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-soc-srom-pmu-4.6
->>>
->>> for you to fetch changes up to 74a6659e8bf193066ba6bf365de66baa897aebb1:
->>>
->>>   drivers: soc: Add support for Exynos PMU driver (2016-01-25 10:46:59 +0900)
->>>
->>> ----------------------------------------------------------------
->>> A set of changes adding new drivers under drivers/soc/samsung:
->>>
->>> 1. Split code for handling SROM registers out of arm/mach-exynos
->>>    in to separate SROM controller driver under drivers/soc/samsung.
->>>    The driver will save and restore SROM registers during Suspend
->>>    to RAM.
->>>
->>> 2. Add to this SROM controller driver support for bank configuration
->>>    used by child devices. This allows usage of SMSC9115 Ethernet chip
->>>    on SMDK5410 (Exynos5410) directly connected to SROM controller.
+On 2/24/2016 5:28 PM, Olof Johansson wrote:
+> Hi,
+>
+> On Sat, Feb 20, 2016 at 01:09:10AM -0800, Santosh Shilimkar wrote:
+>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 >>
->> Hi,
+>>    Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 >>
->> OMAP has GPMC drivers under drivers/memory. I wonder if SROM should go there
->> too, since it's a quite similar bus.
-> 
-> I wish I get this feedback before, when we were discussing the SROM
-> patches. :/
-> 
-> Indeed this sounds reasonable. On some boards the omap-gpmc is used for
-> the same purpose: interfacing to smsc,lan9115 (like on SMDK5410).
-> 
-> 
->> Feel free to respin this without SROM now, so we can get the other pieces in
->> sooner and then revisit the SROM asyncronously. That'll remove the dependencies
->> on DT as well.
-> 
-> Okay, I'll rebase all drivers/soc branches and respin the pull request
-> so PMU driver and other stuff could go in.
-> 
-> BTW, just in case, although PMU stands for "Power Management Unit" I
-> don't think it should be placed under drivers/power because it is not a
-> avs/charger/battery/reset driver. Existing power-related drivers are
-> under driver/soc (bcm, dove, tegra).
-> 
-> Re-work of SROM drivers could be started on top of it.
-> 
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.6
+>>
+>> for you to fetch changes up to 5f67dae54262adeb0bfd98fa4c7a9b62548c9f25:
+>>
+>>    ARM: dts: keystone: Add minimum support for K2G evm (2016-02-20 00:56:06 -0800)
+>>
+>> ----------------------------------------------------------------
+>> ARM: DTS: Add new bindings for K2G and the K2G evm
+>>
+>> K2G SoC family is the newest version of the Keystone family of processors.
+>>
+>> The technical reference manual for K2G can be found here:
+>> http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
+>> ----------------------------------------------------------------
+>> Nishanth Menon (1):
+>>        ARM: keystone: Create new binding for K2G SoC
+>>
+>> Vitaly Andrianov (2):
+>>        ARM: dts: keystone: Add Initial DT support for TI K2G SoC family
+>>        ARM: dts: keystone: Add minimum support for K2G evm
+>>
+>>   .../devicetree/bindings/arm/keystone/keystone.txt  |  5 ++
+>>   arch/arm/boot/dts/Makefile                         |  3 +-
+>>   arch/arm/boot/dts/k2g-evm.dts                      | 32 ++++++++
+>>   arch/arm/boot/dts/k2g.dtsi                         | 89 ++++++++++++++++++++++
+>>   arch/arm/mach-keystone/keystone.c                  |  1 +
+>>   5 files changed, 129 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/boot/dts/k2g-evm.dts
+>>   create mode 100644 arch/arm/boot/dts/k2g.dtsi
+>
+> We've been asking people to prefix the DTS files with vendor or platform
+> prefixes, so that the namespace under arch/arm/boot/dts/ somewhat gets
+> partitioned.
+>
+Sounds good though it will be hard to rename existing files now
+assuming they have been already in use.
 
-Please let me know if I need to take care of any of this work.
+> It's really unfortunate that we didn't notice this when the other k2?-* entries
+> were added, especially since there's a keystone* set of files too.
+>
+I missed as well about the nomenclature followed across.
 
-Thanks,
-Pankaj Dubey
-> Best regards,
-> Krzysztof
-> 
+> How do you feel about moving things around and prefixing with keystone*
+> instead?  We can argue whether users are affected by a rename of already
+> existing files, or if those can be renamed too. I'll leave that up to you, but
+> k2? seems like too short a prefix here.
+>
+I will definitely rename these new ones and resend the pull request.
+For older ones, let me RFC it in next merge window and if no one
+complains, will rename them too.
+
+Regards,
+Santosh
