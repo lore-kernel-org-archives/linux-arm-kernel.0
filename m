@@ -1,31 +1,36 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 25 Feb 2016 11:40:08 +0200
-Subject: [PATCH 1/5] ARM: davinci: devices-da8xx: Add dma_slave_map to edma
-In-Reply-To: <56CAD6B7.2030706@ti.com>
-References: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
- <1454416997-14230-2-git-send-email-peter.ujfalusi@ti.com>
- <56CAD6B7.2030706@ti.com>
-Message-ID: <56CECBF8.6040504@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 25 Feb 2016 09:44:18 +0000
+Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
+In-Reply-To: <7hsi0hr3wj.fsf@baylibre.com>
+References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <7hsi0hr3wj.fsf@baylibre.com>
+Message-ID: <20160225094417.GB31728@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2016 11:36 AM, Sekhar Nori wrote:
-> On Tuesday 02 February 2016 06:13 PM, Peter Ujfalusi wrote:
+On Wed, Feb 24, 2016 at 05:10:20PM -0800, Kevin Hilman wrote:
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 > 
->> +static const struct dma_slave_map da850_edma1_map[] = {
->> +	{ "da830-mmc.1", "rx", EDMA_FILTER_PARAM(0, 28) },
->> +	{ "da830-mmc.1", "tx", EDMA_FILTER_PARAM(0, 29) },
+> > When a CPU is suspended (either through suspend-to-RAM or CPUidle),
+> > its PMU registers content can be lost, which means that counters
+> > registers values that were initialized on power down entry have to be
+> > reprogrammed on power-up to make sure the counters set-up is preserved
 > 
-> This should be EDMA_FILTER_PARAM(1, 29) (and similar for rx). No need to
-> resend though, I will fix while applying.
+> This assumes that the PMUs are always sharing a power rail with a
+> specific CPU, not the cluster.  Is that a reliable assumption?
 
-True and thank you for fixing it up!
+As reliable as assuming the GIC HW state needs save/restore on idle-state
+entry, if we have no power domains information linked to CPU PM
+notifiers saving/restoring everything every time an idle state deeper
+than wfi is entered is the best we can do.
 
-> 
-> Regards,
-> Sekhar
-> 
+As far as this patch is concerned, if the PMU is on a different power
+domain than the CPU, I agree that stopping/resetting/restoring the
+PMU registers is a waste of cycles (I will test it also by triggering
+the notifiers on wfi, to make sure the reset is not disruptive on
+a cpu that is not powered off), I see no alternative other than disabling
+idle to carry out profiling sanely (or implement CPU PM notifiers with
+runtime PM).
 
-
--- 
-P?ter
+Thanks,
+Lorenzo
