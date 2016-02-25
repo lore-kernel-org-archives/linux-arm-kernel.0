@@ -1,27 +1,53 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Thu, 25 Feb 2016 15:38:55 +0100
-Subject: RFC: extend IOMMU attributes
-In-Reply-To: <HE1PR04MB1641F22E38710B68F4ED891F8DAF0@HE1PR04MB1641.eurprd04.prod.outlook.com>
-References: <HE1PR04MB1641F22E38710B68F4ED891F8DAF0@HE1PR04MB1641.eurprd04.prod.outlook.com>
-Message-ID: <20160225143855.GD16675@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Feb 2016 15:44:44 +0100
+Subject: [RFC 3/3] iommu: dma-iommu: use common implementation also on ARM
+ architecture
+In-Reply-To: <56CEF2E9.5040706@samsung.com>
+References: <1455870164-25337-1-git-send-email-m.szyprowski@samsung.com>
+ <2724572.qtPjgumFDJ@wuerfel> <56CEF2E9.5040706@samsung.com>
+Message-ID: <4895295.FP9RzJmAYS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 04:16:26PM +0000, Stuart Yoder wrote:
->  #define IOMMU_READ            (1 << 0)
->  #define IOMMU_WRITE           (1 << 1)
-> -#define IOMMU_CACHE           (1 << 2) /* DMA cache coherency */
-> +#define IOMMU_CACHE_COHERENT  (1 << 2) /* cacheable and coherent */
->  #define IOMMU_NOEXEC          (1 << 3)
->  #define IOMMU_MMIO            (1 << 4) /* e.g. things like MSI doorbells */
-> +#define IOMMU_CACHEABLE       (1 << 5) /* cacheable, not coherent */
-> +#define IOMMU_CACHE_ALLOCATE  (1 << 6) /* hint to allocate in the cache */
+On Thursday 25 February 2016 13:26:17 Marek Szyprowski wrote:
+> >> +}
+> >> +
+> >> +extern void *arch_alloc_from_atomic_pool(size_t size, struct page **ret_page,
+> >> +                                     gfp_t flags);
+> >> +extern bool arch_in_atomic_pool(void *start, size_t size);
+> >> +extern int arch_free_from_atomic_pool(void *start, size_t size);
+> >> +
+> >> +
+> > doesn't feel completely right yet. In particular the arch_flush_page()
+> > interface is probably still too specific to ARM/ARM64 and won't work
+> > that way on other architectures.
+> >
+> > I think it would be better to do this either more generic, or less generic:
+> >
+> > a) leave the iommu_dma_map_ops definition in the architecture specific
+> >     code, but make it call helper functions in the drivers/iommu to do all
+> >     of the really generic parts.
+> >
+> > b) clarify that this is only applicable to arch/arm and arch/arm64, and
+> >     unify things further between these two, as they have very similar
+> >     requirements in the CPU architecture.
+> 
+> Some really generic parts are already in iommu/dma-iommu.c and one can build
+> it's own, non-ARM CPU architecture based IOMMU/DMA-mapping code. Initially I
+> also wanted to use that generic code on both ARM and ARM64, but it 
+> turned out
+> that both archs, ARM and ARM64 will duplicate 99% of code, which use this
+> 'generic' functions. This was the reason why I dedided to move all that
+> common code from arch/{arm,arm64}/mm/dma-mapping.c to
+> drivers/iommu/dma-iommu-ops.c
+> 
+> I'm not sure if I can design all the changes that need to be made to
+> drivers/iommu/dma-iommu-ops.c to make it more generic. Maybe when one will
+> try to use that code with other, non-ARM architecture based arch glue code,
+> a better abstraction can be developed. For now I would like to keep all this
+> code in a common place so both arm and arm64 will benefit from improvements
+> done there.
 
-Hmm, this might be a valid use-case to introduce the
-map_attr()/unmap_attr() calls to the IOMMU-API. I have been resistant to
-these functions until now because the proposed use-cases were not
-convincing, but for hardware-specific map-attributes like this one it
-could make sense.
+Fair enough. Let's stay with your approach then.
 
-
-	Joerg
+	Arnd
