@@ -1,83 +1,114 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 08:52:58 +0900
-Subject: [PATCH 09/19] ARM: dts: r8a7793: enable to use thermal-zone
+Date: Fri, 26 Feb 2016 08:53:00 +0900
+Subject: [PATCH 11/19] ARM: dts: r8a7790: Add L2 cache-controller nodes
 In-Reply-To: <cover.1456443769.git.horms+renesas@verge.net.au>
 References: <cover.1456443769.git.horms+renesas@verge.net.au>
-Message-ID: <57f9156bc620ac561ed46b2316de328e6b280023.1456443769.git.horms+renesas@verge.net.au>
+Message-ID: <fb1cecd40690e61e122d7249e7499c8d799feffb.1456443769.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch enables to use thermal-zone on r8a7793.
-This thermal sensor can measure temperature from -40000 to 125000,
-but over 117000 can be critical on this chip.
-Thus, default critical temperature is now set as 115000 (this driver
-is using 5000 steps) (Current critical temperature is using it as
-90000, but there is no big reason about it)
+Add device nodes for the L2 caches, and link the CPU nodes to them.
 
-And it doesn't check thermal zone periodically (same as current
-behavior). You can exchange it by modifying polling-delay[-passive]
-property.
+The L2 cache for the Cortex-A15 CPU cores is 2 MiB large (organized as
+128 KiB x 16 ways).
 
-You can set trip temp if your kernel has CONFIG_THERMAL_WRITABLE_TRIPS,
-but you need to take care to use it, since it will call
-orderly_poweroff() it it reaches to the value.
-echo $temp > /sys/class/thermal/thermal_zone0/trip_point_0_temp
+The L2 cache for the Cortex-A7 CPU cores is 512 KiB large (organized as
+64 KiB x 8 ways).
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 26 ++++++++++++++++++++++++--
- 1 file changed, 24 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 45dba1c79a43..9837f90f1718 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -54,6 +54,25 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 24b773ae133a..ba4c2530d79f 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -52,6 +52,7 @@
+ 			voltage-tolerance = <1>; /* 1% */
+ 			clocks = <&cpg_clocks R8A7790_CLK_Z>;
+ 			clock-latency = <300000>; /* 300 us */
++			next-level-cache = <&L2_CA15>;
+ 
+ 			/* kHz - uV - OPPs unknown yet */
+ 			operating-points = <1400000 1000000>,
+@@ -67,6 +68,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <1>;
+ 			clock-frequency = <1300000000>;
++			next-level-cache = <&L2_CA15>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -74,6 +76,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <2>;
+ 			clock-frequency = <1300000000>;
++			next-level-cache = <&L2_CA15>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -81,6 +84,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <3>;
+ 			clock-frequency = <1300000000>;
++			next-level-cache = <&L2_CA15>;
+ 		};
+ 
+ 		cpu4: cpu at 4 {
+@@ -88,6 +92,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
+ 			clock-frequency = <780000000>;
++			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+ 		cpu5: cpu at 5 {
+@@ -95,6 +100,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x101>;
+ 			clock-frequency = <780000000>;
++			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+ 		cpu6: cpu at 6 {
+@@ -102,6 +108,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x102>;
+ 			clock-frequency = <780000000>;
++			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+ 		cpu7: cpu at 7 {
+@@ -109,6 +116,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x103>;
+ 			clock-frequency = <780000000>;
++			next-level-cache = <&L2_CA7>;
  		};
  	};
  
-+	thermal-zones {
-+		cpu_thermal: cpu-thermal {
-+			polling-delay-passive	= <0>;
-+			polling-delay		= <0>;
+@@ -131,6 +139,18 @@
+ 		};
+ 	};
+ 
++	L2_CA15: cache-controller at 0 {
++		compatible = "cache";
++		cache-unified;
++		cache-level = <2>;
++	};
 +
-+			thermal-sensors = <&thermal>;
-+
-+			trips {
-+				cpu-crit {
-+					temperature	= <115000>;
-+					hysteresis	= <0>;
-+					type		= "critical";
-+				};
-+			};
-+			cooling-maps {
-+			};
-+		};
++	L2_CA7: cache-controller at 1 {
++		compatible = "cache";
++		cache-unified;
++		cache-level = <2>;
 +	};
 +
  	gic: interrupt-controller at f1001000 {
  		compatible = "arm,gic-400";
  		#interrupt-cells = <3>;
-@@ -170,12 +189,15 @@
- 		power-domains = <&cpg_clocks>;
- 	};
- 
--	thermal at e61f0000 {
--		compatible = "renesas,thermal-r8a7793", "renesas,rcar-thermal";
-+	thermal: thermal at e61f0000 {
-+		compatible =	"renesas,thermal-r8a7793",
-+				"renesas,rcar-gen2-thermal",
-+				"renesas,rcar-thermal";
- 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
- 		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp5_clks R8A7793_CLK_THERMAL>;
- 		power-domains = <&cpg_clocks>;
-+		#thermal-sensor-cells = <0>;
- 	};
- 
- 	timer {
 -- 
 2.7.0.rc3.207.g0ac5344
