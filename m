@@ -1,96 +1,252 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 25 Feb 2016 10:26:40 -0800
-Subject: [PATCH] arm: fixmap: Annotate page flags with pgprot
-In-Reply-To: <1456422178-1371-1-git-send-email-suzuki.poulose@arm.com>
-References: <1456422178-1371-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1b0356923b2008f3133580174abba4e8@agner.ch>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 25 Feb 2016 10:31:39 -0800
+Subject: [PATCH v3] mtd: atmel_nand: move the hsmc_clk from nfc node to
+ nand node
+In-Reply-To: <56CC393B.6090801@atmel.com>
+References: <1456207220-7757-1-git-send-email-wenyou.yang@atmel.com>
+ <56CC393B.6090801@atmel.com>
+Message-ID: <20160225183139.GL21465@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-02-25 09:42, Suzuki K Poulose wrote:
-> With STRICT_MM_TYPECHECKS, the kernel build fails like :
-> 
->   CC      mm/early_ioremap.o
-> mm/early_ioremap.c: In function ?early_ioremap?:
-> mm/early_ioremap.c:211:2: error: incompatible type for argument 3 of
-> ?__early_ioremap?
-> mm/early_ioremap.c:98:1: note: expected ?pgprot_t? but argument is of
-> type ?long long unsigned int?
-> mm/early_ioremap.c: In function ?early_memremap?:
-> mm/early_ioremap.c:219:13: error: incompatible type for argument 3 of
-> ?__early_ioremap?
-> mm/early_ioremap.c:98:1: note: expected ?pgprot_t? but argument is of
-> type ?long long unsigned int?
-> mm/early_ioremap.c: In function ?early_memremap_ro?:
-> mm/early_ioremap.c:225:2: error: incompatible type for argument 3 of
-> ?__early_ioremap?
-> mm/early_ioremap.c:98:1: note: expected ?pgprot_t? but argument is of
-> type ?long long unsigned int?
-> mm/early_ioremap.c:226:1: warning: control reaches end of non-void
-> function [-Wreturn-type]
-> mm/early_ioremap.c: In function ?early_memremap?:
-> mm/early_ioremap.c:220:1: warning: control reaches end of non-void
-> function [-Wreturn-type]
-> mm/early_ioremap.c: In function ?early_ioremap?:
-> mm/early_ioremap.c:212:1: warning: control reaches end of non-void
-> function [-Wreturn-type]
-> make[1]: *** [mm/early_ioremap.o] Error 1
-> make: *** [mm] Error 2
-> make: *** Waiting for unfinished jobs....
->   CC      arch/arm/mm/mmu.o
->   CC      arch/arm/kernel/patch.o
-> arch/arm/kernel/patch.c: In function ?patch_map?:
-> arch/arm/kernel/patch.c:39:2: error: incompatible type for argument 3
-> of ?__set_fixmap?
-> ./arch/arm/include/asm/fixmap.h:55:6: note: expected ?pgprot_t? but
-> argument is of type ?long long unsigned int?
-> make[1]: *** [arch/arm/kernel/patch.o] Error 1
-> 
-> Fixes Commit a5f4c561b ("ARM: 8415/1: early fixmap support for earlycon").
-> 
-> Annotate the page flags properly using __pgprot.
++ devicetree, Boris
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+Convenient you left devicetree off, since I expect you'd get a hearty NAK
+from them...
 
---
-Stefan
+On Tue, Feb 23, 2016 at 11:49:31AM +0100, Nicolas Ferre wrote:
+> Le 23/02/2016 07:00, Wenyou Yang a ?crit :
+> > From: Josh Wu <josh.wu@atmel.com>
+> > 
+> > For SAMA5D3, SAMA5D4 SoC family, PMECC becomes a part of HSMC, they
+> > need the HSMC clock enabled to work.
+> > The NFC is a sub feature for current nand driver, it can be disabled.
+> > But if HSMC clock is controlled by NFC, so disable NFC will also disable
+> > the HSMC clock. then, it will make the PMECC fail to work.
+> > 
+> > So the solution is move the HSMC clock out of NFC to nand node. When
+> > nand driver probed, it will check whether the chip has HSMC, if yes then
+> > it will require a HSMC clock.
+> > 
+> > Add a new "atmel,sama5d3-nand" compatiable string for SAMA5D3's nand.
+> > 
+> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> > 
+> > Changes in v3:
+> >  - add "atmel,sama5d3-nand" compatiable string for SAMA5D3's nand.
+> >  - revert the mail address of Josh's Signed-off to the original.
+> 
+> It seems okay now:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Brian, can we take this patch (if you acknowledged it) with us (through
+> the arm-soc tree) to keep the synchronization with the DT part of this work?
+> I will also consider squashing the DT part in this one as well as they
+> cannot be separated.
 
+Doesn't that mean you have an illegal breakage of the device tree?
+
+Also, if you're going to refactor the binding (and possibly even break
+it like this), why don't you address the comments Boris made back on the
+first version about a year ago?
+
+http://patchwork.ozlabs.org/patch/438211/
+
+Particularly, I agree that you seem to have the sub-node relationship
+all backward. Why is the controller a sub-node of the flash node? And
+you have no provision for multiple NAND chips?
+
+Brian
+
+> Bye,
 > 
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: stable at vger.kernel.org	# v4.3+
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm/include/asm/fixmap.h |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+> > Changes in v2:
+> >  - add missing .has_hsmc_clk assignment for sama5d2_caps.
+> > 
+> >  .../devicetree/bindings/mtd/atmel-nand.txt         |    4 +-
+> >  drivers/mtd/nand/atmel_nand.c                      |   51 +++++++++++---------
+> >  2 files changed, 30 insertions(+), 25 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> > index d53aba9..29bee7c 100644
+> > --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> > @@ -15,6 +15,7 @@ Required properties:
+> >  - atmel,nand-cmd-offset : offset for the command latch.
+> >  - #address-cells, #size-cells : Must be present if the device has sub-nodes
+> >    representing partitions.
+> > +- clocks: phandle to the peripheral clock
+> >  
+> >  - gpios : specifies the gpio pins to control the NAND device. detect is an
+> >    optional gpio and may be set to 0 if not present.
+> > @@ -43,7 +44,6 @@ Required properties:
+> >  - reg : should specify the address and size used for NFC command registers,
+> >          NFC registers and NFC SRAM. NFC SRAM address and size can be absent
+> >          if don't want to use it.
+> > -- clocks: phandle to the peripheral clock
+> >  Optional properties:
+> >  - atmel,write-by-sram: boolean to enable NFC write by SRAM.
+> >  
+> > @@ -100,13 +100,13 @@ nand0: nand at 40000000 {
+> >  	compatible = "atmel,at91rm9200-nand";
+> >  	#address-cells = <1>;
+> >  	#size-cells = <1>;
+> > +	clocks = <&hsmc_clk>
+> >  	ranges;
+> >          ...
+> >          nfc at 70000000 {
+> >  		compatible = "atmel,sama5d3-nfc";
+> >  		#address-cells = <1>;
+> >  		#size-cells = <1>;
+> > -		clocks = <&hsmc_clk>
+> >  		reg = <
+> >  			0x70000000 0x10000000	/* NFC Command Registers */
+> >  			0xffffc000 0x00000070	/* NFC HSMC regs */
+> > diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> > index 20cbaab..482251c 100644
+> > --- a/drivers/mtd/nand/atmel_nand.c
+> > +++ b/drivers/mtd/nand/atmel_nand.c
+> > @@ -66,6 +66,7 @@ module_param(on_flash_bbt, int, 0);
+> >  struct atmel_nand_caps {
+> >  	bool pmecc_correct_erase_page;
+> >  	uint8_t pmecc_max_correction;
+> > +	bool has_hsmc_clk;
+> >  };
+> >  
+> >  struct atmel_nand_nfc_caps {
+> > @@ -106,8 +107,6 @@ struct atmel_nfc {
+> >  	bool			use_nfc_sram;
+> >  	bool			write_by_sram;
+> >  
+> > -	struct clk		*clk;
+> > -
+> >  	bool			is_initialized;
+> >  	struct completion	comp_ready;
+> >  	struct completion	comp_cmd_done;
+> > @@ -132,6 +131,7 @@ struct atmel_nand_host {
+> >  	struct dma_chan		*dma_chan;
+> >  
+> >  	struct atmel_nfc	*nfc;
+> > +	struct clk		*clk;
+> >  
+> >  	const struct atmel_nand_caps	*caps;
+> >  	bool			has_pmecc;
+> > @@ -2157,6 +2157,19 @@ static int atmel_nand_probe(struct platform_device *pdev)
+> >  	nand_chip->IO_ADDR_R = host->io_base;
+> >  	nand_chip->IO_ADDR_W = host->io_base;
+> >  
+> > +	if (host->caps->has_hsmc_clk) {
+> > +		host->clk = devm_clk_get(&pdev->dev, NULL);
+> > +		if (IS_ERR(host->clk)) {
+> > +			dev_err(&pdev->dev, "HSMC clock is missing, update your Device Tree");
+> > +			res = PTR_ERR(host->clk);
+> > +			goto err_nand_ioremap;
+> > +		}
+> > +
+> > +		res = clk_prepare_enable(host->clk);
+> > +		if (res)
+> > +			goto err_nand_ioremap;
+> > +	}
+> > +
+> >  	if (nand_nfc.is_initialized) {
+> >  		/* NFC driver is probed and initialized */
+> >  		host->nfc = &nand_nfc;
+> > @@ -2321,6 +2334,9 @@ static int atmel_nand_remove(struct platform_device *pdev)
+> >  	if (host->dma_chan)
+> >  		dma_release_channel(host->dma_chan);
+> >  
+> > +	if (!IS_ERR(host->clk))
+> > +		clk_disable_unprepare(host->clk);
+> > +
+> >  	platform_driver_unregister(&atmel_nand_nfc_driver);
+> >  
+> >  	return 0;
+> > @@ -2334,11 +2350,19 @@ static int atmel_nand_remove(struct platform_device *pdev)
+> >  static const struct atmel_nand_caps at91rm9200_caps = {
+> >  	.pmecc_correct_erase_page = false,
+> >  	.pmecc_max_correction = 24,
+> > +	.has_hsmc_clk = false,
+> > +};
+> > +
+> > +static struct atmel_nand_caps sama5d3_caps = {
+> > +	.pmecc_correct_erase_page = false,
+> > +	.pmecc_max_correction = 24,
+> > +	.has_hsmc_clk = true,
+> >  };
+> >  
+> >  static const struct atmel_nand_caps sama5d4_caps = {
+> >  	.pmecc_correct_erase_page = true,
+> >  	.pmecc_max_correction = 24,
+> > +	.has_hsmc_clk = true,
+> >  };
+> >  
+> >  /*
+> > @@ -2348,11 +2372,13 @@ static const struct atmel_nand_caps sama5d4_caps = {
+> >  static const struct atmel_nand_caps sama5d2_caps = {
+> >  	.pmecc_correct_erase_page = true,
+> >  	.pmecc_max_correction = 32,
+> > +	.has_hsmc_clk = true,
+> >  };
+> >  
+> >  static const struct of_device_id atmel_nand_dt_ids[] = {
+> >  	{ .compatible = "atmel,at91rm9200-nand", .data = &at91rm9200_caps },
+> >  	{ .compatible = "atmel,sama5d4-nand", .data = &sama5d4_caps },
+> > +	{ .compatible = "atmel,sama5d3-nand", .data = &sama5d3_caps },
+> >  	{ .compatible = "atmel,sama5d2-nand", .data = &sama5d2_caps },
+> >  	{ /* sentinel */ }
+> >  };
+> > @@ -2363,7 +2389,6 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+> >  {
+> >  	struct atmel_nfc *nfc = &nand_nfc;
+> >  	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
+> > -	int ret;
+> >  
+> >  	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+> > @@ -2401,31 +2426,12 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+> >  	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
+> >  	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
+> >  
+> > -	nfc->clk = devm_clk_get(&pdev->dev, NULL);
+> > -	if (!IS_ERR(nfc->clk)) {
+> > -		ret = clk_prepare_enable(nfc->clk);
+> > -		if (ret)
+> > -			return ret;
+> > -	} else {
+> > -		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
+> > -	}
+> > -
+> >  	nfc->is_initialized = true;
+> >  	dev_info(&pdev->dev, "NFC is probed.\n");
+> >  
+> >  	return 0;
+> >  }
+> >  
+> > -static int atmel_nand_nfc_remove(struct platform_device *pdev)
+> > -{
+> > -	struct atmel_nfc *nfc = &nand_nfc;
+> > -
+> > -	if (!IS_ERR(nfc->clk))
+> > -		clk_disable_unprepare(nfc->clk);
+> > -
+> > -	return 0;
+> > -}
+> > -
+> >  static const struct atmel_nand_nfc_caps sama5d3_nfc_caps = {
+> >  	.rb_mask = NFC_SR_RB_EDGE0,
+> >  };
+> > @@ -2447,7 +2453,6 @@ static struct platform_driver atmel_nand_nfc_driver = {
+> >  		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+> >  	},
+> >  	.probe = atmel_nand_nfc_probe,
+> > -	.remove = atmel_nand_nfc_remove,
+> >  };
+> >  
+> >  static struct platform_driver atmel_nand_driver = {
+> > 
 > 
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 5c17d2d..8d48d5a 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -39,13 +39,13 @@ static const enum fixed_addresses __end_of_fixed_addresses =
->  	__end_of_fixmap_region > __end_of_early_ioremap_region ?
->  	__end_of_fixmap_region : __end_of_early_ioremap_region;
->  
-> -#define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN |
-> L_PTE_DIRTY)
-> +#define FIXMAP_PAGE_COMMON	__pgprot(L_PTE_YOUNG | L_PTE_PRESENT |
-> L_PTE_XN | L_PTE_DIRTY)
->  
-> -#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-> -#define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
-> +#define FIXMAP_PAGE_NORMAL	__pgprot(pgprot_val(FIXMAP_PAGE_COMMON) |
-> L_PTE_MT_WRITEBACK)
-> +#define FIXMAP_PAGE_RO		__pgprot(pgprot_val(FIXMAP_PAGE_NORMAL) | L_PTE_RDONLY)
->  
->  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
-> -#define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED |
-> L_PTE_SHARED)
-> +#define FIXMAP_PAGE_IO		__pgprot(pgprot_val(FIXMAP_PAGE_COMMON) |
-> L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
->  #define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
->  
->  #define __early_set_fixmap	__set_fixmap
+> 
+> -- 
+> Nicolas Ferre
