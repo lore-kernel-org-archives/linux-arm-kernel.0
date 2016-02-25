@@ -1,58 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 21:47:57 +0100
-Subject: [PATCH] serial: ifx6x60: avoid uninitialized variable use
-Message-ID: <1456433283-3761559-1-git-send-email-arnd@arndb.de>
+Date: Thu, 25 Feb 2016 21:57:43 +0100
+Subject: [PATCH, RESEND] ssb: host_soc depends on sprom
+Message-ID: <1456433869-3919332-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc warns about a potential use of an uninitialized variable in this driver:
+Drivers that use the SSB sprom functionality typically 'select SSB_SPROM'
+from Kconfig, but CONFIG_SSB_HOST_SOC misses this, which results in
+a build failure unless at least one of the other drivers that selects
+it is enabled:
 
-drivers/tty/serial/ifx6x60.c: In function 'ifx_spi_complete':
-drivers/tty/serial/ifx6x60.c:713:6: warning: 'more' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   if (more || ifx_dev->spi_more || queue_length > 0 ||
+drivers/built-in.o: In function `ssb_host_soc_get_invariants':
+(.text+0x459494): undefined reference to `ssb_fill_sprom_with_fallback'
 
-Unlike a lot of other such warnings, this one is correct and describes
-an actual problem in the handling of the "IFX_SPI_HEADER_F" result code.
-
-This appears to be a result from a restructuring of the driver that
-dates back to before it was merged in the kernel, so it's impossible
-to know where it went wrong. I also don't know what that result code
-means, so I have no idea if setting 'more' to zero is the correct
-solution, but at least it makes the behavior reproducible rather than
-depending on whatever happens to be on the kernel stack.
-
-This patch initializes the 'more' variable to zero in each of the
-three code paths that could result in undefined behavior before,
-which is more explicit than initializing it at the start of the
-function.
+This adds the same select statement that is used elsewhere.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 541c9a84cd85 ("ssb: pick SoC invariants code from MIPS BCM47xx arch")
 ---
- drivers/tty/serial/ifx6x60.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/ssb/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/tty/serial/ifx6x60.c b/drivers/tty/serial/ifx6x60.c
-index 88246f7e435a..2085a6cfa44b 100644
---- a/drivers/tty/serial/ifx6x60.c
-+++ b/drivers/tty/serial/ifx6x60.c
-@@ -395,8 +395,10 @@ static int ifx_spi_decode_spi_header(unsigned char *buffer, int *length,
- 
- 	if (h1 == 0 && h2 == 0) {
- 		*received_cts = 0;
-+		*more = 0;
- 		return IFX_SPI_HEADER_0;
- 	} else if (h1 == 0xffff && h2 == 0xffff) {
-+		*more = 0;
- 		/* spi_slave_cts remains as it was */
- 		return IFX_SPI_HEADER_F;
- 	}
-@@ -688,6 +690,7 @@ static void ifx_spi_complete(void *ctx)
- 			ifx_dev->rx_buffer + IFX_SPI_HEADER_OVERHEAD,
- 			(size_t)actual_length);
- 	} else {
-+		more = 0;
- 		dev_dbg(&ifx_dev->spi_dev->dev, "SPI transfer error %d",
- 		       ifx_dev->spi_msg.status);
- 	}
+I just noticed this hasn't shown up in linux-next yet, so I'm resending
+it to ensure it's still on someone's radar. Please ignore the resend
+if it's already in a tree that is not part of linux-next but will
+be merged eventually.
+
+See https://patchwork.linux-mips.org/patch/12091/ for the original
+submission.
+
+diff --git a/drivers/ssb/Kconfig b/drivers/ssb/Kconfig
+index 0c675861623f..d8e4219c2324 100644
+--- a/drivers/ssb/Kconfig
++++ b/drivers/ssb/Kconfig
+@@ -83,6 +83,7 @@ config SSB_SDIOHOST
+ config SSB_HOST_SOC
+ 	bool "Support for SSB bus on SoC"
+ 	depends on SSB && BCM47XX_NVRAM
++	select SSB_SPROM
+ 	help
+ 	  Host interface for a SSB directly mapped into memory. This is
+ 	  for some Broadcom SoCs from the BCM47xx and BCM53xx lines.
 -- 
 2.7.0
