@@ -1,63 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 22:34:27 +0100
-Subject: [PATCH] pci: stub out some MSI functions
-Message-ID: <1456436095-607394-1-git-send-email-arnd@arndb.de>
+From: ssantosh@kernel.org (Santosh Shilimkar)
+Date: Thu, 25 Feb 2016 13:49:17 -0800
+Subject: [GIT PULL v2] ARM: Keystone DTS for 4.6 
+Message-ID: <1456436957-22836-1-git-send-email-ssantosh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A bug fix to the MSIx handling in vfio added references
-to functions that may not be defined if MSI is disabled in the kernel,
-resulting in this link error:
+Find updated pull request renaming the newly added DTS files. 
 
-drivers/built-in.o: In function `vfio_msi_set_vector_signal':
-:(.text+0x450808): undefined reference to `get_cached_msi_msg'
-:(.text+0x45080c): undefined reference to `write_msi_msg'
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-When MSI is disabled, we should never get into this code path,
-so by adding stub implementations we can avoid the link error
-without causing any other changes.
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b8f02af096b1 ("vfio/pci: Restore MSIx message prior to enabling")
-Link: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294293.html
----
- include/linux/msi.h | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+are available in the git repository at:
 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 8b425c66305a..ae9a65cd6d43 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -17,7 +17,15 @@ struct msi_desc;
- struct pci_dev;
- struct platform_msi_priv_data;
- void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
-+
-+#ifdef CONFIG_PCI_MSI
- void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
-+#else
-+static inline void get_cached_msi_msg(unsigned int irq,
-+				      struct msi_msg *msg)
-+{
-+}
-+#endif
- 
- typedef void (*irq_write_msi_msg_t)(struct msi_desc *desc,
- 				    struct msi_msg *msg);
-@@ -125,7 +133,14 @@ struct msi_desc *alloc_msi_entry(struct device *dev);
- void free_msi_entry(struct msi_desc *entry);
- void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
-+
-+#ifdef CONFIG_PCI_MSI
- void pci_write_msi_msg(unsigned int irq, struct msi_msg *msg);
-+#else
-+static inline void pci_write_msi_msg(unsigned int irq, struct msi_msg *msg)
-+{
-+}
-+#endif
- 
- u32 __pci_msix_desc_mask_irq(struct msi_desc *desc, u32 flag);
- u32 __pci_msi_desc_mask_irq(struct msi_desc *desc, u32 mask, u32 flag);
--- 
-2.7.0
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.6_v2
+
+for you to fetch changes up to 5b7551db86884c54bf1d2e2a943d4ec3f5463da8:
+
+  ARM: dts: keystone: Add minimum support for K2G evm (2016-02-25 09:27:39 -0800)
+
+----------------------------------------------------------------
+ARM: DTS: Add new bindings for K2G and the K2G evm
+
+K2G SoC family is the newest version of the Keystone family of processors.
+
+The technical reference manual for K2G can be found here:
+http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
+
+----------------------------------------------------------------
+Nishanth Menon (1):
+      ARM: keystone: Create new binding for K2G SoC
+
+Vitaly Andrianov (2):
+      ARM: dts: keystone: Add Initial DT support for TI K2G SoC family
+      ARM: dts: keystone: Add minimum support for K2G evm
+
+ .../devicetree/bindings/arm/keystone/keystone.txt  |  5 ++
+ arch/arm/boot/dts/Makefile                         |  3 +-
+ arch/arm/boot/dts/keystone-k2g-evm.dts             | 32 ++++++++
+ arch/arm/boot/dts/keystone-k2g.dtsi                | 89 ++++++++++++++++++++++
+ arch/arm/mach-keystone/keystone.c                  |  1 +
+ 5 files changed, 129 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/keystone-k2g-evm.dts
+ create mode 100644 arch/arm/boot/dts/keystone-k2g.dtsi
