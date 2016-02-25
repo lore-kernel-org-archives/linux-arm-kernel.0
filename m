@@ -1,113 +1,110 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 25 Feb 2016 10:15:37 +0800
-Subject: [PATCH v3 5/6] rockchip: power-domain: Modify power domain driver for
- rk3399
-In-Reply-To: <1456366337-10808-1-git-send-email-zhangqing@rock-chips.com>
-References: <1456366337-10808-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1456366537-10930-1-git-send-email-zhangqing@rock-chips.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 25 Feb 2016 10:41:52 +0800
+Subject: [PATCH 3/3] arm64: dts: register Hi6220's thermal zone for power
+ allocator
+In-Reply-To: <20160224182856.GD3006@e104805>
+References: <1455983529-9559-1-git-send-email-leo.yan@linaro.org>
+ <1455983529-9559-4-git-send-email-leo.yan@linaro.org>
+ <20160224182856.GD3006@e104805>
+Message-ID: <20160225024152.GA20591@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is modified to support RK3399 SoC.
+Hi Javi,
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/soc/rockchip/pm_domains.c | 55 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+Thanks for review.
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 264cbfe..128d303 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -19,6 +19,7 @@
- #include <linux/mfd/syscon.h>
- #include <dt-bindings/power/rk3288-power.h>
- #include <dt-bindings/power/rk3368-power.h>
-+#include <dt-bindings/power/rk3399-power.h>
- 
- struct rockchip_domain_info {
- 	int pwr_mask;
-@@ -79,6 +80,9 @@ struct rockchip_pmu {
- #define DOMAIN_RK3368(pwr, status, req)		\
- 	DOMAIN(pwr, status, req, (req) + 16, req)
- 
-+#define DOMAIN_RK3399(pwr, status, req)                \
-+	DOMAIN(pwr, status, req, req, req)
-+
- static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
- {
- 	struct rockchip_pmu *pmu = pd->pmu;
-@@ -534,6 +538,36 @@ static const struct rockchip_domain_info rk3368_pm_domains[] = {
- 	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
- };
- 
-+static const struct rockchip_domain_info rk3399_pm_domains[] = {
-+	[RK3399_PD_TCPD0]	= DOMAIN_RK3399(8, 8, -1),
-+	[RK3399_PD_TCPD1]	= DOMAIN_RK3399(9, 9, -1),
-+	[RK3399_PD_CCI]	= DOMAIN_RK3399(10, 10, -1),
-+	[RK3399_PD_CCI0]	= DOMAIN_RK3399(-1, -1, 15),
-+	[RK3399_PD_CCI1]	= DOMAIN_RK3399(-1, -1, 16),
-+	[RK3399_PD_PERILP]	= DOMAIN_RK3399(11, 11, 1),
-+	[RK3399_PD_PERIHP]	= DOMAIN_RK3399(12, 12, 2),
-+	[RK3399_PD_CENTER]	= DOMAIN_RK3399(13, 13, 14),
-+	[RK3399_PD_VIO]	= DOMAIN_RK3399(14, 14, 17),
-+	[RK3399_PD_GPU]	= DOMAIN_RK3399(15, 15, 0),
-+	[RK3399_PD_VCODEC]	= DOMAIN_RK3399(16, 16, 3),
-+	[RK3399_PD_VDU]	= DOMAIN_RK3399(17, 17, 4),
-+	[RK3399_PD_RGA]	= DOMAIN_RK3399(18, 18, 5),
-+	[RK3399_PD_IEP]	= DOMAIN_RK3399(19, 19, 6),
-+	[RK3399_PD_VO]	= DOMAIN_RK3399(20, 20, -1),
-+	[RK3399_PD_VOPB]	= DOMAIN_RK3399(-1, -1, 7),
-+	[RK3399_PD_VOPL]	= DOMAIN_RK3399(-1, -1, 8),
-+	[RK3399_PD_ISP0]	= DOMAIN_RK3399(22, 22, 9),
-+	[RK3399_PD_ISP1]	= DOMAIN_RK3399(23, 23, 10),
-+	[RK3399_PD_HDCP]	= DOMAIN_RK3399(24, 24, 11),
-+	[RK3399_PD_GMAC]	= DOMAIN_RK3399(25, 25, 23),
-+	[RK3399_PD_EMMC]	= DOMAIN_RK3399(26, 26, 24),
-+	[RK3399_PD_USB3]	= DOMAIN_RK3399(27, 27, 12),
-+	[RK3399_PD_EDP]	= DOMAIN_RK3399(28, 28, 22),
-+	[RK3399_PD_GIC]	= DOMAIN_RK3399(29, 29, 27),
-+	[RK3399_PD_SD]	= DOMAIN_RK3399(30, 30, 28),
-+	[RK3399_PD_SDIOAUDIO]	= DOMAIN_RK3399(31, 31, 29),
-+};
-+
- static const struct rockchip_pmu_info rk3288_pmu = {
- 	.pwr_offset = 0x08,
- 	.status_offset = 0x0c,
-@@ -568,6 +602,23 @@ static const struct rockchip_pmu_info rk3368_pmu = {
- 	.domain_info = rk3368_pm_domains,
- };
- 
-+static const struct rockchip_pmu_info rk3399_pmu = {
-+	.pwr_offset = 0x14,
-+	.status_offset = 0x18,
-+	.req_offset = 0x60,
-+	.idle_offset = 0x64,
-+	.ack_offset = 0x68,
-+
-+	.core_pwrcnt_offset = 0x9c,
-+	.gpu_pwrcnt_offset = 0xa4,
-+
-+	.core_power_transition_time = 24,
-+	.gpu_power_transition_time = 24,
-+
-+	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
-+	.domain_info = rk3399_pm_domains,
-+};
-+
- static const struct of_device_id rockchip_pm_domain_dt_match[] = {
- 	{
- 		.compatible = "rockchip,rk3288-power-controller",
-@@ -577,6 +628,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
- 		.compatible = "rockchip,rk3368-power-controller",
- 		.data = (void *)&rk3368_pmu,
- 	},
-+	{
-+		.compatible = "rockchip,rk3399-power-controller",
-+		.data = (void *)&rk3399_pmu,
-+	},
- 	{ /* sentinel */ },
- };
- 
--- 
-1.9.1
+On Wed, Feb 24, 2016 at 06:28:57PM +0000, Javi Merino wrote:
+> On Sat, Feb 20, 2016 at 11:52:09PM +0800, Leo Yan wrote:
+> > With profiling Hi6220's power modeling so get dynamic coefficient and
+> > sustainable power. So pass these parameters from DT.
+> > 
+> > Now enable power allocator wit only one actor for CPU part, so directly
+> > use cluster0's thermal sensor for monitoring temperature.
+> > 
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 36 +++++++++++++++++++++++++++++++
+> >  1 file changed, 36 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > index 50ba1b0..3608a3e 100644
+> > --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > @@ -6,6 +6,7 @@
+> >  
+> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> >  #include <dt-bindings/clock/hi6220-clock.h>
+> > +#include <dt-bindings/thermal/thermal.h>
+> >  
+> >  / {
+> >  	compatible = "hisilicon,hi6220";
+> > @@ -87,6 +88,7 @@
+> >  			cooling-max-level = <0>;
+> >  			#cooling-cells = <2>; /* min followed by max */
+> >  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> > +			dynamic-power-coefficient = <311>;
+> >  		};
+> >  
+> >  		cpu1: cpu at 1 {
+> > @@ -322,5 +324,39 @@
+> >  			clock-names = "thermal_clk";
+> >  			#thermal-sensor-cells = <1>;
+> >  		};
+> > +
+> > +		thermal-zones {
+> > +
+> > +			cls0: cls0 {
+> > +				polling-delay = <1000>;
+> > +				polling-delay-passive = <100>;
+> > +				sustainable-power = <3326>;
+> > +
+> > +				/* sensor ID */
+> > +				thermal-sensors = <&tsensor 2>;
+> > +
+> > +				trips {
+> > +					threshold: trip-point at 0 {
+> > +						temperature = <65000>;
+> > +						hysteresis = <1000>;
+> 
+> As far as I know, hysteresis is ignored in the thermal subsystem right
+> now, so you could remove it from both trip points.
+
+Will remove it.
+
+> > +						type = "passive";
+> > +					};
+> > +
+> > +					target: trip-point at 1 {
+> > +						temperature = <75000>;
+> > +						hysteresis = <1000>;
+> > +						type = "passive";
+> > +					};
+> > +				};
+> > +
+> > +				cooling-maps {
+> > +					map0 {
+> > +						trip = <&target>;
+> > +						contribution = <1024>;
+> 
+> As Hikey has only one voltage domain, you only have one cpu cooling
+> device.  "contribution" is only useful when you have more than one
+> cooling device, as it's relative to the other cooling device's
+> contribution.  You can remove contribution from here.
+> 
+> Other than this minor stuff, it looks good to me. FWIW,
+> 
+> Reviewed-by: Javi Merino <javi.merino@arm.com>
+
+Thanks for review. Will sent out new version.
+
+Thanks,
+Leo Yan
+
+> > +						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> > +					};
+> > +				};
+> > +			};
+> > +		};
+> >  	};
+> >  };
