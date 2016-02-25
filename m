@@ -1,40 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 08:52:55 +0900
-Subject: [PATCH 06/19] ARM: dts: porter: fix JP3 jumper description
+Date: Fri, 26 Feb 2016 08:52:57 +0900
+Subject: [PATCH 08/19] ARM: dts: r8a7791: enable to use thermal-zone
 In-Reply-To: <cover.1456443769.git.horms+renesas@verge.net.au>
 References: <cover.1456443769.git.horms+renesas@verge.net.au>
-Message-ID: <f3b063c8f443049fb484086d6a956a5270f137a0.1456443769.git.horms+renesas@verge.net.au>
+Message-ID: <cac68a56e34b9810e28dfd2e8645f278671d37ce.1456443769.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-When finishing the Porter sound support patch, I managed to call the JP3
-jumper SW3 in the comment.  Fix this  along with (also miscalled) jumper
-positions...
+This patch enables to use thermal-zone on r8a7791.
+This thermal sensor can measure temperature from -40000 to 125000,
+but over 117000 can be critical on this chip.
+Thus, default critical temperature is now set as 115000 (this driver
+is using 5000 steps) (Current critical temperature is using it as
+90000, but there is no big reason about it)
 
-Fixes: 493b4da7c10c ("ARM: dts: porter: add sound support")
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+And it doesn't check thermal zone periodically (same as current
+behavior). You can exchange it by modifying polling-delay[-passive]
+property.
+
+You can set trip temp if your kernel has CONFIG_THERMAL_WRITABLE_TRIPS,
+but you need to take care to use it, since it will call
+orderly_poweroff() it it reaches to the value.
+echo $temp > /sys/class/thermal/thermal_zone0/trip_point_0_temp
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-porter.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index ed1f6f884e2b..bf3a0d13cd35 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -11,8 +11,8 @@
- /*
-  * SSI-AK4642
-  *
-- * SW3: 1: AK4642
-- *      3: ADV7511
-+ * JP3: 2-1: AK4642
-+ *      2-3: ADV7511
-  *
-  * This command is required before playback/capture:
-  *
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 8910236e64bf..f1732dde114b 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -69,6 +69,25 @@
+ 		};
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			polling-delay-passive	= <0>;
++			polling-delay		= <0>;
++
++			thermal-sensors = <&thermal>;
++
++			trips {
++				cpu-crit {
++					temperature	= <115000>;
++					hysteresis	= <0>;
++					type		= "critical";
++				};
++			};
++			cooling-maps {
++			};
++		};
++	};
++
+ 	gic: interrupt-controller at f1001000 {
+ 		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
+@@ -185,12 +204,15 @@
+ 		power-domains = <&cpg_clocks>;
+ 	};
+ 
+-	thermal at e61f0000 {
+-		compatible = "renesas,thermal-r8a7791", "renesas,rcar-thermal";
++	thermal: thermal at e61f0000 {
++		compatible =	"renesas,thermal-r8a7791",
++				"renesas,rcar-gen2-thermal",
++				"renesas,rcar-thermal";
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
+ 		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp5_clks R8A7791_CLK_THERMAL>;
+ 		power-domains = <&cpg_clocks>;
++		#thermal-sensor-cells = <0>;
+ 	};
+ 
+ 	timer {
 -- 
 2.7.0.rc3.207.g0ac5344
