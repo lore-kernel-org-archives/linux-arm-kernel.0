@@ -1,54 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Feb 2016 11:25:48 -0800
-Subject: [PATCH v3 00/10] arm64: Introduce Allwinner A64 and Pine64 support
-In-Reply-To: <56CED1CB.8040807@arm.com>
-References: <1456165255-31013-1-git-send-email-andre.przywara@arm.com>
- <56CED1CB.8040807@arm.com>
-Message-ID: <20160225192548.GK4736@lukather>
+Date: Thu, 25 Feb 2016 11:29:38 -0800
+Subject: [PATCH v5 1/4] clk: sunxi: Add apb0 gates for H3
+In-Reply-To: <1456146208-13890-2-git-send-email-k@japko.eu>
+References: <1456146208-13890-1-git-send-email-k@japko.eu>
+ <1456146208-13890-2-git-send-email-k@japko.eu>
+Message-ID: <20160225192938.GL4736@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Feb 25, 2016 at 10:04:59AM +0000, Andre Przywara wrote:
-> Hi Maxime,
+On Mon, Feb 22, 2016 at 02:03:25PM +0100, Krzysztof Adamski wrote:
+> This patch adds support for APB0 in H3. It seems to be compatible with
+> earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
+> etc).
 > 
-> can you give me a quick assessment on how we can progress from here?
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 2 ++
+>  drivers/clk/sunxi/clk-simple-gates.c              | 4 ++++
+>  2 files changed, 6 insertions(+)
 > 
-> Is it already too late for at least some of the patches to go into 4.6?
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index c09f59b..834436f 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -18,6 +18,7 @@ Required properties:
+>  	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
+>  	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
+>  	"allwinner,sun8i-a23-axi-clk" - for the AXI clock on A23
+> +	"allwinner,sun4i-a10-gates-clk" - for generic gates on all compatible SoCs
+>  	"allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
+>  	"allwinner,sun4i-a10-ahb-clk" - for the AHB clock
+>  	"allwinner,sun5i-a13-ahb-clk" - for the AHB clock on A13
+> @@ -46,6 +47,7 @@ Required properties:
+>  	"allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A31
+>  	"allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
+>  	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
+> +	"allwinner,sun8i-h3-apb0-gates-clk" - for the APB0 gates on H3
+>  	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
+>  	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
+>  	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
+> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+> index 2cfc5a8..d7ec2dc 100644
+> --- a/drivers/clk/sunxi/clk-simple-gates.c
+> +++ b/drivers/clk/sunxi/clk-simple-gates.c
+> @@ -98,6 +98,8 @@ static void __init sunxi_simple_gates_init(struct device_node *node)
+>  	sunxi_simple_gates_setup(node, NULL, 0);
+>  }
+>  
+> +CLK_OF_DECLARE(sun4i_a10_gates, "allwinner,sun4i-a10-gates-clk",
+> +	       sunxi_simple_gates_init);
+>  CLK_OF_DECLARE(sun4i_a10_apb0, "allwinner,sun4i-a10-apb0-gates-clk",
+>  	       sunxi_simple_gates_init);
+>  CLK_OF_DECLARE(sun4i_a10_apb1, "allwinner,sun4i-a10-apb1-gates-clk",
+> @@ -132,6 +134,8 @@ CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
+>  	       sunxi_simple_gates_init);
+>  CLK_OF_DECLARE(sun8i_a83t_apb0, "allwinner,sun8i-a83t-apb0-gates-clk",
+>  	       sunxi_simple_gates_init);
+> +CLK_OF_DECLARE(sun8i_h3_apb0, "allwinner,sun8i-h3-apb0-gates-clk",
+> +	       sunxi_simple_gates_init);
 
-I think we still have a major disagreement on the clocks part, and
-yeah, it's too late for 4.6, I'm going to send the PR tomorrow, and am
-merging the final patches that didn't have the attention they deserved
-lately.
+You don't need this one anymore. I removed it, and applied the patch.
 
-> If not, can you at least merge the Kconfig patch (3/10)
-
-This one was already merged
-
-> and the pinctrl driver (if that goes via your tree at all)? Do you
-> need more reviews or Acks?
-
-And I just gave my Acked-by for this one, but it will go through the
-pinctrl tree, hopefully in time.
-
-> Of the prerequisite patches for a clean arm64 compile I see that the
-> sunxi-rsb is in your for-next branch, but not in -next itself. Also I
-> got a message about the sunxi-ss Kconfig patch to be applied, but cannot
-> find it in -next either. All the other patches have made it into -next
-> as of today.
-
-Great, I'll push the A64 kconfig patch in next today, and see if
-there's any fallout.
-
-> Also are you happy with the PLL6 reuse patch I sent on Monday and can I
-> base the A64's PLL7 clock on that?
-> Or do you prefer another approach here? I am happy to discuss this on
-> the list then.
-
-I just commented on it.
-
-Sorry for the unresponsiveness lately,
+Thanks!
 Maxime
 
 -- 
@@ -61,4 +76,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/5d167351/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/42ea11bb/attachment.sig>
