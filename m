@@ -1,75 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 25 Feb 2016 16:05:33 +0000
-Subject: [PATCH 3/3] arm/arm64: pci: remove arch specific
- pcibios_enable_device()
-In-Reply-To: <20160225152417.GB8120@localhost>
-References: <1447779838-15585-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1447779838-15585-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20151123134921.GB4236@arm.com> <20160120162215.GE13437@red-moon>
- <20160225152417.GB8120@localhost>
-Message-ID: <20160225160533.GA3596@red-moon>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 25 Feb 2016 09:05:34 -0700
+Subject: [PATCH net-next V2 00/16] net: fec: cleanup and fixes
+In-Reply-To: <5514193.TiF8b6rKpj@diplodocus>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <5514193.TiF8b6rKpj@diplodocus>
+Message-ID: <56CF264E.2070903@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On Thu, Feb 25, 2016 at 09:24:17AM -0600, Bjorn Helgaas wrote:
-> Hi Lorenzo,
+On 2/24/2016 7:52 PM, Joshua Clayton wrote:
+> Hello Troy,
+> I'm replying here instead of to a particular commit because several of
+> the commit messages seem inadequate.
 > 
-> On Wed, Jan 20, 2016 at 04:22:15PM +0000, Lorenzo Pieralisi wrote:
-> > On Mon, Nov 23, 2015 at 01:49:21PM +0000, Will Deacon wrote:
-> > > On Tue, Nov 17, 2015 at 05:03:58PM +0000, Lorenzo Pieralisi wrote:
-> > > > The arm/arm64 pcibios_enable_device() implementations exist solely
-> > > > to prevent enabling PCI resources on PROBE_ONLY systems, since
-> > > > on those systems the PCI resources are currently not claimed (ie
-> > > > validated and inserted in the PCI resource tree) therefore they can
-> > > > not be enabled since this would trigger PCI set-ups failures.
-> > > > 
-> > > > By introducing resources claiming in the PCI host controllers set-ups
-> > > > that have PROBE_ONLY as a probe option, there is no need for arch specific
-> > > > pcibios_enable_device() implementations anymore in that the kernel can
-> > > > rely on the generic pcibios_enable_device() implementation without
-> > > > resorting to arch specific code to work around the missing resources
-> > > > claiming enumeration step.
-> > > > 
-> > > > This patch removes the pcibios_enable_device() implementations from
-> > > > the arm/arm64 arch back-ends.
-> > > > 
-> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > > ---
-> > > >  arch/arm/kernel/bios32.c | 12 ------------
-> > > >  arch/arm64/kernel/pci.c  | 13 -------------
-> > > >  2 files changed, 25 deletions(-)
-> > > 
-> > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > Thanks, unfortunately I spotted that ARM platforms can set
-> > PCI_PROBE_ONLY also via command line (pcibios_setup()), which means
-> > that I have to add resource claiming to all ARM PCI controllers that
-> > check PCI_PROBE_ONLY (inclusive of ARM bios32) to really make sure we
-> > can apply this patch or alternatevely we add the resource claiming
-> > to the pcibios_fixup_bus() callback (but we can claim resources only if
-> > PCI_PROBE_ONLY is set lest we trigger regressions) which would be the
-> > simpler solution.
+> The first line summaries all look good.
 > 
-> So where are we?  The above response sounds like this series still
-> needs a little tweaking?
+> The descriptions should each also include the "user visible impact" of
+> the patch and the justification for it (i.e. why you made the change).
+> 
+> For instance, patch 3 doesn't include either what will change
+>  (nothing, I'm guessing?) or why we now pass in the structures
+> instead of a queue_id. 
 
-Yes, I rewrote the generic PCI layer for claiming resources (Tomasz's
-posted it in its ACPI PCI ARM64 series):
+I can add to the commit message, that this is in preparation for
+patch 4 which depends on it. Or I could squash patches 2/3/4
+together, but I think it is easier to review smaller patches.
 
-https://lkml.org/lkml/2016/2/16/412
 
-My only concern is removing PCI_PROBE_ONLY handling from arm 32 bit code,
-since I noticed it can be set on the command line there, claiming
-resources in pcibios arm 32 should do the trick, I will move the ARM
-32-bit handling in a separate patch (hopefully someone can help me test
-it on affected platforms (?), I will ask Russell the best way to do it).
+> 
+> You've also got a few (e.g. patch 9, patch 14) where the substance
+> of the patch is in the summary,
+> 
+> but missing from the message.
+> 
+> These kind of descriptions are very hard to review since the expression
+> is split between the subject of the email and the body of the email, which
+> are not close
+> together in some email programs.
+> 
+> Better to reiterate or elaborate on the summary in the message.
+> In patch 9, for instance, it would be more clear to say:
+> 
+> Move restart test to earlier in fec_txq() which saves one comparison. 
 
-Thanks,
-Lorenzo
+
+I can do this. And change patch 14 to read
+
+
+Create subroutine reset_tx_queue to have one place
+to release any queued tx skbs.
+
+Any other commit messages you'd like to improve?
+
+
+> P.S I'm a little confused, as I came looking for a v3 of the first 8 patches
+> and found these instead. I'll try to give your first 8 a look when they show up.
+
+The 1st 8 patches have already been applied. I added a patch to address your review there
+at the end of the series. So, that patch will show up in my next set.
+
+
+Thanks for the review
+
+Troy
