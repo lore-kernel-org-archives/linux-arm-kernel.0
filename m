@@ -1,57 +1,74 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 24 Feb 2016 17:36:59 -0700
-Subject: [PATCH net-next V2 16/16] net: fec: don't set cbd_bufaddr unless no
- mapping error
-In-Reply-To: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1456360619-24390-17-git-send-email-troy.kisky@boundarydevices.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 25 Feb 2016 09:43:00 +0900
+Subject: [GIT PULL 3/7] drivers: soc: EXYNOS drivers for v4.6
+In-Reply-To: <20160224222254.GT10126@localhost>
+References: <1455496446-23779-1-git-send-email-k.kozlowski@samsung.com>
+ <1455496446-23779-4-git-send-email-k.kozlowski@samsung.com>
+ <20160224222254.GT10126@localhost>
+Message-ID: <56CE4E14.2050701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not assigning cbd_bufaddr on error will prevent trying to
-unmap the error in case the FEC is reset.
+On 25.02.2016 07:22, Olof Johansson wrote:
+> On Mon, Feb 15, 2016 at 09:34:02AM +0900, Krzysztof Kozlowski wrote:
+>> Hi Arnd, Kevin and Olof,
+>>
+>> This finally moves SROM controller and PMU code to separate
+>> driver under drivers/soc/samsung.
+>>
+>> Kind regards,
+>> Krzysztof
+>>
+>>
+>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>
+>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-soc-srom-pmu-4.6
+>>
+>> for you to fetch changes up to 74a6659e8bf193066ba6bf365de66baa897aebb1:
+>>
+>>   drivers: soc: Add support for Exynos PMU driver (2016-01-25 10:46:59 +0900)
+>>
+>> ----------------------------------------------------------------
+>> A set of changes adding new drivers under drivers/soc/samsung:
+>>
+>> 1. Split code for handling SROM registers out of arm/mach-exynos
+>>    in to separate SROM controller driver under drivers/soc/samsung.
+>>    The driver will save and restore SROM registers during Suspend
+>>    to RAM.
+>>
+>> 2. Add to this SROM controller driver support for bank configuration
+>>    used by child devices. This allows usage of SMSC9115 Ethernet chip
+>>    on SMDK5410 (Exynos5410) directly connected to SROM controller.
+> 
+> Hi,
+> 
+> OMAP has GPMC drivers under drivers/memory. I wonder if SROM should go there
+> too, since it's a quite similar bus.
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- drivers/net/ethernet/freescale/fec_main.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+I wish I get this feedback before, when we were discussing the SROM
+patches. :/
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 1d71b2e..c443a96 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -600,7 +600,7 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
- 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
- 	struct bufdesc_ex *ebdp = container_of(bdp, struct bufdesc_ex, desc);
- 	void *bufaddr;
--	unsigned long dmabuf;
-+	dma_addr_t dmabuf;
- 	unsigned int estatus = 0;
- 
- 	bufaddr = txq->tso_hdrs + index * TSO_HEADER_SIZE;
-@@ -1298,17 +1298,21 @@ fec_enet_new_rxbdp(struct net_device *ndev, struct bufdesc *bdp, struct sk_buff
- {
- 	struct  fec_enet_private *fep = netdev_priv(ndev);
- 	int off;
-+	dma_addr_t dmabuf;
- 
- 	off = ((unsigned long)skb->data) & fep->rx_align;
- 	if (off)
- 		skb_reserve(skb, fep->rx_align + 1 - off);
- 
--	bdp->cbd_bufaddr = cpu_to_fec32(dma_map_single(&fep->pdev->dev, skb->data, FEC_ENET_RX_FRSIZE - fep->rx_align, DMA_FROM_DEVICE));
--	if (dma_mapping_error(&fep->pdev->dev, fec32_to_cpu(bdp->cbd_bufaddr))) {
-+	dmabuf = dma_map_single(&fep->pdev->dev, skb->data,
-+				FEC_ENET_RX_FRSIZE - fep->rx_align,
-+				DMA_FROM_DEVICE);
-+	if (dma_mapping_error(&fep->pdev->dev, dmabuf)) {
- 		if (net_ratelimit())
- 			netdev_err(ndev, "Rx DMA memory map failed\n");
- 		return -ENOMEM;
- 	}
-+	bdp->cbd_bufaddr = cpu_to_fec32(dmabuf);
- 
- 	return 0;
- }
--- 
-2.5.0
+Indeed this sounds reasonable. On some boards the omap-gpmc is used for
+the same purpose: interfacing to smsc,lan9115 (like on SMDK5410).
+
+
+> Feel free to respin this without SROM now, so we can get the other pieces in
+> sooner and then revisit the SROM asyncronously. That'll remove the dependencies
+> on DT as well.
+
+Okay, I'll rebase all drivers/soc branches and respin the pull request
+so PMU driver and other stuff could go in.
+
+BTW, just in case, although PMU stands for "Power Management Unit" I
+don't think it should be placed under drivers/power because it is not a
+avs/charger/battery/reset driver. Existing power-related drivers are
+under driver/soc (bcm, dove, tegra).
+
+Re-work of SROM drivers could be started on top of it.
+
+Best regards,
+Krzysztof
