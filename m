@@ -1,36 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 25 Feb 2016 09:44:18 +0000
-Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
-In-Reply-To: <7hsi0hr3wj.fsf@baylibre.com>
-References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
- <7hsi0hr3wj.fsf@baylibre.com>
-Message-ID: <20160225094417.GB31728@red-moon>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 25 Feb 2016 10:44:40 +0100
+Subject: [PATCH 0/2] ARM: Make reset_control_ops const
+Message-ID: <1456393482-26318-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 05:10:20PM -0800, Kevin Hilman wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> 
-> > When a CPU is suspended (either through suspend-to-RAM or CPUidle),
-> > its PMU registers content can be lost, which means that counters
-> > registers values that were initialized on power down entry have to be
-> > reprogrammed on power-up to make sure the counters set-up is preserved
-> 
-> This assumes that the PMUs are always sharing a power rail with a
-> specific CPU, not the cluster.  Is that a reliable assumption?
+Since commit 203d4f347d86 ("reset: Make reset_control_ops const") marked
+the ops pointer in struct reset_controller_dev as const, these structs
+can be made const, too. The commit is currently sitting in the
+arm-soc/for-next branch.
 
-As reliable as assuming the GIC HW state needs save/restore on idle-state
-entry, if we have no power domains information linked to CPU PM
-notifiers saving/restoring everything every time an idle state deeper
-than wfi is entered is the best we can do.
+regards
+Philipp
 
-As far as this patch is concerned, if the PMU is on a different power
-domain than the CPU, I agree that stopping/resetting/restoring the
-PMU registers is a waste of cycles (I will test it also by triggering
-the notifiers on wfi, to make sure the reset is not disruptive on
-a cpu that is not powered off), I see no alternative other than disabling
-idle to carry out profiling sanely (or implement CPU PM notifiers with
-runtime PM).
+Philipp Zabel (2):
+  ARM: imx: Make reset_control_ops const
+  ARM: sirf: Make reset_control_ops const
 
-Thanks,
-Lorenzo
+ arch/arm/mach-imx/src.c     | 2 +-
+ arch/arm/mach-prima2/rstc.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+-- 
+2.7.0
