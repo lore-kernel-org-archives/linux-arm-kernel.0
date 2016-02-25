@@ -1,15 +1,15 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 08:52:56 +0900
-Subject: [PATCH 07/19] ARM: dts: r8a7790: enable to use thermal-zone
+Date: Fri, 26 Feb 2016 08:52:58 +0900
+Subject: [PATCH 09/19] ARM: dts: r8a7793: enable to use thermal-zone
 In-Reply-To: <cover.1456443769.git.horms+renesas@verge.net.au>
 References: <cover.1456443769.git.horms+renesas@verge.net.au>
-Message-ID: <a8b805f3606f7af7f2b44763d3d6cf05f7c15afd.1456443769.git.horms+renesas@verge.net.au>
+Message-ID: <57f9156bc620ac561ed46b2316de328e6b280023.1456443769.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch enables to use thermal-zone on r8a7790.
+This patch enables to use thermal-zone on r8a7793.
 This thermal sensor can measure temperature from -40000 to 125000,
 but over 117000 can be critical on this chip.
 Thus, default critical temperature is now set as 115000 (this driver
@@ -28,14 +28,14 @@ echo $temp > /sys/class/thermal/thermal_zone0/trip_point_0_temp
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 26 ++++++++++++++++++++++++--
+ arch/arm/boot/dts/r8a7793.dtsi | 26 ++++++++++++++++++++++++--
  1 file changed, 24 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 76ddf5c6cca7..24b773ae133a 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -112,6 +112,25 @@
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 45dba1c79a43..9837f90f1718 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -54,6 +54,25 @@
  		};
  	};
  
@@ -61,19 +61,19 @@ index 76ddf5c6cca7..24b773ae133a 100644
  	gic: interrupt-controller at f1001000 {
  		compatible = "arm,gic-400";
  		#interrupt-cells = <3>;
-@@ -202,12 +221,15 @@
+@@ -170,12 +189,15 @@
  		power-domains = <&cpg_clocks>;
  	};
  
 -	thermal at e61f0000 {
--		compatible = "renesas,thermal-r8a7790", "renesas,rcar-thermal";
+-		compatible = "renesas,thermal-r8a7793", "renesas,rcar-thermal";
 +	thermal: thermal at e61f0000 {
-+		compatible =	"renesas,thermal-r8a7790",
++		compatible =	"renesas,thermal-r8a7793",
 +				"renesas,rcar-gen2-thermal",
 +				"renesas,rcar-thermal";
  		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
  		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp5_clks R8A7790_CLK_THERMAL>;
+ 		clocks = <&mstp5_clks R8A7793_CLK_THERMAL>;
  		power-domains = <&cpg_clocks>;
 +		#thermal-sensor-cells = <0>;
  	};
