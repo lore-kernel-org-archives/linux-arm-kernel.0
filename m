@@ -1,34 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 08:53:08 +0900
-Subject: [PATCH 19/19] ARM: dts: r8a7790: use fallback etheravb compatibility
- string
+Date: Fri, 26 Feb 2016 08:52:54 +0900
+Subject: [PATCH 05/19] ARM: dts: r8a7794: use fallback pci compatibility string
 In-Reply-To: <cover.1456443769.git.horms+renesas@verge.net.au>
 References: <cover.1456443769.git.horms+renesas@verge.net.au>
-Message-ID: <d92df7e59909940b2b65523981aa0ddb4327047a.1456443769.git.horms+renesas@verge.net.au>
+Message-ID: <c99fbe6437cfe485d96c486b5aa4022c03ad8224.1456443769.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added fallback compatibility string in r8a7790 device tree.
+Use recently added fallback compatibility string in r8a7794 device tree.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index ba4c2530d79f..38b706399a6b 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -773,7 +773,8 @@
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 7d4c5597af5b..df0861e84a4b 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -681,7 +681,7 @@
  	};
  
- 	avb: ethernet at e6800000 {
--		compatible = "renesas,etheravb-r8a7790";
-+		compatible = "renesas,etheravb-r8a7790",
-+			     "renesas,etheravb-rcar-gen2";
- 		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
- 		interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
+ 	pci0: pci at ee090000 {
+-		compatible = "renesas,pci-r8a7794";
++		compatible = "renesas,pci-r8a7794", "renesas,pci-rcar-gen2";
+ 		device_type = "pci";
+ 		reg = <0 0xee090000 0 0xc00>,
+ 		      <0 0xee080000 0 0x1100>;
+@@ -716,7 +716,7 @@
+ 	};
+ 
+ 	pci1: pci at ee0d0000 {
+-		compatible = "renesas,pci-r8a7794";
++		compatible = "renesas,pci-r8a7794", "renesas,pci-rcar-gen2";
+ 		device_type = "pci";
+ 		reg = <0 0xee0d0000 0 0xc00>,
+ 		      <0 0xee0c0000 0 0x1100>;
 -- 
 2.7.0.rc3.207.g0ac5344
