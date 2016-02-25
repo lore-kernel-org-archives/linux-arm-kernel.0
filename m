@@ -1,88 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 22:11:42 +0100
-Subject: [PATCH, RESEND] drm/sti: use u32 to store DMA addresses
-Message-ID: <1456434711-48393-1-git-send-email-arnd@arndb.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 25 Feb 2016 22:24:34 +0100
+Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for HiSilicon
+ SoCs Host Controllers
+In-Reply-To: <20160225195912.GA4818@localhost>
+References: <20160209182429.GD4348@leverpostej>
+ <20160225120750.GA32016@red-moon> <20160225195912.GA4818@localhost>
+Message-ID: <8105311.kD8XXIcipM@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STi drm driver correctly warns about invalid format strings
-when built with 64-bit dma_addr_t:
+On Thursday, February 25, 2016 01:59:12 PM Bjorn Helgaas wrote:
+> On Thu, Feb 25, 2016 at 12:07:50PM +0000, Lorenzo Pieralisi wrote:
+> > On Thu, Feb 25, 2016 at 03:01:19AM +0000, Gabriele Paoloni wrote:
+> > 
+> > [...]
+> > 
+> > > > I think the relevant spec is the PCI Firmware Spec, r3.0, sec 4.1.2.
+> > > > Note 2 in that section says the address range of an MMCFG region
+> > > > must be reserved by declaring a motherboard resource, i.e., included
+> > > > in the _CRS of a PNP0C02 or similar device.
+> > > 
+> > > I had a look a this. So yes the specs says that we should use the 
+> > > PNP0C02 device if MCFG is not supported. 
+> > 
+> > AFAIK, PNP0C02 is a resource reservation mechanism, the spec says that
+> > MCFG regions must be reserved using PNP0C02, even though its
+> > current usage on x86 is a bit unfathomable to me, in particular
+> > in relation to MCFG resources retrieved for hotpluggable bridges (ie
+> > through _CBA, which I think consider the MCFG region as reserved
+> > by default, regardless of PNP0c02):
+> > 
+> > see pci_mmcfg_check_reserved() arch/x86/pci/mmconfig-shared.c
+> 
+> I don't know how _CBA-related resources would be reserved.  I haven't
+> personally worked with any host bridges that supply _CBA, so I don't
+> know whether or how they handled it.
+> 
+> I think the spec intent was that the Consumer/Producer bit (Extended
+> Address Space Descriptor, General Flags Bit[0], see ACPI spec sec
+> 6.4.3.5.4) would be used.  Resources such as ECAM areas would be
+> marked "Consumer", meaning the bridge consumed that space itself, and
+> windows passed down to the PCI bus would be marked "Producer".
+> 
+> But BIOSes didn't use that bit consistently, so we couldn't rely on
+> it.  I verified experimentally that Windows didn't pay attention to
+> that bit either, at least for DWord descriptors:
+> https://bugzilla.kernel.org/show_bug.cgi?id=15701
+> 
+> It's conceivable that we could still use that bit in Extended Address
+> Space descriptors, or maybe some hack like pay attention if the bridge
+> has _CBA, or some such.
 
-sti_hqvdp.c: In function 'sti_hqvdp_vtg_cb':
-sti_hqvdp.c:605:119: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
-sti_hqvdp.c: In function 'sti_hqvdp_atomic_update':
-sti_hqvdp.c:931:118: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+Last time I asked the firmware vendor people in the ASWG about that,
+the answer was that the Consumer/Producer bit was useless as they had
+never paid any attention to it in general.
 
-This could be changed to using the %pad format string, but that
-does not work when printing an rvalue, so instead I'm changing
-the type in the sti_hqvdp structure to u32, which is what gets
-written into the registers anyway.
+It may be good to update the spec to say something along these lines, actually.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/gpu/drm/sti/sti_hqvdp.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
-
-I originally submitted this on Tue, 08 Dec 2015, but got no reply,
-so resending the same patch now.
-
-diff --git a/drivers/gpu/drm/sti/sti_hqvdp.c b/drivers/gpu/drm/sti/sti_hqvdp.c
-index 1d3c3d029603..7818d47bea43 100644
---- a/drivers/gpu/drm/sti/sti_hqvdp.c
-+++ b/drivers/gpu/drm/sti/sti_hqvdp.c
-@@ -349,7 +349,7 @@ struct sti_hqvdp {
- 	unsigned int curr_field_count;
- 	unsigned int last_field_count;
- 	void *hqvdp_cmd;
--	dma_addr_t hqvdp_cmd_paddr;
-+	u32 hqvdp_cmd_paddr;
- 	struct sti_vtg *vtg;
- 	bool xp70_initialized;
- };
-@@ -372,8 +372,8 @@ static const uint32_t hqvdp_supported_formats[] = {
-  */
- static int sti_hqvdp_get_free_cmd(struct sti_hqvdp *hqvdp)
- {
--	int curr_cmd, next_cmd;
--	dma_addr_t cmd = hqvdp->hqvdp_cmd_paddr;
-+	u32 curr_cmd, next_cmd;
-+	u32 cmd = hqvdp->hqvdp_cmd_paddr;
- 	int i;
- 
- 	curr_cmd = readl(hqvdp->regs + HQVDP_MBX_CURRENT_CMD);
-@@ -400,8 +400,8 @@ static int sti_hqvdp_get_free_cmd(struct sti_hqvdp *hqvdp)
-  */
- static int sti_hqvdp_get_curr_cmd(struct sti_hqvdp *hqvdp)
- {
--	int curr_cmd;
--	dma_addr_t cmd = hqvdp->hqvdp_cmd_paddr;
-+	u32 curr_cmd;
-+	u32 cmd = hqvdp->hqvdp_cmd_paddr;
- 	unsigned int i;
- 
- 	curr_cmd = readl(hqvdp->regs + HQVDP_MBX_CURRENT_CMD);
-@@ -612,19 +612,21 @@ int sti_hqvdp_vtg_cb(struct notifier_block *nb, unsigned long evt, void *data)
- static void sti_hqvdp_init(struct sti_hqvdp *hqvdp)
- {
- 	int size;
-+	dma_addr_t dma_addr;
- 
- 	hqvdp->vtg_nb.notifier_call = sti_hqvdp_vtg_cb;
- 
- 	/* Allocate memory for the VDP commands */
- 	size = NB_VDP_CMD * sizeof(struct sti_hqvdp_cmd);
- 	hqvdp->hqvdp_cmd = dma_alloc_wc(hqvdp->dev, size,
--					&hqvdp->hqvdp_cmd_paddr,
-+					&dma_addr,
- 					GFP_KERNEL | GFP_DMA);
- 	if (!hqvdp->hqvdp_cmd) {
- 		DRM_ERROR("Failed to allocate memory for VDP cmd\n");
- 		return;
- 	}
- 
-+	hqvdp->hqvdp_cmd_paddr = (u32)dma_addr;
- 	memset(hqvdp->hqvdp_cmd, 0, size);
- }
- 
--- 
-2.7.0
+Thanks,
+Rafael
