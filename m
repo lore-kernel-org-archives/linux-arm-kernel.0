@@ -1,54 +1,90 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Thu, 25 Feb 2016 13:44:51 +0200
-Subject: [PATCH 12/50] pinctrl: intel: Use devm_pinctrl_register() for
- pinctrl registration
-In-Reply-To: <1456319775-3216-13-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-13-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160225114451.GB29434@kuha.fi.intel.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 25 Feb 2016 19:53:27 +0800
+Subject: [PATCH 1/2] pci/of: to support explicitly declare interrupt pins
+ unused
+Message-ID: <1456401208-10136-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 06:45:37PM +0530, Laxman Dewangan wrote:
-> Use devm_pinctrl_register() for pin control registration.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> ---
->  drivers/pinctrl/intel/pinctrl-intel.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/intel/pinctrl-intel.c b/drivers/pinctrl/intel/pinctrl-intel.c
-> index 85536b4..27bb21b 100644
-> --- a/drivers/pinctrl/intel/pinctrl-intel.c
-> +++ b/drivers/pinctrl/intel/pinctrl-intel.c
-> @@ -1014,7 +1014,8 @@ int intel_pinctrl_probe(struct platform_device *pdev,
->  	pctrl->pctldesc.pins = pctrl->soc->pins;
->  	pctrl->pctldesc.npins = pctrl->soc->npins;
->  
-> -	pctrl->pctldev = pinctrl_register(&pctrl->pctldesc, &pdev->dev, pctrl);
-> +	pctrl->pctldev = devm_pinctrl_register(&pdev->dev, &pctrl->pctldesc,
-> +					       pctrl);
->  	if (IS_ERR(pctrl->pctldev)) {
->  		dev_err(&pdev->dev, "failed to register pinctrl driver\n");
->  		return PTR_ERR(pctrl->pctldev);
+Interrupt Pin register is read-only and optional. Some pci devices may use
+msi/msix but leave the value of Interrupt Pin non-zero. In this case, the
+driver will print information as below:
+pci 0000:40:00.0: of_irq_parse_pci() failed with rc=-22
 
-The same as in pinctrl-cherryview.c. pinctrl_unregister() is also
-called here inside intel_pinctrl_probe().
+It's easily lead to misinterpret.
 
-> @@ -1037,7 +1038,6 @@ int intel_pinctrl_remove(struct platform_device *pdev)
->  	struct intel_pinctrl *pctrl = platform_get_drvdata(pdev);
->  
->  	gpiochip_remove(&pctrl->chip);
-> -	pinctrl_unregister(pctrl->pctldev);
->  
->  	return 0;
->  }
-> -- 
-> 2.1.4
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/of/of_pci_irq.c | 43 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 40 insertions(+), 3 deletions(-)
 
-Thanks,
+diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
+index 2306313..a6d51e0 100644
+--- a/drivers/of/of_pci_irq.c
++++ b/drivers/of/of_pci_irq.c
+@@ -4,6 +4,38 @@
+ #include <linux/export.h>
 
--- 
-heikki
+ /**
++ * of_irq_skip_pci - Skip the interrupt pins for a PCI device
++ * @pdev: the device whose interrupt pins may be skipped
++ * @dn: device node of pdev or pdev's ancestral bus
++ *
++ * Interrupt Pin register is read-only and optional. Some pci devices may use
++ * msi/msix but leave the value of Interrupt Pin non-zero. This function give
++ * an opportunity to suppress the warning about of_irq_parse_pci() failed.
++ */
++static int of_irq_skip_pci(const struct pci_dev *pdev,
++			   const struct device_node *dn)
++{
++	const __be32 *skip_mask, *end;
++	u32 addr, mask;
++	int len;
++
++	skip_mask = of_get_property(dn, "interrupt-skip-mask", &len);
++	if (!skip_mask)
++		return 0;
++
++	end = skip_mask + (len / sizeof(__be32));
++	addr = (pdev->bus->number << 16) | (pdev->devfn << 8);
++
++	while (skip_mask < end) {
++		mask = be32_to_cpu(*(skip_mask++));
++		if ((addr & ~mask) == 0)
++			return 1;
++	}
++
++	return 0;
++}
++
++/**
+  * of_irq_parse_pci - Resolve the interrupt for a PCI device
+  * @pdev:       the device whose interrupt is to be resolved
+  * @out_irq:    structure of_irq filled by this function
+@@ -30,6 +62,9 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
+ 		rc = of_irq_parse_one(dn, 0, out_irq);
+ 		if (!rc)
+ 			return rc;
++
++		if (of_irq_skip_pci(pdev, dn))
++			return -ENODEV;
+ 	}
+
+ 	/* Ok, we don't, time to have fun. Let's start by building up an
+@@ -89,9 +124,11 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
+ 	laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
+ 	laddr[1] = laddr[2] = cpu_to_be32(0);
+ 	rc = of_irq_parse_raw(laddr, out_irq);
+-	if (rc)
+-		goto err;
+-	return 0;
++	if (!rc)
++		return 0;
++
++	if (of_irq_skip_pci(pdev, ppnode))
++		return -ENODEV;
+ err:
+ 	dev_err(&pdev->dev, "of_irq_parse_pci() failed with rc=%d\n", rc);
+ 	return rc;
+--
+2.5.0
