@@ -1,35 +1,34 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 25 Feb 2016 08:57:15 -0700
-Subject: [PATCH net-next V2 00/16] net: fec: cleanup and fixes
-In-Reply-To: <87oab518wo.fsf@gmail.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <87oab518wo.fsf@gmail.com>
-Message-ID: <56CF245B.8050504@boundarydevices.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 25 Feb 2016 09:59:11 -0600
+Subject: [PATCH v3 0/6] Xilinx AXI PCIe Host Bridge driver fixes
+In-Reply-To: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
+References: <1454602213-967-1-git-send-email-paul.burton@imgtec.com>
+Message-ID: <20160225155911.GF8120@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/25/2016 1:39 AM, Holger Schurig wrote:
-> Hi Troy,
+Hi Paul,
+
+On Thu, Feb 04, 2016 at 04:10:07PM +0000, Paul Burton wrote:
+> This series fixes a number of issues found using the Xilinx AXI PCIe
+> Host Bridge IP on the Imagination Technologies MIPS Boston development
+> board. It has been split out of the larger Boston board support series
+> at Michal's request.
 > 
-> what is the general aim of your patches?  Stability?  Speed?  Cleanup?
+> Applies atop v4.5-rc2.
 > 
+> Paul Burton (6):
+>   PCI: xilinx: Keep references to both IRQ domains
+>   PCI: xilinx: Unify INTx & MSI interrupt FIFO decode
+>   PCI: xilinx: Always clear interrupt decode register
+>   PCI: xilinx: Clear interrupt FIFO during probe
+>   PCI: xilinx: Fix INTX irq dispatch
+>   PCI: xilinx: Allow build on MIPS platforms
+> 
+>  drivers/pci/host/Kconfig       |   2 +-
+>  drivers/pci/host/pcie-xilinx.c | 125 +++++++++++++++++++----------------------
 
-1. Stability
-2. performance
-3. easier to read
-4. more debug info
+Looks like Bharat has some IRQ concerns, so I'm guessing you'll be
+posting a v4?
 
-
-The 2nd goal is very hard to measure. It seems function alignment changes swamp
-most any other improvements. I think that if the same measurement that I did were done
-with a different compiler, you would see different patches increased/decreased
-the BPS. But at least the overall trend on the patch set is positive. And
-each individual patch has been tested. I would like someone to test on a machine
-with 3 queues though.
-
-
-If you have a more accurate way to measure performance, please let me know.
-Also, if you know why freescale's bsp has so much better performance
-that would be a very welcome patch.
-
-Troy
+Bjorn
