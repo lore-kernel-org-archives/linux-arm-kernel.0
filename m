@@ -1,241 +1,59 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 24 Feb 2016 16:02:08 -0800
-Subject: [PATCH 2/2] numa, mm,
- cleanup: remove redundant NODE_DATA macro from asm header files.
-In-Reply-To: <1456358528-24213-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1456358528-24213-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1456358528-24213-3-git-send-email-ddaney.cavm@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 25 Feb 2016 09:13:31 +0900
+Subject: [GIT PULL 2/7] ARM: dts: Exynos DT dependency for v4.6
+In-Reply-To: <20160224222319.GU10126@localhost>
+References: <1455496446-23779-1-git-send-email-k.kozlowski@samsung.com>
+ <1455496446-23779-3-git-send-email-k.kozlowski@samsung.com>
+ <20160224222319.GU10126@localhost>
+Message-ID: <56CE472B.5020201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+On 25.02.2016 07:23, Olof Johansson wrote:
+> On Mon, Feb 15, 2016 at 09:34:01AM +0900, Krzysztof Kozlowski wrote:
+>> Hi Arnd, Kevin and Olof,
+>>
+>> Early DT changes for v4.6, needed before removal of SROM support
+>> from mach-exynos.
+>>
+>> Kind regards,
+>> Krzysztof
+>>
+>>
+>> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>>
+>>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-srom-4.6
+>>
+>> for you to fetch changes up to d2deef6c61e65d1e0cee40c1d74fa99007da8c84:
+>>
+>>   ARM: dts: Add SROM to exynos5410 (2016-01-25 10:32:07 +0900)
+>>
+>> ----------------------------------------------------------------
+>> Device Tree changes for v4.6 adding the nodes for Exynos SROM controller
+>> driver. The driver saves and restores SROM registers during suspend to RAM.
+>> DT changes should go in before removal of SROM support from mach-exynos.
+>>
+>> ----------------------------------------------------------------
+>> Pankaj Dubey (2):
+>>       ARM: dts: Add SROM device node for exynos4
+>>       ARM: dts: Add SROM device node for exynos5
+>>
+>> Pavel Fedin (1):
+>>       ARM: dts: Add SROM to exynos5410
+> 
+> Hi,
+> 
+> Please use the format:
+> 
+> ARM: dts: exynos: ...
+> 
+> in the future.
 
-NODE_DATA is defined across multiple asm header files.
-Moving generic definition to asm-generic/mmzone.h to
-remove redundant definitions.
+Sure! I was using it before... but switched to Kukjin's format.
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- arch/arm64/include/asm/mmzone.h   |  4 +---
- arch/m32r/include/asm/mmzone.h    |  4 +---
- arch/metag/include/asm/mmzone.h   |  4 +---
- arch/powerpc/include/asm/mmzone.h |  8 ++------
- arch/s390/include/asm/mmzone.h    |  6 +-----
- arch/sh/include/asm/mmzone.h      |  4 +---
- arch/sparc/include/asm/mmzone.h   |  6 ++----
- arch/x86/include/asm/mmzone.h     |  3 +--
- arch/x86/include/asm/mmzone_32.h  |  5 -----
- arch/x86/include/asm/mmzone_64.h  | 17 -----------------
- include/asm-generic/mmzone.h      | 24 ++++++++++++++++++++++++
- 11 files changed, 34 insertions(+), 51 deletions(-)
- delete mode 100644 arch/x86/include/asm/mmzone_64.h
- create mode 100644 include/asm-generic/mmzone.h
-
-diff --git a/arch/arm64/include/asm/mmzone.h b/arch/arm64/include/asm/mmzone.h
-index a0de9e6..611a1cf 100644
---- a/arch/arm64/include/asm/mmzone.h
-+++ b/arch/arm64/include/asm/mmzone.h
-@@ -4,9 +4,7 @@
- #ifdef CONFIG_NUMA
- 
- #include <asm/numa.h>
--
--extern struct pglist_data *node_data[];
--#define NODE_DATA(nid)		(node_data[(nid)])
-+#include  <asm-generic/mmzone.h>
- 
- #endif /* CONFIG_NUMA */
- #endif /* __ASM_MMZONE_H */
-diff --git a/arch/m32r/include/asm/mmzone.h b/arch/m32r/include/asm/mmzone.h
-index 115ced3..e3d66a0 100644
---- a/arch/m32r/include/asm/mmzone.h
-+++ b/arch/m32r/include/asm/mmzone.h
-@@ -7,12 +7,10 @@
- #define _ASM_MMZONE_H_
- 
- #include <asm/smp.h>
-+#include  <asm-generic/mmzone.h>
- 
- #ifdef CONFIG_DISCONTIGMEM
- 
--extern struct pglist_data *node_data[];
--#define NODE_DATA(nid)		(node_data[nid])
--
- #define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
- 
- #define pmd_page(pmd)		(pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
-diff --git a/arch/metag/include/asm/mmzone.h b/arch/metag/include/asm/mmzone.h
-index 9c88a9c..b1e95b3 100644
---- a/arch/metag/include/asm/mmzone.h
-+++ b/arch/metag/include/asm/mmzone.h
-@@ -3,9 +3,7 @@
- 
- #ifdef CONFIG_NEED_MULTIPLE_NODES
- #include <linux/numa.h>
--
--extern struct pglist_data *node_data[];
--#define NODE_DATA(nid)		(node_data[nid])
-+#include  <asm-generic/mmzone.h>
- 
- static inline int pfn_to_nid(unsigned long pfn)
- {
-diff --git a/arch/powerpc/include/asm/mmzone.h b/arch/powerpc/include/asm/mmzone.h
-index 7b58917..da0c5ba 100644
---- a/arch/powerpc/include/asm/mmzone.h
-+++ b/arch/powerpc/include/asm/mmzone.h
-@@ -19,12 +19,6 @@
- 
- #ifdef CONFIG_NEED_MULTIPLE_NODES
- 
--extern struct pglist_data *node_data[];
--/*
-- * Return a pointer to the node data for node n.
-- */
--#define NODE_DATA(nid)		(node_data[nid])
--
- /*
-  * Following are specific to this numa platform.
-  */
-@@ -42,5 +36,7 @@ u64 memory_hotplug_max(void);
- #define memory_hotplug_max() memblock_end_of_DRAM()
- #endif /* CONFIG_NEED_MULTIPLE_NODES */
- 
-+#include  <asm-generic/mmzone.h>
-+
- #endif /* __KERNEL__ */
- #endif /* _ASM_MMZONE_H_ */
-diff --git a/arch/s390/include/asm/mmzone.h b/arch/s390/include/asm/mmzone.h
-index a9e834e..91f1fcc 100644
---- a/arch/s390/include/asm/mmzone.h
-+++ b/arch/s390/include/asm/mmzone.h
-@@ -7,10 +7,6 @@
- #ifndef _ASM_S390_MMZONE_H
- #define _ASM_S390_MMZONE_H
- 
--#ifdef CONFIG_NUMA
-+#include  <asm-generic/mmzone.h>
- 
--extern struct pglist_data *node_data[];
--#define NODE_DATA(nid) (node_data[nid])
--
--#endif /* CONFIG_NUMA */
- #endif /* _ASM_S390_MMZONE_H */
-diff --git a/arch/sh/include/asm/mmzone.h b/arch/sh/include/asm/mmzone.h
-index 15a8496..c070d00 100644
---- a/arch/sh/include/asm/mmzone.h
-+++ b/arch/sh/include/asm/mmzone.h
-@@ -5,9 +5,7 @@
- 
- #ifdef CONFIG_NEED_MULTIPLE_NODES
- #include <linux/numa.h>
--
--extern struct pglist_data *node_data[];
--#define NODE_DATA(nid)		(node_data[nid])
-+#include  <asm-generic/mmzone.h>
- 
- static inline int pfn_to_nid(unsigned long pfn)
- {
-diff --git a/arch/sparc/include/asm/mmzone.h b/arch/sparc/include/asm/mmzone.h
-index 99d9b9f..ef1365b 100644
---- a/arch/sparc/include/asm/mmzone.h
-+++ b/arch/sparc/include/asm/mmzone.h
-@@ -5,13 +5,11 @@
- 
- #include <linux/cpumask.h>
- 
--extern struct pglist_data *node_data[];
--
--#define NODE_DATA(nid)		(node_data[nid])
--
- extern int numa_cpu_lookup_table[];
- extern cpumask_t numa_cpumask_lookup_table[];
- 
- #endif /* CONFIG_NEED_MULTIPLE_NODES */
- 
-+#include  <asm-generic/mmzone.h>
-+
- #endif /* _SPARC64_MMZONE_H */
-diff --git a/arch/x86/include/asm/mmzone.h b/arch/x86/include/asm/mmzone.h
-index d497bc4..8b9a0c2 100644
---- a/arch/x86/include/asm/mmzone.h
-+++ b/arch/x86/include/asm/mmzone.h
-@@ -1,5 +1,4 @@
-+#include  <asm-generic/mmzone.h>
- #ifdef CONFIG_X86_32
- # include <asm/mmzone_32.h>
--#else
--# include <asm/mmzone_64.h>
- #endif
-diff --git a/arch/x86/include/asm/mmzone_32.h b/arch/x86/include/asm/mmzone_32.h
-index 1ec990b..09f7cfb 100644
---- a/arch/x86/include/asm/mmzone_32.h
-+++ b/arch/x86/include/asm/mmzone_32.h
-@@ -8,11 +8,6 @@
- 
- #include <asm/smp.h>
- 
--#ifdef CONFIG_NUMA
--extern struct pglist_data *node_data[];
--#define NODE_DATA(nid)	(node_data[nid])
--#endif /* CONFIG_NUMA */
--
- #ifdef CONFIG_DISCONTIGMEM
- 
- /*
-diff --git a/arch/x86/include/asm/mmzone_64.h b/arch/x86/include/asm/mmzone_64.h
-deleted file mode 100644
-index 129d9aa..0000000
---- a/arch/x86/include/asm/mmzone_64.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/* K8 NUMA support */
--/* Copyright 2002,2003 by Andi Kleen, SuSE Labs */
--/* 2.5 Version loosely based on the NUMAQ Code by Pat Gaughen. */
--#ifndef _ASM_X86_MMZONE_64_H
--#define _ASM_X86_MMZONE_64_H
--
--#ifdef CONFIG_NUMA
--
--#include <linux/mmdebug.h>
--#include <asm/smp.h>
--
--extern struct pglist_data *node_data[];
--
--#define NODE_DATA(nid)		(node_data[nid])
--
--#endif
--#endif /* _ASM_X86_MMZONE_64_H */
-diff --git a/include/asm-generic/mmzone.h b/include/asm-generic/mmzone.h
-new file mode 100644
-index 0000000..ec0fc4c
---- /dev/null
-+++ b/include/asm-generic/mmzone.h
-@@ -0,0 +1,24 @@
-+/*
-+ * linux/include/asm-generic/mmzone.h
-+ *
-+ * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
-+ * Copyright (C) 2016 Cavium Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#ifndef _ASM_GENERIC_MMZONE_H
-+#define _ASM_GENERIC_MMZONE_H
-+
-+#if defined(CONFIG_NUMA) || defined(CONFIG_NEED_MULTIPLE_NODES)
-+
-+#ifndef NODE_DATA
-+extern struct pglist_data *node_data[];
-+#define NODE_DATA(nid)          (node_data[(nid)])
-+#endif
-+
-+#endif
-+#endif /* _ASM_GENERIC_MMZONE_H */
--- 
-1.8.3.1
+Thanks for merging,
+Krzysztof
