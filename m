@@ -1,108 +1,75 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Thu, 25 Feb 2016 08:07:22 +0000
-Subject: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
-In-Reply-To: <20160217180742.GB17485@shlinux2>
-References: <1454326208-4533-1-git-send-email-B56489@freescale.com>
- <1454326208-4533-3-git-send-email-B56489@freescale.com>
- <20160217180742.GB17485@shlinux2>
-Message-ID: <DB5PR0401MB1912C9D041FF2B408652F4CD94A60@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Feb 2016 09:09:27 +0100
+Subject: [PATCH 1/3] dt-bindings: arm/marvell: ABI unstability warning
+ about Marvell 7K/8K
+In-Reply-To: <CAL_JsqLevrujSeYNBvSJA-5T0Ho8y7c0fKid7QvVm8LLvYLotw@mail.gmail.com>
+References: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1456327007-31008-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160224172545.GC9137@leverpostej>
+ <20160224211045.379352d3@free-electrons.com>
+ <CAL_JsqLevrujSeYNBvSJA-5T0Ho8y7c0fKid7QvVm8LLvYLotw@mail.gmail.com>
+Message-ID: <20160225090927.13492cfb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Han,
+Hello Rob,
 
-I have provided the options " m25p,fast-read ", because there are probable some flashes can't support quad mode.
-So we should support fast-read mode in our driver. Moreover,  There is a option to select fast-read mode in spi_nor.c :
-               /* If we were instantiated by DT, use it */
-                 if (of_property_read_bool(np, "m25p,fast-read"))
-                         nor->flash_read = SPI_NOR_FAST;
+On Wed, 24 Feb 2016 16:07:04 -0600, Rob Herring wrote:
 
-Thanks
-Yunhui
+> You should fix the incomplete information problem. I pushed back on
+> this, you got more information and already the binding is closer to
+> reality.
 
------Original Message-----
-From: Han Xu [mailto:xhnjupt at gmail.com] 
-Sent: Thursday, February 18, 2016 2:08 AM
-To: Yunhui Cui
-Cc: dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com; linux-mtd at lists.infradead.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Yao Yuan
-Subject: Re: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
+"You should fix the incomplete information problem". You seem to think
+that it is a simple thing that can be fixed with a magic wand. But it's
+not.
 
-On Mon, Feb 01, 2016 at 07:30:07PM +0800, Yunhui Cui wrote:
-> The qspi driver add generic fast-read mode for different flash 
-> venders. There are some different board flash work on different mode, 
-> such fast-read, quad-mode.
-> So we have to modify the third entrace parameter of spi_nor_scan().
+Either because the internal processes are complicated, or simply
+because the Linux kernel support is done without cooperation from the
+HW vendor (it's not the case of this Marvell platform, but it's the
+case of many other platforms).
+
+> Mark didn't say don't submit. First, there is value in submitting even
+> if not accepted immediately and you have to carry some patches for
+> some time. It was also suggested that you err on the side of less
+> information in DT if things are uncertain and you have not done that.
+
+Submitting without merging is useless. The point of submitting is to
+get the code merged, to reduce the amount of out-of-tree patches we
+have to carry, and to allow users of the platform to simply run
+mainline on their platform.
+
+So this proposal really doesn't make any sense. Just like Mark initial
+statement of not submitting code so early.
+
+> > So please get to an agreement between DT binding maintainers. And stop
+> > saying this ridiculous statement that HW vendors should stop submitting
+> > their code to the mainline.
 > 
-> Signed-off-by: Yunhui Cui <B56489@freescale.com>
-> ---
->  drivers/mtd/spi-nor/fsl-quadspi.c | 27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
+> You want us to agree, then you won't like the answer. Bindings must be
+> stable. I'll allow exceptions to that, but not without push back.
 > 
-> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c 
-> b/drivers/mtd/spi-nor/fsl-quadspi.c
-> index 9861290..0a31cb1 100644
-> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> @@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Read */
->  	lut_base = SEQID_READ * 4;
->  
-> -	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
-> -			base + QUADSPI_LUT(lut_base));
-> -	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> -		    LUT1(FSL_READ, PAD4, rxfifo),
-> -			base + QUADSPI_LUT(lut_base + 1));
-> +	if (nor->flash_read == SPI_NOR_FAST) {
-> +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> +			    LUT1(ADDR, PAD1, addrlen),
-> +				base + QUADSPI_LUT(lut_base));
-> +		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
-> +			    LUT1(FSL_READ, PAD1, rxfifo),
-> +				base + QUADSPI_LUT(lut_base + 1));
-> +	} else if (nor->flash_read == SPI_NOR_QUAD) {
-> +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> +			    LUT1(ADDR, PAD1, addrlen),
-> +				base + QUADSPI_LUT(lut_base));
-> +		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> +			    LUT1(FSL_READ, PAD4, rxfifo),
-> +				base + QUADSPI_LUT(lut_base + 1));
-> +	}
->  
->  	/* Write enable */
->  	lut_base = SEQID_WREN * 4;
-> @@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, 
-> u8 cmd)  {
->  	switch (cmd) {
->  	case SPINOR_OP_READ_1_1_4:
-> +	case SPINOR_OP_READ_FAST:
->  		return SEQID_READ;
->  	case SPINOR_OP_WREN:
->  		return SEQID_WREN;
-> @@ -963,6 +974,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
->  	struct spi_nor *nor;
->  	struct mtd_info *mtd;
->  	int ret, i = 0;
-> +	enum read_mode mode = SPI_NOR_QUAD;
->  
->  	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
->  	if (!q)
-> @@ -1064,7 +1076,10 @@ static int fsl_qspi_probe(struct platform_device *pdev)
->  		/* set the chip address for READID */
->  		fsl_qspi_set_base_addr(q, nor);
->  
-> -		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
-> +		ret = of_property_read_bool(np, "m25p,fast-read");
-> +		mode = (ret) ? SPI_NOR_FAST : SPI_NOR_QUAD;
-> +
-> +		ret = spi_nor_scan(nor, NULL, mode);
->  		if (ret)
->  			goto mutex_failed;
->  
-I understand you want to provide a more generic read mode, but this is a quad spi driver, I prefer to provide the options, either quad read/quad IO read, or just normal read.
-> --
-> 2.1.0.27.g96db324
-> 
-> 
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+> In general, if there is disagreement about whether stability is
+> required, then it is required. See the recent sunxi discussion. That's
+> more between users and platform maintainers though.
+
+Do you realize that this all DT binding stuff is today the *biggest* to
+getting HW support in the Linux kernel? It has become more complicated
+to merge a 4 properties DT binding than to merge multiple thousands of
+lines of driver code. Simply because of this DT stability fairy tale.
+
+In the mean time, I'm withdrawing this patch. I'll let Mark and you in
+your Alice in Wonderland world, where you believe that DT bindings are
+stable while the reality is that they are not and that their stability
+is actually unneeded for most platforms.
+
+Gregory, can you skip patch 1/3, and merge patches 2/3 and 3/3, once
+the new clock DT binding has been approved.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
