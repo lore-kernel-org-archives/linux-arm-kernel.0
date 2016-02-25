@@ -1,19 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 17:18:23 -0800
-Subject: [GIT PULL] at91: drivers for 4.6 #1
-In-Reply-To: <20160218020608.GA31682@piout.net>
-References: <20160218020608.GA31682@piout.net>
-Message-ID: <20160225011823.GD29055@localhost>
+Date: Wed, 24 Feb 2016 17:19:29 -0800
+Subject: [GIT PULL] at91: dt for 4.6 #1
+In-Reply-To: <20160218022311.GA2466@piout.net>
+References: <20160218022311.GA2466@piout.net>
+Message-ID: <20160225011929.GE29055@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 18, 2016 at 03:06:08AM +0100, Alexandre Belloni wrote:
+On Thu, Feb 18, 2016 at 03:23:11AM +0100, Alexandre Belloni wrote:
 > Arnd, Olof, Kevin,
 > 
-> This is a rework of the PMC driver. It touches multiple subsystems so
-> the easiest path is through arm-soc.
+> This is the addition of the ADC support for sama5d2. The driver went
+> through the iio tree.
 > 
-> Thanks,
+> Thanks!
 > 
 > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
@@ -21,16 +21,13 @@ On Thu, Feb 18, 2016 at 03:06:08AM +0100, Alexandre Belloni wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-drivers
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.6-dt
 > 
-> for you to fetch changes up to 0002ca168f16e5b6ac67415a4e0198cc39af2b7f:
+> for you to fetch changes up to 5e72c25b40c1e9ed77650f258799514aabd17303:
 > 
->   clk: at91: remove useless includes (2016-02-17 17:53:04 +0100)
+>   ARM: dts: at91: sama5d2 Xplained: enable the adc device (2016-02-18 03:10:05 +0100)
 
-Merged into next/drivers.
-
-
-Thanks!
+Merged, thanks.
 
 
 -Olof
