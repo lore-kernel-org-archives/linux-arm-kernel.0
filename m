@@ -1,39 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 12:37:40 +0100
-Subject: [PATCH] spi: lp-8841: return correct error code from probe
-Message-ID: <1456400265-3068525-1-git-send-email-arnd@arndb.de>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Thu, 25 Feb 2016 13:42:06 +0200
+Subject: [PATCH 11/50] pinctrl: cherryview: Use devm_pinctrl_register()
+ for pinctrl registration
+In-Reply-To: <1456319775-3216-12-git-send-email-ldewangan@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <1456319775-3216-12-git-send-email-ldewangan@nvidia.com>
+Message-ID: <20160225114206.GA29434@kuha.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi_lp8841_rtc_probe() function misses an initialization of the
-return code when it fails to get its memory resource, as gcc notices:
+Hi,
 
-drivers/spi/spi-lp8841-rtc.c: In function 'spi_lp8841_rtc_probe':
-drivers/spi/spi-lp8841-rtc.c:239:9: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+On Wed, Feb 24, 2016 at 06:45:36PM +0530, Laxman Dewangan wrote:
+> Use devm_pinctrl_register() for pin control registration.
+> 
+> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
+> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> ---
+>  drivers/pinctrl/intel/pinctrl-cherryview.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/intel/pinctrl-cherryview.c b/drivers/pinctrl/intel/pinctrl-cherryview.c
+> index 4251e07..1152b8a 100644
+> --- a/drivers/pinctrl/intel/pinctrl-cherryview.c
+> +++ b/drivers/pinctrl/intel/pinctrl-cherryview.c
+> @@ -1526,7 +1526,8 @@ static int chv_pinctrl_probe(struct platform_device *pdev)
+>  	pctrl->pctldesc.pins = pctrl->community->pins;
+>  	pctrl->pctldesc.npins = pctrl->community->npins;
+>  
+> -	pctrl->pctldev = pinctrl_register(&pctrl->pctldesc, &pdev->dev, pctrl);
+> +	pctrl->pctldev = devm_pinctrl_register(&pdev->dev, &pctrl->pctldesc,
+> +					       pctrl);
+>  	if (IS_ERR(pctrl->pctldev)) {
+>  		dev_err(&pdev->dev, "failed to register pinctrl driver\n");
+>  		return PTR_ERR(pctrl->pctldev);
 
-This changes the code to propagate the error from devm_ioremap_resource().
+You missed one pinctrl_unregister() call inside chv_pinctrl_probe().
+Check right below this point where chv_gpio_probe() is called.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 7ecbfff6711f ("spi: master driver to enable RTC on ICPDAS LP-8841")
----
- drivers/spi/spi-lp8841-rtc.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> @@ -1548,7 +1549,6 @@ static int chv_pinctrl_remove(struct platform_device *pdev)
+>  	struct chv_pinctrl *pctrl = platform_get_drvdata(pdev);
+>  
+>  	gpiochip_remove(&pctrl->chip);
+> -	pinctrl_unregister(pctrl->pctldev);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.1.4
 
-diff --git a/drivers/spi/spi-lp8841-rtc.c b/drivers/spi/spi-lp8841-rtc.c
-index 44bb69c3f1d6..faa577d282c0 100644
---- a/drivers/spi/spi-lp8841-rtc.c
-+++ b/drivers/spi/spi-lp8841-rtc.c
-@@ -217,8 +217,9 @@ spi_lp8841_rtc_probe(struct platform_device *pdev)
- 	data = spi_master_get_devdata(master);
- 
- 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	data->iomem =  devm_ioremap_resource(&pdev->dev, iomem);
--	if (IS_ERR(data->iomem)) {
-+	data->iomem = devm_ioremap_resource(&pdev->dev, iomem);
-+	ret = PTR_ERR_OR_ZERO(data->iomem);
-+	if (ret) {
- 		dev_err(&pdev->dev, "failed to get IO address\n");
- 		goto err_put_master;
- 	}
+Thanks,
+
 -- 
-2.7.0
+heikki
