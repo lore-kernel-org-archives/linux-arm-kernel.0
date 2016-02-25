@@ -1,802 +1,191 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 25 Feb 2016 18:44:44 +0100
-Subject: [Patch v2] ARM: dts: vf610-zii-dev: Add ZII development board.
-Message-ID: <1456422284-11972-1-git-send-email-andrew@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 25 Feb 2016 17:56:04 +0000
+Subject: [PATCH 1/3] dt-bindings: arm/marvell: ABI unstability warning
+ about Marvell 7K/8K
+In-Reply-To: <20160225173811.23be5b05@free-electrons.com>
+References: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1456327007-31008-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160224172545.GC9137@leverpostej>
+ <20160224211045.379352d3@free-electrons.com>
+ <CAL_JsqLevrujSeYNBvSJA-5T0Ho8y7c0fKid7QvVm8LLvYLotw@mail.gmail.com>
+ <20160225090927.13492cfb@free-electrons.com>
+ <20160225161642.GC10593@leverpostej>
+ <20160225173811.23be5b05@free-electrons.com>
+Message-ID: <20160225175603.GD10593@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cory Tusar <cory.tusar@pid1solutions.com>
+Hi,
 
-This commit adds support for Rev. B of a Zodiac Inflight Innovations
-development board, mainly intended for DSA and ARINC 429 development
-work.
+On Thu, Feb 25, 2016 at 05:38:11PM +0100, Thomas Petazzoni wrote:
+> Hello Mark,
+> 
+> On Thu, 25 Feb 2016 16:16:47 +0000, Mark Rutland wrote:
+> 
+> > > Either because the internal processes are complicated, or simply
+> > > because the Linux kernel support is done without cooperation from the
+> > > HW vendor (it's not the case of this Marvell platform, but it's the
+> > > case of many other platforms).
+> > 
+> > Yes, this is a problem in some cases, and that should be considered in
+> > those cases. There are always shades of grey.
+> 
+> Sure.
+> 
+> > Per the above, that isn't relevant in this case. This is a pretty
+> > black-and-white stand against the usual rules.
+> 
+> I don't see why. The datasheets have not been completely written yet
+> for this particular chip. For other chips we've worked on where we
+> collaborated with the SoC vendor, we never had any datasheet, simply
+> because the SoC vendor doesn't have any. They have the digital logic
+> source code, and then tons of spreadsheets or text documents that are
+> not proper datasheets and that they generally cannot share with
+> third-parties.
+> 
+> Hence, even when the support for a SoC is being done in collaboration
+> with the SoC vendor, we don't always have a nice full datasheet that
+> tells us what all the registers are doing and how they are organized.
+> We discover things as we go.
 
-Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
-v2
- Add ZII Copyright
- Dual license
- Remove bootargs and extend stdout-path
- Remove address format from regulator nodes
- Remove extraneous space i2c_3 node
- Move iomuxc to end
- Remove L2 node
- Add missing gpio-controller to gpio6
- Removed unused fixed clocks
- Add an spi node
- Fix memory range
- Fix naming of GPIO i2c expanders
- Disable DMA on serial port, which appears to cause corrupt.
+So as and when you believe you need to break a binding, we can have a
+discussion on that case-by-case basis.
 
-Documentation/devicetree/bindings/net/mdio-mux.txt says:
+That's different to stating that the usual rules don't apply at all,
+which is black-and-white stand I'm referring to.
 
-Required properties for child nodes:
-- #address-cells = <1>;
-- #size-cells = <0>;
-- reg : The sub-bus number.
+> > Submitting prototypes and RFCs is the usual way we get things reviewed
+> > early, and to allow maintainers and others to get a feel for things
+> > earlier. Submitting patches _for merging_ when you're not sure about
+> > things and don't want to agree to support them is what's being pushed
+> > back on.
+> 
+> This simply doesn't work. This initial support of a few patches (clock,
+> basic DT, irqchip, dmaengine) is going to be followed very soon by lots
+> of other patches to enable more aspects of the SoC. And we should keep
+> all of those patches out-of-tree, piling up hundreds of out-of-tree
+> patches ? Not practical at all.
+> 
+> And then when we'll submit them, they will all be accepted in one go,
+> in one kernel cycle ? Clearly not, so we would have to wait several
+> kernel cycles, which is clearly not what we want.
+> 
+> Instead, what we want is to submit the basic stuff early, and then
+> progressively build on top of this basic stuff by merging more and more
+> features. This way:
+> 
+>  * We don't have to pile up hundreds of out of tree patches;
 
-So i ignored the request to remove these properties.
----
- arch/arm/boot/dts/Makefile                |   3 +-
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 735 ++++++++++++++++++++++++++++++
- 2 files changed, 737 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+Then _support_ what you have upstreamed already. Either it's ready to be
+supported or it is not. If it is, there's no need for DT breakage, and
+if it isn't, then it's not ready for mainline. That's all this boils
+down to. 
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70e8b26..47c4c2ff41de 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -372,7 +372,8 @@ dtb-$(CONFIG_SOC_VF610) += \
- 	vf610m4-colibri.dtb \
- 	vf610-cosmic.dtb \
- 	vf610m4-cosmic.dtb \
--	vf610-twr.dtb
-+	vf610-twr.dtb \
-+	vf610-zii-dev-rev-b.dtb
- dtb-$(CONFIG_ARCH_MXS) += \
- 	imx23-evk.dtb \
- 	imx23-olinuxino.dtb \
-diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-new file mode 100644
-index 000000000000..c2fb60b9b36c
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-@@ -0,0 +1,735 @@
-+/*
-+ * Copyright (C) 2015, 2016 Zodiac Inflight Innovations
-+ *
-+ * Based on an original 'vf610-twr.dts' which is Copyright 2015,
-+ * Freescale Semiconductor, Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "vf610.dtsi"
-+
-+/ {
-+	model = "ZII VF610 Development Board, Rev B";
-+	compatible = "zii,vf610dev-b", "zii,vf610dev", "fsl,vf610";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pinctrl_leds_debug>;
-+		pinctrl-names = "default";
-+
-+		debug_1 {
-+			label = "zii:green:debug1";
-+			gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	mdio-mux {
-+		compatible = "mdio-mux-gpio";
-+		pinctrl-0 = <&pinctrl_mdio_mux>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio0 8  GPIO_ACTIVE_HIGH
-+			 &gpio0 9  GPIO_ACTIVE_HIGH
-+			 &gpio0 24 GPIO_ACTIVE_HIGH
-+			 &gpio0 25 GPIO_ACTIVE_HIGH>;
-+		mdio-parent-bus = <&mdio1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		mdio_mux_1: mdio at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mdio_mux_2: mdio at 2 {
-+			reg = <2>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mdio_mux_4: mdio at 4 {
-+			reg = <4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mdio_mux_8: mdio at 8 {
-+			reg = <8>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
-+	dsa at 0 {
-+		compatible = "marvell,dsa";
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		dsa,ethernet = <&fec1>;
-+		dsa,mii-bus = <&mdio_mux_1>;
-+
-+		/* 6352 - Primary - 7 ports */
-+		switch0: switch at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x00 0>;
-+			eeprom-length = <512>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan0";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan1";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan2";
-+			};
-+
-+			switch0port5: port at 5 {
-+				reg = <5>;
-+				label = "dsa";
-+				phy-mode = "rgmii-txid";
-+				link = <&switch1port6
-+					&switch2port9>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			port at 6 {
-+				reg = <6>;
-+				label = "cpu";
-+				fixed-link {
-+					speed = <100>;
-+					full-duplex;
-+				};
-+			};
-+
-+		};
-+
-+		/* 6352 - Secondary - 7 ports */
-+		switch1: switch at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x00 1>;
-+			eeprom-length = <512>;
-+			mii-bus = <&mdio_mux_2>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan3";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan4";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan5";
-+			};
-+
-+			switch1port5: port at 5 {
-+				reg = <5>;
-+				label = "dsa";
-+				link = <&switch2port9>;
-+				phy-mode = "rgmii-txid";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+			switch1port6: port at 6 {
-+				reg = <6>;
-+				label = "dsa";
-+				phy-mode = "rgmii-txid";
-+				link = <&switch0port5>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+
-+		/* 6185 - 10 ports */
-+		switch2: switch at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x00 2>;
-+			mii-bus = <&mdio_mux_4>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan6";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan7";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan8";
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				label = "optical3";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+					link-gpios = <&gpio6 2
-+						      GPIO_ACTIVE_HIGH>;
-+				};
-+			};
-+
-+			port at 4 {
-+				reg = <4>;
-+				label = "optical4";
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+					link-gpios = <&gpio6 3
-+						      GPIO_ACTIVE_HIGH>;
-+				};
-+			};
-+
-+			switch2port9: port at 9 {
-+				reg = <9>;
-+				label = "dsa";
-+				phy-mode = "rgmii-txid";
-+				link = <&switch1port5
-+					&switch0port5>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+		};
-+	};
-+
-+	reg_vcc_3v3_mcu: reg_vcc_3v3_mcu {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_3v3_mcu";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	usb0_vbus: usb0_vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-0 = <&pinctrl_usb_vbus>;
-+		regulator-name = "usb_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		gpio = <&gpio0 6 0>;
-+	};
-+
-+	spi0 {
-+		compatible = "spi-gpio";
-+		pinctrl-0 = <&pinctrl_gpio_spi0>;
-+		pinctrl-names = "default";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		gpio-sck  = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+		gpio-mosi = <&gpio1 11 GPIO_ACTIVE_HIGH>;
-+		gpio-miso = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-+		cs-gpios  = <&gpio1  9 GPIO_ACTIVE_HIGH
-+			     &gpio1  8 GPIO_ACTIVE_HIGH>;
-+		num-chipselects = <2>;
-+
-+		m25p128 at 0 {
-+			compatible = "m25p128", "jedec,spi-nor";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0>;
-+			spi-max-frequency = <1000000>;
-+		};
-+
-+		at93c46d at 1 {
-+			compatible = "atmel,at93c46d";
-+			pinctrl-0 = <&pinctrl_gpio_e6185_eeprom_sel>;
-+			pinctrl-names = "default";
-+			#address-cells = <0>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+			spi-max-frequency = <500000>;
-+			spi-cs-high;
-+			data-size = <16>;
-+			select-gpios = <&gpio4 4 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&fec0 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec0>;
-+	status = "okay";
-+};
-+
-+&fec1 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1>;
-+	status = "okay";
-+
-+	fixed-link {
-+		   speed = <100>;
-+		   full-duplex;
-+	};
-+
-+	mdio1: mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+	};
-+};
-+
-+&adc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_adc0_ad5>;
-+	vref-supply = <&reg_vcc_3v3_mcu>;
-+	status = "okay";
-+};
-+
-+&edma0 {
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0>;
-+	status = "okay";
-+
-+	gpio5: pca9554 at 20 {
-+		compatible = "nxp,pca9554";
-+		reg = <0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+	};
-+
-+	gpio6: pca9554 at 22 {
-+		compatible = "nxp,pca9554";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pca9554_22>;
-+		reg = <0x22>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+
-+	lm75 at 48 {
-+		compatible = "national,lm75";
-+		reg = <0x48>;
-+	};
-+
-+	at24c04 at 50 {
-+		compatible = "atmel,24c04";
-+		reg = <0x50>;
-+	};
-+
-+	at24c04 at 52 {
-+		compatible = "atmel,24c04";
-+		reg = <0x52>;
-+	};
-+
-+	ds1682 at 6b {
-+		compatible = "dallas,ds1682";
-+		reg = <0x6b>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	tca9548 at 70 {
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x70>;
-+		reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
-+
-+		i2c2_0: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			sfp1: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+		};
-+
-+		i2c2_1: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			sfp2: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+		};
-+
-+		i2c2_2: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+
-+			sfp3: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+		};
-+
-+		i2c2_3:	i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+
-+			sfp4: at24c04 at 50 {
-+				compatible = "atmel,24c02";
-+				reg = <0x50>;
-+			};
-+
-+		};
-+
-+		i2c2_4: i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+		};
-+	};
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart0>;
-+	status = "okay";
-+	dmas = <>;
-+	dma-names = "";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&usbdev0 {
-+	disable-over-current;
-+	status = "okay";
-+	vbus-supply = <&usb0_vbus>;
-+	dr_mode = "host";
-+};
-+
-+&usbh1 {
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbmisc0 {
-+	status = "okay";
-+};
-+
-+&usbmisc1 {
-+	status = "okay";
-+};
-+
-+&usbphy0 {
-+	status = "okay";
-+};
-+
-+&usbphy1 {
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c_mux_reset>;
-+
-+	vf610-zii {
-+		pinctrl_usb_vbus: pinctrl-usb-vbus {
-+			fsl,pins = <
-+				VF610_PAD_PTA16__GPIO_6	0x31c2
-+			>;
-+		};
-+
-+		pinctrl_i2c_mux_reset: pinctrl-i2c-mux-reset {
-+			fsl,pins = <
-+				 VF610_PAD_PTE14__GPIO_119	0x31c2
-+				 >;
-+		};
-+
-+		pinctrl_adc0_ad5: adc0ad5grp {
-+			fsl,pins = <
-+				VF610_PAD_PTC30__ADC0_SE5	0x00a1
-+			>;
-+		};
-+
-+		pinctrl_dspi0: dspi0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB18__DSPI0_CS1	0x1182
-+				VF610_PAD_PTB19__DSPI0_CS0	0x1182
-+				VF610_PAD_PTB20__DSPI0_SIN	0x1181
-+				VF610_PAD_PTB21__DSPI0_SOUT	0x1182
-+				VF610_PAD_PTB22__DSPI0_SCK	0x1182
-+			>;
-+		};
-+
-+		pinctrl_dspi2: dspi2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD31__DSPI2_CS1	0x1182
-+				VF610_PAD_PTD30__DSPI2_CS0	0x1182
-+				VF610_PAD_PTD29__DSPI2_SIN	0x1181
-+				VF610_PAD_PTD28__DSPI2_SOUT	0x1182
-+				VF610_PAD_PTD27__DSPI2_SCK	0x1182
-+			>;
-+		};
-+
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
-+				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
-+				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
-+				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
-+				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
-+				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
-+				VF610_PAD_PTA7__GPIO_134	0x219d
-+			>;
-+		};
-+
-+		pinctrl_fec1: fec1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA6__RMII_CLKIN		0x30d1
-+				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
-+				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
-+				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-+				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
-+				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
-+				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
-+				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-+				VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
-+				VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
-+			>;
-+		};
-+
-+		pinctrl_i2c0: i2c0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB14__I2C0_SCL	0x37ff
-+				VF610_PAD_PTB15__I2C0_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB16__I2C1_SCL	0x37ff
-+				VF610_PAD_PTB17__I2C1_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA22__I2C2_SCL	0x37ff
-+				VF610_PAD_PTA23__I2C2_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_i2c3: i2c3grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA30__I2C3_SCL	0x37ff
-+				VF610_PAD_PTA31__I2C3_SDA	0x37ff
-+			>;
-+		};
-+
-+		pinctrl_pwm0: pwm0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB0__FTM0_CH0	0x1582
-+				VF610_PAD_PTB1__FTM0_CH1	0x1582
-+				VF610_PAD_PTB2__FTM0_CH2	0x1582
-+				VF610_PAD_PTB3__FTM0_CH3	0x1582
-+			>;
-+		};
-+
-+		pinctrl_uart0: uart0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB10__UART0_TX	0x21a2
-+				VF610_PAD_PTB11__UART0_RX	0x21a1
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB23__UART1_TX	0x21a2
-+				VF610_PAD_PTB24__UART1_RX	0x21a1
-+			>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD0__UART2_TX	0x21a2
-+				VF610_PAD_PTD1__UART2_RX	0x21a1
-+			>;
-+		};
-+
-+		pinctrl_qspi0: qspi0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
-+				VF610_PAD_PTD8__QSPI0_B_CS0	0x31ff
-+				VF610_PAD_PTD9__QSPI0_B_DATA3	0x31c3
-+				VF610_PAD_PTD10__QSPI0_B_DATA2	0x31c3
-+				VF610_PAD_PTD11__QSPI0_B_DATA1	0x31c3
-+				VF610_PAD_PTD12__QSPI0_B_DATA0	0x31c3
-+			>;
-+		};
-+
-+		pinctrl_usb0_host: usb0-host-grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD6__GPIO_85		0x0062
-+			>;
-+		};
-+
-+		pinctrl_mdio_mux: pinctrl-mdio-mux {
-+			fsl,pins = <
-+				VF610_PAD_PTA18__GPIO_8		0x31c2
-+				VF610_PAD_PTA19__GPIO_9		0x31c2
-+				VF610_PAD_PTB2__GPIO_24		0x31c2
-+				VF610_PAD_PTB3__GPIO_25		0x31c2
-+			>;
-+		};
-+
-+		pinctrl_gpio_e6185_eeprom_sel: pinctrl-gpio-e6185-eeprom-spi0 {
-+			fsl,pins = <
-+				VF610_PAD_PTE27__GPIO_132	0x33e2
-+			>;
-+		};
-+
-+		pinctrl_gpio_spi0: pinctrl-gpio-spi0 {
-+			fsl,pins = <
-+				VF610_PAD_PTB22__GPIO_44	0x33e2
-+				VF610_PAD_PTB21__GPIO_43	0x33e2
-+				VF610_PAD_PTB20__GPIO_42	0x33e1
-+				VF610_PAD_PTB19__GPIO_41	0x33e2
-+				VF610_PAD_PTB18__GPIO_40	0x33e2
-+			>;
-+		};
-+
-+		pinctrl_fec0: fec0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTC0__ENET_RMII0_MDC	0x30d2
-+				VF610_PAD_PTC1__ENET_RMII0_MDIO	0x30d3
-+				VF610_PAD_PTC2__ENET_RMII0_CRS	0x30d1
-+				VF610_PAD_PTC3__ENET_RMII0_RXD1	0x30d1
-+				VF610_PAD_PTC4__ENET_RMII0_RXD0	0x30d1
-+				VF610_PAD_PTC5__ENET_RMII0_RXER	0x30d1
-+				VF610_PAD_PTC6__ENET_RMII0_TXD1	0x30d2
-+				VF610_PAD_PTC7__ENET_RMII0_TXD0	0x30d2
-+				VF610_PAD_PTC8__ENET_RMII0_TXEN	0x30d2
-+			>;
-+		};
-+
-+		pinctrl_leds_debug: pinctrl-leds-debug {
-+			fsl,pins = <
-+				 VF610_PAD_PTD20__GPIO_74	0x31c2
-+				 >;
-+		};
-+
-+		pinctrl_pca9554_22: pinctrl-pca95540-22 {
-+			fsl,pins = <
-+				VF610_PAD_PTB28__GPIO_98	0x219d
-+			>;
-+		};
-+	};
-+};
-+
--- 
-2.7.0
+If it must go in, then it must be supported.
+
+>  * We have a support in the mainline kernel that is progressively
+>    getting better as we enable more and more feature. We can show that
+>    4.6 has this small set of features, 4.7 has this slightly extended
+>    set of features supported, and so on.
+
+It's not "progressively getting better", if DTBs are arbitrarily getting
+broken.
+
+It's possible to incrementally add support without having to break
+existing DTBs.
+
+> > If you're unsure about something, but still want it merged, then you
+> > have to commit to maintaining that as far as reasonably possible, even
+> > if it turns out to not be quite right.
+> 
+> We are perfectly fine with maintaining *code*. And we have been doing
+> so for several years on Marvell platforms: caring about older
+> platforms, converting old legacy code and legacy platforms to the
+> Device Tree, etc.
+
+The parsing and handling of the existing binding is code, which you are
+arguing you do not need to support.
+
+> What we don't want to commit to is to maintain the DT stability
+> *before* the support for a given device is sufficiently stable/sane.
+
+I do not follow what you mean by support being *not sane*. If it isn't
+sane, why was it merged?
+
+If it was previously considered sane, and the code was considered
+supportable, why is it necessary to break a DT that it supported?
+
+> > > Do you realize that this all DT binding stuff is today the *biggest* to
+> > > getting HW support in the Linux kernel? It has become more complicated
+> > > to merge a 4 properties DT binding than to merge multiple thousands of
+> > > lines of driver code. 
+> > 
+> > As times have changed, pain points have moved around.
+> > 
+> > To some extent that is unavoidable; more up-front effort is required
+> > where crutches we previously relied on are not applicable.
+> > 
+> > Elsewhere we can certainly do better.
+> > 
+> > Throwing your hands up and stating "this is unstable, it might change"
+> > is a crutch. It prevents any real solution to the pain points you
+> > encounter, and creates pain points for others. It only provides the
+> > _illusion_ of support.
+> 
+> Could you please explicit which pain points it creates for others ?
+> 
+> Having unstable DT bindings specific to a platform does not create any
+> single pain point for anyone.
+> 
+> Why are you talking about "illusion" of support ? Sorry, but with
+> unstable DT bindings, as long as you use the DT that comes with the
+> kernel sources, everything works perfectly fine, and is perfectly
+> supported.
+
+A few examples:
+
+* Distro installation (in the absence of a stable DT and a consistent
+  boot environment, you have no idea how to get a kernel up and
+  running). Either your user has to be intimately familiar with the
+  platform, or the distro needs a separate release for each and every
+  platform.
+
+* Distro maintenance. I just upgraded to a point-release kernel and now
+  have to pull down the DTBs. That required the distro to _somehow_
+  identify the relevant DTBs, how to install this in the correct
+  location such that the firmware and/or bootloader can pick it up, etc.
+
+* Other developers tracking down problems that inevitable crop up on the
+  platform, who now have to jump through the hoops above. As the DTBs
+  change, so may the user-facing elements and/or kernel behaviour, so
+  bisecting is extremely painful (though admittedly possible).
+
+  Notice that in this case, the user has to go back in time for their
+  starting point. So it doesn't matter if they're not a user _yet_.
+
+* Portable hypervisors, bootloaders, or other system-level software
+  can't add any (DTB-aware) support for a platform until the kernel
+  support is considered "sane" per your argument above. That time is an
+  arbitrary unknown in the future (which may be at infinity), so they
+  are either indefinitely delayed or end up having attempt to have
+  stable support for a variety of unstable bindings anyway, which may or
+  may not be possible depending on how bindings got broken.
+
+These may not affect _you_ directly, but they do hinder realistic
+user-facing support.
+
+> Even Fedora is installing DTBs in a directory that is kernel-version
+> specific!
+
+This is a _symptom_ of the problem. Read this as:
+
+	Even Fedora _have to_ install DTBs in a directory that is
+	kernel-version specific!
+
+Notice how that does not sound great. Distros are being _forced_ to do
+this because stuff gets broken. As covered above, this doesn't always
+work anyway, so it's really not an argument in favour of breaking
+things.
+
+Thanks,
+Mark.
