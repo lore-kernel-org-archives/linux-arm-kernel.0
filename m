@@ -1,79 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 22:25:18 +0100
-Subject: [PATCH, RESEND] xen: allocate gntdev_copy_batch dynamically
-Message-ID: <1456435523-287763-1-git-send-email-arnd@arndb.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 25 Feb 2016 16:25:48 -0500 (EST)
+Subject: [PATCH] net: thunderx: Fix for Qset error due to CQ full
+In-Reply-To: <1456312250-25694-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1456312250-25694-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20160225.162548.782902392289793973.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct gntdev_copy_batch is arguably too large to fit on the kernel stack,
-and we get a warning about the stack usage in gntdev_ioctl_grant_copy:
+From: sunil.kovvuri@gmail.com
+Date: Wed, 24 Feb 2016 16:40:50 +0530
 
-drivers/xen/gntdev.c:949:1: error: the frame size of 1240 bytes is larger than 1024 bytes
+> From: Sunil Goutham <sgoutham@cavium.com>
+> 
+> On Thunderx pass 1.x and pass2 due to a HW errata default CQ
+> DROP_LEVEL of 0x80 is not sufficient to avoid CQ_WR_FULL Qset
+> error when packets are being received at >20Mpps resulting in
+> complete stall of packet reception.
+> 
+> This patch will configure it to 0x100 which is what is expected
+> by HW on Thunderx. On future passes of thunderx and other chips
+> HW default/reset value will be 0x100 or higher hence not overwritten.
+> 
+> Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 
-This changes the code to us a dynamic allocation instead.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a4cdb556cae0 ("xen/gntdev: add ioctl for grant copy")
----
- drivers/xen/gntdev.c | 17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
-
-I sent this in January, Boris sent an almost identical patch
-as http://www.gossamer-threads.com/lists/xen/devel/414056
-but the bug remains present in mainline and linux-next as of
-Feb 25.
-
-Could you apply one of the patches before the bug makes it
-into v4.5?
-
-diff --git a/drivers/xen/gntdev.c b/drivers/xen/gntdev.c
-index dc495383ad73..cc753b3a7154 100644
---- a/drivers/xen/gntdev.c
-+++ b/drivers/xen/gntdev.c
-@@ -915,15 +915,16 @@ static int gntdev_grant_copy_seg(struct gntdev_copy_batch *batch,
- static long gntdev_ioctl_grant_copy(struct gntdev_priv *priv, void __user *u)
- {
- 	struct ioctl_gntdev_grant_copy copy;
--	struct gntdev_copy_batch batch;
-+	struct gntdev_copy_batch *batch;
- 	unsigned int i;
- 	int ret = 0;
- 
- 	if (copy_from_user(&copy, u, sizeof(copy)))
- 		return -EFAULT;
- 
--	batch.nr_ops = 0;
--	batch.nr_pages = 0;
-+	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
-+	if (!batch)
-+		return -ENOMEM;
- 
- 	for (i = 0; i < copy.count; i++) {
- 		struct gntdev_grant_copy_segment seg;
-@@ -933,18 +934,20 @@ static long gntdev_ioctl_grant_copy(struct gntdev_priv *priv, void __user *u)
- 			goto out;
- 		}
- 
--		ret = gntdev_grant_copy_seg(&batch, &seg, &copy.segments[i].status);
-+		ret = gntdev_grant_copy_seg(batch, &seg, &copy.segments[i].status);
- 		if (ret < 0)
- 			goto out;
- 
- 		cond_resched();
- 	}
--	if (batch.nr_ops)
--		ret = gntdev_copy(&batch);
-+	if (batch->nr_ops)
-+		ret = gntdev_copy(batch);
-+	kfree(batch);
- 	return ret;
- 
-   out:
--	gntdev_put_pages(&batch);
-+	gntdev_put_pages(batch);
-+	kfree(batch);
- 	return ret;
- }
- 
--- 
-2.7.0
+Applied, thank you.
