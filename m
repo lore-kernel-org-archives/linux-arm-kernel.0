@@ -1,21 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 15:13:26 +0100
-Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
- pinctrl_{register, unregister}
-In-Reply-To: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Thu, 25 Feb 2016 09:14:34 -0500
+Subject: [GIT PULL] NXP LPC32xx Platform Updates for v4.6 #1
+In-Reply-To: <20160224213633.GF10126@localhost>
+References: <56BBE6E6.4080802@mleia.com>  <20160224213633.GF10126@localhost>
+Message-ID: <1456409674.25197.9.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 2:15 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+Hi Olof,
 
-> Add resource manageemnt APIs fro pinctrl_register() and pinctrl_unregister()
-> and use these new APIs on hw driver to reduce the error path code and
-> remove callback for driver.
+On Wed, 2016-02-24 at 13:36 -0800, Olof Johansson wrote:
+> Hi!
+> 
+> On Thu, Feb 11, 2016 at 03:41:58AM +0200, Vladimir Zapolskiy wrote:
+> > Hi Arnd, Olof, Kevin,
+> > 
+> > please consider to include NXP LPC32xx platfrom updates (#1) for v4.6.
+> > 
+> > The main change is a switchover to a common clock framework driver
+> > for LPC32xx, this also allows to reuse a shared LPC32xx clockevent
+> > driver, and hence remove legacy clock and timer drivers from
+> > arch/arm/mach-lpc32xx.
+> > 
+> > I'm adding an official LPC32xx maintainer Roland to Cc, however
+> > he seems to be unresponsive for a quite long time (since 2014).
+> > 
+> > ----------------------------------------------------------------
+> > 
+> > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> > 
+> >   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://github.com/vzapolskiy/linux.git lpc32xx/soc
+> > 
+> > for you to fetch changes up to 0ac1a101f5dd28c3894be3c0230ee7ea2e05e8aa:
+> > 
+> >   arm: lpc32xx: remove direct control of GPIOs from shared mach file (2016-02-11 02:27:04 +0200)
+> 
+> In the future, please use the decription you wrote above as part of a tag
+> description, and sign your tags. For extra credit, get other kernel developers
+> to sign your key (easiest done at conferences, but maybe there are other
+> developers in your local area that you can meet up with).
+> 
+> It indeed seems like Roland has gone silent lately. This happens from time to
+> time, but it's always good to know if it's intentional (and if he's coming
+> back) or not. Meanwhile, we can merge patches after review but I don't have
+> hardware to test on so I'd have to rely on you getting that right. If we get
+> regression reports we'll have to re-evaluate the approach. :)
+> 
+I am running this patchset and the LPC32xx DT update patchset on a 
+custom LPC32xx board; I did have any problem while running 
+those changes.
 
-As you can probably guess I like this too, so wait a while, collect ACKs
-and send me a branch to pull for this too.
+I am trying to run the major changes for the LPC32xx platform before 
+the pull request take place; see the 2 link below:
+http://permalink.gmane.org/gmane.linux.drivers.devicetree/155413
+http://permalink.gmane.org/gmane.linux.drivers.devicetree/155560
 
-Yours,
-Linus Walleij
+
+Sylvain Lemieux
+
+> Roland, any chance we can get a word from you on this? Thanks!
+> 
+> 
+> -Olof
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
