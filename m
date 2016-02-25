@@ -1,37 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 23:04:50 +0100
-Subject: [PATCH] ARM: s3c24xx: avoid warning for inb/outb
-Message-ID: <1456437900-853667-1-git-send-email-arnd@arndb.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 25 Feb 2016 23:04:45 +0100
+Subject: [PATCH 0/2] PINT irqchip driver for NXP LPC18xx family
+Message-ID: <1456437887-24432-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c24xx implements its own inb/outb macros, but the implementation
-prints warnings when the port number argument is not a 32-bit scalar:
+The LPC1850 has no less than 3 GPIO interrupt blocks. One of these
+blocks is called 'gpio pin interrupt' or just PINT. LPC1850 PINT can
+handle up to 8 interrupts and these have a one-to-one relationship with
+the main interrupt controller (NVIC).
 
-drivers/scsi/pas16.c: In function 'NCR5380_pwrite':
-arch/arm/mach-s3c24xx/include/mach/io.h:193:68: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
- #define __ioaddrc(port) ((__PORT_PCIO(port) ? PCIO_BASE + (port) : (void __iomem *)(port)))
+The interrupts on PINT can be either level or edge trigger and supports
+any polarity.
 
-This slightly modifies the definition of the __ioaddrc macro to avoid
-the warning.
+This patch set adds an irqchip driver for the PINT found on lpc18xx.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-s3c24xx/include/mach/io.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Joachim Eastwood (2):
+  irqchip: add lpc18xx gpio pin interrupt driver
+  devicetree: document NXP LPC1850 PINT irq controller binding
 
-diff --git a/arch/arm/mach-s3c24xx/include/mach/io.h b/arch/arm/mach-s3c24xx/include/mach/io.h
-index 5dd1db4e2677..235c53647aa4 100644
---- a/arch/arm/mach-s3c24xx/include/mach/io.h
-+++ b/arch/arm/mach-s3c24xx/include/mach/io.h
-@@ -190,7 +190,7 @@ DECLARE_IO(int,l,"")
- 	result;								\
- })
- 
--#define __ioaddrc(port)	((__PORT_PCIO(port) ? PCIO_BASE + (port) : (void __iomem *)(port)))
-+#define __ioaddrc(port)	((__PORT_PCIO(port) ? PCIO_BASE + (port) : (void __iomem *)0 + (port)))
- 
- #define inb(p)		(__builtin_constant_p((p)) ? __inbc(p)	   : __inb(p))
- #define inw(p)		(__builtin_constant_p((p)) ? __inwc(p)	   : __inw(p))
+ .../interrupt-controller/nxp,lpc1850-gpio-pint.txt |  22 ++
+ drivers/irqchip/Kconfig                            |   5 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-lpc18xx-gpio-pint.c            | 238 +++++++++++++++++++++
+ 4 files changed, 266 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nxp,lpc1850-gpio-pint.txt
+ create mode 100644 drivers/irqchip/irq-lpc18xx-gpio-pint.c
+
 -- 
-2.7.0
+1.8.0
