@@ -1,41 +1,43 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Thu, 25 Feb 2016 16:34:39 +0100
-Subject: [PATCH] pinctrl: mediatek/7623: delete unnecessary .owner
-In-Reply-To: <1456413981-26089-1-git-send-email-linus.walleij@linaro.org>
-References: <1456413981-26089-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <56CF1F0F.1060407@openwrt.org>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Thu, 25 Feb 2016 21:00:45 +0530
+Subject: [PATCH v3 2/2] iio: dac: vf610_dac: Add IIO DAC driver for
+ Vybrid SoC
+In-Reply-To: <56CE18AC.6020603@kernel.org>
+References: <cover.1456121233.git.maitysanchayan@gmail.com>
+ <1a70acdd3ffae273bbfe2f80c5e3952d152921df.1456121233.git.maitysanchayan@gmail.com>
+ <20160223205437.GA27366@rob-hp-laptop>
+ <56CE18AC.6020603@kernel.org>
+Message-ID: <20160225153045.GA15913@Sanchayan-Arch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+On 16-02-24 20:55:08, Jonathan Cameron wrote:
+> On 23/02/16 20:54, Rob Herring wrote:
+> > On Mon, Feb 22, 2016 at 11:48:37AM +0530, Sanchayan Maity wrote:
+> >> Add driver support for DAC peripheral on Vybrid SoC.
+> >>
+> >> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> >> ---
+> >>  Documentation/ABI/testing/sysfs-bus-iio-vf610      |   9 +
+> >>  .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
+> > 
+> > For the binding:
+> > 
+> > Acked-by: Rob Herring <robh@kernel.org>
+> Applied to the togreg branch of iio.git - initially pushed out as testing
+> for the autobuilders to play with it.
 
-On 25/02/2016 16:26, Linus Walleij wrote:
-> This is set by the device core.
+Thanks Jonathan.
+
 > 
-> Cc: John Crispin <blogic@openwrt.org>
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Note the dts change probably wants to go via the relevant arch trees.
+> I can take it with an appropriate ack if not.
 
-Thanks, i was just going to send it to you and then i saw you and feng
-had already sent me a version, 2 is already more than needed so i wont
-spin up a 3rd version ;)
+Generally shawn picks up the device tree changes once the driver makes
+it to his for-next branch. I will ping shawn to pick this up once the
+driver lands in shawn's for-next branch.
 
-can you fold this please ?
-
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mt7623.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7623.c b/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-> index bf0d05b6e7dc..67895f8234e3 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-> @@ -367,7 +367,6 @@ static struct platform_driver mtk_pinctrl_driver = {
->  	.probe = mt7623_pinctrl_probe,
->  	.driver = {
->  		.name = "mediatek-mt7623-pinctrl",
-> -		.owner = THIS_MODULE,
->  		.of_match_table = mt7623_pctrl_match,
->  	},
->  };
-> 
+Regards,
+Sanchayan.
