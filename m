@@ -1,39 +1,40 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 26 Feb 2016 06:54:29 +0800
-Subject: [PATCH v2] ARM: dts: sun8i: Add leds and switch on Orangepi Plus
- boards
-In-Reply-To: <20160225204234.GA31610@box2.japko.eu>
-Message-ID: <201602260632.mOdfvVuL%fengguang.wu@intel.com>
+From: colin.king@canonical.com (Colin King)
+Date: Thu, 25 Feb 2016 23:09:59 +0000
+Subject: [PATCH][V2] mt7601u: do not free dma_buf when ivp allocation fails
+Message-ID: <1456441799-19266-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+From: Colin Ian King <colin.king@canonical.com>
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.5-rc5 next-20160225]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+If the allocation of ivp fails the error handling attempts to
+free an uninitialized dma_buf; this data structure just contains
+garbage on the stack, so the freeing will cause issues when the
+urb, buf and dma fields are free'd. Fix this by not free'ing the
+dma_buf if the ivp allocation fails.
 
-url:    https://github.com/0day-ci/linux/commits/Krzysztof-Adamski/ARM-dts-sun8i-Add-leds-and-switch-on-Orangepi-Plus-boards/20160226-044640
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: arm-sunxi_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts:104.1-7 Label or path r_pio not found
-   FATAL ERROR: Syntax error parsing input tree
-
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 17442 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/de271787/attachment-0001.obj>
+ drivers/net/wireless/mediatek/mt7601u/mcu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/wireless/mediatek/mt7601u/mcu.c b/drivers/net/wireless/mediatek/mt7601u/mcu.c
+index fbb1986..70e4b5e 100644
+--- a/drivers/net/wireless/mediatek/mt7601u/mcu.c
++++ b/drivers/net/wireless/mediatek/mt7601u/mcu.c
+@@ -362,10 +362,10 @@ mt7601u_upload_firmware(struct mt7601u_dev *dev, const struct mt76_fw *fw)
+ 	int i, ret;
+ 
+ 	ivb = kmemdup(fw->ivb, sizeof(fw->ivb), GFP_KERNEL);
+-	if (!ivb || mt7601u_usb_alloc_buf(dev, MCU_FW_URB_SIZE, &dma_buf)) {
+-		ret = -ENOMEM;
++	if (!ivb)
++		return -ENOMEM;
++	if (mt7601u_usb_alloc_buf(dev, MCU_FW_URB_SIZE, &dma_buf))
+ 		goto error;
+-	}
+ 
+ 	ilm_len = le32_to_cpu(fw->hdr.ilm_len) - sizeof(fw->ivb);
+ 	dev_dbg(dev->dev, "loading FW - ILM %u + IVB %zu\n",
+-- 
+2.7.0
