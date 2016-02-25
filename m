@@ -1,51 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 14:43:46 +0100
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <B8A82546-46C7-4A21-92D8-62418E49FBB6@konsulko.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <1454594660-7532-12-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbnLgVsrSAu87wxSwktK3ftJzbQLXjU8y65tq=9Ynxicw@mail.gmail.com>
- <56CC2D39.80909@ti.com>
- <CAFEAcA9U3V04o2_93bS5G7+k=UT7kTWt4=v7t1Ju0X9W=5oo9A@mail.gmail.com>
- <56CC546A.9070705@ti.com>
- <20160224104638.GL19428@n2100.arm.linux.org.uk>
- <56CD924F.50108@ti.com>
- <B8A82546-46C7-4A21-92D8-62418E49FBB6@konsulko.com>
-Message-ID: <CACRpkdZ=PR6O28NQusUEipCYwRZyuhbeAJO_ZK80+4H7Zakt=g@mail.gmail.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu, 25 Feb 2016 14:48:16 +0100
+Subject: [PATCH 1/2] ARM: mvebu: change order of ethernet DT nodes on
+ Armada 38x
+In-Reply-To: <20160225113610.351149bf@free-electrons.com>
+References: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1453907300-28283-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160127193143.GF10826@n2100.arm.linux.org.uk>
+ <20160127194512.GA16638@1wt.eu>
+ <20160129114853.GQ10826@n2100.arm.linux.org.uk>
+ <20160224184114.GB2292@1wt.eu>
+ <20160224223350.GP19428@n2100.arm.linux.org.uk>
+ <20160225113610.351149bf@free-electrons.com>
+Message-ID: <op.ydd5yqmx2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 1:13 PM, Pantelis Antoniou
-<pantelis.antoniou@konsulko.com> wrote:
+On Thu, 25 Feb 2016 11:36:10 +0100, Thomas Petazzoni  
+<thomas.petazzoni@free-electrons.com> wrote:
 
-> IMHO DT+overlays handle all your cases just fine.
+> Hello,
 >
-> As far as I see these are the cases which we need to handle:
+> On Wed, 24 Feb 2016 22:33:50 +0000, Russell King - ARM Linux wrote:
 >
-> 1) The expansion board in question has some means of identification, whether it?s an
-> EEPROM or a GPIO keying combination etc. In that case it is the kernel?s job to match this
-> id value with a dtbo firmware file and apply it. The blob is located via means of request_firmware().
+>> I didn't say no to it, I merely asked a few pertinent questions and
+>> made some pertinent points.
+>>
+>> Let me restate:
+>>
+>> * Today, people who switch between mainline and vendor kernels
+>>   experience some pain due to the NIC order changing.
+>>
+>> * Mainline has had support for Armada 38x for 2 years now, which is
+>>   long enough for it to have gained users.  AFAICS, there haven't been
+>>   any complaints about the different NIC ordering.  Changing the NIC
+>>   ordering is going to cause breakage to these users when they migrate
+>>   across the change.
+>>
+>> By making the change, we're effectively telling these mainline-only
+>> users "we don't care about your setups, we're going to break them"
+>> because that's exactly what we're going to do.
+>>
+>> Of course, if no one complains about the change, you've got away
+>> with it.
+>
+> I agree with you that the change isn't perfect, it's really a matter of
+> trade-off. The perfect change would be to be able to help the network
+> subsystem in its naming of network interfaces, but this has always been
+> rejected. It would have indeed been better to add this DT node ordering
+> work-around earlier, but we didn't do it, and we're in the present.
+>
+> So again, yes the proposed change is not "great", but I believe it's
+> relatively reasonable. If we indeed get feedback that it's breaking
+> things for too many people, I guess we'll just revert. I don't mind if
+> things remain as they are today, i.e with a weird ordering of the
+> network interfaces. It's just annoying for new people using the
+> platform, but it's not horrible either.
 
-Since the dawn of time the x86 people used that console to display
-the early boot crawl and collect crash data. What you're suggesting
-is that we can't get the console up until after the filesystems and mounts
-are up so the kernel can read firmware files.
+I can check during the weekend if the mainlined Linksys boards get broken  
+because of this.
 
-This kills of early boot graphics and getting crash logs on the fbdev
-console until that has happened.
 
-It also means there is no way to get the console up without the right
-firmware files in the filesystem. I think that is really crap compared
-to what we have today where the display will always come up, and
-basically a regression.
-
-I understand the stance with respect to things like add-on hardware
-like a Bluetooth board or WLAN or whatnot. But the fbdev console
-is just too basic, like a serial port IMO.
-
-Sure in the ARM world we usually have a serial console, but this is
-seriously breaking current practice.
-
-Yours,
-Linus Walleij
+Imre
