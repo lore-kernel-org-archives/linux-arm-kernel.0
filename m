@@ -1,33 +1,30 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 25 Feb 2016 07:40:07 +0530
-Subject: [PATCH 26/50] pinctrl: spear: Use devm_pinctrl_register() for
- pinctrl registration
-In-Reply-To: <1456319775-3216-27-git-send-email-ldewangan@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <1456319775-3216-27-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160225021007.GA31255@vireshk-i7>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Thu, 25 Feb 2016 10:12:11 +0800
+Subject: [PATCH v3 0/6] rockchip: power-domain: fix pm domain for support
+ RK3399 SoC
+Message-ID: <1456366337-10808-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-02-16, 18:45, Laxman Dewangan wrote:
-> Use devm_pinctrl_register() for pin control registration and remove
-> need of .remove callback.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Viresh Kumar <vireshk@kernel.org>
-> Cc: spear-devel at list.st.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/pinctrl/spear/pinctrl-spear.c     | 11 +----------
->  drivers/pinctrl/spear/pinctrl-spear.h     |  1 -
->  drivers/pinctrl/spear/pinctrl-spear1310.c |  6 ------
->  drivers/pinctrl/spear/pinctrl-spear1340.c |  6 ------
->  drivers/pinctrl/spear/pinctrl-spear300.c  |  6 ------
->  drivers/pinctrl/spear/pinctrl-spear310.c  |  6 ------
->  drivers/pinctrl/spear/pinctrl-spear320.c  |  6 ------
->  7 files changed, 1 insertion(+), 41 deletions(-)
+fix some idle handling
+support sub-power domain
+add rk3399-power.h
+modify power domain for RK3399 SoC
+modify document for RK3399 Soc
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Elaine Zhang (6):
+  rockchip: power-domain: make idle handling optional
+  rockchip: power-domain: allow domains only handling idle requests
+  rockchip: power-domain: add support for sub-power domains
+  dt/bindings: power: add RK3399 SoCs header for power-domain
+  rockchip: power-domain: Modify power domain driver for rk3399
+  dt/bindings: rockchip: modify document of Rockchip power domains
+
+ .../bindings/soc/rockchip/power_domain.txt         |  39 ++++++
+ drivers/soc/rockchip/pm_domains.c                  | 148 +++++++++++++++++++--
+ include/dt-bindings/power/rk3399-power.h           |  53 ++++++++
+ 3 files changed, 230 insertions(+), 10 deletions(-)
+ create mode 100644 include/dt-bindings/power/rk3399-power.h
 
 -- 
-viresh
+1.9.1
