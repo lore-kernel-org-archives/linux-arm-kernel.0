@@ -1,48 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Feb 2016 09:42:02 -0800
-Subject: [PATCH v6] Fix sun7i pin assignment for IRQ's
-In-Reply-To: <280e414e-546e-4a91-91a6-a4fa7157db49@googlegroups.com>
-References: <1456161251-2303-1-git-send-email-henry@nitronetworks.nl>
- <20160225005412.GB4736@lukather>
- <CACRpkdYmf8-ZPV5q9H3cdZtQDUkbx=bcrVg9a8M3zEAifXxF9A@mail.gmail.com>
- <280e414e-546e-4a91-91a6-a4fa7157db49@googlegroups.com>
-Message-ID: <20160225174202.GA31136@lukather>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 25 Feb 2016 17:42:58 +0000
+Subject: [PATCH] arm: fixmap: Annotate page flags with pgprot
+Message-ID: <1456422178-1371-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With STRICT_MM_TYPECHECKS, the kernel build fails like :
 
-On Thu, Feb 25, 2016 at 06:26:22AM -0800, Henry Paulissen wrote:
-> 
-> 
-> Op donderdag 25 februari 2016 15:16:49 UTC+1 schreef Linus Walleij:
-> 
-> >
-> > I'm taking this patch out of my tree now following Maxime's comments. 
-> >
-> > I'm a bit annoyed that it is iterating too quickly as well, I will 
-> > wait and see for a while. 
-> >
-> >  
-> All of Maxime his questions where already answered in a reply to him at:
-> Date: Sun, 21 Feb 2016 11:27:46 -0800 (PST)
+  CC      mm/early_ioremap.o
+mm/early_ioremap.c: In function ?early_ioremap?:
+mm/early_ioremap.c:211:2: error: incompatible type for argument 3 of ?__early_ioremap?
+mm/early_ioremap.c:98:1: note: expected ?pgprot_t? but argument is of type ?long long unsigned int?
+mm/early_ioremap.c: In function ?early_memremap?:
+mm/early_ioremap.c:219:13: error: incompatible type for argument 3 of ?__early_ioremap?
+mm/early_ioremap.c:98:1: note: expected ?pgprot_t? but argument is of type ?long long unsigned int?
+mm/early_ioremap.c: In function ?early_memremap_ro?:
+mm/early_ioremap.c:225:2: error: incompatible type for argument 3 of ?__early_ioremap?
+mm/early_ioremap.c:98:1: note: expected ?pgprot_t? but argument is of type ?long long unsigned int?
+mm/early_ioremap.c:226:1: warning: control reaches end of non-void function [-Wreturn-type]
+mm/early_ioremap.c: In function ?early_memremap?:
+mm/early_ioremap.c:220:1: warning: control reaches end of non-void function [-Wreturn-type]
+mm/early_ioremap.c: In function ?early_ioremap?:
+mm/early_ioremap.c:212:1: warning: control reaches end of non-void function [-Wreturn-type]
+make[1]: *** [mm/early_ioremap.o] Error 1
+make: *** [mm] Error 2
+make: *** Waiting for unfinished jobs....
+  CC      arch/arm/mm/mmu.o
+  CC      arch/arm/kernel/patch.o
+arch/arm/kernel/patch.c: In function ?patch_map?:
+arch/arm/kernel/patch.c:39:2: error: incompatible type for argument 3 of ?__set_fixmap?
+./arch/arm/include/asm/fixmap.h:55:6: note: expected ?pgprot_t? but argument is of type ?long long unsigned int?
+make[1]: *** [arch/arm/kernel/patch.o] Error 1
 
-And I was not among the recipients of that mail, please try to keep
-everyone in Cc.
+Fixes Commit a5f4c561b ("ARM: 8415/1: early fixmap support for earlycon").
 
-Commenting on it right now....
+Annotate the page flags properly using __pgprot.
 
-Maxime
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: stable at vger.kernel.org	# v4.3+
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm/include/asm/fixmap.h |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 5c17d2d..8d48d5a 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -39,13 +39,13 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+ 	__end_of_fixmap_region > __end_of_early_ioremap_region ?
+ 	__end_of_fixmap_region : __end_of_early_ioremap_region;
+ 
+-#define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
++#define FIXMAP_PAGE_COMMON	__pgprot(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+ 
+-#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+-#define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
++#define FIXMAP_PAGE_NORMAL	__pgprot(pgprot_val(FIXMAP_PAGE_COMMON) | L_PTE_MT_WRITEBACK)
++#define FIXMAP_PAGE_RO		__pgprot(pgprot_val(FIXMAP_PAGE_NORMAL) | L_PTE_RDONLY)
+ 
+ /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+-#define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
++#define FIXMAP_PAGE_IO		__pgprot(pgprot_val(FIXMAP_PAGE_COMMON) | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
+ #define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
+ 
+ #define __early_set_fixmap	__set_fixmap
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/127a684d/attachment-0001.sig>
+1.7.9.5
