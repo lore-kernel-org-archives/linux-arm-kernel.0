@@ -1,98 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 17:31:32 +0100
-Subject: [PATCH] modsign: hide openssl output in silent builds
-Message-ID: <1456417901-2192433-1-git-send-email-arnd@arndb.de>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 25 Feb 2016 09:32:17 -0700
+Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
+In-Reply-To: <20160225094417.GB31728@red-moon>
+References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <7hsi0hr3wj.fsf@baylibre.com> <20160225094417.GB31728@red-moon>
+Message-ID: <CANLsYkzq_oFLZ-ijBtxHp2rU=NR5R1PLb0znv2zPTv=4Z2isGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a user calls 'make -s', we can assume they don't want to
-see any output except for warnings and errors, but instead
-they see this for a warning free build:
+On 25 February 2016 at 02:44, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Feb 24, 2016 at 05:10:20PM -0800, Kevin Hilman wrote:
+>> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+>>
+>> > When a CPU is suspended (either through suspend-to-RAM or CPUidle),
+>> > its PMU registers content can be lost, which means that counters
+>> > registers values that were initialized on power down entry have to be
+>> > reprogrammed on power-up to make sure the counters set-up is preserved
+>>
+>> This assumes that the PMUs are always sharing a power rail with a
+>> specific CPU, not the cluster.  Is that a reliable assumption?
+>
+> As reliable as assuming the GIC HW state needs save/restore on idle-state
+> entry, if we have no power domains information linked to CPU PM
+> notifiers saving/restoring everything every time an idle state deeper
+> than wfi is entered is the best we can do.
+>
+> As far as this patch is concerned, if the PMU is on a different power
+> domain than the CPU, I agree that stopping/resetting/restoring the
+> PMU registers is a waste of cycles (I will test it also by triggering
+> the notifiers on wfi, to make sure the reset is not disruptive on
+> a cpu that is not powered off), I see no alternative other than disabling
+> idle to carry out profiling sanely (or implement CPU PM notifiers with
+> runtime PM).
 
- ###
- ### Now generating an X.509 key pair to be used for signing modules.
- ###
- ### If this takes a long time, you might wish to run rngd in the
- ### background to keep the supply of entropy topped up.  It
- ### needs to be run as root, and uses a hardware random
- ### number generator if one is available.
- ###
- Generating a 4096 bit RSA private key
- .................................................................................................................................................................................................................................++
- ..............................................................................................................................++
- writing new private key to 'certs/signing_key.pem'
- -----
- ###
- ### Key pair generated.
- ###
+I totally understand - I'm faced with the same problem on Coresight.
+To me the ultimate solution is still to integrate CPU power domain
+management with runtime PM (like we talked about many times before).
+I know Lina is working on something that will get us close to that but
+it's not finished yet.
 
-The output can confuse simple build testing scripts that just check
-for an empty build log.
-
-This patch silences all the output:
- - "echo" is changed to "@$(kecho)", which is dropped when "-s" gets
-   passed
- - the openssl command itself is only printed with V=1, using the
-   $(Q) macro
- - The output of openssl gets redircted to /dev/null on "-s" builds.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- certs/Makefile | 33 +++++++++++++++++++--------------
- 1 file changed, 19 insertions(+), 14 deletions(-)
-
-diff --git a/certs/Makefile b/certs/Makefile
-index 28ac694dd11a..2773c4afa24c 100644
---- a/certs/Makefile
-+++ b/certs/Makefile
-@@ -36,29 +36,34 @@ ifndef CONFIG_MODULE_SIG_HASH
- $(error Could not determine digest type to use from kernel config)
- endif
- 
-+redirect_openssl	= 2>&1
-+quiet_redirect_openssl	= 2>&1
-+silent_redirect_openssl = 2>/dev/null
-+
- # We do it this way rather than having a boolean option for enabling an
- # external private key, because 'make randconfig' might enable such a
- # boolean option and we unfortunately can't make it depend on !RANDCONFIG.
- ifeq ($(CONFIG_MODULE_SIG_KEY),"certs/signing_key.pem")
- $(obj)/signing_key.pem: $(obj)/x509.genkey
--	@echo "###"
--	@echo "### Now generating an X.509 key pair to be used for signing modules."
--	@echo "###"
--	@echo "### If this takes a long time, you might wish to run rngd in the"
--	@echo "### background to keep the supply of entropy topped up.  It"
--	@echo "### needs to be run as root, and uses a hardware random"
--	@echo "### number generator if one is available."
--	@echo "###"
--	openssl req -new -nodes -utf8 -$(CONFIG_MODULE_SIG_HASH) -days 36500 \
-+	@$(kecho) "###"
-+	@$(kecho) "### Now generating an X.509 key pair to be used for signing modules."
-+	@$(kecho) "###"
-+	@$(kecho) "### If this takes a long time, you might wish to run rngd in the"
-+	@$(kecho) "### background to keep the supply of entropy topped up.  It"
-+	@$(kecho) "### needs to be run as root, and uses a hardware random"
-+	@$(kecho) "### number generator if one is available."
-+	@$(kecho) "###"
-+	$(Q)openssl req -new -nodes -utf8 -$(CONFIG_MODULE_SIG_HASH) -days 36500 \
- 		-batch -x509 -config $(obj)/x509.genkey \
- 		-outform PEM -out $(obj)/signing_key.pem \
--		-keyout $(obj)/signing_key.pem 2>&1
--	@echo "###"
--	@echo "### Key pair generated."
--	@echo "###"
-+		-keyout $(obj)/signing_key.pem \
-+		$($(quiet)redirect_openssl)
-+	@$(kecho) "###"
-+	@$(kecho) "### Key pair generated."
-+	@$(kecho) "###"
- 
- $(obj)/x509.genkey:
--	@echo Generating X.509 key generation config
-+	@$(kecho) Generating X.509 key generation config
- 	@echo  >$@ "[ req ]"
- 	@echo >>$@ "default_bits = 4096"
- 	@echo >>$@ "distinguished_name = req_distinguished_name"
--- 
-2.7.0
+>
+> Thanks,
+> Lorenzo
