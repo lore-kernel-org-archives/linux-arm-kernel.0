@@ -1,65 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 16:26:41 -0800
-Subject: [PATCH 2/9] ARM: dts: uniphier: rework UniPhier System Bus nodes
-In-Reply-To: <1455588911-9827-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1455588911-9827-1-git-send-email-yamada.masahiro@socionext.com>
- <1455588911-9827-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160225002641.GC10126@localhost>
+Date: Wed, 24 Feb 2016 16:29:08 -0800
+Subject: [PATCH v3 2/6] arm: dts: add Artpec-6 SoC dtsi file
+In-Reply-To: <9d3b8e80eeb56ca0808aae62eabd82af23ddb5c5.1455205057.git.larper@axis.com>
+References: <cover.1455205057.git.larper@axis.com>
+ <9d3b8e80eeb56ca0808aae62eabd82af23ddb5c5.1455205057.git.larper@axis.com>
+Message-ID: <20160225002908.GD10126@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 11, 2016 at 05:06:17PM +0100, Lars Persson wrote:
+> Initial device tree for the Artpec-6 SoC.
+> 
+> Signed-off-by: Lars Persson <larper@axis.com>
+> ---
+>  arch/arm/boot/dts/artpec6.dtsi | 236 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 236 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/artpec6.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+> new file mode 100644
+> index 0000000..f2a7e4a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/artpec6.dtsi
+> @@ -0,0 +1,236 @@
+> +/*
+> + * Device Tree Source for the Axis ARTPEC-6 SoC
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
 
-On Tue, Feb 16, 2016 at 11:15:04AM +0900, Masahiro Yamada wrote:
+I just realized these are GPL-only. We try to get most DTS/DTSI files dual
+licensed now so that they can be separated from the linux kernel and used in
+other projects. You can see the boilerplate used by other platforms in the same
+directory.
 
-> diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
-> index e1cfc1d..b53a8d9 100644
-> --- a/arch/arm/mach-uniphier/platsmp.c
-> +++ b/arch/arm/mach-uniphier/platsmp.c
-> @@ -30,7 +30,7 @@
->   * The secondary CPUs check this register from the boot ROM for the jump
->   * destination.  After that, it can be reused as a scratch register.
->   */
-> -#define UNIPHIER_SBC_ROM_BOOT_RSV2	0x1208
-> +#define UNIPHIER_SMPCTRL_ROM_BOOT_RSV2	0x208
->  
->  static void __iomem *uniphier_smp_rom_boot_rsv2;
->  static unsigned int uniphier_smp_max_cpus;
-> @@ -98,15 +98,14 @@ static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
->  	phys_addr_t rom_rsv2_phys;
->  	int ret;
->  
-> -	np = of_find_compatible_node(NULL, NULL,
-> -				"socionext,uniphier-system-bus-controller");
-> -	ret = of_address_to_resource(np, 1, &res);
-> +	np = of_find_compatible_node(NULL, NULL, "socionext,uniphier-smpctrl");
-> +	ret = of_address_to_resource(np, 0, &res);
->  	if (ret) {
-> -		pr_err("failed to get resource of system-bus-controller\n");
-> +		pr_err("failed to get resource of uniphier-smpctrl\n");
->  		return ret;
->  	}
->  
-> -	rom_rsv2_phys = res.start + UNIPHIER_SBC_ROM_BOOT_RSV2;
-> +	rom_rsv2_phys = res.start + UNIPHIER_SMPCTRL_ROM_BOOT_RSV2;
->  
->  	ret = uniphier_smp_copy_trampoline(rom_rsv2_phys);
->  	if (ret)
+I'd appreciate a patch that changed the licensing (it can be done on top of
+this, since I already applied the patches we might as well keep them and fix
+incrementally).
 
-The previous binding has already been released. You can update, but your driver
-should be able to handle the previous binding.
+(Let me know if your corporate lawyers are giving you a hard time over this,
+I'd be happy to talk to them to explain if needed).
 
-So, you still need to keep the old code around.
-
-This has the benefit of breaking the dependency between the code change and the
-DT change, so you no longer have to change your platform code at the same time
-as the DT to avoid regressions.
-
-
-Please adjust and resend. I'll hold off applying the series until then, so we
-don't have a partially applied series.
-
-
-Thanks!
 
 -Olof
