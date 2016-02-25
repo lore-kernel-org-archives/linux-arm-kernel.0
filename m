@@ -1,151 +1,145 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 25 Feb 2016 09:37:16 -0700
-Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
-In-Reply-To: <20160224173511.GF25385@red-moon>
-References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
- <CANLsYkzvB0GbPeYHrcLtUz8DMHJh4FA5RVwVZ-UAm3BCznB_3w@mail.gmail.com>
- <20160224173511.GF25385@red-moon>
-Message-ID: <CANLsYkwYjPeQ=syGk7ofb_yWtzDYoNK6Yf8MLPxhMkN31+xE3g@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Feb 2016 17:38:11 +0100
+Subject: [PATCH 1/3] dt-bindings: arm/marvell: ABI unstability warning
+ about Marvell 7K/8K
+In-Reply-To: <20160225161642.GC10593@leverpostej>
+References: <1456327007-31008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1456327007-31008-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160224172545.GC9137@leverpostej>
+ <20160224211045.379352d3@free-electrons.com>
+ <CAL_JsqLevrujSeYNBvSJA-5T0Ho8y7c0fKid7QvVm8LLvYLotw@mail.gmail.com>
+ <20160225090927.13492cfb@free-electrons.com>
+ <20160225161642.GC10593@leverpostej>
+Message-ID: <20160225173811.23be5b05@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2016 at 10:35, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Feb 24, 2016 at 09:20:22AM -0700, Mathieu Poirier wrote:
->> On 23 February 2016 at 11:22, Lorenzo Pieralisi
->
-> [...]
->
->> > +static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
->> > +                            void *v)
->> > +{
->> > +       struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
->> > +       struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
->> > +       int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
->> > +
->> > +       if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
->> > +               return NOTIFY_DONE;
->> > +
->> > +       /*
->> > +        * Always reset the PMU registers on power-up even if
->> > +        * there are no events running.
->> > +        */
->> > +       if (cmd == CPU_PM_EXIT && armpmu->reset)
->> > +               armpmu->reset(armpmu);
->>
->> I think this patch does the right thing but I can't get the above
->> reset.  Wouldn't it be better to do the reset as part of the
->> CPU_PM_EXIT case below?  At this point nothing tells us the CPU won't
->> go back down before the event is enabled, wasting the cycle needed to
->> reset the PMU.
->
-> The logic goes, if the cpu is woken up and it has no events enabled,
-> if we do not reset it (mind, ->reset here sets the PMU register values
-> to a sane default, some of them are architecturally UNKNOWN on reset, it
-> does NOT reset the PMU) _and_ we subsequently install an event on it we
-> do have a problem, that's why whenever a core gets out of low-power we
-> have to reset its pmu.
->
-> Does it make sense ?
+Hello Mark,
 
-Ok, I understand the context and your solution will work.
+On Thu, 25 Feb 2016 16:16:47 +0000, Mark Rutland wrote:
 
-Isn't there a flag somewhere in the PMU registers that indicate the
-status has been lost due a loss of power?  If so I think the best
-solution is to probe that flag when an event gets installed.  If the
-unit has gone through a power down the reset can be done before
-installing the event.
+> > Either because the internal processes are complicated, or simply
+> > because the Linux kernel support is done without cooperation from the
+> > HW vendor (it's not the case of this Marvell platform, but it's the
+> > case of many other platforms).
+> 
+> Yes, this is a problem in some cases, and that should be considered in
+> those cases. There are always shades of grey.
 
-Mathieu
+Sure.
 
->
-> Thanks,
-> Lorenzo
->
->>
->> Thanks,
->> Mathieu
->>
->> > +
->> > +       if (!enabled)
->> > +               return NOTIFY_OK;
->> > +
->> > +       switch (cmd) {
->> > +       case CPU_PM_ENTER:
->> > +               armpmu->stop(armpmu);
->> > +               cpu_pm_pmu_setup(armpmu, cmd);
->> > +               break;
->> > +       case CPU_PM_EXIT:
->> > +               cpu_pm_pmu_setup(armpmu, cmd);
->> > +       case CPU_PM_ENTER_FAILED:
->> > +               armpmu->start(armpmu);
->> > +               break;
->> > +       default:
->> > +               return NOTIFY_DONE;
->> > +       }
->> > +
->> > +       return NOTIFY_OK;
->> > +}
->> > +
->> > +static int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu)
->> > +{
->> > +       cpu_pmu->cpu_pm_nb.notifier_call = cpu_pm_pmu_notify;
->> > +       return cpu_pm_register_notifier(&cpu_pmu->cpu_pm_nb);
->> > +}
->> > +
->> > +static void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu)
->> > +{
->> > +       cpu_pm_unregister_notifier(&cpu_pmu->cpu_pm_nb);
->> > +}
->> > +#else
->> > +static inline int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu) { return 0; }
->> > +static inline void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu) { }
->> > +#endif
->> > +
->> >  static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
->> >  {
->> >         int err;
->> > @@ -725,6 +813,10 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
->> >         if (err)
->> >                 goto out_hw_events;
->> >
->> > +       err = cpu_pm_pmu_register(cpu_pmu);
->> > +       if (err)
->> > +               goto out_unregister;
->> > +
->> >         for_each_possible_cpu(cpu) {
->> >                 struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
->> >                 raw_spin_lock_init(&events->pmu_lock);
->> > @@ -746,6 +838,8 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
->> >
->> >         return 0;
->> >
->> > +out_unregister:
->> > +       unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
->> >  out_hw_events:
->> >         free_percpu(cpu_hw_events);
->> >         return err;
->> > @@ -753,6 +847,7 @@ out_hw_events:
->> >
->> >  static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
->> >  {
->> > +       cpu_pm_pmu_unregister(cpu_pmu);
->> >         unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
->> >         free_percpu(cpu_pmu->hw_events);
->> >  }
->> > diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
->> > index 83b5e34..9ffa316 100644
->> > --- a/include/linux/perf/arm_pmu.h
->> > +++ b/include/linux/perf/arm_pmu.h
->> > @@ -107,6 +107,7 @@ struct arm_pmu {
->> >         struct platform_device  *plat_device;
->> >         struct pmu_hw_events    __percpu *hw_events;
->> >         struct notifier_block   hotplug_nb;
->> > +       struct notifier_block   cpu_pm_nb;
->> >  };
->> >
->> >  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
->> > --
->> > 2.5.1
->> >
->>
+> Per the above, that isn't relevant in this case. This is a pretty
+> black-and-white stand against the usual rules.
+
+I don't see why. The datasheets have not been completely written yet
+for this particular chip. For other chips we've worked on where we
+collaborated with the SoC vendor, we never had any datasheet, simply
+because the SoC vendor doesn't have any. They have the digital logic
+source code, and then tons of spreadsheets or text documents that are
+not proper datasheets and that they generally cannot share with
+third-parties.
+
+Hence, even when the support for a SoC is being done in collaboration
+with the SoC vendor, we don't always have a nice full datasheet that
+tells us what all the registers are doing and how they are organized.
+We discover things as we go.
+
+Yes, this might be surprising to you, working at ARM, where the
+technical documentation is awesome and very detailed. But trust me,
+this is *NOT* what you get from many SoC vendors.
+
+> > Submitting without merging is useless. The point of submitting is to
+> > get the code merged, to reduce the amount of out-of-tree patches we
+> > have to carry, and to allow users of the platform to simply run
+> > mainline on their platform.
+> 
+> Submitting prototypes and RFCs is the usual way we get things reviewed
+> early, and to allow maintainers and others to get a feel for things
+> earlier. Submitting patches _for merging_ when you're not sure about
+> things and don't want to agree to support them is what's being pushed
+> back on.
+
+This simply doesn't work. This initial support of a few patches (clock,
+basic DT, irqchip, dmaengine) is going to be followed very soon by lots
+of other patches to enable more aspects of the SoC. And we should keep
+all of those patches out-of-tree, piling up hundreds of out-of-tree
+patches ? Not practical at all.
+
+And then when we'll submit them, they will all be accepted in one go,
+in one kernel cycle ? Clearly not, so we would have to wait several
+kernel cycles, which is clearly not what we want.
+
+Instead, what we want is to submit the basic stuff early, and then
+progressively build on top of this basic stuff by merging more and more
+features. This way:
+
+ * We don't have to pile up hundreds of out of tree patches;
+
+ * We have a support in the mainline kernel that is progressively
+   getting better as we enable more and more feature. We can show that
+   4.6 has this small set of features, 4.7 has this slightly extended
+   set of features supported, and so on.
+
+So no, we clearly do not want to keep things out of tree.
+
+> > So this proposal really doesn't make any sense. Just like Mark initial
+> > statement of not submitting code so early.
+> 
+> As what I said was evidently ambiguous, I'm on about code being _merged_
+> prior to being ready. Code and bindings should certainly be posted for
+> review as soon as possible. However, it should be recognised when things
+> aren't quite ready for mainline.
+> 
+> Even if something's unclear about a device, you can highlight more
+> general issues (e.g. problematic edge cases in common subsystem code),
+> and that's possible to have merged even if the binding isn't ready.
+> 
+> If you're unsure about something, but still want it merged, then you
+> have to commit to maintaining that as far as reasonably possible, even
+> if it turns out to not be quite right.
+
+We are perfectly fine with maintaining *code*. And we have been doing
+so for several years on Marvell platforms: caring about older
+platforms, converting old legacy code and legacy platforms to the
+Device Tree, etc.
+
+What we don't want to commit to is to maintain the DT stability
+*before* the support for a given device is sufficiently stable/sane.
+
+> > Do you realize that this all DT binding stuff is today the *biggest* to
+> > getting HW support in the Linux kernel? It has become more complicated
+> > to merge a 4 properties DT binding than to merge multiple thousands of
+> > lines of driver code. 
+> 
+> As times have changed, pain points have moved around.
+> 
+> To some extent that is unavoidable; more up-front effort is required
+> where crutches we previously relied on are not applicable.
+> 
+> Elsewhere we can certainly do better.
+> 
+> Throwing your hands up and stating "this is unstable, it might change"
+> is a crutch. It prevents any real solution to the pain points you
+> encounter, and creates pain points for others. It only provides the
+> _illusion_ of support.
+
+Could you please explicit which pain points it creates for others ?
+
+Having unstable DT bindings specific to a platform does not create any
+single pain point for anyone.
+
+Why are you talking about "illusion" of support ? Sorry, but with
+unstable DT bindings, as long as you use the DT that comes with the
+kernel sources, everything works perfectly fine, and is perfectly
+supported.
+
+Even Fedora is installing DTBs in a directory that is kernel-version
+specific!
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
