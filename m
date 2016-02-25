@@ -1,203 +1,116 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Thu, 25 Feb 2016 14:46:03 +0530
-Subject: [PATCH] arm64: dts: Add tmu node for exynos7
-In-Reply-To: <20160225095803.719122ae@amdc2363>
-References: <1456370865-10086-1-git-send-email-pankaj.dubey@samsung.com>
- <56CE7DAC.4000803@samsung.com> <56CE7FF3.4030101@samsung.com>
- <20160225095803.719122ae@amdc2363>
-Message-ID: <56CEC653.4010004@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 25 Feb 2016 09:24:27 +0000
+Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <56CE3C9E.7070505@riken.jp>
+References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
+ <20160203112112.GA18387@red-moon>
+ <20160203161834.GB26487@MBP.local>
+ <20160224141832.GA26630@red-moon> <56CE3C9E.7070505@riken.jp>
+Message-ID: <20160225092427.GA31728@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
+On Thu, Feb 25, 2016 at 08:28:30AM +0900, Itaru Kitayama wrote:
+> Lorenzo,
+> 
+> On Mustang the lockdep warning I reported to you is disappeared and
+> the system gets to
+> the prompt as you implemented, however only 7 CPUs out of 8 brought up.
 
-On 02/25/2016 02:28 PM, Lukasz Majewski wrote:
-> Hi pankaj.dubey,
->
->> Hi Krzysztof,
->>
->> On Thursday 25 February 2016 09:36 AM, Krzysztof Kozlowski wrote:
->>> On 25.02.2016 12:27, Pankaj Dubey wrote:
->>>> From: Alim Akhtar <alim.akhtar@samsung.com>
->>>>
->>>> This patch adds tmu node, related temprature sensor and triping
->>>> point data for Atlas cpu core found on exynos7 SoC.
->>>>
->>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>>
->>> Yours Sob is missing.
->>>
->>> Cc-ed Lukasz Majewski.
->>>
->>
->> Due to some technical difficulty Alim posted via my account. He will
->> re-spin this patch via his account soon.
->
-> Looking forward to see your patches. :-)
->
-I have resend the patch..please review.
-Thanks for your time.
+It is because, as I mentioned in the other reply to this thread,
+the VA should be stashed before setting up the mailboxes, patch below,
+that should be final (I tested it on AMD Seattle too), please give it a go.
 
-> Best regards,
-> ?ukasz Majewski
->
->>
->> Thanks,
->> Pankaj Dubey
->>> Lukasz,
->>> Your review or ack would be appreciated.
->>>
->>>
->>>> ---
->>>>   .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25
->>>> +++++++++ .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |
->>>> 55 ++++++++++++++++++++
->>>> arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 +++++++
->>>> 3 files changed, 100 insertions(+) create mode 100644
->>>> arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi create
->>>> mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
->>>>
->>>> diff --git
->>>> a/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
->>>> b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi new file
->>>> mode 100644 index 0000000..1d6dcf2 --- /dev/null
->>>> +++ b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
->>>> @@ -0,0 +1,25 @@
->>>> +/*
->>>> + * Device tree sources for Exynos7 TMU sensor configuration
->>>> + *
->>>> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
->>>> + *		http://www.samsung.com
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or
->>>> modify
->>>> + * it under the terms of the GNU General Public License version 2
->>>> as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + */
->>>> +
->>>> +#include <dt-bindings/thermal/thermal_exynos.h>
->>>> +
->>>> +#thermal-sensor-cells = <0>;
->>>> +samsung,tmu_gain = <9>;
->>>> +samsung,tmu_reference_voltage = <17>;
->>>> +samsung,tmu_noise_cancel_mode = <4>;
->>>> +samsung,tmu_efuse_value = <75>;
->>>> +samsung,tmu_min_efuse_value = <15>;
->>>> +samsung,tmu_max_efuse_value = <100>;
->>>> +samsung,tmu_first_point_trim = <25>;
->>>> +samsung,tmu_second_point_trim = <85>;
->>>> +samsung,tmu_default_temp_offset = <50>;
->>>> +samsung,tmu_cal_type = <TYPE_ONE_POINT_TRIMMING>;
->>>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
->>>> b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi new file
->>>> mode 100644 index 0000000..3970545
->>>> --- /dev/null
->>>> +++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
->>>> @@ -0,0 +1,55 @@
->>>> +/*
->>>> + * Device tree sources for default Exynos7 thermal zone definition
->>>> + *
->>>> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
->>>> + *		http://www.samsung.com
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or
->>>> modify
->>>> + * it under the terms of the GNU General Public License version 2
->>>> as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + */
->>>> +
->>>> +trips {
->>>> +	cpu-alert-0 {
->>>> +		temperature = <75000>; /* millicelsius */
->>>> +		hysteresis = <10000>; /* millicelsius */
->>>> +		type = "passive";
->>>> +	};
->>>> +	cpu-alert-1 {
->>>> +		temperature = <80000>; /* millicelsius */
->>>> +		hysteresis = <10000>; /* millicelsius */
->>>> +		type = "passive";
->>>> +	};
->>>> +	cpu-alert-2 {
->>>> +		temperature = <85000>; /* millicelsius */
->>>> +		hysteresis = <10000>; /* millicelsius */
->>>> +		type = "passive";
->>>> +	};
->>>> +	cpu-alert-3 {
->>>> +		temperature = <90000>; /* millicelsius */
->>>> +		hysteresis = <10000>; /* millicelsius */
->>>> +		type = "passive";
->>>> +	};
->>>> +	cpu-alert-4 {
->>>> +		temperature = <95000>; /* millicelsius */
->>>> +		hysteresis = <10000>; /* millicelsius */
->>>> +		type = "passive";
->>>> +	};
->>>> +	cpu-alert-5 {
->>>> +		temperature = <100000>; /* millicelsius */
->>>> +		hysteresis = <10000>; /* millicelsius */
->>>> +		type = "passive";
->>>> +	};
->>>> +	cpu-alert-6 {
->>>> +		temperature = <110000>; /* millicelsius */
->>>> +		hysteresis = <10000>; /* millicelsius */
->>>> +		type = "passive";
->>>> +	};
->>>> +	/* HW Trip point */
->>>
->>> The comment looks unnecessary, all of these are HW trip points,
->>> right?
->>>
->>>> +	cpu-crit-0 {
->>>> +		temperature = <115000>; /* millicelsius */
->>>> +		hysteresis = <0>; /* millicelsius */
->>>> +		type = "critical";
->>>> +	};
->>>> +};
->>>> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi
->>>> b/arch/arm64/boot/dts/exynos/exynos7.dtsi index c662f98..fc9d130
->>>> 100644 --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
->>>> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->>>> @@ -27,6 +27,7 @@
->>>>   		pinctrl6 = &pinctrl_fsys0;
->>>>   		pinctrl7 = &pinctrl_fsys1;
->>>>   		pinctrl8 = &pinctrl_bus1;
->>>> +		tmuctrl0 = &tmuctrl_0;
->>>
->>> Why the alias is needed?
->>>
->>>>   	};
->>>>
->>>>   	cpus {
->>>> @@ -538,6 +539,25 @@
->>>>   			clocks = <&clock_peric0 PCLK_PWM>;
->>>>   			clock-names = "timers";
->>>>   		};
->>>> +
->>>> +		tmuctrl_0: tmu at 10060000 {
->>>> +			compatible = "samsung,exynos7-tmu";
->>>> +			reg = <0x10060000 0x200>;
->>>> +			interrupts = <0 108 0>;
->>>> +			clocks = <&clock_peris PCLK_TMU>,
->>>> +				 <&clock_peris SCLK_TMU>;
->>>> +			clock-names = "tmu_apbif", "tmu_sclk";
->>>> +			#include "exynos7-tmu-sensor-conf.dtsi"
->>>> +		};
->>>> +
->>>> +		thermal-zones {
->>>> +			atlas_thermal: atlas-thermal {
->>>
->>> The atlas is a Exynos7 specific codename. The name of node should
->>> be a general class of the device, so maybe:
->>> 	atlas_thermal: cluster0-thermal
->>> ?
->>>
->>> Best regards,
->>> Krzysztof
->>>
->
->
->
+Thanks,
+Lorenzo
+
+-- >8 --
+diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+index 4b1e5a7..dd671ef 100644
+--- a/arch/arm64/kernel/acpi_parking_protocol.c
++++ b/arch/arm64/kernel/acpi_parking_protocol.c
+@@ -21,7 +21,14 @@
+ 
+ #include <asm/cpu_ops.h>
+ 
++struct parking_protocol_mailbox {
++	__le32 cpu_id;
++	__le32 reserved;
++	__le64 entry_point;
++};
++
+ struct cpu_mailbox_entry {
++	struct parking_protocol_mailbox __iomem *mailbox;
+ 	phys_addr_t mailbox_addr;
+ 	u8 version;
+ 	u8 gic_cpu_id;
+@@ -59,12 +66,6 @@ static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
+ 	return 0;
+ }
+ 
+-struct parking_protocol_mailbox {
+-	__le32 cpu_id;
+-	__le32 reserved;
+-	__le64 entry_point;
+-};
+-
+ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+ {
+ 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+@@ -97,6 +98,12 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+ 	}
+ 
+ 	/*
++	 * stash the mailbox address mapping to use it for further checks
++	 * in postboot method
++	 */
++	cpu_entry->mailbox = mailbox;
++
++	/*
+ 	 * We write the entry point and cpu id as LE regardless of the
+ 	 * native endianness of the kernel. Therefore, any boot-loaders
+ 	 * that read this address need to convert this address to the
+@@ -107,8 +114,6 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+ 
+ 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+ 
+-	iounmap(mailbox);
+-
+ 	return 0;
+ }
+ 
+@@ -116,32 +121,15 @@ static void acpi_parking_protocol_cpu_postboot(void)
+ {
+ 	int cpu = smp_processor_id();
+ 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+-	struct parking_protocol_mailbox __iomem *mailbox;
++	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
+ 	__le64 entry_point;
+ 
+-	/*
+-	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
+-	 * this deviates from the parking protocol specifications since
+-	 * the mailboxes are required to be mapped nGnRnE; the attribute
+-	 * discrepancy is harmless insofar as the protocol specification
+-	 * is concerned).
+-	 * If the mailbox is mistakenly allocated in the linear mapping
+-	 * by FW ioremap will fail since the mapping will be prevented
+-	 * by the kernel (it clashes with the linear mapping attributes
+-	 * specifications).
+-	 */
+-	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
+-	if (!mailbox)
+-		return;
+-
+ 	entry_point = readl_relaxed(&mailbox->entry_point);
+ 	/*
+ 	 * Check if firmware has cleared the entry_point as expected
+ 	 * by the protocol specification.
+ 	 */
+ 	WARN_ON(entry_point);
+-
+-	iounmap(mailbox);
+ }
+ 
+ const struct cpu_operations acpi_parking_protocol_ops = {
