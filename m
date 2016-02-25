@@ -1,45 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 21:57:43 +0100
-Subject: [PATCH, RESEND] ssb: host_soc depends on sprom
-Message-ID: <1456433869-3919332-1-git-send-email-arnd@arndb.de>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 25 Feb 2016 12:58:11 -0800
+Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20160225092427.GA31728@red-moon>
+References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
+ <20160203112112.GA18387@red-moon>
+ <20160203161834.GB26487@MBP.local>
+ <20160224141832.GA26630@red-moon> <56CE3C9E.7070505@riken.jp>
+ <20160225092427.GA31728@red-moon>
+Message-ID: <CAPw-ZTmMVMztB6GTZPCtgoUKt9J2xAo1vBREzFZPUpZiS12Z+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers that use the SSB sprom functionality typically 'select SSB_SPROM'
-from Kconfig, but CONFIG_SSB_HOST_SOC misses this, which results in
-a build failure unless at least one of the other drivers that selects
-it is enabled:
+Hi,
 
-drivers/built-in.o: In function `ssb_host_soc_get_invariants':
-(.text+0x459494): undefined reference to `ssb_fill_sprom_with_fallback'
+> -- >8 --
+> diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
 
-This adds the same select statement that is used elsewhere.
+I applies this to 4.5.0-rc5-next-20160225+ and boot just fine on
+Mustang and Merlin with 8 CPU's.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 541c9a84cd85 ("ssb: pick SoC invariants code from MIPS BCM47xx arch")
----
- drivers/ssb/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Tested-by: Loc Ho <lho@apm.com>
 
-I just noticed this hasn't shown up in linux-next yet, so I'm resending
-it to ensure it's still on someone's radar. Please ignore the resend
-if it's already in a tree that is not part of linux-next but will
-be merged eventually.
-
-See https://patchwork.linux-mips.org/patch/12091/ for the original
-submission.
-
-diff --git a/drivers/ssb/Kconfig b/drivers/ssb/Kconfig
-index 0c675861623f..d8e4219c2324 100644
---- a/drivers/ssb/Kconfig
-+++ b/drivers/ssb/Kconfig
-@@ -83,6 +83,7 @@ config SSB_SDIOHOST
- config SSB_HOST_SOC
- 	bool "Support for SSB bus on SoC"
- 	depends on SSB && BCM47XX_NVRAM
-+	select SSB_SPROM
- 	help
- 	  Host interface for a SSB directly mapped into memory. This is
- 	  for some Broadcom SoCs from the BCM47xx and BCM53xx lines.
--- 
-2.7.0
+-Loc
