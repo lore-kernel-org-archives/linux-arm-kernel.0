@@ -1,75 +1,98 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 25 Feb 2016 18:31:04 +0100
-Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
-In-Reply-To: <20160225165601.GG16546@arm.com>
-References: <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160225160714.GA16546@arm.com>
- <CAKv+Gu94LAAwj2f9Sj9imn68V0VTF+NOtUPsE3tQnVzNDhAATw@mail.gmail.com>
- <20160225162622.GC16546@arm.com>
- <CAKv+Gu8Qx21M=ymne1S4CQUFrXKHTnWFygGBLtXbxiUD9GkiWw@mail.gmail.com>
- <20160225164208.GD16546@arm.com>
- <CAKv+Gu-REUdVJF-_wGU=LRaVRZqsD9bgny9S52pMLp+Es4E-1A@mail.gmail.com>
- <20160225164630.GF16546@arm.com>
- <CAKv+Gu8GYhPeXvgpAoHxYTYfqEHLqqLHVU9U6o3nvxew8dGo6A@mail.gmail.com>
- <CAKv+Gu_dXEQ1U2XY2=xX7R8MoPB0jKM7Vh3zgZB9tBuMfQYuGg@mail.gmail.com>
- <20160225165601.GG16546@arm.com>
-Message-ID: <CAKv+Gu_Bv0CsMrCR=fiowZjtmmepjdLi7RX94wv_oDdrbjr3iw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 25 Feb 2016 17:38:22 +0000
+Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
+ for X-Gene v1
+In-Reply-To: <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
+References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+ <1456330151.5681.46.camel@redhat.com> <56CDD767.6020103@arm.com>
+ <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
+Message-ID: <20160225173822.GA6349@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2016 at 17:56, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Feb 25, 2016 at 05:50:17PM +0100, Ard Biesheuvel wrote:
->> On 25 February 2016 at 17:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 25 February 2016 at 17:46, Will Deacon <will.deacon@arm.com> wrote:
->> >> On Thu, Feb 25, 2016 at 05:43:35PM +0100, Ard Biesheuvel wrote:
->> >>> On 25 February 2016 at 17:42, Will Deacon <will.deacon@arm.com> wrote:
->> >>> > On Thu, Feb 25, 2016 at 05:33:25PM +0100, Ard Biesheuvel wrote:
->> >>> >> AFAIK, gcc never uses x18 (the platform register) so we may be able to
->> >>> >> use that instead. We'd need confirmation from the toolchain guys,
->> >>> >> though ...
->> >>> >
->> >>> > In fact, a better thing to do is probably for the atomic code to
->> >>> > save/restore those register explicitly and then remove them from the
->> >>> > cflags above.
->> >>> >
->> >>> > I'll try hacking something together...
->> >>> >
->> >>>
->> >>> That would be more correct, indeed. Also, the PLT can only use br
->> >>> <reg> so it will always enter the callee with the preserved value
->> >>> stacked, and so the callee needs to be modified in any case.
->> >>
->> >> Wait -- why does the callee need to be modified here? It has no idea
->> >> about whether or not it was invoked via a PLT.
->> >>
->> >
->> > No, it doesn't, and that is exactly the problem: the PLT must end in a
->> > br <reg> instruction because that is the only branch instruction with
->> > unlimited range. That means you will always enter the callee with its
->> > address in some register rather than the value that should have been
->> > preserved. I don't see a way to manage that from the callee
->> >
->>
->> *caller! dammit
->
-> The caller can do:
->
-> save x16, 17
-> bl plt
-> restore x16, x17
->
+On Wed, Feb 24, 2016 at 02:28:10PM -0800, Duc Dang wrote:
+> On Wed, Feb 24, 2016 at 8:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On 24/02/16 16:09, Mark Salter wrote:
+> >> On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
+> >>> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> >>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+> >>>
+> >>> Signed-off-by: Duc Dang <dhdang@apm.com>
+> >>> ---
+> >>>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
+> >>>  1 file changed, 32 insertions(+), 3 deletions(-)
+> >>>
+> >>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+> >>> index a6456b5..466aa93 100644
+> >>> --- a/drivers/pci/host/pci-xgene-msi.c
+> >>> +++ b/drivers/pci/host/pci-xgene-msi.c
+> >>> @@ -24,6 +24,7 @@
+> >>>  #include <linux/pci.h>
+> >>>  #include <linux/platform_device.h>
+> >>>  #include <linux/of_pci.h>
+> >>> +#include <linux/acpi.h>
+> >>>
+> >>>  #define MSI_IR0                     0x000000
+> >>>  #define MSI_INT0            0x800000
+> >>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+> >>>  };
+> >>>
+> >>>  struct xgene_msi {
+> >>> -    struct device_node      *node;
+> >>> +    struct fwnode_handle    *fwnode;
+> >>>      struct irq_domain       *inner_domain;
+> >>>      struct irq_domain       *msi_domain;
+> >>>      u64                     msi_addr;
+> >>> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
+> >>>      .free   = xgene_irq_domain_free,
+> >>>  };
+> >>>
+> >>> +#ifdef CONFIG_ACPI
+> >>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+> >>> +{
+> >>> +    return xgene_msi_ctrl.fwnode;
+> >>> +}
+> >>> +#endif
+> >>> +
+> >>>  static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>>  {
+> >>>      msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+> >>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>>      if (!msi->inner_domain)
+> >>>              return -ENOMEM;
+> >>>
+> >>> -    msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+> >>> +    msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+> >>>                                                  &xgene_msi_domain_info,
+> >>>                                                  msi->inner_domain);
+> >>
+> >> This doesn't work for me (ACPI probing on Mustang) unless I change this
+> >> to be pci_msi_create_default_irq_domain(). The problem seems to be that
+> >> the MSI probe happens after the PCIe RC is probed so there is no MSI domain
+> >> at the time the PCIe root is initialized by ACPI.
+> >
+> > pci_msi_create_default_irq_domain is the wrong thing do use, specially
+> > if you have multiple MSI controllers in the system. I certainly wouldn't
+> > want to see it being used on arm64.
+> >
+> > This is the usual dependency hell. You try moving the probing earlier,
+> > but that may break something else in the process.
+> 
+> Hi Mark and Marc,
+> 
+> I have modified Tianocore firmware to have MSI node declared before
+> PCIe node in Dsdt table. With this modification, the MSI driver will
+> be loaded before PCIe driver and MSI domain is available at the time
+> PCIe root is initialized.
 
-This is __LL_SC_CALL, right? So you just fold a stp/ldp in there?
+I am totally against this. We should not hack ACPI tables to make
+the kernel work (on top of that with unwritten ordering rules that may
+well require changes as kernel evolves), we should have a standard set
+of bindings that people use to describe HW in the DSDT and the kernel(s)
+has to cope with that. If there is a dependency problem in the description
+we may solve it at bindings level, but I absolutely do not want to rely
+on DSDT nodes ordering for things to work, that's fragile, no shortcuts
+please.
 
-> the plt will do:
->
-> get_addr_of_callee_into_x16_and_clobber_x17_or_something
-> br callee
->
-> then the callee will be compiled with all those weird options, but *not*
-> the ones specifying x16 and x17. That means it can happily use those guys
-> as scratch, because the caller will take care of them.
->
-
-Yes, that makes sense. But if you don't relax that restriction, you
-only need the alternative __LL_SC_CALL for modules.
+Thanks,
+Lorenzo
