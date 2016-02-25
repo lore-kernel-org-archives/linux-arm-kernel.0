@@ -1,173 +1,83 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Feb 2016 14:15:09 +0100
-Subject: [PATCH 2/4] ARM: realview: reduce the RealView Kconfig
+Date: Thu, 25 Feb 2016 14:15:10 +0100
+Subject: [PATCH 3/4] ARM: realview: imply Device Tree config
 In-Reply-To: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
 References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1456406111-18579-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1456406111-18579-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We select all we need to the device tree boot and and do not
-really need all the sub-options to get this running smoothly.
-We will support the ARMv5, ARMv6, ARMv7 or ARMv6+ARMv7
-build depending on what the user selects.
+This cuts the RealView DT Kconfig to be the same as
+CONFIG_ARCH_REALVIEW and rids one Kconfig option.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-realview/Kconfig | 127 +++--------------------------------------
- 1 file changed, 8 insertions(+), 119 deletions(-)
+ arch/arm/mach-realview/Kconfig  | 23 ++++++++---------------
+ arch/arm/mach-realview/Makefile |  2 +-
+ 2 files changed, 9 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index def40a0dd60c..cfb4c573638f 100644
+index cfb4c573638f..1706adc5513a 100644
 --- a/arch/arm/mach-realview/Kconfig
 +++ b/arch/arm/mach-realview/Kconfig
-@@ -16,9 +16,13 @@ config REALVIEW_DT
- 	bool "Support RealView(R) Device Tree based boot"
+@@ -1,22 +1,12 @@
+ menuconfig ARCH_REALVIEW
+ 	bool "ARM Ltd. RealView family" if ARCH_MULTI_V5 || ARCH_MULTI_V6 || ARCH_MULTI_V7
+ 	select ARM_AMBA
+-	select ARM_TIMER_SP804
+-	select COMMON_CLK_VERSATILE
+-	select GPIO_PL061 if GPIOLIB
+-	select ICST
+-	select PLAT_VERSATILE
+-	select PLAT_VERSATILE_SCHED_CLOCK
+-	help
+-	  This enables support for ARM Ltd RealView boards.
+-
+-if ARCH_REALVIEW
+-
+-config REALVIEW_DT
+-	bool "Support RealView(R) Device Tree based boot"
  	select ARM_GIC
++	select ARM_TIMER_SP804
  	select CLK_SP810
--	select HAVE_SMP
-+	select CPU_ARM926T if ARCH_MULTI_V5
-+	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
-+	select HAVE_PATA_PLATFORM
-+	select HAVE_SMP if ARCH_MULTI_V6
-+	select HAVE_TCM
++	select COMMON_CLK_VERSATILE
+ 	select CPU_ARM926T if ARCH_MULTI_V5
++	select GPIO_PL061 if GPIOLIB
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select HAVE_PATA_PLATFORM
+@@ -24,6 +14,8 @@ config REALVIEW_DT
+ 	select HAVE_TCM
  	select ICST
--	select MACH_REALVIEW_EB if ARCH_MULTI_V5
  	select MFD_SYSCON
++	select PLAT_VERSATILE
++	select PLAT_VERSATILE_SCHED_CLOCK
  	select POWER_RESET
  	select POWER_RESET_VERSATILE
-@@ -26,129 +30,14 @@ config REALVIEW_DT
- 	select SMP_ON_UP if SMP
- 	select SOC_REALVIEW
+ 	select POWER_SUPPLY
+@@ -32,8 +24,9 @@ config REALVIEW_DT
  	select USE_OF
-+	select ZONE_DMA
+ 	select ZONE_DMA
  	help
- 	  Include support for booting the ARM(R) RealView(R) evaluation
- 	  boards using a device tree machine description.
+-	  Include support for booting the ARM(R) RealView(R) evaluation
+-	  boards using a device tree machine description.
++	  This enables support for ARM Ltd RealView boards.
++
++if ARCH_REALVIEW
  
--config MACH_REALVIEW_EB
--	bool "Support RealView(R) Emulation Baseboard"
--	select ARM_GIC
--	select CPU_ARM926T if ARCH_MULTI_V5
--	help
--	  Include support for the ARM(R) RealView(R) Emulation Baseboard
--	  platform. On an ARMv5 kernel, this will include support for
--	  the ARM926EJ-S core tile, while on an ARMv6/v7 kernel, at least
--	  one of the ARM1136, ARM1176, ARM11MPCore or Cortex-A9MPCore
--	  core tile options should be enabled.
--
--config REALVIEW_EB_ARM1136
--	bool "Support ARM1136J(F)-S Tile"
--	depends on MACH_REALVIEW_EB && ARCH_MULTI_V6
--	select CPU_V6
--	help
--	  Enable support for the ARM1136 tile fitted to the
--	  Realview(R) Emulation Baseboard platform.
--
--config REALVIEW_EB_ARM1176
--	bool "Support ARM1176JZ(F)-S Tile"
--	depends on MACH_REALVIEW_EB && ARCH_MULTI_V6
--	help
--	  Enable support for the ARM1176 tile fitted to the
--	  Realview(R) Emulation Baseboard platform.
--
--config REALVIEW_EB_A9MP
--	bool "Support Multicore Cortex-A9 Tile"
--	depends on MACH_REALVIEW_EB && ARCH_MULTI_V7
--	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if SMP
--	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
--	help
--	  Enable support for the Cortex-A9MPCore tile fitted to the
--	  Realview(R) Emulation Baseboard platform.
--
--config REALVIEW_EB_ARM11MP
--	bool "Support ARM11MPCore Tile"
--	depends on MACH_REALVIEW_EB && ARCH_MULTI_V6
--	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if SMP
--	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
--	help
--	  Enable support for the ARM11MPCore tile fitted to the Realview(R)
--	  Emulation Baseboard platform.
--
--config REALVIEW_EB_ARM11MP_REVB
--	bool "Support ARM11MPCore RevB Tile"
--	depends on REALVIEW_EB_ARM11MP && ARCH_MULTI_V6
--	help
--	  Enable support for the ARM11MPCore Revision B tile on the
--	  Realview(R) Emulation Baseboard platform. Since there are device
--	  address differences, a kernel built with this option enabled is
--	  not compatible with other revisions of the ARM11MPCore tile.
--
--config MACH_REALVIEW_PB11MP
--	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
--	depends on ARCH_MULTI_V6
--	select ARM_GIC
--	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if SMP
--	select HAVE_PATA_PLATFORM
--	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
--	help
--	  Include support for the ARM(R) RealView(R) Platform Baseboard for
--	  the ARM11MPCore.  This platform has an on-board ARM11MPCore and has
--	  support for PCI-E and Compact Flash.
--
--# ARMv6 CPU without K extensions, but does have the new exclusive ops
--config MACH_REALVIEW_PB1176
--	bool "Support RealView(R) Platform Baseboard for ARM1176JZF-S"
--	depends on ARCH_MULTI_V6
--	select ARM_GIC
--	select CPU_V6
--	select HAVE_TCM
--	select MIGHT_HAVE_CACHE_L2X0
--	help
--	  Include support for the ARM(R) RealView(R) Platform Baseboard for
--	  ARM1176JZF-S.
--
--config REALVIEW_PB1176_SECURE_FLASH
--	bool "Allow access to the secure flash memory block"
--	depends on MACH_REALVIEW_PB1176
--	default n
--	help
--	  Select this option if Linux will only run in secure mode on the
--	  RealView PB1176 platform and access to the secure flash memory
--	  block (64MB @ 0x3c000000) is required.
--
--config MACH_REALVIEW_PBA8
--	bool "Support RealView(R) Platform Baseboard for Cortex(tm)-A8 platform"
--	depends on ARCH_MULTI_V7
--	select ARM_GIC
--	select HAVE_PATA_PLATFORM
--	help
--	  Include support for the ARM(R) RealView Platform Baseboard for
--	  Cortex(tm)-A8.  This platform has an on-board Cortex-A8 and has
--	  support for PCI-E and Compact Flash.
--
--config MACH_REALVIEW_PBX
--	bool "Support RealView(R) Platform Baseboard Explore for Cortex-A9"
--	depends on ARCH_MULTI_V7
--	select ARM_GIC
--	select HAVE_ARM_SCU if SMP
--	select HAVE_ARM_TWD if SMP
--	select HAVE_PATA_PLATFORM
--	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
--	select ZONE_DMA
--	help
--	  Include support for the ARM(R) RealView(R) Platform Baseboard
--	  Explore.
--
  config REALVIEW_HIGH_PHYS_OFFSET
  	bool "High physical base address for the RealView platform"
--	depends on MMU && !MACH_REALVIEW_PB1176
-+	depends on MMU
- 	default y
- 	help
- 	  RealView boards other than PB1176 have the RAM available at
+diff --git a/arch/arm/mach-realview/Makefile b/arch/arm/mach-realview/Makefile
+index 97dab53daaf1..75826b2be82e 100644
+--- a/arch/arm/mach-realview/Makefile
++++ b/arch/arm/mach-realview/Makefile
+@@ -4,6 +4,6 @@
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-versatile/include
+ 
+-obj-$(CONFIG_REALVIEW_DT)		+= realview-dt.o
++obj-$(CONFIG_ARCH_REALVIEW)		+= realview-dt.o
+ obj-$(CONFIG_SMP)			+= platsmp-dt.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
 -- 
 2.4.3
