@@ -1,45 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 15:33:46 +0100
-Subject: [PATCH] serial: sa1100: make sa1100_register_uart_fns a function
-Message-ID: <1456410835-3808962-1-git-send-email-arnd@arndb.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 25 Feb 2016 15:34:03 +0100
+Subject: [PATCH v2 00/13] SYSMMU driver update and support for Exynos 5433
+In-Reply-To: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
+References: <1455804780-9616-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20160225143403.GC16675@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling sa1100_register_uart_fns() leaves the port structure
-unused when CONFIG_SERIAL_SA1100 is disabled, and we get a
-compiler warning about that:
+On Thu, Feb 18, 2016 at 03:12:47PM +0100, Marek Szyprowski wrote:
+> Marek Szyprowski (13):
+>   iommu: exynos: rework iommu group initialization
+>   iommu: exynos: add support for IOMMU_DOMAIN_DMA domain type
+>   iommu: exynos: remove ARM-specific cache flush interface
+>   iommu: exynos: simplify master clock operations
+>   iommu: exynos: refactor code (no direct register access)
+>   iommu: exynos: refactor fault handling code
+>   iommu: exynos: refactor init config code
+>   iommu: exynos: unify code for fldp cache invalidation
+>   iommu: exynos: add support for SYSMMU controller with bogus version
+>     reg
+>   iommu: exynos: update device tree documentation
+>   iommu: exynos: add support for v5 SYSMMU
+>   iommu: exynos: add Maintainers entry for Exynos SYSMMU driver
+>   iommu: exynos: support multiple attach_device calls
+> 
+>  .../devicetree/bindings/iommu/samsung,sysmmu.txt   |  22 +-
+>  MAINTAINERS                                        |   6 +
+>  drivers/iommu/Kconfig                              |   2 +-
+>  drivers/iommu/exynos-iommu.c                       | 598 ++++++++++++---------
+>  4 files changed, 372 insertions(+), 256 deletions(-)
 
-arch/arm/mach-sa1100/badge4.c:317:31: warning: 'badge4_port_fns' defined but not used [-Wunused-variable]
- static struct sa1100_port_fns badge4_port_fns __initdata = {
+Applied all patches and changed the subjects to:
 
-This turns the two empty macros into empty inline functions,
-which has the same effect, but lets the compiler know that the
-variables are intentionally unused.
+Marek Szyprowski (13):
+      iommu/exynos: Rework iommu group initialization
+      iommu/exynos: Add support for IOMMU_DOMAIN_DMA domain type
+      iommu/exynos: Remove ARM-specific cache flush interface
+      iommu/exynos: Simplify master clock operations
+      iommu/exynos: Refactor code (no direct register access)
+      iommu/exynos: Refactor fault handling code
+      iommu/exynos: Refactor init config code
+      iommu/exynos: Unify code for fldp cache invalidation
+      iommu/exynos: Add support for SYSMMU controller with bogus version reg
+      iommu/exynos: Update device tree documentation
+      iommu/exynos: Add support for v5 SYSMMU
+      iommu/exynos: Add Maintainers entry for Exynos SYSMMU driver
+      iommu/exynos: Support multiple attach_device calls
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- include/linux/platform_data/sa11x0-serial.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Please make sure you follow this sheme for future iommu patches too.
 
-diff --git a/include/linux/platform_data/sa11x0-serial.h b/include/linux/platform_data/sa11x0-serial.h
-index 4504d5d592f0..009e1d83fe39 100644
---- a/include/linux/platform_data/sa11x0-serial.h
-+++ b/include/linux/platform_data/sa11x0-serial.h
-@@ -26,8 +26,12 @@ struct sa1100_port_fns {
- void sa1100_register_uart_fns(struct sa1100_port_fns *fns);
- void sa1100_register_uart(int idx, int port);
- #else
--#define sa1100_register_uart_fns(fns) do { } while (0)
--#define sa1100_register_uart(idx,port) do { } while (0)
-+static inline void sa1100_register_uart_fns(struct sa1100_port_fns *fns)
-+{
-+}
-+static inline void sa1100_register_uart(int idx, int port)
-+{
-+}
- #endif
- 
- #endif
--- 
-2.7.0
+Thanks,
+
+	Joerg
