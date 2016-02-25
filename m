@@ -1,47 +1,70 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Feb 2016 16:29:08 -0800
-Subject: [PATCH v3 2/6] arm: dts: add Artpec-6 SoC dtsi file
-In-Reply-To: <9d3b8e80eeb56ca0808aae62eabd82af23ddb5c5.1455205057.git.larper@axis.com>
-References: <cover.1455205057.git.larper@axis.com>
- <9d3b8e80eeb56ca0808aae62eabd82af23ddb5c5.1455205057.git.larper@axis.com>
-Message-ID: <20160225002908.GD10126@localhost>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 24 Feb 2016 17:36:43 -0700
+Subject: [PATCH net-next V2 00/16] net: fec: cleanup and fixes
+Message-ID: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 05:06:17PM +0100, Lars Persson wrote:
-> Initial device tree for the Artpec-6 SoC.
-> 
-> Signed-off-by: Lars Persson <larper@axis.com>
-> ---
->  arch/arm/boot/dts/artpec6.dtsi | 236 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 236 insertions(+)
->  create mode 100644 arch/arm/boot/dts/artpec6.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-> new file mode 100644
-> index 0000000..f2a7e4a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/artpec6.dtsi
-> @@ -0,0 +1,236 @@
-> +/*
-> + * Device Tree Source for the Axis ARTPEC-6 SoC
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
+V2 is a rebase on top of johannes endian-safe patch and
+this set is only the next 16 patches.
+The testing for this series was done on a nitrogen6x.
+The base commit was
+commit f5461c27631672b9e95282812ee521c53f502eca
+    Merge branch 'dsa-pass-bridge-to-drivers'
 
-I just realized these are GPL-only. We try to get most DTS/DTSI files dual
-licensed now so that they can be separated from the linux kernel and used in
-other projects. You can see the boilerplate used by other platforms in the same
-directory.
+Testing showed no change in performance.
+Testing used imx_v6_v7_defconfig + CONFIG_MICREL_PHY.
+The processor was running at 996Mhz.
+The following commands were used to get the transfer rates.
 
-I'd appreciate a patch that changed the licensing (it can be done on top of
-this, since I already applied the patches we might as well keep them and fix
-incrementally).
-
-(Let me know if your corporate lawyers are giving you a hard time over this,
-I'd be happy to talk to them to explain if needed).
+On an x86 ubunto system,
+iperf -s -i.5 -u
 
 
--Olof
+On a nitrogen6x board, running via SD Card.
+I first stopped some background processes
+
+stop cron
+stop upstart-file-bridge
+stop upstart-socket-bridge
+stop upstart-udev-bridge
+stop rsyslog
+stop dbus
+killall dhclient
+echo performance >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+taskset 0x2 iperf -c 192.168.0.201 -u -t60 -b500M -r
+
+There is a branch available on github with this series, and the rest of
+my fec patches, for those who would like to test it.
+https://github.com:boundarydevices/linux-imx6.git branch net-next_master
+
+
+
+Troy Kisky (16):
+SDCard
+ TX/RX
+379/402	Before any patches
+376/402  net: fec: only check queue 0 if RXF_0/TXF_0 interrupt is set
+379/399  net: fec: pass rxq to fec_enet_rx_queue instead of queue_id
+379/401  net: fec: pass txq to fec_enet_tx_queue instead of queue_id
+389/409  net: fec: reduce interrupts
+393/411  net: fec: split off napi routine with 3 queues
+386/415  net: fec: don't clear all rx queue bits when just one is being checked
+387/412  net: fec: set cbd_sc without relying on previous value
+385/415  net: fec: eliminate calls to fec_enet_get_prevdesc
+389/414  net: fec: move restart test for efficiency
+386/412  net: fec: clear cbd_sc after transmission to help with debugging
+387/415  net: fec: dump all tx queues in fec_dump
+380/418  net: fec: detect tx int lost
+385/417  net: fec: print more debug info in fec_timeout
+388/417  net: fec: create subroutine reset_tx_queue
+389/418  net: fec: call dma_unmap_single on mapped tx buffers at restart
+381/414  net: fec: don't set cbd_bufaddr unless no mapping error
+
+ drivers/net/ethernet/freescale/fec.h      |   7 +-
+ drivers/net/ethernet/freescale/fec_main.c | 420 ++++++++++++++++--------------
+ 2 files changed, 224 insertions(+), 203 deletions(-)
+
+-- 
+2.5.0
