@@ -1,72 +1,85 @@
-From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Thu, 25 Feb 2016 15:04:30 +0800
-Subject: [PATCH] pci/layerscape: fix MSG TLP drop setting
-Message-ID: <1456383870-23302-1-git-send-email-Minghuan.Lian@nxp.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Thu, 25 Feb 2016 09:08:18 +0200
+Subject: [PATCH 0/2] usb: dwc2: Remove host and gadget only code from core
+In-Reply-To: <CAD=FV=WsBM-50gnDWq7AsXnSQPOu3ELabtbDRYjejAbN4h8b1Q@mail.gmail.com>
+References: <cover.1456213319.git.johnyoun@synopsys.com>
+ <56CC26ED.50004@synopsys.com> <87mvqqjkfj.fsf@ti.com>
+ <CAD=FV=WsBM-50gnDWq7AsXnSQPOu3ELabtbDRYjejAbN4h8b1Q@mail.gmail.com>
+Message-ID: <87r3g1i7x9.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some kinds of Layerscape PCIe controllers will forward the received
-message TLPs to system application address space, which could corrupt
-system memory or lead to a system hang. The patch enables the MSG_DROP
-to fix this issue.
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
----
- drivers/pci/host/pci-layerscape.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+Hi,
 
-diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 3923bed..f39961b 100644
---- a/drivers/pci/host/pci-layerscape.c
-+++ b/drivers/pci/host/pci-layerscape.c
-@@ -77,6 +77,16 @@ static void ls_pcie_fix_class(struct ls_pcie *pcie)
- 	iowrite16(PCI_CLASS_BRIDGE_PCI, pcie->dbi + PCI_CLASS_DEVICE);
- }
- 
-+/* Drop MSG TLP except for Vendor MSG */
-+static void ls_pcie_drop_msg_tlp(struct ls_pcie *pcie)
-+{
-+	u32 val;
-+
-+	val = ioread32(pcie->dbi + PCIE_STRFMR1);
-+	val &= 0xDFFFFFFF;
-+	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
-+}
-+
- static int ls1021_pcie_link_up(struct pcie_port *pp)
- {
- 	u32 state;
-@@ -97,7 +107,7 @@ static int ls1021_pcie_link_up(struct pcie_port *pp)
- static void ls1021_pcie_host_init(struct pcie_port *pp)
- {
- 	struct ls_pcie *pcie = to_ls_pcie(pp);
--	u32 val, index[2];
-+	u32 index[2];
- 
- 	pcie->scfg = syscon_regmap_lookup_by_phandle(pp->dev->of_node,
- 						     "fsl,pcie-scfg");
-@@ -116,13 +126,7 @@ static void ls1021_pcie_host_init(struct pcie_port *pp)
- 
- 	dw_pcie_setup_rc(pp);
- 
--	/*
--	 * LS1021A Workaround for internal TKT228622
--	 * to fix the INTx hang issue
--	 */
--	val = ioread32(pcie->dbi + PCIE_STRFMR1);
--	val &= 0xffff;
--	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
-+	ls_pcie_drop_msg_tlp(pcie);
- }
- 
- static int ls_pcie_link_up(struct pcie_port *pp)
-@@ -147,6 +151,7 @@ static void ls_pcie_host_init(struct pcie_port *pp)
- 	iowrite32(1, pcie->dbi + PCIE_DBI_RO_WR_EN);
- 	ls_pcie_fix_class(pcie);
- 	ls_pcie_clear_multifunction(pcie);
-+	ls_pcie_drop_msg_tlp(pcie);
- 	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
- }
- 
+Doug Anderson <dianders@chromium.org> writes:
+>> John Youn <John.Youn@synopsys.com> writes:
+>>> On 2/23/2016 12:35 AM, John Youn wrote:
+>>>> This series moves the host/gadget-specific code from core.c to hcd.c
+>>>> and gadget.c so that they will be compiled only when their respective
+>>>> configurations are selected, or in DRD.
+>>>>
+>>>> This is mostly just a straight move of the code. I have also added
+>>>> some comments to group related functions together.
+>>>>
+>>>> Compiled and tested in all three modes.
+>>>>
+>>>> This should also solve the issue reported here:
+>>>> http://marc.info/?l=linux-usb&m=145591813410106&w=2
+>>>>
+>>>> Although I wasn't able to test it... couldn't figure out how to
+>>>> disable CONFIG_USB and enable DWC2 in gadget mode.
+>>>>
+>>>> Felipe,
+>>>>
+>>>> This should be applied after Doug's series on your testing/next
+>>>> branch.
+>>>>
+>>>>
+>>>
+>>> Hi Felipe,
+>>>
+>>> Patch 2/2 is triggering our corporate mail filters however I try to
+>>> send it. I'll look into this with IT tomorrow, maybe have to send it
+>>> from another account.
+>>
+>> okay, I don't have patch 2/2. 1/2 is now in testing/next
+>
+> Perhaps John's solution for working around his company's mail filters
+> somehow sent it to your SPAM folder?  I saw his repost of v1 at on
+> patchwork.  GMail put them in my inbox but marked them slightly
+> different, saying they were from "John Youn via messagingengine.com"
+>
+> 8396481 New          [RESEND,1/2] usb: dwc2: Move register save and
+> restore functions
+> 8396491 New          [RESEND,2/2] usb: dwc2: Move host-specific core
+> functions into hcd.c
+>
+> ...I reviewed both 1/2 and 2/2.  For 1/2 I added my reviewed-by /
+> tested-by.  For 2/2 I requested some nitfixes.  John posted v2 at:
+>
+> 8398461 New          [v2,1/2] usb: dwc2: Move register save and
+> restore functions
+> 8398471 New          [v2,2/2] usb: dwc2: Move host-specific core
+> functions into hcd.c
+>
+> v2 of 2/2 looks good to me.  All patches can be found at
+> <https://patchwork.kernel.org/patch/<PATCHNUM>/>, like:
+>
+> https://patchwork.kernel.org/patch/8398461/
+> https://patchwork.kernel.org/patch/8398471/
+
+thanks, after I replied here I refreshed my inbox and there they were
+:-) they're both in my testing/next.
+
+cheers
+
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160225/c7f15a0d/attachment.sig>
