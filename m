@@ -1,36 +1,62 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Feb 2016 17:10:42 +0100
-Subject: [PATCH 0/4] RealView boardfile endgame
-In-Reply-To: <CACRpkdZ_oyJNTzC6Ji+19aRy3Ex47u2Khqd7_RwuGdK+TLTy_A@mail.gmail.com>
-References: <1456406111-18579-1-git-send-email-linus.walleij@linaro.org>
- <5411123.nOOnE7uo7z@wuerfel>
- <CACRpkdZ_oyJNTzC6Ji+19aRy3Ex47u2Khqd7_RwuGdK+TLTy_A@mail.gmail.com>
-Message-ID: <3638303.456FExenOa@wuerfel>
+Date: Thu, 25 Feb 2016 17:08:24 +0100
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <CACRpkdZd8TLdsi7_cOrqzcqWKJrfdp4Vz2sx5ozpwJXOj0fa+Q@mail.gmail.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <56CC60C4.6040908@ti.com>
+ <CACRpkdZd8TLdsi7_cOrqzcqWKJrfdp4Vz2sx5ozpwJXOj0fa+Q@mail.gmail.com>
+Message-ID: <3564059.gK0TOyJAie@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 February 2016 16:29:31 Linus Walleij wrote:
-> On Thu, Feb 25, 2016 at 3:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 25 February 2016 14:15:07 Linus Walleij wrote:
-> >> This patch set deletes the RealView board files and moves it
-> >> over to a pure Device Tree boot, deleting ~3500 LoC.
-> (...)
-> > This leaves the question whether we should do all the preparation
-> > in 4.6 and then only take these for 4.7, or do them all at
-> > once. I can see good reasons either way, but none of them
-> > particularly strong. What did you have in mind here?
+On Thursday 25 February 2016 15:04:52 Linus Walleij wrote:
 > 
-> If the dependencies in CLCD and MTD make it in we'll just
-> merge the whole thing IMO.
+> I add support for doing this for the Integrator and RealView in
+> the patch set, by grabbing a handle to the system controller
+> where they have a few "misc registers". However if you look at
+> it:
 > 
-> If these drag out, we merge the device trees and wait with
-> removing the board files until v4.7.
+> static void integrator_clcd_enable(struct clcd_fb *fb)
+> {
+>         struct fb_var_screeninfo *var = &fb->fb.var;
+>         u32 val;
 > 
-> I will still have some remaining cleanup for Integrator, Versatile
-> and also Versatile Express however, but that is for later.
+>         dev_info(&fb->dev->dev, "enable Integrator CLCD connectors\n");
 > 
+>         val = INTEGRATOR_CLCD_LCD_STATIC1 | INTEGRATOR_CLCD_LCD_STATIC2 |
+>                 INTEGRATOR_CLCD_LCD0_EN | INTEGRATOR_CLCD_LCD1_EN;
+>         if (var->bits_per_pixel <= 8 ||
+>             (var->bits_per_pixel == 16 && var->green.length == 5))
+>                 /* Pseudocolor, RGB555, BGR555 */
+>                 val |= INTEGRATOR_CLCD_LCDMUX_VGA555;
+>         else if (fb->fb.var.bits_per_pixel <= 16)
+>                 /* truecolor RGB565 */
+>                 val |= INTEGRATOR_CLCD_LCDMUX_VGA565;
+>         else
+>                 val = 0; /* no idea for this, don't trust the docs */
 > 
+>         regmap_update_bits(versatile_syscon_map,
+>                            INTEGRATOR_HDR_CTRL_OFFSET,
+>                            0,
+>                            INTEGRATOR_CLCD_MASK);
+> }
+> 
+> This is stuff that is so closely tied in to the fbdev driver that even
+> if it is SoC-specific (and reside in arch/arm/mach-integrator etc
+> today) it would be hard to argument that it should not be part
+> of the fbdev driver: what it does is connect the lines out of the
+> CLCD block to the physical VGA encode chip in different ways
+> depending on how the pixels were set up.
 
-Ok, sounds good.
+I think the nicest approach here would be to make this a layered
+driver, where you have a separate platform_driver instance
+that contains all the versatile specific add-ons, and this calls
+into the common driver that handles everything that is not specific
+to versatile.
+
+It may not be worth investing much into a rework to get there
+though, so simply putting it all into one module sounds like
+a reasonable compromise.
 
 	Arnd
