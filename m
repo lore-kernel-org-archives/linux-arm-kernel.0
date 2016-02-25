@@ -1,137 +1,54 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 25 Feb 2016 16:50:18 +0200
-Subject: [PATCH 02/11] ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1
+Date: Thu, 25 Feb 2016 16:50:20 +0200
+Subject: [PATCH 04/11] ARM: DTS: dra7: Use eDMA and add DAT port address for
+ McASP3
 In-Reply-To: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1456411827-23962-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1456411827-23962-5-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hwmod data for the eDMA blocks:
- - TPCC: Third-party channel controller
- - TPTC0: Third-party transfer controller 0
- - TPTC1: Third-party transfer controller 1
+From: Misael Lopez Cruz <misael.lopez@ti.com>
 
-The TPCC is following it's clock and power domain. This means that
-the hwmod can not control it's status.
+McASP3 does not support constant addressing mode on the DAT
+port, so increment transfers must be used instead.  This
+restriction is also applicable for McASP1 and McASP2.
 
+This DMA addressing constraint poses a major problem for sDMA
+where constant addressing mode is used on the peripheral side.
+Unfortunately, using increment transfers in sDMA comes with
+important side effects.
+
+The addressing mode used in eDMA is INC, so the silicon limitation
+described above has no impact and the McASP3 DAT port can be
+safely added by switching to eDMA instead of sDMA.
+
+Signed-off-by: Misael Lopez Cruz <misael.lopez@ti.com>
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 88 +++++++++++++++++++++++++++++++
- 1 file changed, 88 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index b61355e2a771..3953ad031c43 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -430,6 +430,67 @@ static struct omap_hwmod dra7xx_dma_system_hwmod = {
- };
- 
- /*
-+ * 'tpcc' class
-+ *
-+ */
-+static struct omap_hwmod_class dra7xx_tpcc_hwmod_class = {
-+	.name		= "tpcc",
-+};
-+
-+static struct omap_hwmod dra7xx_tpcc_hwmod = {
-+	.name		= "tpcc",
-+	.class		= &dra7xx_tpcc_hwmod_class,
-+	.clkdm_name	= "l3main1_clkdm",
-+	.main_clk	= "l3_iclk_div",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs = DRA7XX_CM_L3MAIN1_TPCC_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L3MAIN1_TPCC_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/*
-+ * 'tptc' class
-+ *
-+ */
-+static struct omap_hwmod_class dra7xx_tptc_hwmod_class = {
-+	.name		= "tptc",
-+};
-+
-+/* tptc0 */
-+static struct omap_hwmod dra7xx_tptc0_hwmod = {
-+	.name		= "tptc0",
-+	.class		= &dra7xx_tptc_hwmod_class,
-+	.clkdm_name	= "l3main1_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
-+	.main_clk	= "l3_iclk_div",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs = DRA7XX_CM_L3MAIN1_TPTC1_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L3MAIN1_TPTC1_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/* tptc1 */
-+static struct omap_hwmod dra7xx_tptc1_hwmod = {
-+	.name		= "tptc1",
-+	.class		= &dra7xx_tptc_hwmod_class,
-+	.clkdm_name	= "l3main1_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
-+	.main_clk	= "l3_iclk_div",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs = DRA7XX_CM_L3MAIN1_TPTC2_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L3MAIN1_TPTC2_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'dss' class
-  *
-  */
-@@ -2563,6 +2624,30 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__dma_system = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l3_main_1 -> tpcc */
-+static struct omap_hwmod_ocp_if dra7xx_l3_main_1__tpcc = {
-+	.master		= &dra7xx_l3_main_1_hwmod,
-+	.slave		= &dra7xx_tpcc_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* l3_main_1 -> tptc0 */
-+static struct omap_hwmod_ocp_if dra7xx_l3_main_1__tptc0 = {
-+	.master		= &dra7xx_l3_main_1_hwmod,
-+	.slave		= &dra7xx_tptc0_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* l3_main_1 -> tptc1 */
-+static struct omap_hwmod_ocp_if dra7xx_l3_main_1__tptc1 = {
-+	.master		= &dra7xx_l3_main_1_hwmod,
-+	.slave		= &dra7xx_tptc1_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU,
-+};
-+
- static struct omap_hwmod_addr_space dra7xx_dss_addrs[] = {
- 	{
- 		.name		= "family",
-@@ -3380,6 +3465,9 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l3_main_1__mcasp3,
- 	&dra7xx_gmac__mdio,
- 	&dra7xx_l4_cfg__dma_system,
-+	&dra7xx_l3_main_1__tpcc,
-+	&dra7xx_l3_main_1__tptc0,
-+	&dra7xx_l3_main_1__tptc1,
- 	&dra7xx_l3_main_1__dss,
- 	&dra7xx_l3_main_1__dispc,
- 	&dra7xx_l3_main_1__hdmi,
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index d2d2568b5695..258e6712a76b 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1467,12 +1467,13 @@
+ 		mcasp3: mcasp at 48468000 {
+ 			compatible = "ti,dra7-mcasp-audio";
+ 			ti,hwmods = "mcasp3";
+-			reg = <0x48468000 0x2000>;
+-			reg-names = "mpu";
++			reg = <0x48468000 0x2000>,
++			      <0x46000000 0x1000>;
++			reg-names = "mpu","dat";
+ 			interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "tx", "rx";
+-			dmas = <&sdma_xbar 133>, <&sdma_xbar 132>;
++			dmas = <&edma_xbar 133 1>, <&edma_xbar 132 1>;
+ 			dma-names = "tx", "rx";
+ 			clocks = <&mcasp3_aux_gfclk_mux>, <&mcasp3_ahclkx_mux>;
+ 			clock-names = "fck", "ahclkx";
 -- 
 2.7.1
