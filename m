@@ -1,150 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 25 Feb 2016 16:50:27 +0200
-Subject: [PATCH 11/11] ARM: DTS: dra7: Add nodes for McASP1/2/4/5/6/7/8
-In-Reply-To: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1456411827-23962-12-git-send-email-peter.ujfalusi@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 25 Feb 2016 15:54:52 +0100
+Subject: [PATCH 0/3] ARM: mvebu: randconfig warning fixes
+In-Reply-To: <1456236403-115511-1-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Tue, 23 Feb 2016 15:06:36 +0100")
+References: <1456236403-115511-1-git-send-email-arnd@arndb.de>
+Message-ID: <87lh68on5v.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes to represent all McASP ports in the dra7 family.
-For system consistency use the eDMA for audio operations. sDMA would be
-fine for 4/5/6/7/8 since their DAT port is not through L3 interconnect.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 112 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 112 insertions(+)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 258e6712a76b..700382093922 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1464,6 +1464,38 @@
- 			status = "disabled";
- 		};
+Hi Arnd,
  
-+		mcasp1: mcasp at 48460000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp1";
-+			reg = <0x48460000 0x2000>,
-+			      <0x45800000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 129 1>, <&edma_xbar 128 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp1_aux_gfclk_mux>, <&mcasp1_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp2: mcasp at 48464000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp2";
-+			reg = <0x48464000 0x2000>,
-+			      <0x45c00000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 131 1>, <&edma_xbar 130 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp2_aux_gfclk_mux>, <&mcasp2_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
- 		mcasp3: mcasp at 48468000 {
- 			compatible = "ti,dra7-mcasp-audio";
- 			ti,hwmods = "mcasp3";
-@@ -1480,6 +1512,86 @@
- 			status = "disabled";
- 		};
- 
-+		mcasp4: mcasp at 4846c000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp4";
-+			reg = <0x4846c000 0x2000>,
-+			      <0x48436000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 135 1>, <&edma_xbar 134 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp4_aux_gfclk_mux>, <&mcasp4_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp5: mcasp at 48470000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp5";
-+			reg = <0x48470000 0x2000>,
-+			      <0x4843a000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 137 1>, <&edma_xbar 136 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp5_aux_gfclk_mux>, <&mcasp5_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp6: mcasp at 48474000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp6";
-+			reg = <0x48474000 0x2000>,
-+			      <0x4844c000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 139 1>, <&edma_xbar 138 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp6_aux_gfclk_mux>, <&mcasp6_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp7: mcasp at 48478000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp7";
-+			reg = <0x48478000 0x2000>,
-+			      <0x48450000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 141 1>, <&edma_xbar 140 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp7_aux_gfclk_mux>, <&mcasp7_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp8: mcasp at 4847c000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp8";
-+			reg = <0x4847c000 0x2000>,
-+			      <0x48454000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 143 1>, <&edma_xbar 142 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp8_aux_gfclk_mux>, <&mcasp8_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
- 		crossbar_mpu: crossbar at 4a002a48 {
- 			compatible = "ti,irq-crossbar";
- 			reg = <0x4a002a48 0x130>;
+ On mar., f?vr. 23 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+
+> Here are three more warning fixes for orion/mv78xx0/mvebu. All
+> are really harmless and I'm just shutting up the warnings
+> as the current code is basically ok.
+
+Applied on mvebu/soc with the Reviewed-by flag by Andrew Lunn and the
+Acked-by flag by Jason Cooper.
+
+Thanks,
+
+Gregory
+
+>
+> 	Arnd
+>
+
 -- 
-2.7.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
