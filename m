@@ -1,145 +1,136 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 26 Feb 2016 11:50:12 +0000
-Subject: [PATCH] arm64: kernel: acpi: fix ioremap in ACPI parking protocol
- cpu_postboot
-Message-ID: <1456487412-4833-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 Feb 2016 12:51:25 +0100
+Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
+In-Reply-To: <56D030A4.5050205@nxp.com>
+References: <56D030A4.5050205@nxp.com>
+Message-ID: <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When secondary cpus are booted through the ACPI parking protocol, the
-booted cpu should check that FW has correctly cleared its mailbox entry
-point value to make sure the boot process was correctly executed.
-The entry point check is carried in the cpu_ops->cpu_postboot method, that
-is executed by secondary cpus when entering the kernel with irqs disabled.
+On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
+> In case the bootloader doesn't provide randomness
+> (through device tree or by uefi protocol) generate
+> a pseudo-random seed based on the timer counter.
+> People might find this "week rng" approach convenient
+> as it gets rid of the bootloader dependency.
+>
+> The patch tries to mimic the x86's rdtsc
+> based implementation authored by Kees Cook.
+>
+> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Kees Cook <keescook@chromium.org>
 
-The ACPI parking protocol cpu_ops maps/unmaps the mailboxes on the
-primary CPU to trigger secondary boot in the cpu_ops->cpu_boot method
-and on secondary processors to carry out FW checks on the booted CPU
-to verify the boot protocol was successfully executed in the
-cpu_ops->cpu_postboot method.
+Hi Laurentiu,
 
-Therefore, the cpu_ops->cpu_postboot method is forced to ioremap/unmap the
-mailboxes, which is wrong in that ioremap cannot be safely be carried out
-with irqs disabled.
+I appreciate the interest in this work, but to be honest, I don't like
+this at all. I went out of my way to ensure that
+a) the kernel itself does not take part in generating the random bits, and
+b) the random bits are used in such a way that there is no correlation
+between the randomization of the core kernel, the module region and
+the linear region if there is no correlation between the random bits.
 
-To fix this issue, this patch reshuffles the code so that the mailboxes
-are still mapped after the boot processor executes the cpu_ops->cpu_boot
-method for a given cpu, and the VA at which a mailbox is mapped for a given
-cpu is stashed in the per-cpu data struct so that secondary cpus can
-retrieve them in the cpu_ops->cpu_postboot and complete the required
-FW checks.
+The limited entropy of the cycle counter at early boot defeats that,
+and even worse, it will not encourage platform vendors to implement
+this properly in their boot code, given that it will appear to work,
+and the only thing more dangerous than no security is a false sense of
+security imo.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reported-by: Itaru Kitayama <itaru.kitayama@riken.jp>
-Tested-by: Loc Ho <lho@apm.com>
-Tested-by: Itaru Kitayama <itaru.kitayama@riken.jp>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Loc Ho <lho@apm.com>
-Cc: Itaru Kitayama <itaru.kitayama@riken.jp>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Mark Salter <msalter@redhat.com>
-Cc: Al Stone <ahs3@redhat.com>
----
-It applies to the arm64 tree, for-next/core branch.
+What I would ack, for development purposes, is something similar to
+what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
+developers get to exercise this code even if their boot environment
+does not provide any entropy. Anything beyond that is a nack as far as
+I am concerned.
 
-Tested on AMD (Seattle), APM (Mustang and Merlin), sorry for all this churn.
+One other remark below
 
-Thanks,
-Lorenzo
-
- arch/arm64/kernel/acpi_parking_protocol.c | 40 +++++++++++--------------------
- 1 file changed, 14 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
-index 4b1e5a7..a32b401 100644
---- a/arch/arm64/kernel/acpi_parking_protocol.c
-+++ b/arch/arm64/kernel/acpi_parking_protocol.c
-@@ -21,7 +21,14 @@
- 
- #include <asm/cpu_ops.h>
- 
-+struct parking_protocol_mailbox {
-+	__le32 cpu_id;
-+	__le32 reserved;
-+	__le64 entry_point;
-+};
-+
- struct cpu_mailbox_entry {
-+	struct parking_protocol_mailbox __iomem *mailbox;
- 	phys_addr_t mailbox_addr;
- 	u8 version;
- 	u8 gic_cpu_id;
-@@ -59,12 +66,6 @@ static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
- 	return 0;
- }
- 
--struct parking_protocol_mailbox {
--	__le32 cpu_id;
--	__le32 reserved;
--	__le64 entry_point;
--};
--
- static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- {
- 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
-@@ -97,6 +98,12 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 	}
- 
- 	/*
-+	 * stash the mailbox address mapping to use it for further FW
-+	 * checks in the postboot method
-+	 */
-+	cpu_entry->mailbox = mailbox;
-+
-+	/*
- 	 * We write the entry point and cpu id as LE regardless of the
- 	 * native endianness of the kernel. Therefore, any boot-loaders
- 	 * that read this address need to convert this address to the
-@@ -107,8 +114,6 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 
--	iounmap(mailbox);
--
- 	return 0;
- }
- 
-@@ -116,32 +121,15 @@ static void acpi_parking_protocol_cpu_postboot(void)
- {
- 	int cpu = smp_processor_id();
- 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
--	struct parking_protocol_mailbox __iomem *mailbox;
-+	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
- 	__le64 entry_point;
- 
--	/*
--	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
--	 * this deviates from the parking protocol specifications since
--	 * the mailboxes are required to be mapped nGnRnE; the attribute
--	 * discrepancy is harmless insofar as the protocol specification
--	 * is concerned).
--	 * If the mailbox is mistakenly allocated in the linear mapping
--	 * by FW ioremap will fail since the mapping will be prevented
--	 * by the kernel (it clashes with the linear mapping attributes
--	 * specifications).
--	 */
--	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
--	if (!mailbox)
--		return;
--
- 	entry_point = readl_relaxed(&mailbox->entry_point);
- 	/*
- 	 * Check if firmware has cleared the entry_point as expected
- 	 * by the protocol specification.
- 	 */
- 	WARN_ON(entry_point);
--
--	iounmap(mailbox);
- }
- 
- const struct cpu_operations acpi_parking_protocol_ops = {
 -- 
-2.5.1
+Ard.
+
+
+> ---
+> based on http://git.linaro.org/people/ard.biesheuvel/linux-arm.git,
+> branch arm64-kaslr-v6
+>
+>  arch/arm64/kernel/kaslr.c | 44 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 42 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+> index 5829839..41e9cbd 100644
+> --- a/arch/arm64/kernel/kaslr.c
+> +++ b/arch/arm64/kernel/kaslr.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/types.h>
+>
+> +#include <asm/arch_timer.h>
+>  #include <asm/fixmap.h>
+>  #include <asm/kernel-pgtable.h>
+>  #include <asm/memory.h>
+> @@ -20,9 +21,30 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/sections.h>
+>
+> +#include <generated/compile.h>
+> +#include <generated/utsrelease.h>
+> +
+
+This messes with the build system: these will be regenerated every
+time you hit 'make' and so you will always have to rebuild your
+vmlinux, even if nothing changed.
+
+> +/* Simplified build-specific string for starting entropy. */
+> +static const char build_str[] = UTS_RELEASE " (" LINUX_COMPILE_BY "@"
+> +               LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION;
+> +
+>  u64 __read_mostly module_alloc_base;
+>  u16 __initdata memstart_offset_seed;
+>
+> +static u64 rotate_xor(u64 hash, const void *area, size_t size)
+> +{
+> +       size_t i;
+> +       unsigned long *ptr = (unsigned long *)area;
+> +
+> +       for (i = 0; i < size / sizeof(hash); i++) {
+> +               /* Rotate by odd number of bits and XOR. */
+> +               hash = (hash << ((sizeof(hash) * 8) - 7)) | (hash >> 7);
+> +               hash ^= ptr[i];
+> +       }
+> +
+> +       return hash;
+> +}
+> +
+>  static __init u64 get_kaslr_seed(void *fdt)
+>  {
+>         int node, len;
+> @@ -101,8 +123,26 @@ u64 __init kaslr_early_init(u64 dt_phys)
+>          * Retrieve (and wipe) the seed from the FDT
+>          */
+>         seed = get_kaslr_seed(fdt);
+> -       if (!seed)
+> -               return 0;
+> +       if (!seed) {
+> +               u64 raw;
+> +               const u64 mix_const = 0x5d6008cbf3848dd3UL;
+> +
+> +               /*
+> +                * Attempt to create a simple but unpredictable starting
+> +                * entropy.
+> +                */
+> +               seed = rotate_xor(seed, build_str, sizeof(build_str));
+> +               seed = rotate_xor(seed, fdt, size);
+> +
+> +               raw = arch_counter_get_cntvct();
+> +               seed ^= raw;
+> +
+> +               /* Circular multiply for better bit diffusion */
+> +               asm("mul %1, %2, %3; umulh %0, %2, %3"
+> +                   : "=&r" (raw), "=&r" (seed)
+> +                   : "r" (seed), "r" (mix_const));
+> +               seed += raw;
+> +       }
+>
+>         /*
+>          * Check if 'nokaslr' appears on the command line, and
+> --
+> 1.8.3.1
