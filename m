@@ -1,304 +1,111 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 26 Feb 2016 18:15:47 +0100
-Subject: [PATCH V14 8/9] vfio, platform: add support for ACPI while
- detecting the reset driver
-In-Reply-To: <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
-Message-ID: <56D08843.5020306@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Feb 2016 17:28:26 +0000
+Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
+In-Reply-To: <56CF683D.30003@arm.com>
+References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
+ <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
+ <20160225161630.GB16546@arm.com> <56CF683D.30003@arm.com>
+Message-ID: <20160226172825.GK29125@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
-On 02/05/2016 05:34 AM, Sinan Kaya wrote:
-> The code is using the compatible DT string to associate a reset driver with
-> the actual device itself. The compatible string does not exist on ACPI
-> based systems. HID is the unique identifier for a device driver instead.
-> The change allows a driver to register with DT compatible string or ACPI
-> HID and then match the object with one of these conditions.
+On Thu, Feb 25, 2016 at 02:46:54PM -0600, Jeremy Linton wrote:
+> On 02/25/2016 10:16 AM, Will Deacon wrote:
+> >On Fri, Feb 19, 2016 at 11:46:23AM -0600, Jeremy Linton wrote:
 > 
-> Rules for loading the reset driver are as follow:
-> - ACPI HID needs match for ACPI systems
-> - DT compat needs to match for OF systems
+> (trimming)
 > 
-> Tested-by: Eric Auger <eric.auger@linaro.org> (device tree only)
-> Tested-by: Shanker Donthineni <shankerd@codeaurora.org> (ACPI only)
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  .../vfio/platform/reset/vfio_platform_amdxgbe.c    |  3 +-
->  .../platform/reset/vfio_platform_calxedaxgmac.c    |  3 +-
->  drivers/vfio/platform/vfio_platform_common.c       | 80 +++++++++++++++++++---
->  drivers/vfio/platform/vfio_platform_private.h      | 41 ++++++-----
->  4 files changed, 96 insertions(+), 31 deletions(-)
+> >>+static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
+> >>+{
+> >>+	int i;
+> >>+
+> >>+	pte -= CONT_RANGE_OFFSET(addr);
+> >>+	for (i = 0; i < CONT_PTES; i++) {
+> >>+		if (pte_cont(*pte))
+> >>+			set_pte(pte, pte_mknoncont(*pte));
+> >>+		pte++;
+> >>+	}
+> >>+	flush_tlb_all();
+> >
+> >Do you still need this invalidation? I thought the table weren't even
+> >live at this point?
 > 
-> diff --git a/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
-> index d4030d0..cc5b4fa 100644
-> --- a/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
-> +++ b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
-> @@ -119,7 +119,8 @@ int vfio_platform_amdxgbe_reset(struct vfio_platform_device *vdev)
->  	return 0;
->  }
->  
-> -module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
-> +module_vfio_reset_handler("amd,xgbe-seattle-v1a", NULL,
-> +			  vfio_platform_amdxgbe_reset);
->  
->  MODULE_VERSION("0.1");
->  MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> index e3d3d94..0e57529 100644
-> --- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> @@ -77,7 +77,8 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
->  	return 0;
->  }
->  
-> -module_vfio_reset_handler("calxeda,hb-xgmac", vfio_platform_calxedaxgmac_reset);
-> +module_vfio_reset_handler("calxeda,hb-xgmac", NULL,
-> +			  vfio_platform_calxedaxgmac_reset);
->  
->  MODULE_VERSION(DRIVER_VERSION);
->  MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index 418cdd9..5b42e93 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -13,6 +13,7 @@
->   */
->  
->  #include <linux/device.h>
-> +#include <linux/acpi.h>
->  #include <linux/iommu.h>
->  #include <linux/module.h>
->  #include <linux/mutex.h>
-> @@ -31,14 +32,22 @@ static LIST_HEAD(reset_list);
->  static DEFINE_MUTEX(driver_lock);
->  
->  static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
-> -					struct module **module)
-> +				  const char *acpihid, struct module **module)
->  {
->  	struct vfio_platform_reset_node *iter;
->  	vfio_platform_reset_fn_t reset_fn = NULL;
->  
->  	mutex_lock(&driver_lock);
->  	list_for_each_entry(iter, &reset_list, link) {
-> -		if (!strcmp(iter->compat, compat) &&
-> +		if (acpihid && iter->acpihid &&
-> +		    !strcmp(iter->acpihid, acpihid) &&
-> +			try_module_get(iter->owner)) {
-> +			*module = iter->owner;
-> +			reset_fn = iter->reset;
-> +			break;
-> +		}
-> +		if (compat && iter->compat &&
-> +		    !strcmp(iter->compat, compat) &&
->  			try_module_get(iter->owner)) {
->  			*module = iter->owner;
->  			reset_fn = iter->reset;
-> @@ -51,11 +60,12 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
->  
->  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
->  {
-> -	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-> -						&vdev->reset_module);
-> +	vdev->reset = vfio_platform_lookup_reset(vdev->compat, vdev->acpihid,
-> +						 &vdev->reset_module);
->  	if (!vdev->reset) {
->  		request_module("vfio-reset:%s", vdev->compat);
->  		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-> +							 vdev->acpihid,
->  							 &vdev->reset_module);
->  	}
->  }
-> @@ -541,6 +551,46 @@ static const struct vfio_device_ops vfio_platform_ops = {
->  	.mmap		= vfio_platform_mmap,
->  };
->  
-> +#ifdef CONFIG_ACPI
-> +int vfio_platform_probe_acpi(struct vfio_platform_device *vdev,
-> +			     struct device *dev)
-> +{
-> +	struct acpi_device *adev = ACPI_COMPANION(dev);
-> +
-> +	if (!adev)
-> +		return -EINVAL;
--ENODEV seems to be commonly used in that case
-> +
-> +	vdev->acpihid = acpi_device_hid(adev);
-> +	if (!vdev->acpihid) {
-can it return NULL? Seems to return dummy "device" or actual hid
-> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
-> +		       vdev->name);
-> +		return -EINVAL;
--ENODEV too?
-> +	}
-> +	return 0;
-> +}
-> +#else
-> +int vfio_platform_probe_acpi(struct vfio_platform_device *vdev,
-> +			     struct device *dev)
-> +{
-> +	return -EINVAL;
-> +}
-> +#endif
-> +
-> +int vfio_platform_probe_of(struct vfio_platform_device *vdev,
-> +			   struct device *dev)
-> +{
-> +	int ret;
-> +
-> +	ret = device_property_read_string(dev, "compatible",
-> +					  &vdev->compat);
-> +	if (ret) {
-> +		pr_err("VFIO: cannot retrieve compat for %s\n",
-> +			vdev->name);
-> +		return -EINVAL;
-return ret instead.
-> +	}
-> +	return 0;
-> +}
-> +
->  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  			       struct device *dev)
->  {
-> @@ -550,14 +600,14 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  	if (!vdev)
->  		return -EINVAL;
->  
-> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
-> -	if (ret) {
-> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
-> -		return -EINVAL;
-> -	}
-> +	ret = vfio_platform_probe_acpi(vdev, dev);
-> +	if (ret)
-> +		ret = vfio_platform_probe_of(vdev, dev);
->  
-> -	vdev->device = dev;
-> +	if (ret)
-> +		return ret;
->  
-> +	vdev->device = dev;
->  	group = iommu_group_get(dev);
->  	if (!group) {
->  		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
-> @@ -602,13 +652,21 @@ void __vfio_platform_register_reset(struct vfio_platform_reset_node *node)
->  EXPORT_SYMBOL_GPL(__vfio_platform_register_reset);
->  
->  void vfio_platform_unregister_reset(const char *compat,
-> +				    const char *acpihid,
->  				    vfio_platform_reset_fn_t fn)
->  {
->  	struct vfio_platform_reset_node *iter, *temp;
->  
->  	mutex_lock(&driver_lock);
->  	list_for_each_entry_safe(iter, temp, &reset_list, link) {
-> -		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
-> +		if (acpihid && iter->acpihid &&
-> +		    !strcmp(iter->acpihid, acpihid) && (iter->reset == fn)) {
-> +			list_del(&iter->link);
-> +			break;
-> +		}
-> +
-> +		if (compat && iter->compat &&
-> +		    !strcmp(iter->compat, compat) && (iter->reset == fn)) {
->  			list_del(&iter->link);
->  			break;
->  		}
+> Well it continues to match the calls in alloc_init_p*.
 
-in vfio_platform_get_reset, if the 1st vfio_platform_lookup_reset call
-does not return anything then we currently call
-request_module("vfio-reset:%s", vdev->compat);
+Ok, but if it's not needed (and I don't think it is), then we should
+remove the invalidation from there too rather than add more of it.
 
-you need to handle the case where compat is not set but vdev->acpihid
-is, instead.
+> I guess the worry is the extra flush that happens at create_mapping_late(),
+> if mapping ranges aren't cont aligned? (because the loop won't actually be
+> doing any set_pte's)
 
-currently the module alias is constructed with the compat only
-MODULE_ALIAS("vfio-reset:" compat);
+I'm just concerned with trying to make this code understandable! I doubt
+there's a performance argument to be made.
 
-Looks you can define several ones ( for instance in
-drivers/block/xen-blkfront.c).
+> If this and the alloc_init_p* flushes are to be removed, there should
+> probably be a way to detect any cases where the splits are happening after
+> the tables have been activated. This might be a little less straightforward
+> given efi_create_mapping().
 
-If I am not wrong this currently would not work with
-vfio-platform-qcomhidma compiled as a module.
+I think that's a separate issue, since splitting a live page table is
+dodgy regardless of the flushing. But yes, it would be nice to detect
+that case and scream about it.
 
-
-
-
-
-> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-> index 42816dd..32feba3 100644
-> --- a/drivers/vfio/platform/vfio_platform_private.h
-> +++ b/drivers/vfio/platform/vfio_platform_private.h
-> @@ -58,6 +58,7 @@ struct vfio_platform_device {
->  	struct mutex			igate;
->  	struct module			*parent_module;
->  	const char			*compat;
-> +	const char			*acpihid;
->  	struct module			*reset_module;
->  	struct device			*device;
->  
-> @@ -79,6 +80,7 @@ typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
->  struct vfio_platform_reset_node {
->  	struct list_head link;
->  	char *compat;
-> +	char *acpihid;
->  	struct module *owner;
->  	vfio_platform_reset_fn_t reset;
->  };
-> @@ -98,27 +100,30 @@ extern int vfio_platform_set_irqs_ioctl(struct vfio_platform_device *vdev,
->  
->  extern void __vfio_platform_register_reset(struct vfio_platform_reset_node *n);
->  extern void vfio_platform_unregister_reset(const char *compat,
-> +					   const char *acpihid,
->  					   vfio_platform_reset_fn_t fn);
-> -#define vfio_platform_register_reset(__compat, __reset)		\
-> -static struct vfio_platform_reset_node __reset ## _node = {	\
-> -	.owner = THIS_MODULE,					\
-> -	.compat = __compat,					\
-> -	.reset = __reset,					\
-> -};								\
-> +
-> +#define vfio_platform_register_reset(__compat, __acpihid, __reset)	\
-> +static struct vfio_platform_reset_node __reset ## _node = {		\
-> +	.owner = THIS_MODULE,						\
-> +	.compat = __compat,						\
-> +	.acpihid = __acpihid,						\
-> +	.reset = __reset,						\
-> +};									\
->  __vfio_platform_register_reset(&__reset ## _node)
->  
-> -#define module_vfio_reset_handler(compat, reset)		\
-> -MODULE_ALIAS("vfio-reset:" compat);				\
-> -static int __init reset ## _module_init(void)			\
-> -{								\
-> -	vfio_platform_register_reset(compat, reset);		\
-> -	return 0;						\
-> -};								\
-> -static void __exit reset ## _module_exit(void)			\
-> -{								\
-> -	vfio_platform_unregister_reset(compat, reset);		\
-> -};								\
-> -module_init(reset ## _module_init);				\
-> +#define module_vfio_reset_handler(compat, acpihid, reset)		\
-> +MODULE_ALIAS("vfio-reset:" compat);					\
-Here you need to handle alias for hid case I think
-
-Best Regards
-
-Eric
-> +static int __init reset ## _module_init(void)				\
-> +{									\
-> +	vfio_platform_register_reset(compat, acpihid, reset);		\
-> +	return 0;							\
-> +};									\
-> +static void __exit reset ## _module_exit(void)				\
-> +{									\
-> +	vfio_platform_unregister_reset(compat, acpihid, reset);		\
-> +};									\
-> +module_init(reset ## _module_init);					\
->  module_exit(reset ## _module_exit)
->  
->  #endif /* VFIO_PLATFORM_PRIVATE_H */
+> >
+> >>+}
+> >>+
+> >>+/*
+> >>+ * Given a range of PTEs set the pfn and provided page protection flags
+> >>+ */
+> >>+static void __populate_init_pte(pte_t *pte, unsigned long addr,
+> >>+			       unsigned long end, phys_addr_t phys,
+> >>+			       pgprot_t prot)
+> >>+{
+> >>+	unsigned long pfn = __phys_to_pfn(phys);
+> >>+
+> >>+	do {
+> >>+		/* clear all the bits except the pfn, then apply the prot */
+> >>+		set_pte(pte, pfn_pte(pfn, prot));
+> >>+		pte++;
+> >>+		pfn++;
+> >>+		addr += PAGE_SIZE;
+> >>+	} while (addr != end);
+> >>+}
+> >>+
+> (trimming)
+> >>+
+> >>  	do {
+> >>-		set_pte(pte, pfn_pte(pfn, prot));
+> >>-		pfn++;
+> >>-	} while (pte++, addr += PAGE_SIZE, addr != end);
+> >>+		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
+> >>+		if (((addr | next | phys) & ~CONT_MASK) == 0) {
+> >>+			/* a block of CONT_PTES	 */
+> >>+			__populate_init_pte(pte, addr, next, phys,
+> >>+					    prot | __pgprot(PTE_CONT));
+> >>+		} else {
+> >>+			/*
+> >>+			 * If the range being split is already inside of a
+> >>+			 * contiguous range but this PTE isn't going to be
+> >>+			 * contiguous, then we want to unmark the adjacent
+> >>+			 * ranges, then update the portion of the range we
+> >>+			 * are interested in.
+> >>+			 */
+> >>+			clear_cont_pte_range(pte, addr);
+> >>+			__populate_init_pte(pte, addr, next, phys, prot);
+> >
+> >I don't understand the comment or the code here... the splitting is now
+> >done seperately, and I can't think of a scenario where you need to clear
+> >the cont hint explicitly for adjacent ptes.
 > 
+> 	
+> My understanding is that splitting is initially running this code path (via
+> map_kernel_chunk, then again via create_mapping_late where splits won't
+> happen). So, split_pmd() is creating cont ranges. When the ranges aren't
+> sufficiently aligned then this is wiping out the cont mapping immediately
+> after their creation.
+
+Gotcha, thanks for the explanation (I somehow overlooked the initial
+page table creation).
+
+Will
