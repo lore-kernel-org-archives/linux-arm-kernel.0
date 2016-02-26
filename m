@@ -1,49 +1,59 @@
 From: alexandre.torgue@gmail.com (Alexandre TORGUE)
-Date: Fri, 26 Feb 2016 11:51:48 +0100
-Subject: [PATCH v3 0/4] Add Ethernet support on STM32F429
-Message-ID: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
+Date: Fri, 26 Feb 2016 11:51:50 +0100
+Subject: [PATCH v3 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
+References: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <1456483912-32090-3-git-send-email-alexandre.torgue@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32F429 Chip embeds a Synopsys 3.50a MAC IP.
-This series:
- -enhance current stmmac driver to control it (code already
-available) and adds basic glue for STM32F429 chip.
- -Enable basic Net config in kernel.
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
 
-Note that DT patches are not present because STM32 pinctrl code is not
-yet avalaible.
-
-Changes since v2:
- -Fix alphabetic order in Kconfig and Makefile.
- -Improve code according to Joachim review.
- -Binding: remove useless entry.
-
-Changes since v1:
- -Fix Kbuild issue in Kconfig.
- -Remove init/exit callbacks. Suspend/Resume and remove driver is no more
-driven in stmmac_pltfr but directly in dwmac-stm32 glue driver.
- -Take into account Joachim review.
-
-Regards.
-
-Alexandre.
-
-Alexandre TORGUE (4):
-  net: ethernet: dwmac: add Ethernet glue logic for stm32 chip
-  Documentation: Bindings: Add STM32 DWMAC glue
-  net: ethernet: stmmac: add support of Synopsys 3.50a MAC IP
-  ARM: STM32: Enable Ethernet in stm32_defconfig
-
- .../devicetree/bindings/net/stm32-dwmac.txt        |  40 +++++
- arch/arm/configs/stm32_defconfig                   |   9 +
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c  | 193 +++++++++++++++++++++
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   1 +
- 6 files changed, 256 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/stm32-dwmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
-
+diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+new file mode 100644
+index 0000000..67fceda
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+@@ -0,0 +1,40 @@
++STMicroelectronics STM32 / MCU DWMAC glue layer controller
++
++This file documents platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++The device node has following properties.
++
++Required properties:
++- compatible:  Should be "st,stm32-dwmac" to select glue, and
++	       "snps,dwmac-3.50a" to select IP vesrion.
++- clocks: Should contain the GMAC main clock, and tx clock
++- compatible:  Should be "st,stm32-dwmac" to select glue and
++	       "snps,dwmac-3.50a" to select IP version.
++- clocks: Should contain the MAC main clock
++- clock-names: Should contain the clock names "stmmaceth".
++- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
++	      encompases the glue register, and the offset of the control register.
++
++Optional properties:
++- clocks: Could contain:
++	- the tx clock,
++	- the rx clock
++- clock-names: Could contain the clock names "tx-clk", "rx-clk"
++
++Example:
++
++		ethernet0: dwmac at 40028000 {
++			compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
++			status = "disabled";
++			reg = <0x40028000 0x8000>;
++			reg-names = "stmmaceth";
++			interrupts = <0 61 0>, <0 62 0>;
++			interrupt-names = "macirq", "eth_wake_irq";
++			clock-names = "stmmaceth", "tx-clk", "rx-clk";
++			clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
++			st,syscon = <&syscfg 0x4>;
++			snps,pbl = <8>;
++			snps,mixed-burst;
++			dma-ranges;
++		};
 -- 
 1.9.1
