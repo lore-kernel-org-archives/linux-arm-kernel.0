@@ -1,47 +1,40 @@
-From: dhowells@redhat.com (David Howells)
-Date: Fri, 26 Feb 2016 11:20:28 +0000
-Subject: [PATCH] modsign: hide openssl output in silent builds
-In-Reply-To: <1456417901-2192433-1-git-send-email-arnd@arndb.de>
-References: <1456417901-2192433-1-git-send-email-arnd@arndb.de>
-Message-ID: <7539.1456485628@warthog.procyon.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 26 Feb 2016 16:52:43 +0530
+Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for
+ v4.6 - part2
+In-Reply-To: <CADaLNDnqRkOqam1Xt+Oc+7BXnQKr2EQqSL-1AGsn5fKOWEDnvw@mail.gmail.com>
+References: <CADaLNDkF8_DVYWPFtGU8tYsbbxDWZF9tozW=Zs3EuV4BqO6OuA@mail.gmail.com>
+ <CABb+yY2A6bLoNqak5Y8YVLgv=mL1Cx6axnD1trMhKx646NNWFw@mail.gmail.com>
+ <CADaLNDnqRkOqam1Xt+Oc+7BXnQKr2EQqSL-1AGsn5fKOWEDnvw@mail.gmail.com>
+Message-ID: <CABb+yY3cFCYZ3da4zp2UdCTMY6ubjfgMBEkMJ9pe+5OSE=p5+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> When a user calls 'make -s', we can assume they don't want to
-> see any output except for warnings and errors, but instead
-> they see this for a warning free build:
-> 
->  ###
->  ### Now generating an X.509 key pair to be used for signing modules.
->  ###
->  ### If this takes a long time, you might wish to run rngd in the
->  ### background to keep the supply of entropy topped up.  It
->  ### needs to be run as root, and uses a hardware random
->  ### number generator if one is available.
->  ###
->  Generating a 4096 bit RSA private key
->  .................................................................................................................................................................................................................................++
->  ..............................................................................................................................++
->  writing new private key to 'certs/signing_key.pem'
->  -----
->  ###
->  ### Key pair generated.
->  ###
-> 
-> The output can confuse simple build testing scripts that just check
-> for an empty build log.
-> 
-> This patch silences all the output:
->  - "echo" is changed to "@$(kecho)", which is dropped when "-s" gets
->    passed
->  - the openssl command itself is only printed with V=1, using the
->    $(Q) macro
->  - The output of openssl gets redircted to /dev/null on "-s" builds.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Applied.
-
-David
+On Fri, Feb 26, 2016 at 2:20 PM, Duc Dang <dhdang@apm.com> wrote:
+> On Thu, Feb 25, 2016 at 8:28 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Fri, Feb 26, 2016 at 8:21 AM, Duc Dang <dhdang@apm.com> wrote:
+>>> Hi Arnd, Olof,
+>>>
+>>> This is the second part of DT changes on X-Gene platforms for v4.6,
+>>> which enables mailbox driver for X-Gene v2 platforms and also enable
+>>> SLIMpro Mailbox I2C driver (a client of the mailbox driver) for both
+>>> X-Gene v1 and v2 platforms.
+>>>
+>>> This series depends on the 3rd patch
+>>> (http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
+>>> of the series "mailbox: Add APM X-Gene platform mailbox driver"
+>>> (https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
+>>> since Feb-15.
+>>>
+>>> Hi Jassi,
+>>>
+>>> Are you going to get the 3rd patch (dts patch) of series "mailbox: Add
+>>> APM X-Gene platform mailbox driver" to your tree? Otherwise, I will
+>>> need to create another pull request for Arnd and Olof.
+>>>
+>> Please create the pull request, I don't think mailbox tree is the
+>> right path for the patch.
+>
+> Thanks for your confirmation, Jassi.
+>
+I overlooked I had already applied it. Not sure if its better to revert it now.
