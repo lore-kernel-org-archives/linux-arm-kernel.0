@@ -1,54 +1,84 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 17:57:14 +0100
-Subject: [PATCH v2 2/2] arm64: mm: treat memstart_addr as a signed quantity
-In-Reply-To: <1456505834-8638-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456505834-8638-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456505834-8638-3-git-send-email-ard.biesheuvel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 18:00:18 +0100
+Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
+In-Reply-To: <CAOQ7t2Y2B8hfGim9UegUZsurQM0+Df0K0_DjsQ0r8+qMjUSBEw@mail.gmail.com>
+References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
+ <2692251.6GoexVJEYt@wuerfel>
+ <CAOQ7t2Y2B8hfGim9UegUZsurQM0+Df0K0_DjsQ0r8+qMjUSBEw@mail.gmail.com>
+Message-ID: <2709755.YfRKeiaS4S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit c031a4213c11 ("arm64: kaslr: randomize the linear region")
-implements randomization of the linear region, by subtracting a random
-multiple of PUD_SIZE from memstart_addr. This causes the virtual mapping
-of system RAM to move upwards in the linear region, and at the same time
-causes memstart_addr to assume a value which may be negative if the offset
-of system RAM in the physical space is smaller than its offset relative to
-PAGE_OFFSET in the virtual space.
+On Friday 26 February 2016 17:43:54 Carlo Caione wrote:
+> On Fri, Feb 26, 2016 at 5:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 26 February 2016 16:34:59 Carlo Caione wrote:
+> >> On Fri, Feb 19, 2016 at 1:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>
+> >> <cut>
+> >>
+> >> > This still really sounds like a mixed bag to me, which should better get represented
+> >> > as a syscon node, except that there are also some more structured areas in
+> >> > CBUS.
+> >> >
+> >> > Having just the registers between METAL_REVISION and HW_REV in a syscon
+> >> > is clearly wrong, as that would include the pinctrl area that already has
+> >> > a driver, but would not include some other parts that want the syscon.
+> >> >
+> >> > Maybe the best way is to make it compatible with both syscon and
+> >> > simple-bus and put the other nodes underneath. That is still rather
+> >> > ugly, but at least it works and can be extended.
+> >>
+> >> More on this topic.
+> >>
+> >> On the meson platforms (at least on the meson8 / meson8b) we have two
+> >> buses: cbus and aobus. Since in cbus we have a bunch of scattered
+> >> registers, Arnd suggested to make it compatible with both syscon and
+> >> simple-bus. So my idea was actually to update the meson8b DTSI file
+> >> adding the two buses to make it closer to the actual hardware.
+> >>
+> >> In the most simple cases moving the devices under the correct bus is a
+> >> trivial operation since (of course) the same driver can be used when
+> >> the device is attached to a different bus, like in the uart_AO case
+> >> (http://lxr.free-electrons.com/source/arch/arm/boot/dts/meson8b.dtsi#L114).
+> >>
+> >> Unfortunately pinctrl is a different beast since it requires
+> >> (http://lxr.free-electrons.com/source/drivers/pinctrl/meson/pinctrl-meson.c#L659)
+> >> at least two subnodes: one accessing registers from aobus, and the
+> >> other one from cbus.
+> >>
+> >> I know this is quite a peculiar case but I'm wondering what is the
+> >> best way to approach this issue.
+> >>
+> >> 1) We could move only the pinctrl device outside both aobus and cbus
+> >> but IMO this is ugly (at this point is probably better not having the
+> >> two buses at all described in the DTS).
+> >> 2) The second option is just to fix the driver so that the two
+> >> subnodes are not strictly required. The problem with this second
+> >> solution is that in the driver we still need to access some data
+> >> (http://lxr.free-electrons.com/source/drivers/pinctrl/meson/pinctrl-meson8b.c#L873)
+> >> that is specific to each bus. So we will end up having two different
+> >> compatibles for the two buses (meson8b-pinctrl-aobus using data from
+> >> 'ao-bank', and meson8b-pinctrl-cbus using data from 'banks').
+> >> 3) Another option is just to have the driver with a unique compatible
+> >> poking the parent node (or just to another property) to determine on
+> >> which bus it is so that it can use the correct bus-specific data.
+> >>
+> >> Any idea / feedback?
+> >
+> > Would it be possible to split the pin controller driver into two drivers
+> > that each only access registers on one of the buses? Is that a split
+> > that makes sense from the point of view of that driver?
+> 
+> AFAICT (I'm not the driver author) there is no a really strict reason
+> to have one single driver accessing registers on both buses. Of course
+> the driver has to be changed a bit.
+> Are you suggesting to have two different drivers with two different compatibles?
 
-Since memstart_addr is effectively an offset now, redefine its type as s64
-so that expressions involving shifting or division preserve its sign.
+Just an idea, but yes: if the register layout is different, then they
+would also need different compatible strings.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/memory.h | 2 +-
- arch/arm64/mm/init.c            | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 5f8667a99e41..12f8a00fb3f1 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -135,7 +135,7 @@
- #include <linux/bitops.h>
- #include <linux/mmdebug.h>
- 
--extern phys_addr_t		memstart_addr;
-+extern s64			memstart_addr;
- /* PHYS_OFFSET - the physical address of the start of memory. */
- #define PHYS_OFFSET		({ VM_BUG_ON(memstart_addr & 1); memstart_addr; })
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 4ea7efc28e65..a2977d33e0dc 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -54,7 +54,7 @@
-  * executes, which assigns it its actual value. So use a default value
-  * that cannot be mistaken for a real physical address.
-  */
--phys_addr_t memstart_addr __read_mostly = ~0ULL;
-+s64 memstart_addr __read_mostly = -1;
- phys_addr_t arm64_dma_phys_limit __read_mostly;
- 
- #ifdef CONFIG_BLK_DEV_INITRD
--- 
-2.5.0
+This is mostly a question of how the hardware design really looks:
+are these two separate pin controllers that each are responsible for
+a clear subset of the pins?
+	
+	Arnd
