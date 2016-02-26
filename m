@@ -1,32 +1,24 @@
 From: davem@davemloft.net (David Miller)
-Date: Fri, 26 Feb 2016 12:43:13 -0500 (EST)
+Date: Fri, 26 Feb 2016 12:36:21 -0500 (EST)
 Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch
  driver (ESW)
-In-Reply-To: <56D07C82.2040204@openwrt.org>
+In-Reply-To: <56D06E3F.1020100@openwrt.org>
 References: <1456496504-50429-4-git-send-email-blogic@openwrt.org>
- <20160226151813.GD12022@lunn.ch> <56D07C82.2040204@openwrt.org>
-Message-ID: <20160226.124313.718457444189293093.davem@davemloft.net>
+ <20160226151813.GD12022@lunn.ch> <56D06E3F.1020100@openwrt.org>
+Message-ID: <20160226.123621.1711849052272895222.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felix Fietkau <nbd@openwrt.org>
-Date: Fri, 26 Feb 2016 17:25:38 +0100
+From: John Crispin <blogic@openwrt.org>
+Date: Fri, 26 Feb 2016 16:24:47 +0100
 
-> In my opinion, leaving this part out does not make much sense and
-> neither does deferring the entire patch series until we have a
-> switchdev/DSA capable driver. This is just a starting point, which will
-> be turned into a proper driver with the right APIs later.
+> the problem here is that on one side people complain about vendors not
+> sending code upstream. once they start being a good citizen and provide
+> funding to send stuff upstream the feedback tends to be very bad as seen
+> here.
 
-I disagree, and we want people to concentrate on writing proper
-switchdev/DSA drivers.
+The feedback is not bad, on the contrary it is very positive and people
+like Andrew want to help people like you write proper switch drivers.
 
-People like Andrew have offered to help in any way possible to make
-this as easy as possible, so please take this seriously.
-
-I would have accepted your arguments a year ago when we didn't have
-the right infrastructure, but now we do and there is no real excuse
-to submit partial or bastardized drivers for these kinds of hardware
-anymore
-
-Thanks in advance for your understanding, and I'm plan to stand
-very firm on this.
+If you were ignored, or rejected purely on the grounds of coding style
+issues, that would be "very bad" feedback.
