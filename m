@@ -1,49 +1,27 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 26 Feb 2016 20:50:15 +0530
-Subject: [PATCH] cpufreq: qoriq depends on thermal
-In-Reply-To: <1456489361-469413-1-git-send-email-arnd@arndb.de>
-References: <1456489361-469413-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160226152015.GA21797@vireshk-i7>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Feb 2016 15:20:51 +0000
+Subject: [PATCH v4] arm64: Add workaround for Cavium erratum 27456
+In-Reply-To: <1456364697-25083-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1456364697-25083-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160226152051.GM4777@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-02-16, 13:22, Arnd Bergmann wrote:
-> The thermal subsystem can be a loadable module, so the qoriq driver has to be
-> a module in that case as well in order to call of_cpufreq_cooling_register:
+On Wed, Feb 24, 2016 at 05:44:57PM -0800, David Daney wrote:
+> From: Andrew Pinski <apinski@cavium.com>
 > 
-> drivers/built-in.o: In function `qoriq_cpufreq_ready':
-> text+0x1f4548): undefined reference to `of_cpufreq_cooling_register'
+> On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
+> instructions may cause the icache to become corrupted if it contains
+> data for a non-current ASID.
 > 
-> This adds a dependency that clarifies how we can either build the driver
-> when the cpu_thermal support is completely disabled, or how it depends
-> on the thermal support to enforce the qoriq driver to be a module.
+> This patch implements the workaround (which invalidates the local
+> icache when switching the mm) by using code patching.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 8ae1702a0df5 ("cpufreq: qoriq: Register cooling device based on device tree")
-> ---
->  drivers/cpufreq/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> My patch is from Dec 22, and I had marked it as submitted, but can't
-> find the email now, so maybe I forgot to send it out back then.
-> 
-> The problem still exists in linux-next, please apply the patch
-> for 4.6.
-> 
-> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-> index dcb972a38fbc..ca05037dd565 100644
-> --- a/drivers/cpufreq/Kconfig
-> +++ b/drivers/cpufreq/Kconfig
-> @@ -297,6 +297,7 @@ endif
->  config QORIQ_CPUFREQ
->  	tristate "CPU frequency scaling driver for Freescale QorIQ SoCs"
->  	depends on OF && COMMON_CLK && (PPC_E500MC || ARM)
-> +	depends on !CPU_THERMAL || THERMAL=y
->  	select CLK_QORIQ
->  	help
->  	  This adds the CPUFreq driver support for Freescale QorIQ SoCs
+> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Applied. Thanks.
 
 -- 
-viresh
+Catalin
