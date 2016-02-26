@@ -1,49 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 09:07:39 +0900
-Subject: [PATCH 06/14] arm64: dts: r8a7795: Add INTC-EX device node
+Date: Fri, 26 Feb 2016 09:07:40 +0900
+Subject: [PATCH 07/14] arm64: dts: r8a7795: Add GIC-400 virtual interfaces
 In-Reply-To: <cover.1456445161.git.horms+renesas@verge.net.au>
 References: <cover.1456445161.git.horms+renesas@verge.net.au>
-Message-ID: <9c6c053c9ea845d61d3f0a7f1ba656b8154c64d0.1456445161.git.horms+renesas@verge.net.au>
+Message-ID: <4c811edf65e809e6ac6ec35f4818efba2b1c6163.1456445161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Dirk Behme <dirk.behme@de.bosch.com>
 
-Add a single r8a7795 INTC-EX device node to support
-external IRQ pins IRQ0 -> IRQ5.
+Besides the distributor and the CPU interface the GIC-400 additionally
+supports the virtual interface control blocks and the virtual CPU interfaces.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Add the physical base addresses and size for these.
+
+See
+
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
+-> 3.2. GIC-400 register map
+
+and Linux kernel's
+
+Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+
+for more details.
+
+For the at GICH Virtual interface control blocks at 0xf1040000 cover the
+whole 128kB (0x20000) range. This is done based on the advice from Marc
+Zyngier http://www.spinics.net/lists/arm-kernel/msg483139.html
+
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index e32b652c8fd0..6da8f79f10df 100644
+index 6da8f79f10df..1072c681f8b4 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -356,6 +356,21 @@
- 			reg = <0 0xe6060000 0 0x50c>;
+@@ -137,7 +137,9 @@
+ 			#address-cells = <0>;
+ 			interrupt-controller;
+ 			reg = <0x0 0xf1010000 0 0x1000>,
+-			      <0x0 0xf1020000 0 0x2000>;
++			      <0x0 0xf1020000 0 0x2000>,
++			      <0x0 0xf1040000 0 0x20000>,
++			      <0x0 0xf1060000 0 0x2000>;
+ 			interrupts = <GIC_PPI 9
+ 					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
  		};
- 
-+		intc_ex: interrupt-controller at e61c0000 {
-+			compatible = "renesas,intc-ex-r8a7795", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&cpg>;
-+		};
-+
- 		dmac0: dma-controller at e6700000 {
- 			compatible = "renesas,dmac-r8a7795",
- 				     "renesas,rcar-dmac";
 -- 
 2.7.0.rc3.207.g0ac5344
