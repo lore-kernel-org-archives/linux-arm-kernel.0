@@ -1,192 +1,111 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 26 Feb 2016 14:05:58 -0500
-Subject: [PATCH V14 9/9] vfio, platform: add QTI HIDMA reset driver
-In-Reply-To: <56D090C3.8060608@linaro.org>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <1454646882-24369-10-git-send-email-okaya@codeaurora.org>
- <56D090C3.8060608@linaro.org>
-Message-ID: <56D0A216.8090006@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 Feb 2016 20:07:34 +0100
+Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
+In-Reply-To: <CAGXu5jLgDHhQ7srDU09i=MZndimzhwLopRJR29r7kAoWAyTrxQ@mail.gmail.com>
+References: <56D030A4.5050205@nxp.com>
+ <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
+ <20160226121819.GB8728@leverpostej>
+ <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
+ <CAGXu5jLgDHhQ7srDU09i=MZndimzhwLopRJR29r7kAoWAyTrxQ@mail.gmail.com>
+Message-ID: <CAKv+Gu_MkkrRiDtD6juN_VxE0=dZMEVYnusJM40Q9FamFdi=LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/26/2016 12:52 PM, Eric Auger wrote:
-> Hi Sinan,
-> On 02/05/2016 05:34 AM, Sinan Kaya wrote:
->> In situations where the userspace driver is stopped abnormally and the
->> VFIO platform device is released, the assigned HW device currently is
->> left running. As a consequence the HW device might continue issuing IRQs
->> and performing DMA accesses.
+On 26 February 2016 at 19:56, Kees Cook <keescook@chromium.org> wrote:
+> On Fri, Feb 26, 2016 at 4:37 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 26 February 2016 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
+>>>> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
+>>>> > In case the bootloader doesn't provide randomness
+>>>> > (through device tree or by uefi protocol) generate
+>>>> > a pseudo-random seed based on the timer counter.
+>>>> > People might find this "week rng" approach convenient
+>>>> > as it gets rid of the bootloader dependency.
+>>>> >
+>>>> > The patch tries to mimic the x86's rdtsc
+>>>> > based implementation authored by Kees Cook.
+>>>> >
+>>>> > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>>> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> > Cc: Kees Cook <keescook@chromium.org>
+>>>>
+>>>> Hi Laurentiu,
+>>>>
+>>>> I appreciate the interest in this work, but to be honest, I don't like
+>>>> this at all. I went out of my way to ensure that
+>>>> a) the kernel itself does not take part in generating the random bits, and
+>>>> b) the random bits are used in such a way that there is no correlation
+>>>> between the randomization of the core kernel, the module region and
+>>>> the linear region if there is no correlation between the random bits.
+>>>>
+>>>> The limited entropy of the cycle counter at early boot defeats that,
+>>>> and even worse, it will not encourage platform vendors to implement
+>>>> this properly in their boot code, given that it will appear to work,
+>>>> and the only thing more dangerous than no security is a false sense of
+>>>> security imo.
+>>>
+>>> I agree that a false sense of security is a worry here.
+>>>
+>>> Either way, I think we need numbers. It's non-obvious how much entropy
+>>> we can acquire through counters or other means at early boot time.
+>>>
+>>> Has anyone done an analysis of environmental entropy available (through
+>>> any means) at early boot, VM vs native?
+>>>
 >>
->> This patch is implementing a reset driver for HIDMA platform driver.
->> This gets called by the VFIO platform reset interface.
+>> Define 'environmental'. The only architected thing you can rely on is
+>> the timer, which really does not hold a lot of entropy on modern solid
+>> state platforms. I don't have the numbers, but I do have the
+>> experience to back this up, unfortunately (at my former employer).
 >>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/vfio/platform/reset/Kconfig                |  9 ++
->>  drivers/vfio/platform/reset/Makefile               |  2 +
->>  .../vfio/platform/reset/vfio_platform_qcomhidma.c  | 99 ++++++++++++++++++++++
->>  3 files changed, 110 insertions(+)
->>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
+>> You could argue that KASLR does not require strong entropy like key
+>> generation, but I would prefer to simply steer clear of that entire
+>> debate. The bootloader simply needs to do the best job it can, either
+>> based on some peripheral that the kernel has no awareness of this
+>> early in the boot, or perhaps by other means if it doesn't (which
+>> could include storing a random seed in the file system, or even in a
+>> EFI variable). Punting it to the kernel is really the last resort.
 >>
->> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
->> index 70cccc5..d02b3b5 100644
->> --- a/drivers/vfio/platform/reset/Kconfig
->> +++ b/drivers/vfio/platform/reset/Kconfig
->> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
->>  	  Enables the VFIO platform driver to handle reset for AMD XGBE
->>  
->>  	  If you don't know what to do here, say N.
->> +
->> +config VFIO_PLATFORM_QCOMHIDMA_RESET
->> +	tristate "VFIO support for Qualcomm Technologies HIDMA reset"
->> +	depends on VFIO_PLATFORM
->> +	help
->> +	  Enables the VFIO platform driver to handle reset for Qualcomm Technologies
->> +	  HIDMA Channel.
->> +
->> +	  If you don't know what to do here, say N.
->> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
->> index 93f4e23..ec7748a 100644
->> --- a/drivers/vfio/platform/reset/Makefile
->> +++ b/drivers/vfio/platform/reset/Makefile
->> @@ -1,7 +1,9 @@
->>  vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
->>  vfio-platform-amdxgbe-y := vfio_platform_amdxgbe.o
->> +vfio-platform-qcomhidma-y := vfio_platform_qcomhidma.o
->>  
->>  ccflags-y += -Idrivers/vfio/platform
->>  
->>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
->> +obj-$(CONFIG_VFIO_PLATFORM_QCOMHIDMA_RESET) += vfio-platform-qcomhidma.o
->>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
->> diff --git a/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c b/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
->> new file mode 100644
->> index 0000000..70d7eed
->> --- /dev/null
->> +++ b/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
->> @@ -0,0 +1,99 @@
->> +/*
->> + * Qualcomm Technologies HIDMA VFIO Reset Driver
->> + *
->> + * Copyright (c) 2016, The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <linux/device.h>
->> +#include <linux/iopoll.h>
->> +
->> +#include "vfio_platform_private.h"
->> +
->> +#define TRCA_CTRLSTS_OFFSET		0x000
->> +#define EVCA_CTRLSTS_OFFSET		0x000
->> +
->> +#define CH_CONTROL_MASK		GENMASK(7, 0)
-> nit: alignment
-> 
-> Besides it looks ok to me
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> 
-> If it better suits you maybe you can separate the upstream of your
-> management/channel driver from the VFIO reset driver upstream.
-
-Thanks, I wanted to keep things together. There were some review concerns
-to whether I'm doing the right thing when it comes to virtualization. 
-
-Patches 8 & 9 definitely needs to go in through another merge branch.
-
-> 
-> Best Regards
-> 
-> Eric
-> 
->> +#define CH_STATE_MASK			GENMASK(7, 0)
->> +#define CH_STATE_BIT_POS		0x8
->> +
->> +#define HIDMA_CH_STATE(val)	\
->> +	((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
->> +
->> +#define EVCA_IRQ_EN_OFFSET		0x110
->> +
->> +#define CH_RESET			9
->> +#define CH_DISABLED			0
->> +
->> +int vfio_platform_qcomhidma_reset(struct vfio_platform_device *vdev)
->> +{
->> +	struct vfio_platform_region *trreg;
->> +	struct vfio_platform_region *evreg;
->> +	u32 val;
->> +	int ret;
->> +
->> +	if (vdev->num_regions != 2)
->> +		return -ENODEV;
->> +
->> +	trreg = &vdev->regions[0];
->> +	if (!trreg->ioaddr) {
->> +		trreg->ioaddr =
->> +			ioremap_nocache(trreg->addr, trreg->size);
->> +		if (!trreg->ioaddr)
->> +			return -ENOMEM;
->> +	}
->> +
->> +	evreg = &vdev->regions[1];
->> +	if (!evreg->ioaddr) {
->> +		evreg->ioaddr =
->> +			ioremap_nocache(evreg->addr, evreg->size);
->> +		if (!evreg->ioaddr)
->> +			return -ENOMEM;
->> +	}
->> +
->> +	/* disable IRQ */
->> +	writel(0, evreg->ioaddr + EVCA_IRQ_EN_OFFSET);
->> +
->> +	/* reset both transfer and event channels */
->> +	val = readl(trreg->ioaddr + TRCA_CTRLSTS_OFFSET);
->> +	val &= ~(CH_CONTROL_MASK << 16);
->> +	val |= CH_RESET << 16;
->> +	writel(val, trreg->ioaddr + TRCA_CTRLSTS_OFFSET);
->> +
->> +	ret = readl_poll_timeout(trreg->ioaddr + TRCA_CTRLSTS_OFFSET, val,
->> +				 HIDMA_CH_STATE(val) == CH_DISABLED, 1000,
->> +				 10000);
->> +	if (ret)
->> +		return ret;
->> +
->> +	val = readl(evreg->ioaddr + EVCA_CTRLSTS_OFFSET);
->> +	val &= ~(CH_CONTROL_MASK << 16);
->> +	val |= CH_RESET << 16;
->> +	writel(val, evreg->ioaddr + EVCA_CTRLSTS_OFFSET);
->> +
->> +	ret = readl_poll_timeout(evreg->ioaddr + EVCA_CTRLSTS_OFFSET, val,
->> +				 HIDMA_CH_STATE(val) == CH_DISABLED, 1000,
->> +				 10000);
->> +	if (ret)
->> +		return ret;
->> +
->> +	pr_info("HIDMA channel reset\n");
->> +	return 0;
->> +}
->> +module_vfio_reset_handler("qcom,hidma-1.0", "QCOM8061",
->> +			  vfio_platform_qcomhidma_reset);
->> +
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_DESCRIPTION("Reset support for Qualcomm Technologies HIDMA device");
+>>> It's also not obvious that vendors will correctly implement the EFI RNG
+>>> protocol; depending on the above we may want to mix in additional entropy
+>>> regardless.
+>>>
 >>
-> 
+>> True, but that is not the point. The main risk I see is that vendors
+>> will not bother at all once the digits start to look random to the
+>> human eye.
+>
+> Surely there may be RNG sources that will come along in time that the
+> kernel can add to the entropy?
 
+Nope, not for kaslr on arm64.
+
+There are two things to keep in mind here:
+- arm64 does not have a decompressor, so there is no runtime
+environment with MMU caches etc enabled where you can reasonably
+execute arbitrary C code, and I am already pushing the envelope in
+kaslr_early_init by mapping the kernel at its default address, enable
+the MMU and caches, jump into C code to parse the /chosen node and set
+up the randomized mapping, and then tear down the default mapping,
+reapply all relocations and reinitialize bss etc etc.
+- arm64 is an architecture, not a platform like x86/pc, and so the
+only thing we can rely on before we have a clue what kind of system we
+are running on, dispatch drivers etc, is what the architecture gives
+us, and that does not include anything like a RDRAND instruction.
+
+IOW, the highly restricted C environment that we have before KASLR is
+set up does not support arbitrary platforms to slot in the code that
+wires up their entropy source, and so we must leave it to the
+bootloader.
+
+> I worry about boot loaders doing a
+> terrible job of finding a good RNG...
+>
+
+The bootloader is more tightly coupled to the hardware than the kernel
+is, so it is in a better position to find entropy. Case in point is
+UEFI, which can implement its EFI_RNG_PROTOCOL in various ways,
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Ard.
