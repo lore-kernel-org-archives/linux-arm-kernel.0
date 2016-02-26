@@ -1,96 +1,301 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 11:25:15 +0100
-Subject: [PATCH v2] arm64: lse: deal with clobbered x16 register after
- branch via PLT
-In-Reply-To: <20160226101435.GC29125@arm.com>
-References: <1456429733-20825-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160226100325.GB29125@arm.com>
- <CAKv+Gu-AAu7LpbBMuEQSx7Kfg+gbD4eUf0yjP3oPwfx7V5ZiAQ@mail.gmail.com>
- <20160226101435.GC29125@arm.com>
-Message-ID: <CAKv+Gu-F9gVmePmbQ=g4LpsrhHJyuSFUqe+_V12ELB1ivxtxHw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 26 Feb 2016 15:57:28 +0530
+Subject: [PATCH v3 1/5] pwms: pwm-ti*: Remove support for local clock
+ gating
+In-Reply-To: <1456439796-28546-2-git-send-email-fcooper@ti.com>
+References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
+ <1456439796-28546-2-git-send-email-fcooper@ti.com>
+Message-ID: <56D02890.8000003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2016 at 11:14, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Feb 26, 2016 at 11:04:38AM +0100, Ard Biesheuvel wrote:
->> On 26 February 2016 at 11:03, Will Deacon <will.deacon@arm.com> wrote:
->> > Hey Ard,
->> >
->> > On Thu, Feb 25, 2016 at 08:48:53PM +0100, Ard Biesheuvel wrote:
->> >> The LSE atomics implementation uses runtime patching to patch in calls
->> >> to out of line non-LSE atomics implementations on cores that lack hardware
->> >> support for LSE. To avoid paying the overhead cost of a function call even
->> >> if no call ends up being made, the bl instruction is kept invisible to the
->> >> compiler, and the out of line implementations preserve all registers, not
->> >> just the ones that they are required to preserve as per the AAPCS64.
->> >>
->> >> However, commit fd045f6cd98e ("arm64: add support for module PLTs") added
->> >> support for routing branch instructions via veneers if the branch target
->> >> offset exceeds the range of the ordinary relative branch instructions.
->> >> Since this deals with jump and call instructions that are exposed to ELF
->> >> relocations, the PLT code uses x16 to hold the address of the branch target
->> >> when it performs an indirect branch-to-register, something which is
->> >> explicitly allowed by the AAPCS64 (and ordinary compiler generated code
->> >> does not expect register x16 or x17 to retain their values across a bl
->> >> instruction).
->> >>
->> >> Since the lse runtime patched bl instructions don't adhere to the AAPCS64,
->> >> they don't deal with this clobbering of registers x16 and x17. So add them
->> >> to the clobber list of the asm() statements that perform the call
->> >> instructions, and drop x16 and x17 from the list of registers that are
->> >> caller saved in the out of line non-LSE implementations.
->> >>
->> >> In addition, since we have given these functions two scratch registers,
->> >> they no longer need to stack/unstack temp registers, and the only remaining
->> >> stack accesses are for the frame pointer. So pass -fomit-frame-pointer as
->> >> well, this eliminates all stack accesses from these functions.
->> >
->> > [...]
->> >
->> >> diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
->> >> index 197e06afbf71..7af60139f718 100644
->> >> --- a/arch/arm64/include/asm/atomic_lse.h
->> >> +++ b/arch/arm64/include/asm/atomic_lse.h
->> >> @@ -36,7 +36,7 @@ static inline void atomic_andnot(int i, atomic_t *v)
->> >>       "       stclr   %w[i], %[v]\n")
->> >>       : [i] "+r" (w0), [v] "+Q" (v->counter)
->> >>       : "r" (x1)
->> >> -     : "x30");
->> >> +     : "x16", "x17", "x30");
->> >>  }
->> >
->> > The problem with this is that we potentially end up spilling/reloading
->> > x16 and x17 even when we patch in the LSE atomic. That's why I opted for
->> > the explicit stack accesses in my patch, so that they get overwritten
->> > with NOPs when we switch to the LSE version.
->> >
->>
->> I see. But is that really an issue in practice?
->
-> You'd need to ask somebody with silicon ;)
->
->> And the fact that the non-LSE code is a lot more efficient has to count for
->> something, I suppose?
->> (/me thinks enterprise, distro kernels etc etc)
->
-> Right, but with my patch, we also get the nice code in the out-of-line
-> case:
->
-> 0000000000000000 <__ll_sc_atomic_add>:
->    0:   f9800031        prfm    pstl1strm, [x1]
->    4:   885f7c31        ldxr    w17, [x1]
->    8:   0b000231        add     w17, w17, w0
->    c:   88107c31        stxr    w16, w17, [x1]
->   10:   35ffffb0        cbnz    w16, 4 <__ll_sc_atomic_add+0x4>
->   14:   d65f03c0        ret
->
-> and in the inline LSE case we have NOPs instead of stack accesses.
->
++ Thierry, PWM subsystem maintainer.
 
-True, so it is an improvement in the sense that you only stack x16/x17
-rather than create a full stack frame. My concern is that you always
-take the hit of the push/pop when you run a LSE enabled kernel on
-non-LSE hardware, even if the calling code is not short of registers.
-In that sense, I think it is a premature optimization, and we should
-simply mark x16/x17 as clobbered until we can prove that not doing so
-improves performance measurably on LSE capable hardware
+On Friday 26 February 2016 04:06 AM, Franklin S Cooper Jr wrote:
+> The PWMSS local clock gating registers have no real purpose on OMAP ARM
+> devices. These registers were left over registers from DSP IP where the
+> PRCM doesn't exist. There is a silicon bug where gating and ungating clocks
+> don't function properly. TRMs will be update to indicate that these
+> registers shouldn't be touched.
+> 
+> Therefore, all code that accesses the PWMSS_CLKCONFIG or PWMSS_CLKSTATUS
+> will be removed by this patch with zero loss of functionality by the ECAP
+> and EPWM drivers.
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+> Version 3 changes:
+> New patch
+> 
+>  drivers/pwm/pwm-tiecap.c   | 28 --------------------------
+>  drivers/pwm/pwm-tiehrpwm.c | 29 ---------------------------
+>  drivers/pwm/pwm-tipwmss.c  | 49 ----------------------------------------------
+>  drivers/pwm/pwm-tipwmss.h  | 39 ------------------------------------
+>  4 files changed, 145 deletions(-)
+>  delete mode 100644 drivers/pwm/pwm-tipwmss.h
+> 
+> diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+> index 616af76..9e0865d7 100644
+> --- a/drivers/pwm/pwm-tiecap.c
+> +++ b/drivers/pwm/pwm-tiecap.c
+> @@ -27,8 +27,6 @@
+>  #include <linux/pwm.h>
+>  #include <linux/of_device.h>
+>  
+> -#include "pwm-tipwmss.h"
+> -
+>  /* ECAP registers and bits definitions */
+>  #define CAP1			0x08
+>  #define CAP2			0x0C
+> @@ -206,7 +204,6 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+>  	struct resource *r;
+>  	struct clk *clk;
+>  	struct ecap_pwm_chip *pc;
+> -	u16 status;
+>  
+>  	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+>  	if (!pc)
+> @@ -243,40 +240,15 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	pm_runtime_enable(&pdev->dev);
+> -	pm_runtime_get_sync(&pdev->dev);
+> -
+> -	status = pwmss_submodule_state_change(pdev->dev.parent,
+> -			PWMSS_ECAPCLK_EN);
+> -	if (!(status & PWMSS_ECAPCLK_EN_ACK)) {
+> -		dev_err(&pdev->dev, "PWMSS config space clock enable failed\n");
+> -		ret = -EINVAL;
+> -		goto pwmss_clk_failure;
+> -	}
+> -
+> -	pm_runtime_put_sync(&pdev->dev);
+>  
+>  	platform_set_drvdata(pdev, pc);
+>  	return 0;
+> -
+> -pwmss_clk_failure:
+> -	pm_runtime_put_sync(&pdev->dev);
+> -	pm_runtime_disable(&pdev->dev);
+> -	pwmchip_remove(&pc->chip);
+> -	return ret;
+>  }
+>  
+>  static int ecap_pwm_remove(struct platform_device *pdev)
+>  {
+>  	struct ecap_pwm_chip *pc = platform_get_drvdata(pdev);
+>  
+> -	pm_runtime_get_sync(&pdev->dev);
+> -	/*
+> -	 * Due to hardware misbehaviour, acknowledge of the stop_req
+> -	 * is missing. Hence checking of the status bit skipped.
+> -	 */
+> -	pwmss_submodule_state_change(pdev->dev.parent, PWMSS_ECAPCLK_STOP_REQ);
+> -	pm_runtime_put_sync(&pdev->dev);
+> -
+>  	pm_runtime_disable(&pdev->dev);
+>  	return pwmchip_remove(&pc->chip);
+>  }
+> diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
+> index 6a41e66..e09b1f0 100644
+> --- a/drivers/pwm/pwm-tiehrpwm.c
+> +++ b/drivers/pwm/pwm-tiehrpwm.c
+> @@ -27,8 +27,6 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/of_device.h>
+>  
+> -#include "pwm-tipwmss.h"
+> -
+>  /* EHRPWM registers and bits definitions */
+>  
+>  /* Time base module registers */
+> @@ -437,7 +435,6 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+>  	struct resource *r;
+>  	struct clk *clk;
+>  	struct ehrpwm_pwm_chip *pc;
+> -	u16 status;
+>  
+>  	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+>  	if (!pc)
+> @@ -487,27 +484,9 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	pm_runtime_enable(&pdev->dev);
+> -	pm_runtime_get_sync(&pdev->dev);
+> -
+> -	status = pwmss_submodule_state_change(pdev->dev.parent,
+> -			PWMSS_EPWMCLK_EN);
+> -	if (!(status & PWMSS_EPWMCLK_EN_ACK)) {
+> -		dev_err(&pdev->dev, "PWMSS config space clock enable failed\n");
+> -		ret = -EINVAL;
+> -		goto pwmss_clk_failure;
+> -	}
+> -
+> -	pm_runtime_put_sync(&pdev->dev);
+>  
+>  	platform_set_drvdata(pdev, pc);
+>  	return 0;
+> -
+> -pwmss_clk_failure:
+> -	pm_runtime_put_sync(&pdev->dev);
+> -	pm_runtime_disable(&pdev->dev);
+> -	pwmchip_remove(&pc->chip);
+> -	clk_unprepare(pc->tbclk);
+> -	return ret;
+>  }
+>  
+>  static int ehrpwm_pwm_remove(struct platform_device *pdev)
+> @@ -516,14 +495,6 @@ static int ehrpwm_pwm_remove(struct platform_device *pdev)
+>  
+>  	clk_unprepare(pc->tbclk);
+>  
+> -	pm_runtime_get_sync(&pdev->dev);
+> -	/*
+> -	 * Due to hardware misbehaviour, acknowledge of the stop_req
+> -	 * is missing. Hence checking of the status bit skipped.
+> -	 */
+> -	pwmss_submodule_state_change(pdev->dev.parent, PWMSS_EPWMCLK_STOP_REQ);
+> -	pm_runtime_put_sync(&pdev->dev);
+> -
+>  	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  	return pwmchip_remove(&pc->chip);
+> diff --git a/drivers/pwm/pwm-tipwmss.c b/drivers/pwm/pwm-tipwmss.c
+> index 5cf65a1..829f499 100644
+> --- a/drivers/pwm/pwm-tipwmss.c
+> +++ b/drivers/pwm/pwm-tipwmss.c
+> @@ -22,32 +22,6 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/of_device.h>
+>  
+> -#include "pwm-tipwmss.h"
+> -
+> -#define PWMSS_CLKCONFIG		0x8	/* Clock gating reg */
+> -#define PWMSS_CLKSTATUS		0xc	/* Clock gating status reg */
+> -
+> -struct pwmss_info {
+> -	void __iomem	*mmio_base;
+> -	struct mutex	pwmss_lock;
+> -	u16		pwmss_clkconfig;
+> -};
+> -
+> -u16 pwmss_submodule_state_change(struct device *dev, int set)
+> -{
+> -	struct pwmss_info *info = dev_get_drvdata(dev);
+> -	u16 val;
+> -
+> -	mutex_lock(&info->pwmss_lock);
+> -	val = readw(info->mmio_base + PWMSS_CLKCONFIG);
+> -	val |= set;
+> -	writew(val , info->mmio_base + PWMSS_CLKCONFIG);
+> -	mutex_unlock(&info->pwmss_lock);
+> -
+> -	return readw(info->mmio_base + PWMSS_CLKSTATUS);
+> -}
+> -EXPORT_SYMBOL(pwmss_submodule_state_change);
+> -
+>  static const struct of_device_id pwmss_of_match[] = {
+>  	{ .compatible	= "ti,am33xx-pwmss" },
+>  	{},
+> @@ -57,24 +31,10 @@ MODULE_DEVICE_TABLE(of, pwmss_of_match);
+>  static int pwmss_probe(struct platform_device *pdev)
+>  {
+>  	int ret;
+> -	struct resource *r;
+> -	struct pwmss_info *info;
+>  	struct device_node *node = pdev->dev.of_node;
+>  
+> -	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+> -	if (!info)
+> -		return -ENOMEM;
+> -
+> -	mutex_init(&info->pwmss_lock);
+> -
+> -	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	info->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+> -	if (IS_ERR(info->mmio_base))
+> -		return PTR_ERR(info->mmio_base);
+> -
+>  	pm_runtime_enable(&pdev->dev);
+>  	pm_runtime_get_sync(&pdev->dev);
+> -	platform_set_drvdata(pdev, info);
+>  
+>  	/* Populate all the child nodes here... */
+>  	ret = of_platform_populate(node, NULL, NULL, &pdev->dev);
+> @@ -86,30 +46,21 @@ static int pwmss_probe(struct platform_device *pdev)
+>  
+>  static int pwmss_remove(struct platform_device *pdev)
+>  {
+> -	struct pwmss_info *info = platform_get_drvdata(pdev);
+> -
+>  	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+> -	mutex_destroy(&info->pwmss_lock);
+>  	return 0;
+>  }
+>  
+>  #ifdef CONFIG_PM_SLEEP
+>  static int pwmss_suspend(struct device *dev)
+>  {
+> -	struct pwmss_info *info = dev_get_drvdata(dev);
+> -
+> -	info->pwmss_clkconfig = readw(info->mmio_base + PWMSS_CLKCONFIG);
+>  	pm_runtime_put_sync(dev);
+>  	return 0;
+>  }
+>  
+>  static int pwmss_resume(struct device *dev)
+>  {
+> -	struct pwmss_info *info = dev_get_drvdata(dev);
+> -
+>  	pm_runtime_get_sync(dev);
+> -	writew(info->pwmss_clkconfig, info->mmio_base + PWMSS_CLKCONFIG);
+>  	return 0;
+>  }
+>  #endif
+> diff --git a/drivers/pwm/pwm-tipwmss.h b/drivers/pwm/pwm-tipwmss.h
+> deleted file mode 100644
+> index 10ad804..0000000
+> --- a/drivers/pwm/pwm-tipwmss.h
+> +++ /dev/null
+> @@ -1,39 +0,0 @@
+> -/*
+> - * TI PWM Subsystem driver
+> - *
+> - * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> - * GNU General Public License for more details.
+> - *
+> - */
+> -
+> -#ifndef __TIPWMSS_H
+> -#define __TIPWMSS_H
+> -
+> -/* PWM substem clock gating */
+> -#define PWMSS_ECAPCLK_EN	BIT(0)
+> -#define PWMSS_ECAPCLK_STOP_REQ	BIT(1)
+> -#define PWMSS_EPWMCLK_EN	BIT(8)
+> -#define PWMSS_EPWMCLK_STOP_REQ	BIT(9)
+> -
+> -#define PWMSS_ECAPCLK_EN_ACK	BIT(0)
+> -#define PWMSS_EPWMCLK_EN_ACK	BIT(8)
+> -
+> -#ifdef CONFIG_PWM_TIPWMSS
+> -extern u16 pwmss_submodule_state_change(struct device *dev, int set);
+> -#else
+> -static inline u16 pwmss_submodule_state_change(struct device *dev, int set)
+> -{
+> -	/* return success status value */
+> -	return 0xFFFF;
+> -}
+> -#endif
+> -#endif	/* __TIPWMSS_H */
+> 
