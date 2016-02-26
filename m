@@ -1,71 +1,32 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 26 Feb 2016 17:35:50 +0000
-Subject: [RFC v4 10/14] vfio: introduce VFIO_IOVA_RESERVED vfio_dma type
-In-Reply-To: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
-References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1456508154-2253-11-git-send-email-eric.auger@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 26 Feb 2016 12:43:13 -0500 (EST)
+Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch
+ driver (ESW)
+In-Reply-To: <56D07C82.2040204@openwrt.org>
+References: <1456496504-50429-4-git-send-email-blogic@openwrt.org>
+ <20160226151813.GD12022@lunn.ch> <56D07C82.2040204@openwrt.org>
+Message-ID: <20160226.124313.718457444189293093.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We introduce a vfio_dma type since we will need to discriminate
-legacy vfio_dma's from new reserved ones. Since those latter are
-not mapped at registration, some treatments need to be reworked:
-removal, replay. Currently they are unplugged. In subsequent patches
-they will be reworked.
+From: Felix Fietkau <nbd@openwrt.org>
+Date: Fri, 26 Feb 2016 17:25:38 +0100
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- drivers/vfio/vfio_iommu_type1.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+> In my opinion, leaving this part out does not make much sense and
+> neither does deferring the entire patch series until we have a
+> switchdev/DSA capable driver. This is just a starting point, which will
+> be turned into a proper driver with the right APIs later.
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 6f1ea3d..692e9a2 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -53,6 +53,15 @@ module_param_named(disable_hugepages,
- MODULE_PARM_DESC(disable_hugepages,
- 		 "Disable VFIO IOMMU support for IOMMU hugepages.");
- 
-+enum vfio_iova_type {
-+	VFIO_IOVA_USER = 0, /* standard IOVA used to map user vaddr */
-+	/*
-+	 * IOVA reserved to map special host physical addresses,
-+	 * MSI frames for instance
-+	 */
-+	VFIO_IOVA_RESERVED,
-+};
-+
- struct vfio_iommu {
- 	struct list_head	domain_list;
- 	struct mutex		lock;
-@@ -75,6 +84,7 @@ struct vfio_dma {
- 	unsigned long		vaddr;		/* Process virtual addr */
- 	size_t			size;		/* Map size (bytes) */
- 	int			prot;		/* IOMMU_READ/WRITE */
-+	enum vfio_iova_type	type;		/* type of IOVA */
- };
- 
- struct vfio_group {
-@@ -395,7 +405,8 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
- 
- static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
- {
--	vfio_unmap_unpin(iommu, dma);
-+	if (likely(dma->type != VFIO_IOVA_RESERVED))
-+		vfio_unmap_unpin(iommu, dma);
- 	vfio_unlink_dma(iommu, dma);
- 	kfree(dma);
- }
-@@ -671,6 +682,10 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
- 		dma_addr_t iova;
- 
- 		dma = rb_entry(n, struct vfio_dma, node);
-+
-+		if (unlikely(dma->type == VFIO_IOVA_RESERVED))
-+			continue;
-+
- 		iova = dma->iova;
- 
- 		while (iova < dma->iova + dma->size) {
--- 
-1.9.1
+I disagree, and we want people to concentrate on writing proper
+switchdev/DSA drivers.
+
+People like Andrew have offered to help in any way possible to make
+this as easy as possible, so please take this seriously.
+
+I would have accepted your arguments a year ago when we didn't have
+the right infrastructure, but now we do and there is no real excuse
+to submit partial or bastardized drivers for these kinds of hardware
+anymore
+
+Thanks in advance for your understanding, and I'm plan to stand
+very firm on this.
