@@ -1,48 +1,36 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 26 Feb 2016 10:34:31 -0800
-Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch driver
- (ESW)
-In-Reply-To: <56D06E3F.1020100@openwrt.org>
-References: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
- <1456496504-50429-4-git-send-email-blogic@openwrt.org>
- <20160226151813.GD12022@lunn.ch> <56D06E3F.1020100@openwrt.org>
-Message-ID: <56D09AB7.3000203@gmail.com>
+Date: Fri, 26 Feb 2016 10:36:27 -0800
+Subject: [PATCH] bsp: add SoC device to brcmstb
+In-Reply-To: <4679582.DyKPu0pJrQ@wuerfel>
+References: <1456445947-9079-1-git-send-email-justinpopo6@gmail.com>
+ <4679582.DyKPu0pJrQ@wuerfel>
+Message-ID: <56D09B2B.8090805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/02/16 07:24, John Crispin wrote:
+On 26/02/16 05:58, Arnd Bergmann wrote:
+> On Thursday 25 February 2016 16:19:07 Justin Chen wrote:
+>>   */
+>>  void brcmstb_biuctrl_init(void);
+>>  
+>> +/*
+>> + * Helper functions for getting family or product id from the
+>> + * SoC driver.
+>> + */
+>> +u32 brcmstb_get_family_id(void);
+>> +u32 brcmstb_get_product_id(void);
+>> +
+>>  #endif /* __BRCMSTB_SOC_H */
+>> -- 
 > 
-> Hi,
-> 
-> would the series be ok if we just dropped those parts and then have a
-> driver in the kernel that wont do much with the out of tree patches ?
-> 
-> the problem here is that on one side people complain about vendors not
-> sending code upstream. once they start being a good citizen and provide
-> funding to send stuff upstream the feedback tends to be very bad as seen
-> here.
+> Please remove the declarations from the header file and make the
+> variable local to this file, to make sure no other driver accidentally
+> accesses them.
 
-I agree with David here, the feedback from Andrew is very constructive,
-you just don't like the feedback you are being given, which is a
-different thing. You can't always get a 12 series patches adding a new
-driver accepted after second try, look at all the recent submissions
-that occured, it took 5-6-7 maybe more submissions until things were in
-a shape where they could be merged. If for your next submission you get
-the feedback that switchdev/DSA is deprecated, and something new needs
-to be used, then I would agree that feedback is not acceptable, I doubt
-this will be the case unless we wait another 10 years to get these
-patches out.
+I would remove these two helper functions completely, we do not need
+them right now in an upstream kernel, if we ever need them, we could add
+them back, but we have no use for these two now.
 
-> we are planning on doing a DSA driver but one step at a time. this
-> kind of feedback will inevitably lead to vendors doing second thoughts
-> of upstream contributions.
-
-If you are planning on a DSA driver, which sounds like a good plan, then
-maybe drop the integrated switch parts for now, keep it as a local set
-of patches for your testing, and just get the basic CPU Ethernet MAC
-driver to work for data movement, so that part gets in, and later on,
-when your DSA driver is ready, that's one less thing to take care of.
-They ultimately are logically spearated drivers if you use DSA, a little
-less if you use switchdev.
+Thanks!
 -- 
 Florian
