@@ -1,30 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 17:25:18 +0100
-Subject: [PATCH] ARM: ks8695: fix __initdata annotation
-In-Reply-To: <56B92660.8060203@uclinux.org>
-References: <1454941509-2773774-1-git-send-email-arnd@arndb.de>
- <56B92660.8060203@uclinux.org>
-Message-ID: <6605497.i4OUUcPESd@wuerfel>
+From: nbd@openwrt.org (Felix Fietkau)
+Date: Fri, 26 Feb 2016 17:25:38 +0100
+Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch driver
+ (ESW)
+In-Reply-To: <20160226151813.GD12022@lunn.ch>
+References: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
+ <1456496504-50429-4-git-send-email-blogic@openwrt.org>
+ <20160226151813.GD12022@lunn.ch>
+Message-ID: <56D07C82.2040204@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 February 2016 09:36:00 Greg Ungerer wrote:
-> On 09/02/16 00:24, Arnd Bergmann wrote:
-> > Clang complains about the __initdata section attribute being in the
-> > wrong place in two files of ks8695:
-> > 
-> > arch/arm/mach-ks8695/cpu.c:37:31: error: '__section__' attribute only applies to functions and global variables
-> > arch/arm/mach-ks8695/board-og.c:83:31: error: '__section__' attribute only applies to functions and global variables
-> > 
-> > This moves the attribute to the correct place.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 2016-02-26 16:18, Andrew Lunn wrote:
+> On Fri, Feb 26, 2016 at 03:21:35PM +0100, John Crispin wrote:
+>> The ESW is found in many of the old 100mbit MIPS based SoCs. it has 5
+>> external ports, 1 cpu port and 1 further port that the internal HW
+>> offloading engine connects to.
+>> 
+>> This driver is very basic and only provides basic init and irq support.
+>> The SoC and switch core both have support for a special tag making DSA
+>> support possible.
 > 
-> Acked-by: Greg Ungerer <gerg@uclinux.org>
+> Hi Crispin
 > 
+> There was recently a discussion about adding switches without using
+> DSA or switchdev. It was pretty much decided we would not accept such
+> drivers.
+For exactly this reason, the code does not provide any non-standard API
+for allowing the user to configure the switch. The hardware needs to be
+programmed with some defaults for the driver to be functional (since the
+switch logic is built into the SoC).
 
-Applied to next/fixes-non-critical in arm-soc directly.
+In my opinion, leaving this part out does not make much sense and
+neither does deferring the entire patch series until we have a
+switchdev/DSA capable driver. This is just a starting point, which will
+be turned into a proper driver with the right APIs later.
 
-Thanks,
-
-	Arnd
+- Felix
