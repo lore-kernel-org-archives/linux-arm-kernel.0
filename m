@@ -1,159 +1,49 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Fri, 26 Feb 2016 10:21:56 +0800
-Subject: [PATCH v5 01/11] drm/hisilicon: Add device tree binding for
- hi6220 display subsystem
-In-Reply-To: <CAGd==06LUCn74K18njP8+R-83tJ6OOjmwqmx9MFS=AQyVioFZQ@mail.gmail.com>
-References: <1456196431-19923-1-git-send-email-xinliang.liu@linaro.org>
- <1456196431-19923-2-git-send-email-xinliang.liu@linaro.org>
- <20160223183726.GA10246@leverpostej>
- <CAGd==06LUCn74K18njP8+R-83tJ6OOjmwqmx9MFS=AQyVioFZQ@mail.gmail.com>
-Message-ID: <CAGd==04yQRamgTmd90LU=TOBCSz-AS-+ffpUyvO=y8dQ6d_L=g@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 26 Feb 2016 11:30:21 +0900
+Subject: [PATCH 1/4] ASoC: wm9713: add binding for WM9713 codec
+In-Reply-To: <87povkuuf6.fsf@belgarion.home>
+References: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
+ <20160220171459.GA18327@sirena.org.uk>
+ <871t87z1gz.fsf@belgarion.home>
+ <20160220195925.GF18327@sirena.org.uk>
+ <87twl3xgud.fsf@belgarion.home>
+ <20160220211659.GG18327@sirena.org.uk>
+ <878u2fxbp9.fsf@belgarion.home>
+ <20160221014920.GK18327@sirena.org.uk>
+ <87povkuuf6.fsf@belgarion.home>
+Message-ID: <20160226023021.GH18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2016 at 10:21, Xinliang Liu <xinliang.liu@linaro.org> wrote:
-> On 24 February 2016 at 02:37, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Mark, thanks for review.
->
->> On Tue, Feb 23, 2016 at 11:00:21AM +0800, Xinliang Liu wrote:
->>> Add ADE display controller binding doc.
->>> Add DesignWare DSI Host Controller v1.20a binding doc.
->>>
->>> v5:
->>> - Remove endpoint unit address of dsi output port.
->>> - Add "hisilicon,noc-syscon" property for ADE NOC QoS syscon.
->>> - Add "resets" property for ADE reset.
->>> v4:
->>> - Describe more specific of clocks and ports.
->>> - Fix indentation.
->>> v3:
->>> - Make ade as the drm master node.
->>> - Use assigned-clocks to set clock rate.
->>> - Use ports to connect display relavant nodes.
->>> v2:
->>> - Move dt binding docs to bindings/display/hisilicon directory.
->>>
->>> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->>> ---
->>>  .../bindings/display/hisilicon/dw-dsi.txt          | 72 ++++++++++++++++++++++
->>>  .../bindings/display/hisilicon/hisi-ade.txt        | 64 +++++++++++++++++++
->>>  2 files changed, 136 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
->>>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt b/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
->>> new file mode 100644
->>> index 000000000000..0d234b5e19af
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
->>> @@ -0,0 +1,72 @@
->>> +Device-Tree bindings for DesignWare DSI Host Controller v1.20a driver
->>> +
->>> +A DSI Host Controller resides in the middle of display controller and external
->>> +HDMI converter or panel.
->>> +
->>> +Required properties:
->>> +- compatible: value should be "hisilicon,hi6220-dsi".
->>> +- reg: physical base address and length of dsi controller's registers.
->>> +- clocks: the clocks needed.
->>> +- clock-names: the name of the clocks.
->>
->> You _must_ specify the precise set of clock names you expect here.
->>
->> Per the example, you seem to expect "pclk_dsi".
->>
->> Is that the name given in the DSI controller manual? Or is it just
->> "pclk"? It's already specific to the DSI controller...
->>
+On Fri, Feb 26, 2016 at 02:33:49AM +0100, Robert Jarzmik wrote:
+> Mark Brown <broonie@kernel.org> writes:
 
-Yet, while reading the DSI controller manual. It is called "pclk".
-Yes, you are right this is already specific to the DSI controller.
-will use "pclk" instead in next version.
+> > It will not be called, the generic AC'97 code will be used.
 
->
-> I have read the SoC manual again, and it is the configuration clock.
-> Maybe we can call it "cfg_clk".
+> Ok, if it's not called no code in sound/soc/codecs/wm9713.c will be used, right
+> ?
+> In that case wm9713_set_dai_clkdiv() will never be used, nor will the
+> wm9713_audio_map or wm9713_dapm_widgets be created, which will break all
+> userspace programs relying on these mixers and DAPM routes.
 
+> Or am I missing something ?
 
+No, you're not missing anything - that'll be what happens.  If you need
+to preserve the userspace ABI on your board you'd need a much bigger
+(but very welcome) refactoring of the AC'97 code to be less hacky and
+use the device model more directly, or at least define a generic AC'97
+binding somehow.  All the AC'97 support has never really been properly
+moved over to the device model and unfortunately nobody's yet cared
+about it for device tree except in the simple cases supported by the
+generic AC'97 code.  I appreciate that this isn't very helpful, it's
+an unfortunate consequence of DT as an ABI.
 
->
->>> diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->>> new file mode 100644
->>> index 000000000000..c1844b3ff878
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->>> @@ -0,0 +1,64 @@
->>> +Device-Tree bindings for hisilicon ADE display controller driver
->>> +
->>> +ADE (Advanced Display Engine) is the display controller which grab image
->>> +data from memory, do composition, do post image processing, generate RGB
->>> +timing stream and transfer to DSI.
->>> +
->>> +Required properties:
->>> +- compatible: value should be "hisilicon,hi6220-ade".
->>> +- reg: physical base address and length of the ADE controller's registers.
->>> +  Value should be "<0x0 0xf4100000 0x0 0x7800>".
->>
->> Get rid of the "Value should be ... " part. It is nonsensical to
->> describe this in the binding. Just describe what this is with relation
->> to _this_ IP block.
->
-> OK, will fix all these parts in next version.
->
->>
->>> +- reg-names: name of physical base. Value should be "ade_base".
->>
->> That obviously doesn't apply to *-names propertiesm which must all be
->> specified in the binding (they're local to the device rather than
->> remote).
->>
->>> +- hisilicon,noc-syscon: ADE NOC QoS syscon. Value should be "<&medianoc_ade>"
->>> +- resets: The ADE reset controller node. Value should be "<&media_ctrl
->>> +  MEDIA_ADE>".
->>
->> Likewise.
->>
->>> +- interrupt: the ldi vblank interrupt number used.
->>> +- clocks: the clocks needed. Three clocks are used in ADE driver:
->>> +  ADE core clock, value should be "<&media_ctrl HI6220_ADE_CORE>";
->>> +  ADE pixel clok, value should be "<&media_ctrl HI6220_ADE_PIX_SRC>";
->>> +  media NOC QoS clock, value should be "<&media_ctrl HI6220_CODEC_JPEG>".
->>> +- clock-names: the name of the clocks. Values should be "clk_ade_core",
->>> +  "clk_codec_jpeg" and "clk_ade_pix".
->>
->> Likewise, don't specify the value.
->>
->> Jsut define clocks in terms of clock-names, e.g.
->>
->> - clocks: a list of phandle + clock-specifier pairs, one for each entry
->>   in clock-names.
->> - clock-names: should contain:
->>   * "clk_ade_core" for the ADE ciore clock
->>   * ...
->>   * ...
->
-> All right, got it. Thanks for teaching me how to to.
->
->>
->>> +- assigned-clocks: clocks to be assigned rate.
->>> +- assigned-clock-rates: clock rates which are assigned to assigned-clocks.
->>> +  The rate of <&media_ctrl HI6220_ADE_CORE> could be "360000000" or
->>> +  "180000000";
->>> +  The rate of <&media_ctrl HI6220_CODEC_JPEG> could be less than "1440000000".
->>
->> Is this strictly necessary? Why can the druiver not configure this?
->>
->> Does this have to match some pre-existing boot-time configuration?
->
-> This is the maximum configuration value due to the parent clk and divider.
-> And there is no pre-existing boot-time configuration about this.
-> Driver could configure the value according to the performance and
-> power consumption.
->
-> Thanks,
-> -xinliang
->
->>
->> Thanks,
->> Mark.
+We probably want to end up with something like what the Intel folks have
+been doing recently for HDA to get that working within ASoC.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/1af330dd/attachment.sig>
