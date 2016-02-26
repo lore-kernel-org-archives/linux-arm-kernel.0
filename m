@@ -1,54 +1,106 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Feb 2016 16:54:58 +0100
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN external clock support
-In-Reply-To: <SG2PR06MB1038B995B4C12A01C280DFC4C3A70@SG2PR06MB1038.apcprd06.prod.outlook.com>
-References: <1456496023-16240-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <CAMuHMdXJRN2kF2r=bqcY8v87aYHj_OKr2=5vzcfoHwvr02Y2CA@mail.gmail.com>
- <SG2PR06MB1038B995B4C12A01C280DFC4C3A70@SG2PR06MB1038.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdWEkNcBSdm42pZCRxmETvJpT_=PNx2E-AjTBSG4yH973A@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 26 Feb 2016 21:28:54 +0530
+Subject: [PATCH] drivers: i2c: Fix qup fifo handling
+Message-ID: <1456502334-8687-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ramesh,
+After the addition of V2 support, there was a regression observed
+when testing it on MSM8996. The reason is driver puts the controller
+in to RUN state and writes the data to be 'tx' ed in fifo. But controller
+has to be put in to 'PAUSE' state and data has to written to fifo. Then
+should be put in to 'RUN' state separately.
 
-On Fri, Feb 26, 2016 at 4:00 PM, Ramesh Shanmugasundaram
-<ramesh.shanmugasundaram@bp.renesas.com> wrote:
->> On Fri, Feb 26, 2016 at 3:13 PM, Ramesh Shanmugasundaram
->> <ramesh.shanmugasundaram@bp.renesas.com> wrote:
->> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> > @@ -115,6 +115,13 @@
->> >                 clock-frequency = <0>;
->> >         };
->> >
->> > +       /* External CAN clock - to be overridden by boards that provide
->> it */
->> > +       can_clk: can {
->> > +               compatible = "fixed-clock";
->> > +               #clock-cells = <0>;
->> > +               clock-frequency = <0>;
->>
->> As this is an optional clock, it should have
->>
->>         status = "disabled";
->
-> Yes, I too thought the same but the status property is not obeyed. The
-> "disabled" clock still shows up in clk_tree and clk_xxx apis works just fine
-> (Is this a DT bug?). Hence left the ambiguous "status". In code I use
-> clk_get_rate(can_clk) != 0 to see if it's enabled, which seems logical.
->
-> If you add this as a child of soc node, status property is obeyed. But all
-> external clocks are defined outside soc (correctly) and I followed the same.
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/i2c/busses/i2c-qup.c | 46 +++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 39 insertions(+), 7 deletions(-)
 
-You're right. That's clearly a bug. I sent a patch to fix that.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index 30f3a2b..23eaabb 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -372,6 +372,38 @@ static void qup_i2c_set_write_mode(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 	}
+ }
+ 
++static int check_for_fifo_space(struct qup_i2c_dev *qup)
++{
++	int ret;
++
++	ret = qup_i2c_change_state(qup, QUP_PAUSE_STATE);
++	if (ret)
++		goto out;
++
++	ret = qup_i2c_wait_ready(qup, QUP_OUT_FULL,
++				 RESET_BIT, 4 * ONE_BYTE);
++	if (ret) {
++		/* Fifo is full. Drain out the fifo */
++		ret = qup_i2c_change_state(qup, QUP_RUN_STATE);
++		if (ret)
++			goto out;
++
++		ret = qup_i2c_wait_ready(qup, QUP_OUT_NOT_EMPTY,
++					 RESET_BIT, 256 * ONE_BYTE);
++		if (ret) {
++			dev_err(qup->dev, "timeout for fifo out full");
++			goto out;
++		}
++
++		ret = qup_i2c_change_state(qup, QUP_PAUSE_STATE);
++		if (ret)
++			goto out;
++	}
++
++out:
++	return ret;
++}
++
+ static int qup_i2c_issue_write(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ {
+ 	u32 addr = msg->addr << 1;
+@@ -390,8 +422,7 @@ static int qup_i2c_issue_write(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 
+ 	while (qup->pos < msg->len) {
+ 		/* Check that there's space in the FIFO for our pair */
+-		ret = qup_i2c_wait_ready(qup, QUP_OUT_FULL, RESET_BIT,
+-					 4 * ONE_BYTE);
++		ret = check_for_fifo_space(qup);
+ 		if (ret)
+ 			return ret;
+ 
+@@ -413,6 +444,8 @@ static int qup_i2c_issue_write(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 		idx++;
+ 	}
+ 
++	ret = qup_i2c_change_state(qup, QUP_RUN_STATE);
++
+ 	return ret;
+ }
+ 
+@@ -441,12 +474,9 @@ static int qup_i2c_send_data(struct qup_i2c_dev *qup, int tlen, u8 *tbuf,
+ 	int ret = 0;
+ 
+ 	while (len > 0) {
+-		ret = qup_i2c_wait_ready(qup, QUP_OUT_FULL,
+-					 RESET_BIT, 4 * ONE_BYTE);
+-		if (ret) {
+-			dev_err(qup->dev, "timeout for fifo out full");
++		ret = check_for_fifo_space(qup);
++		if (ret)
+ 			return ret;
+-		}
+ 
+ 		t = (len >= 4) ? 4 : len;
+ 
+@@ -465,6 +495,8 @@ static int qup_i2c_send_data(struct qup_i2c_dev *qup, int tlen, u8 *tbuf,
+ 		len -= 4;
+ 	}
+ 
++	ret = qup_i2c_change_state(qup, QUP_RUN_STATE);
++
+ 	return ret;
+ }
+ 
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
