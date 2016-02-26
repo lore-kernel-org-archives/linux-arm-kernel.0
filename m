@@ -1,50 +1,135 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Fri, 26 Feb 2016 17:00:50 +0300
-Subject: [PATCH] arm64: kasan: clear stale stack poison
-In-Reply-To: <1455816458-19485-1-git-send-email-mark.rutland@arm.com>
-References: <1455816458-19485-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <56D05A92.7070802@virtuozzo.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Fri, 26 Feb 2016 19:33:52 +0530
+Subject: [PATCH v3 2/4] dmaengine: xilinx_vdma: Simplify spin lock handling
+In-Reply-To: <1456495434-11722-1-git-send-email-appanad@xilinx.com>
+References: <1456495434-11722-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1456495434-11722-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2016 08:27 PM, Mark Rutland wrote:
-> This patch is a followup to the discussion in [1].
-> 
-> When using KASAN and CPU idle and/or CPU hotplug, KASAN leaves the stack shadow
-> poisoned on exit from the kernel, and this poison is later hit when a CPU is
-> brought online and reuses that portion of the stack. Hitting the poison depends
-> on stackframe layout, so the bug only manifests in some configurations.
-> 
-> I think that the hotplug issue is generic, and x86 is affected. I couldn't spot
-> magic around idle, so x86 may be fine there. It would be great if someone
-> familiar with the x86 code could prove/disprove either of those assertions.
-> 
-> If x86 is affected, it likely makes sense to unpoison the stack in common code
-> prior to bringing a CPU online to avoid that.
-> 
+This patch simplifies the spin lock handling in the driver
+by moving locking out of xilinx_dma_start_transfer() API
+and xilinx_dma_update_completed_cookie() API.
 
-I think x86 need that unpoisoning. do_boot_cpu() resets stack for secondary cpu,
-so it could be possible to hit stale shadow.
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes for v3:
+---> Updated commit message as suggested by vinod.
+---> Added description to the API's(start_transfer/complete_cookie) regarding
+locking as suggested by vinod.
+Changes for v2:
+---> splitted the changes into multiple patches
 
-static int do_boot_cpu(int apicid, int cpu, struct task_struct *idle)
-{
-....
-	idle->thread.sp = (unsigned long) (((struct pt_regs *)
-			  (THREAD_SIZE +  task_stack_page(idle))) - 1);
+ drivers/dma/xilinx/xilinx_vdma.c | 29 ++++++++++++-----------------
+ 1 file changed, 12 insertions(+), 17 deletions(-)
 
-	early_gdt_descr.address = (unsigned long)get_cpu_gdt_table(cpu);
-	initial_code = (unsigned long)start_secondary;
-	stack_start  = idle->thread.sp;
-
-
-
-
-> For idle I'm not keen on having to perform a memset of THREAD_SIZE/8 every time
-> a CPU re-enters the kernel. I don't yet have numbers for how bad that is, but
-> it doesn't sound good.
-> 
-> Thanks,
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/408961.html
-> 
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index 06bffec..ce330d4 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -605,17 +605,15 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+ {
+ 	struct xilinx_vdma_config *config = &chan->config;
+ 	struct xilinx_vdma_tx_descriptor *desc, *tail_desc;
+-	unsigned long flags;
+ 	u32 reg;
+ 	struct xilinx_vdma_tx_segment *tail_segment;
+ 
++	/* This function was invoked with lock held */
+ 	if (chan->err)
+ 		return;
+ 
+-	spin_lock_irqsave(&chan->lock, flags);
+-
+ 	if (list_empty(&chan->pending_list))
+-		goto out_unlock;
++		return;
+ 
+ 	desc = list_first_entry(&chan->pending_list,
+ 				struct xilinx_vdma_tx_descriptor, node);
+@@ -629,7 +627,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+ 	if (chan->has_sg && xilinx_vdma_is_running(chan) &&
+ 	    !xilinx_vdma_is_idle(chan)) {
+ 		dev_dbg(chan->dev, "DMA controller still busy\n");
+-		goto out_unlock;
++		return;
+ 	}
+ 
+ 	/*
+@@ -676,7 +674,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+ 	xilinx_vdma_start(chan);
+ 
+ 	if (chan->err)
+-		goto out_unlock;
++		return;
+ 
+ 	/* Start the transfer */
+ 	if (chan->has_sg) {
+@@ -696,7 +694,7 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+ 		}
+ 
+ 		if (!last)
+-			goto out_unlock;
++			return;
+ 
+ 		/* HW expects these parameters to be same for one transaction */
+ 		vdma_desc_write(chan, XILINX_VDMA_REG_HSIZE, last->hw.hsize);
+@@ -707,9 +705,6 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
+ 
+ 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
+ 	chan->desc_pendingcount = 0;
+-
+-out_unlock:
+-	spin_unlock_irqrestore(&chan->lock, flags);
+ }
+ 
+ /**
+@@ -719,8 +714,11 @@ out_unlock:
+ static void xilinx_vdma_issue_pending(struct dma_chan *dchan)
+ {
+ 	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&chan->lock, flags);
+ 	xilinx_vdma_start_transfer(chan);
++	spin_unlock_irqrestore(&chan->lock, flags);
+ }
+ 
+ /**
+@@ -732,21 +730,16 @@ static void xilinx_vdma_issue_pending(struct dma_chan *dchan)
+ static void xilinx_vdma_complete_descriptor(struct xilinx_vdma_chan *chan)
+ {
+ 	struct xilinx_vdma_tx_descriptor *desc, *next;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&chan->lock, flags);
+ 
++	/* This function was invoked with lock held */
+ 	if (list_empty(&chan->active_list))
+-		goto out_unlock;
++		return;
+ 
+ 	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
+ 		list_del(&desc->node);
+ 		dma_cookie_complete(&desc->async_tx);
+ 		list_add_tail(&desc->node, &chan->done_list);
+ 	}
+-
+-out_unlock:
+-	spin_unlock_irqrestore(&chan->lock, flags);
+ }
+ 
+ /**
+@@ -857,8 +850,10 @@ static irqreturn_t xilinx_vdma_irq_handler(int irq, void *data)
+ 	}
+ 
+ 	if (status & XILINX_VDMA_DMASR_FRM_CNT_IRQ) {
++		spin_lock(&chan->lock);
+ 		xilinx_vdma_complete_descriptor(chan);
+ 		xilinx_vdma_start_transfer(chan);
++		spin_unlock(&chan->lock);
+ 	}
+ 
+ 	tasklet_schedule(&chan->tasklet);
+-- 
+2.1.2
