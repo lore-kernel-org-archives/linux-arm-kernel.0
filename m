@@ -1,49 +1,108 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Feb 2016 11:46:28 -0800
-Subject: [GIT PULL] arm: Allwinner defconfig changes for 4.6
-Message-ID: <20160226194628.GA20693@lukather>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 26 Feb 2016 11:43:46 -0800
+Subject: [PATCH v3 48/52] mtd: nand: vf610: switch to mtd_ooblayout_ops
+In-Reply-To: <1456448280-27788-49-git-send-email-boris.brezillon@free-electrons.com>
+References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1456448280-27788-49-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <43666dfa2308e6575d47c76b688174ef@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+Hi Boris,
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+On 2016-02-25 16:57, Boris Brezillon wrote:
+> Implementing the mtd_ooblayout_ops interface is the new way of exposing
+> ECC/OOB layout to MTD users.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/mtd/nand/vf610_nfc.c | 34 ++++------------------------------
+>  1 file changed, 4 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
+> index 293feb1..da34de1 100644
+> --- a/drivers/mtd/nand/vf610_nfc.c
+> +++ b/drivers/mtd/nand/vf610_nfc.c
+> @@ -175,34 +175,6 @@ static inline struct vf610_nfc *mtd_to_nfc(struct
+> mtd_info *mtd)
+>  	return container_of(mtd_to_nand(mtd), struct vf610_nfc, chip);
+>  }
+>  
+> -static struct nand_ecclayout vf610_nfc_ecc45 = {
+> -	.eccbytes = 45,
+> -	.eccpos = {19, 20, 21, 22, 23,
+> -		   24, 25, 26, 27, 28, 29, 30, 31,
+> -		   32, 33, 34, 35, 36, 37, 38, 39,
+> -		   40, 41, 42, 43, 44, 45, 46, 47,
+> -		   48, 49, 50, 51, 52, 53, 54, 55,
+> -		   56, 57, 58, 59, 60, 61, 62, 63},
+> -	.oobfree = {
+> -		{.offset = 2,
+> -		 .length = 17} }
+> -};
+> -
+> -static struct nand_ecclayout vf610_nfc_ecc60 = {
+> -	.eccbytes = 60,
+> -	.eccpos = { 4,  5,  6,  7,  8,  9, 10, 11,
+> -		   12, 13, 14, 15, 16, 17, 18, 19,
+> -		   20, 21, 22, 23, 24, 25, 26, 27,
+> -		   28, 29, 30, 31, 32, 33, 34, 35,
+> -		   36, 37, 38, 39, 40, 41, 42, 43,
+> -		   44, 45, 46, 47, 48, 49, 50, 51,
+> -		   52, 53, 54, 55, 56, 57, 58, 59,
+> -		   60, 61, 62, 63 },
+> -	.oobfree = {
+> -		{.offset = 2,
+> -		 .length = 2} }
+> -};
+> -
+>  static inline u32 vf610_nfc_read(struct vf610_nfc *nfc, uint reg)
+>  {
+>  	return readl(nfc->regs + reg);
+> @@ -781,14 +753,16 @@ static int vf610_nfc_probe(struct platform_device *pdev)
+>  		if (mtd->oobsize > 64)
+>  			mtd->oobsize = 64;
+>  
+> +		/*
+> +		 * mtd->ecclayout is not specified here because we're using the
+> +		 * default large page ECC layout defined in NAND core.
+> +		 */
+>  		if (chip->ecc.strength == 32) {
+>  			nfc->ecc_mode = ECC_60_BYTE;
+>  			chip->ecc.bytes = 60;
 
-are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-defconfig-for-4.6
+When I add a printk in nand_ooblayout_free_lp, I get this values:
+free offset 2 lenth 62
 
-for you to fetch changes up to 3d0ddadbe6dde5639f565e3456ae112679e288af:
+This seems wrong to me. It seems that nand_ooblayout_free_lp needs steps
+to be set to calculate the free bytes correctly. With chip->ecc.steps =
+1 the calculated values look good to me.
 
-  ARM: sunxi_defconfig: Enable MUSB HDRC driver with Allwinner glue (2016-02-09 19:30:57 +0100)
+I quickly tried to run mtd_oobtest.ko test, however that faild:
+Kernel BUG at 80399764 [verbose debug info unavailable]
+Internal error: Oops - BUG: 0 [#1] ARM
+Modules linked in: mtd_oobtest(+)
+CPU: 0 PID: 676 Comm: insmod Tainted: G        W      
+4.5.0-rc1-00097-g4c60bde-dirty #320
+Hardware name: Freescale Vybrid VF5xx/VF6xx (Device Tree)
+task: 8db27180 ti: 8ce74000 task.ti: 8ce74000
+PC is at nand_fill_oob+0x48/0xac
+LR is at mtd_ooblayout_free+0x5c/0x74
 
-----------------------------------------------------------------
-Allwinner defconfig changes for 4.6
+mtd_ooblayout_set_databytes seems to return -ERANGE...
 
-A bunch of changes to add new drivers to the sunxi and multi_v7 defconfigs,
-most notably the USB OTG that is finally enabled.
+Do you know what is going on here?
 
-----------------------------------------------------------------
-Chen-Yu Tsai (6):
-      ARM: sunxi_defconfig: Enable sunxi IR driver
-      ARM: sunxi_defconfig: Enable A10 audio codec driver
-      ARM: sunxi_defconfig: Enable INPUT_EVDEV so axp20x-pek can be used
-      ARM: multi_v7_defconfig: Enable MUSB HDRC driver with Allwinner glue
-      ARM: multi_v7_defconfig: Enable A10 audio codec driver as module
-      ARM: sunxi_defconfig: Enable MUSB HDRC driver with Allwinner glue
+--
+Stefan
 
- arch/arm/configs/multi_v7_defconfig |  3 +++
- arch/arm/configs/sunxi_defconfig    | 13 +++++++++++++
- 2 files changed, 16 insertions(+)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/8cf2d95b/attachment-0001.sig>
+> -			chip->ecc.layout = &vf610_nfc_ecc60;
+>  		} else if (chip->ecc.strength == 24) {
+>  			nfc->ecc_mode = ECC_45_BYTE;
+>  			chip->ecc.bytes = 45;
+> -			chip->ecc.layout = &vf610_nfc_ecc45;
+>  		} else {
+>  			dev_err(nfc->dev, "Unsupported ECC strength\n");
+>  			err = -ENXIO;
