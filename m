@@ -1,95 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 13:38:08 +0100
-Subject: [PATCH v2] video: exynos: fix modular build
-Message-ID: <1456490307-823812-1-git-send-email-arnd@arndb.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 26 Feb 2016 14:45:30 +0200
+Subject: [PATCH] dmaengine: omap-dma: Do not call omap_dma_callback() from
+ tx_status()
+In-Reply-To: <20160226112524.GP5783@n2100.arm.linux.org.uk>
+References: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
+ <20160226010658.GN5783@n2100.arm.linux.org.uk> <56D0279F.2050703@ti.com>
+ <20160226112524.GP5783@n2100.arm.linux.org.uk>
+Message-ID: <56D048EA.2000604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s6e8ax0 driver has a dependency on BACKLIGHT_CLASS_DEVICE,
-which can be configured as a loadable module, so we have to
-make the driver a tristate symbol as well, to avoid this error:
+On 2016-02-26 13:25, Russell King - ARM Linux wrote:
+>>> Your original commit adding the original hack that you're now removing
+>>> above says that this is to support polled operation: I'm not aware of
+>>> DMA engine supporting such a mode.  DMA_PREP_INTERRUPT is a mechanism
+>>> where requests can be queued without an interrupt to allow batching.
+>>
+>> Also it is used to suppress DMA interrupts during audio playback for example.
+>> In this case we will run w/o interrupts and the position is polled.
+>>
+>>> See the raid5/async_tx code, which queues a set of operations without
+>>> DMA_PREP_INTERRUPT, with the final operation with DMA_PREP_INTERRUPT
+>>> set.
+>>
+>> We only allow the interrupts to be disabled in cyclic or memcpy mode. With
+>> slave_sg we have interrupts as it is needed to move to the next SG.
+>>
+>>> As the driver is reliant on interrupts to move to the next transfer,
+>>> the patch which causes DMA_PREP_INTERRUPT to influence whether
+>>> interrupts are sent is actually buggy, and will prevent several
+>>> queued DMA operations to fail.
+>>
+>> Yes, the omap-dma only allows the interrupts to be actually disabled when it
+>> is save to do so. slave_sg can not work w/o interrupts so there we don't
+>> disable them.
+> 
+> I get the impression that you haven't taken in what I've said, because
+> each fragment of your reply is just repeating what the previous fragment
+> said.
 
-drivers/built-in.o: In function `s6e8ax0_probe':
-:(.text+0x23a48): undefined reference to `devm_backlight_device_register'
+Sorry about that. I got it.
 
-This also means we get another error from a missing export, which
-this fixes as well:
+> Let me state that I don't believe you need any hacks here, and this patch
+> is not necessary: the final operation in a set of chained memcpy()s should
+> have DMA_PREP_INTERRUPT set.
 
-ERROR: "exynos_mipi_dsi_register_lcd_driver" [drivers/video/fbdev/exynos/s6e8ax0.ko] undefined!
+calling the omap_dma_callback() from the tx_status() was a bad idea, this is
+why I'm fixing it.
+As for the DMA_PREP_INTERRUPT not enabling interrupt was introduced by:
+4ce98c0a20bef (dmaengine: omap-dma: Add support for memcpy)
 
-The drivers are all written to be loadable modules already,
-except the Kconfig options for that are missing, which makes
-the patch really easy.
+While we do not have users submitting multiple descriptors I agree that this
+is a possibility and the driver should not fail in such a case.
+I can send a followup patch to fix the omap_dma_prep_dma_memcpy()
 
-Finally, the EXYNOS_VIDEO option is turned into tristate as well
-for good measure, as all framebuffer drivers should be configurable
-as modules, though this change is not strictly necessary.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/video/fbdev/exynos/Kconfig           | 6 +++---
- drivers/video/fbdev/exynos/Makefile          | 6 ++++--
- drivers/video/fbdev/exynos/exynos_mipi_dsi.c | 1 +
- 3 files changed, 8 insertions(+), 5 deletions(-)
-
-v2: improved changelog after feedback from Paul Bolle
-
-diff --git a/drivers/video/fbdev/exynos/Kconfig b/drivers/video/fbdev/exynos/Kconfig
-index 1f16b4678c71..d916bef94f25 100644
---- a/drivers/video/fbdev/exynos/Kconfig
-+++ b/drivers/video/fbdev/exynos/Kconfig
-@@ -3,7 +3,7 @@
- #
- 
- menuconfig EXYNOS_VIDEO
--	bool "Exynos Video driver support"
-+	tristate "Exynos Video driver support"
- 	depends on ARCH_S5PV210 || ARCH_EXYNOS
- 	help
- 	  This enables support for EXYNOS Video device.
-@@ -15,13 +15,13 @@ if EXYNOS_VIDEO
- #
- 
- config EXYNOS_MIPI_DSI
--	bool "EXYNOS MIPI DSI driver support."
-+	tristate "EXYNOS MIPI DSI driver support."
- 	select GENERIC_PHY
- 	help
- 	  This enables support for MIPI-DSI device.
- 
- config EXYNOS_LCD_S6E8AX0
--	bool "S6E8AX0 MIPI AMOLED LCD Driver"
-+	tristate "S6E8AX0 MIPI AMOLED LCD Driver"
- 	depends on EXYNOS_MIPI_DSI && BACKLIGHT_CLASS_DEVICE
- 	depends on (LCD_CLASS_DEVICE = y)
- 	default n
-diff --git a/drivers/video/fbdev/exynos/Makefile b/drivers/video/fbdev/exynos/Makefile
-index b5b1bd228abb..02d8dc522fea 100644
---- a/drivers/video/fbdev/exynos/Makefile
-+++ b/drivers/video/fbdev/exynos/Makefile
-@@ -2,6 +2,8 @@
- # Makefile for the exynos video drivers.
- #
- 
--obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
--				     	exynos_mipi_dsi_lowlevel.o
-+obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
-+
-+exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
-+					   exynos_mipi_dsi_lowlevel.o
- obj-$(CONFIG_EXYNOS_LCD_S6E8AX0)	+= s6e8ax0.o
-diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
-index 951b592794e3..92e4af3caaf8 100644
---- a/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
-+++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
-@@ -263,6 +263,7 @@ int exynos_mipi_dsi_register_lcd_driver(struct mipi_dsim_lcd_driver *lcd_drv)
- 	return 0;
- 
- }
-+EXPORT_SYMBOL_GPL(exynos_mipi_dsi_register_lcd_driver);
- 
- static struct mipi_dsim_ddi *exynos_mipi_dsi_bind_lcd_ddi(
- 						struct mipi_dsim_device *dsim,
 -- 
-2.7.0
+P?ter
