@@ -1,24 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Feb 2016 12:28:08 -0700
-Subject: [PATCH v2] ARM: dts: tegra: correct Beaver pinmux
-In-Reply-To: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
-References: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
-Message-ID: <56D0A748.6060104@wwwdotorg.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 26 Feb 2016 13:31:25 -0600
+Subject: [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
+In-Reply-To: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
+References: <1455802330-17565-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20160226193125.GA16330@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2016 12:18 PM, Lucas Stach wrote:
-> Update pinmux to get rid of invalid uses of the rsvd1 function, which lead
-> to the mux settings on those pins to not be applied.
->
-> Also add correct drive settings, derived from the Tegra3 TRM, for SDIO1,
-> which makes some more SD-cards work.
+On Thu, Feb 18, 2016 at 02:32:10PM +0100, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> This driver uses PCI glue that is only available on 32-bit ARM. This
+> used to work fine as long as ARCH_MVEBU and ARCH_DOVE were exclusively
+> 32-bit, but that's changed now, with ARCH_MVEBU also being available
+> on 64-bit ARM.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 
-I replied the following to V1, which I don't see resolved:
+I applied this with Thomas' ack to my for-linus branch for v4.5, thanks
+Thierry!
 
- > I think it would be worth mentioning in the commit description where 
- > this[1] data came from.
-
-[1] that was in response to the addition of the sdio1 drive settings.
-
-Also, what is different in V2; is this actually V1 REPOST?
+> ---
+>  drivers/pci/host/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 75a605426538..d1cdd9c992ac 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -14,6 +14,7 @@ config PCI_DRA7XX
+>  config PCI_MVEBU
+>  	bool "Marvell EBU PCIe controller"
+>  	depends on ARCH_MVEBU || ARCH_DOVE
+> +	depends on ARM
+>  	depends on OF
+>  
+>  config PCIE_DW
+> -- 
+> 2.7.1
+> 
