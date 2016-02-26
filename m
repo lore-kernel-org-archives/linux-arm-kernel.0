@@ -1,177 +1,298 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 26 Feb 2016 18:52:03 +0100
-Subject: [PATCH V14 9/9] vfio, platform: add QTI HIDMA reset driver
-In-Reply-To: <1454646882-24369-10-git-send-email-okaya@codeaurora.org>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <1454646882-24369-10-git-send-email-okaya@codeaurora.org>
-Message-ID: <56D090C3.8060608@linaro.org>
+Date: Fri, 26 Feb 2016 17:35:51 +0000
+Subject: [RFC v4 11/14] vfio: allow the user to register reserved iova range
+ for MSI mapping
+In-Reply-To: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
+References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1456508154-2253-12-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
-On 02/05/2016 05:34 AM, Sinan Kaya wrote:
-> In situations where the userspace driver is stopped abnormally and the
-> VFIO platform device is released, the assigned HW device currently is
-> left running. As a consequence the HW device might continue issuing IRQs
-> and performing DMA accesses.
-> 
-> This patch is implementing a reset driver for HIDMA platform driver.
-> This gets called by the VFIO platform reset interface.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/vfio/platform/reset/Kconfig                |  9 ++
->  drivers/vfio/platform/reset/Makefile               |  2 +
->  .../vfio/platform/reset/vfio_platform_qcomhidma.c  | 99 ++++++++++++++++++++++
->  3 files changed, 110 insertions(+)
->  create mode 100644 drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
-> 
-> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-> index 70cccc5..d02b3b5 100644
-> --- a/drivers/vfio/platform/reset/Kconfig
-> +++ b/drivers/vfio/platform/reset/Kconfig
-> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
->  	  Enables the VFIO platform driver to handle reset for AMD XGBE
->  
->  	  If you don't know what to do here, say N.
-> +
-> +config VFIO_PLATFORM_QCOMHIDMA_RESET
-> +	tristate "VFIO support for Qualcomm Technologies HIDMA reset"
-> +	depends on VFIO_PLATFORM
-> +	help
-> +	  Enables the VFIO platform driver to handle reset for Qualcomm Technologies
-> +	  HIDMA Channel.
-> +
-> +	  If you don't know what to do here, say N.
-> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-> index 93f4e23..ec7748a 100644
-> --- a/drivers/vfio/platform/reset/Makefile
-> +++ b/drivers/vfio/platform/reset/Makefile
-> @@ -1,7 +1,9 @@
->  vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
->  vfio-platform-amdxgbe-y := vfio_platform_amdxgbe.o
-> +vfio-platform-qcomhidma-y := vfio_platform_qcomhidma.o
->  
->  ccflags-y += -Idrivers/vfio/platform
->  
->  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
-> +obj-$(CONFIG_VFIO_PLATFORM_QCOMHIDMA_RESET) += vfio-platform-qcomhidma.o
->  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
-> diff --git a/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c b/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
-> new file mode 100644
-> index 0000000..70d7eed
-> --- /dev/null
-> +++ b/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
-> @@ -0,0 +1,99 @@
-> +/*
-> + * Qualcomm Technologies HIDMA VFIO Reset Driver
-> + *
-> + * Copyright (c) 2016, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/device.h>
-> +#include <linux/iopoll.h>
-> +
-> +#include "vfio_platform_private.h"
-> +
-> +#define TRCA_CTRLSTS_OFFSET		0x000
-> +#define EVCA_CTRLSTS_OFFSET		0x000
-> +
-> +#define CH_CONTROL_MASK		GENMASK(7, 0)
-nit: alignment
+The user is allowed to [un]register a reserved IOVA range by using the
+DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
+It provides the base address and the size. This region is stored in the
+vfio_dma rb tree. At that point the iova range is not mapped to any target
+address yet. The host kernel will use those iova when needed, typically
+when the VFIO-PCI device allocates its MSIs.
 
-Besides it looks ok to me
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+This patch also handles the destruction of the reserved binding RB-tree and
+domain's iova_domains.
 
-If it better suits you maybe you can separate the upstream of your
-management/channel driver from the VFIO reset driver upstream.
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
 
-Best Regards
+---
+v3 -> v4:
+- use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
+- protect vfio_register_reserved_iova_range implementation with
+  CONFIG_IOMMU_DMA_RESERVED
+- handle unregistration by user-space and on vfio_iommu_type1 release
 
-Eric
+v1 -> v2:
+- set returned value according to alloc_reserved_iova_domain result
+- free the iova domains in case any error occurs
 
-> +#define CH_STATE_MASK			GENMASK(7, 0)
-> +#define CH_STATE_BIT_POS		0x8
-> +
-> +#define HIDMA_CH_STATE(val)	\
-> +	((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
-> +
-> +#define EVCA_IRQ_EN_OFFSET		0x110
-> +
-> +#define CH_RESET			9
-> +#define CH_DISABLED			0
-> +
-> +int vfio_platform_qcomhidma_reset(struct vfio_platform_device *vdev)
-> +{
-> +	struct vfio_platform_region *trreg;
-> +	struct vfio_platform_region *evreg;
-> +	u32 val;
-> +	int ret;
-> +
-> +	if (vdev->num_regions != 2)
-> +		return -ENODEV;
-> +
-> +	trreg = &vdev->regions[0];
-> +	if (!trreg->ioaddr) {
-> +		trreg->ioaddr =
-> +			ioremap_nocache(trreg->addr, trreg->size);
-> +		if (!trreg->ioaddr)
-> +			return -ENOMEM;
-> +	}
-> +
-> +	evreg = &vdev->regions[1];
-> +	if (!evreg->ioaddr) {
-> +		evreg->ioaddr =
-> +			ioremap_nocache(evreg->addr, evreg->size);
-> +		if (!evreg->ioaddr)
-> +			return -ENOMEM;
-> +	}
-> +
-> +	/* disable IRQ */
-> +	writel(0, evreg->ioaddr + EVCA_IRQ_EN_OFFSET);
-> +
-> +	/* reset both transfer and event channels */
-> +	val = readl(trreg->ioaddr + TRCA_CTRLSTS_OFFSET);
-> +	val &= ~(CH_CONTROL_MASK << 16);
-> +	val |= CH_RESET << 16;
-> +	writel(val, trreg->ioaddr + TRCA_CTRLSTS_OFFSET);
-> +
-> +	ret = readl_poll_timeout(trreg->ioaddr + TRCA_CTRLSTS_OFFSET, val,
-> +				 HIDMA_CH_STATE(val) == CH_DISABLED, 1000,
-> +				 10000);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = readl(evreg->ioaddr + EVCA_CTRLSTS_OFFSET);
-> +	val &= ~(CH_CONTROL_MASK << 16);
-> +	val |= CH_RESET << 16;
-> +	writel(val, evreg->ioaddr + EVCA_CTRLSTS_OFFSET);
-> +
-> +	ret = readl_poll_timeout(evreg->ioaddr + EVCA_CTRLSTS_OFFSET, val,
-> +				 HIDMA_CH_STATE(val) == CH_DISABLED, 1000,
-> +				 10000);
-> +	if (ret)
-> +		return ret;
-> +
-> +	pr_info("HIDMA channel reset\n");
-> +	return 0;
-> +}
-> +module_vfio_reset_handler("qcom,hidma-1.0", "QCOM8061",
-> +			  vfio_platform_qcomhidma_reset);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("Reset support for Qualcomm Technologies HIDMA device");
-> 
+RFC v1 -> v1:
+- takes into account Alex comments, based on
+  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
+- use the existing dma map/unmap ioctl interface with a flag to register
+  a reserved IOVA range. A single reserved iova region is allowed.
+---
+ drivers/vfio/vfio_iommu_type1.c | 141 +++++++++++++++++++++++++++++++++++++++-
+ include/uapi/linux/vfio.h       |  12 +++-
+ 2 files changed, 150 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 692e9a2..4e01ebe 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -36,6 +36,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/vfio.h>
+ #include <linux/workqueue.h>
++#include <linux/dma-reserved-iommu.h>
+ 
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -403,10 +404,22 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ 	vfio_lock_acct(-unlocked);
+ }
+ 
++static void vfio_unmap_reserved(struct vfio_iommu *iommu)
++{
++#ifdef CONFIG_IOMMU_DMA_RESERVED
++	struct vfio_domain *d;
++
++	list_for_each_entry(d, &iommu->domain_list, next)
++		iommu_unmap_reserved(d->domain);
++#endif
++}
++
+ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ {
+ 	if (likely(dma->type != VFIO_IOVA_RESERVED))
+ 		vfio_unmap_unpin(iommu, dma);
++	else
++		vfio_unmap_reserved(iommu);
+ 	vfio_unlink_dma(iommu, dma);
+ 	kfree(dma);
+ }
+@@ -489,7 +502,8 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+ 	 */
+ 	if (iommu->v2) {
+ 		dma = vfio_find_dma(iommu, unmap->iova, 0);
+-		if (dma && dma->iova != unmap->iova) {
++		if (dma && (dma->iova != unmap->iova ||
++			   (dma->type == VFIO_IOVA_RESERVED))) {
+ 			ret = -EINVAL;
+ 			goto unlock;
+ 		}
+@@ -501,6 +515,10 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+ 	}
+ 
+ 	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size))) {
++		if (dma->type == VFIO_IOVA_RESERVED) {
++			ret = -EINVAL;
++			goto unlock;
++		}
+ 		if (!iommu->v2 && unmap->iova > dma->iova)
+ 			break;
+ 		unmapped += dma->size;
+@@ -650,6 +668,114 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+ 	return ret;
+ }
+ 
++static int vfio_register_reserved_iova_range(struct vfio_iommu *iommu,
++			   struct vfio_iommu_type1_dma_map *map)
++{
++#ifdef CONFIG_IOMMU_DMA_RESERVED
++	dma_addr_t iova = map->iova;
++	size_t size = map->size;
++	uint64_t mask;
++	struct vfio_dma *dma;
++	int ret = 0;
++	struct vfio_domain *d;
++	unsigned long order;
++
++	/* Verify that none of our __u64 fields overflow */
++	if (map->size != size || map->iova != iova)
++		return -EINVAL;
++
++	order =  __ffs(vfio_pgsize_bitmap(iommu));
++	mask = ((uint64_t)1 << order) - 1;
++
++	WARN_ON(mask & PAGE_MASK);
++
++	if (!size || (size | iova) & mask)
++		return -EINVAL;
++
++	/* Don't allow IOVA address wrap */
++	if (iova + size - 1 < iova)
++		return -EINVAL;
++
++	mutex_lock(&iommu->lock);
++
++	if (vfio_find_dma(iommu, iova, size)) {
++		ret =  -EEXIST;
++		goto out;
++	}
++
++	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
++	if (!dma) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	dma->iova = iova;
++	dma->size = size;
++	dma->type = VFIO_IOVA_RESERVED;
++
++	list_for_each_entry(d, &iommu->domain_list, next)
++		ret |= iommu_alloc_reserved_iova_domain(d->domain, iova,
++							size, order);
++
++	if (ret) {
++		list_for_each_entry(d, &iommu->domain_list, next)
++			iommu_free_reserved_iova_domain(d->domain);
++		goto out;
++	}
++
++	vfio_link_dma(iommu, dma);
++
++out:
++	mutex_unlock(&iommu->lock);
++	return ret;
++#else /* CONFIG_IOMMU_DMA_RESERVED */
++	return -ENODEV;
++#endif
++}
++
++static void vfio_unregister_reserved_iova_range(struct vfio_iommu *iommu,
++				struct vfio_iommu_type1_dma_unmap *unmap)
++{
++#ifdef CONFIG_IOMMU_DMA_RESERVED
++	dma_addr_t iova = unmap->iova;
++	struct vfio_dma *dma;
++	size_t size = unmap->size;
++	uint64_t mask;
++	unsigned long order;
++
++	/* Verify that none of our __u64 fields overflow */
++	if (unmap->size != size || unmap->iova != iova)
++		return;
++
++	order =  __ffs(vfio_pgsize_bitmap(iommu));
++	mask = ((uint64_t)1 << order) - 1;
++
++	WARN_ON(mask & PAGE_MASK);
++
++	if (!size || (size | iova) & mask)
++		return;
++
++	/* Don't allow IOVA address wrap */
++	if (iova + size - 1 < iova)
++		return;
++
++	mutex_lock(&iommu->lock);
++
++	dma = vfio_find_dma(iommu, iova, size);
++
++	if (!dma || (dma->type != VFIO_IOVA_RESERVED)) {
++		unmap->size = 0;
++		goto out;
++	}
++
++	unmap->size =  dma->size;
++	vfio_remove_dma(iommu, dma);
++
++out:
++	mutex_unlock(&iommu->lock);
++#endif
++}
++
+ static int vfio_bus_type(struct device *dev, void *data)
+ {
+ 	struct bus_type **bus = data;
+@@ -946,6 +1072,7 @@ static void vfio_iommu_type1_release(void *iommu_data)
+ 	struct vfio_group *group, *group_tmp;
+ 
+ 	vfio_iommu_unmap_unpin_all(iommu);
++	vfio_unmap_reserved(iommu);
+ 
+ 	list_for_each_entry_safe(domain, domain_tmp,
+ 				 &iommu->domain_list, next) {
+@@ -1019,7 +1146,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+ 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
+ 		struct vfio_iommu_type1_dma_map map;
+ 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
+-				VFIO_DMA_MAP_FLAG_WRITE;
++				VFIO_DMA_MAP_FLAG_WRITE |
++				VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA;
+ 
+ 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
+ 
+@@ -1029,6 +1157,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+ 		if (map.argsz < minsz || map.flags & ~mask)
+ 			return -EINVAL;
+ 
++		if (map.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA)
++			return vfio_register_reserved_iova_range(iommu, &map);
++
+ 		return vfio_dma_do_map(iommu, &map);
+ 
+ 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
+@@ -1043,10 +1174,16 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+ 		if (unmap.argsz < minsz || unmap.flags)
+ 			return -EINVAL;
+ 
++		if (unmap.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA) {
++			vfio_unregister_reserved_iova_range(iommu, &unmap);
++			goto out;
++		}
++
+ 		ret = vfio_dma_do_unmap(iommu, &unmap);
+ 		if (ret)
+ 			return ret;
+ 
++out:
+ 		return copy_to_user((void __user *)arg, &unmap, minsz);
+ 	}
+ 
+diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+index 7d7a4c6..d5a48e7 100644
+--- a/include/uapi/linux/vfio.h
++++ b/include/uapi/linux/vfio.h
+@@ -410,12 +410,21 @@ struct vfio_iommu_type1_info {
+  *
+  * Map process virtual addresses to IO virtual addresses using the
+  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
++ *
++ * In case MSI_RESERVED_IOVA flag is set, the API only aims@registering an
++ * IOVA region which will be used on some platforms to map the host MSI frame.
++ * in that specific case, vaddr and prot are ignored. The requirement for
++ * provisioning such IOVA range can be checked by calling VFIO_IOMMU_GET_INFO
++ * with the VFIO_IOMMU_INFO_REQUIRE_MSI_MAP attribute. A single
++ * MSI_RESERVED_IOVA region can be registered
+  */
+ struct vfio_iommu_type1_dma_map {
+ 	__u32	argsz;
+ 	__u32	flags;
+ #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
+ #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
++/* reserved iova for MSI vectors*/
++#define VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA (1 << 2)
+ 	__u64	vaddr;				/* Process virtual address */
+ 	__u64	iova;				/* IO virtual address */
+ 	__u64	size;				/* Size of mapping (bytes) */
+@@ -431,7 +440,8 @@ struct vfio_iommu_type1_dma_map {
+  * Caller sets argsz.  The actual unmapped size is returned in the size
+  * field.  No guarantee is made to the user that arbitrary unmaps of iova
+  * or size different from those used in the original mapping call will
+- * succeed.
++ * succeed. A Reserved DMA region must be unmapped with MSI_RESERVED_IOVA
++ * flag set.
+  */
+ struct vfio_iommu_type1_dma_unmap {
+ 	__u32	argsz;
+-- 
+1.9.1
