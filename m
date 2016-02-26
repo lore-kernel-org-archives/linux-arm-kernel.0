@@ -1,22 +1,47 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 26 Feb 2016 12:06:33 +0100
-Subject: [PATCH v10 0/5] MT8173 IOMMU SUPPORT
-In-Reply-To: <1456476955.3383.21.camel@pengutronix.de>
-References: <1456161651-6136-1-git-send-email-yong.wu@mediatek.com>
- <20160225155007.GA19092@8bytes.org>
- <1456476955.3383.21.camel@pengutronix.de>
-Message-ID: <20160226110633.GE22747@8bytes.org>
+From: dhowells@redhat.com (David Howells)
+Date: Fri, 26 Feb 2016 11:20:28 +0000
+Subject: [PATCH] modsign: hide openssl output in silent builds
+In-Reply-To: <1456417901-2192433-1-git-send-email-arnd@arndb.de>
+References: <1456417901-2192433-1-git-send-email-arnd@arndb.de>
+Message-ID: <7539.1456485628@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Fri, Feb 26, 2016 at 09:55:55AM +0100, Philipp Zabel wrote:
-> Do you have a stable branch that I could base the mediatek-drm patches
-> on and that I may include in a pull request to be merged via drm-next?
+> When a user calls 'make -s', we can assume they don't want to
+> see any output except for warnings and errors, but instead
+> they see this for a warning free build:
+> 
+>  ###
+>  ### Now generating an X.509 key pair to be used for signing modules.
+>  ###
+>  ### If this takes a long time, you might wish to run rngd in the
+>  ### background to keep the supply of entropy topped up.  It
+>  ### needs to be run as root, and uses a hardware random
+>  ### number generator if one is available.
+>  ###
+>  Generating a 4096 bit RSA private key
+>  .................................................................................................................................................................................................................................++
+>  ..............................................................................................................................++
+>  writing new private key to 'certs/signing_key.pem'
+>  -----
+>  ###
+>  ### Key pair generated.
+>  ###
+> 
+> The output can confuse simple build testing scripts that just check
+> for an empty build log.
+> 
+> This patch silences all the output:
+>  - "echo" is changed to "@$(kecho)", which is dropped when "-s" gets
+>    passed
+>  - the openssl command itself is only printed with V=1, using the
+>    $(Q) macro
+>  - The output of openssl gets redircted to /dev/null on "-s" builds.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-You can base it on the arm/mediatek branch of the iommu tree. I'll push
-it out in the next minutes.
+Applied.
 
-
-	Joerg
+David
