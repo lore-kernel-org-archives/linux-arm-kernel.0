@@ -1,42 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Feb 2016 13:58:21 -0800
-Subject: [GIT PULL] omap device tree changes for v4.6 merge window, part 1
-In-Reply-To: <6026634.ihuvqopRan@wuerfel>
-References: <20160222215612.GV13417@atomide.com> <6026634.ihuvqopRan@wuerfel>
-Message-ID: <20160226215820.GK13417@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 23:02:21 +0100
+Subject: [PATCH 0/7] arm/arm64: Alpine patches for 4.6
+In-Reply-To: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <2955978.E8qlghcpm8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160226 13:35]:
-> On Monday 22 February 2016 13:56:12 Tony Lindgren wrote:
-> > Device tree changes for omaps for v4.6 merge window. Mostly just
-> > adding board specific devices and few new boards:
+On Thursday 25 February 2016 11:14:50 Antoine Tenart wrote:
+> Hi Arnd, Olof and Kevin,
 > 
-> Pulled into next/dt, with a trivial conflict resolution:
+> Here are the Alpine patches for 4.6. As seen with Olof these patches are
+> sent to you as a series as there are only 7 of them. I'll get my gpg key
+> signed and setup a git tree somewhere for next time.
 > 
-> --- a/arch/arm/boot/dts/logicpd-torpedo-som.dtsi
-> +++ b/arch/arm/boot/dts/logicpd-torpedo-som.dtsi
-> @@@ -110,6 -110,19 +110,11 @@@
->   
->   &i2c3 {
->   	clock-frequency = <400000>;
->  -};
->  -
->  -&i2c2 {
->  -	clock-frequency = <400000>;
->  -};
->  -
->  -&i2c3 {
->  -	clock-frequency = <400000>;
-> + 	at24 at 50 {
-> + 		compatible = "at24,24c02";
-> + 		readonly;
-> + 		reg = <0x50>;
-> + 	};
->   };
->   
->   /*
+> The first 3 patches introduce a basic arm64 Alpine support, by adding
+> the Alpine v2 EVP board. The last 4 patches add an MSIX node in both
+> Alpine v1 (arm) and Alpine v2 (arm64) dtsi and select the Alpine MSI
+> controller driver.
 
-OK looks god to me thanks.
+Applied the patches to the next/dt, next/dt64, next/arm64 and next/soc
+branches, respectively. I did not see any strong dependencies between
+the patches, so they are now out of order (depending how Linus
+pulls our branches). Please check if that's ok and if I missed anything.
 
-Tony
+They should show up in the for-next branch of arm-soc once I've done
+some basic testing tonight.
+
+	Arnd
