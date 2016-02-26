@@ -1,20 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 22:24:39 +0100
-Subject: [GIT PULL] ARM: mediatek: soc updates for v4.5
-In-Reply-To: <CABuKBeLEf+jyE5gzWEVzfRZ7DwRgnLrdWLREwqqfYGBb2g+exQ@mail.gmail.com>
-References: <CABuKBeLEf+jyE5gzWEVzfRZ7DwRgnLrdWLREwqqfYGBb2g+exQ@mail.gmail.com>
-Message-ID: <3414351.uxCDVXedab@wuerfel>
+Date: Fri, 26 Feb 2016 22:26:25 +0100
+Subject: [GIT PULL] ARM: mediatek: dts updates for v4.6
+In-Reply-To: <CABuKBe+vk0E6-8ni5bHtyn6X3EbLoOxfjw0zqPRE_tLdp0AAXQ@mail.gmail.com>
+References: <CABuKBe+vk0E6-8ni5bHtyn6X3EbLoOxfjw0zqPRE_tLdp0AAXQ@mail.gmail.com>
+Message-ID: <5329731.9Lo5B37Fqc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 February 2016 13:40:51 Matthias Brugger wrote:
-> Fix state machine implemenation of PMIC wrapper.
-> Add SMP support for mt7623.
-> Disable watchdog of STAUPD in PMIC wrapper for mt8173.
-> Add SMP support for mt2701.
-> Use builtin_platform_driver for scpsys. Driver can't be build as module.
-> Fix regulator enablement in scpsys.
-> 
+On Monday 22 February 2016 13:47:24 Matthias Brugger wrote:
+> Add support for mt7623 SoC.
+> Enable SMP support for mt7623.
+> Enable SMP support for mt2701
+> Add pinctrl for mt2701
 > 
 
 Pulled into next/dt, thanks!
