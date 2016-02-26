@@ -1,136 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 12:51:25 +0100
-Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
-In-Reply-To: <56D030A4.5050205@nxp.com>
-References: <56D030A4.5050205@nxp.com>
-Message-ID: <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 12:52:20 +0100
+Subject: [PATCH] drm: rcar-du: clarify vsp dependency
+Message-ID: <1456487546-3886345-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
-> In case the bootloader doesn't provide randomness
-> (through device tree or by uefi protocol) generate
-> a pseudo-random seed based on the timer counter.
-> People might find this "week rng" approach convenient
-> as it gets rid of the bootloader dependency.
->
-> The patch tries to mimic the x86's rdtsc
-> based implementation authored by Kees Cook.
->
-> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Kees Cook <keescook@chromium.org>
+The VSP1 compositor code in DRM links against the respective V4L
+driver, but the dependency is not expressed correctly in Kconfig,
+which leads to a build error when the DRM driver is built-in
+and the V4L driver is a module:
 
-Hi Laurentiu,
+drivers/gpu/built-in.o: In function `rcar_du_vsp_plane_atomic_update':
+rcar-du/rcar_du_vsp.c:183: undefined reference to `vsp1_du_atomic_update'
 
-I appreciate the interest in this work, but to be honest, I don't like
-this at all. I went out of my way to ensure that
-a) the kernel itself does not take part in generating the random bits, and
-b) the random bits are used in such a way that there is no correlation
-between the randomization of the core kernel, the module region and
-the linear region if there is no correlation between the random bits.
+This patch avoids the problem by ensuring that the DRM VSP code can
+only be enabled if the V4L driver is linked into the kernel, or
+both are loadable modules.
 
-The limited entropy of the cycle counter at early boot defeats that,
-and even worse, it will not encourage platform vendors to implement
-this properly in their boot code, given that it will appear to work,
-and the only thing more dangerous than no security is a false sense of
-security imo.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6d62ef3ac30b ("drm: rcar-du: Expose the VSP1 compositor through KMS planes")
+---
+ drivers/gpu/drm/rcar-du/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-What I would ack, for development purposes, is something similar to
-what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
-developers get to exercise this code even if their boot environment
-does not provide any entropy. Anything beyond that is a nack as far as
-I am concerned.
-
-One other remark below
-
+diff --git a/drivers/gpu/drm/rcar-du/Kconfig b/drivers/gpu/drm/rcar-du/Kconfig
+index 1f10fa0928b4..eb1e6d5cfed9 100644
+--- a/drivers/gpu/drm/rcar-du/Kconfig
++++ b/drivers/gpu/drm/rcar-du/Kconfig
+@@ -27,6 +27,6 @@ config DRM_RCAR_LVDS
+ config DRM_RCAR_VSP
+ 	bool "R-Car DU VSP Compositor Support"
+ 	depends on DRM_RCAR_DU
+-	depends on VIDEO_RENESAS_VSP1
++	depends on VIDEO_RENESAS_VSP1=y || (VIDEO_RENESAS_VSP1 && DRM_RCAR_DU=m)
+ 	help
+ 	  Enable support to expose the R-Car VSP Compositor as KMS planes.
 -- 
-Ard.
-
-
-> ---
-> based on http://git.linaro.org/people/ard.biesheuvel/linux-arm.git,
-> branch arm64-kaslr-v6
->
->  arch/arm64/kernel/kaslr.c | 44 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 42 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-> index 5829839..41e9cbd 100644
-> --- a/arch/arm64/kernel/kaslr.c
-> +++ b/arch/arm64/kernel/kaslr.c
-> @@ -13,6 +13,7 @@
->  #include <linux/sched.h>
->  #include <linux/types.h>
->
-> +#include <asm/arch_timer.h>
->  #include <asm/fixmap.h>
->  #include <asm/kernel-pgtable.h>
->  #include <asm/memory.h>
-> @@ -20,9 +21,30 @@
->  #include <asm/pgtable.h>
->  #include <asm/sections.h>
->
-> +#include <generated/compile.h>
-> +#include <generated/utsrelease.h>
-> +
-
-This messes with the build system: these will be regenerated every
-time you hit 'make' and so you will always have to rebuild your
-vmlinux, even if nothing changed.
-
-> +/* Simplified build-specific string for starting entropy. */
-> +static const char build_str[] = UTS_RELEASE " (" LINUX_COMPILE_BY "@"
-> +               LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION;
-> +
->  u64 __read_mostly module_alloc_base;
->  u16 __initdata memstart_offset_seed;
->
-> +static u64 rotate_xor(u64 hash, const void *area, size_t size)
-> +{
-> +       size_t i;
-> +       unsigned long *ptr = (unsigned long *)area;
-> +
-> +       for (i = 0; i < size / sizeof(hash); i++) {
-> +               /* Rotate by odd number of bits and XOR. */
-> +               hash = (hash << ((sizeof(hash) * 8) - 7)) | (hash >> 7);
-> +               hash ^= ptr[i];
-> +       }
-> +
-> +       return hash;
-> +}
-> +
->  static __init u64 get_kaslr_seed(void *fdt)
->  {
->         int node, len;
-> @@ -101,8 +123,26 @@ u64 __init kaslr_early_init(u64 dt_phys)
->          * Retrieve (and wipe) the seed from the FDT
->          */
->         seed = get_kaslr_seed(fdt);
-> -       if (!seed)
-> -               return 0;
-> +       if (!seed) {
-> +               u64 raw;
-> +               const u64 mix_const = 0x5d6008cbf3848dd3UL;
-> +
-> +               /*
-> +                * Attempt to create a simple but unpredictable starting
-> +                * entropy.
-> +                */
-> +               seed = rotate_xor(seed, build_str, sizeof(build_str));
-> +               seed = rotate_xor(seed, fdt, size);
-> +
-> +               raw = arch_counter_get_cntvct();
-> +               seed ^= raw;
-> +
-> +               /* Circular multiply for better bit diffusion */
-> +               asm("mul %1, %2, %3; umulh %0, %2, %3"
-> +                   : "=&r" (raw), "=&r" (seed)
-> +                   : "r" (seed), "r" (mix_const));
-> +               seed += raw;
-> +       }
->
->         /*
->          * Check if 'nokaslr' appears on the command line, and
-> --
-> 1.8.3.1
+2.7.0
