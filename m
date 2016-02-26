@@ -1,53 +1,23 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Fri, 26 Feb 2016 11:50:35 -0500
-Subject: [PATCH v4 0/6] watchdog: pnx4008: add restart handler
-In-Reply-To: <56D07394.8030107@roeck-us.net>
-References: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
- <56D062DD.1060707@roeck-us.net> <1456500886.2194.6.camel@localhost>
- <56D07394.8030107@roeck-us.net>
-Message-ID: <1456505435.28671.3.camel@localhost>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 26 Feb 2016 10:52:39 -0600
+Subject: [PATCH V14 0/9] dma: add Qualcomm Technologies HIDMA driver
+In-Reply-To: <56D07B71.4080209@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <56D07B71.4080209@codeaurora.org>
+Message-ID: <56D082D7.1050002@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-02-26 at 07:47 -0800, Guenter Roeck wrote:
-> On 02/26/2016 07:34 AM, Sylvain Lemieux wrote:
-> > On Fri, 2016-02-26 at 06:36 -0800, Guenter Roeck wrote:
-> >> On 02/25/2016 10:31 AM, Sylvain Lemieux wrote:
-> >>> From: Sylvain Lemieux <slemieux@tycoint.com>
-> >>>
-> >>> The LPC32xx provide the capability to perform a soft or hard reset;
-> >>> a soft reset will no reset the external peripheral
-> >>> (i.e. RESOUT_N output not asserted).
-> >>>
-> >>> This changeset migrate the restart code from the "mach-lpc32xx" to
-> >>> the "pnx-4008" watchdog driver and add the soft reset capability.
-> >>>
-> >>> The default behavior (i.e. hard reset) remain unchanged.
-> >>>
-> >>> The core restart handler support added by this change:
-> >>> 2165bf524da5f5e496d - "watchdog: core: add restart handler support"
-> >>> is not use in this changeset; it does not support the reboot mode.
-> >>
-> >> I finally had the time to look into this. Sorry for the late reply.
-> >>
-> >> Changing the watchdog core to pass the restart mode (or action)
-> >> and the cmd/data pointer to the driver would be trivial and should
-> >> be done instead.
-> >>
-> > Thanks for the feedback.
-> >
-> > Do you want me to rebase this patchset on the patch you will submit
-> > to update the core restart handler support?
-> >
-> 
-> Yes, please. I'll Cc: you on it.
-> 
-> If you want to get started early and are open to do some early testing,
-> try cloning git://kerneltests.org/git/linux.git. You'll find the patch
-> in branch 'testing'.
-> 
-Rebase and tested on a custom LPC32xx board.
+Sinan Kaya wrote:
+> Hi Marc Zyngier, Mark Rutland;
+>
+> I'm looking forward to hear your feedback on this series.
 
-> Thanks,
-> Guenter
-> 
+Would it be possible to get this patchset into 4.6?  We're already at 
+v14, and there have been no review comments since this patch was posted 
+on the fourth (over three weeks ago).
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
