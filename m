@@ -1,32 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Feb 2016 11:36:35 -0800
-Subject: [PATCH v2] ARM: dts: sun8i: Add leds and switch on Orangepi Plus
- boards
-In-Reply-To: <20160225204234.GA31610@box2.japko.eu>
-References: <20160225204234.GA31610@box2.japko.eu>
-Message-ID: <20160226193635.GA8418@lukather>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Fri, 26 Feb 2016 20:36:24 +0100
+Subject: [PATCH v2] ARM: dts: tegra: correct Beaver pinmux
+In-Reply-To: <56D0A748.6060104@wwwdotorg.org>
+References: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
+ <56D0A748.6060104@wwwdotorg.org>
+Message-ID: <1456515384.20487.2.camel@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 09:42:35PM +0100, Krzysztof Adamski wrote:
-> OrangePi Plus board has dwo leds - green ("pwr") and red ("status")
-> and a switch ("sw4"). This patch describes them in a devicetree.
+Am Freitag, den 26.02.2016, 12:28 -0700 schrieb Stephen Warren:
+> On 02/26/2016 12:18 PM, Lucas Stach wrote:
+> > Update pinmux to get rid of invalid uses of the rsvd1 function,
+> > which lead
+> > to the mux settings on those pins to not be applied.
+> > 
+> > Also add correct drive settings, derived from the Tegra3 TRM, for 
+Your comment from v1 is addressed here ?^^^^^^^^^^^^^^^^^^^^^^^^
+
+> > SDIO1,
+> > which makes some more SD-cards work.
 > 
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+> I replied the following to V1, which I don't see resolved:
+> 
+> ?> I think it would be worth mentioning in the commit description
+> where?
+> ?> this[1] data came from.
+> 
+> [1] that was in response to the addition of the sdio1 drive settings.
+> 
+> Also, what is different in V2; is this actually V1 REPOST?
 
-Applied (with a minor change to the pinctrl list to have pinctrl-0 =
-<&node1>, <&node2>;), thanks!
+Other than the reworded commit message there is no change in v2.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/662ef014/attachment.sig>
+Regards,
+Lucas
