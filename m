@@ -1,93 +1,129 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 13:37:11 +0100
-Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
-In-Reply-To: <20160226121819.GB8728@leverpostej>
-References: <56D030A4.5050205@nxp.com>
- <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
- <20160226121819.GB8728@leverpostej>
-Message-ID: <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
+From: glider@google.com (Alexander Potapenko)
+Date: Fri, 26 Feb 2016 13:38:37 +0100
+Subject: [PATCH v1] kasan,
+ arm64: Unpoison dirty stack frames when resuming from suspend.
+Message-ID: <c08aa050cb03e40098775dc8d200f073451c342e.1456489933.git.glider@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2016 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
->> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
->> > In case the bootloader doesn't provide randomness
->> > (through device tree or by uefi protocol) generate
->> > a pseudo-random seed based on the timer counter.
->> > People might find this "week rng" approach convenient
->> > as it gets rid of the bootloader dependency.
->> >
->> > The patch tries to mimic the x86's rdtsc
->> > based implementation authored by Kees Cook.
->> >
->> > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Cc: Kees Cook <keescook@chromium.org>
->>
->> Hi Laurentiu,
->>
->> I appreciate the interest in this work, but to be honest, I don't like
->> this at all. I went out of my way to ensure that
->> a) the kernel itself does not take part in generating the random bits, and
->> b) the random bits are used in such a way that there is no correlation
->> between the randomization of the core kernel, the module region and
->> the linear region if there is no correlation between the random bits.
->>
->> The limited entropy of the cycle counter at early boot defeats that,
->> and even worse, it will not encourage platform vendors to implement
->> this properly in their boot code, given that it will appear to work,
->> and the only thing more dangerous than no security is a false sense of
->> security imo.
->
-> I agree that a false sense of security is a worry here.
->
-> Either way, I think we need numbers. It's non-obvious how much entropy
-> we can acquire through counters or other means at early boot time.
->
-> Has anyone done an analysis of environmental entropy available (through
-> any means) at early boot, VM vs native?
->
+Before an ARM64 CPU is suspended, the kernel saves the context which will
+be used to initialize the register state upon resume. After that and
+before the actual execution of the SMC instruction the kernel creates
+several stack frames which are never unpoisoned because arm_smccc_smc()
+does not return. This may cause false positive stack buffer overflow
+reports from KASAN.
 
-Define 'environmental'. The only architected thing you can rely on is
-the timer, which really does not hold a lot of entropy on modern solid
-state platforms. I don't have the numbers, but I do have the
-experience to back this up, unfortunately (at my former employer).
+The solution is to record the stack pointer value just before the CPU is
+suspended, and unpoison the part of stack between the saved value and
+the stack pointer upon resume.
 
-You could argue that KASLR does not require strong entropy like key
-generation, but I would prefer to simply steer clear of that entire
-debate. The bootloader simply needs to do the best job it can, either
-based on some peripheral that the kernel has no awareness of this
-early in the boot, or perhaps by other means if it doesn't (which
-could include storing a random seed in the file system, or even in a
-EFI variable). Punting it to the kernel is really the last resort.
+Signed-off-by: Alexander Potapenko <glider@google.com>
+---
+ arch/arm64/kernel/suspend.c |  5 +++++
+ drivers/firmware/psci.c     |  5 +++++
+ include/linux/kasan.h       |  5 +++++
+ mm/kasan/kasan.c            | 32 ++++++++++++++++++++++++++++++++
+ 4 files changed, 47 insertions(+)
 
-> It's also not obvious that vendors will correctly implement the EFI RNG
-> protocol; depending on the above we may want to mix in additional entropy
-> regardless.
->
-
-True, but that is not the point. The main risk I see is that vendors
-will not bother at all once the digits start to look random to the
-human eye.
-
->> What I would ack, for development purposes, is something similar to
->> what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
->> developers get to exercise this code even if their boot environment
->> does not provide any entropy. Anything beyond that is a nack as far as
->> I am concerned.
->
-> FWIW, I would not like to see that approach. I can easily see a build-time
-> constant KASLR seed being abused to give a false sense of security. Having a
-> bootloader or hypervisor provide different random seeds to the same Image gives
-> you a much better turnaround time for testing regardless (vs rebuilding,
-> copying, etc).
->
-
-If it would be *instead* of the ordinary handling, with a big fat
-blurb saying that KASLR is disabled, I would not mind.
-
-> The TEXT_OFFSET fuzzing was for fuzzing the bootloader, which is a bit
-> different to fuzzing the kernel itself.
->
-> Mark.
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 1095aa4..1070415 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -1,4 +1,5 @@
+ #include <linux/ftrace.h>
++#include <linux/kasan.h>
+ #include <linux/percpu.h>
+ #include <linux/slab.h>
+ #include <asm/cacheflush.h>
+@@ -117,6 +118,10 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 		 */
+ 		if (hw_breakpoint_restore)
+ 			hw_breakpoint_restore(NULL);
++#ifdef CONFIG_KASAN
++		/* Unpoison the stack above the current frame. */
++		kasan_cpu_resume();
++#endif
+ 	}
+ 
+ 	unpause_graph_tracing();
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index f25cd79..2480189 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -15,6 +15,7 @@
+ 
+ #include <linux/arm-smccc.h>
+ #include <linux/errno.h>
++#include <linux/kasan.h>
+ #include <linux/linkage.h>
+ #include <linux/of.h>
+ #include <linux/pm.h>
+@@ -122,6 +123,10 @@ static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
+ {
+ 	struct arm_smccc_res res;
+ 
++#ifdef CONFIG_KASAN
++	/* Notify KASAN it should unpoison the stack up to this point. */
++	kasan_stack_watermark();
++#endif
+ 	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+ 	return res.a0;
+ }
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index 4b9f85c..d4fd7a4 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -62,6 +62,11 @@ void kasan_slab_free(struct kmem_cache *s, void *object);
+ int kasan_module_alloc(void *addr, size_t size);
+ void kasan_free_shadow(const struct vm_struct *vm);
+ 
++#ifdef CONFIG_ARM64
++void kasan_stack_watermark(void);
++void kasan_cpu_resume(void);
++#endif
++
+ #else /* CONFIG_KASAN */
+ 
+ static inline void kasan_unpoison_shadow(const void *address, size_t size) {}
+diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
+index bc0a8d8..6529d345 100644
+--- a/mm/kasan/kasan.c
++++ b/mm/kasan/kasan.c
+@@ -550,3 +550,35 @@ static int __init kasan_memhotplug_init(void)
+ 
+ module_init(kasan_memhotplug_init);
+ #endif
++
++#ifdef CONFIG_ARM64
++static DEFINE_PER_CPU(unsigned long, cpu_stack_watermark);
++
++/* Record the stack pointer before the CPU is suspended. The recorded value
++ * will be used upon resume to unpoison the dirty stack frames.
++ */
++void kasan_stack_watermark(void)
++{
++	unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
++
++	*watermark = __builtin_frame_address(0);
++}
++EXPORT_SYMBOL_GPL(kasan_stack_watermark);
++
++void kasan_cpu_resume(void)
++{
++	unsigned long sp = __builtin_frame_address(0);
++	unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
++
++	if (*watermark == 0) {
++		WARN_ON_ONCE(*watermark == 0);
++		*watermark = sp;
++		return;
++	}
++	if (sp > *watermark) {
++		kasan_unpoison_shadow(*watermark, sp - *watermark);
++		*watermark = 0;
++	}
++}
++EXPORT_SYMBOL_GPL(kasan_cpu_resume);
++#endif
+-- 
+2.7.0.rc3.207.g0ac5344
