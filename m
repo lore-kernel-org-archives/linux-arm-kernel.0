@@ -1,10 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 01:57:25 +0100
-Subject: [PATCH v3 17/52] mtd: onenand: use mtd_set_ecclayout() where
- appropriate
+Date: Fri, 26 Feb 2016 01:57:26 +0100
+Subject: [PATCH v3 18/52] mtd: docg3: use mtd_set_ecclayout() where appropriate
 In-Reply-To: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1456448280-27788-18-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1456448280-27788-19-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,22 +11,23 @@ Use the mtd_set_ecclayout() helper instead of directly assigning the
 mtd->ecclayout field.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/mtd/onenand/onenand_base.c | 2 +-
+ drivers/mtd/devices/docg3.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
-index 20fdf8c..d0fa505 100644
---- a/drivers/mtd/onenand/onenand_base.c
-+++ b/drivers/mtd/onenand/onenand_base.c
-@@ -3997,7 +3997,7 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
+diff --git a/drivers/mtd/devices/docg3.c b/drivers/mtd/devices/docg3.c
+index e7b2e43..6b516e1 100644
+--- a/drivers/mtd/devices/docg3.c
++++ b/drivers/mtd/devices/docg3.c
+@@ -1857,7 +1857,7 @@ static int __init doc_set_driver_info(int chip_id, struct mtd_info *mtd)
+ 	mtd->_read_oob = doc_read_oob;
+ 	mtd->_write_oob = doc_write_oob;
+ 	mtd->_block_isbad = doc_block_isbad;
+-	mtd->ecclayout = &docg3_oobinfo;
++	mtd_set_ecclayout(mtd, &docg3_oobinfo);
+ 	mtd->oobavail = 8;
+ 	mtd->ecc_strength = DOC_ECC_BCH_T;
  
- 	mtd->oobavail = ret;
- 
--	mtd->ecclayout = this->ecclayout;
-+	mtd_set_ecclayout(mtd, this->ecclayout);
- 	mtd->ecc_strength = 1;
- 
- 	/* Fill in remaining MTD driver data */
 -- 
 2.1.4
