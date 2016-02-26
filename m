@@ -1,22 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 22:41:12 +0100
-Subject: [GIT PULL v2] Renesas ARM Based SoC Updates for v4.6
-In-Reply-To: <cover.1456275652.git.horms+renesas@verge.net.au>
-References: <cover.1456275652.git.horms+renesas@verge.net.au>
-Message-ID: <9690263.69L9WD628V@wuerfel>
+Date: Fri, 26 Feb 2016 22:43:24 +0100
+Subject: [GIT PULL] DaVinci EDMA enhancements for v4.6
+In-Reply-To: <1456221214-18042-2-git-send-email-nsekhar@ti.com>
+References: <1456221214-18042-1-git-send-email-nsekhar@ti.com>
+ <1456221214-18042-2-git-send-email-nsekhar@ti.com>
+Message-ID: <3099721.fE27jmolfX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 February 2016 10:21:25 Simon Horman wrote:
-> Renesas ARM Based SoC Updates for v4.6
-> 
-> * Enable PM and PM_GENERIC_DOMAINS for SoCs with PM Domains
-> * Move emev2_smp_ops to emev2
-> * Remove legacy map_io callbacks on r8a7740 and emev2 SoCs
-> * Migrate to generic l2c OF initialization on r8a7740
-> 
+On Tuesday 23 February 2016 15:23:34 Sekhar Nori wrote:
+> Pass dma_slave_map data to EDMA driver. This will help
+> migration to new DMA engine API for requesting
+> slave channels dma_request_chan().
 
-Pulled into next/soc, thanks! I guess some of it could have been
-part of the cleanup branch as well, but it seems fine either way.
+Pulled into next/soc, thanks!
 
 	Arnd
