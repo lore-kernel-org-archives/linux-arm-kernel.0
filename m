@@ -1,153 +1,33 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 26 Feb 2016 14:36:30 +0530
-Subject: [PATCH v2] arm64: dts: Add tmu node for exynos7
-Message-ID: <1456477590-4530-1-git-send-email-alim.akhtar@samsung.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 26 Feb 2016 09:12:15 +0000
+Subject: [PATCH V2] ARM64: tegra: Add support for Google Pixel C
+In-Reply-To: <CAL1qeaHVuvwTkctEMo6TFggPPgqaQZDnKZGYn1QRUROpJ9Dhrw@mail.gmail.com>
+References: <1454949199-27050-1-git-send-email-jonathanh@nvidia.com>
+ <CAL1qeaHVuvwTkctEMo6TFggPPgqaQZDnKZGYn1QRUROpJ9Dhrw@mail.gmail.com>
+Message-ID: <56D016EF.1000404@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds tmu node, related temprature sensor and triping
-point data for Atlas cpu core found on exynos7 SoC.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
-Changes since v1:
-* Addressed krzysztof's review comments.
+On 25/02/16 21:07, Andrew Bresticker wrote:
+> Jon,
+> 
+> On Mon, Feb 8, 2016 at 8:33 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
+>> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
+>> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
+>>
+>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> 
+> Reviewed-by: Andrew Bresticker <abrestic@chromium.org>
+> 
+> ... and I booted up my Smaug with v4.5-rc5 + this patch, so:
+> 
+> Tested-by: Andrew Bresticker <abrestic@chromium.org>
 
- .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +++++++++
- .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   54 ++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 ++++++++
- 3 files changed, 99 insertions(+)
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+Thanks. There is a V3 of this patch [0]. The main difference is that it
+enables all 4 CPUs. Care of test/ack this version?
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
-new file mode 100644
-index 0000000..1d6dcf2
---- /dev/null
-+++ b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
-@@ -0,0 +1,25 @@
-+/*
-+ * Device tree sources for Exynos7 TMU sensor configuration
-+ *
-+ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <dt-bindings/thermal/thermal_exynos.h>
-+
-+#thermal-sensor-cells = <0>;
-+samsung,tmu_gain = <9>;
-+samsung,tmu_reference_voltage = <17>;
-+samsung,tmu_noise_cancel_mode = <4>;
-+samsung,tmu_efuse_value = <75>;
-+samsung,tmu_min_efuse_value = <15>;
-+samsung,tmu_max_efuse_value = <100>;
-+samsung,tmu_first_point_trim = <25>;
-+samsung,tmu_second_point_trim = <85>;
-+samsung,tmu_default_temp_offset = <50>;
-+samsung,tmu_cal_type = <TYPE_ONE_POINT_TRIMMING>;
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-new file mode 100644
-index 0000000..0623583
---- /dev/null
-+++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-@@ -0,0 +1,54 @@
-+/*
-+ * Device tree sources for default Exynos7 thermal zone definition
-+ *
-+ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+trips {
-+	cpu-alert-0 {
-+		temperature = <75000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-1 {
-+		temperature = <80000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-2 {
-+		temperature = <85000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-3 {
-+		temperature = <90000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-4 {
-+		temperature = <95000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-5 {
-+		temperature = <100000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-alert-6 {
-+		temperature = <110000>; /* millicelsius */
-+		hysteresis = <10000>; /* millicelsius */
-+		type = "passive";
-+	};
-+	cpu-crit-0 {
-+		temperature = <115000>; /* millicelsius */
-+		hysteresis = <0>; /* millicelsius */
-+		type = "critical";
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index c662f98..19de742 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -27,6 +27,7 @@
- 		pinctrl6 = &pinctrl_fsys0;
- 		pinctrl7 = &pinctrl_fsys1;
- 		pinctrl8 = &pinctrl_bus1;
-+		tmuctrl0 = &tmuctrl_0;
- 	};
- 
- 	cpus {
-@@ -538,6 +539,25 @@
- 			clocks = <&clock_peric0 PCLK_PWM>;
- 			clock-names = "timers";
- 		};
-+
-+		tmuctrl_0: tmu at 10060000 {
-+			compatible = "samsung,exynos7-tmu";
-+			reg = <0x10060000 0x200>;
-+			interrupts = <0 108 0>;
-+			clocks = <&clock_peris PCLK_TMU>,
-+				 <&clock_peris SCLK_TMU>;
-+			clock-names = "tmu_apbif", "tmu_sclk";
-+			#include "exynos7-tmu-sensor-conf.dtsi"
-+		};
-+
-+		thermal-zones {
-+			atlas_thermal: cluster0-thermal {
-+				polling-delay-passive = <0>; /* milliseconds */
-+				polling-delay = <0>; /* milliseconds */
-+				thermal-sensors = <&tmuctrl_0>;
-+				#include "exynos7-trip-points.dtsi"
-+			};
-+		};
- 	};
- };
- 
--- 
-1.7.10.4
+Cheers
+Jon
+
+[0] http://marc.info/?l=linux-arm-kernel&m=145502094332480&w=4
