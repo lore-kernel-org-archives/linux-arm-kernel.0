@@ -1,61 +1,85 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Fri, 26 Feb 2016 13:34:31 +0300
-Subject: [PATCH -next] mm: fix build for arm64 hugetlbpage
-In-Reply-To: <1456414385-13775-1-git-send-email-sudeep.holla@arm.com>
-References: <1456414385-13775-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160226103431.GB22450@node.shutemov.name>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 26 Feb 2016 12:34:34 +0200
+Subject: [PATCH 3/7 v2] video: ARM CLCD: support DT signal inversion flags
+In-Reply-To: <1456221704-5792-4-git-send-email-linus.walleij@linaro.org>
+References: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
+ <1456221704-5792-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <56D02A3A.6010701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 03:33:05PM +0000, Sudeep Holla wrote:
-> Commit ("mm: cleanup *pte_alloc* interfaces") redefined pte_alloc_map()
-> using pte_alloc() and fixed all the callsites. However arm64 callsite
-> seem to have got missed. This patch fixes the same and thereby fixing
-> the following build error.
+
+
+On 23/02/16 12:01, Linus Walleij wrote:
+> The device tree bindings from display-timing.txt allows us to
+> specify if data enable, hsync, vsync or the pixed clock should be
+> inverted on the way to the display. The driver does not currently
+> handle this so add support for those flags as it is needed for
+> the Versatile Sanyo LCD display.
 > 
-> arch/arm64/mm/hugetlbpage.c: In function 'huge_pte_alloc':
-> arch/arm64/mm/hugetlbpage.c:127:42: error: macro "pte_alloc_map" passed 4 arguments, but takes just 3
->    pte = pte_alloc_map(mm, NULL, pmd, addr);
->                                           ^
-> arch/arm64/mm/hugetlbpage.c:127:9: error: 'pte_alloc_map' undeclared (first use in this function)
->    pte = pte_alloc_map(mm, NULL, pmd, addr);
->          ^
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-
-Sorry for that.
-
-Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-
+> Note that the previous behaviour was to invert the pixel clock
+> for all displays, so unless the pixel clock polarity is
+> explicitly defined in the device tree (i.e. the timings node
+> has the "pixelclk-active" property) we fall back to inverting
+> the pixel clock. This needs some extra compatibility code.
+> 
+> Since the timing flags have to be set up inside the struct
+> clcd_panel, we need to refactor the code a bit to pass around
+> the panel rather than just the mode.
+> 
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm64/mm/hugetlbpage.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> ChangeLog v1->v2:
+> - No changes. Just reposting.
+> ---
+>  drivers/video/fbdev/amba-clcd.c | 41 ++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 34 insertions(+), 7 deletions(-)
 > 
-> Hi,
-> 
-> Since it's from -mm tree, I have not put the commit id causing the
-> breakage. Also since I don't have the original patch in my inbox, I am
-> posting this separately. It would be good to squash this into original
-> commit.
-> 
-> Regards,
-> Sudeep
-> 
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 82d607c3614e..bb6b4c7bfab3 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -124,7 +124,7 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
->  		 * will be no pte_unmap() to correspond with this
->  		 * pte_alloc_map().
->  		 */
-> -		pte = pte_alloc_map(mm, NULL, pmd, addr);
-> +		pte = pte_alloc_map(mm, pmd, addr);
->  	} else if (sz == PMD_SIZE) {
->  		if (IS_ENABLED(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) &&
->  		    pud_none(*pud))
-> -- 
-> 1.9.1
-> 
+> diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
+> index c5d1e9ca81ab..8903a42c4122 100644
+> --- a/drivers/video/fbdev/amba-clcd.c
+> +++ b/drivers/video/fbdev/amba-clcd.c
+> @@ -567,10 +567,11 @@ static int clcdfb_register(struct clcd_fb *fb)
+>  
+>  #ifdef CONFIG_OF
+>  static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
+> -		struct fb_videomode *mode)
+> +		struct clcd_panel *clcd_panel)
+>  {
+>  	int err;
+>  	struct display_timing timing;
+> +	struct device_node *timnp;
+>  	struct videomode video;
+>  
+>  	err = of_get_display_timing(node, "panel-timing", &timing);
+> @@ -579,10 +580,34 @@ static int clcdfb_of_get_dpi_panel_mode(struct device_node *node,
+>  
+>  	videomode_from_timing(&timing, &video);
+>  
+> -	err = fb_videomode_from_videomode(&video, mode);
+> +	err = fb_videomode_from_videomode(&video, &clcd_panel->mode);
+>  	if (err)
+>  		return err;
+>  
+> +	/* Set up some inversion flags */
+> +	timnp = of_get_child_by_name(node, "panel-timing");
+> +	if (timnp && of_property_read_bool(timnp, "pixelclk-active")) {
 
--- 
- Kirill A. Shutemov
+Hmm, why are you poking in the videomode DT properties directly? If the
+pixelclk-active was not defined in the DT, you should see it in the
+videomode struct as neither DISPLAY_FLAGS_PIXDATA_POSEDGE nor
+DISPLAY_FLAGS_PIXDATA_NEGEDGE being set (I think, I didn't go through
+the code in detail).
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/de0044c5/attachment.sig>
