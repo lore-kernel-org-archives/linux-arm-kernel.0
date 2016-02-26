@@ -1,76 +1,114 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 26 Feb 2016 17:10:11 +0530
-Subject: [PATCH v7 RESEND 0/4] mailbox: hisilicon: add Hi6220 mailbox
- driver
-In-Reply-To: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
-References: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <CABb+yY0_OzKmftb0HQKyfuE+2jgOfoRLHp-ok=Ux36sK8na6Ag@mail.gmail.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 26 Feb 2016 12:44:13 +0100
+Subject: [i.MX] various errors in arch/arm/boot/dts/imx*-pinfunc.h files
+Message-ID: <20160226124413.71cef89a@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 15, 2016 at 7:20 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
-> with a maximum message size of 8 words. I/O is performed using register
-> access (there is no DMA) and the cell raises an interrupt when messages
-> are received.
->
-> This patch series is to implement Hi6220 mailbox driver. It registers
-> two channels into framework for communication with MCU, one is tx channel
-> and another is rx channel. Now mailbox driver is used to send message to
-> MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
->
-> Changes from v6:
-> * Fix to use lowercase for hexadecimal value in DT binding document
->
-> Changes from v5:
-> * Refine to use mailbox three specifiers for client driver, so add xlate
->   callback function in mailbox driver to support these specifiers
-> * Refine document for property "hi6220,mbox-tx-noirq"
->
-> Changes from v4:
-> * According to Jassi's suggestion, using DT binding to register channels
-> * Change to use operating-points-v2 to register operating points
->
-> Changes from v3:
-> * The patch series for enabling idle state for Hi6220 has reserved memory
->   regions, so this series will not include it anymore
-> * Refined mailbox driver according to Jassi's suggestion;
->   Removed kfifo from mailbox driver;
->   Removed spinlock for ipc registers accessing, due every channel has its
->   own dedicated bit in ipc register and readl/writel will introduce memory
->   barrier, so don't need spinlock to protect ipc registers accessing
-> * After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
->   stub clock driver; finally can enable CPUFreq driver for CPU frequency
->   scaling
->
-> Changes from v2:
-> * Get rid of unused memory regions from memory node in DT, and don't use
->   reserved-memory node according to Mark and Leif's suggestion; Haojian also
->   has updated UEFI for efi memory info
->
-> Changes from v1:
-> * Correct lock usage for SMP scenario
->
-> Changes from RFC:
-> * According to Jassi's review, totally remove the abstract common driver
->   layer and only commit driver dedicated for Hi6220
-> * According to Paul Bolle's review, fix typo issue for Kconfig and remove
->   unnecessary dependency with OF and fix minor for mailbox driver
-> * Refine a little for dts nodes
->
->
-> Leo Yan (4):
->   dt-bindings: mailbox: Document Hi6220 mailbox driver
->   mailbox: Hi6220: add mailbox driver
->   arm64: dts: add mailbox node for Hi6220
->   arm64: dts: add Hi6220's stub clock node
->
->  .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  74 ++++
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++++
->  drivers/mailbox/Kconfig                            |   8 +
->  drivers/mailbox/Makefile                           |   2 +
->  drivers/mailbox/hi6220-mailbox.c                   | 395 +++++++++++++++++++++
->
-Applied 1 & 2 to mailbox-for-next.  Patch-3&4 should go via asoc tree.
+Hi,
 
-Thanks
+after finding a bug in the imx6ul-pinconf.h file (missing input_sel
+config for MX6UL_PAD_UART5_RX_DATA__ECSPI2_MISO), I decided
+to write a perl script (see attachment) to check the file for
+consistency and found 44 more errors in the same file.
+
+Running the script over the remaining imx pinconf files revealed the
+following errors:
+arch/arm/boot/dts/imx35-pinfunc.h:
+----------------------------------
+ERROR: Missing INPUT_SEL address for FUNCTION 'KPP_ROW_3' on PAD 'MX35_PAD_CSI_D15',
+        other pads for this function are:
+        MX35_PAD_FST             0x097c 0x1
+        MX35_PAD_ATA_BUFF_EN     0x097c 0x2
+ERROR: Missing INPUT_SEL address for FUNCTION 'AUDMUX_AUD6_RXC' on PAD 'MX35_PAD_FEC_RDATA1',
+        other pads for this function are:
+        MX35_PAD_ATA_DATA10      0x07b8 0x0
+ERROR: Missing INPUT_SEL address for FUNCTION 'AUDMUX_AUD5_RXC' on PAD 'MX35_PAD_RTS2',
+        other pads for this function are:
+        MX35_PAD_HCKT            0x07a8 0x0
+arch/arm/boot/dts/imx35-pinfunc.h: 952 pads checked: 3 errors found
+
+arch/arm/boot/dts/imx50-pinfunc.h:
+----------------------------------
+ERROR: Missing INPUT_SEL address for FUNCTION 'UART3_CTS' on PAD 'MX50_PAD_ECSPI1_MOSI',
+        other pads for this function are:
+        MX50_PAD_UART4_TXD       0x07d0 0x0
+ERROR: Duplicate MUX reg addr 0x01f8 for pad 'MX50_PAD_EPDC_GDRL' and 'MX50_PAD_EPDC_GDOE'
+ERROR: Duplicate INPUT_SEL value 0x0 for FUNC 'ELCDIF_DAT_4' on pad 'MX50_PAD_EPDC_SDCE1'
+        pads for this function are:
+        MX50_PAD_DISP_D4         0x070c 0x0
+        MX50_PAD_EPDC_SDCE1      0x070c 0x0
+arch/arm/boot/dts/imx50-pinfunc.h: 905 pads checked: 3 errors found
+
+arch/arm/boot/dts/imx51-pinfunc.h:
+----------------------------------
+ERROR: Missing INPUT_SEL address for FUNCTION 'DISP1_EXT_CLK' on PAD 'MX51_PAD_DISPB2_SER_RS',
+        other pads for this function are:
+        MX51_PAD_EIM_CS5         0x0904 0x0
+ERROR: Duplicate MUX value 0x2 for FUNC 'DISP1_EXT_CLK' and 'DISP1_PIN16' on PAD 'MX51_PAD_DISPB2_SER_RS'
+arch/arm/boot/dts/imx51-pinfunc.h: 755 pads checked: 1 errors found
+
+arch/arm/boot/dts/imx7d-pinfunc.h:
+----------------------------------
+ERROR: Missing INPUT_SEL address for FUNCTION 'KPP_COL1' on PAD 'MX7D_PAD_ENET1_RGMII_RXC',
+        other pads for this function are:
+        MX7D_PAD_EPDC_DATA05     0x05f8 0x0
+ERROR: Missing INPUT_SEL address for FUNCTION 'SAI1_RX_BCLK' on PAD 'MX7D_PAD_ENET1_RGMII_TXC',
+        other pads for this function are:
+        MX7D_PAD_SAI1_RX_BCLK    0x069c 0x0
+ERROR: Missing INPUT_SEL address for FUNCTION 'SAI1_RX_SYNC' on PAD 'MX7D_PAD_ENET1_RGMII_TX_CTL',
+        other pads for this function are:
+        MX7D_PAD_SAI1_RX_SYNC    0x06a4 0x0
+ERROR: Duplicate MUX reg addr 0x0014 for pad 'MX7D_PAD_GPIO1_IO08' and 'MX7D_PAD_GPIO1_IO05'
+ERROR: Duplicate MUX reg addr 0x0018 for pad 'MX7D_PAD_GPIO1_IO09' and 'MX7D_PAD_GPIO1_IO06'
+ERROR: Duplicate MUX reg addr 0x001c for pad 'MX7D_PAD_GPIO1_IO10' and 'MX7D_PAD_GPIO1_IO07'
+ERROR: Missing INPUT_SEL address for FUNCTION 'CCM_PMIC_READY' on PAD 'MX7D_PAD_UART1_RX_DATA',
+        other pads for this function are:
+        MX7D_PAD_GPIO1_IO09      0x04f4 0x0
+        MX7D_PAD_GPIO1_IO13      0x04f4 0x1
+        MX7D_PAD_SAI1_MCLK       0x04f4 0x3
+ERROR: Missing INPUT_SEL address for FUNCTION 'ENET1_MDIO' on PAD 'MX7D_PAD_UART1_RX_DATA',
+        other pads for this function are:
+        MX7D_PAD_GPIO1_IO10      0x0568 0x0
+        MX7D_PAD_SD2_CD_B        0x0568 0x2
+ERROR: Missing INPUT_SEL address for FUNCTION 'SAI3_RX_BCLK' on PAD 'MX7D_PAD_UART2_RX_DATA',
+        other pads for this function are:
+        MX7D_PAD_SD1_CMD         0x06c4 0x1
+        MX7D_PAD_SD3_CMD         0x06c4 0x2
+ERROR: Missing INPUT_SEL address for FUNCTION 'ENET2_MDIO' on PAD 'MX7D_PAD_UART2_RX_DATA',
+        other pads for this function are:
+        MX7D_PAD_GPIO1_IO14      0x0574 0x0
+        MX7D_PAD_SD2_CD_B        0x0574 0x2
+ERROR: Missing INPUT_SEL address for FUNCTION 'UART2_DTE_RX' on PAD 'MX7D_PAD_UART2_TX_DATA',
+        other pads for this function are:
+        MX7D_PAD_LCD_ENABLE      0x06fc 0x1
+ERROR: Missing INPUT_SEL address for FUNCTION 'ECSPI1_SCLK' on PAD 'MX7D_PAD_UART3_RTS_B',
+        other pads for this function are:
+        MX7D_PAD_ECSPI1_SCLK     0x0524 0x1
+arch/arm/boot/dts/imx7d-pinfunc.h: 1135 pads checked: 12 errors found
+
+
+I will send a patch for imx6ul and imx51 shortly.
+But I have no resources to correct the bugs in the imx35, imx50 and
+imx7d files.
+The "Duplicate MUX reg addr" message for imx7d are false positives due
+to the deviant nature of the imx7d pinctrl design, but the other
+messages should be relevant.
+
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: check-pinfuncs.pl
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/ae124bfe/attachment.pl>
