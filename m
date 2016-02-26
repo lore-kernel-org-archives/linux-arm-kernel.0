@@ -1,48 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 16:25:17 +0100
-Subject: [PATCH] [media] saa7134: fix warning with !MEDIA_CONTROLLER
-Message-ID: <1456500332-2565063-1-git-send-email-arnd@arndb.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 26 Feb 2016 07:27:14 -0800
+Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
+In-Reply-To: <56D04D17.6030502@ti.com>
+References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
+ <20160204224128.GG4215@xsjsorenbubuntu>
+ <CAAtXAHcV-9gXcZOX8dzUOBZUwj9M=O4MAsMCJNQYAP+os-D7Tg@mail.gmail.com>
+ <20160204233950.GH4215@xsjsorenbubuntu> <56D04D17.6030502@ti.com>
+Message-ID: <20160226152714.GD3173@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_MEDIA_CONTROLLER is disabled, we get a warning
-about an unused function:
+On Fri, 2016-02-26 at 15:03:19 +0200, Grygorii Strashko wrote:
+> On 02/05/2016 01:39 AM, S?ren Brinkmann wrote:
+> > On Thu, 2016-02-04 at 15:14:47 -0800, Moritz Fischer wrote:
+> >> Hi Soeren,
+> >>
+> >> On Thu, Feb 4, 2016 at 2:41 PM, S?ren Brinkmann
+> >> <soren.brinkmann@xilinx.com> wrote:
+> >>
+> >>> But with this change the 'if !CPU_FREQ' becomes obsolete.
+> >> I'm confused, could you explain that statement? You don't want people
+> >> accidentally running with GT when CPU_FREQ is on, right?
+> > 
+> > Correct. But with this Kconfig rework you can just deselect it in
+> > Kconfig. The generic HAVE_GT could always be selected.
+> > 
+> 
+> 
+> Don't know whom should i ask - but what will be the final conclusion here?
+> Can it be merged?
 
-drivers/media/pci/saa7134/saa7134-core.c:832:13: error: 'saa7134_create_entities' defined but not used [-Werror=unused-function]
+I think we don't break anything either way. Would just be some
+additional clean up to get rid of that mentioned constraint (which
+doesn't really work well anyway in the multi-arch kernel). So, no real
+objections to merging it from my side.
 
-This moves the #ifdef outside of the function, as it is
-never called here.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: ac90aa02d5b9 ("[media] saa7134: add media controller support")
----
- drivers/media/pci/saa7134/saa7134-core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/media/pci/saa7134/saa7134-core.c b/drivers/media/pci/saa7134/saa7134-core.c
-index 42bc4172febd..9c7876bff7c3 100644
---- a/drivers/media/pci/saa7134/saa7134-core.c
-+++ b/drivers/media/pci/saa7134/saa7134-core.c
-@@ -829,9 +829,9 @@ static void saa7134_media_release(struct saa7134_dev *dev)
- #endif
- }
- 
-+#if defined(CONFIG_MEDIA_CONTROLLER)
- static void saa7134_create_entities(struct saa7134_dev *dev)
- {
--#if defined(CONFIG_MEDIA_CONTROLLER)
- 	int ret, i;
- 	struct media_entity *entity;
- 	struct media_entity *decoder = NULL;
-@@ -950,8 +950,8 @@ static void saa7134_create_entities(struct saa7134_dev *dev)
- 		if (ret < 0)
- 			pr_err("failed to register input entity %d!\n", i);
- 	}
--#endif
- }
-+#endif
- 
- static struct video_device *vdev_init(struct saa7134_dev *dev,
- 				      struct video_device *template,
--- 
-2.7.0
+	Thanks,
+	S?ren
