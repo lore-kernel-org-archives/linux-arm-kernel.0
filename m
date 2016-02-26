@@ -1,47 +1,39 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 26 Feb 2016 13:51:51 +0100
-Subject: [PATCH 1/2] spi: sun4i: add DMA support
-In-Reply-To: <20160226122504.GR18327@sirena.org.uk>
-References: <1456466217-6793-1-git-send-email-plaes@plaes.org>
- <1456466217-6793-2-git-send-email-plaes@plaes.org>
- <20160226122504.GR18327@sirena.org.uk>
-Message-ID: <CAOMqctTz=szSkpk95D_dUJjjpziCKoPv=xRczjfq2Roct-K-OA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 13:54:09 +0100
+Subject: [PATCH 1/2] orangefs: remove unused 'diff' function
+Message-ID: <1456491255-1111319-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+orangefs contains a helper function to calculate the difference
+between two timeval structures. We are trying to remove all
+instances of timespec from the kernel, and this one is not
+used at all, so let's remove it now.
 
-On 26 February 2016 at 13:25, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Feb 26, 2016 at 07:56:56AM +0200, Priit Laes wrote:
->> From: Emilio L?pez <emilio@elopez.com.ar>
->>
->> This patch adds support for 64 byte or bigger transfers on the
->> sun4i SPI controller. Said transfers will be performed via DMA.
->>
->> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
->> Tested-by: Michal Suchanek <hramrach@gmail.com>
->> Tested-by: Priit Laes <plaes@plaes.org>
->> ---
->
-> You *must* sign off any patches you are sending, please see
-> SubmittingPatches.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ fs/orangefs/orangefs-kernel.h | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-I have sent these patches in the past. Besides this non-technical
-objection there were multiple technical objections.
-
-IIRC one was that the driver does not handle the case when the DMA
-channels are not available. As I understand it the channels are
-exclusively reserved for a particular peripherial on sunxi platform so
-this ShoulNotHappen(tm). So it's probably fine for the driver to fail
-probe  when you have broken DT or no DMA engine support for sunxi
-platform.
-
-The driver could also work fully without DMA and there is a patch for
-that also but since nobody will be testing that codepath it's probably
-better to not include it.
-
-I have not addressed the other objections so far.
-
-Thanks
-
-Michal
+diff --git a/fs/orangefs/orangefs-kernel.h b/fs/orangefs/orangefs-kernel.h
+index 6290c24d8270..9d92c4fc7dbd 100644
+--- a/fs/orangefs/orangefs-kernel.h
++++ b/fs/orangefs/orangefs-kernel.h
+@@ -675,15 +675,4 @@ static inline void orangefs_i_size_write(struct inode *inode, loff_t i_size)
+ #endif
+ }
+ 
+-static inline unsigned int diff(struct timeval *end, struct timeval *begin)
+-{
+-	if (end->tv_usec < begin->tv_usec) {
+-		end->tv_usec += 1000000;
+-		end->tv_sec--;
+-	}
+-	end->tv_sec -= begin->tv_sec;
+-	end->tv_usec -= begin->tv_usec;
+-	return (end->tv_sec * 1000000) + end->tv_usec;
+-}
+-
+ #endif /* __ORANGEFSKERNEL_H */
+-- 
+2.7.0
