@@ -1,76 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Feb 2016 16:41:27 +0100
-Subject: [PATCH/RFC v2 04/11] soc: renesas: rcar: Add DT support for SYSC
- PM domains
-In-Reply-To: <3535519.g4KL1PCIZy@avalon>
-References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
- <1455571020-18968-5-git-send-email-geert+renesas@glider.be>
- <3535519.g4KL1PCIZy@avalon>
-Message-ID: <CAMuHMdVo2V7Ez5g8ZW74w-QWiwS8i2mbYeCjOU9brxRzNjMAdg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Feb 2016 15:43:19 +0000
+Subject: [PATCH] arm64: kernel: acpi: fix ioremap in ACPI parking
+ protocol cpu_postboot
+In-Reply-To: <1456487412-4833-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1456487412-4833-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160226154318.GP4777@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Fri, Feb 26, 2016 at 11:50:12AM +0000, Lorenzo Pieralisi wrote:
+> When secondary cpus are booted through the ACPI parking protocol, the
+> booted cpu should check that FW has correctly cleared its mailbox entry
+> point value to make sure the boot process was correctly executed.
+> The entry point check is carried in the cpu_ops->cpu_postboot method, that
+> is executed by secondary cpus when entering the kernel with irqs disabled.
+> 
+> The ACPI parking protocol cpu_ops maps/unmaps the mailboxes on the
+> primary CPU to trigger secondary boot in the cpu_ops->cpu_boot method
+> and on secondary processors to carry out FW checks on the booted CPU
+> to verify the boot protocol was successfully executed in the
+> cpu_ops->cpu_postboot method.
+> 
+> Therefore, the cpu_ops->cpu_postboot method is forced to ioremap/unmap the
+> mailboxes, which is wrong in that ioremap cannot be safely be carried out
+> with irqs disabled.
+> 
+> To fix this issue, this patch reshuffles the code so that the mailboxes
+> are still mapped after the boot processor executes the cpu_ops->cpu_boot
+> method for a given cpu, and the VA at which a mailbox is mapped for a given
+> cpu is stashed in the per-cpu data struct so that secondary cpus can
+> retrieve them in the cpu_ops->cpu_postboot and complete the required
+> FW checks.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Itaru Kitayama <itaru.kitayama@riken.jp>
+> Tested-by: Loc Ho <lho@apm.com>
+> Tested-by: Itaru Kitayama <itaru.kitayama@riken.jp>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Loc Ho <lho@apm.com>
+> Cc: Itaru Kitayama <itaru.kitayama@riken.jp>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Al Stone <ahs3@redhat.com>
 
-On Mon, Feb 15, 2016 at 11:51 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->>  drivers/soc/renesas/pm-rcar.c | 327 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 327 insertions(+)
->>
->> diff --git a/drivers/soc/renesas/pm-rcar.c b/drivers/soc/renesas/pm-rcar.c
->> index cc684e9cc8db5d1c..c0540934126e58eb 100644
->> --- a/drivers/soc/renesas/pm-rcar.c
->> +++ b/drivers/soc/renesas/pm-rcar.c
+Applied. Thanks.
 
->> +static int __init rcar_init_pm_domains(void)
->> +{
->> +     const struct of_device_id *match;
->> +     struct device_node *np, *pmd;
->> +     bool scanned = false;
->> +     void __iomem *base;
->> +     int ret = 0;
->> +
->> +     for_each_matching_node_and_match(np, rcar_sysc_matches, &match) {
->> +             u32 syscier = 0;
->> +
->> +             rcar_gen = (uintptr_t)match->data;
->> +
->> +             base = of_iomap(np, 0);
->> +             if (!base) {
->> +                     pr_warn("%s cannot map reg 0\n", np->full_name);
->> +                     continue;
->> +             }
->> +
->> +             rcar_sysc_base = base;  // FIXME conflicts with rcar_sysc_init()
->> +
->> +             pmd = of_get_child_by_name(np, "pm-domains");
->> +             if (!pmd) {
->> +                     pr_warn("%s lacks pm-domains node\n", np->full_name);
->
-> Shouldn't you call iounmap() here ?
-
-Yes. Will fix.
-
->> +             /*
->> +              * Enable all interrupt sources, but do not use interrupt
->> +              * handler
->> +              */
->> +             pr_debug("%s: syscier = 0x%08x\n", np->full_name, syscier);
->> +             iowrite32(syscier, rcar_sysc_base + SYSCIER);
->> +             iowrite32(0, rcar_sysc_base + SYSCIMR);
->
-> Shouldn't the SYSCIMR bits be set to 1 to mask interrupts ?
-
-That would work, too. It doesn't matter much, as the driver doesn't use
-interrupts, so they stay disabled at the GIC level.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Catalin
