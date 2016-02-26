@@ -1,29 +1,40 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Fri, 26 Feb 2016 09:18:04 +0200
-Subject: [PATCH, RESEND] ssb: host_soc depends on sprom
-In-Reply-To: <1456433869-3919332-1-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Thu, 25 Feb 2016 21:57:43 +0100")
-References: <1456433869-3919332-1-git-send-email-arnd@arndb.de>
-Message-ID: <87twkwlz2r.fsf@purkki.adurom.net>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 26 Feb 2016 16:18:33 +0900
+Subject: [PATCH 6/9] ARM: dts: uniphier: enable I2C channel 2 of ProXstream2
+ Gentil board
+In-Reply-To: <1456471116-8140-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1456471116-8140-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1456471116-8140-7-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+This is used for on-board inter-connection.
 
-> Drivers that use the SSB sprom functionality typically 'select SSB_SPROM'
-> from Kconfig, but CONFIG_SSB_HOST_SOC misses this, which results in
-> a build failure unless at least one of the other drivers that selects
-> it is enabled:
->
-> drivers/built-in.o: In function `ssb_host_soc_get_invariants':
-> (.text+0x459494): undefined reference to `ssb_fill_sprom_with_fallback'
->
-> This adds the same select statement that is used elsewhere.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 541c9a84cd85 ("ssb: pick SoC invariants code from MIPS BCM47xx arch")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-I'm planning to queue this to 4.5.
+ arch/arm/boot/dts/uniphier-proxstream2-gentil.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
+diff --git a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
+index 0da3018..bf2619e 100644
+--- a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
++++ b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
+@@ -63,6 +63,7 @@
+ 		serial1 = &serial1;
+ 		serial2 = &serial2;
+ 		i2c0 = &i2c0;
++		i2c2 = &i2c2;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
+ 		i2c6 = &i2c6;
+@@ -81,3 +82,7 @@
+ 		reg = <0x54>;
+ 	};
+ };
++
++&i2c2 {
++	status = "okay";
++};
 -- 
-Kalle Valo
+1.9.1
