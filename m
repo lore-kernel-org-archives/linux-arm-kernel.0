@@ -1,77 +1,178 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 26 Feb 2016 12:16:14 -0600
-Subject: [PATCH v3 5/5] cpufreq: qoriq: Don't look at clock
- implementation details
-In-Reply-To: <CADRPPNRiU-9b5J_9+0ofk6huLCn4LPm1s_2yd=Py0eBBi9GGXg@mail.gmail.com>
-References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
- <3374654.Hks5DeSGVV@vostro.rjw.lan>
- <1443215827.32298.130.camel@freescale.com>
- <2148611.GEpYdTfpoR@vostro.rjw.lan>
- <CADRPPNRiU-9b5J_9+0ofk6huLCn4LPm1s_2yd=Py0eBBi9GGXg@mail.gmail.com>
-Message-ID: <1456510574.5360.48.camel@buserror.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 26 Feb 2016 10:17:53 -0800
+Subject: [RFC v2 02/12] PM / Domains: Support IRQ safe PM domains
+In-Reply-To: <1455310238-8963-3-git-send-email-lina.iyer@linaro.org>
+References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+ <1455310238-8963-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20160226181753.GU28849@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-02-26 at 12:14 -0600, Li Yang wrote:
-> On Fri, Sep 25, 2015 at 4:50 PM, Rafael J. Wysocki <rjw@rjwysocki.net>
-> wrote:
-> > On Friday, September 25, 2015 04:17:07 PM Scott Wood wrote:
-> > > On Fri, 2015-09-25 at 23:42 +0200, Rafael J. Wysocki wrote:
-> > > > On Tuesday, September 22, 2015 12:46:54 PM Viresh Kumar wrote:
-> > > > > On 19-09-15, 23:29, Scott Wood wrote:
-> > > > > > Get the CPU clock's potential parent clocks from the clock
-> > > > > > interface
-> > > > > > itself, rather than manually parsing the clocks property to find a
-> > > > > > phandle, looking at the clock-names property of that, and assuming
-> > > > > > that
-> > > > > > those are valid parent clocks for the cpu clock.
-> > > > > > 
-> > > > > > This is necessary now that the clocks are generated based on the
-> > > > > > clock
-> > > > > > driver's knowledge of the chip rather than a fragile device-tree
-> > > > > > description of the mux options.
-> > > > > > 
-> > > > > > We can now rely on the clock driver to ensure that the mux only
-> > > > > > exposes
-> > > > > > options that are valid.  The cpufreq driver was currently being
-> > > > > > overly
-> > > > > > conservative in some cases -- for example, the "min_cpufreq =
-> > > > > > get_bus_freq()" restriction only applies to chips with erratum
-> > > > > > A-004510, and whether the freq_mask used on p5020 is needed
-> > > > > > depends on
-> > > > > > the actual frequencies of the PLLs (FWIW, p5040 has a similar
-> > > > > > limitation but its .freq_mask was zero) -- and the frequency mask
-> > > > > > mechanism made assumptions about particular parent clock indices
-> > > > > > that
-> > > > > > are no longer valid.
-> > > > > > 
-> > > > > > Signed-off-by: Scott Wood <scottwood@freescale.com>
-> > > > > > ---
-> > > > > > v3: was patch 1/5 and patch 4/5, plus blacklist e6500 and changes
-> > > > > > to clk api usage
-> > > > > > 
-> > > > > >  drivers/cpufreq/qoriq-cpufreq.c | 137 ++++++++++++---------------
-> > > > > > ------
-> > > > > > -------
-> > > > > >  1 file changed, 40 insertions(+), 97 deletions(-)
-> > > > > 
-> > > > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > > > 
-> > > > I'm wondering who's supposed to be merging this set?
-> > > 
-> > > As I noted in the cover letter, I'm looking for acks so that I can apply
-> > > these to a topic branch which can be pulled through the PPC and ARM
-> > > trees,
-> > > each of which will have patches that depend on it.
-> > 
-> > OK, so no objections from the cpufreq side and you have the ACK from
-> > Viresh.
-> 
-> Hi Scott,
-> 
-> Did you drop this patch later?  I can not find it in 4.5-rc still.
+On 02/12, Lina Iyer wrote:
+> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
+> index 8ba6625..c06f0b6 100644
+> --- a/Documentation/power/devices.txt
+> +++ b/Documentation/power/devices.txt
+> @@ -607,7 +607,16 @@ individually.  Instead, a set of devices sharing a power resource can be put
+>  into a low-power state together at the same time by turning off the shared
+>  power resource.  Of course, they also need to be put into the full-power state
+>  together, by turning the shared power resource on.  A set of devices with this
+> -property is often referred to as a power domain.
+> +property is often referred to as a power domain. A power domain may also be
+> +nested inside another power domain.
+> +
+> +Devices, by default, operate in process context and if a device can operate in
+> +IRQ safe context, has to be explicitly set as IRQ safe. Power domains by
 
-I was asked to get an ack from Russell King patch 4/5, which this patch
-requires.  Despite repeated pings, I could not get a reply from Russell King.
+Devices, by default, operate in process context. If a device can
+operate in IRQ safe context that has to be explicitly indicated
+by setting the irq_safe boolean inside struct generic_pm_domain
+to true. Power domains typically operate in process context...
 
--Scott
+> +default, operate in process context but could have devices that are IRQ safe.
+> +Such power domains cannot be powered on/off during runtime PM. On the other
+> +hand, an IRQ safe PM domains that have IRQ safe devices may be powered off
+
+On the other hand, IRQ safe PM domains that have ..
+
+> +when all the devices are in idle. An IRQ safe domain may only be attached as a
+
+all the devices in the domain?
+
+> +subdomain to another IRQ safe domain.
+>  
+>  Support for power domains is provided through the pm_domain field of struct
+>  device.  This field is a pointer to an object of type struct dev_pm_domain,
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 8204615..3c4f675 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -75,11 +75,59 @@ static struct genpd_lock_fns irq_lock = {
+>  	.unlock = genpd_unlock_irq,
+>  };
+>  
+> +static void genpd_lock_nosleep(struct generic_pm_domain *genpd)
+> +	__acquires(&genpd->slock)
+> +{
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&genpd->slock, flags);
+> +	genpd->lock_flags = flags;
+> +}
+> +
+> +static void genpd_lock_nosleep_nested(struct generic_pm_domain *genpd,
+> +					int depth)
+> +	__acquires(&genpd->slock)
+> +{
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave_nested(&genpd->slock, flags, depth);
+> +	genpd->lock_flags = flags;
+> +}
+> +
+> +static int genpd_lock_nosleep_interruptible(struct generic_pm_domain *genpd)
+> +	__acquires(&genpd->slock)
+> +{
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&genpd->slock, flags);
+> +	genpd->lock_flags = flags;
+> +	return 0;
+
+	genpd_lock_nosleep(genpd);
+	return 0;
+
+> +}
+> +
+> +static void genpd_unlock_nosleep(struct generic_pm_domain *genpd)
+> +	__releases(&genpd->slock)
+> +{
+> +	spin_unlock_irqrestore(&genpd->slock, genpd->lock_flags);
+> +}
+> +
+> +static struct genpd_lock_fns no_sleep_lock = {
+
+const?
+
+> +	.lock = genpd_lock_nosleep,
+> +	.lock_nested = genpd_lock_nosleep_nested,
+> +	.lock_interruptible = genpd_lock_nosleep_interruptible,
+> +	.unlock = genpd_unlock_nosleep,
+> +};
+> +
+>  #define genpd_lock(p)			p->lock_fns->lock(p)
+>  #define genpd_lock_nested(p, d)		p->lock_fns->lock_nested(p, d)
+>  #define genpd_lock_interruptible(p)	p->lock_fns->lock_interruptible(p)
+>  #define genpd_unlock(p)			p->lock_fns->unlock(p)
+>  
+> +static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
+> +		struct generic_pm_domain *genpd)
+> +{
+> +	return dev->power.irq_safe && !genpd->irq_safe;
+> +}
+> +
+>  /*
+>   * Get the generic PM domain for a particular struct device.
+>   * This validates the struct device pointer, the PM domain pointer,
+> @@ -510,8 +570,11 @@ static int pm_genpd_runtime_resume(struct device *dev)
+>  	if (IS_ERR(genpd))
+>  		return -EINVAL;
+>  
+> -	/* If power.irq_safe, the PM domain is never powered off. */
+> -	if (dev->power.irq_safe) {
+> +	/*
+> +	 * As we dont power off a non IRQ safe domain, which holds
+
+s/dont/don't/
+
+> +	 * an IRQ safe device, we dont need to restore power to it.
+
+s/dont/don't/
+
+> +	 */
+> +	if (dev->power.irq_safe && !genpd->irq_safe) {
+>  		timed = false;
+>  		goto out;
+>  	}
+> @@ -1296,6 +1359,13 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+>  	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev))
+>  		return -EINVAL;
+>  
+> +	if (genpd->irq_safe && !dev->power.irq_safe) {
+> +		dev_err(dev,
+> +			"PM Domain %s is IRQ safe; device has to IRQ safe.\n",
+
+has to be?
+
+> +			genpd->name);
+> +		return -EINVAL;
+> +	}
+> +
+>  	gpd_data = genpd_alloc_dev_data(dev, genpd, td);
+>  	if (IS_ERR(gpd_data))
+>  		return PTR_ERR(gpd_data);
+> @@ -1394,6 +1464,17 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>  	    || genpd == subdomain)
+>  		return -EINVAL;
+>  
+> +	/*
+> +	 * If the domain can be powered on/off in an IRQ safe
+> +	 * context, ensure that the subdomain can also be
+> +	 * powered on/off in that context.
+> +	 */
+> +	if (!genpd->irq_safe && subdomain->irq_safe) {
+> +		WARN("Parent %s of subdomain %s must be IRQ-safe\n",
+
+Nitpick! IRQ-safe or IRQ safe? Use one consistently please.
+
+> +				genpd->name, subdomain->name);
+> +		return -EINVAL;
+> +	}
+> +
+>  	link = kzalloc(sizeof(*link), GFP_KERNEL);
+>  	if (!link)
+>  		return -ENOMEM;
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
