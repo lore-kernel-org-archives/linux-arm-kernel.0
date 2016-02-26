@@ -1,102 +1,30 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Fri, 26 Feb 2016 14:10:23 +0800
-Subject: [PATCH v4 3/6] rockchip: power-domain: add support for sub-power
- domains
-In-Reply-To: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
-References: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1456467026-16030-4-git-send-email-zhangqing@rock-chips.com>
+Date: Fri, 26 Feb 2016 14:10:20 +0800
+Subject: [PATCH v4 0/6] rockchip: power-domain: fix pm domain for support
+ RK3399 SoC
+Message-ID: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for making one power domain a sub-domain of
-other domain. This is useful for modeling power dependences,
-which needs to have more than one power domain enabled to be operational.
+fix some idle handling
+support sub-power domain
+add rk3399-power.h
+modify document for RK3399 Soc
+modify power domain for RK3399 SoC
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/soc/rockchip/pm_domains.c | 63 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+Elaine Zhang (6):
+  rockchip: power-domain: make idle handling optional
+  power-domain: allow domains only handling idle requests
+  rockchip: power-domain: add support for sub-power domains
+  dt/bindings: power: add RK3399 SoCs header for power-domain
+  dt/bindings: rockchip: modify document of Rockchip power domains
+  rockchip: power-domain: Modify power domain driver for rk3399
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 0465a06..fdb74f9 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -370,6 +370,62 @@ static void rockchip_configure_pd_cnt(struct rockchip_pmu *pmu,
- 	regmap_write(pmu->regmap, domain_reg_offset + 4, count);
- }
- 
-+static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
-+				     struct device_node *parent)
-+{
-+	struct device_node *np;
-+	struct generic_pm_domain *child_domain, *parent_domain;
-+	int error;
-+
-+	for_each_child_of_node(parent, np) {
-+		u32 idx = ~0;
-+
-+		if (of_property_read_u32(parent, "reg", &idx)) {
-+			dev_err(pmu->dev,
-+				"%s: failed to retrieve domain id (reg)\n",
-+				parent->name);
-+			goto err_out;
-+		}
-+		parent_domain = pmu->genpd_data.domains[idx];
-+
-+		error = rockchip_pm_add_one_domain(pmu, np);
-+		if (error) {
-+			dev_err(pmu->dev, "failed to handle node %s: %d\n",
-+				np->name, error);
-+			goto err_out;
-+		}
-+
-+		if (of_property_read_u32(np, "reg", &idx)) {
-+			dev_err(pmu->dev,
-+				"%s: failed to retrieve domain id (reg)\n",
-+				np->name);
-+			goto err_out;
-+		}
-+		child_domain = pmu->genpd_data.domains[idx];
-+
-+		if (pm_genpd_add_subdomain(parent_domain, child_domain)) {
-+			dev_err(pmu->dev, "%s failed to add subdomain: %s\n",
-+				parent_domain->name, child_domain->name);
-+			goto err_out;
-+		} else
-+			dev_info(pmu->dev, "%s add subdomain: %s\n",
-+				parent_domain->name, child_domain->name);
-+
-+		error = rockchip_pm_add_subdomain(pmu, np);
-+		if (error < 0)
-+			goto rm_sub_domain;
-+	}
-+	return 0;
-+
-+err_out:
-+	of_node_put(parent);
-+	of_node_put(np);
-+	return -EINVAL;
-+rm_sub_domain:
-+	pm_genpd_remove_subdomain(parent_domain, child_domain);
-+	return error;
-+}
-+
- static int rockchip_pm_domain_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -440,6 +496,13 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 			of_node_put(node);
- 			goto err_out;
- 		}
-+
-+		error = rockchip_pm_add_subdomain(pmu, node);
-+		if (error < 0) {
-+			dev_err(dev, "failed to handle subdomain node %s: %d\n",
-+				node->name, error);
-+			goto err_out;
-+		}
- 	}
- 
- 	if (error) {
+ .../bindings/soc/rockchip/power_domain.txt         |  41 ++++++
+ drivers/soc/rockchip/pm_domains.c                  | 138 ++++++++++++++++++++-
+ include/dt-bindings/power/rk3399-power.h           |  53 ++++++++
+ 3 files changed, 227 insertions(+), 5 deletions(-)
+ create mode 100644 include/dt-bindings/power/rk3399-power.h
+
 -- 
 1.9.1
