@@ -1,99 +1,76 @@
-From: leoli@freescale.com (Li Yang)
-Date: Fri, 26 Feb 2016 15:01:41 -0600
-Subject: [PATCH v3 5/5] cpufreq: qoriq: Don't look at clock implementation
- details
-In-Reply-To: <1456510574.5360.48.camel@buserror.net>
-References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
- <3374654.Hks5DeSGVV@vostro.rjw.lan>
- <1443215827.32298.130.camel@freescale.com>
- <2148611.GEpYdTfpoR@vostro.rjw.lan>
- <CADRPPNRiU-9b5J_9+0ofk6huLCn4LPm1s_2yd=Py0eBBi9GGXg@mail.gmail.com>
- <1456510574.5360.48.camel@buserror.net>
-Message-ID: <CADRPPNQtsMo0D7KbQtYTktLWJPiTg2bqKvuhNtcC02TSrw1GUg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 26 Feb 2016 22:04:15 +0100
+Subject: [PATCH 1/4] ASoC: wm9713: add binding for WM9713 codec
+In-Reply-To: <20160226023021.GH18327@sirena.org.uk> (Mark Brown's message of
+ "Fri, 26 Feb 2016 11:30:21 +0900")
+References: <1455979079-9030-1-git-send-email-robert.jarzmik@free.fr>
+ <20160220171459.GA18327@sirena.org.uk> <871t87z1gz.fsf@belgarion.home>
+ <20160220195925.GF18327@sirena.org.uk> <87twl3xgud.fsf@belgarion.home>
+ <20160220211659.GG18327@sirena.org.uk> <878u2fxbp9.fsf@belgarion.home>
+ <20160221014920.GK18327@sirena.org.uk> <87povkuuf6.fsf@belgarion.home>
+ <20160226023021.GH18327@sirena.org.uk>
+Message-ID: <87k2lruqsw.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 12:16 PM, Scott Wood <oss@buserror.net> wrote:
-> On Fri, 2016-02-26 at 12:14 -0600, Li Yang wrote:
->> On Fri, Sep 25, 2015 at 4:50 PM, Rafael J. Wysocki <rjw@rjwysocki.net>
->> wrote:
->> > On Friday, September 25, 2015 04:17:07 PM Scott Wood wrote:
->> > > On Fri, 2015-09-25 at 23:42 +0200, Rafael J. Wysocki wrote:
->> > > > On Tuesday, September 22, 2015 12:46:54 PM Viresh Kumar wrote:
->> > > > > On 19-09-15, 23:29, Scott Wood wrote:
->> > > > > > Get the CPU clock's potential parent clocks from the clock
->> > > > > > interface
->> > > > > > itself, rather than manually parsing the clocks property to find a
->> > > > > > phandle, looking at the clock-names property of that, and assuming
->> > > > > > that
->> > > > > > those are valid parent clocks for the cpu clock.
->> > > > > >
->> > > > > > This is necessary now that the clocks are generated based on the
->> > > > > > clock
->> > > > > > driver's knowledge of the chip rather than a fragile device-tree
->> > > > > > description of the mux options.
->> > > > > >
->> > > > > > We can now rely on the clock driver to ensure that the mux only
->> > > > > > exposes
->> > > > > > options that are valid.  The cpufreq driver was currently being
->> > > > > > overly
->> > > > > > conservative in some cases -- for example, the "min_cpufreq =
->> > > > > > get_bus_freq()" restriction only applies to chips with erratum
->> > > > > > A-004510, and whether the freq_mask used on p5020 is needed
->> > > > > > depends on
->> > > > > > the actual frequencies of the PLLs (FWIW, p5040 has a similar
->> > > > > > limitation but its .freq_mask was zero) -- and the frequency mask
->> > > > > > mechanism made assumptions about particular parent clock indices
->> > > > > > that
->> > > > > > are no longer valid.
->> > > > > >
->> > > > > > Signed-off-by: Scott Wood <scottwood@freescale.com>
->> > > > > > ---
->> > > > > > v3: was patch 1/5 and patch 4/5, plus blacklist e6500 and changes
->> > > > > > to clk api usage
->> > > > > >
->> > > > > >  drivers/cpufreq/qoriq-cpufreq.c | 137 ++++++++++++---------------
->> > > > > > ------
->> > > > > > -------
->> > > > > >  1 file changed, 40 insertions(+), 97 deletions(-)
->> > > > >
->> > > > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> > > >
->> > > > I'm wondering who's supposed to be merging this set?
->> > >
->> > > As I noted in the cover letter, I'm looking for acks so that I can apply
->> > > these to a topic branch which can be pulled through the PPC and ARM
->> > > trees,
->> > > each of which will have patches that depend on it.
->> >
->> > OK, so no objections from the cpufreq side and you have the ACK from
->> > Viresh.
->>
->> Hi Scott,
->>
->> Did you drop this patch later?  I can not find it in 4.5-rc still.
+Mark Brown <broonie@kernel.org> writes:
+
+> On Fri, Feb 26, 2016 at 02:33:49AM +0100, Robert Jarzmik wrote:
+>> Mark Brown <broonie@kernel.org> writes:
 >
-> I was asked to get an ack from Russell King patch 4/5, which this patch
-> requires.  Despite repeated pings, I could not get a reply from Russell King.
+>> > It will not be called, the generic AC'97 code will be used.
+>
+>> Ok, if it's not called no code in sound/soc/codecs/wm9713.c will be used, right
+>> ?
+>> In that case wm9713_set_dai_clkdiv() will never be used, nor will the
+>> wm9713_audio_map or wm9713_dapm_widgets be created, which will break all
+>> userspace programs relying on these mixers and DAPM routes.
+>
+>> Or am I missing something ?
+>
+> No, you're not missing anything - that'll be what happens.  If you need
+> to preserve the userspace ABI on your board you'd need a much bigger
+> (but very welcome) refactoring of the AC'97 code to be less hacky and
+> use the device model more directly, or at least define a generic AC'97
+> binding somehow.  All the AC'97 support has never really been properly
+> moved over to the device model and unfortunately nobody's yet cared
+> about it for device tree except in the simple cases supported by the
+> generic AC'97 code.  I appreciate that this isn't very helpful, it's
+> an unfortunate consequence of DT as an ABI.
+>
+> We probably want to end up with something like what the Intel folks have
+> been doing recently for HDA to get that working within ASoC.
 
-This patch?   I think you should try to get ACK from clock maintainers
-instead of Russell.
+Ok, let me think about it and propose something, an approach.
 
-Commit fc4a05d4b0eb ("clk: Remove unused provider APIs") removed
-__clk_get_num_parents() and clk_hw_get_parent_by_index(), leaving only
-true provider API versions that operate on struct clk_hw.
+I must admit I like the structure I saw in drivers/amba/bus.c, ie. to have
+something like :
+ - a bus driver core (sound/ac97/bus.c ?)
+   Split between this and sound/pci/ac97_codec.c I don't know yet.
+   => an instance of this bus will be instanciated from each snd_ac97_bus() call
+      just as now
+   => bus_register(&ac97_bustype)
+   => ac97_bus_probe/remove(), match/uevent/dev_attrs
+   => ac97_driver_register(struct ac97_driver *drv)
 
-qoriq-cpufreq needs these functions in order to determine the options
-it has for calling clk_set_parent() and thus populate the cpufreq
-table, so revive them as legitimate consumer APIs.
+ - a ac97 driver structure (struct ac97_driver) with :
+   => u32 vendor_id (vendor_id = lambda(vendor_id1, vendor_id2))
+   => u32 vendor_id_mask (mask of bits to match)
+   ...
 
-Signed-off-by: Scott Wood <scottwood@freescale.com>
----
-v3: new patch
+ - each ac97 controller will call snd_ac97_bus().
+   In my case, that's sound/arm/pxa2xx-ac97.c or sound/soc/pxa2xx-ac97.c,
+   whatever.
 
- drivers/clk/clk.c   | 19 +++++++++++++++++++
- include/linux/clk.h | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ - each ac97 codec will subscribe to the bus
+   ac97_driver_register(struct ac97_driver *drv, u32 vendor_id, u32 vendor_mask)
+   For example wm9713.c will call :
+     ac97_driver_register(drv, AC97_VENDOR(0x...., 0x....), 0xffffffff);
 
-Regards,
-Leo
+Well, if I'm totally mistaken, tell me. If not it will take me a bit of time to
+write is down properly in a Documentation/ file.
+
+Cheers.
+
+-- 
+Robert
