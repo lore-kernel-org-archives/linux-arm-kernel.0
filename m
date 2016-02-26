@@ -1,87 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Feb 2016 10:14:35 +0000
-Subject: [PATCH v2] arm64: lse: deal with clobbered x16 register after
- branch via PLT
-In-Reply-To: <CAKv+Gu-AAu7LpbBMuEQSx7Kfg+gbD4eUf0yjP3oPwfx7V5ZiAQ@mail.gmail.com>
-References: <1456429733-20825-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160226100325.GB29125@arm.com>
- <CAKv+Gu-AAu7LpbBMuEQSx7Kfg+gbD4eUf0yjP3oPwfx7V5ZiAQ@mail.gmail.com>
-Message-ID: <20160226101435.GC29125@arm.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 26 Feb 2016 11:15:04 +0100
+Subject: [PATCH v3] tty/serial: at91: restore dynamic driver binding
+Message-ID: <1456481704-18997-1-git-send-email-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 11:04:38AM +0100, Ard Biesheuvel wrote:
-> On 26 February 2016 at 11:03, Will Deacon <will.deacon@arm.com> wrote:
-> > Hey Ard,
-> >
-> > On Thu, Feb 25, 2016 at 08:48:53PM +0100, Ard Biesheuvel wrote:
-> >> The LSE atomics implementation uses runtime patching to patch in calls
-> >> to out of line non-LSE atomics implementations on cores that lack hardware
-> >> support for LSE. To avoid paying the overhead cost of a function call even
-> >> if no call ends up being made, the bl instruction is kept invisible to the
-> >> compiler, and the out of line implementations preserve all registers, not
-> >> just the ones that they are required to preserve as per the AAPCS64.
-> >>
-> >> However, commit fd045f6cd98e ("arm64: add support for module PLTs") added
-> >> support for routing branch instructions via veneers if the branch target
-> >> offset exceeds the range of the ordinary relative branch instructions.
-> >> Since this deals with jump and call instructions that are exposed to ELF
-> >> relocations, the PLT code uses x16 to hold the address of the branch target
-> >> when it performs an indirect branch-to-register, something which is
-> >> explicitly allowed by the AAPCS64 (and ordinary compiler generated code
-> >> does not expect register x16 or x17 to retain their values across a bl
-> >> instruction).
-> >>
-> >> Since the lse runtime patched bl instructions don't adhere to the AAPCS64,
-> >> they don't deal with this clobbering of registers x16 and x17. So add them
-> >> to the clobber list of the asm() statements that perform the call
-> >> instructions, and drop x16 and x17 from the list of registers that are
-> >> caller saved in the out of line non-LSE implementations.
-> >>
-> >> In addition, since we have given these functions two scratch registers,
-> >> they no longer need to stack/unstack temp registers, and the only remaining
-> >> stack accesses are for the frame pointer. So pass -fomit-frame-pointer as
-> >> well, this eliminates all stack accesses from these functions.
-> >
-> > [...]
-> >
-> >> diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-> >> index 197e06afbf71..7af60139f718 100644
-> >> --- a/arch/arm64/include/asm/atomic_lse.h
-> >> +++ b/arch/arm64/include/asm/atomic_lse.h
-> >> @@ -36,7 +36,7 @@ static inline void atomic_andnot(int i, atomic_t *v)
-> >>       "       stclr   %w[i], %[v]\n")
-> >>       : [i] "+r" (w0), [v] "+Q" (v->counter)
-> >>       : "r" (x1)
-> >> -     : "x30");
-> >> +     : "x16", "x17", "x30");
-> >>  }
-> >
-> > The problem with this is that we potentially end up spilling/reloading
-> > x16 and x17 even when we patch in the LSE atomic. That's why I opted for
-> > the explicit stack accesses in my patch, so that they get overwritten
-> > with NOPs when we switch to the LSE version.
-> >
-> 
-> I see. But is that really an issue in practice?
+In commit c39dfebc7798956fd2140ae6321786ff35da30c3, the modular support
+code for atmel_serial was removed, as the driver cannot be built as a
+module. Because no use case was proposed, the dynamic driver binding
+support was removed as well.
 
-You'd need to ask somebody with silicon ;)
+The atmel_serial driver can manage up to 7 serial controllers, which are
+multiplexed with other functions. For example, in the Atmel SAMA5D2, the
+Flexcom controllers can work as USART, SPI or I2C controllers, and on
+all Atmel devices serial lines can be reconfigured as GPIOs.
 
-> And the fact that the non-LSE code is a lot more efficient has to count for
-> something, I suppose?
-> (/me thinks enterprise, distro kernels etc etc)
+My use case uses GPIOs to transfer a firmware update using a custom
+protocol on the lines used as a serial port during the normal life of
+the device. If it is not possible to unbind the atmel_serial driver, the
+GPIO lines remain reserved and prevent this case from working.
 
-Right, but with my patch, we also get the nice code in the out-of-line
-case:
+This patch reinstates the atmel_serial_remove function, and fixes it as
+it failed to clear the "clk" field on removal, triggering an oops when
+a device was bound again after being unbound.
 
-0000000000000000 <__ll_sc_atomic_add>:
-   0:   f9800031        prfm    pstl1strm, [x1]
-   4:   885f7c31        ldxr    w17, [x1]
-   8:   0b000231        add     w17, w17, w0
-   c:   88107c31        stxr    w16, w17, [x1]
-  10:   35ffffb0        cbnz    w16, 4 <__ll_sc_atomic_add+0x4>
-  14:   d65f03c0        ret
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+Changelog:
+v2: Add the rationale for keeping the "remove" function as a comment.
+v3: Do not cleanup the spaces in the driver initializer, as requested by
+  the maintainer
 
-and in the inline LSE case we have NOPs instead of stack accesses.
+ drivers/tty/serial/atmel_serial.c | 35 ++++++++++++++++++++++++++++++++++-
+ 1 file changed, 34 insertions(+), 1 deletion(-)
 
-Will
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 1c0884d8ef32..969084455f94 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -2759,14 +2759,47 @@ err:
+ 	return ret;
+ }
+ 
++/*
++ * Even if the driver is not modular, it makes sense to be able to
++ * unbind a device: there can be many bound devices, and there are
++ * situations where dynamic binding and unbinding can be useful.
++ *
++ * For example, a connected device can require a specific firmware update
++ * protocol that needs bitbanging on IO lines, but use the regular serial
++ * port in the normal case.
++ */
++static int atmel_serial_remove(struct platform_device *pdev)
++{
++	struct uart_port *port = platform_get_drvdata(pdev);
++	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++	int ret = 0;
++
++	tasklet_kill(&atmel_port->tasklet);
++
++	device_init_wakeup(&pdev->dev, 0);
++
++	ret = uart_remove_one_port(&atmel_uart, port);
++
++	kfree(atmel_port->rx_ring.buf);
++
++	/* "port" is allocated statically, so we shouldn't free it */
++
++	clear_bit(port->line, atmel_ports_in_use);
++
++	clk_put(atmel_port->clk);
++	atmel_port->clk = NULL;
++
++	return ret;
++}
++
+ static struct platform_driver atmel_serial_driver = {
+ 	.probe		= atmel_serial_probe,
++	.remove		= atmel_serial_remove,
+ 	.suspend	= atmel_serial_suspend,
+ 	.resume		= atmel_serial_resume,
+ 	.driver		= {
+ 		.name			= "atmel_usart",
+ 		.of_match_table		= of_match_ptr(atmel_serial_dt_ids),
+-		.suppress_bind_attrs    = true,
+ 	},
+ };
+ 
+-- 
+2.5.0
