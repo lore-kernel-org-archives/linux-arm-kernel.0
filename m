@@ -1,72 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 18:34:13 +0100
-Subject: [PATCH v2 3/3] ARM: memremap: implement arch_memremap_wb()
-In-Reply-To: <1456508053-15015-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456508053-15015-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456508053-15015-4-git-send-email-ard.biesheuvel@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 26 Feb 2016 12:35:10 -0500 (EST)
+Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch
+ driver (ESW)
+In-Reply-To: <20160226151813.GD12022@lunn.ch>
+References: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
+ <1456496504-50429-4-git-send-email-blogic@openwrt.org>
+ <20160226151813.GD12022@lunn.ch>
+Message-ID: <20160226.123510.2183497788787486032.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic memremap() falls back to using ioremap_cache() to create
-MEMREMAP_WB mappings if the requested region is not already covered
-by the linear mapping, unless the architecture provides an implementation
-of arch_memremap_wb().
+From: Andrew Lunn <andrew@lunn.ch>
+Date: Fri, 26 Feb 2016 16:18:13 +0100
 
-Since ioremap_cache() is not appropriate on ARM to map memory with the
-same attributes used for the linear mapping, implement arch_memremap_wb()
-which does exactly that. Also, relax the WARN() check to allow MT_MEMORY_RW
-mappings of pfn_valid() pages.
+> On Fri, Feb 26, 2016 at 03:21:35PM +0100, John Crispin wrote:
+>> The ESW is found in many of the old 100mbit MIPS based SoCs. it has 5
+>> external ports, 1 cpu port and 1 further port that the internal HW
+>> offloading engine connects to.
+>> 
+>> This driver is very basic and only provides basic init and irq support.
+>> The SoC and switch core both have support for a special tag making DSA
+>> support possible.
+> 
+> Hi Crispin
+> 
+> There was recently a discussion about adding switches without using
+> DSA or switchdev. It was pretty much decided we would not accept such
+> drivers.
+> 
+> Sorry
 
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/io.h |  3 +++
- arch/arm/mm/ioremap.c     | 11 +++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 485982084fe9..7456638e6b3a 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -402,6 +402,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
- void iounmap(volatile void __iomem *iomem_cookie);
- #define iounmap iounmap
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size);
-+#define arch_memremap_wb arch_memremap_wb
-+
- /*
-  * io{read,write}{16,32}be() macros
-  */
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 66a978d05958..d3a2b028c614 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -297,9 +297,10 @@ static void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	}
- 
- 	/*
--	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-+	 * Don't allow RAM to be mapped with mismatched attributes - this
-+	 * causes problems with ARMv6+
- 	 */
--	if (WARN_ON(pfn_valid(pfn)))
-+	if (WARN_ON(pfn_valid(pfn) && mtype != MT_MEMORY_RW))
- 		return NULL;
- 
- 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-@@ -414,6 +415,12 @@ __arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
- 			__builtin_return_address(0));
- }
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
-+{
-+	return __arm_ioremap_caller(phys_addr, size, MT_MEMORY_RW,
-+			__builtin_return_address(0));
-+}
-+
- void __iounmap(volatile void __iomem *io_addr)
- {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
--- 
-2.5.0
++1
