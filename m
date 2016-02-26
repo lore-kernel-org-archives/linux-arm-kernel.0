@@ -1,111 +1,278 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 16:10:54 +0100
-Subject: [PATCH v3 07/52] mtd: nand: core: use mtd_ooblayout_xxx()
- helpers where appropriate
-In-Reply-To: <56D0629C.9080805@imgtec.com>
-References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
- <1456448280-27788-8-git-send-email-boris.brezillon@free-electrons.com>
- <56D0629C.9080805@imgtec.com>
-Message-ID: <20160226161054.3477cd4b@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 Feb 2016 16:15:10 +0100
+Subject: [PATCH] arm64: Remove fixmap include fragility
+In-Reply-To: <20160226144457.GD8728@leverpostej>
+References: <CAKv+Gu933t2DjBoHEfe=ZNcbrJMHHvT_F3Pug261w0WYTduVTw@mail.gmail.com>
+ <20160226144457.GD8728@leverpostej>
+Message-ID: <CAKv+Gu8MC01+YD+FOwSnC80bZY9U--Jr0as_LPuwRw_QaxCW9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harvey,
+On 26 February 2016 at 15:44, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Feb 26, 2016 at 09:51:45AM +0100, Ard Biesheuvel wrote:
+>> arm64 defconfig is currently broken in -next, due to the way
+>> early_memremap_ro() is compiled conditionally, based on a condition
+>> that incorrectly resolves to false due to the inclusion order of
+>> various header files
+>
+> In mm/early_ioremap.c that depends on FIXMAP_PAGE_RO, which is defined
+> in include/asm-generic/fixmap.h:
+>
+> 49 #if !defined(FIXMAP_PAGE_RO) && defined(PAGE_KERNEL_RO)
+> 50 #define FIXMAP_PAGE_RO PAGE_KERNEL_RO
+> 51 #endif
+>
+> As arm64's fixmap.h doesn't include pgtable.h, PAGE_KERNEL_RO isn't
+> guaranteed to be defined in all cases, even if we reorder pgtable.h. So
+> reordering just masks the issue.
+>
+> Since pgtable.h includes fixmap.h already, we can't just add that
+> include, and we need to break the cycle.
+>
+> How about the below, which factors all the prot defines into a separate
+> header?
+>
+> Otherwise, as a simple fix in fixmap.h we can hard-code:
+>
+> #define FIXMAP_PAGE_RO PAGE_KERNEL_RO
+>
+> Thanks,
+> Mark.
+>
+> ---->8----
+> From 390b07ab8f7cd5ab0c8fdf4cf082b36263a715f6 Mon Sep 17 00:00:00 2001
+> From: Mark Rutland <mark.rutland@arm.com>
+> Date: Fri, 26 Feb 2016 14:31:32 +0000
+> Subject: [PATCH] arm64: Remove fixmap include fragility
+>
+> The asm-generic fixmap.h depends on each architecture's fixmap.h to pull
+> in the definition of PAGE_KERNEL_RO, if this exists. In the absence of
+> this, FIXMAP_PAGE_RO will not be defined. In mm/early_ioremap.c the
+> definition of early_memremap_ro is predicated on FIXMAP_PAGE_RO being
+> defined.
+>
+> Currently, the arm64 fixmap.h doesn't include pgtable.h for the
+> definition of PAGE_KERNEL_RO, and as a knock-on effect early_memremap_ro
+> is not always defined, leading to link-time failures when it is used.
+> This has been observed with defconfig on next-20160226.
+>
+> Unfortunately, as pgtable.h includes fixmap.h, adding the include
+> introduces a circular dependency, which is just as fragile.
+>
+> Instead, this patch factors out PAGE_KERNEL_RO and other prot
+> definitions into a new pgtable-prot header which can be included by poth
+> pgtable.h and fixmap.h, avoiding the  circular dependency, and ensuring
+> that early_memremap_ro is alwyas defined where it is used.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-On Fri, 26 Feb 2016 14:35:08 +0000
-Harvey Hunt <harvey.hunt@imgtec.com> wrote:
+This fixes the build for me
 
-> Hi Boris,
-> 
-> On 26/02/16 00:57, Boris Brezillon wrote:
-> > The mtd_ooblayout_xxx() helper functions have been added to avoid direct
-> > accesses to the ecclayout field, and thus ease for future reworks.
-> > Use these helpers in all places where the oobfree[] and eccpos[] arrays
-> > where directly accessed.
-> >
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >   drivers/mtd/nand/nand_base.c | 183 +++++++++++++++++++------------------------
-> >   drivers/mtd/nand/nand_bch.c  |   3 +-
-> >   2 files changed, 82 insertions(+), 104 deletions(-)
-> >
-> > diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-> > index 91672bf..17504f2 100644
-> [...]
-> 
-> I just pulled your nand/ecclayout branch from github and tested out your 
-> latest patchset "mtd: rework ECC layout definition" on a Ci20 
-> (jz4780_{nand,bch}) and noticed that my board was failing to boot.
-> 
-> I bisected to this patch, here is the kernel's output during boot:
-> 
-> 479556d ("mtd: nand: core: use mtd_ooblayout_xxx() helpers where 
-> appropriate"):
-> 
-> [ 0.256349] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0x88
-> [ 0.262860] nand: Micron MT29F64G08CBAAAWP
-> [ 0.266970] nand: 8192 MiB, MLC, erase size: 2048 KiB, page size: 8192, 
-> OOB size: 448
-> [ 0.274856] jz4780-nand 1b000000.nand-controller: using hardware BCH 
-> (strength 24, size 1024, bytes 42)
-> [ 0.288982] Bad block table not found for chip 0
-> [ 0.297673] Bad block table not found for chip 0
-> [ 0.302328] Scanning device for bad blocks
-> [ 0.320135] Bad eraseblock 90 at 0x00000b400000
-> [ 0.324829] Bad eraseblock 91 at 0x00000b600000
-> [ 0.931085] Bad eraseblock 4092 at 0x0001ff800000
-> [ 0.935947] Bad eraseblock 4093 at 0x0001ffa00000
-> [ 0.944878] nand_bbt: error while writing bad block table -34
-> [ 0.950666] jz4780-nand: probe of 1b000000.nand-controller failed with 
-> error -34
-> [ 0.958302] UBI error: cannot open mtd 3, error -19
-> [ 0.963002] UBI error: cannot open mtd 4, error -19[ 0.970419] clk: Not 
-> disabling unused clocks
-> [ 0.975011] UBIFS error (pid: 1): cannot open "ubi1:root", error -19VFS: 
-> Cannot open root device "ubi1:root" or unknown-block(0,0): error -19
-> [ 0.987810] Please append a correct "root=" boot option; here are the 
-> available partitions:
-> [ 0.996210] Kernel panic - not syncing: VFS: Unable to mount root fs on 
-> unknown-block(0,0)
-> [ 1.004498] Rebooting in 10 seconds..
-> 
-> 6625d32 ("mtd: use mtd_ooblayout_xxx() helpers where appropriate"):
-> 
-> [ 0.256232] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0x88
-> [ 0.262745] nand: Micron MT29F64G08CBAAAWP
-> [ 0.266854] nand: 8192 MiB, MLC, erase size: 2048 KiB, page size: 8192, 
-> OOB size: 448
-> [ 0.274739] jz4780-nand 1b000000.nand-controller: using hardware BCH 
-> (strength 24, size 1024, bytes 42)
-> [ 0.285993] Bad block table found at page 1048320, version 0x01
-> [ 0.294353] Bad block table found at page 1048064, version 0x01
-> [ 0.301523] nand_read_bbt: bad block at 0x00000b400000
-> [ 0.306677] nand_read_bbt: bad block at 0x00000b600000
-> [ 0.312289] 5 ofpart partitions found on MTD device 
-> 1b000000.nand-controller.1
-> [ 0.319553] Creating 5 MTD partitions on "1b000000.nand-controller.1":
-> [ 0.326098] 0x000000000000-0x000000800000 : "u-boot-spl"
-> [ 0.331757] 0x000000800000-0x000000a00000 : "u-boot"
-> [ 0.337185] 0x000000a00000-0x000000c00000 : "u-boot-env"
-> [ 0.342903] 0x000000c00000-0x000004c00000 : "boot"
-> [ 0.348109] 0x000004c00000-0x000200000000 : "system"
-> [ 0.354284] ubi0 error: ubi_attach_mtd_dev: More than 64 PEBs are needed 
-> for fastmap, sorry.
-> [...]
-> 
-> I'll look into this more later today, but wanted to run it by you in 
-> case you have any thoughts.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Can you apply this patch [1], and let me know if you see the additional
-trace?
 
-Thanks,
 
-Boris
-
-[1]http://code.bulix.org/l2hkl1-91947
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> ---
+>  arch/arm64/include/asm/fixmap.h       |  1 +
+>  arch/arm64/include/asm/pgtable-prot.h | 92 +++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/pgtable.h      | 63 +-----------------------
+>  3 files changed, 94 insertions(+), 62 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/pgtable-prot.h
+>
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 1a617d4..caf86be 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -20,6 +20,7 @@
+>  #include <linux/sizes.h>
+>  #include <asm/boot.h>
+>  #include <asm/page.h>
+> +#include <asm/pgtable-prot.h>
+>
+>  /*
+>   * Here we define all the compile-time 'special' virtual
+> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+> new file mode 100644
+> index 0000000..29fcb33
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/pgtable-prot.h
+> @@ -0,0 +1,92 @@
+> +/*
+> + * Copyright (C) 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_PGTABLE_PROT_H
+> +#define __ASM_PGTABLE_PROT_H
+> +
+> +#include <asm/memory.h>
+> +#include <asm/pgtable-hwdef.h>
+> +
+> +#include <linux/const.h>
+> +
+> +/*
+> + * Software defined PTE bits definition.
+> + */
+> +#define PTE_VALID              (_AT(pteval_t, 1) << 0)
+> +#define PTE_WRITE              (PTE_DBM)                /* same as DBM (51) */
+> +#define PTE_DIRTY              (_AT(pteval_t, 1) << 55)
+> +#define PTE_SPECIAL            (_AT(pteval_t, 1) << 56)
+> +#define PTE_PROT_NONE          (_AT(pteval_t, 1) << 58) /* only when !PTE_VALID */
+> +
+> +#ifndef __ASSEMBLY__
+> +
+> +#include <asm/pgtable-types.h>
+> +
+> +#define PROT_DEFAULT           (PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+> +#define PROT_SECT_DEFAULT      (PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+> +
+> +#define PROT_DEVICE_nGnRnE     (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+> +#define PROT_DEVICE_nGnRE      (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+> +#define PROT_NORMAL_NC         (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_NC))
+> +#define PROT_NORMAL_WT         (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_WT))
+> +#define PROT_NORMAL            (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
+> +
+> +#define PROT_SECT_DEVICE_nGnRE (PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
+> +#define PROT_SECT_NORMAL       (PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+> +#define PROT_SECT_NORMAL_EXEC  (PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+> +
+> +#define _PAGE_DEFAULT          (PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+> +
+> +#define PAGE_KERNEL            __pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+> +#define PAGE_KERNEL_RO         __pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+> +#define PAGE_KERNEL_ROX                __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+> +#define PAGE_KERNEL_EXEC       __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+> +#define PAGE_KERNEL_EXEC_CONT  __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+> +
+> +#define PAGE_HYP               __pgprot(_PAGE_DEFAULT | PTE_HYP)
+> +#define PAGE_HYP_DEVICE                __pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+> +
+> +#define PAGE_S2                        __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+> +#define PAGE_S2_DEVICE         __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+> +
+> +#define PAGE_NONE              __pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+> +#define PAGE_SHARED            __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+> +#define PAGE_SHARED_EXEC       __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+> +#define PAGE_COPY              __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> +#define PAGE_COPY_EXEC         __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> +#define PAGE_READONLY          __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> +#define PAGE_READONLY_EXEC     __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> +
+> +#define __P000  PAGE_NONE
+> +#define __P001  PAGE_READONLY
+> +#define __P010  PAGE_COPY
+> +#define __P011  PAGE_COPY
+> +#define __P100  PAGE_READONLY_EXEC
+> +#define __P101  PAGE_READONLY_EXEC
+> +#define __P110  PAGE_COPY_EXEC
+> +#define __P111  PAGE_COPY_EXEC
+> +
+> +#define __S000  PAGE_NONE
+> +#define __S001  PAGE_READONLY
+> +#define __S010  PAGE_SHARED
+> +#define __S011  PAGE_SHARED
+> +#define __S100  PAGE_READONLY_EXEC
+> +#define __S101  PAGE_READONLY_EXEC
+> +#define __S110  PAGE_SHARED_EXEC
+> +#define __S111  PAGE_SHARED_EXEC
+> +
+> +#endif /* __ASSEMBLY__ */
+> +
+> +#endif /* __ASM_PGTABLE_PROT_H */
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 16438dd..7c73b36 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -21,15 +21,7 @@
+>
+>  #include <asm/memory.h>
+>  #include <asm/pgtable-hwdef.h>
+> -
+> -/*
+> - * Software defined PTE bits definition.
+> - */
+> -#define PTE_VALID              (_AT(pteval_t, 1) << 0)
+> -#define PTE_WRITE              (PTE_DBM)                /* same as DBM (51) */
+> -#define PTE_DIRTY              (_AT(pteval_t, 1) << 55)
+> -#define PTE_SPECIAL            (_AT(pteval_t, 1) << 56)
+> -#define PTE_PROT_NONE          (_AT(pteval_t, 1) << 58) /* only when !PTE_VALID */
+> +#include <asm/pgtable-prot.h>
+>
+>  /*
+>   * VMALLOC and SPARSEMEM_VMEMMAP ranges.
+> @@ -59,59 +51,6 @@ extern void __pmd_error(const char *file, int line, unsigned long val);
+>  extern void __pud_error(const char *file, int line, unsigned long val);
+>  extern void __pgd_error(const char *file, int line, unsigned long val);
+>
+> -#define PROT_DEFAULT           (PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+> -#define PROT_SECT_DEFAULT      (PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+> -
+> -#define PROT_DEVICE_nGnRnE     (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+> -#define PROT_DEVICE_nGnRE      (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+> -#define PROT_NORMAL_NC         (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_NC))
+> -#define PROT_NORMAL_WT         (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_WT))
+> -#define PROT_NORMAL            (PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
+> -
+> -#define PROT_SECT_DEVICE_nGnRE (PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
+> -#define PROT_SECT_NORMAL       (PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+> -#define PROT_SECT_NORMAL_EXEC  (PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+> -
+> -#define _PAGE_DEFAULT          (PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+> -
+> -#define PAGE_KERNEL            __pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+> -#define PAGE_KERNEL_RO         __pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+> -#define PAGE_KERNEL_ROX                __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+> -#define PAGE_KERNEL_EXEC       __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+> -#define PAGE_KERNEL_EXEC_CONT  __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+> -
+> -#define PAGE_HYP               __pgprot(_PAGE_DEFAULT | PTE_HYP)
+> -#define PAGE_HYP_DEVICE                __pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+> -
+> -#define PAGE_S2                        __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+> -#define PAGE_S2_DEVICE         __pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+> -
+> -#define PAGE_NONE              __pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+> -#define PAGE_SHARED            __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+> -#define PAGE_SHARED_EXEC       __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+> -#define PAGE_COPY              __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> -#define PAGE_COPY_EXEC         __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> -#define PAGE_READONLY          __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+> -#define PAGE_READONLY_EXEC     __pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+> -
+> -#define __P000  PAGE_NONE
+> -#define __P001  PAGE_READONLY
+> -#define __P010  PAGE_COPY
+> -#define __P011  PAGE_COPY
+> -#define __P100  PAGE_READONLY_EXEC
+> -#define __P101  PAGE_READONLY_EXEC
+> -#define __P110  PAGE_COPY_EXEC
+> -#define __P111  PAGE_COPY_EXEC
+> -
+> -#define __S000  PAGE_NONE
+> -#define __S001  PAGE_READONLY
+> -#define __S010  PAGE_SHARED
+> -#define __S011  PAGE_SHARED
+> -#define __S100  PAGE_READONLY_EXEC
+> -#define __S101  PAGE_READONLY_EXEC
+> -#define __S110  PAGE_SHARED_EXEC
+> -#define __S111  PAGE_SHARED_EXEC
+> -
+>  /*
+>   * ZERO_PAGE is a global shared page that is always zero: used
+>   * for zero-mapped memory areas etc..
+> --
+> 1.9.1
+>
