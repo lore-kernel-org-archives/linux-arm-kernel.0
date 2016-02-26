@@ -1,23 +1,32 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 26 Feb 2016 16:16:06 +0900
-Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1 (2nd
- round)
-Message-ID: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Fri, 26 Feb 2016 16:16:07 +0900
+Subject: [PATCH 1/2] ARM: uniphier: add missing of_node_put()
+In-Reply-To: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1456470968-7900-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+This node pointer is allocated by of_find_compatible_node() in this
+function.  It should be put before exitting this function.
 
-Here is a small patch series for UniPhier SoC updates.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ arch/arm/mach-uniphier/platsmp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-Masahiro Yamada (2):
-  ARM: uniphier: add missing of_node_put()
-  ARM: uniphier: rework SMP code to support new System Bus binding
-
- arch/arm/mach-uniphier/platsmp.c | 26 +++++++++++++++++---------
- 1 file changed, 17 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
+index e1cfc1d..8d988f5 100644
+--- a/arch/arm/mach-uniphier/platsmp.c
++++ b/arch/arm/mach-uniphier/platsmp.c
+@@ -100,6 +100,7 @@ static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
+ 
+ 	np = of_find_compatible_node(NULL, NULL,
+ 				"socionext,uniphier-system-bus-controller");
++	of_node_put(np);
+ 	ret = of_address_to_resource(np, 1, &res);
+ 	if (ret) {
+ 		pr_err("failed to get resource of system-bus-controller\n");
 -- 
 1.9.1
