@@ -1,42 +1,28 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 26 Feb 2016 18:40:11 +0100
-Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
-In-Reply-To: <2709755.YfRKeiaS4S@wuerfel>
-References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
- <2692251.6GoexVJEYt@wuerfel>
- <CAOQ7t2Y2B8hfGim9UegUZsurQM0+Df0K0_DjsQ0r8+qMjUSBEw@mail.gmail.com>
- <2709755.YfRKeiaS4S@wuerfel>
-Message-ID: <CAOQ7t2b4N+uxkR7_aiiVWzr=DEFjz5BeAEfXiK+YgQZxzF31nQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 26 Feb 2016 12:44:59 -0500 (EST)
+Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch
+ driver (ESW)
+In-Reply-To: <20160226170545.GE12022@lunn.ch>
+References: <20160226151813.GD12022@lunn.ch> <56D06E3F.1020100@openwrt.org>
+ <20160226170545.GE12022@lunn.ch>
+Message-ID: <20160226.124459.2214228338245540067.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 6:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 26 February 2016 17:43:54 Carlo Caione wrote:
+From: Andrew Lunn <andrew@lunn.ch>
+Date: Fri, 26 Feb 2016 18:05:45 +0100
 
-[cut]
+> I think it is great a vendor is providing funding to get code
+> upstream. However, that code needs to conform with current kernel
+> architecture and design philosophy.
+> 
+> We as a community also need to be consistent. We have recently push
+> back on Microchip with there LAN9352 who want to do something very
+> similar, introduce the MAC and a very dumb switch driver. They are now
+> looking at what it means to do a DSA driver. There is also talk of
+> writing a DSA driver for the ks8995 family.
+> 
+> As David said recently, a year ago this probably would of been
+> accepted. But now, switches need to be DSA or switchdev.
 
->> AFAICT (I'm not the driver author) there is no a really strict reason
->> to have one single driver accessing registers on both buses. Of course
->> the driver has to be changed a bit.
->> Are you suggesting to have two different drivers with two different compatibles?
->
-> Just an idea, but yes: if the register layout is different, then they
-> would also need different compatible strings.
-
-The meson pin controller driver basically defines the register layout
-in the DTS: http://lxr.free-electrons.com/source/arch/arm/boot/dts/meson8.dtsi
-#L102 and #L111, so yes, we have a different layouts.
-
-> This is mostly a question of how the hardware design really looks:
-> are these two separate pin controllers that each are responsible for
-> a clear subset of the pins?
-
-Exactly. All the GPIOAO_XX pins are managed by the pin controller on the AO bus.
-At this point I guess it is needed to rework a bit the pinctrl driver
-to address this problem switching to two drivers with different
-compatibles for the two buses.
-
-Thanks,
-
--- 
-Carlo Caione
++1
