@@ -1,52 +1,41 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 26 Feb 2016 09:48:30 +0100
-Subject: [PATCH v3 3/3] ARM: imx6: Fix procedure to switch the parent
- of, LDB_DI_CLK
-In-Reply-To: <56CF5ABC.8040109@timesys.com>
-References: <56CF5ABC.8040109@timesys.com>
-Message-ID: <1456476510.3383.19.camel@pengutronix.de>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 26 Feb 2016 00:50:22 -0800
+Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for
+ v4.6 - part2
+In-Reply-To: <CABb+yY2A6bLoNqak5Y8YVLgv=mL1Cx6axnD1trMhKx646NNWFw@mail.gmail.com>
+References: <CADaLNDkF8_DVYWPFtGU8tYsbbxDWZF9tozW=Zs3EuV4BqO6OuA@mail.gmail.com>
+ <CABb+yY2A6bLoNqak5Y8YVLgv=mL1Cx6axnD1trMhKx646NNWFw@mail.gmail.com>
+Message-ID: <CADaLNDnqRkOqam1Xt+Oc+7BXnQKr2EQqSL-1AGsn5fKOWEDnvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akshay,
+On Thu, Feb 25, 2016 at 8:28 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Fri, Feb 26, 2016 at 8:21 AM, Duc Dang <dhdang@apm.com> wrote:
+>> Hi Arnd, Olof,
+>>
+>> This is the second part of DT changes on X-Gene platforms for v4.6,
+>> which enables mailbox driver for X-Gene v2 platforms and also enable
+>> SLIMpro Mailbox I2C driver (a client of the mailbox driver) for both
+>> X-Gene v1 and v2 platforms.
+>>
+>> This series depends on the 3rd patch
+>> (http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
+>> of the series "mailbox: Add APM X-Gene platform mailbox driver"
+>> (https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
+>> since Feb-15.
+>>
+>> Hi Jassi,
+>>
+>> Are you going to get the 3rd patch (dts patch) of series "mailbox: Add
+>> APM X-Gene platform mailbox driver" to your tree? Otherwise, I will
+>> need to create another pull request for Arnd and Olof.
+>>
+> Please create the pull request, I don't think mailbox tree is the
+> right path for the patch.
 
-Am Donnerstag, den 25.02.2016, 14:49 -0500 schrieb Akshay Bhat:
-> Hi Fabio, Phillip,
-> 
-> Philipp Zabel <p.zabel <at> pengutronix.de> writes:
-> 
->  >
->  > From: Fabio Estevam <fabio.estevam <at> freescale.com>
->  >
-> 
-> <snip>
->  > +		sel[i][2] = sel[i][3] | 4;
->  > +
->  > +		pr_debug("ccm: switching ldb_di0_sel: %d->%d->%d->%d\n",
->  > +			 sel[i][0], sel[i][1], sel[i][2], sel[i][3]);
-> 
-> Change ldb_di0_sel to ldb_di%d_sel
-> 
-> <snip>
+Thanks for your confirmation, Jassi.
 
-Will do.
-
->  > +	if (sel[0][0] == sel[0][3] && sel[1][0] == sel[1][3])
->  > +		return;
->  > +
->  > +	mmdc_ch1_disable(ccm_base);
->  > +
->  > +	for (i = 1; i < 4; i++) {
->  > +		reg = readl_relaxed(ccm_base + CCM_CS2CDR);
->  > +		reg &= ~((7 << CS2CDR_LDB_DI0_CLK_SEL_SHIFT) |
->  > +			 (7 << CS2CDR_LDB_DI1_CLK_SEL_SHIFT));
->  > +		reg |= ((sel[0][i] << CS2CDR_LDB_DI0_CLK_SEL_SHIFT) |
->  > +			(sel[1][i] << CS2CDR_LDB_DI0_CLK_SEL_SHIFT));
-> 
-> Needs to be CS2CDR_LDB_DI1_CLK_SEL_SHIFT in the last line; otherwise the 
-> ldb_di1_clock is set to have incorrect source.
-
-Thanks for spotting this!
-
-regards
-Philipp
+Regards,
+Duc Dang.
+>
+> Thanks.
