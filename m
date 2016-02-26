@@ -1,44 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 12:53:22 +0100
-Subject: [PATCH] [media] em28xx: restore lost #ifdef
-Message-ID: <1456487606-3912264-1-git-send-email-arnd@arndb.de>
+Date: Fri, 26 Feb 2016 12:54:12 +0100
+Subject: [PATCH] ARM: imx: select ARM_CPU_SUSPEND only for imx6
+Message-ID: <1456487657-3928107-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cleanup that changed the em28xx driver to use v4l2_mc_create_media_graph
-instead of its own implementation causes a build error when CONFIG_MEDIA_CONTROLLER
-is disabled:
+i.MX only needs to select ARM_CPU_SUSPEND manually for the
+very specific case that CONFIG_PM_SLEEP is disabled and imx6
+is used with CONFIG_PM enabled for runtime PM.
 
-drivers/media/usb/em28xx/em28xx-video.c: In function 'em28xx_v4l2_init':
-drivers/media/usb/em28xx/em28xx-video.c:2717:38: error: 'struct em28xx' has no member named 'media_dev'
+If we are building a kernel only for CPUs that are not using
+the cpu_suspend() helper, we otherwise get a harmless
+build warning:
 
-This puts the new code inside the same #ifdef that controls the presence
-of the 'media_dev' member, and that the old code was in.
+warning: (ARCH_MXC && SOC_IMX23 && SOC_IMX28 && ARCH_PXA && MACH_MVEBU_V7 && ARCH_OMAP3 && ARCH_OMAP4 && SOC_OMAP5 && SOC_AM33XX && SOC_DRA7XX && ARCH_EXYNOS3 && ARCH_EXYNOS4 && EXYNOS5420_MCPM && EXYNOS_CPU_SUSPEND && ARCH_VEXPRESS_TC2_PM && ARM_BIG_LITTLE_CPUIDLE && ARM_HIGHBANK_CPUIDLE && QCOM_PM) selects ARM_CPU_SUSPEND which has unmet direct dependencies (ARCH_SUSPEND_POSSIBLE)
+
+This moves the option to the SOC_IMX6 option that actually
+requires it, in effect reverting commit f36b594f3754 ("ARM:
+mach-imx: Select ARM_CPU_SUSPEND at ARCH_MXC level") that was
+meant as a cleanup and unintentionally caused this warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: de39078779cb ("[media] em2xx: use v4l2_mc_create_media_graph()")
 ---
- drivers/media/usb/em28xx/em28xx-video.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-imx/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/usb/em28xx/em28xx-video.c b/drivers/media/usb/em28xx/em28xx-video.c
-index f772e2612608..44834b2eff55 100644
---- a/drivers/media/usb/em28xx/em28xx-video.c
-+++ b/drivers/media/usb/em28xx/em28xx-video.c
-@@ -2714,12 +2714,14 @@ static int em28xx_v4l2_init(struct em28xx *dev)
- 	/* Init entities at the Media Controller */
- 	em28xx_v4l2_create_entities(dev);
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 6c6b86cdeced..53fc0d4948a4 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -3,7 +3,6 @@ menuconfig ARCH_MXC
+ 	depends on ARCH_MULTIPLATFORM || ARM_SINGLE_ARMV7M
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+-	select ARM_CPU_SUSPEND if PM
+ 	select CLKSRC_IMX_GPT
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
+@@ -512,6 +511,7 @@ config	SOC_IMX53
  
-+#ifdef CONFIG_MEDIA_CONTROLLER
- 	ret = v4l2_mc_create_media_graph(dev->media_dev);
- 	if (ret) {
- 		em28xx_errdev("failed to create media graph\n");
- 		em28xx_v4l2_media_release(dev);
- 		goto unregister_dev;
- 	}
-+#endif
- 
- 	em28xx_info("V4L2 video device registered as %s\n",
- 		    video_device_node_name(&v4l2->vdev));
+ config SOC_IMX6
+ 	bool
++	select ARM_CPU_SUSPEND if PM
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_775420
+ 	select ARM_GIC
 -- 
 2.7.0
