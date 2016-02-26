@@ -1,88 +1,142 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Thu, 25 Feb 2016 19:22:44 -0500
-Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
-In-Reply-To: <20160224223128.GA30750@red-moon>
-References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
- <CANLsYkzvB0GbPeYHrcLtUz8DMHJh4FA5RVwVZ-UAm3BCznB_3w@mail.gmail.com>
- <20160224173511.GF25385@red-moon>
- <CAJ5Y-ea3gxxOEGdJMPZAh78Ap0GBvzGePhBKzQRVoJBwwY6NzA@mail.gmail.com>
- <20160224223128.GA30750@red-moon>
-Message-ID: <CAJ5Y-eYmYHU8Z+BBD0brmnx70ynWV8mhSrG36Bmu3yorsfk+4Q@mail.gmail.com>
+From: justinpopo6@gmail.com (Justin Chen)
+Date: Thu, 25 Feb 2016 16:19:07 -0800
+Subject: [PATCH] bsp: add SoC device to brcmstb
+Message-ID: <1456445947-9079-1-git-send-email-justinpopo6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2016 at 17:31, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Feb 24, 2016 at 02:53:02PM -0500, Ashwin Chaugule wrote:
->> Hi Lorenzo,
->>
->> On 24 February 2016 at 12:35, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->> > On Wed, Feb 24, 2016 at 09:20:22AM -0700, Mathieu Poirier wrote:
->> >> On 23 February 2016 at 11:22, Lorenzo Pieralisi
->> >
->> > [...]
->> >
->> >> > +static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
->> >> > +                            void *v)
->> >> > +{
->> >> > +       struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
->> >> > +       struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
->> >> > +       int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
->> >> > +
->> >> > +       if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
->> >> > +               return NOTIFY_DONE;
->> >> > +
->> >> > +       /*
->> >> > +        * Always reset the PMU registers on power-up even if
->> >> > +        * there are no events running.
->> >> > +        */
->> >> > +       if (cmd == CPU_PM_EXIT && armpmu->reset)
->> >> > +               armpmu->reset(armpmu);
->> >>
->> >> I think this patch does the right thing but I can't get the above
->> >> reset.  Wouldn't it be better to do the reset as part of the
->> >> CPU_PM_EXIT case below?  At this point nothing tells us the CPU won't
->> >> go back down before the event is enabled, wasting the cycle needed to
->> >> reset the PMU.
->> >
->> > The logic goes, if the cpu is woken up and it has no events enabled,
->> > if we do not reset it (mind, ->reset here sets the PMU register values
->> > to a sane default, some of them are architecturally UNKNOWN on reset, it
->> > does NOT reset the PMU) _and_ we subsequently install an event on it we
->> > do have a problem, that's why whenever a core gets out of low-power we
->> > have to reset its pmu.
->>
->> Dont we blow out the previous value in the counter when installing an
->> event? Or has that changed lately? IIRC, there was some initial value
->> we'd program into the counter to avoid missing the overflow event.
->> (sorry its been too long) ;)
->
-> If you mean there is no need of resetting the value since we are
-> overwriting it anyway you should see ->reset from a PMU unit POW
-> not just an event. If you look at the ->reset method for eg v8, you
-> will see that the reset method operates on all counters and the PMU
-> unit as a whole, that's the only sane way of setting up the PMU unit
-> before enabling single counters (some registers are UNKNOWN at reset).
->
-> To make my reply to Mathieu clearer, the ->reset method contains
-> operations (eg writing PMCR counters reset bits) that do carry out
-> counters reset, what I wanted to say is that the ->reset method
-> does not by itself drive the PMU HW reset signal, that's what the
-> power controller does when it resets the CPU on power up.
->
-> The PMU ->reset method must be called on a cpu on power-up, to make
-> sure PMU HW is set-up to sane default values and ready to be used (ie
-> install counters), for instance on v8 all counters must be disabled
-> (irq inclusive) and reset, that's what armv8pmu_reset() does.
->
-> I hope this makes things clearer.
->
+From: Justin Chen <justin.chen@broadcom.com>
 
-Indeed. Thanks for the explanation. The patch looks good to me.
+Added SoC driver at drivers/soc/brcmstb/common.c. Added two
+helper functions for getting family/product ID located at
+include/linux/soc/brcmstb/brcmstb.h.
 
-Acked-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Assigned the values of soc_dev_attribute accordingly:
+family = chip family id
+soc_id = product id
+revision = product revision
 
+Signed-off-by: Justin Chen <justin.chen@broadcom.com>
+---
+ arch/arm/mach-bcm/Kconfig           |    1 +
+ drivers/soc/brcmstb/common.c        |   68 +++++++++++++++++++++++++++++++++++
+ include/linux/soc/brcmstb/brcmstb.h |    7 ++++
+ 3 files changed, 76 insertions(+), 0 deletions(-)
 
-> Thanks,
-> Lorenzo
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 7ef1214..b95ea11 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -179,6 +179,7 @@ config ARCH_BRCMSTB
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select SOC_BRCMSTB
++	select SOC_BUS
+ 	help
+ 	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
+ 	  chipset.
+diff --git a/drivers/soc/brcmstb/common.c b/drivers/soc/brcmstb/common.c
+index c262c02..dd8cb42 100644
+--- a/drivers/soc/brcmstb/common.c
++++ b/drivers/soc/brcmstb/common.c
+@@ -12,10 +12,18 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/soc/brcmstb/brcmstb.h>
++#include <linux/sys_soc.h>
+ 
+ #include <soc/brcmstb/common.h>
+ 
++static u32 family_id;
++static u32 product_id;
++
+ static const struct of_device_id brcmstb_machine_match[] = {
+ 	{ .compatible = "brcm,brcmstb", },
+ 	{ }
+@@ -31,3 +39,63 @@ bool soc_is_brcmstb(void)
+ 
+ 	return of_match_node(brcmstb_machine_match, root) != NULL;
+ }
++
++u32 brcmstb_get_family_id(void)
++{
++	return family_id;
++}
++
++u32 brcmstb_get_product_id(void)
++{
++	return product_id;
++}
++
++static const struct of_device_id sun_top_ctrl_match[] = {
++	{ .compatible = "brcm,brcmstb-sun-top-ctrl", },
++	{ }
++};
++
++static int __init brcmstb_soc_device_init(void)
++{
++	struct soc_device_attribute *soc_dev_attr;
++	struct soc_device *soc_dev;
++	struct device_node *sun_top_ctrl;
++	void __iomem *sun_top_ctrl_base;
++
++	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
++	if (!sun_top_ctrl)
++		return -ENODEV;
++
++	sun_top_ctrl_base = of_iomap(sun_top_ctrl, 0);
++	if (!sun_top_ctrl_base)
++		return -ENODEV;
++
++	family_id = readl(sun_top_ctrl_base);
++	product_id = readl(sun_top_ctrl_base + 0x4);
++
++	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
++	if (!soc_dev_attr)
++		return -ENOMEM;
++
++	soc_dev_attr->family = kasprintf(GFP_KERNEL, "%x",
++					family_id >> 28 ?
++					family_id >> 16 : family_id >> 8);
++	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%x",
++					product_id >> 28 ?
++					product_id >> 16 : product_id >> 8);
++	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c%d",
++				    (char)(((product_id & 0xff) >> 4) + 65),
++				     product_id & 0xf);
++
++	soc_dev = soc_device_register(soc_dev_attr);
++	if (IS_ERR(soc_dev)) {
++		kfree(soc_dev_attr->family);
++		kfree(soc_dev_attr->soc_id);
++		kfree(soc_dev_attr->revision);
++		kfree(soc_dev_attr);
++		return -1;
++	}
++
++	return 0;
++}
++arch_initcall(brcmstb_soc_device_init);
+diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
+index 337ce41..ac10b0c 100644
+--- a/include/linux/soc/brcmstb/brcmstb.h
++++ b/include/linux/soc/brcmstb/brcmstb.h
+@@ -7,4 +7,11 @@
+  */
+ void brcmstb_biuctrl_init(void);
+ 
++/*
++ * Helper functions for getting family or product id from the
++ * SoC driver.
++ */
++u32 brcmstb_get_family_id(void);
++u32 brcmstb_get_product_id(void);
++
+ #endif /* __BRCMSTB_SOC_H */
+-- 
+1.7.1
