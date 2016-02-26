@@ -1,34 +1,96 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 26 Feb 2016 09:58:03 +0530
-Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for
- v4.6 - part2
-In-Reply-To: <CADaLNDkF8_DVYWPFtGU8tYsbbxDWZF9tozW=Zs3EuV4BqO6OuA@mail.gmail.com>
-References: <CADaLNDkF8_DVYWPFtGU8tYsbbxDWZF9tozW=Zs3EuV4BqO6OuA@mail.gmail.com>
-Message-ID: <CABb+yY2A6bLoNqak5Y8YVLgv=mL1Cx6axnD1trMhKx646NNWFw@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 26 Feb 2016 13:28:34 +0800
+Subject: [PATCH] arm64: dts: Add L2 cache topology to Hi6220
+Message-ID: <1456464514-24380-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 8:21 AM, Duc Dang <dhdang@apm.com> wrote:
-> Hi Arnd, Olof,
->
-> This is the second part of DT changes on X-Gene platforms for v4.6,
-> which enables mailbox driver for X-Gene v2 platforms and also enable
-> SLIMpro Mailbox I2C driver (a client of the mailbox driver) for both
-> X-Gene v1 and v2 platforms.
->
-> This series depends on the 3rd patch
-> (http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
-> of the series "mailbox: Add APM X-Gene platform mailbox driver"
-> (https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
-> since Feb-15.
->
-> Hi Jassi,
->
-> Are you going to get the 3rd patch (dts patch) of series "mailbox: Add
-> APM X-Gene platform mailbox driver" to your tree? Otherwise, I will
-> need to create another pull request for Arnd and Olof.
->
-Please create the pull request, I don't think mailbox tree is the
-right path for the patch.
+This patch adds the L2 cache topology on Hi6220. Hi6220 has two
+clusters, every cluster has 512KiB L2 cache (32KiB x 16 ways).
 
-Thanks.
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index d8b963c..1746d50 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -82,6 +82,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER0_L2>;
+ 			clocks = <&stub_clock 0>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cooling-min-level = <4>;
+@@ -96,6 +97,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER0_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+ 		};
+@@ -105,6 +107,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER0_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+ 		};
+@@ -114,6 +117,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER0_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+ 		};
+@@ -123,6 +127,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x100>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+ 		};
+@@ -132,6 +137,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x101>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+ 		};
+@@ -141,6 +147,7 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x102>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+ 		};
+@@ -150,9 +157,18 @@
+ 			device_type = "cpu";
+ 			reg = <0x0 0x103>;
+ 			enable-method = "psci";
++			next-level-cache = <&CLUSTER1_L2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+ 		};
++
++		CLUSTER0_L2: l2-cache0 {
++			compatible = "cache";
++		};
++
++		CLUSTER1_L2: l2-cache1 {
++			compatible = "cache";
++		};
+ 	};
+ 
+ 	cpu_opp_table: cpu_opp_table {
+-- 
+1.9.1
