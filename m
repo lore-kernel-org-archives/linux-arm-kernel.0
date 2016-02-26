@@ -1,98 +1,51 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 26 Feb 2016 17:35:46 +0000
-Subject: [RFC v4 06/14] dma-reserved-iommu: iommu_unmap_reserved
+Date: Fri, 26 Feb 2016 17:35:47 +0000
+Subject: [RFC v4 07/14] msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
 In-Reply-To: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
 References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1456508154-2253-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <1456508154-2253-8-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new function whose role is to unmap all allocated
-reserved IOVAs and free the reserved iova domain
+Let's introduce a new msi_domain_info flag value, MSI_FLAG_IRQ_REMAPPING
+meant to tell the domain supports IRQ REMAPPING, also known as Interrupt
+Translation Service. On Intel HW this capability is abstracted on IOMMU
+side while on ARM it is abstracted on MSI controller side.
+
+GICv3 ITS HW is the first HW advertising that feature.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c | 3 ++-
+ include/linux/msi.h                      | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-v3 -> v4:
-- previously "iommu/arm-smmu: relinquish reserved resources on
-  domain deletion"
----
- drivers/iommu/dma-reserved-iommu.c | 27 ++++++++++++++++++++++++---
- include/linux/dma-reserved-iommu.h |  7 +++++++
- 2 files changed, 31 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
-index 537c83e..7217bb7 100644
---- a/drivers/iommu/dma-reserved-iommu.c
-+++ b/drivers/iommu/dma-reserved-iommu.c
-@@ -116,7 +116,7 @@ unlock:
- }
- EXPORT_SYMBOL_GPL(iommu_alloc_reserved_iova_domain);
+diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+index aee60ed..8223765 100644
+--- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+@@ -96,7 +96,8 @@ static struct msi_domain_ops its_pci_msi_ops = {
  
--void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
-+void __iommu_free_reserved_iova_domain(struct iommu_domain *domain)
- {
- 	struct iova_domain *iovad =
- 		(struct iova_domain *)domain->reserved_iova_cookie;
-@@ -124,11 +124,14 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
- 	if (!iovad)
- 		return;
+ static struct msi_domain_info its_pci_msi_domain_info = {
+ 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
++		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX |
++		   MSI_FLAG_IRQ_REMAPPING),
+ 	.ops	= &its_pci_msi_ops,
+ 	.chip	= &its_msi_irq_chip,
+ };
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index a2a0068..03eda72 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -261,6 +261,8 @@ enum {
+ 	MSI_FLAG_MULTI_PCI_MSI		= (1 << 3),
+ 	/* Support PCI MSIX interrupts */
+ 	MSI_FLAG_PCI_MSIX		= (1 << 4),
++	/* Support MSI IRQ remapping service */
++	MSI_FLAG_IRQ_REMAPPING		= (1 << 5),
+ };
  
--	mutex_lock(&domain->reserved_mutex);
--
- 	put_iova_domain(iovad);
- 	kfree(iovad);
-+}
- 
-+void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
-+{
-+	mutex_lock(&domain->reserved_mutex);
-+	__iommu_free_reserved_iova_domain(domain);
- 	mutex_unlock(&domain->reserved_mutex);
- }
- EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
-@@ -245,5 +248,23 @@ unlock:
- }
- EXPORT_SYMBOL_GPL(iommu_put_single_reserved);
- 
-+void iommu_unmap_reserved(struct iommu_domain *domain)
-+{
-+	struct rb_node *node;
-+
-+	mutex_lock(&domain->reserved_mutex);
-+	while ((node = rb_first(&domain->reserved_binding_list))) {
-+		struct iommu_reserved_binding *b =
-+			rb_entry(node, struct iommu_reserved_binding, node);
-+
-+		while (!kref_put(&b->kref, reserved_binding_release))
-+			;
-+	}
-+	domain->reserved_binding_list = RB_ROOT;
-+	__iommu_free_reserved_iova_domain(domain);
-+	mutex_unlock(&domain->reserved_mutex);
-+}
-+EXPORT_SYMBOL_GPL(iommu_unmap_reserved);
-+
- 
- 
-diff --git a/include/linux/dma-reserved-iommu.h b/include/linux/dma-reserved-iommu.h
-index 71ec800..766c58c 100644
---- a/include/linux/dma-reserved-iommu.h
-+++ b/include/linux/dma-reserved-iommu.h
-@@ -66,6 +66,13 @@ int iommu_get_single_reserved(struct iommu_domain *domain,
-  */
- void iommu_put_single_reserved(struct iommu_domain *domain, dma_addr_t iova);
- 
-+/**
-+ * iommu_unmap_reserved: unmap & destroy the reserved iova bindings
-+ *
-+ * @domain: iommu domain handle
-+ */
-+void iommu_unmap_reserved(struct iommu_domain *domain);
-+
- #endif	/* CONFIG_IOMMU_DMA_RESERVED */
- #endif	/* __KERNEL__ */
- #endif	/* __DMA_RESERVED_IOMMU_H */
+ int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
 -- 
 1.9.1
