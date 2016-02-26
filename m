@@ -1,31 +1,32 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Feb 2016 12:09:49 +0900
-Subject: next-20160225 build: 2 failures 44 warnings (next-20160225)
-In-Reply-To: <E1aYsmb-0006qb-76@optimist>
-References: <E1aYsmb-0006qb-76@optimist>
-Message-ID: <20160226030949.GL18327@sirena.org.uk>
+Date: Fri, 26 Feb 2016 12:10:52 +0900
+Subject: [PATCH] ASoC: mediatek: Add I03/I04 widgets and corresponding
+ routes
+In-Reply-To: <1456454516.15436.2.camel@mtksdaap41>
+References: <1456384353-13041-1-git-send-email-pc.liao@mediatek.com>
+ <20160226023050.GI18327@sirena.org.uk>
+ <1456454516.15436.2.camel@mtksdaap41>
+Message-ID: <20160226031052.GM18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 10:04:29AM +0000, Build bot for Mark Brown wrote:
+On Fri, Feb 26, 2016 at 10:41:56AM +0800, PC Liao wrote:
+> On Fri, 2016-02-26 at 10:30 +0800, Mark Brown wrote:
+> > On Thu, Feb 25, 2016 at 03:12:33PM +0800, PC Liao wrote:
 
-Today's -next fails to build an arm64 allmodconfig due to:
+> > > Change-Id: Ib6804bbbde388830d8359245fe13bbb0f2bb36ba
 
-> 	arm64-allmodconfig
-> ../drivers/watchdog/orion_wdt.c:109:2: error: implicit declaration of function 'atomic_io_modify' [-Werror=implicit-function-declaration]
+> > Don't include noise like this in upstream submissions, we don't use your
+> > gerritt.
 
-also caused by b4f596b19624 (arm64: add mvebu architecture entry) which
-enables MVBEU on arm64, the commit was present for a little while and
-the error cropped up but didn't get reported due to other things masking
-it.  atomic_io_modify() is only available on ARM, I'm unsure if this
-needs a driver change or if the driver is just specific to older
-hardware anyway.  The code is only used in the init path accessing what
-look to be device specific registers so I'm not 100% clear why it
-specifically needs to be an atomic modify.
+> Sorry about that.
+> I will upload new version.
+
+It's fine, I edited out - more for future reference.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/23d7bd97/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/1a566e44/attachment.sig>
