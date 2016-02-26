@@ -1,28 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 26 Feb 2016 12:44:59 -0500 (EST)
-Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch
- driver (ESW)
-In-Reply-To: <20160226170545.GE12022@lunn.ch>
-References: <20160226151813.GD12022@lunn.ch> <56D06E3F.1020100@openwrt.org>
- <20160226170545.GE12022@lunn.ch>
-Message-ID: <20160226.124459.2214228338245540067.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Feb 2016 09:45:03 -0800
+Subject: [PATCH] clk: ti: Allow COMPILE_TEST to build selected drivers
+Message-ID: <1456508703-17390-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
-Date: Fri, 26 Feb 2016 18:05:45 +0100
+The arch independent drivers can be build testeed with
+COMPILE_TEST. Let's allow that for drivers/clk/ti.
 
-> I think it is great a vendor is providing funding to get code
-> upstream. However, that code needs to conform with current kernel
-> architecture and design philosophy.
-> 
-> We as a community also need to be consistent. We have recently push
-> back on Microchip with there LAN9352 who want to do something very
-> similar, introduce the MAC and a very dumb switch driver. They are now
-> looking at what it means to do a DSA driver. There is also talk of
-> writing a DSA driver for the ks8995 family.
-> 
-> As David said recently, a year ago this probably would of been
-> accepted. But now, switches need to be DSA or switchdev.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/clk/Makefile    | 2 +-
+ drivers/clk/ti/Makefile | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-+1
+---
+
+This allows the appll driver to be built with COMPILE_TEST,
+and this is not currently needed without the adpll driver.
+
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index b038e36..45939a1 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -78,7 +78,7 @@ obj-$(CONFIG_PLAT_SPEAR)		+= spear/
+ obj-$(CONFIG_ARCH_STI)			+= st/
+ obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
+ obj-$(CONFIG_ARCH_TEGRA)		+= tegra/
+-obj-$(CONFIG_ARCH_OMAP2PLUS)		+= ti/
++obj-y					+= ti/
+ obj-$(CONFIG_ARCH_U8500)		+= ux500/
+ obj-$(CONFIG_COMMON_CLK_VERSATILE)	+= versatile/
+ obj-$(CONFIG_X86)			+= x86/
+diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
+index dfe91d7..0deac98 100644
+--- a/drivers/clk/ti/Makefile
++++ b/drivers/clk/ti/Makefile
+@@ -1,3 +1,5 @@
++ifeq ($(CONFIG_ARCH_OMAP2PLUS), y)
++
+ obj-y					+= clk.o autoidle.o clockdomain.o
+ clk-common				= dpll.o composite.o divider.o gate.o \
+ 					  fixed-factor.o mux.o apll.o \
+@@ -19,4 +21,6 @@ ifdef CONFIG_ATAGS
+ obj-$(CONFIG_ARCH_OMAP3)                += clk-3xxx-legacy.o
+ endif
+ 
++endif	# CONFIG_ARCH_OMAP2PLUS
++
+ obj-$(CONFIG_COMMON_CLK_TI_ADPLL)	+= adpll.o
+-- 
+2.7.0
