@@ -1,92 +1,67 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Fri, 26 Feb 2016 10:34:46 -0500
-Subject: [PATCH v4 0/6] watchdog: pnx4008: add restart handler
-In-Reply-To: <56D062DD.1060707@roeck-us.net>
-References: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
- <56D062DD.1060707@roeck-us.net>
-Message-ID: <1456500886.2194.6.camel@localhost>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 26 Feb 2016 16:34:59 +0100
+Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
+In-Reply-To: <3072897.5MMsyiojns@wuerfel>
+References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
+ <CAOQ7t2aqZj3STFsdTSQZMTK5U+8Oem8oFroxHKWkt=AeP+Zczg@mail.gmail.com>
+ <CAD8Lp47LGUc3-MFpU+3iNjXJL0i4nLTY_49NUxFXeZ2SokDuaQ@mail.gmail.com>
+ <3072897.5MMsyiojns@wuerfel>
+Message-ID: <CAOQ7t2Za5t_3nAm0wyf0rmFa+RTRSGUDAg5b64VvXp-okLMoNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-02-26 at 06:36 -0800, Guenter Roeck wrote:
-> On 02/25/2016 10:31 AM, Sylvain Lemieux wrote:
-> > From: Sylvain Lemieux <slemieux@tycoint.com>
-> >
-> > The LPC32xx provide the capability to perform a soft or hard reset;
-> > a soft reset will no reset the external peripheral
-> > (i.e. RESOUT_N output not asserted).
-> >
-> > This changeset migrate the restart code from the "mach-lpc32xx" to
-> > the "pnx-4008" watchdog driver and add the soft reset capability.
-> >
-> > The default behavior (i.e. hard reset) remain unchanged.
-> >
-> > The core restart handler support added by this change:
-> > 2165bf524da5f5e496d - "watchdog: core: add restart handler support"
-> > is not use in this changeset; it does not support the reboot mode.
-> 
-> I finally had the time to look into this. Sorry for the late reply.
-> 
-> Changing the watchdog core to pass the restart mode (or action)
-> and the cmd/data pointer to the driver would be trivial and should
-> be done instead.
-> 
-Thanks for the feedback.
+On Fri, Feb 19, 2016 at 1:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Do you want me to rebase this patchset on the patch you will submit
-to update the core restart handler support?
+<cut>
 
-> I wrote a patch to do just that. I'll send it out later today for review,
-> assuming it passes my internal tests.
-> 
-> Guenter
+> This still really sounds like a mixed bag to me, which should better get represented
+> as a syscon node, except that there are also some more structured areas in
+> CBUS.
+>
+> Having just the registers between METAL_REVISION and HW_REV in a syscon
+> is clearly wrong, as that would include the pinctrl area that already has
+> a driver, but would not include some other parts that want the syscon.
+>
+> Maybe the best way is to make it compatible with both syscon and
+> simple-bus and put the other nodes underneath. That is still rather
+> ugly, but at least it works and can be extended.
 
-> >
-> > Note:
-> > Patch #5 was generated with the option "--unified=2" to ensure
-> > it can be apply before or after the changes for the new
-> > LPC32xx irqchip driver:
-> > - http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
-> > ---
-> > Changes from v3 to v4:
-> > * Update the patch as per the feedback received from:
-> >    Arnd: http://permalink.gmane.org/gmane.linux.watchdog/3329
-> >    - Switch patch #5 and #6 order.
-> >
-> > Changes from v2 to v3:
-> > * Update the patch as per the feedback received from:
-> >    Joachim: http://permalink.gmane.org/gmane.linux.watchdog/3303
-> >    - remove explicit clock enable from restart handler.
-> >    - verify "register_restart_handler" return value.
-> >    - add call to unregister_restart_handler".
-> >    - do the restart handling directly in "pnx4008_restart_handler".
-> > * Move the change to "phy3250.c" into a separate patch and generate
-> >    the new patch with the "--unified=2" option.
-> >
-> > Changes from v1 to v2:
-> > * Rename patch title;
-> >    was "arm: lpc32xx: restart: add support for soft reset"
-> > * Update the patch as per the feedback received from:
-> >    Joachim: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/479791
-> >    - migrate restart code from "mach-lpc32xx" to "pnx-4008" driver.
-> > * Add soft reset support to "pnx-4008" driver instead of "mach-lpc32xx".
-> > * Use define available in "pnx-4008" when writting to watchdog register.
-> > * Remove restart handler from "mach-lpc32xx".
-> > * Remove restart hook from "phy3250.c".
-> > * Update driver logging during power-on.
-> >
-> > Sylvain Lemieux (6):
-> >    watchdog: pnx4008: update logging during power-on
-> >    watchdog: pnx4008: add restart handler
-> >    watchdog: pnx4008: add support for soft reset
-> >    watchdog: pnx4008: restart: support "cmd" from userspace
-> >    arm: lpc32xx: phy3250 remove restart hook
-> >    arm: lpc32xx: remove restart handler
-> >
-> >   arch/arm/mach-lpc32xx/common.c  | 15 ------------
-> >   arch/arm/mach-lpc32xx/common.h  |  1 -
-> >   arch/arm/mach-lpc32xx/phy3250.c |  1 -
-> >   drivers/watchdog/pnx4008_wdt.c  | 51 +++++++++++++++++++++++++++++++++++++++--
-> >   4 files changed, 49 insertions(+), 19 deletions(-)
-> >
-> 
+More on this topic.
+
+On the meson platforms (at least on the meson8 / meson8b) we have two
+buses: cbus and aobus. Since in cbus we have a bunch of scattered
+registers, Arnd suggested to make it compatible with both syscon and
+simple-bus. So my idea was actually to update the meson8b DTSI file
+adding the two buses to make it closer to the actual hardware.
+
+In the most simple cases moving the devices under the correct bus is a
+trivial operation since (of course) the same driver can be used when
+the device is attached to a different bus, like in the uart_AO case
+(http://lxr.free-electrons.com/source/arch/arm/boot/dts/meson8b.dtsi#L114).
+
+Unfortunately pinctrl is a different beast since it requires
+(http://lxr.free-electrons.com/source/drivers/pinctrl/meson/pinctrl-meson.c#L659)
+at least two subnodes: one accessing registers from aobus, and the
+other one from cbus.
+
+I know this is quite a peculiar case but I'm wondering what is the
+best way to approach this issue.
+
+1) We could move only the pinctrl device outside both aobus and cbus
+but IMO this is ugly (at this point is probably better not having the
+two buses at all described in the DTS).
+2) The second option is just to fix the driver so that the two
+subnodes are not strictly required. The problem with this second
+solution is that in the driver we still need to access some data
+(http://lxr.free-electrons.com/source/drivers/pinctrl/meson/pinctrl-meson8b.c#L873)
+that is specific to each bus. So we will end up having two different
+compatibles for the two buses (meson8b-pinctrl-aobus using data from
+'ao-bank', and meson8b-pinctrl-cbus using data from 'banks').
+3) Another option is just to have the driver with a unique compatible
+poking the parent node (or just to another property) to determine on
+which bus it is so that it can use the correct bus-specific data.
+
+Any idea / feedback?
+
+-- 
+Carlo Caione
