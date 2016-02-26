@@ -1,82 +1,141 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Feb 2016 01:06:58 +0000
-Subject: [PATCH] dmaengine: omap-dma: Do not call omap_dma_callback()
- from tx_status()
-In-Reply-To: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20160226010658.GN5783@n2100.arm.linux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 26 Feb 2016 01:57:54 +0100
+Subject: [PATCH v3 46/52] mtd: nand: sm_common: switch to mtd_ooblayout_ops
+In-Reply-To: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1456448280-27788-47-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 10:28:59AM +0200, Peter Ujfalusi wrote:
-> When based on the CCR_ENABLE bit the channel is stopped we should not call
-> omap_dma_callback(), only change the return value to DMA_COMPLETE. Client
-> drivers will do the right thing to clean up the channel after the transfer
-> has been completed.
-> Check the CCR_ENABLE only if the channel is not paused since pause in sDMA
-> means that the channel is stopped.
-> This will fix one hard to reproduce race condition when the channel is
-> terminated during transfer (affecting cyclic operation).
-> 
-> Fixes: 1a7cf7b26f25 ("dmaengine: omap-dma: Handle cases when the channel is polled for completion")
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  drivers/dma/omap-dma.c | 16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> index f6bef0d93998..a6b189fdbbe6 100644
-> --- a/drivers/dma/omap-dma.c
-> +++ b/drivers/dma/omap-dma.c
-> @@ -671,18 +671,22 @@ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
->  	struct omap_chan *c = to_omap_dma_chan(chan);
->  	struct virt_dma_desc *vd;
->  	enum dma_status ret;
-> -	uint32_t ccr;
->  	unsigned long flags;
->  
-> -	ccr = omap_dma_chan_read(c, CCR);
-> -	/* The channel is no longer active, handle the completion right away */
-> -	if (!(ccr & CCR_ENABLE))
-> -		omap_dma_callback(c->dma_ch, 0, c);
-> -
->  	ret = dma_cookie_status(chan, cookie, txstate);
->  	if (ret == DMA_COMPLETE || !txstate)
->  		return ret;
->  
-> +	if (!c->paused) {
-> +		uint32_t ccr = omap_dma_chan_read(c, CCR);
-> +		/*
-> +		 * The channel is no longer active, set the return value
-> +		 * accordingly
-> +		 */
-> +		if (!(ccr & CCR_ENABLE))
-> +			ret = DMA_COMPLETE;
-> +	}
-> +
+Implementing the mtd_ooblayout_ops interface is the new way of exposing
+ECC/OOB layout to MTD users.
 
-This looks very much like a hack, and surely opens a race condition
-up: what happens when a request submitted and pending but not yet
-started?  If the channel is idle, requesting status will report
-that the request has completed.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/sm_common.c | 93 ++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 77 insertions(+), 16 deletions(-)
 
-It's also wrong for another reason.  If txstate is NULL...
-
-Your original commit adding the original hack that you're now removing
-above says that this is to support polled operation: I'm not aware of
-DMA engine supporting such a mode.  DMA_PREP_INTERRUPT is a mechanism
-where requests can be queued without an interrupt to allow batching.
-See the raid5/async_tx code, which queues a set of operations without
-DMA_PREP_INTERRUPT, with the final operation with DMA_PREP_INTERRUPT
-set.
-
-As the driver is reliant on interrupts to move to the next transfer,
-the patch which causes DMA_PREP_INTERRUPT to influence whether
-interrupts are sent is actually buggy, and will prevent several
-queued DMA operations to fail.
-
+diff --git a/drivers/mtd/nand/sm_common.c b/drivers/mtd/nand/sm_common.c
+index c514740..5939dff 100644
+--- a/drivers/mtd/nand/sm_common.c
++++ b/drivers/mtd/nand/sm_common.c
+@@ -12,14 +12,47 @@
+ #include <linux/sizes.h>
+ #include "sm_common.h"
+ 
+-static struct nand_ecclayout nand_oob_sm = {
+-	.eccbytes = 6,
+-	.eccpos = {8, 9, 10, 13, 14, 15},
+-	.oobfree = {
+-		{.offset = 0 , .length = 4}, /* reserved */
+-		{.offset = 6 , .length = 2}, /* LBA1 */
+-		{.offset = 11, .length = 2}  /* LBA2 */
++static int oob_sm_ooblayout_ecc(struct mtd_info *mtd, int section,
++				struct mtd_oob_region *oobregion)
++{
++	if (section > 1)
++		return -ERANGE;
++
++	oobregion->length = 3;
++	oobregion->offset = ((section + 1) * 8) - 3;
++
++	return 0;
++}
++
++static int oob_sm_ooblayout_free(struct mtd_info *mtd, int section,
++				 struct mtd_oob_region *oobregion)
++{
++	switch (section) {
++	case 0:
++		/* reserved */
++		oobregion->offset = 0;
++		oobregion->length = 4;
++		break;
++	case 1:
++		/* LBA1 */
++		oobregion->offset = 6;
++		oobregion->length = 2;
++		break;
++	case 2:
++		/* LBA2 */
++		oobregion->offset = 11;
++		oobregion->length = 2;
++		break;
++	default:
++		return -ERANGE;
+ 	}
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops oob_sm_ops = {
++	.ecc = oob_sm_ooblayout_ecc,
++	.free = oob_sm_ooblayout_free,
+ };
+ 
+ /* NOTE: This layout is is not compatabable with SmartMedia, */
+@@ -28,15 +61,43 @@ static struct nand_ecclayout nand_oob_sm = {
+ /* If you use smftl, it will bypass this and work correctly */
+ /* If you not, then you break SmartMedia compliance anyway */
+ 
+-static struct nand_ecclayout nand_oob_sm_small = {
+-	.eccbytes = 3,
+-	.eccpos = {0, 1, 2},
+-	.oobfree = {
+-		{.offset = 3 , .length = 2}, /* reserved */
+-		{.offset = 6 , .length = 2}, /* LBA1 */
++static int oob_sm_small_ooblayout_ecc(struct mtd_info *mtd, int section,
++				      struct mtd_oob_region *oobregion)
++{
++	if (section)
++		return -ERANGE;
++
++	oobregion->length = 3;
++	oobregion->offset = 0;
++
++	return 0;
++}
++
++static int oob_sm_small_ooblayout_free(struct mtd_info *mtd, int section,
++				       struct mtd_oob_region *oobregion)
++{
++	switch (section) {
++	case 0:
++		/* reserved */
++		oobregion->offset = 3;
++		oobregion->length = 2;
++		break;
++	case 1:
++		/* LBA1 */
++		oobregion->offset = 6;
++		oobregion->length = 2;
++		break;
++	default:
++		return -ERANGE;
+ 	}
+-};
+ 
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops oob_sm_small_ops = {
++	.ecc = oob_sm_small_ooblayout_ecc,
++	.free = oob_sm_small_ooblayout_free,
++};
+ 
+ static int sm_block_markbad(struct mtd_info *mtd, loff_t ofs)
+ {
+@@ -121,9 +182,9 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
+ 
+ 	/* ECC layout */
+ 	if (mtd->writesize == SM_SECTOR_SIZE)
+-		chip->ecc.layout = &nand_oob_sm;
++		mtd_set_ooblayout(mtd, &oob_sm_ops);
+ 	else if (mtd->writesize == SM_SMALL_PAGE)
+-		chip->ecc.layout = &nand_oob_sm_small;
++		mtd_set_ooblayout(mtd, &oob_sm_small_ops);
+ 	else
+ 		return -ENODEV;
+ 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
