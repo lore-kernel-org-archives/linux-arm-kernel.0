@@ -1,34 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 09:07:43 +0900
-Subject: [PATCH 10/14] arm64: dts: r8a7795: use fallback etheravb
- compatibility string
+Date: Fri, 26 Feb 2016 09:07:44 +0900
+Subject: [PATCH 11/14] arm64: dts: r8a7795: add usb2_phy device nodes
 In-Reply-To: <cover.1456445161.git.horms+renesas@verge.net.au>
 References: <cover.1456445161.git.horms+renesas@verge.net.au>
-Message-ID: <2b953ccd0e11bc468ff7337c9ae66c97c7747396.1456445161.git.horms+renesas@verge.net.au>
+Message-ID: <5923bb5227e5601a2e71da2b0d870b840bdfee9d.1456445161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added fallback compatibility string in r8a7795 device tree.
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index c2bffd160c18..e9adb31cd48c 100644
+index e9adb31cd48c..c6e379000e90 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -473,7 +473,8 @@
+@@ -1024,5 +1024,33 @@
+ 			cap-mmc-highspeed;
+ 			status = "disabled";
  		};
- 
- 		avb: ethernet at e6800000 {
--			compatible = "renesas,etheravb-r8a7795";
-+			compatible = "renesas,etheravb-r8a7795",
-+				     "renesas,etheravb-rcar-gen3";
- 			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
- 			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++
++		usb2_phy0: usb-phy at ee080200 {
++			compatible = "renesas,usb2-phy-r8a7795";
++			reg = <0 0xee080200 0 0x700>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&cpg>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
++		usb2_phy1: usb-phy at ee0a0200 {
++			compatible = "renesas,usb2-phy-r8a7795";
++			reg = <0 0xee0a0200 0 0x700>;
++			clocks = <&cpg CPG_MOD 702>;
++			power-domains = <&cpg>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
++		usb2_phy2: usb-phy at ee0c0200 {
++			compatible = "renesas,usb2-phy-r8a7795";
++			reg = <0 0xee0c0200 0 0x700>;
++			clocks = <&cpg CPG_MOD 701>;
++			power-domains = <&cpg>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 2.7.0.rc3.207.g0ac5344
