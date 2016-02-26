@@ -1,66 +1,73 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 03:16:00 +0100
-Subject: [PATCH v3 00/52] mtd: rework ECC layout definition
-In-Reply-To: <d968b867f4d7f603581a0ff83e07c15c@agner.ch>
-References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
- <d968b867f4d7f603581a0ff83e07c15c@agner.ch>
-Message-ID: <20160226031600.15ad27ba@bbrezillon>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 25 Feb 2016 18:51:58 -0800
+Subject: [GIT PULL 1/2] arm64: X-Gene platforms DTS changes queued for v4.6 -
+ part1
+Message-ID: <CADaLND=vwMXG5EcWpnKYODABcXkToiW_kF6s_disLmUknZx_Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Feb 2016 17:27:23 -0800
-Stefan Agner <stefan@agner.ch> wrote:
+Hi Arnd, Olof,
 
-> Hi Boris,
-> 
-> On 2016-02-25 16:57, Boris Brezillon wrote:
-> > Hello,
-> > 
-> > This patchset aims at getting rid of the nand_ecclayout limitations.
-> > struct nand_ecclayout is defining fixed eccpos and oobfree arrays which
-> > can only be increased by modifying the MTD_MAX_ECCPOS_ENTRIES_LARGE and
-> > MTD_MAX_OOBFREE_ENTRIES_LARGE macros.
-> > This approach forces us to modify the macro values each time we add a
-> > new NAND chip with a bigger OOB area, and increasing these arrays also
-> > penalize all platforms, even those who only support small NAND devices
-> > (with small OOB area).
-> > 
-> > The idea to overcome this limitation, is to define the ECC/OOB layout
-> > by the mean of two functions: ->ecc() and ->free(), which will
-> > basically return the same information has those stored in the
-> > nand_ecclayout struct.
-> > 
-> > Another advantage of this solution is that ECC layouts are usually
-> > following a repetitive pattern (i.e. leave X bytes free and put Y bytes
-> > of ECC per ECC chunk), which allows one to implement the ->ecc()
-> > and ->free() functions with a simple logic that can be applied
-> > to any size of OOB.
-> > 
-> > Patches 1 to 4 are just cleanups or trivial fixes that can be taken
-> > independently.
-> > 
-> > Also note that the last two commits are removing the nand_ecclayout
-> > definition, thus preventing any new driver to use this structure.
-> > Of course, this step can be delayed if some of the previous patches
-> > are not accepted.
-> 
-> Is the patch set somewhere available to pull from?
+This is the first part of DT changes on X-Gene platforms for v4.6 with
+below information:
 
-Yes, it's here [1].
++ "arm64: dts: apm: Update Merlin DT PCP PLL clock node for v2
+hardware" is the 3rd patch of the series
+http://www.spinics.net/lists/arm-kernel/msg475481.html, which was also
+accepted.
 
-> 
-> Do I see things right that patch 21/52 contains the crucial function
-> nand_ooblayout_ecc_lp which calculate the ECC position? (for those who
-> do not provide mtd_ooblayout_ops anyway...)
++ "arm64: dts: apm: Update X-Gene standby GPIO controller DTS entries"
+is the 3rd patch of the series
+http://www.spinics.net/lists/arm-kernel/msg483918.html, which was
+already accepted.
+The 3 remaining patches are the follow up of the same "Enable X-Gene
+standby GPIO as  interrupt controller" series to update standby GPIO
+controller for X-Gene v2 and power button GPIO on both X-Gene v1 and
+v2 platforms
 
-You're correct. This implementation is here for NAND controller drivers
-relying on the linux default ECC layout (the one used when soft ECC is
-selected, or when not layout is specified). This layout is just putting
-all ECC bytes at the end of the OOB area.
+Regards,
+Duc Dang.
+------
 
-[1]https://github.com/bbrezillon/linux-0day/tree/nand/ecclayout
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.6-part1
+
+for you to fetch changes up to edf21f271024ec6adb93c7b4e6c1dc928b6a7250:
+
+  arm64: dts: apm: Update GPIO to control power-off on X-Gene v2
+platforms (2016-02-25 17:14:00 -0800)
+
+----------------------------------------------------------------
+First part of X-Gene DT changes queued for v4.6
+
+This patch set includes:
++ A change in compatible string of X-Gene v2 SoC
+PLL DT node to reflect the v2 hardware
++ Update DT fields for X-Gene v1 and v2 standby
+GPIO controllers
++ Update declaration of power button GPIO for
+X-Gene v1 and X-Gene v2 platforms
+
+----------------------------------------------------------------
+Duc Dang (3):
+      arm64: dts: apm: Update GPIO to control power-off on X-Gene v1 platforms
+      arm64: dts: apm: Update GPIO standby controller DT node for
+X-Gene v2 platforms
+      arm64: dts: apm: Update GPIO to control power-off on X-Gene v2 platforms
+
+Loc Ho (1):
+      arm64: dts: apm: Update Merlin DT PCP PLL clock node for v2 hardware
+
+Quan Nguyen (1):
+      arm64: dts: apm: Update X-Gene standby GPIO controller DTS entries
+
+ arch/arm64/boot/dts/apm/apm-merlin.dts     | 3 ++-
+ arch/arm64/boot/dts/apm/apm-mustang.dts    | 3 ++-
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 8 +++++++-
+ arch/arm64/boot/dts/apm/apm-storm.dtsi     | 3 +++
+ 4 files changed, 14 insertions(+), 3 deletions(-)
