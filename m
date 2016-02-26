@@ -1,63 +1,153 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 26 Feb 2016 01:04:29 -0800
-Subject: [GIT PULL v2 2/2] arm64: X-Gene platforms DTS changes queued for v4.6
- - part2
-Message-ID: <CADaLND==AshC-syR3Tm93bPqB-vEyO3=AY+pM5r_ohgr4n-nBw@mail.gmail.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Fri, 26 Feb 2016 14:36:30 +0530
+Subject: [PATCH v2] arm64: dts: Add tmu node for exynos7
+Message-ID: <1456477590-4530-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+This patch adds tmu node, related temprature sensor and triping
+point data for Atlas cpu core found on exynos7 SoC.
 
-This is the second part of DT changes on X-Gene platforms for v4.6,
-which enables mailbox driver for X-Gene v1 and X-Gene v2 platforms and
-also enable SLIMpro Mailbox I2C driver (a client of the mailbox
-driver) for both X-Gene v1 and v2 platforms.
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+Changes since v1:
+* Addressed krzysztof's review comments.
 
-"arm64: dts: apm: mailbox device tree node for APM X-Gene platform"
-patch is the 3rd patch
-(http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
-of the series "mailbox: Add APM X-Gene platform mailbox driver"
-(https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
-since Feb-15.
+ .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +++++++++
+ .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   54 ++++++++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 ++++++++
+ 3 files changed, 99 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
 
-"arm64: dts: apm: Mailbox device tree node for APM X-Gene v2 platform"
-is the follow up patch to enable mailbox on X-Gene v2 platform.
-
-The remaining 2 patches enable SLIMpro Mailbox I2C driver on X-Gene v1
-and v2 platforms.
-
-Regards,
-Duc Dang.
-------
-The following changes since commit edf21f271024ec6adb93c7b4e6c1dc928b6a7250:
-
-  arm64: dts: apm: Update GPIO to control power-off on X-Gene v2
-platforms (2016-02-25 17:14:00 -0800)
-
-are available in the git repository at:
-
-  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.6-part2
-
-for you to fetch changes up to 406f5940549e78fd7d4d41413a7ed3e611bccc4f:
-
-  arm64: dts: apm: Add DT node for X-Gene v2 SLIMpro Mailbox I2C
-Driver (2016-02-25 17:14:04 -0800)
-
-----------------------------------------------------------------
-Second part of X-Gene DT changes queued for v4.6
-
-This patch set includes:
-+ X-Gene v1 and v2 Mailbox DT nodes
-+ X-Gene v1 and X-Gene v2 SLIMpro Mailbox
-I2C driver DT nodes
-
-----------------------------------------------------------------
-Duc Dang (4):
-      arm64: dts: apm: mailbox device tree node for APM X-Gene platform.
-      arm64: dts: apm: Add DT node for X-Gene v1 SLIMpro Mailbox I2C Driver
-      arm64: dts: apm: Mailbox device tree node for APM X-Gene v2 platform.
-      arm64: dts: apm: Add DT node for X-Gene v2 SLIMpro Mailbox I2C Driver
-
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 19 +++++++++++++++++++
- arch/arm64/boot/dts/apm/apm-storm.dtsi     | 19 +++++++++++++++++++
- 2 files changed, 38 insertions(+)
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+new file mode 100644
+index 0000000..1d6dcf2
+--- /dev/null
++++ b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+@@ -0,0 +1,25 @@
++/*
++ * Device tree sources for Exynos7 TMU sensor configuration
++ *
++ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <dt-bindings/thermal/thermal_exynos.h>
++
++#thermal-sensor-cells = <0>;
++samsung,tmu_gain = <9>;
++samsung,tmu_reference_voltage = <17>;
++samsung,tmu_noise_cancel_mode = <4>;
++samsung,tmu_efuse_value = <75>;
++samsung,tmu_min_efuse_value = <15>;
++samsung,tmu_max_efuse_value = <100>;
++samsung,tmu_first_point_trim = <25>;
++samsung,tmu_second_point_trim = <85>;
++samsung,tmu_default_temp_offset = <50>;
++samsung,tmu_cal_type = <TYPE_ONE_POINT_TRIMMING>;
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+new file mode 100644
+index 0000000..0623583
+--- /dev/null
++++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+@@ -0,0 +1,54 @@
++/*
++ * Device tree sources for default Exynos7 thermal zone definition
++ *
++ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++trips {
++	cpu-alert-0 {
++		temperature = <75000>; /* millicelsius */
++		hysteresis = <10000>; /* millicelsius */
++		type = "passive";
++	};
++	cpu-alert-1 {
++		temperature = <80000>; /* millicelsius */
++		hysteresis = <10000>; /* millicelsius */
++		type = "passive";
++	};
++	cpu-alert-2 {
++		temperature = <85000>; /* millicelsius */
++		hysteresis = <10000>; /* millicelsius */
++		type = "passive";
++	};
++	cpu-alert-3 {
++		temperature = <90000>; /* millicelsius */
++		hysteresis = <10000>; /* millicelsius */
++		type = "passive";
++	};
++	cpu-alert-4 {
++		temperature = <95000>; /* millicelsius */
++		hysteresis = <10000>; /* millicelsius */
++		type = "passive";
++	};
++	cpu-alert-5 {
++		temperature = <100000>; /* millicelsius */
++		hysteresis = <10000>; /* millicelsius */
++		type = "passive";
++	};
++	cpu-alert-6 {
++		temperature = <110000>; /* millicelsius */
++		hysteresis = <10000>; /* millicelsius */
++		type = "passive";
++	};
++	cpu-crit-0 {
++		temperature = <115000>; /* millicelsius */
++		hysteresis = <0>; /* millicelsius */
++		type = "critical";
++	};
++};
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index c662f98..19de742 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -27,6 +27,7 @@
+ 		pinctrl6 = &pinctrl_fsys0;
+ 		pinctrl7 = &pinctrl_fsys1;
+ 		pinctrl8 = &pinctrl_bus1;
++		tmuctrl0 = &tmuctrl_0;
+ 	};
+ 
+ 	cpus {
+@@ -538,6 +539,25 @@
+ 			clocks = <&clock_peric0 PCLK_PWM>;
+ 			clock-names = "timers";
+ 		};
++
++		tmuctrl_0: tmu at 10060000 {
++			compatible = "samsung,exynos7-tmu";
++			reg = <0x10060000 0x200>;
++			interrupts = <0 108 0>;
++			clocks = <&clock_peris PCLK_TMU>,
++				 <&clock_peris SCLK_TMU>;
++			clock-names = "tmu_apbif", "tmu_sclk";
++			#include "exynos7-tmu-sensor-conf.dtsi"
++		};
++
++		thermal-zones {
++			atlas_thermal: cluster0-thermal {
++				polling-delay-passive = <0>; /* milliseconds */
++				polling-delay = <0>; /* milliseconds */
++				thermal-sensors = <&tmuctrl_0>;
++				#include "exynos7-trip-points.dtsi"
++			};
++		};
+ 	};
+ };
+ 
+-- 
+1.7.10.4
