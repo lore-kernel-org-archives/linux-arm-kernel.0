@@ -1,69 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 22:35:11 +0100
-Subject: [GIT PULL] omap device tree changes for v4.6 merge window, part 1
-In-Reply-To: <20160222215612.GV13417@atomide.com>
-References: <20160222215612.GV13417@atomide.com>
-Message-ID: <6026634.ihuvqopRan@wuerfel>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 26 Feb 2016 16:35:53 -0500
+Subject: [PATCH RT 02/10] ARM: smp: Move clear_tasks_mm_cpumask() call to
+ __cpu_die()
+References: <20160226213551.557375746@goodmis.org>
+Message-ID: <20160226213708.401914663@goodmis.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 February 2016 13:56:12 Tony Lindgren wrote:
-> Device tree changes for omaps for v4.6 merge window. Mostly just
-> adding board specific devices and few new boards:
-> 
-> - N900 improvments for adp1653 and gpio keys
-> 
-> - Add missing bandgap data for omap3
-> 
-> - Add more devices for compulab cm-t335
-> 
-> - Add n950 WLAN support, enable modem, add pinctrl for SSI
-> 
-> - Correct dm814x and dra62x auxclk rate, add support for GPMC and NAND
-> 
-> - Add syscon node for PHY's on dra7
-> 
-> - Add support more devices on logicpd torpedo
-> 
-> - Add USB host support for igep and specify boot console
-> 
-> - Fix audio clock for am335x-sl50 and specify boot console
-> 
-> - Remove deprecated tx-fifo-resize for dwc3 that was only used on
->   omap5 es1.0
-> 
-> - Add dra7 thermal data
-> 
-> - Update am43x-epos-evm compatible string to am438
-> 
-> - Add support for logicpd dm3730 som-lv
-> 
+3.14.61-rt63-rc1 stable review patch.
+If anyone has any objections, please let me know.
 
-Pulled into next/dt, with a trivial conflict resolution:
+------------------
 
---- a/arch/arm/boot/dts/logicpd-torpedo-som.dtsi
-+++ b/arch/arm/boot/dts/logicpd-torpedo-som.dtsi
-@@@ -110,6 -110,19 +110,11 @@@
-  
-  &i2c3 {
-  	clock-frequency = <400000>;
- -};
- -
- -&i2c2 {
- -	clock-frequency = <400000>;
- -};
- -
- -&i2c3 {
- -	clock-frequency = <400000>;
-+ 	at24 at 50 {
-+ 		compatible = "at24,24c02";
-+ 		readonly;
-+ 		reg = <0x50>;
-+ 	};
-  };
-  
-  /*
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Thanks,
+When running with the RT-kernel (4.1.5-rt5) on TI OMAP dra7-evm and trying
+to do Suspend to RAM, the following backtrace occurs:
 
-	Arnd
+ Disabling non-boot CPUs ...
+ PM: noirq suspend of devices complete after 7.295 msecs
+ Disabling non-boot CPUs ...
+ BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
+ in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
+ INFO: lockdep is turned off.
+ irq event stamp: 122
+ hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
+ hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
+ softirqs last  enabled at (0): [<c003d294>] copy_process.part.52+0x410/0x19d8
+ softirqs last disabled at (0): [<  (null)>]   (null)
+ Preemption disabled at:[<  (null)>]   (null)
+  CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
+ Hardware name: Generic DRA74X (Flattened Device Tree)
+ [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
+ [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
+ [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
+ [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
+ [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
+ [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
+ [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
+ [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
+ [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
+ [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
+ [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
+ [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
+ [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
+ CPU1: shutdown
+ PM: Calling sched_clock_suspend+0x0/0x40
+ PM: Calling timekeeping_suspend+0x0/0x2e0
+ PM: Calling irq_gc_suspend+0x0/0x68
+ PM: Calling fw_suspend+0x0/0x2c
+ PM: Calling cpu_pm_suspend+0x0/0x28
+
+Also, sometimes system stucks right after displaying "Disabling non-boot
+CPUs ...". The root cause of above backtrace is task_lock() which takes
+a sleeping lock on -RT.
+
+To fix the issue, move clear_tasks_mm_cpumask() call from __cpu_disable()
+to __cpu_die() which is called on the thread which is asking for a target
+CPU to be shutdown. In addition, this change restores CPUhotplug functionality
+on TI OMAP dra7-evm and CPU1 can be unplugged/plugged many times.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Austin Schuh <austin@peloton-tech.com>
+Cc: <philipp@peloton-tech.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: <bigeasy@linutronix.de>
+Cc: stable-rt at vger.kernel.org
+Link: http://lkml.kernel.org/r/1441995683-30817-1-git-send-email-grygorii.strashko at ti.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+ arch/arm/kernel/smp.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 8cd3724714fe..0480b2685da0 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -209,8 +209,6 @@ int __cpu_disable(void)
+ 	flush_cache_louis();
+ 	local_flush_tlb_all();
+ 
+-	clear_tasks_mm_cpumask(cpu);
+-
+ 	return 0;
+ }
+ 
+@@ -226,6 +224,9 @@ void __cpu_die(unsigned int cpu)
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
+ 		return;
+ 	}
++
++	clear_tasks_mm_cpumask(cpu);
++
+ 	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
+ 
+ 	/*
+-- 
+2.7.0
