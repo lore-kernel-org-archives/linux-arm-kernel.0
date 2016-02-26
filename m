@@ -1,103 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 26 Feb 2016 11:33:38 -0800
-Subject: [RFC v2 07/12] PM / cpu_domains: Add PM Domain governor for CPUs
-In-Reply-To: <1455310238-8963-8-git-send-email-lina.iyer@linaro.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-8-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160226193338.GY28849@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 26 Feb 2016 13:34:30 -0600
+Subject: next-20160225 build: 2 failures 44 warnings (next-20160225)
+In-Reply-To: <20160226090830.41a63a86@free-electrons.com>
+References: <E1aYsmb-0006qb-76@optimist> <20160226030411.GK18327@sirena.org.uk>
+ <20160226090830.41a63a86@free-electrons.com>
+Message-ID: <CAErSpo4d_roPQO2XmSvCDexDy_wm-L0GReh_TT6ZR-gdLAyVkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12, Lina Iyer wrote:
-> @@ -52,6 +55,76 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
->  	return res;
->  }
->  
-> +static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
-> +{
-> +	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-> +	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
-> +	int qos = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-> +	u64 sleep_ns;
-> +	ktime_t earliest, next_wakeup;
-> +	int cpu;
-> +	int i;
-> +
-> +	/* Reset the last set genpd state, default to index 0 */
-> +	genpd->state_idx = 0;
-> +
-> +	/* We dont want to power down, if QoS is 0 */
-> +	if (!qos)
-> +		return false;
-> +
-> +	/*
-> +	 * Find the sleep time for the cluster.
-> +	 * The time between now and the first wake up of any CPU that
-> +	 * are in this domain hierarchy is the time available for the
-> +	 * domain to be idle.
-> +	 */
-> +	earliest = ktime_set(KTIME_SEC_MAX, 0);
-> +	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
+On Fri, Feb 26, 2016 at 2:08 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Mark,
+>
+> On Fri, 26 Feb 2016 12:04:11 +0900, Mark Brown wrote:
+>
+>> Today's -next fails to build an arm64 allmodconfig due to:
+>>
+>> >     arm64-allmodconfig
+>> > ../drivers/pci/host/pci-mvebu.c:755:12: error: dereferencing pointer to incomplete type 'struct pci_sys_data'
+>> > ../drivers/pci/host/pci-mvebu.c:855:31: error: dereferencing pointer to incomplete type 'struct pci_sys_data'
+>> > ../drivers/pci/host/pci-mvebu.c:904:16: error: storage size of 'hw' isn't known
+>> > ../drivers/pci/host/pci-mvebu.c:919:2: error: implicit declaration of function 'pci_common_init_dev' [-Werror=implicit-function-declaration]
+>> > ../drivers/pci/host/pci-mvebu.c:1282:3: error: implicit declaration of function 'pci_ioremap_io' [-Werror=implicit-function-declaration]
+>>
+>> caused by b4f596b19624 (arm64: add mvebu architecture entry) which
+>> enables MVBEU on arm64, the commit was present for a little while and
+>> the error cropped up but didn't get reported due to other things masking
+>> it.  This looks like the driver needs modernization and probably ought
+>> to have a !ARM64 dependency for now.
+>
+> This has already been fixed by:
+>
+>         [PATCH] PCI: mvebu: Restrict build to 32-bit ARM
+>
+> submitted by Thierry Redding. I'm Cc'ing Bjorn, who is the one in
+> charge of merging this fix.
 
-We're not worried about hotplug happening in parallel because
-preemption is disabled here?
+I applied Thierry's patch ("PCI: mvebu: Restrict build to 32-bit ARM")
+to my for-linus branch, so it should appear in Linus' tree before
+v4.5.
 
-> +		next_wakeup = tick_nohz_get_next_wakeup(cpu);
-> +		if (earliest.tv64 > next_wakeup.tv64)
-
-	if (ktime_before(next_wakeup, earliest))
-
-> +			earliest = next_wakeup;
-> +	}
-> +
-> +	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
-> +	if (sleep_ns <= 0)
-> +		return false;
-> +
-> +	/*
-> +	 * Find the deepest sleep state that satisfies the residency
-> +	 * requirement and the QoS constraint
-> +	 */
-> +	for (i = genpd->state_count - 1; i >= 0; i--) {
-> +		u64 state_sleep_ns;
-> +
-> +		state_sleep_ns = genpd->states[i].power_off_latency_ns +
-> +			genpd->states[i].power_on_latency_ns +
-> +			genpd->states[i].residency_ns;
-> +
-> +		/*
-> +		 * If we cant sleep to save power in the state, move on
-
-s/cant/can't/
-
-> +		 * to the next lower idle state.
-> +		 */
-> +		if (state_sleep_ns > sleep_ns)
-> +			continue;
-> +
-> +		/*
-> +		 * We also dont want to sleep more than we should to
-
-s/dont/don't/
-
-> +		 * gaurantee QoS.
-> +		 */
-> +		if (state_sleep_ns < (qos * NSEC_PER_USEC))
-
-Maybe we should make qos into qos_ns? Presumably the compiler
-would hoist out the multiplication here, but it doesn't hurt to
-do it explicitly.
-
-> +			break;
-> +	}
-> +
-> +	if (i >= 0)
-> +		genpd->state_idx = i;
-> +
-> +	return  (i >= 0) ? true : false;
-
-Just return i >= 0?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Bjorn
