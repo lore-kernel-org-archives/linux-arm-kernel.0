@@ -1,42 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 14:54:49 +0100
-Subject: [PATCH] serial: ifx6x60: avoid uninitialized variable use
-In-Reply-To: <20160226000651.628e28fe@lxorguk.ukuu.org.uk>
-References: <1456433283-3761559-1-git-send-email-arnd@arndb.de>
- <20160226000651.628e28fe@lxorguk.ukuu.org.uk>
-Message-ID: <11867118.gBQtPfGrif@wuerfel>
+Date: Fri, 26 Feb 2016 14:58:15 +0100
+Subject: [PATCH] bsp: add SoC device to brcmstb
+In-Reply-To: <1456445947-9079-1-git-send-email-justinpopo6@gmail.com>
+References: <1456445947-9079-1-git-send-email-justinpopo6@gmail.com>
+Message-ID: <4679582.DyKPu0pJrQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 February 2016 00:06:51 One Thousand Gnomes wrote:
-> On Thu, 25 Feb 2016 21:47:57 +0100
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > gcc warns about a potential use of an uninitialized variable in this driver:
-> > 
-> > drivers/tty/serial/ifx6x60.c: In function 'ifx_spi_complete':
-> > drivers/tty/serial/ifx6x60.c:713:6: warning: 'more' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> >    if (more || ifx_dev->spi_more || queue_length > 0 ||
-> > 
-> > Unlike a lot of other such warnings, this one is correct and describes
-> > an actual problem in the handling of the "IFX_SPI_HEADER_F" result code.
-> > 
-> > This appears to be a result from a restructuring of the driver that
-> > dates back to before it was merged in the kernel, so it's impossible
-> > to know where it went wrong. I also don't know what that result code
-> > means, so I have no idea if setting 'more' to zero is the correct
-> > solution, but at least it makes the behavior reproducible rather than
-> > depending on whatever happens to be on the kernel stack.
-> 
-> Would it not be far simpler just to set more = 0 at the top of
-> ifx_spi_complete ?
-> 
-> 
+On Thursday 25 February 2016 16:19:07 Justin Chen wrote:
+>   */
+>  void brcmstb_biuctrl_init(void);
+>  
+> +/*
+> + * Helper functions for getting family or product id from the
+> + * SoC driver.
+> + */
+> +u32 brcmstb_get_family_id(void);
+> +u32 brcmstb_get_product_id(void);
+> +
+>  #endif /* __BRCMSTB_SOC_H */
+> -- 
 
-That would be simpler, but I generally don't like to do that, because it
-makes it less obvious where the value is coming from.
-
-In this case, it's still not obvious, as I was just guessing what the
-original intention might have been.
+Please remove the declarations from the header file and make the
+variable local to this file, to make sure no other driver accidentally
+accesses them.
 
 	Arnd
