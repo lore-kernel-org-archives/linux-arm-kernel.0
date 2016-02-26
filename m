@@ -1,111 +1,214 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 20:07:34 +0100
-Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
-In-Reply-To: <CAGXu5jLgDHhQ7srDU09i=MZndimzhwLopRJR29r7kAoWAyTrxQ@mail.gmail.com>
-References: <56D030A4.5050205@nxp.com>
- <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
- <20160226121819.GB8728@leverpostej>
- <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
- <CAGXu5jLgDHhQ7srDU09i=MZndimzhwLopRJR29r7kAoWAyTrxQ@mail.gmail.com>
-Message-ID: <CAKv+Gu_MkkrRiDtD6juN_VxE0=dZMEVYnusJM40Q9FamFdi=LA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 26 Feb 2016 11:10:16 -0800
+Subject: [RFC v2 03/12] PM / cpu_domains: Setup PM domains for
+ CPUs/clusters
+In-Reply-To: <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
+References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+ <1455310238-8963-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20160226191016.GW28849@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2016 at 19:56, Kees Cook <keescook@chromium.org> wrote:
-> On Fri, Feb 26, 2016 at 4:37 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 26 February 2016 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
->>>> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
->>>> > In case the bootloader doesn't provide randomness
->>>> > (through device tree or by uefi protocol) generate
->>>> > a pseudo-random seed based on the timer counter.
->>>> > People might find this "week rng" approach convenient
->>>> > as it gets rid of the bootloader dependency.
->>>> >
->>>> > The patch tries to mimic the x86's rdtsc
->>>> > based implementation authored by Kees Cook.
->>>> >
->>>> > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> > Cc: Kees Cook <keescook@chromium.org>
->>>>
->>>> Hi Laurentiu,
->>>>
->>>> I appreciate the interest in this work, but to be honest, I don't like
->>>> this at all. I went out of my way to ensure that
->>>> a) the kernel itself does not take part in generating the random bits, and
->>>> b) the random bits are used in such a way that there is no correlation
->>>> between the randomization of the core kernel, the module region and
->>>> the linear region if there is no correlation between the random bits.
->>>>
->>>> The limited entropy of the cycle counter at early boot defeats that,
->>>> and even worse, it will not encourage platform vendors to implement
->>>> this properly in their boot code, given that it will appear to work,
->>>> and the only thing more dangerous than no security is a false sense of
->>>> security imo.
->>>
->>> I agree that a false sense of security is a worry here.
->>>
->>> Either way, I think we need numbers. It's non-obvious how much entropy
->>> we can acquire through counters or other means at early boot time.
->>>
->>> Has anyone done an analysis of environmental entropy available (through
->>> any means) at early boot, VM vs native?
->>>
->>
->> Define 'environmental'. The only architected thing you can rely on is
->> the timer, which really does not hold a lot of entropy on modern solid
->> state platforms. I don't have the numbers, but I do have the
->> experience to back this up, unfortunately (at my former employer).
->>
->> You could argue that KASLR does not require strong entropy like key
->> generation, but I would prefer to simply steer clear of that entire
->> debate. The bootloader simply needs to do the best job it can, either
->> based on some peripheral that the kernel has no awareness of this
->> early in the boot, or perhaps by other means if it doesn't (which
->> could include storing a random seed in the file system, or even in a
->> EFI variable). Punting it to the kernel is really the last resort.
->>
->>> It's also not obvious that vendors will correctly implement the EFI RNG
->>> protocol; depending on the above we may want to mix in additional entropy
->>> regardless.
->>>
->>
->> True, but that is not the point. The main risk I see is that vendors
->> will not bother at all once the digits start to look random to the
->> human eye.
->
-> Surely there may be RNG sources that will come along in time that the
-> kernel can add to the entropy?
+On 02/12, Lina Iyer wrote:
+> diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
+> new file mode 100644
+> index 0000000..981592f
+> --- /dev/null
+> +++ b/drivers/base/power/cpu_domains.c
+> @@ -0,0 +1,267 @@
+> +
+> +/* List of CPU PM domains we care about */
+> +static LIST_HEAD(of_cpu_pd_list);
+> +static DEFINE_SPINLOCK(cpu_pd_list_lock);
 
-Nope, not for kaslr on arm64.
+Can this be a mutex?
 
-There are two things to keep in mind here:
-- arm64 does not have a decompressor, so there is no runtime
-environment with MMU caches etc enabled where you can reasonably
-execute arbitrary C code, and I am already pushing the envelope in
-kaslr_early_init by mapping the kernel at its default address, enable
-the MMU and caches, jump into C code to parse the /chosen node and set
-up the randomized mapping, and then tear down the default mapping,
-reapply all relocations and reinitialize bss etc etc.
-- arm64 is an architecture, not a platform like x86/pc, and so the
-only thing we can rely on before we have a clue what kind of system we
-are running on, dispatch drivers etc, is what the architecture gives
-us, and that does not include anything like a RDRAND instruction.
+> +
+> +/**
+> + * of_init_cpu_pm_domain() - Initialize a CPU PM domain from a device node
+> + *
+> + * @dn: The domain provider's device node
+> + * @ops: The power_on/_off callbacks for the domain
+> + *
+> + * Returns the generic_pm_domain (genpd) pointer to the domain on success
+> + */
+> +static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
+> +				const struct cpu_pd_ops *ops)
+> +{
+> +	struct cpu_pm_domain *pd = NULL;
+> +	struct generic_pm_domain *genpd = NULL;
+> +	int ret = -ENOMEM;
+> +
+> +	if (!of_device_is_available(dn))
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	genpd = kzalloc(sizeof(*(genpd)), GFP_KERNEL);
 
-IOW, the highly restricted C environment that we have before KASLR is
-set up does not support arbitrary platforms to slot in the code that
-wires up their entropy source, and so we must leave it to the
-bootloader.
+Drop extra parenthesis
 
-> I worry about boot loaders doing a
-> terrible job of finding a good RNG...
->
+> +	if (!genpd)
+> +		goto fail;
+> +
+> +	genpd->name = kstrndup(dn->full_name, CPU_PD_NAME_MAX, GFP_KERNEL);
+> +	if (!genpd->name)
+> +		goto fail;
+> +
+> +	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+> +	if (!pd)
+> +		goto fail;
+> +
+> +	pd->genpd = genpd;
+> +	pd->genpd->power_off = cpu_pd_power_off;
+> +	pd->genpd->power_on = cpu_pd_power_on;
+> +	pd->genpd->flags |= GENPD_FLAG_IRQ_SAFE;
+> +	pd->ops.power_on = ops->power_on;
+> +	pd->ops.power_off = ops->power_off;
+> +
+> +	INIT_LIST_HEAD_RCU(&pd->link);
+> +	spin_lock(&cpu_pd_list_lock);
+> +	list_add_rcu(&pd->link, &of_cpu_pd_list);
+> +	spin_unlock(&cpu_pd_list_lock);
+> +
+> +	/* Register the CPU genpd */
+> +	pr_debug("adding %s as CPU PM domain.\n", pd->genpd->name);
 
-The bootloader is more tightly coupled to the hardware than the kernel
-is, so it is in a better position to find entropy. Case in point is
-UEFI, which can implement its EFI_RNG_PROTOCOL in various ways,
+Drop the full stop?
+
+> +	ret = of_pm_genpd_init(dn, pd->genpd, &simple_qos_governor, false);
+> +	if (ret) {
+> +		pr_err("Unable to initialize domain %s\n", dn->full_name);
+> +		goto fail;
+> +	}
+> +
+> +	ret = of_genpd_add_provider_simple(dn, pd->genpd);
+> +	if (ret)
+> +		pr_warn("Unable to add genpd %s as provider\n",
+> +				pd->genpd->name);
+> +
+> +	return pd->genpd;
+> +fail:
+> +
+> +	kfree(genpd);
+> +	kfree(genpd->name);
+
+Switch order so that name is freed first to avoid junk deref here.
+
+> +	kfree(pd);
+> +	return ERR_PTR(ret);
+> +}
+> +
+> +static struct generic_pm_domain *of_get_cpu_domain(struct device_node *dn,
+> +		const struct cpu_pd_ops *ops, int cpu)
+> +{
+> +	struct of_phandle_args args;
+> +	struct generic_pm_domain *genpd, *parent;
+> +	int ret;
+> +
+> +	/* Do we have this domain? If not, create the domain */
+> +	args.np = dn;
+> +	args.args_count = 0;
+> +
+> +	genpd = of_genpd_get_from_provider(&args);
+> +	if (!IS_ERR(genpd))
+> +		goto skip_parent;
+
+Why not just return genpd and drop the goto?
+
+> +
+> +	genpd = of_init_cpu_pm_domain(dn, ops);
+> +	if (IS_ERR(genpd))
+> +		return genpd;
+> +
+> +	/* Is there a domain provider for this domain? */
+> +	ret = of_parse_phandle_with_args(dn, "power-domains",
+> +			"#power-domain-cells", 0, &args);
+> +	of_node_put(dn);
+
+Shouldn't this be of_node_put(args.np)? I suppose it's the same
+so this isn't too important.
+
+> +	if (ret < 0)
+> +		goto skip_parent;
+> +
+> +	/* Find its parent and attach this domain to it, recursively */
+> +	parent = of_get_cpu_domain(args.np, ops, cpu);
+
+Except that we use the np here. So perhaps move the of_node_put()
+down to the skip_parent goto?
+
+> +	if (IS_ERR(parent)) {
+> +		struct cpu_pm_domain *cpu_pd, *parent_cpu_pd;
+> +
+> +		ret = pm_genpd_add_subdomain(genpd, parent);
+
+parent is an error pointer here... isn't this always going to
+fail? Maybe that should be if (!IS_ERR(parent)) up there?
+
+> +		if (ret) {
+> +			pr_err("%s: Unable to add sub-domain (%s) to parent (%s)\n err: %d",
+> +					__func__, genpd->name, parent->name,
+> +					ret);
+> +			return ERR_PTR(ret);
+> +		}
+> +
+> +		/*
+> +		 * Reference parent domain for easy access.
+> +		 * Note: We could be attached to a domain that is not a
+> +		 * CPU PM domain in that case dont reference the parent.
+
+s/dont/don't/
+
+> +		 */
+> +		cpu_pd = to_cpu_pd(genpd);
+> +		parent_cpu_pd = to_cpu_pd(parent);
+> +
+> +		if (cpu_pd && parent_cpu_pd)
+> +			cpu_pd->parent = parent_cpu_pd;
+> +	}
+> +
+> +skip_parent:
+> +	return genpd;
+> +}
+> +
+> +/**
+> + * of_setup_cpu_pd_single() - Setup the PM domains for a CPU
+> + *
+> + * @cpu: The CPU for which the PM domain is to be set up.
+> + * @ops: The PM domain suspend/resume ops for the CPU's domain
+> + *
+> + * If the CPU PM domain exists already, then the CPU is attached to
+> + * that CPU PD. If it doesn't, the domain is created, the @ops are
+> + * set for power_on/power_off callbacks and then the CPU is attached
+> + * to that domain. If the domain was created outside this framework,
+> + * then we do not attach the CPU to the domain.
+> + */
+> +int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
+> +{
+> +
+> +	struct device_node *dn;
+> +	struct generic_pm_domain *genpd;
+> +
+> +	dn = of_get_cpu_node(cpu, NULL);
+> +	if (!dn)
+> +		return -ENODEV;
+> +
+> +	dn = of_parse_phandle(dn, "power-domains", 0);
+> +	if (!dn)
+> +		return -ENODEV;
+> +	of_node_put(dn);
+
+This should be put after of_get_cpu_domain().
+
+> +
+> +	/* Find the genpd for this CPU, create if not found */
+> +	genpd = of_get_cpu_domain(dn, ops, cpu);
+> +	if (IS_ERR(genpd))
+> +		return PTR_ERR(genpd);
+> +
+> +	return cpu_pd_attach_cpu(cpu);
+> +}
+> +EXPORT_SYMBOL(of_setup_cpu_pd_single);
 
 -- 
-Ard.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
