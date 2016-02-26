@@ -1,90 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 16:39:55 +0100
-Subject: [RFC PATCH 1/6] arm64: vmemmap: use virtual projection of linear
- region
-In-Reply-To: <20160226151557.GD29125@arm.com>
-References: <1456330893-19228-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456330893-19228-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9M6QukGqLWYgDqAp6xaa7RPVW36E591LOPf6xP_TH48w@mail.gmail.com>
- <20160226151557.GD29125@arm.com>
-Message-ID: <CAKv+Gu9Os3ZOepFDYTCQxfkWkhQUMbWyc_N=c5DNFgzmkAx0ZQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Feb 2016 16:41:27 +0100
+Subject: [PATCH/RFC v2 04/11] soc: renesas: rcar: Add DT support for SYSC
+ PM domains
+In-Reply-To: <3535519.g4KL1PCIZy@avalon>
+References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
+ <1455571020-18968-5-git-send-email-geert+renesas@glider.be>
+ <3535519.g4KL1PCIZy@avalon>
+Message-ID: <CAMuHMdVo2V7Ez5g8ZW74w-QWiwS8i2mbYeCjOU9brxRzNjMAdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2016 at 16:15, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Feb 25, 2016 at 08:02:00AM +0100, Ard Biesheuvel wrote:
->> On 24 February 2016 at 17:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > Commit dd006da21646 ("arm64: mm: increase VA range of identity map") made
->> > some changes to the memory mapping code to allow physical memory to reside
->> > at an offset that exceeds the size of the virtual address space.
->> >
->> > However, since the size of the vmemmap area is proportional to the size of
->> > the VA area, but it is populated relative to the physical space, we may
->> > end up with the struct page array being mapped outside of the vmemmap
->> > region. For instance, on my Seattle A0 box, I can see the following output
->> > in the dmesg log.
->> >
->> >    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
->> >              0xffffffbfc0000000 - 0xffffffbfd0000000   (   256 MB actual)
->> >
->> > We can fix this by deciding that the vmemmap region is not a projection of
->> > the physical space, but of the virtual space above PAGE_OFFSET, i.e., the
->> > linear region. This way, we are guaranteed that the vmemmap region is of
->> > sufficient size, and we can also reduce its size by half.
->> >
->> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > ---
->> >  arch/arm64/include/asm/pgtable.h | 7 ++++---
->> >  arch/arm64/mm/init.c             | 4 ++--
->> >  2 files changed, 6 insertions(+), 5 deletions(-)
->> >
->> > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> > index a440f5a85d08..8e6baea0ff61 100644
->> > --- a/arch/arm64/include/asm/pgtable.h
->> > +++ b/arch/arm64/include/asm/pgtable.h
->> > @@ -34,18 +34,19 @@
->> >  /*
->> >   * VMALLOC and SPARSEMEM_VMEMMAP ranges.
->> >   *
->> > - * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
->> > + * VMEMAP_SIZE: allows the whole linear region to be covered by a struct page array
->> >   *     (rounded up to PUD_SIZE).
->> >   * VMALLOC_START: beginning of the kernel vmalloc space
->> >   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
->> >   *     fixed mappings and modules
->> >   */
->> > -#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
->> > +#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
->> >
->> >  #define VMALLOC_START          (MODULES_END)
->> >  #define VMALLOC_END            (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
->> >
->> > -#define vmemmap                        ((struct page *)(VMALLOC_END + SZ_64K))
->> > +#define VMEMMAP_START          (VMALLOC_END + SZ_64K)
->> > +#define vmemmap                        ((struct page *)(VMEMMAP_START - memstart_addr / sizeof(struct page)))
->> >
+Hi Laurent,
+
+On Mon, Feb 15, 2016 at 11:51 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>>  drivers/soc/renesas/pm-rcar.c | 327 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 327 insertions(+)
 >>
->> Note that with the linear region randomization which is now in -next,
->> this division needs to be signed (since memstart_addr can wrap).
->>
->> So I should either update the definition of memstart_addr to s64 in
->> this patch, or cast to (s64) in the expression above
->
-> Can you avoid the division altogether by doing something like:
->
-> (struct page *)(VMEMMAP_START - (PHYS_PFN(memstart_addr) * sizeof(struct page)))
->
-> or have I misunderstood how this works?
->
+>> diff --git a/drivers/soc/renesas/pm-rcar.c b/drivers/soc/renesas/pm-rcar.c
+>> index cc684e9cc8db5d1c..c0540934126e58eb 100644
+>> --- a/drivers/soc/renesas/pm-rcar.c
+>> +++ b/drivers/soc/renesas/pm-rcar.c
 
-It needs to be a signed shift, since the RHS of the subtraction must
-remain negative if memstart_addr is 'negative'
+>> +static int __init rcar_init_pm_domains(void)
+>> +{
+>> +     const struct of_device_id *match;
+>> +     struct device_node *np, *pmd;
+>> +     bool scanned = false;
+>> +     void __iomem *base;
+>> +     int ret = 0;
+>> +
+>> +     for_each_matching_node_and_match(np, rcar_sysc_matches, &match) {
+>> +             u32 syscier = 0;
+>> +
+>> +             rcar_gen = (uintptr_t)match->data;
+>> +
+>> +             base = of_iomap(np, 0);
+>> +             if (!base) {
+>> +                     pr_warn("%s cannot map reg 0\n", np->full_name);
+>> +                     continue;
+>> +             }
+>> +
+>> +             rcar_sysc_base = base;  // FIXME conflicts with rcar_sysc_init()
+>> +
+>> +             pmd = of_get_child_by_name(np, "pm-domains");
+>> +             if (!pmd) {
+>> +                     pr_warn("%s lacks pm-domains node\n", np->full_name);
+>
+> Shouldn't you call iounmap() here ?
 
-This works as well:
-(struct page *)VMEMMAP_START - ((s64)memstart_addr >> PAGE_SHIFT)
+Yes. Will fix.
 
-It may be appropriate to change the definition of memstart_addr to
-s64, to reflect that, under randomization of the linear region, the
-start of physical memory may be 'below zero' so that the actual
-populated RAM region is high up in the linear region.
-That way, we can lose the case here.
+>> +             /*
+>> +              * Enable all interrupt sources, but do not use interrupt
+>> +              * handler
+>> +              */
+>> +             pr_debug("%s: syscier = 0x%08x\n", np->full_name, syscier);
+>> +             iowrite32(syscier, rcar_sysc_base + SYSCIER);
+>> +             iowrite32(0, rcar_sysc_base + SYSCIMR);
+>
+> Shouldn't the SYSCIMR bits be set to 1 to mask interrupts ?
+
+That would work, too. It doesn't matter much, as the driver doesn't use
+interrupts, so they stay disabled at the GIC level.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
