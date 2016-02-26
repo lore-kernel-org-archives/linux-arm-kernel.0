@@ -1,111 +1,208 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Feb 2016 17:28:26 +0000
-Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
-In-Reply-To: <56CF683D.30003@arm.com>
-References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
- <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
- <20160225161630.GB16546@arm.com> <56CF683D.30003@arm.com>
-Message-ID: <20160226172825.GK29125@arm.com>
+From: glider@google.com (Alexander Potapenko)
+Date: Fri, 26 Feb 2016 18:28:27 +0100
+Subject: [PATCH v1] kasan, arm64: Unpoison dirty stack frames when
+ resuming from suspend.
+In-Reply-To: <20160226135335.GC8728@leverpostej>
+References: <c08aa050cb03e40098775dc8d200f073451c342e.1456489933.git.glider@google.com>
+ <20160226135335.GC8728@leverpostej>
+Message-ID: <CAG_fn=XowizL_=tt5aiHBF=_UNYKZsGWQOR7Ju-NYz2kre-7bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 02:46:54PM -0600, Jeremy Linton wrote:
-> On 02/25/2016 10:16 AM, Will Deacon wrote:
-> >On Fri, Feb 19, 2016 at 11:46:23AM -0600, Jeremy Linton wrote:
-> 
-> (trimming)
-> 
-> >>+static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
-> >>+{
-> >>+	int i;
-> >>+
-> >>+	pte -= CONT_RANGE_OFFSET(addr);
-> >>+	for (i = 0; i < CONT_PTES; i++) {
-> >>+		if (pte_cont(*pte))
-> >>+			set_pte(pte, pte_mknoncont(*pte));
-> >>+		pte++;
-> >>+	}
-> >>+	flush_tlb_all();
-> >
-> >Do you still need this invalidation? I thought the table weren't even
-> >live at this point?
-> 
-> Well it continues to match the calls in alloc_init_p*.
+On Fri, Feb 26, 2016 at 2:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Fri, Feb 26, 2016 at 01:38:37PM +0100, Alexander Potapenko wrote:
+>> Before an ARM64 CPU is suspended, the kernel saves the context which will
+>> be used to initialize the register state upon resume. After that and
+>> before the actual execution of the SMC instruction the kernel creates
+>> several stack frames which are never unpoisoned because arm_smccc_smc()
+>> does not return. This may cause false positive stack buffer overflow
+>> reports from KASAN.
+>>
+>> The solution is to record the stack pointer value just before the CPU is
+>> suspended, and unpoison the part of stack between the saved value and
+>> the stack pointer upon resume.
+>
+> Thanks for looking into this! That's much appreciated.
+>
+> I think the general approach (unposioning the stack upon cold return to
+> the kernel) is fine, but I have concerns with the implementation, which
+> I've noted below.
+>
+> The problem also applies for hotplug, as leftover poison from the
+> hot-unplug path isn't cleaned before a CPU is hotplugged back on. The
+> first few functions are likely deterministic in their stack usage, so
+> it's not seen with a defconfig, but I think it's possible to trigger,
+> and it's also a cross-architecture problem shared with x86.
+Agreed, but since I haven't yet seen problems with hotplug, it's hard
+to test the fix for them.
 
-Ok, but if it's not needed (and I don't think it is), then we should
-remove the invalidation from there too rather than add more of it.
+>>
+>> Signed-off-by: Alexander Potapenko <glider@google.com>
+>> ---
+>>  arch/arm64/kernel/suspend.c |  5 +++++
+>>  drivers/firmware/psci.c     |  5 +++++
+>>  include/linux/kasan.h       |  5 +++++
+>>  mm/kasan/kasan.c            | 32 ++++++++++++++++++++++++++++++++
+>>  4 files changed, 47 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+>> index 1095aa4..1070415 100644
+>> --- a/arch/arm64/kernel/suspend.c
+>> +++ b/arch/arm64/kernel/suspend.c
+>> @@ -1,4 +1,5 @@
+>>  #include <linux/ftrace.h>
+>> +#include <linux/kasan.h>
+>>  #include <linux/percpu.h>
+>>  #include <linux/slab.h>
+>>  #include <asm/cacheflush.h>
+>> @@ -117,6 +118,10 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>>                */
+>>               if (hw_breakpoint_restore)
+>>                       hw_breakpoint_restore(NULL);
+>> +#ifdef CONFIG_KASAN
+>> +             /* Unpoison the stack above the current frame. */
+>> +             kasan_cpu_resume();
+>> +#endif
+>
+> I think this is too late. Since we returned from __cpu_suspend_enter we
+> have called several functions, any of which may have touched the stack,
+> and could have hit stale poison.
+True.
+We can probably move kasan_cpu_resume() right after
+__cpu_suspend_enter() returns.
 
-> I guess the worry is the extra flush that happens at create_mapping_late(),
-> if mapping ranges aren't cont aligned? (because the loop won't actually be
-> doing any set_pte's)
+> Do we have any strong guarantee that the compiler won't (in future)
+> extend the current stack frame arbitrarily? I can imagine that happening
+> if the compiler does some interprocedural analysis and/or splits this
+> function into specialised parts.
+>
+> Given that, I think it's possible to hit stale poison even in the
+> current function, and I'm not keen on having the kasan_cpu_resume call
+> within cpu_suspend due to that.
+>
+> If we're going to unpoison the stack upon re-entry to the kernel, I
+> think that has to happen in the return path of __cpu_suspend_enter.
+I didn't want to mess up with arch/arm64/kernel/sleep.S, but perhaps
+it's better to inject kasan_cpu_resume() right into
+cpu_resume_after_mmu() then?
+>>       }
+>>
+>>       unpause_graph_tracing();
+>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>> index f25cd79..2480189 100644
+>> --- a/drivers/firmware/psci.c
+>> +++ b/drivers/firmware/psci.c
+>> @@ -15,6 +15,7 @@
+>>
+>>  #include <linux/arm-smccc.h>
+>>  #include <linux/errno.h>
+>> +#include <linux/kasan.h>
+>>  #include <linux/linkage.h>
+>>  #include <linux/of.h>
+>>  #include <linux/pm.h>
+>> @@ -122,6 +123,10 @@ static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
+>>  {
+>>       struct arm_smccc_res res;
+>>
+>> +#ifdef CONFIG_KASAN
+>> +     /* Notify KASAN it should unpoison the stack up to this point. */
+>> +     kasan_stack_watermark();
+>> +#endif
+>
+> Similarly to the comment above, I'm not sure this necessarily gives us
+> an accurate bound in all cases, and could easily be perturbed by
+> other compiler instrumentation/optimisation/specialisation.
+>
+> If we go ahead with unpoisoning rather than moving functions into
+> uninstrumented compilation units, I think we have to clear everything
+> from the end of the current thread_info up to the SP in
+> __cpu_suspend_enter.
+Agreed, it should be fine to start at the current thread_info.
+>>       arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+>>       return res.a0;
+>>  }
+>> diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+>> index 4b9f85c..d4fd7a4 100644
+>> --- a/include/linux/kasan.h
+>> +++ b/include/linux/kasan.h
+>> @@ -62,6 +62,11 @@ void kasan_slab_free(struct kmem_cache *s, void *object);
+>>  int kasan_module_alloc(void *addr, size_t size);
+>>  void kasan_free_shadow(const struct vm_struct *vm);
+>>
+>> +#ifdef CONFIG_ARM64
+>> +void kasan_stack_watermark(void);
+>> +void kasan_cpu_resume(void);
+>> +#endif
+>> +
+>>  #else /* CONFIG_KASAN */
+>>
+>>  static inline void kasan_unpoison_shadow(const void *address, size_t size) {}
+>> diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
+>> index bc0a8d8..6529d345 100644
+>> --- a/mm/kasan/kasan.c
+>> +++ b/mm/kasan/kasan.c
+>> @@ -550,3 +550,35 @@ static int __init kasan_memhotplug_init(void)
+>>
+>>  module_init(kasan_memhotplug_init);
+>>  #endif
+>> +
+>> +#ifdef CONFIG_ARM64
+>> +static DEFINE_PER_CPU(unsigned long, cpu_stack_watermark);
+>> +
+>> +/* Record the stack pointer before the CPU is suspended. The recorded value
+>> + * will be used upon resume to unpoison the dirty stack frames.
+>> + */
+>> +void kasan_stack_watermark(void)
+>> +{
+>> +     unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
+>> +
+>> +     *watermark = __builtin_frame_address(0);
+>> +}
+>> +EXPORT_SYMBOL_GPL(kasan_stack_watermark);
+>> +
+>> +void kasan_cpu_resume(void)
+>> +{
+>> +     unsigned long sp = __builtin_frame_address(0);
+>> +     unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
+>> +
+>> +     if (*watermark == 0) {
+>> +             WARN_ON_ONCE(*watermark == 0);
+>> +             *watermark = sp;
+>> +             return;
+>> +     }
+>> +     if (sp > *watermark) {
+>> +             kasan_unpoison_shadow(*watermark, sp - *watermark);
+>> +             *watermark = 0;
+>> +     }
+>> +}
+>> +EXPORT_SYMBOL_GPL(kasan_cpu_resume);
+>> +#endif
+>
+> As above, we'll need to clear the entire stack upon hotplug on all
+> architectures, and this should probably be reused for that (and shared
+> with other architectures).
+>
+> Thanks,
+> Mark.
 
-I'm just concerned with trying to make this code understandable! I doubt
-there's a performance argument to be made.
 
-> If this and the alloc_init_p* flushes are to be removed, there should
-> probably be a way to detect any cases where the splits are happening after
-> the tables have been activated. This might be a little less straightforward
-> given efi_create_mapping().
 
-I think that's a separate issue, since splitting a live page table is
-dodgy regardless of the flushing. But yes, it would be nice to detect
-that case and scream about it.
+-- 
+Alexander Potapenko
+Software Engineer
 
-> >
-> >>+}
-> >>+
-> >>+/*
-> >>+ * Given a range of PTEs set the pfn and provided page protection flags
-> >>+ */
-> >>+static void __populate_init_pte(pte_t *pte, unsigned long addr,
-> >>+			       unsigned long end, phys_addr_t phys,
-> >>+			       pgprot_t prot)
-> >>+{
-> >>+	unsigned long pfn = __phys_to_pfn(phys);
-> >>+
-> >>+	do {
-> >>+		/* clear all the bits except the pfn, then apply the prot */
-> >>+		set_pte(pte, pfn_pte(pfn, prot));
-> >>+		pte++;
-> >>+		pfn++;
-> >>+		addr += PAGE_SIZE;
-> >>+	} while (addr != end);
-> >>+}
-> >>+
-> (trimming)
-> >>+
-> >>  	do {
-> >>-		set_pte(pte, pfn_pte(pfn, prot));
-> >>-		pfn++;
-> >>-	} while (pte++, addr += PAGE_SIZE, addr != end);
-> >>+		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
-> >>+		if (((addr | next | phys) & ~CONT_MASK) == 0) {
-> >>+			/* a block of CONT_PTES	 */
-> >>+			__populate_init_pte(pte, addr, next, phys,
-> >>+					    prot | __pgprot(PTE_CONT));
-> >>+		} else {
-> >>+			/*
-> >>+			 * If the range being split is already inside of a
-> >>+			 * contiguous range but this PTE isn't going to be
-> >>+			 * contiguous, then we want to unmark the adjacent
-> >>+			 * ranges, then update the portion of the range we
-> >>+			 * are interested in.
-> >>+			 */
-> >>+			clear_cont_pte_range(pte, addr);
-> >>+			__populate_init_pte(pte, addr, next, phys, prot);
-> >
-> >I don't understand the comment or the code here... the splitting is now
-> >done seperately, and I can't think of a scenario where you need to clear
-> >the cont hint explicitly for adjacent ptes.
-> 
-> 	
-> My understanding is that splitting is initially running this code path (via
-> map_kernel_chunk, then again via create_mapping_late where splits won't
-> happen). So, split_pmd() is creating cont ranges. When the ranges aren't
-> sufficiently aligned then this is wiping out the cont mapping immediately
-> after their creation.
+Google Germany GmbH
+Erika-Mann-Stra?e, 33
+80636 M?nchen
 
-Gotcha, thanks for the explanation (I somehow overlooked the initial
-page table creation).
-
-Will
+Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
+Registergericht und -nummer: Hamburg, HRB 86891
+Sitz der Gesellschaft: Hamburg
+Diese E-Mail ist vertraulich. Wenn Sie nicht der richtige Adressat sind,
+leiten Sie diese bitte nicht weiter, informieren Sie den
+Absender und l?schen Sie die E-Mail und alle Anh?nge. Vielen Dank.
+This e-mail is confidential. If you are not the right addressee please
+do not forward it, please inform the sender, and please erase this
+e-mail including any attachments. Thanks.
