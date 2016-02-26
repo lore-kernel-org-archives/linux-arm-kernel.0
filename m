@@ -1,56 +1,268 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 26 Feb 2016 15:30:45 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.6 (#2)
-Message-ID: <878u27o86i.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Feb 2016 14:44:58 +0000
+Subject: [PATCH] arm64: Remove fixmap include fragility
+In-Reply-To: <CAKv+Gu933t2DjBoHEfe=ZNcbrJMHHvT_F3Pug261w0WYTduVTw@mail.gmail.com>
+References: <CAKv+Gu933t2DjBoHEfe=ZNcbrJMHHvT_F3Pug261w0WYTduVTw@mail.gmail.com>
+Message-ID: <20160226144457.GD8728@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 26, 2016 at 09:51:45AM +0100, Ard Biesheuvel wrote:
+> arm64 defconfig is currently broken in -next, due to the way
+> early_memremap_ro() is compiled conditionally, based on a condition
+> that incorrectly resolves to false due to the inclusion order of
+> various header files
 
-Here is the second pull request for dt64 for mvebu for v4.6.
+In mm/early_ioremap.c that depends on FIXMAP_PAGE_RO, which is defined
+in include/asm-generic/fixmap.h:
 
-Gregory
+49 #if !defined(FIXMAP_PAGE_RO) && defined(PAGE_KERNEL_RO)
+50 #define FIXMAP_PAGE_RO PAGE_KERNEL_RO
+51 #endif
 
-The following changes since commit adbc3695d9e487fa07214140a46b68ac3156fb78:
+As arm64's fixmap.h doesn't include pgtable.h, PAGE_KERNEL_RO isn't
+guaranteed to be defined in all cases, even if we reorder pgtable.h. So
+reordering just masks the issue.
 
-  arm64: dts: add the Marvell Armada 3700 family and a development board (2016-02-17 16:09:55 +0100)
+Since pgtable.h includes fixmap.h already, we can't just add that
+include, and we need to break the cycle.
 
-are available in the git repository at:
+How about the below, which factors all the prot defines into a separate
+header?
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.6-2
+Otherwise, as a simple fix in fixmap.h we can hard-code:
 
-for you to fetch changes up to b5ebfad8df1c73df6932d11eeada4caea0ec8f30:
+#define FIXMAP_PAGE_RO PAGE_KERNEL_RO
 
-  arm64: dts: marvell: re-order Device Tree nodes for Armada AP806 (2016-02-26 15:17:31 +0100)
+Thanks,
+Mark.
 
-----------------------------------------------------------------
-mvebu dt64 for 4.6 (part 2)
+---->8----
+>From 390b07ab8f7cd5ab0c8fdf4cf082b36263a715f6 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Fri, 26 Feb 2016 14:31:32 +0000
+Subject: [PATCH] arm64: Remove fixmap include fragility
 
-Add support for the Armada 7K and 8K SoCs and the Armada 8040 DB board
+The asm-generic fixmap.h depends on each architecture's fixmap.h to pull
+in the definition of PAGE_KERNEL_RO, if this exists. In the absence of
+this, FIXMAP_PAGE_RO will not be defined. In mm/early_ioremap.c the
+definition of early_memremap_ro is predicated on FIXMAP_PAGE_RO being
+defined.
 
-----------------------------------------------------------------
-Thomas Petazzoni (3):
-      arm64: dts: marvell: add Device Tree files for Armada 7K/8K
-      arm64: dts: marvell: update Armada AP806 clock description
-      arm64: dts: marvell: re-order Device Tree nodes for Armada AP806
+Currently, the arm64 fixmap.h doesn't include pgtable.h for the
+definition of PAGE_KERNEL_RO, and as a knock-on effect early_memremap_ro
+is not always defined, leading to link-time failures when it is used.
+This has been observed with defconfig on next-20160226.
 
- .../bindings/arm/marvell/armada-7k-8k.txt          |  24 +++
- arch/arm64/boot/dts/marvell/Makefile               |   1 +
- arch/arm64/boot/dts/marvell/armada-7020.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  92 ++++++++
- arch/arm64/boot/dts/marvell/armada-7040.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  54 +++++
- arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |  71 ++++++
- arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  84 ++++++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 237 +++++++++++++++++++++
- 10 files changed, 725 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
- create mode 100644 arch/arm64/boot/dts/marvell/armada-7020.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-7040-db.dts
- create mode 100644 arch/arm64/boot/dts/marvell/armada-7040.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-8020.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-8040.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
- create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+Unfortunately, as pgtable.h includes fixmap.h, adding the include
+introduces a circular dependency, which is just as fragile.
+
+Instead, this patch factors out PAGE_KERNEL_RO and other prot
+definitions into a new pgtable-prot header which can be included by poth
+pgtable.h and fixmap.h, avoiding the  circular dependency, and ensuring
+that early_memremap_ro is alwyas defined where it is used.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/fixmap.h       |  1 +
+ arch/arm64/include/asm/pgtable-prot.h | 92 +++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/pgtable.h      | 63 +-----------------------
+ 3 files changed, 94 insertions(+), 62 deletions(-)
+ create mode 100644 arch/arm64/include/asm/pgtable-prot.h
+
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 1a617d4..caf86be 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -20,6 +20,7 @@
+ #include <linux/sizes.h>
+ #include <asm/boot.h>
+ #include <asm/page.h>
++#include <asm/pgtable-prot.h>
+ 
+ /*
+  * Here we define all the compile-time 'special' virtual
+diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+new file mode 100644
+index 0000000..29fcb33
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-prot.h
+@@ -0,0 +1,92 @@
++/*
++ * Copyright (C) 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_PROT_H
++#define __ASM_PGTABLE_PROT_H
++
++#include <asm/memory.h>
++#include <asm/pgtable-hwdef.h>
++
++#include <linux/const.h>
++
++/*
++ * Software defined PTE bits definition.
++ */
++#define PTE_VALID		(_AT(pteval_t, 1) << 0)
++#define PTE_WRITE		(PTE_DBM)		 /* same as DBM (51) */
++#define PTE_DIRTY		(_AT(pteval_t, 1) << 55)
++#define PTE_SPECIAL		(_AT(pteval_t, 1) << 56)
++#define PTE_PROT_NONE		(_AT(pteval_t, 1) << 58) /* only when !PTE_VALID */
++
++#ifndef __ASSEMBLY__
++
++#include <asm/pgtable-types.h>
++
++#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++
++#define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
++#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
++#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_NC))
++#define PROT_NORMAL_WT		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_WT))
++#define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
++
++#define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
++#define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
++#define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
++
++#define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
++
++#define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
++#define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
++#define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
++#define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
++#define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
++
++#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
++#define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
++
++#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
++#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
++
++#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
++#define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
++#define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
++#define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define PAGE_COPY_EXEC		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
++#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
++#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
++
++#define __P000  PAGE_NONE
++#define __P001  PAGE_READONLY
++#define __P010  PAGE_COPY
++#define __P011  PAGE_COPY
++#define __P100  PAGE_READONLY_EXEC
++#define __P101  PAGE_READONLY_EXEC
++#define __P110  PAGE_COPY_EXEC
++#define __P111  PAGE_COPY_EXEC
++
++#define __S000  PAGE_NONE
++#define __S001  PAGE_READONLY
++#define __S010  PAGE_SHARED
++#define __S011  PAGE_SHARED
++#define __S100  PAGE_READONLY_EXEC
++#define __S101  PAGE_READONLY_EXEC
++#define __S110  PAGE_SHARED_EXEC
++#define __S111  PAGE_SHARED_EXEC
++
++#endif /* __ASSEMBLY__ */
++
++#endif /* __ASM_PGTABLE_PROT_H */
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 16438dd..7c73b36 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -21,15 +21,7 @@
+ 
+ #include <asm/memory.h>
+ #include <asm/pgtable-hwdef.h>
+-
+-/*
+- * Software defined PTE bits definition.
+- */
+-#define PTE_VALID		(_AT(pteval_t, 1) << 0)
+-#define PTE_WRITE		(PTE_DBM)		 /* same as DBM (51) */
+-#define PTE_DIRTY		(_AT(pteval_t, 1) << 55)
+-#define PTE_SPECIAL		(_AT(pteval_t, 1) << 56)
+-#define PTE_PROT_NONE		(_AT(pteval_t, 1) << 58) /* only when !PTE_VALID */
++#include <asm/pgtable-prot.h>
+ 
+ /*
+  * VMALLOC and SPARSEMEM_VMEMMAP ranges.
+@@ -59,59 +51,6 @@ extern void __pmd_error(const char *file, int line, unsigned long val);
+ extern void __pud_error(const char *file, int line, unsigned long val);
+ extern void __pgd_error(const char *file, int line, unsigned long val);
+ 
+-#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+-#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+-
+-#define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+-#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+-#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_NC))
+-#define PROT_NORMAL_WT		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_WT))
+-#define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
+-
+-#define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
+-#define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+-#define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+-
+-#define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+-
+-#define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+-#define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+-#define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+-#define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+-#define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+-
+-#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
+-#define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+-
+-#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+-#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+-
+-#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+-#define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+-#define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+-#define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define PAGE_COPY_EXEC		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+-#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+-#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+-
+-#define __P000  PAGE_NONE
+-#define __P001  PAGE_READONLY
+-#define __P010  PAGE_COPY
+-#define __P011  PAGE_COPY
+-#define __P100  PAGE_READONLY_EXEC
+-#define __P101  PAGE_READONLY_EXEC
+-#define __P110  PAGE_COPY_EXEC
+-#define __P111  PAGE_COPY_EXEC
+-
+-#define __S000  PAGE_NONE
+-#define __S001  PAGE_READONLY
+-#define __S010  PAGE_SHARED
+-#define __S011  PAGE_SHARED
+-#define __S100  PAGE_READONLY_EXEC
+-#define __S101  PAGE_READONLY_EXEC
+-#define __S110  PAGE_SHARED_EXEC
+-#define __S111  PAGE_SHARED_EXEC
+-
+ /*
+  * ZERO_PAGE is a global shared page that is always zero: used
+  * for zero-mapped memory areas etc..
+-- 
+1.9.1
