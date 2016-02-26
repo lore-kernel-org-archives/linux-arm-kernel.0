@@ -1,21 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 22:49 +0100
-Subject: [GIT PULL v2] ARM: Keystone DTS for 4.6
-In-Reply-To: <1456436957-22836-1-git-send-email-ssantosh@kernel.org>
-References: <1456436957-22836-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <2797842.ys4n4vaKaP@wuerfel>
+Date: Fri, 26 Feb 2016 22:50:47 +0100
+Subject: [GIT PULL] ARM32: Xilinx Zynq DT changes for v4.6
+In-Reply-To: <56CF0048.7060601@monstr.eu>
+References: <56CF0048.7060601@monstr.eu>
+Message-ID: <3963149.FVB4mYe4m7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 February 2016 13:49:17 Santosh Shilimkar wrote:
-> ARM: DTS: Add new bindings for K2G and the K2G evm
+On Thursday 25 February 2016 14:23:20 Michal Simek wrote:
+> arm: Xilinx Zynq dt patches for v4.5
 > 
-> K2G SoC family is the newest version of the Keystone family of processors.
+> - Add usb phy for Zybo
+> - Use earlycon instead of earlyprintk
 > 
-> The technical reference manual for K2G can be found here:
-> http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
 > 
 
-Pulled into next/dt, thanks!
+I've edited the commit log to say 4.6 instead of 4.5 and merged it
+into next/dt, thanks!
 
 	Arnd
