@@ -1,18 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 22:43:24 +0100
-Subject: [GIT PULL] DaVinci EDMA enhancements for v4.6
-In-Reply-To: <1456221214-18042-2-git-send-email-nsekhar@ti.com>
-References: <1456221214-18042-1-git-send-email-nsekhar@ti.com>
- <1456221214-18042-2-git-send-email-nsekhar@ti.com>
-Message-ID: <3099721.fE27jmolfX@wuerfel>
+Date: Fri, 26 Feb 2016 22:45:20 +0100
+Subject: [PATCH 2/2] ARM: multi_v5_defconfig: Enable initramfs support
+In-Reply-To: <1456326199-12438-2-git-send-email-m.grzeschik@pengutronix.de>
+References: <1456326199-12438-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1456326199-12438-2-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <3276682.37MCJo7gfA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 February 2016 15:23:34 Sekhar Nori wrote:
-> Pass dma_slave_map data to EDMA driver. This will help
-> migration to new DMA engine API for requesting
-> slave channels dma_request_chan().
+On Wednesday 24 February 2016 16:03:19 Michael Grzeschik wrote:
+> From: Jan Luebbe <jlu@pengutronix.de>
+> 
+> This makes it possible to automatically boot-test this defconfig with
+> kernelci.org.
+> 
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+> 
 
-Pulled into next/soc, thanks!
+Applied both to next/defconfig. Thanks!
 
 	Arnd
