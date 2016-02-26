@@ -1,35 +1,21 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 26 Feb 2016 16:22:59 +0900
-Subject: [PATCH] arm64: dts: uniphier: rename PH1-LD10 to PH1-LD20
-In-Reply-To: <1456202421-10857-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1456202421-10857-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQ8smP1X613QCi2MXJ7M+v+bd4GmumXP84Ttt-40+jtUg@mail.gmail.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Fri, 26 Feb 2016 08:24:15 +0100
+Subject: [RFC v1] clk: Add debugfs nodes for
+ enable/disable/set-rate/set-parent
+In-Reply-To: <1456454309-25037-1-git-send-email-pankaj.dev@st.com> (Pankaj
+ Dev's message of "Fri, 26 Feb 2016 08:08:29 +0530")
+References: <1456454309-25037-1-git-send-email-pankaj.dev@st.com>
+Message-ID: <87fuwg9bog.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-23 13:40 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Due to the company's awful projecting, this chip has been renamed to
-> PH1-LD20.  It has not been shipped yet, this change would not give
-> much impact on our customers.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
-> Olof, Arnd,
->
-> Please apply this patch along with my series
-> "[PATCH 0/9] ARM: uniphier: UniPhier updates for Linux 4.6-rc1".
->
-> If it goes to a different branch, it will cause a big merge conflict later.
+Pankaj Dev <pankaj.dev@st.com> writes:
 
+> 1. clk_set_rate : Set new rate to value. Reading returns the
+> current rate
 
-Note:
+If you can use this to set *and* read it, then "_set_" shouldn't be in
+the name.
 
-This patch has been included in the series,
-"ARM: dts: uniphier: UniPhier DT updates for Linux 4.6-rc1 (2nd round)"
-in order to clarify the patch dependency.
-
-
--- 
-Best Regards
-Masahiro Yamada
+What is wrong with using the existing "clk_rate" for reading/setting the
+rate?
