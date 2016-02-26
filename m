@@ -1,96 +1,71 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 26 Feb 2016 10:24:19 -0800
-Subject: [RFC v2 04/12] ARM: cpuidle: Add runtime PM support for CPUs
-In-Reply-To: <1455310238-8963-5-git-send-email-lina.iyer@linaro.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160226182419.GV28849@codeaurora.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 26 Feb 2016 17:35:50 +0000
+Subject: [RFC v4 10/14] vfio: introduce VFIO_IOVA_RESERVED vfio_dma type
+In-Reply-To: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
+References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1456508154-2253-11-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12, Lina Iyer wrote:
-> @@ -45,6 +48,8 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->  
->  	ret = cpu_pm_enter();
->  	if (!ret) {
-> +		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
+We introduce a vfio_dma type since we will need to discriminate
+legacy vfio_dma's from new reserved ones. Since those latter are
+not mapped at registration, some treatments need to be reworked:
+removal, replay. Currently they are unplugged. In subsequent patches
+they will be reworked.
 
-Can you add a comment on why we need to use RCU_NONIDLE here?
-It's not super obvious.
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/vfio_iommu_type1.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-> +
->  		/*
->  		 * Pass idle state index to cpu_suspend which in turn will
->  		 * call the CPU ops suspend protocol with idle index as a
-> @@ -52,6 +57,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->  		 */
->  		arm_cpuidle_suspend(idx);
->  
-> +		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
->  		cpu_pm_exit();
->  	}
->  
-> @@ -84,6 +90,30 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
->  	{ },
->  };
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +static int cpu_hotplug(struct notifier_block *nb,
-
-This function is pretty generically named. Maybe something more
-runtime PM specific or cpu idle specific?
-
-> +			unsigned long action, void *data)
-> +{
-> +	struct device *cpu_dev = get_cpu_device(smp_processor_id());
-> +
-> +	/* Execute CPU runtime PM on that CPU */
-> +	switch (action) {
-
-We could do the & ~CPU_TASKS_FROZEN trick here to save a few cases.
-
-> +	case CPU_DYING:
-> +	case CPU_DYING_FROZEN:
-> +		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
-
-And do we actually need to use it for hotplug path? These
-notifiers don't run from idle context do they?
-
-> +		break;
-> +	case CPU_STARTING:
-> +	case CPU_STARTING_FROZEN:
-> +		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_OK;
-> +}
-> +#endif
-> +
->  /*
->   * arm_idle_init
->   *
-> @@ -96,6 +126,7 @@ static int __init arm_idle_init(void)
->  	int cpu, ret;
->  	struct cpuidle_driver *drv = &arm_idle_driver;
->  	struct cpuidle_device *dev;
-> +	struct device *cpu_dev;
->  
->  	/*
->  	 * Initialize idle states data, starting at index 1.
-> @@ -148,10 +189,17 @@ static int __init arm_idle_init(void)
->  		}
->  	}
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	/* Register for hotplug notifications for runtime PM */
-> +	hotcpu_notifier(cpu_hotplug, 0);
-
-Define an empty cpu_hotplug() function for !CONFIG_HOTPLUG_CPU
-and then always call this without the ifdef?
-
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 6f1ea3d..692e9a2 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -53,6 +53,15 @@ module_param_named(disable_hugepages,
+ MODULE_PARM_DESC(disable_hugepages,
+ 		 "Disable VFIO IOMMU support for IOMMU hugepages.");
+ 
++enum vfio_iova_type {
++	VFIO_IOVA_USER = 0, /* standard IOVA used to map user vaddr */
++	/*
++	 * IOVA reserved to map special host physical addresses,
++	 * MSI frames for instance
++	 */
++	VFIO_IOVA_RESERVED,
++};
++
+ struct vfio_iommu {
+ 	struct list_head	domain_list;
+ 	struct mutex		lock;
+@@ -75,6 +84,7 @@ struct vfio_dma {
+ 	unsigned long		vaddr;		/* Process virtual addr */
+ 	size_t			size;		/* Map size (bytes) */
+ 	int			prot;		/* IOMMU_READ/WRITE */
++	enum vfio_iova_type	type;		/* type of IOVA */
+ };
+ 
+ struct vfio_group {
+@@ -395,7 +405,8 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ 
+ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ {
+-	vfio_unmap_unpin(iommu, dma);
++	if (likely(dma->type != VFIO_IOVA_RESERVED))
++		vfio_unmap_unpin(iommu, dma);
+ 	vfio_unlink_dma(iommu, dma);
+ 	kfree(dma);
+ }
+@@ -671,6 +682,10 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
+ 		dma_addr_t iova;
+ 
+ 		dma = rb_entry(n, struct vfio_dma, node);
++
++		if (unlikely(dma->type == VFIO_IOVA_RESERVED))
++			continue;
++
+ 		iova = dma->iova;
+ 
+ 		while (iova < dma->iova + dma->size) {
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
