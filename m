@@ -1,162 +1,159 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 26 Feb 2016 09:38:43 +0900
-Subject: [RESPIN/PATCH] arm64: dts: Add tmu node for exynos7
-In-Reply-To: <1456391116-11553-1-git-send-email-alim.akhtar@samsung.com>
-References: <1456391116-11553-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <56CF9E93.9090905@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 26 Feb 2016 01:57:08 +0100
+Subject: [PATCH v3 00/52] mtd: rework ECC layout definition
+Message-ID: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.02.2016 18:05, Alim Akhtar wrote:
-> This patch adds tmu node, related temprature sensor and triping
-> point data for Atlas cpu core found on exynos7 SoC.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
-> Change log:
-> * no changes, just sending back from my email id.
+Hello,
 
-All my comments from previous submission are still valid...
+This patchset aims at getting rid of the nand_ecclayout limitations.
+struct nand_ecclayout is defining fixed eccpos and oobfree arrays which
+can only be increased by modifying the MTD_MAX_ECCPOS_ENTRIES_LARGE and
+MTD_MAX_OOBFREE_ENTRIES_LARGE macros.
+This approach forces us to modify the macro values each time we add a
+new NAND chip with a bigger OOB area, and increasing these arrays also
+penalize all platforms, even those who only support small NAND devices
+(with small OOB area).
 
-Best regards,
-Krzysztof
+The idea to overcome this limitation, is to define the ECC/OOB layout
+by the mean of two functions: ->ecc() and ->free(), which will
+basically return the same information has those stored in the
+nand_ecclayout struct.
 
-> 
->  .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +++++++++
->  .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   55 ++++++++++++++++++++
->  arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 +++++++
->  3 files changed, 100 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
-> new file mode 100644
-> index 0000000..1d6dcf2
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
-> @@ -0,0 +1,25 @@
-> +/*
-> + * Device tree sources for Exynos7 TMU sensor configuration
-> + *
-> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <dt-bindings/thermal/thermal_exynos.h>
-> +
-> +#thermal-sensor-cells = <0>;
-> +samsung,tmu_gain = <9>;
-> +samsung,tmu_reference_voltage = <17>;
-> +samsung,tmu_noise_cancel_mode = <4>;
-> +samsung,tmu_efuse_value = <75>;
-> +samsung,tmu_min_efuse_value = <15>;
-> +samsung,tmu_max_efuse_value = <100>;
-> +samsung,tmu_first_point_trim = <25>;
-> +samsung,tmu_second_point_trim = <85>;
-> +samsung,tmu_default_temp_offset = <50>;
-> +samsung,tmu_cal_type = <TYPE_ONE_POINT_TRIMMING>;
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-> new file mode 100644
-> index 0000000..3970545
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
-> @@ -0,0 +1,55 @@
-> +/*
-> + * Device tree sources for default Exynos7 thermal zone definition
-> + *
-> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +trips {
-> +	cpu-alert-0 {
-> +		temperature = <75000>; /* millicelsius */
-> +		hysteresis = <10000>; /* millicelsius */
-> +		type = "passive";
-> +	};
-> +	cpu-alert-1 {
-> +		temperature = <80000>; /* millicelsius */
-> +		hysteresis = <10000>; /* millicelsius */
-> +		type = "passive";
-> +	};
-> +	cpu-alert-2 {
-> +		temperature = <85000>; /* millicelsius */
-> +		hysteresis = <10000>; /* millicelsius */
-> +		type = "passive";
-> +	};
-> +	cpu-alert-3 {
-> +		temperature = <90000>; /* millicelsius */
-> +		hysteresis = <10000>; /* millicelsius */
-> +		type = "passive";
-> +	};
-> +	cpu-alert-4 {
-> +		temperature = <95000>; /* millicelsius */
-> +		hysteresis = <10000>; /* millicelsius */
-> +		type = "passive";
-> +	};
-> +	cpu-alert-5 {
-> +		temperature = <100000>; /* millicelsius */
-> +		hysteresis = <10000>; /* millicelsius */
-> +		type = "passive";
-> +	};
-> +	cpu-alert-6 {
-> +		temperature = <110000>; /* millicelsius */
-> +		hysteresis = <10000>; /* millicelsius */
-> +		type = "passive";
-> +	};
-> +	/* HW Trip point */
-> +	cpu-crit-0 {
-> +		temperature = <115000>; /* millicelsius */
-> +		hysteresis = <0>; /* millicelsius */
-> +		type = "critical";
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index c662f98..fc9d130 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -27,6 +27,7 @@
->  		pinctrl6 = &pinctrl_fsys0;
->  		pinctrl7 = &pinctrl_fsys1;
->  		pinctrl8 = &pinctrl_bus1;
-> +		tmuctrl0 = &tmuctrl_0;
->  	};
->  
->  	cpus {
-> @@ -538,6 +539,25 @@
->  			clocks = <&clock_peric0 PCLK_PWM>;
->  			clock-names = "timers";
->  		};
-> +
-> +		tmuctrl_0: tmu at 10060000 {
-> +			compatible = "samsung,exynos7-tmu";
-> +			reg = <0x10060000 0x200>;
-> +			interrupts = <0 108 0>;
-> +			clocks = <&clock_peris PCLK_TMU>,
-> +				 <&clock_peris SCLK_TMU>;
-> +			clock-names = "tmu_apbif", "tmu_sclk";
-> +			#include "exynos7-tmu-sensor-conf.dtsi"
-> +		};
-> +
-> +		thermal-zones {
-> +			atlas_thermal: atlas-thermal {
-> +				polling-delay-passive = <0>; /* milliseconds */
-> +				polling-delay = <0>; /* milliseconds */
-> +				thermal-sensors = <&tmuctrl_0>;
-> +				#include "exynos7-trip-points.dtsi"
-> +			};
-> +		};
->  	};
->  };
->  
-> 
+Another advantage of this solution is that ECC layouts are usually
+following a repetitive pattern (i.e. leave X bytes free and put Y bytes
+of ECC per ECC chunk), which allows one to implement the ->ecc()
+and ->free() functions with a simple logic that can be applied
+to any size of OOB.
+
+Patches 1 to 4 are just cleanups or trivial fixes that can be taken
+independently.
+
+Also note that the last two commits are removing the nand_ecclayout
+definition, thus preventing any new driver to use this structure.
+Of course, this step can be delayed if some of the previous patches
+are not accepted.
+
+Best Regards,
+
+Boris
+
+Changes since v2:
+- fixed a few bugs in the core and driver implementations
+
+Changes since v1:
+- unified the way of defining ECC and free bytes
+- fixed a few bugs in some ->ecc()/->free() implementations
+- added new helpers to ease ECC and free bytes manipulation
+- separated driver changes in different commits to ease review
+- dropped already applied patches
+
+*** BLURB HERE ***
+
+Boris Brezillon (52):
+  mtd: kill the ecclayout->oobavail field
+  mtd: create an mtd_oobavail() helper and make use of it
+  mtd: mtdswap: remove useless if (!mtd->ecclayout) test
+  mtd: nand: simplify nand_bch_init() usage
+  mtd: add mtd_ooblayout_xxx() helper functions
+  mtd: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: core: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: atmel: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: fsl_ifc: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: gpmi: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: lpc32xx: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: omap2: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: onenand: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: add mtd_set_ecclayout() helper function
+  mtd: use mtd_set_ecclayout() where appropriate
+  mtd: nand: use mtd_set_ecclayout() where appropriate
+  mtd: onenand: use mtd_set_ecclayout() where appropriate
+  mtd: docg3: use mtd_set_ecclayout() where appropriate
+  mtd: create an mtd_ooblayout_ops struct to ease ECC layout definition
+  mtd: docg3: switch to mtd_ooblayout_ops
+  mtd: nand: implement the default mtd_ooblayout_ops
+  mtd: nand: bch: switch to mtd_ooblayout_ops
+  mtd: nand: sharpsl: switch to mtd_ooblayout_ops
+  mtd: nand: jz4740: switch to mtd_ooblayout_ops
+  mtd: nand: atmel: switch to mtd_ooblayout_ops
+  mtd: nand: bf5xx: switch to mtd_ooblayout_ops
+  mtd: nand: brcm: switch to mtd_ooblayout_ops
+  mtd: nand: cafe: switch to mtd_ooblayout_ops
+  mtd: nand: davinci: switch to mtd_ooblayout_ops
+  mtd: nand: denali: switch to mtd_ooblayout_ops
+  mtd: nand: diskonchip: switch to mtd_ooblayout_ops
+  mtd: nand: docg4: switch to mtd_ooblayout_ops
+  mtd: nand: fsl_elbc: switch to mtd_ooblayout_ops
+  mtd: nand: fsl_ifc: switch to mtd_ooblayout_ops
+  mtd: nand: fsmc: switch to mtd_ooblayout_ops
+  mtd: nand: fsmc: get rid of the fsmc_nand_eccplace struct
+  mtd: nand: gpmi: switch to mtd_ooblayout_ops
+  mtd: nand: hisi504: switch to mtd_ooblayout_ops
+  mtd: nand: jz4780: switch to mtd_ooblayout_ops
+  mtd: nand: lpc32xx: switch to mtd_ooblayout_ops
+  mtd: nand: mxc: switch to mtd_ooblayout_ops
+  mtd: nand: omap2: switch to mtd_ooblayout_ops
+  mtd: nand: pxa3xx: switch to mtd_ooblayout_ops
+  mtd: nand: s3c2410: switch to mtd_ooblayout_ops
+  mtd: nand: sh_flctl: switch to mtd_ooblayout_ops
+  mtd: nand: sm_common: switch to mtd_ooblayout_ops
+  mtd: nand: sunxi: switch to mtd_ooblayout_ops
+  mtd: nand: vf610: switch to mtd_ooblayout_ops
+  mtd: onenand: switch to mtd_ooblayout_ops
+  staging: mt29f_spinand: switch to mtd_ooblayout_ops
+  mtd: nand: kill the ecc->layout field
+  mtd: kill the nand_ecclayout struct
+
+ arch/arm/mach-pxa/spitz.c                       |  55 +++-
+ arch/mips/include/asm/mach-jz4740/jz4740_nand.h |   2 +-
+ arch/mips/jz4740/board-qi_lb60.c                |  87 +++---
+ drivers/mtd/devices/docg3.c                     |  51 +++-
+ drivers/mtd/mtdchar.c                           | 123 ++++++--
+ drivers/mtd/mtdconcat.c                         |   2 +-
+ drivers/mtd/mtdcore.c                           | 358 ++++++++++++++++++++++++
+ drivers/mtd/mtdpart.c                           |  28 +-
+ drivers/mtd/mtdswap.c                           |  24 +-
+ drivers/mtd/nand/atmel_nand.c                   | 130 ++++-----
+ drivers/mtd/nand/bf5xx_nand.c                   |  51 ++--
+ drivers/mtd/nand/brcmnand/brcmnand.c            | 262 ++++++++++-------
+ drivers/mtd/nand/cafe_nand.c                    |  45 ++-
+ drivers/mtd/nand/davinci_nand.c                 | 118 +++-----
+ drivers/mtd/nand/denali.c                       |  51 +++-
+ drivers/mtd/nand/diskonchip.c                   |  60 +++-
+ drivers/mtd/nand/docg4.c                        |  34 ++-
+ drivers/mtd/nand/fsl_elbc_nand.c                |  83 +++---
+ drivers/mtd/nand/fsl_ifc_nand.c                 | 245 +++++-----------
+ drivers/mtd/nand/fsmc_nand.c                    | 322 ++++++---------------
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c          |  61 ++--
+ drivers/mtd/nand/hisi504_nand.c                 |  27 +-
+ drivers/mtd/nand/jz4740_nand.c                  |   2 +-
+ drivers/mtd/nand/jz4780_nand.c                  |  19 +-
+ drivers/mtd/nand/lpc32xx_mlc.c                  |  50 ++--
+ drivers/mtd/nand/lpc32xx_slc.c                  |  58 +++-
+ drivers/mtd/nand/mxc_nand.c                     | 212 +++++++-------
+ drivers/mtd/nand/nand_base.c                    | 344 ++++++++++++-----------
+ drivers/mtd/nand/nand_bch.c                     |  46 ++-
+ drivers/mtd/nand/omap2.c                        | 241 +++++++++-------
+ drivers/mtd/nand/pxa3xx_nand.c                  | 104 ++++---
+ drivers/mtd/nand/s3c2410.c                      |  32 ++-
+ drivers/mtd/nand/sh_flctl.c                     |  87 ++++--
+ drivers/mtd/nand/sharpsl.c                      |   2 +-
+ drivers/mtd/nand/sm_common.c                    |  93 ++++--
+ drivers/mtd/nand/sunxi_nand.c                   | 114 ++++----
+ drivers/mtd/nand/vf610_nfc.c                    |  34 +--
+ drivers/mtd/onenand/onenand_base.c              | 262 ++++++++---------
+ drivers/mtd/tests/oobtest.c                     |  49 ++--
+ drivers/staging/mt29f_spinand/mt29f_spinand.c   |  49 ++--
+ fs/jffs2/wbuf.c                                 |   6 +-
+ include/linux/mtd/fsmc.h                        |  18 --
+ include/linux/mtd/mtd.h                         |  69 ++++-
+ include/linux/mtd/nand.h                        |   5 +-
+ include/linux/mtd/nand_bch.h                    |   8 +-
+ include/linux/mtd/onenand.h                     |   2 -
+ include/linux/mtd/sharpsl.h                     |   2 +-
+ include/uapi/mtd/mtd-abi.h                      |   2 +-
+ 48 files changed, 2375 insertions(+), 1754 deletions(-)
+
+-- 
+2.1.4
