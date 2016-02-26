@@ -1,130 +1,150 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 01:57:31 +0100
-Subject: [PATCH v3 23/52] mtd: nand: sharpsl: switch to mtd_ooblayout_ops
+Date: Fri, 26 Feb 2016 01:57:10 +0100
+Subject: [PATCH v3 02/52] mtd: create an mtd_oobavail() helper and make use of
+ it
 In-Reply-To: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1456448280-27788-24-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1456448280-27788-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing the mtd_ooblayout_ops interface is the new way of exposing
-ECC/OOB layout to MTD users.
+Currently, all MTD drivers/sublayers exposing an OOB area are
+doing the same kind of test to extract the available OOB size
+based on the mtd_info and mtd_oob_ops structures.
+Move this common logic into an inline function and make use of it.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Suggested-by: Priit Laes <plaes@plaes.org>
 ---
- arch/arm/mach-pxa/spitz.c   | 55 ++++++++++++++++++++++++++++++++++++---------
- drivers/mtd/nand/sharpsl.c  |  2 +-
- include/linux/mtd/sharpsl.h |  2 +-
- 3 files changed, 47 insertions(+), 12 deletions(-)
+ drivers/mtd/mtdpart.c              |  5 +----
+ drivers/mtd/nand/nand_base.c       | 16 ++++------------
+ drivers/mtd/onenand/onenand_base.c | 19 +++----------------
+ include/linux/mtd/mtd.h            |  5 +++++
+ 4 files changed, 13 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 825f903..165a8db 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -763,14 +763,49 @@ static struct nand_bbt_descr spitz_nand_bbt = {
- 	.pattern	= scan_ff_pattern
- };
+diff --git a/drivers/mtd/mtdpart.c b/drivers/mtd/mtdpart.c
+index 10bf304..08de4b2 100644
+--- a/drivers/mtd/mtdpart.c
++++ b/drivers/mtd/mtdpart.c
+@@ -126,10 +126,7 @@ static int part_read_oob(struct mtd_info *mtd, loff_t from,
+ 	if (ops->oobbuf) {
+ 		size_t len, pages;
  
--static struct nand_ecclayout akita_oobinfo = {
--	.oobfree	= { {0x08, 0x09} },
--	.eccbytes	= 24,
--	.eccpos		= {
--			0x05, 0x01, 0x02, 0x03, 0x06, 0x07, 0x15, 0x11,
--			0x12, 0x13, 0x16, 0x17, 0x25, 0x21, 0x22, 0x23,
--			0x26, 0x27, 0x35, 0x31, 0x32, 0x33, 0x36, 0x37,
--	},
-+static int akita_ooblayout_ecc(struct mtd_info *mtd, int section,
-+			       struct mtd_oob_region *oobregion)
+-		if (ops->mode == MTD_OPS_AUTO_OOB)
+-			len = mtd->oobavail;
+-		else
+-			len = mtd->oobsize;
++		len = mtd_oobavail(mtd, ops);
+ 		pages = mtd_div_by_ws(mtd->size, mtd);
+ 		pages -= mtd_div_by_ws(from, mtd);
+ 		if (ops->ooboffs + ops->ooblen > pages * len)
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 9f49d3e..ee89195 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -1723,8 +1723,7 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
+ 	int ret = 0;
+ 	uint32_t readlen = ops->len;
+ 	uint32_t oobreadlen = ops->ooblen;
+-	uint32_t max_oobsize = ops->mode == MTD_OPS_AUTO_OOB ?
+-		mtd->oobavail : mtd->oobsize;
++	uint32_t max_oobsize = mtd_oobavail(mtd, ops);
+ 
+ 	uint8_t *bufpoi, *oob, *buf;
+ 	int use_bufpoi;
+@@ -2075,10 +2074,7 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
+ 
+ 	stats = mtd->ecc_stats;
+ 
+-	if (ops->mode == MTD_OPS_AUTO_OOB)
+-		len = mtd->oobavail;
+-	else
+-		len = mtd->oobsize;
++	len = mtd_oobavail(mtd, ops);
+ 
+ 	if (unlikely(ops->ooboffs >= len)) {
+ 		pr_debug("%s: attempt to start read outside oob\n",
+@@ -2575,8 +2571,7 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
+ 	uint32_t writelen = ops->len;
+ 
+ 	uint32_t oobwritelen = ops->ooblen;
+-	uint32_t oobmaxlen = ops->mode == MTD_OPS_AUTO_OOB ?
+-				mtd->oobavail : mtd->oobsize;
++	uint32_t oobmaxlen = mtd_oobavail(mtd, ops);
+ 
+ 	uint8_t *oob = ops->oobbuf;
+ 	uint8_t *buf = ops->datbuf;
+@@ -2766,10 +2761,7 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
+ 	pr_debug("%s: to = 0x%08x, len = %i\n",
+ 			 __func__, (unsigned int)to, (int)ops->ooblen);
+ 
+-	if (ops->mode == MTD_OPS_AUTO_OOB)
+-		len = mtd->oobavail;
+-	else
+-		len = mtd->oobsize;
++	len = mtd_oobavail(mtd, ops);
+ 
+ 	/* Do not allow write past end of page */
+ 	if ((ops->ooboffs + ops->ooblen) > len) {
+diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
+index df47537..af28bb3 100644
+--- a/drivers/mtd/onenand/onenand_base.c
++++ b/drivers/mtd/onenand/onenand_base.c
+@@ -1124,11 +1124,7 @@ static int onenand_mlc_read_ops_nolock(struct mtd_info *mtd, loff_t from,
+ 	pr_debug("%s: from = 0x%08x, len = %i\n", __func__, (unsigned int)from,
+ 			(int)len);
+ 
+-	if (ops->mode == MTD_OPS_AUTO_OOB)
+-		oobsize = mtd->oobavail;
+-	else
+-		oobsize = mtd->oobsize;
+-
++	oobsize = mtd_oobavail(mtd, ops);
+ 	oobcolumn = from & (mtd->oobsize - 1);
+ 
+ 	/* Do not allow reads past end of device */
+@@ -1229,11 +1225,7 @@ static int onenand_read_ops_nolock(struct mtd_info *mtd, loff_t from,
+ 	pr_debug("%s: from = 0x%08x, len = %i\n", __func__, (unsigned int)from,
+ 			(int)len);
+ 
+-	if (ops->mode == MTD_OPS_AUTO_OOB)
+-		oobsize = mtd->oobavail;
+-	else
+-		oobsize = mtd->oobsize;
+-
++	oobsize = mtd_oobavail(mtd, ops);
+ 	oobcolumn = from & (mtd->oobsize - 1);
+ 
+ 	/* Do not allow reads past end of device */
+@@ -1885,12 +1877,7 @@ static int onenand_write_ops_nolock(struct mtd_info *mtd, loff_t to,
+ 	/* Check zero length */
+ 	if (!len)
+ 		return 0;
+-
+-	if (ops->mode == MTD_OPS_AUTO_OOB)
+-		oobsize = mtd->oobavail;
+-	else
+-		oobsize = mtd->oobsize;
+-
++	oobsize = mtd_oobavail(mtd, ops);
+ 	oobcolumn = to & (mtd->oobsize - 1);
+ 
+ 	column = to & (mtd->writesize - 1);
+diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
+index 9cf13c4..7712721 100644
+--- a/include/linux/mtd/mtd.h
++++ b/include/linux/mtd/mtd.h
+@@ -264,6 +264,11 @@ static inline struct device_node *mtd_get_of_node(struct mtd_info *mtd)
+ 	return mtd->dev.of_node;
+ }
+ 
++static inline int mtd_oobavail(struct mtd_info *mtd, struct mtd_oob_ops *ops)
 +{
-+	if (section > 12)
-+		return -ERANGE;
-+
-+	switch (section % 3) {
-+	case 0:
-+		oobregion->offset = 5;
-+		oobregion->length = 1;
-+		break;
-+
-+	case 1:
-+		oobregion->offset = 1;
-+		oobregion->length = 3;
-+		break;
-+
-+	case 2:
-+		oobregion->offset = 6;
-+		oobregion->length = 2;
-+		break;
-+	}
-+
-+	oobregion->offset += (section / 3) * 0x10;
-+
-+	return 0;
++	return ops->mode == MTD_OPS_AUTO_OOB ? mtd->oobavail : mtd->oobsize;
 +}
 +
-+static int akita_ooblayout_free(struct mtd_info *mtd, int section,
-+				struct mtd_oob_region *oobregion)
-+{
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = 8;
-+	oobregion->length = 9;
-+
-+	return 0;
-+}
-+
-+static const struct mtd_ooblayout_ops akita_ooblayout_ops = {
-+	.ecc = akita_ooblayout_ecc,
-+	.free = akita_ooblayout_free,
- };
- 
- static struct sharpsl_nand_platform_data spitz_nand_pdata = {
-@@ -804,11 +839,11 @@ static void __init spitz_nand_init(void)
- 	} else if (machine_is_akita()) {
- 		spitz_nand_partitions[1].size = 58 * 1024 * 1024;
- 		spitz_nand_bbt.len = 1;
--		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
-+		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
- 	} else if (machine_is_borzoi()) {
- 		spitz_nand_partitions[1].size = 32 * 1024 * 1024;
- 		spitz_nand_bbt.len = 1;
--		spitz_nand_pdata.ecc_layout = &akita_oobinfo;
-+		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
- 	}
- 
- 	platform_device_register(&spitz_nand_device);
-diff --git a/drivers/mtd/nand/sharpsl.c b/drivers/mtd/nand/sharpsl.c
-index b7d1b55..064ca17 100644
---- a/drivers/mtd/nand/sharpsl.c
-+++ b/drivers/mtd/nand/sharpsl.c
-@@ -148,6 +148,7 @@ static int sharpsl_nand_probe(struct platform_device *pdev)
- 	/* Link the private data with the MTD structure */
- 	mtd = nand_to_mtd(this);
- 	mtd->dev.parent = &pdev->dev;
-+	mtd_set_ooblayout(mtd, data->ecc_layout);
- 
- 	platform_set_drvdata(pdev, sharpsl);
- 
-@@ -170,7 +171,6 @@ static int sharpsl_nand_probe(struct platform_device *pdev)
- 	this->ecc.bytes = 3;
- 	this->ecc.strength = 1;
- 	this->badblock_pattern = data->badblock_pattern;
--	this->ecc.layout = data->ecc_layout;
- 	this->ecc.hwctl = sharpsl_nand_enable_hwecc;
- 	this->ecc.calculate = sharpsl_nand_calculate_ecc;
- 	this->ecc.correct = nand_correct_data;
-diff --git a/include/linux/mtd/sharpsl.h b/include/linux/mtd/sharpsl.h
-index 25f4d2a..65e91d0 100644
---- a/include/linux/mtd/sharpsl.h
-+++ b/include/linux/mtd/sharpsl.h
-@@ -14,7 +14,7 @@
- 
- struct sharpsl_nand_platform_data {
- 	struct nand_bbt_descr	*badblock_pattern;
--	struct nand_ecclayout	*ecc_layout;
-+	const struct mtd_ooblayout_ops *ecc_layout;
- 	struct mtd_partition	*partitions;
- 	unsigned int		nr_partitions;
- };
+ int mtd_erase(struct mtd_info *mtd, struct erase_info *instr);
+ int mtd_point(struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen,
+ 	      void **virt, resource_size_t *phys);
 -- 
 2.1.4
