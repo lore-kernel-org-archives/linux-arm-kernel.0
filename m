@@ -1,74 +1,62 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 26 Feb 2016 17:35:41 +0000
-Subject: [RFC v4 01/14] iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+Date: Fri, 26 Feb 2016 17:35:42 +0000
+Subject: [RFC v4 02/14] iommu: introduce a reserved iova cookie
 In-Reply-To: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
 References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1456508154-2253-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1456508154-2253-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce new DOMAIN_ATTR_MSI_MAPPING domain attribute. If supported,
-this means the MSI addresses need to be mapped in the IOMMU. ARM SMMUS
-and FSL PAMU, at least expose this attribute.
+This patch introduces some new fields in the iommu_domain struct,
+dedicated to reserved iova management.
 
-x86 IOMMUs typically don't expose the attribute since on x86, MSI write
-transaction addresses always are within the 1MB PA region [FEE0_0000h -
-FEF0_000h] window which directly targets the APIC configuration space and
-hence bypass the sMMU.
+In a similar way as DMA mapping IOVA window, we need to store
+information related to a reserved IOVA window.
 
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+The reserved_iova_cookie will store the reserved iova_domain
+handle. An RB tree indexed by physical address is introduced to
+store the host physical addresses bound to reserved IOVAs.
+
+Those physical addresses will correspond to MSI frame base
+addresses, also referred to as doorbells. Their number should be
+quite limited per domain.
+
+Also a mutex is introduced to protect accesses to the iova_domain
+and RB tree.
+
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
+ drivers/iommu/iommu.c | 1 +
+ include/linux/iommu.h | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-RFC v1 -> v1:
-- the data field is not used
-- for this attribute domain_get_attr simply returns 0 if the MSI_MAPPING
-  capability if needed or <0 if not.
-- removed struct iommu_domain_msi_maps
----
- drivers/iommu/arm-smmu.c        | 2 ++
- drivers/iommu/fsl_pamu_domain.c | 2 ++
- include/linux/iommu.h           | 1 +
- 3 files changed, 5 insertions(+)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 59ee4b8..c8b7e71 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1409,6 +1409,8 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
- 	case DOMAIN_ATTR_NESTING:
- 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
- 		return 0;
-+	case DOMAIN_ATTR_MSI_MAPPING:
-+		return 0;
- 	default:
- 		return -ENODEV;
- 	}
-diff --git a/drivers/iommu/fsl_pamu_domain.c b/drivers/iommu/fsl_pamu_domain.c
-index da0e1e3..46d5c6a 100644
---- a/drivers/iommu/fsl_pamu_domain.c
-+++ b/drivers/iommu/fsl_pamu_domain.c
-@@ -856,6 +856,8 @@ static int fsl_pamu_get_domain_attr(struct iommu_domain *domain,
- 	case DOMAIN_ATTR_FSL_PAMUV1:
- 		*(int *)data = DOMAIN_ATTR_FSL_PAMUV1;
- 		break;
-+	case DOMAIN_ATTR_MSI_MAPPING:
-+		break;
- 	default:
- 		pr_debug("Unsupported attribute type\n");
- 		ret = -EINVAL;
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 0e3b009..7b2bb94 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1072,6 +1072,7 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
+ 
+ 	domain->ops  = bus->iommu_ops;
+ 	domain->type = type;
++	mutex_init(&domain->reserved_mutex);
+ 
+ 	return domain;
+ }
 diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a5c539f..a4fe04a 100644
+index a4fe04a..0189144 100644
 --- a/include/linux/iommu.h
 +++ b/include/linux/iommu.h
-@@ -112,6 +112,7 @@ enum iommu_attr {
- 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
- 	DOMAIN_ATTR_FSL_PAMUV1,
- 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
-+	DOMAIN_ATTR_MSI_MAPPING, /* Require MSIs mapping in iommu */
- 	DOMAIN_ATTR_MAX,
+@@ -82,6 +82,11 @@ struct iommu_domain {
+ 	void *handler_token;
+ 	struct iommu_domain_geometry geometry;
+ 	void *iova_cookie;
++	void *reserved_iova_cookie;
++	/* rb tree indexed by PA, for reserved bindings only */
++	struct rb_root reserved_binding_list;
++	/* protects reserved cookie and rbtree manipulation */
++	struct mutex reserved_mutex;
  };
  
+ enum iommu_cap {
 -- 
 1.9.1
