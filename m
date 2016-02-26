@@ -1,25 +1,37 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Feb 2016 15:20:51 +0000
-Subject: [PATCH v4] arm64: Add workaround for Cavium erratum 27456
-In-Reply-To: <1456364697-25083-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1456364697-25083-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160226152051.GM4777@e104818-lin.cambridge.arm.com>
+Date: Fri, 26 Feb 2016 15:23:53 +0000
+Subject: [PATCH] arm64: Remove fixmap include fragility
+In-Reply-To: <20160226144457.GD8728@leverpostej>
+References: <CAKv+Gu933t2DjBoHEfe=ZNcbrJMHHvT_F3Pug261w0WYTduVTw@mail.gmail.com>
+ <20160226144457.GD8728@leverpostej>
+Message-ID: <20160226152352.GN4777@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 05:44:57PM -0800, David Daney wrote:
-> From: Andrew Pinski <apinski@cavium.com>
+On Fri, Feb 26, 2016 at 02:44:58PM +0000, Mark Rutland wrote:
+> The asm-generic fixmap.h depends on each architecture's fixmap.h to pull
+> in the definition of PAGE_KERNEL_RO, if this exists. In the absence of
+> this, FIXMAP_PAGE_RO will not be defined. In mm/early_ioremap.c the
+> definition of early_memremap_ro is predicated on FIXMAP_PAGE_RO being
+> defined.
 > 
-> On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
-> instructions may cause the icache to become corrupted if it contains
-> data for a non-current ASID.
+> Currently, the arm64 fixmap.h doesn't include pgtable.h for the
+> definition of PAGE_KERNEL_RO, and as a knock-on effect early_memremap_ro
+> is not always defined, leading to link-time failures when it is used.
+> This has been observed with defconfig on next-20160226.
 > 
-> This patch implements the workaround (which invalidates the local
-> icache when switching the mm) by using code patching.
+> Unfortunately, as pgtable.h includes fixmap.h, adding the include
+> introduces a circular dependency, which is just as fragile.
 > 
-> Signed-off-by: Andrew Pinski <apinski@cavium.com>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> Instead, this patch factors out PAGE_KERNEL_RO and other prot
+> definitions into a new pgtable-prot header which can be included by poth
+> pgtable.h and fixmap.h, avoiding the  circular dependency, and ensuring
+> that early_memremap_ro is alwyas defined where it is used.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
 Applied. Thanks.
 
