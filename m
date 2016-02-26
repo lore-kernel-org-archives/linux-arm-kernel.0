@@ -1,45 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 12:59:43 +0100
-Subject: [PATCH] staging/goldfish: use 6-arg get_user_pages()
-Message-ID: <1456488033-4044939-1-git-send-email-arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 26 Feb 2016 21:12:20 +0900
+Subject: next-20160225 build: 2 failures 44 warnings (next-20160225)
+In-Reply-To: <20160226091410.5dad4306@free-electrons.com>
+References: <E1aYsmb-0006qb-76@optimist> <20160226030949.GL18327@sirena.org.uk>
+ <20160226091410.5dad4306@free-electrons.com>
+Message-ID: <20160226121220.GO18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit cde70140fed8 ("mm/gup: Overload get_user_pages() functions"),
-we get warning for this file, as it calls get_user_pages() with eight
-arguments after the change of the calling convention to use only six:
+On Fri, Feb 26, 2016 at 09:14:10AM +0100, Thomas Petazzoni wrote:
 
-drivers/platform/goldfish/goldfish_pipe.c: In function 'goldfish_pipe_read_write':
-drivers/platform/goldfish/goldfish_pipe.c:312:3: error: 'get_user_pages8' is deprecated [-Werror=deprecated-declarations]
+> atomic_io_modify() is also used in the ->start() and ->stop() hooks, so
+> not only during initialization. The reason we use atomic_io_modify()
+> here is because this TIMER_CTRL register is shared with the clocksource
+> drivers (time-orion.c, time-armada-370-xp.c). Indeed, the timers and
+> watchdogs share a single register that allows to enable/disable all
+> timers/watchdogs. Somewhat unfortunate choice, but that's how the HW is.
 
-This removes the first two arguments, which are now the default.
+> By far the easiest solution is to add "depends on ARM" to
+> ORION_WATCHDOG.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-The API change is currently only in the mm/pkeys branch of the
-tip tree, while the goldfish_pipe driver started using the
-old API in the staging/next branch.
+> Another solution would be to provide an implementation of
+> atomic_io_modify() on arm64, though that would need the ACK from the
+> ARM64 maintainers.
 
-Andrew could pick it up into linux-mm in the meantime, or I can
-resend it at some later point if nobody else does the change
-after 4.6-rc1.
----
- drivers/platform/goldfish/goldfish_pipe.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/platform/goldfish/goldfish_pipe.c b/drivers/platform/goldfish/goldfish_pipe.c
-index 9973cebb4d6f..07462d79d040 100644
---- a/drivers/platform/goldfish/goldfish_pipe.c
-+++ b/drivers/platform/goldfish/goldfish_pipe.c
-@@ -309,8 +309,7 @@ static ssize_t goldfish_pipe_read_write(struct file *filp, char __user *buffer,
- 		 * much memory to the process.
- 		 */
- 		down_read(&current->mm->mmap_sem);
--		ret = get_user_pages(current, current->mm, address, 1,
--				     !is_write, 0, &page, NULL);
-+		ret = get_user_pages(address, 1, !is_write, 0, &page, NULL);
- 		up_read(&current->mm->mmap_sem);
- 		if (ret < 0)
- 			break;
--- 
-2.7.0
+It also sounds like a more modern solution might be to use syscon for
+the shared register, but perhaps I'm missing something about how the IP
+is set up so ICBW.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/c084c32b/attachment.sig>
