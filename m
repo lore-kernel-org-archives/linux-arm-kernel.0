@@ -1,72 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 26 Feb 2016 15:29:16 +0100
-Subject: [GIT PULL] ARM: mvebu: dt for v4.6 (#2)
-Message-ID: <87d1rjo88z.fsf@free-electrons.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 26 Feb 2016 17:34:50 +0300
+Subject: [PATCH v3 0/5] all: s390: make compat wrappers the generic solution
+Message-ID: <1456497295-22991-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The problem that makes us use wrappers is that some compat
+architectures allows user code to access top halves of registers.
+This is not a problem for syscalls that are already handled by compat
+code, or for that who has types of the same size in kernel and
+userspace. In case of s390 and lp64/ilp32 the problem is in pointer
+types, long, unsigned long.
 
-Here is the second pull request for dt for mvebu for v4.6. There is a
-dependency with the fixes branches for the orion5x device tree file, so
-these commits are also part of this PR.
+S390 folks already have the solution for it. In this patchset,
+it is turned to be general, as arm64/ilp32 needs it too.
 
-Gregory
+This patchset is created as the part of the work of enabling arm64
+with ILP32 user mode. See details here:
+http://thread.gmane.org/gmane.linux.kernel/2126946
 
-The following changes since commit 5dda254d0cc5cbdcc81dbce0985c35b68dd5e3b1:
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
 
-  ARM: dts: kirkwood: add device tree for buffalo linkstation ls-qvl (2016-02-09 11:00:26 +0100)
+v2:
+ This is the implementation of one of two possible approaches. First
+ one defines new syscall handler declaration macro, that creates both compat and
+ non-compat handlers, see [1]. This one declares all wrappers in separated file
+ kernel/compat_wrapper.c
 
-are available in the git repository at:
+v3: 
+ - move 2 s390-related wrappers from kernel/compat_wrappers.h
+   to arch/s390/kernel/compat_linux.c
+ - comments extended
+Build-tested on s390.
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.6-2
+[1] http://www.spinics.net/lists/linux-s390/msg11593.html
 
-for you to fetch changes up to af5ece3967c697d6d3264f1ca949a8633f97de25:
+Yury Norov (5):
+  all: syscall wrappers: add documentation
+  all: introduce COMPAT_WRAPPER option and enable it for s390
+  all: s390: move wrapper infrastructure to generic headers
+  all: s390: move compat_wrappers.c from arch/s390/kernel to kernel/
+  all: wrap needed syscalls in generic unistd
 
-  ARM: dts: mvebu: add NAND description to Armada 370 DB and Armada XP DB (2016-02-12 17:45:49 +0100)
+ Documentation/adding-syscalls.txt |  32 +++++
+ arch/Kconfig                      |   4 +
+ arch/s390/Kconfig                 |   1 +
+ arch/s390/include/asm/compat.h    |  17 ++-
+ arch/s390/kernel/Makefile         |   2 +-
+ arch/s390/kernel/compat_wrapper.c | 180 ------------------------
+ include/linux/compat.h            | 278 ++++++++++++++++++++++++++++++++++++++
+ include/linux/syscalls.h          |  57 +-------
+ include/linux/syscalls_structs.h  |  60 ++++++++
+ include/uapi/asm-generic/unistd.h | 231 +++++++++++++++----------------
+ kernel/Makefile                   |   1 +
+ kernel/compat_wrapper.c           | 170 +++++++++++++++++++++++
+ 12 files changed, 680 insertions(+), 353 deletions(-)
+ delete mode 100644 arch/s390/kernel/compat_wrapper.c
+ create mode 100644 include/linux/syscalls_structs.h
+ create mode 100644 kernel/compat_wrapper.c
 
-----------------------------------------------------------------
-mvebu dt for 4.6 (part 2)
-
-- Reorder Ethernet node on Armada 38x SoCs
-- Add device tree for buffalo linkstation ls-gl
-- Use the more accurate armada-370-sata string for SATA on Armada 375
-- Add NAND description to Armada 370 DB and Armada XP DB
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      Merge branch 'mvebu/fixes' into mvebu/dt
-
-Heinrich Schuchardt (1):
-      ARM: dts: kirkwood: use unique machine name for ds112
-
-Lior Amsalem (1):
-      ARM: dts: armada-375: use armada-370-sata for SATA
-
-Roger Shimizu (3):
-      ARM: dts: orion5x: fix the missing mtd flash on linkstation lswtgl
-      ARM: dts: orion5x: split linkstation lswtgl into common and device parts
-      ARM: dts: orion5x: add device tree for buffalo linkstation ls-gl
-
-Thomas Petazzoni (3):
-      ARM: dts: armada-38x: change order of ethernet DT nodes on Armada 38x
-      ARM: dts: armada-38x: add reference to ETH connectors for A385-AP
-      ARM: dts: mvebu: add NAND description to Armada 370 DB and Armada XP DB
-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/armada-370-db.dts                |  27 +++
- arch/arm/boot/dts/armada-375.dtsi                  |   2 +-
- arch/arm/boot/dts/armada-385-db-ap.dts             |   3 +
- arch/arm/boot/dts/armada-38x.dtsi                  |  30 ++-
- arch/arm/boot/dts/armada-xp-db.dts                 |  28 +++
- arch/arm/boot/dts/kirkwood-ds112.dts               |   2 +-
- arch/arm/boot/dts/mvebu-linkstation-fan.dtsi       |  72 +++++++
- .../boot/dts/mvebu-linkstation-gpio-simple.dtsi    | 105 ++++++++++
- arch/arm/boot/dts/orion5x-linkstation-lsgl.dts     |  87 +++++++++
- arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts   | 214 +++++----------------
- arch/arm/boot/dts/orion5x-linkstation.dtsi         | 180 +++++++++++++++++
- 12 files changed, 572 insertions(+), 179 deletions(-)
- create mode 100644 arch/arm/boot/dts/mvebu-linkstation-fan.dtsi
- create mode 100644 arch/arm/boot/dts/mvebu-linkstation-gpio-simple.dtsi
- create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
- create mode 100644 arch/arm/boot/dts/orion5x-linkstation.dtsi
+-- 
+2.5.0
