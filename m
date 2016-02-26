@@ -1,86 +1,145 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 Feb 2016 11:46:43 +0000
-Subject: [PATCH 2/2] PCI: generic: add description of property
- "interrupt-skip-mask"
-In-Reply-To: <56CFFC9B.20703@huawei.com>
-References: <1456401208-10136-1-git-send-email-thunder.leizhen@huawei.com>
- <1456401208-10136-2-git-send-email-thunder.leizhen@huawei.com>
- <20160225122035.GB10593@leverpostej> <56CFFC9B.20703@huawei.com>
-Message-ID: <20160226114643.GA8728@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 26 Feb 2016 11:50:12 +0000
+Subject: [PATCH] arm64: kernel: acpi: fix ioremap in ACPI parking protocol
+ cpu_postboot
+Message-ID: <1456487412-4833-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 03:19:55PM +0800, Leizhen (ThunderTown) wrote:
-> 
-> On 2016/2/25 20:20, Mark Rutland wrote:
-> > Hi,
-> > 
-> > In future, please send the binding document first in a series, per point
-> > 3 of Documentation/devicetree/bindings/submitting-patches.txt. It makes
-> > review easier/faster.
-> Thank you for your reminding.
-> 
-> > On Thu, Feb 25, 2016 at 07:53:28PM +0800, Zhen Lei wrote:
-> >> Interrupt Pin register is read-only and optional. Some pci devices may use
-> >> msi/msix but leave the value of Interrupt Pin non-zero.
-> > 
-> > Is that permitted by the spec? Surely 'optional' means it must be zero
-> > if not implemented?
-> 
-> In <PCI Local Bus Specification Revision 3.0>:
-> Devices (or device functions) that do not use an interrupt pin must put a 0 in this register. This register is read-only.
-> 
-> So, do you think this is a hardware bug?
+When secondary cpus are booted through the ACPI parking protocol, the
+booted cpu should check that FW has correctly cleared its mailbox entry
+point value to make sure the boot process was correctly executed.
+The entry point check is carried in the cpu_ops->cpu_postboot method, that
+is executed by secondary cpus when entering the kernel with irqs disabled.
 
-Per the above, that does appear to be the case.
+The ACPI parking protocol cpu_ops maps/unmaps the mailboxes on the
+primary CPU to trigger secondary boot in the cpu_ops->cpu_boot method
+and on secondary processors to carry out FW checks on the booted CPU
+to verify the boot protocol was successfully executed in the
+cpu_ops->cpu_postboot method.
 
-> But these pci-devices are not produced by our company.
-> 
-> In function init_service_irqs, it try msix first, then msi, Interrupt
-> PIN is the last attemption. But of_irq_parse_pci() happened before
-> this.
+Therefore, the cpu_ops->cpu_postboot method is forced to ioremap/unmap the
+mailboxes, which is wrong in that ioremap cannot be safely be carried out
+with irqs disabled.
 
-I assume that for devices with 0 in this register we do not produce a
-warning. So where do we check the interrupt pin register, and when does
-this happen relative to of_irq_parse_pci such that we do not produce
-that warning?
+To fix this issue, this patch reshuffles the code so that the mailboxes
+are still mapped after the boot processor executes the cpu_ops->cpu_boot
+method for a given cpu, and the VA at which a mailbox is mapped for a given
+cpu is stashed in the per-cpu data struct so that secondary cpus can
+retrieve them in the cpu_ops->cpu_postboot and complete the required
+FW checks.
 
-I als assume that all instances of these particular devices broken in
-this regard? If so, I think we need to identify them by Device ID and
-Vendor ID, and treat them as if the interrupt pin register read as
-zero, in the place we normally check the interrupt pin register.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reported-by: Itaru Kitayama <itaru.kitayama@riken.jp>
+Tested-by: Loc Ho <lho@apm.com>
+Tested-by: Itaru Kitayama <itaru.kitayama@riken.jp>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Loc Ho <lho@apm.com>
+Cc: Itaru Kitayama <itaru.kitayama@riken.jp>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Al Stone <ahs3@redhat.com>
+---
+It applies to the arm64 tree, for-next/core branch.
 
-Note that this is completely independent of the RID/BDF, so the
-interrupt-*-mask approach is insufficient.
-
-> In fact, there also a familiar problem exist. As below:
-> pci 0000:42:00.0: BAR 7: no space for [io  size 0x1000]
-> pci 0000:42:00.0: BAR 7: failed to assign [io  size 0x1000]
-> 
-> There no "io space" on arm64, maybe only exist on X86. And the Memory Space Indicator also read-only in BAR register.
-
-I'm not entirely sure, but I thought we handled the PCI I/O space as an
-MMIO region on ARM64. Do you have many devices/functions attached? It
-may be that our VA carveout of 16M is too small.
-
-This is probably worth a separate thread.
-
-> >> In this case, the driver will print information as below: pci
-> >> 0000:40:00.0: of_irq_parse_pci() failed with rc=-22
-> >>
-> >> It's easily lead to misinterpret.
-> > 
-> > If this is limited to a subset of devices which we know are broken in
-> > this regard, can we not handle these cases explicitly?
-> Actually, we have another way to block this warning. Use "interrupt-map" to map it to a pesudo IRQ. But I think it will also be misunderstanded.
-
-This is very fragile, as it depends on the RIDs/addresses assigned by
-the host controller. If devices are plugged into different slots then
-that could change, you get the warning, and other devices may be
-prevented from using wired interrupts.
-
-As I mentioned above, I think we need to identify the buggy devices by
-ID, rather than by topology.
+Tested on AMD (Seattle), APM (Mustang and Merlin), sorry for all this churn.
 
 Thanks,
-Mark.
+Lorenzo
+
+ arch/arm64/kernel/acpi_parking_protocol.c | 40 +++++++++++--------------------
+ 1 file changed, 14 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+index 4b1e5a7..a32b401 100644
+--- a/arch/arm64/kernel/acpi_parking_protocol.c
++++ b/arch/arm64/kernel/acpi_parking_protocol.c
+@@ -21,7 +21,14 @@
+ 
+ #include <asm/cpu_ops.h>
+ 
++struct parking_protocol_mailbox {
++	__le32 cpu_id;
++	__le32 reserved;
++	__le64 entry_point;
++};
++
+ struct cpu_mailbox_entry {
++	struct parking_protocol_mailbox __iomem *mailbox;
+ 	phys_addr_t mailbox_addr;
+ 	u8 version;
+ 	u8 gic_cpu_id;
+@@ -59,12 +66,6 @@ static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
+ 	return 0;
+ }
+ 
+-struct parking_protocol_mailbox {
+-	__le32 cpu_id;
+-	__le32 reserved;
+-	__le64 entry_point;
+-};
+-
+ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+ {
+ 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+@@ -97,6 +98,12 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+ 	}
+ 
+ 	/*
++	 * stash the mailbox address mapping to use it for further FW
++	 * checks in the postboot method
++	 */
++	cpu_entry->mailbox = mailbox;
++
++	/*
+ 	 * We write the entry point and cpu id as LE regardless of the
+ 	 * native endianness of the kernel. Therefore, any boot-loaders
+ 	 * that read this address need to convert this address to the
+@@ -107,8 +114,6 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+ 
+ 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+ 
+-	iounmap(mailbox);
+-
+ 	return 0;
+ }
+ 
+@@ -116,32 +121,15 @@ static void acpi_parking_protocol_cpu_postboot(void)
+ {
+ 	int cpu = smp_processor_id();
+ 	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+-	struct parking_protocol_mailbox __iomem *mailbox;
++	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
+ 	__le64 entry_point;
+ 
+-	/*
+-	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
+-	 * this deviates from the parking protocol specifications since
+-	 * the mailboxes are required to be mapped nGnRnE; the attribute
+-	 * discrepancy is harmless insofar as the protocol specification
+-	 * is concerned).
+-	 * If the mailbox is mistakenly allocated in the linear mapping
+-	 * by FW ioremap will fail since the mapping will be prevented
+-	 * by the kernel (it clashes with the linear mapping attributes
+-	 * specifications).
+-	 */
+-	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
+-	if (!mailbox)
+-		return;
+-
+ 	entry_point = readl_relaxed(&mailbox->entry_point);
+ 	/*
+ 	 * Check if firmware has cleared the entry_point as expected
+ 	 * by the protocol specification.
+ 	 */
+ 	WARN_ON(entry_point);
+-
+-	iounmap(mailbox);
+ }
+ 
+ const struct cpu_operations acpi_parking_protocol_ops = {
+-- 
+2.5.1
