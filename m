@@ -1,73 +1,56 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 26 Feb 2016 09:09:38 +0900
-Subject: [GIT PULL 2/2] ARM64: EXYNOS: mach/soc changes for v4.6, 2nd
-In-Reply-To: <1456445103-23314-2-git-send-email-k.kozlowski@samsung.com>
-References: <1456445103-23314-1-git-send-email-k.kozlowski@samsung.com>
- <1456445103-23314-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56CF97C2.5000305@samsung.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 26 Feb 2016 00:11:14 +0000
+Subject: [PATCH] PCI: keystone: fix msi code that retrieves the pp struct
+ ptr
+In-Reply-To: <1456438984-22111-1-git-send-email-m-karicheri2@ti.com>
+References: <1456438984-22111-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20160226001114.GA10923@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.02.2016 09:05, Krzysztof Kozlowski wrote:
-> Hi Arnd, Kevin and Olof,
+On Thu, Feb 25, 2016 at 05:23:04PM -0500, Murali Karicheri wrote:
+> Recent update to pcie-designware core driver,
+> commit "cbce79005 PCI: designware: Make driver arch-agnostic" broke the
+> keystone PCI driver. This is because, the way pp struct ptr is retrieved
+> from  msi desc has changed and require similar update in pci-keystone-dw.c
+> as well. This patch fix this issue. Here is the early boot crash log seen
+> on K2E EVM.
 > 
+> [    1.012999] pci 0000:00:00.0: PCI bridge to [bus 01]
+> [    1.018073] pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
+> [    1.024308] pci 0000:00:00.0:   bridge window [mem 0x60000000-0x600fffff]
+> [    1.031216] pci 0000:00:00.0:   bridge window [mem 0x60100000-0x601fffff
+> pref]
+> [    1.038736] Unable to handle kernel NULL pointer dereference at virtual
+> address 00000030
+> [    1.046950] pgd = c0003000
+> [    1.049750] [00000030] *pgd=80000800004003, *pmd=00000000
+> [    1.055265] Internal error: Oops: 206 [#1] PREEMPT SMP ARM
+> [    1.060860] Modules linked in:
+> [    1.064013] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.2-00139-gb74f926 #2
+> [    1.071266] Hardware name: Keystone
+> [    1.074853] task: eb888000 ti: eb890000 task.ti: eb890000
+> [    1.080364] PC is at ks_dw_pcie_msi_irq_unmask+0x24/0x58
+> [    1.085785] LR is at ks_dw_pcie_msi_irq_unmask+0x18/0x58
+> [    1.091206] pc : [<c02f65c8>]    lr : [<c02f65bc>]    psr: 60000093
+> [    1.091206] sp : eb891bc8  ip : 00000000  fp : ebb15010
+> [    1.102915] r10: 00000051  r9 : 60000013  r8 : ebafaa20
+> [    1.108247] r7 : ebaa9f80  r6 : eb9fd0c0  r5 : ebafa9d0  r4 : ebafa9c0
+> [    1.114889] r3 : 00000051  r2 : 00000000  r1 : 00000001  r0 : ebb14c18
+> [    1.121533] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment
+> kernel
+> [    1.129049] Control: 30c5387d  Table: 00003000  DAC: fffffffd
+> [    1.134905] Process swapper/0 (pid: 1, stack limit = 0xeb890210)
+> [    1.141023] Stack: (0xeb891bc8 to 0xeb892000)
 > 
-> Pull request for v4.6 with ARM64 mach/soc changes.
-> 
-> This depends on change in clk tree (removal of ARCH_EXYNOS7) which is
-> pulled here.
-> 
-> 
-> Kind regards,
-> Krzysztof
-> 
-> 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> 
-> 
-> 
-> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-> 
->   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.6-2
-> 
-> for you to fetch changes up to c87b3e970c70d5e27f9eb9acd09c6b5b9d589860:
-> 
->   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2016-02-23 08:49:46 +0900)
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  - Need this fix in 4.4.4 as well
 
-And for easier grepping through history, below is the pull request
-for Exynos-specific change (no clk commits):
+<formletter>
 
+This is not the correct way to submit patches for inclusion in the
+stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+for how to do this properly.
 
-The following changes since commit 85997a7cba7bc1578eb554e88f82023d85fb499a:
-
-  clk: samsung: Don't build ARMv8 clock drivers on ARMv7 (2016-02-22 10:20:24 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.6-2
-
-for you to fetch changes up to c87b3e970c70d5e27f9eb9acd09c6b5b9d589860:
-
-  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2016-02-23 08:49:46 +0900)
-
-----------------------------------------------------------------
-Samsung Exynos ARM64 improvements for v4.6:
-1. Remove separate ARCH_EXYNOS7 symbol and consolidate it into
-   one ARCH_EXYNOS.
-   This depends on clk tree: removal of last presence of ARCH_EXYNOS7.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (2):
-      Merge branch 'clk-samsung' of git://git.kernel.org/.../clk/linux into next/soc64
-      arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
-
- arch/arm64/Kconfig.platforms        | 11 ++---------
- arch/arm64/boot/dts/exynos/Makefile |  2 +-
- arch/arm64/configs/defconfig        |  2 +-
- 3 files changed, 4 insertions(+), 11 deletions(-)
+</formletter>
