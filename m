@@ -1,34 +1,34 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 26 Feb 2016 15:03:19 +0200
-Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <20160204233950.GH4215@xsjsorenbubuntu>
-References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
- <20160204224128.GG4215@xsjsorenbubuntu>
- <CAAtXAHcV-9gXcZOX8dzUOBZUwj9M=O4MAsMCJNQYAP+os-D7Tg@mail.gmail.com>
- <20160204233950.GH4215@xsjsorenbubuntu>
-Message-ID: <56D04D17.6030502@ti.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 26 Feb 2016 14:09:44 +0100
+Subject: [PATCH v5 0/8] Add MT8173 Video Encoder Driver and VPU Driver
+In-Reply-To: <56D03DE2.1090400@mm-sol.com>
+References: <1456215081-16858-1-git-send-email-tiffany.lin@mediatek.com>
+ <56CC1CAB.1060409@xs4all.nl> <56D03DE2.1090400@mm-sol.com>
+Message-ID: <56D04E98.8040209@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2016 01:39 AM, S?ren Brinkmann wrote:
-> On Thu, 2016-02-04 at 15:14:47 -0800, Moritz Fischer wrote:
->> Hi Soeren,
->>
->> On Thu, Feb 4, 2016 at 2:41 PM, S?ren Brinkmann
->> <soren.brinkmann@xilinx.com> wrote:
->>
->>> But with this change the 'if !CPU_FREQ' becomes obsolete.
->> I'm confused, could you explain that statement? You don't want people
->> accidentally running with GT when CPU_FREQ is on, right?
+On 02/26/2016 12:58 PM, Stanimir Varbanov wrote:
+> Hi Hans,
 > 
-> Correct. But with this Kconfig rework you can just deselect it in
-> Kconfig. The generic HAVE_GT could always be selected.
+> <snip>
+> 
+>> Nice!
+>>
+>> Can you try 'v4l2-compliance -s'? Note that this may not work since I know
+>> that v4l2-compliance doesn't work all that well with codecs, but I am
+>> curious what the output is when you try streaming.
+> 
+> Sorry for the off topic question.
+> 
+> Does every new v4l2 encoder/decoder driver must use v4l2 mem2mem device
+> framework, with other words is that mandatory?
 > 
 
+No, that's not mandatory. In most cases it will simplify your code, but
+sometimes it only makes it harder and then you are better off doing it
+yourself.
 
-Don't know whom should i ask - but what will be the final conclusion here?
-Can it be merged?
+Regards,
 
--- 
-regards,
--grygorii
+	Hans
