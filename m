@@ -1,59 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 26 Feb 2016 16:51:40 +0900
-Subject: [RESPIN 0/6] Add support for Exynos SROM Controller driver.
-In-Reply-To: <1456389222-12738-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1456389222-12738-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <56D0040C.8020204@samsung.com>
+From: pankaj.dev@st.com (Pankaj DEV)
+Date: Fri, 26 Feb 2016 16:06:48 +0800
+Subject: [RFC v1] clk: Add debugfs nodes for
+ enable/disable/set-rate/set-parent
+In-Reply-To: <87fuwg9bog.fsf@gmail.com>
+References: <1456454309-25037-1-git-send-email-pankaj.dev@st.com>
+ <87fuwg9bog.fsf@gmail.com>
+Message-ID: <8B5B4FB66A982549A83D90C7791B761007F362D2E1@EAPEX1MAIL2.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.02.2016 17:33, Pankaj Dubey wrote:
-> This series is collection of patches already reviewed and merged in
-> maintainer's tree, but could not make it thorugh main linus tree, due
-> to last moment suggestion of proper location of driver should be
-> "drivers/memory" instead of "drivers/soc". I have rebased all the patches
-> and moved into "drivers/memory/samsung".
-> 
-> As this is just a movement without changing actual driver code,
-> I have not removed "Reviewed-By", "Tested-By" or "Acked-By".
-> 
-> To make sure everything is fine, I have again tested it on Exynos5880 based
-> Chromebook for normal boot, S2R functionality and its working fine.
-> 
-> This series has been prepared on top of next-soc branch of Krzysztof's tree.
-> 
-> Changes w.r.t. original merged patches:
->  - Moved exynos-srom driver into "drivers/memory/samsung"
->  - Moved DT binding documentation into "bindings/memory-controller"
->  - Added new patch for entry of new directory in MAINTAINERS file.
->  - Added new CONFIG as SAMSUNG_MC for grouping Samsung's memory controller drivers.
->  - Added my Signed-off-by for patch 5/6 and 6/6 for touching it.
-> 
-> Pankaj Dubey (4):
->   dt-bindings: EXYNOS: Add exynos-srom device tree binding
->   drivers: memory: Add support for exynos SROM driver
->   MAINTAINERS: Add maintainers entry for drivers/memory/samsung
->   ARM: EXYNOS: Remove SROM related register settings from mach-exynos
-> 
-> Pavel Fedin (2):
->   dt-bindings: EXYNOS: Describe SROMc configuration
->   drivers: memory: exynos-srom: Add support for bank configuration
+Hey
 
-Thanks!
+The prime motive for clk_set_rate is to set new rate for a clock, since the 'clk_rate' currently available, allows only reading.
+To provide reading rate from 'clk_set_rate' is just additional feature.
 
-The driver was put under samsung subdirectory of drivers/memory because
-Pankaj has a plan to add more stuff there. This way we can avoid
-unnecessary movements of files (making history reading more difficult).
+Regards
+Pankaj
 
-
-I applied (with fixes mentioned in my comments) everything and pushed
-here so everyone could play with it:
-https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=for-v4.6/drivers-soc-exynos-srom-2
-
-
-It is also included in for-next.
-
-If there is no comments then I will send it in pull request for v4.6.
-
-Best regards,
-Krzysztof
+>-----Original Message-----
+>From: Holger Schurig [mailto:holgerschurig at gmail.com]
+>Sent: Friday, February 26, 2016 12:54 PM
+>To: Pankaj DEV
+>Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>devicetree at vger.kernel.org; mturquette at linaro.org; kernel at stlinux.com;
+>sboyd at codeaurora.org; Laurent MEUNIER; lee.jones at linaro.org; Maxime
+>COQUELIN
+>Subject: Re: [RFC v1] clk: Add debugfs nodes for enable/disable/set-rate/set-
+>parent
+>
+>Pankaj Dev <pankaj.dev@st.com> writes:
+>
+>> 1. clk_set_rate : Set new rate to value. Reading returns the current
+>> rate
+>
+>If you can use this to set *and* read it, then "_set_" shouldn't be in the name.
+>
+>What is wrong with using the existing "clk_rate" for reading/setting the rate?
