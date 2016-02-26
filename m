@@ -1,96 +1,43 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 26 Feb 2016 13:28:34 +0800
-Subject: [PATCH] arm64: dts: Add L2 cache topology to Hi6220
-Message-ID: <1456464514-24380-1-git-send-email-leo.yan@linaro.org>
+From: plaes@plaes.org (Priit Laes)
+Date: Fri, 26 Feb 2016 07:56:55 +0200
+Subject: [PATCH RESEND 0/2] spi: sun4i: add DMA support
+Message-ID: <1456466217-6793-1-git-send-email-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the L2 cache topology on Hi6220. Hi6220 has two
-clusters, every cluster has 512KiB L2 cache (32KiB x 16 ways).
+While trying to get SPI TFT screen working with Cubietruck, I noticed that
+at current state driver didn't actually support SPI data bursts bigger than
+n bytes (n is probably ~64 bytes).
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Patches below were sent to mailinglists a while ago (May 2015) but apparently
+were not addressed to correct maintainers and therefore were never applied.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index d8b963c..1746d50 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -82,6 +82,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER0_L2>;
- 			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cooling-min-level = <4>;
-@@ -96,6 +97,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER0_L2>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
-@@ -105,6 +107,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER0_L2>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
-@@ -114,6 +117,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER0_L2>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
-@@ -123,6 +127,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER1_L2>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
-@@ -132,6 +137,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER1_L2>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
-@@ -141,6 +147,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER1_L2>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
-@@ -150,9 +157,18 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
-+			next-level-cache = <&CLUSTER1_L2>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
-+
-+		CLUSTER0_L2: l2-cache0 {
-+			compatible = "cache";
-+		};
-+
-+		CLUSTER1_L2: l2-cache1 {
-+			compatible = "cache";
-+		};
- 	};
- 
- 	cpu_opp_table: cpu_opp_table {
+With those patches, it's now possible to use TFT screens over SPI (fbtft
+driver in staging), although there seems to be a possible issue where bigger
+data bursts cause the driver to temporarily fall back to PIO mode:
+
+spi_master spi32766: Using DMA mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using DMA mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+spi_master spi32766: Using PIO mode for transfer
+
+
+Emilio L?pez (1):
+  spi: sun4i: add DMA support
+
+Michal Suchanek (1):
+  ARM: sunxi: spi: add notice about SPI FIFO limit.
+
+ drivers/spi/spi-sun4i.c | 142 ++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 130 insertions(+), 12 deletions(-)
+
 -- 
-1.9.1
+2.7.2
