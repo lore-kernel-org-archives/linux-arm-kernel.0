@@ -1,37 +1,46 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Fri, 26 Feb 2016 07:56:57 +0200
-Subject: [PATCH 2/2] ARM: sunxi: spi: add notice about SPI FIFO limit.
-In-Reply-To: <1456466217-6793-1-git-send-email-plaes@plaes.org>
-References: <1456466217-6793-1-git-send-email-plaes@plaes.org>
-Message-ID: <1456466217-6793-3-git-send-email-plaes@plaes.org>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Fri, 26 Feb 2016 14:10:21 +0800
+Subject: [PATCH v4 1/6] rockchip: power-domain: make idle handling optional
+In-Reply-To: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
+References: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1456467026-16030-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Suchanek <hramrach@gmail.com>
+Not all new socs need to handle idle states on domain state changes,
+so add the possibility to make them optional.
 
-When testing SPI without DMA I noticed that filling the FIFO on the
-spi controller causes timeout. This should never happen with DMA support
-so just adding a comment.
-
-Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/spi/spi-sun4i.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/soc/rockchip/pm_domains.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index 78141a6..b750664 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -333,7 +333,9 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 		sun4i_spi_write(sspi, SUN4I_DMA_CTL_REG, 0);
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index 18aee6b..c46312d 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -68,9 +68,9 @@ struct rockchip_pmu {
+ {						\
+ 	.pwr_mask = BIT(pwr),			\
+ 	.status_mask = BIT(status),		\
+-	.req_mask = BIT(req),			\
+-	.idle_mask = BIT(idle),			\
+-	.ack_mask = BIT(ack),			\
++	.req_mask = (req >= 0) ? BIT(req) : 0,		\
++	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
++	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
+ }
  
- 		/* Fill the TX FIFO */
--		sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
-+		/* Filling the fifo fully causes timeout for some reason - at least on spi2 on a10s */
-+		/* The can_dma check is txlen >= SUN4I_FIFO_DEPTH so with DMA this should never happen anyway. */
-+		sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH - 1);
- 	}
+ #define DOMAIN_RK3288(pwr, status, req)		\
+@@ -96,6 +96,9 @@ static int rockchip_pmu_set_idle_request(struct rockchip_pm_domain *pd,
+ 	struct rockchip_pmu *pmu = pd->pmu;
+ 	unsigned int val;
  
- 	/* Start the transfer */
++	if (pd_info->req_mask == 0)
++		return 0;
++
+ 	regmap_update_bits(pmu->regmap, pmu->info->req_offset,
+ 			   pd_info->req_mask, idle ? -1U : 0);
+ 
 -- 
-2.7.2
+1.9.1
