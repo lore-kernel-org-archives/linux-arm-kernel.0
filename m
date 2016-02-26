@@ -1,56 +1,88 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 26 Feb 2016 00:11:14 +0000
-Subject: [PATCH] PCI: keystone: fix msi code that retrieves the pp struct
- ptr
-In-Reply-To: <1456438984-22111-1-git-send-email-m-karicheri2@ti.com>
-References: <1456438984-22111-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20160226001114.GA10923@kroah.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Thu, 25 Feb 2016 19:22:44 -0500
+Subject: [PATCH] drivers: perf: arm: implement CPU_PM notifier
+In-Reply-To: <20160224223128.GA30750@red-moon>
+References: <1456251759-24768-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <CANLsYkzvB0GbPeYHrcLtUz8DMHJh4FA5RVwVZ-UAm3BCznB_3w@mail.gmail.com>
+ <20160224173511.GF25385@red-moon>
+ <CAJ5Y-ea3gxxOEGdJMPZAh78Ap0GBvzGePhBKzQRVoJBwwY6NzA@mail.gmail.com>
+ <20160224223128.GA30750@red-moon>
+Message-ID: <CAJ5Y-eYmYHU8Z+BBD0brmnx70ynWV8mhSrG36Bmu3yorsfk+4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 05:23:04PM -0500, Murali Karicheri wrote:
-> Recent update to pcie-designware core driver,
-> commit "cbce79005 PCI: designware: Make driver arch-agnostic" broke the
-> keystone PCI driver. This is because, the way pp struct ptr is retrieved
-> from  msi desc has changed and require similar update in pci-keystone-dw.c
-> as well. This patch fix this issue. Here is the early boot crash log seen
-> on K2E EVM.
-> 
-> [    1.012999] pci 0000:00:00.0: PCI bridge to [bus 01]
-> [    1.018073] pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
-> [    1.024308] pci 0000:00:00.0:   bridge window [mem 0x60000000-0x600fffff]
-> [    1.031216] pci 0000:00:00.0:   bridge window [mem 0x60100000-0x601fffff
-> pref]
-> [    1.038736] Unable to handle kernel NULL pointer dereference at virtual
-> address 00000030
-> [    1.046950] pgd = c0003000
-> [    1.049750] [00000030] *pgd=80000800004003, *pmd=00000000
-> [    1.055265] Internal error: Oops: 206 [#1] PREEMPT SMP ARM
-> [    1.060860] Modules linked in:
-> [    1.064013] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.2-00139-gb74f926 #2
-> [    1.071266] Hardware name: Keystone
-> [    1.074853] task: eb888000 ti: eb890000 task.ti: eb890000
-> [    1.080364] PC is at ks_dw_pcie_msi_irq_unmask+0x24/0x58
-> [    1.085785] LR is at ks_dw_pcie_msi_irq_unmask+0x18/0x58
-> [    1.091206] pc : [<c02f65c8>]    lr : [<c02f65bc>]    psr: 60000093
-> [    1.091206] sp : eb891bc8  ip : 00000000  fp : ebb15010
-> [    1.102915] r10: 00000051  r9 : 60000013  r8 : ebafaa20
-> [    1.108247] r7 : ebaa9f80  r6 : eb9fd0c0  r5 : ebafa9d0  r4 : ebafa9c0
-> [    1.114889] r3 : 00000051  r2 : 00000000  r1 : 00000001  r0 : ebb14c18
-> [    1.121533] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment
-> kernel
-> [    1.129049] Control: 30c5387d  Table: 00003000  DAC: fffffffd
-> [    1.134905] Process swapper/0 (pid: 1, stack limit = 0xeb890210)
-> [    1.141023] Stack: (0xeb891bc8 to 0xeb892000)
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  - Need this fix in 4.4.4 as well
+On 24 February 2016 at 17:31, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Feb 24, 2016 at 02:53:02PM -0500, Ashwin Chaugule wrote:
+>> Hi Lorenzo,
+>>
+>> On 24 February 2016 at 12:35, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>> > On Wed, Feb 24, 2016 at 09:20:22AM -0700, Mathieu Poirier wrote:
+>> >> On 23 February 2016 at 11:22, Lorenzo Pieralisi
+>> >
+>> > [...]
+>> >
+>> >> > +static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
+>> >> > +                            void *v)
+>> >> > +{
+>> >> > +       struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
+>> >> > +       struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
+>> >> > +       int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
+>> >> > +
+>> >> > +       if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
+>> >> > +               return NOTIFY_DONE;
+>> >> > +
+>> >> > +       /*
+>> >> > +        * Always reset the PMU registers on power-up even if
+>> >> > +        * there are no events running.
+>> >> > +        */
+>> >> > +       if (cmd == CPU_PM_EXIT && armpmu->reset)
+>> >> > +               armpmu->reset(armpmu);
+>> >>
+>> >> I think this patch does the right thing but I can't get the above
+>> >> reset.  Wouldn't it be better to do the reset as part of the
+>> >> CPU_PM_EXIT case below?  At this point nothing tells us the CPU won't
+>> >> go back down before the event is enabled, wasting the cycle needed to
+>> >> reset the PMU.
+>> >
+>> > The logic goes, if the cpu is woken up and it has no events enabled,
+>> > if we do not reset it (mind, ->reset here sets the PMU register values
+>> > to a sane default, some of them are architecturally UNKNOWN on reset, it
+>> > does NOT reset the PMU) _and_ we subsequently install an event on it we
+>> > do have a problem, that's why whenever a core gets out of low-power we
+>> > have to reset its pmu.
+>>
+>> Dont we blow out the previous value in the counter when installing an
+>> event? Or has that changed lately? IIRC, there was some initial value
+>> we'd program into the counter to avoid missing the overflow event.
+>> (sorry its been too long) ;)
+>
+> If you mean there is no need of resetting the value since we are
+> overwriting it anyway you should see ->reset from a PMU unit POW
+> not just an event. If you look at the ->reset method for eg v8, you
+> will see that the reset method operates on all counters and the PMU
+> unit as a whole, that's the only sane way of setting up the PMU unit
+> before enabling single counters (some registers are UNKNOWN at reset).
+>
+> To make my reply to Mathieu clearer, the ->reset method contains
+> operations (eg writing PMCR counters reset bits) that do carry out
+> counters reset, what I wanted to say is that the ->reset method
+> does not by itself drive the PMU HW reset signal, that's what the
+> power controller does when it resets the CPU on power up.
+>
+> The PMU ->reset method must be called on a cpu on power-up, to make
+> sure PMU HW is set-up to sane default values and ready to be used (ie
+> install counters), for instance on v8 all counters must be disabled
+> (irq inclusive) and reset, that's what armv8pmu_reset() does.
+>
+> I hope this makes things clearer.
+>
 
-<formletter>
+Indeed. Thanks for the explanation. The patch looks good to me.
 
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
-for how to do this properly.
+Acked-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
 
-</formletter>
+
+> Thanks,
+> Lorenzo
