@@ -1,115 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 26 Feb 2016 15:20:35 +0100
-Subject: [PATCH 2/2] arm*: efi: drop writable mapping of the UEFI System table
-In-Reply-To: <1456496435-12679-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456496435-12679-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456496435-12679-2-git-send-email-ard.biesheuvel@linaro.org>
+From: blogic@openwrt.org (John Crispin)
+Date: Fri, 26 Feb 2016 15:21:32 +0100
+Subject: [PATCH V2 00/12] net-next: mediatek: add ethernet driver
+Message-ID: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2eec5dedf770 ("efi/arm-init: Use read-only early mappings")
-updated the early ARM UEFI init code to create the temporary, early
-mapping of the UEFI System table using read-only attributes, as a
-hardening measure against inadvertent modification.
+This series adds support for the Ralink/Mediatek ethernet core. The driver
+works on all SoCs made by Ralink and all SoCs made by MTK/WCN that were
+produced after the acquisition.
 
-However, this still leaves the permanent, writable mapping of the UEFI
-System table, which is only ever referenced during invocations of UEFI
-Runtime Services, at which time the UEFI virtual mapping is available,
-which also covers the system table. (This is guaranteed by the fact that
-SetVirtualAddressMap(), which is a runtime service itself, converts
-various entries in the table to their virtual equivalents, which implies
-that the table must be covered by a RuntimeServicesData region that has
-the EFI_MEMORY_RUNTIME attribute.)
+There have been a lot of changes since I posted this start of january. The
+most important ones are listed below
 
-So instead of creating this permanent mapping, record the virtual address
-of the system table inside the UEFI virtual mapping, and dereference that
-when accessing the table. This protects the contents of the system table
-from inadvertent (or deliberate) modification when no UEFI Runtime
-Services calls are in progress.
+Changes in V2
+* change the namespace of the functions from fe_* to mtk_*
+* add support for the latest generation of ARM SoCs
+* add dual MAC support
+* remove the swconfig specific bits
+* remove most of the magic values and replace them with defines
+* add verbose descriptions to the patches
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/arm-init.c    |  2 ++
- drivers/firmware/efi/arm-runtime.c | 27 ++++++++++++++++-----------
- 2 files changed, 18 insertions(+), 11 deletions(-)
+John Crispin (12):
+  net-next: mediatek: Document ralink/mediatek SoC ethernet binding
+  net-next: mediatek: add the drivers core files
+  net-next: mediatek: add embedded switch driver (ESW)
+  net-next: mediatek: add gigabit switch driver (GSW)
+  net-next: mediatek: add support for rt2880
+  net-next: mediatek: add support for rt3050
+  net-next: mediatek: add support for rt3883
+  net-next: mediatek: add support for mt7620
+  net-next: mediatek: add support for mt7621
+  net-next: mediatek: add support for mt7623
+  net-next: mediatek: add Kconfig and Makefile
+  net-next: mediatek: add an entry to MAINTAINERS
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 9e15d571b53c..415ddfc213a7 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -85,6 +85,8 @@ static int __init uefi_init(void)
- 			efi.systab->hdr.revision >> 16,
- 			efi.systab->hdr.revision & 0xffff);
- 
-+	efi.runtime_version = efi.systab->hdr.revision;
-+
- 	/* Show what we know for posterity */
- 	c16 = early_memremap(efi_to_phys(efi.systab->fw_vendor),
- 			     sizeof(vendor) * sizeof(efi_char16_t));
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 16c7d2a71156..6c97d4884fc7 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -42,10 +42,12 @@ static struct mm_struct efi_mm = {
- static bool __init efi_virtmap_init(void)
- {
- 	efi_memory_desc_t *md;
-+	bool systab_found;
- 
- 	efi_mm.pgd = pgd_alloc(&efi_mm);
- 	init_new_context(NULL, &efi_mm);
- 
-+	systab_found = false;
- 	for_each_efi_memory_desc(&memmap, md) {
- 		phys_addr_t phys = md->phys_addr;
- 		int ret;
-@@ -64,8 +66,20 @@ static bool __init efi_virtmap_init(void)
- 				&phys, ret);
- 			return false;
- 		}
-+		/*
-+		 * If this entry covers the address of the UEFI system table,
-+		 * calculate and record its virtual address.
-+		 */
-+		if (efi_system_table >= phys &&
-+		    efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
-+			efi.systab = (void *)(efi_system_table - phys +
-+					      md->virt_addr);
-+			systab_found = true;
-+		}
- 	}
--	return true;
-+	if (!systab_found)
-+		pr_err("No virtual mapping found for the UEFI System Table\n");
-+	return systab_found;
- }
- 
- /*
-@@ -99,15 +113,8 @@ static int __init arm_enable_runtime_services(void)
- 	memmap.map_end = memmap.map + mapsize;
- 	efi.memmap = &memmap;
- 
--	efi.systab = (__force void *)ioremap_cache(efi_system_table,
--						   sizeof(efi_system_table_t));
--	if (!efi.systab) {
--		pr_err("Failed to remap EFI System Table\n");
--		return -ENOMEM;
--	}
--
- 	if (!efi_virtmap_init()) {
--		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
-+		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
- 		return -ENOMEM;
- 	}
- 
-@@ -115,8 +122,6 @@ static int __init arm_enable_runtime_services(void)
- 	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
--	efi.runtime_version = efi.systab->hdr.revision;
--
- 	return 0;
- }
- early_initcall(arm_enable_runtime_services);
+ .../devicetree/bindings/net/mediatek-net-esw.txt   |   25 +
+ .../devicetree/bindings/net/mediatek-net-gsw.txt   |   48 +
+ .../devicetree/bindings/net/mediatek-net.txt       |  113 +
+ MAINTAINERS                                        |    7 +
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/mediatek/Kconfig              |   70 +
+ drivers/net/ethernet/mediatek/Makefile             |   23 +
+ drivers/net/ethernet/mediatek/esw_rt3050.c         |  642 ++++++
+ drivers/net/ethernet/mediatek/esw_rt3050.h         |   21 +
+ drivers/net/ethernet/mediatek/ethtool.c            |  223 ++
+ drivers/net/ethernet/mediatek/ethtool.h            |   22 +
+ drivers/net/ethernet/mediatek/gsw_mt7620.c         |  256 +++
+ drivers/net/ethernet/mediatek/gsw_mt7620.h         |  277 +++
+ drivers/net/ethernet/mediatek/gsw_mt7621.c         |  265 +++
+ drivers/net/ethernet/mediatek/gsw_mt7623.c         |  417 ++++
+ drivers/net/ethernet/mediatek/mdio.c               |  265 +++
+ drivers/net/ethernet/mediatek/mdio.h               |   27 +
+ drivers/net/ethernet/mediatek/mdio_mt7620.c        |  168 ++
+ drivers/net/ethernet/mediatek/mdio_rt2880.c        |  224 ++
+ drivers/net/ethernet/mediatek/mdio_rt2880.h        |   24 +
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c        | 2170 ++++++++++++++++++++
+ drivers/net/ethernet/mediatek/mtk_eth_soc.h        |  720 +++++++
+ drivers/net/ethernet/mediatek/soc_mt7620.c         |  296 +++
+ drivers/net/ethernet/mediatek/soc_mt7621.c         |  148 ++
+ drivers/net/ethernet/mediatek/soc_mt7623.c         |  169 ++
+ drivers/net/ethernet/mediatek/soc_rt2880.c         |   71 +
+ drivers/net/ethernet/mediatek/soc_rt3050.c         |  138 ++
+ drivers/net/ethernet/mediatek/soc_rt3883.c         |   72 +
+ 29 files changed, 6903 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/mediatek-net-esw.txt
+ create mode 100644 Documentation/devicetree/bindings/net/mediatek-net-gsw.txt
+ create mode 100644 Documentation/devicetree/bindings/net/mediatek-net.txt
+ create mode 100644 drivers/net/ethernet/mediatek/Kconfig
+ create mode 100644 drivers/net/ethernet/mediatek/Makefile
+ create mode 100644 drivers/net/ethernet/mediatek/esw_rt3050.c
+ create mode 100644 drivers/net/ethernet/mediatek/esw_rt3050.h
+ create mode 100644 drivers/net/ethernet/mediatek/ethtool.c
+ create mode 100644 drivers/net/ethernet/mediatek/ethtool.h
+ create mode 100644 drivers/net/ethernet/mediatek/gsw_mt7620.c
+ create mode 100644 drivers/net/ethernet/mediatek/gsw_mt7620.h
+ create mode 100644 drivers/net/ethernet/mediatek/gsw_mt7621.c
+ create mode 100644 drivers/net/ethernet/mediatek/gsw_mt7623.c
+ create mode 100644 drivers/net/ethernet/mediatek/mdio.c
+ create mode 100644 drivers/net/ethernet/mediatek/mdio.h
+ create mode 100644 drivers/net/ethernet/mediatek/mdio_mt7620.c
+ create mode 100644 drivers/net/ethernet/mediatek/mdio_rt2880.c
+ create mode 100644 drivers/net/ethernet/mediatek/mdio_rt2880.h
+ create mode 100644 drivers/net/ethernet/mediatek/mtk_eth_soc.c
+ create mode 100644 drivers/net/ethernet/mediatek/mtk_eth_soc.h
+ create mode 100644 drivers/net/ethernet/mediatek/soc_mt7620.c
+ create mode 100644 drivers/net/ethernet/mediatek/soc_mt7621.c
+ create mode 100644 drivers/net/ethernet/mediatek/soc_mt7623.c
+ create mode 100644 drivers/net/ethernet/mediatek/soc_rt2880.c
+ create mode 100644 drivers/net/ethernet/mediatek/soc_rt3050.c
+ create mode 100644 drivers/net/ethernet/mediatek/soc_rt3883.c
+
 -- 
-2.5.0
+1.7.10.4
