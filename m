@@ -1,35 +1,36 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Fri, 26 Feb 2016 08:44:11 -0500
-Subject: [PATCH, RESEND] xen: allocate gntdev_copy_batch dynamically
-In-Reply-To: <1456435523-287763-1-git-send-email-arnd@arndb.de>
-References: <1456435523-287763-1-git-send-email-arnd@arndb.de>
-Message-ID: <56D056AB.4020806@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 14:46:20 +0100
+Subject: [PATCH RESEND] ASoC: pxa: remove unused variable
+In-Reply-To: <20160226011827.GA18327@sirena.org.uk>
+References: <1456437736-732609-1-git-send-email-arnd@arndb.de>
+ <20160226011827.GA18327@sirena.org.uk>
+Message-ID: <2759692.ZNT2pvbZBk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2016 04:25 PM, Arnd Bergmann wrote:
-> struct gntdev_copy_batch is arguably too large to fit on the kernel stack,
-> and we get a warning about the stack usage in gntdev_ioctl_grant_copy:
->
-> drivers/xen/gntdev.c:949:1: error: the frame size of 1240 bytes is larger than 1024 bytes
->
-> This changes the code to us a dynamic allocation instead.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: a4cdb556cae0 ("xen/gntdev: add ioctl for grant copy")
-> ---
->   drivers/xen/gntdev.c | 17 ++++++++++-------
->   1 file changed, 10 insertions(+), 7 deletions(-)
->
-> I sent this in January, Boris sent an almost identical patch
-> as http://www.gossamer-threads.com/lists/xen/devel/414056
-> but the bug remains present in mainline and linux-next as of
-> Feb 25.
->
-> Could you apply one of the patches before the bug makes it
-> into v4.5?
+On Friday 26 February 2016 10:18:27 Mark Brown wrote:
+> On Thu, Feb 25, 2016 at 11:02:04PM +0100, Arnd Bergmann wrote:
+> 
+> > Submitted originally on Nov 23 2015, this apparently got lost,
+> > resending it now.
+> 
+> You didn't really submit it, you pasted it into the middle of a reply to
+> a message on an existing thread for a patch that was already applied:
+> 
+> https://lkml.org/lkml/2015/11/23/88
+> 
+> That's not really submitting a patch as far as I'm concerned, something
+> that won't just apply with git am without special faffing isn't helping
+> and things in the middle of threads aren't good either (it gets
+> difficult to follow and there's every chance they'll never even get seen
+> if they're buried in the middle of a reply where you don't expect to see
+> a patch).
 
-David wanted to shrink the structure size instead:
-     http://www.gossamer-threads.com/lists/xen/devel/414535
+I see your point about the patch being in the middle of the thread.
 
--boris
+Regarding the 'git am' compatibility, I thought I'd done it right,
+but see now that I used incorrect scissors, apparently 'git mailinfo'
+expects at least six '-' characters as the separator, while I used
+just three.
+
+	Arnd
