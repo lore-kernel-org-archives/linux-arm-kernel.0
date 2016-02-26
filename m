@@ -1,22 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 26 Feb 2016 12:53:38 -0700
-Subject: [PATCH v2] ARM: dts: tegra: correct Beaver pinmux
-In-Reply-To: <1456515384.20487.2.camel@lynxeye.de>
-References: <1456514310-27605-1-git-send-email-dev@lynxeye.de>
- <56D0A748.6060104@wwwdotorg.org> <1456515384.20487.2.camel@lynxeye.de>
-Message-ID: <56D0AD42.9050507@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 21:21:22 +0100
+Subject: [PATCH] kallsyms: ignore ARM mode switching veneers
+In-Reply-To: <1456516254-15615-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456516254-15615-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <2625557.ANpx9Yzf9D@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2016 12:36 PM, Lucas Stach wrote:
-> Am Freitag, den 26.02.2016, 12:28 -0700 schrieb Stephen Warren:
->> On 02/26/2016 12:18 PM, Lucas Stach wrote:
->>> Update pinmux to get rid of invalid uses of the rsvd1 function,
->>> which lead
->>> to the mux settings on those pins to not be applied.
->>>
->>> Also add correct drive settings, derived from the Tegra3 TRM, for
- >
-> Your comment from v1 is addressed here  ^^^^^^^^^^^^^^^^^^^^^^^^
+On Friday 26 February 2016 20:50:54 Ard Biesheuvel wrote:
+> On ARM, the linker may emit veneers to deal with relative branch
+> instructions that appear too far away from their targets. Since the second
+> kallsyms pass results in an increase of the kernel size, it may result in
+> additional veneers to be emitted, potentially affecting the output of
+> kallsyms itself if these symbols are visible to it, and for that reason,
+> symbols whose names end in '_veneer' are ignored explicitly.
+> 
+> However, when building Thumb2 kernels, such veneers are named differently
+> if they also incur a mode switch, and since they are not filtered by
+> kallsyms, they may cause the build to fail. So filter symbols whose names
+> end in '_from_arm' or '_from_thumb' as well.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Oh right, sorry about that.
+
+Thanks again for debugging this!
+
+I have two (randconfig) configurations that ran into this problem, and they
+are both with your patch
+
+Tested-by: Arnd Bergmann <arnd@arndb.de>
+
+>  scripts/kallsyms.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+> index 8fa81e84e295..e2379de76563 100644
+> --- a/scripts/kallsyms.c
+> +++ b/scripts/kallsyms.c
+> @@ -215,6 +215,8 @@ static int symbol_valid(struct sym_entry *s)
+>  
+>  	static char *special_suffixes[] = {
+>  		"_veneer",		/* arm */
+> +		"_from_arm",		/* arm */
+> +		"_from_thumb",		/* arm */
+>  		NULL };
+>  
+>  	int i;
+> 
