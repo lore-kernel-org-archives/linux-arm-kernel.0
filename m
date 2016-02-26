@@ -1,51 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 26 Feb 2016 11:50:35 -0800
-Subject: [RFC v2 12/12] ARM64: dts: Define CPU power domain for MSM8916
-In-Reply-To: <1455310238-8963-13-git-send-email-lina.iyer@linaro.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-13-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160226195035.GA28849@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 Feb 2016 20:50:54 +0100
+Subject: [PATCH] kallsyms: ignore ARM mode switching veneers
+Message-ID: <1456516254-15615-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12, Lina Iyer wrote:
-> @@ -101,6 +105,27 @@
->  		};
->  	};
->  
-> +	CPU_PD: cpu-pd at 0 {
-> +		#power-domain-cells = <0>;
-> +		power-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
+On ARM, the linker may emit veneers to deal with relative branch
+instructions that appear too far away from their targets. Since the second
+kallsyms pass results in an increase of the kernel size, it may result in
+additional veneers to be emitted, potentially affecting the output of
+kallsyms itself if these symbols are visible to it, and for that reason,
+symbols whose names end in '_veneer' are ignored explicitly.
 
-Why isn't this part of the psci node? PSCI is the node that's
-providing the code/logic for the power domain.
+However, when building Thumb2 kernels, such veneers are named differently
+if they also incur a mode switch, and since they are not filtered by
+kallsyms, they may cause the build to fail. So filter symbols whose names
+end in '_from_arm' or '_from_thumb' as well.
 
-> +	};
-> +
-> +	pd-power-states {
-> +		CLUSTER_RET: power-state at 1 {
-> +			state-param = <0x1000010>;
-> +			entry-latency-us = <500>;
-> +			exit-latency-us = <500>;
-> +			residency-us = <2000>;
-> +		 };
-> +
-> +		CLUSTER_PWR_DWN: power-state at 2 {
-> +			state-param = <0x1000030>;
-> +			entry-latency-us = <2000>;
-> +			exit-latency-us = <2000>;
-> +			residency-us = <6000>;
-> +		};
-> +	};
-> +
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ scripts/kallsyms.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-And I would expect these to be put somewhere inside the power
-domain provider as well? Is this documented somewhere?
-
->  	psci {
->  		compatible = "arm,psci-1.0";
->  		method = "smc";
-
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index 8fa81e84e295..e2379de76563 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -215,6 +215,8 @@ static int symbol_valid(struct sym_entry *s)
+ 
+ 	static char *special_suffixes[] = {
+ 		"_veneer",		/* arm */
++		"_from_arm",		/* arm */
++		"_from_thumb",		/* arm */
+ 		NULL };
+ 
+ 	int i;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.5.0
