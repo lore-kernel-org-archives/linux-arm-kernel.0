@@ -1,52 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Feb 2016 15:43:19 +0000
-Subject: [PATCH] arm64: kernel: acpi: fix ioremap in ACPI parking
- protocol cpu_postboot
-In-Reply-To: <1456487412-4833-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1456487412-4833-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160226154318.GP4777@e104818-lin.cambridge.arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 26 Feb 2016 07:47:32 -0800
+Subject: [PATCH v4 0/6] watchdog: pnx4008: add restart handler
+In-Reply-To: <1456500886.2194.6.camel@localhost>
+References: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
+ <56D062DD.1060707@roeck-us.net> <1456500886.2194.6.camel@localhost>
+Message-ID: <56D07394.8030107@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 11:50:12AM +0000, Lorenzo Pieralisi wrote:
-> When secondary cpus are booted through the ACPI parking protocol, the
-> booted cpu should check that FW has correctly cleared its mailbox entry
-> point value to make sure the boot process was correctly executed.
-> The entry point check is carried in the cpu_ops->cpu_postboot method, that
-> is executed by secondary cpus when entering the kernel with irqs disabled.
-> 
-> The ACPI parking protocol cpu_ops maps/unmaps the mailboxes on the
-> primary CPU to trigger secondary boot in the cpu_ops->cpu_boot method
-> and on secondary processors to carry out FW checks on the booted CPU
-> to verify the boot protocol was successfully executed in the
-> cpu_ops->cpu_postboot method.
-> 
-> Therefore, the cpu_ops->cpu_postboot method is forced to ioremap/unmap the
-> mailboxes, which is wrong in that ioremap cannot be safely be carried out
-> with irqs disabled.
-> 
-> To fix this issue, this patch reshuffles the code so that the mailboxes
-> are still mapped after the boot processor executes the cpu_ops->cpu_boot
-> method for a given cpu, and the VA at which a mailbox is mapped for a given
-> cpu is stashed in the per-cpu data struct so that secondary cpus can
-> retrieve them in the cpu_ops->cpu_postboot and complete the required
-> FW checks.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: Itaru Kitayama <itaru.kitayama@riken.jp>
-> Tested-by: Loc Ho <lho@apm.com>
-> Tested-by: Itaru Kitayama <itaru.kitayama@riken.jp>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Loc Ho <lho@apm.com>
-> Cc: Itaru Kitayama <itaru.kitayama@riken.jp>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Al Stone <ahs3@redhat.com>
+On 02/26/2016 07:34 AM, Sylvain Lemieux wrote:
+> On Fri, 2016-02-26 at 06:36 -0800, Guenter Roeck wrote:
+>> On 02/25/2016 10:31 AM, Sylvain Lemieux wrote:
+>>> From: Sylvain Lemieux <slemieux@tycoint.com>
+>>>
+>>> The LPC32xx provide the capability to perform a soft or hard reset;
+>>> a soft reset will no reset the external peripheral
+>>> (i.e. RESOUT_N output not asserted).
+>>>
+>>> This changeset migrate the restart code from the "mach-lpc32xx" to
+>>> the "pnx-4008" watchdog driver and add the soft reset capability.
+>>>
+>>> The default behavior (i.e. hard reset) remain unchanged.
+>>>
+>>> The core restart handler support added by this change:
+>>> 2165bf524da5f5e496d - "watchdog: core: add restart handler support"
+>>> is not use in this changeset; it does not support the reboot mode.
+>>
+>> I finally had the time to look into this. Sorry for the late reply.
+>>
+>> Changing the watchdog core to pass the restart mode (or action)
+>> and the cmd/data pointer to the driver would be trivial and should
+>> be done instead.
+>>
+> Thanks for the feedback.
+>
+> Do you want me to rebase this patchset on the patch you will submit
+> to update the core restart handler support?
+>
 
-Applied. Thanks.
+Yes, please. I'll Cc: you on it.
 
--- 
-Catalin
+If you want to get started early and are open to do some early testing,
+try cloning git://kerneltests.org/git/linux.git. You'll find the patch
+in branch 'testing'.
+
+Thanks,
+Guenter
