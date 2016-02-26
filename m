@@ -1,38 +1,34 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 26 Feb 2016 09:21:59 +0100
-Subject: next-20160225 build: 2 failures 44 warnings (next-20160225)
-In-Reply-To: <56D001BE.2090209@roeck-us.net>
-References: <E1aYsmb-0006qb-76@optimist> <20160226030949.GL18327@sirena.org.uk>
- <56D001BE.2090209@roeck-us.net>
-Message-ID: <20160226092159.2f7ef3c7@free-electrons.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Fri, 26 Feb 2016 09:22:29 +0100
+Subject: [RFC v1] clk: Add debugfs nodes for
+ enable/disable/set-rate/set-parent
+In-Reply-To: <8B5B4FB66A982549A83D90C7791B761007F362D2E1@EAPEX1MAIL2.st.com>
+ (Pankaj DEV's message of "Fri, 26 Feb 2016 16:06:48 +0800")
+References: <1456454309-25037-1-git-send-email-pankaj.dev@st.com>
+ <87fuwg9bog.fsf@gmail.com>
+ <8B5B4FB66A982549A83D90C7791B761007F362D2E1@EAPEX1MAIL2.st.com>
+Message-ID: <87twkvj2yi.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter,
+Pankaj DEV <pankaj.dev@st.com> writes:
 
-On Thu, 25 Feb 2016 23:41:50 -0800, Guenter Roeck wrote:
+> The prime motive for clk_set_rate is to set new rate for a clock,
+> since the 'clk_rate' currently available, allows only reading.
+> To provide reading rate from 'clk_set_rate' is just additional feature.
 
-> > also caused by b4f596b19624 (arm64: add mvebu architecture entry) which
-> > enables MVBEU on arm64, the commit was present for a little while and
-> > the error cropped up but didn't get reported due to other things masking
-> > it.  atomic_io_modify() is only available on ARM, I'm unsure if this
-> > needs a driver change or if the driver is just specific to older
-> > hardware anyway.  The code is only used in the init path accessing what
-> > look to be device specific registers so I'm not 100% clear why it
-> > specifically needs to be an atomic modify.
-> >
-> Thierry already submitted a patch yesterday to restrict the driver to only
-> build on ARM. We can revisit if/when the driver is needed on ARM64.
+Sure.
 
-Ah, good, thanks. It isn't clear yet whether the driver will be needed
-on ARM64 for the Marvell platforms. For Armada 7K/8K, there is a SBSA
-compliant watchdog. For Armada 3700, I have only briefly looked, but it
-seems to be a different IP than the one used on the 32 bits SoCs.
+But my point is to combine things.
 
-Thanks Thierry for fixing the issue!
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+After your patch:
+
+- read via clk_rate
+- read via clk_set_rate
+- write via clk_set_rate
+
+My proposal:
+
+- read via clk_rate
+- write via clk_rate
