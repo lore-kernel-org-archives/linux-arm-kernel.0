@@ -1,98 +1,45 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 26 Feb 2016 17:29:19 +0530
-Subject: [PATCH 1/2] Documentation: dt: mailbox: Add TI Message Manager
-In-Reply-To: <56BC1617.3090204@ti.com>
-References: <1454690044-2560-1-git-send-email-nm@ti.com>
- <1454690044-2560-2-git-send-email-nm@ti.com>
- <CABb+yY3kGq_R49Xx4fK3UMqtuFiuv-pXJWvjkEFLPL9xRu5T4A@mail.gmail.com>
- <56B9DC30.5040806@ti.com>
- <CABb+yY24XzsWaSGLMCE4_nvgWx0OhhQmcaP41g06FxdjQYFchg@mail.gmail.com>
- <CAGo_u6qGaQj9Qvjwrm7cD=cr2UjLN+62tcquXYPsQrRjYD=UCw@mail.gmail.com>
- <20160209181031.GA23603@kahuna>
- <CABb+yY3nSZCbF7G1LP_7cGkKJpdJ1fko_6d3UkrF_vNpHk4uBg@mail.gmail.com>
- <56BC1617.3090204@ti.com>
-Message-ID: <CABb+yY0i2kfBg0qBOdMQxZ0M4bDBh5gHX5q-wCP2b+8OE7NyzQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 12:59:43 +0100
+Subject: [PATCH] staging/goldfish: use 6-arg get_user_pages()
+Message-ID: <1456488033-4044939-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 10:33 AM, Nishanth Menon <nm@ti.com> wrote:
-> Hi Jassi,
->
-> On 02/10/2016 10:23 PM, Jassi Brar wrote:
-> [...]
->
->
-> Thanks for taking the time and checking the TRM, I apologize that the
-> actual details of the hardware block which was supposed to be in
-> sections 8.1.3 and 8.1.4 has unfortunately been dropped since the last
-> time I reviewed in the spec Vs what actually went out into public
-> domain! I do realize the problem of doing a review without comprehensive
-> and accurate documentation - ugghh.. :(
->
-> But, I am trying to get our internal guys to upload the proper TRM
-> chapter in public domain -> hopefully we will get it done some time soon.
->
->
->>>         msgmgr: msgmgr at 02a00000 {
->>>                 compatible = "ti,k2g-message-manager";
->>>                 #mbox-cells = <2>;
->>>                 reg-names = "queue_proxy_region", "queue_state_debug_region";
->>>                 reg = <0x02a00000 0x400000>, <0x028c3400 0x400>;
->>>                 interrupt-names = "rx_005_002",
->>>                                   "rx_057_002";
->>>
->> Looking at figure in page-1445, it seems QID is the h/w channel id,
->> while proxy is its programming parameter. So maybe we need to list all
->> the ARM irq's as a list here, matched only by the qid asked by the
->> consumer ... assuming no two channels could have the same qid (?).
->
-> The overall story is something like what you already figured out..
-> message manager has a queue engine and a ram for data buffers, and n
-> queues. Each of these queues have a memory map corresponding to the
-> processor view.. we can call that programming paramater as well.
->
->>   interrupt-names = "irq_005", "irq_037", "irq_049", "irq_057",
->> "perr", "ferr", "eerr";
->
-> proxy error (perr), free index error(ferr) and ECC error(eerr) cannot be
-> handled by a slave, since it involves controlling a shared register set
-> for a single message manager instance. in the case of K2G, the master of
-> the message manager is actually PMMC, and not the compute processors -
-> it has error handling logic to handle things there - a slave can only
-> report these errors without ability to even expect reliable detection
-> (for example PMMC reacting even before any of  these cores have come up
-> from low power state).
->
-> irq_37 and irq_49 go to the secure world and we have no access from ARM
-> "non secure" world. the "missing documentation" would have helped
-> clarify that :(..
->
->>
->> I may be slightly off, but the idea remains to not have to encode any
->> consumer specific info in the provider node.
->
-> I do realize the reasoning behind your suggestion here. the reasoning
-> for providing rx_qid_pid as the interrupt name was as follows: I was
-> hoping to get a future SoC to provide proxy specific error instead of a
-> global error which is really useless since the processor generating
-> error should be the guy actually be notified.. queue specific interrupts
-> as well.. the reason for naming interrupts with the proxy id information
-> was primarily to let the dtb ABI stay compatible with only additional
-> properties defined when the new SoC gets supported.
->
-> I can make it compatible for today's SoC, but based on what i explained,
-> how about just "rx_<qid>" for the interrupt names?
-> interrupt-names = "rx_005", "rx_057" (I kinda feel using "irq" for
-> interrupt-names is actually redundant information)?
->
-Feel free to name the interrupts "rx_" instead of "irq_" ... assuming
-the interrupts correspond to only reception of data.
+After commit cde70140fed8 ("mm/gup: Overload get_user_pages() functions"),
+we get warning for this file, as it calls get_user_pages() with eight
+arguments after the change of the calling convention to use only six:
 
-> *if* i manage to convince to get a new IP with proxy specific
-> interrupts, then "perr_qid_pid" could then be introduced for that new
-> compatible type..
->
-Yeah, let us cross the bridge when we come to it. Let us not add any
-feature/binding that has no user today.
+drivers/platform/goldfish/goldfish_pipe.c: In function 'goldfish_pipe_read_write':
+drivers/platform/goldfish/goldfish_pipe.c:312:3: error: 'get_user_pages8' is deprecated [-Werror=deprecated-declarations]
 
-Thanks.
+This removes the first two arguments, which are now the default.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+The API change is currently only in the mm/pkeys branch of the
+tip tree, while the goldfish_pipe driver started using the
+old API in the staging/next branch.
+
+Andrew could pick it up into linux-mm in the meantime, or I can
+resend it at some later point if nobody else does the change
+after 4.6-rc1.
+---
+ drivers/platform/goldfish/goldfish_pipe.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/platform/goldfish/goldfish_pipe.c b/drivers/platform/goldfish/goldfish_pipe.c
+index 9973cebb4d6f..07462d79d040 100644
+--- a/drivers/platform/goldfish/goldfish_pipe.c
++++ b/drivers/platform/goldfish/goldfish_pipe.c
+@@ -309,8 +309,7 @@ static ssize_t goldfish_pipe_read_write(struct file *filp, char __user *buffer,
+ 		 * much memory to the process.
+ 		 */
+ 		down_read(&current->mm->mmap_sem);
+-		ret = get_user_pages(current, current->mm, address, 1,
+-				     !is_write, 0, &page, NULL);
++		ret = get_user_pages(address, 1, !is_write, 0, &page, NULL);
+ 		up_read(&current->mm->mmap_sem);
+ 		if (ret < 0)
+ 			break;
+-- 
+2.7.0
