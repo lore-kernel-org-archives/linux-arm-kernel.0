@@ -1,62 +1,32 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 25 Feb 2016 18:51:59 -0800
-Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for v4.6 -
- part2
-Message-ID: <CADaLNDkF8_DVYWPFtGU8tYsbbxDWZF9tozW=Zs3EuV4BqO6OuA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 26 Feb 2016 12:04:11 +0900
+Subject: next-20160225 build: 2 failures 44 warnings (next-20160225)
+In-Reply-To: <E1aYsmb-0006qb-76@optimist>
+References: <E1aYsmb-0006qb-76@optimist>
+Message-ID: <20160226030411.GK18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Thu, Feb 25, 2016 at 10:04:29AM +0000, Build bot for Mark Brown wrote:
 
-This is the second part of DT changes on X-Gene platforms for v4.6,
-which enables mailbox driver for X-Gene v2 platforms and also enable
-SLIMpro Mailbox I2C driver (a client of the mailbox driver) for both
-X-Gene v1 and v2 platforms.
+Today's -next fails to build an arm64 allmodconfig due to:
 
-This series depends on the 3rd patch
-(http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
-of the series "mailbox: Add APM X-Gene platform mailbox driver"
-(https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
-since Feb-15.
+> 	arm64-allmodconfig
+> ../drivers/pci/host/pci-mvebu.c:755:12: error: dereferencing pointer to incomplete type 'struct pci_sys_data'
+> ../drivers/pci/host/pci-mvebu.c:855:31: error: dereferencing pointer to incomplete type 'struct pci_sys_data'
+> ../drivers/pci/host/pci-mvebu.c:904:16: error: storage size of 'hw' isn't known
+> ../drivers/pci/host/pci-mvebu.c:919:2: error: implicit declaration of function 'pci_common_init_dev' [-Werror=implicit-function-declaration]
+> ../drivers/pci/host/pci-mvebu.c:1282:3: error: implicit declaration of function 'pci_ioremap_io' [-Werror=implicit-function-declaration]
 
-Hi Jassi,
-
-Are you going to get the 3rd patch (dts patch) of series "mailbox: Add
-APM X-Gene platform mailbox driver" to your tree? Otherwise, I will
-need to create another pull request for Arnd and Olof.
-
-Regards,
-Duc Dang.
-------
-
-The following changes since commit b0e4563c2f6d939a124f06e10b205151bbac487c:
-
-  arm64: dts: apm: mailbox device tree node for APM X-Gene platform.
-(2016-02-25 17:14:01 -0800)
-
-are available in the git repository at:
-
-  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.6-part2
-
-for you to fetch changes up to 406f5940549e78fd7d4d41413a7ed3e611bccc4f:
-
-  arm64: dts: apm: Add DT node for X-Gene v2 SLIMpro Mailbox I2C
-Driver (2016-02-25 17:14:04 -0800)
-
-----------------------------------------------------------------
-Second part of X-Gene DT changes queued for v4.6
-
-This patch set includes:
-+ X-Gene v2 Mailbox DT node
-+ X-Gene v1 and X-Gene v2 SLIMpro Mailbox
-I2C driver DT nodes
-
-----------------------------------------------------------------
-Duc Dang (3):
-      arm64: dts: apm: Add DT node for X-Gene v1 SLIMpro Mailbox I2C Driver
-      arm64: dts: apm: Mailbox device tree node for APM X-Gene v2 platform.
-      arm64: dts: apm: Add DT node for X-Gene v2 SLIMpro Mailbox I2C Driver
-
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 19 +++++++++++++++++++
- arch/arm64/boot/dts/apm/apm-storm.dtsi     |  5 +++++
- 2 files changed, 24 insertions(+)
+caused by b4f596b19624 (arm64: add mvebu architecture entry) which
+enables MVBEU on arm64, the commit was present for a little while and
+the error cropped up but didn't get reported due to other things masking
+it.  This looks like the driver needs modernization and probably ought
+to have a !ARM64 dependency for now.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/1f18ad67/attachment.sig>
