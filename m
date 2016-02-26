@@ -1,60 +1,29 @@
-From: harvey.hunt@imgtec.com (Harvey Hunt)
-Date: Fri, 26 Feb 2016 15:17:28 +0000
-Subject: [PATCH v3 07/52] mtd: nand: core: use mtd_ooblayout_xxx() helpers
- where appropriate
-In-Reply-To: <20160226161054.3477cd4b@bbrezillon>
-References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
- <1456448280-27788-8-git-send-email-boris.brezillon@free-electrons.com>
- <56D0629C.9080805@imgtec.com> <20160226161054.3477cd4b@bbrezillon>
-Message-ID: <56D06C88.9080608@imgtec.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 26 Feb 2016 16:18:13 +0100
+Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch driver
+ (ESW)
+In-Reply-To: <1456496504-50429-4-git-send-email-blogic@openwrt.org>
+References: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
+ <1456496504-50429-4-git-send-email-blogic@openwrt.org>
+Message-ID: <20160226151813.GD12022@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Fri, Feb 26, 2016 at 03:21:35PM +0100, John Crispin wrote:
+> The ESW is found in many of the old 100mbit MIPS based SoCs. it has 5
+> external ports, 1 cpu port and 1 further port that the internal HW
+> offloading engine connects to.
+> 
+> This driver is very basic and only provides basic init and irq support.
+> The SoC and switch core both have support for a special tag making DSA
+> support possible.
 
-On 26/02/16 15:10, Boris Brezillon wrote:
-> Hi Harvey,
->
-> On Fri, 26 Feb 2016 14:35:08 +0000
-> Harvey Hunt <harvey.hunt@imgtec.com> wrote:
->
->> [...]
->> I'll look into this more later today, but wanted to run it by you in
->> case you have any thoughts.
->
-> Can you apply this patch [1], and let me know if you see the additional
-> trace?
+Hi Crispin
 
-I applied the patch, the following is the (unchanged) output:
+There was recently a discussion about adding switches without using
+DSA or switchdev. It was pretty much decided we would not accept such
+drivers.
 
-[    0.256375] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0x88
-[    0.262887] nand: Micron MT29F64G08CBAAAWP
-[    0.266995] nand: 8192 MiB, MLC, erase size: 2048 KiB, page size: 
-8192, OOB size: 448
-[    0.274881] jz4780-nand 1b000000.nand-controller: using hardware BCH 
-(strength 24, size 1024, bytes 42)
-[    0.289046] Bad block table not found for chip 0
-[    0.297769] Bad block table not found for chip 0
-[    0.302425] Scanning device for bad blocks
-[    0.320239] Bad eraseblock 90 at 0x00000b400000
-[    0.324934] Bad eraseblock 91 at 0x00000b600000
-[    0.931054] Bad eraseblock 4092 at 0x0001ff800000
-[    0.935917] Bad eraseblock 4093 at 0x0001ffa00000
-[    0.944660] nand_bbt: error while writing bad block table -34
-[    0.950448] jz4780-nand: probe of 1b000000.nand-controller failed 
-with error -34
-[    0.958079] UBI error: cannot open mtd 3, error -19
-[    0.962788] UBI error: cannot open mtd 4, error -19[    0.970229] 
-clk: Not disabling unused clocks
+Sorry
 
->
-> Thanks,
->
-> Boris
->
-> [1]http://code.bulix.org/l2hkl1-91947
->
-
-Thanks,
-
-Harvey
+	Andrew
