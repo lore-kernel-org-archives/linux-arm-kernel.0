@@ -1,25 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Feb 2016 21:15:42 +0900
-Subject: [PATCH RESEND 0/2] spi: sun4i: add DMA support
-In-Reply-To: <1456466217-6793-1-git-send-email-plaes@plaes.org>
-References: <1456466217-6793-1-git-send-email-plaes@plaes.org>
-Message-ID: <20160226121542.GP18327@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Feb 2016 12:18:19 +0000
+Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
+In-Reply-To: <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
+References: <56D030A4.5050205@nxp.com>
+ <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
+Message-ID: <20160226121819.GB8728@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 07:56:55AM +0200, Priit Laes wrote:
-> While trying to get SPI TFT screen working with Cubietruck, I noticed that
-> at current state driver didn't actually support SPI data bursts bigger than
-> n bytes (n is probably ~64 bytes).
+On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
+> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
+> > In case the bootloader doesn't provide randomness
+> > (through device tree or by uefi protocol) generate
+> > a pseudo-random seed based on the timer counter.
+> > People might find this "week rng" approach convenient
+> > as it gets rid of the bootloader dependency.
+> >
+> > The patch tries to mimic the x86's rdtsc
+> > based implementation authored by Kees Cook.
+> >
+> > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Kees Cook <keescook@chromium.org>
+> 
+> Hi Laurentiu,
+> 
+> I appreciate the interest in this work, but to be honest, I don't like
+> this at all. I went out of my way to ensure that
+> a) the kernel itself does not take part in generating the random bits, and
+> b) the random bits are used in such a way that there is no correlation
+> between the randomization of the core kernel, the module region and
+> the linear region if there is no correlation between the random bits.
+> 
+> The limited entropy of the cycle counter at early boot defeats that,
+> and even worse, it will not encourage platform vendors to implement
+> this properly in their boot code, given that it will appear to work,
+> and the only thing more dangerous than no security is a false sense of
+> security imo.
 
-If you're going to add noise like "RESEND" to your subject lines (which
-makes the visible space for the actual subject smaller so makes handling
-incoming mail harder) please at least make sure it's true, you've not
-sent these before.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/681c8e01/attachment.sig>
+I agree that a false sense of security is a worry here.
+
+Either way, I think we need numbers. It's non-obvious how much entropy
+we can acquire through counters or other means at early boot time.
+
+Has anyone done an analysis of environmental entropy available (through
+any means) at early boot, VM vs native?
+
+It's also not obvious that vendors will correctly implement the EFI RNG
+protocol; depending on the above we may want to mix in additional entropy
+regardless.
+
+> What I would ack, for development purposes, is something similar to
+> what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
+> developers get to exercise this code even if their boot environment
+> does not provide any entropy. Anything beyond that is a nack as far as
+> I am concerned.
+
+FWIW, I would not like to see that approach. I can easily see a build-time
+constant KASLR seed being abused to give a false sense of security. Having a
+bootloader or hypervisor provide different random seeds to the same Image gives
+you a much better turnaround time for testing regardless (vs rebuilding,
+copying, etc).
+
+The TEXT_OFFSET fuzzing was for fuzzing the bootloader, which is a bit
+different to fuzzing the kernel itself.
+
+Mark.
