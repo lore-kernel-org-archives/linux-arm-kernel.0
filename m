@@ -1,51 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Feb 2016 15:25:47 +0100
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN external clock support
-In-Reply-To: <1456496023-16240-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-References: <1456496023-16240-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <CAMuHMdXJRN2kF2r=bqcY8v87aYHj_OKr2=5vzcfoHwvr02Y2CA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Feb 2016 15:25:45 +0100
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.6 (#2)
+Message-ID: <87fuwfo8eu.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ramesh,
+Hi,
 
-On Fri, Feb 26, 2016 at 3:13 PM, Ramesh Shanmugasundaram
-<ramesh.shanmugasundaram@bp.renesas.com> wrote:
-> Adds external CAN clock node for r8a7795. This clock can be used as
-> fCAN clock of CAN and CAN FD controller.
->
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> ---
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index a7315eb..5167a6c 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -115,6 +115,13 @@
->                 clock-frequency = <0>;
->         };
->
-> +       /* External CAN clock - to be overridden by boards that provide it */
-> +       can_clk: can {
-> +               compatible = "fixed-clock";
-> +               #clock-cells = <0>;
-> +               clock-frequency = <0>;
+Here is the second pull request for cleanup for mvebu for v4.6.
 
-As this is an optional clock, it should have
+Gregory
 
-        status = "disabled";
+The following changes since commit 727c62d29c3a0b982fb72ef993db95e9d2036e07:
 
-> +       };
+  ARM: mv78xx0: use "depends on" instead of "if" after prompt (2016-01-25 16:43:16 +0100)
 
-Gr{oetje,eeting}s,
+are available in the git repository at:
 
-                        Geert
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.6-2
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+for you to fetch changes up to 7d8f9ac16223cf14f199a96355b0add4ca286662:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+  ARM: mvebu: add missing of_node_put() (2016-02-08 17:30:14 +0100)
+
+----------------------------------------------------------------
+mvebu cleanup for 4.6 (part 2)
+
+Add a missing call to of_node_put() armada_xp_smp_prepare_cpus()
+
+----------------------------------------------------------------
+Masahiro Yamada (1):
+      ARM: mvebu: add missing of_node_put()
+
+ arch/arm/mach-mvebu/platsmp.c | 1 +
+ 1 file changed, 1 insertion(+)
