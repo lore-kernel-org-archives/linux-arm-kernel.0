@@ -1,38 +1,57 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 26 Feb 2016 09:51:51 +0100
-Subject: [PATCH v4 0/3] i.MX6 LDB mux/divider glitch workaround
-Message-ID: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
+Date: Fri, 26 Feb 2016 09:51:52 +0100
+Subject: [PATCH v4 1/3] ARM: imx6: Mask mmdc_ch1 handshake for periph2_sel and
+ mmdc_ch1_axi_podf
+In-Reply-To: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
+References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1456476714-11351-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+MMDC CH1 is not used on i.MX6Q, so the handshake needed to change the
+parent of periph2_sel or the divider of mmdc_ch1_axi_podf will never
+succeed.
+Disable the handshake mechanism to allow changing the frequency of
+mmdc_ch1_axi, allowing to use it as a possible source for the LDB DI
+clock.
 
-the last version contained a bug when setting the muxes, which caused it
-to OR the desired mux values for ldb_di0_sel and ldb_di1_sel and write the
-result to the ldb_di0_sel bitfield. This is fixed now.
-I think the mmdc_ch1 patch should be uncontroversial. The remaining two
-could use some test feedback and somebody who can take a look at ERR009219
-and EB821 and can confirm that this patch is in line with the suggested
-workaround.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/clk/imx/clk-imx6q.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-regards
-Philipp
-
-Changes since v3:
- - Fix LDB_DI1_SEL shift when setting divider and fix a debug printk,
-   issues reported by Akshay Bhat.
-
-Fabio Estevam (1):
-  ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
-
-Philipp Zabel (2):
-  ARM: imx6: Mask mmdc_ch1 handshake for periph2_sel and
-    mmdc_ch1_axi_podf
-  ARM: imx6: Make the LDB_DI0 and LDB_DI1 clocks read-only.
-
- drivers/clk/imx/clk-imx6q.c | 294 ++++++++++++++++++++++++++++++++++++++++++--
- drivers/clk/imx/clk.h       |   8 ++
- 2 files changed, 292 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index f0efc6f..871c905 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -138,6 +138,19 @@ static struct clk ** const uart_clks[] __initconst = {
+ 	NULL
+ };
+ 
++#define CCM_CCDR		0x04
++
++#define CCDR_MMDC_CH1_MASK	BIT(16)
++
++static void __init imx6q_mmdc_ch1_mask_handshake(void __iomem *ccm_base)
++{
++	unsigned int reg;
++
++	reg = readl_relaxed(ccm_base + CCM_CCDR);
++	reg |= CCDR_MMDC_CH1_MASK;
++	writel_relaxed(reg, ccm_base + CCM_CCDR);
++}
++
+ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ {
+ 	struct device_node *np;
+@@ -279,6 +292,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
+ 
++	imx6q_mmdc_ch1_mask_handshake(base);
++
+ 	/*                                              name                reg       shift width parent_names     num_parents */
+ 	clk[IMX6QDL_CLK_STEP]             = imx_clk_mux("step",	            base + 0xc,  8,  1, step_sels,	   ARRAY_SIZE(step_sels));
+ 	clk[IMX6QDL_CLK_PLL1_SW]          = imx_clk_mux("pll1_sw",	    base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
 -- 
 2.7.0
