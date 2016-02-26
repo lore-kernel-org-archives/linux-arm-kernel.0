@@ -1,67 +1,93 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 09:07:41 +0900
-Subject: [PATCH 08/14] arm64: dts: r8a7795: Add SDHI support to dtsi
+Date: Fri, 26 Feb 2016 09:07:45 +0900
+Subject: [PATCH 12/14] arm64: dts: r8a7795: add USB2.0 Host (EHCI/OHCI) device
+ nodes
 In-Reply-To: <cover.1456445161.git.horms+renesas@verge.net.au>
 References: <cover.1456445161.git.horms+renesas@verge.net.au>
-Message-ID: <d9d67010e0c699c838ac84245ec6d8651420d337.1456445161.git.horms+renesas@verge.net.au>
+Message-ID: <a2bcdc287694842504255e47323bcf57bc8c0572.1456445161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ai Kyuse <ai.kyuse.uw@renesas.com>
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Signed-off-by: Ai Kyuse <ai.kyuse.uw@renesas.com>
 Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-[wsa: squashed some fixes and added mmc-caps]
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 38 ++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 66 ++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 1072c681f8b4..c2bffd160c18 100644
+index c6e379000e90..a7315ebe3883 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -985,5 +985,43 @@
- 			#dma-cells = <1>;
- 			dma-channels = <2>;
+@@ -1052,5 +1052,71 @@
+ 			#phy-cells = <0>;
+ 			status = "disabled";
  		};
 +
-+		sdhi0: sd at ee100000 {
-+			compatible = "renesas,sdhi-r8a7795";
-+			reg = <0 0xee100000 0 0x2000>;
-+			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 314>;
++		ehci0: usb at ee080100 {
++			compatible = "generic-ehci";
++			reg = <0 0xee080100 0 0x100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			phys = <&usb2_phy0>;
++			phy-names = "usb";
 +			power-domains = <&cpg>;
 +			status = "disabled";
 +		};
 +
-+		sdhi1: sd at ee120000 {
-+			compatible = "renesas,sdhi-r8a7795";
-+			reg = <0 0xee120000 0 0x2000>;
-+			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 313>;
++		ehci1: usb at ee0a0100 {
++			compatible = "generic-ehci";
++			reg = <0 0xee0a0100 0 0x100>;
++			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 702>;
++			phys = <&usb2_phy1>;
++			phy-names = "usb";
 +			power-domains = <&cpg>;
 +			status = "disabled";
 +		};
 +
-+		sdhi2: sd at ee140000 {
-+			compatible = "renesas,sdhi-r8a7795";
-+			reg = <0 0xee140000 0 0x2000>;
-+			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 312>;
++		ehci2: usb at ee0c0100 {
++			compatible = "generic-ehci";
++			reg = <0 0xee0c0100 0 0x100>;
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 701>;
++			phys = <&usb2_phy2>;
++			phy-names = "usb";
 +			power-domains = <&cpg>;
-+			cap-mmc-highspeed;
 +			status = "disabled";
 +		};
 +
-+		sdhi3: sd at ee160000 {
-+			compatible = "renesas,sdhi-r8a7795";
-+			reg = <0 0xee160000 0 0x2000>;
-+			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 311>;
++		ohci0: usb at ee080000 {
++			compatible = "generic-ohci";
++			reg = <0 0xee080000 0 0x100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			phys = <&usb2_phy0>;
++			phy-names = "usb";
 +			power-domains = <&cpg>;
-+			cap-mmc-highspeed;
++			status = "disabled";
++		};
++
++		ohci1: usb at ee0a0000 {
++			compatible = "generic-ohci";
++			reg = <0 0xee0a0000 0 0x100>;
++			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 702>;
++			phys = <&usb2_phy1>;
++			phy-names = "usb";
++			power-domains = <&cpg>;
++			status = "disabled";
++		};
++
++		ohci2: usb at ee0c0000 {
++			compatible = "generic-ohci";
++			reg = <0 0xee0c0000 0 0x100>;
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 701>;
++			phys = <&usb2_phy2>;
++			phy-names = "usb";
++			power-domains = <&cpg>;
 +			status = "disabled";
 +		};
  	};
