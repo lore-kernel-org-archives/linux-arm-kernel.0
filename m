@@ -1,7 +1,7 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Feb 2016 11:43:52 -0800
-Subject: [GIT PULL] arm64: Allwinner config changes for 4.6
-Message-ID: <20160226194352.GA19388@lukather>
+Date: Fri, 26 Feb 2016 11:45:45 -0800
+Subject: [GIT PULL] arm: Allwinner core changes for 4.6
+Message-ID: <20160226194545.GA20331@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,26 +11,25 @@ The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-config64-for-4.6
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-4.6
 
-for you to fetch changes up to 22b0898e831bc1ffb64ce0b8452a376f0892b478:
+for you to fetch changes up to 1425ec0f1ce46c95838c797a721bf9c6e0be14e2:
 
-  arm64: add defconfig options for Allwinner SoCs (2016-02-25 10:51:50 -0800)
-
-----------------------------------------------------------------
-Allwinner configuration changes for ARM64, 4.6 edition
-
-Not a lot of changes for this kernel release, just a new Kconfig option and
-some changes to the arm64 defconfig to add Allwinner drivers
+  ARM: sunxi: Introduce Allwinner for A83T support (2016-02-05 07:54:08 +0100)
 
 ----------------------------------------------------------------
-Andre Przywara (2):
-      arm64: Introduce Allwinner SoC config option
-      arm64: add defconfig options for Allwinner SoCs
+Allwinner core changes for 4.6
 
- arch/arm64/Kconfig.platforms | 5 +++++
- arch/arm64/configs/defconfig | 7 +++++++
- 2 files changed, 12 insertions(+)
+Just introduce the A83T support.
+
+----------------------------------------------------------------
+Vishnu Patekar (1):
+      ARM: sunxi: Introduce Allwinner for A83T support
+
+ Documentation/arm/sunxi/README                  | 1 -
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 1 +
+ 3 files changed, 2 insertions(+), 1 deletion(-)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -42,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/f8c83d02/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/f82f0aee/attachment.sig>
