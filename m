@@ -1,41 +1,24 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Fri, 26 Feb 2016 10:17:51 +0800
-Subject: [PATCH v9 2/6] clk: hisilicon: add CRG driver for hi3519 soc
-In-Reply-To: <20160225234215.GK28849@codeaurora.org>
-References: <1456127280-23275-1-git-send-email-xuejiancheng@huawei.com>
- <1456127280-23275-3-git-send-email-xuejiancheng@huawei.com>
- <20160225234215.GK28849@codeaurora.org>
-Message-ID: <56CFB5CF.2050800@huawei.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Fri, 26 Feb 2016 10:41:56 +0800
+Subject: [PATCH] ASoC: mediatek: Add I03/I04 widgets and corresponding
+ routes
+In-Reply-To: <20160226023050.GI18327@sirena.org.uk>
+References: <1456384353-13041-1-git-send-email-pc.liao@mediatek.com>
+ <20160226023050.GI18327@sirena.org.uk>
+Message-ID: <1456454516.15436.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Mark,
 
-On 2016/2/26 7:42, Stephen Boyd wrote:
->> diff --git a/drivers/clk/hisilicon/reset.c b/drivers/clk/hisilicon/reset.c
->> new file mode 100644
->> index 0000000..50e00e7
->> --- /dev/null
->> +++ b/drivers/clk/hisilicon/reset.c
->> +
->> +int hisi_reset_init(struct device_node *np)
->> +{
->> +	struct hisi_reset_controller *rstc;
->> +
->> +	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
->> +	if (!rstc)
->> +		return -ENOMEM;
->> +
->> +	rstc->membase = of_iomap(np, 0);
+On Fri, 2016-02-26 at 10:30 +0800, Mark Brown wrote:
+> On Thu, Feb 25, 2016 at 03:12:33PM +0800, PC Liao wrote:
 > 
-> Any reason why we can't pass the platform device here and map the
-> register space with platform device APIs?
+> > Change-Id: Ib6804bbbde388830d8359245fe13bbb0f2bb36ba
 > 
-This function can be called by other clock drivers except clk-hi3519. Some
-clock drivers may not be registered as platform drivers. Moreover this function
-may be called early even before platform_bus_init.
+> Don't include noise like this in upstream submissions, we don't use your
+> gerritt.
 
-Thank you!
-
-Regards,
-Jiancheng.
+Sorry about that.
+I will upload new version.
+Thanks!
