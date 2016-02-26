@@ -1,30 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 23:02:21 +0100
-Subject: [PATCH 0/7] arm/arm64: Alpine patches for 4.6
-In-Reply-To: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <2955978.E8qlghcpm8@wuerfel>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 26 Feb 2016 16:06:58 -0600
+Subject: [PATCH] ARM: scu: Should include asm/errno.h
+Message-ID: <1456524418-4006-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 February 2016 11:14:50 Antoine Tenart wrote:
-> Hi Arnd, Olof and Kevin,
-> 
-> Here are the Alpine patches for 4.6. As seen with Olof these patches are
-> sent to you as a series as there are only 7 of them. I'll get my gpg key
-> signed and setup a git tree somewhere for next time.
-> 
-> The first 3 patches introduce a basic arm64 Alpine support, by adding
-> the Alpine v2 EVP board. The last 4 patches add an MSIX node in both
-> Alpine v1 (arm) and Alpine v2 (arm64) dtsi and select the Alpine MSI
-> controller driver.
+The stub for scu_power_mode returns -EINVAL if a !CONFIG_SMP build is
+being done, and because this file can be included in files that are
+shared between SMP and non-SMP platforms, we must make sure to
+explicitly include asm/errno.h otherwise the build may fail based on
+include order.
 
-Applied the patches to the next/dt, next/dt64, next/arm64 and next/soc
-branches, respectively. I did not see any strong dependencies between
-the patches, so they are now out of order (depending how Linus
-pulls our branches). Please check if that's ok and if I missed anything.
+Reported-by: Dan Murphy <dmurphy@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/include/asm/smp_scu.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-They should show up in the for-next branch of arm-soc once I've done
-some basic testing tonight.
-
-	Arnd
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index bfe163c40024..e7f39655333a 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -8,6 +8,7 @@
+ #ifndef __ASSEMBLER__
+ 
+ #include <asm/cputype.h>
++#include <asm/errno.h>
+ 
+ static inline bool scu_a9_has_base(void)
+ {
+-- 
+2.7.2
