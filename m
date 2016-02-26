@@ -1,39 +1,92 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 26 Feb 2016 07:27:14 -0800
-Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
-In-Reply-To: <56D04D17.6030502@ti.com>
-References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
- <20160204224128.GG4215@xsjsorenbubuntu>
- <CAAtXAHcV-9gXcZOX8dzUOBZUwj9M=O4MAsMCJNQYAP+os-D7Tg@mail.gmail.com>
- <20160204233950.GH4215@xsjsorenbubuntu> <56D04D17.6030502@ti.com>
-Message-ID: <20160226152714.GD3173@xsjsorenbubuntu>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Fri, 26 Feb 2016 10:34:46 -0500
+Subject: [PATCH v4 0/6] watchdog: pnx4008: add restart handler
+In-Reply-To: <56D062DD.1060707@roeck-us.net>
+References: <1456425100-28136-1-git-send-email-slemieux.tyco@gmail.com>
+ <56D062DD.1060707@roeck-us.net>
+Message-ID: <1456500886.2194.6.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-02-26 at 15:03:19 +0200, Grygorii Strashko wrote:
-> On 02/05/2016 01:39 AM, S?ren Brinkmann wrote:
-> > On Thu, 2016-02-04 at 15:14:47 -0800, Moritz Fischer wrote:
-> >> Hi Soeren,
-> >>
-> >> On Thu, Feb 4, 2016 at 2:41 PM, S?ren Brinkmann
-> >> <soren.brinkmann@xilinx.com> wrote:
-> >>
-> >>> But with this change the 'if !CPU_FREQ' becomes obsolete.
-> >> I'm confused, could you explain that statement? You don't want people
-> >> accidentally running with GT when CPU_FREQ is on, right?
-> > 
-> > Correct. But with this Kconfig rework you can just deselect it in
-> > Kconfig. The generic HAVE_GT could always be selected.
-> > 
+On Fri, 2016-02-26 at 06:36 -0800, Guenter Roeck wrote:
+> On 02/25/2016 10:31 AM, Sylvain Lemieux wrote:
+> > From: Sylvain Lemieux <slemieux@tycoint.com>
+> >
+> > The LPC32xx provide the capability to perform a soft or hard reset;
+> > a soft reset will no reset the external peripheral
+> > (i.e. RESOUT_N output not asserted).
+> >
+> > This changeset migrate the restart code from the "mach-lpc32xx" to
+> > the "pnx-4008" watchdog driver and add the soft reset capability.
+> >
+> > The default behavior (i.e. hard reset) remain unchanged.
+> >
+> > The core restart handler support added by this change:
+> > 2165bf524da5f5e496d - "watchdog: core: add restart handler support"
+> > is not use in this changeset; it does not support the reboot mode.
 > 
+> I finally had the time to look into this. Sorry for the late reply.
 > 
-> Don't know whom should i ask - but what will be the final conclusion here?
-> Can it be merged?
+> Changing the watchdog core to pass the restart mode (or action)
+> and the cmd/data pointer to the driver would be trivial and should
+> be done instead.
+> 
+Thanks for the feedback.
 
-I think we don't break anything either way. Would just be some
-additional clean up to get rid of that mentioned constraint (which
-doesn't really work well anyway in the multi-arch kernel). So, no real
-objections to merging it from my side.
+Do you want me to rebase this patchset on the patch you will submit
+to update the core restart handler support?
 
-	Thanks,
-	S?ren
+> I wrote a patch to do just that. I'll send it out later today for review,
+> assuming it passes my internal tests.
+> 
+> Guenter
+
+> >
+> > Note:
+> > Patch #5 was generated with the option "--unified=2" to ensure
+> > it can be apply before or after the changes for the new
+> > LPC32xx irqchip driver:
+> > - http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
+> > ---
+> > Changes from v3 to v4:
+> > * Update the patch as per the feedback received from:
+> >    Arnd: http://permalink.gmane.org/gmane.linux.watchdog/3329
+> >    - Switch patch #5 and #6 order.
+> >
+> > Changes from v2 to v3:
+> > * Update the patch as per the feedback received from:
+> >    Joachim: http://permalink.gmane.org/gmane.linux.watchdog/3303
+> >    - remove explicit clock enable from restart handler.
+> >    - verify "register_restart_handler" return value.
+> >    - add call to unregister_restart_handler".
+> >    - do the restart handling directly in "pnx4008_restart_handler".
+> > * Move the change to "phy3250.c" into a separate patch and generate
+> >    the new patch with the "--unified=2" option.
+> >
+> > Changes from v1 to v2:
+> > * Rename patch title;
+> >    was "arm: lpc32xx: restart: add support for soft reset"
+> > * Update the patch as per the feedback received from:
+> >    Joachim: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/479791
+> >    - migrate restart code from "mach-lpc32xx" to "pnx-4008" driver.
+> > * Add soft reset support to "pnx-4008" driver instead of "mach-lpc32xx".
+> > * Use define available in "pnx-4008" when writting to watchdog register.
+> > * Remove restart handler from "mach-lpc32xx".
+> > * Remove restart hook from "phy3250.c".
+> > * Update driver logging during power-on.
+> >
+> > Sylvain Lemieux (6):
+> >    watchdog: pnx4008: update logging during power-on
+> >    watchdog: pnx4008: add restart handler
+> >    watchdog: pnx4008: add support for soft reset
+> >    watchdog: pnx4008: restart: support "cmd" from userspace
+> >    arm: lpc32xx: phy3250 remove restart hook
+> >    arm: lpc32xx: remove restart handler
+> >
+> >   arch/arm/mach-lpc32xx/common.c  | 15 ------------
+> >   arch/arm/mach-lpc32xx/common.h  |  1 -
+> >   arch/arm/mach-lpc32xx/phy3250.c |  1 -
+> >   drivers/watchdog/pnx4008_wdt.c  | 51 +++++++++++++++++++++++++++++++++++++++--
+> >   4 files changed, 49 insertions(+), 19 deletions(-)
+> >
+> 
