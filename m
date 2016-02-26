@@ -1,32 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Feb 2016 10:18:27 +0900
-Subject: [PATCH RESEND] ASoC: pxa: remove unused variable
-In-Reply-To: <1456437736-732609-1-git-send-email-arnd@arndb.de>
-References: <1456437736-732609-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160226011827.GA18327@sirena.org.uk>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 25 Feb 2016 17:26:34 -0800
+Subject: [PATCH v11 08/10] dt, numa: Add NUMA dt binding implementation.
+In-Reply-To: <20160223193651.GA8491@rob-hp-laptop>
+References: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
+ <1455930799-5371-9-git-send-email-ddaney.cavm@gmail.com>
+ <20160223193651.GA8491@rob-hp-laptop>
+Message-ID: <56CFA9CA.6090803@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 11:02:04PM +0100, Arnd Bergmann wrote:
+On 02/23/2016 11:36 AM, Rob Herring wrote:
+> On Fri, Feb 19, 2016 at 05:13:17PM -0800, David Daney wrote:
+>> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>>
+>> ADD device tree node parsing for NUMA topology using device
+>> "numa-node-id" property distance-map.
+>
+> I still want an adequate explanation why NUMA setup cannot be done with
+> an unflattened tree. PowerPC manages to do that and should have a
+> similar init flow being memblock based, so I would expect arm64 can too.
 
-> Submitted originally on Nov 23 2015, this apparently got lost,
-> resending it now.
+Many things could be done.  Really, we want to know what *should* be done.
 
-You didn't really submit it, you pasted it into the middle of a reply to
-a message on an existing thread for a patch that was already applied:
+In the context of the current arm64 memory initialization we (more or 
+less) do:
 
-https://lkml.org/lkml/2015/11/23/88
+  1) early_init_fdt_scan_reserved_mem();
+  2) memory_present()
+  3) sparse_init()
+  4) other things
+  5) unflatten_device_tree()
 
-That's not really submitting a patch as far as I'm concerned, something
-that won't just apply with git am without special faffing isn't helping
-and things in the middle of threads aren't good either (it gets
-difficult to follow and there's every chance they'll never even get seen
-if they're buried in the middle of a reply where you don't expect to see
-a patch).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/77c700e0/attachment-0001.sig>
+We are already reading information out of the FDT at #1.
+
+This patch set adds a step between 1 and 2 where we read NUMA 
+information out of the FDT.
+
+Hypothetically, it might be possible to rewrite the arm64 setup code so 
+that the ordering was different, and the NUMA setup was done on the 
+unflattened tree, but that would certainly be a much more invasive patch.
+
+If the arm64 maintainers would like a rewrite of:
+
+   arch/arm64/kernel/setup.c
+   arch/arm64/mm/init.c
+   arch/arm64/mm/mm/mmu.c
+   .
+   .
+   .
+
+we can discuss doing NUMA setup with the unflattened tree.  With the 
+current memory initialization code, I think it makes more sense to parse 
+the NUMA information out of the flattened form.
+
+David Daney
