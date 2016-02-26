@@ -1,111 +1,199 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Feb 2016 11:25:25 +0000
-Subject: [PATCH] dmaengine: omap-dma: Do not call omap_dma_callback()
- from tx_status()
-In-Reply-To: <56D0279F.2050703@ti.com>
-References: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
- <20160226010658.GN5783@n2100.arm.linux.org.uk>
- <56D0279F.2050703@ti.com>
-Message-ID: <20160226112524.GP5783@n2100.arm.linux.org.uk>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 26 Feb 2016 19:29:19 +0800
+Subject: [PATCH v15 15/20] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <1456324417-18992-1-git-send-email-shannon.zhao@linaro.org>
+References: <1456324417-18992-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1456486159-14564-1-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 12:23:27PM +0200, Peter Ujfalusi wrote:
-> On 2016-02-26 03:06, Russell King - ARM Linux wrote:
-> > On Thu, Feb 25, 2016 at 10:28:59AM +0200, Peter Ujfalusi wrote:
-> >> When based on the CCR_ENABLE bit the channel is stopped we should not call
-> >> omap_dma_callback(), only change the return value to DMA_COMPLETE. Client
-> >> drivers will do the right thing to clean up the channel after the transfer
-> >> has been completed.
-> >> Check the CCR_ENABLE only if the channel is not paused since pause in sDMA
-> >> means that the channel is stopped.
-> >> This will fix one hard to reproduce race condition when the channel is
-> >> terminated during transfer (affecting cyclic operation).
-> >>
-> >> Fixes: 1a7cf7b26f25 ("dmaengine: omap-dma: Handle cases when the channel is polled for completion")
-> >>
-> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> >> ---
-> >>  drivers/dma/omap-dma.c | 16 ++++++++++------
-> >>  1 file changed, 10 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> >> index f6bef0d93998..a6b189fdbbe6 100644
-> >> --- a/drivers/dma/omap-dma.c
-> >> +++ b/drivers/dma/omap-dma.c
-> >> @@ -671,18 +671,22 @@ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
-> >>  	struct omap_chan *c = to_omap_dma_chan(chan);
-> >>  	struct virt_dma_desc *vd;
-> >>  	enum dma_status ret;
-> >> -	uint32_t ccr;
-> >>  	unsigned long flags;
-> >>  
-> >> -	ccr = omap_dma_chan_read(c, CCR);
-> >> -	/* The channel is no longer active, handle the completion right away */
-> >> -	if (!(ccr & CCR_ENABLE))
-> >> -		omap_dma_callback(c->dma_ch, 0, c);
-> >> -
-> >>  	ret = dma_cookie_status(chan, cookie, txstate);
-> >>  	if (ret == DMA_COMPLETE || !txstate)
-> >>  		return ret;
-> >>  
-> >> +	if (!c->paused) {
-> >> +		uint32_t ccr = omap_dma_chan_read(c, CCR);
-> >> +		/*
-> >> +		 * The channel is no longer active, set the return value
-> >> +		 * accordingly
-> >> +		 */
-> >> +		if (!(ccr & CCR_ENABLE))
-> >> +			ret = DMA_COMPLETE;
-> >> +	}
-> >> +
-> > 
-> > This looks very much like a hack, and surely opens a race condition
-> > up: what happens when a request submitted and pending but not yet
-> > started?  If the channel is idle, requesting status will report
-> > that the request has completed.
-> > 
-> > It's also wrong for another reason.  If txstate is NULL...
-> 
-> True, I have fixed these up.
-> 
-> > Your original commit adding the original hack that you're now removing
-> > above says that this is to support polled operation: I'm not aware of
-> > DMA engine supporting such a mode.  DMA_PREP_INTERRUPT is a mechanism
-> > where requests can be queued without an interrupt to allow batching.
-> 
-> Also it is used to suppress DMA interrupts during audio playback for example.
-> In this case we will run w/o interrupts and the position is polled.
-> 
-> > See the raid5/async_tx code, which queues a set of operations without
-> > DMA_PREP_INTERRUPT, with the final operation with DMA_PREP_INTERRUPT
-> > set.
-> 
-> We only allow the interrupts to be disabled in cyclic or memcpy mode. With
-> slave_sg we have interrupts as it is needed to move to the next SG.
-> 
-> > As the driver is reliant on interrupts to move to the next transfer,
-> > the patch which causes DMA_PREP_INTERRUPT to influence whether
-> > interrupts are sent is actually buggy, and will prevent several
-> > queued DMA operations to fail.
-> 
-> Yes, the omap-dma only allows the interrupts to be actually disabled when it
-> is save to do so. slave_sg can not work w/o interrupts so there we don't
-> disable them.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-I get the impression that you haven't taken in what I've said, because
-each fragment of your reply is just repeating what the previous fragment
-said.
+When calling perf_event_create_kernel_counter to create perf_event,
+assign a overflow handler. Then when the perf event overflows, set the
+corresponding bit of guest PMOVSSET register. If this counter is enabled
+and its interrupt is enabled as well, kick the vcpu to sync the
+interrupt.
 
-Let me state that I don't believe you need any hacks here, and this patch
-is not necessary: the final operation in a set of chained memcpy()s should
-have DMA_PREP_INTERRUPT set.
+On VM entry, if there is counter overflowed and interrupt level is
+changed, inject the interrupt with corresponding level. On VM exit, sync
+the interrupt level as well if it has been changed.
 
-For the periodic stuff for audio, it's irrelevant anyway: periodic
-transfers never complete - you can start them, and they continue running
-until terminated.  There's no completion.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/kvm/arm.c    |  8 ++++--
+ include/kvm/arm_pmu.h |  5 ++++
+ virt/kvm/arm/pmu.c    | 69 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 79 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dda1959..a7e50d7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -28,6 +28,7 @@
+ #include <linux/sched.h>
+ #include <linux/kvm.h>
+ #include <trace/events/kvm.h>
++#include <kvm/arm_pmu.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -577,6 +578,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * non-preemptible context.
+ 		 */
+ 		preempt_disable();
++		kvm_pmu_flush_hwstate(vcpu);
+ 		kvm_timer_flush_hwstate(vcpu);
+ 		kvm_vgic_flush_hwstate(vcpu);
+ 
+@@ -593,6 +595,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
+ 			vcpu->arch.power_off || vcpu->arch.pause) {
+ 			local_irq_enable();
++			kvm_pmu_sync_hwstate(vcpu);
+ 			kvm_timer_sync_hwstate(vcpu);
+ 			kvm_vgic_sync_hwstate(vcpu);
+ 			preempt_enable();
+@@ -642,10 +645,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+ 
+ 		/*
+-		 * We must sync the timer state before the vgic state so that
+-		 * the vgic can properly sample the updated state of the
++		 * We must sync the PMU and timer state before the vgic state so
++		 * that the vgic can properly sample the updated state of the
+ 		 * interrupt line.
+ 		 */
++		kvm_pmu_sync_hwstate(vcpu);
+ 		kvm_timer_sync_hwstate(vcpu);
+ 
+ 		kvm_vgic_sync_hwstate(vcpu);
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 8bc92d1..9c184ed 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -35,6 +35,7 @@ struct kvm_pmu {
+ 	int irq_num;
+ 	struct kvm_pmc pmc[ARMV8_PMU_MAX_COUNTERS];
+ 	bool ready;
++	bool irq_level;
+ };
+ 
+ #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
+@@ -44,6 +45,8 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
++void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+@@ -67,6 +70,8 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
++static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
++static inline void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index cda869c..74e858c 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -21,6 +21,7 @@
+ #include <linux/perf_event.h>
+ #include <asm/kvm_emulate.h>
+ #include <kvm/arm_pmu.h>
++#include <kvm/arm_vgic.h>
+ 
+ /**
+  * kvm_pmu_get_counter_value - get PMU counter value
+@@ -180,6 +181,71 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
+ 		kvm_vcpu_kick(vcpu);
+ }
+ 
++static void kvm_pmu_update_state(struct kvm_vcpu *vcpu)
++{
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	bool overflow;
++
++	if (!kvm_arm_pmu_v3_ready(vcpu))
++		return;
++
++	overflow = !!kvm_pmu_overflow_status(vcpu);
++	if (pmu->irq_level != overflow) {
++		pmu->irq_level = overflow;
++		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
++				    pmu->irq_num, overflow);
++	}
++}
++
++/**
++ * kvm_pmu_flush_hwstate - flush pmu state to cpu
++ * @vcpu: The vcpu pointer
++ *
++ * Check if the PMU has overflowed while we were running in the host, and inject
++ * an interrupt if that was the case.
++ */
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
++{
++	kvm_pmu_update_state(vcpu);
++}
++
++/**
++ * kvm_pmu_sync_hwstate - sync pmu state from cpu
++ * @vcpu: The vcpu pointer
++ *
++ * Check if the PMU has overflowed while we were running in the guest, and
++ * inject an interrupt if that was the case.
++ */
++void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
++{
++	kvm_pmu_update_state(vcpu);
++}
++
++static inline struct kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
++{
++	struct kvm_pmu *pmu;
++	struct kvm_vcpu_arch *vcpu_arch;
++
++	pmc -= pmc->idx;
++	pmu = container_of(pmc, struct kvm_pmu, pmc[0]);
++	vcpu_arch = container_of(pmu, struct kvm_vcpu_arch, pmu);
++	return container_of(vcpu_arch, struct kvm_vcpu, arch);
++}
++
++/**
++ * When perf event overflows, call kvm_pmu_overflow_set to set overflow status.
++ */
++static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
++				  struct perf_sample_data *data,
++				  struct pt_regs *regs)
++{
++	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
++	struct kvm_vcpu *vcpu = kvm_pmc_to_vcpu(pmc);
++	int idx = pmc->idx;
++
++	kvm_pmu_overflow_set(vcpu, BIT(idx));
++}
++
+ /**
+  * kvm_pmu_software_increment - do software increment
+  * @vcpu: The vcpu pointer
+@@ -291,7 +357,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 	/* The initial sample period (overflow count) of an event. */
+ 	attr.sample_period = (-counter) & pmc->bitmask;
+ 
+-	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
++	event = perf_event_create_kernel_counter(&attr, -1, current,
++						 kvm_pmu_perf_overflow, pmc);
+ 	if (IS_ERR(event)) {
+ 		pr_err_once("kvm: pmu event creation failed %ld\n",
+ 			    PTR_ERR(event));
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.0.4
