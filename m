@@ -1,70 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 13:46:27 +0100
-Subject: [PATCH 2/2] lib/mpi: use "static inline" instead of "extern inline"
-In-Reply-To: <1456490794-1034544-1-git-send-email-arnd@arndb.de>
-References: <1456490794-1034544-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456490794-1034544-2-git-send-email-arnd@arndb.de>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Fri, 26 Feb 2016 13:51:51 +0100
+Subject: [PATCH 1/2] spi: sun4i: add DMA support
+In-Reply-To: <20160226122504.GR18327@sirena.org.uk>
+References: <1456466217-6793-1-git-send-email-plaes@plaes.org>
+ <1456466217-6793-2-git-send-email-plaes@plaes.org>
+ <20160226122504.GR18327@sirena.org.uk>
+Message-ID: <CAOMqctTz=szSkpk95D_dUJjjpziCKoPv=xRczjfq2Roct-K-OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we use CONFIG_PROFILE_ALL_BRANCHES, every 'if()' introduces
-a static variable, but that is not allowed in 'extern inline'
-functions:
+Hello,
 
-mpi-inline.h:116:204: warning: '______f' is static but declared in inline function 'mpihelp_sub' which is not static
-mpi-inline.h:113:184: warning: '______f' is static but declared in inline function 'mpihelp_sub' which is not static
-mpi-inline.h:70:184: warning: '______f' is static but declared in inline function 'mpihelp_add' which is not static
-mpi-inline.h:56:204: warning: '______f' is static but declared in inline function 'mpihelp_add_1' which is not static
+On 26 February 2016 at 13:25, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Feb 26, 2016 at 07:56:56AM +0200, Priit Laes wrote:
+>> From: Emilio L?pez <emilio@elopez.com.ar>
+>>
+>> This patch adds support for 64 byte or bigger transfers on the
+>> sun4i SPI controller. Said transfers will be performed via DMA.
+>>
+>> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+>> Tested-by: Michal Suchanek <hramrach@gmail.com>
+>> Tested-by: Priit Laes <plaes@plaes.org>
+>> ---
+>
+> You *must* sign off any patches you are sending, please see
+> SubmittingPatches.
 
-This changes the MPI code to use 'static inline' instead, to get
-rid of hundreds of warnings.
+I have sent these patches in the past. Besides this non-technical
+objection there were multiple technical objections.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- lib/mpi/mpi-inline.h   | 2 +-
- lib/mpi/mpi-internal.h | 8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+IIRC one was that the driver does not handle the case when the DMA
+channels are not available. As I understand it the channels are
+exclusively reserved for a particular peripherial on sunxi platform so
+this ShoulNotHappen(tm). So it's probably fine for the driver to fail
+probe  when you have broken DT or no DMA engine support for sunxi
+platform.
 
-diff --git a/lib/mpi/mpi-inline.h b/lib/mpi/mpi-inline.h
-index e2b39852b30a..c245ea31f785 100644
---- a/lib/mpi/mpi-inline.h
-+++ b/lib/mpi/mpi-inline.h
-@@ -30,7 +30,7 @@
- #define G10_MPI_INLINE_H
- 
- #ifndef G10_MPI_INLINE_DECL
--#define G10_MPI_INLINE_DECL  extern inline
-+#define G10_MPI_INLINE_DECL  static inline
- #endif
- 
- G10_MPI_INLINE_DECL mpi_limb_t
-diff --git a/lib/mpi/mpi-internal.h b/lib/mpi/mpi-internal.h
-index c65dd1bff45a..7eceeddb3fb8 100644
---- a/lib/mpi/mpi-internal.h
-+++ b/lib/mpi/mpi-internal.h
-@@ -168,19 +168,19 @@ void mpi_rshift_limbs(MPI a, unsigned int count);
- int mpi_lshift_limbs(MPI a, unsigned int count);
- 
- /*-- mpihelp-add.c --*/
--mpi_limb_t mpihelp_add_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
-+static inline mpi_limb_t mpihelp_add_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
- 			 mpi_size_t s1_size, mpi_limb_t s2_limb);
- mpi_limb_t mpihelp_add_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
- 			 mpi_ptr_t s2_ptr, mpi_size_t size);
--mpi_limb_t mpihelp_add(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
-+static inline mpi_limb_t mpihelp_add(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
- 		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
- 
- /*-- mpihelp-sub.c --*/
--mpi_limb_t mpihelp_sub_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
-+static inline mpi_limb_t mpihelp_sub_1(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
- 			 mpi_size_t s1_size, mpi_limb_t s2_limb);
- mpi_limb_t mpihelp_sub_n(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr,
- 			 mpi_ptr_t s2_ptr, mpi_size_t size);
--mpi_limb_t mpihelp_sub(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
-+static inline mpi_limb_t mpihelp_sub(mpi_ptr_t res_ptr, mpi_ptr_t s1_ptr, mpi_size_t s1_size,
- 		       mpi_ptr_t s2_ptr, mpi_size_t s2_size);
- 
- /*-- mpihelp-cmp.c --*/
--- 
-2.7.0
+The driver could also work fully without DMA and there is a patch for
+that also but since nobody will be testing that codepath it's probably
+better to not include it.
+
+I have not addressed the other objections so far.
+
+Thanks
+
+Michal
