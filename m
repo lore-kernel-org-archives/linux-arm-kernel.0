@@ -1,142 +1,126 @@
-From: justinpopo6@gmail.com (Justin Chen)
-Date: Thu, 25 Feb 2016 16:19:07 -0800
-Subject: [PATCH] bsp: add SoC device to brcmstb
-Message-ID: <1456445947-9079-1-git-send-email-justinpopo6@gmail.com>
+From: itaru.kitayama@riken.jp (Itaru Kitayama)
+Date: Fri, 26 Feb 2016 09:23:56 +0900
+Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <20160225092427.GA31728@red-moon>
+References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160202182657.GC15706@e104818-lin.cambridge.arm.com>
+ <20160203112112.GA18387@red-moon> <20160203161834.GB26487@MBP.local>
+ <20160224141832.GA26630@red-moon> <56CE3C9E.7070505@riken.jp>
+ <20160225092427.GA31728@red-moon>
+Message-ID: <56CF9B1C.6050303@riken.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Justin Chen <justin.chen@broadcom.com>
+Hi Lorenzo,
 
-Added SoC driver at drivers/soc/brcmstb/common.c. Added two
-helper functions for getting family/product ID located at
-include/linux/soc/brcmstb/brcmstb.h.
+I have applied your latest patch on top of today's HEAD of for-next/core 
+(cac4b8cd),
+and confirmed the kernel boots fine with acpi=force. No lockdep warning 
+was seen,
+all 8 CPUs were successfully brought up.
 
-Assigned the values of soc_dev_attribute accordingly:
-family = chip family id
-soc_id = product id
-revision = product revision
+Itaru
 
-Signed-off-by: Justin Chen <justin.chen@broadcom.com>
----
- arch/arm/mach-bcm/Kconfig           |    1 +
- drivers/soc/brcmstb/common.c        |   68 +++++++++++++++++++++++++++++++++++
- include/linux/soc/brcmstb/brcmstb.h |    7 ++++
- 3 files changed, 76 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 7ef1214..b95ea11 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -179,6 +179,7 @@ config ARCH_BRCMSTB
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select SOC_BRCMSTB
-+	select SOC_BUS
- 	help
- 	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
- 	  chipset.
-diff --git a/drivers/soc/brcmstb/common.c b/drivers/soc/brcmstb/common.c
-index c262c02..dd8cb42 100644
---- a/drivers/soc/brcmstb/common.c
-+++ b/drivers/soc/brcmstb/common.c
-@@ -12,10 +12,18 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/soc/brcmstb/brcmstb.h>
-+#include <linux/sys_soc.h>
- 
- #include <soc/brcmstb/common.h>
- 
-+static u32 family_id;
-+static u32 product_id;
-+
- static const struct of_device_id brcmstb_machine_match[] = {
- 	{ .compatible = "brcm,brcmstb", },
- 	{ }
-@@ -31,3 +39,63 @@ bool soc_is_brcmstb(void)
- 
- 	return of_match_node(brcmstb_machine_match, root) != NULL;
- }
-+
-+u32 brcmstb_get_family_id(void)
-+{
-+	return family_id;
-+}
-+
-+u32 brcmstb_get_product_id(void)
-+{
-+	return product_id;
-+}
-+
-+static const struct of_device_id sun_top_ctrl_match[] = {
-+	{ .compatible = "brcm,brcmstb-sun-top-ctrl", },
-+	{ }
-+};
-+
-+static int __init brcmstb_soc_device_init(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+	struct device_node *sun_top_ctrl;
-+	void __iomem *sun_top_ctrl_base;
-+
-+	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
-+	if (!sun_top_ctrl)
-+		return -ENODEV;
-+
-+	sun_top_ctrl_base = of_iomap(sun_top_ctrl, 0);
-+	if (!sun_top_ctrl_base)
-+		return -ENODEV;
-+
-+	family_id = readl(sun_top_ctrl_base);
-+	product_id = readl(sun_top_ctrl_base + 0x4);
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENOMEM;
-+
-+	soc_dev_attr->family = kasprintf(GFP_KERNEL, "%x",
-+					family_id >> 28 ?
-+					family_id >> 16 : family_id >> 8);
-+	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%x",
-+					product_id >> 28 ?
-+					product_id >> 16 : product_id >> 8);
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c%d",
-+				    (char)(((product_id & 0xff) >> 4) + 65),
-+				     product_id & 0xf);
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->family);
-+		kfree(soc_dev_attr->soc_id);
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr);
-+		return -1;
-+	}
-+
-+	return 0;
-+}
-+arch_initcall(brcmstb_soc_device_init);
-diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
-index 337ce41..ac10b0c 100644
---- a/include/linux/soc/brcmstb/brcmstb.h
-+++ b/include/linux/soc/brcmstb/brcmstb.h
-@@ -7,4 +7,11 @@
-  */
- void brcmstb_biuctrl_init(void);
- 
-+/*
-+ * Helper functions for getting family or product id from the
-+ * SoC driver.
-+ */
-+u32 brcmstb_get_family_id(void);
-+u32 brcmstb_get_product_id(void);
-+
- #endif /* __BRCMSTB_SOC_H */
--- 
-1.7.1
+On 2/25/16 6:24 PM, Lorenzo Pieralisi wrote:
+> On Thu, Feb 25, 2016 at 08:28:30AM +0900, Itaru Kitayama wrote:
+>> Lorenzo,
+>>
+>> On Mustang the lockdep warning I reported to you is disappeared and
+>> the system gets to
+>> the prompt as you implemented, however only 7 CPUs out of 8 brought up.
+> It is because, as I mentioned in the other reply to this thread,
+> the VA should be stashed before setting up the mailboxes, patch below,
+> that should be final (I tested it on AMD Seattle too), please give it a go.
+>
+> Thanks,
+> Lorenzo
+>
+> -- >8 --
+> diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+> index 4b1e5a7..dd671ef 100644
+> --- a/arch/arm64/kernel/acpi_parking_protocol.c
+> +++ b/arch/arm64/kernel/acpi_parking_protocol.c
+> @@ -21,7 +21,14 @@
+>   
+>   #include <asm/cpu_ops.h>
+>   
+> +struct parking_protocol_mailbox {
+> +	__le32 cpu_id;
+> +	__le32 reserved;
+> +	__le64 entry_point;
+> +};
+> +
+>   struct cpu_mailbox_entry {
+> +	struct parking_protocol_mailbox __iomem *mailbox;
+>   	phys_addr_t mailbox_addr;
+>   	u8 version;
+>   	u8 gic_cpu_id;
+> @@ -59,12 +66,6 @@ static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
+>   	return 0;
+>   }
+>   
+> -struct parking_protocol_mailbox {
+> -	__le32 cpu_id;
+> -	__le32 reserved;
+> -	__le64 entry_point;
+> -};
+> -
+>   static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>   {
+>   	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> @@ -97,6 +98,12 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>   	}
+>   
+>   	/*
+> +	 * stash the mailbox address mapping to use it for further checks
+> +	 * in postboot method
+> +	 */
+> +	cpu_entry->mailbox = mailbox;
+> +
+> +	/*
+>   	 * We write the entry point and cpu id as LE regardless of the
+>   	 * native endianness of the kernel. Therefore, any boot-loaders
+>   	 * that read this address need to convert this address to the
+> @@ -107,8 +114,6 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>   
+>   	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+>   
+> -	iounmap(mailbox);
+> -
+>   	return 0;
+>   }
+>   
+> @@ -116,32 +121,15 @@ static void acpi_parking_protocol_cpu_postboot(void)
+>   {
+>   	int cpu = smp_processor_id();
+>   	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> -	struct parking_protocol_mailbox __iomem *mailbox;
+> +	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
+>   	__le64 entry_point;
+>   
+> -	/*
+> -	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
+> -	 * this deviates from the parking protocol specifications since
+> -	 * the mailboxes are required to be mapped nGnRnE; the attribute
+> -	 * discrepancy is harmless insofar as the protocol specification
+> -	 * is concerned).
+> -	 * If the mailbox is mistakenly allocated in the linear mapping
+> -	 * by FW ioremap will fail since the mapping will be prevented
+> -	 * by the kernel (it clashes with the linear mapping attributes
+> -	 * specifications).
+> -	 */
+> -	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
+> -	if (!mailbox)
+> -		return;
+> -
+>   	entry_point = readl_relaxed(&mailbox->entry_point);
+>   	/*
+>   	 * Check if firmware has cleared the entry_point as expected
+>   	 * by the protocol specification.
+>   	 */
+>   	WARN_ON(entry_point);
+> -
+> -	iounmap(mailbox);
+>   }
+>   
+>   const struct cpu_operations acpi_parking_protocol_ops = {
