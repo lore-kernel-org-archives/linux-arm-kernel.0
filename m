@@ -1,71 +1,30 @@
-From: dh.herrmann@gmail.com (David Herrmann)
-Date: Fri, 26 Feb 2016 15:07:58 +0100
-Subject: [PATCH,
- RESEND] drm: avoid uninitialized timestamp use in wait_vblank
-In-Reply-To: <1456434600-4185759-1-git-send-email-arnd@arndb.de>
-References: <1456434600-4185759-1-git-send-email-arnd@arndb.de>
-Message-ID: <CANq1E4SZTL-vZ7T7EjPeQ29W19jd9qXtrb_4paKJRgxGH73+Zg@mail.gmail.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Fri, 26 Feb 2016 15:08:52 +0100
+Subject: [PATCH bugfix] ARM: dts: imx51: remove bogus pin definition
+Message-ID: <1456495732-3233-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Pad DISPB2_SER_RS has no function DISP1_EXT_CLK.
+The definition is obviusly a copy/paste error from
+MX51_PAD_DISPB2_SER_RS__DISP1_PIN16.
 
-On Thu, Feb 25, 2016 at 10:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> gcc warns about the timestamp in drm_wait_vblank being possibly
-> used without an initialization:
->
-> drivers/gpu/drm/drm_irq.c: In function 'drm_wait_vblank':
-> drivers/gpu/drm/drm_irq.c:1755:28: warning: 'now.tv_usec' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    vblwait->reply.tval_usec = now.tv_usec;
-> drivers/gpu/drm/drm_irq.c:1754:27: warning: 'now.tv_sec' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    vblwait->reply.tval_sec = now.tv_sec;
->
-> This can happen if drm_vblank_count_and_time() returns 0 in its
-> error path. To sanitize the error case, I'm changing that function
-> to return a zero timestamp when it fails.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: e6ae8687a87b ("drm: idiot-proof vblank")
-> ---
->  drivers/gpu/drm/drm_irq.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> I'm going through the maybe-unused warnings in randconfig builds, this one is
-> apparently not a false positive, although it only happens if something
-> else has already gone wrong.
->
-> Originally sent out on Jan 13, but I received no reply, so resending now.
->
-> diff --git a/drivers/gpu/drm/drm_irq.c b/drivers/gpu/drm/drm_irq.c
-> index 881c5a6c180c..6f41ddfbe061 100644
-> --- a/drivers/gpu/drm/drm_irq.c
-> +++ b/drivers/gpu/drm/drm_irq.c
-> @@ -997,8 +997,10 @@ u32 drm_vblank_count_and_time(struct drm_device *dev, unsigned int pipe,
->         int count = DRM_TIMESTAMP_MAXRETRIES;
->         u32 cur_vblank;
->
-> -       if (WARN_ON(pipe >= dev->num_crtcs))
-> +       if (WARN_ON(pipe >= dev->num_crtcs)) {
-> +               *vblanktime = (struct timeval) { 0 };
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx51-pinfunc.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-The '0' is redundant. Anyway, this is:
-
-Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
-
-(CC: Daniel, for drm-misc)
-
-Thanks
-David
-
->                 return 0;
-> +       }
->
->         /*
->          * Vblank timestamps are read lockless. To ensure consistency the vblank
-> --
-> 2.7.0
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+diff --git a/arch/arm/boot/dts/imx51-pinfunc.h b/arch/arm/boot/dts/imx51-pinfunc.h
+index 9eb92ab..82eae3c 100644
+--- a/arch/arm/boot/dts/imx51-pinfunc.h
++++ b/arch/arm/boot/dts/imx51-pinfunc.h
+@@ -536,7 +536,6 @@
+ #define MX51_PAD_DISPB2_SER_CLK__DISP1_PIN7		0x2c4 0x6c4 0x000 0x3 0x0
+ #define MX51_PAD_DISPB2_SER_CLK__DISPB2_SER_CLK		0x2c4 0x6c4 0x000 0x0 0x0
+ #define MX51_PAD_DISPB2_SER_CLK__GPIO3_7		0x2c4 0x6c4 0x990 0x4 0x1
+-#define MX51_PAD_DISPB2_SER_RS__DISP1_EXT_CLK		0x2c8 0x6c8 0x000 0x2 0x0
+ #define MX51_PAD_DISPB2_SER_RS__DISP1_PIN16		0x2c8 0x6c8 0x000 0x2 0x0
+ #define MX51_PAD_DISPB2_SER_RS__DISP1_PIN8		0x2c8 0x6c8 0x000 0x3 0x0
+ #define MX51_PAD_DISPB2_SER_RS__DISPB2_SER_RS		0x2c8 0x6c8 0x000 0x0 0x0
+-- 
+2.1.4
