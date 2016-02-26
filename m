@@ -1,28 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 17:45:32 +0100
-Subject: [PATCH] ARM: socfpga: hide unused functions
-In-Reply-To: <56CC7947.6000909@opensource.altera.com>
-References: <1456236527-189885-1-git-send-email-arnd@arndb.de>
- <56CC7947.6000909@opensource.altera.com>
-Message-ID: <4863197.tpCxBrE0HK@wuerfel>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 26 Feb 2016 08:46:34 -0800
+Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for
+ v4.6 - part2
+In-Reply-To: <CABb+yY3cFCYZ3da4zp2UdCTMY6ubjfgMBEkMJ9pe+5OSE=p5+g@mail.gmail.com>
+References: <CADaLNDkF8_DVYWPFtGU8tYsbbxDWZF9tozW=Zs3EuV4BqO6OuA@mail.gmail.com>
+ <CABb+yY2A6bLoNqak5Y8YVLgv=mL1Cx6axnD1trMhKx646NNWFw@mail.gmail.com>
+ <CADaLNDnqRkOqam1Xt+Oc+7BXnQKr2EQqSL-1AGsn5fKOWEDnvw@mail.gmail.com>
+ <CABb+yY3cFCYZ3da4zp2UdCTMY6ubjfgMBEkMJ9pe+5OSE=p5+g@mail.gmail.com>
+Message-ID: <CADaLND=U8broQa6kZBodrnM446F_UfKKRm_Rwne91yMF33CwPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 February 2016 09:22:47 Dinh Nguyen wrote:
-> 
-> On 02/23/2016 08:08 AM, Arnd Bergmann wrote:
-> > The cpu_die and cpu_kill callbacks are only used when CONFIG_HOTPLUG_CPU
-> > is enabled, otherwise we get a warning about them:
-> > 
-> > arch/arm/mach-socfpga/platsmp.c:102:13: error: 'socfpga_cpu_die' defined but not used [-Werror=unused-function]
-> > arch/arm/mach-socfpga/platsmp.c:115:12: error: 'socfpga_cpu_kill' defined but not used [-Werror=unused-function]
-> > 
-> > This adds the appropriate #ifdef.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Fri, Feb 26, 2016 at 3:22 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Fri, Feb 26, 2016 at 2:20 PM, Duc Dang <dhdang@apm.com> wrote:
+>> On Thu, Feb 25, 2016 at 8:28 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Fri, Feb 26, 2016 at 8:21 AM, Duc Dang <dhdang@apm.com> wrote:
+>>>> Hi Arnd, Olof,
+>>>>
+>>>> This is the second part of DT changes on X-Gene platforms for v4.6,
+>>>> which enables mailbox driver for X-Gene v2 platforms and also enable
+>>>> SLIMpro Mailbox I2C driver (a client of the mailbox driver) for both
+>>>> X-Gene v1 and v2 platforms.
+>>>>
+>>>> This series depends on the 3rd patch
+>>>> (http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
+>>>> of the series "mailbox: Add APM X-Gene platform mailbox driver"
+>>>> (https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
+>>>> since Feb-15.
+>>>>
+>>>> Hi Jassi,
+>>>>
+>>>> Are you going to get the 3rd patch (dts patch) of series "mailbox: Add
+>>>> APM X-Gene platform mailbox driver" to your tree? Otherwise, I will
+>>>> need to create another pull request for Arnd and Olof.
+>>>>
+>>> Please create the pull request, I don't think mailbox tree is the
+>>> right path for the patch.
+>>
+>> Thanks for your confirmation, Jassi.
+>>
+> I overlooked I had already applied it. Not sure if its better to revert it now.
 
-Applied to next/fixes-non-critical, thanks!
+Hi Arnd and Olof,
 
-	Arnd
+Can you please advise?
+
+Regards,
+Duc Dang.
