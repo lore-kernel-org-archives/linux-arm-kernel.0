@@ -1,13 +1,13 @@
 From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 26 Feb 2016 16:41:01 -0500
-Subject: [PATCH RT 01/10] ARM: smp: Move clear_tasks_mm_cpumask() call to
+Date: Fri, 26 Feb 2016 16:39:13 -0500
+Subject: [PATCH RT 02/10] ARM: smp: Move clear_tasks_mm_cpumask() call to
  __cpu_die()
-References: <20160226214100.390136141@goodmis.org>
-Message-ID: <20160226214118.878342331@goodmis.org>
+References: <20160226213911.445523575@goodmis.org>
+Message-ID: <20160226213931.294002853@goodmis.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.10.97-rt106-rc1 stable review patch.
+3.12.54-rt73-rc1 stable review patch.
 If anyone has any objections, please let me know.
 
 ------------------
@@ -77,10 +77,10 @@ Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
  1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 5919eb451bb9..7ad24aa57040 100644
+index bd1b9e633356..2f7325963bf5 100644
 --- a/arch/arm/kernel/smp.c
 +++ b/arch/arm/kernel/smp.c
-@@ -192,8 +192,6 @@ int __cpuinit __cpu_disable(void)
+@@ -207,8 +207,6 @@ int __cpu_disable(void)
  	flush_cache_louis();
  	local_flush_tlb_all();
  
@@ -89,7 +89,7 @@ index 5919eb451bb9..7ad24aa57040 100644
  	return 0;
  }
  
-@@ -209,6 +207,9 @@ void __cpuinit __cpu_die(unsigned int cpu)
+@@ -224,6 +222,9 @@ void __cpu_die(unsigned int cpu)
  		pr_err("CPU%u: cpu didn't die\n", cpu);
  		return;
  	}
