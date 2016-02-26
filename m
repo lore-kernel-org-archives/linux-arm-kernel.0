@@ -1,29 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 26 Feb 2016 16:18:13 +0100
-Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch driver
- (ESW)
-In-Reply-To: <1456496504-50429-4-git-send-email-blogic@openwrt.org>
-References: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
- <1456496504-50429-4-git-send-email-blogic@openwrt.org>
-Message-ID: <20160226151813.GD12022@lunn.ch>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 26 Feb 2016 20:50:15 +0530
+Subject: [PATCH] cpufreq: qoriq depends on thermal
+In-Reply-To: <1456489361-469413-1-git-send-email-arnd@arndb.de>
+References: <1456489361-469413-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160226152015.GA21797@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 03:21:35PM +0100, John Crispin wrote:
-> The ESW is found in many of the old 100mbit MIPS based SoCs. it has 5
-> external ports, 1 cpu port and 1 further port that the internal HW
-> offloading engine connects to.
+On 26-02-16, 13:22, Arnd Bergmann wrote:
+> The thermal subsystem can be a loadable module, so the qoriq driver has to be
+> a module in that case as well in order to call of_cpufreq_cooling_register:
 > 
-> This driver is very basic and only provides basic init and irq support.
-> The SoC and switch core both have support for a special tag making DSA
-> support possible.
+> drivers/built-in.o: In function `qoriq_cpufreq_ready':
+> text+0x1f4548): undefined reference to `of_cpufreq_cooling_register'
+> 
+> This adds a dependency that clarifies how we can either build the driver
+> when the cpu_thermal support is completely disabled, or how it depends
+> on the thermal support to enforce the qoriq driver to be a module.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 8ae1702a0df5 ("cpufreq: qoriq: Register cooling device based on device tree")
+> ---
+>  drivers/cpufreq/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> My patch is from Dec 22, and I had marked it as submitted, but can't
+> find the email now, so maybe I forgot to send it out back then.
+> 
+> The problem still exists in linux-next, please apply the patch
+> for 4.6.
+> 
+> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> index dcb972a38fbc..ca05037dd565 100644
+> --- a/drivers/cpufreq/Kconfig
+> +++ b/drivers/cpufreq/Kconfig
+> @@ -297,6 +297,7 @@ endif
+>  config QORIQ_CPUFREQ
+>  	tristate "CPU frequency scaling driver for Freescale QorIQ SoCs"
+>  	depends on OF && COMMON_CLK && (PPC_E500MC || ARM)
+> +	depends on !CPU_THERMAL || THERMAL=y
+>  	select CLK_QORIQ
+>  	help
+>  	  This adds the CPUFreq driver support for Freescale QorIQ SoCs
 
-Hi Crispin
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-There was recently a discussion about adding switches without using
-DSA or switchdev. It was pretty much decided we would not accept such
-drivers.
-
-Sorry
-
-	Andrew
+-- 
+viresh
