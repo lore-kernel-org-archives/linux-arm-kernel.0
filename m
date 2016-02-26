@@ -1,48 +1,71 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 26 Feb 2016 11:43:42 +0800
-Subject: [PATCH v2 0/5] thermal: hisilicon: enable power allocator for Hi6220
-Message-ID: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
+Date: Fri, 26 Feb 2016 11:43:43 +0800
+Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
+In-Reply-To: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
+References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi6220 has octa-core so it has quite high power consumption when run
-benchmark and introduces high temperature for SoC. So need enable
-thermal governor to control temperature and also cannot hurt much for
-performance after impose cooling operations on CPU.
+The property "hysteresis" is mandatory for trip points, so if without
+it the thermal zone cannot register successfully. But "hysteresis" is
+ignored in the thermal subsystem and only inquired by several thermal
+sensor drivers.
 
-This patch series is to enable power allocator for Hi6220. Patch 1 is to
-change "hysteresis" as optional property for trip points, so when enable
-power allocator governor we can ignore this property.
+So change "hysteresis" as optional properties.
 
-During profiling also found two issues for thermal sensor's driver. The
-power allocator just uses only one sensor, so patch 2 is to fix sensor
-driver to let it can initialize driver successfully with only enabling
-one sensor; patch 3 is to dismiss warning of IRQ imbalance enabling.
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ Documentation/devicetree/bindings/thermal/thermal.txt | 9 +++++----
+ drivers/thermal/of-thermal.c                          | 9 ++++-----
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-After profiling on Hikey, the power model has been simplized with only
-dynamic coefficient, and now it's convienence to pass it from CPU node.
-So patch 4 and 5 bind sensor and pass power model parameters.
-
-This patch series have been tested on 96boards Hikey.
-
-Changes from v1:
-* According to Javi's review, removed unecessary properties for DT
-* Add patch 1 for change "hysteresis" as optional property
-* Add patch 3 to fix IRQ imbalance enabling issue
-
-
-Leo Yan (5):
-  thermal: change "hysteresis" as optional property
-  thermal: hisilicon: support to use any sensor
-  thermal: hisilicon: fix IRQ imbalance enabling
-  arm64: dts: register Hi6220's thermal sensor
-  arm64: dts: register Hi6220's thermal zone for power allocator
-
- .../devicetree/bindings/thermal/thermal.txt        |  9 ++---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 42 ++++++++++++++++++++++
- drivers/thermal/hisi_thermal.c                     | 40 ++++++++++++---------
- drivers/thermal/of-thermal.c                       |  9 +++--
- 4 files changed, 75 insertions(+), 25 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
+index 41b817f..7d79e77 100644
+--- a/Documentation/devicetree/bindings/thermal/thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/thermal.txt
+@@ -89,10 +89,6 @@ Required properties:
+   Type: signed		in millicelsius.
+   Size: one cell
+ 
+-- hysteresis:		A low hysteresis value on temperature property (above).
+-  Type: unsigned	This is a relative value, in millicelsius.
+-  Size: one cell
+-
+ - type:			a string containing the trip type. Expected values are:
+ 	"active":	A trip point to enable active cooling
+ 	"passive":	A trip point to enable passive cooling
+@@ -100,6 +96,11 @@ Required properties:
+ 	"critical":	Hardware not reliable.
+   Type: string
+ 
++Optional properties:
++- hysteresis:		A low hysteresis value on temperature property (above).
++  Type: unsigned	This is a relative value, in millicelsius.
++  Size: one cell
++
+ * Cooling device maps
+ 
+ The cooling device maps node is a node to describe how cooling devices
+diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+index 9043f8f..ab05500 100644
+--- a/drivers/thermal/of-thermal.c
++++ b/drivers/thermal/of-thermal.c
+@@ -689,11 +689,10 @@ static int thermal_of_populate_trip(struct device_node *np,
+ 	trip->temperature = prop;
+ 
+ 	ret = of_property_read_u32(np, "hysteresis", &prop);
+-	if (ret < 0) {
+-		pr_err("missing hysteresis property\n");
+-		return ret;
+-	}
+-	trip->hysteresis = prop;
++	if (ret < 0)
++		pr_warning("missing hysteresis property\n");
++	else
++		trip->hysteresis = prop;
+ 
+ 	ret = thermal_of_get_trip_type(np, &trip->type);
+ 	if (ret < 0) {
 -- 
 1.9.1
