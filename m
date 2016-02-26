@@ -1,103 +1,78 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 26 Feb 2016 16:39:13 -0500
-Subject: [PATCH RT 02/10] ARM: smp: Move clear_tasks_mm_cpumask() call to
- __cpu_die()
-References: <20160226213911.445523575@goodmis.org>
-Message-ID: <20160226213931.294002853@goodmis.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 26 Feb 2016 23:22:03 +0100
+Subject: [PATCH v2] dmaengine: pxa_dma: fix cyclic transfers
+In-Reply-To: <1455659642-7746-1-git-send-email-robert.jarzmik@free.fr> (Robert
+ Jarzmik's message of "Tue, 16 Feb 2016 22:54:02 +0100")
+References: <1455659642-7746-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87a8mnun78.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.12.54-rt73-rc1 stable review patch.
-If anyone has any objections, please let me know.
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-------------------
+> While testing audio with pxa2xx-ac97, underrun were happening while the
+> user application was correctly feeding the music. Debug proved that the
+> cyclic transfer is not cyclic, ie. the last descriptor did not loop on
+> the first.
+>
+> Another issue is that the descriptor length was always set to 8192,
+> because of an trivial operator issue.
+>
+> This was tested on a pxa27x platform.
+>
+> Fixes: a57e16cf0333 ("dmaengine: pxa: add pxa dmaengine driver")
+> Reported-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Since v1: add the mask fix suggested by Vasily
+Hi Vinod,
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Could you consider this patch, it's a fix and I'd like to have it reviewed.
 
-When running with the RT-kernel (4.1.5-rt5) on TI OMAP dra7-evm and trying
-to do Suspend to RAM, the following backtrace occurs:
+Cheers.
 
- Disabling non-boot CPUs ...
- PM: noirq suspend of devices complete after 7.295 msecs
- Disabling non-boot CPUs ...
- BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
- in_atomic(): 1, irqs_disabled(): 128, pid: 18, name: migration/1
- INFO: lockdep is turned off.
- irq event stamp: 122
- hardirqs last  enabled at (121): [<c06ac0ac>] _raw_spin_unlock_irqrestore+0x88/0x90
- hardirqs last disabled at (122): [<c06abed0>] _raw_spin_lock_irq+0x28/0x5c
- softirqs last  enabled at (0): [<c003d294>] copy_process.part.52+0x410/0x19d8
- softirqs last disabled at (0): [<  (null)>]   (null)
- Preemption disabled at:[<  (null)>]   (null)
-  CPU: 1 PID: 18 Comm: migration/1 Tainted: G        W       4.1.4-rt3-01046-g96ac8da #204
- Hardware name: Generic DRA74X (Flattened Device Tree)
- [<c0019134>] (unwind_backtrace) from [<c0014774>] (show_stack+0x20/0x24)
- [<c0014774>] (show_stack) from [<c06a70f4>] (dump_stack+0x88/0xdc)
- [<c06a70f4>] (dump_stack) from [<c006cab8>] (___might_sleep+0x198/0x2a8)
- [<c006cab8>] (___might_sleep) from [<c06ac4dc>] (rt_spin_lock+0x30/0x70)
- [<c06ac4dc>] (rt_spin_lock) from [<c013f790>] (find_lock_task_mm+0x9c/0x174)
- [<c013f790>] (find_lock_task_mm) from [<c00409ac>] (clear_tasks_mm_cpumask+0xb4/0x1ac)
- [<c00409ac>] (clear_tasks_mm_cpumask) from [<c00166a4>] (__cpu_disable+0x98/0xbc)
- [<c00166a4>] (__cpu_disable) from [<c06a2e8c>] (take_cpu_down+0x1c/0x50)
- [<c06a2e8c>] (take_cpu_down) from [<c00f2600>] (multi_cpu_stop+0x11c/0x158)
- [<c00f2600>] (multi_cpu_stop) from [<c00f2a9c>] (cpu_stopper_thread+0xc4/0x184)
- [<c00f2a9c>] (cpu_stopper_thread) from [<c0069058>] (smpboot_thread_fn+0x18c/0x324)
- [<c0069058>] (smpboot_thread_fn) from [<c00649c4>] (kthread+0xe8/0x104)
- [<c00649c4>] (kthread) from [<c0010058>] (ret_from_fork+0x14/0x3c)
- CPU1: shutdown
- PM: Calling sched_clock_suspend+0x0/0x40
- PM: Calling timekeeping_suspend+0x0/0x2e0
- PM: Calling irq_gc_suspend+0x0/0x68
- PM: Calling fw_suspend+0x0/0x2c
- PM: Calling cpu_pm_suspend+0x0/0x28
+--
+Robert
 
-Also, sometimes system stucks right after displaying "Disabling non-boot
-CPUs ...". The root cause of above backtrace is task_lock() which takes
-a sleeping lock on -RT.
+[1] The patch on cyclic transfers
+> ---
+>  drivers/dma/pxa_dma.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+> index 8ab4a53e5660..77c1c44009d8 100644
+> --- a/drivers/dma/pxa_dma.c
+> +++ b/drivers/dma/pxa_dma.c
+> @@ -586,6 +586,8 @@ static void set_updater_desc(struct pxad_desc_sw *sw_desc,
+>  		(PXA_DCMD_LENGTH & sizeof(u32));
+>  	if (flags & DMA_PREP_INTERRUPT)
+>  		updater->dcmd |= PXA_DCMD_ENDIRQEN;
+> +	if (sw_desc->cyclic)
+> +		sw_desc->hw_desc[sw_desc->nb_desc - 2]->ddadr = sw_desc->first;
+>  }
+>  
+>  static bool is_desc_completed(struct virt_dma_desc *vd)
+> @@ -676,6 +678,10 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
+>  		dev_dbg(&chan->vc.chan.dev->device,
+>  			"%s(): checking txd %p[%x]: completed=%d\n",
+>  			__func__, vd, vd->tx.cookie, is_desc_completed(vd));
+> +		if (to_pxad_sw_desc(vd)->cyclic) {
+> +			vchan_cyclic_callback(vd);
+> +			break;
+> +		}
+>  		if (is_desc_completed(vd)) {
+>  			list_del(&vd->node);
+>  			vchan_cookie_complete(vd);
+> @@ -1084,7 +1090,7 @@ pxad_prep_dma_cyclic(struct dma_chan *dchan,
+>  		return NULL;
+>  
+>  	pxad_get_config(chan, dir, &dcmd, &dsadr, &dtadr);
+> -	dcmd |= PXA_DCMD_ENDIRQEN | (PXA_DCMD_LENGTH | period_len);
+> +	dcmd |= PXA_DCMD_ENDIRQEN | (PXA_DCMD_LENGTH & period_len);
+>  	dev_dbg(&chan->vc.chan.dev->device,
+>  		"%s(): buf_addr=0x%lx len=%zu period=%zu dir=%d flags=%lx\n",
+>  		__func__, (unsigned long)buf_addr, len, period_len, dir, flags);
 
-To fix the issue, move clear_tasks_mm_cpumask() call from __cpu_disable()
-to __cpu_die() which is called on the thread which is asking for a target
-CPU to be shutdown. In addition, this change restores CPUhotplug functionality
-on TI OMAP dra7-evm and CPU1 can be unplugged/plugged many times.
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Austin Schuh <austin@peloton-tech.com>
-Cc: <philipp@peloton-tech.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: <bigeasy@linutronix.de>
-Cc: stable-rt at vger.kernel.org
-Link: http://lkml.kernel.org/r/1441995683-30817-1-git-send-email-grygorii.strashko at ti.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
----
- arch/arm/kernel/smp.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index bd1b9e633356..2f7325963bf5 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -207,8 +207,6 @@ int __cpu_disable(void)
- 	flush_cache_louis();
- 	local_flush_tlb_all();
- 
--	clear_tasks_mm_cpumask(cpu);
--
- 	return 0;
- }
- 
-@@ -224,6 +222,9 @@ void __cpu_die(unsigned int cpu)
- 		pr_err("CPU%u: cpu didn't die\n", cpu);
- 		return;
- 	}
-+
-+	clear_tasks_mm_cpumask(cpu);
-+
- 	printk(KERN_NOTICE "CPU%u: shutdown\n", cpu);
- 
- 	/*
 -- 
-2.7.0
+Robert
