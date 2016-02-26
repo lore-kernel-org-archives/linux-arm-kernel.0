@@ -1,143 +1,96 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 26 Feb 2016 19:19:45 +0100 (CET)
-Subject: [RFC v4 09/14] msi: IOMMU map the doorbell address when needed
-In-Reply-To: <1456508154-2253-10-git-send-email-eric.auger@linaro.org>
-References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
- <1456508154-2253-10-git-send-email-eric.auger@linaro.org>
-Message-ID: <alpine.DEB.2.11.1602261907050.3638@nanos>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 26 Feb 2016 10:24:19 -0800
+Subject: [RFC v2 04/12] ARM: cpuidle: Add runtime PM support for CPUs
+In-Reply-To: <1455310238-8963-5-git-send-email-lina.iyer@linaro.org>
+References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+ <1455310238-8963-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20160226182419.GV28849@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Feb 2016, Eric Auger wrote:
-> +static int msi_map_doorbell(struct iommu_domain *d, struct msi_msg *msg)
+On 02/12, Lina Iyer wrote:
+> @@ -45,6 +48,8 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+>  
+>  	ret = cpu_pm_enter();
+>  	if (!ret) {
+> +		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
+
+Can you add a comment on why we need to use RCU_NONIDLE here?
+It's not super obvious.
+
+> +
+>  		/*
+>  		 * Pass idle state index to cpu_suspend which in turn will
+>  		 * call the CPU ops suspend protocol with idle index as a
+> @@ -52,6 +57,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+>  		 */
+>  		arm_cpuidle_suspend(idx);
+>  
+> +		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
+>  		cpu_pm_exit();
+>  	}
+>  
+> @@ -84,6 +90,30 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
+>  	{ },
+>  };
+>  
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +static int cpu_hotplug(struct notifier_block *nb,
+
+This function is pretty generically named. Maybe something more
+runtime PM specific or cpu idle specific?
+
+> +			unsigned long action, void *data)
 > +{
-> +#ifdef CONFIG_IOMMU_DMA_RESERVED
-> +	dma_addr_t iova;
-> +	phys_addr_t addr;
-> +	int ret;
+> +	struct device *cpu_dev = get_cpu_device(smp_processor_id());
 > +
-> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
-> +	addr = ((phys_addr_t)(msg->address_hi) << 32) | msg->address_lo;
-> +#else
-> +	addr = msg->address_lo;
-> +#endif
-> +
-> +	ret = iommu_get_single_reserved(d, addr, IOMMU_WRITE, &iova);
-> +	if (!ret) {
-> +		msg->address_lo = lower_32_bits(iova);
-> +		msg->address_hi = upper_32_bits(iova);
+> +	/* Execute CPU runtime PM on that CPU */
+> +	switch (action) {
+
+We could do the & ~CPU_TASKS_FROZEN trick here to save a few cases.
+
+> +	case CPU_DYING:
+> +	case CPU_DYING_FROZEN:
+> +		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
+
+And do we actually need to use it for hotplug path? These
+notifiers don't run from idle context do they?
+
+> +		break;
+> +	case CPU_STARTING:
+> +	case CPU_STARTING_FROZEN:
+> +		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
+> +		break;
+> +	default:
+> +		break;
 > +	}
-> +	return ret;
-> +#else
-> +	return -ENODEV;
-> +#endif
-
-This is completely unreadable. Please make this in a way which is parseable.
-A few small inline functions do the trick.
-
-> +static void msi_unmap_doorbell(struct iommu_domain *d, struct msi_msg *msg)
-> +{
-> +#ifdef CONFIG_IOMMU_DMA_RESERVED
-> +	dma_addr_t iova;
 > +
-> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-> +	iova = ((dma_addr_t)(msg->address_hi) << 32) | msg->address_lo;
-> +#else
-> +	iova = msg->address_lo;
+> +	return NOTIFY_OK;
+> +}
 > +#endif
 > +
-> +	iommu_put_single_reserved(d, iova);
-> +#endif
+>  /*
+>   * arm_idle_init
+>   *
+> @@ -96,6 +126,7 @@ static int __init arm_idle_init(void)
+>  	int cpu, ret;
+>  	struct cpuidle_driver *drv = &arm_idle_driver;
+>  	struct cpuidle_device *dev;
+> +	struct device *cpu_dev;
+>  
+>  	/*
+>  	 * Initialize idle states data, starting at index 1.
+> @@ -148,10 +189,17 @@ static int __init arm_idle_init(void)
+>  		}
+>  	}
+>  
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	/* Register for hotplug notifications for runtime PM */
+> +	hotcpu_notifier(cpu_hotplug, 0);
 
-Ditto.
+Define an empty cpu_hotplug() function for !CONFIG_HOTPLUG_CPU
+and then always call this without the ifdef?
 
-> +}
-> +
-> +#ifdef CONFIG_IOMMU_API
-> +static struct iommu_domain *
-> +	irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
-
-If you split lines, then the function name starts at the beginning of the line
-and not at some randome place.
-
-> +{
-> +
-> +	struct msi_desc *desc;
-> +	struct device *dev;
-> +	struct iommu_domain *d;
-> +	int ret;
-
-Please order variables by descending length
-
-> +	desc = irq_data_get_msi_desc(irq_data);
-> +	if (!desc)
-> +		return NULL;
-> +
-> +	dev = msi_desc_to_dev(desc);
-> +
-> +	d = iommu_get_domain_for_dev(dev);
-> +	if (!d)
-> +		return NULL;
-> +
-> +	ret = iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_MAPPING, NULL);
-> +	if (!ret)
-> +		return d;
-> +	else
-> +		return NULL;
-
-Does anyone except you understand the purpose of the function? Comments have
-been invented for a reason.
-
-> +}
-> +#else
-> +static inline iommu_domain *
-> +		irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
-> +{
-> +	return NULL;
-> +}
-> +#endif /* CONFIG_IOMMU_API */
-> +
-> +static int msi_compose(struct irq_data *irq_data,
-> +		       struct msi_msg *msg, bool erase)
-> +{
-> +	struct msi_msg old_msg;
-> +	struct iommu_domain *d;
-> +	int ret = 0;
-> +
-> +	d = irq_data_to_msi_mapping_domain(irq_data);
-> +	if (unlikely(d))
-> +		get_cached_msi_msg(irq_data->irq, &old_msg);
-> +
-> +	if (erase)
-> +		memset(msg, 0, sizeof(*msg));
-> +	else
-> +		ret = irq_chip_compose_msi_msg(irq_data, msg);
-> +
-> +	if (!d)
-> +		goto out;
-> +
-> +	/* handle (re-)mapping of MSI doorbell */
-> +	if ((old_msg.address_lo != msg->address_lo) ||
-> +	    (old_msg.address_hi != msg->address_hi))
-> +		msi_unmap_doorbell(d, &old_msg);
-> +
-> +	if (!erase)
-> +		WARN_ON(msi_map_doorbell(d, msg));
-> +
-> +out:
-> +	return ret;
-> +}
-
-No, this is not the way we do this. You replace existing functionality by some
-new fangled thing. which behaves differently.
-
-This wants to be seperate patches, which first create a wrapper for
-irq_chip_compose_msi_msg() and then adds the new functionality to it including
-a proper explanation.
-
-I have no idea how the above is supposed to be the same as the existing code
-for the non iommu case.
-
-Thanks,
-
-	tglx
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
