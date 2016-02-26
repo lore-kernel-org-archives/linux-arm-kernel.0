@@ -1,65 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 19:33:25 +0100
-Subject: [PATCH v3 07/52] mtd: nand: core: use mtd_ooblayout_xxx()
- helpers where appropriate
-In-Reply-To: <56D06C88.9080608@imgtec.com>
-References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
- <1456448280-27788-8-git-send-email-boris.brezillon@free-electrons.com>
- <56D0629C.9080805@imgtec.com> <20160226161054.3477cd4b@bbrezillon>
- <56D06C88.9080608@imgtec.com>
-Message-ID: <20160226193325.2d84a8c8@bbrezillon>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 26 Feb 2016 10:34:31 -0800
+Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch driver
+ (ESW)
+In-Reply-To: <56D06E3F.1020100@openwrt.org>
+References: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
+ <1456496504-50429-4-git-send-email-blogic@openwrt.org>
+ <20160226151813.GD12022@lunn.ch> <56D06E3F.1020100@openwrt.org>
+Message-ID: <56D09AB7.3000203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harvey,
-
-On Fri, 26 Feb 2016 15:17:28 +0000
-Harvey Hunt <harvey.hunt@imgtec.com> wrote:
-
-> Hi Boris,
+On 26/02/16 07:24, John Crispin wrote:
 > 
-> On 26/02/16 15:10, Boris Brezillon wrote:
-> > Hi Harvey,
-> >
-> > On Fri, 26 Feb 2016 14:35:08 +0000
-> > Harvey Hunt <harvey.hunt@imgtec.com> wrote:
-> >
-> >> [...]
-> >> I'll look into this more later today, but wanted to run it by you in
-> >> case you have any thoughts.
-> >
-> > Can you apply this patch [1], and let me know if you see the additional
-> > trace?
+> Hi,
 > 
-> I applied the patch, the following is the (unchanged) output:
+> would the series be ok if we just dropped those parts and then have a
+> driver in the kernel that wont do much with the out of tree patches ?
 > 
-> [    0.256375] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0x88
-> [    0.262887] nand: Micron MT29F64G08CBAAAWP
-> [    0.266995] nand: 8192 MiB, MLC, erase size: 2048 KiB, page size: 
-> 8192, OOB size: 448
-> [    0.274881] jz4780-nand 1b000000.nand-controller: using hardware BCH 
-> (strength 24, size 1024, bytes 42)
-> [    0.289046] Bad block table not found for chip 0
-> [    0.297769] Bad block table not found for chip 0
-> [    0.302425] Scanning device for bad blocks
-> [    0.320239] Bad eraseblock 90 at 0x00000b400000
-> [    0.324934] Bad eraseblock 91 at 0x00000b600000
-> [    0.931054] Bad eraseblock 4092 at 0x0001ff800000
-> [    0.935917] Bad eraseblock 4093 at 0x0001ffa00000
-> [    0.944660] nand_bbt: error while writing bad block table -34
-> [    0.950448] jz4780-nand: probe of 1b000000.nand-controller failed 
-> with error -34
-> [    0.958079] UBI error: cannot open mtd 3, error -19
-> [    0.962788] UBI error: cannot open mtd 4, error -19[    0.970229] 
-> clk: Not disabling unused clocks
-> 
+> the problem here is that on one side people complain about vendors not
+> sending code upstream. once they start being a good citizen and provide
+> funding to send stuff upstream the feedback tends to be very bad as seen
+> here.
 
-Can you test with this one [1]?
+I agree with David here, the feedback from Andrew is very constructive,
+you just don't like the feedback you are being given, which is a
+different thing. You can't always get a 12 series patches adding a new
+driver accepted after second try, look at all the recent submissions
+that occured, it took 5-6-7 maybe more submissions until things were in
+a shape where they could be merged. If for your next submission you get
+the feedback that switchdev/DSA is deprecated, and something new needs
+to be used, then I would agree that feedback is not acceptable, I doubt
+this will be the case unless we wait another 10 years to get these
+patches out.
 
-[1]http://code.bulix.org/36oytz-91960
+> we are planning on doing a DSA driver but one step at a time. this
+> kind of feedback will inevitably lead to vendors doing second thoughts
+> of upstream contributions.
 
-
+If you are planning on a DSA driver, which sounds like a good plan, then
+maybe drop the integrated switch parts for now, keep it as a local set
+of patches for your testing, and just get the basic CPU Ethernet MAC
+driver to work for data movement, so that part gets in, and later on,
+when your DSA driver is ready, that's one less thing to take care of.
+They ultimately are logically spearated drivers if you use DSA, a little
+less if you use switchdev.
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Florian
