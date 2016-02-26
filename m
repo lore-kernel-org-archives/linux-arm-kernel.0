@@ -1,34 +1,24 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Fri, 26 Feb 2016 09:22:29 +0100
-Subject: [RFC v1] clk: Add debugfs nodes for
- enable/disable/set-rate/set-parent
-In-Reply-To: <8B5B4FB66A982549A83D90C7791B761007F362D2E1@EAPEX1MAIL2.st.com>
- (Pankaj DEV's message of "Fri, 26 Feb 2016 16:06:48 +0800")
-References: <1456454309-25037-1-git-send-email-pankaj.dev@st.com>
- <87fuwg9bog.fsf@gmail.com>
- <8B5B4FB66A982549A83D90C7791B761007F362D2E1@EAPEX1MAIL2.st.com>
-Message-ID: <87twkvj2yi.fsf@gmail.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Fri, 26 Feb 2016 09:24:20 +0100
+Subject: [linux-sunxi] Re: [PATCH v2] ARM: dts: sun8i: Add leds and
+ switch on Orangepi Plus boards
+In-Reply-To: <201602260632.mOdfvVuL%fengguang.wu@intel.com>
+References: <20160225204234.GA31610@box2.japko.eu>
+ <201602260632.mOdfvVuL%fengguang.wu@intel.com>
+Message-ID: <20160226082420.GD25658@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pankaj DEV <pankaj.dev@st.com> writes:
+On Fri, Feb 26, 2016 at 06:54:29AM +0800, kbuild test robot wrote:
+>Hi Krzysztof,
+>
+>[auto build test ERROR on robh/for-next]
+>[also build test ERROR on v4.5-rc5 next-20160225]
 
-> The prime motive for clk_set_rate is to set new rate for a clock,
-> since the 'clk_rate' currently available, allows only reading.
-> To provide reading rate from 'clk_set_rate' is just additional feature.
+I posted this patch to early. Patches it depends on are only avaiable in 
+next-20160226, not 25. It went through Maximes tree (
+https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/ 
+sunxi/for-next). This build error can be ignored.
 
-Sure.
-
-But my point is to combine things.
-
-
-After your patch:
-
-- read via clk_rate
-- read via clk_set_rate
-- write via clk_set_rate
-
-My proposal:
-
-- read via clk_rate
-- write via clk_rate
+Best regards,
+Krzysztof Adamski
