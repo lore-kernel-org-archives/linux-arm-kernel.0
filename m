@@ -1,9 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 01:57:23 +0100
-Subject: [PATCH v3 15/52] mtd: use mtd_set_ecclayout() where appropriate
+Date: Fri, 26 Feb 2016 01:57:25 +0100
+Subject: [PATCH v3 17/52] mtd: onenand: use mtd_set_ecclayout() where
+ appropriate
 In-Reply-To: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1456448280-27788-16-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1456448280-27788-18-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,35 +13,21 @@ mtd->ecclayout field.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/mtdconcat.c | 2 +-
- drivers/mtd/mtdpart.c   | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/onenand/onenand_base.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/mtdconcat.c b/drivers/mtd/mtdconcat.c
-index 239a8c8..481565e 100644
---- a/drivers/mtd/mtdconcat.c
-+++ b/drivers/mtd/mtdconcat.c
-@@ -777,7 +777,7 @@ struct mtd_info *mtd_concat_create(struct mtd_info *subdev[],	/* subdevices to c
+diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
+index 20fdf8c..d0fa505 100644
+--- a/drivers/mtd/onenand/onenand_base.c
++++ b/drivers/mtd/onenand/onenand_base.c
+@@ -3997,7 +3997,7 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
  
- 	}
+ 	mtd->oobavail = ret;
  
--	concat->mtd.ecclayout = subdev[0]->ecclayout;
-+	mtd_set_ecclayout(&concat->mtd, subdev[0]->ecclayout);
+-	mtd->ecclayout = this->ecclayout;
++	mtd_set_ecclayout(mtd, this->ecclayout);
+ 	mtd->ecc_strength = 1;
  
- 	concat->num_subdev = num_devs;
- 	concat->mtd.name = name;
-diff --git a/drivers/mtd/mtdpart.c b/drivers/mtd/mtdpart.c
-index 08de4b2..f53d9d7 100644
---- a/drivers/mtd/mtdpart.c
-+++ b/drivers/mtd/mtdpart.c
-@@ -533,7 +533,7 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
- 			part->name);
- 	}
- 
--	slave->mtd.ecclayout = master->ecclayout;
-+	mtd_set_ecclayout(&slave->mtd, master->ecclayout);
- 	slave->mtd.ecc_step_size = master->ecc_step_size;
- 	slave->mtd.ecc_strength = master->ecc_strength;
- 	slave->mtd.bitflip_threshold = master->bitflip_threshold;
+ 	/* Fill in remaining MTD driver data */
 -- 
 2.1.4
