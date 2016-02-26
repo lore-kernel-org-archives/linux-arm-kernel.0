@@ -1,70 +1,82 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 01:57:52 +0100
-Subject: [PATCH v3 44/52] mtd: nand: s3c2410: switch to mtd_ooblayout_ops
-In-Reply-To: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1456448280-27788-45-git-send-email-boris.brezillon@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Feb 2016 01:06:58 +0000
+Subject: [PATCH] dmaengine: omap-dma: Do not call omap_dma_callback()
+ from tx_status()
+In-Reply-To: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20160226010658.GN5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing the mtd_ooblayout_ops interface is the new way of exposing
-ECC/OOB layout to MTD users.
+On Thu, Feb 25, 2016 at 10:28:59AM +0200, Peter Ujfalusi wrote:
+> When based on the CCR_ENABLE bit the channel is stopped we should not call
+> omap_dma_callback(), only change the return value to DMA_COMPLETE. Client
+> drivers will do the right thing to clean up the channel after the transfer
+> has been completed.
+> Check the CCR_ENABLE only if the channel is not paused since pause in sDMA
+> means that the channel is stopped.
+> This will fix one hard to reproduce race condition when the channel is
+> terminated during transfer (affecting cyclic operation).
+> 
+> Fixes: 1a7cf7b26f25 ("dmaengine: omap-dma: Handle cases when the channel is polled for completion")
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/omap-dma.c | 16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> index f6bef0d93998..a6b189fdbbe6 100644
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -671,18 +671,22 @@ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
+>  	struct omap_chan *c = to_omap_dma_chan(chan);
+>  	struct virt_dma_desc *vd;
+>  	enum dma_status ret;
+> -	uint32_t ccr;
+>  	unsigned long flags;
+>  
+> -	ccr = omap_dma_chan_read(c, CCR);
+> -	/* The channel is no longer active, handle the completion right away */
+> -	if (!(ccr & CCR_ENABLE))
+> -		omap_dma_callback(c->dma_ch, 0, c);
+> -
+>  	ret = dma_cookie_status(chan, cookie, txstate);
+>  	if (ret == DMA_COMPLETE || !txstate)
+>  		return ret;
+>  
+> +	if (!c->paused) {
+> +		uint32_t ccr = omap_dma_chan_read(c, CCR);
+> +		/*
+> +		 * The channel is no longer active, set the return value
+> +		 * accordingly
+> +		 */
+> +		if (!(ccr & CCR_ENABLE))
+> +			ret = DMA_COMPLETE;
+> +	}
+> +
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/s3c2410.c | 32 +++++++++++++++++++++++++++-----
- 1 file changed, 27 insertions(+), 5 deletions(-)
+This looks very much like a hack, and surely opens a race condition
+up: what happens when a request submitted and pending but not yet
+started?  If the channel is idle, requesting status will report
+that the request has completed.
 
-diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-index 9c9397b..700c097 100644
---- a/drivers/mtd/nand/s3c2410.c
-+++ b/drivers/mtd/nand/s3c2410.c
-@@ -84,11 +84,33 @@
- 
- /* new oob placement block for use with hardware ecc generation
-  */
-+static int s3c2410_ooblayout_ecc(struct mtd_info *mtd, int section,
-+				 struct mtd_oob_region *oobregion)
-+{
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = 0;
-+	oobregion->length = 3;
-+
-+	return 0;
-+}
-+
-+static int s3c2410_ooblayout_free(struct mtd_info *mtd, int section,
-+				  struct mtd_oob_region *oobregion)
-+{
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = 8;
-+	oobregion->length = 8;
-+
-+	return 0;
-+}
- 
--static struct nand_ecclayout nand_hw_eccoob = {
--	.eccbytes = 3,
--	.eccpos = {0, 1, 2},
--	.oobfree = {{8, 8}}
-+static const struct mtd_ooblayout_ops s3c2410_ooblayout_ops = {
-+	.ecc = s3c2410_ooblayout_ecc,
-+	.free = s3c2410_ooblayout_free,
- };
- 
- /* controller and mtd information */
-@@ -919,7 +941,7 @@ static void s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
- 	} else {
- 		chip->ecc.size	    = 512;
- 		chip->ecc.bytes	    = 3;
--		chip->ecc.layout    = &nand_hw_eccoob;
-+		mtd_set_ooblayout(nand_to_mtd(chip), &s3c2410_ooblayout_ops);
- 	}
- }
- 
+It's also wrong for another reason.  If txstate is NULL...
+
+Your original commit adding the original hack that you're now removing
+above says that this is to support polled operation: I'm not aware of
+DMA engine supporting such a mode.  DMA_PREP_INTERRUPT is a mechanism
+where requests can be queued without an interrupt to allow batching.
+See the raid5/async_tx code, which queues a set of operations without
+DMA_PREP_INTERRUPT, with the final operation with DMA_PREP_INTERRUPT
+set.
+
+As the driver is reliant on interrupts to move to the next transfer,
+the patch which causes DMA_PREP_INTERRUPT to influence whether
+interrupts are sent is actually buggy, and will prevent several
+queued DMA operations to fail.
+
 -- 
-2.1.4
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
