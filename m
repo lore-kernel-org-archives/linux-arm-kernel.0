@@ -1,160 +1,97 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 26 Feb 2016 16:18:29 +0900
-Subject: [PATCH 2/9] ARM: dts: uniphier: factor out ranges property of support
- card
+Date: Fri, 26 Feb 2016 16:18:28 +0900
+Subject: [PATCH 1/9] arm64: dts: uniphier: rename PH1-LD10 to PH1-LD20
 In-Reply-To: <1456471116-8140-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1456471116-8140-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1456471116-8140-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1456471116-8140-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This property is used in common by several boards.  Move it to the
-common place (uniphier-support-card.dtsi).  If necessary, each board
-can still override the property.
+Due to the company's awful projecting, this chip has been renamed to
+PH1-LD20.  It has not been shipped yet, this change would have no
+impact on our customers.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts              | 8 --------
- arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts             | 8 --------
- arch/arm/boot/dts/uniphier-support-card.dtsi            | 3 +++
- arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts | 8 --------
- 7 files changed, 3 insertions(+), 48 deletions(-)
+ arch/arm64/boot/dts/socionext/Makefile                            | 2 +-
+ .../{uniphier-ph1-ld10-ref.dts => uniphier-ph1-ld20-ref.dts}      | 8 ++++----
+ .../socionext/{uniphier-ph1-ld10.dtsi => uniphier-ph1-ld20.dtsi}  | 6 +++---
+ 3 files changed, 8 insertions(+), 8 deletions(-)
+ rename arch/arm64/boot/dts/socionext/{uniphier-ph1-ld10-ref.dts => uniphier-ph1-ld20-ref.dts} (92%)
+ rename arch/arm64/boot/dts/socionext/{uniphier-ph1-ld10.dtsi => uniphier-ph1-ld20.dtsi} (98%)
 
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-index f1e9d40..ec94b7a 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts
-@@ -72,14 +72,6 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/socionext/Makefile b/arch/arm64/boot/dts/socionext/Makefile
+index 8d72771..299b67e 100644
+--- a/arch/arm64/boot/dts/socionext/Makefile
++++ b/arch/arm64/boot/dts/socionext/Makefile
+@@ -1,4 +1,4 @@
+-dtb-$(CONFIG_ARCH_UNIPHIER) += uniphier-ph1-ld10-ref.dtb
++dtb-$(CONFIG_ARCH_UNIPHIER) += uniphier-ph1-ld20-ref.dtb
  
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 49 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-index 5baa9fc..b8134c6 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld6b-ref.dts
-@@ -74,14 +74,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 52 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-index 2462668..95f631a 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts
-@@ -74,14 +74,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 50 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-index b7a03215..acb4204 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts
-@@ -73,14 +73,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 49 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-index fc7250c..d594f40 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts
-@@ -72,14 +72,6 @@
- 	};
- };
- 
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 48 4>;
- };
-diff --git a/arch/arm/boot/dts/uniphier-support-card.dtsi b/arch/arm/boot/dts/uniphier-support-card.dtsi
-index da271e3..fa807e8 100644
---- a/arch/arm/boot/dts/uniphier-support-card.dtsi
-+++ b/arch/arm/boot/dts/uniphier-support-card.dtsi
-@@ -43,10 +43,13 @@
+ always		:= $(dtb-y)
+ clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
+similarity index 92%
+rename from arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
+rename to arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
+index 3e53317..80f71ba 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for UniPhier PH1-LD10 Reference Board
++ * Device Tree Source for UniPhier PH1-LD20 Reference Board
+  *
+  * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+@@ -43,12 +43,12 @@
   */
  
- &extbus {
-+	ranges = <1 0x00000000 0x42000000 0x02000000>;
-+
- 	support_card: support_card {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		ranges = <0x00000000 1 0x01f00000 0x00100000>;
+ /dts-v1/;
+-/include/ "uniphier-ph1-ld10.dtsi"
++/include/ "uniphier-ph1-ld20.dtsi"
+ /include/ "uniphier-support-card.dtsi"
  
- 		ethsc: ethernet at 00000000 {
- 			compatible = "smsc,lan9118", "smsc,lan9115";
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
-index 80f71ba..727ae5f 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20-ref.dts
-@@ -74,14 +74,6 @@
- 	};
- };
+ / {
+-	model = "UniPhier PH1-LD10 Reference Board";
+-	compatible = "socionext,ph1-ld10-ref", "socionext,ph1-ld10";
++	model = "UniPhier PH1-LD20 Reference Board";
++	compatible = "socionext,ph1-ld20-ref", "socionext,ph1-ld20";
  
--&extbus {
--	ranges = <1 0x00000000 0x42000000 0x02000000>;
--};
--
--&support_card {
--	ranges = <0x00000000 1 0x01f00000 0x00100000>;
--};
--
- &ethsc {
- 	interrupts = <0 48 4>;
- };
+ 	memory {
+ 		device_type = "memory";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+similarity index 98%
+rename from arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi
+rename to arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+index 0296af9..e6871ea 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for UniPhier PH1-LD10 SoC
++ * Device Tree Source for UniPhier PH1-LD20 SoC
+  *
+  * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+  *
+@@ -43,7 +43,7 @@
+  */
+ 
+ / {
+-	compatible = "socionext,ph1-ld10";
++	compatible = "socionext,ph1-ld20";
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 	interrupt-parent = <&gic>;
+@@ -262,7 +262,7 @@
+ 		};
+ 
+ 		pinctrl: pinctrl at 5f801000 {
+-			compatible = "socionext,ph1-ld10-pinctrl", "syscon";
++			compatible = "socionext,ph1-ld20-pinctrl", "syscon";
+ 			reg = <0x5f801000 0xe00>;
+ 		};
+ 
 -- 
 1.9.1
