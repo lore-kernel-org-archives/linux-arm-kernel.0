@@ -1,98 +1,21 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 26 Feb 2016 15:46:06 -0600
-Subject: [PATCH v3 5/5] cpufreq: qoriq: Don't look at clock
- implementation details
-In-Reply-To: <CADRPPNQtsMo0D7KbQtYTktLWJPiTg2bqKvuhNtcC02TSrw1GUg@mail.gmail.com>
-References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
- <3374654.Hks5DeSGVV@vostro.rjw.lan>
- <1443215827.32298.130.camel@freescale.com>
- <2148611.GEpYdTfpoR@vostro.rjw.lan>
- <CADRPPNRiU-9b5J_9+0ofk6huLCn4LPm1s_2yd=Py0eBBi9GGXg@mail.gmail.com>
- <1456510574.5360.48.camel@buserror.net>
- <CADRPPNQtsMo0D7KbQtYTktLWJPiTg2bqKvuhNtcC02TSrw1GUg@mail.gmail.com>
-Message-ID: <1456523166.5360.49.camel@buserror.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 22:49 +0100
+Subject: [GIT PULL v2] ARM: Keystone DTS for 4.6
+In-Reply-To: <1456436957-22836-1-git-send-email-ssantosh@kernel.org>
+References: <1456436957-22836-1-git-send-email-ssantosh@kernel.org>
+Message-ID: <2797842.ys4n4vaKaP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-02-26 at 15:01 -0600, Li Yang wrote:
-> On Fri, Feb 26, 2016 at 12:16 PM, Scott Wood <oss@buserror.net> wrote:
-> > On Fri, 2016-02-26 at 12:14 -0600, Li Yang wrote:
-> > > On Fri, Sep 25, 2015 at 4:50 PM, Rafael J. Wysocki <rjw@rjwysocki.net>
-> > > wrote:
-> > > > On Friday, September 25, 2015 04:17:07 PM Scott Wood wrote:
-> > > > > On Fri, 2015-09-25 at 23:42 +0200, Rafael J. Wysocki wrote:
-> > > > > > On Tuesday, September 22, 2015 12:46:54 PM Viresh Kumar wrote:
-> > > > > > > On 19-09-15, 23:29, Scott Wood wrote:
-> > > > > > > > Get the CPU clock's potential parent clocks from the clock
-> > > > > > > > interface
-> > > > > > > > itself, rather than manually parsing the clocks property to
-> > > > > > > > find a
-> > > > > > > > phandle, looking at the clock-names property of that, and
-> > > > > > > > assuming
-> > > > > > > > that
-> > > > > > > > those are valid parent clocks for the cpu clock.
-> > > > > > > > 
-> > > > > > > > This is necessary now that the clocks are generated based on
-> > > > > > > > the
-> > > > > > > > clock
-> > > > > > > > driver's knowledge of the chip rather than a fragile device
-> > > > > > > > -tree
-> > > > > > > > description of the mux options.
-> > > > > > > > 
-> > > > > > > > We can now rely on the clock driver to ensure that the mux
-> > > > > > > > only
-> > > > > > > > exposes
-> > > > > > > > options that are valid.  The cpufreq driver was currently
-> > > > > > > > being
-> > > > > > > > overly
-> > > > > > > > conservative in some cases -- for example, the "min_cpufreq =
-> > > > > > > > get_bus_freq()" restriction only applies to chips with erratum
-> > > > > > > > A-004510, and whether the freq_mask used on p5020 is needed
-> > > > > > > > depends on
-> > > > > > > > the actual frequencies of the PLLs (FWIW, p5040 has a similar
-> > > > > > > > limitation but its .freq_mask was zero) -- and the frequency
-> > > > > > > > mask
-> > > > > > > > mechanism made assumptions about particular parent clock
-> > > > > > > > indices
-> > > > > > > > that
-> > > > > > > > are no longer valid.
-> > > > > > > > 
-> > > > > > > > Signed-off-by: Scott Wood <scottwood@freescale.com>
-> > > > > > > > ---
-> > > > > > > > v3: was patch 1/5 and patch 4/5, plus blacklist e6500 and
-> > > > > > > > changes
-> > > > > > > > to clk api usage
-> > > > > > > > 
-> > > > > > > >  drivers/cpufreq/qoriq-cpufreq.c | 137 ++++++++++++-----------
-> > > > > > > > ----
-> > > > > > > > ------
-> > > > > > > > -------
-> > > > > > > >  1 file changed, 40 insertions(+), 97 deletions(-)
-> > > > > > > 
-> > > > > > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > > > > > 
-> > > > > > I'm wondering who's supposed to be merging this set?
-> > > > > 
-> > > > > As I noted in the cover letter, I'm looking for acks so that I can
-> > > > > apply
-> > > > > these to a topic branch which can be pulled through the PPC and ARM
-> > > > > trees,
-> > > > > each of which will have patches that depend on it.
-> > > > 
-> > > > OK, so no objections from the cpufreq side and you have the ACK from
-> > > > Viresh.
-> > > 
-> > > Hi Scott,
-> > > 
-> > > Did you drop this patch later?  I can not find it in 4.5-rc still.
-> > 
-> > I was asked to get an ack from Russell King patch 4/5, which this patch
-> > requires.  Despite repeated pings, I could not get a reply from Russell
-> > King.
+On Thursday 25 February 2016 13:49:17 Santosh Shilimkar wrote:
+> ARM: DTS: Add new bindings for K2G and the K2G evm
 > 
-> This patch?   I think you should try to get ACK from clock maintainers
-> instead of Russell.
+> K2G SoC family is the newest version of the Keystone family of processors.
+> 
+> The technical reference manual for K2G can be found here:
+> http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
+> 
 
-A clock maintainer was who asked me to get an ACK from Russell.
+Pulled into next/dt, thanks!
 
--Scott
+	Arnd
