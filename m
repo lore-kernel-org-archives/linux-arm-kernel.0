@@ -1,50 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 21:21:22 +0100
-Subject: [PATCH] kallsyms: ignore ARM mode switching veneers
-In-Reply-To: <1456516254-15615-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456516254-15615-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <2625557.ANpx9Yzf9D@wuerfel>
+Date: Fri, 26 Feb 2016 21:32:21 +0100
+Subject: [PATCH] bsp: add SoC device to brcmstb
+In-Reply-To: <56D09B2B.8090805@gmail.com>
+References: <1456445947-9079-1-git-send-email-justinpopo6@gmail.com>
+ <4679582.DyKPu0pJrQ@wuerfel> <56D09B2B.8090805@gmail.com>
+Message-ID: <5174855.MZxnsKaRHh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 February 2016 20:50:54 Ard Biesheuvel wrote:
-> On ARM, the linker may emit veneers to deal with relative branch
-> instructions that appear too far away from their targets. Since the second
-> kallsyms pass results in an increase of the kernel size, it may result in
-> additional veneers to be emitted, potentially affecting the output of
-> kallsyms itself if these symbols are visible to it, and for that reason,
-> symbols whose names end in '_veneer' are ignored explicitly.
+On Friday 26 February 2016 10:36:27 Florian Fainelli wrote:
+> On 26/02/16 05:58, Arnd Bergmann wrote:
+> > On Thursday 25 February 2016 16:19:07 Justin Chen wrote:
+> >>   */
+> >>  void brcmstb_biuctrl_init(void);
+> >>  
+> >> +/*
+> >> + * Helper functions for getting family or product id from the
+> >> + * SoC driver.
+> >> + */
+> >> +u32 brcmstb_get_family_id(void);
+> >> +u32 brcmstb_get_product_id(void);
+> >> +
+> >>  #endif /* __BRCMSTB_SOC_H */
+> >> -- 
+> > 
+> > Please remove the declarations from the header file and make the
+> > variable local to this file, to make sure no other driver accidentally
+> > accesses them.
 > 
-> However, when building Thumb2 kernels, such veneers are named differently
-> if they also incur a mode switch, and since they are not filtered by
-> kallsyms, they may cause the build to fail. So filter symbols whose names
-> end in '_from_arm' or '_from_thumb' as well.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> I would remove these two helper functions completely, we do not need
+> them right now in an upstream kernel, if we ever need them, we could add
+> them back, but we have no use for these two now.
 
+Ok, that sounds even better.
 
-Thanks again for debugging this!
-
-I have two (randconfig) configurations that ran into this problem, and they
-are both with your patch
-
-Tested-by: Arnd Bergmann <arnd@arndb.de>
-
->  scripts/kallsyms.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-> index 8fa81e84e295..e2379de76563 100644
-> --- a/scripts/kallsyms.c
-> +++ b/scripts/kallsyms.c
-> @@ -215,6 +215,8 @@ static int symbol_valid(struct sym_entry *s)
->  
->  	static char *special_suffixes[] = {
->  		"_veneer",		/* arm */
-> +		"_from_arm",		/* arm */
-> +		"_from_thumb",		/* arm */
->  		NULL };
->  
->  	int i;
-> 
+	Arnd
