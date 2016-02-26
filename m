@@ -1,30 +1,96 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Fri, 26 Feb 2016 14:10:20 +0800
-Subject: [PATCH v4 0/6] rockchip: power-domain: fix pm domain for support
- RK3399 SoC
-Message-ID: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
+Date: Fri, 26 Feb 2016 14:12:15 +0800
+Subject: [PATCH v4 5/6] dt/bindings: rockchip: modify document of Rockchip
+ power domains
+In-Reply-To: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
+References: <1456467026-16030-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1456467135-16115-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix some idle handling
-support sub-power domain
-add rk3399-power.h
-modify document for RK3399 Soc
-modify power domain for RK3399 SoC
+Add binding documentation for the power domains
+found on Rockchip RK3399 SoCs
 
-Elaine Zhang (6):
-  rockchip: power-domain: make idle handling optional
-  power-domain: allow domains only handling idle requests
-  rockchip: power-domain: add support for sub-power domains
-  dt/bindings: power: add RK3399 SoCs header for power-domain
-  dt/bindings: rockchip: modify document of Rockchip power domains
-  rockchip: power-domain: Modify power domain driver for rk3399
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ .../bindings/soc/rockchip/power_domain.txt         | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
- .../bindings/soc/rockchip/power_domain.txt         |  41 ++++++
- drivers/soc/rockchip/pm_domains.c                  | 138 ++++++++++++++++++++-
- include/dt-bindings/power/rk3399-power.h           |  53 ++++++++
- 3 files changed, 227 insertions(+), 5 deletions(-)
- create mode 100644 include/dt-bindings/power/rk3399-power.h
-
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 13dc6a3..9eb43fa 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -7,6 +7,7 @@ Required properties for power domain controller:
+ - compatible: Should be one of the following.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
++	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
+ - #power-domain-cells: Number of cells in a power-domain specifier.
+ 	Should be 1 for multiple PM domains.
+ - #address-cells: Should be 1.
+@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
+ - clocks (optional): phandles to clocks which need to be enabled while power domain
+ 	switches state.
+ 
+@@ -45,12 +47,45 @@ Example:
+                 };
+         };
+ 
++Example 2:
++
++	power: power-controller {
++		compatible = "rockchip,rk3399-power-controller";
++		#power-domain-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/*parent domain*/
++		pd_vio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <RK3399_PD_VIO>;
++
++			/*child domain of pd_vio*/
++			pd_vo {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <RK3399_PD_VO>;
++
++				/*child domain of pd_vo*/
++				pd_vopb {
++					reg = <RK3399_PD_VOPB>;
++				};
++
++				pd_vopl {
++					reg = <RK3399_PD_VOPL>;
++				};
++			};
++		};
++	};
++
+ Node of a device using power domains must have a power-domains property,
+ containing a phandle to the power device node and an index specifying which
+ power domain to use.
+ The index should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
+ 
+ Example of the node using power domain:
+ 
+@@ -65,3 +100,9 @@ Example of the node using power domain:
+                 power-domains = <&power RK3368_PD_GPU_1>;
+                 /* ... */
+         };
++
++	node {
++		/* ... */
++		power-domains = <&power RK3399_PD_VOPB>;
++		/* ... */
++	};
 -- 
 1.9.1
