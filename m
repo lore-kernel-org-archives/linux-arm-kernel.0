@@ -1,140 +1,52 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Fri, 26 Feb 2016 16:40:28 +0800
-Subject: [PATCH v6 11/11] arm64: dts: hisilicon: Add display subsystem DT
- nodes for hi6220
-In-Reply-To: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
-References: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <1456476028-36880-12-git-send-email-xinliang.liu@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 26 Feb 2016 09:48:30 +0100
+Subject: [PATCH v3 3/3] ARM: imx6: Fix procedure to switch the parent
+ of, LDB_DI_CLK
+In-Reply-To: <56CF5ABC.8040109@timesys.com>
+References: <56CF5ABC.8040109@timesys.com>
+Message-ID: <1456476510.3383.19.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ade, dsi and adv7533 DT nodes for hikey board.
+Hi Akshay,
 
-Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 40 +++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 55 ++++++++++++++++++++++++++
- 2 files changed, 95 insertions(+)
+Am Donnerstag, den 25.02.2016, 14:49 -0500 schrieb Akshay Bhat:
+> Hi Fabio, Phillip,
+> 
+> Philipp Zabel <p.zabel <at> pengutronix.de> writes:
+> 
+>  >
+>  > From: Fabio Estevam <fabio.estevam <at> freescale.com>
+>  >
+> 
+> <snip>
+>  > +		sel[i][2] = sel[i][3] | 4;
+>  > +
+>  > +		pr_debug("ccm: switching ldb_di0_sel: %d->%d->%d->%d\n",
+>  > +			 sel[i][0], sel[i][1], sel[i][2], sel[i][3]);
+> 
+> Change ldb_di0_sel to ldb_di%d_sel
+> 
+> <snip>
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 818525197508..40239fba0572 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -39,3 +39,43 @@
- &uart3 {
- 	label = "LS-UART1";
- };
-+
-+&ade {
-+	status = "okay";
-+};
-+
-+&dsi {
-+	status = "ok";
-+
-+	ports {
-+		/* 1 for output port */
-+		port at 1 {
-+			reg = <1>;
-+
-+			dsi_out0: endpoint at 0 {
-+				remote-endpoint = <&adv7533_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	status = "ok";
-+
-+	adv7533: adv7533 at 39 {
-+		compatible = "adi,adv7533";
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <1 2>;
-+		pd-gpio = <&gpio0 4 0>;
-+		adi,dsi-lanes = <4>;
-+
-+		port {
-+			adv7533_in: endpoint {
-+				remote-endpoint = <&dsi_out0>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index ad1f1ebcb05c..991568bb3ea1 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -162,6 +162,11 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		medianoc_ade: medianoc_ade at f4520000 {
-+			compatible = "syscon";
-+			reg = <0x0 0xf4520000 0x0 0x4000>;
-+		};
-+
- 		uart0: uart at f8015000 {	/* console */
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xf8015000 0x0 0x1000>;
-@@ -209,5 +214,55 @@
- 			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
-+
-+		ade: ade at f4100000 {
-+			compatible = "hisilicon,hi6220-ade";
-+			reg = <0x0 0xf4100000 0x0 0x7800>;
-+			reg-names = "ade_base";
-+			hisilicon,noc-syscon = <&medianoc_ade>;
-+			resets = <&media_ctrl MEDIA_ADE>;
-+			interrupts = <0 115 4>; /* ldi interrupt */
-+
-+			clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				 <&media_ctrl HI6220_CODEC_JPEG>,
-+				 <&media_ctrl HI6220_ADE_PIX_SRC>;
-+			/*clock name*/
-+			clock-names  = "clk_ade_core",
-+				       "clk_codec_jpeg",
-+				       "clk_ade_pix";
-+
-+			assigned-clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				<&media_ctrl HI6220_CODEC_JPEG>;
-+			assigned-clock-rates = <360000000>, <288000000>;
-+			dma-coherent;
-+			status = "disabled";
-+
-+			port {
-+				ade_out: endpoint {
-+					remote-endpoint = <&dsi_in>;
-+				};
-+			};
-+		};
-+
-+		dsi: dsi at f4107800 {
-+			compatible = "hisilicon,hi6220-dsi";
-+			reg = <0x0 0xf4107800 0x0 0x100>;
-+			clocks = <&media_ctrl  HI6220_DSI_PCLK>;
-+			clock-names = "pclk";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				/* 0 for input port */
-+				port at 0 {
-+					reg = <0>;
-+					dsi_in: endpoint {
-+						remote-endpoint = <&ade_out>;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
--- 
-2.7.1
+Will do.
+
+>  > +	if (sel[0][0] == sel[0][3] && sel[1][0] == sel[1][3])
+>  > +		return;
+>  > +
+>  > +	mmdc_ch1_disable(ccm_base);
+>  > +
+>  > +	for (i = 1; i < 4; i++) {
+>  > +		reg = readl_relaxed(ccm_base + CCM_CS2CDR);
+>  > +		reg &= ~((7 << CS2CDR_LDB_DI0_CLK_SEL_SHIFT) |
+>  > +			 (7 << CS2CDR_LDB_DI1_CLK_SEL_SHIFT));
+>  > +		reg |= ((sel[0][i] << CS2CDR_LDB_DI0_CLK_SEL_SHIFT) |
+>  > +			(sel[1][i] << CS2CDR_LDB_DI0_CLK_SEL_SHIFT));
+> 
+> Needs to be CS2CDR_LDB_DI1_CLK_SEL_SHIFT in the last line; otherwise the 
+> ldb_di1_clock is set to have incorrect source.
+
+Thanks for spotting this!
+
+regards
+Philipp
