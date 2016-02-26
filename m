@@ -1,51 +1,39 @@
-From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
-Date: Fri, 26 Feb 2016 15:00:35 +0000
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN external clock support
-In-Reply-To: <CAMuHMdXJRN2kF2r=bqcY8v87aYHj_OKr2=5vzcfoHwvr02Y2CA@mail.gmail.com>
-References: <1456496023-16240-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <CAMuHMdXJRN2kF2r=bqcY8v87aYHj_OKr2=5vzcfoHwvr02Y2CA@mail.gmail.com>
-Message-ID: <SG2PR06MB1038B995B4C12A01C280DFC4C3A70@SG2PR06MB1038.apcprd06.prod.outlook.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 26 Feb 2016 15:01:56 +0000
+Subject: [PATCH 2/2] arm*: efi: drop writable mapping of the UEFI System
+ table
+In-Reply-To: <1456496435-12679-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456496435-12679-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456496435-12679-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160226150156.GC7475@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-> On Fri, Feb 26, 2016 at 3:13 PM, Ramesh Shanmugasundaram
-> <ramesh.shanmugasundaram@bp.renesas.com> wrote:
-> > Adds external CAN clock node for r8a7795. This clock can be used as
-> > fCAN clock of CAN and CAN FD controller.
-> >
-> > Signed-off-by: Ramesh Shanmugasundaram
-> > <ramesh.shanmugasundaram@bp.renesas.com>
-> > ---
-> >  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > index a7315eb..5167a6c 100644
-> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > @@ -115,6 +115,13 @@
-> >                 clock-frequency = <0>;
-> >         };
-> >
-> > +       /* External CAN clock - to be overridden by boards that provide
-> it */
-> > +       can_clk: can {
-> > +               compatible = "fixed-clock";
-> > +               #clock-cells = <0>;
-> > +               clock-frequency = <0>;
+On Fri, 26 Feb, at 03:20:35PM, Ard Biesheuvel wrote:
+> Commit 2eec5dedf770 ("efi/arm-init: Use read-only early mappings")
+> updated the early ARM UEFI init code to create the temporary, early
+> mapping of the UEFI System table using read-only attributes, as a
+> hardening measure against inadvertent modification.
 > 
-> As this is an optional clock, it should have
+> However, this still leaves the permanent, writable mapping of the UEFI
+> System table, which is only ever referenced during invocations of UEFI
+> Runtime Services, at which time the UEFI virtual mapping is available,
+> which also covers the system table. (This is guaranteed by the fact that
+> SetVirtualAddressMap(), which is a runtime service itself, converts
+> various entries in the table to their virtual equivalents, which implies
+> that the table must be covered by a RuntimeServicesData region that has
+> the EFI_MEMORY_RUNTIME attribute.)
 > 
->         status = "disabled";
+> So instead of creating this permanent mapping, record the virtual address
+> of the system table inside the UEFI virtual mapping, and dereference that
+> when accessing the table. This protects the contents of the system table
+> from inadvertent (or deliberate) modification when no UEFI Runtime
+> Services calls are in progress.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/arm-init.c    |  2 ++
+>  drivers/firmware/efi/arm-runtime.c | 27 ++++++++++++++++-----------
+>  2 files changed, 18 insertions(+), 11 deletions(-)
 
-Yes, I too thought the same but the status property is not obeyed. The "disabled" clock still shows up in clk_tree and clk_xxx apis works just fine (Is this a DT bug?). Hence left the ambiguous "status". In code I use clk_get_rate(can_clk) != 0 to see if it's enabled, which seems logical.
-
-If you add this as a child of soc node, status property is obeyed. But all external clocks are defined outside soc (correctly) and I followed the same.
-
-Thanks,
-Ramesh
-
-Note: tests based on next-20160127
+Looks like a nice cleanup. Applied.
