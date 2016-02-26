@@ -1,55 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Feb 2016 09:07:40 +0900
-Subject: [PATCH 07/14] arm64: dts: r8a7795: Add GIC-400 virtual interfaces
+Date: Fri, 26 Feb 2016 09:07:41 +0900
+Subject: [PATCH 08/14] arm64: dts: r8a7795: Add SDHI support to dtsi
 In-Reply-To: <cover.1456445161.git.horms+renesas@verge.net.au>
 References: <cover.1456445161.git.horms+renesas@verge.net.au>
-Message-ID: <4c811edf65e809e6ac6ec35f4818efba2b1c6163.1456445161.git.horms+renesas@verge.net.au>
+Message-ID: <d9d67010e0c699c838ac84245ec6d8651420d337.1456445161.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dirk Behme <dirk.behme@de.bosch.com>
+From: Ai Kyuse <ai.kyuse.uw@renesas.com>
 
-Besides the distributor and the CPU interface the GIC-400 additionally
-supports the virtual interface control blocks and the virtual CPU interfaces.
-
-Add the physical base addresses and size for these.
-
-See
-
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/index.html
--> 3.2. GIC-400 register map
-
-and Linux kernel's
-
-Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-
-for more details.
-
-For the at GICH Virtual interface control blocks at 0xf1040000 cover the
-whole 128kB (0x20000) range. This is done based on the advice from Marc
-Zyngier http://www.spinics.net/lists/arm-kernel/msg483139.html
-
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Ai Kyuse <ai.kyuse.uw@renesas.com>
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+[wsa: squashed some fixes and added mmc-caps]
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 38 ++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 6da8f79f10df..1072c681f8b4 100644
+index 1072c681f8b4..c2bffd160c18 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -137,7 +137,9 @@
- 			#address-cells = <0>;
- 			interrupt-controller;
- 			reg = <0x0 0xf1010000 0 0x1000>,
--			      <0x0 0xf1020000 0 0x2000>;
-+			      <0x0 0xf1020000 0 0x2000>,
-+			      <0x0 0xf1040000 0 0x20000>,
-+			      <0x0 0xf1060000 0 0x2000>;
- 			interrupts = <GIC_PPI 9
- 					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+@@ -985,5 +985,43 @@
+ 			#dma-cells = <1>;
+ 			dma-channels = <2>;
  		};
++
++		sdhi0: sd at ee100000 {
++			compatible = "renesas,sdhi-r8a7795";
++			reg = <0 0xee100000 0 0x2000>;
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			power-domains = <&cpg>;
++			status = "disabled";
++		};
++
++		sdhi1: sd at ee120000 {
++			compatible = "renesas,sdhi-r8a7795";
++			reg = <0 0xee120000 0 0x2000>;
++			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 313>;
++			power-domains = <&cpg>;
++			status = "disabled";
++		};
++
++		sdhi2: sd at ee140000 {
++			compatible = "renesas,sdhi-r8a7795";
++			reg = <0 0xee140000 0 0x2000>;
++			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 312>;
++			power-domains = <&cpg>;
++			cap-mmc-highspeed;
++			status = "disabled";
++		};
++
++		sdhi3: sd at ee160000 {
++			compatible = "renesas,sdhi-r8a7795";
++			reg = <0 0xee160000 0 0x2000>;
++			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 311>;
++			power-domains = <&cpg>;
++			cap-mmc-highspeed;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 2.7.0.rc3.207.g0ac5344
