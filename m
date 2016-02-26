@@ -1,41 +1,79 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 26 Feb 2016 15:26:06 +0100
-Subject: [GIT PULL] ARM: mvebu: soc for v4.6 (#1)
-Message-ID: <87egbzo8e9.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 15:29:05 +0100
+Subject: [PATCH] asm-generic: remove old nonatomic-io wrapper files
+Message-ID: <1456496980-1852604-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The two header files got moved to include/linux, and most
+users were already converted, this changes the remaining drivers
+and removes the files.
 
-Here is the first pull request for soc for mvebu for v4.6.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/dma/idma64.h                                | 2 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c | 2 +-
+ drivers/net/ethernet/netronome/nfp/nfp_net.h        | 2 +-
+ include/asm-generic/io-64-nonatomic-hi-lo.h         | 2 --
+ include/asm-generic/io-64-nonatomic-lo-hi.h         | 2 --
+ 5 files changed, 3 insertions(+), 7 deletions(-)
+ delete mode 100644 include/asm-generic/io-64-nonatomic-hi-lo.h
+ delete mode 100644 include/asm-generic/io-64-nonatomic-lo-hi.h
 
-Gregory
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.6-1
-
-for you to fetch changes up to 60f23952317a34e8d41c22a6058dcb7bdaf91b96:
-
-  ARM: mvebu: mark mvebu_hwcc_pci_nb as __maybe_unused (2016-02-25 15:39:20 +0100)
-
-----------------------------------------------------------------
-mvebu soc for 4.6 (part 1)
-
-randconfig warning fixes for mvebu SoCs
-
-----------------------------------------------------------------
-Arnd Bergmann (3):
-      ARM: orion: only select I2C_BOARDINFO when using I2C
-      ARM: mv78xx0: avoid unused function warning
-      ARM: mvebu: mark mvebu_hwcc_pci_nb as __maybe_unused
-
- arch/arm/mach-dove/Kconfig      |  2 +-
- arch/arm/mach-mv78xx0/common.c  |  5 ++---
- arch/arm/mach-mvebu/coherency.c |  2 +-
- arch/arm/mach-orion5x/Kconfig   | 18 +++++++++---------
- 4 files changed, 13 insertions(+), 14 deletions(-)
+diff --git a/drivers/dma/idma64.h b/drivers/dma/idma64.h
+index 8423f13ed0da..a52ad6bcf86a 100644
+--- a/drivers/dma/idma64.h
++++ b/drivers/dma/idma64.h
+@@ -16,7 +16,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
+ 
+-#include <asm-generic/io-64-nonatomic-lo-hi.h>
++#include <linux/io-64-nonatomic-lo-hi.h>
+ 
+ #include "virt-dma.h"
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
+index 802d55457f19..fd90f3737963 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
+@@ -7,7 +7,7 @@
+  * (at your option) any later version.
+  */
+ 
+-#include <asm-generic/io-64-nonatomic-hi-lo.h>
++#include <linux/io-64-nonatomic-hi-lo.h>
+ #include <linux/of_mdio.h>
+ #include "hns_dsaf_main.h"
+ #include "hns_dsaf_mac.h"
+diff --git a/drivers/net/ethernet/netronome/nfp/nfp_net.h b/drivers/net/ethernet/netronome/nfp/nfp_net.h
+index ab264e1bccd0..75683fb26734 100644
+--- a/drivers/net/ethernet/netronome/nfp/nfp_net.h
++++ b/drivers/net/ethernet/netronome/nfp/nfp_net.h
+@@ -45,7 +45,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/netdevice.h>
+ #include <linux/pci.h>
+-#include <asm-generic/io-64-nonatomic-hi-lo.h>
++#include <linux/io-64-nonatomic-hi-lo.h>
+ 
+ #include "nfp_net_ctrl.h"
+ 
+diff --git a/include/asm-generic/io-64-nonatomic-hi-lo.h b/include/asm-generic/io-64-nonatomic-hi-lo.h
+deleted file mode 100644
+index 32b73abce1b0..000000000000
+--- a/include/asm-generic/io-64-nonatomic-hi-lo.h
++++ /dev/null
+@@ -1,2 +0,0 @@
+-/* XXX: delete asm-generic/io-64-nonatomic-hi-lo.h after converting new users */
+-#include <linux/io-64-nonatomic-hi-lo.h>
+diff --git a/include/asm-generic/io-64-nonatomic-lo-hi.h b/include/asm-generic/io-64-nonatomic-lo-hi.h
+deleted file mode 100644
+index 55a627c37721..000000000000
+--- a/include/asm-generic/io-64-nonatomic-lo-hi.h
++++ /dev/null
+@@ -1,2 +0,0 @@
+-/* XXX: delete asm-generic/io-64-nonatomic-lo-hi.h after converting new users */
+-#include <linux/io-64-nonatomic-lo-hi.h>
+-- 
+2.7.0
