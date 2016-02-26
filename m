@@ -1,39 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Feb 2016 12:52:20 +0100
-Subject: [PATCH] drm: rcar-du: clarify vsp dependency
-Message-ID: <1456487546-3886345-1-git-send-email-arnd@arndb.de>
+Date: Fri, 26 Feb 2016 12:53:22 +0100
+Subject: [PATCH] [media] em28xx: restore lost #ifdef
+Message-ID: <1456487606-3912264-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VSP1 compositor code in DRM links against the respective V4L
-driver, but the dependency is not expressed correctly in Kconfig,
-which leads to a build error when the DRM driver is built-in
-and the V4L driver is a module:
+The cleanup that changed the em28xx driver to use v4l2_mc_create_media_graph
+instead of its own implementation causes a build error when CONFIG_MEDIA_CONTROLLER
+is disabled:
 
-drivers/gpu/built-in.o: In function `rcar_du_vsp_plane_atomic_update':
-rcar-du/rcar_du_vsp.c:183: undefined reference to `vsp1_du_atomic_update'
+drivers/media/usb/em28xx/em28xx-video.c: In function 'em28xx_v4l2_init':
+drivers/media/usb/em28xx/em28xx-video.c:2717:38: error: 'struct em28xx' has no member named 'media_dev'
 
-This patch avoids the problem by ensuring that the DRM VSP code can
-only be enabled if the V4L driver is linked into the kernel, or
-both are loadable modules.
+This puts the new code inside the same #ifdef that controls the presence
+of the 'media_dev' member, and that the old code was in.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6d62ef3ac30b ("drm: rcar-du: Expose the VSP1 compositor through KMS planes")
+Fixes: de39078779cb ("[media] em2xx: use v4l2_mc_create_media_graph()")
 ---
- drivers/gpu/drm/rcar-du/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/usb/em28xx/em28xx-video.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/gpu/drm/rcar-du/Kconfig b/drivers/gpu/drm/rcar-du/Kconfig
-index 1f10fa0928b4..eb1e6d5cfed9 100644
---- a/drivers/gpu/drm/rcar-du/Kconfig
-+++ b/drivers/gpu/drm/rcar-du/Kconfig
-@@ -27,6 +27,6 @@ config DRM_RCAR_LVDS
- config DRM_RCAR_VSP
- 	bool "R-Car DU VSP Compositor Support"
- 	depends on DRM_RCAR_DU
--	depends on VIDEO_RENESAS_VSP1
-+	depends on VIDEO_RENESAS_VSP1=y || (VIDEO_RENESAS_VSP1 && DRM_RCAR_DU=m)
- 	help
- 	  Enable support to expose the R-Car VSP Compositor as KMS planes.
+diff --git a/drivers/media/usb/em28xx/em28xx-video.c b/drivers/media/usb/em28xx/em28xx-video.c
+index f772e2612608..44834b2eff55 100644
+--- a/drivers/media/usb/em28xx/em28xx-video.c
++++ b/drivers/media/usb/em28xx/em28xx-video.c
+@@ -2714,12 +2714,14 @@ static int em28xx_v4l2_init(struct em28xx *dev)
+ 	/* Init entities at the Media Controller */
+ 	em28xx_v4l2_create_entities(dev);
+ 
++#ifdef CONFIG_MEDIA_CONTROLLER
+ 	ret = v4l2_mc_create_media_graph(dev->media_dev);
+ 	if (ret) {
+ 		em28xx_errdev("failed to create media graph\n");
+ 		em28xx_v4l2_media_release(dev);
+ 		goto unregister_dev;
+ 	}
++#endif
+ 
+ 	em28xx_info("V4L2 video device registered as %s\n",
+ 		    video_device_node_name(&v4l2->vdev));
 -- 
 2.7.0
