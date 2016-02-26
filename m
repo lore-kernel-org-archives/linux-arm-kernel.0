@@ -1,34 +1,98 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 26 Feb 2016 12:20:33 +0200
-Subject: [PATCH 0/7] video: ARM CLCD: non-controversial parts
-In-Reply-To: <CACRpkdbGDXTbenOY_bsiuGqS3oBP3CKyjsOJuMPStaMFi=u3hw@mail.gmail.com>
-References: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbGDXTbenOY_bsiuGqS3oBP3CKyjsOJuMPStaMFi=u3hw@mail.gmail.com>
-Message-ID: <56D026F1.1080009@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 26 Feb 2016 12:23:27 +0200
+Subject: [PATCH] dmaengine: omap-dma: Do not call omap_dma_callback() from
+ tx_status()
+In-Reply-To: <20160226010658.GN5783@n2100.arm.linux.org.uk>
+References: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
+ <20160226010658.GN5783@n2100.arm.linux.org.uk>
+Message-ID: <56D0279F.2050703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 25/02/16 21:35, Linus Walleij wrote:
-> On Tue, Feb 23, 2016 at 11:01 AM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
+On 2016-02-26 03:06, Russell King - ARM Linux wrote:
+> On Thu, Feb 25, 2016 at 10:28:59AM +0200, Peter Ujfalusi wrote:
+>> When based on the CCR_ENABLE bit the channel is stopped we should not call
+>> omap_dma_callback(), only change the return value to DMA_COMPLETE. Client
+>> drivers will do the right thing to clean up the channel after the transfer
+>> has been completed.
+>> Check the CCR_ENABLE only if the channel is not paused since pause in sDMA
+>> means that the channel is stopped.
+>> This will fix one hard to reproduce race condition when the channel is
+>> terminated during transfer (affecting cyclic operation).
+>>
+>> Fixes: 1a7cf7b26f25 ("dmaengine: omap-dma: Handle cases when the channel is polled for completion")
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  drivers/dma/omap-dma.c | 16 ++++++++++------
+>>  1 file changed, 10 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+>> index f6bef0d93998..a6b189fdbbe6 100644
+>> --- a/drivers/dma/omap-dma.c
+>> +++ b/drivers/dma/omap-dma.c
+>> @@ -671,18 +671,22 @@ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
+>>  	struct omap_chan *c = to_omap_dma_chan(chan);
+>>  	struct virt_dma_desc *vd;
+>>  	enum dma_status ret;
+>> -	uint32_t ccr;
+>>  	unsigned long flags;
+>>  
+>> -	ccr = omap_dma_chan_read(c, CCR);
+>> -	/* The channel is no longer active, handle the completion right away */
+>> -	if (!(ccr & CCR_ENABLE))
+>> -		omap_dma_callback(c->dma_ch, 0, c);
+>> -
+>>  	ret = dma_cookie_status(chan, cookie, txstate);
+>>  	if (ret == DMA_COMPLETE || !txstate)
+>>  		return ret;
+>>  
+>> +	if (!c->paused) {
+>> +		uint32_t ccr = omap_dma_chan_read(c, CCR);
+>> +		/*
+>> +		 * The channel is no longer active, set the return value
+>> +		 * accordingly
+>> +		 */
+>> +		if (!(ccr & CCR_ENABLE))
+>> +			ret = DMA_COMPLETE;
+>> +	}
+>> +
 > 
->> This is a redux version of the previous patch set that strips out
->> any attempts to auto-switch or rewrite the device tree to match
->> the CLCD Versatile panel.
+> This looks very much like a hack, and surely opens a race condition
+> up: what happens when a request submitted and pending but not yet
+> started?  If the channel is idle, requesting status will report
+> that the request has completed.
 > 
-> It seems patch #4 didn't make it out so I re-sent it.
+> It's also wrong for another reason.  If txstate is NULL...
 
-Hmm, it was there in the series... Russell had comments to it, to which
-you didn't reply.
+True, I have fixed these up.
 
- Tomi
+> Your original commit adding the original hack that you're now removing
+> above says that this is to support polled operation: I'm not aware of
+> DMA engine supporting such a mode.  DMA_PREP_INTERRUPT is a mechanism
+> where requests can be queued without an interrupt to allow batching.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/2bb28b03/attachment.sig>
+Also it is used to suppress DMA interrupts during audio playback for example.
+In this case we will run w/o interrupts and the position is polled.
+
+> See the raid5/async_tx code, which queues a set of operations without
+> DMA_PREP_INTERRUPT, with the final operation with DMA_PREP_INTERRUPT
+> set.
+
+We only allow the interrupts to be disabled in cyclic or memcpy mode. With
+slave_sg we have interrupts as it is needed to move to the next SG.
+
+> As the driver is reliant on interrupts to move to the next transfer,
+> the patch which causes DMA_PREP_INTERRUPT to influence whether
+> interrupts are sent is actually buggy, and will prevent several
+> queued DMA operations to fail.
+
+Yes, the omap-dma only allows the interrupts to be actually disabled when it
+is save to do so. slave_sg can not work w/o interrupts so there we don't
+disable them.
+
+> 
+
+
+-- 
+P?ter
