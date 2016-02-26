@@ -1,32 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Feb 2016 12:10:52 +0900
-Subject: [PATCH] ASoC: mediatek: Add I03/I04 widgets and corresponding
- routes
-In-Reply-To: <1456454516.15436.2.camel@mtksdaap41>
-References: <1456384353-13041-1-git-send-email-pc.liao@mediatek.com>
- <20160226023050.GI18327@sirena.org.uk>
- <1456454516.15436.2.camel@mtksdaap41>
-Message-ID: <20160226031052.GM18327@sirena.org.uk>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Fri, 26 Feb 2016 11:12:18 +0800
+Subject: [PATCH v2 0/3] Rockchip: rk3399: Add core dtsi for rk3399
+In-Reply-To: <1456210864-29037-1-git-send-email-jay.xu@rock-chips.com>
+References: <1456210864-29037-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1456456341-14282-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 10:41:56AM +0800, PC Liao wrote:
-> On Fri, 2016-02-26 at 10:30 +0800, Mark Brown wrote:
-> > On Thu, Feb 25, 2016 at 03:12:33PM +0800, PC Liao wrote:
+There is the new SoCs from Rockchip which named rk3399, the
+patches are added to support them.
 
-> > > Change-Id: Ib6804bbbde388830d8359245fe13bbb0f2bb36ba
+Jianqun Xu (1):
+  ARM64: dts: rockchip: add core dtsi file for rk3399
 
-> > Don't include noise like this in upstream submissions, we don't use your
-> > gerritt.
+Xing Zheng (2):
+  dt-bindings: add bindings for rk3399 clock controller
+  clk: rockchip: add dt-binding header for rk3399
 
-> Sorry about that.
-> I will upload new version.
+ .../bindings/clock/rockchip,rk3399-cru.txt         |  82 ++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 950 +++++++++++++++++++++
+ include/dt-bindings/clock/rk3399-cru.h             | 716 ++++++++++++++++
+ 3 files changed, 1748 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+ create mode 100644 include/dt-bindings/clock/rk3399-cru.h
 
-It's fine, I edited out - more for future reference.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/1a566e44/attachment.sig>
+-- 
+changes in v2:
+- remove applied grf patch (applied by Heiko)
+- add "rockchip,grf = <&pmugrf>" for pmucru node (xing)
+- add NR_CLK defination (xing)
+
+1.9.1
