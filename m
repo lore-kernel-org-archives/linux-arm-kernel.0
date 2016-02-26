@@ -1,96 +1,24 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Fri, 26 Feb 2016 09:54:25 +0800
-Subject: [PATCH v9 2/6] clk: hisilicon: add CRG driver for hi3519 soc
-In-Reply-To: <20160225234215.GK28849@codeaurora.org>
-References: <1456127280-23275-1-git-send-email-xuejiancheng@huawei.com>
- <1456127280-23275-3-git-send-email-xuejiancheng@huawei.com>
- <20160225234215.GK28849@codeaurora.org>
-Message-ID: <56CFB051.3050809@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 26 Feb 2016 11:10:19 +0900
+Subject: [PATCH V7 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <1456396631-12788-2-git-send-email-blogic@openwrt.org>
+References: <1456396631-12788-1-git-send-email-blogic@openwrt.org>
+ <1456396631-12788-2-git-send-email-blogic@openwrt.org>
+Message-ID: <20160226021019.GD18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-    Thank you for your advice.  I'll fixed them in next version.
+On Thu, Feb 25, 2016 at 11:37:11AM +0100, John Crispin wrote:
 
-Regards,
+> This patch needs to be merged post-rc1 as it depends on the MFD series of
+> the PMIC which is already inside Lee's tree pending the PR.
 
-Jiancheng.
-
-On 2016/2/26 7:42, Stephen Boyd wrote:
-> On 02/22, Jiancheng Xue wrote:
->> diff --git a/Documentation/devicetree/bindings/clock/hi3519-crg.txt b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
->> new file mode 100644
->> index 0000000..2d23950
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/hi3519-crg.txt
->> @@ -0,0 +1,46 @@
->> +Example: CRG nodes
->> +CRG: clock-reset-controller at 12010000 {
->> +	compatible = "hisilicon,hi3519-crg";
-> 
-> Indentation is off here.
-> 
->> +        reg = <0x12010000 0x10000>;
->> +        #clock-cells = <1>;
->> +        #reset-cells = <2>;
->> +};
->> +
->> +Example: consumer nodes
->> +i2c0: i2c at 12110000 {
->> +	compatible = "hisilicon,hi3519-i2c";
->> +        reg = <0x12110000 0x1000>;
->> +        clocks = <&CRG HI3519_I2C0_RST>;*/
->> +        resets = <&CRG 0xe4 0>;
->> +};
->> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
->> index e434854..296371f 100644
->> --- a/drivers/clk/hisilicon/Kconfig
->> +++ b/drivers/clk/hisilicon/Kconfig
->> @@ -1,3 +1,11 @@
->> +config COMMON_CLK_HI3519
->> +	tristate "Hi3519 Clock Driver"
->> +	depends on ARCH_HISI || COMPILE_TEST
->> +	select RESET_HISI
->> +	default y
-> 
-> default ARCH_HISI
-> 
->> +	help
->> +	  Build the clock driver for hi3519.
->> +
->> diff --git a/drivers/clk/hisilicon/reset.c b/drivers/clk/hisilicon/reset.c
->> new file mode 100644
->> index 0000000..50e00e7
->> --- /dev/null
->> +++ b/drivers/clk/hisilicon/reset.c
->> +
->> +int hisi_reset_init(struct device_node *np)
->> +{
->> +	struct hisi_reset_controller *rstc;
->> +
->> +	rstc = kzalloc(sizeof(*rstc), GFP_KERNEL);
->> +	if (!rstc)
->> +		return -ENOMEM;
->> +
->> +	rstc->membase = of_iomap(np, 0);
-> 
-> Any reason why we can't pass the platform device here and map the
-> register space with platform device APIs?
-> 
->> +	if (!rstc->membase)
->> +		return -EINVAL;
->> +
->> +	spin_lock_init(&rstc->lock);
->> +
->> +	rstc->rcdev.owner = THIS_MODULE;
->> +	rstc->rcdev.ops = &hisi_reset_ops;
->> +	rstc->rcdev.of_node = np;
->> +	rstc->rcdev.of_reset_n_cells = 2;
->> +	rstc->rcdev.of_xlate = hisi_reset_of_xlate;
->> +
->> +	return reset_controller_register(&rstc->rcdev);
->> +}
->> +EXPORT_SYMBOL(hisi_reset_init);
-> 
-> Why not GPL?
-> 
+Please resubmit when that has happened or arrange with Lee (who I've
+added to the CC) for a tag I can pull with the required dependencies.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160226/b10afa9b/attachment.sig>
