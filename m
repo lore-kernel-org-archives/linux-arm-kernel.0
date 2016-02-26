@@ -1,47 +1,51 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 26 Feb 2016 08:59:47 -0600
-Subject: [PATCH v3] arm64: mm: Mark .rodata as RO
-In-Reply-To: <20160226145516.GE8728@leverpostej>
-References: <1455904232-24053-1-git-send-email-jeremy.linton@arm.com>
- <20160226145516.GE8728@leverpostej>
-Message-ID: <56D06863.3080901@arm.com>
+From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
+Date: Fri, 26 Feb 2016 15:00:35 +0000
+Subject: [PATCH] arm64: dts: r8a7795: Add CAN external clock support
+In-Reply-To: <CAMuHMdXJRN2kF2r=bqcY8v87aYHj_OKr2=5vzcfoHwvr02Y2CA@mail.gmail.com>
+References: <1456496023-16240-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <CAMuHMdXJRN2kF2r=bqcY8v87aYHj_OKr2=5vzcfoHwvr02Y2CA@mail.gmail.com>
+Message-ID: <SG2PR06MB1038B995B4C12A01C280DFC4C3A70@SG2PR06MB1038.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2016 08:55 AM, Mark Rutland wrote:
-> On Fri, Feb 19, 2016 at 11:50:32AM -0600, Jeremy Linton wrote:
->> Currently the .rodata section is actually still executable when DEBUG_RODATA
->> is enabled. This changes that so the .rodata is actually read only, no execute.
->> It also adds the .rodata section to the mem_init banner.
->>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>   arch/arm64/kernel/vmlinux.lds.S |  5 +++--
->>   arch/arm64/mm/init.c            |  4 +++-
->>   arch/arm64/mm/mmu.c             | 17 +++++++++++++----
->>   3 files changed, 19 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index 8f4fc2c..9208f53 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -114,8 +114,9 @@ SECTIONS
->>   		*(.got)			/* Global offset table		*/
->>   	}
->>
->> -	RO_DATA(PAGE_SIZE)
->> -	EXCEPTION_TABLE(8)
->> +	ALIGN_DEBUG_RO_MIN(0)
->> +	RO_DATA(PAGE_SIZE)		/* everything from this point to */
->> +	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
->>   	NOTES
->
-> That should be ALIGN_DEBUG_RO_MIN(PAGE_SIZE), given we map .text and
-> .rodata separately regardless of DEBUG_RODATA (and hence they need to
-> never share a page).
->
+Hi Geert,
 
-The RO_DATA macro has an explicit alignment (PAGE_SIZE in this case) in 
-it too. That is why I left it at 0 to make it clear that it wasn't 
-changing the alignment unless DEBUG_RO was enabled (and in that case 
-only really applies if the section_size/cont_size is enabled).
+> On Fri, Feb 26, 2016 at 3:13 PM, Ramesh Shanmugasundaram
+> <ramesh.shanmugasundaram@bp.renesas.com> wrote:
+> > Adds external CAN clock node for r8a7795. This clock can be used as
+> > fCAN clock of CAN and CAN FD controller.
+> >
+> > Signed-off-by: Ramesh Shanmugasundaram
+> > <ramesh.shanmugasundaram@bp.renesas.com>
+> > ---
+> >  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> > b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> > index a7315eb..5167a6c 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> > @@ -115,6 +115,13 @@
+> >                 clock-frequency = <0>;
+> >         };
+> >
+> > +       /* External CAN clock - to be overridden by boards that provide
+> it */
+> > +       can_clk: can {
+> > +               compatible = "fixed-clock";
+> > +               #clock-cells = <0>;
+> > +               clock-frequency = <0>;
+> 
+> As this is an optional clock, it should have
+> 
+>         status = "disabled";
+
+Yes, I too thought the same but the status property is not obeyed. The "disabled" clock still shows up in clk_tree and clk_xxx apis works just fine (Is this a DT bug?). Hence left the ambiguous "status". In code I use clk_get_rate(can_clk) != 0 to see if it's enabled, which seems logical.
+
+If you add this as a child of soc node, status property is obeyed. But all external clocks are defined outside soc (correctly) and I followed the same.
+
+Thanks,
+Ramesh
+
+Note: tests based on next-20160127
