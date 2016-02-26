@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 26 Feb 2016 01:57:18 +0100
-Subject: [PATCH v3 10/52] mtd: nand: gpmi: use mtd_ooblayout_xxx() helpers
- where appropriate
+Date: Fri, 26 Feb 2016 01:57:21 +0100
+Subject: [PATCH v3 13/52] mtd: onenand: use mtd_ooblayout_xxx() helpers where
+ appropriate
 In-Reply-To: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1456448280-27788-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1456448280-27788-14-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,36 +15,108 @@ where directly accessed.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/mtd/onenand/onenand_base.c | 75 ++++++++------------------------------
+ 1 file changed, 15 insertions(+), 60 deletions(-)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 8122c69..3a29b65 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1327,18 +1327,19 @@ static int gpmi_ecc_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
- static int
- gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
+diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
+index af28bb3..20fdf8c 100644
+--- a/drivers/mtd/onenand/onenand_base.c
++++ b/drivers/mtd/onenand/onenand_base.c
+@@ -1024,34 +1024,15 @@ static int onenand_transfer_auto_oob(struct mtd_info *mtd, uint8_t *buf, int col
+ 				int thislen)
  {
--	struct nand_oobfree *of = mtd->ecclayout->oobfree;
-+	struct mtd_oob_region of = { };
- 	int status = 0;
+ 	struct onenand_chip *this = mtd->priv;
+-	struct nand_oobfree *free;
+-	int readcol = column;
+-	int readend = column + thislen;
+-	int lastgap = 0;
+-	unsigned int i;
+-	uint8_t *oob_buf = this->oob_buf;
+-
+-	free = this->ecclayout->oobfree;
+-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
+-		if (readcol >= lastgap)
+-			readcol += free->offset - lastgap;
+-		if (readend >= lastgap)
+-			readend += free->offset - lastgap;
+-		lastgap = free->offset + free->length;
+-	}
+-	this->read_bufferram(mtd, ONENAND_SPARERAM, oob_buf, 0, mtd->oobsize);
+-	free = this->ecclayout->oobfree;
+-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
+-		int free_end = free->offset + free->length;
+-		if (free->offset < readend && free_end > readcol) {
+-			int st = max_t(int,free->offset,readcol);
+-			int ed = min_t(int,free_end,readend);
+-			int n = ed - st;
+-			memcpy(buf, oob_buf + st, n);
+-			buf += n;
+-		} else if (column == 0)
+-			break;
+-	}
++	int ret;
++
++	this->read_bufferram(mtd, ONENAND_SPARERAM, this->oob_buf, 0,
++			     mtd->oobsize);
++	ret = mtd_ooblayout_get_databytes(mtd, buf, this->oob_buf,
++					  column, thislen);
++	if (ret)
++		return ret;
++
+ 	return 0;
+ }
  
- 	/* Do we have available oob area? */
--	if (!of->length)
-+	mtd_ooblayout_free(mtd, 0, &of);
-+	if (!of.length)
- 		return -EPERM;
+@@ -1808,34 +1789,7 @@ static int onenand_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
+ static int onenand_fill_auto_oob(struct mtd_info *mtd, u_char *oob_buf,
+ 				  const u_char *buf, int column, int thislen)
+ {
+-	struct onenand_chip *this = mtd->priv;
+-	struct nand_oobfree *free;
+-	int writecol = column;
+-	int writeend = column + thislen;
+-	int lastgap = 0;
+-	unsigned int i;
+-
+-	free = this->ecclayout->oobfree;
+-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
+-		if (writecol >= lastgap)
+-			writecol += free->offset - lastgap;
+-		if (writeend >= lastgap)
+-			writeend += free->offset - lastgap;
+-		lastgap = free->offset + free->length;
+-	}
+-	free = this->ecclayout->oobfree;
+-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES && free->length; i++, free++) {
+-		int free_end = free->offset + free->length;
+-		if (free->offset < writeend && free_end > writecol) {
+-			int st = max_t(int,free->offset,writecol);
+-			int ed = min_t(int,free_end,writeend);
+-			int n = ed - st;
+-			memcpy(oob_buf + st, buf, n);
+-			buf += n;
+-		} else if (column == 0)
+-			break;
+-	}
+-	return 0;
++	return mtd_ooblayout_set_databytes(mtd, buf, oob_buf, column, thislen);
+ }
  
- 	if (!nand_is_slc(chip))
- 		return -EPERM;
+ /**
+@@ -4037,10 +3991,11 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
+ 	 * The number of bytes available for a client to place data into
+ 	 * the out of band area
+ 	 */
+-	mtd->oobavail = 0;
+-	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES &&
+-	    this->ecclayout->oobfree[i].length; i++)
+-		mtd->oobavail += this->ecclayout->oobfree[i].length;
++	ret = mtd_ooblayout_count_freebytes(mtd);
++	if (ret < 0)
++		ret = 0;
++
++	mtd->oobavail = ret;
  
--	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of->offset, page);
--	chip->write_buf(mtd, chip->oob_poi + of->offset, of->length);
-+	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of.offset, page);
-+	chip->write_buf(mtd, chip->oob_poi + of.offset, of.length);
- 	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
- 
- 	status = chip->waitfunc(mtd, chip);
+ 	mtd->ecclayout = this->ecclayout;
+ 	mtd->ecc_strength = 1;
 -- 
 2.1.4
