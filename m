@@ -1,77 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Feb 2016 15:15:59 +0000
-Subject: [RFC PATCH 1/6] arm64: vmemmap: use virtual projection of linear
- region
-In-Reply-To: <CAKv+Gu9M6QukGqLWYgDqAp6xaa7RPVW36E591LOPf6xP_TH48w@mail.gmail.com>
-References: <1456330893-19228-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456330893-19228-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9M6QukGqLWYgDqAp6xaa7RPVW36E591LOPf6xP_TH48w@mail.gmail.com>
-Message-ID: <20160226151557.GD29125@arm.com>
+From: harvey.hunt@imgtec.com (Harvey Hunt)
+Date: Fri, 26 Feb 2016 15:17:28 +0000
+Subject: [PATCH v3 07/52] mtd: nand: core: use mtd_ooblayout_xxx() helpers
+ where appropriate
+In-Reply-To: <20160226161054.3477cd4b@bbrezillon>
+References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1456448280-27788-8-git-send-email-boris.brezillon@free-electrons.com>
+ <56D0629C.9080805@imgtec.com> <20160226161054.3477cd4b@bbrezillon>
+Message-ID: <56D06C88.9080608@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 08:02:00AM +0100, Ard Biesheuvel wrote:
-> On 24 February 2016 at 17:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > Commit dd006da21646 ("arm64: mm: increase VA range of identity map") made
-> > some changes to the memory mapping code to allow physical memory to reside
-> > at an offset that exceeds the size of the virtual address space.
-> >
-> > However, since the size of the vmemmap area is proportional to the size of
-> > the VA area, but it is populated relative to the physical space, we may
-> > end up with the struct page array being mapped outside of the vmemmap
-> > region. For instance, on my Seattle A0 box, I can see the following output
-> > in the dmesg log.
-> >
-> >    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-> >              0xffffffbfc0000000 - 0xffffffbfd0000000   (   256 MB actual)
-> >
-> > We can fix this by deciding that the vmemmap region is not a projection of
-> > the physical space, but of the virtual space above PAGE_OFFSET, i.e., the
-> > linear region. This way, we are guaranteed that the vmemmap region is of
-> > sufficient size, and we can also reduce its size by half.
-> >
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/pgtable.h | 7 ++++---
-> >  arch/arm64/mm/init.c             | 4 ++--
-> >  2 files changed, 6 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> > index a440f5a85d08..8e6baea0ff61 100644
-> > --- a/arch/arm64/include/asm/pgtable.h
-> > +++ b/arch/arm64/include/asm/pgtable.h
-> > @@ -34,18 +34,19 @@
-> >  /*
-> >   * VMALLOC and SPARSEMEM_VMEMMAP ranges.
-> >   *
-> > - * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
-> > + * VMEMAP_SIZE: allows the whole linear region to be covered by a struct page array
-> >   *     (rounded up to PUD_SIZE).
-> >   * VMALLOC_START: beginning of the kernel vmalloc space
-> >   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
-> >   *     fixed mappings and modules
-> >   */
-> > -#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
-> > +#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
-> >
-> >  #define VMALLOC_START          (MODULES_END)
-> >  #define VMALLOC_END            (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
-> >
-> > -#define vmemmap                        ((struct page *)(VMALLOC_END + SZ_64K))
-> > +#define VMEMMAP_START          (VMALLOC_END + SZ_64K)
-> > +#define vmemmap                        ((struct page *)(VMEMMAP_START - memstart_addr / sizeof(struct page)))
-> >
-> 
-> Note that with the linear region randomization which is now in -next,
-> this division needs to be signed (since memstart_addr can wrap).
-> 
-> So I should either update the definition of memstart_addr to s64 in
-> this patch, or cast to (s64) in the expression above
+Hi Boris,
 
-Can you avoid the division altogether by doing something like:
+On 26/02/16 15:10, Boris Brezillon wrote:
+> Hi Harvey,
+>
+> On Fri, 26 Feb 2016 14:35:08 +0000
+> Harvey Hunt <harvey.hunt@imgtec.com> wrote:
+>
+>> [...]
+>> I'll look into this more later today, but wanted to run it by you in
+>> case you have any thoughts.
+>
+> Can you apply this patch [1], and let me know if you see the additional
+> trace?
 
-(struct page *)(VMEMMAP_START - (PHYS_PFN(memstart_addr) * sizeof(struct page)))
+I applied the patch, the following is the (unchanged) output:
 
-or have I misunderstood how this works?
+[    0.256375] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0x88
+[    0.262887] nand: Micron MT29F64G08CBAAAWP
+[    0.266995] nand: 8192 MiB, MLC, erase size: 2048 KiB, page size: 
+8192, OOB size: 448
+[    0.274881] jz4780-nand 1b000000.nand-controller: using hardware BCH 
+(strength 24, size 1024, bytes 42)
+[    0.289046] Bad block table not found for chip 0
+[    0.297769] Bad block table not found for chip 0
+[    0.302425] Scanning device for bad blocks
+[    0.320239] Bad eraseblock 90 at 0x00000b400000
+[    0.324934] Bad eraseblock 91 at 0x00000b600000
+[    0.931054] Bad eraseblock 4092 at 0x0001ff800000
+[    0.935917] Bad eraseblock 4093 at 0x0001ffa00000
+[    0.944660] nand_bbt: error while writing bad block table -34
+[    0.950448] jz4780-nand: probe of 1b000000.nand-controller failed 
+with error -34
+[    0.958079] UBI error: cannot open mtd 3, error -19
+[    0.962788] UBI error: cannot open mtd 4, error -19[    0.970229] 
+clk: Not disabling unused clocks
 
-Will
+>
+> Thanks,
+>
+> Boris
+>
+> [1]http://code.bulix.org/l2hkl1-91947
+>
+
+Thanks,
+
+Harvey
