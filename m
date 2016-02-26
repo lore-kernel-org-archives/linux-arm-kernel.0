@@ -1,79 +1,63 @@
-From: hs.liao@mediatek.com (Horng-Shyang Liao)
-Date: Fri, 26 Feb 2016 17:00:30 +0800
-Subject: [RFC 3/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <CAGS+omABD93f3X0pfiFgaxa9Lob2txkJfUUomUvs+hiRkxSuHw@mail.gmail.com>
-References: <8A0FDEEF9DBBD140A3857422D81DA20F867B19FD@mtkmbs01n1>
- <1454479333.11967.12.camel@mtksdaap41>
- <CAGS+omABD93f3X0pfiFgaxa9Lob2txkJfUUomUvs+hiRkxSuHw@mail.gmail.com>
-Message-ID: <1456477230.17841.2.camel@mtksdaap41>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 26 Feb 2016 01:04:29 -0800
+Subject: [GIT PULL v2 2/2] arm64: X-Gene platforms DTS changes queued for v4.6
+ - part2
+Message-ID: <CADaLND==AshC-syR3Tm93bPqB-vEyO3=AY+pM5r_ohgr4n-nBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-02-03 at 14:40 +0800, Daniel Kurtz wrote:
-> > Hi Dan,
-> >
-> > Thanks for your comment.
-> > This solution looks good to me.
-> > I will change it as your suggestion.
-> >
-> > But, I have a question about 'mask out the provided *device virtual*
-> > address'.
-> > Are lower 16-bits (or 24-bits for JUMP op) of device virtual address the
-> > same as device physical address?
-> 
-> I'm not sure.  But I doubt it we can rely on this.
-> My guess would be that the ioremap only preserves the lower 12 bits
-> (4k page size).
-> 
-> > If not, we still need to pass in physical address into CMDQ driver.
-> 
-> Or, instead of the iommu/slot approach, we can just provide a
-> registration function for the gce driver.
-> Each gce consumer could then have a simple gce node, with no slot/address:
-> 
->   mediatek,gce = <&gce>;
-> 
-> Then on probe, the gce consumer could pass in its (struct device *) to
-> gce_register_device().  gce_register_device() could then access the
-> device's of_node to extract its physical address range, and look up
-> its physical address in its table of per-soc of
-> "device_address:gce_subsys_address" entries.  If the physical address
-> is in a valid subsys ranges, the gce_register_device would cache the
-> subsys address, and an offset in a (struct gce_consumer).
-> gce_register_device() could then add this struct to a struct list_head
-> of gce_consumers, and finally return a pointer to it back to the
-> caller.
-> 
-> Later, the gce consumer could pass in ths (struct gce_consumer *) when
-> make gce calls, along with the *offset* (not the physical address or
-> virtual address) for the register that it wishes to access.  Then the
-> gce driver can simply use the gce_consumer->subsys entry to create a
-> gce address from the passed in offset.
-> 
-> This will keep the binding very simple, and would remove the need to
-> convert from device virtual to physical addresses by the gce consumer,
-> but require a little more per-gce-consumer setup.
-> 
-> -Dan
+Hi Arnd, Olof,
 
-Hi Dan,
+This is the second part of DT changes on X-Gene platforms for v4.6,
+which enables mailbox driver for X-Gene v1 and X-Gene v2 platforms and
+also enable SLIMpro Mailbox I2C driver (a client of the mailbox
+driver) for both X-Gene v1 and v2 platforms.
 
-When I try to implement this comment, I realize the only benefit from
-this comment is to wrap physical address.
+"arm64: dts: apm: mailbox device tree node for APM X-Gene platform"
+patch is the 3rd patch
+(http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
+of the series "mailbox: Add APM X-Gene platform mailbox driver"
+(https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
+since Feb-15.
 
-Recall from my previous reply: gce address = subsys + valid low bits.
-So, CMDQ driver still need to do "(Base + offset) & valid mask" to get
-gce valid low bits.
-Current implementation let display driver do "base + offset".
-This comment just transfers this calculation from display driver to CMDQ
-driver.
+"arm64: dts: apm: Mailbox device tree node for APM X-Gene v2 platform"
+is the follow up patch to enable mailbox on X-Gene v2 platform.
 
-However, this comment will let CMDQ interface (behavior) become more
-complicated, e.g. gce_register_device(), struct gce_consumer, and int
-cmdq_rec_write(struct cmdq_rec *handle, u32 value, struct gce_consumer
-*consumer, u32 offset)
+The remaining 2 patches enable SLIMpro Mailbox I2C driver on X-Gene v1
+and v2 platforms.
 
-Do you think it is worth to do this effort to wrap physical address?
+Regards,
+Duc Dang.
+------
+The following changes since commit edf21f271024ec6adb93c7b4e6c1dc928b6a7250:
 
-Thanks,
-HS Liao
+  arm64: dts: apm: Update GPIO to control power-off on X-Gene v2
+platforms (2016-02-25 17:14:00 -0800)
+
+are available in the git repository at:
+
+  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.6-part2
+
+for you to fetch changes up to 406f5940549e78fd7d4d41413a7ed3e611bccc4f:
+
+  arm64: dts: apm: Add DT node for X-Gene v2 SLIMpro Mailbox I2C
+Driver (2016-02-25 17:14:04 -0800)
+
+----------------------------------------------------------------
+Second part of X-Gene DT changes queued for v4.6
+
+This patch set includes:
++ X-Gene v1 and v2 Mailbox DT nodes
++ X-Gene v1 and X-Gene v2 SLIMpro Mailbox
+I2C driver DT nodes
+
+----------------------------------------------------------------
+Duc Dang (4):
+      arm64: dts: apm: mailbox device tree node for APM X-Gene platform.
+      arm64: dts: apm: Add DT node for X-Gene v1 SLIMpro Mailbox I2C Driver
+      arm64: dts: apm: Mailbox device tree node for APM X-Gene v2 platform.
+      arm64: dts: apm: Add DT node for X-Gene v2 SLIMpro Mailbox I2C Driver
+
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 19 +++++++++++++++++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi     | 19 +++++++++++++++++++
+ 2 files changed, 38 insertions(+)
