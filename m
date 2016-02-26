@@ -1,98 +1,96 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 26 Feb 2016 12:23:27 +0200
-Subject: [PATCH] dmaengine: omap-dma: Do not call omap_dma_callback() from
- tx_status()
-In-Reply-To: <20160226010658.GN5783@n2100.arm.linux.org.uk>
-References: <1456388939-15722-1-git-send-email-peter.ujfalusi@ti.com>
- <20160226010658.GN5783@n2100.arm.linux.org.uk>
-Message-ID: <56D0279F.2050703@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 26 Feb 2016 11:25:15 +0100
+Subject: [PATCH v2] arm64: lse: deal with clobbered x16 register after
+ branch via PLT
+In-Reply-To: <20160226101435.GC29125@arm.com>
+References: <1456429733-20825-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160226100325.GB29125@arm.com>
+ <CAKv+Gu-AAu7LpbBMuEQSx7Kfg+gbD4eUf0yjP3oPwfx7V5ZiAQ@mail.gmail.com>
+ <20160226101435.GC29125@arm.com>
+Message-ID: <CAKv+Gu-F9gVmePmbQ=g4LpsrhHJyuSFUqe+_V12ELB1ivxtxHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-02-26 03:06, Russell King - ARM Linux wrote:
-> On Thu, Feb 25, 2016 at 10:28:59AM +0200, Peter Ujfalusi wrote:
->> When based on the CCR_ENABLE bit the channel is stopped we should not call
->> omap_dma_callback(), only change the return value to DMA_COMPLETE. Client
->> drivers will do the right thing to clean up the channel after the transfer
->> has been completed.
->> Check the CCR_ENABLE only if the channel is not paused since pause in sDMA
->> means that the channel is stopped.
->> This will fix one hard to reproduce race condition when the channel is
->> terminated during transfer (affecting cyclic operation).
+On 26 February 2016 at 11:14, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Feb 26, 2016 at 11:04:38AM +0100, Ard Biesheuvel wrote:
+>> On 26 February 2016 at 11:03, Will Deacon <will.deacon@arm.com> wrote:
+>> > Hey Ard,
+>> >
+>> > On Thu, Feb 25, 2016 at 08:48:53PM +0100, Ard Biesheuvel wrote:
+>> >> The LSE atomics implementation uses runtime patching to patch in calls
+>> >> to out of line non-LSE atomics implementations on cores that lack hardware
+>> >> support for LSE. To avoid paying the overhead cost of a function call even
+>> >> if no call ends up being made, the bl instruction is kept invisible to the
+>> >> compiler, and the out of line implementations preserve all registers, not
+>> >> just the ones that they are required to preserve as per the AAPCS64.
+>> >>
+>> >> However, commit fd045f6cd98e ("arm64: add support for module PLTs") added
+>> >> support for routing branch instructions via veneers if the branch target
+>> >> offset exceeds the range of the ordinary relative branch instructions.
+>> >> Since this deals with jump and call instructions that are exposed to ELF
+>> >> relocations, the PLT code uses x16 to hold the address of the branch target
+>> >> when it performs an indirect branch-to-register, something which is
+>> >> explicitly allowed by the AAPCS64 (and ordinary compiler generated code
+>> >> does not expect register x16 or x17 to retain their values across a bl
+>> >> instruction).
+>> >>
+>> >> Since the lse runtime patched bl instructions don't adhere to the AAPCS64,
+>> >> they don't deal with this clobbering of registers x16 and x17. So add them
+>> >> to the clobber list of the asm() statements that perform the call
+>> >> instructions, and drop x16 and x17 from the list of registers that are
+>> >> caller saved in the out of line non-LSE implementations.
+>> >>
+>> >> In addition, since we have given these functions two scratch registers,
+>> >> they no longer need to stack/unstack temp registers, and the only remaining
+>> >> stack accesses are for the frame pointer. So pass -fomit-frame-pointer as
+>> >> well, this eliminates all stack accesses from these functions.
+>> >
+>> > [...]
+>> >
+>> >> diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
+>> >> index 197e06afbf71..7af60139f718 100644
+>> >> --- a/arch/arm64/include/asm/atomic_lse.h
+>> >> +++ b/arch/arm64/include/asm/atomic_lse.h
+>> >> @@ -36,7 +36,7 @@ static inline void atomic_andnot(int i, atomic_t *v)
+>> >>       "       stclr   %w[i], %[v]\n")
+>> >>       : [i] "+r" (w0), [v] "+Q" (v->counter)
+>> >>       : "r" (x1)
+>> >> -     : "x30");
+>> >> +     : "x16", "x17", "x30");
+>> >>  }
+>> >
+>> > The problem with this is that we potentially end up spilling/reloading
+>> > x16 and x17 even when we patch in the LSE atomic. That's why I opted for
+>> > the explicit stack accesses in my patch, so that they get overwritten
+>> > with NOPs when we switch to the LSE version.
+>> >
 >>
->> Fixes: 1a7cf7b26f25 ("dmaengine: omap-dma: Handle cases when the channel is polled for completion")
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>  drivers/dma/omap-dma.c | 16 ++++++++++------
->>  1 file changed, 10 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
->> index f6bef0d93998..a6b189fdbbe6 100644
->> --- a/drivers/dma/omap-dma.c
->> +++ b/drivers/dma/omap-dma.c
->> @@ -671,18 +671,22 @@ static enum dma_status omap_dma_tx_status(struct dma_chan *chan,
->>  	struct omap_chan *c = to_omap_dma_chan(chan);
->>  	struct virt_dma_desc *vd;
->>  	enum dma_status ret;
->> -	uint32_t ccr;
->>  	unsigned long flags;
->>  
->> -	ccr = omap_dma_chan_read(c, CCR);
->> -	/* The channel is no longer active, handle the completion right away */
->> -	if (!(ccr & CCR_ENABLE))
->> -		omap_dma_callback(c->dma_ch, 0, c);
->> -
->>  	ret = dma_cookie_status(chan, cookie, txstate);
->>  	if (ret == DMA_COMPLETE || !txstate)
->>  		return ret;
->>  
->> +	if (!c->paused) {
->> +		uint32_t ccr = omap_dma_chan_read(c, CCR);
->> +		/*
->> +		 * The channel is no longer active, set the return value
->> +		 * accordingly
->> +		 */
->> +		if (!(ccr & CCR_ENABLE))
->> +			ret = DMA_COMPLETE;
->> +	}
->> +
-> 
-> This looks very much like a hack, and surely opens a race condition
-> up: what happens when a request submitted and pending but not yet
-> started?  If the channel is idle, requesting status will report
-> that the request has completed.
-> 
-> It's also wrong for another reason.  If txstate is NULL...
+>> I see. But is that really an issue in practice?
+>
+> You'd need to ask somebody with silicon ;)
+>
+>> And the fact that the non-LSE code is a lot more efficient has to count for
+>> something, I suppose?
+>> (/me thinks enterprise, distro kernels etc etc)
+>
+> Right, but with my patch, we also get the nice code in the out-of-line
+> case:
+>
+> 0000000000000000 <__ll_sc_atomic_add>:
+>    0:   f9800031        prfm    pstl1strm, [x1]
+>    4:   885f7c31        ldxr    w17, [x1]
+>    8:   0b000231        add     w17, w17, w0
+>    c:   88107c31        stxr    w16, w17, [x1]
+>   10:   35ffffb0        cbnz    w16, 4 <__ll_sc_atomic_add+0x4>
+>   14:   d65f03c0        ret
+>
+> and in the inline LSE case we have NOPs instead of stack accesses.
+>
 
-True, I have fixed these up.
-
-> Your original commit adding the original hack that you're now removing
-> above says that this is to support polled operation: I'm not aware of
-> DMA engine supporting such a mode.  DMA_PREP_INTERRUPT is a mechanism
-> where requests can be queued without an interrupt to allow batching.
-
-Also it is used to suppress DMA interrupts during audio playback for example.
-In this case we will run w/o interrupts and the position is polled.
-
-> See the raid5/async_tx code, which queues a set of operations without
-> DMA_PREP_INTERRUPT, with the final operation with DMA_PREP_INTERRUPT
-> set.
-
-We only allow the interrupts to be disabled in cyclic or memcpy mode. With
-slave_sg we have interrupts as it is needed to move to the next SG.
-
-> As the driver is reliant on interrupts to move to the next transfer,
-> the patch which causes DMA_PREP_INTERRUPT to influence whether
-> interrupts are sent is actually buggy, and will prevent several
-> queued DMA operations to fail.
-
-Yes, the omap-dma only allows the interrupts to be actually disabled when it
-is save to do so. slave_sg can not work w/o interrupts so there we don't
-disable them.
-
-> 
-
-
--- 
-P?ter
+True, so it is an improvement in the sense that you only stack x16/x17
+rather than create a full stack frame. My concern is that you always
+take the hit of the push/pop when you run a LSE enabled kernel on
+non-LSE hardware, even if the calling code is not short of registers.
+In that sense, I think it is a premature optimization, and we should
+simply mark x16/x17 as clobbered until we can prove that not doing so
+improves performance measurably on LSE capable hardware
