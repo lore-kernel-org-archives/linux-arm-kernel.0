@@ -1,53 +1,48 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Fri, 26 Feb 2016 16:24:47 +0100
-Subject: [PATCH V2 03/12] net-next: mediatek: add embedded switch driver
- (ESW)
-In-Reply-To: <20160226151813.GD12022@lunn.ch>
-References: <1456496504-50429-1-git-send-email-blogic@openwrt.org>
- <1456496504-50429-4-git-send-email-blogic@openwrt.org>
- <20160226151813.GD12022@lunn.ch>
-Message-ID: <56D06E3F.1020100@openwrt.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Feb 2016 16:25:17 +0100
+Subject: [PATCH] [media] saa7134: fix warning with !MEDIA_CONTROLLER
+Message-ID: <1456500332-2565063-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When CONFIG_MEDIA_CONTROLLER is disabled, we get a warning
+about an unused function:
 
+drivers/media/pci/saa7134/saa7134-core.c:832:13: error: 'saa7134_create_entities' defined but not used [-Werror=unused-function]
 
-On 26/02/2016 16:18, Andrew Lunn wrote:
-> On Fri, Feb 26, 2016 at 03:21:35PM +0100, John Crispin wrote:
->> The ESW is found in many of the old 100mbit MIPS based SoCs. it has 5
->> external ports, 1 cpu port and 1 further port that the internal HW
->> offloading engine connects to.
->>
->> This driver is very basic and only provides basic init and irq support.
->> The SoC and switch core both have support for a special tag making DSA
->> support possible.
-> 
-> Hi Crispin
-> 
-> There was recently a discussion about adding switches without using
-> DSA or switchdev. It was pretty much decided we would not accept such
-> drivers.
-> 
-> Sorry
-> 
-> 	Andrew
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
+This moves the #ifdef outside of the function, as it is
+never called here.
 
-Hi,
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: ac90aa02d5b9 ("[media] saa7134: add media controller support")
+---
+ drivers/media/pci/saa7134/saa7134-core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-would the series be ok if we just dropped those parts and then have a
-driver in the kernel that wont do much with the out of tree patches ?
-
-the problem here is that on one side people complain about vendors not
-sending code upstream. once they start being a good citizen and provide
-funding to send stuff upstream the feedback tends to be very bad as seen
-here. we are planning on doing a DSA driver but one step at a time. this
-kind of feedback will inevitably lead to vendors doing second thoughts
-of upstream contributions.
-
-	John
+diff --git a/drivers/media/pci/saa7134/saa7134-core.c b/drivers/media/pci/saa7134/saa7134-core.c
+index 42bc4172febd..9c7876bff7c3 100644
+--- a/drivers/media/pci/saa7134/saa7134-core.c
++++ b/drivers/media/pci/saa7134/saa7134-core.c
+@@ -829,9 +829,9 @@ static void saa7134_media_release(struct saa7134_dev *dev)
+ #endif
+ }
+ 
++#if defined(CONFIG_MEDIA_CONTROLLER)
+ static void saa7134_create_entities(struct saa7134_dev *dev)
+ {
+-#if defined(CONFIG_MEDIA_CONTROLLER)
+ 	int ret, i;
+ 	struct media_entity *entity;
+ 	struct media_entity *decoder = NULL;
+@@ -950,8 +950,8 @@ static void saa7134_create_entities(struct saa7134_dev *dev)
+ 		if (ret < 0)
+ 			pr_err("failed to register input entity %d!\n", i);
+ 	}
+-#endif
+ }
++#endif
+ 
+ static struct video_device *vdev_init(struct saa7134_dev *dev,
+ 				      struct video_device *template,
+-- 
+2.7.0
