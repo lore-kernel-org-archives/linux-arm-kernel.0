@@ -1,121 +1,78 @@
-From: xhnjupt@gmail.com (Han Xu)
-Date: Sat, 27 Feb 2016 00:31:45 +0800
-Subject: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
-In-Reply-To: <DB5PR0401MB1912C9D041FF2B408652F4CD94A60@DB5PR0401MB1912.eurprd04.prod.outlook.com>
-References: <1454326208-4533-1-git-send-email-B56489@freescale.com>
- <1454326208-4533-3-git-send-email-B56489@freescale.com>
- <20160217180742.GB17485@shlinux2>
- <DB5PR0401MB1912C9D041FF2B408652F4CD94A60@DB5PR0401MB1912.eurprd04.prod.outlook.com>
-Message-ID: <20160226163145.GA2182@shlinux2.ap.freescale.net>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 26 Feb 2016 17:43:54 +0100
+Subject: [PATCH 2/2] ARM: dts: meson: Adding hwrev syscon node
+In-Reply-To: <2692251.6GoexVJEYt@wuerfel>
+References: <1455730114-2547-1-git-send-email-romain.perier@gmail.com>
+ <3072897.5MMsyiojns@wuerfel>
+ <CAOQ7t2Za5t_3nAm0wyf0rmFa+RTRSGUDAg5b64VvXp-okLMoNQ@mail.gmail.com>
+ <2692251.6GoexVJEYt@wuerfel>
+Message-ID: <CAOQ7t2Y2B8hfGim9UegUZsurQM0+Df0K0_DjsQ0r8+qMjUSBEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 08:07:22AM +0000, Yunhui Cui wrote:
-> Hi Han,
-> 
-> I have provided the options " m25p,fast-read ", because there are probable some flashes can't support quad mode.
-> So we should support fast-read mode in our driver. Moreover,  There is a option to select fast-read mode in spi_nor.c :
->                /* If we were instantiated by DT, use it */
->                  if (of_property_read_bool(np, "m25p,fast-read"))
->                          nor->flash_read = SPI_NOR_FAST;
+On Fri, Feb 26, 2016 at 5:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 26 February 2016 16:34:59 Carlo Caione wrote:
+>> On Fri, Feb 19, 2016 at 1:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> <cut>
+>>
+>> > This still really sounds like a mixed bag to me, which should better get represented
+>> > as a syscon node, except that there are also some more structured areas in
+>> > CBUS.
+>> >
+>> > Having just the registers between METAL_REVISION and HW_REV in a syscon
+>> > is clearly wrong, as that would include the pinctrl area that already has
+>> > a driver, but would not include some other parts that want the syscon.
+>> >
+>> > Maybe the best way is to make it compatible with both syscon and
+>> > simple-bus and put the other nodes underneath. That is still rather
+>> > ugly, but at least it works and can be extended.
+>>
+>> More on this topic.
+>>
+>> On the meson platforms (at least on the meson8 / meson8b) we have two
+>> buses: cbus and aobus. Since in cbus we have a bunch of scattered
+>> registers, Arnd suggested to make it compatible with both syscon and
+>> simple-bus. So my idea was actually to update the meson8b DTSI file
+>> adding the two buses to make it closer to the actual hardware.
+>>
+>> In the most simple cases moving the devices under the correct bus is a
+>> trivial operation since (of course) the same driver can be used when
+>> the device is attached to a different bus, like in the uart_AO case
+>> (http://lxr.free-electrons.com/source/arch/arm/boot/dts/meson8b.dtsi#L114).
+>>
+>> Unfortunately pinctrl is a different beast since it requires
+>> (http://lxr.free-electrons.com/source/drivers/pinctrl/meson/pinctrl-meson.c#L659)
+>> at least two subnodes: one accessing registers from aobus, and the
+>> other one from cbus.
+>>
+>> I know this is quite a peculiar case but I'm wondering what is the
+>> best way to approach this issue.
+>>
+>> 1) We could move only the pinctrl device outside both aobus and cbus
+>> but IMO this is ugly (at this point is probably better not having the
+>> two buses at all described in the DTS).
+>> 2) The second option is just to fix the driver so that the two
+>> subnodes are not strictly required. The problem with this second
+>> solution is that in the driver we still need to access some data
+>> (http://lxr.free-electrons.com/source/drivers/pinctrl/meson/pinctrl-meson8b.c#L873)
+>> that is specific to each bus. So we will end up having two different
+>> compatibles for the two buses (meson8b-pinctrl-aobus using data from
+>> 'ao-bank', and meson8b-pinctrl-cbus using data from 'banks').
+>> 3) Another option is just to have the driver with a unique compatible
+>> poking the parent node (or just to another property) to determine on
+>> which bus it is so that it can use the correct bus-specific data.
+>>
+>> Any idea / feedback?
+>
+> Would it be possible to split the pin controller driver into two drivers
+> that each only access registers on one of the buses? Is that a split
+> that makes sense from the point of view of that driver?
 
-Did you have some REAL cases using SPI NOR that only supports upto fast-read
-with Quad SPI driver? Neither fast-read or normal-read, which is actually more
-general, supported in the driver, just because I didn't see any REAL cases till
-now.
+AFAICT (I'm not the driver author) there is no a really strict reason
+to have one single driver accessing registers on both buses. Of course
+the driver has to be changed a bit.
+Are you suggesting to have two different drivers with two different compatibles?
 
-I didn't run against the patch, although IMO it's not that necessary. But I
-don't think QuadSPI driver need to check the m25p,fast-read property again
-since spi-nor layer has already done that. Adding the property in flash node
-should work in the same way.
- 
-> 
-> Thanks
-> Yunhui
-> 
-> -----Original Message-----
-> From: Han Xu [mailto:xhnjupt at gmail.com] 
-> Sent: Thursday, February 18, 2016 2:08 AM
-> To: Yunhui Cui
-> Cc: dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com; linux-mtd at lists.infradead.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Yao Yuan
-> Subject: Re: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
-> 
-> On Mon, Feb 01, 2016 at 07:30:07PM +0800, Yunhui Cui wrote:
-> > The qspi driver add generic fast-read mode for different flash 
-> > venders. There are some different board flash work on different mode, 
-> > such fast-read, quad-mode.
-> > So we have to modify the third entrace parameter of spi_nor_scan().
-> > 
-> > Signed-off-by: Yunhui Cui <B56489@freescale.com>
-> > ---
-> >  drivers/mtd/spi-nor/fsl-quadspi.c | 27 +++++++++++++++++++++------
-> >  1 file changed, 21 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c 
-> > b/drivers/mtd/spi-nor/fsl-quadspi.c
-> > index 9861290..0a31cb1 100644
-> > --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> > +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> > @@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
-> >  	/* Read */
-> >  	lut_base = SEQID_READ * 4;
-> >  
-> > -	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
-> > -			base + QUADSPI_LUT(lut_base));
-> > -	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> > -		    LUT1(FSL_READ, PAD4, rxfifo),
-> > -			base + QUADSPI_LUT(lut_base + 1));
-> > +	if (nor->flash_read == SPI_NOR_FAST) {
-> > +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> > +			    LUT1(ADDR, PAD1, addrlen),
-> > +				base + QUADSPI_LUT(lut_base));
-> > +		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
-> > +			    LUT1(FSL_READ, PAD1, rxfifo),
-> > +				base + QUADSPI_LUT(lut_base + 1));
-> > +	} else if (nor->flash_read == SPI_NOR_QUAD) {
-> > +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> > +			    LUT1(ADDR, PAD1, addrlen),
-> > +				base + QUADSPI_LUT(lut_base));
-> > +		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> > +			    LUT1(FSL_READ, PAD4, rxfifo),
-> > +				base + QUADSPI_LUT(lut_base + 1));
-> > +	}
-> >  
-> >  	/* Write enable */
-> >  	lut_base = SEQID_WREN * 4;
-> > @@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, 
-> > u8 cmd)  {
-> >  	switch (cmd) {
-> >  	case SPINOR_OP_READ_1_1_4:
-> > +	case SPINOR_OP_READ_FAST:
-> >  		return SEQID_READ;
-> >  	case SPINOR_OP_WREN:
-> >  		return SEQID_WREN;
-> > @@ -963,6 +974,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
-> >  	struct spi_nor *nor;
-> >  	struct mtd_info *mtd;
-> >  	int ret, i = 0;
-> > +	enum read_mode mode = SPI_NOR_QUAD;
-> >  
-> >  	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
-> >  	if (!q)
-> > @@ -1064,7 +1076,10 @@ static int fsl_qspi_probe(struct platform_device *pdev)
-> >  		/* set the chip address for READID */
-> >  		fsl_qspi_set_base_addr(q, nor);
-> >  
-> > -		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
-> > +		ret = of_property_read_bool(np, "m25p,fast-read");
-> > +		mode = (ret) ? SPI_NOR_FAST : SPI_NOR_QUAD;
-> > +
-> > +		ret = spi_nor_scan(nor, NULL, mode);
-> >  		if (ret)
-> >  			goto mutex_failed;
-> >  
-> I understand you want to provide a more generic read mode, but this is a quad spi driver, I prefer to provide the options, either quad read/quad IO read, or just normal read.
-> > --
-> > 2.1.0.27.g96db324
-> > 
-> > 
-> > ______________________________________________________
-> > Linux MTD discussion mailing list
-> > http://lists.infradead.org/mailman/listinfo/linux-mtd/
+-- 
+Carlo Caione
