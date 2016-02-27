@@ -1,87 +1,55 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Sat, 27 Feb 2016 19:01:47 +0100
-Subject: [PATCH v5 3/4] ARM: dts: meson8b: Add MMC nodes
+Date: Sat, 27 Feb 2016 19:01:45 +0100
+Subject: [PATCH v5 1/4] mmc: meson: Document Amlogic Meson MMC DT bindings
 In-Reply-To: <1456596108-1406-1-git-send-email-carlo@caione.org>
 References: <1456596108-1406-1-git-send-email-carlo@caione.org>
-Message-ID: <1456596108-1406-4-git-send-email-carlo@caione.org>
+Message-ID: <1456596108-1406-2-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-Enable the MMC for the Meson8b platforms.
-
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- arch/arm/boot/dts/meson8b-mxq.dts      |  8 ++++++++
- arch/arm/boot/dts/meson8b-odroidc1.dts |  8 ++++++++
- arch/arm/boot/dts/meson8b.dtsi         | 16 ++++++++++++++++
- 3 files changed, 32 insertions(+)
+ .../devicetree/bindings/mmc/meson-mmc.txt          | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/meson-mmc.txt
 
-diff --git a/arch/arm/boot/dts/meson8b-mxq.dts b/arch/arm/boot/dts/meson8b-mxq.dts
-index c7fdaea..5c533a6 100644
---- a/arch/arm/boot/dts/meson8b-mxq.dts
-+++ b/arch/arm/boot/dts/meson8b-mxq.dts
-@@ -60,6 +60,14 @@
- 	};
- };
- 
-+&mmc0 {
-+	status = "okay";
-+	pinctrl-names = "sdio_b";
-+	pinctrl-0 = <&mmc0_sd_b_pins>;
-+	meson,sd-port = <1>;
-+	broken-cd;
-+};
+diff --git a/Documentation/devicetree/bindings/mmc/meson-mmc.txt b/Documentation/devicetree/bindings/mmc/meson-mmc.txt
+new file mode 100644
+index 0000000..328157e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/meson-mmc.txt
+@@ -0,0 +1,30 @@
++* Amlogic Meson MMC controller
 +
- &uart_AO {
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
-diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
-index e50f1a1..a060c84 100644
---- a/arch/arm/boot/dts/meson8b-odroidc1.dts
-+++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
-@@ -71,6 +71,14 @@
- 	};
- };
- 
-+&mmc0 {
-+	status = "okay";
-+	pinctrl-names = "sdio_b";
-+	pinctrl-0 = <&mmc0_sd_b_pins>;
-+	meson,sd-port = <1>;
-+	broken-cd;
-+};
++The highspeed MMC host controller on Amlogic SoCs provides an interface
++for MMC, SD, SDIO and SDHC types of memory cards.
 +
- &uart_AO {
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 8bad557..25d795c 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -187,6 +187,22 @@
- 					function = "uart_ao";
- 				};
- 			};
++Supported maximum speeds are the ones of the eMMC standard 4.41 as well
++as the speed of SD standard 2.0.
 +
-+			mmc0_sd_b_pins: mmc0_sd_b {
-+				mux {
-+					groups = "sd_d1_b", "sd_d0_b", "sd_clk_b", "sd_cmd_b",
-+						 "sd_d3_b", "sd_d2_b";
-+					function = "sd_b";
-+				};
-+			};
-+		};
++Required properties:
++ - compatible : "amlogic,meson-mmc"
++ - reg : mmc controller base registers
++ - interrupts : mmc controller interrupt
++ - clocks : phandle to clock provider
++ - pinctrl-names : should contain "sdio_a" or "sdio_b"
++ - pinctrl-0: Should specify pin control groups used for this controller
 +
-+		mmc0: mmc at c1108c20 {
-+			compatible = "amlogic,meson-mmc";
-+			reg = <0xc1108c20 0x20>;
-+			interrupts = <0 28 1>;
-+			clocks = <&clkc CLKID_CLK81>;
-+			status = "disabled";
- 		};
- 	};
- }; /* end of / */
++Optional properties:
++ - meson,sd-port : 0 for port A, 1 for port B
++ - for cd, bus-width and additional generic mmc parameters
++   please refer to mmc.txt within this directory
++
++Examples:
++	mmc0: mmc at c1108c20 {
++		pinctrl-names = "sdio_b";
++		pinctrl-0 = <&mmc0_sd_b_pins>;
++		compatible = "amlogic,meson-mmc";
++		reg = <0xc1108c20 0x20>;
++		interrupts = <0 28 1>;
++		clocks = <&clkc CLKID_CLK81>;
++	};
 -- 
 1.9.1
