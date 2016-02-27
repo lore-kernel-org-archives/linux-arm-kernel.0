@@ -1,34 +1,39 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 27 Feb 2016 20:35:32 +0100
-Subject: [PATCH 1/2] lib/mpi: avoid assembler warning
-In-Reply-To: <1456490794-1034544-1-git-send-email-arnd@arndb.de>
-References: <1456490794-1034544-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160227193532.GF9123@gondor.apana.org.au>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Sat, 27 Feb 2016 12:03:01 -0800
+Subject: [PATCH v3 1/5] arm64: Broadcom Vulcan support
+In-Reply-To: <1456555925-11583-1-git-send-email-jchandra@broadcom.com>
+References: <56C8C38E.50007@gmail.com>
+ <1456555925-11583-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <56D200F5.7010505@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 01:46:26PM +0100, Arnd Bergmann wrote:
-> A wrapper around the umull assembly instruction might reuse
-> the input register as an output, which is undefined on
-> some ARM machines, as pointed out by this assembler warning:
+On 26/02/16 22:52, Jayachandran C wrote:
+> From: Zi Shen Lim <zlim@broadcom.com>
 > 
->   CC      lib/mpi/generic_mpih-mul1.o
-> /tmp/ccxJuxIy.s: Assembler messages:
-> /tmp/ccxJuxIy.s:53: rdhi, rdlo and rm must all be different
->   CC      lib/mpi/generic_mpih-mul2.o
-> /tmp/ccI0scAD.s: Assembler messages:
-> /tmp/ccI0scAD.s:53: rdhi, rdlo and rm must all be different
->   CC      lib/mpi/generic_mpih-mul3.o
-> /tmp/ccMvVQcp.s: Assembler messages:
-> /tmp/ccMvVQcp.s:53: rdhi, rdlo and rm must all be different
+> Add a configuration option and a device tree for Broadcom's Vulcan
+> ARM64 processor. vulcan.dtsi has the on-chip blocks like the PCIe
+> controller, GICv3 with ITS, PMU, system timer and the pl011 UART.
+> vulcan-eval.dts has definitions for a basic evaluation board.
 > 
-> This changes the constraints to force different registers to
-> be used as output.
+> Vulcan's processor cores support the ARMv8.1 instruction set and
+> will use "brcm,vulcan" as the compatible property. The firmware
+> has PSCI 0.2 support for cpu wakeup.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
+> [ updated and split dts - jchandra at broadcom.com ]
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+> 
+> There is a minor update to this patch.
+> 
+> After some discussions here, it looks like it is necessary to increase the
+> PCI mem and mem64 ranges to support all the use cases. We are updating the
+> firmware to use these ranges as well.
+> 
+> Hope it is not too late to fix this, sorry for the late churn.
 
-Both applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+V2 got merged already into next/dt64 by the arm-soc maintainers, could
+you provide an incremental patch to your v2? Thanks!
+--
+Florian
