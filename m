@@ -1,36 +1,34 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 27 Feb 2016 17:18:24 +0100
-Subject: [linux-sunxi][PATCH 0/5] ARM: sunxi: Add SPDIF playback support
-Message-ID: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
+Date: Sat, 27 Feb 2016 17:18:25 +0100
+Subject: [linux-sunxi][PATCH 1/5] clk: sunxi: mod1 clock should modify it's
+ parent
+In-Reply-To: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
+References: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
+Message-ID: <1456589909-2428-2-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+From: Andrea Venturi <ennesimamail.av@gmail.com>
 
-Hi All,
+add CLK_SET_RATE_PARENT to modify the rate on clk upstream
 
-now that the sun4i-spdif driver has made it into linux-next then this patch
-series completes what is needed to have SPDIF working on both A10 and A20
-devices.
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ drivers/clk/sunxi/clk-a10-mod1.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Enjoy,
-CK
-
-Andrea Venturi (1):
-  clk: sunxi: mod1 clock should modify it's parent
-
-Marcus Cooper (4):
-  ARM: dts :sunxi: Add SPDIF pins to A10 and A20
-  ARM: dts: sunxi: Add the SPDIF to the A10 and A20
-  ARM: dts: sun4i: Add SPDIF to the Mele A1000
-  ARM: dts: sun7i: Add SPDIF to Itead Ibox
-
- arch/arm/boot/dts/sun4i-a10-a1000.dts      | 23 ++++++++++++++++
- arch/arm/boot/dts/sun4i-a10.dtsi           | 44 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 24 ++++++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi           | 44 ++++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-a10-mod1.c           |  2 +-
- 5 files changed, 136 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
+index e9d870d..e2819fa 100644
+--- a/drivers/clk/sunxi/clk-a10-mod1.c
++++ b/drivers/clk/sunxi/clk-a10-mod1.c
+@@ -62,7 +62,7 @@ static void __init sun4i_mod1_clk_setup(struct device_node *node)
+ 	clk = clk_register_composite(NULL, clk_name, parents, i,
+ 				     &mux->hw, &clk_mux_ops,
+ 				     NULL, NULL,
+-				     &gate->hw, &clk_gate_ops, 0);
++				     &gate->hw, &clk_gate_ops, CLK_SET_RATE_PARENT);
+ 	if (IS_ERR(clk))
+ 		goto err_free_gate;
+ 
 -- 
 2.7.1
