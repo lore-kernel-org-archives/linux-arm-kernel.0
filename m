@@ -1,46 +1,126 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sat, 27 Feb 2016 16:03:04 +0100
-Subject: [PATCH 0/7] arm/arm64: Alpine patches for 4.6
-In-Reply-To: <2955978.E8qlghcpm8@wuerfel>
-References: <1456395297-6505-1-git-send-email-antoine.tenart@free-electrons.com>
- <2955978.E8qlghcpm8@wuerfel>
-Message-ID: <20160227150304.GF12453@kwain>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 27 Feb 2016 17:03:35 +0100
+Subject: [PATCH 1/2] irqchip: add lpc18xx gpio pin interrupt driver
+In-Reply-To: <alpine.DEB.2.11.1602261122120.3638@nanos>
+References: <1456437887-24432-1-git-send-email-manabian@gmail.com>
+ <1456437887-24432-2-git-send-email-manabian@gmail.com>
+ <alpine.DEB.2.11.1602261122120.3638@nanos>
+Message-ID: <CAGhQ9VxqMO24uKX8rJcbAHBcNKGkh9aYmM-+5FaNwYqqSnh-Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Hi Thomas,
 
-On Fri, Feb 26, 2016 at 11:02:21PM +0100, Arnd Bergmann wrote:
-> On Thursday 25 February 2016 11:14:50 Antoine Tenart wrote:
-> > 
-> > Here are the Alpine patches for 4.6. As seen with Olof these patches are
-> > sent to you as a series as there are only 7 of them. I'll get my gpg key
-> > signed and setup a git tree somewhere for next time.
-> > 
-> > The first 3 patches introduce a basic arm64 Alpine support, by adding
-> > the Alpine v2 EVP board. The last 4 patches add an MSIX node in both
-> > Alpine v1 (arm) and Alpine v2 (arm64) dtsi and select the Alpine MSI
-> > controller driver.
-> 
-> Applied the patches to the next/dt, next/dt64, next/arm64 and next/soc
-> branches, respectively. I did not see any strong dependencies between
-> the patches, so they are now out of order (depending how Linus
-> pulls our branches). Please check if that's ok and if I missed anything.
+On 26 February 2016 at 11:26, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Thu, 25 Feb 2016, Joachim Eastwood wrote:
+>> +static void lpc18xx_gpio_pint_handler(struct irq_desc *desc)
+>> +{
+>> +     struct lpc18xx_gpio_pint_chip *pint = irq_desc_get_handler_data(desc);
+>> +     unsigned int irq = irq_desc_get_irq(desc);
+>> +     int irq_no, i;
+>> +
+>> +     /* Find the interrupt */
+>> +     for (i = 0; i < pint->nrirqs; i++) {
+>> +             if (pint->irqmap[i] == irq) {
+>
+> Why don't you have a reverse map for this?
 
-You're right, there are no strong dependencies between the patches.
+Is there any thing it the irq subsystem for this that I can use?
 
-Thanks!
+I have now implement one based on linear_revmap in the irq domain code
+and it seems to work. Slightly more code and I needed two loops in
+probe. First one to determine the max virq number from the main irq
+controller and then another one to create the mapping/register the irq
+themselves.
 
-Antoine
+Looked at radix tree also, but I think it might be overkill here.
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160227/1905af9b/attachment.sig>
+What do you think?
+
+
+>> +                     irq_no = irq_find_mapping(pint->domain, i);
+>> +                     generic_handle_irq(irq_no);
+>> +             }
+>> +     }
+>> +}
+>> +
+>> +static void lpc18xx_gpio_pint_edge_ack(struct irq_data *d)
+>> +{
+>> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+>> +     u32 mask = d->mask;
+>> +
+>> +     irq_gc_lock(gc);
+>> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_IST);
+>> +     irq_gc_unlock(gc);
+>> +}
+>
+> How is that different from irq_gc_ack_set_bit ?
+
+No, the generic one is same. I'll fix it.
+
+
+>> +static void lpc18xx_gpio_pint_edge_mask(struct irq_data *d)
+>> +{
+>> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+>> +     u32 mask = d->mask;
+>> +
+>> +     irq_gc_lock(gc);
+>> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_CIENR);
+>> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_CIENF);
+>> +     irq_gc_unlock(gc);
+>> +}
+>
+> If you use seperate irq types, then you can use the generic chip functions and
+> be done with it.
+
+Do you mean one type for IRQ_TYPE_EDGE_RISING and one for IRQ_TYPE_EDGE_FALLING?
+
+Will those two handle the EDGE_BOTH case too? or do I need a type for that also?
+
+
+>> +static void lpc18xx_gpio_pint_edge_unmask(struct irq_data *d)
+>> +{
+>> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+>> +     u32 type, mask = d->mask;
+>> +
+>> +     irq_gc_lock(gc);
+>> +     type = irqd_get_trigger_type(d);
+>> +     if (type & IRQ_TYPE_EDGE_RISING)
+>> +             irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_SIENR);
+>> +     if (type & IRQ_TYPE_EDGE_FALLING)
+>> +             irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_SIENF);
+>> +     irq_gc_unlock(gc);
+>> +}
+>> +
+>> +static void lpc18xx_gpio_pint_level_mask(struct irq_data *d)
+>> +{
+>> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+>> +     u32 mask = d->mask;
+>> +
+>> +     irq_gc_lock(gc);
+>> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_CIENR);
+>> +     irq_gc_unlock(gc);
+>> +}
+>> +
+>> +static void lpc18xx_gpio_pint_level_unmask(struct irq_data *d)
+>> +{
+>> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+>> +     u32 mask = d->mask;
+>> +
+>> +     irq_gc_lock(gc);
+>> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_SIENR);
+>> +     irq_gc_unlock(gc);
+>> +}
+>
+> All the callbacks can go away.
+
+I have now replaced lpc18xx_gpio_pint_edge_ack,
+lpc18xx_gpio_pint_level_mask and lpc18xx_gpio_pint_level_unmask with
+the equivalent generic versions.
+
+
+Thanks for taking the time to look at this, Thomas.
+
+
+regards,
+Joachim Eastwood
