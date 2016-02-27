@@ -1,215 +1,90 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Sat, 27 Feb 2016 12:29:55 +0530
-Subject: [PATCH v4 2/3] input: syscon support in bcm_iproc_tsc driver
-In-Reply-To: <1456556396-4759-1-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1456556396-4759-1-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <1456556396-4759-3-git-send-email-raveendra.padasalagi@broadcom.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Sat, 27 Feb 2016 15:53:41 +0800
+Subject: [PATCH v7 RESEND 0/4] mailbox: hisilicon: add Hi6220 mailbox
+ driver
+In-Reply-To: <CABb+yY0_OzKmftb0HQKyfuE+2jgOfoRLHp-ok=Ux36sK8na6Ag@mail.gmail.com>
+References: <1455544226-10094-1-git-send-email-leo.yan@linaro.org>
+ <CABb+yY0_OzKmftb0HQKyfuE+2jgOfoRLHp-ok=Ux36sK8na6Ag@mail.gmail.com>
+Message-ID: <56D15605.5040505@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Cygnus SOC touch screen controller registers are shared
-with ADC and flex timer. Using readl/writel could lead to
-race condition. So touch screen driver is enhanced to support
-register access using syscon framework API's to take care of
-mutually exclusive access.
+Hi Leo and Jassi,
 
-Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
----
- drivers/input/touchscreen/bcm_iproc_tsc.c | 79 +++++++++++++++++--------------
- 1 file changed, 44 insertions(+), 35 deletions(-)
+On 26/02/2016 19:40, Jassi Brar wrote:
+> On Mon, Feb 15, 2016 at 7:20 PM, Leo Yan <leo.yan@linaro.org> wrote:
+>> Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+>> with a maximum message size of 8 words. I/O is performed using register
+>> access (there is no DMA) and the cell raises an interrupt when messages
+>> are received.
+>>
+>> This patch series is to implement Hi6220 mailbox driver. It registers
+>> two channels into framework for communication with MCU, one is tx channel
+>> and another is rx channel. Now mailbox driver is used to send message to
+>> MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
+>>
+>> Changes from v6:
+>> * Fix to use lowercase for hexadecimal value in DT binding document
+>>
+>> Changes from v5:
+>> * Refine to use mailbox three specifiers for client driver, so add xlate
+>>   callback function in mailbox driver to support these specifiers
+>> * Refine document for property "hi6220,mbox-tx-noirq"
+>>
+>> Changes from v4:
+>> * According to Jassi's suggestion, using DT binding to register channels
+>> * Change to use operating-points-v2 to register operating points
+>>
+>> Changes from v3:
+>> * The patch series for enabling idle state for Hi6220 has reserved memory
+>>   regions, so this series will not include it anymore
+>> * Refined mailbox driver according to Jassi's suggestion;
+>>   Removed kfifo from mailbox driver;
+>>   Removed spinlock for ipc registers accessing, due every channel has its
+>>   own dedicated bit in ipc register and readl/writel will introduce memory
+>>   barrier, so don't need spinlock to protect ipc registers accessing
+>> * After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
+>>   stub clock driver; finally can enable CPUFreq driver for CPU frequency
+>>   scaling
+>>
+>> Changes from v2:
+>> * Get rid of unused memory regions from memory node in DT, and don't use
+>>   reserved-memory node according to Mark and Leif's suggestion; Haojian also
+>>   has updated UEFI for efi memory info
+>>
+>> Changes from v1:
+>> * Correct lock usage for SMP scenario
+>>
+>> Changes from RFC:
+>> * According to Jassi's review, totally remove the abstract common driver
+>>   layer and only commit driver dedicated for Hi6220
+>> * According to Paul Bolle's review, fix typo issue for Kconfig and remove
+>>   unnecessary dependency with OF and fix minor for mailbox driver
+>> * Refine a little for dts nodes
+>>
+>>
+>> Leo Yan (4):
+>>   dt-bindings: mailbox: Document Hi6220 mailbox driver
+>>   mailbox: Hi6220: add mailbox driver
+>>   arm64: dts: add mailbox node for Hi6220
+>>   arm64: dts: add Hi6220's stub clock node
+>>
+>>  .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  74 ++++
+>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++++
+>>  drivers/mailbox/Kconfig                            |   8 +
+>>  drivers/mailbox/Makefile                           |   2 +
+>>  drivers/mailbox/hi6220-mailbox.c                   | 395 +++++++++++++++++++++
+>>
+> Applied 1 & 2 to mailbox-for-next.  Patch-3&4 should go via asoc tree.
 
-diff --git a/drivers/input/touchscreen/bcm_iproc_tsc.c b/drivers/input/touchscreen/bcm_iproc_tsc.c
-index ae460a5c..9957587 100644
---- a/drivers/input/touchscreen/bcm_iproc_tsc.c
-+++ b/drivers/input/touchscreen/bcm_iproc_tsc.c
-@@ -23,6 +23,8 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/serio.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
- 
- #define IPROC_TS_NAME "iproc-ts"
- 
-@@ -88,7 +90,11 @@
- #define TS_WIRE_MODE_BIT        BIT(1)
- 
- #define dbg_reg(dev, priv, reg) \
--	dev_dbg(dev, "%20s= 0x%08x\n", #reg, readl((priv)->regs + reg))
-+do { \
-+	u32 val; \
-+	regmap_read(priv->regmap, reg, &val); \
-+	dev_dbg(dev, "%20s= 0x%08x\n", #reg, val); \
-+} while (0)
- 
- struct tsc_param {
- 	/* Each step is 1024 us.  Valid 1-256 */
-@@ -141,7 +147,7 @@ struct iproc_ts_priv {
- 	struct platform_device *pdev;
- 	struct input_dev *idev;
- 
--	void __iomem *regs;
-+	struct regmap *regmap;
- 	struct clk *tsc_clk;
- 
- 	int  pen_status;
-@@ -196,22 +202,22 @@ static irqreturn_t iproc_touchscreen_interrupt(int irq, void *data)
- 	int i;
- 	bool needs_sync = false;
- 
--	intr_status = readl(priv->regs + INTERRUPT_STATUS);
--	intr_status &= TS_PEN_INTR_MASK | TS_FIFO_INTR_MASK;
-+	regmap_read(priv->regmap, INTERRUPT_STATUS, &intr_status);
-+	intr_status &= (TS_PEN_INTR_MASK | TS_FIFO_INTR_MASK);
- 	if (intr_status == 0)
- 		return IRQ_NONE;
- 
- 	/* Clear all interrupt status bits, write-1-clear */
--	writel(intr_status, priv->regs + INTERRUPT_STATUS);
--
-+	regmap_write(priv->regmap, INTERRUPT_STATUS, intr_status);
- 	/* Pen up/down */
- 	if (intr_status & TS_PEN_INTR_MASK) {
--		if (readl(priv->regs + CONTROLLER_STATUS) & TS_PEN_DOWN)
-+		regmap_read(priv->regmap, CONTROLLER_STATUS, &priv->pen_status);
-+		if (priv->pen_status & TS_PEN_DOWN)
- 			priv->pen_status = PEN_DOWN_STATUS;
- 		else
- 			priv->pen_status = PEN_UP_STATUS;
- 
--		input_report_key(priv->idev, BTN_TOUCH, priv->pen_status);
-+		input_report_key(priv->idev, BTN_TOUCH,	priv->pen_status);
- 		needs_sync = true;
- 
- 		dev_dbg(&priv->pdev->dev,
-@@ -221,7 +227,7 @@ static irqreturn_t iproc_touchscreen_interrupt(int irq, void *data)
- 	/* coordinates in FIFO exceed the theshold */
- 	if (intr_status & TS_FIFO_INTR_MASK) {
- 		for (i = 0; i < priv->cfg_params.fifo_threshold; i++) {
--			raw_coordinate = readl(priv->regs + FIFO_DATA);
-+			regmap_read(priv->regmap, FIFO_DATA, &raw_coordinate);
- 			if (raw_coordinate == INVALID_COORD)
- 				continue;
- 
-@@ -239,7 +245,7 @@ static irqreturn_t iproc_touchscreen_interrupt(int irq, void *data)
- 			x = (x >> 4) & 0x0FFF;
- 			y = (y >> 4) & 0x0FFF;
- 
--			/* adjust x y according to lcd tsc mount angle */
-+			/* Adjust x y according to LCD tsc mount angle. */
- 			if (priv->cfg_params.invert_x)
- 				x = priv->cfg_params.max_x - x;
- 
-@@ -262,9 +268,10 @@ static irqreturn_t iproc_touchscreen_interrupt(int irq, void *data)
- 
- static int iproc_ts_start(struct input_dev *idev)
- {
--	struct iproc_ts_priv *priv = input_get_drvdata(idev);
- 	u32 val;
-+	u32 mask;
- 	int error;
-+	struct iproc_ts_priv *priv = input_get_drvdata(idev);
- 
- 	/* Enable clock */
- 	error = clk_prepare_enable(priv->tsc_clk);
-@@ -279,9 +286,10 @@ static int iproc_ts_start(struct input_dev *idev)
- 	 *  FIFO reaches the int_th value, and pen event(up/down)
- 	 */
- 	val = TS_PEN_INTR_MASK | TS_FIFO_INTR_MASK;
--	writel(val, priv->regs + INTERRUPT_MASK);
-+	regmap_update_bits(priv->regmap, INTERRUPT_MASK, val, val);
- 
--	writel(priv->cfg_params.fifo_threshold, priv->regs + INTERRUPT_THRES);
-+	val = priv->cfg_params.fifo_threshold;
-+	regmap_write(priv->regmap, INTERRUPT_THRES, val);
- 
- 	/* Initialize control reg1 */
- 	val = 0;
-@@ -289,26 +297,23 @@ static int iproc_ts_start(struct input_dev *idev)
- 	val |= priv->cfg_params.debounce_timeout << DEBOUNCE_TIMEOUT_SHIFT;
- 	val |= priv->cfg_params.settling_timeout << SETTLING_TIMEOUT_SHIFT;
- 	val |= priv->cfg_params.touch_timeout << TOUCH_TIMEOUT_SHIFT;
--	writel(val, priv->regs + REGCTL1);
-+	regmap_write(priv->regmap, REGCTL1, val);
- 
- 	/* Try to clear all interrupt status */
--	val = readl(priv->regs + INTERRUPT_STATUS);
--	val |= TS_FIFO_INTR_MASK | TS_PEN_INTR_MASK;
--	writel(val, priv->regs + INTERRUPT_STATUS);
-+	val = TS_FIFO_INTR_MASK | TS_PEN_INTR_MASK;
-+	regmap_update_bits(priv->regmap, INTERRUPT_STATUS, val, val);
- 
- 	/* Initialize control reg2 */
--	val = readl(priv->regs + REGCTL2);
--	val |= TS_CONTROLLER_EN_BIT | TS_WIRE_MODE_BIT;
--
--	val &= ~TS_CONTROLLER_AVGDATA_MASK;
-+	val = TS_CONTROLLER_EN_BIT | TS_WIRE_MODE_BIT;
- 	val |= priv->cfg_params.average_data << TS_CONTROLLER_AVGDATA_SHIFT;
- 
--	val &= ~(TS_CONTROLLER_PWR_LDO |	/* PWR up LDO */
-+	mask = (TS_CONTROLLER_AVGDATA_MASK);
-+	mask |= (TS_CONTROLLER_PWR_LDO |	/* PWR up LDO */
- 		   TS_CONTROLLER_PWR_ADC |	/* PWR up ADC */
- 		   TS_CONTROLLER_PWR_BGP |	/* PWR up BGP */
- 		   TS_CONTROLLER_PWR_TS);	/* PWR up TS */
--
--	writel(val, priv->regs + REGCTL2);
-+	mask |= val;
-+	regmap_update_bits(priv->regmap, REGCTL2, mask, val);
- 
- 	ts_reg_dump(priv);
- 
-@@ -320,12 +325,17 @@ static void iproc_ts_stop(struct input_dev *dev)
- 	u32 val;
- 	struct iproc_ts_priv *priv = input_get_drvdata(dev);
- 
--	writel(0, priv->regs + INTERRUPT_MASK); /* Disable all interrupts */
-+	/*
-+	 * Disable FIFO int_th and pen event(up/down)Interrupts only
-+	 * as the interrupt mask register is shared between ADC, TS and
-+	 * flextimer.
-+	 */
-+	val = TS_PEN_INTR_MASK | TS_FIFO_INTR_MASK;
-+	regmap_update_bits(priv->regmap, INTERRUPT_MASK, val, 0);
- 
- 	/* Only power down touch screen controller */
--	val = readl(priv->regs + REGCTL2);
--	val |= TS_CONTROLLER_PWR_TS;
--	writel(val, priv->regs + REGCTL2);
-+	val = TS_CONTROLLER_PWR_TS;
-+	regmap_update_bits(priv->regmap, REGCTL2, val, val);
- 
- 	clk_disable(priv->tsc_clk);
- }
-@@ -414,7 +424,6 @@ static int iproc_ts_probe(struct platform_device *pdev)
- {
- 	struct iproc_ts_priv *priv;
- 	struct input_dev *idev;
--	struct resource *res;
- 	int irq;
- 	int error;
- 
-@@ -422,12 +431,12 @@ static int iproc_ts_probe(struct platform_device *pdev)
- 	if (!priv)
- 		return -ENOMEM;
- 
--	/* touchscreen controller memory mapped regs */
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	priv->regs = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(priv->regs)) {
--		error = PTR_ERR(priv->regs);
--		dev_err(&pdev->dev, "unable to map I/O memory: %d\n", error);
-+	/* touchscreen controller memory mapped regs via syscon*/
-+	priv->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-+							"ts_syscon");
-+	if (IS_ERR(priv->regmap)) {
-+		error = PTR_ERR(priv->regmap);
-+		dev_err(&pdev->dev, "unable to map I/O memory:%d\n", error);
- 		return error;
- 	}
- 
--- 
-1.9.1
+Applied 3 and 4 to the hisilicon soc tree.
+Thanks!
+
+Best Regards,
+Wei
+
+> 
+> Thanks
+> 
+> .
+> 
