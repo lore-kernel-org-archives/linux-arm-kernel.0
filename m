@@ -1,270 +1,47 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Sat, 27 Feb 2016 12:22:05 +0530
-Subject: [PATCH v3 1/5] arm64: Broadcom Vulcan support
-In-Reply-To: <56C8C38E.50007@gmail.com>
-References: <56C8C38E.50007@gmail.com>
-Message-ID: <1456555925-11583-1-git-send-email-jchandra@broadcom.com>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Sat, 27 Feb 2016 12:29:53 +0530
+Subject: [PATCH v4 0/3] Syscon support for iProc touchscreen driver
+Message-ID: <1456556396-4759-1-git-send-email-raveendra.padasalagi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zi Shen Lim <zlim@broadcom.com>
+This patchset is based on v4.5-rc3 tag and its tested on
+Broadcom Cygnus SoC.
 
-Add a configuration option and a device tree for Broadcom's Vulcan
-ARM64 processor. vulcan.dtsi has the on-chip blocks like the PCIe
-controller, GICv3 with ITS, PMU, system timer and the pl011 UART.
-vulcan-eval.dts has definitions for a basic evaluation board.
+The patches can be fetched from iproc-tsc-v4 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-Vulcan's processor cores support the ARMv8.1 instruction set and
-will use "brcm,vulcan" as the compatible property. The firmware
-has PSCI 0.2 support for cpu wakeup.
+Changes since v3:
+ - Renamed touchscreen node "tsc" to "touchscreen" in dt binding document
+ - Added support for syscon only based register access in touch screen
+   driver and removed "regs" based register access. Updated dt binding
+   document to reflect the changes.
+ - Removed "brcm,iproc-touchscreen-syscon" compatible string support in
+   dt binding document and touchscreen driver implementation.
 
-Signed-off-by: Zi Shen Lim <zlim@broadcom.com>
-[ updated and split dts - jchandra at broadcom.com ]
-Signed-off-by: Jayachandran C <jchandra@broadcom.com>
----
+Changes since v2:
+ - Omitted '0x' in "tsc node" definition in dt documentation file
+ - Omitted '0x' in "ts_adc_syscon" definition in dt documentation file
+ - Added "brcm,iproc-ts-adc-syscon" compatible string in "ts_adc_syscon"
+   node. Updated dt documentation file to reflect this change.
 
-There is a minor update to this patch.
+Changes since v1:
+ - Enhanced touchscreen driver to handle syscon based register access if
+   "brcm,iproc-touchscreen-syscon" compatible string is provided in dt
+ - Normal register access is handled through readl and writel API's if
+   "brcm,iproc-touchscreen" compatible string is provided.
+ - Updated touchscreen dt node document to reflect the new changes.
+ - Updated change logs in each patchset to reflect the new changes
 
-After some discussions here, it looks like it is necessary to increase the
-PCI mem and mem64 ranges to support all the use cases. We are updating the
-firmware to use these ranges as well.
+Raveendra Padasalagi (3):
+  input: cygnus-update touchscreen dt node document
+  input: syscon support in bcm_iproc_tsc driver
+  ARM: dts: use syscon in cygnus touchscreen dt node
 
-Hope it is not too late to fix this, sorry for the late churn.
+ .../input/touchscreen/brcm,iproc-touchscreen.txt   | 21 ++++--
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  | 11 ++-
+ drivers/input/touchscreen/bcm_iproc_tsc.c          | 79 ++++++++++++----------
+ 3 files changed, 69 insertions(+), 42 deletions(-)
 
-Thanks,
-JC.
-
-v2->v3:
- update ranges in the pci entry in vulcan.dtsi, changes are:
- IO: removed, since it is not supported
- MEM:   0x4800_0000-0x5000_0000 to 0x4000_0000-0x6000_0000
- MEM 64: 0x6_0000_0000-0x7_0000_0000 to 0x40_0000_0000-0x60_0000_0000
-
- arch/arm64/Kconfig.platforms                 |   5 +
- arch/arm64/boot/dts/broadcom/Makefile        |   1 +
- arch/arm64/boot/dts/broadcom/vulcan-eval.dts |  33 ++++++
- arch/arm64/boot/dts/broadcom/vulcan.dtsi     | 147 +++++++++++++++++++++++++++
- 4 files changed, 186 insertions(+)
- create mode 100644 arch/arm64/boot/dts/broadcom/vulcan-eval.dts
- create mode 100644 arch/arm64/boot/dts/broadcom/vulcan.dtsi
-
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 21074f6..75e1bfe 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -131,6 +131,11 @@ config ARCH_VEXPRESS
- 	  This enables support for the ARMv8 software model (Versatile
- 	  Express).
- 
-+config ARCH_VULCAN
-+	bool "Broadcom Vulcan SOC Family"
-+	help
-+	  This enables support for Broadcom Vulcan SoC Family
-+
- config ARCH_XGENE
- 	bool "AppliedMicro X-Gene SOC Family"
- 	help
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-index e21fe66..bec1f8b 100644
---- a/arch/arm64/boot/dts/broadcom/Makefile
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_BCM_IPROC) += ns2-svk.dtb
-+dtb-$(CONFIG_ARCH_VULCAN) += vulcan-eval.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/broadcom/vulcan-eval.dts b/arch/arm64/boot/dts/broadcom/vulcan-eval.dts
-new file mode 100644
-index 0000000..9ee8d3d
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/vulcan-eval.dts
-@@ -0,0 +1,33 @@
-+/*
-+ * dts file for Broadcom (BRCM) Vulcan Evaluation Platform
-+ *
-+ * Copyright (c) 2013-2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+
-+#include "vulcan.dtsi"
-+
-+/ {
-+	model = "Broadcom Vulcan Eval Platform";
-+	compatible = "brcm,vulcan-eval", "brcm,vulcan-soc";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x80000000 0x0 0x80000000>,  /* 2G @ 2G  */
-+		      <0x00000008 0x80000000 0x0 0x80000000>;  /* 2G @ 34G */
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/broadcom/vulcan.dtsi b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-new file mode 100644
-index 0000000..85820e2
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-@@ -0,0 +1,147 @@
-+/*
-+ * dtsi file for Broadcom (BRCM) Vulcan processor
-+ *
-+ * Copyright (c) 2013-2016 Broadcom
-+ * Author: Zi Shen Lim <zlim@broadcom.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "Broadcom Vulcan";
-+	compatible = "brcm,vulcan-soc";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	/* just 4 cpus now, 128 needed in full config */
-+	cpus {
-+		#address-cells = <0x2>;
-+		#size-cells = <0x0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "brcm,vulcan", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "brcm,vulcan", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "brcm,vulcan", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "brcm,vulcan", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	gic: interrupt-controller at 400080000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		interrupt-controller;
-+		#redistributor-regions = <1>;
-+		reg = <0x04 0x00080000 0x0 0x20000>,	/* GICD */
-+		      <0x04 0x01000000 0x0 0x1000000>;	/* GICR */
-+		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		gicits: gic-its at 40010000 {
-+			compatible = "arm,gic-v3-its";
-+			msi-controller;
-+			reg = <0x04 0x00100000 0x0 0x20000>;	/* GIC ITS */
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>; /* PMU overflow */
-+	};
-+
-+	clk125mhz: uart_clk125mhz {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clk125mhz";
-+	};
-+
-+	pci {
-+		compatible = "pci-host-ecam-generic";
-+		device_type = "pci";
-+		#interrupt-cells = <1>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+
-+		/* ECAM at 0x3000_0000 - 0x4000_0000 */
-+		reg = <0x0 0x30000000  0x0 0x10000000>;
-+		reg-names = "PCI ECAM";
-+
-+		/*
-+		 * PCI ranges:
-+		 *   IO		no supported
-+		 *   MEM        0x4000_0000 - 0x6000_0000
-+		 *   MEM64 pref 0x40_0000_0000 - 0x60_0000_0000
-+		 */
-+		ranges =
-+		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
-+		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map =
-+		      /* addr  pin  ic   icaddr  icintr */
-+			<0 0 0  1  &gic   0 0    GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH
-+			 0 0 0  2  &gic   0 0    GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH
-+			 0 0 0  3  &gic   0 0    GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH
-+			 0 0 0  4  &gic   0 0    GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+		msi-parent = <&gicits>;
-+		dma-coherent;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		uart0: serial at 402020000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x04 0x02020000 0x0 0x1000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk125mhz>;
-+			clock-names = "apb_pclk";
-+		};
-+	};
-+
-+};
 -- 
 1.9.1
