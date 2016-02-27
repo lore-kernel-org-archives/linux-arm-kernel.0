@@ -1,154 +1,137 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Sat, 27 Feb 2016 09:43:49 +0530
-Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
-In-Reply-To: <56D0ACC4.1060605@caviumnetworks.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
- <20160226185341.GN29125@arm.com>
- <56D0ACC4.1060605@caviumnetworks.com>
-Message-ID: <CAFpQJXURSKFw6RmNVLiB=YDcUiaaQLz3zMvM9gy=b1MobaCfgg@mail.gmail.com>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Sat, 27 Feb 2016 12:19:00 +0530
+Subject: [PATCH v2 1/3] input: cygnus-update touchscreen dt node document
+In-Reply-To: <47ef2a75-3f97-644f-a817-c93e6b3bc658@broadcom.com>
+References: <1455702226-20599-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1455702226-20599-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <20160218143617.GH9654@rob-hp-laptop>
+ <CAAFb_vq6_uQbcWvwV8TZqVqH_C-ueUd+gBRA=mXUQrWqxoz=ww@mail.gmail.com>
+ <20160222193604.GA26177@dtor-ws> <56CB6471.3020400@broadcom.com>
+ <47ef2a75-3f97-644f-a817-c93e6b3bc658@broadcom.com>
+Message-ID: <CAAFb_vqozomcuZ_OaB+d_HWsPqr1VPSTjfYc_Bh9a+vbaLPBpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 27, 2016 at 1:21 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 02/26/2016 10:53 AM, Will Deacon wrote:
-> [...]
->>>
->>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
->>> new file mode 100644
->>> index 0000000..604e886
->>> --- /dev/null
->>> +++ b/arch/arm64/mm/numa.c
->>> @@ -0,0 +1,403 @@
->
-> [...]
->>>
->>> +
->>> +static int numa_off;
->>> +static int numa_distance_cnt;
->>> +static u8 *numa_distance;
->>> +
->>> +static __init int numa_parse_early_param(char *opt)
->>> +{
->>> +       if (!opt)
->>> +               return -EINVAL;
->>> +       if (!strncmp(opt, "off", 3)) {
->>> +               pr_info("%s\n", "NUMA turned off");
->>> +               numa_off = 1;
->>> +       }
->>> +       return 0;
->>> +}
->>> +early_param("numa", numa_parse_early_param);
->>
->>
->> Curious, but when is this option actually useful?
->>
->
-> Good point.  I will remove that bit, it was used as an aid in debugging
-> while bringing up the patch set.
+Thanks Scott and Ray for the inputs. I will implement syscon only
+register access and send out the changes in patch set - v4.
 
-this is handy in debugging new platforms.
-this boot argument option forces to boot as single node dummy system
-adding all resources to node0.
->
->
->
->>> +
->>> +cpumask_var_t node_to_cpumask_map[MAX_NUMNODES];
->>> +EXPORT_SYMBOL(node_to_cpumask_map);
->>> +
->>> +#ifdef CONFIG_DEBUG_PER_CPU_MAPS
->>> +
->>> +/*
->>> + * Returns a pointer to the bitmask of CPUs on Node 'node'.
->>> + */
->>> +const struct cpumask *cpumask_of_node(int node)
->>> +{
->>> +       if (WARN_ON(node >= nr_node_ids))
->>> +               return cpu_none_mask;
->>> +
->>> +       if (WARN_ON(node_to_cpumask_map[node] == NULL))
->>> +               return cpu_online_mask;
->>> +
->>> +       return node_to_cpumask_map[node];
->>> +}
->>> +EXPORT_SYMBOL(cpumask_of_node);
->>> +
->>> +#endif
->>> +
->>> +static void map_cpu_to_node(unsigned int cpu, int nid)
->>> +{
->>> +       set_cpu_numa_node(cpu, nid);
->>> +       if (nid >= 0)
->>> +               cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
->>> +}
->>> +
->>> +static void unmap_cpu_to_node(unsigned int cpu)
->>> +{
->>> +       int nid = cpu_to_node(cpu);
->>> +
->>> +       if (nid >= 0)
->>> +               cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
->>> +       set_cpu_numa_node(cpu, NUMA_NO_NODE);
->>> +}
->>
->>
->> How do you end up with negative nids this late in the game?
->>
->
-> It might be possible with some of the hot plugging code.  It is a little
-> paranoia programming.
->
-> If you really don't like it, we can remove it.
->
->>> +
->>> +void numa_clear_node(unsigned int cpu)
->>> +{
->>> +       unmap_cpu_to_node(cpu);
->>
->>
->> Why don't you just inline this function?
->
->
-> Good point, I will do that.
->
-> [...]
->>>
->>> +int __init numa_add_memblk(int nid, u64 start, u64 size)
->>> +{
->>> +       int ret;
->>> +
->>> +       ret = memblock_set_node(start, size, &memblock.memory, nid);
->>> +       if (ret < 0) {
->>> +               pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on
->>> node %d\n",
->>> +                       start, (start + size - 1), nid);
->>> +               return ret;
->>> +       }
->>> +
->>> +       node_set(nid, numa_nodes_parsed);
->>> +       pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
->>> +                       start, (start + size - 1), nid);
->>> +       return ret;
->>> +}
->>> +EXPORT_SYMBOL(numa_add_memblk);
->>
->>
->> But this is marked __init... (and you've done this elsewhere in the patch
->> too).
->
->
-> I will fix these.
->
->
->>
->> Will
->>
->
+Regards,
+Raveendra
 
-Ganapat
+On Tue, Feb 23, 2016 at 1:18 AM, Ray Jui <ray.jui@broadcom.com> wrote:
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> On 2/22/2016 11:41 AM, Scott Branden wrote:
+>>
+>> My comments below
+>>
+>> On 16-02-22 11:36 AM, Dmitry Torokhov wrote:
+>>>
+>>> On Fri, Feb 19, 2016 at 11:43:50AM +0530, Raveendra Padasalagi wrote:
+>>>>
+>>>> On Thu, Feb 18, 2016 at 8:06 PM, Rob Herring <robh@kernel.org> wrote:
+>>>>>
+>>>>> On Wed, Feb 17, 2016 at 03:13:44PM +0530, Raveendra Padasalagi wrote:
+>>>>>>
+>>>>>> In Cygnus SOC touch screen controller registers are shared
+>>>>>> with ADC and flex timer. Using readl/writel could lead to
+>>>>>> race condition. So touch screen driver is enhanced to support
+>>>>>>
+>>>>>> 1. If touchscreen register's are not shared. Register access
+>>>>>> is handled through readl/writel if "brcm,iproc-touchscreen"
+>>>>>> compatible is provided in touchscreen dt node. This will help
+>>>>>> for future SOC's if comes with dedicated touchscreen IP register's.
+>>>>>>
+>>>>>> 2. If touchscreen register's are shared with other IP's, register
+>>>>>> access is handled through syscon framework API's to take care of
+>>>>>> mutually exclusive access. This feature can be enabled by selecting
+>>>>>> "brcm,iproc-touchscreen-syscon" compatible string in the touchscreen
+>>>>>> dt node.
+>>>>>>
+>>>>>> Hence touchscreen dt node bindings document is updated to take care
+>>>>>> of above changes in the touchscreen driver.
+>>>>>>
+>>>>>> Signed-off-by: Raveendra Padasalagi
+>>>>>> <raveendra.padasalagi@broadcom.com>
+>>>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>> ---
+>>>>>>   .../input/touchscreen/brcm,iproc-touchscreen.txt   | 57
+>>>>>> +++++++++++++++++++---
+>>>>>>   1 file changed, 51 insertions(+), 6 deletions(-)
+>>>>>>
+>>>>>> diff --git
+>>>>>>
+>>>>>> a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>>>
+>>>>>> b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>>>
+>>>>>> index 34e3382..f530c25 100644
+>>>>>> ---
+>>>>>>
+>>>>>> a/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>>>
+>>>>>> +++
+>>>>>>
+>>>>>> b/Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
+>>>>>>
+>>>>>> @@ -1,12 +1,30 @@
+>>>>>>   * Broadcom's IPROC Touchscreen Controller
+>>>>>>
+>>>>>>   Required properties:
+>>>>>> -- compatible: must be "brcm,iproc-touchscreen"
+>>>>>> -- reg: physical base address of the controller and length of
+>>>>>> memory mapped
+>>>>>> -  region.
+>>>>>> +- compatible: should be one of
+>>>>>> +        "brcm,iproc-touchscreen"
+>>>>>> +        "brcm,iproc-touchscreen-syscon"
+>>>>>
+>>>>>
+>>>>> More specific and this is not how you do syscon. Either the block is or
+>>>>> isn't. You can't have it both ways.
+>>>>
+>>>>
+>>>> Existing driver has support for reg, if we modify now to support only
+>>>> syscon
+>>>> then this driver will not work if some one wishes to use previous
+>>>> kernel version's
+>>>> dt and vice versa. Basically this breaks dt compatibility. Is that ok ?
+>>>
+>>>
+>>> But the issue is that the driver does not actually work correctly with
+>>> direct register access on those systems, since the registers are
+>>> actually shared with other components. I am not quite sure if it is OK
+>>> to break DT binding in this case...
+>>
+>>
+>> The driver does work correctly with direct register access on those
+>> systems because the other components using those registers are not
+>> active in those systems - so syscon is not needed in those cases.
+>>
+>> I'm ok with not containing backwards compatibility though and always
+>> using syscon.  There are no deployed systems using older versions of the
+>> upstreamed kernel.
+>>>
+>>>
+>>> Thanks.
+>>>
+>>
+>> Regards,
+>> Scott
+>
+>
+> The iproc touchscreen is currently activated in the "bcm9hmidc.dtsi" that
+> represents the optional daughter card installed on reference boards
+> bcm958300k and bcm958305k. While not maintaining backwards compatibility
+> *might not* be a serious issue, it would be nice if we can at least make
+> sure the driver change and DT are merged into the same kernel version so
+> they stay in sync.
+>
+> Going forward, if we are only going to support syscon based implementation,
+> the existing compatible string "brcm,iproc-touchscreen" is preferred over
+> "brcm,iproc-touchscreen-syscon".
+>
+> Thanks,
+>
+> Ray
