@@ -1,127 +1,113 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 27 Feb 2016 03:53:16 +0200
-Subject: [PATCH/RFC v2 00/11] ARM/arm64: renesas: Add SYSC PM Domain DT
- Support
-In-Reply-To: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
-References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <8723964.uvbBYGm8Wz@avalon>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Sat, 27 Feb 2016 09:49:16 +0800
+Subject: [PATCH] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <1455926041-9579-1-git-send-email-al.stone@linaro.org>
+References: <1455926041-9579-1-git-send-email-al.stone@linaro.org>
+Message-ID: <56D1009C.90803@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Al,
 
-After rebasing this series on top of Simon's latest devel branch, I'm 
-experiencing hard system freezes when using the VSP.
+On 2016/2/20 7:54, al.stone at linaro.org wrote:
+> From: Al Stone <al.stone@linaro.org>	
+>
+> The ACPI 6.1 specification was recently released at the end of January 2016,
+> but the arm64 kernel documentation for the use of ACPI was written for the
+> 5.1 version of the spec.  There were significant additions to the spec that
+> had not yet been mentioned -- for example, the 6.0 mechanisms added to make
+> it easier to define processors and low power idle states, as well as the
+> 6.1 addition allowing regular interrupts (not just from GPIO) be used to
+> signal ACPI general purpose events.
+>
+> This patch reflects going back through and examining the specs in detail
+> and updating content appropriately.  Whilst there, a few odds and ends of
+> typos were caught as well.  This brings the documentation up to date with
+> ACPI 6.1 for arm64.
+>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> ---
+>  Documentation/arm64/acpi_object_usage.txt | 433 ++++++++++++++++++++++--------
+>  Documentation/arm64/arm-acpi.txt          |  28 +-
+>  2 files changed, 346 insertions(+), 115 deletions(-)
+>
+> diff --git a/Documentation/arm64/acpi_object_usage.txt b/Documentation/arm64/acpi_object_usage.txt
+> index a6e1a18..e321235 100644
+> --- a/Documentation/arm64/acpi_object_usage.txt
+> +++ b/Documentation/arm64/acpi_object_usage.txt
+> @@ -13,13 +13,14 @@ For ACPI on arm64, tables also fall into the following categories:
+>  
+>         -- Required: DSDT, FADT, GTDT, MADT, MCFG, RSDP, SPCR, XSDT
+>  
+> -       -- Recommended: BERT, EINJ, ERST, HEST, SSDT
+> +       -- Recommended: BERT, EINJ, ERST, HEST, IORT, PCCT, SSDT
 
-What makes the problem curious is that PM runtime works fine when the VSP 
-instances are probed, the A3VP power domain is turned on and off correctly for 
-each instance. However, after booting the system, if I try to RPM resume the 
-device, the system hangs.
+I would suggest IORT is Required, because IORT is the key table for supporting
+PCI MSI (MCFG is required above and I think ARM server should have PCI :) ), also
+IORT is needed for SMMU and platform  MSI.
 
-I've traced this (using printk debugging) down to the SYSCISCR write in 
-rcar_sysc_power(). The value written is 0x00000200, which corresponds to the 
-A3VP power domain, and the resume request completion wait loop doesn't time 
-out.
+>  
+> -       -- Optional: BGRT, CPEP, CSRT, DRTM, ECDT, FACS, FPDT, MCHI, MPST,
+> -          MSCT, RASF, SBST, SLIT, SPMI, SRAT, TCPA, TPM2, UEFI
+> +       -- Optional: BGRT, CPEP, CSRT, DBG2, DRTM, ECDT, FACS, FPDT, MCHI,
+> +          MPST, MSCT, NFIT, PMTT, RASF, SBST, SLIT, SPMI, SRAT, STAO, TCPA,
+> +	  TPM2, UEFI, XENV
+>  
+> -       -- Not supported: BOOT, DBG2, DBGP, DMAR, ETDT, HPET, IBFT, IVRS,
+> -          LPIT, MSDM, RSDT, SLIC, WAET, WDAT, WDRT, WPBT
+> +       -- Not supported: BOOT, DBGP, DMAR, ETDT, HPET, IBFT, IVRS, LPIT, 
+> +          MSDM, OEMx, PSDT, RSDT, SLIC, WAET, WDAT, WDRT, WPBT
+>  
+>  
+>  Table  Usage for ARMv8 Linux
+> @@ -50,7 +51,9 @@ CSRT   Signature Reserved (signature == "CSRT")
+>  
+>  DBG2   Signature Reserved (signature == "DBG2")
+>         == DeBuG port table 2 ==
+> -       Microsoft only table, will not be supported.
+> +       License has changed and should be usable.  
 
-Does this ring any bell ? Do you have a more recent version of this patch 
-series that I could try ?
+> Patches are available as of
+> +       this writing, but they have not been accepted into the kernel.  Optional
 
-On Monday 15 February 2016 22:16:49 Geert Uytterhoeven wrote:
-> 	Hi all,
-> 
-> The Renesas R-Car System Controller, as found in various Renesas R-Car
-> SoCs, provides power management for the CPU cores and various
-> coprocessors.
-> 
-> This RFC patch series adds DT support for the R-Car SYSC, using the
-> generic PM Domain. It supports R-Car H1, R-Car Gen2, and R-Car H3.
-> 
-> Patches:
->   - Patch 1 adds the DT binding documentation (alternatives I considered
->     below the "---"-line),
->   - Patch 2 moves the existing pm-rcar driver to drivers/soc/renesas, so
->     it can be shared by arm32 and arm64,
->   - Patches 3-5 contain the driver implementation,
->   - Patches 6-11 add the SYSC PM domains themselves to the various dtsi
->     files.
-> 
-> Known issues:
->   - This needs better integration with the PM code in pm-rcar-gen2, the
->     SMP code in smp-r8a7790, and Magnus' DT APMU series,
->   - CPG/MSSR clock domain handling should share more code with the
->     renesas-cpg-mssr driver.
-> 
-> Changes compared to v2 (more details in the individual patches):
->   - Moved pm-rcar from arch/arm/mach-shmobile/ to drivers/soc/renesas/,
->   - Added R-Car H3 (r8a7795) support, incl. support for devices part of
->     a SYSC PM domain and the CPG/MSSR clock domain,
->   - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
->   - Added fallback compatibility strings for R-Car Gen2 and Gen3.
->   - Changed one-line summary prefix to match current arm-soc practices,
->   - The L2 cache-controller patches have been extracted into a separate
->     series ("[PATCH v3 0/7] ARM/arm64: dts: renesas: Add/complete L2
->     cache-controller nodes"),
->   - Minor fixes.
-> 
-> This series is against renesas-devel-20160215-v4.5-rc4, with series
-> "[PATCH v3 0/7] ARM/arm64: dts: renesas: Add/complete L2
-> cache-controller nodes" applied. It is not yet meant to be applied!
-> It's published as-is to ease development of drivers for devices residing
-> in a SYSC PM domain on R-Car H3 (e.g. VSP, FCP_V).
-> 
-> This was tested on r8a7779/marzen, r8a7791/koelsch, r8a7794/alt, and
-> r8a7795/salvator-x.
-> 
-> For your convenience, I've also pushed this series to
-> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git#topi
-> c/rcar-sysc-pd-rfc-v2
-> 
-> Thanks for your comments!
-> 
-> Geert Uytterhoeven (11):
->   PM / Domains: Add DT bindings for the R-Car System Controller
->   soc: renesas: Move pm-rcar to drivers/soc/renesas/
->   soc: renesas: Improve rcar_sysc_power() debug info
->   soc: renesas: rcar: Add DT support for SYSC PM domains
->   soc: renesas: rcar: Handle clock domain devices in SYSC PM domains
->   ARM: dts: r8a7779: Add SYSC PM domains
->   ARM: dts: r8a7790: Add SYSC PM domains
->   ARM: dts: r8a7791: Add SYSC PM domains
->   ARM: dts: r8a7793: Add SYSC PM domains
->   ARM: dts: r8a7794: Add SYSC PM domains
->   arm64: dts: r8a7795: Add SYSC PM domains
-> 
->  .../bindings/power/renesas,sysc-rcar.txt           |  87 ++++
->  arch/arm/boot/dts/r8a7779.dtsi                     |  48 ++
->  arch/arm/boot/dts/r8a7790.dtsi                     |  89 ++++
->  arch/arm/boot/dts/r8a7791.dtsi                     |  40 ++
->  arch/arm/boot/dts/r8a7793.dtsi                     |  39 ++
->  arch/arm/boot/dts/r8a7794.dtsi                     |  40 ++
->  arch/arm/mach-shmobile/Kconfig                     |   8 +-
->  arch/arm/mach-shmobile/Makefile                    |   1 -
->  arch/arm/mach-shmobile/pm-r8a7779.c                |   3 +-
->  arch/arm/mach-shmobile/pm-rcar-gen2.c              |   2 +-
->  arch/arm/mach-shmobile/pm-rcar.c                   | 164 ------
->  arch/arm/mach-shmobile/smp-r8a7779.c               |   2 +-
->  arch/arm/mach-shmobile/smp-r8a7790.c               |   2 +-
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 142 ++++++
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   3 +-
->  drivers/soc/renesas/Kconfig                        |   8 +
->  drivers/soc/renesas/Makefile                       |   1 +
->  drivers/soc/renesas/pm-rcar.c                      | 559 ++++++++++++++++++
->  .../linux/soc/renesas}/pm-rcar.h                   |   2 +
->  20 files changed, 1065 insertions(+), 176 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/power/renesas,sysc-rcar.txt delete mode
-> 100644 arch/arm/mach-shmobile/pm-rcar.c
->  create mode 100644 drivers/soc/renesas/Kconfig
->  create mode 100644 drivers/soc/renesas/Makefile
->  create mode 100644 drivers/soc/renesas/pm-rcar.c
->  rename {arch/arm/mach-shmobile => include/linux/soc/renesas}/pm-rcar.h
-> (93%)
+The information will be outdated once those patches are accepted, can we remove
+it?
 
--- 
-Regards,
+> +       if used instead of earlycon=<device> on the command line.
+>  
+>  DBGP   Signature Reserved (signature == "DBGP")
+>         == DeBuG Port table ==
+> @@ -133,10 +136,11 @@ GTDT   Section 5.2.24 (signature == "GTDT")
+>  
+>  HEST   Section 18.3.2 (signature == "HEST")
+>         == Hardware Error Source Table ==
+> -       Until further error source types are defined, use only types 6 (AER
+> -       Root Port), 7 (AER Endpoint), 8 (AER Bridge), or 9 (Generic Hardware
+> -       Error Source).  Firmware first error handling is possible if and only
+> -       if Trusted Firmware is being used on arm64.
+> +       ARM-specific error sources have been defined; please use those or the
+> +       PCI types such as type 6 (AER Root Port), 7 (AER Endpoint), or 8 (AER 
+> +       Bridge), or use type 9 (Generic Hardware Error Source).  Firmware first
+> +       error handling is possible if and only if Trusted Firmware is being 
+> +       used on arm64.
+>  
+>         Must be supplied if RAS support is provided by the platform.  It
+>         is recommended this table be supplied.
+> @@ -149,20 +153,26 @@ IBFT   Signature Reserved (signature == "IBFT")
+>         == iSCSI Boot Firmware Table ==
+>         Microsoft defined table, support TBD.
+>  
+> +IORT   Signature Reserved (signature == "IORT")
+> +       == Input Output Remapping Table ==
+> +       arm64 only table, required in order to describe the SMMU and/or ITS 
+> +       when it is provided by the platform.
 
-Laurent Pinchart
+How about the following:
+
+"arm64 only table, required in order to describe IO topology, SMMUs, and GIC ITSs,
+and how those various components are connected together, such as identify which
+components are behind which SMMU/ITS(ITSs)."
+
+Thanks
+Hanjun
