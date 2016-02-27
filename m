@@ -1,91 +1,117 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 27 Feb 2016 10:54:47 -0800
-Subject: [PATCH v2 00/10] mfd: axp20x: Add support for AXP809 PMIC
-In-Reply-To: <1455532288-30870-1-git-send-email-wens@csie.org>
-References: <1455532288-30870-1-git-send-email-wens@csie.org>
-Message-ID: <CAGb2v667XLSNQQf9kfYf1fV3Q0J1ktfVe+QFfxmZYCXQHnf=7g@mail.gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Sat, 27 Feb 2016 22:32:57 +0300
+Subject: [PATCH] spi: lp-8841: return correct error code from probe
+In-Reply-To: <1456400265-3068525-1-git-send-email-arnd@arndb.de>
+References: <1456400265-3068525-1-git-send-email-arnd@arndb.de>
+Message-ID: <1456601577.23036.60.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi?Arnd,
 
-On Mon, Feb 15, 2016 at 2:31 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi everyone,
->
-> This is v2 of the AXP809 PMIC support series. This adds support for
-> X-Powers' AXP809 PMIC. This is the primary PMIC accompanying Allwinner's
-> A80 SoC. For now, only the power button (PEK) and regulators are
-> supported. These are supported using existing axp20x drivers. This is
-> based on the AXP223 series v8, as well as 2 patches from v1 that are
-> already in regulator/topic/axp20x.
+On Thu, 2016-02-25 at 12:37 +0100, Arnd Bergmann wrote:
+> The spi_lp8841_rtc_probe() function misses an initialization of the
+> return code when it fails to get its memory resource, as gcc notices:
+> 
+> drivers/spi/spi-lp8841-rtc.c: In function 'spi_lp8841_rtc_probe':
+> drivers/spi/spi-lp8841-rtc.c:239:9: error: 'ret' may be used
+> uninitialized in this function [-Werror=maybe-uninitialized]
 
-Any updates on this series?
+I wasn't getting this warning when I was building the driver. This
+happened because -Wmaybe-uninitialized is suppressed when
+CONFIG_CC_OPTIMIZE_FOR_SIZE is selected
+(Commit?e74fc973b6e531fef1fce8b101ffff05ecfb774c "Turn off -Wmaybe-
+uninitialized when building with -Os").
 
-Thanks.
-ChenYu
+A recent gcc version like 5.3.1 doesn't seem to produce much false
+positives. May it make sense to revert that commit?
 
-> Changes since v1:
->
->   - Added patch 4, changing default regulator names to lowercase.
->   - Dropped regulator nodes from axp809.dtsi.
->
-> Patch 1 adds a MAINTAINERS entry for the X-Powers AXP PMICs. I list
-> myself as the maintainer.
->
-> Patch 2 adds AXP809 to the axp20x bindings.
->
-> Patch 3 adds AXP809 support to the axp20x mfd driver.
->
-> Patch 4 changes the in-kernel default regulator names from uppercase to
-> lowercase, making it easier on the eye.
->
-> Patch 5 adds AXP809 support to the axp20x regulator driver. This patch
-> depends on patch 3, and patches already in regulator/topic/axp20x.
->
-> Patch 6 adds a dtsi file for AXP809.
->
-> Patch 7 enables AXP809 support on the A80 Optimus board.
->
-> Patch 8 enables AXP809 support on the Cubieboard 4.
->
-> Patch 9 disables the dummy regulators from sunxi-common-regulators.dtsi
-> on the A80 Optimus board. These aren't used in the board DTS anymore.
->
-> Patch 10 disables the dummy regulators from sunxi-common-regulators.dtsi,
-> on the Cubieboard4. These aren't used in the board DTS anymore.
->
->
-> Regards
-> ChenYu
->
-> Chen-Yu Tsai (10):
->   MAINTAINERS: Add entry for X-Powers AXP family PMIC drivers
->   mfd: axp20x: Add bindings for AXP809 PMIC
->   mfd: axp20x: Add support for AXP809 PMIC
->   regulator: axp20x: Use of_match name as default regulator name
->   regulator: axp20x: support AXP809 variant
->   ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
->   ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC device node and
->     regulators
->   ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device node and
->     regulators
->   ARM: dts: sun9i: a80-optimus: Disable dummy regulators vcc3v0, vcc3v3,
->     vcc5v0
->   ARM: dts: sun9i: cubieboard4: Disable dummy regulators vcc3v0, vcc3v3,
->     vcc5v0
->
->  Documentation/devicetree/bindings/mfd/axp20x.txt   |  31 ++++-
->  MAINTAINERS                                        |   6 +
->  .../dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} |  98 ++------------
->  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 143 ++++++++++++++++++++-
->  arch/arm/boot/dts/sun9i-a80-optimus.dts            | 143 ++++++++++++++++++++-
->  drivers/mfd/axp20x-rsb.c                           |   1 +
->  drivers/mfd/axp20x.c                               |  79 ++++++++++++
->  drivers/regulator/axp20x-regulator.c               | 129 ++++++++++++++-----
->  include/linux/mfd/axp20x.h                         |  59 +++++++++
->  9 files changed, 559 insertions(+), 130 deletions(-)
->  copy arch/arm/boot/dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} (52%)
->
-> --
-> 2.7.0
->
+The gcc-5.3.1 log for reference.
+
+---8<---
+$ arm-linux-gnueabi-gcc --version
+arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+$ make -j 4 -s KCFLAGS=-Wmaybe-uninitialized
+ipc/shm.c: In function 'SyS_shmdt':
+ipc/shm.c:1344:59: warning: 'file' may be used uninitialized in this function [-Wmaybe-uninitialized]
+???????((vma->vm_start - addr)/PAGE_SIZE == vma->vm_pgoff) &&
+???????????????????????????????????????????????????????????^
+ipc/shm.c:1267:15: note: 'file' was declared here
+? struct file *file;
+???????????????^
+mm/vmscan.c: In function 'shrink_zone':
+mm/vmscan.c:2418:18: warning: 'lru_pages' may be used uninitialized in this function [-Wmaybe-uninitialized]
+????unsigned long lru_pages;
+??????????????????^
+drivers/gpio/gpiolib-of.c: In function 'of_gpiochip_add':
+drivers/gpio/gpiolib-of.c:221:7: warning: 'dflags' may be used uninitialized in this function [-Wmaybe-uninitialized]
+???if (gpiod_hog(desc, name, lflags, dflags))
+???????^
+drivers/gpio/gpiolib-of.c:211:19: note: 'dflags' was declared here
+? enum gpiod_flags dflags;
+???????????????????^
+drivers/gpio/gpiolib-of.c:221:7: warning: 'lflags' may be used uninitialized in this function [-Wmaybe-uninitialized]
+???if (gpiod_hog(desc, name, lflags, dflags))
+???????^
+drivers/gpio/gpiolib-of.c:210:25: note: 'lflags' was declared here
+? enum gpio_lookup_flags lflags;
+?????????????????????????^
+net/core/dev.c: In function 'validate_xmit_skb_list':
+net/core/dev.c:2984:15: warning: 'tail' may be used uninitialized in this function [-Wmaybe-uninitialized]
+????tail->next = skb;
+???????????????^
+drivers/spi/spi-lp8841-rtc.c: In function 'spi_lp8841_rtc_probe':
+drivers/spi/spi-lp8841-rtc.c:239:9: warning: 'ret' may be used uninitialized in this function [-Wmaybe-uninitialized]
+? return ret;
+?????????^
+net/sunrpc/svcauth_unix.c: In function 'unix_gid_parse':
+net/sunrpc/svcauth_unix.c:510:2: warning: 'gids' may be used uninitialized in this function [-Wmaybe-uninitialized]
+? for (i = 0 ; i < gids ; i++) {
+? ^
+In file included from include/linux/sunrpc/svcauth.h:16:0,
+?????????????????from include/linux/sunrpc/svc.h:18,
+?????????????????from include/linux/sunrpc/svcsock.h:12,
+?????????????????from net/sunrpc/svcauth_unix.c:6:
+include/linux/sunrpc/cache.h:306:9: warning: 'rv' may be used uninitialized in this function [-Wmaybe-uninitialized]
+? return rv - boot.tv_sec;
+?????????^
+include/linux/sunrpc/cache.h:298:9: note: 'rv' was declared here
+? time_t rv;
+?????????^
+net/sunrpc/svcauth_unix.c: In function 'ip_map_parse':
+include/linux/sunrpc/cache.h:306:9: warning: 'rv' may be used uninitialized in this function [-Wmaybe-uninitialized]
+? return rv - boot.tv_sec;
+?????????^
+include/linux/sunrpc/cache.h:298:9: note: 'rv' was declared here
+? time_t rv;
+?????????^
+In file included from net/sunrpc/cache.c:34:0:
+net/sunrpc/cache.c: In function 'write_flush':
+include/linux/sunrpc/cache.h:306:9: warning: 'rv' may be used uninitialized in this function [-Wmaybe-uninitialized]
+? return rv - boot.tv_sec;
+?????????^
+include/linux/sunrpc/cache.h:298:9: note: 'rv' was declared here
+? time_t rv;
+?????????^
+net/sunrpc/auth_gss/svcauth_gss.c: In function 'rsc_parse':
+net/sunrpc/auth_gss/svcauth_gss.c:456:22: warning: 'id' may be used uninitialized in this function [-Wmaybe-uninitialized]
+???rsci.cred.cr_uid = make_kuid(&init_user_ns, id);
+??????????????????????^
+In file included from include/linux/sunrpc/svcauth.h:16:0,
+?????????????????from include/linux/sunrpc/svc.h:18,
+?????????????????from include/linux/sunrpc/auth_gss.h:17,
+?????????????????from net/sunrpc/auth_gss/svcauth_gss.c:46:
+include/linux/sunrpc/cache.h:306:9: warning: 'rv' may be used uninitialized in this function [-Wmaybe-uninitialized]
+? return rv - boot.tv_sec;
+?????????^
+include/linux/sunrpc/cache.h:298:9: note: 'rv' was declared here
+? time_t rv;
+?????????^
+net/sunrpc/auth_gss/svcauth_gss.c: In function 'rsi_parse':
+include/linux/sunrpc/cache.h:306:9: warning: 'rv' may be used uninitialized in this function [-Wmaybe-uninitialized]
+? return rv - boot.tv_sec;
+?????????^
+include/linux/sunrpc/cache.h:298:9: note: 'rv' was declared here
+? time_t rv;
+?????????^
+---8<---
