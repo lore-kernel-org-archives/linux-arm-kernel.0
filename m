@@ -1,79 +1,54 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 27 Feb 2016 09:05:44 +0800
-Subject: [PATCH v1] kasan, arm64: Unpoison dirty stack frames when
- resuming from suspend.
-In-Reply-To: <c08aa050cb03e40098775dc8d200f073451c342e.1456489933.git.glider@google.com>
-Message-ID: <201602270944.MOAjfHX8%fengguang.wu@intel.com>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Fri, 26 Feb 2016 20:31:00 -0500
+Subject: [PATCH 0/4] pwm: omap-dmtimer: fix period/duty_cycle calculation
+In-Reply-To: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <20160226203100.303fe192.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+On Fri, 29 Jan 2016 23:26:50 -0500
+"David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
 
-[auto build test WARNING on arm64/for-next/core]
-[also build test WARNING on v4.5-rc5 next-20160226]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> From: David Rivshin <drivshin@allworx.com>
+> 
+> When using a short PWM period (approaching the min of 2/clk_rate),
+> pwm-omap-dmtimer does not produce accurate results. In the worst case a
+> requested period of 2/clk_rate would result in a real period of 4/clk_rate
+> instead. This is a series includes a fix for that problem, as well as
+> other related improvements, and is based on the current linux-pwm/for-next
+> tip.
+> 
+> I have tested on a Sitara AM335x platform, using a scope to verify the
+> output with a variety of periods and duty cycles. This includes a PWM
+> rate up clk_rate/2 with 50% duty cycle (e.g. generating fclk/2) with
+> both 32768Hz and 24MHz fclks. I do not have an OMAP4 board to test with,
+> although appropriate sections in the the reference manuals appear
+> substantially the same, so I believe the changes are equally correct
+> there.
+> 
+> Note that the OMAP4 TRMs do effectively state that the maximum PWM
+> rate is clk_rate/4, so at very fast PWM rates the behavior may not be
+> as reliable as I observed with Sitara. Although I suspect that it's
+> the same module and will also work, at least under some circumstances.
+> If anyone with OMAP4 hardware and a scope is so inclined, I would be
+> curious to know the results.
+> 
+> David Rivshin (4):
+>   pwm: omap-dmtimer: fix inaccurate period/duty_cycle calculation
+>   pwm: omap-dmtimer: add sanity checking for load and match values
+>   pwm: omap-dmtimer: round load and match values rather than truncate
+>   pwm: omap-dmtimer: add dev_dbg() message for effective period and duty
+>     cycle
+> 
+>  drivers/pwm/pwm-omap-dmtimer.c | 71 ++++++++++++++++++++++++++++++++----------
+>  1 file changed, 55 insertions(+), 16 deletions(-)
+> 
 
-url:    https://github.com/0day-ci/linux/commits/Alexander-Potapenko/kasan-arm64-Unpoison-dirty-stack-frames-when-resuming-from-suspend/20160226-204052
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/core
-config: arm64-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Hi Thierry,
 
-All warnings (new ones prefixed by >>):
+Gentle ping. It does not look like you've taken this series, and I 
+wanted to make sure you're not waiting on something from me. It would 
+be nice to get at least the first patch into 4.5, if possible.
 
-   mm/kasan/kasan.c: In function 'kasan_stack_watermark':
->> mm/kasan/kasan.c:564:13: warning: assignment makes integer from pointer without a cast
-     *watermark = __builtin_frame_address(0);
-                ^
-   mm/kasan/kasan.c: In function 'kasan_cpu_resume':
->> mm/kasan/kasan.c:570:21: warning: initialization makes integer from pointer without a cast
-     unsigned long sp = __builtin_frame_address(0);
-                        ^
->> mm/kasan/kasan.c:579:3: warning: passing argument 1 of 'kasan_unpoison_shadow' makes pointer from integer without a cast
-      kasan_unpoison_shadow(*watermark, sp - *watermark);
-      ^
-   mm/kasan/kasan.c:53:6: note: expected 'const void *' but argument is of type 'long unsigned int'
-    void kasan_unpoison_shadow(const void *address, size_t size)
-         ^
-
-vim +564 mm/kasan/kasan.c
-
-   558	 * will be used upon resume to unpoison the dirty stack frames.
-   559	 */
-   560	void kasan_stack_watermark(void)
-   561	{
-   562		unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
-   563	
- > 564		*watermark = __builtin_frame_address(0);
-   565	}
-   566	EXPORT_SYMBOL_GPL(kasan_stack_watermark);
-   567	
-   568	void kasan_cpu_resume(void)
-   569	{
- > 570		unsigned long sp = __builtin_frame_address(0);
-   571		unsigned long *watermark = this_cpu_ptr(&cpu_stack_watermark);
-   572	
-   573		if (*watermark == 0) {
-   574			WARN_ON_ONCE(*watermark == 0);
-   575			*watermark = sp;
-   576			return;
-   577		}
-   578		if (sp > *watermark) {
- > 579			kasan_unpoison_shadow(*watermark, sp - *watermark);
-   580			*watermark = 0;
-   581		}
-   582	}
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 48245 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160227/22099514/attachment-0001.obj>
+Thanks!
