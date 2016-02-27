@@ -1,137 +1,55 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 27 Feb 2016 17:58:59 +0100
-Subject: [PATCH v4 2/2] ohci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
-References: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1456592339-31767-3-git-send-email-hdegoede@redhat.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 27 Feb 2016 19:01:44 +0100
+Subject: [PATCH v5 0/4] Add support for Amlogic Meson MMC driver
+Message-ID: <1456596108-1406-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
-reset lines, the controller will not initialize while the reset for
-its companion is still asserted, which means we need to de-assert
-2 resets for the controller to work.
+From: Carlo Caione <carlo@endlessm.com>
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
-Changes in v2:
--New patch in v2 of this patch-set, to complement the identical patch for
- the ehci-platform code
-Changes in v3:
--Adjust for changes to shared-reset reset-controller functions
-Changes in v4:
--Fix Ugly continuation line
----
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  2 +-
- drivers/usb/host/ohci-platform.c                   | 43 ++++++++++++----------
- 2 files changed, 24 insertions(+), 21 deletions(-)
+This patchset adds support for the MMC driver found on the Meson platforms.
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 19233b7..9df4569 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -14,7 +14,7 @@ Optional properties:
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
--- resets : phandle + reset specifier pair
-+- resets : a list of phandle + reset specifier pairs
- 
- Example:
- 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index c2669f18..85f5c9a 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -33,11 +33,12 @@
- 
- #define DRIVER_DESC "OHCI generic platform driver"
- #define OHCI_MAX_CLKS 3
-+#define OHCI_MAX_RESETS 2
- #define hcd_to_ohci_priv(h) ((struct ohci_platform_priv *)hcd_to_ohci(h)->priv)
- 
- struct ohci_platform_priv {
- 	struct clk *clks[OHCI_MAX_CLKS];
--	struct reset_control *rst;
-+	struct reset_control *resets[OHCI_MAX_RESETS];
- 	struct phy **phys;
- 	int num_phys;
- };
-@@ -117,7 +118,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
- 	struct ohci_hcd *ohci;
--	int err, irq, phy_num, clk = 0;
-+	int err, irq, phy_num, clk = 0, rst = 0;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -195,19 +196,21 @@ static int ohci_platform_probe(struct platform_device *dev)
- 				break;
- 			}
- 		}
--
--	}
--
--	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
--	if (IS_ERR(priv->rst)) {
--		err = PTR_ERR(priv->rst);
--		if (err == -EPROBE_DEFER)
--			goto err_put_clks;
--		priv->rst = NULL;
--	} else {
--		err = reset_control_deassert(priv->rst);
--		if (err)
--			goto err_put_clks;
-+		for (rst = 0; rst < OHCI_MAX_RESETS; rst++) {
-+			priv->resets[rst] =
-+				devm_reset_control_get_shared_by_index(
-+						&dev->dev, rst);
-+			if (IS_ERR(priv->resets[rst])) {
-+				err = PTR_ERR(priv->resets[rst]);
-+				if (err == -EPROBE_DEFER)
-+					goto err_reset;
-+				priv->resets[rst] = NULL;
-+				break;
-+			}
-+			err = reset_control_deassert(priv->resets[rst]);
-+			if (err)
-+				goto err_reset;
-+		}
- 	}
- 
- 	if (pdata->big_endian_desc)
-@@ -265,8 +268,8 @@ err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- err_reset:
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	while (--rst >= 0)
-+		reset_control_assert(priv->resets[rst]);
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
-@@ -284,15 +287,15 @@ static int ohci_platform_remove(struct platform_device *dev)
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
--	int clk;
-+	int clk, rst;
- 
- 	usb_remove_hcd(hcd);
- 
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- 
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	for (rst = 0; rst < OHCI_MAX_RESETS && priv->resets[rst]; rst++)
-+		reset_control_assert(priv->resets[rst]);
- 
- 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++)
- 		clk_put(priv->clks[clk]);
+Changelog:
+
+v2:
+    * fix typo in commit message
+    * avoid the bounce buffer (max_segs == 1)
+
+v3:
+    * simplify meson_mmc_map_dma() and fix memory leak
+
+v4:
+    * code and documentation cleanup
+    * removed redundant variables
+    * removed useless printing
+    * introduced MMC_CAP2_NO_SDIO
+    * removed state machine
+    * better spinlocks management and positioning
+
+v5:
+    * split submission in several patches
+    * update mmc->actual_clock
+    * fix timeout value
+    * add clk_prepare_enable()
+    * add 'meson,sd-port' property
+
+Carlo Caione (4):
+  mmc: meson: Document Amlogic Meson MMC DT bindings
+  mmc: meson: Add driver for the SD/MMC host found on Amlogic Meson SoCs
+  ARM: dts: meson8b: Add MMC nodes
+  ARM: multi_v7_defconfig: Add Amlogic Meson MMC support
+
+ .../devicetree/bindings/mmc/meson-mmc.txt          |  30 ++
+ arch/arm/boot/dts/meson8b-mxq.dts                  |   8 +
+ arch/arm/boot/dts/meson8b-odroidc1.dts             |   8 +
+ arch/arm/boot/dts/meson8b.dtsi                     |  16 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ drivers/mmc/host/Kconfig                           |   7 +
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/meson-mmc.c                       | 535 +++++++++++++++++++++
+ 8 files changed, 606 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/meson-mmc.txt
+ create mode 100644 drivers/mmc/host/meson-mmc.c
+
 -- 
-2.7.1
+1.9.1
