@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Sat, 27 Feb 2016 17:44:12 +0800
-Subject: [GIT PULL]Hisilicon Hip05 SoC DT updates for 4.6
-Message-ID: <56D16FEC.9070906@hisilicon.com>
+Date: Sat, 27 Feb 2016 17:47:10 +0800
+Subject: [GIT PULL]Hisilicon Hip05 SoC defconfig updates for 4.6
+Message-ID: <56D1709E.90109@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,29 +21,20 @@ The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hip05-dt-for-4.6
+  git://github.com/hisilicon/linux-hisi.git tags/hip05-config-for-4.6
 
-for you to fetch changes up to 82a14b1e95b4ce003bf8774861f631ea47e54975:
+for you to fetch changes up to c966f0521db49f561d18820107654b0895c1c394:
 
-  arm64: dts: hip05: Append power button node for D02 board (2016-02-25 21:15:58 +0800)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon Hip05 soc and D02 board updates for 4.6
-
-- Add L2 cache topology
-- Use Cortex specific device node for pmu
-- Append all gicv3 ITS entries
-- Append gpio nodes
-- Append power button node for D02 board
+  arm64: defconfig: Enable DesignWare APB GPIO controller (2016-02-25 21:21:26 +0800)
 
 ----------------------------------------------------------------
-Kefeng Wang (5):
-      arm64: dts: hip05: Add L2 cache topology
-      arm64: dts: hip05: Use Cortex specific device node for pmu
-      arm64: dts: hip05: Append all gicv3 ITS entries
-      arm64: dts: hip05: Append gpio nodes
-      arm64: dts: hip05: Append power button node for D02 board
+ARM64: Hip05: configure updates for 4.6
 
- arch/arm64/boot/dts/hisilicon/hip05-d02.dts | 18 ++++++
- arch/arm64/boot/dts/hisilicon/hip05.dtsi    | 92 ++++++++++++++++++++++++++++-
- 2 files changed, 108 insertions(+), 2 deletions(-)
+- Enable DesignWare APB GPIO controller
+
+----------------------------------------------------------------
+Kefeng Wang (1):
+      arm64: defconfig: Enable DesignWare APB GPIO controller
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
