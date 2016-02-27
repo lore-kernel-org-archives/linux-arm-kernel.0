@@ -1,86 +1,62 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 27 Feb 2016 17:18:26 +0100
-Subject: [linux-sunxi][PATCH 2/5] ARM: dts :sunxi: Add SPDIF pins to A10 and
- A20
+Date: Sat, 27 Feb 2016 17:18:29 +0100
+Subject: [linux-sunxi][PATCH 5/5] ARM: dts: sun7i: Add SPDIF to Itead Ibox
 In-Reply-To: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
 References: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1456589909-2428-3-git-send-email-codekipper@gmail.com>
+Message-ID: <1456589909-2428-6-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Add the SPDIF pins to the A10 and A20 dtsi.
+Enable the S/PDIF transmitter that is present on the Itead Ibox.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 21 +++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi | 21 +++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 2c8f5e6..0483640 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -1006,6 +1006,27 @@
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
-+
-+			spdif_tx_pins_a: spdif at 0 {
-+				allwinner,pins = "PB13";
-+				allwinner,function = "spdif";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+			};
-+
-+			spdif_rx_pins_a: spdif at 1 {
-+				allwinner,pins = "PB12";
-+				allwinner,function = "spdif";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			spdif_mclk_pins_a: spdif at 2 {
-+				allwinner,pins = "PB3";
-+				allwinner,function = "spdif";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
+diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+index a512581..df76b74 100644
+--- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+@@ -65,6 +65,23 @@
+ 			default-state = "on";
  		};
+ 	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "On-board SPDIF";
++		simple-audio-card,cpu {
++			sound-dai = <&spdif>;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&spdif_out>;
++		};
++	};
++
++	spdif_out: spdif-out {
++		#sound-dai-cells = <0>;
++		compatible = "linux,spdif-dit";
++	};
+ };
  
- 		timer at 01c20c00 {
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 0940a78..7264d5e 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1193,6 +1193,27 @@
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
-+
-+			spdif_tx_pins_a: spdif at 0 {
-+				allwinner,pins = "PB13";
-+				allwinner,function = "spdif";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+			};
-+
-+			spdif_rx_pins_a: spdif at 1 {
-+				allwinner,pins = "PB12";
-+				allwinner,function = "spdif";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			spdif_mclk_pins_a: spdif at 2 {
-+				allwinner,pins = "PB3";
-+				allwinner,function = "spdif";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
- 		};
+ &ahci {
+@@ -131,6 +148,13 @@
+ 	status = "okay";
+ };
  
- 		timer at 01c20c00 {
++
++&spdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spdif_tx_pins_a>;
++	status = "okay";
++};
++
+ &usbphy {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&usb0_id_detect_pin>;
 -- 
 2.7.1
