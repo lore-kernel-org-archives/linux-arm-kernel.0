@@ -1,82 +1,154 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 27 Feb 2016 11:29:20 +0800
-Subject: [PATCH V2 11/12] net-next: mediatek: add Kconfig and Makefile
-In-Reply-To: <1456496504-50429-12-git-send-email-blogic@openwrt.org>
-Message-ID: <201602271159.LQufbxSQ%fengguang.wu@intel.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Sat, 27 Feb 2016 09:43:49 +0530
+Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
+In-Reply-To: <56D0ACC4.1060605@caviumnetworks.com>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+ <20160226185341.GN29125@arm.com>
+ <56D0ACC4.1060605@caviumnetworks.com>
+Message-ID: <CAFpQJXURSKFw6RmNVLiB=YDcUiaaQLz3zMvM9gy=b1MobaCfgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+On Sat, Feb 27, 2016 at 1:21 AM, David Daney <ddaney@caviumnetworks.com> wrote:
+> On 02/26/2016 10:53 AM, Will Deacon wrote:
+> [...]
+>>>
+>>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+>>> new file mode 100644
+>>> index 0000000..604e886
+>>> --- /dev/null
+>>> +++ b/arch/arm64/mm/numa.c
+>>> @@ -0,0 +1,403 @@
+>
+> [...]
+>>>
+>>> +
+>>> +static int numa_off;
+>>> +static int numa_distance_cnt;
+>>> +static u8 *numa_distance;
+>>> +
+>>> +static __init int numa_parse_early_param(char *opt)
+>>> +{
+>>> +       if (!opt)
+>>> +               return -EINVAL;
+>>> +       if (!strncmp(opt, "off", 3)) {
+>>> +               pr_info("%s\n", "NUMA turned off");
+>>> +               numa_off = 1;
+>>> +       }
+>>> +       return 0;
+>>> +}
+>>> +early_param("numa", numa_parse_early_param);
+>>
+>>
+>> Curious, but when is this option actually useful?
+>>
+>
+> Good point.  I will remove that bit, it was used as an aid in debugging
+> while bringing up the patch set.
 
-[auto build test ERROR on net/master]
-[also build test ERROR on v4.5-rc5 next-20160226]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+this is handy in debugging new platforms.
+this boot argument option forces to boot as single node dummy system
+adding all resources to node0.
+>
+>
+>
+>>> +
+>>> +cpumask_var_t node_to_cpumask_map[MAX_NUMNODES];
+>>> +EXPORT_SYMBOL(node_to_cpumask_map);
+>>> +
+>>> +#ifdef CONFIG_DEBUG_PER_CPU_MAPS
+>>> +
+>>> +/*
+>>> + * Returns a pointer to the bitmask of CPUs on Node 'node'.
+>>> + */
+>>> +const struct cpumask *cpumask_of_node(int node)
+>>> +{
+>>> +       if (WARN_ON(node >= nr_node_ids))
+>>> +               return cpu_none_mask;
+>>> +
+>>> +       if (WARN_ON(node_to_cpumask_map[node] == NULL))
+>>> +               return cpu_online_mask;
+>>> +
+>>> +       return node_to_cpumask_map[node];
+>>> +}
+>>> +EXPORT_SYMBOL(cpumask_of_node);
+>>> +
+>>> +#endif
+>>> +
+>>> +static void map_cpu_to_node(unsigned int cpu, int nid)
+>>> +{
+>>> +       set_cpu_numa_node(cpu, nid);
+>>> +       if (nid >= 0)
+>>> +               cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
+>>> +}
+>>> +
+>>> +static void unmap_cpu_to_node(unsigned int cpu)
+>>> +{
+>>> +       int nid = cpu_to_node(cpu);
+>>> +
+>>> +       if (nid >= 0)
+>>> +               cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
+>>> +       set_cpu_numa_node(cpu, NUMA_NO_NODE);
+>>> +}
+>>
+>>
+>> How do you end up with negative nids this late in the game?
+>>
+>
+> It might be possible with some of the hot plugging code.  It is a little
+> paranoia programming.
+>
+> If you really don't like it, we can remove it.
+>
+>>> +
+>>> +void numa_clear_node(unsigned int cpu)
+>>> +{
+>>> +       unmap_cpu_to_node(cpu);
+>>
+>>
+>> Why don't you just inline this function?
+>
+>
+> Good point, I will do that.
+>
+> [...]
+>>>
+>>> +int __init numa_add_memblk(int nid, u64 start, u64 size)
+>>> +{
+>>> +       int ret;
+>>> +
+>>> +       ret = memblock_set_node(start, size, &memblock.memory, nid);
+>>> +       if (ret < 0) {
+>>> +               pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on
+>>> node %d\n",
+>>> +                       start, (start + size - 1), nid);
+>>> +               return ret;
+>>> +       }
+>>> +
+>>> +       node_set(nid, numa_nodes_parsed);
+>>> +       pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
+>>> +                       start, (start + size - 1), nid);
+>>> +       return ret;
+>>> +}
+>>> +EXPORT_SYMBOL(numa_add_memblk);
+>>
+>>
+>> But this is marked __init... (and you've done this elsewhere in the patch
+>> too).
+>
+>
+> I will fix these.
+>
+>
+>>
+>> Will
+>>
+>
 
-url:    https://github.com/0day-ci/linux/commits/John-Crispin/net-next-mediatek-add-ethernet-driver/20160226-223245
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All error/warnings (new ones prefixed by >>):
-
-   drivers/net/ethernet/mediatek/mtk_eth_soc.c: In function 'mtk_init_fq_dma':
->> drivers/net/ethernet/mediatek/mtk_eth_soc.c:771:22: warning: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type
-     eth->scratch_ring = dma_alloc_coherent(eth->dev,
-                         ^
-   In file included from drivers/net/ethernet/mediatek/mtk_eth_soc.c:18:0:
-   include/linux/dma-mapping.h:396:21: note: expected 'dma_addr_t *' but argument is of type 'unsigned int *'
-    static inline void *dma_alloc_coherent(struct device *dev, size_t size,
-                        ^
-   drivers/net/ethernet/mediatek/mtk_eth_soc.c: In function 'mtk_probe':
->> drivers/net/ethernet/mediatek/mtk_eth_soc.c:2059:2: warning: ignoring return value of 'device_reset', declared with attribute warn_unused_result [-Wunused-result]
-     device_reset(&pdev->dev);
-     ^
---
-   drivers/net/ethernet/mediatek/ethtool.c: In function 'mtk_set_settings':
->> drivers/net/ethernet/mediatek/ethtool.c:49:38: error: 'struct phy_device' has no member named 'addr'
-     if (cmd->phy_address != mac->phy_dev->addr) {
-                                         ^
->> drivers/net/ethernet/mediatek/ethtool.c:54:23: error: 'struct mii_bus' has no member named 'phy_map'
-          mac->hw->mii_bus->phy_map[cmd->phy_address]) {
-                          ^
-   drivers/net/ethernet/mediatek/ethtool.c:56:21: error: 'struct mii_bus' has no member named 'phy_map'
-        mac->hw->mii_bus->phy_map[cmd->phy_address];
-                        ^
-
-vim +49 drivers/net/ethernet/mediatek/ethtool.c
-
-79b0e682 John Crispin 2016-02-26  43  {
-79b0e682 John Crispin 2016-02-26  44  	struct mtk_mac *mac = netdev_priv(dev);
-79b0e682 John Crispin 2016-02-26  45  
-79b0e682 John Crispin 2016-02-26  46  	if (!mac->phy_dev)
-79b0e682 John Crispin 2016-02-26  47  		return -ENODEV;
-79b0e682 John Crispin 2016-02-26  48  
-79b0e682 John Crispin 2016-02-26 @49  	if (cmd->phy_address != mac->phy_dev->addr) {
-79b0e682 John Crispin 2016-02-26  50  		if (mac->hw->phy->phy_node[cmd->phy_address]) {
-79b0e682 John Crispin 2016-02-26  51  			mac->phy_dev = mac->hw->phy->phy[cmd->phy_address];
-79b0e682 John Crispin 2016-02-26  52  			mac->phy_flags = MTK_PHY_FLAG_PORT;
-79b0e682 John Crispin 2016-02-26  53  		} else if (mac->hw->mii_bus &&
-79b0e682 John Crispin 2016-02-26 @54  			   mac->hw->mii_bus->phy_map[cmd->phy_address]) {
-79b0e682 John Crispin 2016-02-26  55  			mac->phy_dev =
-79b0e682 John Crispin 2016-02-26  56  				mac->hw->mii_bus->phy_map[cmd->phy_address];
-79b0e682 John Crispin 2016-02-26  57  			mac->phy_flags = MTK_PHY_FLAG_ATTACH;
-
-:::::: The code at line 49 was first introduced by commit
-:::::: 79b0e682b3b2ed2a983b0263c6b8b3af61fdbf8e net-next: mediatek: add the drivers core files
-
-:::::: TO: John Crispin <blogic@openwrt.org>
-:::::: CC: 0day robot <fengguang.wu@intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 47927 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160227/7e0d86b8/attachment-0001.obj>
+Ganapat
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
