@@ -1,34 +1,41 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Sat, 27 Feb 2016 17:53:31 +0800
-Subject: [PATCH V5 0/3] add gpio/pinctrl/spi DTS for hi6220 and hikey
-In-Reply-To: <1455883107-8411-1-git-send-email-guodong.xu@linaro.org>
-References: <1455883107-8411-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <56D1721B.1080506@hisilicon.com>
+Date: Sat, 27 Feb 2016 18:13:01 +0800
+Subject: [PATCH 0/5] add DTS for hi6220 and HiKey
+In-Reply-To: <1455859148-29098-1-git-send-email-guodong.xu@linaro.org>
+References: <1455859148-29098-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <56D176AD.1080703@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Guodong,
 
-On 19/02/2016 19:58, Guodong Xu wrote:
-> As of V4, this patchset has been ack'ed by Rob Herring.
+On 19/02/2016 13:19, Guodong Xu wrote:
+> This patchset include more dts changes for hi6220 SoC and HiKey board.
 > 
-> V5, added pmx0 pmx1 pmx2 nodes description into hi6220.dtsi.
+> Patch 1 adds pinctrl to uart ports in SoC and enables them for HiKey board.
+> Patch 2 adds gpio LEDs device nodes.
+> Patch 3 adds dwmmc nodes description for hi6220. It refers to two LDO's
+> which are defined in regulator patchsets which pending on review:
+> [PATCH v8 5/5] arm64: dts: hisilicon: Add hi655x pmic dts node
+> http://thread.gmane.org/gmane.linux.kernel/2151688
 > 
-> Zhong Kaihua (3):
->   arm64: dts: Add Hi6220 gpio configuration nodes
->   arm64: dts: add Hi6220 pinctrl configuration nodes
->   arm64: dts: add Hi6220 spi configuration nodes
+> Patch 4 adds resets property into dwmmc nodes.
+> Patch 5 adds wifi device nodes (TI's wl1835) for HiKey board.
 > 
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   |   3 +
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 351 +++++++++++
->  arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi    | 607 +++++++++++++++++++
->  arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 705 +++++++++++++++++++++++
->  include/dt-bindings/pinctrl/hisi.h               |  59 ++
->  5 files changed, 1725 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
->  create mode 100644 include/dt-bindings/pinctrl/hisi.h
+> Guodong Xu (4):
+>   arm64: dts: hi6220: add pinctrl for uarts and enable them
+>   arm64: dts: add LED nodes for hi6220-hikey
+>   arm64: dts: hi6220: add resets property into dwmmc nodes
+>   arm64: dts: add wifi nodes support for hi6220-hikey
 > 
+> Xinwei Kong (1):
+>   arm64: dts: add dwmmc nodes for hi6220
+> 
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 81 ++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 66 +++++++++++++++++++++
+>  2 files changed, 147 insertions(+)
+> 
+
 
 Applied all the patches into the hisilicon soc tree.
 Thanks!
