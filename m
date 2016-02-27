@@ -1,126 +1,36 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 27 Feb 2016 17:03:35 +0100
-Subject: [PATCH 1/2] irqchip: add lpc18xx gpio pin interrupt driver
-In-Reply-To: <alpine.DEB.2.11.1602261122120.3638@nanos>
-References: <1456437887-24432-1-git-send-email-manabian@gmail.com>
- <1456437887-24432-2-git-send-email-manabian@gmail.com>
- <alpine.DEB.2.11.1602261122120.3638@nanos>
-Message-ID: <CAGhQ9VxqMO24uKX8rJcbAHBcNKGkh9aYmM-+5FaNwYqqSnh-Hw@mail.gmail.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat, 27 Feb 2016 17:18:24 +0100
+Subject: [linux-sunxi][PATCH 0/5] ARM: sunxi: Add SPDIF playback support
+Message-ID: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Marcus Cooper <codekipper@gmail.com>
 
-On 26 February 2016 at 11:26, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Thu, 25 Feb 2016, Joachim Eastwood wrote:
->> +static void lpc18xx_gpio_pint_handler(struct irq_desc *desc)
->> +{
->> +     struct lpc18xx_gpio_pint_chip *pint = irq_desc_get_handler_data(desc);
->> +     unsigned int irq = irq_desc_get_irq(desc);
->> +     int irq_no, i;
->> +
->> +     /* Find the interrupt */
->> +     for (i = 0; i < pint->nrirqs; i++) {
->> +             if (pint->irqmap[i] == irq) {
->
-> Why don't you have a reverse map for this?
+Hi All,
 
-Is there any thing it the irq subsystem for this that I can use?
+now that the sun4i-spdif driver has made it into linux-next then this patch
+series completes what is needed to have SPDIF working on both A10 and A20
+devices.
 
-I have now implement one based on linear_revmap in the irq domain code
-and it seems to work. Slightly more code and I needed two loops in
-probe. First one to determine the max virq number from the main irq
-controller and then another one to create the mapping/register the irq
-themselves.
+Enjoy,
+CK
 
-Looked at radix tree also, but I think it might be overkill here.
+Andrea Venturi (1):
+  clk: sunxi: mod1 clock should modify it's parent
 
-What do you think?
+Marcus Cooper (4):
+  ARM: dts :sunxi: Add SPDIF pins to A10 and A20
+  ARM: dts: sunxi: Add the SPDIF to the A10 and A20
+  ARM: dts: sun4i: Add SPDIF to the Mele A1000
+  ARM: dts: sun7i: Add SPDIF to Itead Ibox
 
+ arch/arm/boot/dts/sun4i-a10-a1000.dts      | 23 ++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10.dtsi           | 44 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 24 ++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi           | 44 ++++++++++++++++++++++++++++++
+ drivers/clk/sunxi/clk-a10-mod1.c           |  2 +-
+ 5 files changed, 136 insertions(+), 1 deletion(-)
 
->> +                     irq_no = irq_find_mapping(pint->domain, i);
->> +                     generic_handle_irq(irq_no);
->> +             }
->> +     }
->> +}
->> +
->> +static void lpc18xx_gpio_pint_edge_ack(struct irq_data *d)
->> +{
->> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->> +     u32 mask = d->mask;
->> +
->> +     irq_gc_lock(gc);
->> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_IST);
->> +     irq_gc_unlock(gc);
->> +}
->
-> How is that different from irq_gc_ack_set_bit ?
-
-No, the generic one is same. I'll fix it.
-
-
->> +static void lpc18xx_gpio_pint_edge_mask(struct irq_data *d)
->> +{
->> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->> +     u32 mask = d->mask;
->> +
->> +     irq_gc_lock(gc);
->> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_CIENR);
->> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_CIENF);
->> +     irq_gc_unlock(gc);
->> +}
->
-> If you use seperate irq types, then you can use the generic chip functions and
-> be done with it.
-
-Do you mean one type for IRQ_TYPE_EDGE_RISING and one for IRQ_TYPE_EDGE_FALLING?
-
-Will those two handle the EDGE_BOTH case too? or do I need a type for that also?
-
-
->> +static void lpc18xx_gpio_pint_edge_unmask(struct irq_data *d)
->> +{
->> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->> +     u32 type, mask = d->mask;
->> +
->> +     irq_gc_lock(gc);
->> +     type = irqd_get_trigger_type(d);
->> +     if (type & IRQ_TYPE_EDGE_RISING)
->> +             irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_SIENR);
->> +     if (type & IRQ_TYPE_EDGE_FALLING)
->> +             irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_SIENF);
->> +     irq_gc_unlock(gc);
->> +}
->> +
->> +static void lpc18xx_gpio_pint_level_mask(struct irq_data *d)
->> +{
->> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->> +     u32 mask = d->mask;
->> +
->> +     irq_gc_lock(gc);
->> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_CIENR);
->> +     irq_gc_unlock(gc);
->> +}
->> +
->> +static void lpc18xx_gpio_pint_level_unmask(struct irq_data *d)
->> +{
->> +     struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->> +     u32 mask = d->mask;
->> +
->> +     irq_gc_lock(gc);
->> +     irq_reg_writel(gc, mask, LPC18XX_GPIO_PINT_SIENR);
->> +     irq_gc_unlock(gc);
->> +}
->
-> All the callbacks can go away.
-
-I have now replaced lpc18xx_gpio_pint_edge_ack,
-lpc18xx_gpio_pint_level_mask and lpc18xx_gpio_pint_level_unmask with
-the equivalent generic versions.
-
-
-Thanks for taking the time to look at this, Thomas.
-
-
-regards,
-Joachim Eastwood
+-- 
+2.7.1
