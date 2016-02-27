@@ -1,61 +1,86 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 27 Feb 2016 17:18:28 +0100
-Subject: [linux-sunxi][PATCH 4/5] ARM: dts: sun4i: Add SPDIF to the Mele A1000
+Date: Sat, 27 Feb 2016 17:18:26 +0100
+Subject: [linux-sunxi][PATCH 2/5] ARM: dts :sunxi: Add SPDIF pins to A10 and
+ A20
 In-Reply-To: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
 References: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1456589909-2428-5-git-send-email-codekipper@gmail.com>
+Message-ID: <1456589909-2428-3-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Enable the S/PDIF transmitter that is present on the A1000.
+Add the SPDIF pins to the A10 and A20 dtsi.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 21 +++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index 97570cb..aaf5605 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -87,6 +87,23 @@
- 		enable-active-high;
- 		gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>;
- 	};
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 2c8f5e6..0483640 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -1006,6 +1006,27 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
 +
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "On-board SPDIF";
-+		simple-audio-card,cpu {
-+			sound-dai = <&spdif>;
-+		};
++			spdif_tx_pins_a: spdif at 0 {
++				allwinner,pins = "PB13";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++			};
 +
-+		simple-audio-card,codec {
-+			sound-dai = <&spdif_out>;
-+		};
-+	};
++			spdif_rx_pins_a: spdif at 1 {
++				allwinner,pins = "PB12";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+	spdif_out: spdif-out {
-+		#sound-dai-cells = <0>;
-+		compatible = "linux,spdif-dit";
-+	};
- };
++			spdif_mclk_pins_a: spdif at 2 {
++				allwinner,pins = "PB3";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
  
- &ahci {
-@@ -188,6 +205,12 @@
- 	status = "okay";
- };
- 
-+&spdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spdif_tx_pins_a>;
-+	status = "okay";
-+};
+ 		timer at 01c20c00 {
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 0940a78..7264d5e 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1193,6 +1193,27 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
 +
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
++			spdif_tx_pins_a: spdif at 0 {
++				allwinner,pins = "PB13";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++			};
++
++			spdif_rx_pins_a: spdif at 1 {
++				allwinner,pins = "PB12";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spdif_mclk_pins_a: spdif at 2 {
++				allwinner,pins = "PB3";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 2.7.1
