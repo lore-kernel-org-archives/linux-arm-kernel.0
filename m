@@ -1,29 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 27 Feb 2016 14:10:32 +0000
-Subject: [PATCH] dt-bindings: interrupt-controller: add SoC-specific
- compatible string to Marvell ODMI
-In-Reply-To: <1456327494-31358-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1456327494-31358-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160227141032.GF7219@io.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 27 Feb 2016 15:40:28 +0100
+Subject: next-20160225 build: 2 failures 44 warnings (next-20160225)
+In-Reply-To: <20160226121220.GO18327@sirena.org.uk>
+References: <E1aYsmb-0006qb-76@optimist> <20160226030949.GL18327@sirena.org.uk>
+ <20160226091410.5dad4306@free-electrons.com>
+ <20160226121220.GO18327@sirena.org.uk>
+Message-ID: <20160227154028.60f2cfca@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Morning, Thomas!
+Mark,
 
-On Wed, Feb 24, 2016 at 04:24:54PM +0100, Thomas Petazzoni wrote:
-> As requested by Rob Herring, this commit adds a SoC-specific
-> compatible string to the Marvell ODMI DT binding.
+On Fri, 26 Feb 2016 21:12:20 +0900, Mark Brown wrote:
+
+> > Another solution would be to provide an implementation of
+> > atomic_io_modify() on arm64, though that would need the ACK from the
+> > ARM64 maintainers.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> This commit applies on top of the Marvell ODMI driver patch, which has
-> already been merged.
-> ---
->  .../bindings/interrupt-controller/marvell,odmi-controller.txt      | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> It also sounds like a more modern solution might be to use syscon for
+> the shared register, but perhaps I'm missing something about how the IP
+> is set up so ICBW.
 
-Applied to irqchip/mvebu
+I think back when we implemented this, syscon/simple-mfd was
+not available or widely used - I don't really remember. We could indeed
+try to switch to a syscon based solution.
 
-thx,
+Thanks,
 
-Jason.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
