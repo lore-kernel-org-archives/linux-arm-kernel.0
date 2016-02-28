@@ -1,101 +1,64 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun, 28 Feb 2016 13:22:03 -0600
-Subject: [PATCH v2] irqchip/gicv3-its: Don't allow devices whose ID is outside
- range
-Message-ID: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 28 Feb 2016 21:26:10 +0200
+Subject: [PATCH/RFC v2 00/11] ARM/arm64: renesas: Add SYSC PM Domain DT
+ Support
+In-Reply-To: <2939018.LGDkKsjeJ3@avalon>
+References: <1455571020-18968-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdWxHWfghHM5xLVPdDcun5bQPVJKBQ69ZAa6TszDFD+XBw@mail.gmail.com>
+ <2939018.LGDkKsjeJ3@avalon>
+Message-ID: <4841673.3GCjGElFcY@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are not checking whether the requested device identifier fits into
-the device table memory or not. The function its_create_device()
-assumes that enough memory has been allocated for whole DevID sparse
-(reported by ITS_TYPER.Devbits) during the ITS probe() and continues
-to initialize ITS hardware.
+Hi Geert,
 
-This assumption is not perfect, sometimes we reduce memory size either
-because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
-MAPD command fails if 'Device ID' is outside of device table range.
+Here's an update.
 
-Add a simple validation check to avoid MAPD failures since we are
-not handling ITS command errors. This change also helps to return an
-error -ENOMEM instead of success to caller.
+On Sunday 28 February 2016 17:04:47 Laurent Pinchart wrote:
+> On Sunday 28 February 2016 09:55:32 Geert Uytterhoeven wrote:
+> > On Sat, Feb 27, 2016 at 2:53 AM, Laurent Pinchart wrote:
+> >> After rebasing this series on top of Simon's latest devel branch, I'm
+> >> experiencing hard system freezes when using the VSP.
+> > 
+> > Is this due to the rebasing? Did it work in
+> > renesas-drivers-2016-02-16-v4.5-rc4 or
+> > renesas-drivers-2016-02-23-v4.5-rc5?
+> 
+> I thought it was, but after further investigations I've been unable to get
+> it working at all even on my older branches, so I think the problem has
+> always been there.
+> 
+> >> What makes the problem curious is that PM runtime works fine when the
+> >> VSP instances are probed, the A3VP power domain is turned on and off
+> >> correctly for each instance. However, after booting the system, if I try
+> >> to RPM resume the device, the system hangs.
+> >> 
+> >> I've traced this (using printk debugging) down to the SYSCISCR write in
+> >> rcar_sysc_power(). The value written is 0x00000200, which corresponds to
+> >> the A3VP power domain, and the resume request completion wait loop
+> >> doesn't time out.
+> > 
+> > So the second write to SYSCISCR in that function locks up the system?
+> 
+> Correct, and only after the kernel has booted, there's a bunch of calls to
+> rcar_sysc_power() to enable/disable the A3VP power domain at boot time when
+> the vsp devices are probed, and those don't cause any issue.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-[v1]->[v2]
-  Rebase to v4.5-rc6, edit commit text and simplify code changes
+I've investigated the problem further, and realized the freeze was caused by 
+writing to the PWRONCR_OFFS register, not the SYSCISCR register. It doesn't 
+occur immediately though, I had to put longer delays between the register 
+writes to locate the faulty one.
 
- drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
- 1 file changed, 20 insertions(+), 4 deletions(-)
+Furthermore, I've also realized that commenting out the A3SH power domain from 
+DT seemed to fix the problem. Unused power domains are powered off at the end 
+of the boot sequence, and it looks like powering A3SH there somehow messes up 
+the SYSC and hangs the system the next time a power domain is turned on.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 43dfd15..6d986ac 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -55,6 +55,16 @@ struct its_collection {
- };
- 
- /*
-+ * The ITS_BASER structure - contains memeory information and table
-+ * entry size in bytes.
-+ */
-+struct its_baser {
-+	void		*base;
-+	u32		order;
-+	u32		entry_size;
-+};
-+
-+/*
-  * The ITS structure - contains most of the infrastructure, with the
-  * top-level MSI domain, the command queue, the collections, and the
-  * list of devices writing to it.
-@@ -66,14 +76,12 @@ struct its_node {
- 	unsigned long		phys_base;
- 	struct its_cmd_block	*cmd_base;
- 	struct its_cmd_block	*cmd_write;
--	struct {
--		void		*base;
--		u32		order;
--	} tables[GITS_BASER_NR_REGS];
-+	struct its_baser	tables[GITS_BASER_NR_REGS];
- 	struct its_collection	*collections;
- 	struct list_head	its_device_list;
- 	u64			flags;
- 	u32			ite_size;
-+	struct its_baser	*device_table;
- };
- 
- #define ITS_ITT_ALIGN		SZ_256
-@@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 		 * For other tables, only allocate a single page.
- 		 */
- 		if (type == GITS_BASER_TYPE_DEVICE) {
-+			its->device_table = &its->tables[i];
- 			/*
- 			 * 'order' was initialized earlier to the default page
- 			 * granule of the the ITS.  We can't have an allocation
-@@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 					node_name, order);
- 			}
- 		}
-+		its->tables[i].entry_size = entry_size;
- 
- retry_alloc_baser:
- 		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
-@@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	int nr_ites;
- 	int sz;
- 
-+	/* Don't allow 'dev_id' that exceeds single, flat table limit */
-+	if (its->device_table &&
-+	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
-+	    its->device_table->entry_size)))
-+		return NULL;
-+
- 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
- 	/*
- 	 * At least one bit of EventID is being used, hence a minimum
+Given that the latest version of the datasheet doesn't document the A3SH power 
+domain it would probably be a good idea to remove it, at least until we can 
+get more information from the hardware team.
+
 -- 
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
-a Linux Foundation Collaborative Project
+Regards,
+
+Laurent Pinchart
