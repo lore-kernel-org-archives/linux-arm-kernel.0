@@ -1,75 +1,60 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sun, 28 Feb 2016 15:36:56 +0000
-Subject: [PATCH v5 05/20] clk: bcm2835: enable clocks that have been enabled
- by firmware
+Date: Sun, 28 Feb 2016 15:36:55 +0000
+Subject: [PATCH v5 04/20] clk: bcm2835: remove uart0/1_pclk fixed clocks
 In-Reply-To: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
 References: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456673831-2408-6-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456673831-2408-5-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-If a clock that has been enabled by the firmware gets disabled
-by a driver this may right now result in a crash of the system
-as then also the corresponding PLL_dividers as well as PLLs
-get disabled (if not used) - some of which are used by the
-VideoCore GPU (which also runs the firmware)
+Remove the fixed clocks uart0_pclk and uart1_pclk.
+These are not referred to anywhere and the corresponding
+uart clock is created by default.
 
-This patch prepares/enables those clocks that have been
-configured by the firmware.
+The uart1 clock is created by clk-bcm2835-aux.
 
-Whenever the clock framework implements either
-CLK_IS_CRITICAL or HAND_OFF this can get changed to use this
-new mechanism.
-
-For this to be completely successful it is recommended to
-add all the known clock so that this can get applied to all clocks.
+Note that the use of apb_pclk is questionable and
+not referred to anywhere.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ drivers/clk/bcm/clk-bcm2835.c |   17 -----------------
+ 1 file changed, 17 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index c277ecb..14ff81e 100644
+index d999a13..c277ecb 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -34,6 +34,7 @@
-  * generator).
-  */
+@@ -319,28 +319,11 @@ static inline u32 cprman_read(struct bcm2835_cprman *cprman, u32 reg)
+ void __init bcm2835_init_clocks(void)
+ {
+ 	struct clk *clk;
+-	int ret;
  
-+#include <linux/clk.h>
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/clk/bcm2835.h>
-@@ -1457,6 +1458,7 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 	struct clk_init_data init;
- 	const char *parents[1 << CM_SRC_BITS];
- 	size_t i;
-+	struct clk *clk;
- 
- 	/*
- 	 * Replace our "xosc" references with the oscillator's
-@@ -1490,7 +1492,18 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
- 	clock->data = data;
- 	clock->hw.init = &init;
- 
--	return devm_clk_register(cprman->dev, &clock->hw);
-+	clk = devm_clk_register(cprman->dev, &clock->hw);
-+	if (IS_ERR_OR_NULL(clk))
-+		return clk;
-+
-+	/* enable/prepare if the clock is enabled by the firmware */
-+	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
-+		dev_info(cprman->dev,
-+			 "found firmware enabled clock %pC\n", clk);
-+		clk_prepare_enable(clk);
-+	}
-+
-+	return clk;
+ 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
+ 				      126000000);
+ 	if (IS_ERR(clk))
+ 		pr_err("apb_pclk not registered\n");
+-
+-	clk = clk_register_fixed_rate(NULL, "uart0_pclk", NULL, CLK_IS_ROOT,
+-				      3000000);
+-	if (IS_ERR(clk))
+-		pr_err("uart0_pclk not registered\n");
+-	ret = clk_register_clkdev(clk, NULL, "20201000.uart");
+-	if (ret)
+-		pr_err("uart0_pclk alias not registered\n");
+-
+-	clk = clk_register_fixed_rate(NULL, "uart1_pclk", NULL, CLK_IS_ROOT,
+-				      125000000);
+-	if (IS_ERR(clk))
+-		pr_err("uart1_pclk not registered\n");
+-	ret = clk_register_clkdev(clk, NULL, "20215000.uart");
+-	if (ret)
+-		pr_err("uart1_pclk alias not registered\n");
  }
  
- static int bcm2835_clk_probe(struct platform_device *pdev)
+ struct bcm2835_pll_data {
 -- 
 1.7.10.4
