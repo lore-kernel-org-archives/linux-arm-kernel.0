@@ -1,62 +1,24 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Sun, 28 Feb 2016 13:07:17 +0530
-Subject: [PATCH] arm64: dts: vulcan: Update PCI ranges
-In-Reply-To: <56D200F5.7010505@broadcom.com>
-References: <56D200F5.7010505@broadcom.com>
-Message-ID: <1456645037-12978-1-git-send-email-jchandra@broadcom.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 28 Feb 2016 15:53:33 +0800
+Subject: [PATCH v2] ARM: imx: Do L2 errata only if the L2 cache isn't
+ enabled
+In-Reply-To: <1455864612-12089-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1455864612-12089-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <20160228075333.GI22051@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI memory windows available in vulcan.dtsi are limited to 128MB
-for 32-bit BARs, and 4GB for 64-bit BARs. Given the memory mapped IO
-space available in arm64, these windows can be increased substantially
-to support more use cases.
+On Fri, Feb 19, 2016 at 07:50:12AM +0100, Dirk Behme wrote:
+> All the generic L2 cache handling code is encapsulated by a
+> check if the L2 cache is enabled. If it's enabled already, the code
+> is skipped. The write to the L2-Cache controller from non-secure
+> world causes an imprecise external abort. This is needed in
+> scenarios where one of the cores runs an other OS, e.g. an RTOS.
+> 
+> For the i.MX6 specific L2 cache handling we missed this check.
+> Add it.
+> 
+> Signed-off-by: Marcel Grosshans <MarcelViktor.Grosshans@de.bosch.com>
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-The change increases the 32-bit window to 256MB and the 64-bit window
-to 128 GB. The firmware on vulcan boards will use these ranges as well.
-
-PCI IO windows are not supported on Vulcan, so remove them instead of
-keeping an unused value.
-
-Signed-off-by: Jayachandran C <jchandra@broadcom.com>
----
-
-This is an update to the patch with subject
-"arm64: Broadcom Vulcan support"
-I had sent earlier, please fold it into that patch if possible
-
-Thanks,
-JC.
-
-
- arch/arm64/boot/dts/broadcom/vulcan.dtsi | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/broadcom/vulcan.dtsi b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-index c49b5a8..85820e2 100644
---- a/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-@@ -108,12 +108,15 @@
- 		reg = <0x0 0x30000000  0x0 0x10000000>;
- 		reg-names = "PCI ECAM";
- 
--			  /* IO 0x4000_0000 - 0x4001_0000 */
--		ranges = <0x01000000 0 0x40000000 0 0x40000000 0 0x00010000
--			  /* MEM 0x4800_0000 - 0x5000_0000 */
--			  0x02000000 0 0x48000000 0 0x48000000 0 0x08000000
--			  /* MEM64 pref 0x6_0000_0000 - 0x7_0000_0000 */
--			  0x43000000 6 0x00000000 6 0x00000000 1 0x00000000>;
-+		/*
-+		 * PCI ranges:
-+		 *   IO		no supported
-+		 *   MEM        0x4000_0000 - 0x6000_0000
-+		 *   MEM64 pref 0x40_0000_0000 - 0x60_0000_0000
-+		 */
-+		ranges =
-+		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
-+		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
- 		interrupt-map-mask = <0 0 0 7>;
- 		interrupt-map =
- 		      /* addr  pin  ic   icaddr  icintr */
--- 
-1.9.1
+Applied, thanks.
