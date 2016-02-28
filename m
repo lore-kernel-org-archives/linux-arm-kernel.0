@@ -1,47 +1,62 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 28 Feb 2016 14:49:12 +0800
-Subject: ARM: dts: imx6ul: add more functionality to i.MX6UL
-In-Reply-To: <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
-References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
- <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20160228064912.GH22051@tiger>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Sun, 28 Feb 2016 13:07:17 +0530
+Subject: [PATCH] arm64: dts: vulcan: Update PCI ranges
+In-Reply-To: <56D200F5.7010505@broadcom.com>
+References: <56D200F5.7010505@broadcom.com>
+Message-ID: <1456645037-12978-1-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 11:08:53AM +0100, Lothar Wa?mann wrote:
-> This patchset adds more functionality to the i.MX6UL machines.
-> 
-> The first three patches are cleanup patches with no functional changes
-> intended.
-> The other patches make various subsystems functional.
-> 
-> ARM: dts: imx6ul: whitespace cleanup; no functional
+The PCI memory windows available in vulcan.dtsi are limited to 128MB
+for 32-bit BARs, and 4GB for 64-bit BARs. Given the memory mapped IO
+space available in arm64, these windows can be increased substantially
+to support more use cases.
 
-This has been applied from another series.
+The change increases the 32-bit window to 256MB and the 64-bit window
+to 128 GB. The firmware on vulcan boards will use these ranges as well.
 
-> ARM: dts: imx6ul: move tsc node to appropriate place
-> ARM: dts: imx6ul: move dt-bindings/input/input.h
-> ARM: dts: imx6ul: specify proper clocks for GPT node
-> ARM: dts: imx6ul: specify proper clocks for the PWM
-> ARM: dts: imx6ul: disable PWMs by default
-> ARM: dts: imx6ul: add pwm[1-4] nodes
-> ARM: dts: imx6ul: add sdma support
-> ARM: dts: imx6ul: add flexcan support
-> ARM: dts: imx6ul: add sai support
-> ARM: dts: imx6ul: add lcdif support
-> ARM: dts: imx6ul: add gpmi support
+PCI IO windows are not supported on Vulcan, so remove them instead of
+keeping an unused value.
 
-Just applied the above.
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+---
 
-> clk: imx: whitespace cleanup; no functional change
-> clk: imx: add kpp clock for i.MX6UL
+This is an update to the patch with subject
+"arm64: Broadcom Vulcan support"
+I had sent earlier, please fold it into that patch if possible
 
-These two have been applied from a separate series.
+Thanks,
+JC.
 
-> ARM: dts: imx6ul: add kpp support
 
-It was just applied.
+ arch/arm64/boot/dts/broadcom/vulcan.dtsi | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-Shawn
-
-> ARM: dts: imx6ul: add support for Ka-Ro electronics TX6UL module
+diff --git a/arch/arm64/boot/dts/broadcom/vulcan.dtsi b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+index c49b5a8..85820e2 100644
+--- a/arch/arm64/boot/dts/broadcom/vulcan.dtsi
++++ b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+@@ -108,12 +108,15 @@
+ 		reg = <0x0 0x30000000  0x0 0x10000000>;
+ 		reg-names = "PCI ECAM";
+ 
+-			  /* IO 0x4000_0000 - 0x4001_0000 */
+-		ranges = <0x01000000 0 0x40000000 0 0x40000000 0 0x00010000
+-			  /* MEM 0x4800_0000 - 0x5000_0000 */
+-			  0x02000000 0 0x48000000 0 0x48000000 0 0x08000000
+-			  /* MEM64 pref 0x6_0000_0000 - 0x7_0000_0000 */
+-			  0x43000000 6 0x00000000 6 0x00000000 1 0x00000000>;
++		/*
++		 * PCI ranges:
++		 *   IO		no supported
++		 *   MEM        0x4000_0000 - 0x6000_0000
++		 *   MEM64 pref 0x40_0000_0000 - 0x60_0000_0000
++		 */
++		ranges =
++		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
++		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
+ 		interrupt-map-mask = <0 0 0 7>;
+ 		interrupt-map =
+ 		      /* addr  pin  ic   icaddr  icintr */
+-- 
+1.9.1
