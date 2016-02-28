@@ -1,51 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 28 Feb 2016 23:03:01 +0100
-Subject: [PATCH] spi: lp-8841: return correct error code from probe
-In-Reply-To: <1456601577.23036.60.camel@gmail.com>
-References: <1456400265-3068525-1-git-send-email-arnd@arndb.de>
- <1456601577.23036.60.camel@gmail.com>
-Message-ID: <4810940.iqjRTUDvFQ@wuerfel>
+From: linux@baker-net.org.uk (Adam Baker)
+Date: Sun, 28 Feb 2016 22:30:12 +0000
+Subject: [PATCH v3 1/3] hwmon: Define binding for the nsa320-hwmon driver
+In-Reply-To: <1456698614-15176-1-git-send-email-linux@baker-net.org.uk>
+References: <1456698614-15176-1-git-send-email-linux@baker-net.org.uk>
+Message-ID: <1456698614-15176-2-git-send-email-linux@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 February 2016 22:32:57 Sergei Ianovich wrote:
-> Hi Arnd,
-> 
-> On Thu, 2016-02-25 at 12:37 +0100, Arnd Bergmann wrote:
-> > The spi_lp8841_rtc_probe() function misses an initialization of the
-> > return code when it fails to get its memory resource, as gcc notices:
-> > 
-> > drivers/spi/spi-lp8841-rtc.c: In function 'spi_lp8841_rtc_probe':
-> > drivers/spi/spi-lp8841-rtc.c:239:9: error: 'ret' may be used
-> > uninitialized in this function [-Werror=maybe-uninitialized]
-> 
-> I wasn't getting this warning when I was building the driver. This
-> happened because -Wmaybe-uninitialized is suppressed when
-> CONFIG_CC_OPTIMIZE_FOR_SIZE is selected
-> (Commit e74fc973b6e531fef1fce8b101ffff05ecfb774c "Turn off -Wmaybe-
-> uninitialized when building with -Os").
-> 
-> A recent gcc version like 5.3.1 doesn't seem to produce much false
-> positives. May it make sense to revert that commit?
-> 
-> The gcc-5.3.1 log for reference.
+Define a binding for the hardware monitoring chip present in the Zyxel
+NSA-320 and some of the other Zyxel NAS devices.
 
-I have spent a lot of time on fixing those warning messages. I still
-see tons of warnings even with the latest compilers when -Os (all
-false positives) is used, and I have a branch in which I have fixed
-all the ones that happen when building with -O2.
+Signed-off-by: Adam Baker <linux@baker-net.org.uk>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes for v3, Add Robs Ack
+---
+ .../devicetree/bindings/hwmon/nsa320-mcu.txt        | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
 
-I recently submitted a patch to turn CONFIG_CC_OPTIMIZE_FOR_SIZE
-into a choice statement that is not automatically set on an
-allmodconfig build, which should help here, but my patch has
-not yet been merged.
-
-We have similar problems with a couple of other options that
-drastically increase the false positive rate for these warnings
-(GCOV_PROFILE_ALL, PROFILE_ALL_BRANCHES, UBSAN_SANTIZE_ALL, ...),
-and I think our best strategy for all of these is to make sure
-they are not enabled in an allmodconfig build or the typical
-defconfigs, but also to hide the warnings if they are used in
-a particular config.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt b/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
+new file mode 100644
+index 0000000..7b346d4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt
+@@ -0,0 +1,21 @@
++Bindings for the fan / temperature monitor microcontroller used on
++the Zyxel NSA 320 and several subsequent models.
++
++Required properties:
++- compatible	: "zyxel,nsa320-mcu"
++- data-gpios	: The GPIO pin connected to the data line on the MCU
++- clk-gpios	: The GPIO pin connected to the clock line on the MCU
++- act-gpios	: The GPIO pin connected to the active line on the MCU
++
++Example:
++
++	hwmon {
++		compatible = "zyxel,nsa320-mcu";
++		pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act>;
++		pinctrl-names = "default";
++
++		data-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
++		clk-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++		act-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
++	};
++
+-- 
+2.1.4
