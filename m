@@ -1,9 +1,11 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 28 Feb 2016 18:48:28 +0100 (CET)
-Subject: [PATCH v5 00/20] add additional clocks and frac/mash support
-In-Reply-To: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
+Date: Sun, 28 Feb 2016 18:58:15 +0100 (CET)
+Subject: [PATCH v5 01/20] clk: bcm2835: pll_off should only set
+ CM_PLL_ANARST
+In-Reply-To: <1456673831-2408-2-git-send-email-kernel@martin.sperl.org>
 References: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <518878293.330817.eb44c2f6-8870-42b4-ada5-1ccea76f532b.open-xchange@email.1und1.de>
+ <1456673831-2408-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <440771566.330986.eb44c2f6-8870-42b4-ada5-1ccea76f532b.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,30 +16,42 @@ Hi Martin,
 >
 > From: Martin Sperl <kernel@martin.sperl.org>
 >
-> Fix issues found with current driver with regards to:
-> * coding style
-> * locking
-> * setting register instead of bits in register
-> * the use of BCM2835_CLOCK_COUNT in the device tree bindings
+> bcm2835_pll_off is currently assigning CM_PLL_ANARST
+> to the control register.
 >
-> adds:
-> * frac/mash support (with correct limits)
-> * exposing of additional clock parameters in debugfs
-> (registers, divider and parent)
-> * added all the missing pll dividers
-> * almost all so far undefined clocks
+> This patch only sets the CM_PLL_ANARST bit
+> not resetting any of the other bits, which allows
+> restoring the register to its original value
+> via bcm2834_pll_on.
 >
-> [...]
->
-> Martin Sperl (20):
-> clk: bcm2835: pll_off should only set CM_PLL_ANARST
-> [...]
-> clk: bcm2835: add locking to pll*_on/off methods
-> [...]
-> clk: bcm2835: enable clocks that have been enabled by firmware
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-i suggest you separate these 3 important fixes out of these series to get them
-faster in.
+Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain
+clocks")
+
+> ---
+> drivers/clk/bcm/clk-bcm2835.c | 8 ++++++--
+> 1 file changed, 6 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+> index 5747a9d..d3009a6 100644
+> --- a/drivers/clk/bcm/clk-bcm2835.c
+> +++ b/drivers/clk/bcm/clk-bcm2835.c
+> @@ -913,8 +913,12 @@ static void bcm2835_pll_off(struct clk_hw *hw)
+> struct bcm2835_cprman *cprman = pll->cprman;
+> const struct bcm2835_pll_data *data = pll->data;
+>
+> - cprman_write(cprman, data->cm_ctrl_reg, CM_PLL_ANARST);
+> - cprman_write(cprman, data->a2w_ctrl_reg, A2W_PLL_CTRL_PWRDN);
+> + cprman_write(cprman, data->cm_ctrl_reg,
+> + cprman_read(cprman, data->cm_ctrl_reg) |
+> + CM_PLL_ANARST);
+> + cprman_write(cprman, data->a2w_ctrl_reg,
+> + cprman_read(cprman, data->a2w_ctrl_reg) |
+> + A2W_PLL_CTRL_PWRDN);
+
+Since this change adds a RMW cycle we should add the spinlocks for
+bcm2835_pll_off here and not in 03/20.
 
 Regards
 Stefan
