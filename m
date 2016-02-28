@@ -1,70 +1,75 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sun, 28 Feb 2016 15:36:54 +0000
-Subject: [PATCH v5 03/20] clk: bcm2835: add locking to pll*_on/off methods
+Date: Sun, 28 Feb 2016 15:36:56 +0000
+Subject: [PATCH v5 05/20] clk: bcm2835: enable clocks that have been enabled
+ by firmware
 In-Reply-To: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
 References: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456673831-2408-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456673831-2408-6-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Add missing locking to:
-* bcm2835_pll_on
-* bcm2835_pll_off
-* bcm2835_pll_divider_on
+If a clock that has been enabled by the firmware gets disabled
+by a driver this may right now result in a crash of the system
+as then also the corresponding PLL_dividers as well as PLLs
+get disabled (if not used) - some of which are used by the
+VideoCore GPU (which also runs the firmware)
+
+This patch prepares/enables those clocks that have been
+configured by the firmware.
+
+Whenever the clock framework implements either
+CLK_IS_CRITICAL or HAND_OFF this can get changed to use this
+new mechanism.
+
+For this to be completely successful it is recommended to
+add all the known clock so that this can get applied to all clocks.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clk/bcm/clk-bcm2835.c |   15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 3aa3e7a..d999a13 100644
+index c277ecb..14ff81e 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -910,12 +910,14 @@ static void bcm2835_pll_off(struct clk_hw *hw)
- 	struct bcm2835_cprman *cprman = pll->cprman;
- 	const struct bcm2835_pll_data *data = pll->data;
-
-+	spin_lock(&cprman->regs_lock);
- 	cprman_write(cprman, data->cm_ctrl_reg,
- 		     cprman_read(cprman, data->cm_ctrl_reg) |
- 		     CM_PLL_ANARST);
- 	cprman_write(cprman, data->a2w_ctrl_reg,
- 		     cprman_read(cprman, data->a2w_ctrl_reg) |
- 		     A2W_PLL_CTRL_PWRDN);
-+	spin_unlock(&cprman->regs_lock);
+@@ -34,6 +34,7 @@
+  * generator).
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk/bcm2835.h>
+@@ -1457,6 +1458,7 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 	struct clk_init_data init;
+ 	const char *parents[1 << CM_SRC_BITS];
+ 	size_t i;
++	struct clk *clk;
+ 
+ 	/*
+ 	 * Replace our "xosc" references with the oscillator's
+@@ -1490,7 +1492,18 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 	clock->data = data;
+ 	clock->hw.init = &init;
+ 
+-	return devm_clk_register(cprman->dev, &clock->hw);
++	clk = devm_clk_register(cprman->dev, &clock->hw);
++	if (IS_ERR_OR_NULL(clk))
++		return clk;
++
++	/* enable/prepare if the clock is enabled by the firmware */
++	if (cprman_read(cprman, data->ctl_reg) & CM_ENABLE) {
++		dev_info(cprman->dev,
++			 "found firmware enabled clock %pC\n", clk);
++		clk_prepare_enable(clk);
++	}
++
++	return clk;
  }
-
- static int bcm2835_pll_on(struct clk_hw *hw)
-@@ -1083,10 +1085,12 @@ static void bcm2835_pll_divider_off(struct clk_hw *hw)
- 	struct bcm2835_cprman *cprman = divider->cprman;
- 	const struct bcm2835_pll_divider_data *data = divider->data;
-
-+	spin_lock(&cprman->regs_lock);
- 	cprman_write(cprman, data->cm_reg,
- 		     (cprman_read(cprman, data->cm_reg) &
- 		      ~data->load_mask) | data->hold_mask);
- 	cprman_write(cprman, data->a2w_reg, A2W_PLL_CHANNEL_DISABLE);
-+	spin_unlock(&cprman->regs_lock);
- }
-
- static int bcm2835_pll_divider_on(struct clk_hw *hw)
-@@ -1095,12 +1099,14 @@ static int bcm2835_pll_divider_on(struct clk_hw *hw)
- 	struct bcm2835_cprman *cprman = divider->cprman;
- 	const struct bcm2835_pll_divider_data *data = divider->data;
-
-+	spin_lock(&cprman->regs_lock);
- 	cprman_write(cprman, data->a2w_reg,
- 		     cprman_read(cprman, data->a2w_reg) &
- 		     ~A2W_PLL_CHANNEL_DISABLE);
-
- 	cprman_write(cprman, data->cm_reg,
- 		     cprman_read(cprman, data->cm_reg) & ~data->hold_mask);
-+	spin_unlock(&cprman->regs_lock);
-
- 	return 0;
- }
---
+ 
+ static int bcm2835_clk_probe(struct platform_device *pdev)
+-- 
 1.7.10.4
