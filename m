@@ -1,85 +1,164 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 28 Feb 2016 23:18:52 +0800
-Subject: [PATCH v2 07/13] ARM: dts: sun8i-a83t: Add PRCM related clocks and
- resets
+Date: Sun, 28 Feb 2016 23:18:49 +0800
+Subject: [PATCH v2 04/13] ARM: dts: sun8i-a83t: Add basic clocks and resets
 In-Reply-To: <1456672738-4993-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1456672738-4993-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1456672738-4993-8-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1456672738-4993-5-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds A83T PRCM related clocks, clock resets.
+This adds A83T system bus clocks, bus gates, and clock resets.
 
-As a83t apb0 gates clock support is added earlier, this enables it.
-Apart from apb0 gates, other added clocks are compatible with
-earlier sun8i socs.
+Three ahb reset registers are combined into one node.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 44 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 114 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 112 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index dfb510e..b184ea3 100644
+index d3473f8..fa7ded5 100644
 --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -267,6 +267,44 @@
- 					     "mmc2_output",
- 					     "mmc2_sample";
+@@ -146,6 +146,97 @@
+ 			clocks = <&osc16M>;
+ 			clock-output-names = "osc16M-d512";
  		};
 +
-+		cpus_clk: clk at 01f01400 {
-+			compatible = "allwinner,sun9i-a80-cpus-clk";
-+			reg = <0x01f01400 0x4>;
++		pll6: clk at 01c20028 {
 +			#clock-cells = <0>;
-+			clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&osc16M>;
-+			clock-output-names = "cpus";
++			compatible = "allwinner,sun9i-a80-pll4-clk";
++			reg = <0x01c20028 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "pll6";
 +		};
 +
-+		ahb0: ahb0_clk {
++		pll6d2: pll6d2_clk {
++			#clock-cells = <0>;
 +			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
++			clock-div = <2>;
 +			clock-mult = <1>;
-+			clocks = <&cpus_clk>;
-+			clock-output-names = "ahb0";
++			clocks = <&pll6>;
++			clock-output-names = "pll6d2";
 +		};
 +
-+		apb0: clk at 01f0140c {
-+			compatible = "allwinner,sun8i-a23-apb0-clk";
-+			reg = <0x01f0140c 0x4>;
++		ahb1: clk at 01c20054 {
 +			#clock-cells = <0>;
-+			clocks = <&ahb0>;
-+			clock-output-names = "apb0";
++			compatible = "allwinner,sun8i-a83t-ahb1-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&pll6>;
++			clock-output-names = "ahb1";
 +		};
 +
-+		apb0_gates: clk at 01f01428 {
-+			compatible = "allwinner,sun8i-a83t-apb0-gates-clk";
-+			reg = <0x01f01428 0x4>;
++		apb1: apb1_clk at 01c20054 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun8i-a83t-apb1-clk";
++			reg = <0x01c20054 0x4>;
++			clocks = <&ahb1>;
++			clock-output-names = "apb1";
++		};
++
++		apb2: clk at 01c20058 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-apb1-clk";
++			reg = <0x01c20058 0x4>;
++			clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&pll6>;
++			clock-output-names = "apb2";
++		};
++
++		ahb2: clk at 01c2005c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun8i-h3-ahb2-clk";
++			reg = <0x01c2005c 0x4>;
++			clocks = <&ahb1>, <&pll6d2>;
++			clock-output-names = "ahb2";
++		};
++
++		bus_gates: clk at 01c20060 {
 +			#clock-cells = <1>;
-+			clocks = <&apb0>;
-+			clock-indices = <0>, <1>,
-+					<2>, <3>,
-+					<4>, <6>, <7>;
-+			clock-output-names = "apb0_pio", "apb0_ir",
-+					"apb0_timer", "apb0_rsb",
-+					"apb0_uart", "apb0_i2c0", "apb0_twd";
++			compatible = "allwinner,sun8i-a83t-bus-gates-clk";
++			reg = <0x01c20060 0x10>;
++			clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
++			clock-names = "ahb1", "ahb2", "apb1", "apb2";
++			clock-indices = <1>, <5>, <6>,
++					<8>, <9>, <10>,
++					<13>, <14>, <17>,
++					<19>, <20>,
++					<21>, <24>,
++					<26>, <27>,
++					<29>, <32>,
++					<36>, <37>,
++					<40>, <43>,
++					<44>, <52>, <53>,
++					<54>, <65>,
++					<69>, <76>, <77>,
++					<78>, <79>, <96>,
++					<97>, <98>,
++					<112>, <113>,
++					<114>, <115>,
++					<116>;
++			clock-output-names = "bus_mipidsi", "bus_ss", "bus_dma",
++					     "bus_mmc0", "bus_mmc1", "bus_mmc2",
++					     "bus_nand", "bus_sdram", "bus_emac",
++					     "bus_hstimer", "bus_spi0",
++					     "bus_spi1", "bus_usb_otg",
++					     "bus_ehci0", "bus_ehci1",
++					     "bus_ohci0", "bus_ve",
++					     "bus_lcd0", "bus_lcd1",
++					     "bus_csi", "bus_hdmi",
++					     "bus_de", "bus_gpu", "bus_msgbox",
++					     "bus_spinlock", "bus_spidf",
++					     "bus_pio", "bus_i2s0", "bus_i2s1",
++					     "bus_i2s2", "bus_tdm", "bus_i2c0",
++					     "bus_i2c1", "bus_i2c2",
++					     "bus_uart0", "bus_uart1",
++					     "bus_uart2", "bus_uart3",
++					     "bus_uart4";
 +		};
  	};
  
  	soc {
-@@ -421,5 +459,11 @@
+@@ -160,7 +251,7 @@
+ 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0x01c20800 0x400>;
+-			clocks = <&osc24M>;
++			clocks = <&bus_gates 69>;
+ 			gpio-controller;
+ 			interrupt-controller;
  			#interrupt-cells = <3>;
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+@@ -189,12 +280,31 @@
+ 			};
  		};
-+
-+		apb0_reset: reset at 01f014b0 {
-+			reg = <0x01f014b0 0x4>;
+ 
++		ahb_reset: reset at 01c202c0 {
++			reg = <0x01c202c0 0xc>;
 +			compatible = "allwinner,sun6i-a31-clock-reset";
 +			#reset-cells = <1>;
 +		};
- 	};
- };
++
++		apb1_reset: reset at 01c202d0 {
++			reg = <0x01c202d0 0x4>;
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			#reset-cells = <1>;
++		};
++
++		apb2_reset: reset at 01c202d8 {
++			reg = <0x01c202d8 0x4>;
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			#reset-cells = <1>;
++		};
++
+ 		timer at 01c20c00 {
+ 			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0xa0>;
+ 			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&osc24M>;
++			clocks = <&bus_gates 112>;
++			resets = <&apb2_reset 16>;
+ 		};
+ 
+ 		watchdog at 01c20ca0 {
 -- 
 1.9.1
