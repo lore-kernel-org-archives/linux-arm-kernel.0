@@ -1,37 +1,38 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Sun, 28 Feb 2016 20:02:02 +0530
-Subject: [PATCH 00/61] gpio: Add and use devm_gpiochip_add_data()
-In-Reply-To: <CACRpkdYsG8X5XiV2+Ss2GLJkFnLFzLi0uy0yy8R5sdi0b_Y+qA@mail.gmail.com>
-References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>	<CACRpkdbt+RiWMA74e40MNZVnDM0t0futtFnbyu9sRhv7p93-Tg@mail.gmail.com>	<56CC1FD4.1080905@nvidia.com>	<56CC7791.2000607@nvidia.com>
- <CACRpkdYsG8X5XiV2+Ss2GLJkFnLFzLi0uy0yy8R5sdi0b_Y+qA@mail.gmail.com>
-Message-ID: <56D304E2.7000608@nvidia.com>
+Date: Sun, 28 Feb 2016 20:14:28 +0530
+Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
+ pinctrl_{register, unregister}
+In-Reply-To: <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
+Message-ID: <56D307CC.2050202@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Thursday 25 February 2016 06:54 PM, Linus Walleij wrote:
-> On Tue, Feb 23, 2016 at 4:15 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+On Thursday 25 February 2016 07:43 PM, Linus Walleij wrote:
+> On Wed, Feb 24, 2016 at 2:15 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
 >
->> I have made the repo in git hub as
->>      https://github.com/ldewangan/linux-upstream.git
-> Awesome.
+>> Add resource manageemnt APIs fro pinctrl_register() and pinctrl_unregister()
+>> and use these new APIs on hw driver to reduce the error path code and
+>> remove callback for driver.
+> As you can probably guess I like this too, so wait a while, collect ACKs
+> and send me a branch to pull for this too.
 >
->> branch name is devm_gpiochip.
->>      https://github.com/ldewangan/linux-upstream/tree/devm_gpiochip
-> I've pulled this branch into my tree on a separate branch for
-> testing. I pushed the tree to kernel.org so that the zeroday
-> autobuilders can have a go at it.
+Got lots of ack/reviewed by and captured all. Also did code changes per 
+review:
+- Optimizing in devm_ apis.
+- Correcting the description of devm_ apis.
+- Simplifying probe in digicolor.
+- Removing unwanted pfc->pinctrl in ish.
 
-Thanks you very much for taking care.
+Pushed the change at:
+Branch "devm_pinctrl_register" of 
+https://github.com/ldewangan/linux-upstream.git.
 
->
-> If everything goes well I plan to merge this for v4.6, then we
-> can merge the changes in pin control and other subsystems
-> for v4.7.
-Yes, once this is there, we can grep all over subsystem and push the change.
+Base repo is
+for-next of 
+https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
 
-I am seeing lots of code reduction on pincontrol driver side once we 
-have devm_ for pincontrol register and gpiochip_add_data().
 
-Thanks,
-Laxman
+If required, I can send the V2 version of list with acks.
