@@ -1,72 +1,48 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sun, 28 Feb 2016 15:36:59 +0000
-Subject: [PATCH v5 08/20] clk: bcm2835: add fractional support
+Date: Sun, 28 Feb 2016 15:37:00 +0000
+Subject: [PATCH v5 09/20] clk: bcm2835: enable management of PCM clock
 In-Reply-To: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
 References: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456673831-2408-9-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456673831-2408-10-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-The current driver calculates the clock divider with
-fractional support enabled.
-But it does not enable fractional support in the control register.
-
-This patch enables fractional support in the control register
-whenever there is a fractional bit set in the requested clock divider.
+Enable the PCM clock in the SOC, which is used by the
+bcm2835-i2s driver.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/clk/bcm/clk-bcm2835.c       |    6 ++++++
+ include/dt-bindings/clock/bcm2835.h |    1 +
+ 2 files changed, 7 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 144d5d5..ffc5b3c 100644
+index ffc5b3c..3df17a5 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -49,6 +49,7 @@
- #define CM_GNRICCTL		0x000
- #define CM_GNRICDIV		0x004
- # define CM_DIV_FRAC_BITS	12
-+# define CM_DIV_FRAC_MASK	GENMASK(CM_DIV_FRAC_BITS - 1, 0)
- 
- #define CM_VPUCTL		0x008
- #define CM_VPUDIV		0x00c
-@@ -126,6 +127,7 @@
- # define CM_GATE			BIT(CM_GATE_BIT)
- # define CM_BUSY			BIT(7)
- # define CM_BUSYD			BIT(8)
-+# define CM_FRAC			BIT(9)
- # define CM_SRC_SHIFT			0
- # define CM_SRC_BITS			4
- # define CM_SRC_MASK			0xf
-@@ -875,9 +877,26 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
- 	struct bcm2835_cprman *cprman = clock->cprman;
- 	const struct bcm2835_clock_data *data = clock->data;
- 	u32 div = bcm2835_clock_choose_div(hw, rate, parent_rate, false);
-+	u32 ctl;
-+
-+	spin_lock(&cprman->regs_lock);
-+
-+	/*
-+	 * Setting up frac support
-+	 *
-+	 * In principle it is recommended to stop/start the clock first,
-+	 * but as we set CLK_SET_RATE_GATE during registration of the
-+	 * clock this requirement should be take care of by the
-+	 * clk-framework.
-+	 */
-+	ctl = cprman_read(cprman, data->ctl_reg) & ~CM_FRAC;
-+	ctl |= (div & CM_DIV_FRAC_MASK) ? CM_FRAC : 0;
-+	cprman_write(cprman, data->ctl_reg, ctl);
- 
- 	cprman_write(cprman, data->div_reg, div);
- 
-+	spin_unlock(&cprman->regs_lock);
-+
- 	return 0;
- }
- 
+@@ -1507,6 +1507,12 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.div_reg = CM_HSMDIV,
+ 		.int_bits = 4,
+ 		.frac_bits = 8),
++	[BCM2835_CLOCK_PCM]	= REGISTER_PER_CLK(
++		.name = "pcm",
++		.ctl_reg = CM_PCMCTL,
++		.div_reg = CM_PCMDIV,
++		.int_bits = 12,
++		.frac_bits = 12),
+ 	[BCM2835_CLOCK_PWM]	= REGISTER_PER_CLK(
+ 		.name = "pwm",
+ 		.ctl_reg = CM_PWMCTL,
+diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
+index 87235ac..9a7b4a5 100644
+--- a/include/dt-bindings/clock/bcm2835.h
++++ b/include/dt-bindings/clock/bcm2835.h
+@@ -44,3 +44,4 @@
+ #define BCM2835_CLOCK_EMMC		28
+ #define BCM2835_CLOCK_PERI_IMAGE	29
+ #define BCM2835_CLOCK_PWM		30
++#define BCM2835_CLOCK_PCM		31
 -- 
 1.7.10.4
