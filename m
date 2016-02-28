@@ -1,55 +1,34 @@
-From: saeedm@dev.mellanox.co.il (Saeed Mahameed)
-Date: Sun, 28 Feb 2016 15:26:53 +0200
-Subject: [PATCH] net/mlx5e: make VXLAN support conditional
-In-Reply-To: <1456521217-2174580-1-git-send-email-arnd@arndb.de>
-References: <1456521217-2174580-1-git-send-email-arnd@arndb.de>
-Message-ID: <CALzJLG8MG9y8yr7zi4UTED0FwgBTJ+_5vSSWHB5SHFs-e8WTbg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 28 Feb 2016 10:56:49 -0300
+Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
+ 'ext-reset-output' dt prop
+In-Reply-To: <56AA79DA.2010305@timesys.com>
+References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
+ <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
+ <20151105222325.GA26159@roeck-us.net>
+ <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
+ <20151106220249.GA19791@roeck-us.net>
+ <565F4244.7090502@timesys.com>
+ <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
+ <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
+ <20151228162923.GA31680@spo001.leaseweb.nl>
+ <56AA79DA.2010305@timesys.com>
+Message-ID: <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 11:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> VXLAN can be disabled at compile-time or it can be a loadable
-> module while mlx5 is built-in, which leads to a link error:
->
-> drivers/net/built-in.o: In function `mlx5e_create_netdev':
-> ntb_netdev.c:(.text+0x106de4): undefined reference to `vxlan_get_rx_port'
->
-> This avoids the link error and makes the vxlan code optional,
-> like the other ethernet drivers do as well.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: b3f63c3d5e2c ("net/mlx5e: Add netdev support for VXLAN tunneling")
-Hi Arnd,
+Rob,
 
-Thanks for the patch, I will suggest some slight modifications and we
-will handle it and re-post the patch.
+On Thu, Jan 28, 2016 at 6:28 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
 
+>> I have no objections against the idea and the code itself.
+>> But as Guenter pointed out: it would be handy to get feedback from the
+>> devicetree maintainers on the above discussion.
+>>
+>> Kind regards,
+>> Wim.
+>>
 >
->         struct mlx5e_params        params;
->         spinlock_t                 async_events_spinlock; /* sync hw events */
-> diff --git a/drivers/net/ethernet/mellanox/mlx5/core/en_main.c b/drivers/net/ethernet/mellanox/mlx5/core/en_main.c
-> index 0d45f35aee72..44fc4bc35ffd 100644
-> --- a/drivers/net/ethernet/mellanox/mlx5/core/en_main.c
-> +++ b/drivers/net/ethernet/mellanox/mlx5/core/en_main.c
-> @@ -2116,6 +2116,9 @@ static netdev_features_t mlx5e_vxlan_features_check(struct mlx5e_priv *priv,
->         u16 proto;
->         u16 port = 0;
->
-> +       if (!IS_ENABLED(CONFIG_MLX5_CORE_EN_VXLAN))
-> +               goto out;
-> +
+> Any suggestions on whether a vendor specific prefix is necessary?
 
-I would rather wrap the whole mlx5e_features_check with the suggested
-config flag and disable it in case CONFIG_MLX5_CORE_EN_VXLAN is OFF,
-since this function is only needed for when vxlan is supported.
-
->
->  static inline bool mlx5e_vxlan_allowed(struct mlx5_core_dev *mdev)
->  {
-> -       return (MLX5_CAP_ETH(mdev, tunnel_stateless_vxlan) &&
-> +       return IS_ENABLED(CONFIG_MLX5_CORE_EN_VXLAN) &&
-> +               (MLX5_CAP_ETH(mdev, tunnel_stateless_vxlan) &&
->                 mlx5_core_is_pf(mdev));
->  }
-
-Same here.
+Any comments?
