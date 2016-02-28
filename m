@@ -1,61 +1,23 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 28 Feb 2016 10:38:18 +0800
-Subject: [PATCH v2 2/2] ARM64: dts: add LS1043a-QDS board support
-In-Reply-To: <HE1PR04MB0906707F686591B374AA364F84A00@HE1PR04MB0906.eurprd04.prod.outlook.com>
-References: <1450948298-33238-1-git-send-email-Zhiqiang.Hou@freescale.com>
- <1450948298-33238-2-git-send-email-Zhiqiang.Hou@freescale.com>
- <20160219032830.GG6756@tiger>
- <HE1PR04MB0906707F686591B374AA364F84A00@HE1PR04MB0906.eurprd04.prod.outlook.com>
-Message-ID: <20160228023818.GB22051@tiger>
+Date: Sun, 28 Feb 2016 10:51:07 +0800
+Subject: [PATCH 0/2] clk: imx6: add kpp clock for i.MX6UL
+In-Reply-To: <20160225235655.GN28849@codeaurora.org>
+References: <1452619759-14474-1-git-send-email-LW@KARO-electronics.de>
+ <20160225235655.GN28849@codeaurora.org>
+Message-ID: <20160228025107.GC22051@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 19, 2016 at 10:10:04AM +0000, Zhiqiang Hou wrote:
-
-<snip>
-
-> > > +	pca9547 at 77 {
-> > > +		compatible = "philips,pca9547";
-> > 
-> > I cannot find this compatible string in either binding docs or driver code.
+On Thu, Feb 25, 2016 at 03:56:55PM -0800, Stephen Boyd wrote:
+> On 01/12, Lothar Wa?mann wrote:
+> > This patchset adds the clock which is necessary to operate the KPP
+> > unit on i.MX6UL.
+> > The first patch removes bogus whitespace before TABs in indentation.
+> > The second patch adds the clock definition.
 > > 
 > 
-> See the file below.
-> ./drivers/i2c/muxes/i2c-mux-pca954x.c:115:	{ "pca9547", pca_9547 },
-> Perhaps the vender name should be updated to nxp.
+> Both look fine. Shawn?
 
-Yes, if you look at Documentation/devicetree/bindings/i2c/i2c-mux-pca954x.txt,
-"nxp,pca9547" is the one you should use here.
-
-<snip>
-
-> > > +			eeprom at 56 {
-> > > +				compatible = "at24,24c512";
-> > 
-> > Unsupported/undocumented compatible?
-> 
-> Will change it to "atmel, 24c512".
-
-Yes, but without the space in the middle.
-
-> 
-> > 
-> > > +				reg = <0x56>;
-> > > +			};
-> > > +
-> > > +			eeprom at 57 {
-> > > +				compatible = "at24,24c512";
-> > > +				reg = <0x57>;
-> > > +			};
-> > > +
-> > > +			adt7461a at 4c {
-> > 
-> > temp-sensor should be a better node name, if I understand the device correctly.
-> > 
-> 
-> I didn't find a reference in kernel, so what name should be better, do you have any advice?
-
-"temp-sensor" is what I see from the example in
-Documentation/devicetree/bindings/hwmon/lm90.txt.
+Oops, the patches were overlooked.  Applied now.  Thanks for reminding.
 
 Shawn
