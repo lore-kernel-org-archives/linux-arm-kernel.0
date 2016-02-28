@@ -1,112 +1,37 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Sun, 28 Feb 2016 22:01:55 +0800
-Subject: [PATCH v12 4/4] Watchdog: introduce ARM SBSA watchdog driver
-In-Reply-To: <56D0A72B.8020100@codeaurora.org>
-References: <1455611785-2407-1-git-send-email-fu.wei@linaro.org>
- <1455611785-2407-5-git-send-email-fu.wei@linaro.org>
- <56D0A72B.8020100@codeaurora.org>
-Message-ID: <CADyBb7s9eX6mn6vkb3tn=m=TfD83d4R+U5=iLPADa+XHBE3kDw@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Sun, 28 Feb 2016 20:02:02 +0530
+Subject: [PATCH 00/61] gpio: Add and use devm_gpiochip_add_data()
+In-Reply-To: <CACRpkdYsG8X5XiV2+Ss2GLJkFnLFzLi0uy0yy8R5sdi0b_Y+qA@mail.gmail.com>
+References: <1456150130-2668-1-git-send-email-ldewangan@nvidia.com>	<CACRpkdbt+RiWMA74e40MNZVnDM0t0futtFnbyu9sRhv7p93-Tg@mail.gmail.com>	<56CC1FD4.1080905@nvidia.com>	<56CC7791.2000607@nvidia.com>
+ <CACRpkdYsG8X5XiV2+Ss2GLJkFnLFzLi0uy0yy8R5sdi0b_Y+qA@mail.gmail.com>
+Message-ID: <56D304E2.7000608@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
 
-On 27 February 2016 at 03:27, Timur Tabi <timur@codeaurora.org> wrote:
-> fu.wei at linaro.org wrote:
->>
->> +       if (action) {
->> +               irq = platform_get_irq(pdev, 0);
->> +               if (irq < 0) {
->> +                       action = 0;
->> +                       dev_warn(dev, "unable to get ws0 interrupt.\n");
->> +               } else {
->> +                       if (devm_request_irq(dev, irq,
->> sbsa_gwdt_interrupt, 0,
->> +                                            pdev->name, gwdt)) {
->> +                               action = 0;
->> +                               dev_warn(dev, "unable to request IRQ
->> %d.\n",
->> +                                        irq);
->> +                       }
->> +               }
->> +               if (!action)
->> +                       dev_warn(dev, "falling back to signle stage
->> mode.\n");
->> +       }
->> +
->> +       /*
->> +        * Get the frequency of system counter from the cp15 interface of
->> ARM
->> +        * Generic timer. We don't need to check it, because if it returns
->> "0",
->> +        * system would panic in very early stage.
->> +        */
->> +       gwdt->clk = arch_timer_get_cntfrq();
->> +       gwdt->refresh_base = rf_base;
->> +       gwdt->control_base = cf_base;
+On Thursday 25 February 2016 06:54 PM, Linus Walleij wrote:
+> On Tue, Feb 23, 2016 at 4:15 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
 >
+>> I have made the repo in git hub as
+>>      https://github.com/ldewangan/linux-upstream.git
+> Awesome.
 >
-> I think you need to ping the watchdog before enabling the interrupt, in case
-> there is a pending interrupt.  This just happened to me in testing, so I
-> recommend this:
+>> branch name is devm_gpiochip.
+>>      https://github.com/ldewangan/linux-upstream/tree/devm_gpiochip
+> I've pulled this branch into my tree on a separate branch for
+> testing. I pushed the tree to kernel.org so that the zeroday
+> autobuilders can have a go at it.
+
+Thanks you very much for taking care.
+
 >
->>         /*
->>          * Get the frequency of system counter from the cp15 interface of
->> ARM
->>          * Generic timer. We don't need to check it, because if it returns
->> "0",
->>          * system would panic in very early stage.
->>          */
->>         gwdt->clk = arch_timer_get_cntfrq();
->>         gwdt->refresh_base = rf_base;
->>         gwdt->control_base = cf_base;
->>
->>         if (action) {
->>                 irq = platform_get_irq(pdev, 0);
->>                 if (irq < 0) {
->>                         action = 0;
->>                         dev_warn(dev, "unable to get ws0 interrupt.\n");
->>                 } else {
->>                         sbsa_gwdt_keepalive(&gwdt->wdd);
->>                         if (devm_request_irq(dev, irq,
->> sbsa_gwdt_interrupt, 0,
->>                                              pdev->name, gwdt)) {
->>                                 action = 0;
->>                                 dev_warn(dev, "unable to request IRQ
->> %d.\n",
->>                                          irq);
->>                         }
->>                 }
->>                 if (!action)
->>                         dev_warn(dev, "falling back to single stage
->> mode.\n");
->>         }
->
->
-> In fact, I think you need to move the "if (action) {" block near the end of
-> sbsa_gwdt_probe().  We don't want to enable the interrupt until the watchdog
-> is fully initialized.
->
+> If everything goes well I plan to merge this for v4.6, then we
+> can merge the changes in pin control and other subsystems
+> for v4.7.
+Yes, once this is there, we can grep all over subsystem and push the change.
 
-Good point! Thanks for your testing :-)
+I am seeing lots of code reduction on pincontrol driver side once we 
+have devm_ for pincontrol register and gpiochip_add_data().
 
-Will post v14 for this change.
-
-> --
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-> Forum, a Linux Foundation collaborative project.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+Thanks,
+Laxman
