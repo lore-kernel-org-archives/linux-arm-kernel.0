@@ -1,93 +1,88 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sun, 28 Feb 2016 15:36:51 +0000
-Subject: [PATCH v5 00/20] add additional clocks and frac/mash support
-Message-ID: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
+Date: Sun, 28 Feb 2016 15:36:53 +0000
+Subject: [PATCH v5 02/20] clk: bcm2835: clean up coding style issues
+In-Reply-To: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
+References: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456673831-2408-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Fix issues found with current driver with regards to:
-* coding style
-* locking
-* setting register instead of bits in register
-* the use of BCM2835_CLOCK_COUNT in the device tree bindings
+Fix all the checkpatch complaints for clk-bcm2835.c.
+Specifically:
+* indention
+* missing spin lock comments
+* multiple empty lines
 
-adds:
-* frac/mash support (with correct limits)
-* exposing of additional clock parameters in debugfs
-  (registers, divider and parent)
-* added all the missing pll dividers
-* almost all so far undefined clocks
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ drivers/clk/bcm/clk-bcm2835.c |   14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
-Clocks still missing:
-* gnric - Eric says that this is not really a clock
-          (but it has corresponding registers set)
-* tcnt - this seems to be more of a counter clock gate
-         used for some other purpose - there are 4 CNT registers
-* pllt - totally unidentified clock with a strange mux size of
-         8 clocks (3 bit, not the typical 4 or 16 bit)
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index d3009a6..3aa3e7a 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -12,9 +12,6 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
 
-Lots of information here has been gathered from the broadcom
-provided header files for the VC4 and some information has
-been inferred.
+ /**
+@@ -297,7 +294,7 @@
+ struct bcm2835_cprman {
+ 	struct device *dev;
+ 	void __iomem *regs;
+-	spinlock_t regs_lock;
++	spinlock_t regs_lock; /* spinlock for all clocks */
+ 	const char *osc_name;
 
-I also hope that all the feedback so far has been included
-in this patch-set.
+ 	struct clk_onecell_data onecell;
+@@ -325,12 +322,12 @@ void __init bcm2835_init_clocks(void)
+ 	int ret;
 
-Complete mash clock divider support has been left out for now.
-We now only support the basic fractional divider option (MASH=1)
-but with the corresponding divider limits that apply to mash clocks.
+ 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
+-					126000000);
++				      126000000);
+ 	if (IS_ERR(clk))
+ 		pr_err("apb_pclk not registered\n");
 
-Some measurements on I2S-DACs show unexpected noise levels using
-different mash levels, so that an automatic "best" selection does
-not seem wise - this exercise is left for a later patch-set.
+ 	clk = clk_register_fixed_rate(NULL, "uart0_pclk", NULL, CLK_IS_ROOT,
+-					3000000);
++				      3000000);
+ 	if (IS_ERR(clk))
+ 		pr_err("uart0_pclk not registered\n");
+ 	ret = clk_register_clkdev(clk, NULL, "20201000.uart");
+@@ -338,7 +335,7 @@ void __init bcm2835_init_clocks(void)
+ 		pr_err("uart0_pclk alias not registered\n");
 
-Changelog:
-        V1 -> V2: split the asoc/sound patches from the clock patches
-                  enable frac/mash support
-        V2 -> V3: clamp clock divider to be >= 2
-                  clamp max clock divider to be integer (not fractional)
-                  added additional limit checks for divider selection
-                    allowing fallback to lower mash levels.
-                  use a newer probing mechanism based on a single array
-        V3 -> V4: fixed bad NULL pointer check in init
-                  fixed (mash) limit checks
-                  separated basic mash support from limits checks
-                  really tested with I2S device (unfortunately V3 was
-                  not well tested in this respect)
-        V4 -> V5: major reorganisation of patchset
-	      	  including fixes for newly discovered bugs
-		  split up clock commits into several chunks
-		  separate clamping for mash enabled clocks
-		  made better use of static assignment reducing
-		    efforts to add a new clock - see specifically patch 7
+ 	clk = clk_register_fixed_rate(NULL, "uart1_pclk", NULL, CLK_IS_ROOT,
+-					125000000);
++				      125000000);
+ 	if (IS_ERR(clk))
+ 		pr_err("uart1_pclk not registered\n");
+ 	ret = clk_register_clkdev(clk, NULL, "20215000.uart");
+@@ -1291,7 +1288,7 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
+ }
 
-Martin Sperl (20):
-  clk: bcm2835: pll_off should only set CM_PLL_ANARST
-  clk: bcm2835: clean up coding style issues
-  clk: bcm2835: add locking to pll*_on/off methods
-  clk: bcm2835: remove uart0/1_pclk fixed clocks
-  clk: bcm2835: enable clocks that have been enabled by firmware
-  clk: bcm2835: remove use of BCM2835_CLOCK_COUNT in driver
-  clk: bcm2835: reorganize bcm2835_clock_array assignment
-  clk: bcm2835: add fractional support
-  clk: bcm2835: enable management of PCM clock
-  clk: bcm2835: implement correct clamping for mash clocks
-  clk: bcm2835: divider value has to be 1 or more
-  clk: bcm2835: expose raw clock-registers via debugfs
-  clk: bcm2835: expose current divider, parent and mash via debugfs
-  clk: bcm2835: added missing PLL clock divider
-  clk: bcm2835: add additional clocks
-  clk: bcm2835: add the camera related clocks cam0, cam1 and ccp2
-  clk: bcm2835: add the dsi clocks
-  clk: bcm2835: add arm clock
-  clk: bcm2835: add gates that require PM_DEBUG to be set
-  clk: bcm2835: add the testdebug clock generators
+ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
+-		struct clk_rate_request *req)
++					struct clk_rate_request *req)
+ {
+ 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
+ 	struct clk_hw *parent, *best_parent = NULL;
+@@ -1349,7 +1346,6 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
+ 	return (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
+ }
 
- drivers/clk/bcm/clk-bcm2835.c       | 1536 +++++++++++++++++++++++------------
- include/dt-bindings/clock/bcm2835.h |   31 +-
- 2 files changed, 1061 insertions(+), 506 deletions(-)
-
+-
+ static const struct clk_ops bcm2835_clock_clk_ops = {
+ 	.is_prepared = bcm2835_clock_is_on,
+ 	.prepare = bcm2835_clock_on,
 --
 1.7.10.4
