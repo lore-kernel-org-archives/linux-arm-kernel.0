@@ -1,259 +1,86 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 28 Feb 2016 11:20:24 +0100
-Subject: [PATCH v3 1/4] ARM: dts: LG Optimus Black codename sniper basic
- support
-In-Reply-To: <1456654827-11349-1-git-send-email-contact@paulk.fr>
-References: <1456654827-11349-1-git-send-email-contact@paulk.fr>
-Message-ID: <1456654827-11349-2-git-send-email-contact@paulk.fr>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 28 Feb 2016 12:23:23 +0200
+Subject: [PATCH] serial: imx: support RS-485 Rx disable on Tx
+In-Reply-To: <20160228095601.GB2613@pengutronix.de>
+References: <3b5ba06fdb9c1bdd0b3018bf2f623f52b2856d18.1456651551.git.baruch@tkos.co.il>
+ <20160228095601.GB2613@pengutronix.de>
+Message-ID: <20160228102323.GI2399@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LG Optimus Black codename sniper is a smartphone that was designed and
-manufactured by LG Electronics (LGE) and released back in 2011.
-It is using an OMAP3630 SoC, GP version.
+Hi Uwe,
 
-This adds devicetree support for the device, with only a few basic features
-supported, such as debug uart, i2c, internal emmc and external mmc.
+Thanks for your prompt response.
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/omap3-sniper.dts | 215 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 216 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-sniper.dts
+On Sun, Feb 28, 2016 at 10:56:01AM +0100, Uwe Kleine-K?nig wrote:
+> On Sun, Feb 28, 2016 at 11:25:51AM +0200, Baruch Siach wrote:
+> > Some RS-232 to RS-485 transceivers require Rx to be disabled on Tx to
+> > avoid echo of Tx data into the Rx buffer. Specifically, the XR3160E
+> > RS-232/RS-485/RS-422 transceiver behaves this way.
+> > 
+> > This commit disables Rx on active Tx when SER_RS485_ENABLED is active and
+> > SER_RS485_RX_DURING_TX is disabled.
+> > 
+> > Note that this is a change in behavior of the driver. Until now
+> 
+> But this change is a good one (assuming it does what it advertises :-).
+> Userspace got informed before that SER_RS485_RX_DURING_TX is enabled, so
+> this is not an incompatible change.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70..7314cf8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -460,6 +460,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += \
- 	omap3-sbc-t3517.dtb \
- 	omap3-sbc-t3530.dtb \
- 	omap3-sbc-t3730.dtb \
-+	omap3-sniper.dtb \
- 	omap3-thunder.dtb \
- 	omap3-zoom3.dtb
- dtb-$(CONFIG_SOC_TI81XX) += \
-diff --git a/arch/arm/boot/dts/omap3-sniper.dts b/arch/arm/boot/dts/omap3-sniper.dts
-new file mode 100644
-index 0000000..8c50f8e
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-sniper.dts
-@@ -0,0 +1,215 @@
-+/*
-+ * Copyright (C) 2015-2016 Paul Kocialkowski <contact@paulk.fr>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+#include "omap36xx.dtsi"
-+
-+/ {
-+	model = "LG Optimus Black";
-+	compatible = "lge,omap3-sniper", "ti,omap36xx", "ti,omap3";
-+
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vcc>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>; /* 512 MB */
-+	};
-+};
-+
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx */
-+			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)	/* uart3_tx_irtx */
-+		>;
-+	};
-+
-+	dp3t_sel_pins: pinmux_dp3t_sel_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2196, PIN_OUTPUT | MUX_MODE4)	/* gpio_161 */
-+			OMAP3_CORE1_IOPAD(0x2198, PIN_OUTPUT | MUX_MODE4)	/* gpio_162 */
-+		>;
-+	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21ba, PIN_INPUT | MUX_MODE0)	/* i2c1_scl */
-+			OMAP3_CORE1_IOPAD(0x21bc, PIN_INPUT | MUX_MODE0)	/* i2c1_sda */
-+		>;
-+	};
-+
-+	i2c2_pins: pinmux_i2c2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21be, PIN_INPUT | MUX_MODE0)	/* i2c2_scl */
-+			OMAP3_CORE1_IOPAD(0x21c0, PIN_INPUT | MUX_MODE0)	/* i2c2_sda */
-+		>;
-+	};
-+
-+	i2c3_pins: pinmux_i2c3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT | MUX_MODE0)	/* i2c3_scl */
-+			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT | MUX_MODE0)	/* i2c3_sda */
-+		>;
-+	};
-+
-+	lp8720_en_pin: pinmux_lp8720_en_pin {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2080, PIN_OUTPUT | MUX_MODE4)	/* gpio_37 */
-+		>;
-+	};
-+
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT | MUX_MODE0)	/* sdmmc1_clk */
-+			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT | MUX_MODE0)	/* sdmmc1_cmd */
-+			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat0 */
-+			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat1 */
-+			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat2 */
-+			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT | MUX_MODE0)	/* sdmmc1_dat3 */
-+		>;
-+	};
-+
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT | MUX_MODE0)	/* sdmmc2_clk */
-+			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT | MUX_MODE0)	/* sdmmc2_cmd */
-+			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat0 */
-+			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat1 */
-+			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat2 */
-+			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat3 */
-+			OMAP3_CORE1_IOPAD(0x2164, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat4 */
-+			OMAP3_CORE1_IOPAD(0x2166, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat5 */
-+			OMAP3_CORE1_IOPAD(0x2168, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat6 */
-+			OMAP3_CORE1_IOPAD(0x216a, PIN_INPUT | MUX_MODE0)	/* sdmmc2_dat7 */
-+		>;
-+	};
-+};
-+
-+&omap3_pmx_wkup {
-+	pinctrl-names = "default";
-+
-+	mmc1_cd_pin: pinmux_mmc1_cd_pin {
-+		pinctrl-single,pins = <
-+			OMAP3_WKUP_IOPAD(0x2a1a, PIN_INPUT | MUX_MODE4)		/* gpio_10 */
-+		>;
-+	};
-+};
-+
-+&gpio2 {
-+	ti,no-reset-on-init;
-+};
-+
-+&gpio5 {
-+	ti,no-reset-on-init;
-+};
-+
-+&gpio6 {
-+	ti,no-reset-on-init;
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins &dp3t_sel_pins>;
-+
-+	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+
-+		power {
-+			compatible = "ti,twl4030-power";
-+			ti,use_poweroff;
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins>;
-+
-+	clock-frequency = <400000>;
-+
-+	lp8720 at 7d {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lp8720_en_pin>;
-+
-+		compatible = "ti,lp8720";
-+		reg = <0x7d>;
-+
-+		enable-gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>; /* gpio_37 */
-+
-+		lp8720_ldo1: ldo1 {
-+			regulator-min-microvolt = <3000000>;
-+			regulator-max-microvolt = <3000000>;
-+		};
-+	};
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins &mmc1_cd_pin>;
-+	vmmc-supply = <&lp8720_ldo1>;
-+	cd-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>; /* gpio 10 */
-+	bus-width = <4>;
-+};
-+
-+&mmc2 {
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&vmmc2>;
-+	ti,non-removable;
-+	bus-width = <8>;
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+#include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
-+
-+/*
-+ * The TWL4030 VAUX2 and VDAC regulators power sensors that are slaves on I2C3.
-+ * When not powered, these sensors cause the I2C3 clock to stay low at all times,
-+ * making it impossible to reach other devices on I2C3.
-+ */
-+
-+&vaux2 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-always-on;
-+};
-+
-+&vdac {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-always-on;
-+};
+I thought it is a good idea to mention this fact in the commit log anyway. It 
+is not hard to imagine broken userspace being affected by this change.
+
+> > SER_RS485_RX_DURING_TX was enabled unconditionally even when disabled in
+> > the TIOCSRS485 ioctl serial_rs485 flags field.
+> > 
+> > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  drivers/tty/serial/imx.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > index 9362f54c816c..333d34ff358c 100644
+> > --- a/drivers/tty/serial/imx.c
+> > +++ b/drivers/tty/serial/imx.c
+> > @@ -361,6 +361,8 @@ static void imx_stop_tx(struct uart_port *port)
+> >  			imx_port_rts_inactive(sport, &temp);
+> >  		else
+> >  			imx_port_rts_active(sport, &temp);
+> > +		if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
+> > +			temp |= UCR2_RXEN;
+> >  		writel(temp, port->membase + UCR2);
+> >  
+> >  		temp = readl(port->membase + UCR4);
+> > @@ -568,6 +570,8 @@ static void imx_start_tx(struct uart_port *port)
+> >  			imx_port_rts_inactive(sport, &temp);
+> >  		else
+> >  			imx_port_rts_active(sport, &temp);
+> > +		if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
+> > +			temp &= ~UCR2_RXEN;
+> >  		writel(temp, port->membase + UCR2);
+> 
+> Can this happen:
+> 
+>  - SER_RS485_RX_DURING_TX is off
+>  - thread A starts sending (and so disables RX)
+>  - thread B sets SER_RS485_RX_DURING_TX
+>  - thread A finishes sending, and doesn't restore RXEN.
+> 
+> ?
+> 
+> Even if this cannot happen it might be more robust to restore RXEN
+> unconditionally in imx_stop_tx?!
+
+Sounds like a good idea. But if I take your comment to its logical conclusion, 
+thread B might just disable SER_RS485_ENABLED entirely. Would it make sense to 
+restore RXEN outside the 'if (port->rs485.flags & SER_RS485_ENABLED)' block?  
+Or maybe we should just set RXEN in imx_rs485_config() when 
+SER_RS485_RX_DURING_TX is enabled?
+
+baruch
+
 -- 
-2.6.4
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
