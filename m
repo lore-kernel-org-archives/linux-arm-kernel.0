@@ -1,17 +1,28 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 28 Feb 2016 11:13:10 +0800
-Subject: [PATCH bugfix] ARM: dts: imx51: remove bogus pin definition
-In-Reply-To: <1456495732-3233-1-git-send-email-LW@KARO-electronics.de>
-References: <1456495732-3233-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20160228031310.GE22051@tiger>
+Date: Sun, 28 Feb 2016 11:19:46 +0800
+Subject: [PATCH] ARM: imx: select ARM_CPU_SUSPEND only for imx6
+In-Reply-To: <1456487657-3928107-1-git-send-email-arnd@arndb.de>
+References: <1456487657-3928107-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160228031946.GF22051@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 03:08:52PM +0100, Lothar Wa?mann wrote:
-> Pad DISPB2_SER_RS has no function DISP1_EXT_CLK.
-> The definition is obviusly a copy/paste error from
-> MX51_PAD_DISPB2_SER_RS__DISP1_PIN16.
+On Fri, Feb 26, 2016 at 12:54:12PM +0100, Arnd Bergmann wrote:
+> i.MX only needs to select ARM_CPU_SUSPEND manually for the
+> very specific case that CONFIG_PM_SLEEP is disabled and imx6
+> is used with CONFIG_PM enabled for runtime PM.
 > 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> If we are building a kernel only for CPUs that are not using
+> the cpu_suspend() helper, we otherwise get a harmless
+> build warning:
+> 
+> warning: (ARCH_MXC && SOC_IMX23 && SOC_IMX28 && ARCH_PXA && MACH_MVEBU_V7 && ARCH_OMAP3 && ARCH_OMAP4 && SOC_OMAP5 && SOC_AM33XX && SOC_DRA7XX && ARCH_EXYNOS3 && ARCH_EXYNOS4 && EXYNOS5420_MCPM && EXYNOS_CPU_SUSPEND && ARCH_VEXPRESS_TC2_PM && ARM_BIG_LITTLE_CPUIDLE && ARM_HIGHBANK_CPUIDLE && QCOM_PM) selects ARM_CPU_SUSPEND which has unmet direct dependencies (ARCH_SUSPEND_POSSIBLE)
+> 
+> This moves the option to the SOC_IMX6 option that actually
+> requires it, in effect reverting commit f36b594f3754 ("ARM:
+> mach-imx: Select ARM_CPU_SUSPEND at ARCH_MXC level") that was
+> meant as a cleanup and unintentionally caused this warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
 Applied, thanks.
