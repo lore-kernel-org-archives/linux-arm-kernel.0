@@ -1,76 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 28 Feb 2016 10:56:01 +0100
-Subject: [PATCH] serial: imx: support RS-485 Rx disable on Tx
-In-Reply-To: <3b5ba06fdb9c1bdd0b3018bf2f623f52b2856d18.1456651551.git.baruch@tkos.co.il>
-References: <3b5ba06fdb9c1bdd0b3018bf2f623f52b2856d18.1456651551.git.baruch@tkos.co.il>
-Message-ID: <20160228095601.GB2613@pengutronix.de>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 28 Feb 2016 11:20:26 +0100
+Subject: [PATCH v3 3/4] ARM: dts: omap3-sniper: TWL4030 keypad support
+In-Reply-To: <1456654827-11349-1-git-send-email-contact@paulk.fr>
+References: <1456654827-11349-1-git-send-email-contact@paulk.fr>
+Message-ID: <1456654827-11349-4-git-send-email-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Baruch,
+This adds support for the volume and gesture keys, using TWL4030 keypad.
 
-On Sun, Feb 28, 2016 at 11:25:51AM +0200, Baruch Siach wrote:
-> Some RS-232 to RS-485 transceivers require Rx to be disabled on Tx to
-> avoid echo of Tx data into the Rx buffer. Specifically, the XR3160E
-> RS-232/RS-485/RS-422 transceiver behaves this way.
-> 
-> This commit disables Rx on active Tx when SER_RS485_ENABLED is active and
-> SER_RS485_RX_DURING_TX is disabled.
-> 
-> Note that this is a change in behavior of the driver. Until now
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ arch/arm/boot/dts/omap3-sniper.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-But this change is a good one (assuming it does what it advertises :-).
-Userspace got informed before that SER_RS485_RX_DURING_TX is enabled, so
-this is not an incompatible change.
-
-Best regards
-Uwe
-
-> SER_RS485_RX_DURING_TX was enabled unconditionally even when disabled in
-> the TIOCSRS485 ioctl serial_rs485 flags field.
-> 
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  drivers/tty/serial/imx.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 9362f54c816c..333d34ff358c 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -361,6 +361,8 @@ static void imx_stop_tx(struct uart_port *port)
->  			imx_port_rts_inactive(sport, &temp);
->  		else
->  			imx_port_rts_active(sport, &temp);
-> +		if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
-> +			temp |= UCR2_RXEN;
->  		writel(temp, port->membase + UCR2);
->  
->  		temp = readl(port->membase + UCR4);
-> @@ -568,6 +570,8 @@ static void imx_start_tx(struct uart_port *port)
->  			imx_port_rts_inactive(sport, &temp);
->  		else
->  			imx_port_rts_active(sport, &temp);
-> +		if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
-> +			temp &= ~UCR2_RXEN;
->  		writel(temp, port->membase + UCR2);
-
-Can this happen:
-
- - SER_RS485_RX_DURING_TX is off
- - thread A starts sending (and so disables RX)
- - thread B sets SER_RS485_RX_DURING_TX
- - thread A finishes sending, and doesn't restore RXEN.
-
-?
-
-Even if this cannot happen it might be more robust to restore RXEN
-unconditionally in imx_stop_tx?!
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/boot/dts/omap3-sniper.dts b/arch/arm/boot/dts/omap3-sniper.dts
+index 21d6afa..7f38d58 100644
+--- a/arch/arm/boot/dts/omap3-sniper.dts
++++ b/arch/arm/boot/dts/omap3-sniper.dts
+@@ -8,6 +8,7 @@
+ /dts-v1/;
+ 
+ #include "omap36xx.dtsi"
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	model = "LG Optimus Black";
+@@ -226,6 +227,14 @@
+ #include "twl4030.dtsi"
+ #include "twl4030_omap3.dtsi"
+ 
++&twl_keypad {
++	linux,keymap = <
++		MATRIX_KEY(0x00, 0x00, KEY_VOLUMEUP)
++		MATRIX_KEY(0x01, 0x00, KEY_VOLUMEDOWN)
++		MATRIX_KEY(0x02, 0x00, KEY_SELECT)
++	>;
++};
++
+ /*
+  * The TWL4030 VAUX2 and VDAC regulators power sensors that are slaves on I2C3.
+  * When not powered, these sensors cause the I2C3 clock to stay low at all times,
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.6.4
