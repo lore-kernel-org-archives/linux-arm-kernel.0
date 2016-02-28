@@ -1,151 +1,112 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sun, 28 Feb 2016 15:37:04 +0000
-Subject: [PATCH v5 13/20] clk: bcm2835: expose current divider,
- parent and mash via debugfs
+Date: Sun, 28 Feb 2016 15:37:05 +0000
+Subject: [PATCH v5 14/20] clk: bcm2835: added missing PLL clock divider
 In-Reply-To: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
 References: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456673831-2408-14-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456673831-2408-15-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-For each clock expose the following values via debugfs:
-* current_parent - the currently selected parent
-* current_divi - the integer portion of the currently set divider
-* current_divf - the fractional portion of the currently set divider
-* current_frac - the current frac/mash settings for the divider
+Added the missing pll clock divider definitions.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |  101 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 101 insertions(+)
+ drivers/clk/bcm/clk-bcm2835.c       |   50 +++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/bcm2835.h |    8 ++++++
+ 2 files changed, 58 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 366f975..b67147b 100644
+index b67147b..ff02871 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -129,6 +129,10 @@
- # define CM_BUSY			BIT(7)
- # define CM_BUSYD			BIT(8)
- # define CM_FRAC			BIT(9)
-+# define CM_MASH0			BIT(9)
-+# define CM_MASH1			BIT(10)
-+# define CM_MASH_MASK			(CM_MASH0 | CM_MASH1)
-+# define CM_MASH_SHIFT			9
- # define CM_SRC_SHIFT			0
- # define CM_SRC_BITS			4
- # define CM_SRC_MASK			0xf
-@@ -1045,6 +1049,90 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
- 	return (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
- }
+@@ -1470,6 +1470,22 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.load_mask = CM_PLLA_LOADPER,
+ 		.hold_mask = CM_PLLA_HOLDPER,
+ 		.fixed_divider = 1),
++	[BCM2835_PLLA_DSI0]	= REGISTER_PLL_DIV(
++		.name = "plla_dsi0",
++		.source_pll = "plla",
++		.cm_reg = CM_PLLA,
++		.a2w_reg = A2W_PLLA_DSI0,
++		.load_mask = CM_PLLA_LOADDSI0,
++		.hold_mask = CM_PLLA_HOLDDSI0,
++		.fixed_divider = 1),
++	[BCM2835_PLLA_CCP2]	= REGISTER_PLL_DIV(
++		.name = "plla_ccp2",
++		.source_pll = "plla",
++		.cm_reg = CM_PLLA,
++		.a2w_reg = A2W_PLLA_DSI0,
++		.load_mask = CM_PLLA_LOADCCP2,
++		.hold_mask = CM_PLLA_HOLDCCP2,
++		.fixed_divider = 1),
  
-+static const char *bcm2835_clock_get_parent_name(struct clk_hw *hw)
-+{
-+	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
-+	const struct bcm2835_clock_data *data = clock->data;
-+	u8 id = bcm2835_clock_get_parent(hw);
-+
-+	return (id < data->num_mux_parents) ?
-+		data->parents[id] : "unknown";
-+}
-+
-+static int bcm2835_clock_debug_current_parent_open(struct inode *inode,
-+						   struct file *file)
-+{
-+	const char *parent = bcm2835_clock_get_parent_name(inode->i_private);
-+
-+	file->private_data = kstrdup(parent, GFP_KERNEL);
-+	return 0;
-+}
-+
-+static ssize_t bcm2835_clock_debug_current_parent_read(struct file *file,
-+						       char __user *buf,
-+						       size_t len,
-+						       loff_t *ppos)
-+{
-+	const char *parent = file->private_data;
-+	size_t size = strlen(parent);
-+
-+	return simple_read_from_buffer(buf, len, ppos, parent, size);
-+}
-+
-+static const struct file_operations bcm2835_clock_debug_current_parent_fops = {
-+	.owner   = THIS_MODULE,
-+	.open    = bcm2835_clock_debug_current_parent_open,
-+	.release = simple_attr_release,
-+	.read    = bcm2835_clock_debug_current_parent_read,
-+	.llseek  = generic_file_llseek,
-+};
-+
-+static int bcm2835_clock_debug_current_divi_get(void *hw, u64 *val)
-+{
-+	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
-+	struct bcm2835_cprman *cprman = clock->cprman;
-+	const struct bcm2835_clock_data *data = clock->data;
-+	u32 div = cprman_read(cprman, data->div_reg);
-+
-+	*val = div >> CM_DIV_FRAC_BITS;
-+	return 0;
-+}
-+DEFINE_SIMPLE_ATTRIBUTE(bcm2835_clock_debug_current_divi_fops,
-+			bcm2835_clock_debug_current_divi_get,
-+			NULL, "%llu\n");
-+
-+static int bcm2835_clock_debug_current_divf_get(void *hw, u64 *val)
-+{
-+	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
-+	struct bcm2835_cprman *cprman = clock->cprman;
-+	const struct bcm2835_clock_data *data = clock->data;
-+	u32 div = cprman_read(cprman, data->div_reg);
-+
-+	*val = div & CM_DIV_FRAC_MASK;
-+	return 0;
-+}
-+DEFINE_SIMPLE_ATTRIBUTE(bcm2835_clock_debug_current_divf_fops,
-+			bcm2835_clock_debug_current_divf_get,
-+			NULL, "%llu\n");
-+
-+static int bcm2835_clock_debug_current_frac_get(void *hw, u64 *val)
-+{
-+	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
-+	struct bcm2835_cprman *cprman = clock->cprman;
-+	const struct bcm2835_clock_data *data = clock->data;
-+	u32 ctl = cprman_read(cprman, data->ctl_reg);
-+
-+	if (data->is_mash_clock)
-+		*val = (ctl & CM_MASH_MASK) >> CM_MASH_SHIFT;
-+	else
-+		*val = ctl & CM_FRAC ? 1 : 0;
-+
-+	return 0;
-+}
-+DEFINE_SIMPLE_ATTRIBUTE(bcm2835_clock_debug_current_frac_fops,
-+			bcm2835_clock_debug_current_frac_get,
-+			NULL, "%llu\n");
-+
- static struct debugfs_reg32 bcm2835_debugfs_clock_reg32[] = {
- 	{
- 		.name = "ctl",
-@@ -1063,6 +1151,19 @@ static int bcm2835_clock_debug_init(struct clk_hw *hw,
- 	struct bcm2835_cprman *cprman = clock->cprman;
- 	const struct bcm2835_clock_data *data = clock->data;
+ 	/* PLLB is used for the ARM's clock. */
+ 	[BCM2835_PLLB]		= REGISTER_PLL(
+@@ -1494,6 +1510,24 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.load_mask = CM_PLLB_LOADARM,
+ 		.hold_mask = CM_PLLB_HOLDARM,
+ 		.fixed_divider = 1),
++	[BCM2835_PLLB_SP0]	= REGISTER_PLL_DIV(
++		.name = "pllb_sp0",
++		.source_pll = "pllb",
++		.cm_reg = CM_PLLB,
++		.a2w_reg = A2W_PLLB_SP0,
++		.fixed_divider = 1),
++	[BCM2835_PLLB_SP1]	= REGISTER_PLL_DIV(
++		.name = "pllb_sp1",
++		.source_pll = "pllb",
++		.cm_reg = CM_PLLB,
++		.a2w_reg = A2W_PLLB_SP1,
++		.fixed_divider = 1),
++	[BCM2835_PLLB_SP2]	= REGISTER_PLL_DIV(
++		.name = "pllb_sp2",
++		.source_pll = "pllb",
++		.cm_reg = CM_PLLB,
++		.a2w_reg = A2W_PLLB_SP2,
++		.fixed_divider = 1),
  
-+	/* expose the current parrent */
-+	debugfs_create_file("current_parent", S_IRUGO, dentry, hw,
-+			    &bcm2835_clock_debug_current_parent_fops);
+ 	/*
+ 	 * PLLC is the core PLL, used to drive the core VPU clock.
+@@ -1584,6 +1618,22 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.load_mask = CM_PLLD_LOADPER,
+ 		.hold_mask = CM_PLLD_HOLDPER,
+ 		.fixed_divider = 1),
++	[BCM2835_PLLD_DSI0]	= REGISTER_PLL_DIV(
++		.name = "plld_dsi0",
++		.source_pll = "plld",
++		.cm_reg = CM_PLLD,
++		.a2w_reg = A2W_PLLD_DSI0,
++		.load_mask = CM_PLLD_LOADDSI0,
++		.hold_mask = CM_PLLD_HOLDDSI0,
++		.fixed_divider = 1),
++	[BCM2835_PLLD_DSI1]	= REGISTER_PLL_DIV(
++		.name = "plld_dsi1",
++		.source_pll = "plld",
++		.cm_reg = CM_PLLD,
++		.a2w_reg = A2W_PLLD_DSI1,
++		.load_mask = CM_PLLD_LOADDSI1,
++		.hold_mask = CM_PLLD_HOLDDSI1,
++		.fixed_divider = 1),
+ 
+ 	/*
+ 	 * PLLH is used to supply the pixel clock or the AUX clock for the
+diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
+index 9a7b4a5..9689812 100644
+--- a/include/dt-bindings/clock/bcm2835.h
++++ b/include/dt-bindings/clock/bcm2835.h
+@@ -45,3 +45,11 @@
+ #define BCM2835_CLOCK_PERI_IMAGE	29
+ #define BCM2835_CLOCK_PWM		30
+ #define BCM2835_CLOCK_PCM		31
 +
-+	/* expose the current divider components */
-+	debugfs_create_file("current_divi", S_IRUGO, dentry, hw,
-+			    &bcm2835_clock_debug_current_divi_fops);
-+	debugfs_create_file("current_divf", S_IRUGO, dentry, hw,
-+			    &bcm2835_clock_debug_current_divf_fops);
-+	debugfs_create_file("current_frac", S_IRUGO, dentry, hw,
-+			    &bcm2835_clock_debug_current_frac_fops);
-+
-+	/* add the regset */
- 	return bcm2835_debugfs_regset(
- 		cprman, data->ctl_reg,
- 		bcm2835_debugfs_clock_reg32,
++#define BCM2835_PLLA_DSI0		32
++#define BCM2835_PLLA_CCP2		33
++#define BCM2835_PLLB_SP0		34
++#define BCM2835_PLLB_SP1		35
++#define BCM2835_PLLB_SP2		36
++#define BCM2835_PLLD_DSI0		37
++#define BCM2835_PLLD_DSI1		38
 -- 
 1.7.10.4
