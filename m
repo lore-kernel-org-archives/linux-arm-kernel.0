@@ -1,79 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 28 Feb 2016 21:51:48 +0100
-Subject: [PATCH] [media] v4l2/dvb: allow v4l2_mc functions to be used by dvb
-Message-ID: <1456692724-751344-1-git-send-email-arnd@arndb.de>
+Date: Sun, 28 Feb 2016 22:57:23 +0100
+Subject: [PATCH] [RFC] mm/page_ref, crypto/async_pq: don't put_page from __exit
+Message-ID: <1456696663-2340682-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a configuration that supports all DVB drivers but that disables
-V4L2 or builds it as a loadable module, we get link errors because
-of the recent change to use __v4l2_mc_usb_media_device_init:
+The addition of tracepoints to the page reference tracking had an
+unfortunate side-effect in at least one driver that calls put_page
+from its exit function, resulting in a link error:
 
-drivers/media/built-in.o: In function `dvb_usb_adapter_dvb_init':
-:(.text+0xe7966): undefined reference to `__v4l2_mc_usb_media_device_init'
-drivers/media/built-in.o: In function `dvb_usbv2_init':
-:(.text+0xff1cc): undefined reference to `__v4l2_mc_usb_media_device_init'
-drivers/media/built-in.o: In function `smsusb_init_device':
-:(.text+0x113be4): undefined reference to `__v4l2_mc_usb_media_device_init'
-drivers/media/built-in.o: In function `au0828_usb_probe':
-:(.text+0x114d08): undefined reference to `__v4l2_mc_usb_media_device_init'
+`.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
 
-This patch is one way out, by simply building the v4l2-mc.c file
-whenever at least one of VIDEO_V4L2 or DVB_CORE are enabled, including
-the case that one of them is a module and the other is built-in, which
-leads the MC code to become built-in as well.
+I could not come up with a nice solution that ignores __jump_table
+entries in discarded code, so we probably now have to treat this
+as something a driver is not allowed to do. Removing the __exit
+annotation avoids the problem in this particular driver, but the
+same problem could come back any time in other code.
+
+On a related problem regarding the runtime patching for SMP
+operations on ARM uniprocessor systems, we resorted to not
+drop the .exit section at link time, but that doesn't seem
+appropriate here.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
 ---
- drivers/media/Makefile           | 2 +-
- drivers/media/v4l2-core/Makefile | 8 +++++++-
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ crypto/async_tx/async_pq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/Makefile b/drivers/media/Makefile
-index e608bbce0c35..16d471a56c0f 100644
---- a/drivers/media/Makefile
-+++ b/drivers/media/Makefile
-@@ -19,7 +19,7 @@ ifeq ($(CONFIG_MEDIA_CONTROLLER),y)
- endif
+diff --git a/crypto/async_tx/async_pq.c b/crypto/async_tx/async_pq.c
+index c0748bbd4c08..be167145aa55 100644
+--- a/crypto/async_tx/async_pq.c
++++ b/crypto/async_tx/async_pq.c
+@@ -442,7 +442,7 @@ static int __init async_pq_init(void)
+ 	return -ENOMEM;
+ }
  
- obj-$(CONFIG_VIDEO_DEV) += v4l2-core/
--obj-$(CONFIG_DVB_CORE)  += dvb-core/
-+obj-$(CONFIG_DVB_CORE)  += dvb-core/ v4l2-core/
- 
- # There are both core and drivers at RC subtree - merge before drivers
- obj-y += rc/
-diff --git a/drivers/media/v4l2-core/Makefile b/drivers/media/v4l2-core/Makefile
-index 795a5352761d..c26472f9950e 100644
---- a/drivers/media/v4l2-core/Makefile
-+++ b/drivers/media/v4l2-core/Makefile
-@@ -16,7 +16,11 @@ endif
- ifeq ($(CONFIG_TRACEPOINTS),y)
-   videodev-objs += vb2-trace.o v4l2-trace.o
- endif
--videodev-$(CONFIG_MEDIA_CONTROLLER) += v4l2-mc.o
-+
-+ifdef CONFIG_MEDIA_CONTROLLER
-+obj-$(CONFIG_VIDEO_V4L2) += v4l2-mc.o
-+obj-$(CONFIG_DVB_CORE) += v4l2-mc.o
-+endif
- 
- obj-$(CONFIG_VIDEO_V4L2) += videodev.o
- obj-$(CONFIG_VIDEO_V4L2) += v4l2-common.o
-@@ -28,6 +32,7 @@ obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
- 
- obj-$(CONFIG_V4L2_FLASH_LED_CLASS) += v4l2-flash-led-class.o
- 
-+ifdef CONFIG_VIDEO_V4L2
- obj-$(CONFIG_VIDEOBUF_GEN) += videobuf-core.o
- obj-$(CONFIG_VIDEOBUF_DMA_SG) += videobuf-dma-sg.o
- obj-$(CONFIG_VIDEOBUF_DMA_CONTIG) += videobuf-dma-contig.o
-@@ -40,6 +45,7 @@ obj-$(CONFIG_VIDEOBUF2_VMALLOC) += videobuf2-vmalloc.o
- obj-$(CONFIG_VIDEOBUF2_DMA_CONTIG) += videobuf2-dma-contig.o
- obj-$(CONFIG_VIDEOBUF2_DMA_SG) += videobuf2-dma-sg.o
- obj-$(CONFIG_VIDEOBUF2_DVB) += videobuf2-dvb.o
-+endif
- 
- ccflags-y += -I$(srctree)/drivers/media/dvb-core
- ccflags-y += -I$(srctree)/drivers/media/dvb-frontends
+-static void __exit async_pq_exit(void)
++static void async_pq_exit(void)
+ {
+ 	put_page(pq_scribble_page);
+ }
 -- 
 2.7.0
