@@ -1,56 +1,101 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 28 Feb 2016 19:04:57 +0100 (CET)
-Subject: [PATCH v5 03/20] clk: bcm2835: add locking to pll*_on/off methods
-In-Reply-To: <1456673831-2408-4-git-send-email-kernel@martin.sperl.org>
-References: <1456673831-2408-1-git-send-email-kernel@martin.sperl.org>
- <1456673831-2408-4-git-send-email-kernel@martin.sperl.org>
-Message-ID: <413895849.331121.eb44c2f6-8870-42b4-ada5-1ccea76f532b.open-xchange@email.1und1.de>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun, 28 Feb 2016 13:22:03 -0600
+Subject: [PATCH v2] irqchip/gicv3-its: Don't allow devices whose ID is outside
+ range
+Message-ID: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+We are not checking whether the requested device identifier fits into
+the device table memory or not. The function its_create_device()
+assumes that enough memory has been allocated for whole DevID sparse
+(reported by ITS_TYPER.Devbits) during the ITS probe() and continues
+to initialize ITS hardware.
 
-> kernel at martin.sperl.org hat am 28. Februar 2016 um 16:36 geschrieben:
->
->
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> Add missing locking to:
-> * bcm2835_pll_on
-> * bcm2835_pll_off
-> * bcm2835_pll_divider_on
+This assumption is not perfect, sometimes we reduce memory size either
+because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
+MAPD command fails if 'Device ID' is outside of device table range.
 
-this should be obvious. Please explain the why.
+Add a simple validation check to avoid MAPD failures since we are
+not handling ITS command errors. This change also helps to return an
+error -ENOMEM instead of success to caller.
 
->
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+[v1]->[v2]
+  Rebase to v4.5-rc6, edit commit text and simplify code changes
 
-Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain
-clocks")
+ drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
 
-> ---
-> drivers/clk/bcm/clk-bcm2835.c | 6 ++++++
-> 1 file changed, 6 insertions(+)
->
-> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-> index 3aa3e7a..d999a13 100644
-> --- a/drivers/clk/bcm/clk-bcm2835.c
-> +++ b/drivers/clk/bcm/clk-bcm2835.c
-> @@ -910,12 +910,14 @@ static void bcm2835_pll_off(struct clk_hw *hw)
-> struct bcm2835_cprman *cprman = pll->cprman;
-> const struct bcm2835_pll_data *data = pll->data;
->
-> + spin_lock(&cprman->regs_lock);
-> cprman_write(cprman, data->cm_ctrl_reg,
-> cprman_read(cprman, data->cm_ctrl_reg) |
-> CM_PLL_ANARST);
-> cprman_write(cprman, data->a2w_ctrl_reg,
-> cprman_read(cprman, data->a2w_ctrl_reg) |
-> A2W_PLL_CTRL_PWRDN);
-> + spin_unlock(&cprman->regs_lock);
-> }
-
-As i told please move this particular change into 01/20, the rest is okay.
-
-Regards
-Stefan
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 43dfd15..6d986ac 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -55,6 +55,16 @@ struct its_collection {
+ };
+ 
+ /*
++ * The ITS_BASER structure - contains memeory information and table
++ * entry size in bytes.
++ */
++struct its_baser {
++	void		*base;
++	u32		order;
++	u32		entry_size;
++};
++
++/*
+  * The ITS structure - contains most of the infrastructure, with the
+  * top-level MSI domain, the command queue, the collections, and the
+  * list of devices writing to it.
+@@ -66,14 +76,12 @@ struct its_node {
+ 	unsigned long		phys_base;
+ 	struct its_cmd_block	*cmd_base;
+ 	struct its_cmd_block	*cmd_write;
+-	struct {
+-		void		*base;
+-		u32		order;
+-	} tables[GITS_BASER_NR_REGS];
++	struct its_baser	tables[GITS_BASER_NR_REGS];
+ 	struct its_collection	*collections;
+ 	struct list_head	its_device_list;
+ 	u64			flags;
+ 	u32			ite_size;
++	struct its_baser	*device_table;
+ };
+ 
+ #define ITS_ITT_ALIGN		SZ_256
+@@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		 * For other tables, only allocate a single page.
+ 		 */
+ 		if (type == GITS_BASER_TYPE_DEVICE) {
++			its->device_table = &its->tables[i];
+ 			/*
+ 			 * 'order' was initialized earlier to the default page
+ 			 * granule of the the ITS.  We can't have an allocation
+@@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 					node_name, order);
+ 			}
+ 		}
++		its->tables[i].entry_size = entry_size;
+ 
+ retry_alloc_baser:
+ 		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+@@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	int nr_ites;
+ 	int sz;
+ 
++	/* Don't allow 'dev_id' that exceeds single, flat table limit */
++	if (its->device_table &&
++	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
++	    its->device_table->entry_size)))
++		return NULL;
++
+ 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+ 	/*
+ 	 * At least one bit of EventID is being used, hence a minimum
+-- 
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
+a Linux Foundation Collaborative Project
