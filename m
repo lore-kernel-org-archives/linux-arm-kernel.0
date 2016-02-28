@@ -1,86 +1,56 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 28 Feb 2016 12:23:23 +0200
-Subject: [PATCH] serial: imx: support RS-485 Rx disable on Tx
-In-Reply-To: <20160228095601.GB2613@pengutronix.de>
-References: <3b5ba06fdb9c1bdd0b3018bf2f623f52b2856d18.1456651551.git.baruch@tkos.co.il>
- <20160228095601.GB2613@pengutronix.de>
-Message-ID: <20160228102323.GI2399@tarshish>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 28 Feb 2016 13:38:58 +0100
+Subject: [PATCH v3 0/4] LG Optimus Black codename sniper support series
+In-Reply-To: <1456654827-11349-1-git-send-email-contact@paulk.fr>
+References: <1456654827-11349-1-git-send-email-contact@paulk.fr>
+Message-ID: <1456663138.1022.12.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Will send out v4 soon, with minor changes.
 
-Thanks for your prompt response.
-
-On Sun, Feb 28, 2016 at 10:56:01AM +0100, Uwe Kleine-K?nig wrote:
-> On Sun, Feb 28, 2016 at 11:25:51AM +0200, Baruch Siach wrote:
-> > Some RS-232 to RS-485 transceivers require Rx to be disabled on Tx to
-> > avoid echo of Tx data into the Rx buffer. Specifically, the XR3160E
-> > RS-232/RS-485/RS-422 transceiver behaves this way.
-> > 
-> > This commit disables Rx on active Tx when SER_RS485_ENABLED is active and
-> > SER_RS485_RX_DURING_TX is disabled.
-> > 
-> > Note that this is a change in behavior of the driver. Until now
+Le dimanche 28 f?vrier 2016 ? 11:20 +0100, Paul Kocialkowski a ?crit?:
+> This series requires lp872x regulator patches from the regulator tree[0] to
+> work
+> at run-time but can be applied as-is.
 > 
-> But this change is a good one (assuming it does what it advertises :-).
-> Userspace got informed before that SER_RS485_RX_DURING_TX is enabled, so
-> this is not an incompatible change.
-
-I thought it is a good idea to mention this fact in the commit log anyway. It 
-is not hard to imagine broken userspace being affected by this change.
-
-> > SER_RS485_RX_DURING_TX was enabled unconditionally even when disabled in
-> > the TIOCSRS485 ioctl serial_rs485 flags field.
-> > 
-> > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> >  drivers/tty/serial/imx.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> > index 9362f54c816c..333d34ff358c 100644
-> > --- a/drivers/tty/serial/imx.c
-> > +++ b/drivers/tty/serial/imx.c
-> > @@ -361,6 +361,8 @@ static void imx_stop_tx(struct uart_port *port)
-> >  			imx_port_rts_inactive(sport, &temp);
-> >  		else
-> >  			imx_port_rts_active(sport, &temp);
-> > +		if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
-> > +			temp |= UCR2_RXEN;
-> >  		writel(temp, port->membase + UCR2);
-> >  
-> >  		temp = readl(port->membase + UCR4);
-> > @@ -568,6 +570,8 @@ static void imx_start_tx(struct uart_port *port)
-> >  			imx_port_rts_inactive(sport, &temp);
-> >  		else
-> >  			imx_port_rts_active(sport, &temp);
-> > +		if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
-> > +			temp &= ~UCR2_RXEN;
-> >  		writel(temp, port->membase + UCR2);
+> Changes since v2:
+> * Add USB OTG support
+> * Add TWL4030 keypad support
+> * Drop references to P970 since other devices (e.g. KU5900) are supported too
 > 
-> Can this happen:
+> Changes since v1:
+> * Remove lp872x patches that were accepted already from the series
+> * Explain why removing the invalid DVS GPIO warning is enough
+> * Update copyright notice on omap3-sniper.dts
+> * Rename the devicetree property for the enable GPIO to enable-gpios
+> * Rename function to enable GPIO to lp872x_hw_enable
+> * Add enable delays after requesting the enable GPIO
+> * Use IOPAD macros for pinmux description
+> * Mux the dp3t uart selection pins to gpio
+> * Restrict not-reset gpio controllers to only avoid reset when needed
 > 
->  - SER_RS485_RX_DURING_TX is off
->  - thread A starts sending (and so disables RX)
->  - thread B sets SER_RS485_RX_DURING_TX
->  - thread A finishes sending, and doesn't restore RXEN.
+> This series introduces support for the LG Optimus Black, as described in the
+> patch adding devicetree support for the device.
 > 
-> ?
+> In order to power the external mmc (mmc1), the lp872x regulator is used.
+> Its code had to be improved a bit to work on the device.
 > 
-> Even if this cannot happen it might be more robust to restore RXEN
-> unconditionally in imx_stop_tx?!
-
-Sounds like a good idea. But if I take your comment to its logical conclusion, 
-thread B might just disable SER_RS485_ENABLED entirely. Would it make sense to 
-restore RXEN outside the 'if (port->rs485.flags & SER_RS485_ENABLED)' block?  
-Or maybe we should just set RXEN in imx_rs485_config() when 
-SER_RS485_RX_DURING_TX is enabled?
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> Note that the patch adding devicetree support for the device requires the
+> changes applied to the lp872x regulator, so all this is sent in one series
+> despite the fact they're different parts of the code.
+> 
+> [0]: https://git.kernel.org/cgit/linux/kernel/git/broonie/regulator.git/log/?h
+> =topic/lp872x
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at??http://vger.kernel.org/majordomo-info.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160228/cb8b96fc/attachment.sig>
