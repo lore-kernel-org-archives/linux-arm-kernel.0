@@ -1,51 +1,55 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 28 Feb 2016 23:18:58 +0800
-Subject: [PATCH v2 13/13] ARM: sunxi: Introduce MACH_SUN8I_A83T option
-In-Reply-To: <1456672738-4993-1-git-send-email-vishnupatekar0510@gmail.com>
-References: <1456672738-4993-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1456672738-4993-14-git-send-email-vishnupatekar0510@gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Sun, 28 Feb 2016 17:32:07 +0200
+Subject: [PATCH for-4.5] arm/kvm: fix ioctl error handling
+Message-ID: <1456673397-23625-1-git-send-email-mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A83T has CPUS clock similar to A80's. currently, a80 cpus clock only
-compiled for A80. So, Introduce MACH_SUN8I_A83T to compile it for
-A83T as well.
+Calling return copy_to_user(...) in an ioctl will not
+do the right thing if there's a pagefault:
+copy_to_user returns the number of bytes not copied
+in this case.
 
-Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+Fix up kvm to do
+	return copy_to_user(...)) ?  -EFAULT : 0;
+
+everywhere.
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 ---
- arch/arm/mach-sunxi/Kconfig | 5 +++++
- drivers/clk/sunxi/Makefile  | 3 +++
- 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index c124d65..424b76d 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -41,6 +41,11 @@ config MACH_SUN8I
- 	select ARM_GIC
- 	select MFD_SUN6I_PRCM
+Compiled only.
+
+ arch/arm/kvm/guest.c   | 2 +-
+ arch/arm64/kvm/guest.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 5fa69d7..99361f1 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -161,7 +161,7 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	u64 val;
  
-+config MACH_SUN8I_A83T
-+	bool "Allwinner A83T (sun8i) SoCs support"
-+	default ARCH_SUNXI
-+	select ARM_GIC
-+
- config MACH_SUN9I
- 	bool "Allwinner (sun9i) SoCs support"
- 	default ARCH_SUNXI
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 3fd7901..2aabfc4 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -20,6 +20,9 @@ obj-y += clk-usb.o
- obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
- obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
+ 	val = kvm_arm_timer_get_reg(vcpu, reg->id);
+-	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
++	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
+ }
  
-+obj-$(CONFIG_MACH_SUN8I_A83T) += clk-sun8i-apb0.o
-+obj-$(CONFIG_MACH_SUN8I_A83T) += clk-sun9i-cpus.o
-+
- obj-$(CONFIG_MFD_SUN6I_PRCM) += \
- 	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
- 	clk-sun8i-apb0.o
+ static unsigned long num_core_regs(void)
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index fcb7788..9e54ad7 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -194,7 +194,7 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	u64 val;
+ 
+ 	val = kvm_arm_timer_get_reg(vcpu, reg->id);
+-	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
++	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
+ }
+ 
+ /**
 -- 
-1.9.1
+MST
