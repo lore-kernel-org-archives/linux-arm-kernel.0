@@ -1,51 +1,17 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Feb 2016 15:39:35 +0000
-Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
-In-Reply-To: <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
-References: <cover.1455810755.git.jglauber@cavium.com>
- <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
-Message-ID: <20160229153934.GB14848@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 29 Feb 2016 18:39:01 +0300
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <208897488.c0hkBy2G1S@wuerfel>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
+ <208897488.c0hkBy2G1S@wuerfel>
+Message-ID: <20160229153901.GA27327@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
+On Fri, Feb 19, 2016 at 09:23:35AM +0100, Arnd Bergmann wrote:
+> I have no idea whether this is good news or bad news ;-)
 
-I've queued this lot on my perf/updates branch, but I just noticed an
-oddity whilst dealing with some potential conflicts with the kvm tree.
-
-On Thu, Feb 18, 2016 at 05:50:13PM +0100, Jan Glauber wrote:
-> With the long cycle counter bit (LC) disabled the cycle counter is not
-> working on ThunderX SOC (ThunderX only implements Aarch64).
-> Also, according to documentation LC == 0 is deprecated.
-> 
-> To keep the code simple the patch does not introduce 64 bit wide counter
-> functions. Instead writing the cycle counter always sets the upper
-> 32 bits so overflow interrupts are generated as before.
-> 
-> Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
->  1 file changed, 16 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 0ed05f6..c68fa98 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
->  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
->  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
->  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-> +#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
->  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
->  #define	ARMV8_PMCR_N_MASK	0x1f
->  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-
-You haven't extended this mask to cover the LC bit, so it will be ignored
-by armv8pmu_pmcr_write afaict.
-
-How did you test this? I can easily update the mask, but it would be
-good to know that it doesn't end up cause a breakage.
-
-Will
+This is neutral news, I think. V5 had ~25 fails, and aarch32 and lp64 has
+~5 fails each. I believe I'll manage to achieve ~25 fails soon. The
+rest fails are not clear for me now, so I'll investigate it...
