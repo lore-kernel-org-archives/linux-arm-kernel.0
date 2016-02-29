@@ -1,39 +1,56 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Feb 2016 07:54:24 +0100
-Subject: [PATCH V3] ARM64: tegra: Add support for Google Pixel C
-In-Reply-To: <1455020809-17531-1-git-send-email-jonathanh@nvidia.com>
-References: <1454949199-27050-1-git-send-email-jonathanh@nvidia.com>
- <1455020809-17531-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20160229065424.GD23745@ulmo>
+From: js1304@gmail.com (Joonsoo Kim)
+Date: Mon, 29 Feb 2016 16:40:02 +0900
+Subject: [PATCH] [RFC] mm/page_ref,
+ crypto/async_pq: don't put_page from __exit
+In-Reply-To: <1456696663-2340682-1-git-send-email-arnd@arndb.de>
+References: <1456696663-2340682-1-git-send-email-arnd@arndb.de>
+Message-ID: <CAAmzW4N0YJc_O9ArC8e7Q5y4rmbHjj6-Q1yfvZ5LvORvG764cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 09, 2016 at 12:26:49PM +0000, Jon Hunter wrote:
-> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
-> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+2016-02-29 6:57 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> The addition of tracepoints to the page reference tracking had an
+> unfortunate side-effect in at least one driver that calls put_page
+> from its exit function, resulting in a link error:
+>
+> `.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
+>
+> I could not come up with a nice solution that ignores __jump_table
+> entries in discarded code, so we probably now have to treat this
+> as something a driver is not allowed to do. Removing the __exit
+> annotation avoids the problem in this particular driver, but the
+> same problem could come back any time in other code.
+>
+> On a related problem regarding the runtime patching for SMP
+> operations on ARM uniprocessor systems, we resorted to not
+> drop the .exit section at link time, but that doesn't seem
+> appropriate here.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
 > ---
-> 
-> Changes v2 -> v3:
-> - Added PSCI information to enable all 4 CPUs on boot
-> 
-> Changes v1 -> v2:
-> - Removed console boot parameter and added stdout-path
-> - Added 32k clock for PMC
-> 
->  arch/arm64/boot/dts/nvidia/Makefile           |  1 +
->  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 83 +++++++++++++++++++++++++++
->  2 files changed, 84 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+>  crypto/async_tx/async_pq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/crypto/async_tx/async_pq.c b/crypto/async_tx/async_pq.c
+> index c0748bbd4c08..be167145aa55 100644
+> --- a/crypto/async_tx/async_pq.c
+> +++ b/crypto/async_tx/async_pq.c
+> @@ -442,7 +442,7 @@ static int __init async_pq_init(void)
+>         return -ENOMEM;
+>  }
+>
+> -static void __exit async_pq_exit(void)
+> +static void async_pq_exit(void)
+>  {
+>         put_page(pq_scribble_page);
+>  }
 
-Applied, thanks.
+Hello, Arnd.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/5c33bdce/attachment.sig>
+I think that we can avoid this error by using __free_page().
+It would not be inlined so calling it would have no problem.
+
+Could you test it, please?
+
+Thanks.
