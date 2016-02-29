@@ -1,74 +1,55 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 29 Feb 2016 18:32:52 +0530
-Subject: [PATCH 1/1] arm64: defconfig: Enable Maxim PMIC max77620 config
-Message-ID: <1456750972-13972-1-git-send-email-ldewangan@nvidia.com>
+Date: Mon, 29 Feb 2016 18:36:50 +0530
+Subject: [PATCH 1/2] arm64: tegra: Add DT entry for keys used in Jetson-TX1
+Message-ID: <1456751211-14341-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable following configs for the Maxim Semiconductor's PMIC
-MAX77620/MAX20024. This is used on NVIDIA's Tegra 210 platform
-Jetson-TX1.
-
- CONFIG_MFD_MAX77620 For MFD driver.
- CONFIG_PINCTRL_MAX77620 For pin control support
- CONFIG_GPIO_MAX77620 for GPIO Support.
- CONFIG_REGULATOR_MAX77620 for regulator support.
- CONFIG_RTC_DRV_MAX77686 for RTC support.
-
-Enable Tegra I2C config to enable I2C in NVIDIA's Tegra 210
-platforms.
+Add DT entry for keys used in Jetson-TX p2371-2180. This has
+three keys, POWER, VOLUME-UP and VOLUME-DOWN.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
-The patches for drivers of MFD/GPIO/Pincontrol are in flight.
+ arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
- arch/arm64/configs/defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index a98a8ad..af3d4df 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -147,27 +147,32 @@ CONFIG_VIRTIO_CONSOLE=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
-+CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_QUP=y
- CONFIG_SPMI=y
-+CONFIG_PINCTRL_MAX77620=y
- CONFIG_PINCTRL_MSM8916=y
- CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PL061=y
- CONFIG_GPIO_RCAR=y
- CONFIG_GPIO_XGENE=y
-+CONFIG_GPIO_MAX77620=y
- CONFIG_POWER_RESET_XGENE=y
- CONFIG_POWER_RESET_SYSCON=y
- # CONFIG_HWMON is not set
-+CONFIG_MFD_MAX77620=y
- CONFIG_MFD_SPMI_PMIC=y
- CONFIG_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_MAX77620=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_FB=y
-@@ -216,6 +221,7 @@ CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_EFI=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_SUN6I=y
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts b/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
+index 683b339..18147eb 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
+@@ -2,8 +2,33 @@
+ 
+ #include "tegra210-p2180.dtsi"
+ #include "tegra210-p2597.dtsi"
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	model = "NVIDIA Jetson TX1 Developer Kit";
+ 	compatible = "nvidia,p2371-2180", "nvidia,tegra210";
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		label = "gpio-keys";
++
++		power {
++			label = "Power";
++			gpios = <&gpio TEGRA_GPIO(X, 5) GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
++			gpio-key,wakeup;
++		};
++
++		volume_down {
++			label = "Volume Down";
++			gpios = <&gpio TEGRA_GPIO(Y, 0) GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEDOWN>;
++		};
++
++		volume_up {
++			label = "Volume Up";
++			gpios = <&gpio TEGRA_GPIO(X, 6) GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_VOLUMEUP>;
++		};
++	};
+ };
 -- 
 2.1.4
