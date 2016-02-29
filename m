@@ -1,35 +1,38 @@
-From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
-Date: Mon, 29 Feb 2016 11:06:34 +0000
-Subject: [PATCH 1/2] can: rcar_can: Add r8a7795 support
-In-Reply-To: <CAMuHMdV3EsvN=sqiB2npB=cH8Bz4D6UVcQj-BKqfdHerKSDowQ@mail.gmail.com>
-References: <1456737661-20538-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <CAMuHMdV3EsvN=sqiB2npB=cH8Bz4D6UVcQj-BKqfdHerKSDowQ@mail.gmail.com>
-Message-ID: <SG2PR06MB10389D8C1D30451EC2AE8FF0C3BA0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 29 Feb 2016 12:12:26 +0100
+Subject: [PATCH v2 2/3] ARM: i.MX25: add scc module to dtsi
+In-Reply-To: <1456744347-4176-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1456744347-4176-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1456744347-4176-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Add the Security Controller (SCC) module to the dtsi.
 
-> On Mon, Feb 29, 2016 at 10:21 AM, Ramesh Shanmugasundaram
-> <ramesh.shanmugasundaram@bp.renesas.com> wrote:
-> > --- a/drivers/net/can/rcar_can.c
-> > +++ b/drivers/net/can/rcar_can.c
-> > @@ -808,6 +808,10 @@ static int rcar_can_probe(struct platform_device
-> *pdev)
-> >         priv->regs = addr;
-> >         priv->clock_select = clock_select;
-> >         priv->can.clock.freq = clk_get_rate(priv->can_clk);
-> > +
-> > +       /* Use the rounded clock value (nearest kHz) */
-> > +       priv->can.clock.freq = 1000 *
-> > + DIV_ROUND_UP(priv->can.clock.freq, 1000);
-> 
-> The comment and the implementation don't match.
-> To get the nearest kHz, you have to useDIV_ROUND_CLOSEST().
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/imx25.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Thanks Geert. Yes, DIV_ROUND_CLOSEST() would be apt as you pointed out.
-I'll be removing this hack when I rebase, as Marc is fixing the algorithm.
-
-Thanks,
-Ramesh
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index cde329e9b9e3..73118aba4cc4 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -397,6 +397,15 @@
+ 				interrupts = <41>;
+ 			};
+ 
++			scc: crypto at 53fac000 {
++				compatible = "fsl,imx25-scc";
++				reg = <0x53fac000 0x4000>;
++				clocks = <&clks 111>;
++				clock-names = "ipg";
++				interrupts = <49>, <50>;
++				interrupt-names = "scm", "smn";
++			};
++
+ 			esdhc1: esdhc at 53fb4000 {
+ 				compatible = "fsl,imx25-esdhc";
+ 				reg = <0x53fb4000 0x4000>;
+-- 
+2.7.0
