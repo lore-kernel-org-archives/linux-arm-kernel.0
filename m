@@ -1,40 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Feb 2016 10:46:49 +0000
-Subject: [PATCH 0/2] arm64, cma, gicv3-its: Use CMA for allocation of
- large device tables
-In-Reply-To: <1456398164-16864-1-git-send-email-rrichter@caviumnetworks.com>
-References: <1456398164-16864-1-git-send-email-rrichter@caviumnetworks.com>
-Message-ID: <56D42199.7040207@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 11:53:46 +0100
+Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
+In-Reply-To: <56D41F74.8010408@arm.com>
+References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
+ <56D41F74.8010408@arm.com>
+Message-ID: <2734684.OJWJHS6snX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-On 25/02/16 11:02, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
+On Monday 29 February 2016 10:37:40 Robin Murphy wrote:
+> Hi Arnd,
 > 
-> This series implements the use of CMA for allocation of large device
-> tables for the arm64 gicv3 interrupt controller.
+> On 29/02/16 09:19, Arnd Bergmann wrote:
+> > The newly added Mediatek IOMMU driver uses the IOMMU_DMA infrastructure,
+> > but unlike other such drivers, it does not select 'ARM_DMA_USE_IOMMU',
+> > which is a prerequisite, leading to a link error:
+> >
+> > warning: (MTK_IOMMU) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT && NEED_SG_DMA_LENGTH)
 > 
-> There are 2 patches, the first is for early activation of cma, which
-> needs to be done before interrupt initialization to make it available
-> to the gicv3. The second implements the use of CMA to allocate
-> gicv3-its device tables.
+> Going off on a tangent, is it actually right for that to depend on a 
+> NEED_* symbol, or should that really be a select instead?
+
+ARM_DMA_USE_IOMMU gets this right, it selects NEED_SG_DMA_LENGTH as it
+actually needs it.
+
+The IOMMU_DMA symbol is a bit strange, and the dependency can probably
+get dropped altogether, but at least here it told us what went wrong.
+
+> > drivers/iommu/built-in.o: In function `iommu_put_dma_cookie':
+> > mtk_iommu.c:(.text+0x11fe): undefined reference to `put_iova_domain'
+> > drivers/iommu/built-in.o: In function `iommu_dma_init_domain':
+> > mtk_iommu.c:(.text+0x1316): undefined reference to `init_iova_domain'
+> > drivers/iommu/built-in.o: In function `__iommu_dma_unmap':
+> > mtk_iommu.c:(.text+0x1380): undefined reference to `find_iova'
+> >
+> > This adds the same select that the other drivers have. On a related
+> > note, I wonder if we should just always select ARM_DMA_USE_IOMMU
+> > whenever any IOMMU driver is enabled. Are there any cases where
+> > we would enable an IOMMU but not use it?
 > 
-> This solves the problem where mem allocation is limited to 4MB. A
-> previous patch sent to the list to address this that instead increases
-> FORCE_MAX_ZONEORDER becomes obsolete.
+> You could use one solely for VFIO without caring about DMA ops - I think 
+> that's mostly how ARM SMMUs are being used in practice at the moment - 
+> but DMA-focused 'media' IOMMUs vastly outnumber 'virtualisation' IOMMUs 
+> on ARM, so it would probably make sense. We already have the equivalent 
+> "select IOMMU_DMA if IOMMU_SUPPORT" on arm64.
 
-I think you're looking at the problem the wrong way. Instead of going
-through CMA directly, I'd rather go through the normal DMA API
-(dma_alloc_coherent), which can itself try CMA (should it be enabled).
+Ok.
 
-That will give you all the benefit of the CMA allocation, and also make
-the driver more robust. I meant to do this for a while, and never found
-the time. Any chance you could have a look?
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
+> > ---
+> >   drivers/iommu/Kconfig | 1 +
+> >   1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> > index b325954cf8f8..ea0998921702 100644
+> > --- a/drivers/iommu/Kconfig
+> > +++ b/drivers/iommu/Kconfig
+> > @@ -341,6 +341,7 @@ config MTK_IOMMU
+> >   	bool "MTK IOMMU Support"
+> >   	depends on ARM || ARM64
+> >   	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > +	select ARM_DMA_USE_IOMMU
+> 
+> If going down this route, I'd be inclined to add an "if ARM" there, just 
+> for clarity.
 
-Thanks,
+That would run into the NEED_SG_DMA_LENGTH problem on other architectures
+that don't already set it, right?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
