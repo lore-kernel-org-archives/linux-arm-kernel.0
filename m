@@ -1,40 +1,66 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 29 Feb 2016 15:42:04 +0300
-Subject: [PATCH v3 7/7] serial: pl011: add ACPI DBG2 serial port
-In-Reply-To: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1456749726-30261-8-git-send-email-aleksey.makarov@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 29 Feb 2016 12:44:58 +0000
+Subject: Tegra baseline test results for v4.5-rc6
+Message-ID: <56D43D4A.4030300@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for ACPI DBG2 serial port of type ACPI_DBG2_ARM_PL011
-that sets up an earlycon on it.
+Here are some basic Tegra test results for Linux v4.5-rc6.
+Logs and other details at:
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 3 +++
- 1 file changed, 3 insertions(+)
+    https://nvtb.github.io//linux/test_v4.5-rc6/20160228090104/
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 500232a..d38da86 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -59,6 +59,7 @@
- #include <linux/sizes.h>
- #include <linux/io.h>
- #include <linux/acpi.h>
-+#include <linux/acpi_dbg2.h>
- 
- #include "amba-pl011.h"
- 
-@@ -2327,6 +2328,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
-+ACPI_DBG2_EARLYCON_DECLARE(pl011, ACPI_DBG2_ARM_PL011,
-+			   pl011_early_console_setup);
- 
- #else
- #define AMBA_CONSOLE	NULL
--- 
-2.7.1
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 4): tegra114-dalmore-a04
+    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
+		   tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.5-rc5 (81f70ba233d5f660e1ea5fe23260ee323af5d53a)):
+   text     data      bss    total  kernel
+    -32        0        0      -32  defconfig
+  +2152     +160     +192    +2504  multi_v7_defconfig
+  +1976     +160        0    +2136  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.5-rc5 (81f70ba233d5f660e1ea5fe23260ee323af5d53a))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+      -8k       8k        .       4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+      -8k       8k        .       4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+      -8k       8k        .       4k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+      -8k       8k        .       4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
