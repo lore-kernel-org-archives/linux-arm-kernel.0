@@ -1,97 +1,93 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Feb 2016 19:03:10 +0000
-Subject: [PATCH v13 01/20] ARM64: Move PMU register related defines to
- asm/perf_event.h
-In-Reply-To: <56D492E5.4040709@huawei.com>
-References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
- <1456290520-10012-2-git-send-email-zhaoshenglong@huawei.com>
- <20160224175247.GE12471@arm.com> <56CE6098.8070001@huawei.com>
- <56D4428B.5000505@arm.com> <56D492E5.4040709@huawei.com>
-Message-ID: <56D495EE.7060006@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Feb 2016 19:08:33 +0000
+Subject: [PATCHv3] arm64: Rework valid_user_regs
+In-Reply-To: <20160216182005.GN14509@arm.com>
+References: <1455646517-22903-1-git-send-email-mark.rutland@arm.com>
+ <20160216182005.GN14509@arm.com>
+Message-ID: <20160229190832.GH14848@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/02/16 18:50, Shannon Zhao wrote:
+Mark,
+
+On Tue, Feb 16, 2016 at 06:20:05PM +0000, Will Deacon wrote:
+> On Tue, Feb 16, 2016 at 06:15:17PM +0000, Mark Rutland wrote:
+> > We validate pstate using PSR_MODE32_BIT, which is part of the
+> > user-provided pstate (and cannot be trusted). Also, we conflate
+> > validation of AArch32 and AArch64 pstate values, making the code
+> > difficult to reason about.
+> > 
+> > Instead, validate the pstate value based on the associated task. The
+> > task may or may not be current (e.g. when using ptrace), so this must be
+> > passed explicitly by callers. To avoid circular header dependencies via
+> > sched.h, is_compat_task is pulled out of asm/ptrace.h.
+> > 
+> > To make the code possible to reason about, the AArch64 and AArch32
+> > validation is split into separate functions. Software must respect the
+> > RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
+> > policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
+> > architected meaning writes may be permitted (potentially with additional
+> > validation).
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Dave Martin <dave.martin@arm.com>
+> > Cc: James Morse <james.morse@arm.com>
+> > Cc: Peter Maydell <peter.maydell@linaro.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
+
+[...]
+
+> > +static int valid_compat_regs(struct user_pt_regs *regs)
+> > +{
+> > +	regs->pstate &= ~SPSR_EL1_AARCH32_RES0_BITS;
+> > +
+> > +	if (!system_supports_mixed_endian_el0()) {
+> > +		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+> > +			regs->pstate |= COMPAT_PSR_E_BIT;
+> > +		else
+> > +			regs->pstate &= ~COMPAT_PSR_E_BIT;
+> > +	}
+> > +
+> > +	if (user_mode(regs) && (regs->pstate & PSR_MODE32_BIT) &&
+> > +	    (regs->pstate & COMPAT_PSR_A_BIT) == 0 &&
+> > +	    (regs->pstate & COMPAT_PSR_I_BIT) == 0 &&
+> > +	    (regs->pstate & COMPAT_PSR_F_BIT) == 0) {
+> > +		return 1;
+> > +	}
+> > +
+> > +	/* Force PSR to a valid 32-bit EL0t */
+> > +	regs->pstate &= COMPAT_PSR_N_BIT | COMPAT_PSR_Z_BIT |
+> > +			COMPAT_PSR_C_BIT | COMPAT_PSR_V_BIT |
+> > +			COMPAT_PSR_Q_BIT | COMPAT_PSR_IT_MASK |
+> > +			COMPAT_PSR_GE_MASK | COMPAT_PSR_E_BIT |
+> > +			COMPAT_PSR_T_BIT;
+> > +	regs->pstate |= PSR_MODE32_BIT;
 > 
+> Might be worth an explicit comment to say that we're mirroring arch/arm/
+> behaviour here.
 > 
-> On 2016/2/29 21:07, Marc Zyngier wrote:
->> Shannon,
->>
->> On 25/02/16 02:02, Shannon Zhao wrote:
->>>
->>>
->>> On 2016/2/25 1:52, Will Deacon wrote:
->>>> On Wed, Feb 24, 2016 at 01:08:21PM +0800, Shannon Zhao wrote:
->>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>>>
->>>>> To use the ARMv8 PMU related register defines from the KVM code, we move
->>>>> the relevant definitions to asm/perf_event.h header file and rename them
->>>>> with prefix ARMV8_PMU_.
->>>>>
->>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> Reviewed-by: Andrew Jones <drjones@redhat.com>
->>>>> ---
->>>>>  arch/arm64/include/asm/perf_event.h | 35 +++++++++++++++++++
->>>>>  arch/arm64/kernel/perf_event.c      | 68 ++++++++++---------------------------
->>>>>  2 files changed, 52 insertions(+), 51 deletions(-)
->>>>
->>>> Looks fine to me, but we're going to get some truly horrible conflicts
->>>> in -next.
->>>>
->>>> I'm open to suggestions on the best way to handle this, but one way
->>>> would be:
->>>>
->>>>   1. Duplicate all the #defines privately in KVM (queue via kvm tree)
->>> This way seems not proper I think.
->>>
->>>>   2. Rebase this patch onto my perf/updates branch [1] (queue via me)
->>> While to this series, it really relies on the perf_event.h to compile
->>> and test, so maybe for KVM-ARM and KVM maintainers it's not proper.
->>>
->>>>   3. Patch at -rc1 dropping the #defines from (1) and moving to the new
->>>>      perf_event.h stuff
->>>>
->>> I vote for this way. Since the patch in [1] is small and nothing else
->>> relies on them, I think it would be simple to rebase them onto this series.
->>>
->>>> Thoughts?
->>>>
->>> Anyway, there are only 3 lines which have conflicts. I'm not sure
->>> whether we could handle this when we merge them.
->>
->> I think you're missing the point:
->>
->> - We want both the arm64 perf and KVM trees to be easy to merge
->> - The conflicts are not that simple to resolve
->> - We want these conflicts to be solved before it hits Linus' tree
->>
-> Ah, sorry. I realized this later.
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int valid_native_regs(struct user_pt_regs *regs)
+> > +{
+> > +	regs->pstate &= ~SPSR_EL1_AARCH64_RES0_BITS;
+> > +
+> > +	if (user_mode(regs) && !(regs->pstate & PSR_MODE32_BIT) &&
+> > +	    (regs->pstate & PSR_D_BIT) == 0 &&
+> > +	    (regs->pstate & PSR_A_BIT) == 0 &&
+> > +	    (regs->pstate & PSR_I_BIT) == 0 &&
+> > +	    (regs->pstate & PSR_F_BIT) == 0) {
+> > +		return 1;
+> > +	}
+> > +
+> > +	/* Force PSR to a valid 64-bit EL0t */
+> > +	regs->pstate &= PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT;
 > 
->> With that in mind, here's what I'm suggesting we merge as a first patch:
->>
->> https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/commit/?h=queue&id=2029b4b02691ec6ebba3d281068e783353d7e108
->>
->> Once this and the perf/updates branch are merged, we can add one last
->> patch reverting this hack and actually doing the renaming work (Will has
->> posted a resolution for most of the new things).
->>
->> Thoughts?
->>
-> It's fine I think. (It's first time to me to face this kind of problem.
-> :)). Thanks for your help.
+> Can we not just zap the pstate to PSR_MODE_EL0t and be done with it?
 
-No worries. I've taken this patch plus most of your v14 series and the
-v15 patch that you posted here, and applied the whole thing on top of
-kvmarm/next (having rejigged a couple of things there). I've also fixed
-the definition of ARMV8_PMU_PMCR_MASK to take PMCR_EL0.LC into account.
+Are you planning to respin this patch?
 
-Please give it a go. Any fix will should now come as a patch on top of
-this branch.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
