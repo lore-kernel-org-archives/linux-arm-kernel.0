@@ -1,106 +1,49 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 29 Feb 2016 12:47:16 +0000
-Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
-In-Reply-To: <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
-References: <56D030A4.5050205@nxp.com>
- <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
- <20160226121819.GB8728@leverpostej>
- <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
-Message-ID: <56D43DD3.9010508@nxp.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 29 Feb 2016 13:47:04 +0100
+Subject: [PATCH 1/2] can: rcar_can: Add r8a7795 support
+In-Reply-To: <56D416A9.6080608@pengutronix.de>
+References: <1456737661-20538-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <56D411A5.9070706@pengutronix.de>
+ <SG2PR06MB10380FC567E038EA92D5401EC3BA0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+ <56D416A9.6080608@pengutronix.de>
+Message-ID: <56D43DC8.8010409@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2016 02:37 PM, Ard Biesheuvel wrote:
-> On 26 February 2016 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
->>> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
->>>> In case the bootloader doesn't provide randomness
->>>> (through device tree or by uefi protocol) generate
->>>> a pseudo-random seed based on the timer counter.
->>>> People might find this "week rng" approach convenient
->>>> as it gets rid of the bootloader dependency.
->>>>
->>>> The patch tries to mimic the x86's rdtsc
->>>> based implementation authored by Kees Cook.
->>>>
->>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> Cc: Kees Cook <keescook@chromium.org>
->>>
->>> Hi Laurentiu,
->>>
->>> I appreciate the interest in this work, but to be honest, I don't like
->>> this at all. I went out of my way to ensure that
->>> a) the kernel itself does not take part in generating the random bits, and
->>> b) the random bits are used in such a way that there is no correlation
->>> between the randomization of the core kernel, the module region and
->>> the linear region if there is no correlation between the random bits.
->>>
->>> The limited entropy of the cycle counter at early boot defeats that,
->>> and even worse, it will not encourage platform vendors to implement
->>> this properly in their boot code, given that it will appear to work,
->>> and the only thing more dangerous than no security is a false sense of
->>> security imo.
->>
->> I agree that a false sense of security is a worry here.
->>
->> Either way, I think we need numbers. It's non-obvious how much entropy
->> we can acquire through counters or other means at early boot time.
->>
->> Has anyone done an analysis of environmental entropy available (through
->> any means) at early boot, VM vs native?
->>
-> 
-> Define 'environmental'. The only architected thing you can rely on is
-> the timer, which really does not hold a lot of entropy on modern solid
-> state platforms. I don't have the numbers, but I do have the
-> experience to back this up, unfortunately (at my former employer).
-> 
-> You could argue that KASLR does not require strong entropy like key
-> generation, but I would prefer to simply steer clear of that entire
-> debate. The bootloader simply needs to do the best job it can, either
-> based on some peripheral that the kernel has no awareness of this
-> early in the boot, or perhaps by other means if it doesn't (which
-> could include storing a random seed in the file system, or even in a
-> EFI variable). Punting it to the kernel is really the last resort.
-> 
->> It's also not obvious that vendors will correctly implement the EFI RNG
->> protocol; depending on the above we may want to mix in additional entropy
->> regardless.
->>
-> 
-> True, but that is not the point. The main risk I see is that vendors
-> will not bother at all once the digits start to look random to the
-> human eye.
-> 
->>> What I would ack, for development purposes, is something similar to
->>> what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
->>> developers get to exercise this code even if their boot environment
->>> does not provide any entropy. Anything beyond that is a nack as far as
->>> I am concerned.
->>
->> FWIW, I would not like to see that approach. I can easily see a build-time
->> constant KASLR seed being abused to give a false sense of security. Having a
->> bootloader or hypervisor provide different random seeds to the same Image gives
->> you a much better turnaround time for testing regardless (vs rebuilding,
->> copying, etc).
->>
+On 02/29/2016 11:00 AM, Marc Kleine-Budde wrote:
+> I think it's better to fix the algorithm. I'll look into it.
 
-Hi guys,
+What about:
 
-And thanks for all the great comments. In conclusion, seems that this
-patch is not the right direction, at least not in its current form.
- 
-> If it would be *instead* of the ordinary handling, with a big fat
-> blurb saying that KASLR is disabled, I would not mind.
+> ./can-calc-bit-timing -c 39999998 rcar_can                                                         
+> Bit timing parameters for rcar_can with 39.999998 MHz ref clock
+> nominal                                 real Bitrt   nom  real SampP
+> Bitrate TQ[ns] PrS PhS1 PhS2 SJW BRP Bitrate Error SampP SampP Error      CiBCR
+> 1000000    125   2    3    2   1   5  999999  0.0% 75.0% 75.0%  0.0% 0x40040100
+>  800000    125   3    4    2   1   5  799999  0.0% 80.0% 80.0%  0.0% 0x60040100
+>  500000    125   6    7    2   1   5  499999  0.0% 87.5% 87.5%  0.0% 0xc0040100
+>  250000    250   6    7    2   1  10  249999  0.0% 87.5% 87.5%  0.0% 0xc0090100
+>  125000    500   6    7    2   1  20  124999  0.0% 87.5% 87.5%  0.0% 0xc0130100
+>  100000    625   6    7    2   1  25   99999  0.0% 87.5% 87.5%  0.0% 0xc0180100
+>   50000   1250   6    7    2   1  50   49999  0.0% 87.5% 87.5%  0.0% 0xc0310100
+>   20000   3125   6    7    2   1 125   19999  0.0% 87.5% 87.5%  0.0% 0xc07c0100
+>   10000   6250   6    7    2   1 250    9999  0.0% 87.5% 87.5%  0.0% 0xc0f90100
 
-Ard,
+But I've to port the algorithm from can-calc-bit-timing to the kernel.
 
-Let me see if i understood your thoughts correctly.
-Have something like a KConfig option (suggestions for name, please?
-CONFIG_DEBUG_RANDOMIZE_BASE?) that disables the normal RNG seed
-handling and replaces it with this counter based weak rng,
-plus the big fat warning.
+Marc
 
----
-Best Regards, Laurentiu
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/6f4e4a6b/attachment-0001.sig>
