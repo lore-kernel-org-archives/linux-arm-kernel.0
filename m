@@ -1,69 +1,78 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 29 Feb 2016 10:13:48 -0800
-Subject: [PATCH v12 3/5] dt, numa: Add NUMA dt binding implementation.
-In-Reply-To: <20160229172956.GF31343@rric.localdomain>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-4-git-send-email-ddaney.cavm@gmail.com>
- <20160229172956.GF31343@rric.localdomain>
-Message-ID: <56D48A5C.6040709@caviumnetworks.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Mon, 29 Feb 2016 19:14:19 +0100
+Subject: [PATCH V2 6/8] dmaengine: bcm2835: move controlblock chain
+ generation into separate method
+In-Reply-To: <874md6ya2m.fsf@eliezer.anholt.net>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-7-git-send-email-kernel@martin.sperl.org>
+ <874md6ya2m.fsf@eliezer.anholt.net>
+Message-ID: <BBA893B4-C93B-4817-89C3-2A2B4CB268AA@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2016 09:29 AM, Robert Richter wrote:
-> On 22.02.16 17:58:21, David Daney wrote:
->> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->>
->> ADD device tree node parsing for NUMA topology using device
->> "numa-node-id" property distance-map.
->>
->> Reviewed-by: Robert Richter <rrichter@cavium.com>
->> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->> Signed-off-by: David Daney <david.daney@cavium.com>
+
+> On 18.02.2016, at 04:24, Eric Anholt <eric@anholt.net> wrote:
+> 
+> kernel at martin.sperl.org writes:
+> 
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> In preparation of adding slave_sg functionality this patch moves the
+>> generation/allocation of bcm2835_desc and the building of
+>> the corresponding DMA-control-block chain from bcm2835_dma_prep_dma_cyclic
+>> into the newly created method bcm2835_dma_create_cb_chain.
+>> 
+>> This new code also takes the limits of LITE channels into account
+>> and splits the control-block transfers at the correct location.
+>> 
+>> Tested Audio output with a Hifiberry I2S card.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 >> ---
->>   drivers/of/Kconfig   |   3 +
->>   drivers/of/Makefile  |   1 +
->>   drivers/of/of_numa.c | 211 +++++++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/of.h   |   9 +++
->>   4 files changed, 224 insertions(+)
->>   create mode 100644 drivers/of/of_numa.c
->>
->> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
->> index e2a4841..b3bec3a 100644
->> --- a/drivers/of/Kconfig
->> +++ b/drivers/of/Kconfig
->> @@ -112,4 +112,7 @@ config OF_OVERLAY
->>   	  While this option is selected automatically when needed, you can
->>   	  enable it manually to improve device tree unit test coverage.
->>
->> +config OF_NUMA
->
-> In arch/arm64/Kconfig you now need to:
->
-> 	select OF_NUMA if NUMA && OF
->
-> This should depend here on OF and NUMA and enabled in that case. Why
-> moving that to arch code?
+>> drivers/dma/bcm2835-dma.c |  288 ++++++++++++++++++++++++++++++---------------
+>> 1 file changed, 191 insertions(+), 97 deletions(-)
+>> 
+>> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+>> index 43758ba..41a4f0b 100644
+>> --- a/drivers/dma/bcm2835-dma.c
+>> +++ b/drivers/dma/bcm2835-dma.c
+>> @@ -90,12 +90,12 @@ struct bcm2835_desc {
+>> 	struct virt_dma_desc vd;
+>> 	enum dma_transfer_direction dir;
+>> 
+>> -	struct bcm2835_cb_entry *cb_list;
+>> -
+>> 	unsigned int frames;
+>> 	size_t size;
+>> 
+>> 	bool cyclic;
+>> +
+>> +	struct bcm2835_cb_entry cb_list[];
+>> };
+>> 
+>> #define BCM2835_DMA_CS		0x00
+>> @@ -181,6 +181,22 @@ struct bcm2835_desc {
+>> #define BCM2835_DMA_IRQ_SHARED		11
+>> #define BCM2835_DMA_IRQ_ALL		12
+>> 
+>> +/* the max dma length for different channels */
+>> +#define MAX_DMA_LEN SZ_1G
+>> +#define MAX_LITE_DMA_LEN (SZ_64K - 4)
+>> +
+>> +static inline bool bcm2835_dma_is_lite(struct bcm2835_chan *c)
+>> +{
+>> +	/* dma channels >= 7 are LITE channels */
+>> +	return (c->ch >= 7);
+>> +}
+> 
+> You can ask a channel if it's a LITE engine by checking if the DEBUG reg
+> has bit 28 set.  Then you don't need to have the software/DT guessing
+> about it.
+I will implement that - it is simple.
 
-The dependency on of_numa.o is in the architecture specific code, so 
-that is where the Kconfig select should be too.
+> However, I'm disappointed to see these changes for adding LITE support
+> included in the same commit as refactoring chain generation into a
+> separate function.
+I will separate this ?LITE-channel handling? out into a separate patch.
 
-For new code, we try to avoid putting architecture specific things into 
-the core Kconfig files.
-
-Since arm64 is the only architecture that is currently using this, we 
-don't want to select it for non-arm64 kernels that happen to select NUMA 
-&& OF.
-
-I will restore the depends, as it is guard against errors in the 
-architecture specific Kconfig select statements, but I am going to leave 
-the NUMA && OF in the arm64/Kconfig for clarity.
-
-> This duplicates code as the same needs to be
-> implemented for every arch.
->
-
-Better to duplicate a single Kconfig select statement a few times in 
-architecture specific Kconfig files, than force people to continuously 
-modify the depends in  drivers/of/Kconfig
-
-David.
+Martin
