@@ -1,21 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 23:58:46 +0100
-Subject: [GIT PULL] ARM: mvebu: dt for v4.6 (#2)
-In-Reply-To: <87d1rjo88z.fsf@free-electrons.com>
-References: <87d1rjo88z.fsf@free-electrons.com>
-Message-ID: <3690860.fR8UaiNDKR@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Feb 2016 15:01:46 -0800
+Subject: [PATCH] ARM: dts: DRA7: change address-cells and size-cells
+In-Reply-To: <1456308664-28308-1-git-send-email-lokeshvutla@ti.com>
+References: <1456308664-28308-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20160229230146.GT13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 February 2016 15:29:16 Gregory CLEMENT wrote:
-> Hi,
-> 
-> Here is the second pull request for dt for mvebu for v4.6. There is a
-> dependency with the fixes branches for the orion5x device tree file, so
-> these commits are also part of this PR.
-> 
-> 
+* Lokesh Vutla <lokeshvutla@ti.com> [160224 02:14]:
+> DRA7 SoC has the capability to support DDR memory upto 4GB. In order to
+> represent this in memory dt node, the address-cells and size cells
+> should be 2. So, changing the address-cells and size-cells to 2 and
+> updating the memory nodes accordingly.
 
-Ok, pulled into next/dt, thanks!
+Applying into omap-for-v4.6/dt thanks.
 
-	Arnd
+Tony
