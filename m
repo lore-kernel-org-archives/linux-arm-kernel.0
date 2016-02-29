@@ -1,56 +1,111 @@
-From: js1304@gmail.com (Joonsoo Kim)
-Date: Mon, 29 Feb 2016 16:40:02 +0900
-Subject: [PATCH] [RFC] mm/page_ref,
- crypto/async_pq: don't put_page from __exit
-In-Reply-To: <1456696663-2340682-1-git-send-email-arnd@arndb.de>
-References: <1456696663-2340682-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAAmzW4N0YJc_O9ArC8e7Q5y4rmbHjj6-Q1yfvZ5LvORvG764cg@mail.gmail.com>
+From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
+Date: Mon, 29 Feb 2016 13:33:41 +0530
+Subject: [PATCH V4 17/23] acpi, mcfg: Add default PCI config accessors
+ implementation and initial support for related quirks.
+In-Reply-To: <1454606941-9523-18-git-send-email-tn@semihalf.com>
+References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
+ <1454606941-9523-18-git-send-email-tn@semihalf.com>
+Message-ID: <CAKc_7PWD_jcj323q9moSd4urc7FD1gr9KLqBL+Ox60Mv+zsrmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-29 6:57 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> The addition of tracepoints to the page reference tracking had an
-> unfortunate side-effect in at least one driver that calls put_page
-> from its exit function, resulting in a link error:
+On Thu, Feb 4, 2016 at 10:58 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> We use generic accessors from access.c by default. However, we already
+> know platforms that need special handling while accessing to PCI config
+> space. These platforms will need different accessors set matched against
+> platform ID, domain, bus touple. Therefore we are going to add (in future)
+> DECLARE_ACPI_MCFG_FIXUP which will register platform specific custom
+> accessors. For now, we let pci_mcfg_get_ops to take acpi_pci_root structure
+> as an arguments and left some space for quirk matching algorithm.
 >
-> `.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
->
-> I could not come up with a nice solution that ignores __jump_table
-> entries in discarded code, so we probably now have to treat this
-> as something a driver is not allowed to do. Removing the __exit
-> annotation avoids the problem in this particular driver, but the
-> same problem could come back any time in other code.
->
-> On a related problem regarding the runtime patching for SMP
-> operations on ARM uniprocessor systems, we resorted to not
-> drop the .exit section at link time, but that doesn't seem
-> appropriate here.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Tested-by: Duc Dang <dhdang@apm.com>
+> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Tested-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  crypto/async_tx/async_pq.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/acpi/mcfg.c      | 30 ++++++++++++++++++++++++++++++
+>  include/linux/pci-acpi.h |  8 ++++++++
+>  2 files changed, 38 insertions(+)
 >
-> diff --git a/crypto/async_tx/async_pq.c b/crypto/async_tx/async_pq.c
-> index c0748bbd4c08..be167145aa55 100644
-> --- a/crypto/async_tx/async_pq.c
-> +++ b/crypto/async_tx/async_pq.c
-> @@ -442,7 +442,7 @@ static int __init async_pq_init(void)
->         return -ENOMEM;
+> diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+> index dca4c4e..dfc2d14 100644
+> --- a/drivers/acpi/mcfg.c
+> +++ b/drivers/acpi/mcfg.c
+> @@ -34,6 +34,36 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+>         return PCIBIOS_DEVICE_NOT_FOUND;
 >  }
 >
-> -static void __exit async_pq_exit(void)
-> +static void async_pq_exit(void)
+> +void __iomem *
+> +pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
+> +{
+> +       struct pci_mmcfg_region *cfg;
+> +
+> +       cfg = pci_mmconfig_lookup(pci_domain_nr(bus), bus->number);
+
+In the existing code, calls to pci_mmconfig_lookup() is done inside an
+rcu_read_lock/rcu_read_unlock pair. Any reason that is not required here?
+
+Also, you can avoid having to do the lookup every time by saving a cfg pointer
+see http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/396921.html
+
+
+> +       if (cfg && cfg->virt)
+> +               return cfg->virt +
+> +                       (PCI_MMCFG_BUS_OFFSET(bus->number) | (devfn << 12)) +
+> +                       offset;
+
+PCI_MMCFG_OFFSET(bus->number, devfn) would be better
+
+> +       return NULL;
+> +}
+> +
+> +/* Default generic PCI config accessors */
+> +static struct pci_ops default_pci_mcfg_ops = {
+> +       .map_bus = pci_mcfg_dev_base,
+> +       .read = pci_generic_config_read,
+> +       .write = pci_generic_config_write,
+> +};
+> +
+> +struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+> +{
+> +       /*
+> +        * TODO: Match against platform specific quirks and return
+> +        * corresponding PCI config space accessor set.
+> +        */
+> +
+> +       return &default_pci_mcfg_ops;
+> +}
+
+Is it necessary to make these non-static, even in the next patch, the
+functions are only used from this file.
+
+> +
+>  int __init acpi_parse_mcfg(struct acpi_table_header *header)
 >  {
->         put_page(pq_scribble_page);
->  }
+>         struct acpi_table_mcfg *mcfg;
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index 65b91f3..c974586 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -83,10 +83,18 @@ void acpi_pci_remove_bus(struct pci_bus *bus);
+>  #ifdef CONFIG_PCI_MMCONFIG
+>  int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci);
+>  void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci);
+> +struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root);
+> +void __iomem *
+> +pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset);
+>  #else
+>  static inline int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
+>  { return 0; }
+>  static inline void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci) { }
+> +static inline struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+> +{ return NULL; }
+> +static inline void __iomem *
+> +pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
+> +{ return NULL; }
+>  #endif
+>  #ifdef CONFIG_ACPI_PCI_SLOT
 
-Hello, Arnd.
-
-I think that we can avoid this error by using __free_page().
-It would not be inlined so calling it would have no problem.
-
-Could you test it, please?
-
-Thanks.
+JC.
