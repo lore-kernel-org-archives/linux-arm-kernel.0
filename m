@@ -1,19 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Mar 2016 00:13:18 +0100
-Subject: [GIT PULL] arm: Allwinner core changes for 4.6
-In-Reply-To: <20160226194545.GA20331@lukather>
-References: <20160226194545.GA20331@lukather>
-Message-ID: <2496058.t8eD2m1ogm@wuerfel>
+Date: Tue, 01 Mar 2016 00:14:33 +0100
+Subject: [GIT PULL] arm: Allwinner defconfig changes for 4.6
+In-Reply-To: <20160226194628.GA20693@lukather>
+References: <20160226194628.GA20693@lukather>
+Message-ID: <3889065.gaqLkgBdpY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 February 2016 11:45:45 Maxime Ripard wrote:
-> Allwinner core changes for 4.6
+On Friday 26 February 2016 11:46:28 Maxime Ripard wrote:
+> Allwinner defconfig changes for 4.6
 > 
-> Just introduce the A83T support.
-> 
+> A bunch of changes to add new drivers to the sunxi and multi_v7 defconfigs,
+> most notably the USB OTG that is finally enabled.
 > 
 
-Merged into next/soc, thanks!
+Merged into next/defconfig, thanks!
 
 	Arnd
