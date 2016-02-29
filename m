@@ -1,49 +1,114 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 29 Feb 2016 17:20:18 +0000
-Subject: [PATCH v6 09/14] arm64: Promote KERNEL_START/KERNEL_END definitions
- to a header file
+Date: Mon, 29 Feb 2016 17:20:23 +0000
+Subject: [PATCH v6 14/14] arm64: hibernate: Prevent resume from a different
+ kernel version
 In-Reply-To: <1456766423-1554-1-git-send-email-james.morse@arm.com>
 References: <1456766423-1554-1-git-send-email-james.morse@arm.com>
-Message-ID: <1456766423-1554-10-git-send-email-james.morse@arm.com>
+Message-ID: <1456766423-1554-15-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KERNEL_START and KERNEL_END are useful outside head.S, move them to a
-header file.
+Resuming using a different kernel version is fragile, while there are
+sufficient details in the hibernate arch-header to perform the restore,
+changes in the boot process can have a long-lasting impact on the system.
+In particular, if the EFI stub causes more runtime services memory to be
+allocated, the amount of memory left for linux is reduced. If we are
+lucky, this will cause restore to fail with the message:
+> PM: Image mismatch: memory size
+If we are unlucky, the system will explode sometime later when an EFI
+runtime services call is made.
+
+Prevent resuming with a different kernel build, by storing UTS_VERSION
+in the hibernate header. This also ensures the page size and va bits
+configuration remain the same.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/memory.h | 3 +++
- arch/arm64/kernel/head.S        | 3 ---
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/hibernate.c | 35 +++++------------------------------
+ 1 file changed, 5 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 5f8667a99e41..22c8c53d4d65 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -71,6 +71,9 @@
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 279c556ee24b..486315249f2a 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -20,6 +20,7 @@
+ #include <linux/pm.h>
+ #include <linux/sched.h>
+ #include <linux/suspend.h>
++#include <linux/utsname.h>
+ #include <linux/version.h>
  
- #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
- 
-+#define KERNEL_START      _text
-+#define KERNEL_END        _end
-+
- /*
-  * The size of the KASAN shadow region. This should be 1/8th of the
-  * size of the entire kernel virtual address space.
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 7526a777384c..7e4f840e1de7 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -50,9 +50,6 @@
- #error TEXT_OFFSET must be less than 2MB
+ #include <asm/barrier.h>
+@@ -42,8 +43,6 @@
+ #define pud_index(x)	0
  #endif
  
--#define KERNEL_START	_text
--#define KERNEL_END	_end
+-#define TCR_IPS_BITS (0x7UL<<32)
 -
  /*
-  * Kernel startup entry point.
-  * ---------------------------
+  * Hibernate core relies on this value being 0 on resume, and marks it
+  * __nosavedata assuming it will keep the resume kernel's '0' value. This
+@@ -54,17 +53,6 @@
+  */
+ extern int in_suspend;
+ 
+-/*
+- * This value is written to the hibernate arch header, and prevents resuming
+- * from a hibernate image produced by an incompatible kernel. If you change
+- * a value that isn't saved/restored by hibernate, you should change this value.
+- *
+- * For example, if the mair_el1 values used by the kernel are changed, you
+- * should prevent resuming from a kernel with incompatible attributes, as these
+- * aren't saved/restored.
+- */
+-#define HIBERNATE_VERSION	KERNEL_VERSION(4, 6, 0)
+-
+ /* Find a symbols alias in the linear map */
+ #define LMADDR(x)	phys_to_virt(virt_to_phys(x))
+ 
+@@ -81,8 +69,7 @@ extern char hibernate_el2_vectors[];
+ extern char el2_setup[];
+ 
+ struct arch_hibernate_hdr_invariants {
+-	unsigned long	version;
+-	unsigned long	tcr_el1;	/* page_size, va bit etc */
++	char		uts_version[__NEW_UTS_LEN + 1];
+ };
+ 
+ /* These values need to be know across a hibernate/restore. */
+@@ -104,11 +91,8 @@ static struct arch_hibernate_hdr {
+ 
+ static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
+ {
+-	i->version = HIBERNATE_VERSION;
+-	asm volatile("mrs	%0, tcr_el1" : "=r"(i->tcr_el1));
+-
+-	/* IPS bits vary on big/little systems, mask them out */
+-	i->tcr_el1 &= ~TCR_IPS_BITS;
++	memset(i, 0, sizeof(*i));
++	memcpy(i->uts_version, init_utsname()->version, sizeof(i->uts_version));
+ }
+ 
+ int pfn_is_nosave(unsigned long pfn)
+@@ -155,18 +139,9 @@ int arch_hibernation_header_restore(void *addr)
+ 	struct arch_hibernate_hdr_invariants invariants;
+ 	struct arch_hibernate_hdr *hdr = addr;
+ 
+-	/*
+-	 * If this header is ancient, it may be smaller than we expect.
+-	 * Test the version first.
+-	 */
+-	if (hdr->invariants.version != HIBERNATE_VERSION) {
+-		pr_crit("Hibernate image not compatible with this kernel version!\n");
+-		return -EINVAL;
+-	}
+-
+ 	arch_hdr_invariants(&invariants);
+ 	if (memcmp(&hdr->invariants, &invariants, sizeof(invariants))) {
+-		pr_crit("Hibernate image not compatible with this kernel configuration!\n");
++		pr_crit("Hibernate image not generated by this kernel!\n");
+ 		return -EINVAL;
+ 	}
+ 
 -- 
 2.7.0
