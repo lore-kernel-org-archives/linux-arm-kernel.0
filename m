@@ -1,153 +1,97 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 29 Feb 2016 15:48:44 -0500
-Subject: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs. non-modular
- distinctions
-In-Reply-To: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
+Date: Mon, 29 Feb 2016 15:48:36 -0500
+Subject: [PATCH 0/8] drivers/pinctrl: remove truly orphaned module code
+Message-ID: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixups here tend to be more all over the map vs. some of the other
-repeated/systematic ones we've seen elsewhere.
+This series of commits is a part of a larger project to ensure
+people don't reference modular support functions in non-modular
+code.  Overall there was roughly 5k lines of dead code in the
+kernel due to this.  So far we've fixed several areas, like tty,
+x86, net, ... and we continue to work on other areas.
 
-We remove module.h from code that isn't doing anything modular at
-all;  if they have __init sections, then replace it with init.h
+There are several reasons to not use module support for code that
+can never be built as a module, but the big ones are:
 
-A couple drivers have module_exit() code that is essentially orphaned,
-and so we remove that.
+ (1) it is easy to accidentally write unused module_exit and remove code
+ (2) it can be misleading when reading the source, thinking it can be
+     modular when the Makefile and/or Kconfig prohibit it
+ (3) it requires the include of the module.h header file which in turn
+     includes nearly everything else, thus adding to CPP overhead.
+ (4) it gets copied/replicated into other code and spreads like weeds.
 
-There are no module_init replacements, so we have no concerns wrt.
-initcall ordering changes as per some of the other cleanups.
+This group represents roughly 1/2 of the pinctrl commits I've got under
+testing locally.  The commonality within this group is that there should
+be zero runtime changes with this series, because none of the drivers
+here deployed a ".remove" field which in turn would cause me to add the
+".suppress_bind_attrs = true," to the driver struct.  Similarly there is
+no change in the initcall ordering either.
 
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+So hopefully with that in mind it eases review.
 
-We also delete the MODULE_LICENSE tag etc. since all that information
-was (or is now) contained at the top of the file in the comments.
-
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-gpio at vger.kernel.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+I'm happy to have this go in via the maintainer's tree and reduce the
+(large) number of patches I'm carrying locally.
 ---
+
+Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
+Cc: Beniamino Galvani <b.galvani@gmail.com>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Carlo Caione <carlo@endlessm.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Vishnu Patekar <vishnupatekar0510@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-gpio at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-renesas-soc at vger.kernel.org
+Cc: linux-samsung-soc at vger.kernel.org
+
+
+Paul Gortmaker (8):
+  drivers/pinctrl: sunxi/pinctrl-sunxi.c does not need module.h
+  drivers/pinctrl: make mediatek/pinctrl-mt6397 driver explicitly non-modular
+  drivers/pinctrl: make meson/pinctrl-meson.c explicitly non-modular
+  drivers/pinctrl: make sh-pfc/core.c explicitly non-modular
+  drivers/pinctrl: make stm32/pinctrl-stm32f429.c explicitly non-modular
+  drivers/pinctrl: make sunxi/pinctrl-sun[4-9]* explicitly non-modular
+  drivers/pinctrl: make sunxi/pinctrl-sun9i-a80-r.c explicitly non-modular
+  drivers/pinctrl: clean up samsung modular vs. non-modular distinctions
+
+ drivers/pinctrl/mediatek/pinctrl-mt6397.c    | 10 ++--------
+ drivers/pinctrl/meson/pinctrl-meson.c        |  8 +-------
  drivers/pinctrl/samsung/pinctrl-exynos.c     |  1 -
  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 15 +++------------
  drivers/pinctrl/samsung/pinctrl-s3c24xx.c    |  2 +-
  drivers/pinctrl/samsung/pinctrl-s3c64xx.c    |  2 +-
  drivers/pinctrl/samsung/pinctrl-samsung.c    | 12 +-----------
- 5 files changed, 6 insertions(+), 26 deletions(-)
+ drivers/pinctrl/sh-pfc/core.c                | 18 ++++--------------
+ drivers/pinctrl/stm32/pinctrl-stm32f429.c    |  9 +--------
+ drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c    |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c   |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c    |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c  | 10 ++--------
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c    |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31s.c   |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c    |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c  | 11 ++---------
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c    | 10 ++--------
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c    |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c  |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c    |  9 ++-------
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c        |  2 +-
+ 22 files changed, 39 insertions(+), 152 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 051b5bf701a8..428094e797bd 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -18,7 +18,6 @@
-  * external gpio and wakeup interrupt support.
-  */
- 
--#include <linux/module.h>
- #include <linux/device.h>
- #include <linux/interrupt.h>
- #include <linux/irqdomain.h>
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-index 00ab63abf1d9..50cb7d3bb098 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-@@ -1,6 +1,8 @@
- /*
-  * pin-controller/pin-mux/pin-config/gpio-driver for Samsung's EXYNOS5440 SoC.
-  *
-+ * Author: Thomas Abraham <thomas.ab@samsung.com>
-+ *
-  * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
-@@ -10,7 +12,7 @@
-  * (at your option) any later version.
-  */
- 
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-@@ -990,7 +992,6 @@ static const struct of_device_id exynos5440_pinctrl_dt_match[] = {
- 	{ .compatible = "samsung,exynos5440-pinctrl" },
- 	{},
- };
--MODULE_DEVICE_TABLE(of, exynos5440_pinctrl_dt_match);
- 
- static struct platform_driver exynos5440_pinctrl_driver = {
- 	.probe		= exynos5440_pinctrl_probe,
-@@ -1005,13 +1006,3 @@ static int __init exynos5440_pinctrl_drv_register(void)
- 	return platform_driver_register(&exynos5440_pinctrl_driver);
- }
- postcore_initcall(exynos5440_pinctrl_drv_register);
--
--static void __exit exynos5440_pinctrl_drv_unregister(void)
--{
--	platform_driver_unregister(&exynos5440_pinctrl_driver);
--}
--module_exit(exynos5440_pinctrl_drv_unregister);
--
--MODULE_AUTHOR("Thomas Abraham <thomas.ab@samsung.com>");
--MODULE_DESCRIPTION("Samsung EXYNOS5440 SoC pinctrl driver");
--MODULE_LICENSE("GPL v2");
-diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-index 3d92f827da7a..edf27264b603 100644
---- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-+++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-@@ -13,7 +13,7 @@
-  * external gpio and wakeup interrupt support.
-  */
- 
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/device.h>
- #include <linux/interrupt.h>
- #include <linux/irqdomain.h>
-diff --git a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-index 43407ab248f5..5eda18297a4e 100644
---- a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-+++ b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-@@ -15,7 +15,7 @@
-  * external gpio and wakeup interrupt support.
-  */
- 
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/device.h>
- #include <linux/interrupt.h>
- #include <linux/irqdomain.h>
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 5cc97f85db02..b698bfe1814f 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -20,7 +20,7 @@
-  * and wakeup interrupts can be hooked to.
-  */
- 
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-@@ -1289,13 +1289,3 @@ static int __init samsung_pinctrl_drv_register(void)
- 	return platform_driver_register(&samsung_pinctrl_driver);
- }
- postcore_initcall(samsung_pinctrl_drv_register);
--
--static void __exit samsung_pinctrl_drv_unregister(void)
--{
--	platform_driver_unregister(&samsung_pinctrl_driver);
--}
--module_exit(samsung_pinctrl_drv_unregister);
--
--MODULE_AUTHOR("Thomas Abraham <thomas.ab@samsung.com>");
--MODULE_DESCRIPTION("Samsung pinctrl driver");
--MODULE_LICENSE("GPL v2");
 -- 
 2.6.1
