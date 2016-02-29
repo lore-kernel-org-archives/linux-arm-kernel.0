@@ -1,175 +1,47 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  1 Mar 2016 00:44:20 +0100
-Subject: [PATCH 3/8] ARM64: dts: Prepare configs for Amlogic Meson GXBaby
-In-Reply-To: <1456789465-2962-1-git-send-email-afaerber@suse.de>
-References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
-Message-ID: <1456789465-2962-4-git-send-email-afaerber@suse.de>
+Date: Tue,  1 Mar 2016 00:44:17 +0100
+Subject: [PATCH 0/8] ARM64: meson: GXBaby (S905) and Vega S95 enablement
+Message-ID: <1456789465-2962-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- arch/arm64/boot/dts/Makefile                |   1 +
- arch/arm64/boot/dts/amlogic/Makefile        |   3 +
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 128 ++++++++++++++++++++++++++++
- 3 files changed, 132 insertions(+)
+Hello,
+
+This series adds initial support for the Amlogic S905 based
+Tronsmart Vega S95 Pro, Meta and Telos TV boxes.
+
+Regards,
+Andreas
+
+Cc: devicetree at vger.kernel.org
+
+Andreas F?rber (8):
+  ARM64: Enable Amlogic Meson GXBaby platform
+  Documentation: devicetree: amlogic: Document Meson GXBaby
+  ARM64: dts: Prepare configs for Amlogic Meson GXBaby
+  Documentation: devicetree: Document Tronsmart vendor prefix
+  Documentation: devicetree: amlogic: Document Tronsmart Vega S95 boards
+  ARM64: dts: amlogic: Add Tronsmart Vega S95 configs
+  ARM64: dts: amlogic: Extend GXBaby GIC node
+  ARM64: dts: amlogic: Add arch timer node for Meson GXBaby
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   7 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm64/Kconfig.platforms                       |   6 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   7 +
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |  55 ++++++++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |  55 ++++++++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |  55 ++++++++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  73 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 142 +++++++++++++++++++++
+ 10 files changed, 402 insertions(+)
  create mode 100644 arch/arm64/boot/dts/amlogic/Makefile
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index fd80617a9c6f..330fae966cf3 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,6 +1,7 @@
- dts-dirs += al
- dts-dirs += altera
- dts-dirs += amd
-+dts-dirs += amlogic
- dts-dirs += apm
- dts-dirs += arm
- dts-dirs += broadcom
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-new file mode 100644
-index 000000000000..1b06c28c67eb
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -0,0 +1,3 @@
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-new file mode 100644
-index 000000000000..0ae089bd1806
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -0,0 +1,128 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "amlogic,meson-gxbb";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <0x2>;
-+		#size-cells = <0x0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	arm-pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci";
-+		method = "smc";
-+		cpu_suspend = <0xc4000001>;
-+		cpu_off = <0x84000002>;
-+		cpu_on = <0xc4000003>;
-+		migrate = <0xc4000005>;
-+	};
-+
-+	xtal: xtal-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "xtal";
-+		#clock-cells = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at c4301000 {
-+			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-+			reg = <0x0 0xc4301000 0 0x1000>,
-+			      <0x0 0xc4302000 0 0x0100>;
-+			interrupt-controller;
-+			interrupts = <GIC_PPI 9
-+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+		};
-+	};
-+};
 -- 
 2.6.2
