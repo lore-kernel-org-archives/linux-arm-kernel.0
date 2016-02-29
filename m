@@ -1,44 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 10:33:58 +0100
-Subject: [PATCH] crypto/async_pq: use __free_page() instead of put_page()
-Message-ID: <1456738445-876239-1-git-send-email-arnd@arndb.de>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Mon, 29 Feb 2016 10:36:59 +0100
+Subject: [PATCH v3 0/4] Add Ethernet support on STM32F429
+In-Reply-To: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
+References: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <56D4113B.2000501@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The addition of tracepoints to the page reference tracking had an
-unfortunate side-effect in at least one driver that calls put_page
-from its exit function, resulting in a link error:
+On 2/26/2016 11:51 AM, Alexandre TORGUE wrote:
+> STM32F429 Chip embeds a Synopsys 3.50a MAC IP.
+> This series:
+>   -enhance current stmmac driver to control it (code already
+> available) and adds basic glue for STM32F429 chip.
+>   -Enable basic Net config in kernel.
+>
+> Note that DT patches are not present because STM32 pinctrl code is not
+> yet avalaible.
+>
+> Changes since v2:
+>   -Fix alphabetic order in Kconfig and Makefile.
+>   -Improve code according to Joachim review.
+>   -Binding: remove useless entry.
+>
+> Changes since v1:
+>   -Fix Kbuild issue in Kconfig.
+>   -Remove init/exit callbacks. Suspend/Resume and remove driver is no more
+> driven in stmmac_pltfr but directly in dwmac-stm32 glue driver.
+>   -Take into account Joachim review.
+>
+> Regards.
+>
+> Alexandre.
 
-`.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
+thanks Alex, for the series please consider my:
 
->From a cursory look at that this driver, it seems that it may be
-doing the wrong thing here anyway, as the page gets allocated
-using 'alloc_page()', and should be freed using '__free_page()'
-rather than 'put_page()'.
+Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 
-With this patch, I no longer get any other build errors from the
-page_ref patch, so hopefully we can assume that it's always wrong
-to call any of those functions from __exit code, and that no other
-driver does it.
 
-Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- crypto/async_tx/async_pq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/crypto/async_tx/async_pq.c b/crypto/async_tx/async_pq.c
-index c0748bbd4c08..08b3ac68952b 100644
---- a/crypto/async_tx/async_pq.c
-+++ b/crypto/async_tx/async_pq.c
-@@ -444,7 +444,7 @@ static int __init async_pq_init(void)
- 
- static void __exit async_pq_exit(void)
- {
--	put_page(pq_scribble_page);
-+	__free_page(pq_scribble_page);
- }
- 
- module_init(async_pq_init);
--- 
-2.7.0
+>
+> Alexandre TORGUE (4):
+>    net: ethernet: dwmac: add Ethernet glue logic for stm32 chip
+>    Documentation: Bindings: Add STM32 DWMAC glue
+>    net: ethernet: stmmac: add support of Synopsys 3.50a MAC IP
+>    ARM: STM32: Enable Ethernet in stm32_defconfig
+>
+>   .../devicetree/bindings/net/stm32-dwmac.txt        |  40 +++++
+>   arch/arm/configs/stm32_defconfig                   |   9 +
+>   drivers/net/ethernet/stmicro/stmmac/Kconfig        |  12 ++
+>   drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+>   drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c  | 193 +++++++++++++++++++++
+>   .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   1 +
+>   6 files changed, 256 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/net/stm32-dwmac.txt
+>   create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+>
