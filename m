@@ -1,38 +1,37 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Mon, 29 Feb 2016 17:00:29 +0100
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <208897488.c0hkBy2G1S@wuerfel> (Arnd Bergmann's message of "Fri,
- 19 Feb 2016 09:23:35 +0100")
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
- <208897488.c0hkBy2G1S@wuerfel>
-Message-ID: <mvm4mcrtski.fsf@hawking.suse.de>
+From: brad.mouring@ni.com (Brad Mouring)
+Date: Mon, 29 Feb 2016 10:01:56 -0600
+Subject: [PATCH 2/2] Documentation: devicetree: Add PL310 PM bindings
+In-Reply-To: <1456761716-10174-1-git-send-email-brad.mouring@ni.com>
+References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
+ <1456761716-10174-1-git-send-email-brad.mouring@ni.com>
+Message-ID: <1456761716-10174-2-git-send-email-brad.mouring@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Document the DT bindings for controlling ARM PL310 Power Control
+settings.
 
-> In https://github.com/norov/glibc/commit/5d4290435e428267171ece871539b76e1d079d11
-> you are defining a struct __kernel_stat64 in the glibc. Is this the expected
-> way to do it? I would have thought you'd get the definition from the kernel
-> headers.
+Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+Acked-by: Josh Cartwright <joshc@ni.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-The problem really is that struct stat64 does not match the kernel
-struct stat64.  The latter uses the broken st_ino, where the 64-bit
-inode is actually stored at the end of the structure, and there is
-padding *before* the 32-bit inode, not after (so you cannot overlay a
-64-bit inode field in little endian mode).  You need to add the attached
-file as sysdeps/unix/sysv/linux/aarch64/bits/stat.h, then you can use
-the user-space struct stat64 to communicate with the *stat64 syscalls,
-and __kernel_stat64 is not needed any more.
-
-Andreas.
-
+diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+index fe0398c..6b2366ed 100644
+--- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+@@ -84,6 +84,10 @@ Optional properties:
+ - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+   <1> (forcibly enable), property absent (retain settings set by
+   firmware)
++- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
++  disable), <1> (forcibly enable), property absent (retain firmware settings)
++- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
++  <1> (forcibly enable), property absent (retain firmware settings)
+ 
+ Example:
+ 
 -- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: stat.h
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/6c496eb8/attachment-0001.h>
+2.7.1
