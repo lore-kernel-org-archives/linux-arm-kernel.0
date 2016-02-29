@@ -1,70 +1,64 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 29 Feb 2016 15:44:01 +0000
-Subject: [PATCH 7/8] clk: bcm2835: add gates that require PM_DEBUG to be set
+Date: Mon, 29 Feb 2016 15:44:02 +0000
+Subject: [PATCH 8/8] clk: bcm2835: add the testdebug clock generators
 In-Reply-To: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
 References: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456760642-2412-8-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456760642-2412-9-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Add clocks that require PM_DEBUG to be set and mark this
-fact in the gate_data structure, so that this fact can get
-referred to if needed.
+Add the testdebug0/1 clock generators using the osc parent mux.
+
+These may also require PM_DEBUG to work propperly.
+Also the parents are - for now - unclear, so we assume osc parents.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c       |   16 +++++++++++++++-
+ drivers/clk/bcm/clk-bcm2835.c       |   19 +++++++++++++++++++
  include/dt-bindings/clock/bcm2835.h |    2 ++
- 2 files changed, 17 insertions(+), 1 deletion(-)
+ 2 files changed, 21 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 12ce209..2ddff8f 100644
+index 2ddff8f..926fdf5 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -463,6 +463,8 @@ struct bcm2835_gate_data {
- 	const char *parent;
- 
- 	u32 ctl_reg;
-+
-+	bool requires_pm_debug;
- };
- 
- struct bcm2835_pll {
-@@ -2078,10 +2080,22 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 	 * don't bother exposing) are individual gates off of the
- 	 * non-stop vpu clock.
- 	 */
-+	[BCM2835_CLOCK_PERA] = REGISTER_GATE(
-+		.name = "pera",
-+		.parent = "vpu",
-+		.ctl_reg = CM_PERIACTL,
-+		.requires_pm_debug = true),
- 	[BCM2835_CLOCK_PERI_IMAGE] = REGISTER_GATE(
- 		.name = "peri_image",
- 		.parent = "vpu",
--		.ctl_reg = CM_PERIICTL),
-+		.ctl_reg = CM_PERIICTL,
-+		.requires_pm_debug = true),
-+	[BCM2835_CLOCK_SYS] = REGISTER_GATE(
-+		.name = "sys",
-+		.parent = "vpu",
-+		.ctl_reg = CM_SYSCTL,
-+		.requires_pm_debug = true),
-+
- };
- 
- static int bcm2835_clk_probe(struct platform_device *pdev)
+@@ -1865,6 +1865,25 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.div_reg = CM_TECDIV,
+ 		.int_bits = 6,
+ 		.frac_bits = 0),
++	/*
++	 * testdebug clocks
++	 * these may possibly require PM_DEBUG to be set as well
++	 * for now we assume these are using the osc parent mux
++	 * (note that testdebugX is in this mux as well,
++	 * so it may produce issues)
++	 */
++	[BCM2835_CLOCK_TESTDEBUG0] = REGISTER_OSC_CLK(
++		.name = "testdebug0",
++		.ctl_reg = CM_TD0CTL,
++		.div_reg = CM_TD0DIV,
++		.int_bits = 12,
++		.frac_bits = 12),
++	[BCM2835_CLOCK_TESTDEBUG0] = REGISTER_OSC_CLK(
++		.name = "testdebug1",
++		.ctl_reg = CM_TD1CTL,
++		.div_reg = CM_TD1DIV,
++		.int_bits = 12,
++		.frac_bits = 12),
+
+ 	/* clocks with vpu parent mux */
+ 	[BCM2835_CLOCK_H264]	= REGISTER_VPU_CLK(
 diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
-index 109086e..7bc03cd 100644
+index 7bc03cd..c752392 100644
 --- a/include/dt-bindings/clock/bcm2835.h
 +++ b/include/dt-bindings/clock/bcm2835.h
-@@ -71,3 +71,5 @@
- #define BCM2835_CLOCK_DSI1E		53
- #define BCM2835_CLOCK_DSI1_IMAGE	54
+@@ -73,3 +73,5 @@
  #define BCM2835_CLOCK_ARM		55
-+#define BCM2835_CLOCK_PERA		56
-+#define BCM2835_CLOCK_SYS		57
--- 
+ #define BCM2835_CLOCK_PERA		56
+ #define BCM2835_CLOCK_SYS		57
++#define BCM2835_CLOCK_TESTDEBUG0	58
++#define BCM2835_CLOCK_TESTDEBUG1	59
+--
 1.7.10.4
