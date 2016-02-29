@@ -1,36 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 11:09:20 +0100
-Subject: [PATCH] staging/goldfish: use 6-arg get_user_pages()
-In-Reply-To: <20160226132812.a81d46c0151cb47f9433909f@linux-foundation.org>
-References: <1456488033-4044939-1-git-send-email-arnd@arndb.de>
- <20160226132812.a81d46c0151cb47f9433909f@linux-foundation.org>
-Message-ID: <4257177.cb22GWAUkR@wuerfel>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Mon, 29 Feb 2016 11:12:36 +0100
+Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
+In-Reply-To: <CAFpQJXURSKFw6RmNVLiB=YDcUiaaQLz3zMvM9gy=b1MobaCfgg@mail.gmail.com>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+ <20160226185341.GN29125@arm.com>
+ <56D0ACC4.1060605@caviumnetworks.com>
+ <CAFpQJXURSKFw6RmNVLiB=YDcUiaaQLz3zMvM9gy=b1MobaCfgg@mail.gmail.com>
+Message-ID: <20160229101236.GQ24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 February 2016 13:28:12 Andrew Morton wrote:
-> On Fri, 26 Feb 2016 12:59:43 +0100 Arnd Bergmann <arnd@arndb.de> wrote:
-> > The API change is currently only in the mm/pkeys branch of the
-> > tip tree, while the goldfish_pipe driver started using the
-> > old API in the staging/next branch.
+On 27.02.16 09:43:49, Ganapatrao Kulkarni wrote:
+> On Sat, Feb 27, 2016 at 1:21 AM, David Daney <ddaney@caviumnetworks.com> wrote:
+> > On 02/26/2016 10:53 AM, Will Deacon wrote:
+
+> >>> +static __init int numa_parse_early_param(char *opt)
+> >>> +{
+> >>> +       if (!opt)
+> >>> +               return -EINVAL;
+> >>> +       if (!strncmp(opt, "off", 3)) {
+> >>> +               pr_info("%s\n", "NUMA turned off");
+> >>> +               numa_off = 1;
+> >>> +       }
+> >>> +       return 0;
+> >>> +}
+> >>> +early_param("numa", numa_parse_early_param);
+> >>
+> >>
+> >> Curious, but when is this option actually useful?
+> >>
 > >
-> > Andrew could pick it up into linux-mm in the meantime, or I can
-> > resend it at some later point if nobody else does the change
-> > after 4.6-rc1.
+> > Good point.  I will remove that bit, it was used as an aid in debugging
+> > while bringing up the patch set.
 > 
-> This is one for Ingo.
-> 
-...
-> 
-> This removes the first two arguments, which are now the default.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Dave Hansen <dave.hansen@linux.intel.com>
-> Cc: Ingo Molnar <mingo@elte.hu>
-> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+> this is handy in debugging new platforms.
+> this boot argument option forces to boot as single node dummy system
+> adding all resources to node0.
 
-As mentioned in my comment above, the patch can only get added
-after the staging/next tree has also been merged, which I think
-Ingo doesn't want to add to the tip tree.
+This is used to disable numa in a numa enabled kernel esp. for
+debugging/enabling/booting single node systems. Same kernel parameter
+as for x86 and other archs. Should not being removed.
 
-	Arnd
+-Robert
