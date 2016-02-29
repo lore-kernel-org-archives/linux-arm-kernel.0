@@ -1,49 +1,127 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 29 Feb 2016 12:51:43 +0000
-Subject: [PATCH 3/3] clk: bcm2835: enable management of PCM clock
-In-Reply-To: <1456750304-2424-1-git-send-email-kernel@martin.sperl.org>
-References: <1456750304-2424-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456750304-2424-4-git-send-email-kernel@martin.sperl.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 29 Feb 2016 13:54:05 +0100
+Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
+In-Reply-To: <56D43DD3.9010508@nxp.com>
+References: <56D030A4.5050205@nxp.com>
+ <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
+ <20160226121819.GB8728@leverpostej>
+ <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
+ <56D43DD3.9010508@nxp.com>
+Message-ID: <CAKv+Gu9tj=QBhL-gc9fxgHN6dW+DWkM_tgcBoJT4sqV_-KvWWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+On 29 February 2016 at 13:47, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
+> On 02/26/2016 02:37 PM, Ard Biesheuvel wrote:
+>> On 26 February 2016 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
+>>>> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
+>>>>> In case the bootloader doesn't provide randomness
+>>>>> (through device tree or by uefi protocol) generate
+>>>>> a pseudo-random seed based on the timer counter.
+>>>>> People might find this "week rng" approach convenient
+>>>>> as it gets rid of the bootloader dependency.
+>>>>>
+>>>>> The patch tries to mimic the x86's rdtsc
+>>>>> based implementation authored by Kees Cook.
+>>>>>
+>>>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>> Cc: Kees Cook <keescook@chromium.org>
+>>>>
+>>>> Hi Laurentiu,
+>>>>
+>>>> I appreciate the interest in this work, but to be honest, I don't like
+>>>> this at all. I went out of my way to ensure that
+>>>> a) the kernel itself does not take part in generating the random bits, and
+>>>> b) the random bits are used in such a way that there is no correlation
+>>>> between the randomization of the core kernel, the module region and
+>>>> the linear region if there is no correlation between the random bits.
+>>>>
+>>>> The limited entropy of the cycle counter at early boot defeats that,
+>>>> and even worse, it will not encourage platform vendors to implement
+>>>> this properly in their boot code, given that it will appear to work,
+>>>> and the only thing more dangerous than no security is a false sense of
+>>>> security imo.
+>>>
+>>> I agree that a false sense of security is a worry here.
+>>>
+>>> Either way, I think we need numbers. It's non-obvious how much entropy
+>>> we can acquire through counters or other means at early boot time.
+>>>
+>>> Has anyone done an analysis of environmental entropy available (through
+>>> any means) at early boot, VM vs native?
+>>>
+>>
+>> Define 'environmental'. The only architected thing you can rely on is
+>> the timer, which really does not hold a lot of entropy on modern solid
+>> state platforms. I don't have the numbers, but I do have the
+>> experience to back this up, unfortunately (at my former employer).
+>>
+>> You could argue that KASLR does not require strong entropy like key
+>> generation, but I would prefer to simply steer clear of that entire
+>> debate. The bootloader simply needs to do the best job it can, either
+>> based on some peripheral that the kernel has no awareness of this
+>> early in the boot, or perhaps by other means if it doesn't (which
+>> could include storing a random seed in the file system, or even in a
+>> EFI variable). Punting it to the kernel is really the last resort.
+>>
+>>> It's also not obvious that vendors will correctly implement the EFI RNG
+>>> protocol; depending on the above we may want to mix in additional entropy
+>>> regardless.
+>>>
+>>
+>> True, but that is not the point. The main risk I see is that vendors
+>> will not bother at all once the digits start to look random to the
+>> human eye.
+>>
+>>>> What I would ack, for development purposes, is something similar to
+>>>> what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
+>>>> developers get to exercise this code even if their boot environment
+>>>> does not provide any entropy. Anything beyond that is a nack as far as
+>>>> I am concerned.
+>>>
+>>> FWIW, I would not like to see that approach. I can easily see a build-time
+>>> constant KASLR seed being abused to give a false sense of security. Having a
+>>> bootloader or hypervisor provide different random seeds to the same Image gives
+>>> you a much better turnaround time for testing regardless (vs rebuilding,
+>>> copying, etc).
+>>>
+>
+> Hi guys,
+>
+> And thanks for all the great comments. In conclusion, seems that this
+> patch is not the right direction, at least not in its current form.
+>
+>> If it would be *instead* of the ordinary handling, with a big fat
+>> blurb saying that KASLR is disabled, I would not mind.
+>
+> Ard,
+>
+> Let me see if i understood your thoughts correctly.
+> Have something like a KConfig option (suggestions for name, please?
+> CONFIG_DEBUG_RANDOMIZE_BASE?) that disables the normal RNG seed
+> handling and replaces it with this counter based weak rng,
+> plus the big fat warning.
+>
 
-Enable the PCM clock in the SOC, which is used by the
-bcm2835-i2s driver.
+No, that is not what I meant.
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- drivers/clk/bcm/clk-bcm2835.c       |    7 +++++++
- include/dt-bindings/clock/bcm2835.h |    1 +
- 2 files changed, 8 insertions(+)
+What i meant was, that, in order for the KASLR plumbing to be
+exercised by developers whose bootloader does not supply a random
+seed, I could imagine a Kconfig option that rolls the dice at build
+time, and hardcodes that value into kaslr_early_init rather than
+retrieve it from the DT. This means your kernel will execute from the
+same 'random' address each time, even if you rebuild it, and only a
+Kconfig change may trigger a new value to be generated.
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index f6ac110..0b2fd9d 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1537,6 +1537,13 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
- 		.div_reg = CM_HSMDIV,
- 		.int_bits = 4,
- 		.frac_bits = 8),
-+	[BCM2835_CLOCK_PCM]	= REGISTER_PER_CLK(
-+		.name = "pcm",
-+		.ctl_reg = CM_PCMCTL,
-+		.div_reg = CM_PCMDIV,
-+		.int_bits = 12,
-+		.frac_bits = 12,
-+		.is_mash_clock = true),
- 	[BCM2835_CLOCK_PWM]	= REGISTER_PER_CLK(
- 		.name = "pwm",
- 		.ctl_reg = CM_PWMCTL,
-diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
-index 87235ac..9a7b4a5 100644
---- a/include/dt-bindings/clock/bcm2835.h
-+++ b/include/dt-bindings/clock/bcm2835.h
-@@ -44,3 +44,4 @@
- #define BCM2835_CLOCK_EMMC		28
- #define BCM2835_CLOCK_PERI_IMAGE	29
- #define BCM2835_CLOCK_PWM		30
-+#define BCM2835_CLOCK_PCM		31
+Since this is not KASLR but a build time hack to get testing coverage
+for the code, it should announce that in some way.
+
+However, while I said I was not opposed to the idea, I am not crazy
+about it either, and it is not up to me to ultimately decide what gets
+merged anyway. So before you sit down and spend the time, you may want
+to get the maintainer's opinion first.
+
 -- 
-1.7.10.4
+Ard.
