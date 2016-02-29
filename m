@@ -1,94 +1,34 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 29 Feb 2016 17:20:13 +0000
-Subject: [PATCH v6 04/14] arm64: Add new hcall HVC_CALL_FUNC
+Date: Mon, 29 Feb 2016 17:20:17 +0000
+Subject: [PATCH v6 08/14] arm64: kernel: Include _AC definition in page.h
 In-Reply-To: <1456766423-1554-1-git-send-email-james.morse@arm.com>
 References: <1456766423-1554-1-git-send-email-james.morse@arm.com>
-Message-ID: <1456766423-1554-5-git-send-email-james.morse@arm.com>
+Message-ID: <1456766423-1554-9-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geoff Levand <geoff@infradead.org>
+page.h uses '_AC' in the definition of PAGE_SIZE, but doesn't include
+linux/const.h where this is defined. This produces build warnings when only
+asm/page.h is included by asm code.
 
-Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
-During CPU reset the CPU must be brought to the exception level it had on
-entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
-needed for this exception level switch.
-
-To allow the HVC_CALL_FUNC exception vector to work without a stack, which
-is needed to support an hcall at CPU reset, this implementation uses
-register x18 to store the link register across the caller provided
-function.  This dictates that the caller provided function must preserve
-the contents of register x18.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org>
-[Renumbered labels in el1_sync()]
 Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/include/asm/virt.h | 13 +++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 19 +++++++++++++++----
- 2 files changed, 28 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/page.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index eb10368c329e..30700961f28c 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -45,6 +45,19 @@
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index ae615b9d9a55..17b45f7d96d3 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -19,6 +19,8 @@
+ #ifndef __ASM_PAGE_H
+ #define __ASM_PAGE_H
  
- #define HVC_SET_VECTORS 2
- 
-+/*
-+ * HVC_CALL_FUNC - Execute a function at EL2.
-+ *
-+ * @x0: Physical address of the function to be executed.
-+ * @x1: Passed as the first argument to the function.
-+ * @x2: Passed as the second argument to the function.
-+ * @x3: Passed as the third argument to the function.
-+ *
-+ * The called function must preserve the contents of register x18.
-+ */
++#include <linux/const.h>
 +
-+#define HVC_CALL_FUNC 3
-+
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 017ab519aaf1..cfacfe55e3ef 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -59,18 +59,29 @@ el1_sync:
- 	and	x18, x18, #ESR_ELx_ISS_MASK
- 
- 	cmp	x17, #ESR_ELx_EC_HVC64
--	b.ne	2f				// Not an HVC trap
-+	b.ne	9f				// Not an HVC trap
- 
- 	cmp	x18, #HVC_GET_VECTORS
- 	b.ne	1f
- 	mrs	x0, vbar_el2
--	b	2f
-+	b	9f
- 
- 1:	cmp	x18, #HVC_SET_VECTORS
- 	b.ne	2f
- 	msr	vbar_el2, x0
--
--2:	eret
-+	b	9f
-+
-+2:	cmp	x18, #HVC_CALL_FUNC
-+	b.ne	9f
-+	mov	x18, lr
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+	mov	lr, x18
-+
-+9:	eret
- ENDPROC(el1_sync)
- 
- .macro invalid_vector	label
+ /* PAGE_SHIFT determines the page size */
+ /* CONT_SHIFT determines the number of pages which can be tracked together  */
+ #ifdef CONFIG_ARM64_64K_PAGES
 -- 
 2.7.0
