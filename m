@@ -1,65 +1,68 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Mon, 29 Feb 2016 11:26:17 +0100
-Subject: [PATCH v2 1/2] ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
-Message-ID: <1456741578-3202-1-git-send-email-m.grzeschik@pengutronix.de>
+From: harvey.hunt@imgtec.com (Harvey Hunt)
+Date: Mon, 29 Feb 2016 10:33:49 +0000
+Subject: [PATCH v3 07/52] mtd: nand: core: use mtd_ooblayout_xxx() helpers
+ where appropriate
+In-Reply-To: <20160226193325.2d84a8c8@bbrezillon>
+References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1456448280-27788-8-git-send-email-boris.brezillon@free-electrons.com>
+ <56D0629C.9080805@imgtec.com> <20160226161054.3477cd4b@bbrezillon>
+ <56D06C88.9080608@imgtec.com> <20160226193325.2d84a8c8@bbrezillon>
+Message-ID: <56D41E8D.1010901@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Luebbe <jlu@pengutronix.de>
+Hi Boris,
 
-Regenerate imx_v4_v5_defconfig by running:
-make imx_v4_v5_defconfig
-- Manually disable EXT2_FS and EXT3_FS
-make savedefconfig
-mv defconfig arch/arm/configs/imx_v4_v5_defconfig
+On 26/02/16 18:33, Boris Brezillon wrote:
+> Hi Harvey,
+>
+> On Fri, 26 Feb 2016 15:17:28 +0000
+> Harvey Hunt <harvey.hunt@imgtec.com> wrote:
+>
+>> Hi Boris,
+>>
+>> On 26/02/16 15:10, Boris Brezillon wrote:
+>>> Hi Harvey,
+>>>
+>>> On Fri, 26 Feb 2016 14:35:08 +0000
+>>> Harvey Hunt <harvey.hunt@imgtec.com> wrote:
+>>>
+>>>> [...]
+>>>> I'll look into this more later today, but wanted to run it by you in
+>>>> case you have any thoughts.
+>>>
+>>> Can you apply this patch [1], and let me know if you see the additional
+>>> trace?
+>>
+>> I applied the patch, the following is the (unchanged) output:
+>>
+>> [    0.256375] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0x88
+>> [    0.262887] nand: Micron MT29F64G08CBAAAWP
+>> [    0.266995] nand: 8192 MiB, MLC, erase size: 2048 KiB, page size:
+>> 8192, OOB size: 448
+>> [    0.274881] jz4780-nand 1b000000.nand-controller: using hardware BCH
+>> (strength 24, size 1024, bytes 42)
+>> [    0.289046] Bad block table not found for chip 0
+>> [    0.297769] Bad block table not found for chip 0
+>> [    0.302425] Scanning device for bad blocks
+>> [    0.320239] Bad eraseblock 90 at 0x00000b400000
+>> [    0.324934] Bad eraseblock 91 at 0x00000b600000
+>> [    0.931054] Bad eraseblock 4092 at 0x0001ff800000
+>> [    0.935917] Bad eraseblock 4093 at 0x0001ffa00000
+>> [    0.944660] nand_bbt: error while writing bad block table -34
+>> [    0.950448] jz4780-nand: probe of 1b000000.nand-controller failed
+>> with error -34
+>> [    0.958079] UBI error: cannot open mtd 3, error -19
+>> [    0.962788] UBI error: cannot open mtd 4, error -19[    0.970229]
+>> clk: Not disabling unused clocks
+>>
+>
+> Can you test with this one [1]?
+>
+> [1]http://code.bulix.org/36oytz-91960
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
-v2: Disabled EXT2_FS and EXT3_FS instead of EXT4_FS
+With that patch applied, my Ci20 successfully boots again.
 
- arch/arm/configs/imx_v4_v5_defconfig | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+Thanks for looking into it :-)
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index d3a8018..c5d36c2 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -24,14 +24,12 @@ CONFIG_ARCH_MXC=y
- CONFIG_MACH_SCB9328=y
- CONFIG_MACH_APF9328=y
- CONFIG_MACH_MX21ADS=y
--CONFIG_MACH_EUKREA_CPUIMX25SD=y
--CONFIG_SOC_IMX25=y
- CONFIG_MACH_MX27ADS=y
- CONFIG_MACH_MX27_3DS=y
- CONFIG_MACH_IMX27_VISSTRIM_M10=y
- CONFIG_MACH_PCA100=y
--CONFIG_MACH_MXT_TD60=y
- CONFIG_MACH_IMX27_DT=y
-+CONFIG_SOC_IMX25=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -169,11 +167,9 @@ CONFIG_RTC_DRV_IMXDI=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_DMADEVICES=y
--CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
-+CONFIG_IMX_SDMA=y
- # CONFIG_IOMMU_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS=y
- # CONFIG_DNOTIFY is not set
- CONFIG_VFAT_FS=y
-@@ -187,6 +183,5 @@ CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_CODEPAGE_850=m
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
- CONFIG_FONTS=y
- CONFIG_FONT_8x8=y
--- 
-2.7.0
+Harvey
