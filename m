@@ -1,26 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 16:25:57 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
- v4.6
-In-Reply-To: <cover.1456443769.git.horms+renesas@verge.net.au>
-References: <cover.1456443769.git.horms+renesas@verge.net.au>
-Message-ID: <3261857.3dzYkr9LzW@wuerfel>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 29 Feb 2016 16:25:39 +0100
+Subject: [RFC v4 07/14] msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
+In-Reply-To: <alpine.DEB.2.11.1602261904500.3638@nanos>
+References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
+ <1456508154-2253-8-git-send-email-eric.auger@linaro.org>
+ <alpine.DEB.2.11.1602261904500.3638@nanos>
+Message-ID: <56D462F3.1020206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 February 2016 08:53:07 Simon Horman wrote:
-> Second Round of Renesas ARM Based SoC DT Updates for v4.6
+Hi Thomas,
+On 02/26/2016 07:06 PM, Thomas Gleixner wrote:
+> On Fri, 26 Feb 2016, Eric Auger wrote:
 > 
-> * Add L2 cache-controller nodes to r8a779[0134] and r8a73a4
-> * Add etheravb support to r8a7794
-> * Correct JP3 jumper description on Porter
-> * Enable thermal zone on  r8a779[013]
-> * Replace gpio-key, wakeup with wakeup-source property on r8a7794
-> * Use demuxer for IIC0/I2C0 on lager
-> * Use fallback etheravb, pci and pcie compatibility strings as appropriate
+>> Let's introduce a new msi_domain_info flag value, MSI_FLAG_IRQ_REMAPPING
+>> meant to tell the domain supports IRQ REMAPPING, also known as Interrupt
+>> Translation Service. On Intel HW this capability is abstracted on IOMMU
+>> side while on ARM it is abstracted on MSI controller side.
+>>
+>> GICv3 ITS HW is the first HW advertising that feature.
 > 
-> 
+> No. We add the flag, epxlain what it does and then in a second step add the
+> user _after_ all other preliminaries are implemented.
+Sure I will proceed that way.
 
-Merged into next/dt, thanks!
+Best Regards
 
-	Arnd
+Eric
+>  
+> Thanks,
+> 
+> 	tglx
+> 
