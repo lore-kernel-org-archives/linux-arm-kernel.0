@@ -1,141 +1,69 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 29 Feb 2016 17:20:34 -0600
-Subject: [PATCH v2] PCI: keystone: fix msi code that retrieves the pp
- struct ptr
-In-Reply-To: <1456761113-8416-1-git-send-email-m-karicheri2@ti.com>
-References: <1456761113-8416-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20160229232034.GF3653@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Feb 2016 15:23:48 -0800
+Subject: [PATCH v3 3/5] ARM: dts: DRA7: Add TBCLK for PWMSS
+In-Reply-To: <1456439796-28546-4-git-send-email-fcooper@ti.com>
+References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
+ <1456439796-28546-4-git-send-email-fcooper@ti.com>
+Message-ID: <20160229232348.GV13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[-cc stable, +cc Zhou]
-
-On Mon, Feb 29, 2016 at 10:51:53AM -0500, Murali Karicheri wrote:
-> Recent update to pcie-designware core driver, 
-> 'commit cbce7900598c ("PCI: designware: Make driver arch-agnostic")'
-> broke the keystone PCI driver. After this commit, we see a kernel crash on
-> Keystone SoC as shown below in the boot log. This is because, the way pp
-> struct ptr is retrieved from  msi desc has changed and require similar
-> update in pci-keystone-dw.c as well. This patch fixes this issue. 
+* Franklin S Cooper Jr <fcooper@ti.com> [160225 14:37]:
+> From: Vignesh R <vigneshr@ti.com>
 > 
-> [    1.012999] pci 0000:00:00.0: PCI bridge to [bus 01]
-> [    1.018073] pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
-> [    1.024308] pci 0000:00:00.0:   bridge window [mem 0x60000000-0x600fffff]
-> [    1.031216] pci 0000:00:00.0:   bridge window [mem 0x60100000-0x601fffff
-> pref]
-> [    1.038736] Unable to handle kernel NULL pointer dereference at virtual
-> address 00000030
-> [    1.046950] pgd = c0003000
-> [    1.049750] [00000030] *pgd=80000800004003, *pmd=00000000
-> [    1.055265] Internal error: Oops: 206 [#1] PREEMPT SMP ARM
-> [    1.060860] Modules linked in:
-> [    1.064013] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.2-00139-gb74f926 #2
-> [    1.071266] Hardware name: Keystone
-> [    1.074853] task: eb888000 ti: eb890000 task.ti: eb890000
-> [    1.080364] PC is at ks_dw_pcie_msi_irq_unmask+0x24/0x58
-> [    1.085785] LR is at ks_dw_pcie_msi_irq_unmask+0x18/0x58
-> [    1.091206] pc : [<c02f65c8>]    lr : [<c02f65bc>]    psr: 60000093
-> [    1.091206] sp : eb891bc8  ip : 00000000  fp : ebb15010
-> [    1.102915] r10: 00000051  r9 : 60000013  r8 : ebafaa20
-> [    1.108247] r7 : ebaa9f80  r6 : eb9fd0c0  r5 : ebafa9d0  r4 : ebafa9c0
-> [    1.114889] r3 : 00000051  r2 : 00000000  r1 : 00000001  r0 : ebb14c18
-> [    1.121533] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment
-> kernel
-> [    1.129049] Control: 30c5387d  Table: 00003000  DAC: fffffffd
-> [    1.134905] Process swapper/0 (pid: 1, stack limit = 0xeb890210)
-> [    1.141023] Stack: (0xeb891bc8 to 0xeb892000)
+> tbclk is used by ehrpwm to generate PWM waveform on DRA7 SoC. Add Linux
+> clock to control ehrpwm tbclk.
+> The TRM says, tbclk is derived from SYSCLKOUT. SYSCLKOUT is nothing but
+> ehrpwm functional clock derived from the gateable interface and
+> functional clock of PWMSS(l4_root_clk_div).
+> Refer AM57x TRM SPRUHZ6[1], October 2014, Table 29-4 and Section 29.2.2.1,
+> Table 29-19 and the NOTE at the end of the table.
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: <stable@vger.kernel.org> # 4.4.x
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
 
-This fixes a regression, so I applied this to for-linus for v4.5, with
-changelog as follows:
+Applying this into omap-for-v4.6/dt thanks.
 
-commit 79e3f4a853ed161cd4c06d84b50beebf961a47c6
-Author: Murali Karicheri <m-karicheri2@ti.com>
-Date:   Mon Feb 29 17:18:22 2016 -0600
+Note for Tero, let's plan on getting rid of the duplicate
+reg entries by using the standard clock output offset within
+the clock register. I think we should easily be able to add
+a binding for this and then deprecate the overlapping reg
+entries.
 
-    PCI: keystone: Fix MSI code that retrieves struct pcie_port pointer
-    
-    Commit cbce7900598c ("PCI: designware: Make driver arch-agnostic") changed
-    the host bridge sysdata pointer from the ARM pci_sys_data to the DesignWare
-    pcie_port structure, and changed pcie-designware.c to reflect that.  But it
-    did not change the corresponding code in pci-keystone-dw.c, so it caused
-    crashes on Keystone:
-    
-      Unable to handle kernel NULL pointer dereference at virtual address 00000030
-      pgd = c0003000
-      [00000030] *pgd=80000800004003, *pmd=00000000
-      Internal error: Oops: 206 [#1] PREEMPT SMP ARM
-      CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.2-00139-gb74f926 #2
-      Hardware name: Keystone
-      PC is at ks_dw_pcie_msi_irq_unmask+0x24/0x58
-    
-    Change pci-keystone-dw.c to expect sysdata to be the struct pcie_port
-    pointer.
-    
-    [bhelgaas: changelog]
-    Fixes: cbce7900598c ("PCI: designware: Make driver arch-agnostic")
-    Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    CC: stable at vger.kernel.org	# v4.4+
-    CC: Zhou Wang <wangzhou1@hisilicon.com>
+Regards,
 
-> ---
->  v2 - Looks like I missed the fix version format for stable.
->       Fixed it per best of my knowledge.
->  v1 - Resending as per stable submission procedure
->  drivers/pci/host/pci-keystone-dw.c | 11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-> index ed34c95..6153853 100644
-> --- a/drivers/pci/host/pci-keystone-dw.c
-> +++ b/drivers/pci/host/pci-keystone-dw.c
-> @@ -58,11 +58,6 @@
->  
->  #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
->  
-> -static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
-> -{
-> -	return sys->private_data;
-> -}
-> -
->  static inline void update_reg_offset_bit_pos(u32 offset, u32 *reg_offset,
->  					     u32 *bit_pos)
->  {
-> @@ -108,7 +103,7 @@ static void ks_dw_pcie_msi_irq_ack(struct irq_data *d)
->  	struct pcie_port *pp;
->  
->  	msi = irq_data_get_msi_desc(d);
-> -	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
-> +	pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
->  	ks_pcie = to_keystone_pcie(pp);
->  	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
->  	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-> @@ -146,7 +141,7 @@ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
->  	u32 offset;
->  
->  	msi = irq_data_get_msi_desc(d);
-> -	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
-> +	pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
->  	ks_pcie = to_keystone_pcie(pp);
->  	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
->  
-> @@ -167,7 +162,7 @@ static void ks_dw_pcie_msi_irq_unmask(struct irq_data *d)
->  	u32 offset;
->  
->  	msi = irq_data_get_msi_desc(d);
-> -	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
-> +	pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
->  	ks_pcie = to_keystone_pcie(pp);
->  	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
->  
+Tony
+
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -2146,4 +2146,28 @@
+>  		ti,bit-shift = <0>;
+>  		reg = <0x558>;
+>  	};
+> +
+> +       ehrpwm0_tbclk: ehrpwm0_tbclk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&l4_root_clk_div>;
+> +		ti,bit-shift = <20>;
+> +		reg = <0x0558>;
+> +	};
+> +
+> +	ehrpwm1_tbclk: ehrpwm1_tbclk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&l4_root_clk_div>;
+> +		ti,bit-shift = <21>;
+> +		reg = <0x0558>;
+> +	};
+> +
+> +	ehrpwm2_tbclk: ehrpwm2_tbclk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&l4_root_clk_div>;
+> +		ti,bit-shift = <22>;
+> +		reg = <0x0558>;
+> +	};
+>  };
 > -- 
-> 1.9.1
+> 2.7.0
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
