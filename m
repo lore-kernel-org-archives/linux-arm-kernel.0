@@ -1,41 +1,36 @@
 From: alexandre.torgue@gmail.com (Alexandre TORGUE)
-Date: Mon, 29 Feb 2016 17:29:36 +0100
-Subject: [PATCH 3/3] ARM: dts: stm32f429: Enable Ethernet on Eval board
-In-Reply-To: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
-References: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
-Message-ID: <1456763376-21457-4-git-send-email-alexandre.torgue@gmail.com>
+Date: Mon, 29 Feb 2016 17:29:33 +0100
+Subject: [PATCH 0/3] Enable Ethernet on STM32F429 EVAL board
+Message-ID: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MAC is connected to a PHY in MII mode.
+This series adds Ethernet support on STM32F429 SOC and enable it on Eval
+board:
+ -Add Ethernet node in SOC file:
+  -Define MII mode pinctrl
+  -use Mixed burst and PBL 8
+ -Add system config node for glue.
+ -Enable Ethernet for Eval board:
+  -mii mode
+  -connected to a PHY through MDIO.
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+Note, this series follow the series which adds glue and update stmmac driver:
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 1ae57fa..e345459 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -87,6 +87,21 @@
- 	clock-frequency = <25000000>;
- };
- 
-+&ethernet0 {
-+	status = "okay";
-+	pinctrl-0	= <&ethernet0_mii>;
-+	pinctrl-names	= "default";
-+	phy-mode	= "mii-id";
-+	mdio0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,dwmac-mdio";
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+};
-+
- &usart1 {
- 	pinctrl-0 = <&usart1_pins_a>;
- 	pinctrl-names = "default";
+https://lkml.org/lkml/2016/2/26/329
+
+Best regards.
+
+Alex
+
+Alexandre TORGUE (3):
+  ARM: dts: stm32f429: Add system config bank node
+  ARM: dts: stm32f429: Add Ethernet support
+  ARM: dts: stm32f429: Enable Ethernet on Eval board
+
+ arch/arm/boot/dts/stm32429i-eval.dts | 15 ++++++++++++++
+ arch/arm/boot/dts/stm32f429.dtsi     | 40 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+)
+
 -- 
 1.9.1
