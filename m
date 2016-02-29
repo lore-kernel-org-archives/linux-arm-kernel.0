@@ -1,50 +1,75 @@
-From: dvhart@infradead.org (Darren Hart)
-Date: Mon, 29 Feb 2016 15:10:54 -0800
-Subject: [PATCH] platform/x86: never 'select DMI' from a driver
-In-Reply-To: <1456748014-358588-1-git-send-email-arnd@arndb.de>
-References: <1456748014-358588-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160229231054.GI7499@dvhart-mobl5.amr.corp.intel.com>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Mon, 29 Feb 2016 17:11:46 -0600
+Subject: [PATCH v3 1/5] pwms: pwm-ti*: Remove support for local clock
+ gating
+In-Reply-To: <20160229225536.GR13417@atomide.com>
+References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
+ <1456439796-28546-2-git-send-email-fcooper@ti.com>
+ <20160229220444.GQ13417@atomide.com> <56D4C69D.1090100@ti.com>
+ <20160229225536.GR13417@atomide.com>
+Message-ID: <56D4D032.7040801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 01:13:31PM +0100, Arnd Bergmann wrote:
-> CONFIG_DMI is a user-selectable Kconfig symbol that some drivers
-> depend on. As part of a recent patch, other drivers started
-> adding a 'select' for the same symbol, which now causes
-> a recursive dependency:
-> 
-> drivers/gpio/Kconfig:34:error: recursive dependency detected!
-> subsection "Kconfig recursive dependency limitations"
-> drivers/gpio/Kconfig:34:        symbol GPIOLIB is selected by GEOS
-> For a resolution refer to Documentation/kbuild/kconfig-language.txt
-> subsection "Kconfig recursive dependency limitations"
-> arch/x86/Kconfig:2591:  symbol GEOS depends on DMI
-> For a resolution refer to Documentation/kbuild/kconfig-language.txt
-> subsection "Kconfig recursive dependency limitations"
-> arch/x86/Kconfig:815:   symbol DMI is selected by DELL_LAPTOP
-> For a resolution refer to Documentation/kbuild/kconfig-language.txt
-> subsection "Kconfig recursive dependency limitations"
-> drivers/platform/x86/Kconfig:104:       symbol DELL_LAPTOP depends on BACKLIGHT_CLASS_DEVICE
-> For a resolution refer to Documentation/kbuild/kconfig-language.txt
-> subsection "Kconfig recursive dependency limitations"
-> drivers/video/backlight/Kconfig:158:    symbol BACKLIGHT_CLASS_DEVICE is selected by FB_BACKLIGHT
-> For a resolution refer to Documentation/kbuild/kconfig-language.txt
-> subsection "Kconfig recursive dependency limitations"
-> drivers/video/fbdev/Kconfig:192:        symbol FB_BACKLIGHT is selected by FB_SSD1307
-> For a resolution refer to Documentation/kbuild/kconfig-language.txt
-> subsection "Kconfig recursive dependency limitations"
-> drivers/video/fbdev/Kconfig:2462:       symbol FB_SSD1307 depends on GPIOLIB
-> 
-> Basically we should either always use 'depends on' or always use 'select'
-> to avoid this kind of loop. Using 'depends on' is more useful here,
-> as it still allows users to turn off the symbol of they really
-> want to, without having to track down every driver selecting it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: cbd9d95b2b27 ("dell-wmi, dell-laptop: select DMI")
 
-Thanks Arnd, queued to testing.
 
--- 
-Darren Hart
-Intel Open Source Technology Center
+On 02/29/2016 04:55 PM, Tony Lindgren wrote:
+> * Franklin S Cooper Jr. <fcooper@ti.com> [160229 14:31]:
+>> On 02/29/2016 04:04 PM, Tony Lindgren wrote:
+>>> Hmm but why are you also removing the pm_runtime calls? Those
+>>> actually do take care of gating the clocks via the interconnect
+>>> level code that is hwmod in this case.
+>> I removed all PM runtime calls that revolved around
+>> pwmss_submodule_state_change. Originally the driver would do
+>> a pm_runtime_get_sync then call pwmss_submodule_state_change
+>> and then immediately call pm_runtime_put_sync. Without
+>> pwmss_submodule_state_change those calls would be
+>> meaningless.  I also removed pm_runtime calls in error paths
+>> that no longer existed.
+> Typically the interconnect level code can gate the clkctrl bit
+> for the module with PM runtime even with no other driver specific
+> registers. If you remove the pm_runtime calls, that does not
+> happen.
+
+So the clocks should be unlocked when ever the IP registers are
+being read/written or if the peripheral is being used for
+example
+the pwm signal is being generated. All these cases are already
+being handled.
+
+Using ecap driver as an example.
+
+Pm_runtime_get_sync is called within ecap_pwm_enable when
+the pwm signal is to be generated. Pm_runtime_put_sync is called
+when the pwm signal is to be stopped.
+
+When either the pwm signal polarity is set or pwm
+configuration is made
+then a pm_runtime_get_sync and pm_runtime_put_sync are
+called within
+the same function surrounding calls to the IP's registers.
+
+Probe is calling pm_runtime_enable while remove is calling
+pm_runtime_disable.
+
+So the correct pm_runtime calls are being made from what I
+can see.
+I'm not sure I understand the concern since removing those
+calls aren't
+creating any kind of imbalance.
+
+If I'm not addressing your concern please give me an example
+of where
+you see a possible issue.
+
+> Also, how do you know this change does not affect the other
+> SoC variants using the same driver?
+
+I've tested these changes on AM335x GP and AM437x GP evms.
+AM335x
+and AM437x were the only other users of this driver. Sorry 
+I should of
+documented this in my cover-letter.
+> Regards,
+>
+> Tony
