@@ -1,45 +1,47 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 29 Feb 2016 10:58:34 +0100
-Subject: [PATCH] arm: mvebu: Add SPI1 pinctrl defines for Armada XP
-Message-ID: <1456739914-12096-1-git-send-email-sr@denx.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 29 Feb 2016 11:00:09 +0100
+Subject: [PATCH 1/2] can: rcar_can: Add r8a7795 support
+In-Reply-To: <SG2PR06MB10380FC567E038EA92D5401EC3BA0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+References: <1456737661-20538-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <56D411A5.9070706@pengutronix.de>
+ <SG2PR06MB10380FC567E038EA92D5401EC3BA0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+Message-ID: <56D416A9.6080608@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines and uses common Armada XP pinctrl settings in
-armada-xp.dtsi for the SPI1 interface (MPP13,14,16,17).
+On 02/29/2016 10:56 AM, Ramesh Shanmugasundaram wrote:
+>> On 02/29/2016 10:21 AM, Ramesh Shanmugasundaram wrote:
+>>> Added r8a7795 SoC support.
+>>>
+>>> For smoother bit timing calculation, the rounded clock frequency is
+>> used.
+>>
+>> Why this? From my point of view this introduces a clock error.
+> 
+> Thanks for the comments. 
+> 
+> Without the rounded clock, can_calc_bittiming returns different BRP
+> values and reports high sampling error percentage. However, the
+> rounded clock shows no such issues and it works fine for all
+> bitrates.
+> 
+> Below is an e.g. from my board for an input clock differs by 2Hz.
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I think it's better to fix the algorithm. I'll look into it.
 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index be23196..c779e31 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -94,6 +94,8 @@
- 			spi1: spi at 10680 {
- 				compatible = "marvell,armada-xp-spi",
- 						"marvell,orion-spi";
-+				pinctrl-0 = <&spi1_pins>;
-+				pinctrl-names = "default";
- 			};
- 
- 
-@@ -343,6 +345,12 @@
- 		marvell,function = "spi0";
- 	};
- 
-+	spi1_pins: spi1-pins {
-+		marvell,pins = "mpp13", "mpp14",
-+			       "mpp16", "mpp17";
-+		marvell,function = "spi1";
-+	};
-+
- 	uart2_pins: uart2-pins {
- 		marvell,pins = "mpp42", "mpp43";
- 		marvell,function = "uart2";
+Marc
+
 -- 
-2.7.2
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/e6ca9453/attachment.sig>
