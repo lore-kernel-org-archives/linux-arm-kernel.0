@@ -1,127 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 29 Feb 2016 13:54:05 +0100
-Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
-In-Reply-To: <56D43DD3.9010508@nxp.com>
-References: <56D030A4.5050205@nxp.com>
- <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
- <20160226121819.GB8728@leverpostej>
- <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
- <56D43DD3.9010508@nxp.com>
-Message-ID: <CAKv+Gu9tj=QBhL-gc9fxgHN6dW+DWkM_tgcBoJT4sqV_-KvWWg@mail.gmail.com>
+From: mmarek@suse.com (Michal Marek)
+Date: Mon, 29 Feb 2016 13:58:13 +0100
+Subject: [PATCH] lz4c: shut up lz4c output
+In-Reply-To: <1456749618-1067584-1-git-send-email-arnd@arndb.de>
+References: <1456749618-1067584-1-git-send-email-arnd@arndb.de>
+Message-ID: <56D44065.4070005@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 February 2016 at 13:47, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
-> On 02/26/2016 02:37 PM, Ard Biesheuvel wrote:
->> On 26 February 2016 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
->>> On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
->>>> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
->>>>> In case the bootloader doesn't provide randomness
->>>>> (through device tree or by uefi protocol) generate
->>>>> a pseudo-random seed based on the timer counter.
->>>>> People might find this "week rng" approach convenient
->>>>> as it gets rid of the bootloader dependency.
->>>>>
->>>>> The patch tries to mimic the x86's rdtsc
->>>>> based implementation authored by Kees Cook.
->>>>>
->>>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>> Cc: Kees Cook <keescook@chromium.org>
->>>>
->>>> Hi Laurentiu,
->>>>
->>>> I appreciate the interest in this work, but to be honest, I don't like
->>>> this at all. I went out of my way to ensure that
->>>> a) the kernel itself does not take part in generating the random bits, and
->>>> b) the random bits are used in such a way that there is no correlation
->>>> between the randomization of the core kernel, the module region and
->>>> the linear region if there is no correlation between the random bits.
->>>>
->>>> The limited entropy of the cycle counter at early boot defeats that,
->>>> and even worse, it will not encourage platform vendors to implement
->>>> this properly in their boot code, given that it will appear to work,
->>>> and the only thing more dangerous than no security is a false sense of
->>>> security imo.
->>>
->>> I agree that a false sense of security is a worry here.
->>>
->>> Either way, I think we need numbers. It's non-obvious how much entropy
->>> we can acquire through counters or other means at early boot time.
->>>
->>> Has anyone done an analysis of environmental entropy available (through
->>> any means) at early boot, VM vs native?
->>>
->>
->> Define 'environmental'. The only architected thing you can rely on is
->> the timer, which really does not hold a lot of entropy on modern solid
->> state platforms. I don't have the numbers, but I do have the
->> experience to back this up, unfortunately (at my former employer).
->>
->> You could argue that KASLR does not require strong entropy like key
->> generation, but I would prefer to simply steer clear of that entire
->> debate. The bootloader simply needs to do the best job it can, either
->> based on some peripheral that the kernel has no awareness of this
->> early in the boot, or perhaps by other means if it doesn't (which
->> could include storing a random seed in the file system, or even in a
->> EFI variable). Punting it to the kernel is really the last resort.
->>
->>> It's also not obvious that vendors will correctly implement the EFI RNG
->>> protocol; depending on the above we may want to mix in additional entropy
->>> regardless.
->>>
->>
->> True, but that is not the point. The main risk I see is that vendors
->> will not bother at all once the digits start to look random to the
->> human eye.
->>
->>>> What I would ack, for development purposes, is something similar to
->>>> what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
->>>> developers get to exercise this code even if their boot environment
->>>> does not provide any entropy. Anything beyond that is a nack as far as
->>>> I am concerned.
->>>
->>> FWIW, I would not like to see that approach. I can easily see a build-time
->>> constant KASLR seed being abused to give a false sense of security. Having a
->>> bootloader or hypervisor provide different random seeds to the same Image gives
->>> you a much better turnaround time for testing regardless (vs rebuilding,
->>> copying, etc).
->>>
->
-> Hi guys,
->
-> And thanks for all the great comments. In conclusion, seems that this
-> patch is not the right direction, at least not in its current form.
->
->> If it would be *instead* of the ordinary handling, with a big fat
->> blurb saying that KASLR is disabled, I would not mind.
->
-> Ard,
->
-> Let me see if i understood your thoughts correctly.
-> Have something like a KConfig option (suggestions for name, please?
-> CONFIG_DEBUG_RANDOMIZE_BASE?) that disables the normal RNG seed
-> handling and replaces it with this counter based weak rng,
-> plus the big fat warning.
->
+On 2016-02-29 13:40, Arnd Bergmann wrote:
+> When KERNEL_LZ4 is set, we always get an output even when building
+> with 'make -s':
+> 
+>     *** LZ4 Compression CLI , by Yann Collet (May 31 2013) ***
+>     ! Generating compressed LZ4 using Legacy format (deprecated !) !
+>     Using stdin for input
+>     Using stdout for output
+>     Compressed 11213376 bytes into 4555781 bytes ==> 40.63%
+>     Done in 0.63 s ==> 16.97 MB/s
+> 
+> The output is not helpful in the context of building the kernel,
+> so this patch hides the stdout output of the lz4 binary completely.
 
-No, that is not what I meant.
+> -	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
+> +	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ 2>&1 || \
+>  	(rm -f $@ ; false)
 
-What i meant was, that, in order for the KASLR plumbing to be
-exercised by developers whose bootloader does not supply a random
-seed, I could imagine a Kconfig option that rolls the dice at build
-time, and hardcodes that value into kaslr_early_init rather than
-retrieve it from the DT. This means your kernel will execute from the
-same 'random' address each time, even if you rebuild it, and only a
-Kconfig change may trigger a new value to be generated.
+Hi Arnd,
 
-Since this is not KASLR but a build time hack to get testing coverage
-for the code, it should announce that in some way.
+this redirection does not hide it, but rather includes it in the
+compressed image file.
 
-However, while I said I was not opposed to the idea, I am not crazy
-about it either, and it is not up to me to ultimately decide what gets
-merged anyway. So before you sit down and spend the time, you may want
-to get the maintainer's opinion first.
+BTW, my copy of lz4c only displays this warning with -v.
 
--- 
-Ard.
+Michal
