@@ -1,78 +1,69 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 29 Feb 2016 18:34:46 +0100
-Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
-In-Reply-To: <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160229173446.GG31343@rric.localdomain>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 29 Feb 2016 17:43:20 +0000
+Subject: [RFC PATCH] arm: kernel: pci: remove pci=firmware command line
+ parameter handling
+Message-ID: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.02.16 17:58:22, David Daney wrote:
-> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> 
-> Attempt to get the memory and CPU NUMA node via of_numa.  If that
-> fails, default the dummy NUMA node and map all memory and CPUs to node
-> 0.
-> 
-> Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  arch/arm64/Kconfig                |  26 +++
->  arch/arm64/include/asm/mmzone.h   |  12 ++
->  arch/arm64/include/asm/numa.h     |  45 +++++
->  arch/arm64/include/asm/topology.h |  10 +
->  arch/arm64/kernel/pci.c           |  10 +
->  arch/arm64/kernel/setup.c         |   4 +
->  arch/arm64/kernel/smp.c           |   4 +
->  arch/arm64/mm/Makefile            |   1 +
->  arch/arm64/mm/init.c              |  34 +++-
->  arch/arm64/mm/mmu.c               |   1 +
->  arch/arm64/mm/numa.c              | 403 ++++++++++++++++++++++++++++++++++++++
->  11 files changed, 545 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm64/include/asm/mmzone.h
->  create mode 100644 arch/arm64/include/asm/numa.h
->  create mode 100644 arch/arm64/mm/numa.c
+According to kernel documentation, the pci=firmware command line
+parameter is only meant to be used on IXP2000 ARM platforms to prevent
+the kernel from assigning PCI resources configured by the bootloader.
 
-> +static int __init numa_init(int (*init_func)(void))
-> +{
-> +	int ret;
-> +
-> +	nodes_clear(numa_nodes_parsed);
-> +	nodes_clear(node_possible_map);
-> +	nodes_clear(node_online_map);
-> +	numa_free_distance();
-> +
-> +	ret = numa_alloc_distance();
-> +	if (ret < 0)
-> +		return ret;
+Since the IXP2000 ARM platforms support has been removed from the
+kernel in commit:
 
-If you move this before the remaining initializers, you will need to
-clean this up on error. So better move it back after
-numa_register_nodes() as it was in v10. This should work since
-distances are used not earlier than numa is enabled.
+commit c65f2abf54a6 ("ARM: remove ixp23xx and ixp2000 platforms")
 
--Robert
+its platforms specific kernel parameters should be removed
+too from the kernel documentation along with the kernel code
+currently handling them in that they have just become obsolete.
 
-> +
-> +	ret = init_func();
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	if (nodes_empty(numa_nodes_parsed))
-> +		return -EINVAL;
-> +
-> +	ret = numa_register_nodes();
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	setup_node_to_cpumask_map();
-> +
-> +	/* init boot processor */
-> +	cpu_to_node_map[0] = 0;
-> +	map_cpu_to_node(0, 0);
-> +
-> +	return 0;
-> +}
+This patch removes the pci=firmware command line parameter handling
+from ARM code and the related kernel parameters documentation
+section.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Lennert Buytenhek <kernel@wantstofly.org>
+Cc: Jonathan Corbet <corbet@lwn.net>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ Documentation/kernel-parameters.txt | 5 -----
+ arch/arm/kernel/bios32.c            | 3 ---
+ 2 files changed, 8 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 9a53c92..e213acc 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -2875,11 +2875,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 				for broken drivers that don't call it.
+ 		skip_isa_align	[X86] do not align io start addr, so can
+ 				handle more pci cards
+-		firmware	[ARM] Do not re-enumerate the bus but instead
+-				just use the configuration from the
+-				bootloader. This is currently used on
+-				IXP2000 systems where the bus has to be
+-				configured a certain way for adjunct CPUs.
+ 		noearly		[X86] Don't do any early type 1 scanning.
+ 				This might help on some broken boards which
+ 				machine check when some devices' config space
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 066f7f9..05e61a2 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -550,9 +550,6 @@ char * __init pcibios_setup(char *str)
+ 	if (!strcmp(str, "debug")) {
+ 		debug_pci = 1;
+ 		return NULL;
+-	} else if (!strcmp(str, "firmware")) {
+-		pci_add_flags(PCI_PROBE_ONLY);
+-		return NULL;
+ 	}
+ 	return str;
+ }
+-- 
+2.5.1
