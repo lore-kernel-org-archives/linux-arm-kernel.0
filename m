@@ -1,36 +1,33 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  1 Mar 2016 00:44:18 +0100
-Subject: [PATCH 1/8] ARM64: Enable Amlogic Meson GXBaby platform
+Date: Tue,  1 Mar 2016 00:44:22 +0100
+Subject: [PATCH 5/8] Documentation: devicetree: amlogic: Document Tronsmart
+ Vega S95 boards
 In-Reply-To: <1456789465-2962-1-git-send-email-afaerber@suse.de>
 References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
-Message-ID: <1456789465-2962-2-git-send-email-afaerber@suse.de>
+Message-ID: <1456789465-2962-6-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the ARCH_MESON Kconfig symbol to allow enabling existing serial
-and i2c drivers.
+Use "tronsmart,vega-s95" as well as
+    "tronsmart,vega-s95-pro",
+    "tronsmart,vega-s95-meta" and
+    "tronsmart,vega-s95-telos" compatible strings.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm64/Kconfig.platforms | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/arm/amlogic.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index a0a69589e46c..17d0ddaa0516 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -56,6 +56,12 @@ config ARCH_MEDIATEK
- 	help
- 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
- 
-+config ARCH_MESON
-+	bool "Amlogic Platforms"
-+	select ARM_GIC
-+	help
-+	  This enables support for the S905 SoCs
-+
- config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
- 	select ARMADA_AP806_CORE_CLK
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index 776f08ca215f..8a5122ab19b0 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -22,3 +22,6 @@ Board compatible values:
+   - "minix,neo-x8" (Meson8)
+   - "tronfy,mxq" (Meson8b)
+   - "hardkernel,odroid-c1" (Meson8b)
++  - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
++  - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
++  - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
 -- 
 2.6.2
