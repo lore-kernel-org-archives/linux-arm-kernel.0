@@ -1,203 +1,228 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 29 Feb 2016 11:54:27 -0700
-Subject: [PATCH 8/8] coresight: etm4x: implementing the perf PMU API
+Date: Mon, 29 Feb 2016 11:54:23 -0700
+Subject: [PATCH 4/8] coresight: etm4x: splitting etmv4 default configuration
 In-Reply-To: <1456772067-18085-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1456772067-18085-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1456772067-18085-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1456772067-18085-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a set of API allowing the Perf core to treat ETMv4
-tracers like other PMUs.
+Splitting and updating the default initialisation for each etmv4
+configuration so that it can be called at the beginning of each
+session rather than initialisation time only.
+
+Since the trace ID isn't expected to change with every session,
+moving it with the default tracer initialisation.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/Makefile          |  5 +-
- drivers/hwtracing/coresight/coresight-etm4x.c | 85 +++++++++++++++++++++++++--
- 2 files changed, 82 insertions(+), 8 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 128 ++++++++++++--------------
+ drivers/hwtracing/coresight/coresight-etm4x.h |  12 +++
+ 2 files changed, 73 insertions(+), 67 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-index 637ca978cd05..1d0e32c7dbe4 100644
---- a/drivers/hwtracing/coresight/Makefile
-+++ b/drivers/hwtracing/coresight/Makefile
-@@ -1,7 +1,7 @@
- #
- # Makefile for CoreSight drivers.
- #
--obj-$(CONFIG_CORESIGHT) += coresight.o
-+obj-$(CONFIG_CORESIGHT) += coresight.o coresight-etm-perf.o
- obj-$(CONFIG_OF) += of_coresight.o
- obj-$(CONFIG_CORESIGHT_LINK_AND_SINK_TMC) += coresight-tmc.o
- obj-$(CONFIG_CORESIGHT_SINK_TPIU) += coresight-tpiu.o
-@@ -9,8 +9,7 @@ obj-$(CONFIG_CORESIGHT_SINK_ETBV10) += coresight-etb10.o
- obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-funnel.o \
- 					   coresight-replicator.o
- obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o \
--					coresight-etm3x-sysfs.o \
--					coresight-etm-perf.o
-+					coresight-etm3x-sysfs.o
- obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
- 					coresight-etm4x-sysfs.o
- obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 743c34b92a80..8bd400cce904 100644
+index e204db40082b..6fd554f10ba5 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -32,12 +32,14 @@
+@@ -27,6 +27,7 @@
+ #include <linux/clk.h>
+ #include <linux/cpu.h>
+ #include <linux/coresight.h>
++#include <linux/coresight-pmu.h>
+ #include <linux/pm_wakeup.h>
  #include <linux/amba/bus.h>
  #include <linux/seq_file.h>
- #include <linux/uaccess.h>
-+#include <linux/perf_event.h>
- #include <linux/pm_runtime.h>
- #include <linux/perf_event.h>
- #include <asm/sections.h>
- #include <asm/local.h>
- 
- #include "coresight-etm4x.h"
-+#include "coresight-etm-perf.h"
- 
- static int boot_enable;
- module_param_named(boot_enable, boot_enable, int, S_IRUGO);
-@@ -45,6 +47,7 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
- /* The number of ETMv4 currently registered */
- static int etm4_count;
- static struct etmv4_drvdata *etmdrvdata[NR_CPUS];
-+static void etm4_set_default(struct etmv4_config *config);
- 
- static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
- {
-@@ -190,6 +193,58 @@ static void etm4_enable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+@@ -437,14 +438,20 @@ static void etm4_init_arch_data(void *info)
+ 	CS_LOCK(drvdata->base);
  }
  
-+static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
-+				   struct perf_event_attr *attr)
-+{
-+	struct etmv4_config *config = &drvdata->config;
-+
-+	if (!attr)
-+		return -EINVAL;
-+
-+	/* Clear configuration from previous run */
-+	memset(config, 0, sizeof(struct etmv4_config));
-+
-+	if (attr->exclude_kernel)
-+		config->mode = ETM_MODE_EXCL_KERN;
-+
-+	if (attr->exclude_user)
-+		config->mode = ETM_MODE_EXCL_USER;
-+
-+	/* Always start from the default config */
-+	etm4_set_default(config);
-+
+-static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
++static void etm4_set_default(struct etmv4_config *config)
+ {
+-	int i;
+-	struct etmv4_config *config = &drvdata->config;
++	if (WARN_ON_ONCE(!config))
++		return;
+ 
+-	config->pe_sel = 0x0;
+-	config->cfg = (ETMv4_MODE_CTXID | ETM_MODE_VMID |
+-			ETMv4_MODE_TIMESTAMP | ETM_MODE_RETURNSTACK);
 +	/*
-+	 * By default the tracers are configured to trace the whole address
-+	 * range.  Narrow the field only if requested by user space.
++	 * Make default initialisation trace everything
++	 *
++	 * Select the "always true" resource selector on the
++	 * "Enablign Event" line and configure address range comparator
++	 * '0' to trace all the possible address range.  From there
++	 * configure the "include/exclude" engine to include address
++	 * range comparator '0'.
 +	 */
-+	if (config->mode)
-+		etm4_config_trace_mode(config);
+ 
+ 	/* disable all events tracing */
+ 	config->eventctrl0 = 0x0;
+@@ -453,78 +460,58 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
+ 	/* disable stalling */
+ 	config->stall_ctrl = 0x0;
+ 
++	/* enable trace synchronization every 4096 bytes, if available */
++	config->syncfreq = 0xC;
 +
-+	/* Go from generic option to ETMv4 specifics */
-+	if (attr->config & BIT(ETM_OPT_CYCACC))
-+		config->cfg |= ETMv4_MODE_CYCACC;
-+	if (attr->config & BIT(ETM_OPT_TS))
-+		config->cfg |= ETMv4_MODE_TIMESTAMP;
+ 	/* disable timestamp event */
+ 	config->ts_ctrl = 0x0;
+ 
+-	/* enable trace synchronization every 4096 bytes for trace */
+-	if (drvdata->syncpr == false)
+-		config->syncfreq = 0xC;
++	/* TRCVICTLR::EVENT = 0x01, select the always on logic */
++	config->vinst_ctrl |= BIT(0);
+ 
+ 	/*
+-	 *  enable viewInst to trace everything with start-stop logic in
+-	 *  started state
++	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
++	 * in the started state
+ 	 */
+-	config->vinst_ctrl |= BIT(0);
+-	/* set initial state of start-stop logic */
+-	if (drvdata->nr_addr_cmp)
+-		config->vinst_ctrl |= BIT(9);
+-
+-	/* no address range filtering for ViewInst */
+-	config->viiectlr = 0x0;
+-	/* no start-stop filtering for ViewInst */
+-	config->vissctlr = 0x0;
+-
+-	/* disable seq events */
+-	for (i = 0; i < drvdata->nrseqstate-1; i++)
+-		config->seq_ctrl[i] = 0x0;
+-	config->seq_rst = 0x0;
+-	config->seq_state = 0x0;
+-
+-	/* disable external input events */
+-	config->ext_inp = 0x0;
+-
+-	for (i = 0; i < drvdata->nr_cntr; i++) {
+-		config->cntrldvr[i] = 0x0;
+-		config->cntr_ctrl[i] = 0x0;
+-		config->cntr_val[i] = 0x0;
+-	}
+-
+-	/* Resource selector pair 0 is always implemented and reserved */
+-	config->res_idx = 0x2;
+-	for (i = 2; i < drvdata->nr_resource * 2; i++)
+-		config->res_ctrl[i] = 0x0;
++	config->vinst_ctrl |= BIT(9);
+ 
+-	for (i = 0; i < drvdata->nr_ss_cmp; i++) {
+-		config->ss_ctrl[i] = 0x0;
+-		config->ss_pe_cmp[i] = 0x0;
+-	}
+-
+-	if (drvdata->nr_addr_cmp >= 1) {
+-		config->addr_val[0] = (unsigned long)_stext;
+-		config->addr_val[1] = (unsigned long)_etext;
+-		config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
+-		config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
+-	}
+-
+-	for (i = 0; i < drvdata->numcidc; i++) {
+-		config->ctxid_pid[i] = 0x0;
+-		config->ctxid_vpid[i] = 0x0;
+-	}
++	/*
++	 * Configure address range comparator '0' to encompass all
++	 * possible addresses.
++	 */
+ 
+-	config->ctxid_mask0 = 0x0;
+-	config->ctxid_mask1 = 0x0;
++	/* First half of default address comparator: start at address 0 */
++	config->addr_val[ETM_DEFAULT_ADDR_COMP] = 0x0;
++	/* trace instruction addresses */
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP] &= ~(BIT(0) | BIT(1));
++	/* EXLEVEL_NS, bits[12:15], only trace application and kernel space */
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP] |= ETM_EXLEVEL_NS_HYP;
++	/* EXLEVEL_S, bits[11:8], don't trace anything in secure state */
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP] |= (ETM_EXLEVEL_S_APP |
++						    ETM_EXLEVEL_S_OS |
++						    ETM_EXLEVEL_S_HYP);
++	config->addr_type[ETM_DEFAULT_ADDR_COMP] = ETM_ADDR_TYPE_RANGE;
+ 
+-	for (i = 0; i < drvdata->numvmidc; i++)
+-		config->vmid_val[i] = 0x0;
+-	config->vmid_mask0 = 0x0;
+-	config->vmid_mask1 = 0x0;
++	/*
++	 * Second half of default address comparator: go all
++	 * the way to the top.
++	*/
++	config->addr_val[ETM_DEFAULT_ADDR_COMP + 1] = ~0x0;
++	/* trace instruction addresses */
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] &= ~(BIT(0) | BIT(1));
++	/* Address comparator type must be equal for both halves */
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] =
++					config->addr_acc[ETM_DEFAULT_ADDR_COMP];
++	config->addr_type[ETM_DEFAULT_ADDR_COMP + 1] = ETM_ADDR_TYPE_RANGE;
+ 
+ 	/*
+-	 * A trace ID value of 0 is invalid, so let's start at some
+-	 * random value that fits in 7 bits.  ETMv3.x has 0x10 so let's
+-	 * start at 0x20.
++	 * Configure the ViewInst function to filter on address range
++	 * comparator '0'.
+ 	 */
+-	drvdata->trcid = 0x20 + drvdata->cpu;
++	config->viiectlr = BIT(0);
 +
-+	return 0;
-+}
-+
-+static int etm4_enable_perf(struct coresight_device *csdev,
-+			    struct perf_event_attr *attr)
-+{
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	/* Configure the tracer based on the session's specifics */
-+	etm4_parse_event_config(drvdata, attr);
-+	/* And enable it */
-+	etm4_enable_hw(drvdata);
-+
-+	return 0;
-+}
-+
- static int etm4_enable_sysfs(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -234,6 +289,9 @@ static int etm4_enable(struct coresight_device *csdev,
- 	case CS_MODE_SYSFS:
- 		ret = etm4_enable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		ret = etm4_enable_perf(csdev, attr);
-+		break;
- 	default:
- 		ret = -EINVAL;
- 	}
-@@ -267,6 +325,17 @@ static void etm4_disable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
++	/* no start-stop filtering for ViewInst */
++	config->vissctlr = 0x0;
  }
  
-+static int etm4_disable_perf(struct coresight_device *csdev)
+ static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
+@@ -569,6 +556,11 @@ static struct notifier_block etm4_cpu_notifier = {
+ 	.notifier_call = etm4_cpu_callback,
+ };
+ 
++static void etm4_init_trace_id(struct etmv4_drvdata *drvdata)
 +{
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	etm4_disable_hw(drvdata);
-+	return 0;
++	drvdata->trcid = coresight_get_trace_id(drvdata->cpu);
 +}
 +
- static void etm4_disable_sysfs(struct coresight_device *csdev)
+ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
  {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -310,6 +379,9 @@ static void etm4_disable(struct coresight_device *csdev)
- 	case CS_MODE_SYSFS:
- 		etm4_disable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		etm4_disable_perf(csdev);
-+		break;
+ 	int ret;
+@@ -628,7 +620,9 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 		ret = -EINVAL;
+ 		goto err_arch_supported;
  	}
- 
- 	if (mode)
-@@ -709,8 +781,6 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	etm4_init_trace_id(drvdata);
- 	etm4_set_default(&drvdata->config);
- 
--	pm_runtime_put(&adev->dev);
--
- 	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
- 	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
- 	desc->ops = &etm4_cs_ops;
-@@ -720,9 +790,16 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->csdev = coresight_register(desc);
- 	if (IS_ERR(drvdata->csdev)) {
- 		ret = PTR_ERR(drvdata->csdev);
--		goto err_coresight_register;
-+		goto err_arch_supported;
- 	}
- 
-+	ret = etm_perf_symlink(drvdata->csdev, true);
-+	if (ret) {
-+		coresight_unregister(drvdata->csdev);
-+		goto err_arch_supported;
-+	}
+-	etm4_init_default_data(drvdata);
 +
-+	pm_runtime_put(&adev->dev);
- 	dev_info(dev, "%s initialized\n", (char *)id->data);
++	etm4_init_trace_id(drvdata);
++	etm4_set_default(&drvdata->config);
  
- 	if (boot_enable) {
-@@ -733,8 +810,6 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	return 0;
+ 	pm_runtime_put(&adev->dev);
  
- err_arch_supported:
--	pm_runtime_put(&adev->dev);
--err_coresight_register:
- 	if (--etm4_count == 0)
- 		unregister_hotcpu_notifier(&etm4_cpu_notifier);
- 	return ret;
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index 709d96e63910..6ff499bfb2f2 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -178,6 +178,18 @@
+ #define ETMv4_MODE_ALL			0xFFFFFFF
+ 
+ #define TRCSTATR_IDLE_BIT		0
++#define ETM_DEFAULT_ADDR_COMP		0
++
++/* secure state access levels */
++#define ETM_EXLEVEL_S_APP		BIT(8)
++#define ETM_EXLEVEL_S_OS		BIT(9)
++#define ETM_EXLEVEL_S_NA		BIT(10)
++#define ETM_EXLEVEL_S_HYP		BIT(11)
++/* non-secure state access levels */
++#define ETM_EXLEVEL_NS_APP		BIT(12)
++#define ETM_EXLEVEL_NS_OS		BIT(13)
++#define ETM_EXLEVEL_NS_HYP		BIT(14)
++#define ETM_EXLEVEL_NS_NA		BIT(15)
+ 
+ /**
+  * struct etmv4_config - configuration information related to an ETMv4
 -- 
 2.1.4
