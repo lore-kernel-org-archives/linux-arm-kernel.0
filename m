@@ -1,24 +1,72 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 29 Feb 2016 11:23:25 -0300
-Subject: Booting MX7Solo with 4.5-rc6
-Message-ID: <CAOMZO5A6AO1n+fiwYBa=7VS3i1qk6zZ_ifym1yPt6+ApcTAuoA@mail.gmail.com>
+From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
+Date: Mon, 29 Feb 2016 14:22:39 +0000
+Subject: [PATCH] arm64: dts: r8a7795: Add CAN support
+Message-ID: <1456755759-51288-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Adds CAN controller nodes for r8a7795.
 
-I am trying to boot linux-next 20160229 on a m7solo warp board and
-this is what I get:
+Note: CAN channel register base address mentioned in R-Car Gen3 Hardware
+User Manual v0.5E is incorrect. The corrected base addresses are:
 
-http://pastebin.com/TmQdqd2B
+CAN Channel 0 - 0xe6c30000
+CAN Channel 1 - 0xe6c38000
 
-I can boot this board fine using NXP 3.14.52 kernel.
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+---
+Hi All,
 
-These clock warnings also happen on a mx7d sabresd board, but the boot
-proceed fine.
+   This patch is based on linux-next (tag:next-20160225) with following patch
+   applied on top
 
-Any ideas as to what needs to be done in order to boot a MX7S?
+   [PATCH v2] arm64: dts: r8a7795: Add CAN external clock support
 
-I have also tried to disable cpu1 in the imx7d.dtsi, but it did not help.
+   The respective CAN subsystem changes are submitted separately here (http://marc.info/?l=linux-can&m=145674974416086&w=2)
 
-Thanks
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 4049182..a88f8d8 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -523,6 +523,36 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		can0: can at e6c30000 {
++			compatible = "renesas,can-r8a7795",
++				     "renesas,rcar-gen3-can";
++			reg = <0 0xe6c30000 0 0x1000>;
++			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 916>,
++			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
++			       <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
++			assigned-clock-rates = <40000000>;
++			power-domains = <&cpg>;
++			status = "disabled";
++		};
++
++		can1: can at e6c38000 {
++			compatible = "renesas,can-r8a7795",
++				     "renesas,rcar-gen3-can";
++			reg = <0 0xe6c38000 0 0x1000>;
++			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 915>,
++			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
++			       <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
++			assigned-clock-rates = <40000000>;
++			power-domains = <&cpg>;
++			status = "disabled";
++		};
++
+ 		hscif0: serial at e6540000 {
+ 			compatible = "renesas,hscif-r8a7795",
+ 				     "renesas,rcar-gen3-hscif",
+-- 
+1.9.1
