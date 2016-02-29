@@ -1,36 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 29 Feb 2016 14:55:36 -0800
-Subject: [PATCH v3 1/5] pwms: pwm-ti*: Remove support for local clock
- gating
-In-Reply-To: <56D4C69D.1090100@ti.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-2-git-send-email-fcooper@ti.com>
- <20160229220444.GQ13417@atomide.com> <56D4C69D.1090100@ti.com>
-Message-ID: <20160229225536.GR13417@atomide.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 29 Feb 2016 16:56:53 -0600
+Subject: [RFC PATCH] arm: kernel: pci: remove pci=firmware command line
+ parameter handling
+In-Reply-To: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160229225653.GE3653@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Franklin S Cooper Jr. <fcooper@ti.com> [160229 14:31]:
-> On 02/29/2016 04:04 PM, Tony Lindgren wrote:
-> > Hmm but why are you also removing the pm_runtime calls? Those
-> > actually do take care of gating the clocks via the interconnect
-> > level code that is hwmod in this case.
-> I removed all PM runtime calls that revolved around
-> pwmss_submodule_state_change. Originally the driver would do
-> a pm_runtime_get_sync then call pwmss_submodule_state_change
-> and then immediately call pm_runtime_put_sync. Without
-> pwmss_submodule_state_change those calls would be
-> meaningless.  I also removed pm_runtime calls in error paths
-> that no longer existed.
+On Mon, Feb 29, 2016 at 05:43:20PM +0000, Lorenzo Pieralisi wrote:
+> According to kernel documentation, the pci=firmware command line
+> parameter is only meant to be used on IXP2000 ARM platforms to prevent
+> the kernel from assigning PCI resources configured by the bootloader.
+> 
+> Since the IXP2000 ARM platforms support has been removed from the
+> kernel in commit:
+> 
+> commit c65f2abf54a6 ("ARM: remove ixp23xx and ixp2000 platforms")
+> 
+> its platforms specific kernel parameters should be removed
+> too from the kernel documentation along with the kernel code
+> currently handling them in that they have just become obsolete.
+> 
+> This patch removes the pci=firmware command line parameter handling
+> from ARM code and the related kernel parameters documentation
+> section.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Typically the interconnect level code can gate the clkctrl bit
-for the module with PM runtime even with no other driver specific
-registers. If you remove the pm_runtime calls, that does not
-happen.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Also, how do you know this change does not affect the other
-SoC variants using the same driver?
+It looks like Rob merged c65f2abf54a6, so maybe he will merge this as
+well?  Otherwise I'd be happy to merge it; just let me know if you
+want me to.
 
-Regards,
-
-Tony
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  Documentation/kernel-parameters.txt | 5 -----
+>  arch/arm/kernel/bios32.c            | 3 ---
+>  2 files changed, 8 deletions(-)
+> 
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index 9a53c92..e213acc 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -2875,11 +2875,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>  				for broken drivers that don't call it.
+>  		skip_isa_align	[X86] do not align io start addr, so can
+>  				handle more pci cards
+> -		firmware	[ARM] Do not re-enumerate the bus but instead
+> -				just use the configuration from the
+> -				bootloader. This is currently used on
+> -				IXP2000 systems where the bus has to be
+> -				configured a certain way for adjunct CPUs.
+>  		noearly		[X86] Don't do any early type 1 scanning.
+>  				This might help on some broken boards which
+>  				machine check when some devices' config space
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 066f7f9..05e61a2 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -550,9 +550,6 @@ char * __init pcibios_setup(char *str)
+>  	if (!strcmp(str, "debug")) {
+>  		debug_pci = 1;
+>  		return NULL;
+> -	} else if (!strcmp(str, "firmware")) {
+> -		pci_add_flags(PCI_PROBE_ONLY);
+> -		return NULL;
+>  	}
+>  	return str;
+>  }
+> -- 
+> 2.5.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
