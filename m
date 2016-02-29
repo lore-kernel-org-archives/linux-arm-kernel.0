@@ -1,60 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 17:04:21 +0100
-Subject: [PATCH 2/2] cpufreq: mediatek: allow building as a module
-In-Reply-To: <1456761867-1742824-1-git-send-email-arnd@arndb.de>
-References: <1456761867-1742824-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456761867-1742824-2-git-send-email-arnd@arndb.de>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Mon, 29 Feb 2016 16:09:20 +0000
+Subject: [PATCH v2 0/4] Fix kernel panic in dma-coherent allocations
+Message-ID: <cover.1456225103.git.brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MT8173 cpufreq driver can currently only be built-in, but
-it has a Kconfig dependency on the thermal core. THERMAL
-can be a loadable module, which in turn makes this driver
-impossible to build.
+Hi,
 
-It is nicer to make the cpufreq driver a module as well, so
-this patch turns the option in to a 'tristate' and adapts
-the dependency accordingly.
+These patches implement a MEMREMAP_WC flag for memremap(), which can
+be used to obtain writecombine mappings. This is then used for setting
+up dma_coherent_mem regions which use the DMA_MEMORY_MAP flag.
 
-The driver has no module_exit() function, so it will continue
-to not support unloading, but it can be built as a module
-and loaded at runtime now.
+The motivation is to fix an alignment fault on arm64, and the
+suggestion to implement MEMREMAP_WC for this case was made at [1].
+That particular issue is handled in patch 4, which makes sure that the
+appropriate memset function is used when zeroing allocations mapped as
+IO memory.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5269e7067cd6 ("cpufreq: Add ARM_MT8173_CPUFREQ dependency on THERMAL")
----
- drivers/cpufreq/Kconfig.arm      | 4 ++--
- drivers/cpufreq/mt8173-cpufreq.c | 1 +
- 2 files changed, 3 insertions(+), 2 deletions(-)
+Best Regards,
+Brian
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 0031069b64c9..14b1f9393b05 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -84,10 +84,10 @@ config ARM_KIRKWOOD_CPUFREQ
- 	  SoCs.
- 
- config ARM_MT8173_CPUFREQ
--	bool "Mediatek MT8173 CPUFreq support"
-+	tristate "Mediatek MT8173 CPUFreq support"
- 	depends on ARCH_MEDIATEK && REGULATOR
- 	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
--	depends on !CPU_THERMAL || THERMAL=y
-+	depends on !CPU_THERMAL || THERMAL
- 	select PM_OPP
- 	help
- 	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-index 1efba340456d..2058e6d292ce 100644
---- a/drivers/cpufreq/mt8173-cpufreq.c
-+++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -17,6 +17,7 @@
- #include <linux/cpu_cooling.h>
- #include <linux/cpufreq.h>
- #include <linux/cpumask.h>
-+#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/pm_opp.h>
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390857.html
+
+Changes since v1:
+* Added preparatory patch removing flag modifications in memremap()
+  (Suggested by Andrew Morton)
+* Rebase onto linux-next
+
+Brian Starkey (4):
+  memremap: don't modify flags
+  memremap: add MEMREMAP_WC flag.
+  drivers: dma-coherent: use MEMREMAP_WC for DMA_MEMORY_MAP
+  drivers: dma-coherent: use memset_io for DMA_MEMORY_IO mappings
+
+ drivers/base/dma-coherent.c |   25 ++++++++++++++++++++-----
+ include/linux/io.h          |    1 +
+ kernel/memremap.c           |   24 +++++++++++++++---------
+ 3 files changed, 36 insertions(+), 14 deletions(-)
+
 -- 
-2.7.0
+1.7.9.5
