@@ -1,38 +1,66 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 29 Feb 2016 15:44:43 +0100
-Subject: [PATCH v2 8/9] openrisc: drop wrongly typed definition of
- page_to_virt()
+Date: Mon, 29 Feb 2016 15:44:42 +0100
+Subject: [PATCH v2 7/9] nios2: use correct void* return type for page_to_virt()
 In-Reply-To: <1456757084-1078-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456757084-1078-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456757084-1078-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456757084-1078-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To align with generic code and other architectures that expect the macro
-page_to_virt to produce an expression whose type is 'void*', drop the
-arch specific definition, which is never referenced anyway.
+To align with other architectures, the expression procuded by expanding
+the macro page_to_virt() should be of type void*, since it returns a
+virtual address. Fix that, and also fix up an instance where page_to_virt
+was expected to return 'unsigned long', and drop another instance that was
+entirely unused (page_to_bus)
 
 Cc: linux-mm at kvack.org
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Jonas Bonn <jonas@southpole.se>
-Cc: linux at lists.openrisc.net
+Cc: Ley Foon Tan <lftan@altera.com>
+Cc: nios2-dev at lists.rocketboards.org
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/openrisc/include/asm/page.h | 2 --
- 1 file changed, 2 deletions(-)
+ arch/nios2/include/asm/io.h      | 1 -
+ arch/nios2/include/asm/page.h    | 2 +-
+ arch/nios2/include/asm/pgtable.h | 2 +-
+ 3 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/openrisc/include/asm/page.h b/arch/openrisc/include/asm/page.h
-index 108906f991d6..1976f7272b1f 100644
---- a/arch/openrisc/include/asm/page.h
-+++ b/arch/openrisc/include/asm/page.h
-@@ -84,8 +84,6 @@ typedef struct page *pgtable_t;
+diff --git a/arch/nios2/include/asm/io.h b/arch/nios2/include/asm/io.h
+index c5a62da22cd2..ce072ba0f8dd 100644
+--- a/arch/nios2/include/asm/io.h
++++ b/arch/nios2/include/asm/io.h
+@@ -50,7 +50,6 @@ static inline void iounmap(void __iomem *addr)
  
- #define virt_to_page(addr) \
- 	(mem_map + (((unsigned long)(addr)-PAGE_OFFSET) >> PAGE_SHIFT))
--#define page_to_virt(page) \
+ /* Pages to physical address... */
+ #define page_to_phys(page)	virt_to_phys(page_to_virt(page))
+-#define page_to_bus(page)	page_to_virt(page)
+ 
+ /* Macros used for converting between virtual and physical mappings. */
+ #define phys_to_virt(vaddr)	\
+diff --git a/arch/nios2/include/asm/page.h b/arch/nios2/include/asm/page.h
+index 4b32d6fd9d98..c1683f51ad0f 100644
+--- a/arch/nios2/include/asm/page.h
++++ b/arch/nios2/include/asm/page.h
+@@ -84,7 +84,7 @@ extern struct page *mem_map;
+ 	((void *)((unsigned long)(x) + PAGE_OFFSET - PHYS_OFFSET))
+ 
+ #define page_to_virt(page)	\
 -	((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
++	((void *)(((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
  
- #define page_to_phys(page)      ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
+ # define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+ # define pfn_valid(pfn)		((pfn) >= ARCH_PFN_OFFSET &&	\
+diff --git a/arch/nios2/include/asm/pgtable.h b/arch/nios2/include/asm/pgtable.h
+index a213e8c9aad0..298393c3cb42 100644
+--- a/arch/nios2/include/asm/pgtable.h
++++ b/arch/nios2/include/asm/pgtable.h
+@@ -209,7 +209,7 @@ static inline void set_pte(pte_t *ptep, pte_t pteval)
+ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 			      pte_t *ptep, pte_t pteval)
+ {
+-	unsigned long paddr = page_to_virt(pte_page(pteval));
++	unsigned long paddr = (unsigned long)page_to_virt(pte_page(pteval));
  
+ 	flush_dcache_range(paddr, paddr + PAGE_SIZE);
+ 	set_pte(ptep, pteval);
 -- 
 2.5.0
