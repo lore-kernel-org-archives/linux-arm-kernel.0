@@ -1,37 +1,26 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 29 Feb 2016 12:43:36 -0800
-Subject: [PATCH 2/2] clk: bcm2835: expose current divider,
- parent and mash via debugfs
-In-Reply-To: <1456755616-2472-3-git-send-email-kernel@martin.sperl.org>
-References: <1456755616-2472-1-git-send-email-kernel@martin.sperl.org>
- <1456755616-2472-3-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87h9gr5jt3.fsf@eliezer.anholt.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 21:45:09 +0100
+Subject: [PATCH] ARM: dts: DRA7: change address-cells and size-cells
+In-Reply-To: <20160229181606.GM13417@atomide.com>
+References: <1456308664-28308-1-git-send-email-lokeshvutla@ti.com>
+ <56D40505.8020702@ti.com> <20160229181606.GM13417@atomide.com>
+Message-ID: <17470332.nnZZr9fh67@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+On Monday 29 February 2016 10:16:07 Tony Lindgren wrote:
+> Yes I understand that if we need to set it at the top level. But what
+> happens if you only set it for the memory node?
+> 
+> With just something like:
+> 
+> memory {
+>        #address-cells = <2>;
+>        #size-cells = <2>;
+>        ...
+> };
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> For each clock expose the following values via debugfs:
-> * current_parent - the currently selected parent
-> * current_divi - the integer portion of the currently set divider
-> * current_divf - the fractional portion of the currently set divider
-> * current_frac - the current frac/mash settings for the divider
+Nothing happens there: the memory node has no children, and no
+ranges property, so the two properties are never referenced.
 
-current_parent can already be found through /debug/clk/clk_summary quite
-nicely I think.  If we wanted a per-clock parent file, that seems like
-something the core ought to be doing.
-
-current_frac is looking at a bit that doesn't exist for non-MASH clocks.
-
-divi/divf are OK, I guess, but don't seem particularly useful given the
-raw register output already.  A cooked floating point point divider
-debugfs entry would be nice, but I don't know if we can do that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/32024f09/attachment.sig>
+	Arnd
