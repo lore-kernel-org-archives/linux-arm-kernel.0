@@ -1,68 +1,83 @@
-From: alexandre.torgue@gmail.com (Alexandre TORGUE)
-Date: Mon, 29 Feb 2016 17:29:35 +0100
-Subject: [PATCH 2/3] ARM: dts: stm32f429: Add Ethernet support
-In-Reply-To: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
-References: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
-Message-ID: <1456763376-21457-3-git-send-email-alexandre.torgue@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 17:39:59 +0100
+Subject: [PATCH v2] video: exynos: fix modular build
+In-Reply-To: <56D46DFD.6090706@ti.com>
+References: <1456490307-823812-1-git-send-email-arnd@arndb.de>
+ <56D46DFD.6090706@ti.com>
+Message-ID: <6291541.7IMAnfX0g2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ethernet support (Synopsys MAC IP 3.50a) on stm32f429 SOC.
+On Monday 29 February 2016 18:12:45 Tomi Valkeinen wrote:
+> Hi,
+> 
+> On 26/02/16 14:38, Arnd Bergmann wrote:
+> > The s6e8ax0 driver has a dependency on BACKLIGHT_CLASS_DEVICE,
+> > which can be configured as a loadable module, so we have to
+> > make the driver a tristate symbol as well, to avoid this error:
+> > 
+> > drivers/built-in.o: In function `s6e8ax0_probe':
+> > :(.text+0x23a48): undefined reference to `devm_backlight_device_register'
+> 
+> If a 'bool' Kconfig option depends on BACKLIGHT_CLASS_DEVICE, shouldn't
+> the Kconfig dependency take care of having BACKLIGHT_CLASS_DEVICE as
+> built-in?
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+No, that's not how Kconfig interprets it. There are many bool option
+that depend on tristate options but can be enabled if the dependency
+is built-in.
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index bb7a736..af0367c 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -283,6 +283,26 @@
- 					bias-disable;
- 				};
- 			};
-+
-+			ethernet0_mii: mii at 0 {
-+				mii {
-+					slew-rate = <2>;
-+					pinmux = <STM32F429_PG13_FUNC_ETH_MII_TXD0_ETH_RMII_TXD0>,
-+						 <STM32F429_PG14_FUNC_ETH_MII_TXD1_ETH_RMII_TXD1>,
-+						 <STM32F429_PC2_FUNC_ETH_MII_TXD2>,
-+						 <STM32F429_PB8_FUNC_ETH_MII_TXD3>,
-+						 <STM32F429_PC3_FUNC_ETH_MII_TX_CLK>,
-+						 <STM32F429_PG11_FUNC_ETH_MII_TX_EN_ETH_RMII_TX_EN>,
-+						 <STM32F429_PA2_FUNC_ETH_MDIO>,
-+						 <STM32F429_PC1_FUNC_ETH_MDC>,
-+						 <STM32F429_PA1_FUNC_ETH_MII_RX_CLK_ETH_RMII_REF_CLK>,
-+						 <STM32F429_PA7_FUNC_ETH_MII_RX_DV_ETH_RMII_CRS_DV>,
-+						 <STM32F429_PC4_FUNC_ETH_MII_RXD0_ETH_RMII_RXD0>,
-+						 <STM32F429_PC5_FUNC_ETH_MII_RXD1_ETH_RMII_RXD1>,
-+						 <STM32F429_PH6_FUNC_ETH_MII_RXD2>,
-+						 <STM32F429_PH7_FUNC_ETH_MII_RXD3>;
-+				};
-+			};
- 		};
- 
- 		rcc: rcc at 40023810 {
-@@ -323,6 +343,21 @@
- 			st,mem2mem;
- 		};
- 
-+		ethernet0: dwmac at 40028000 {
-+			compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
-+			status = "disabled";
-+			reg = <0x40028000 0x8000>;
-+			reg-names = "stmmaceth";
-+			interrupts = <0 61 0>, <0 62 0>;
-+			interrupt-names = "macirq", "eth_wake_irq";
-+			clock-names = "stmmaceth", "tx-clk", "rx-clk";
-+			clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
-+			st,syscon = <&syscfg 0x4>;
-+			snps,pbl = <8>;
-+			snps,mixed-burst;
-+			dma-ranges;
-+		};
-+
- 		rng: rng at 50060800 {
- 			compatible = "st,stm32-rng";
- 			reg = <0x50060800 0x400>;
--- 
-1.9.1
+Take this one for example:
+
+config FIRMWARE_EDID
+       bool "Enable firmware EDID"
+       depends on FB
+
+We clearly want to be able to turn this on even for FB=m.
+
+> > This also means we get another error from a missing export, which
+> > this fixes as well:
+> > 
+> > ERROR: "exynos_mipi_dsi_register_lcd_driver" [drivers/video/fbdev/exynos/s6e8ax0.ko] undefined!
+> > 
+> > The drivers are all written to be loadable modules already,
+> > except the Kconfig options for that are missing, which makes
+> > the patch really easy.
+> 
+> Looks and sound fine, except doesn't this tell that the drivers have
+> never been tested as modules? Did you or someone else actually test these?
+
+No, this is not runtime tested. Generally there is very little that
+can go wrong here though.
+
+An alternative would be to change the dependency to
+
+	depends on BACKLIGHT_CLASS_DEVICE=y
+
+which doesn't allow the driver to be turned on for the =m case.
+However, no other framebuffer driver does this.
+
+> > diff --git a/drivers/video/fbdev/exynos/Makefile b/drivers/video/fbdev/exynos/Makefile
+> > index b5b1bd228abb..02d8dc522fea 100644
+> > --- a/drivers/video/fbdev/exynos/Makefile
+> > +++ b/drivers/video/fbdev/exynos/Makefile
+> > @@ -2,6 +2,8 @@
+> >  # Makefile for the exynos video drivers.
+> >  #
+> >  
+> > -obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
+> > -				     	exynos_mipi_dsi_lowlevel.o
+> > +obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
+> > +
+> > +exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
+> > +					   exynos_mipi_dsi_lowlevel.o
+> 
+> Hmm, why is this makefile change needed?
+
+The original Makefile would link each file into a separate module, but that
+cannot work, because they reference symbols from each other that are not
+exported to other modules.
+
+With my change, all the files get linked into a single module.
+
+	Arnd
