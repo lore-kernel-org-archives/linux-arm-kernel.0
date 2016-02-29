@@ -1,66 +1,64 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 29 Feb 2016 15:44:42 +0100
-Subject: [PATCH v2 7/9] nios2: use correct void* return type for page_to_virt()
+Date: Mon, 29 Feb 2016 15:44:44 +0100
+Subject: [PATCH v2 9/9] mm: replace open coded page to virt conversion with
+ page_to_virt()
 In-Reply-To: <1456757084-1078-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456757084-1078-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456757084-1078-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456757084-1078-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To align with other architectures, the expression procuded by expanding
-the macro page_to_virt() should be of type void*, since it returns a
-virtual address. Fix that, and also fix up an instance where page_to_virt
-was expected to return 'unsigned long', and drop another instance that was
-entirely unused (page_to_bus)
+The open coded conversion from struct page address to virtual address in
+lowmem_page_address() involves an intermediate conversion step to pfn
+number/physical address. Since the placement of the struct page array
+relative to the linear mapping may be completely independent from the
+placement of physical RAM (as is that case for arm64 after commit
+dfd55ad85e 'arm64: vmemmap: use virtual projection of linear region'),
+the conversion to physical address and back again should factor out of
+the equation, but unfortunately, the shifting and pointer arithmetic
+involved prevent this from happening, and the resulting calculation
+essentially subtracts the address of the start of physical memory and
+adds it back again, in a way that prevents the compiler from optimizing
+it away.
+
+Since the start of physical memory is not a build time constant on arm64,
+the resulting conversion involves an unnecessary memory access, which
+we would like to get rid of. So replace the open coded conversion with
+a call to page_to_virt(), and use the open coded conversion as its
+default definition, to be overriden by the architecture, if desired.
+The existing arch specific definitions of page_to_virt are all equivalent
+to this default definition, so by itself this patch is a no-op.
 
 Cc: linux-mm at kvack.org
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Ley Foon Tan <lftan@altera.com>
-Cc: nios2-dev at lists.rocketboards.org
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/nios2/include/asm/io.h      | 1 -
- arch/nios2/include/asm/page.h    | 2 +-
- arch/nios2/include/asm/pgtable.h | 2 +-
- 3 files changed, 2 insertions(+), 3 deletions(-)
+ include/linux/mm.h | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/nios2/include/asm/io.h b/arch/nios2/include/asm/io.h
-index c5a62da22cd2..ce072ba0f8dd 100644
---- a/arch/nios2/include/asm/io.h
-+++ b/arch/nios2/include/asm/io.h
-@@ -50,7 +50,6 @@ static inline void iounmap(void __iomem *addr)
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 516e14944339..82cb74a3b158 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -71,6 +71,10 @@ extern int mmap_rnd_compat_bits __read_mostly;
+ #define __pa_symbol(x)  __pa(RELOC_HIDE((unsigned long)(x), 0))
+ #endif
  
- /* Pages to physical address... */
- #define page_to_phys(page)	virt_to_phys(page_to_virt(page))
--#define page_to_bus(page)	page_to_virt(page)
++#ifndef page_to_virt
++#define page_to_virt(x)	__va(PFN_PHYS(page_to_pfn(x)))
++#endif
++
+ /*
+  * To prevent common memory management code establishing
+  * a zero page mapping on a read fault.
+@@ -927,7 +931,7 @@ static inline void set_page_memcg(struct page *page, struct mem_cgroup *memcg)
  
- /* Macros used for converting between virtual and physical mappings. */
- #define phys_to_virt(vaddr)	\
-diff --git a/arch/nios2/include/asm/page.h b/arch/nios2/include/asm/page.h
-index 4b32d6fd9d98..c1683f51ad0f 100644
---- a/arch/nios2/include/asm/page.h
-+++ b/arch/nios2/include/asm/page.h
-@@ -84,7 +84,7 @@ extern struct page *mem_map;
- 	((void *)((unsigned long)(x) + PAGE_OFFSET - PHYS_OFFSET))
- 
- #define page_to_virt(page)	\
--	((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
-+	((void *)(((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
- 
- # define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- # define pfn_valid(pfn)		((pfn) >= ARCH_PFN_OFFSET &&	\
-diff --git a/arch/nios2/include/asm/pgtable.h b/arch/nios2/include/asm/pgtable.h
-index a213e8c9aad0..298393c3cb42 100644
---- a/arch/nios2/include/asm/pgtable.h
-+++ b/arch/nios2/include/asm/pgtable.h
-@@ -209,7 +209,7 @@ static inline void set_pte(pte_t *ptep, pte_t pteval)
- static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 			      pte_t *ptep, pte_t pteval)
+ static __always_inline void *lowmem_page_address(const struct page *page)
  {
--	unsigned long paddr = page_to_virt(pte_page(pteval));
-+	unsigned long paddr = (unsigned long)page_to_virt(pte_page(pteval));
+-	return __va(PFN_PHYS(page_to_pfn(page)));
++	return page_to_virt(page);
+ }
  
- 	flush_dcache_range(paddr, paddr + PAGE_SIZE);
- 	set_pte(ptep, pteval);
+ #if defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL)
 -- 
 2.5.0
