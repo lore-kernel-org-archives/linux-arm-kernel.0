@@ -1,73 +1,78 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon, 29 Feb 2016 12:31:08 -0500
-Subject: [PATCH v5 6/6] arm: lpc32xx: remove restart handler
-In-Reply-To: <1456767068-14449-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1456767068-14449-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1456767068-14449-7-git-send-email-slemieux.tyco@gmail.com>
+From: rric@kernel.org (Robert Richter)
+Date: Mon, 29 Feb 2016 18:34:46 +0100
+Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
+In-Reply-To: <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160229173446.GG31343@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+On 22.02.16 17:58:22, David Daney wrote:
+> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> 
+> Attempt to get the memory and CPU NUMA node via of_numa.  If that
+> fails, default the dummy NUMA node and map all memory and CPUs to node
+> 0.
+> 
+> Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Reviewed-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  arch/arm64/Kconfig                |  26 +++
+>  arch/arm64/include/asm/mmzone.h   |  12 ++
+>  arch/arm64/include/asm/numa.h     |  45 +++++
+>  arch/arm64/include/asm/topology.h |  10 +
+>  arch/arm64/kernel/pci.c           |  10 +
+>  arch/arm64/kernel/setup.c         |   4 +
+>  arch/arm64/kernel/smp.c           |   4 +
+>  arch/arm64/mm/Makefile            |   1 +
+>  arch/arm64/mm/init.c              |  34 +++-
+>  arch/arm64/mm/mmu.c               |   1 +
+>  arch/arm64/mm/numa.c              | 403 ++++++++++++++++++++++++++++++++++++++
+>  11 files changed, 545 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/mmzone.h
+>  create mode 100644 arch/arm64/include/asm/numa.h
+>  create mode 100644 arch/arm64/mm/numa.c
 
-Remove the restart handler from "mach-lpc32xx";
-this functionality is now available in the
-pnx4008 watchdog driver.
+> +static int __init numa_init(int (*init_func)(void))
+> +{
+> +	int ret;
+> +
+> +	nodes_clear(numa_nodes_parsed);
+> +	nodes_clear(node_possible_map);
+> +	nodes_clear(node_online_map);
+> +	numa_free_distance();
+> +
+> +	ret = numa_alloc_distance();
+> +	if (ret < 0)
+> +		return ret;
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
-Changes from v4 to v5:
-- none.
+If you move this before the remaining initializers, you will need to
+clean this up on error. So better move it back after
+numa_register_nodes() as it was in v10. This should work since
+distances are used not earlier than numa is enabled.
 
-Changes from v3 to v4:
-- Switch patch #5 and #6 order.
+-Robert
 
-Changes from v2 to v3:
-- move the change to "phy3250.c" into a separate patch.
-
-Changes from v1 to v2:
-- new patch in v2.
-
- arch/arm/mach-lpc32xx/common.c | 15 ---------------
- arch/arm/mach-lpc32xx/common.h |  1 -
- 2 files changed, 16 deletions(-)
-
-diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
-index 716e83e..5b7a1e7 100644
---- a/arch/arm/mach-lpc32xx/common.c
-+++ b/arch/arm/mach-lpc32xx/common.c
-@@ -194,21 +194,6 @@ void __init lpc32xx_map_io(void)
- 	iotable_init(lpc32xx_io_desc, ARRAY_SIZE(lpc32xx_io_desc));
- }
- 
--void lpc23xx_restart(enum reboot_mode mode, const char *cmd)
--{
--	/* Make sure WDT clocks are enabled */
--	__raw_writel(LPC32XX_CLKPWR_PWMCLK_WDOG_EN,
--		LPC32XX_CLKPWR_TIMER_CLK_CTRL);
--
--	/* Instant assert of RESETOUT_N with pulse length 1mS */
--	__raw_writel(13000, io_p2v(LPC32XX_WDTIM_BASE + 0x18));
--	__raw_writel(0x70, io_p2v(LPC32XX_WDTIM_BASE + 0xC));
--
--	/* Wait for watchdog to reset system */
--	while (1)
--		;
--}
--
- static int __init lpc32xx_check_uid(void)
- {
- 	u32 uid[4];
-diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
-index 1cd8853..2d90801 100644
---- a/arch/arm/mach-lpc32xx/common.h
-+++ b/arch/arm/mach-lpc32xx/common.h
-@@ -30,7 +30,6 @@ extern void lpc32xx_timer_init(void);
- extern void __init lpc32xx_init_irq(void);
- extern void __init lpc32xx_map_io(void);
- extern void __init lpc32xx_serial_init(void);
--extern void lpc23xx_restart(enum reboot_mode, const char *);
- 
- 
- /*
--- 
-1.8.3.1
+> +
+> +	ret = init_func();
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	if (nodes_empty(numa_nodes_parsed))
+> +		return -EINVAL;
+> +
+> +	ret = numa_register_nodes();
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	setup_node_to_cpumask_map();
+> +
+> +	/* init boot processor */
+> +	cpu_to_node_map[0] = 0;
+> +	map_cpu_to_node(0, 0);
+> +
+> +	return 0;
+> +}
