@@ -1,75 +1,29 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 29 Feb 2016 15:44:16 -0800
-Subject: [PATCH 5/6] clk: bcm2835: correctly enable fractional clock
- support
-In-Reply-To: <0ED2FB7F-B112-487B-B222-08E5FAEE27F9@martin.sperl.org>
-References: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
- <1456745963-2403-6-git-send-email-kernel@martin.sperl.org>
- <87mvqj5k9r.fsf@eliezer.anholt.net>
- <0ED2FB7F-B112-487B-B222-08E5FAEE27F9@martin.sperl.org>
-Message-ID: <87lh63jd4f.fsf@eliezer.anholt.net>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 29 Feb 2016 15:52:58 -0800
+Subject: [GIT PULL v2 2/2] arm64: X-Gene platforms DTS changes queued for
+ v4.6 - part2
+In-Reply-To: <2810423.Kcm4tofWV4@wuerfel>
+References: <CADaLND==AshC-syR3Tm93bPqB-vEyO3=AY+pM5r_ohgr4n-nBw@mail.gmail.com>
+ <2810423.Kcm4tofWV4@wuerfel>
+Message-ID: <CADaLNDnS1A25UyNoJ3Ybq1QunqSOjwG2qpHCL_ZS9iKjyTme7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Sperl <kernel@martin.sperl.org> writes:
-
->> On 29.02.2016, at 21:33, Eric Anholt <eric@anholt.net> wrote:
->> 
->> kernel at martin.sperl.org writes:
->> 
->>> From: Martin Sperl <kernel@martin.sperl.org>
->>> 
->>> The current driver calculates the clock divider with
->>> fractional support enabled.
->>> 
->>> But it does not enable fractional support in the
->>> control register itself resulting in an integer only divider,
->>> but in clk_set_rate responds back the fractionally divided
->>> clock frequency.
->>> 
->>> This patch enables fractional support in the control register
->>> whenever there is a fractional bit set in the requested clock divider.
->>> 
->>> Mash clock limits are are also handled for the PWM clock
->>> applying the correct divider limits (2 and max_int) applicable to
->>> basic fractional divider support (mash order of 1).
->>> 
->>> It also adds locking to protect the read/modify/write cycle of
->>> the register modification.
->>> 
->>> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the
->>> audio domain clocks")
->>> 
->>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> 
->> Rewrite of the commit message:
->> 
->> The driver has been using fractional dividers for all clocks with
->> fractional bits.  However, MASH clocks (those used to drive audio) only
->> do fractional division when in MASH mode, which is used to push clock
->> jitter out of the audio band.  The PWM clock (used to drive i2s audio)
->> is the only MASH clock currently enabled in the driver.
->> 
->> Additional MASH modes are available that widen the frequency range, but
->> only 1-level MASH is used for now, until we characterize some better
->> policy.
->> 
->> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the
->> audio domain clocks?)
+On Mon, Feb 29, 2016 at 3:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 26 February 2016 01:04:29 Duc Dang wrote:
+>> Second part of X-Gene DT changes queued for v4.6
+>>
+>> This patch set includes:
+>> + X-Gene v1 and v2 Mailbox DT nodes
+>> + X-Gene v1 and X-Gene v2 SLIMpro Mailbox
+>> I2C driver DT nodes
+>>
 >
-> That is not 100% true - non mash modes have CM_FRAC and CM_FRAC = CM_MASH0
-> so these map each other
+> Merged into next/dt64, thanks!
 
-Once again, trusting the docs turns out to be a bad idea.  You're right,
-the non-MASH clocks *do* have a bit 9 to enable fractional mode.  Sigh.
+Thanks, Arnd.
 
-So, this patch is:
-
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/9a4365e6/attachment.sig>
+Regards,
+Duc Dang.
+>
+>         Arnd
