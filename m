@@ -1,95 +1,154 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 29 Feb 2016 15:41:58 +0300
-Subject: [PATCH v3 1/7] of/serial: move earlycon early_param handling to serial
-In-Reply-To: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1456749726-30261-2-git-send-email-aleksey.makarov@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 29 Feb 2016 13:42:57 +0100
+Subject: [PATCH] iommu/exynos: Use proper readl/writel register interface
+Message-ID: <1456749777-8998-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leif Lindholm <leif.lindholm@linaro.org>
+Drivers should use generic readl/writel calls to access HW registers, so
+replace all __raw_readl/writel with generic version.
 
-We have multiple "earlycon" early_param handlers - merge the DT one into
-the main earlycon one. This means the earlycon early_param handler does
-not just return success if no options are specified.
-
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/of/fdt.c              | 11 +----------
- drivers/tty/serial/earlycon.c |  3 ++-
- include/linux/of_fdt.h        |  2 ++
- 3 files changed, 5 insertions(+), 11 deletions(-)
+ drivers/iommu/exynos-iommu.c | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 3349d2a..0547256 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index b066504..20fe443 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -268,18 +268,18 @@ static bool is_sysmmu_active(struct sysmmu_drvdata *data)
  
- #ifdef CONFIG_SERIAL_EARLYCON
- 
--static int __init early_init_dt_scan_chosen_serial(void)
-+int __init early_init_dt_scan_chosen_serial(void)
+ static void sysmmu_unblock(struct sysmmu_drvdata *data)
  {
- 	int offset;
- 	const char *p, *q, *options = NULL;
-@@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
- 	}
- 	return -ENODEV;
+-	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
++	writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
  }
--
--static int __init setup_of_earlycon(char *buf)
--{
--	if (buf)
--		return 0;
--
--	return early_init_dt_scan_chosen_serial();
--}
--early_param("earlycon", setup_of_earlycon);
- #endif
  
- /**
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index 067783f..d217366 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -17,6 +17,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/of_fdt.h>
- #include <linux/serial_core.h>
- #include <linux/sizes.h>
- #include <linux/of.h>
-@@ -209,7 +210,7 @@ static int __init param_setup_earlycon(char *buf)
- 	 * don't generate a warning from parse_early_params() in that case
- 	 */
- 	if (!buf || !buf[0])
--		return 0;
-+		return early_init_dt_scan_chosen_serial();
+ static bool sysmmu_block(struct sysmmu_drvdata *data)
+ {
+ 	int i = 120;
  
- 	err = setup_earlycon(buf);
- 	if (err == -ENOENT || err == -EALREADY)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index 2fbe868..56b2a43 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
- 				     int depth, void *data);
- extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
- 				     int depth, void *data);
-+extern int early_init_dt_scan_chosen_serial(void);
- extern void early_init_fdt_scan_reserved_mem(void);
- extern void early_init_fdt_reserve_self(void);
- extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-@@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
- extern u64 of_flat_dt_translate_address(unsigned long node);
- extern void of_fdt_limit_memory(int limit);
- #else /* CONFIG_OF_FLATTREE */
-+static inline int early_init_dt_scan_chosen_serial(void) { return -ENODEV; }
- static inline void early_init_fdt_scan_reserved_mem(void) {}
- static inline void early_init_fdt_reserve_self(void) {}
- static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+-	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
+-	while ((i > 0) && !(__raw_readl(data->sfrbase + REG_MMU_STATUS) & 1))
++	writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
++	while ((i > 0) && !(readl(data->sfrbase + REG_MMU_STATUS) & 1))
+ 		--i;
+ 
+-	if (!(__raw_readl(data->sfrbase + REG_MMU_STATUS) & 1)) {
++	if (!(readl(data->sfrbase + REG_MMU_STATUS) & 1)) {
+ 		sysmmu_unblock(data);
+ 		return false;
+ 	}
+@@ -290,9 +290,9 @@ static bool sysmmu_block(struct sysmmu_drvdata *data)
+ static void __sysmmu_tlb_invalidate(struct sysmmu_drvdata *data)
+ {
+ 	if (MMU_MAJ_VER(data->version) < 5)
+-		__raw_writel(0x1, data->sfrbase + REG_MMU_FLUSH);
++		writel(0x1, data->sfrbase + REG_MMU_FLUSH);
+ 	else
+-		__raw_writel(0x1, data->sfrbase + REG_V5_MMU_FLUSH_ALL);
++		writel(0x1, data->sfrbase + REG_V5_MMU_FLUSH_ALL);
+ }
+ 
+ static void __sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+@@ -302,10 +302,10 @@ static void __sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+ 
+ 	for (i = 0; i < num_inv; i++) {
+ 		if (MMU_MAJ_VER(data->version) < 5)
+-			__raw_writel((iova & SPAGE_MASK) | 1,
++			writel((iova & SPAGE_MASK) | 1,
+ 				     data->sfrbase + REG_MMU_FLUSH_ENTRY);
+ 		else
+-			__raw_writel((iova & SPAGE_MASK) | 1,
++			writel((iova & SPAGE_MASK) | 1,
+ 				     data->sfrbase + REG_V5_MMU_FLUSH_ENTRY);
+ 		iova += SPAGE_SIZE;
+ 	}
+@@ -314,9 +314,9 @@ static void __sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
+ static void __sysmmu_set_ptbase(struct sysmmu_drvdata *data, phys_addr_t pgd)
+ {
+ 	if (MMU_MAJ_VER(data->version) < 5)
+-		__raw_writel(pgd, data->sfrbase + REG_PT_BASE_ADDR);
++		writel(pgd, data->sfrbase + REG_PT_BASE_ADDR);
+ 	else
+-		__raw_writel(pgd >> PAGE_SHIFT,
++		writel(pgd >> PAGE_SHIFT,
+ 			     data->sfrbase + REG_V5_PT_BASE_PFN);
+ 
+ 	__sysmmu_tlb_invalidate(data);
+@@ -331,7 +331,7 @@ static void __sysmmu_get_version(struct sysmmu_drvdata *data)
+ 	clk_enable(data->pclk);
+ 	clk_enable(data->aclk);
+ 
+-	ver = __raw_readl(data->sfrbase + REG_MMU_VERSION);
++	ver = readl(data->sfrbase + REG_MMU_VERSION);
+ 
+ 	/* controllers on some SoCs don't report proper version */
+ 	if (ver == 0x80000001u)
+@@ -392,7 +392,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 
+ 	clk_enable(data->clk_master);
+ 
+-	itype = __ffs(__raw_readl(data->sfrbase + reg_status));
++	itype = __ffs(readl(data->sfrbase + reg_status));
+ 	for (i = 0; i < n; i++, finfo++)
+ 		if (finfo->bit == itype)
+ 			break;
+@@ -400,7 +400,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	BUG_ON(i == n);
+ 
+ 	/* print debug message */
+-	fault_addr = __raw_readl(data->sfrbase + finfo->addr_reg);
++	fault_addr = readl(data->sfrbase + finfo->addr_reg);
+ 	show_fault_information(data, finfo, fault_addr);
+ 
+ 	if (data->domain)
+@@ -409,7 +409,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	/* fault is not recovered by fault handler */
+ 	BUG_ON(ret != 0);
+ 
+-	__raw_writel(1 << itype, data->sfrbase + reg_clear);
++	writel(1 << itype, data->sfrbase + reg_clear);
+ 
+ 	sysmmu_unblock(data);
+ 
+@@ -424,8 +424,8 @@ static void __sysmmu_disable_nocount(struct sysmmu_drvdata *data)
+ {
+ 	clk_enable(data->clk_master);
+ 
+-	__raw_writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
+-	__raw_writel(0, data->sfrbase + REG_MMU_CFG);
++	writel(CTRL_DISABLE, data->sfrbase + REG_MMU_CTRL);
++	writel(0, data->sfrbase + REG_MMU_CFG);
+ 
+ 	clk_disable(data->aclk);
+ 	clk_disable(data->pclk);
+@@ -470,7 +470,7 @@ static void __sysmmu_init_config(struct sysmmu_drvdata *data)
+ 	else
+ 		cfg = CFG_QOS(15) | CFG_FLPDCACHE | CFG_ACGEN;
+ 
+-	__raw_writel(cfg, data->sfrbase + REG_MMU_CFG);
++	writel(cfg, data->sfrbase + REG_MMU_CFG);
+ }
+ 
+ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
+@@ -480,13 +480,13 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *data)
+ 	clk_enable(data->pclk);
+ 	clk_enable(data->aclk);
+ 
+-	__raw_writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
++	writel(CTRL_BLOCK, data->sfrbase + REG_MMU_CTRL);
+ 
+ 	__sysmmu_init_config(data);
+ 
+ 	__sysmmu_set_ptbase(data, data->pgtable);
+ 
+-	__raw_writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
++	writel(CTRL_ENABLE, data->sfrbase + REG_MMU_CTRL);
+ 
+ 	clk_disable(data->clk_master);
+ }
 -- 
-2.7.1
+1.9.2
