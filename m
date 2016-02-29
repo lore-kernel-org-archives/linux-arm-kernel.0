@@ -1,87 +1,76 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 29 Feb 2016 14:34:10 +0200
-Subject: [PATCH v2] serial: imx: support RS-485 Rx disable on Tx
-Message-ID: <fbc7c561dc1a8f5193262ab471b105935c4d7cea.1456749250.git.baruch@tkos.co.il>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 29 Feb 2016 13:39:48 +0100
+Subject: [PATCH v2 2/2] arm64: mm: treat memstart_addr as a signed quantity
+In-Reply-To: <1456505834-8638-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456505834-8638-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456505834-8638-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu93DcrAa65xGRF6rRtuq-Hjitk-B6RxV_9ztT=nKjQ_Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some RS-232 to RS-485 transceivers require Rx to be disabled on Tx to
-avoid echo of Tx data into the Rx buffer. Specifically, the XR3160E
-RS-232/RS-485/RS-422 transceiver behaves this way.
+On 26 February 2016 at 17:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Commit c031a4213c11 ("arm64: kaslr: randomize the linear region")
+> implements randomization of the linear region, by subtracting a random
+> multiple of PUD_SIZE from memstart_addr. This causes the virtual mapping
+> of system RAM to move upwards in the linear region, and at the same time
+> causes memstart_addr to assume a value which may be negative if the offset
+> of system RAM in the physical space is smaller than its offset relative to
+> PAGE_OFFSET in the virtual space.
+>
+> Since memstart_addr is effectively an offset now, redefine its type as s64
+> so that expressions involving shifting or division preserve its sign.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This commit disables Rx on active Tx when SER_RS485_ENABLED is active and
-SER_RS485_RX_DURING_TX is disabled.
 
-Note that this is a change in behavior of the driver. Until now
-SER_RS485_RX_DURING_TX was enabled unconditionally even when disabled in
-the TIOCSRS485 ioctl serial_rs485 flags field.
+FYI this results in a warning, please fold
 
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v2:
-   * Make Rx enable more robust as Uwe Kleine-K?nig suggested
-   * Expand Cc list
----
- drivers/tty/serial/imx.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 67ce440cb702..9cfe94b41b54 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -181,7 +181,7 @@ void __init arm64_memblock_init(void)
+  * linear mapping. Take care not to clip the kernel which may be
+  * high in memory.
+  */
+- memblock_remove(max(memstart_addr + linear_region_size, __pa(_end)),
++ memblock_remove(max_t(u64, memstart_addr + linear_region_size, __pa(_end)),
+  ULLONG_MAX);
+  if (memblock_end_of_DRAM() > linear_region_size)
+  memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 9362f54c816c..87950c111cbe 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -361,6 +361,7 @@ static void imx_stop_tx(struct uart_port *port)
- 			imx_port_rts_inactive(sport, &temp);
- 		else
- 			imx_port_rts_active(sport, &temp);
-+		temp |= UCR2_RXEN;
- 		writel(temp, port->membase + UCR2);
- 
- 		temp = readl(port->membase + UCR4);
-@@ -568,6 +569,8 @@ static void imx_start_tx(struct uart_port *port)
- 			imx_port_rts_inactive(sport, &temp);
- 		else
- 			imx_port_rts_active(sport, &temp);
-+		if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
-+			temp &= ~UCR2_RXEN;
- 		writel(temp, port->membase + UCR2);
- 
- 		/* enable transmitter and shifter empty irq */
-@@ -1610,19 +1613,17 @@ static int imx_rs485_config(struct uart_port *port,
- 			    struct serial_rs485 *rs485conf)
- {
- 	struct imx_port *sport = (struct imx_port *)port;
-+	unsigned long temp;
- 
- 	/* unimplemented */
- 	rs485conf->delay_rts_before_send = 0;
- 	rs485conf->delay_rts_after_send = 0;
--	rs485conf->flags |= SER_RS485_RX_DURING_TX;
- 
- 	/* RTS is required to control the transmitter */
- 	if (!sport->have_rtscts)
- 		rs485conf->flags &= ~SER_RS485_ENABLED;
- 
- 	if (rs485conf->flags & SER_RS485_ENABLED) {
--		unsigned long temp;
--
- 		/* disable transmitter */
- 		temp = readl(sport->port.membase + UCR2);
- 		if (rs485conf->flags & SER_RS485_RTS_AFTER_SEND)
-@@ -1632,6 +1633,14 @@ static int imx_rs485_config(struct uart_port *port,
- 		writel(temp, sport->port.membase + UCR2);
- 	}
- 
-+	/* Make sure Rx is enabled in case Tx is active with Rx disabled */
-+	if (!(rs485conf->flags & SER_RS485_ENABLED) ||
-+	    rs485conf->flags & SER_RS485_RX_DURING_TX) {
-+		temp = readl(sport->port.membase + UCR2);
-+		temp |= UCR2_RXEN;
-+		writel(temp, sport->port.membase + UCR2);
-+	}
-+
- 	port->rs485 = *rs485conf;
- 
- 	return 0;
--- 
-2.7.0
+
+> ---
+>  arch/arm64/include/asm/memory.h | 2 +-
+>  arch/arm64/mm/init.c            | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 5f8667a99e41..12f8a00fb3f1 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -135,7 +135,7 @@
+>  #include <linux/bitops.h>
+>  #include <linux/mmdebug.h>
+>
+> -extern phys_addr_t             memstart_addr;
+> +extern s64                     memstart_addr;
+>  /* PHYS_OFFSET - the physical address of the start of memory. */
+>  #define PHYS_OFFSET            ({ VM_BUG_ON(memstart_addr & 1); memstart_addr; })
+>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 4ea7efc28e65..a2977d33e0dc 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -54,7 +54,7 @@
+>   * executes, which assigns it its actual value. So use a default value
+>   * that cannot be mistaken for a real physical address.
+>   */
+> -phys_addr_t memstart_addr __read_mostly = ~0ULL;
+> +s64 memstart_addr __read_mostly = -1;
+>  phys_addr_t arm64_dma_phys_limit __read_mostly;
+>
+>  #ifdef CONFIG_BLK_DEV_INITRD
+> --
+> 2.5.0
+>
