@@ -1,71 +1,104 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 29 Feb 2016 13:46:15 +0000
-Subject: [PATCH 06/12] iommu/arm-smmu: Streamline SMMU data lookup
+Date: Mon, 29 Feb 2016 13:46:14 +0000
+Subject: [PATCH 05/12] arm64/dma-mapping: Remove default domain workaround
 In-Reply-To: <cover.1456514380.git.robin.murphy@arm.com>
 References: <cover.1456514380.git.robin.murphy@arm.com>
-Message-ID: <dea9c65414a1134bbe74dee79a055bf2222d8adc.1456514380.git.robin.murphy@arm.com>
+Message-ID: <698ecf1450da8b56a8f297b83815d2fe866ca0e1.1456514380.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify things by stashing our SMMU instance data in drvdata, so that
-we don't need to go off hunting for it in the driver model callbacks.
-Watch out, arm_smmu_devices list, your days are numbered!
+With the IOMMU core now taking care of default domains for groups
+regardless of bus type, we can gleefully rip out this stop-gap, as
+slight recompense for having to expand the other one.
 
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 20 +++++++-------------
- 1 file changed, 7 insertions(+), 13 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 52 +++++++--------------------------------------
+ 1 file changed, 8 insertions(+), 44 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 2409e3b..514ae2d 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1836,6 +1836,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		}
- 	}
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 607e709..fd8b942 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -804,57 +804,24 @@ struct iommu_dma_notifier_data {
+ static LIST_HEAD(iommu_dma_masters);
+ static DEFINE_MUTEX(iommu_dma_notifier_lock);
  
-+	platform_set_drvdata(pdev, smmu);
- 	INIT_LIST_HEAD(&smmu->list);
- 	spin_lock(&arm_smmu_devices_lock);
- 	list_add(&smmu->list, &arm_smmu_devices);
-@@ -1860,24 +1861,17 @@ out_put_masters:
- 
- static int arm_smmu_device_remove(struct platform_device *pdev)
- {
-+	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
- 	int i;
--	struct device *dev = &pdev->dev;
--	struct arm_smmu_device *curr, *smmu = NULL;
- 	struct rb_node *node;
- 
--	spin_lock(&arm_smmu_devices_lock);
--	list_for_each_entry(curr, &arm_smmu_devices, list) {
--		if (curr->dev == dev) {
--			smmu = curr;
--			list_del(&smmu->list);
--			break;
--		}
--	}
--	spin_unlock(&arm_smmu_devices_lock);
+-/*
+- * Temporarily "borrow" a domain feature flag to to tell if we had to resort
+- * to creating our own domain here, in case we need to clean it up again.
+- */
+-#define __IOMMU_DOMAIN_FAKE_DEFAULT		(1U << 31)
 -
- 	if (!smmu)
- 		return -ENODEV;
+ static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+ 			   u64 dma_base, u64 size)
+ {
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
  
-+	spin_lock(&arm_smmu_devices_lock);
-+	list_del(&smmu->list);
-+	spin_unlock(&arm_smmu_devices_lock);
-+
- 	for (node = rb_first(&smmu->masters); node; node = rb_next(node)) {
- 		struct arm_smmu_master *master
- 			= container_of(node, struct arm_smmu_master, node);
-@@ -1885,7 +1879,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	/*
+-	 * Best case: The device is either part of a group which was
+-	 * already attached to a domain in a previous call, or it's
+-	 * been put in a default DMA domain by the IOMMU core.
++	 * If the IOMMU driver has the DMA domain support that we require,
++	 * then the IOMMU core will have already configured a group for this
++	 * device, and allocated the default domain for that group.
+ 	 */
+-	if (!domain) {
+-		/*
+-		 * Urgh. The IOMMU core isn't going to do default domains
+-		 * for non-PCI devices anyway, until it has some means of
+-		 * abstracting the entirely implementation-specific
+-		 * sideband data/SoC topology/unicorn dust that may or
+-		 * may not differentiate upstream masters.
+-		 * So until then, HORRIBLE HACKS!
+-		 */
+-		domain = ops->domain_alloc(IOMMU_DOMAIN_DMA);
+-		if (!domain)
+-			goto out_no_domain;
+-
+-		domain->ops = ops;
+-		domain->type = IOMMU_DOMAIN_DMA | __IOMMU_DOMAIN_FAKE_DEFAULT;
+-
+-		if (iommu_attach_device(domain, dev))
+-			goto out_put_domain;
++	if (!domain || iommu_dma_init_domain(domain, dma_base, size)) {
++		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
++			dev_name(dev));
++		return false;
  	}
  
- 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
--		dev_err(dev, "removing device with active domains!\n");
-+		dev_err(&pdev->dev, "removing device with active domains!\n");
+-	if (iommu_dma_init_domain(domain, dma_base, size))
+-		goto out_detach;
+-
+ 	dev->archdata.dma_ops = &iommu_dma_ops;
+ 	return true;
+-
+-out_detach:
+-	iommu_detach_device(domain, dev);
+-out_put_domain:
+-	if (domain->type & __IOMMU_DOMAIN_FAKE_DEFAULT)
+-		iommu_domain_free(domain);
+-out_no_domain:
+-	pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
+-		dev_name(dev));
+-	return false;
+ }
  
- 	for (i = 0; i < smmu->num_global_irqs; ++i)
- 		free_irq(smmu->irqs[i], smmu);
+ static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+@@ -971,11 +938,8 @@ void arch_teardown_dma_ops(struct device *dev)
+ {
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+ 
+-	if (domain) {
++	if (WARN_ON(domain))
+ 		iommu_detach_device(domain, dev);
+-		if (domain->type & __IOMMU_DOMAIN_FAKE_DEFAULT)
+-			iommu_domain_free(domain);
+-	}
+ 
+ 	dev->archdata.dma_ops = NULL;
+ }
 -- 
 2.7.2.333.g70bd996.dirty
