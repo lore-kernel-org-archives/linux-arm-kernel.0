@@ -1,185 +1,165 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Mon, 29 Feb 2016 22:43:35 +0800
-Subject: [PATCH v2 04/13] ARM: dts: sun8i-a83t: Add basic clocks and resets
-In-Reply-To: <CAGb2v67DzA7qBKqStcp+VEU0yDgJruD28_MMaixRPv3TfWJBpw@mail.gmail.com>
-References: <1456672738-4993-1-git-send-email-vishnupatekar0510@gmail.com>
- <1456672738-4993-5-git-send-email-vishnupatekar0510@gmail.com>
- <CAGb2v67DzA7qBKqStcp+VEU0yDgJruD28_MMaixRPv3TfWJBpw@mail.gmail.com>
-Message-ID: <CAEzqOZuSAYJLzxLAKh+CSv9dvqiT3=UXHFb-c5RfpJVo+KLPiQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 29 Feb 2016 15:44:35 +0100
+Subject: [PATCH v2 0/9] arm64: optimize virt_to_page and page_address
+Message-ID: <1456757084-1078-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wens,
+Apologies for the wall of text. This is a followup to 'restrict virt_to_page
+to linear region (instead of __pa)' [1], posted on the 24th of this month.
+This series applies onto current arm64/for-next/core (5be8b70af1ca 'arm64:
+lse: deal with clobbered IP registers after branch via PLT') with
+arm64/fixes/core (dfd55ad85e4a 'arm64: vmemmap: use virtual projection of
+linear region') merged into it. Complete branch can be found here [2].
 
-On Mon, Feb 29, 2016 at 1:29 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Sun, Feb 28, 2016 at 7:18 AM, Vishnu Patekar
-> <vishnupatekar0510@gmail.com> wrote:
->> This adds A83T system bus clocks, bus gates, and clock resets.
->>
->> Three ahb reset registers are combined into one node.
->>
->> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
->> ---
->>  arch/arm/boot/dts/sun8i-a83t.dtsi | 114 +++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 112 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
->> index d3473f8..fa7ded5 100644
->> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
->> @@ -146,6 +146,97 @@
->>                         clocks = <&osc16M>;
->>                         clock-output-names = "osc16M-d512";
->>                 };
->> +
->> +               pll6: clk at 01c20028 {
->> +                       #clock-cells = <0>;
->> +                       compatible = "allwinner,sun9i-a80-pll4-clk";
->> +                       reg = <0x01c20028 0x4>;
->> +                       clocks = <&osc24M>;
->> +                       clock-output-names = "pll6";
->> +               };
->> +
->> +               pll6d2: pll6d2_clk {
->> +                       #clock-cells = <0>;
->> +                       compatible = "fixed-factor-clock";
->> +                       clock-div = <2>;
->> +                       clock-mult = <1>;
->> +                       clocks = <&pll6>;
->> +                       clock-output-names = "pll6d2";
->> +               };
->> +
->> +               ahb1: clk at 01c20054 {
->> +                       #clock-cells = <0>;
->> +                       compatible = "allwinner,sun8i-a83t-ahb1-clk";
->> +                       reg = <0x01c20054 0x4>;
->> +                       clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&pll6>;
->> +                       clock-output-names = "ahb1";
->> +               };
->> +
->> +               apb1: apb1_clk at 01c20054 {
->> +                       #clock-cells = <0>;
->> +                       compatible = "allwinner,sun8i-a83t-apb1-clk";
->> +                       reg = <0x01c20054 0x4>;
->> +                       clocks = <&ahb1>;
->> +                       clock-output-names = "apb1";
->> +               };
->> +
->> +               apb2: clk at 01c20058 {
->> +                       #clock-cells = <0>;
->> +                       compatible = "allwinner,sun4i-a10-apb1-clk";
->> +                       reg = <0x01c20058 0x4>;
->> +                       clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&pll6>;
->> +                       clock-output-names = "apb2";
->> +               };
->> +
->> +               ahb2: clk at 01c2005c {
->> +                       #clock-cells = <0>;
->> +                       compatible = "allwinner,sun8i-h3-ahb2-clk";
->> +                       reg = <0x01c2005c 0x4>;
->> +                       clocks = <&ahb1>, <&pll6d2>;
->> +                       clock-output-names = "ahb2";
->> +               };
->> +
->> +               bus_gates: clk at 01c20060 {
->> +                       #clock-cells = <1>;
->> +                       compatible = "allwinner,sun8i-a83t-bus-gates-clk";
->> +                       reg = <0x01c20060 0x10>;
->> +                       clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
->> +                       clock-names = "ahb1", "ahb2", "apb1", "apb2";
->> +                       clock-indices = <1>, <5>, <6>,
->> +                                       <8>, <9>, <10>,
->> +                                       <13>, <14>, <17>,
->> +                                       <19>, <20>,
->> +                                       <21>, <24>,
->> +                                       <26>, <27>,
->> +                                       <29>, <32>,
->> +                                       <36>, <37>,
->> +                                       <40>, <43>,
->> +                                       <44>, <52>, <53>,
->> +                                       <54>, <65>,
->> +                                       <69>, <76>, <77>,
->> +                                       <78>, <79>, <96>,
->> +                                       <97>, <98>,
->> +                                       <112>, <113>,
->> +                                       <114>, <115>,
->> +                                       <116>;
->> +                       clock-output-names = "bus_mipidsi", "bus_ss", "bus_dma",
->> +                                            "bus_mmc0", "bus_mmc1", "bus_mmc2",
->> +                                            "bus_nand", "bus_sdram", "bus_emac",
->> +                                            "bus_hstimer", "bus_spi0",
->> +                                            "bus_spi1", "bus_usb_otg",
->> +                                            "bus_ehci0", "bus_ehci1",
->> +                                            "bus_ohci0", "bus_ve",
->> +                                            "bus_lcd0", "bus_lcd1",
->> +                                            "bus_csi", "bus_hdmi",
->> +                                            "bus_de", "bus_gpu", "bus_msgbox",
->> +                                            "bus_spinlock", "bus_spidf",
->
-> "spdif". See https://en.wikipedia.org/wiki/S/PDIF
-I'll correct.
->
->> +                                            "bus_pio", "bus_i2s0", "bus_i2s1",
->> +                                            "bus_i2s2", "bus_tdm", "bus_i2c0",
->> +                                            "bus_i2c1", "bus_i2c2",
->> +                                            "bus_uart0", "bus_uart1",
->> +                                            "bus_uart2", "bus_uart3",
->> +                                            "bus_uart4";
->> +               };
->>         };
->>
->>         soc {
->> @@ -160,7 +251,7 @@
->>                                      <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
->>                                      <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
->>                         reg = <0x01c20800 0x400>;
->> -                       clocks = <&osc24M>;
->> +                       clocks = <&bus_gates 69>;
->>                         gpio-controller;
->>                         interrupt-controller;
->>                         #interrupt-cells = <3>;
->> @@ -189,12 +280,31 @@
->>                         };
->>                 };
->>
->> +               ahb_reset: reset at 01c202c0 {
->> +                       reg = <0x01c202c0 0xc>;
->> +                       compatible = "allwinner,sun6i-a31-clock-reset";
->> +                       #reset-cells = <1>;
->> +               };
->> +
->> +               apb1_reset: reset at 01c202d0 {
->> +                       reg = <0x01c202d0 0x4>;
->> +                       compatible = "allwinner,sun6i-a31-clock-reset";
->> +                       #reset-cells = <1>;
->> +               };
->> +
->> +               apb2_reset: reset at 01c202d8 {
->> +                       reg = <0x01c202d8 0x4>;
->> +                       compatible = "allwinner,sun6i-a31-clock-reset";
->> +                       #reset-cells = <1>;
->> +               };
->> +
->>                 timer at 01c20c00 {
->>                         compatible = "allwinner,sun4i-a10-timer";
->>                         reg = <0x01c20c00 0xa0>;
->>                         interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
->>                                      <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
->> -                       clocks = <&osc24M>;
->> +                       clocks = <&bus_gates 112>;
->> +                       resets = <&apb2_reset 16>;
->
-> These 2 were in uart0 in v1. Clearly something went wrong.
-True, I messed it up, I'll correct this also.
-This is uart0 reset and clock gate.
+In current -next, the implementations of virt_to_page and its converse
+[lowmem_]page_address resolve to
 
-Sorry, for these typos, I will be more careful.
->
-> ChenYu
->
->>                 };
->>
->>                 watchdog at 01c20ca0 {
->> --
->> 1.9.1
->>
+   virt_to_page
+     6f0:   b6300180        tbz     x0, #38, 720 <bar+0x30>
+     6f4:   90000001        adrp    x1, 0 <memstart_addr>
+     6f8:   92409400        and     x0, x0, #0x3fffffffff
+     6fc:   f9400021        ldr     x1, [x1]
+     700:   8b000020        add     x0, x1, x0
+     704:   370001e1        tbnz    w1, #0, 740 <bar+0x50>
+     708:   d34cfc00        lsr     x0, x0, #12
+     70c:   d2dff7c1        mov     x1, #0xffbe00000000
+     710:   f2ffffe1        movk    x1, #0xffff, lsl #48
+     714:   8b001820        add     x0, x1, x0, lsl #6
+     718:   d65f03c0        ret
+     71c:   d503201f        nop
+     720:   90000001        adrp    x1, 0 <init_pgd>
+     724:   f9400021        ldr     x1, [x1]
+     728:   cb010000        sub     x0, x0, x1
+     72c:   d2dff7c1        mov     x1, #0xffbe00000000
+     730:   d34cfc00        lsr     x0, x0, #12
+     734:   f2ffffe1        movk    x1, #0xffff, lsl #48
+     738:   8b001820        add     x0, x1, x0, lsl #6
+     73c:   d65f03c0        ret
+     740:   d4210000        brk     #0x800
+
+   page_address:
+     6c0:   90000002        adrp    x2, 0 <memstart_addr>
+     6c4:   d2c00841        mov     x1, #0x4200000000
+     6c8:   8b010000        add     x0, x0, x1
+     6cc:   9346fc01        asr     x1, x0, #6
+     6d0:   f9400040        ldr     x0, [x2]
+     6d4:   d374cc21        lsl     x1, x1, #12
+     6d8:   37000080        tbnz    w0, #0, 6e8 <foo+0x28>
+     6dc:   cb000020        sub     x0, x1, x0
+     6e0:   b25a6400        orr     x0, x0, #0xffffffc000000000
+     6e4:   d65f03c0        ret
+     6e8:   d4210000        brk     #0x800
+
+Disappointingly, after cherrypicking commit dfd55ad85e ("arm64: vmemmap:
+use virtual projection of linear region") from arm64/fixes/core, which
+should make this translation independent of the physical start of RAM,
+things don't improve much, and even get slightly worse:
+
+   virt_to_page
+     6f8:   b6300180        tbz     x0, #38, 728 <bar+0x30>
+     6fc:   90000001        adrp    x1, 0 <memstart_addr>
+     700:   92409400        and     x0, x0, #0x3fffffffff
+     704:   f9400021        ldr     x1, [x1]
+     708:   8b000020        add     x0, x1, x0
+     70c:   37000261        tbnz    w1, #0, 758 <bar+0x60>
+     710:   d34cfc00        lsr     x0, x0, #12
+     714:   d2dff7c2        mov     x2, #0xffbe00000000
+     718:   cb813000        sub     x0, x0, x1, asr #12
+     71c:   f2ffffe2        movk    x2, #0xffff, lsl #48
+     720:   8b001840        add     x0, x2, x0, lsl #6
+     724:   d65f03c0        ret
+     728:   90000002        adrp    x2, 0 <init_pgd>
+     72c:   90000001        adrp    x1, 0 <memstart_addr>
+     730:   f9400042        ldr     x2, [x2]
+     734:   f9400021        ldr     x1, [x1]
+     738:   cb020000        sub     x0, x0, x2
+     73c:   d2dff7c2        mov     x2, #0xffbe00000000
+     740:   d34cfc00        lsr     x0, x0, #12
+     744:   f2ffffe2        movk    x2, #0xffff, lsl #48
+     748:   cb813000        sub     x0, x0, x1, asr #12
+     74c:   8b001840        add     x0, x2, x0, lsl #6
+     750:   d65f03c0        ret
+     754:   d503201f        nop
+     758:   d4210000        brk     #0x800
+
+   page_address:
+     6c0:   90000002        adrp    x2, 0 <memstart_addr>
+     6c4:   d2c00841        mov     x1, #0x4200000000
+     6c8:   f9400043        ldr     x3, [x2]
+     6cc:   934cfc62        asr     x2, x3, #12
+     6d0:   8b021800        add     x0, x0, x2, lsl #6
+     6d4:   8b010001        add     x1, x0, x1
+     6d8:   9346fc21        asr     x1, x1, #6
+     6dc:   d374cc21        lsl     x1, x1, #12
+     6e0:   37000083        tbnz    w3, #0, 6f0 <foo+0x30>
+     6e4:   cb030020        sub     x0, x1, x3
+     6e8:   b25a6400        orr     x0, x0, #0xffffffc000000000
+     6ec:   d65f03c0        ret
+     6f0:   d4210000        brk     #0x800
+
+The thing to note here is that the expression is evaluated in a way that
+does not allow the compiler to eliminate the read of memstart_addr,
+presumably since it is unaware that its value is aligned to PAGE_SIZE, and
+that shifting it down and up again by 12 bits produces the exact same value.
+
+So let's give the compiler a hand here. First of all, let's reimplement
+virt_to_page() (patch #6) so that it explicitly translates without taking
+the physical placement into account. This results in the virt_to_page()
+translation to only work correctly for addresses above PAGE_OFFSET, but
+this is a reasonable restriction to impose, even if it means a couple of
+incorrect uses need to be fixed (patches #1 to #4). If we also, in patch #5,
+move the vmemmap region right below the linear region (which guarantees that
+the region is always aligned to a power-of-2 upper bound of its size, which
+means we can treat VMEMMAP_START as a bitmask rather than an offset), we end
+up with
+
+   virt_to_page
+     6d0:   d34c9400        ubfx    x0, x0, #12, #26
+     6d4:   d2dff7c1        mov     x1, #0xffbe00000000
+     6d8:   f2ffffe1        movk    x1, #0xffff, lsl #48
+     6dc:   aa001820        orr     x0, x1, x0, lsl #6
+     6e0:   d65f03c0        ret
+
+In the same way, we can get page_address to look like this
+
+   page_address:
+     6c0:   d37a7c00        ubfiz   x0, x0, #6, #32
+     6c4:   b25a6400        orr     x0, x0, #0xffffffc000000000
+     6c8:   d65f03c0        ret
+
+However, in this case, we need to slightly refactor the implementation of
+lowmem_page_paddress(), since it performs an explicit page-to-pa-to-va
+translation, rather than going through an opaque arch-defined definition
+of page_to_virt. (patches #7 to #9)
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/481327
+[2] https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-vmemmap
+    (git url git://git.linaro.org/people/ard.biesheuvel/linux-arm.git arm64-vmemmap)
+
+Ard Biesheuvel (9):
+  arm64: vdso: avoid virt_to_page() translations on kernel symbols
+  arm64: mm: free __init memory via the linear mapping
+  arm64: mm: avoid virt_to_page() translation for the zero page
+  arm64: insn: avoid virt_to_page() translations on core kernel symbols
+  arm64: mm: move vmemmap region right below the linear region
+  arm64: mm: restrict virt_to_page() to the linear mapping
+  nios2: use correct void* return type for page_to_virt()
+  openrisc: drop wrongly typed definition of page_to_virt()
+  mm: replace open coded page to virt conversion with page_to_virt()
+
+ arch/arm64/include/asm/memory.h  | 30 ++++++++++++++++++--
+ arch/arm64/include/asm/pgtable.h | 13 +++------
+ arch/arm64/kernel/insn.c         |  2 +-
+ arch/arm64/kernel/vdso.c         |  7 +++--
+ arch/arm64/mm/dump.c             | 16 +++++------
+ arch/arm64/mm/init.c             | 19 +++++++++----
+ arch/nios2/include/asm/io.h      |  1 -
+ arch/nios2/include/asm/page.h    |  2 +-
+ arch/nios2/include/asm/pgtable.h |  2 +-
+ arch/openrisc/include/asm/page.h |  2 --
+ include/linux/mm.h               |  6 +++-
+ 11 files changed, 65 insertions(+), 35 deletions(-)
+
+-- 
+2.5.0
