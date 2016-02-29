@@ -1,37 +1,34 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Mon, 29 Feb 2016 11:23:39 +0100
-Subject: [PATCH 1/2] ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
-In-Reply-To: <20160229025822.GO22051@tiger>
-References: <1456325867-5309-1-git-send-email-m.grzeschik@pengutronix.de>
- <20160229025822.GO22051@tiger>
-Message-ID: <20160229102339.GA4754@pengutronix.de>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Mon, 29 Feb 2016 11:26:18 +0100
+Subject: [PATCH v2 2/2] ARM: imx_v4_v5_defconfig: Enable initramfs support
+In-Reply-To: <1456741578-3202-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1456741578-3202-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1456741578-3202-2-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 10:58:22AM +0800, Shawn Guo wrote:
-> On Wed, Feb 24, 2016 at 03:57:46PM +0100, Michael Grzeschik wrote:
-> > @@ -169,12 +167,11 @@ CONFIG_RTC_DRV_IMXDI=y
-> >  CONFIG_RTC_DRV_MC13XXX=y
-> >  CONFIG_RTC_DRV_MXC=y
-> >  CONFIG_DMADEVICES=y
-> > -CONFIG_IMX_SDMA=y
-> >  CONFIG_IMX_DMA=y
-> > +CONFIG_IMX_SDMA=y
-> >  # CONFIG_IOMMU_SUPPORT is not set
-> >  CONFIG_EXT2_FS=y
-> >  CONFIG_EXT3_FS=y
-> > -CONFIG_EXT4_FS=y
-> 
-> I guess that Arnd's comment about keeping CONFIG_EXT4_FS and dropping
-> the other two applies here too?
+From: Jan Luebbe <jlu@pengutronix.de>
 
-Sure, I missed that. Will send v2 in a second.
+This makes it possible to automatically boot-test this defconfig with
+kernelci.org.
 
-Thanks,
-Michael
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ arch/arm/configs/imx_v4_v5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index c5d36c2..2c935c9 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -6,6 +6,7 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_CGROUPS=y
++CONFIG_BLK_DEV_INITRD=y
+ CONFIG_EXPERT=y
+ # CONFIG_COMPAT_BRK is not set
+ CONFIG_SLAB=y
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.0
