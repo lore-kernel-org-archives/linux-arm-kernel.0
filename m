@@ -1,149 +1,152 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Mon, 29 Feb 2016 03:43:36 +0000
-Subject: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
-In-Reply-To: <20160226163145.GA2182@shlinux2.ap.freescale.net>
-References: <1454326208-4533-1-git-send-email-B56489@freescale.com>
- <1454326208-4533-3-git-send-email-B56489@freescale.com>
- <20160217180742.GB17485@shlinux2>
- <DB5PR0401MB1912C9D041FF2B408652F4CD94A60@DB5PR0401MB1912.eurprd04.prod.outlook.com>
- <20160226163145.GA2182@shlinux2.ap.freescale.net>
-Message-ID: <DB5PR0401MB1912E33280B6EB755144995D94BA0@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 28 Feb 2016 20:09:48 -0800
+Subject: [PATCH v2 02/13] clk: sunxi: add ahb1 clock for A83T
+In-Reply-To: <1456672738-4993-3-git-send-email-vishnupatekar0510@gmail.com>
+References: <1456672738-4993-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1456672738-4993-3-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <CAGb2v66P5zKkbriUOnvg9ms-HSpmYDQ7RtQ5MG9fLopo3pwPoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Han,
+Hi,
 
-But I don't think QuadSPI driver need to check the m25p,fast-read property again since spi-nor layer has already done that. Adding the property in flash node should work in the same way.
+On Sun, Feb 28, 2016 at 7:18 AM, Vishnu Patekar
+<vishnupatekar0510@gmail.com> wrote:
+> AHB1 on A83T is similar to ahb1 on A31, except parents are different.
+> clock index 0b1x is PLL6.
+>
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>  drivers/clk/sunxi/clk-sunxi.c                     | 76 +++++++++++++++++++++++
+>  2 files changed, 77 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index c09f59b..2ee7841 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -29,6 +29,7 @@ Required properties:
+>         "allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+>         "allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
+>         "allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+> +       "allwinner,sun8i-a83t-ahb1-clk" - for the AHB1 clock on A83T
+>         "allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+>         "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>         "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 99f60ef..0ae1f09 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -344,6 +344,67 @@ static void sun6i_ahb1_recalc(struct factors_request *req)
+>         req->rate >>= req->p;
+>  }
+>
+> +#define SUN8I_A83T_AHB1_PARENT_PLL6    2
+> +/**
+> + * sun8i_a83t_get_ahb_factors() - calculates m, p factors for AHB
+> + * AHB rate is calculated as follows
+> + * rate = parent_rate >> p
+> + *
+> + * if parent is pll6, then
+> + * parent_rate = pll6 rate / (m + 1)
+> + */
+> +
+> +static void sun8i_a83t_get_ahb1_factors(struct factors_request *req)
+> +{
+> +       u8 div, calcp, calcm = 1;
+> +
+> +       /*
+> +        * clock can only divide, so we will never be able to achieve
+> +        * frequencies higher than the parent frequency
+> +        */
+> +       if (req->parent_rate && req->rate > req->parent_rate)
+> +               req->rate = req->parent_rate;
+> +
+> +       div = DIV_ROUND_UP(req->parent_rate, req->rate);
+> +
+> +       /* calculate pre-divider if parent is pll6 */
+> +       if (req->parent_index >= SUN8I_A83T_AHB1_PARENT_PLL6) {
+> +               if (div < 4)
+> +                       calcp = 0;
+> +               else if (div / 2 < 4)
+> +                       calcp = 1;
+> +               else if (div / 4 < 4)
+> +                       calcp = 2;
+> +               else
+> +                       calcp = 3;
+> +
+> +               calcm = DIV_ROUND_UP(div, 1 << calcp);
+> +       } else {
+> +               calcp = __roundup_pow_of_two(div);
+> +               calcp = calcp > 3 ? 3 : calcp;
+> +}
 
-[Yunhui]: There are three modes in fsl-quadspi driver , fast mode, quad mode, ddr quad read. The last parameter mode of spi_nor_scan() I have to specify . Otherwise, flash is still set to quad mode.
-spi-nor.c: 
+Indent here.
 
-1419         if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
-1420                 ret = set_quad_mode(nor, info);
-1421                 if (ret) {
-1422                         dev_err(dev, "quad mode not supported\n");
-1423                         return ret;
-1424                 }
-1425                 nor->flash_read = SPI_NOR_QUAD;
-1426         } else if (mode == SPI_NOR_DUAL && info->flags & SPI_NOR_DUAL_READ) {
-1427                 nor->flash_read = SPI_NOR_DUAL;
-1428         }
+> +
+> +       req->rate = (req->parent_rate / calcm) >> calcp;
+> +       req->p = calcp;
+> +       req->m = calcm - 1;
+> +}
+> +
+> +/**
+> +* sun8i_a83t_ahb1_recalc() - calculates AHB clock rate from m, p factors and
+> +*                       parent index
 
+Whitespace here.
 
-Thanks 
-Yunhui
------Original Message-----
-From: Han Xu [mailto:xhnjupt at gmail.com] 
-Sent: Saturday, February 27, 2016 12:32 AM
-To: Yunhui Cui
-Cc: Yunhui Cui; dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com; linux-mtd at lists.infradead.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Yao Yuan
-Subject: Re: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
+> +*/
+> +static void sun8i_a83t_ahb1_recalc(struct factors_request *req)
+> +{
+> +       req->rate = req->parent_rate;
+> +
+> +/* apply pre-divider first if parent is pll6 */
 
-On Thu, Feb 25, 2016 at 08:07:22AM +0000, Yunhui Cui wrote:
-> Hi Han,
-> 
-> I have provided the options " m25p,fast-read ", because there are probable some flashes can't support quad mode.
-> So we should support fast-read mode in our driver. Moreover,  There is a option to select fast-read mode in spi_nor.c :
->                /* If we were instantiated by DT, use it */
->                  if (of_property_read_bool(np, "m25p,fast-read"))
->                          nor->flash_read = SPI_NOR_FAST;
+Indent here.
 
-Did you have some REAL cases using SPI NOR that only supports upto fast-read with Quad SPI driver? Neither fast-read or normal-read, which is actually more general, supported in the driver, just because I didn't see any REAL cases till now.
+ChenYu
 
-I didn't run against the patch, although IMO it's not that necessary. But I don't think QuadSPI driver need to check the m25p,fast-read property again since spi-nor layer has already done that. Adding the property in flash node should work in the same way.
- 
-> 
-> Thanks
-> Yunhui
-> 
-> -----Original Message-----
-> From: Han Xu [mailto:xhnjupt at gmail.com]
-> Sent: Thursday, February 18, 2016 2:08 AM
-> To: Yunhui Cui
-> Cc: dwmw2 at infradead.org; computersforpeace at gmail.com; 
-> han.xu at freescale.com; linux-mtd at lists.infradead.org; 
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; 
-> Yao Yuan
-> Subject: Re: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode 
-> support
-> 
-> On Mon, Feb 01, 2016 at 07:30:07PM +0800, Yunhui Cui wrote:
-> > The qspi driver add generic fast-read mode for different flash 
-> > venders. There are some different board flash work on different 
-> > mode, such fast-read, quad-mode.
-> > So we have to modify the third entrace parameter of spi_nor_scan().
-> > 
-> > Signed-off-by: Yunhui Cui <B56489@freescale.com>
-> > ---
-> >  drivers/mtd/spi-nor/fsl-quadspi.c | 27 +++++++++++++++++++++------
-> >  1 file changed, 21 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c
-> > b/drivers/mtd/spi-nor/fsl-quadspi.c
-> > index 9861290..0a31cb1 100644
-> > --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> > +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> > @@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
-> >  	/* Read */
-> >  	lut_base = SEQID_READ * 4;
-> >  
-> > -	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
-> > -			base + QUADSPI_LUT(lut_base));
-> > -	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> > -		    LUT1(FSL_READ, PAD4, rxfifo),
-> > -			base + QUADSPI_LUT(lut_base + 1));
-> > +	if (nor->flash_read == SPI_NOR_FAST) {
-> > +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> > +			    LUT1(ADDR, PAD1, addrlen),
-> > +				base + QUADSPI_LUT(lut_base));
-> > +		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
-> > +			    LUT1(FSL_READ, PAD1, rxfifo),
-> > +				base + QUADSPI_LUT(lut_base + 1));
-> > +	} else if (nor->flash_read == SPI_NOR_QUAD) {
-> > +		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-> > +			    LUT1(ADDR, PAD1, addrlen),
-> > +				base + QUADSPI_LUT(lut_base));
-> > +		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> > +			    LUT1(FSL_READ, PAD4, rxfifo),
-> > +				base + QUADSPI_LUT(lut_base + 1));
-> > +	}
-> >  
-> >  	/* Write enable */
-> >  	lut_base = SEQID_WREN * 4;
-> > @@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi 
-> > *q,
-> > u8 cmd)  {
-> >  	switch (cmd) {
-> >  	case SPINOR_OP_READ_1_1_4:
-> > +	case SPINOR_OP_READ_FAST:
-> >  		return SEQID_READ;
-> >  	case SPINOR_OP_WREN:
-> >  		return SEQID_WREN;
-> > @@ -963,6 +974,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
-> >  	struct spi_nor *nor;
-> >  	struct mtd_info *mtd;
-> >  	int ret, i = 0;
-> > +	enum read_mode mode = SPI_NOR_QUAD;
-> >  
-> >  	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
-> >  	if (!q)
-> > @@ -1064,7 +1076,10 @@ static int fsl_qspi_probe(struct platform_device *pdev)
-> >  		/* set the chip address for READID */
-> >  		fsl_qspi_set_base_addr(q, nor);
-> >  
-> > -		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
-> > +		ret = of_property_read_bool(np, "m25p,fast-read");
-> > +		mode = (ret) ? SPI_NOR_FAST : SPI_NOR_QUAD;
-> > +
-> > +		ret = spi_nor_scan(nor, NULL, mode);
-> >  		if (ret)
-> >  			goto mutex_failed;
-> >  
-> I understand you want to provide a more generic read mode, but this is a quad spi driver, I prefer to provide the options, either quad read/quad IO read, or just normal read.
-> > --
-> > 2.1.0.27.g96db324
-> > 
-> > 
-> > ______________________________________________________
-> > Linux MTD discussion mailing list
-> > http://lists.infradead.org/mailman/listinfo/linux-mtd/
+> +       if (req->parent_index >= SUN6I_AHB1_PARENT_PLL6)
+> +               req->rate /= req->m + 1;
+> +
+> +       /* clk divider */
+> +       req->rate >>= req->p;
+> +}
+> +
+>  /**
+>   * sun4i_get_apb1_factors() - calculates m, p factors for APB1
+>   * APB1 rate is calculated as follows
+> @@ -555,6 +616,14 @@ static const struct factors_data sun6i_ahb1_data __initconst = {
+>         .recalc = sun6i_ahb1_recalc,
+>  };
+>
+> +static const struct factors_data sun8i_a83t_ahb1_data __initconst = {
+> +       .mux = 12,
+> +       .muxmask = BIT(1) | BIT(0),
+> +       .table = &sun6i_ahb1_config,
+> +       .getter = sun8i_a83t_get_ahb1_factors,
+> +       .recalc = sun8i_a83t_ahb1_recalc,
+> +};
+> +
+>  static const struct factors_data sun4i_apb1_data __initconst = {
+>         .mux = 24,
+>         .muxmask = BIT(1) | BIT(0),
+> @@ -627,6 +696,13 @@ static void __init sun6i_ahb1_clk_setup(struct device_node *node)
+>  CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk",
+>                sun6i_ahb1_clk_setup);
+>
+> +static void __init sun8i_a83t_ahb1_clk_setup(struct device_node *node)
+> +{
+> +       sunxi_factors_clk_setup(node, &sun8i_a83t_ahb1_data);
+> +}
+> +CLK_OF_DECLARE(sun8i_a83t_ahb1, "allwinner,sun8i-a83t-ahb1-clk",
+> +              sun8i_a83t_ahb1_clk_setup);
+> +
+>  static void __init sun4i_apb1_clk_setup(struct device_node *node)
+>  {
+>         sunxi_factors_clk_setup(node, &sun4i_apb1_data);
+> --
+> 1.9.1
+>
