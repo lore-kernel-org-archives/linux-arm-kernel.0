@@ -1,43 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 13:40:15 +0100
-Subject: [PATCH] lz4c: shut up lz4c output
-Message-ID: <1456749618-1067584-1-git-send-email-arnd@arndb.de>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 29 Feb 2016 15:41:57 +0300
+Subject: [PATCH v3 0/7] ACPI: parse the DBG2 table
+Message-ID: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When KERNEL_LZ4 is set, we always get an output even when building
-with 'make -s':
+"ARM Server Base Boot Requirements" [1] mentions DBG2 (Microsoft Debug
+Port Table 2) [2] as a mandatory ACPI table that specifies debug ports.
 
-    *** LZ4 Compression CLI , by Yann Collet (May 31 2013) ***
-    ! Generating compressed LZ4 using Legacy format (deprecated !) !
-    Using stdin for input
-    Using stdout for output
-    Compressed 11213376 bytes into 4555781 bytes ==> 40.63%
-    Done in 0.63 s ==> 16.97 MB/s
+- Move earlycon early_param handling to serial to parse earlycon option once
+- Add definition of DBG2 subtypes.  It's the same patch as in the SPCR series [3]
+- Refactor ACPI linker tables code to enable iterating over subtables other than
+  subtables having acpi_subtype header (such as DBG2)
+- Implement macros
 
-The output is not helpful in the context of building the kernel,
-so this patch hides the stdout output of the lz4 binary completely.
+	ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)
 
-We could also try to not hide the output when building without '-s',
-but I could not come up with any use for that.
+  that defines a handler for the port of the given type and subtype.
+- For each port defined by that macros that is also described in the ACPI DBG2
+  table call provided callback.
+- Implement a helper macros that can be used to define early serial console
+- Enable DBG2 on ARM64
+- Define early console for pl011 serial
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- scripts/Makefile.lib | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Based on the work by Leif Lindholm <leif.lindholm@linaro.org> [4]
 
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 31d7a73c35ce..5ab935aed8ad 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -347,7 +347,7 @@ cmd_lzo = (cat $(filter-out FORCE,$^) | \
- 
- quiet_cmd_lz4 = LZ4     $@
- cmd_lz4 = (cat $(filter-out FORCE,$^) | \
--	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
-+	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ 2>&1 || \
- 	(rm -f $@ ; false)
- 
- # U-Boot mkimage
+Should be applied to next-20160229.
+
+Tested on last QEMU with patches that introduce DBG2 and fix a QEMU bug:
+
+https://git.linaro.org/people/aleksey.makarov/qemu.git amakarov/gdb2.03
+
+v3:
+- Drop "arm64: move acpi/dt decision earlier in boot process".  It is incorrect.
+  (Matthias Brugger)
+- Fix the message at port discovery.
+
+v2:
+https://lkml.kernel.org/g/1456333819-13482-1-git-send-email-aleksey.makarov at linaro.org
+- Fix parse_acpi() (Matthias Brugger)
+- Add a reference to QEMU DBG2 patches and to original work
+- Rebase to the last linux-next
+
+v1:
+https://lkml.kernel.org/g/1456148818-26257-1-git-send-email-aleksey.makarov at linaro.org
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+[2] http://go.microsoft.com/fwlink/p/?LinkId=234837
+[3] https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
+[4] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+
+Aleksey Makarov (6):
+  ACPI: add definitions of DBG2 subtypes
+  ACPI: genaralize iterating over subtables in ACPI_PROBE_TABLE()
+  ACPI: parse DBG2 table
+  ACPI: serial: implement earlycon on ACPI DBG2 port
+  ACPI: enable ACPI_DBG2_TABLE on ARM64
+  serial: pl011: add ACPI DBG2 serial port
+
+Leif Lindholm (1):
+  of/serial: move earlycon early_param handling to serial
+
+ Documentation/kernel-parameters.txt  |   3 +
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/kernel/acpi.c             |   2 +
+ drivers/acpi/Kconfig                 |   3 +
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/dbg2.c                  |  88 +++++++++++++++++++++++++++++
+ drivers/acpi/scan.c                  |  44 ++++++++++-----
+ drivers/clocksource/arm_arch_timer.c |   3 +-
+ drivers/irqchip/irq-gic.c            |   4 +-
+ drivers/of/fdt.c                     |  11 +---
+ drivers/tty/serial/amba-pl011.c      |   3 +
+ drivers/tty/serial/earlycon.c        |  61 ++++++++++++++++++++
+ include/acpi/actbl2.h                |   5 ++
+ include/asm-generic/vmlinux.lds.h    |   1 +
+ include/linux/acpi.h                 | 104 ++++++++++++++++++++++++-----------
+ include/linux/acpi_dbg2.h            |  68 +++++++++++++++++++++++
+ include/linux/clocksource.h          |   2 +-
+ include/linux/irqchip.h              |   5 +-
+ include/linux/of_fdt.h               |   2 +
+ 19 files changed, 348 insertions(+), 63 deletions(-)
+ create mode 100644 drivers/acpi/dbg2.c
+ create mode 100644 include/linux/acpi_dbg2.h
+
 -- 
-2.7.0
+2.7.1
