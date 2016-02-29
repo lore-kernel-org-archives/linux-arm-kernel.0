@@ -1,17 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Feb 2016 13:20:12 +0000
-Subject: [PATCH] ARM64: Don't set the default console to ttyAMA0
-In-Reply-To: <56D42169.70804@nvidia.com>
-References: <1455727422-10733-1-git-send-email-jonathanh@nvidia.com>
- <56D42169.70804@nvidia.com>
-Message-ID: <20160229132010.GA14848@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 29 Feb 2016 15:29:41 +0200
+Subject: [PATCH v4 1/4] ACPI: parse SPCR and enable matching console
+In-Reply-To: <1456747355-15692-2-git-send-email-aleksey.makarov@linaro.org>
+References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456747355-15692-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAHp75VdswvD23xqRNUX=fwMt5HReR-wcSo+RYweB6FYqWPar8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 10:46:01AM +0000, Jon Hunter wrote:
-> Any feedback on this?
+On Mon, Feb 29, 2016 at 2:02 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
+> Console Redirection Table) [2] as a mandatory ACPI table that
+> specifies the configuration of serial console.
+>
+> Parse this table and check if any registered console match the
+> description.  If it does, enable that console.
+>
+> Introduce a new function acpi_console_check().  At the uart port
+> registration, this function checks if the ACPI SPCR table specifies
+> its argument of type struct uart_port to be a console
+> and if so calls add_preferred_console().
 
-I plan to mop up the defconfig updates at -rc1, since there are a few
-of them and merging them in dribs and drabs is a bit of a pain.
+> +       if (ACPI_FAILURE(status)) {
+> +               pr_err("could not get the table\n");
 
-Will
+Is it worse to have on error level? Is it possible to have firmware
+without this table? I think it would be a normal case for non-arm
+world.
+I'm also not sure if this message useful even on warn level.
+
+> +               return -ENOENT;
+> +       }
+> +
+> +       if (table->header.revision < 2) {
+> +               err = -EINVAL;
+> +               pr_err("wrong table version\n");
+
+And this one quite good to have, indeed.
+
+> + * acpi_console_check - Check if uart matches the console specified by SPCR.
+> + *
+> + * @uport:     uart port to check
+> + *
+
+Since you use sections, you may add:
++ * Description:
+
+> + * This function checks if the ACPI SPCR table specifies @uport to be a console
+> + * and if so calls add_preferred_console()
+> + *
+> + * Return: a non-error value if the console matches.
+
+> @@ -2654,8 +2655,17 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
+>                 spin_lock_init(&uport->lock);
+>                 lockdep_set_class(&uport->lock, &port_lock_key);
+>         }
+> -       if (uport->cons && uport->dev)
+> -               of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
+> +
+> +       /*
+> +        * Support both open FW and ACPI access to console definitions.
+> +        * Both of_console_check() and acpi_console_check() will call
+> +        * add_preferred_console() if a console definition is found.
+> +        */
+> +       if (uport->cons && uport->dev) {
+> +               if (!acpi_console_check(uport))
+
+if (cond1) {
+ if (cond2) {
+...
+ }
+}
+
+is equivalent to
+if (cond1 && cond2) {
+...
+}
+
+> +                       of_console_check(uport->dev->of_node, uport->cons->name,
+> +                                        uport->line);
+> +       }
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
