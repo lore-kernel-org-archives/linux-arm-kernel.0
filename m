@@ -1,49 +1,40 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 29 Feb 2016 10:46:01 +0000
-Subject: [PATCH] ARM64: Don't set the default console to ttyAMA0
-In-Reply-To: <1455727422-10733-1-git-send-email-jonathanh@nvidia.com>
-References: <1455727422-10733-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <56D42169.70804@nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Feb 2016 10:46:49 +0000
+Subject: [PATCH 0/2] arm64, cma, gicv3-its: Use CMA for allocation of
+ large device tables
+In-Reply-To: <1456398164-16864-1-git-send-email-rrichter@caviumnetworks.com>
+References: <1456398164-16864-1-git-send-email-rrichter@caviumnetworks.com>
+Message-ID: <56D42199.7040207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Catalin,
+Hi Robert,
 
-Any feedback on this?
+On 25/02/16 11:02, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
+> 
+> This series implements the use of CMA for allocation of large device
+> tables for the arm64 gicv3 interrupt controller.
+> 
+> There are 2 patches, the first is for early activation of cma, which
+> needs to be done before interrupt initialization to make it available
+> to the gicv3. The second implements the use of CMA to allocate
+> gicv3-its device tables.
+> 
+> This solves the problem where mem allocation is limited to 4MB. A
+> previous patch sent to the list to address this that instead increases
+> FORCE_MAX_ZONEORDER becomes obsolete.
 
-Cheers
-Jon
+I think you're looking at the problem the wrong way. Instead of going
+through CMA directly, I'd rather go through the normal DMA API
+(dma_alloc_coherent), which can itself try CMA (should it be enabled).
 
-On 17/02/16 16:43, Jon Hunter wrote:
-> When booting Tegra210 with a minimal rootfs it may not be necessary to
-> specify any boot parameters via the kernel command line as information
-> for console is described via the "stdout-path" node the device-tree
-> blob. However, when there are no boot parameter specified, no output is
-> seen on the console in the case of Tegra210 and this is because the
-> default command line in the ARM64 defconfig specifies the console as
-> ttyAMA0 which takes precedence over the "stdout-path" node from
-> device-tree.
-> 
-> ttyAMAx is used for AMBA PL011 serial ports, but not all ARM64 platforms
-> use this serial driver. Therefore, remove the default command line
-> entry from the ARM64 defconfig to ensure that ttyAMA0 does not get set
-> as the default console if no kernel command line is specified.
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  arch/arm64/configs/defconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index d21631760ec7..caecb66188be 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -64,7 +64,6 @@ CONFIG_KSM=y
->  CONFIG_TRANSPARENT_HUGEPAGE=y
->  CONFIG_CMA=y
->  CONFIG_XEN=y
-> -CONFIG_CMDLINE="console=ttyAMA0"
->  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
->  CONFIG_COMPAT=y
->  CONFIG_CPU_IDLE=y
-> 
+That will give you all the benefit of the CMA allocation, and also make
+the driver more robust. I meant to do this for a while, and never found
+the time. Any chance you could have a look?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
