@@ -1,36 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 12:14:50 +0100
-Subject: [PATCH] target/cxgbit: add INET dependency
-Message-ID: <1456744504-3011977-1-git-send-email-arnd@arndb.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 29 Feb 2016 11:22:24 +0000
+Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
+In-Reply-To: <2734684.OJWJHS6snX@wuerfel>
+References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
+ <56D41F74.8010408@arm.com> <2734684.OJWJHS6snX@wuerfel>
+Message-ID: <56D429F0.7010409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added cxgbit driver directly calls functions of the
-IPv4 network stack, which fails if that is disabled:
+On 29/02/16 10:53, Arnd Bergmann wrote:
+> On Monday 29 February 2016 10:37:40 Robin Murphy wrote:
+>> Hi Arnd,
+>>
+>> On 29/02/16 09:19, Arnd Bergmann wrote:
+>>> The newly added Mediatek IOMMU driver uses the IOMMU_DMA infrastructure,
+>>> but unlike other such drivers, it does not select 'ARM_DMA_USE_IOMMU',
+>>> which is a prerequisite, leading to a link error:
+>>>
+>>> warning: (MTK_IOMMU) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT && NEED_SG_DMA_LENGTH)
+>>
+>> Going off on a tangent, is it actually right for that to depend on a
+>> NEED_* symbol, or should that really be a select instead?
+>
+> ARM_DMA_USE_IOMMU gets this right, it selects NEED_SG_DMA_LENGTH as it
+> actually needs it.
+>
+> The IOMMU_DMA symbol is a bit strange, and the dependency can probably
+> get dropped altogether, but at least here it told us what went wrong.
 
-ERROR: "ip_route_output_flow" [drivers/target/iscsi/cxgbit/cxgbit.ko] undefined!
-ERROR: "__ip_dev_find" [drivers/target/iscsi/cxgbit/cxgbit.ko] undefined!
+IOMMU_DMA uses sg_dma_len() unconditionally all over the place, hence 
+the "dependency". Thanks for the clarification; fix sent.
 
-This adds a Kconfig dependency to ensure we can't enable this
-driver without the complete network stack it needs.
+>>> drivers/iommu/built-in.o: In function `iommu_put_dma_cookie':
+>>> mtk_iommu.c:(.text+0x11fe): undefined reference to `put_iova_domain'
+>>> drivers/iommu/built-in.o: In function `iommu_dma_init_domain':
+>>> mtk_iommu.c:(.text+0x1316): undefined reference to `init_iova_domain'
+>>> drivers/iommu/built-in.o: In function `__iommu_dma_unmap':
+>>> mtk_iommu.c:(.text+0x1380): undefined reference to `find_iova'
+>>>
+>>> This adds the same select that the other drivers have. On a related
+>>> note, I wonder if we should just always select ARM_DMA_USE_IOMMU
+>>> whenever any IOMMU driver is enabled. Are there any cases where
+>>> we would enable an IOMMU but not use it?
+>>
+>> You could use one solely for VFIO without caring about DMA ops - I think
+>> that's mostly how ARM SMMUs are being used in practice at the moment -
+>> but DMA-focused 'media' IOMMUs vastly outnumber 'virtualisation' IOMMUs
+>> on ARM, so it would probably make sense. We already have the equivalent
+>> "select IOMMU_DMA if IOMMU_SUPPORT" on arm64.
+>
+> Ok.
+>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
+>>> ---
+>>>    drivers/iommu/Kconfig | 1 +
+>>>    1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+>>> index b325954cf8f8..ea0998921702 100644
+>>> --- a/drivers/iommu/Kconfig
+>>> +++ b/drivers/iommu/Kconfig
+>>> @@ -341,6 +341,7 @@ config MTK_IOMMU
+>>>    	bool "MTK IOMMU Support"
+>>>    	depends on ARM || ARM64
+>>>    	depends on ARCH_MEDIATEK || COMPILE_TEST
+>>> +	select ARM_DMA_USE_IOMMU
+>>
+>> If going down this route, I'd be inclined to add an "if ARM" there, just
+>> for clarity.
+>
+> That would run into the NEED_SG_DMA_LENGTH problem on other architectures
+> that don't already set it, right?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b7ca3321e114 ("cxgbit: add Kconfig and Makefile")
----
- drivers/target/iscsi/cxgbit/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Sorry, I'm lost - wouldn't "depends on ARM || ARM64" make other 
+architectures moot? arm64 already has NEED_SG_DMA_LENGTH=y by default.
 
-diff --git a/drivers/target/iscsi/cxgbit/Kconfig b/drivers/target/iscsi/cxgbit/Kconfig
-index cf335b4dbb4e..ce6f5cca315d 100644
---- a/drivers/target/iscsi/cxgbit/Kconfig
-+++ b/drivers/target/iscsi/cxgbit/Kconfig
-@@ -1,6 +1,7 @@
- config ISCSI_TARGET_CXGB4
- 	tristate "Chelsio iSCSI target offload driver"
- 	depends on ISCSI_TARGET && CHELSIO_T4
-+	depends on INET
- 	select CHELSIO_T4_UWIRE
- 	---help---
- 	To compile this driver as module, choose M here: the module
--- 
-2.7.0
+Robin.
