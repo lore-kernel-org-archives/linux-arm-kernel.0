@@ -1,11 +1,10 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 29 Feb 2016 12:09:54 -0800
-Subject: [PATCH 3/6] clk: bcm2835: enable clocks that have been enabled by
- firmware
-In-Reply-To: <1456745963-2403-4-git-send-email-kernel@martin.sperl.org>
+Date: Mon, 29 Feb 2016 12:11:28 -0800
+Subject: [PATCH 4/6] clk: bcm2835: divider value has to be 1 or more
+In-Reply-To: <1456745963-2403-5-git-send-email-kernel@martin.sperl.org>
 References: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
- <1456745963-2403-4-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87vb575ld9.fsf@eliezer.anholt.net>
+ <1456745963-2403-5-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87si0b5lan.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +12,16 @@ kernel at martin.sperl.org writes:
 
 > From: Martin Sperl <kernel@martin.sperl.org>
 >
-> If a clock that has been enabled by the firmware gets disabled
-> by a driver this may right now result in a crash of the system
-> as then also the corresponding PLL_dividers as well as PLLs
-> get disabled (if not used) - some of which are used by the
-> VideoCore GPU (which also runs the firmware)
+> Current clamping of a normal divider allows a value < 1 to be valid.
 >
-> This patch prepares/enables those clocks that have been
-> configured by the firmware.
+> A divider of < 1 would actually only be possible if we had a PLL...
 >
-> Whenever the clock framework implements either
-> CLK_IS_CRITICAL or HAND_OFF this can get changed to use this
-> new mechanism.
+> So this patch clamps the divider to 1.
 >
-> For this to be completely successful (i.e not missing a clock
-> and subsequently a pll) it is recommended to add all the known
-> clocks of the soc so that this can get applied to all clocks.
-
-I think this makes sense to have, for now at least.
+> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the
+> audio domain clocks")
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
 Reviewed-by: Eric Anholt <eric@anholt.net>
 -------------- next part --------------
@@ -39,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/5da66916/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/3c909ba8/attachment.sig>
