@@ -1,41 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 17:30:06 +0100
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <mvm4mcrtski.fsf@hawking.suse.de>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <208897488.c0hkBy2G1S@wuerfel> <mvm4mcrtski.fsf@hawking.suse.de>
-Message-ID: <2753057.uyT99zxyCM@wuerfel>
+From: alexandre.torgue@gmail.com (Alexandre TORGUE)
+Date: Mon, 29 Feb 2016 17:29:35 +0100
+Subject: [PATCH 2/3] ARM: dts: stm32f429: Add Ethernet support
+In-Reply-To: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
+References: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <1456763376-21457-3-git-send-email-alexandre.torgue@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 February 2016 17:00:29 Andreas Schwab wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > In https://github.com/norov/glibc/commit/5d4290435e428267171ece871539b76e1d079d11
-> > you are defining a struct __kernel_stat64 in the glibc. Is this the expected
-> > way to do it? I would have thought you'd get the definition from the kernel
-> > headers.
-> 
-> The problem really is that struct stat64 does not match the kernel
-> struct stat64.  The latter uses the broken st_ino, where the 64-bit
-> inode is actually stored at the end of the structure, and there is
-> padding *before* the 32-bit inode, not after (so you cannot overlay a
-> 64-bit inode field in little endian mode).  You need to add the attached
-> file as sysdeps/unix/sysv/linux/aarch64/bits/stat.h, then you can use
-> the user-space struct stat64 to communicate with the *stat64 syscalls,
-> and __kernel_stat64 is not needed any more.
-> 
+Add Ethernet support (Synopsys MAC IP 3.50a) on stm32f429 SOC.
 
-Ok, got it. So this is an unfortunate side-effect of using the same
-'stat64' as arm32 does.
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
 
-If it's really that broken, should we change the kernel (once more)
-to use the layout of arm64 instead? That has the 64-bit time fields
-though, so it might require similar hacks, unless we first merge
-support for 64-bit time_t based syscalls (which seems unlikely
-at this point, sorry for the delay on my end).
-
-Is there possibly a way to reference the implementation that we
-have for stat64 on arm32 rather than duplicating it?
-
-	Arnd
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index bb7a736..af0367c 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -283,6 +283,26 @@
+ 					bias-disable;
+ 				};
+ 			};
++
++			ethernet0_mii: mii at 0 {
++				mii {
++					slew-rate = <2>;
++					pinmux = <STM32F429_PG13_FUNC_ETH_MII_TXD0_ETH_RMII_TXD0>,
++						 <STM32F429_PG14_FUNC_ETH_MII_TXD1_ETH_RMII_TXD1>,
++						 <STM32F429_PC2_FUNC_ETH_MII_TXD2>,
++						 <STM32F429_PB8_FUNC_ETH_MII_TXD3>,
++						 <STM32F429_PC3_FUNC_ETH_MII_TX_CLK>,
++						 <STM32F429_PG11_FUNC_ETH_MII_TX_EN_ETH_RMII_TX_EN>,
++						 <STM32F429_PA2_FUNC_ETH_MDIO>,
++						 <STM32F429_PC1_FUNC_ETH_MDC>,
++						 <STM32F429_PA1_FUNC_ETH_MII_RX_CLK_ETH_RMII_REF_CLK>,
++						 <STM32F429_PA7_FUNC_ETH_MII_RX_DV_ETH_RMII_CRS_DV>,
++						 <STM32F429_PC4_FUNC_ETH_MII_RXD0_ETH_RMII_RXD0>,
++						 <STM32F429_PC5_FUNC_ETH_MII_RXD1_ETH_RMII_RXD1>,
++						 <STM32F429_PH6_FUNC_ETH_MII_RXD2>,
++						 <STM32F429_PH7_FUNC_ETH_MII_RXD3>;
++				};
++			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
+@@ -323,6 +343,21 @@
+ 			st,mem2mem;
+ 		};
+ 
++		ethernet0: dwmac at 40028000 {
++			compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
++			status = "disabled";
++			reg = <0x40028000 0x8000>;
++			reg-names = "stmmaceth";
++			interrupts = <0 61 0>, <0 62 0>;
++			interrupt-names = "macirq", "eth_wake_irq";
++			clock-names = "stmmaceth", "tx-clk", "rx-clk";
++			clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
++			st,syscon = <&syscfg 0x4>;
++			snps,pbl = <8>;
++			snps,mixed-burst;
++			dma-ranges;
++		};
++
+ 		rng: rng at 50060800 {
+ 			compatible = "st,stm32-rng";
+ 			reg = <0x50060800 0x400>;
+-- 
+1.9.1
