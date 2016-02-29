@@ -1,190 +1,94 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 29 Feb 2016 17:20:12 +0000
-Subject: [PATCH v6 03/14] arm64: Convert hcalls to use HVC immediate value
+Date: Mon, 29 Feb 2016 17:20:13 +0000
+Subject: [PATCH v6 04/14] arm64: Add new hcall HVC_CALL_FUNC
 In-Reply-To: <1456766423-1554-1-git-send-email-james.morse@arm.com>
 References: <1456766423-1554-1-git-send-email-james.morse@arm.com>
-Message-ID: <1456766423-1554-4-git-send-email-james.morse@arm.com>
+Message-ID: <1456766423-1554-5-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geoff Levand <geoff@infradead.org>
 
-The existing arm64 hcall implementations are limited in that they only
-allow for two distinct hcalls; with the x0 register either zero or not
-zero.  Also, the API of the hyp-stub exception vector routines and the
-KVM exception vector routines differ; hyp-stub uses a non-zero value in
-x0 to implement __hyp_set_vectors, whereas KVM uses it to implement
-kvm_call_hyp.
+Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
+During CPU reset the CPU must be brought to the exception level it had on
+entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
+needed for this exception level switch.
 
-To allow for additional hcalls to be defined and to make the arm64 hcall
-API more consistent across exception vector routines, change the hcall
-implementations to use the 16 bit immediate value of the HVC instruction
-to specify the hcall type.
-
-Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
-HVC_SET_VECTORS to be used as hcall type specifiers and convert the
-existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp()
-routines to use these new macros when executing an HVC call.  Also,
-change the corresponding hyp-stub and KVM el1_sync exception vector
-routines to use these new macros.
+To allow the HVC_CALL_FUNC exception vector to work without a stack, which
+is needed to support an hcall at CPU reset, this implementation uses
+register x18 to store the link register across the caller provided
+function.  This dictates that the caller provided function must preserve
+the contents of register x18.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
+[Renumbered labels in el1_sync()]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/virt.h  | 27 +++++++++++++++++++++++++++
- arch/arm64/kernel/hyp-stub.S   | 32 +++++++++++++++++++++-----------
- arch/arm64/kvm/hyp.S           |  3 ++-
- arch/arm64/kvm/hyp/hyp-entry.S |  9 ++++++---
- 4 files changed, 56 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/virt.h | 13 +++++++++++++
+ arch/arm64/kernel/hyp-stub.S  | 19 +++++++++++++++----
+ 2 files changed, 28 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df5252dd7..eb10368c329e 100644
+index eb10368c329e..30700961f28c 100644
 --- a/arch/arm64/include/asm/virt.h
 +++ b/arch/arm64/include/asm/virt.h
-@@ -18,6 +18,33 @@
- #ifndef __ASM__VIRT_H
- #define __ASM__VIRT_H
+@@ -45,6 +45,19 @@
+ 
+ #define HVC_SET_VECTORS 2
  
 +/*
-+ * The arm64 hcall implementation uses the ISS field of the ESR_EL2 register to
-+ * specify the hcall type.  The exception handlers are allowed to use registers
-+ * x17 and x18 in their implementation.  Any routine issuing an hcall must not
-+ * expect these registers to be preserved.
-+ */
-+
-+/*
-+ * HVC_CALL_HYP - Execute a hyp routine.
-+ */
-+
-+#define HVC_CALL_HYP 0
-+
-+/*
-+ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
-+ */
-+
-+#define HVC_GET_VECTORS 1
-+
-+/*
-+ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
++ * HVC_CALL_FUNC - Execute a function at EL2.
 + *
-+ * @x0: Physical address of the new vector table.
++ * @x0: Physical address of the function to be executed.
++ * @x1: Passed as the first argument to the function.
++ * @x2: Passed as the second argument to the function.
++ * @x3: Passed as the third argument to the function.
++ *
++ * The called function must preserve the contents of register x18.
 + */
 +
-+#define HVC_SET_VECTORS 2
++#define HVC_CALL_FUNC 3
 +
  #define BOOT_CPU_MODE_EL1	(0xe11)
  #define BOOT_CPU_MODE_EL2	(0xe12)
  
 diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index a272f335c289..017ab519aaf1 100644
+index 017ab519aaf1..cfacfe55e3ef 100644
 --- a/arch/arm64/kernel/hyp-stub.S
 +++ b/arch/arm64/kernel/hyp-stub.S
-@@ -22,6 +22,7 @@
- #include <linux/irqchip/arm-gic-v3.h>
+@@ -59,18 +59,29 @@ el1_sync:
+ 	and	x18, x18, #ESR_ELx_ISS_MASK
  
- #include <asm/assembler.h>
-+#include <asm/kvm_arm.h>
- #include <asm/ptrace.h>
- #include <asm/virt.h>
+ 	cmp	x17, #ESR_ELx_EC_HVC64
+-	b.ne	2f				// Not an HVC trap
++	b.ne	9f				// Not an HVC trap
  
-@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
- 	.align 11
+ 	cmp	x18, #HVC_GET_VECTORS
+ 	b.ne	1f
+ 	mrs	x0, vbar_el2
+-	b	2f
++	b	9f
  
- el1_sync:
--	mrs	x1, esr_el2
--	lsr	x1, x1, #26
--	cmp	x1, #0x16
-+	mrs	x18, esr_el2
-+	lsr	x17, x18, #ESR_ELx_EC_SHIFT
-+	and	x18, x18, #ESR_ELx_ISS_MASK
+ 1:	cmp	x18, #HVC_SET_VECTORS
+ 	b.ne	2f
+ 	msr	vbar_el2, x0
+-
+-2:	eret
++	b	9f
 +
-+	cmp	x17, #ESR_ELx_EC_HVC64
- 	b.ne	2f				// Not an HVC trap
--	cbz	x0, 1f
--	msr	vbar_el2, x0			// Set vbar_el2
++2:	cmp	x18, #HVC_CALL_FUNC
++	b.ne	9f
++	mov	x18, lr
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
++	mov	lr, x18
 +
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
-+	mrs	x0, vbar_el2
- 	b	2f
--1:	mrs	x0, vbar_el2			// Return vbar_el2
-+
-+1:	cmp	x18, #HVC_SET_VECTORS
-+	b.ne	2f
-+	msr	vbar_el2, x0
-+
- 2:	eret
++9:	eret
  ENDPROC(el1_sync)
  
-@@ -100,11 +109,12 @@ ENDPROC(\label)
-  * initialisation entry point.
-  */
- 
--ENTRY(__hyp_get_vectors)
--	mov	x0, xzr
--	// fall through
- ENTRY(__hyp_set_vectors)
--	hvc	#0
-+	hvc	#HVC_SET_VECTORS
- 	ret
--ENDPROC(__hyp_get_vectors)
- ENDPROC(__hyp_set_vectors)
-+
-+ENTRY(__hyp_get_vectors)
-+	hvc	#HVC_GET_VECTORS
-+	ret
-+ENDPROC(__hyp_get_vectors)
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 870578f84b1c..29e93388ebab 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -18,6 +18,7 @@
- #include <linux/linkage.h>
- 
- #include <asm/assembler.h>
-+#include <asm/virt.h>
- 
- /*
-  * u64 __kvm_call_hyp(void *hypfn, ...);
-@@ -38,6 +39,6 @@
-  * arch/arm64/kernel/hyp_stub.S.
-  */
- ENTRY(__kvm_call_hyp)
--	hvc	#0
-+	hvc	#HVC_CALL_HYP
- 	ret
- ENDPROC(__kvm_call_hyp)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 93e8d983c0bd..a1edf7743df6 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -43,6 +43,7 @@ el1_sync:				// Guest trapped into EL2
- 
- 	mrs	x1, esr_el2
- 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
-+	and	x0, x1, #ESR_ELx_ISS_MASK
- 
- 	cmp	x2, #ESR_ELx_EC_HVC64
- 	b.ne	el1_trap
-@@ -51,14 +52,16 @@ el1_sync:				// Guest trapped into EL2
- 	cbnz	x3, el1_trap		// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
-+	mov	x18, x0
- 	restore_x0_to_x3
- 
--	/* Check for __hyp_get_vectors */
--	cbnz	x0, 1f
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
- 	mrs	x0, vbar_el2
- 	b	2f
- 
--1:	stp	lr, xzr, [sp, #-16]!
-+1:     /* Default to HVC_CALL_HYP. */
-+	push	lr, xzr
- 
- 	/*
- 	 * Compute the function address in EL2, and shuffle the parameters.
+ .macro invalid_vector	label
 -- 
 2.7.0
