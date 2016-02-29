@@ -1,38 +1,126 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Mon, 29 Feb 2016 19:42:58 +0200
-Subject: [RFC PATCH] arm: kernel: pci: remove pci=firmware command line
- parameter handling
-In-Reply-To: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160229174258.GL5891@wantstofly.org>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 29 Feb 2016 17:43:28 +0000
+Subject: [PATCH v4 00/23] arm64: Virtualization Host Extension support
+In-Reply-To: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+References: <1455216004-19499-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <871t7vjttr.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 05:43:20PM +0000, Lorenzo Pieralisi wrote:
 
-> According to kernel documentation, the pci=firmware command line
-> parameter is only meant to be used on IXP2000 ARM platforms to prevent
-> the kernel from assigning PCI resources configured by the bootloader.
-> 
-> Since the IXP2000 ARM platforms support has been removed from the
-> kernel in commit:
-> 
-> commit c65f2abf54a6 ("ARM: remove ixp23xx and ixp2000 platforms")
-> 
-> its platforms specific kernel parameters should be removed
-> too from the kernel documentation along with the kernel code
-> currently handling them in that they have just become obsolete.
-> 
-> This patch removes the pci=firmware command line parameter handling
-> from ARM code and the related kernel parameters documentation
-> section.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-Acked-by: Lennert Buytenhek <kernel@wantstofly.org>
+> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
+> short), which enables simpler support of Type-2 hypervisors.
+>
+> This extension allows the kernel to directly run at EL2, and
+> significantly reduces the number of system registers shared between
+> host and guest, reducing the overhead of virtualization.
+>
+> In order to have the same kernel binary running on all versions of the
+> architecture, this series makes heavy use of runtime code patching.
+>
+> The first 22 patches massage the KVM code to deal with VHE and enable
+> Linux to run at EL2. The last patch catches an ugly case when VHE
+> capable CPUs are paired with some of their less capable siblings. This
+> should never happen, but hey...
+>
+> I have deliberately left out some of the more "advanced"
+> optimizations, as they are likely to distract the reviewer from the
+> core infrastructure, which is what I care about at the moment.
+>
+> Note: GDB is currently busted on VHE systems, as it checks for version
+>       6 on the debug architecture, while VHE is version 7. The
+>       binutils people are on the case.
+
+I assume you are talking about ptrace debug here rather than guest
+debug?
+
+Anyway from a cursory inspection I didn't see anything to worry about
+from the guest debug side which is unchanged.
+
+Acked-by: Alex Benn?e <alex.bennee@linaro.org>
+
+>
+> This has been tested on the FVP_Base_SLV-V8-A model, and based on
+> v4.5-rc3 + kvmarm/master. I've put a branch out on:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
+>
+> * From v3:
+>   - Cleaned debug handling after comments from Catalin
+>   - Added missing barriers in the panic patch
+>   - Collected Rb and Acks from Christoffer and Catalin
+>
+> * From v2:
+>   - Added support for perf to count kernel events in EL2
+>   - Added support for EL2 breakpoints
+>   - Moved the VTCR_EL2 setup from assembly to C
+>   - Made the fault handling easier to understand (hopefuly)
+>   - Plenty of smaller fixups
+>
+> * From v1:
+>   - Full rewrite now that the World Switch is written in C code.
+>   - Dropped the "early IRQ handling" for the moment.
+>
+> Marc Zyngier (23):
+>   arm/arm64: KVM: Add hook for C-based stage2 init
+>   arm64: KVM: Switch to C-based stage2 init
+>   arm/arm64: Add new is_kernel_in_hyp_mode predicate
+>   arm64: Allow the arch timer to use the HYP timer
+>   arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
+>   arm64: KVM: Skip HYP setup when already running in HYP
+>   arm64: KVM: VHE: Patch out use of HVC
+>   arm64: KVM: VHE: Patch out kern_hyp_va
+>   arm64: KVM: VHE: Introduce unified system register accessors
+>   arm64: KVM: VHE: Differenciate host/guest sysreg save/restore
+>   arm64: KVM: VHE: Split save/restore of registers shared between guest
+>     and host
+>   arm64: KVM: VHE: Use unified system register accessors
+>   arm64: KVM: VHE: Enable minimal sysreg save/restore
+>   arm64: KVM: VHE: Make __fpsimd_enabled VHE aware
+>   arm64: KVM: VHE: Implement VHE activate/deactivate_traps
+>   arm64: KVM: VHE: Use unified sysreg accessors for timer
+>   arm64: KVM: VHE: Add fpsimd enabling on guest access
+>   arm64: KVM: VHE: Add alternative panic handling
+>   arm64: KVM: Move most of the fault decoding to C
+>   arm64: perf: Count EL2 events if the kernel is running in HYP
+>   arm64: hw_breakpoint: Allow EL2 breakpoints if running in HYP
+>   arm64: VHE: Add support for running Linux in EL2 mode
+>   arm64: Panic when VHE and non VHE CPUs coexist
+>
+>  arch/arm/include/asm/kvm_host.h        |   4 +
+>  arch/arm/include/asm/virt.h            |   5 +
+>  arch/arm/kvm/arm.c                     | 174 ++++++++++++++++++----------
+>  arch/arm/kvm/mmu.c                     |   7 ++
+>  arch/arm64/Kconfig                     |  13 +++
+>  arch/arm64/include/asm/cpufeature.h    |   3 +-
+>  arch/arm64/include/asm/hw_breakpoint.h |  49 +++++---
+>  arch/arm64/include/asm/kvm_arm.h       |   6 +-
+>  arch/arm64/include/asm/kvm_asm.h       |   2 +
+>  arch/arm64/include/asm/kvm_emulate.h   |   3 +
+>  arch/arm64/include/asm/kvm_host.h      |   6 +
+>  arch/arm64/include/asm/kvm_mmu.h       |  12 +-
+>  arch/arm64/include/asm/virt.h          |  27 +++++
+>  arch/arm64/kernel/asm-offsets.c        |   3 -
+>  arch/arm64/kernel/cpufeature.c         |  11 ++
+>  arch/arm64/kernel/head.S               |  50 +++++++-
+>  arch/arm64/kernel/perf_event.c         |  14 ++-
+>  arch/arm64/kernel/smp.c                |   3 +
+>  arch/arm64/kvm/hyp-init.S              |  18 ---
+>  arch/arm64/kvm/hyp.S                   |   7 ++
+>  arch/arm64/kvm/hyp/Makefile            |   1 +
+>  arch/arm64/kvm/hyp/entry.S             |   6 +
+>  arch/arm64/kvm/hyp/hyp-entry.S         | 109 ++++++------------
+>  arch/arm64/kvm/hyp/hyp.h               | 108 ++++++++++++++++--
+>  arch/arm64/kvm/hyp/s2-setup.c          |  44 +++++++
+>  arch/arm64/kvm/hyp/switch.c            | 202 +++++++++++++++++++++++++++++----
+>  arch/arm64/kvm/hyp/sysreg-sr.c         | 147 ++++++++++++++++--------
+>  arch/arm64/kvm/hyp/timer-sr.c          |  10 +-
+>  drivers/clocksource/arm_arch_timer.c   |  96 ++++++++++------
+>  29 files changed, 842 insertions(+), 298 deletions(-)
+>  create mode 100644 arch/arm64/kvm/hyp/s2-setup.c
+
+
+--
+Alex Benn?e
