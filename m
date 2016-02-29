@@ -1,24 +1,19 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 29 Feb 2016 16:33:23 -0600
-Subject: [PATCH 0/3] davinci: device tree - small simplifications
-Message-ID: <1456785206-2280-1-git-send-email-david@lechnology.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 23:53:49 +0100
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.6 (#2)
+In-Reply-To: <87fuwfo8eu.fsf@free-electrons.com>
+References: <87fuwfo8eu.fsf@free-electrons.com>
+Message-ID: <10314651.NhuOsrJ7ml@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have been trying out device tree with mach-davinci. Here are some small
-simplifications that I have made.
+On Friday 26 February 2016 15:25:45 Gregory CLEMENT wrote:
+> mvebu cleanup for 4.6 (part 2)
+> 
+> Add a missing call to of_node_put() armada_xp_smp_prepare_cpus()
+> 
+> 
 
-I would also like to know if anyone is working on getting the clocks and related
-soc devices (pll and psc) into device tree as well.
+Merged into next/cleanup, thanks!
 
-David Lechner (3):
-  arm: davinci: simplify call to of populate
-  arm: davinci: remove unused DA8XX_NUM_UARTS
-  arm: davinci: use IRQCHIP_DECLARE for cp_intc
-
- arch/arm/mach-davinci/cp_intc.c  |  3 +++
- arch/arm/mach-davinci/da8xx-dt.c | 17 +----------------
- 2 files changed, 4 insertions(+), 16 deletions(-)
-
--- 
-1.9.1
+	Arnd
