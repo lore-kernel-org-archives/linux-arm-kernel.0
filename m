@@ -1,69 +1,22 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 29 Feb 2016 15:23:48 -0800
-Subject: [PATCH v3 3/5] ARM: dts: DRA7: Add TBCLK for PWMSS
-In-Reply-To: <1456439796-28546-4-git-send-email-fcooper@ti.com>
+Date: Mon, 29 Feb 2016 15:24:43 -0800
+Subject: [PATCH v3 5/5] ARM: dts: DRA7: Add dt nodes for PWMSS
+In-Reply-To: <1456439796-28546-6-git-send-email-fcooper@ti.com>
 References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-4-git-send-email-fcooper@ti.com>
-Message-ID: <20160229232348.GV13417@atomide.com>
+ <1456439796-28546-6-git-send-email-fcooper@ti.com>
+Message-ID: <20160229232443.GW13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Franklin S Cooper Jr <fcooper@ti.com> [160225 14:37]:
 > From: Vignesh R <vigneshr@ti.com>
 > 
-> tbclk is used by ehrpwm to generate PWM waveform on DRA7 SoC. Add Linux
-> clock to control ehrpwm tbclk.
-> The TRM says, tbclk is derived from SYSCLKOUT. SYSCLKOUT is nothing but
-> ehrpwm functional clock derived from the gateable interface and
-> functional clock of PWMSS(l4_root_clk_div).
-> Refer AM57x TRM SPRUHZ6[1], October 2014, Table 29-4 and Section 29.2.2.1,
-> Table 29-19 and the NOTE at the end of the table.
-> 
-> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
+> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
+> for dt bindings.
 
-Applying this into omap-for-v4.6/dt thanks.
-
-Note for Tero, let's plan on getting rid of the duplicate
-reg entries by using the standard clock output offset within
-the clock register. I think we should easily be able to add
-a binding for this and then deprecate the overlapping reg
-entries.
+Seems to be all standard so applying this one into omap-for-v4.6/dt
+thanks.
 
 Regards,
 
 Tony
-
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -2146,4 +2146,28 @@
->  		ti,bit-shift = <0>;
->  		reg = <0x558>;
->  	};
-> +
-> +       ehrpwm0_tbclk: ehrpwm0_tbclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&l4_root_clk_div>;
-> +		ti,bit-shift = <20>;
-> +		reg = <0x0558>;
-> +	};
-> +
-> +	ehrpwm1_tbclk: ehrpwm1_tbclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&l4_root_clk_div>;
-> +		ti,bit-shift = <21>;
-> +		reg = <0x0558>;
-> +	};
-> +
-> +	ehrpwm2_tbclk: ehrpwm2_tbclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&l4_root_clk_div>;
-> +		ti,bit-shift = <22>;
-> +		reg = <0x0558>;
-> +	};
->  };
-> -- 
-> 2.7.0
-> 
