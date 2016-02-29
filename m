@@ -1,18 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Mar 2016 00:18:42 +0100
-Subject: [GIT PULL] pxa dt for v4.6
-In-Reply-To: <87lh65rir0.fsf@belgarion.home>
-References: <87lh65rir0.fsf@belgarion.home>
-Message-ID: <2638000.3aSMBuz1aG@wuerfel>
+Date: Tue, 01 Mar 2016 00:21:45 +0100
+Subject: [GIT PULL]Hisilicon Hip05 SoC DT updates for 4.6
+In-Reply-To: <56D16FEC.9070906@hisilicon.com>
+References: <56D16FEC.9070906@hisilicon.com>
+Message-ID: <5771989.YNoapr5mNI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 February 2016 21:38:43 Robert Jarzmik wrote:
-> This device-tree pxa update brings :
->  - a single fix for nand dmaengine node
+On Saturday 27 February 2016 17:44:12 Wei Xu wrote:
+> ARM64: DT: Hisilicon Hip05 soc and D02 board updates for 4.6
 > 
+> - Add L2 cache topology
+> - Use Cortex specific device node for pmu
+> - Append all gicv3 ITS entries
+> - Append gpio nodes
+> - Append power button node for D02 board
 > 
 
-Pulled into next/dt, thanks!
+Merged into next/dt, thanks!
 
 	Arnd
