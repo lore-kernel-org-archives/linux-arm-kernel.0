@@ -1,83 +1,139 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 29 Feb 2016 13:46:19 +0000
-Subject: [PATCH 10/12] Docs: dt: document ARM SMMU generic binding usage
+Date: Mon, 29 Feb 2016 13:46:21 +0000
+Subject: [PATCH 12/12] iommu/arm-smmu: Group platform devices appropriately
 In-Reply-To: <cover.1456514380.git.robin.murphy@arm.com>
 References: <cover.1456514380.git.robin.murphy@arm.com>
-Message-ID: <af1ce6d7d69e340ac839c69b475728f7aa50ff23.1456514380.git.robin.murphy@arm.com>
+Message-ID: <472100c4e1392f20937935ef175d8a49940aa299.1456514380.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document how the generic "iommus" binding should be used to describe ARM
-SMMU stream IDs instead of the old "mmu-masters" binding.
+IOMMU groups are necessary to represent multiple devices which the IOMMU
+cannot tell apart; if two platform devices are wired up with the same
+stream ID, then the current approach of blindly placing every device in
+its own group makes it possible for each device to end up attached to a
+different domain. This is a Very Bad Thing under the SMMU architecture,
+where mapping a stream ID to more than one context leads to various
+unpleasant behaviours.
+
+In the absence of a suitable common abstraction (which is difficult due
+to the implementation-specific nature of platform device IDs), implement
+a simple lookup table within the SMMU driver to ensure that any devices
+with overlapping stream IDs end up in the same group as they should.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- .../devicetree/bindings/iommu/arm,smmu.txt         | 40 ++++++++++++++--------
- 1 file changed, 25 insertions(+), 15 deletions(-)
+ drivers/iommu/arm-smmu.c | 61 +++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 50 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index 7180745..a213f74 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -34,12 +34,11 @@ conditions.
-                   interrupt per context bank. In the case of a single,
-                   combined interrupt, it must be listed multiple times.
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 8fcf27a..2d65de4 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -333,6 +333,7 @@ struct arm_smmu_device {
  
--- mmu-masters   : A list of phandles to device nodes representing bus
--                  masters for which the SMMU can provide a translation
--                  and their corresponding StreamIDs (see example below).
--                  Each device node linked from this list must have a
--                  "#stream-id-cells" property, indicating the number of
--                  StreamIDs associated with it.
-+- #iommu-cells  : See Documentation/devicetree/bindings/iommu/iommu.txt
-+                  for details. Should be 1, where each "iommus" entry on
-+                  the device represents a distinct stream ID emitted by
-+                  that device into the relevant SMMU. Cells beyond 1 are
-+                  reserved for future use.
+ 	u32				num_mapping_groups;
+ 	DECLARE_BITMAP(smr_map, ARM_SMMU_MAX_SMRS);
++	struct iommu_group		**group_lut;
  
- ** System MMU optional properties:
+ 	unsigned long			va_size;
+ 	unsigned long			ipa_size;
+@@ -1272,11 +1273,6 @@ static int arm_smmu_add_device(struct device *dev)
+ 			return ret;
+ 	}
  
-@@ -55,9 +54,19 @@ conditions.
-                   aliases of secure registers have to be used during
-                   SMMU configuration.
+-	/*
+-	 * For now, assume that the default group allocators suffice.
+-	 * We might have to do some preparatory work here to properly
+-	 * handle multiple devices sharing stream IDs.
+-	 */
+ 	group = iommu_group_get_for_dev(dev);
+ 	if (IS_ERR(group))
+ 		return PTR_ERR(group);
+@@ -1297,6 +1293,45 @@ static void __arm_smmu_release_iommudata(void *data)
+ 	kfree(data);
+ }
  
--Example:
-+** Deprecated properties:
- 
--        smmu {
-+- mmu-masters (deprecated in favour of the generic "iommus" binding) :
-+                  A list of phandles to device nodes representing bus
-+                  masters for which the SMMU can provide a translation
-+                  and their corresponding StreamIDs (see example below).
-+                  Each device node linked from this list must have a
-+                  "#stream-id-cells" property, indicating the number of
-+                  StreamIDs associated with it.
++static struct iommu_group *arm_smmu_group_lookup(struct device *dev)
++{
++	struct arm_smmu_master_cfg *cfg = dev->archdata.iommu;
++	struct arm_smmu_device *smmu = cfg->smmu;
++	struct iommu_group **lut = smmu->group_lut;
++	struct iommu_group *group = NULL;
++	int i;
 +
-+** Example:
++	if (!lut) {
++		/*
++		 * Unfortunately this has to be sized for the worst-case until
++		 * we get even cleverer with stream ID management.
++		 */
++		lut = devm_kcalloc(smmu->dev, SMR_ID_MASK + 1,
++				   sizeof(*lut), GFP_KERNEL);
++		if (lut)
++			smmu->group_lut = lut;
++		else
++			group = ERR_PTR(-ENOMEM);
++	} else {
++		/* Check for platform or cross-bus aliases */
++		for (i = 0; i < cfg->num_streamids; i++) {
++			struct iommu_group *tmp = lut[cfg->streamids[i].id];
 +
-+        smmu1: iommu {
-                 compatible = "arm,smmu-v1";
-                 reg = <0xba5e0000 0x10000>;
-                 #global-interrupts = <2>;
-@@ -67,11 +76,12 @@ Example:
-                              <0 35 4>,
-                              <0 36 4>,
-                              <0 37 4>;
--
--                /*
--                 * Two DMA controllers, the first with two StreamIDs (0xd01d
--                 * and 0xd01e) and the second with only one (0xd11c).
--                 */
--                mmu-masters = <&dma0 0xd01d 0xd01e>,
--                              <&dma1 0xd11c>;
-+                #iommu-cells = <1>;
-         };
++			if (!tmp)
++				continue;
 +
-+        /* device with two stream IDs, 0 and 7 */
-+        master {
-+                iommus = <&smmu1 0>,
-+                         <&smmu1 7>;
-+        };
++			if (group && tmp != group) {
++				dev_err(smmu->dev,
++					"Cannot handle master %s aliasing multiple groups\n",
++					dev_name(dev));
++				return ERR_PTR(-EBUSY);
++			}
++			group = tmp;
++		}
++	}
++	return group;
++}
 +
+ static inline bool __streamid_match_sme(struct arm_smmu_streamid *sid,
+ 					struct arm_smmu_stream_map_entry *sme)
+ {
+@@ -1306,22 +1341,24 @@ static inline bool __streamid_match_sme(struct arm_smmu_streamid *sid,
+ 
+ static struct iommu_group *arm_smmu_device_group(struct device *dev)
+ {
+-	struct arm_smmu_master_cfg *master_cfg;
++	struct arm_smmu_master_cfg *master_cfg = dev->archdata.iommu;
+ 	struct arm_smmu_group_cfg *group_cfg;
+ 	struct arm_smmu_streamid *sids;
+ 	struct arm_smmu_stream_map_entry *smes;
+ 	struct iommu_group *group;
+ 	int i, j;
+ 
+-	if (dev_is_pci(dev))
+-		group = pci_device_group(dev);
+-	else
+-		group = generic_device_group(dev);
++	group = arm_smmu_group_lookup(dev);
++	if (!group) {
++		if (dev_is_pci(dev))
++			group = pci_device_group(dev);
++		else
++			group = generic_device_group(dev);
++	}
+ 
+ 	if (IS_ERR(group))
+ 		return group;
+ 
+-	master_cfg = dev->archdata.iommu;
+ 	group_cfg = iommu_group_get_iommudata(group);
+ 	if (!group_cfg) {
+ 		group_cfg = kzalloc(sizeof(*group_cfg), GFP_KERNEL);
+@@ -1336,6 +1373,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
+ 	sids = master_cfg->streamids;
+ 	smes = group_cfg->smes;
+ 	for (i = 0; i < master_cfg->num_streamids; i++) {
++		master_cfg->smmu->group_lut[sids[i].id] = group;
++
+ 		for (j = 0; j < group_cfg->num_smes; j++) {
+ 			if (__streamid_match_sme(&sids[i], &smes[j])) {
+ 				sids[i].s2cr_idx = STREAM_MULTIPLE;
 -- 
 2.7.2.333.g70bd996.dirty
