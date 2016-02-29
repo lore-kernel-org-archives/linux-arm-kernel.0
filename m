@@ -1,48 +1,86 @@
-From: mike.caraman@nxp.com (Mihai Claudiu Caraman)
-Date: Mon, 29 Feb 2016 10:43:29 +0000
-Subject: [PATCH v2 00/17] KVM/ARM: Guest Entry/Exit optimizations
-In-Reply-To: <56D400A4.3020904@arm.com>
-References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
- <AM2PR04MB073947192D0A7015739689EF84BA0@AM2PR04MB0739.eurprd04.prod.outlook.com>
- <56D400A4.3020904@arm.com>
-Message-ID: <AM2PR04MB0739F13F5F6CBBCB45F2071784BA0@AM2PR04MB0739.eurprd04.prod.outlook.com>
+From: harvey.hunt@imgtec.com (Harvey Hunt)
+Date: Mon, 29 Feb 2016 10:45:56 +0000
+Subject: [PATCH v3 39/52] mtd: nand: jz4780: switch to mtd_ooblayout_ops
+In-Reply-To: <1456448280-27788-40-git-send-email-boris.brezillon@free-electrons.com>
+References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1456448280-27788-40-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <56D42164.9030007@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com] 
-> Sent: Monday, February 29, 2016 10:26 AM
-> To: Mihai Claudiu Caraman <mike.caraman@nxp.com>; Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: kvm at vger.kernel.org; linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu
-> Subject: Re: [PATCH v2 00/17] KVM/ARM: Guest Entry/Exit optimizations
-> 
-> On 29/02/16 00:57, Mihai Claudiu Caraman wrote:
-> > Reported-by: Mihai Caraman <mihai.caraman@freescale.com>
-> 
-> Reported-by? Where? Did I miss an email (wouldn't surprise me)?
+Hi Boris,
 
-Private meeting between ARM and Freescale/NXP, it was me.
+On 26/02/16 00:57, Boris Brezillon wrote:
+> Implementing the mtd_ooblayout_ops interface is the new way of exposing
+> ECC/OOB layout to MTD users.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>   drivers/mtd/nand/jz4780_nand.c | 19 +++++--------------
+>   1 file changed, 5 insertions(+), 14 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/jz4780_nand.c b/drivers/mtd/nand/jz4780_nand.c
+> index e1c016c..b86a579 100644
+> --- a/drivers/mtd/nand/jz4780_nand.c
+> +++ b/drivers/mtd/nand/jz4780_nand.c
+> @@ -56,8 +56,6 @@ struct jz4780_nand_chip {
+>   	struct nand_chip chip;
+>   	struct list_head chip_list;
+>
+> -	struct nand_ecclayout ecclayout;
+> -
+>   	struct gpio_desc *busy_gpio;
+>   	struct gpio_desc *wp_gpio;
+>   	unsigned int reading: 1;
+> @@ -165,8 +163,7 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>   	struct nand_chip *chip = &nand->chip;
+>   	struct mtd_info *mtd = nand_to_mtd(chip);
+>   	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(chip->controller);
+> -	struct nand_ecclayout *layout = &nand->ecclayout;
+> -	u32 start, i;
+> +	int eccbytes;
+>
+>   	chip->ecc.bytes = fls((1 + 8) * chip->ecc.size)	*
+>   				(chip->ecc.strength / 8);
+> @@ -201,23 +198,17 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>   		return 0;
+>
+>   	/* Generate ECC layout. ECC codes are right aligned in the OOB area. */
+> -	layout->eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
+> +	eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
+>
+> -	if (layout->eccbytes > mtd->oobsize - 2) {
+> +	if (eccbytes > mtd->oobsize - 2) {
+>   		dev_err(dev,
+>   			"invalid ECC config: required %d ECC bytes, but only %d are available",
+> -			layout->eccbytes, mtd->oobsize - 2);
+> +			eccbytes, mtd->oobsize - 2);
+>   		return -EINVAL;
+>   	}
+>
+> -	start = mtd->oobsize - layout->eccbytes;
+> -	for (i = 0; i < layout->eccbytes; i++)
+> -		layout->eccpos[i] = start + i;
+> -
+> -	layout->oobfree[0].offset = 2;
+> -	layout->oobfree[0].length = mtd->oobsize - layout->eccbytes - 2;
+> +	mtd->ooblayout = &nand_ooblayout_lp_ops;
+>
+> -	chip->ecc.layout = layout;
+>   	return 0;
+>   }
+>
+>
 
-> 
-> > Tested-by: Mihai Caraman <mihai.caraman@freescale.com>
-> > 
-> > 40% improvements here and there will make the difference. 
-> 
-> I'm sceptical that you will see a significant improvement
+With your patch applied [0] that you gave me earlier in the patchset, I 
+am able to boot to userland on my Ci20 (jz4780_{nand,bch}) with a NAND 
+rootfs. So, dependant upon that patch (or equivalent) being added to 
+this patchset:
 
-1% improvement with this patch is good enough.
+Tested-by: Harvey Hunt <harvey.hunt@imgtec.com>
 
-> on any *realistic* workload
+Thanks,
 
-You will hear about this sooner than you think ;-)
+Harvey
 
-> , but thanks for testing!
-
-Thanks for the patch, we plan to contribute as well.
-
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
-
--Mike
+[0] http://code.bulix.org/36oytz-91960
