@@ -1,103 +1,82 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 29 Feb 2016 16:47:37 +0300
-Subject: [PATCH v4 1/4] ACPI: parse SPCR and enable matching console
-In-Reply-To: <CAHp75VdswvD23xqRNUX=fwMt5HReR-wcSo+RYweB6FYqWPar8w@mail.gmail.com>
-References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
- <1456747355-15692-2-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75VdswvD23xqRNUX=fwMt5HReR-wcSo+RYweB6FYqWPar8w@mail.gmail.com>
-Message-ID: <56D44BF9.3030007@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Feb 2016 13:59:49 +0000
+Subject: [PATCH v13 01/20] ARM64: Move PMU register related defines to
+ asm/perf_event.h
+In-Reply-To: <56D4428B.5000505@arm.com>
+References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
+ <1456290520-10012-2-git-send-email-zhaoshenglong@huawei.com>
+ <20160224175247.GE12471@arm.com> <56CE6098.8070001@huawei.com>
+ <56D4428B.5000505@arm.com>
+Message-ID: <56D44ED5.8070606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy, 
-
-Thank you for review.
-
-On 02/29/2016 04:29 PM, Andy Shevchenko wrote:
-> On Mon, Feb 29, 2016 at 2:02 PM, Aleksey Makarov
-> <aleksey.makarov@linaro.org> wrote:
->> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
->> Console Redirection Table) [2] as a mandatory ACPI table that
->> specifies the configuration of serial console.
+On 29/02/16 13:07, Marc Zyngier wrote:
+> Shannon,
+> 
+> On 25/02/16 02:02, Shannon Zhao wrote:
 >>
->> Parse this table and check if any registered console match the
->> description.  If it does, enable that console.
 >>
->> Introduce a new function acpi_console_check().  At the uart port
->> registration, this function checks if the ACPI SPCR table specifies
->> its argument of type struct uart_port to be a console
->> and if so calls add_preferred_console().
+>> On 2016/2/25 1:52, Will Deacon wrote:
+>>> On Wed, Feb 24, 2016 at 01:08:21PM +0800, Shannon Zhao wrote:
+>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>
+>>>> To use the ARMv8 PMU related register defines from the KVM code, we move
+>>>> the relevant definitions to asm/perf_event.h header file and rename them
+>>>> with prefix ARMV8_PMU_.
+>>>>
+>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Reviewed-by: Andrew Jones <drjones@redhat.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/perf_event.h | 35 +++++++++++++++++++
+>>>>  arch/arm64/kernel/perf_event.c      | 68 ++++++++++---------------------------
+>>>>  2 files changed, 52 insertions(+), 51 deletions(-)
+>>>
+>>> Looks fine to me, but we're going to get some truly horrible conflicts
+>>> in -next.
+>>>
+>>> I'm open to suggestions on the best way to handle this, but one way
+>>> would be:
+>>>
+>>>   1. Duplicate all the #defines privately in KVM (queue via kvm tree)
+>> This way seems not proper I think.
+>>
+>>>   2. Rebase this patch onto my perf/updates branch [1] (queue via me)
+>> While to this series, it really relies on the perf_event.h to compile
+>> and test, so maybe for KVM-ARM and KVM maintainers it's not proper.
+>>
+>>>   3. Patch at -rc1 dropping the #defines from (1) and moving to the new
+>>>      perf_event.h stuff
+>>>
+>> I vote for this way. Since the patch in [1] is small and nothing else
+>> relies on them, I think it would be simple to rebase them onto this series.
+>>
+>>> Thoughts?
+>>>
+>> Anyway, there are only 3 lines which have conflicts. I'm not sure
+>> whether we could handle this when we merge them.
 > 
->> +       if (ACPI_FAILURE(status)) {
->> +               pr_err("could not get the table\n");
+> I think you're missing the point:
 > 
-> Is it worse to have on error level? Is it possible to have firmware
-> without this table? I think it would be a normal case for non-arm
-> world.
-> I'm also not sure if this message useful even on warn level.
+> - We want both the arm64 perf and KVM trees to be easy to merge
+> - The conflicts are not that simple to resolve
+> - We want these conflicts to be solved before it hits Linus' tree
+> 
+> With that in mind, here's what I'm suggesting we merge as a first patch:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/commit/?h=queue&id=2029b4b02691ec6ebba3d281068e783353d7e108
+> 
+> Once this and the perf/updates branch are merged, we can add one last
+> patch reverting this hack and actually doing the renaming work (Will has
+> posted a resolution for most of the new things).
 
-I will delete the message in the next version, thank you.
+For the record, here's the patch I propose we merge once everything gets
+into mainline:
 
->> +               return -ENOENT;
->> +       }
->> +
->> +       if (table->header.revision < 2) {
->> +               err = -EINVAL;
->> +               pr_err("wrong table version\n");
-> 
-> And this one quite good to have, indeed.
-> 
->> + * acpi_console_check - Check if uart matches the console specified by SPCR.
->> + *
->> + * @uport:     uart port to check
->> + *
-> 
-> Since you use sections, you may add:
-> + * Description:
+https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/commit/?h=queue&id=ba1e09b2f2cd2d5cc5cfdb76e96460aee1bd9482
 
-According to kernel-doc-nano-HOWTO.txt "Description: " is optional.
-
->> + * This function checks if the ACPI SPCR table specifies @uport to be a console
->> + * and if so calls add_preferred_console()
->> + *
->> + * Return: a non-error value if the console matches.
-> 
->> @@ -2654,8 +2655,17 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
->>                 spin_lock_init(&uport->lock);
->>                 lockdep_set_class(&uport->lock, &port_lock_key);
->>         }
->> -       if (uport->cons && uport->dev)
->> -               of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
->> +
->> +       /*
->> +        * Support both open FW and ACPI access to console definitions.
->> +        * Both of_console_check() and acpi_console_check() will call
->> +        * add_preferred_console() if a console definition is found.
->> +        */
->> +       if (uport->cons && uport->dev) {
->> +               if (!acpi_console_check(uport))
-> 
-> if (cond1) {
->  if (cond2) {
-> ...
->  }
-> }
-> 
-> is equivalent to
-> if (cond1 && cond2) {
-> ...
-> }
-
-It is, but it's a style decision.  I would prefer to leave it as is because it emphasizes that
-after meeting some condition we first call acpi_console_check() and then of_console_check().
-
-Thank you
-Aleksey Makarov
-
-> 
->> +                       of_console_check(uport->dev->of_node, uport->cons->name,
->> +                                        uport->line);
->> +       }
-> 
-> 
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
