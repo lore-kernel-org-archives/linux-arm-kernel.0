@@ -1,70 +1,31 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 29 Feb 2016 10:37:40 +0000
-Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
-In-Reply-To: <1456737553-496245-1-git-send-email-arnd@arndb.de>
-References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
-Message-ID: <56D41F74.8010408@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 29 Feb 2016 11:42:30 +0100
+Subject: [PATCH] arm: mvebu: Add SPI1 pinctrl defines for Armada XP
+In-Reply-To: <1456739914-12096-1-git-send-email-sr@denx.de>
+References: <1456739914-12096-1-git-send-email-sr@denx.de>
+Message-ID: <20160229114230.52ca0837@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Dear Stefan Roese,
 
-On 29/02/16 09:19, Arnd Bergmann wrote:
-> The newly added Mediatek IOMMU driver uses the IOMMU_DMA infrastructure,
-> but unlike other such drivers, it does not select 'ARM_DMA_USE_IOMMU',
-> which is a prerequisite, leading to a link error:
->
-> warning: (MTK_IOMMU) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT && NEED_SG_DMA_LENGTH)
-
-Going off on a tangent, is it actually right for that to depend on a 
-NEED_* symbol, or should that really be a select instead?
-
-> drivers/iommu/built-in.o: In function `iommu_put_dma_cookie':
-> mtk_iommu.c:(.text+0x11fe): undefined reference to `put_iova_domain'
-> drivers/iommu/built-in.o: In function `iommu_dma_init_domain':
-> mtk_iommu.c:(.text+0x1316): undefined reference to `init_iova_domain'
-> drivers/iommu/built-in.o: In function `__iommu_dma_unmap':
-> mtk_iommu.c:(.text+0x1380): undefined reference to `find_iova'
->
-> This adds the same select that the other drivers have. On a related
-> note, I wonder if we should just always select ARM_DMA_USE_IOMMU
-> whenever any IOMMU driver is enabled. Are there any cases where
-> we would enable an IOMMU but not use it?
-
-You could use one solely for VFIO without caring about DMA ops - I think 
-that's mostly how ARM SMMUs are being used in practice at the moment - 
-but DMA-focused 'media' IOMMUs vastly outnumber 'virtualisation' IOMMUs 
-on ARM, so it would probably make sense. We already have the equivalent 
-"select IOMMU_DMA if IOMMU_SUPPORT" on arm64.
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
+On Mon, 29 Feb 2016 10:58:34 +0100, Stefan Roese wrote:
+> This patch defines and uses common Armada XP pinctrl settings in
+> armada-xp.dtsi for the SPI1 interface (MPP13,14,16,17).
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->   drivers/iommu/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index b325954cf8f8..ea0998921702 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -341,6 +341,7 @@ config MTK_IOMMU
->   	bool "MTK IOMMU Support"
->   	depends on ARM || ARM64
->   	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	select ARM_DMA_USE_IOMMU
+>  arch/arm/boot/dts/armada-xp.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-If going down this route, I'd be inclined to add an "if ARM" there, just 
-for clarity.
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
->   	select IOMMU_API
->   	select IOMMU_DMA
+Thanks!
 
-As above, this is already selected on arm64, and isn't used on 32-bit*, 
-so could probably just be removed, especially if it leads to build issues.
-
-Robin.
-
-*yet, of course. I need to have a proper look over Marek's RFC ;)
-
->   	select IOMMU_IO_PGTABLE_ARMV7S
->
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
