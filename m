@@ -1,38 +1,50 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 29 Feb 2016 12:12:26 +0100
-Subject: [PATCH v2 2/3] ARM: i.MX25: add scc module to dtsi
-In-Reply-To: <1456744347-4176-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1456744347-4176-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1456744347-4176-2-git-send-email-s.trumtrar@pengutronix.de>
+Date: Mon, 29 Feb 2016 12:12:25 +0100
+Subject: [PATCH v2 1/3] Documentation: devicetree: add Freescale SCC bindings
+Message-ID: <1456744347-4176-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Security Controller (SCC) module to the dtsi.
+Add documentation for the Freescale Security Controller (SCC)
+found on i.MX25 SoCs.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/imx25.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Changes since v1:
+  - add clocks to required properties
+  - add Acked-by
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index cde329e9b9e3..73118aba4cc4 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -397,6 +397,15 @@
- 				interrupts = <41>;
- 			};
- 
-+			scc: crypto at 53fac000 {
-+				compatible = "fsl,imx25-scc";
-+				reg = <0x53fac000 0x4000>;
-+				clocks = <&clks 111>;
-+				clock-names = "ipg";
-+				interrupts = <49>, <50>;
-+				interrupt-names = "scm", "smn";
-+			};
+ .../devicetree/bindings/crypto/fsl-imx-scc.txt      | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
+
+diff --git a/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt b/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
+new file mode 100644
+index 000000000000..7aad448e8a36
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
+@@ -0,0 +1,21 @@
++Freescale Security Controller (SCC)
 +
- 			esdhc1: esdhc at 53fb4000 {
- 				compatible = "fsl,imx25-esdhc";
- 				reg = <0x53fb4000 0x4000>;
++Required properties:
++- compatible : Should be "fsl,imx25-scc".
++- reg : Should contain register location and length.
++- interrupts : Should contain interrupt numbers for SCM IRQ and SMN IRQ.
++- interrupt-names : Should specify the names "scm" and "smn" for the
++		    SCM IRQ and SMN IRQ.
++- clocks: Should contain the clock driving the SCC core.
++- clock-names: Should be set to "ipg".
++
++Example:
++
++	scc: crypto at 53fac000 {
++		compatible = "fsl,imx25-scc";
++		reg = <0x53fac000 0x4000>;
++		clocks = <&clks 111>;
++		clock-names = "ipg";
++		interrupts = <49>, <50>;
++		interrupt-names = "scm", "smn";
++	};
 -- 
 2.7.0
