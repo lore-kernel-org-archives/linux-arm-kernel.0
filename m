@@ -1,76 +1,44 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Mon, 29 Feb 2016 14:14:53 +0530
-Subject: [PATCH] ARM: dts: DRA7: change address-cells and size-cells
-In-Reply-To: <20160226191127.GE13417@atomide.com>
-References: <1456308664-28308-1-git-send-email-lokeshvutla@ti.com>
- <20160226191127.GE13417@atomide.com>
-Message-ID: <56D40505.8020702@ti.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Mon, 29 Feb 2016 16:46:49 +0800
+Subject: [PATCH v14 3/4] ARM64: add SBSA Generic Watchdog device node in
+ amd-seattle-soc.dtsi
+In-Reply-To: <1456735610-22012-1-git-send-email-fu.wei@linaro.org>
+References: <1456735610-22012-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <1456735610-22012-4-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+From: Fu Wei <fu.wei@linaro.org>
 
-On Saturday 27 February 2016 12:41 AM, Tony Lindgren wrote:
-> * Lokesh Vutla <lokeshvutla@ti.com> [160224 02:14]:
->> DRA7 SoC has the capability to support DDR memory upto 4GB. In order to
->> represent this in memory dt node, the address-cells and size cells
->> should be 2. So, changing the address-cells and size-cells to 2 and
->> updating the memory nodes accordingly.
->> @@ -57,10 +57,10 @@
->>  		compatible = "arm,cortex-a15-gic";
->>  		interrupt-controller;
->>  		#interrupt-cells = <3>;
->> -		reg = <0x48211000 0x1000>,
->> -		      <0x48212000 0x1000>,
->> -		      <0x48214000 0x2000>,
->> -		      <0x48216000 0x2000>;
->> +		reg = <0x0 0x48211000 0x0 0x1000>,
->> +		      <0x0 0x48212000 0x0 0x1000>,
->> +		      <0x0 0x48214000 0x0 0x2000>,
->> +		      <0x0 0x48216000 0x0 0x2000>;
->>  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
->>  		interrupt-parent = <&gic>;
->>  	};
->> @@ -69,7 +69,7 @@
->>  		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
->>  		interrupt-controller;
->>  		#interrupt-cells = <3>;
->> -		reg = <0x48281000 0x1000>;
->> +		reg = <0x0 0x48281000 0x0 0x1000>;
->>  		interrupt-parent = <&gic>;
->>  	};
->>  
->> @@ -96,10 +96,10 @@
->>  		compatible = "ti,dra7-l3-noc", "simple-bus";
->>  		#address-cells = <1>;
->>  		#size-cells = <1>;
->> -		ranges;
->> +		ranges = <0x0 0x0 0x0 0xc0000000>;
->>  		ti,hwmods = "l3_main_1", "l3_main_2";
->> -		reg = <0x44000000 0x1000000>,
->> -		      <0x45000000 0x1000>;
->> +		reg = <0x0 0x44000000 0x0 0x1000000>,
->> +		      <0x0 0x45000000 0x0 0x1000>;
->>  		interrupts-extended = <&crossbar_mpu GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
->>  				      <&wakeupgen GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
->>  
-> 
-> Is size-cells 2 needed for all these devices too? Can't
-> you just set it for the memory nodes?
+This can be a example of adding SBSA Generic Watchdog device node
+into some dts files for the Soc which contains SBSA Generic Watchdog.
 
-For updating memory nodes with 64bit, I have to change the address and
-size cells as 2 for the root node. So, reg property in all the children
-to the root node should also be updated with 2 address cells and 2 size
-cells or else the below warning shows up:
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+---
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Warning (reg_format): "reg" property in /interrupt-controller at 48281000
-has invalid length (8 bytes) (#address-cells == 2, #size-cells == 2)
-Warning (ranges_format): /ocp has empty "ranges" property but its
-#address-cells (1) differs from / (2)
-Warning (ranges_format): /ocp has empty "ranges" property but its
-#size-cells (1) differs from / (2)
-
-This is why I am updating all the children to the root node.
-
-Thanks and regards,
-Lokesh
+diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+index 2874d92..0a8ca1d 100644
+--- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
++++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+@@ -84,6 +84,14 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 		};
+ 
++		watchdog0: watchdog at e0bb0000 {
++			compatible = "arm,sbsa-gwdt";
++			reg = <0x0 0xe0bc0000 0 0x1000>,
++				<0x0 0xe0bb0000 0 0x1000>;
++			interrupts = <0 337 4>;
++			timeout-sec = <15>;
++		};
++
+ 		spi0: ssp at e1020000 {
+ 			status = "disabled";
+ 			compatible = "arm,pl022", "arm,primecell";
+-- 
+2.5.0
