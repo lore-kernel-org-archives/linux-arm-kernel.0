@@ -1,77 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Feb 2016 13:07:23 +0000
-Subject: [PATCH v13 01/20] ARM64: Move PMU register related defines to
- asm/perf_event.h
-In-Reply-To: <56CE6098.8070001@huawei.com>
-References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
- <1456290520-10012-2-git-send-email-zhaoshenglong@huawei.com>
- <20160224175247.GE12471@arm.com> <56CE6098.8070001@huawei.com>
-Message-ID: <56D4428B.5000505@arm.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Mon, 29 Feb 2016 18:32:52 +0530
+Subject: [PATCH 1/1] arm64: defconfig: Enable Maxim PMIC max77620 config
+Message-ID: <1456750972-13972-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shannon,
+Enable following configs for the Maxim Semiconductor's PMIC
+MAX77620/MAX20024. This is used on NVIDIA's Tegra 210 platform
+Jetson-TX1.
 
-On 25/02/16 02:02, Shannon Zhao wrote:
-> 
-> 
-> On 2016/2/25 1:52, Will Deacon wrote:
->> On Wed, Feb 24, 2016 at 01:08:21PM +0800, Shannon Zhao wrote:
->>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>
->>> To use the ARMv8 PMU related register defines from the KVM code, we move
->>> the relevant definitions to asm/perf_event.h header file and rename them
->>> with prefix ARMV8_PMU_.
->>>
->>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Reviewed-by: Andrew Jones <drjones@redhat.com>
->>> ---
->>>  arch/arm64/include/asm/perf_event.h | 35 +++++++++++++++++++
->>>  arch/arm64/kernel/perf_event.c      | 68 ++++++++++---------------------------
->>>  2 files changed, 52 insertions(+), 51 deletions(-)
->>
->> Looks fine to me, but we're going to get some truly horrible conflicts
->> in -next.
->>
->> I'm open to suggestions on the best way to handle this, but one way
->> would be:
->>
->>   1. Duplicate all the #defines privately in KVM (queue via kvm tree)
-> This way seems not proper I think.
-> 
->>   2. Rebase this patch onto my perf/updates branch [1] (queue via me)
-> While to this series, it really relies on the perf_event.h to compile
-> and test, so maybe for KVM-ARM and KVM maintainers it's not proper.
-> 
->>   3. Patch at -rc1 dropping the #defines from (1) and moving to the new
->>      perf_event.h stuff
->>
-> I vote for this way. Since the patch in [1] is small and nothing else
-> relies on them, I think it would be simple to rebase them onto this series.
-> 
->> Thoughts?
->>
-> Anyway, there are only 3 lines which have conflicts. I'm not sure
-> whether we could handle this when we merge them.
+ CONFIG_MFD_MAX77620 For MFD driver.
+ CONFIG_PINCTRL_MAX77620 For pin control support
+ CONFIG_GPIO_MAX77620 for GPIO Support.
+ CONFIG_REGULATOR_MAX77620 for regulator support.
+ CONFIG_RTC_DRV_MAX77686 for RTC support.
 
-I think you're missing the point:
+Enable Tegra I2C config to enable I2C in NVIDIA's Tegra 210
+platforms.
 
-- We want both the arm64 perf and KVM trees to be easy to merge
-- The conflicts are not that simple to resolve
-- We want these conflicts to be solved before it hits Linus' tree
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+The patches for drivers of MFD/GPIO/Pincontrol are in flight.
 
-With that in mind, here's what I'm suggesting we merge as a first patch:
+ arch/arm64/configs/defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/commit/?h=queue&id=2029b4b02691ec6ebba3d281068e783353d7e108
-
-Once this and the perf/updates branch are merged, we can add one last
-patch reverting this hack and actually doing the renaming work (Will has
-posted a resolution for most of the new things).
-
-Thoughts?
-
-	M.
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index a98a8ad..af3d4df 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -147,27 +147,32 @@ CONFIG_VIRTIO_CONSOLE=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_QUP=y
++CONFIG_I2C_TEGRA=y
+ CONFIG_I2C_UNIPHIER_F=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_QUP=y
+ CONFIG_SPMI=y
++CONFIG_PINCTRL_MAX77620=y
+ CONFIG_PINCTRL_MSM8916=y
+ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_RCAR=y
+ CONFIG_GPIO_XGENE=y
++CONFIG_GPIO_MAX77620=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
+ # CONFIG_HWMON is not set
++CONFIG_MFD_MAX77620=y
+ CONFIG_MFD_SPMI_PMIC=y
+ CONFIG_THERMAL=y
+ CONFIG_THERMAL_EMULATION=y
+ CONFIG_EXYNOS_THERMAL=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_MAX77620=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_QCOM_SPMI=y
+ CONFIG_FB=y
+@@ -216,6 +221,7 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_EFI=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_SUN6I=y
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
