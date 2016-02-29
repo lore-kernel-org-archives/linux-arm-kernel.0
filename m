@@ -1,72 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 11:53:46 +0100
-Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
-In-Reply-To: <56D41F74.8010408@arm.com>
-References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
- <56D41F74.8010408@arm.com>
-Message-ID: <2734684.OJWJHS6snX@wuerfel>
+From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
+Date: Mon, 29 Feb 2016 11:06:34 +0000
+Subject: [PATCH 1/2] can: rcar_can: Add r8a7795 support
+In-Reply-To: <CAMuHMdV3EsvN=sqiB2npB=cH8Bz4D6UVcQj-BKqfdHerKSDowQ@mail.gmail.com>
+References: <1456737661-20538-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <CAMuHMdV3EsvN=sqiB2npB=cH8Bz4D6UVcQj-BKqfdHerKSDowQ@mail.gmail.com>
+Message-ID: <SG2PR06MB10389D8C1D30451EC2AE8FF0C3BA0@SG2PR06MB1038.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 February 2016 10:37:40 Robin Murphy wrote:
-> Hi Arnd,
+Hi Geert,
+
+> On Mon, Feb 29, 2016 at 10:21 AM, Ramesh Shanmugasundaram
+> <ramesh.shanmugasundaram@bp.renesas.com> wrote:
+> > --- a/drivers/net/can/rcar_can.c
+> > +++ b/drivers/net/can/rcar_can.c
+> > @@ -808,6 +808,10 @@ static int rcar_can_probe(struct platform_device
+> *pdev)
+> >         priv->regs = addr;
+> >         priv->clock_select = clock_select;
+> >         priv->can.clock.freq = clk_get_rate(priv->can_clk);
+> > +
+> > +       /* Use the rounded clock value (nearest kHz) */
+> > +       priv->can.clock.freq = 1000 *
+> > + DIV_ROUND_UP(priv->can.clock.freq, 1000);
 > 
-> On 29/02/16 09:19, Arnd Bergmann wrote:
-> > The newly added Mediatek IOMMU driver uses the IOMMU_DMA infrastructure,
-> > but unlike other such drivers, it does not select 'ARM_DMA_USE_IOMMU',
-> > which is a prerequisite, leading to a link error:
-> >
-> > warning: (MTK_IOMMU) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT && NEED_SG_DMA_LENGTH)
-> 
-> Going off on a tangent, is it actually right for that to depend on a 
-> NEED_* symbol, or should that really be a select instead?
+> The comment and the implementation don't match.
+> To get the nearest kHz, you have to useDIV_ROUND_CLOSEST().
 
-ARM_DMA_USE_IOMMU gets this right, it selects NEED_SG_DMA_LENGTH as it
-actually needs it.
+Thanks Geert. Yes, DIV_ROUND_CLOSEST() would be apt as you pointed out.
+I'll be removing this hack when I rebase, as Marc is fixing the algorithm.
 
-The IOMMU_DMA symbol is a bit strange, and the dependency can probably
-get dropped altogether, but at least here it told us what went wrong.
-
-> > drivers/iommu/built-in.o: In function `iommu_put_dma_cookie':
-> > mtk_iommu.c:(.text+0x11fe): undefined reference to `put_iova_domain'
-> > drivers/iommu/built-in.o: In function `iommu_dma_init_domain':
-> > mtk_iommu.c:(.text+0x1316): undefined reference to `init_iova_domain'
-> > drivers/iommu/built-in.o: In function `__iommu_dma_unmap':
-> > mtk_iommu.c:(.text+0x1380): undefined reference to `find_iova'
-> >
-> > This adds the same select that the other drivers have. On a related
-> > note, I wonder if we should just always select ARM_DMA_USE_IOMMU
-> > whenever any IOMMU driver is enabled. Are there any cases where
-> > we would enable an IOMMU but not use it?
-> 
-> You could use one solely for VFIO without caring about DMA ops - I think 
-> that's mostly how ARM SMMUs are being used in practice at the moment - 
-> but DMA-focused 'media' IOMMUs vastly outnumber 'virtualisation' IOMMUs 
-> on ARM, so it would probably make sense. We already have the equivalent 
-> "select IOMMU_DMA if IOMMU_SUPPORT" on arm64.
-
-Ok.
-
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
-> > ---
-> >   drivers/iommu/Kconfig | 1 +
-> >   1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> > index b325954cf8f8..ea0998921702 100644
-> > --- a/drivers/iommu/Kconfig
-> > +++ b/drivers/iommu/Kconfig
-> > @@ -341,6 +341,7 @@ config MTK_IOMMU
-> >   	bool "MTK IOMMU Support"
-> >   	depends on ARM || ARM64
-> >   	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > +	select ARM_DMA_USE_IOMMU
-> 
-> If going down this route, I'd be inclined to add an "if ARM" there, just 
-> for clarity.
-
-That would run into the NEED_SG_DMA_LENGTH problem on other architectures
-that don't already set it, right?
-
-	Arnd
+Thanks,
+Ramesh
