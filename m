@@ -1,55 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 29 Feb 2016 20:54:19 -0300
-Subject: [PATCH 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
-In-Reply-To: <20160229213850.GS2613@pengutronix.de>
-References: <1456761156-27664-1-git-send-email-s.trumtrar@pengutronix.de>
- <1456761156-27664-3-git-send-email-s.trumtrar@pengutronix.de>
- <CAOMZO5BN-1U6vX0HAHWX30t+23NnqEpOw6AttSgvqaZnq=cN6Q@mail.gmail.com>
- <20160229213850.GS2613@pengutronix.de>
-Message-ID: <CAOMZO5BLYumOrBuoB5-RgzLAJ=o4zp9ocv4jcZRy=p6Pky1SyQ@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 29 Feb 2016 17:54:49 -0600
+Subject: [GIT PULL] Qualcomm SoC Updates for 4.6
+In-Reply-To: <1456789296-28703-1-git-send-email-andy.gross@linaro.org>
+References: <1456789296-28703-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160229235449.GA13904@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 6:38 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Mon, Feb 29, 2016 at 06:16:50PM -0300, Fabio Estevam wrote:
->> On Mon, Feb 29, 2016 at 12:52 PM, Steffen Trumtrar
->> <s.trumtrar@pengutronix.de> wrote:
->>
->> > +       ret = clk_prepare_enable(rngc->clk);
->> > +       if (ret)
->> > +               return ret;
->> > +
->> > +       rngc->irq = platform_get_irq(pdev, 0);
->> > +       if (!rngc->irq) {
->> > +               dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
->> > +               clk_disable_unprepare(rngc->clk);
->> > +
->> > +               return ret;
->>
->> You are returning the wrong error code here:
->>
->> Better do like this:
->>
->>        rngc->irq = platform_get_irq(pdev, 0);
->>        if (rngc->irq < 0) {
->
-> rngc->irq is unsigned, so this is never true.
->
->>                dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
->>                clk_disable_unprepare(rngc->clk);
->>                return rngc->irq;
->>        }
->
-> So here comes my better approach:
+On Mon, Feb 29, 2016 at 05:41:36PM -0600, Andy Gross wrote:
 
-As irq is only used inside probe it can be removed from struct mxc_rngc.
+<snip>
 
-Or maybe like this:
+> Lina Iyer (1):
+>       drivers: qcom: spm: avoid module usage in non-modular SPM driver
+> 
+> Srinivas Kandagatla (2):
+>       MAINTAINERS: add qcom i2c and spi drivers to list
+>       MAINTAINERS: add qcom clocks to the maintainers list
+> 
+> Stephen Boyd (3):
+>       spmi: pmic-arb: Support more than 128 peripherals
 
-         ret = platform_get_irq(pdev, 0);
-         if (ret < 0) {
-                 dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
-                 clk_disable_unprepare(rngc->clk);
-                 return ret;
-         }
+Stephen informed me that this was picked up by Greg.  I'll drop this patch and
+resend the pull request.
