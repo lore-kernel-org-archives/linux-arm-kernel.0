@@ -1,102 +1,61 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 29 Feb 2016 18:55:39 +0200
-Subject: [PATCH v2] video: exynos: fix modular build
-In-Reply-To: <6291541.7IMAnfX0g2@wuerfel>
-References: <1456490307-823812-1-git-send-email-arnd@arndb.de>
- <56D46DFD.6090706@ti.com> <6291541.7IMAnfX0g2@wuerfel>
-Message-ID: <56D4780B.2070406@ti.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Mon, 29 Feb 2016 18:10:53 +0100
+Subject: [PATCH V2 3/8] dmaengine: bcm2835: use shared interrupt for
+ channel 11 to 14.
+In-Reply-To: <20160114040749.GJ11130@localhost>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-4-git-send-email-kernel@martin.sperl.org>
+ <20160113122621.GA11130@localhost> <56965178.7070700@martin.sperl.org>
+ <20160113134338.GH11130@localhost> <56965E3B.7060104@martin.sperl.org>
+ <20160114040749.GJ11130@localhost>
+Message-ID: <1181247D-8257-439A-943F-34F40604D5A5@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/02/16 18:39, Arnd Bergmann wrote:
-> On Monday 29 February 2016 18:12:45 Tomi Valkeinen wrote:
->> Hi,
->>
->> On 26/02/16 14:38, Arnd Bergmann wrote:
->>> The s6e8ax0 driver has a dependency on BACKLIGHT_CLASS_DEVICE,
->>> which can be configured as a loadable module, so we have to
->>> make the driver a tristate symbol as well, to avoid this error:
->>>
->>> drivers/built-in.o: In function `s6e8ax0_probe':
->>> :(.text+0x23a48): undefined reference to `devm_backlight_device_register'
->>
->> If a 'bool' Kconfig option depends on BACKLIGHT_CLASS_DEVICE, shouldn't
->> the Kconfig dependency take care of having BACKLIGHT_CLASS_DEVICE as
->> built-in?
-> 
-> No, that's not how Kconfig interprets it. There are many bool option
-> that depend on tristate options but can be enabled if the dependency
-> is built-in.
-> 
-> Take this one for example:
-> 
-> config FIRMWARE_EDID
->        bool "Enable firmware EDID"
->        depends on FB
-> 
-> We clearly want to be able to turn this on even for FB=m.
 
-Right.
-
->>> This also means we get another error from a missing export, which
->>> this fixes as well:
->>>
->>> ERROR: "exynos_mipi_dsi_register_lcd_driver" [drivers/video/fbdev/exynos/s6e8ax0.ko] undefined!
->>>
->>> The drivers are all written to be loadable modules already,
->>> except the Kconfig options for that are missing, which makes
->>> the patch really easy.
->>
->> Looks and sound fine, except doesn't this tell that the drivers have
->> never been tested as modules? Did you or someone else actually test these?
+> On 14.01.2016, at 05:07, Vinod Koul <vinod.koul@intel.com> wrote:
 > 
-> No, this is not runtime tested. Generally there is very little that
-> can go wrong here though.
+> On Wed, Jan 13, 2016 at 03:24:59PM +0100, Martin Sperl wrote:
+>>>> But that would be frowned upon, so I had to come up with the approach
+>>>> taken, which makes the following assumptions:
+>>> 
+>>> DT was designed to move this info and hardcoding from kernel into
+>>> DT, so why cant we do that?
+>> We still need to be backwards-compatible - at least that is what
+>> everyone tells me, so I need to hard-code fallbacks for those values.
 > 
-> An alternative would be to change the dependency to
+> IMO hard code for falling back is okay as that supports old cases and new
+> platforms use geric DT info and new devices can be supported generically,
+> please check with DT folks..
 > 
-> 	depends on BACKLIGHT_CLASS_DEVICE=y
+>>>> * the DT maps only the interrupts that are assigned to the HW block
+>>>> * the driver knows about the number of DMA channels in HW
+>> that could be a DT property, yes.
+>>>> * the driver knows about the mapping of shared interrupts
+>>>>  (11-14 share irq).
+>> OK - how would you define that "mapping" in a "sane" manner in the DT
+>> that allows us to have multiple such mappings in the future?
 > 
-> which doesn't allow the driver to be turned on for the =m case.
-> However, no other framebuffer driver does this.
+> You are hard coding the flags for each channel, we can pass this for each
+> channel in the interrupt configi, a flag share/none..? Please run this thru
+> DT experts and I am not one of them..
 
-No, I think it's clearly better to make them tristate. I think all
-drivers should be buildable as modules. It just makes me a bit
-uncomfortable to enable code that has never been ran.
+So here a ?simple? approach with the following device tree addition (plus defaults):
+	interrupts = <1 16>, /* dma 0 irq */
+		     <1 17>, /* dma 1 irq */
+	...
+		     <1 26>, /* dma 10 irq */
+		     <1 27>, /* dma 11-14 irq */
+		     <1 28>; /* dma all irq */
+	brcm,dma-channel-mask = <0x7f35>;
+	/* new properties below - also the defaults */
+	brcm,dma-channel-shared-mask = <0x7800>;
+	brcm,dma-shared-irq-index = <11>;
 
->>> diff --git a/drivers/video/fbdev/exynos/Makefile b/drivers/video/fbdev/exynos/Makefile
->>> index b5b1bd228abb..02d8dc522fea 100644
->>> --- a/drivers/video/fbdev/exynos/Makefile
->>> +++ b/drivers/video/fbdev/exynos/Makefile
->>> @@ -2,6 +2,8 @@
->>>  # Makefile for the exynos video drivers.
->>>  #
->>>  
->>> -obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
->>> -				     	exynos_mipi_dsi_lowlevel.o
->>> +obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
->>> +
->>> +exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
->>> +					   exynos_mipi_dsi_lowlevel.o
->>
->> Hmm, why is this makefile change needed?
-> 
-> The original Makefile would link each file into a separate module, but that
-> cannot work, because they reference symbols from each other that are not
-> exported to other modules.
-> 
-> With my change, all the files get linked into a single module.
+Is this sufficient to move forward?
 
-Yes, of course.
+Thanks,
+	Martin
 
-Thanks, I'll queue this up for 4.6.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/cf158edd/attachment.sig>
+P.s: this would also mean (for later patches):
+	brcm,dma-lite-channel-mask = <0x7f00>;
