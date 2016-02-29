@@ -1,49 +1,50 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Mon, 29 Feb 2016 22:11:19 +0100
-Subject: [PATCH 2/2] clk: bcm2835: expose current divider,
- parent and mash via debugfs
-In-Reply-To: <87h9gr5jt3.fsf@eliezer.anholt.net>
-References: <1456755616-2472-1-git-send-email-kernel@martin.sperl.org>
- <1456755616-2472-3-git-send-email-kernel@martin.sperl.org>
- <87h9gr5jt3.fsf@eliezer.anholt.net>
-Message-ID: <058897BC-1090-4171-B239-D2A289F1D626@martin.sperl.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 29 Feb 2016 16:12:23 -0500
+Subject: [PATCH V3] AHCI: Workaround for ThunderX Errata#22536
+In-Reply-To: <56CF64B9.4080605@caviumnetworks.com>
+References: <1455653329-4934-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <alpine.DEB.2.11.1602171710350.19512@nanos>
+ <56CF64B9.4080605@caviumnetworks.com>
+Message-ID: <20160229211223.GZ3965@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-> On 29.02.2016, at 21:43, Eric Anholt <eric@anholt.net> wrote:
+Sorry about the delay.
+
+On Thu, Feb 25, 2016 at 12:31:53PM -0800, Tirumalesh Chalamarla wrote:
+> On 02/17/2016 08:12 AM, Thomas Gleixner wrote:
+> >On Tue, 16 Feb 2016, tchalamarla at caviumnetworks.com wrote:
+> >>+#ifdef CONFIG_ARM64
+> >>+/* Due to ERRATA#22536, ThunderX need to handle
+> >>+ * HOST_IRQ_STAT differently.
+> >>+ * Work around is to make sure all pending IRQs
+> >>+ * are served before leaving handler
+> >>+ */
+> >>+static irqreturn_t ahci_thunderx_irq_handler(int irq, void *dev_instance)
+> >>+{
+> >>+	struct ata_host *host = dev_instance;
+> >>+	struct ahci_host_priv *hpriv;
+> >>+	unsigned int rc = 0;
+> >>+	void __iomem *mmio;
+> >>+	u32 irq_stat, irq_masked;
+> >>+	unsigned int handled = 1;
+> >>+
+> >>+	VPRINTK("ENTER\n");
+> >
+> >Come on. This VPRINK stuff is really pointless. Enable irq tracepoints, they
+> >already track the enter/exit of interrupt handlers ....
 > 
-> kernel at martin.sperl.org writes:
-> 
->> From: Martin Sperl <kernel@martin.sperl.org>
->> 
->> For each clock expose the following values via debugfs:
->> * current_parent - the currently selected parent
->> * current_divi - the integer portion of the currently set divider
->> * current_divf - the fractional portion of the currently set divider
->> * current_frac - the current frac/mash settings for the divider
-> 
-> current_parent can already be found through /debug/clk/clk_summary quite
-> nicely I think.  If we wanted a per-clock parent file, that seems like
-> something the core ought to be doing.
-> 
-> current_frac is looking at a bit that doesn't exist for non-MASH clocks.
-> 
-> divi/divf are OK, I guess, but don't seem particularly useful given the
-> raw register output already.  A cooked floating point point divider
-> debugfs entry would be nice, but I don't know if we can do that.
+> sure. waiting for some more comments if any.
 
-The reason I had those is because I wanted to allow people to
-see quickly what is the parent clock and what is the used 
-parent and divider?
+Yeah, VPRINTK way predates tracepoints and is kinda silly at this
+point.  That said, it's used relatively consistently across libata and
+some people still use it for debugging.  We can replace them with
+proper tracepoints but that's a work for another patchset.  For now,
+let's leave it in for consistency with counterparts.
 
-While discussing with the PCM/I2s people they were always concerned
-about those details - so I needed to provide them with a way to access
-those things easily. And explaining to them the register format was -
-for me - out of the question.
+Thanks.
 
-Especially the mapping of ?id? to real parent was a bit of a pain.
-
-What do you mean by cooked? Something like: "33+27/4096??
-
-Martin
+-- 
+tejun
