@@ -1,48 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 29 Feb 2016 11:47:28 +0000
-Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
-In-Reply-To: <5357325.sBkT8ESvOS@wuerfel>
-References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
- <2734684.OJWJHS6snX@wuerfel> <56D429F0.7010409@arm.com>
- <5357325.sBkT8ESvOS@wuerfel>
-Message-ID: <56D42FD0.8030302@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Mon, 29 Feb 2016 17:22:45 +0530
+Subject: [PATCH] ARM: dts: dra7: Support QSPI MODE-0 operation at 64MHz
+In-Reply-To: <20160226191342.GF13417@atomide.com>
+References: <1456375652-14071-1-git-send-email-vigneshr@ti.com>
+ <20160226191342.GF13417@atomide.com>
+Message-ID: <56D4310D.5020608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/02/16 11:29, Arnd Bergmann wrote:
-> On Monday 29 February 2016 11:22:24 Robin Murphy wrote:
->>>>> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->>>>> index b325954cf8f8..ea0998921702 100644
->>>>> --- a/drivers/iommu/Kconfig
->>>>> +++ b/drivers/iommu/Kconfig
->>>>> @@ -341,6 +341,7 @@ config MTK_IOMMU
->>>>>      bool "MTK IOMMU Support"
->>>>>      depends on ARM || ARM64
->>>>>      depends on ARCH_MEDIATEK || COMPILE_TEST
->>>>> +   select ARM_DMA_USE_IOMMU
->>>>
->>>> If going down this route, I'd be inclined to add an "if ARM" there, just
->>>> for clarity.
->>>
->>> That would run into the NEED_SG_DMA_LENGTH problem on other architectures
->>> that don't already set it, right?
+Hi,
+
+On 02/27/2016 12:43 AM, Tony Lindgren wrote:
+> Hi,
+> 
+> * Vignesh R <vigneshr@ti.com> [160224 20:49]:
+>> According to Data Manual(SPRS915P) of AM57x, TI QSPI controller on
+>> DRA74(rev 1.1+) can support up to 64MHz in MODE-0, whereas MODE-3 is
+>> limited to 48MHz. Hence, switch to MODE-0 for better throughput.
 >>
->> Sorry, I'm lost - wouldn't "depends on ARM || ARM64" make other
->> architectures moot? arm64 already has NEED_SG_DMA_LENGTH=y by default.
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>  arch/arm/boot/dts/dra7-evm.dts | 6 ++----
+>>  1 file changed, 2 insertions(+), 4 deletions(-)
 >>
->
-> Nevermind, I didn't notice the dependency on the architecture.
->
-> What is keeping us from having 'depends on ARM || ARM64 || COMPILE_TEST'?
+>> diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+>> index cfc24e52244e..15f10bdc8c31 100644
+>> --- a/arch/arm/boot/dts/dra7-evm.dts
+>> +++ b/arch/arm/boot/dts/dra7-evm.dts
+>> @@ -653,15 +653,13 @@
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&qspi1_pins>;
+>>  
+>> -	spi-max-frequency = <48000000>;
+>> +	spi-max-frequency = <64000000>;
+>>  	m25p80 at 0 {
+>>  		compatible = "s25fl256s1";
+>> -		spi-max-frequency = <48000000>;
+>> +		spi-max-frequency = <64000000>;
+>>  		reg = <0>;
+>>  		spi-tx-bus-width = <1>;
+>>  		spi-rx-bus-width = <4>;
+>> -		spi-cpol;
+>> -		spi-cpha;
+>>  		#address-cells = <1>;
+>>  		#size-cells = <1>;
+>>  
+> 
+> Do we have any earlier pre DRA74(rev 1.1)versions in use too?
 
-IIRC it got changed because the kbuild test robot was consistently 
-blowing up due to missing definitions on things like parisc.
+Yes, there are pre 1.1 boards (production boards are all rev 1.1+), but
+QSPI is broken on them due to erratas (even w/o this patch).
 
-Robin.
+> 
+> What about the spi-cpol and spi-cpha changes? Those should be
+> at least documented?
+> 
 
-> I assume it doesn't work yet, but it would be nice to get that done
-> at some point so we can take advantage of automated build testing like
-> coverity.
->
-> 	Arnd
->
+Ok, I will add a NOTE in the documentation saying "spi-cpol" and
+"spi-cpha" are not supported by ti-qspi in
+Documentation/devicetree/bindings/spi/ti_qspi.txt.
+
+-- 
+Regards
+Vignesh
