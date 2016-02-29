@@ -1,24 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 29 Feb 2016 20:13:59 +0900
-Subject: [PATCH] ASoC: trace: fix printing jack name
-In-Reply-To: <s5hlh65i5js.wl-tiwai@suse.de>
-References: <1456331903-3999234-1-git-send-email-arnd@arndb.de>
- <20160224115037.40772a90@gandalf.local.home>
- <s5hlh65i5js.wl-tiwai@suse.de>
-Message-ID: <20160229111359.GX18327@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 12:14:50 +0100
+Subject: [PATCH] target/cxgbit: add INET dependency
+Message-ID: <1456744504-3011977-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 28, 2016 at 09:48:39AM +0100, Takashi Iwai wrote:
+The newly added cxgbit driver directly calls functions of the
+IPv4 network stack, which fails if that is disabled:
 
-> In anyway, the breakage came from my tree, so I'm going to apply the
-> fix directly on mine.
+ERROR: "ip_route_output_flow" [drivers/target/iscsi/cxgbit/cxgbit.ko] undefined!
+ERROR: "__ip_dev_find" [drivers/target/iscsi/cxgbit/cxgbit.ko] undefined!
 
-I applied it to ASoC a few days ago.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/349a812e/attachment.sig>
+This adds a Kconfig dependency to ensure we can't enable this
+driver without the complete network stack it needs.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: b7ca3321e114 ("cxgbit: add Kconfig and Makefile")
+---
+ drivers/target/iscsi/cxgbit/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/target/iscsi/cxgbit/Kconfig b/drivers/target/iscsi/cxgbit/Kconfig
+index cf335b4dbb4e..ce6f5cca315d 100644
+--- a/drivers/target/iscsi/cxgbit/Kconfig
++++ b/drivers/target/iscsi/cxgbit/Kconfig
+@@ -1,6 +1,7 @@
+ config ISCSI_TARGET_CXGB4
+ 	tristate "Chelsio iSCSI target offload driver"
+ 	depends on ISCSI_TARGET && CHELSIO_T4
++	depends on INET
+ 	select CHELSIO_T4_UWIRE
+ 	---help---
+ 	To compile this driver as module, choose M here: the module
+-- 
+2.7.0
