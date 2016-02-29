@@ -1,41 +1,106 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 29 Feb 2016 15:02:31 +0300
-Subject: [PATCH v4 3/4] ACPI: add definitions of DBG2 subtypes
+Date: Mon, 29 Feb 2016 15:02:32 +0300
+Subject: [PATCH v4 4/4] serial: pl011: use ACPI SPCR to setup 32-bit access
 In-Reply-To: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1456747355-15692-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456747355-15692-5-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent version of Microsoft Debug Port Table 2 (DBG2) [1]
-specifies additional serial debug port subtypes.  These constants
-are also referred by Serial Port Console Redirection Table (SPCR) [2]
+Some implementations of ARM SBSA serial port hardware require that access
+to the registers should be 32-bit.  Unfortunately, the only way for
+the driver to tell if it's the case is to use the data from ACPI SPCR/DBG2
+tables.  In this case the value of the 'Interface Type' field of the SPCR
+table is ACPI_DBG2_ARM_SBSA_32BIT.
 
-Add these constants.
-
-[1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
-[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+How this value is described in the DBG2 spec:
+"(deprecated) ARM SBSA (2.x only) Generic UART supporting only
+32-bit accesses"
 
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- include/acpi/actbl2.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/acpi/spcr.c             | 22 ++++++++++++++++++++++
+ drivers/tty/serial/amba-pl011.c |  2 ++
+ include/linux/acpi.h            |  5 +++++
+ 3 files changed, 29 insertions(+)
 
-diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-index a4ef625..652f747 100644
---- a/include/acpi/actbl2.h
-+++ b/include/acpi/actbl2.h
-@@ -371,6 +371,11 @@ struct acpi_dbg2_device {
+diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+index c460cb1..f2e81af 100644
+--- a/drivers/acpi/spcr.c
++++ b/drivers/acpi/spcr.c
+@@ -18,6 +18,7 @@
  
- #define ACPI_DBG2_16550_COMPATIBLE  0x0000
- #define ACPI_DBG2_16550_SUBSET      0x0001
-+#define ACPI_DBG2_ARM_PL011         0x0003
-+#define ACPI_DBG2_ARM_SBSA_32BIT    0x000D
-+#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000E
-+#define ACPI_DBG2_ARM_DCC           0x000F
-+#define ACPI_DBG2_BCM2835           0x0010
+ static char *options;
+ static struct acpi_generic_address address;
++static bool sbsa_32_bit;
  
- #define ACPI_DBG2_1394_STANDARD     0x0000
+ static int __init parse_spcr_init(void)
+ {
+@@ -60,6 +61,7 @@ static int __init parse_spcr_init(void)
+ 	}
  
+ 	address = table->serial_port;
++	sbsa_32_bit = table->interface_type == ACPI_DBG2_ARM_SBSA_32BIT;
+ 
+ done:
+ 	early_acpi_os_unmap_memory((void __iomem *)table, table_size);
+@@ -114,3 +116,23 @@ bool acpi_console_check(struct uart_port *uport)
+ 
+ 	return false;
+ }
++
++/**
++ * acpi_console_sbsa_32bit - Tell if SPCR specifies 32-bit SBSA.
++ *
++ * Some implementations of ARM SBSA serial port hardware require that access
++ * to the registers should be 32-bit.  Unfortunately, the only way for
++ * the driver to tell if it's the case is to use the data from ACPI SPCR/DBG2
++ * tables.  In this case the value of the 'Interface Type' field of the SPCR
++ * table is ACPI_DBG2_ARM_SBSA_32BIT.
++ *
++ * Return: true if access should be 32-bit wide.
++ */
++bool acpi_console_sbsa_32bit(void)
++{
++	if (acpi_disabled || parse_spcr() < 0)
++		return false;
++
++	return sbsa_32_bit;
++}
++EXPORT_SYMBOL(acpi_console_sbsa_32bit);
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 500232a..d9ca3a4 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2541,6 +2541,8 @@ static int sbsa_uart_probe(struct platform_device *pdev)
+ 		baudrate = 115200;
+ 	}
+ 
++	vendor_sbsa.access_32b = acpi_console_sbsa_32bit();
++
+ 	portnr = pl011_find_free_port();
+ 	if (portnr < 0)
+ 		return portnr;
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index ea0c297..da1eb23 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -1007,11 +1007,16 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
+ struct uart_port;
+ #ifdef CONFIG_ACPI_SPCR_TABLE
+ bool acpi_console_check(struct uart_port *uport);
++bool acpi_console_sbsa_32bit(void);
+ #else
+ static inline bool acpi_console_check(struct uart_port *uport)
+ {
+ 	return FALSE;
+ }
++static inline bool acpi_console_sbsa_32bit(void)
++{
++	return false;
++}
+ #endif
+ 
+ #endif	/*_LINUX_ACPI_H*/
 -- 
 2.7.1
