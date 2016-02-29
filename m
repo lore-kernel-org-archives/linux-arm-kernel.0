@@ -1,29 +1,55 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 29 Feb 2016 15:52:58 -0800
-Subject: [GIT PULL v2 2/2] arm64: X-Gene platforms DTS changes queued for
- v4.6 - part2
-In-Reply-To: <2810423.Kcm4tofWV4@wuerfel>
-References: <CADaLND==AshC-syR3Tm93bPqB-vEyO3=AY+pM5r_ohgr4n-nBw@mail.gmail.com>
- <2810423.Kcm4tofWV4@wuerfel>
-Message-ID: <CADaLNDnS1A25UyNoJ3Ybq1QunqSOjwG2qpHCL_ZS9iKjyTme7w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 Feb 2016 20:54:19 -0300
+Subject: [PATCH 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
+In-Reply-To: <20160229213850.GS2613@pengutronix.de>
+References: <1456761156-27664-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1456761156-27664-3-git-send-email-s.trumtrar@pengutronix.de>
+ <CAOMZO5BN-1U6vX0HAHWX30t+23NnqEpOw6AttSgvqaZnq=cN6Q@mail.gmail.com>
+ <20160229213850.GS2613@pengutronix.de>
+Message-ID: <CAOMZO5BLYumOrBuoB5-RgzLAJ=o4zp9ocv4jcZRy=p6Pky1SyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 3:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 26 February 2016 01:04:29 Duc Dang wrote:
->> Second part of X-Gene DT changes queued for v4.6
+On Mon, Feb 29, 2016 at 6:38 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Mon, Feb 29, 2016 at 06:16:50PM -0300, Fabio Estevam wrote:
+>> On Mon, Feb 29, 2016 at 12:52 PM, Steffen Trumtrar
+>> <s.trumtrar@pengutronix.de> wrote:
 >>
->> This patch set includes:
->> + X-Gene v1 and v2 Mailbox DT nodes
->> + X-Gene v1 and X-Gene v2 SLIMpro Mailbox
->> I2C driver DT nodes
+>> > +       ret = clk_prepare_enable(rngc->clk);
+>> > +       if (ret)
+>> > +               return ret;
+>> > +
+>> > +       rngc->irq = platform_get_irq(pdev, 0);
+>> > +       if (!rngc->irq) {
+>> > +               dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
+>> > +               clk_disable_unprepare(rngc->clk);
+>> > +
+>> > +               return ret;
 >>
+>> You are returning the wrong error code here:
+>>
+>> Better do like this:
+>>
+>>        rngc->irq = platform_get_irq(pdev, 0);
+>>        if (rngc->irq < 0) {
 >
-> Merged into next/dt64, thanks!
-
-Thanks, Arnd.
-
-Regards,
-Duc Dang.
+> rngc->irq is unsigned, so this is never true.
 >
->         Arnd
+>>                dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
+>>                clk_disable_unprepare(rngc->clk);
+>>                return rngc->irq;
+>>        }
+>
+> So here comes my better approach:
+
+As irq is only used inside probe it can be removed from struct mxc_rngc.
+
+Or maybe like this:
+
+         ret = platform_get_irq(pdev, 0);
+         if (ret < 0) {
+                 dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
+                 clk_disable_unprepare(rngc->clk);
+                 return ret;
+         }
