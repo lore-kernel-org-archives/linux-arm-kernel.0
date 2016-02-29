@@ -1,67 +1,60 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 29 Feb 2016 11:54:21 -0700
-Subject: [PATCH 2/8] coresight: etm4x: adding config and traceid registers
+Date: Mon, 29 Feb 2016 11:54:24 -0700
+Subject: [PATCH 5/8] coresight: etm4x: unlocking tracers in default arch init
 In-Reply-To: <1456772067-18085-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1456772067-18085-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1456772067-18085-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1456772067-18085-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding new sysFS management interface to query the configuration
-and the traceid registers.  Both are required to convey information
-to the perf cmd line tools when using ETMv4 tracers as PMU.
+As with the ETMv3.x driver, calling 'smp_call_function_single()'
+twice in a row is highly ineffective.  As such moving function
+'etm4_os_unlock()' before the default initialisation takes
+place, which results in the same outcome.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x | 13 +++++++++++++
- drivers/hwtracing/coresight/coresight-etm4x-sysfs.c         |  4 ++++
- 2 files changed, 17 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-index 2355ed8ae31f..36258bc1b473 100644
---- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-@@ -359,6 +359,19 @@ Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description:	(R) Print the content of the Peripheral ID3 Register
- 		(0xFEC).  The value is taken directly from the HW.
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 6fd554f10ba5..4b83a753256b 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -45,12 +45,11 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+ static int etm4_count;
+ static struct etmv4_drvdata *etmdrvdata[NR_CPUS];
  
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcconfig
-+Date:		February 2016
-+KernelVersion:	4.07
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the trace configuration register
-+		(0x010) as currently set by SW.
+-static void etm4_os_unlock(void *info)
++static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
+ {
+-	struct etmv4_drvdata *drvdata = (struct etmv4_drvdata *)info;
+-
+ 	/* Writing any value to ETMOSLAR unlocks the trace registers */
+ 	writel_relaxed(0x0, drvdata->base + TRCOSLAR);
++	drvdata->os_unlock = true;
+ 	isb();
+ }
+ 
+@@ -287,6 +286,9 @@ static void etm4_init_arch_data(void *info)
+ 	u32 etmidr5;
+ 	struct etmv4_drvdata *drvdata = info;
+ 
++	/* Make sure all registers are accessible */
++	etm4_os_unlock(drvdata);
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trctraceid
-+Date:		February 2016
-+KernelVersion:	4.07
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the trace ID register (0x040).
-+
- What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr0
- Date:		April 2015
- KernelVersion:	4.01
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-index 5db0de7d4e0e..39a8b077e0c2 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-@@ -1972,6 +1972,8 @@ coresight_simple_func(trcoslsr, TRCOSLSR);
- coresight_simple_func(trcpdcr, TRCPDCR);
- coresight_simple_func(trcpdsr, TRCPDSR);
- coresight_simple_func(trclsr, TRCLSR);
-+coresight_simple_func(trcconfig, TRCCONFIGR);
-+coresight_simple_func(trctraceid, TRCTRACEIDR);
- coresight_simple_func(trcauthstatus, TRCAUTHSTATUS);
- coresight_simple_func(trcdevid, TRCDEVID);
- coresight_simple_func(trcdevtype, TRCDEVTYPE);
-@@ -1985,6 +1987,8 @@ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
- 	&dev_attr_trcpdcr.attr,
- 	&dev_attr_trcpdsr.attr,
- 	&dev_attr_trclsr.attr,
-+	&dev_attr_trcconfig.attr,
-+	&dev_attr_trctraceid.attr,
- 	&dev_attr_trcauthstatus.attr,
- 	&dev_attr_trcdevid.attr,
- 	&dev_attr_trcdevtype.attr,
+ 	CS_UNLOCK(drvdata->base);
+ 
+ 	/* find all capabilities of the tracing unit */
+@@ -604,9 +606,6 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	get_online_cpus();
+ 	etmdrvdata[drvdata->cpu] = drvdata;
+ 
+-	if (!smp_call_function_single(drvdata->cpu, etm4_os_unlock, drvdata, 1))
+-		drvdata->os_unlock = true;
+-
+ 	if (smp_call_function_single(drvdata->cpu,
+ 				etm4_init_arch_data,  drvdata, 1))
+ 		dev_err(dev, "ETM arch init failed\n");
 -- 
 2.1.4
