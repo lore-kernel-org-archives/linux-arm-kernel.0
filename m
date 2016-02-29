@@ -1,79 +1,114 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 29 Feb 2016 11:22:24 +0000
-Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
-In-Reply-To: <2734684.OJWJHS6snX@wuerfel>
-References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
- <56D41F74.8010408@arm.com> <2734684.OJWJHS6snX@wuerfel>
-Message-ID: <56D429F0.7010409@arm.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 29 Feb 2016 12:21:39 +0100
+Subject: [PATCHv2 16/16] ARM: dts: imx6ul: add support for Ka-Ro
+ electronics TXUL modules
+In-Reply-To: <20160228064326.GG22051@tiger>
+References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
+ <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
+ <1453284549-16363-17-git-send-email-LW@KARO-electronics.de>
+ <20160228064326.GG22051@tiger>
+Message-ID: <20160229122139.6a560304@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/02/16 10:53, Arnd Bergmann wrote:
-> On Monday 29 February 2016 10:37:40 Robin Murphy wrote:
->> Hi Arnd,
->>
->> On 29/02/16 09:19, Arnd Bergmann wrote:
->>> The newly added Mediatek IOMMU driver uses the IOMMU_DMA infrastructure,
->>> but unlike other such drivers, it does not select 'ARM_DMA_USE_IOMMU',
->>> which is a prerequisite, leading to a link error:
->>>
->>> warning: (MTK_IOMMU) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT && NEED_SG_DMA_LENGTH)
->>
->> Going off on a tangent, is it actually right for that to depend on a
->> NEED_* symbol, or should that really be a select instead?
->
-> ARM_DMA_USE_IOMMU gets this right, it selects NEED_SG_DMA_LENGTH as it
-> actually needs it.
->
-> The IOMMU_DMA symbol is a bit strange, and the dependency can probably
-> get dropped altogether, but at least here it told us what went wrong.
+Hi,
 
-IOMMU_DMA uses sg_dma_len() unconditionally all over the place, hence 
-the "dependency". Thanks for the clarification; fix sent.
+On Sun, 28 Feb 2016 14:43:26 +0800 Shawn Guo wrote:
+> On Wed, Jan 20, 2016 at 11:09:09AM +0100, Lothar Wa?mann wrote:
+[...]
+> > +/dts-v1/;
+> > +#include "imx6ul.dtsi"
+> > +#include "imx6ul-txul.dtsi"
+> > +
+> > +/ {
+> > +	model = "Ka-Ro electronics TXUL-0010 Module";
+> > +	compatible = "karo,imx6ul-tx6ul", "fsl,imx6ul";
+> > +
+> > +	aliases {
+> > +		mmc0 = &usdhc1;
+> > +		/delete-property/ mmc1;
+> 
+> Why is this deletion of mmc1 needed?
+> 
+Its not actually necessary, but for convenience of U-Boot users who may
+want to enable/disable the mmc interface dynamically. Since the
+USDHC2 interface is not available on this module, I prefer not to have
+a dangling alias that points to an interface that is not actually
+useable.
 
->>> drivers/iommu/built-in.o: In function `iommu_put_dma_cookie':
->>> mtk_iommu.c:(.text+0x11fe): undefined reference to `put_iova_domain'
->>> drivers/iommu/built-in.o: In function `iommu_dma_init_domain':
->>> mtk_iommu.c:(.text+0x1316): undefined reference to `init_iova_domain'
->>> drivers/iommu/built-in.o: In function `__iommu_dma_unmap':
->>> mtk_iommu.c:(.text+0x1380): undefined reference to `find_iova'
->>>
->>> This adds the same select that the other drivers have. On a related
->>> note, I wonder if we should just always select ARM_DMA_USE_IOMMU
->>> whenever any IOMMU driver is enabled. Are there any cases where
->>> we would enable an IOMMU but not use it?
->>
->> You could use one solely for VFIO without caring about DMA ops - I think
->> that's mostly how ARM SMMUs are being used in practice at the moment -
->> but DMA-focused 'media' IOMMUs vastly outnumber 'virtualisation' IOMMUs
->> on ARM, so it would probably make sense. We already have the equivalent
->> "select IOMMU_DMA if IOMMU_SUPPORT" on arm64.
->
-> Ok.
->
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
->>> ---
->>>    drivers/iommu/Kconfig | 1 +
->>>    1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->>> index b325954cf8f8..ea0998921702 100644
->>> --- a/drivers/iommu/Kconfig
->>> +++ b/drivers/iommu/Kconfig
->>> @@ -341,6 +341,7 @@ config MTK_IOMMU
->>>    	bool "MTK IOMMU Support"
->>>    	depends on ARM || ARM64
->>>    	depends on ARCH_MEDIATEK || COMPILE_TEST
->>> +	select ARM_DMA_USE_IOMMU
->>
->> If going down this route, I'd be inclined to add an "if ARM" there, just
->> for clarity.
->
-> That would run into the NEED_SG_DMA_LENGTH problem on other architectures
-> that don't already set it, right?
+> > diff --git a/arch/arm/boot/dts/imx6ul-txul-0011.dts b/arch/arm/boot/dts/imx6ul-txul-0011.dts
+> > new file mode 100644
+> > index 0000000..dd3055b
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx6ul-txul-0011.dts
+> > @@ -0,0 +1,85 @@
+> > +/*
+> > + * Copyright 2015 Lothar Wa?mann <LW@KARO-electronics.de>
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License
+> > + *     version 2 as published by the Free Software Foundation.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "imx6ul.dtsi"
+> > +#include "imx6ul-txul.dtsi"
+> > +
+> > +/ {
+> > +	model = "Ka-Ro electronics TXUL-0011 Module";
+> > +	compatible = "karo,imx6ul-tx6ul", "fsl,imx6ul";
+> > +
+> > +	aliases {
+> > +		mmc0 = &usdhc2;
+> > +		mmc1 = &usdhc1;
+> > +	};
+> > +};
+> > +
+> > +&gpmi {
+> > +	status = "disabled";
+> > +};
+> > +
+> > +&iomuxc {
+> > +	imx6ul-txul {
+> 
+> Since commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without
+> function nodes), we can save this container node.
+> 
+I already reworked the file in the meantime, so that this and your
+remaining comments are addressed.
 
-Sorry, I'm lost - wouldn't "depends on ARM || ARM64" make other 
-architectures moot? arm64 already has NEED_SG_DMA_LENGTH=y by default.
 
-Robin.
+Lothar Wa?mann
