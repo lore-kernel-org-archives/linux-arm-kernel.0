@@ -1,39 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 17:04:20 +0100
-Subject: [PATCH 1/2] cpufreq: qoriq: allow building as module with THERMAL=m
-Message-ID: <1456761867-1742824-1-git-send-email-arnd@arndb.de>
+Date: Mon, 29 Feb 2016 17:04:21 +0100
+Subject: [PATCH 2/2] cpufreq: mediatek: allow building as a module
+In-Reply-To: <1456761867-1742824-1-git-send-email-arnd@arndb.de>
+References: <1456761867-1742824-1-git-send-email-arnd@arndb.de>
+Message-ID: <1456761867-1742824-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My previous patch to avoid link errors with the qoriq cpufreq
-driver disallowed all of the broken cases, but also prevented
-the driver from being built when CONFIG_THERMAL is a module.
+The MT8173 cpufreq driver can currently only be built-in, but
+it has a Kconfig dependency on the thermal core. THERMAL
+can be a loadable module, which in turn makes this driver
+impossible to build.
 
-This changes the dependency to allow the cpufreq driver to
-also be a module in this case, just not built-in.
+It is nicer to make the cpufreq driver a module as well, so
+this patch turns the option in to a 'tristate' and adapts
+the dependency accordingly.
+
+The driver has no module_exit() function, so it will continue
+to not support unloading, but it can be built as a module
+and loaded at runtime now.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: cpufreq: qoriq depends on thermal
+Fixes: 5269e7067cd6 ("cpufreq: Add ARM_MT8173_CPUFREQ dependency on THERMAL")
 ---
+ drivers/cpufreq/Kconfig.arm      | 4 ++--
+ drivers/cpufreq/mt8173-cpufreq.c | 1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-If possible, please fold this change directly into the previous
-commit
-
- drivers/cpufreq/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-index ca05037dd565..d5e11d24f72b 100644
---- a/drivers/cpufreq/Kconfig
-+++ b/drivers/cpufreq/Kconfig
-@@ -297,7 +297,7 @@ endif
- config QORIQ_CPUFREQ
- 	tristate "CPU frequency scaling driver for Freescale QorIQ SoCs"
- 	depends on OF && COMMON_CLK && (PPC_E500MC || ARM)
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 0031069b64c9..14b1f9393b05 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -84,10 +84,10 @@ config ARM_KIRKWOOD_CPUFREQ
+ 	  SoCs.
+ 
+ config ARM_MT8173_CPUFREQ
+-	bool "Mediatek MT8173 CPUFreq support"
++	tristate "Mediatek MT8173 CPUFreq support"
+ 	depends on ARCH_MEDIATEK && REGULATOR
+ 	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
 -	depends on !CPU_THERMAL || THERMAL=y
 +	depends on !CPU_THERMAL || THERMAL
- 	select CLK_QORIQ
+ 	select PM_OPP
  	help
- 	  This adds the CPUFreq driver support for Freescale QorIQ SoCs
+ 	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+index 1efba340456d..2058e6d292ce 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mt8173-cpufreq.c
+@@ -17,6 +17,7 @@
+ #include <linux/cpu_cooling.h>
+ #include <linux/cpufreq.h>
+ #include <linux/cpumask.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_opp.h>
 -- 
 2.7.0
