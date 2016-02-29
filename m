@@ -1,79 +1,80 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 13:13:31 +0100
-Subject: [PATCH] platform/x86: never 'select DMI' from a driver
-Message-ID: <1456748014-358588-1-git-send-email-arnd@arndb.de>
+Date: Mon, 29 Feb 2016 13:20:28 +0100
+Subject: [PATCH v2] mtd: avoid stack overflow in MTD CFI code
+Message-ID: <1456748436-522413-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_DMI is a user-selectable Kconfig symbol that some drivers
-depend on. As part of a recent patch, other drivers started
-adding a 'select' for the same symbol, which now causes
-a recursive dependency:
+When map_word gets too large, we use a lot of kernel stack, and for
+MTD_MAP_BANK_WIDTH_32, this means we use more than the recommended
+1024 bytes in a number of functions:
 
-drivers/gpio/Kconfig:34:error: recursive dependency detected!
-subsection "Kconfig recursive dependency limitations"
-drivers/gpio/Kconfig:34:        symbol GPIOLIB is selected by GEOS
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-arch/x86/Kconfig:2591:  symbol GEOS depends on DMI
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-arch/x86/Kconfig:815:   symbol DMI is selected by DELL_LAPTOP
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/platform/x86/Kconfig:104:       symbol DELL_LAPTOP depends on BACKLIGHT_CLASS_DEVICE
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/backlight/Kconfig:158:    symbol BACKLIGHT_CLASS_DEVICE is selected by FB_BACKLIGHT
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:192:        symbol FB_BACKLIGHT is selected by FB_SSD1307
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:2462:       symbol FB_SSD1307 depends on GPIOLIB
+drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
+drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1336 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_erase_varsize':
+drivers/mtd/chips/cfi_cmdset_0020.c:972:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+drivers/mtd/chips/cfi_cmdset_0001.c: In function 'do_write_buffer':
+drivers/mtd/chips/cfi_cmdset_0001.c:1835:1: warning: the frame size of 1240 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 
-Basically we should either always use 'depends on' or always use 'select'
-to avoid this kind of loop. Using 'depends on' is more useful here,
-as it still allows users to turn off the symbol of they really
-want to, without having to track down every driver selecting it.
+This can be avoided if all operations on the map word are done
+indirectly and the stack gets reused between the calls. We can
+mostly achieve this by selecting MTD_COMPLEX_MAPPINGS whenever
+MTD_MAP_BANK_WIDTH_32 is set, but for the case that no other
+bank width is enabled, we also need to use a non-constant
+map_bankwidth() to convince the compiler to use less stack.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: cbd9d95b2b27 ("dell-wmi, dell-laptop: select DMI")
 ---
- drivers/platform/x86/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+v2: added 'if HAS_IOMEM' to avoid a Kconfig warning on user-mode-linux.
 
-diff --git a/drivers/platform/x86/Kconfig b/drivers/platform/x86/Kconfig
-index 659e13b1e6f0..a65d974f387a 100644
---- a/drivers/platform/x86/Kconfig
-+++ b/drivers/platform/x86/Kconfig
-@@ -105,6 +105,7 @@ config DELL_LAPTOP
- 	tristate "Dell Laptop Extras"
- 	depends on X86
- 	depends on DELL_SMBIOS
-+	depends on DMI
- 	depends on BACKLIGHT_CLASS_DEVICE
- 	depends on ACPI_VIDEO || ACPI_VIDEO = n
- 	depends on RFKILL || RFKILL = n
-@@ -112,7 +113,6 @@ config DELL_LAPTOP
- 	select POWER_SUPPLY
- 	select LEDS_CLASS
- 	select NEW_LEDS
--	select DMI
- 	default n
- 	---help---
- 	This driver adds support for rfkill and backlight control to Dell
-@@ -121,10 +121,10 @@ config DELL_LAPTOP
- config DELL_WMI
- 	tristate "Dell WMI extras"
- 	depends on ACPI_WMI
-+	depends on DMI
- 	depends on INPUT
- 	depends on ACPI_VIDEO || ACPI_VIDEO = n
- 	select INPUT_SPARSEKMAP
--	select DMI
- 	---help---
- 	  Say Y here if you want to support WMI-based hotkeys on Dell laptops.
+Originally sent out on Jan 1, sorry for taking my time to follow
+up with a new version.
+
+ drivers/mtd/chips/Kconfig |  1 +
+ include/linux/mtd/map.h   | 19 +++++++------------
+ 2 files changed, 8 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/mtd/chips/Kconfig b/drivers/mtd/chips/Kconfig
+index 741ec69e0b46..cd162cbc3746 100644
+--- a/drivers/mtd/chips/Kconfig
++++ b/drivers/mtd/chips/Kconfig
+@@ -117,6 +117,7 @@ config MTD_MAP_BANK_WIDTH_16
  
+ config MTD_MAP_BANK_WIDTH_32
+ 	bool "Support 256-bit buswidth" if MTD_CFI_GEOMETRY
++	select MTD_COMPLEX_MAPPINGS if HAS_IOMEM
+ 	default n
+ 	help
+ 	  If you wish to support CFI devices on a physical bus which is
+diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+index 5e0eb7ccabd4..3aa56e3104bb 100644
+--- a/include/linux/mtd/map.h
++++ b/include/linux/mtd/map.h
+@@ -122,18 +122,13 @@
+ #endif
+ 
+ #ifdef CONFIG_MTD_MAP_BANK_WIDTH_32
+-# ifdef map_bankwidth
+-#  undef map_bankwidth
+-#  define map_bankwidth(map) ((map)->bankwidth)
+-#  undef map_bankwidth_is_large
+-#  define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
+-#  undef map_words
+-#  define map_words(map) map_calc_words(map)
+-# else
+-#  define map_bankwidth(map) 32
+-#  define map_bankwidth_is_large(map) (1)
+-#  define map_words(map) map_calc_words(map)
+-# endif
++/* always use indirect access for 256-bit to preserve kernel stack */
++# undef map_bankwidth
++# define map_bankwidth(map) ((map)->bankwidth)
++# undef map_bankwidth_is_large
++# define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
++# undef map_words
++# define map_words(map) map_calc_words(map)
+ #define map_bankwidth_is_32(map) (map_bankwidth(map) == 32)
+ #undef MAX_MAP_BANKWIDTH
+ #define MAX_MAP_BANKWIDTH 32
 -- 
 2.7.0
