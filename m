@@ -1,68 +1,76 @@
 From: brian.starkey@arm.com (Brian Starkey)
-Date: Mon, 29 Feb 2016 16:09:21 +0000
-Subject: [PATCH v2 1/4] memremap: don't modify flags
+Date: Mon, 29 Feb 2016 16:09:22 +0000
+Subject: [PATCH v2 2/4] memremap: add MEMREMAP_WC flag.
 In-Reply-To: <cover.1456225103.git.brian.starkey@arm.com>
 References: <cover.1456225103.git.brian.starkey@arm.com>
-Message-ID: <14384f41309a577b80f80356b6a38fce4241a6b1.1456225103.git.brian.starkey@arm.com>
+Message-ID: <ae56f89fbe67f81dbf523c9ea226a94b51892e54.1456225103.git.brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't modify the flags input argument to memremap(). MEMREMAP_WB is
-already a special case so we can check for it directly instead of
-clearing flag bits in each mapper.
+Add a flag to memremap() for writecombine mappings. Mappings satisfied
+by this flag will not be cached, however writes may be delayed or
+combined into more efficient bursts. This is most suitable for
+buffers written sequentially by the CPU for use by other DMA devices.
 
 Signed-off-by: Brian Starkey <brian.starkey@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- kernel/memremap.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ include/linux/io.h |    1 +
+ kernel/memremap.c  |   13 +++++++++++--
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
+diff --git a/include/linux/io.h b/include/linux/io.h
+index 32403b5..e2c8419 100644
+--- a/include/linux/io.h
++++ b/include/linux/io.h
+@@ -135,6 +135,7 @@ enum {
+ 	/* See memremap() kernel-doc for usage description... */
+ 	MEMREMAP_WB = 1 << 0,
+ 	MEMREMAP_WT = 1 << 1,
++	MEMREMAP_WC = 1 << 2,
+ };
+ 
+ void *memremap(resource_size_t offset, size_t size, unsigned long flags);
 diff --git a/kernel/memremap.c b/kernel/memremap.c
-index 59c55af..92adb19 100644
+index 92adb19..03ce593 100644
 --- a/kernel/memremap.c
 +++ b/kernel/memremap.c
-@@ -64,6 +64,9 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 				       IORESOURCE_SYSTEM_RAM, IORES_DESC_NONE);
- 	void *addr = NULL;
- 
-+	if (!flags)
-+		return NULL;
-+
- 	if (is_ram == REGION_MIXED) {
- 		WARN_ONCE(1, "memremap attempted on mixed range %pa size: %#lx\n",
- 				&offset, (unsigned long) size);
-@@ -72,7 +75,6 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 
- 	/* Try all mapping types requested until one returns non-NULL */
- 	if (flags & MEMREMAP_WB) {
--		flags &= ~MEMREMAP_WB;
- 		/*
- 		 * MEMREMAP_WB is special in that it can be satisifed
- 		 * from the direct map.  Some archs depend on the
-@@ -86,21 +88,19 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 	}
- 
- 	/*
--	 * If we don't have a mapping yet and more request flags are
--	 * pending then we will be attempting to establish a new virtual
-+	 * If we don't have a mapping yet and other request flags are
-+	 * present then we will be attempting to establish a new virtual
- 	 * address mapping.  Enforce that this mapping is not aliasing
- 	 * System RAM.
- 	 */
--	if (!addr && is_ram == REGION_INTERSECTS && flags) {
-+	if (!addr && is_ram == REGION_INTERSECTS && flags != MEMREMAP_WB) {
- 		WARN_ONCE(1, "memremap attempted on ram %pa size: %#lx\n",
- 				&offset, (unsigned long) size);
- 		return NULL;
- 	}
- 
--	if (!addr && (flags & MEMREMAP_WT)) {
--		flags &= ~MEMREMAP_WT;
-+	if (!addr && (flags & MEMREMAP_WT))
+@@ -41,11 +41,13 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
+  * memremap() - remap an iomem_resource as cacheable memory
+  * @offset: iomem resource start address
+  * @size: size of remap
+- * @flags: either MEMREMAP_WB or MEMREMAP_WT
++ * @flags: any of MEMREMAP_WB, MEMREMAP_WT and MEMREMAP_WC
+  *
+  * memremap() is "ioremap" for cases where it is known that the resource
+  * being mapped does not have i/o side effects and the __iomem
+- * annotation is not applicable.
++ * annotation is not applicable. In the case of multiple flags, the different
++ * mapping types will be attempted in the order listed below until one of
++ * them succeeds.
+  *
+  * MEMREMAP_WB - matches the default mapping for System RAM on
+  * the architecture.  This is usually a read-allocate write-back cache.
+@@ -57,6 +59,10 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
+  * cache or are written through to memory and never exist in a
+  * cache-dirty state with respect to program visibility.  Attempts to
+  * map System RAM with this mapping type will fail.
++ *
++ * MEMREMAP_WC - establish a writecombine mapping, whereby writes may
++ * be coalesced together (e.g. in the CPU's write buffers), but is otherwise
++ * uncached. Attempts to map System RAM with this mapping type will fail.
+  */
+ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
+ {
+@@ -102,6 +108,9 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
+ 	if (!addr && (flags & MEMREMAP_WT))
  		addr = ioremap_wt(offset, size);
--	}
  
++	if (!addr && (flags & MEMREMAP_WC))
++		addr = ioremap_wc(offset, size);
++
  	return addr;
  }
+ EXPORT_SYMBOL(memremap);
 -- 
 1.7.9.5
