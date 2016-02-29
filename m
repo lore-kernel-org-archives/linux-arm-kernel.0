@@ -1,51 +1,77 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Feb 2016 11:23:42 +0800
-Subject: [PATCH v3 2/2] iio: dac: vf610_dac: Add IIO DAC driver for
- Vybrid SoC
-In-Reply-To: <20160225153045.GA15913@Sanchayan-Arch>
-References: <cover.1456121233.git.maitysanchayan@gmail.com>
- <1a70acdd3ffae273bbfe2f80c5e3952d152921df.1456121233.git.maitysanchayan@gmail.com>
- <20160223205437.GA27366@rob-hp-laptop>
- <56CE18AC.6020603@kernel.org>
- <20160225153045.GA15913@Sanchayan-Arch>
-Message-ID: <20160229032342.GR22051@tiger>
+Date: Mon, 29 Feb 2016 11:36:49 +0800
+Subject: [PATCH] bus: imx-weim: Take the 'status' property value into
+ account
+In-Reply-To: <1456142513-12876-1-git-send-email-festevam@gmail.com>
+References: <1456142513-12876-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160229033649.GS22051@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 09:00:45PM +0530, maitysanchayan at gmail.com wrote:
-> Hello,
+On Mon, Feb 22, 2016 at 09:01:53AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> On 16-02-24 20:55:08, Jonathan Cameron wrote:
-> > On 23/02/16 20:54, Rob Herring wrote:
-> > > On Mon, Feb 22, 2016 at 11:48:37AM +0530, Sanchayan Maity wrote:
-> > >> Add driver support for DAC peripheral on Vybrid SoC.
-> > >>
-> > >> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > >> ---
-> > >>  Documentation/ABI/testing/sysfs-bus-iio-vf610      |   9 +
-> > >>  .../devicetree/bindings/iio/dac/vf610-dac.txt      |  20 ++
-> > > 
-> > > For the binding:
-> > > 
-> > > Acked-by: Rob Herring <robh@kernel.org>
-> > Applied to the togreg branch of iio.git - initially pushed out as testing
-> > for the autobuilders to play with it.
+> Currently we have an incorrect behaviour when multiple devices
+> are present under the weim node. For example:
 > 
-> Thanks Jonathan.
+> &weim {
+> 	...
+> 	status = "okay";
+> 	
+> 	sram at 0,0 {
+> 		...
+>         	status = "okay";
+> 	};
 > 
-> > 
-> > Note the dts change probably wants to go via the relevant arch trees.
-> > I can take it with an appropriate ack if not.
+> 	mram at 0,0 {
+> 		...
+>         	status = "disabled";
+>     	};
+> };
 > 
-> Generally shawn picks up the device tree changes once the driver makes
-> it to his for-next branch. I will ping shawn to pick this up once the
-> driver lands in shawn's for-next branch.
+> In this case only the 'sram' device should be probed and not 'mram'.
+> 
+> However what happens currently is that the status variable is ignored,
+> causing the 'sram' device to be disabled and 'mram' to be enabled.  
+> 
+> Change the weim_parse_dt() function to use
+> for_each_available_child_of_node()so that the devices marked with
+> 'status = disabled' are not probed.
+> 
+> Cc: <stable@vger.kernel.org>
+> Suggested-by: Wolfgang Netbal <wolfgang.netbal@sigmatek.at>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-For such device enabling which does no harm on my tree, i.e. no
-regression or breakage, I will be happy to take it once driver part gets
-applied, so that we do not need to wait for another release cycle to
-get it work.
+Acked-by: Shawn Guo <shawnguo@kernel.org>
 
-I applied dts patch, thanks.
+Arnd, Olof,
+
+I do not have any other 'driver' patches queued, so please help directly
+apply this one.  Considering this fixes a real problem, it would be good
+if we can merge this through -rc.  But we understand that it's -rc6 now,
+and this doesn't fix a regression or so-critical issue, so it should be
+fine to queue the patch for the next release as well.
 
 Shawn
+
+> ---
+>  drivers/bus/imx-weim.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+> index e98d15e..1827fc4 100644
+> --- a/drivers/bus/imx-weim.c
+> +++ b/drivers/bus/imx-weim.c
+> @@ -150,7 +150,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+>  			return ret;
+>  	}
+>  
+> -	for_each_child_of_node(pdev->dev.of_node, child) {
+> +	for_each_available_child_of_node(pdev->dev.of_node, child) {
+>  		if (!child->name)
+>  			continue;
+>  
+> -- 
+> 1.9.1
+> 
+> 
