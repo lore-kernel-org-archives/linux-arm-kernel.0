@@ -1,20 +1,41 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 29 Feb 2016 17:28:46 +0100
-Subject: [PATCH] iommu/dma: Fix NEED_SG_DMA_LENGTH dependency
-In-Reply-To: <189f8d7a6b1598108dc8e9f1777c67b07a4bd781.1456744313.git.robin.murphy@arm.com>
-References: <189f8d7a6b1598108dc8e9f1777c67b07a4bd781.1456744313.git.robin.murphy@arm.com>
-Message-ID: <20160229162846.GD13711@8bytes.org>
+From: alexandre.torgue@gmail.com (Alexandre TORGUE)
+Date: Mon, 29 Feb 2016 17:29:36 +0100
+Subject: [PATCH 3/3] ARM: dts: stm32f429: Enable Ethernet on Eval board
+In-Reply-To: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
+References: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <1456763376-21457-4-git-send-email-alexandre.torgue@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 11:13:39AM +0000, Robin Murphy wrote:
-> IOMMU_DMA does indeed depend on scatterlists having a DMA length, but
-> the NEED_SG_DMA_LENGTH symbol should be selected, not depended upon.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+MAC is connected to a PHY in MII mode.
 
-Applied, thanks.
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+index 1ae57fa..e345459 100644
+--- a/arch/arm/boot/dts/stm32429i-eval.dts
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -87,6 +87,21 @@
+ 	clock-frequency = <25000000>;
+ };
+ 
++&ethernet0 {
++	status = "okay";
++	pinctrl-0	= <&ethernet0_mii>;
++	pinctrl-names	= "default";
++	phy-mode	= "mii-id";
++	mdio0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,dwmac-mdio";
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++};
++
+ &usart1 {
+ 	pinctrl-0 = <&usart1_pins_a>;
+ 	pinctrl-names = "default";
+-- 
+1.9.1
