@@ -1,45 +1,67 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Mon, 29 Feb 2016 11:12:36 +0100
-Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
-In-Reply-To: <CAFpQJXURSKFw6RmNVLiB=YDcUiaaQLz3zMvM9gy=b1MobaCfgg@mail.gmail.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
- <20160226185341.GN29125@arm.com>
- <56D0ACC4.1060605@caviumnetworks.com>
- <CAFpQJXURSKFw6RmNVLiB=YDcUiaaQLz3zMvM9gy=b1MobaCfgg@mail.gmail.com>
-Message-ID: <20160229101236.GQ24726@rric.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Feb 2016 10:14:28 +0000
+Subject: [PATCH 2/2 v3] irqchip/Layerscape: Add SCFG MSI controller support
+In-Reply-To: <VI1PR04MB1615735FD9B40547228B7B51E8A60@VI1PR04MB1615.eurprd04.prod.outlook.com>
+References: <1454403648-5551-1-git-send-email-Minghuan.Lian@nxp.com>
+ <1454403648-5551-2-git-send-email-Minghuan.Lian@nxp.com>
+ <56C4AE17.4050301@arm.com>
+ <VI1PR04MB1615735FD9B40547228B7B51E8A60@VI1PR04MB1615.eurprd04.prod.outlook.com>
+Message-ID: <56D41A04.8030302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.02.16 09:43:49, Ganapatrao Kulkarni wrote:
-> On Sat, Feb 27, 2016 at 1:21 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> > On 02/26/2016 10:53 AM, Will Deacon wrote:
-
-> >>> +static __init int numa_parse_early_param(char *opt)
-> >>> +{
-> >>> +       if (!opt)
-> >>> +               return -EINVAL;
-> >>> +       if (!strncmp(opt, "off", 3)) {
-> >>> +               pr_info("%s\n", "NUMA turned off");
-> >>> +               numa_off = 1;
-> >>> +       }
-> >>> +       return 0;
-> >>> +}
-> >>> +early_param("numa", numa_parse_early_param);
-> >>
-> >>
-> >> Curious, but when is this option actually useful?
-> >>
-> >
-> > Good point.  I will remove that bit, it was used as an aid in debugging
-> > while bringing up the patch set.
+On 25/02/16 03:21, Minghuan Lian wrote:
+> Hi Marc,
 > 
-> this is handy in debugging new platforms.
-> this boot argument option forces to boot as single node dummy system
-> adding all resources to node0.
+> I am sorry for the delayed response due to the Chinese Spring Festival holiday.
+> Thank you very much for the review.
+> Please see my comments inline.
+> 
+> Thanks,
+> Minghuan
+> 
 
-This is used to disable numa in a numa enabled kernel esp. for
-debugging/enabling/booting single node systems. Same kernel parameter
-as for x86 and other archs. Should not being removed.
+[...]
 
--Robert
+>>> +static int ls_scfg_msi_probe(struct platform_device *pdev) {
+>>> +	struct ls_scfg_msi *msi_data;
+>>> +	struct resource *res;
+>>> +	int ret;
+>>> +
+>>> +	msi_data = devm_kzalloc(&pdev->dev, sizeof(*msi_data), GFP_KERNEL);
+>>> +	if (!msi_data)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> +	msi_data->regs = devm_ioremap_resource(&pdev->dev, res);
+>>> +	if (IS_ERR(msi_data->regs)) {
+>>> +		dev_err(&pdev->dev, "failed to initialize 'regs'\n");
+>>> +		return PTR_ERR(msi_data->regs);
+>>> +	}
+>>> +	msi_data->msiir_addr = res->start;
+>>> +
+>>> +	msi_data->irq = platform_get_irq(pdev, 0);
+>>> +	if (msi_data->irq <= 0) {
+>>> +		dev_err(&pdev->dev, "failed to get MSI irq\n");
+>>> +		return -ENODEV;
+>>> +	}
+>>> +
+>>> +	msi_data->pdev = pdev;
+>>> +	msi_data->nr_irqs = MSI_MAX_IRQS;
+>>
+>> So this is hardcoded, always. Why do you need a nr_irqs variable at all?
+> [Lian Minghuan-B31939] Currently, nr_irqs is always 32, but in the
+> future, the MSI controller may be extended to support more IRQs. And,
+> we may set nr_irqs the value of less than 32 to reserve some IRQs for
+> special usage. So nr_irqs can bring flexibility
+
+You have to choose: either this is configurable and you describe it in
+DT, or this is not and you drop this field from the structure.
+
+As for the "reserved interrupts", that would need to be described too.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
