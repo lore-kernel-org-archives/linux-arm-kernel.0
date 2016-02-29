@@ -1,84 +1,96 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 29 Feb 2016 17:42:11 -0600
-Subject: [GIT PULL] Qualcomm DT Updates for 4.6
-Message-ID: <1456789331-28780-1-git-send-email-andy.gross@linaro.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 29 Feb 2016 15:42:58 -0800
+Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
+In-Reply-To: <20160229173446.GG31343@rric.localdomain>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+ <20160229173446.GG31343@rric.localdomain>
+Message-ID: <56D4D782.3010503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+On 02/29/2016 09:34 AM, Robert Richter wrote:
+> On 22.02.16 17:58:22, David Daney wrote:
+>> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>>
+>> Attempt to get the memory and CPU NUMA node via of_numa.  If that
+>> fails, default the dummy NUMA node and map all memory and CPUs to node
+>> 0.
+>>
+>> Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> Reviewed-by: Robert Richter <rrichter@cavium.com>
+>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   arch/arm64/Kconfig                |  26 +++
+>>   arch/arm64/include/asm/mmzone.h   |  12 ++
+>>   arch/arm64/include/asm/numa.h     |  45 +++++
+>>   arch/arm64/include/asm/topology.h |  10 +
+>>   arch/arm64/kernel/pci.c           |  10 +
+>>   arch/arm64/kernel/setup.c         |   4 +
+>>   arch/arm64/kernel/smp.c           |   4 +
+>>   arch/arm64/mm/Makefile            |   1 +
+>>   arch/arm64/mm/init.c              |  34 +++-
+>>   arch/arm64/mm/mmu.c               |   1 +
+>>   arch/arm64/mm/numa.c              | 403 ++++++++++++++++++++++++++++++++++++++
+>>   11 files changed, 545 insertions(+), 5 deletions(-)
+>>   create mode 100644 arch/arm64/include/asm/mmzone.h
+>>   create mode 100644 arch/arm64/include/asm/numa.h
+>>   create mode 100644 arch/arm64/mm/numa.c
+>
+>> +static int __init numa_init(int (*init_func)(void))
+>> +{
+>> +	int ret;
+>> +
+>> +	nodes_clear(numa_nodes_parsed);
+>> +	nodes_clear(node_possible_map);
+>> +	nodes_clear(node_online_map);
+>> +	numa_free_distance();
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+         ^^^^^^^^^^^^^
+      Cleanup for any previous numa_alloc_distance()
 
-are available in the git repository at:
+>> +
+>> +	ret = numa_alloc_distance();
+>> +	if (ret < 0)
+>> +		return ret;
+>
+> If you move this before the remaining initializers, you will need to
+> clean this up on error.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dt-for-4.6
+Yes, we do this.  See above.
 
-for you to fetch changes up to 90bd6e8fea27c4a199d017134bbcb9f8a045a152:
+> So better move it back after
+> numa_register_nodes() as it was in v10. This should work since
+> distances are used not earlier than numa is enabled.
 
-  ARM: dts: ifc6410: add correct aliases to the i2c and spi bus (2016-02-26 13:15:49 -0600)
+I moved it here for a reason.
 
-----------------------------------------------------------------
-Qualcomm ARM Based Device Tree Updates for v4.6
+The init_func (of_numa_init() in this case) makes callbacks that use the 
+numa_distance object.  We need to allocate it before using it. 
+Allocating it after calling the init_func() is too late.
 
-* Add documentation for Kryo
-* Add RPMCC node for APQ8064
-* Updates for MSM8974
-* Add board clocks
-* Add support for Nexus7 device
-* Fixup pmic reg properties
-* Various updates/cleanups for APQ8064 based boards
 
-----------------------------------------------------------------
-Bjorn Andersson (3):
-      ARM: dts: qcom: msm8974: Add additional reserved regions
-      ARM: dts: qcom: msm8974: Add smsm node
-      ARM: dts: qcom: msm8974: Add WCNSS SMP2P node
-
-Georgi Djakov (1):
-      arm: dts: qcom: apq8064: Add RPMCC DT node
-
-John Stultz (2):
-      devicetree: qcom-apq8064.dtsi: Add i2c3 address-cells and size-cells values
-      devicetree: Add DTS file to support the Nexus7 2013 (flo) device.
-
-Sricharan R (2):
-      dts: msm8974: Add blsp2_bam dma node
-      dts: msm8974: Add dma channels for blsp2_i2c1 node
-
-Srinivas Kandagatla (11):
-      ARM: dts: qcom: fix i2c lables to be inline with others
-      ARM: dts: apq8064: move pinctrls to dedicated dtsi
-      ARM: dts: apq8064: add pci support in CM QS600
-      ARM: dts: apq8064: add i2c sleep pinctrl states.
-      ARM: dts: apq8064: add spi5 device node.
-      ARM: dts: ifc6410: enable spi device on expansion
-      ARM: dts: apq8064: add missing i2c2 pinctrl info
-      ARM: dts: apq8064: add gsbi4 with i2c node.
-      ARM: dts: ifc6410: enable cam i2c device
-      ARM: dts: apq8064: add i2c6 device node.
-      ARM: dts: ifc6410: add correct aliases to the i2c and spi bus
-
-Stephen Boyd (4):
-      devicetree: bindings: Document Kryo cpu
-      arm: dts: qcom: Add more board clocks
-      devicetree: bindings: Document qcom board compatible format
-      ARM: dts: qcom: Remove size elements from pmic reg properties
-
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- Documentation/devicetree/bindings/arm/qcom.txt     |  51 ++++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts | 276 +++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts        |  27 ++
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |  26 +-
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi           | 208 ++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi                | 128 +++++-----
- arch/arm/boot/dts/qcom-apq8084.dtsi                |  14 ++
- arch/arm/boot/dts/qcom-ipq8064.dtsi                |  12 +
- arch/arm/boot/dts/qcom-msm8660.dtsi                |  20 ++
- arch/arm/boot/dts/qcom-msm8974.dtsi                | 135 +++++++++-
- arch/arm/boot/dts/qcom-pm8841.dtsi                 |   4 +-
- arch/arm/boot/dts/qcom-pm8941.dtsi                 |  20 +-
- 14 files changed, 846 insertions(+), 77 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+>
+> -Robert
+>
+>> +
+>> +	ret = init_func();
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
+>> +	if (nodes_empty(numa_nodes_parsed))
+>> +		return -EINVAL;
+>> +
+>> +	ret = numa_register_nodes();
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
+>> +	setup_node_to_cpumask_map();
+>> +
+>> +	/* init boot processor */
+>> +	cpu_to_node_map[0] = 0;
+>> +	map_cpu_to_node(0, 0);
+>> +
+>> +	return 0;
+>> +}
