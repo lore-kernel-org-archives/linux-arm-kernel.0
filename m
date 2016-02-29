@@ -1,96 +1,85 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 29 Feb 2016 15:42:58 -0800
-Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
-In-Reply-To: <20160229173446.GG31343@rric.localdomain>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
- <20160229173446.GG31343@rric.localdomain>
-Message-ID: <56D4D782.3010503@gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 29 Feb 2016 17:43:15 -0600
+Subject: [GIT PULL] Qualcomm ARM64 Updates for 4.6
+Message-ID: <1456789395-28868-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2016 09:34 AM, Robert Richter wrote:
-> On 22.02.16 17:58:22, David Daney wrote:
->> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->>
->> Attempt to get the memory and CPU NUMA node via of_numa.  If that
->> fails, default the dummy NUMA node and map all memory and CPUs to node
->> 0.
->>
->> Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
->> Reviewed-by: Robert Richter <rrichter@cavium.com>
->> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   arch/arm64/Kconfig                |  26 +++
->>   arch/arm64/include/asm/mmzone.h   |  12 ++
->>   arch/arm64/include/asm/numa.h     |  45 +++++
->>   arch/arm64/include/asm/topology.h |  10 +
->>   arch/arm64/kernel/pci.c           |  10 +
->>   arch/arm64/kernel/setup.c         |   4 +
->>   arch/arm64/kernel/smp.c           |   4 +
->>   arch/arm64/mm/Makefile            |   1 +
->>   arch/arm64/mm/init.c              |  34 +++-
->>   arch/arm64/mm/mmu.c               |   1 +
->>   arch/arm64/mm/numa.c              | 403 ++++++++++++++++++++++++++++++++++++++
->>   11 files changed, 545 insertions(+), 5 deletions(-)
->>   create mode 100644 arch/arm64/include/asm/mmzone.h
->>   create mode 100644 arch/arm64/include/asm/numa.h
->>   create mode 100644 arch/arm64/mm/numa.c
->
->> +static int __init numa_init(int (*init_func)(void))
->> +{
->> +	int ret;
->> +
->> +	nodes_clear(numa_nodes_parsed);
->> +	nodes_clear(node_possible_map);
->> +	nodes_clear(node_online_map);
->> +	numa_free_distance();
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-         ^^^^^^^^^^^^^
-      Cleanup for any previous numa_alloc_distance()
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
->> +
->> +	ret = numa_alloc_distance();
->> +	if (ret < 0)
->> +		return ret;
->
-> If you move this before the remaining initializers, you will need to
-> clean this up on error.
+are available in the git repository at:
 
-Yes, we do this.  See above.
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.6
 
-> So better move it back after
-> numa_register_nodes() as it was in v10. This should work since
-> distances are used not earlier than numa is enabled.
+for you to fetch changes up to 4bd40f6cebaca4a4fa023f27300d8268b15156e7:
 
-I moved it here for a reason.
+  arm64: dts: qcom: Fix MPP's function used for LED control (2016-02-29 16:17:45 -0600)
 
-The init_func (of_numa_init() in this case) makes callbacks that use the 
-numa_distance object.  We need to allocate it before using it. 
-Allocating it after calling the init_func() is too late.
+----------------------------------------------------------------
+Qualcomm ARM64 Updates for v4.6
 
+* Add MSM8996 support
+* Cleanups for MSM8916
+* Updates for APQ8016 SBC
+* Fixup pmic reg properties
+* Add RPMCC node for 8916
+* Add LPASS audio nodes
+* Add USB support on MSM8916
 
->
-> -Robert
->
->> +
->> +	ret = init_func();
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	if (nodes_empty(numa_nodes_parsed))
->> +		return -EINVAL;
->> +
->> +	ret = numa_register_nodes();
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	setup_node_to_cpumask_map();
->> +
->> +	/* init boot processor */
->> +	cpu_to_node_map[0] = 0;
->> +	map_cpu_to_node(0, 0);
->> +
->> +	return 0;
->> +}
+----------------------------------------------------------------
+Georgi Djakov (1):
+      arm64: dts: qcom: msm8916: Add RPMCC DT node
+
+Ivan T. Ivanov (1):
+      arm64: dts: qcom: Fix MPP's function used for LED control
+
+Rajendra Nayak (1):
+      arm64: dts: msm8996: Add #power-domain-cells property
+
+Srinivas Kandagatla (15):
+      arm64: dts: apq8016-sbc: Add aliases to spi device.
+      arm64: dts: qcom: remove redundant spi cs pins from pinconf
+      arm64: dts: qcom: add correct drive strenght on cs pins
+      arm64: dts: remove s2 regulator from smd regulators.
+      arm64: dts: qcom: add lable for smd rpm regulators
+      arm64: dts: apq8016-sbc: add regulators support
+      arm64: dts: apq8016-sbc: make 1.8v available on LS expansion
+      arm64: dts: apq8016-sbc: move sdhci node under soc node
+      arm64: dts: apq8016-sbc: Add real regulators and pinctrl for sdhc
+      arm64: dts: qcom: add manual pullup setting to otg.
+      arm64: dts: qcom: apq8016-sbc: add usb support
+      arm64: dts: qcom: add audio pinctrls
+      arm64: dts: qcom: add lpass node
+      arm64: dts: qcom: apq8016-sbc: enable lpass on DB410c
+      arm64: dts: qcom: fix usb digital voltage levels
+
+Stephen Boyd (6):
+      arm64: dts: Add msm8996 SoC and MTP board support
+      arm64: dts: qcom: Add pm8994, pmi8994, pm8004 PMIC skeletons
+      arm64: dts: qcom: Add pm8994 gpios and MPPs
+      arm64: dts: Rename qcom,gcc node to clock-controller
+      arm64: dts: Add L2 cache node to msm8916
+      ARM64: dts: qcom: Remove size elements from pmic reg properties
+
+ arch/arm64/boot/dts/qcom/Makefile                  |   1 +
+ .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |   2 +-
+ arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  14 ++
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 170 ++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi         | 238 +++++++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  48 +++-
+ arch/arm64/boot/dts/qcom/msm8996-mtp.dts           |  21 ++
+ arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi          |  30 +++
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 269 +++++++++++++++++++++
+ arch/arm64/boot/dts/qcom/pm8004.dtsi               |  19 ++
+ arch/arm64/boot/dts/qcom/pm8916.dtsi               |  10 +-
+ arch/arm64/boot/dts/qcom/pm8994.dtsi               |  62 +++++
+ arch/arm64/boot/dts/qcom/pmi8994.dtsi              |  19 ++
+ 13 files changed, 880 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pm8004.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pm8994.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pmi8994.dtsi
