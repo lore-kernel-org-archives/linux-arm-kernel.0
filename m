@@ -1,49 +1,35 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 29 Feb 2016 13:47:04 +0100
-Subject: [PATCH 1/2] can: rcar_can: Add r8a7795 support
-In-Reply-To: <56D416A9.6080608@pengutronix.de>
-References: <1456737661-20538-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <56D411A5.9070706@pengutronix.de>
- <SG2PR06MB10380FC567E038EA92D5401EC3BA0@SG2PR06MB1038.apcprd06.prod.outlook.com>
- <56D416A9.6080608@pengutronix.de>
-Message-ID: <56D43DC8.8010409@pengutronix.de>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Mon, 29 Feb 2016 12:51:40 +0000
+Subject: [PATCH 0/3] reorganize clock initialization and add PCM clock
+Message-ID: <1456750304-2424-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2016 11:00 AM, Marc Kleine-Budde wrote:
-> I think it's better to fix the algorithm. I'll look into it.
+From: Martin Sperl <kernel@martin.sperl.org>
 
-What about:
+As changing entries in the dt-bindings header files is frowned upon
+and as we would need to change BCM2835_CLOCK_COUNT for every new
+clock added, this patchset moves away from the use of
+BCM2835_CLOCK_COUNT and removes it from the dt-bindings alltogether.
 
-> ./can-calc-bit-timing -c 39999998 rcar_can                                                         
-> Bit timing parameters for rcar_can with 39.999998 MHz ref clock
-> nominal                                 real Bitrt   nom  real SampP
-> Bitrate TQ[ns] PrS PhS1 PhS2 SJW BRP Bitrate Error SampP SampP Error      CiBCR
-> 1000000    125   2    3    2   1   5  999999  0.0% 75.0% 75.0%  0.0% 0x40040100
->  800000    125   3    4    2   1   5  799999  0.0% 80.0% 80.0%  0.0% 0x60040100
->  500000    125   6    7    2   1   5  499999  0.0% 87.5% 87.5%  0.0% 0xc0040100
->  250000    250   6    7    2   1  10  249999  0.0% 87.5% 87.5%  0.0% 0xc0090100
->  125000    500   6    7    2   1  20  124999  0.0% 87.5% 87.5%  0.0% 0xc0130100
->  100000    625   6    7    2   1  25   99999  0.0% 87.5% 87.5%  0.0% 0xc0180100
->   50000   1250   6    7    2   1  50   49999  0.0% 87.5% 87.5%  0.0% 0xc0310100
->   20000   3125   6    7    2   1 125   19999  0.0% 87.5% 87.5%  0.0% 0xc07c0100
->   10000   6250   6    7    2   1 250    9999  0.0% 87.5% 87.5%  0.0% 0xc0f90100
+Instead - as recommended by Michael Turquette, Geert Uytterhoeven
+and Remi Pommarel - patch 1 introduces a new initialization
+process in probe that simply uses ARRAY_SIZE on a (sparse) array.
 
-But I've to port the algorithm from can-calc-bit-timing to the kernel.
+With patch 2 the initialization of the array is simplified and
+better grouped together.
 
-Marc
+Patch 3 introduces the pcm clock of the bcm2835 soc and already
+shows the simplification at work - the main reason for this patchset.
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Martin Sperl (3):
+  clk: bcm2835: remove use of BCM2835_CLOCK_COUNT in driver
+  clk: bcm2835: reorganize bcm2835_clock_array assignment
+  clk: bcm2835: enable management of PCM clock
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/6f4e4a6b/attachment-0001.sig>
+ drivers/clk/bcm/clk-bcm2835.c       |  918 +++++++++++++++++------------------
+ include/dt-bindings/clock/bcm2835.h |    3 +-
+ 2 files changed, 441 insertions(+), 480 deletions(-)
+
+--
+1.7.10.4
