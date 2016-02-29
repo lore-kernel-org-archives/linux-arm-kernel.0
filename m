@@ -1,111 +1,53 @@
-From: jayachandran.chandrashekaran@broadcom.com (Jayachandran Chandrashekaran Nair)
-Date: Mon, 29 Feb 2016 13:33:41 +0530
-Subject: [PATCH V4 17/23] acpi, mcfg: Add default PCI config accessors
- implementation and initial support for related quirks.
-In-Reply-To: <1454606941-9523-18-git-send-email-tn@semihalf.com>
-References: <1454606941-9523-1-git-send-email-tn@semihalf.com>
- <1454606941-9523-18-git-send-email-tn@semihalf.com>
-Message-ID: <CAKc_7PWD_jcj323q9moSd4urc7FD1gr9KLqBL+Ox60Mv+zsrmQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Feb 2016 16:06:07 +0800
+Subject: [GIT PULL] i.MX clock driver update for 4.6
+Message-ID: <20160229080607.GT22051@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 4, 2016 at 10:58 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> We use generic accessors from access.c by default. However, we already
-> know platforms that need special handling while accessing to PCI config
-> space. These platforms will need different accessors set matched against
-> platform ID, domain, bus touple. Therefore we are going to add (in future)
-> DECLARE_ACPI_MCFG_FIXUP which will register platform specific custom
-> accessors. For now, we let pci_mcfg_get_ops to take acpi_pci_root structure
-> as an arguments and left some space for quirk matching algorithm.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/mcfg.c      | 30 ++++++++++++++++++++++++++++++
->  include/linux/pci-acpi.h |  8 ++++++++
->  2 files changed, 38 insertions(+)
->
-> diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-> index dca4c4e..dfc2d14 100644
-> --- a/drivers/acpi/mcfg.c
-> +++ b/drivers/acpi/mcfg.c
-> @@ -34,6 +34,36 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
->         return PCIBIOS_DEVICE_NOT_FOUND;
->  }
->
-> +void __iomem *
-> +pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
-> +{
-> +       struct pci_mmcfg_region *cfg;
-> +
-> +       cfg = pci_mmconfig_lookup(pci_domain_nr(bus), bus->number);
+Hi Mike, Stephen,
 
-In the existing code, calls to pci_mmconfig_lookup() is done inside an
-rcu_read_lock/rcu_read_unlock pair. Any reason that is not required here?
+The following are the i.MX clock patches I queued for 4.6.  Please pull
+and keep it stable, as I need to pull it into my DT branch to resolve
+the dependency on those new clock IDs.
 
-Also, you can avoid having to do the lookup every time by saving a cfg pointer
-see http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/396921.html
+Thanks,
+Shawn
 
 
-> +       if (cfg && cfg->virt)
-> +               return cfg->virt +
-> +                       (PCI_MMCFG_BUS_OFFSET(bus->number) | (devfn << 12)) +
-> +                       offset;
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-PCI_MMCFG_OFFSET(bus->number, devfn) would be better
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-> +       return NULL;
-> +}
-> +
-> +/* Default generic PCI config accessors */
-> +static struct pci_ops default_pci_mcfg_ops = {
-> +       .map_bus = pci_mcfg_dev_base,
-> +       .read = pci_generic_config_read,
-> +       .write = pci_generic_config_write,
-> +};
-> +
-> +struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
-> +{
-> +       /*
-> +        * TODO: Match against platform specific quirks and return
-> +        * corresponding PCI config space accessor set.
-> +        */
-> +
-> +       return &default_pci_mcfg_ops;
-> +}
+are available in the git repository at:
 
-Is it necessary to make these non-static, even in the next patch, the
-functions are only used from this file.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.6
 
-> +
->  int __init acpi_parse_mcfg(struct acpi_table_header *header)
->  {
->         struct acpi_table_mcfg *mcfg;
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index 65b91f3..c974586 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -83,10 +83,18 @@ void acpi_pci_remove_bus(struct pci_bus *bus);
->  #ifdef CONFIG_PCI_MMCONFIG
->  int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci);
->  void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci);
-> +struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root);
-> +void __iomem *
-> +pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset);
->  #else
->  static inline int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
->  { return 0; }
->  static inline void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci) { }
-> +static inline struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
-> +{ return NULL; }
-> +static inline void __iomem *
-> +pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
-> +{ return NULL; }
->  #endif
->  #ifdef CONFIG_ACPI_PCI_SLOT
+for you to fetch changes up to f6c3aec2f7a218abec9e5c00353abc02224be49e:
 
-JC.
+  clk: imx: add kpp clock for i.MX6UL (2016-02-28 10:45:29 +0800)
+
+----------------------------------------------------------------
+The i.MX clock update for 4.6:
+- Add the clock driver support for the latest i.MX6 family SoCs
+  addition - i.MX6QP.
+- Clean up the whitespace in i.MX6UL clock driver and add the missing
+  KPP clock.
+- Correct pwm7 clock name in i.MX6UL clock driver.
+
+----------------------------------------------------------------
+Anatolij Gustschin (1):
+      clk: imx: correct pwm7 clock name in driver for i.MX6UL
+
+Bai Ping (1):
+      clk: imx: Add clock support for imx6qp
+
+Lothar Wa?mann (2):
+      clk: imx: whitespace cleanup; no functional change
+      clk: imx: add kpp clock for i.MX6UL
+
+ drivers/clk/imx/clk-imx6q.c               | 132 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------
+ drivers/clk/imx/clk-imx6ul.c              |  65 +++++++++++++++++++++++++++++++++--------------------------------
+ include/dt-bindings/clock/imx6qdl-clock.h |  16 +++++++++++++++-
+ include/dt-bindings/clock/imx6ul-clock.h  | 149 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------------------------
+ 4 files changed, 228 insertions(+), 134 deletions(-)
