@@ -1,135 +1,99 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 29 Feb 2016 01:32:03 +0000 (UTC)
-Subject: OMAP baseline test results for v4.5-rc6
-Message-ID: <alpine.DEB.2.02.1602290131070.15643@utopia.booyaka.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Mon, 29 Feb 2016 10:02:36 +0800
+Subject: [PATCH v4 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1667812.hY9vsC2epc@vostro.rjw.lan>
+References: <1454641552-12576-1-git-send-email-zhaoshenglong@huawei.com>
+ <44113385.2QnPtvxQx0@vostro.rjw.lan>
+ <alpine.DEB.2.02.1602111557430.27008@kaball.uk.xensource.com>
+ <1667812.hY9vsC2epc@vostro.rjw.lan>
+Message-ID: <56D3A6BC.8020005@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Here are some basic OMAP test results for Linux v4.5-rc6.
-Logs and other details at:
 
-    http://www.pwsan.com/omap/testlogs/test_v4.5-rc6/20160228162516/
+On 2016/2/12 6:22, Rafael J. Wysocki wrote:
+> On Thursday, February 11, 2016 04:04:14 PM Stefano Stabellini wrote:
+>> > On Wed, 10 Feb 2016, Rafael J. Wysocki wrote:
+>>> > > On Tuesday, February 09, 2016 11:19:02 AM Stefano Stabellini wrote:
+>>>> > > > On Mon, 8 Feb 2016, Rafael J. Wysocki wrote:
+>>>>> > > > > On Monday, February 08, 2016 10:57:01 AM Stefano Stabellini wrote:
+>>>>>> > > > > > On Sat, 6 Feb 2016, Rafael J. Wysocki wrote:
+>>>>>>> > > > > > > On Fri, Feb 5, 2016 at 4:05 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>>>>>>>> > > > > > > > From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>>>>> > > > > > > >
+>>>>>>>> > > > > > > > ACPI 6.0 introduces a new table STAO to list the devices which are used
+>>>>>>>> > > > > > > > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+>>>>>>>> > > > > > > > UART is used by Xen. So here it hides UART from Dom0.
+>>>>>>>> > > > > > > >
+>>>>>>>> > > > > > > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>>>>> > > > > > > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>>>>>> > > > > > > 
+>>>>>>> > > > > > > Well, this doesn't look right to me.
+>>>>>>> > > > > > > 
+>>>>>>> > > > > > > We need to find a nicer way to achieve what you want.
+>>>>>> > > > > > 
+>>>>>> > > > > > I take that you are talking about how to honor the STAO table in Linux.
+>>>>>> > > > > > Do you have any concrete suggestions?
+>>>>> > > > > 
+>>>>> > > > > I do.
+>>>>> > > > > 
+>>>>> > > > > The last hunk of the patch is likely what it needs to be, although I'm
+>>>>> > > > > not sure if the place it is added to is the right one.  That's a minor thing,
+>>>>> > > > > though.
+>>>>> > > > > 
+>>>>> > > > > The other part is problematic.  Not that as it doesn't work, but because of
+>>>>> > > > > how it works.  With these changes the device will be visible to the OS (in
+>>>>> > > > > fact to user space even), but will never be "present".  I'm not sure if
+>>>>> > > > > that's what you want?
+>>>>> > > > > 
+>>>>> > > > > It might be better to add a check to acpi_bus_type_and_status() that will
+>>>>> > > > > evaluate the "should ignore?" thing and return -ENODEV if this is true.  This
+>>>>> > > > > way the device won't be visible at all.
+>>>> > > > 
+>>>> > > > Something like below?  Actually your suggestion is better, thank you!
+>>>> > > > 
+>>>> > > > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>>>> > > > index 78d5f02..4778c51 100644
+>>>> > > > --- a/drivers/acpi/scan.c
+>>>> > > > +++ b/drivers/acpi/scan.c
+>>>> > > > @@ -1455,6 +1455,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>>>> > > >  	if (ACPI_FAILURE(status))
+>>>> > > >  		return -ENODEV;
+>>>> > > >  
+>>>> > > > +	if (acpi_check_device_is_ignored(handle))
+>>>> > > > +		return -ENODEV;
+>>>> > > > +
+>>>> > > >  	switch (acpi_type) {
+>>>> > > >  	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
+>>>> > > >  	case ACPI_TYPE_DEVICE:
+>>>> > > > 
+>>> > > 
+>>> > > I thought about doing that under ACPI_TYPE_DEVICE, because it shouldn't be
+>>> > > applicable to the other types.  But generally, yes.
+>> > 
+>> > I was pondering about it myself. Maybe an ACPI_TYPE_PROCESSOR object
+>> > could theoretically be hidden with the STAO?
+> But this patch won't check for it anyway, will it?
+> 
+> It seems to be only checking against the UART address or have I missed
+> anything?
+> 
+>> > I added the check before
+>> > the switch because I thought that there would be no harm in being
+>> > caution about it.
+>> > 
+>> > 
+>>> > > Plus I'd move the table checks to acpi_scan_init(), so the UART address can
+>>> > > be a static variable in scan.c.
+>>> > >
+>>> > > Also maybe rename acpi_check_device_is_ignored() to something like
+>>> > > acpi_device_should_be_hidden().
+>> > 
+>> > Both make sense. Shannon, are you happy to make these changes?
+> Plus maybe make acpi_device_should_be_hidden() print a (KERN_INFO) message
+> when it decides to hide something?
+Ok, will update this patch. Thanks a lot!
 
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (18/18): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  omap2plus_defconfig_ti81xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    (none)
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL ( 1/18): multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/18): 2430sdp
-    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
-    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
-		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
-		  cmt3517, 5430es2uevm, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 2/18): 4430es2panda, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 8/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  3530es3beagle, 3530es31beagle, 2430sdp, 5430es2uevm
-    Pass ( 3/11): 4460pandaes, 3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
-    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
-    Pass ( 1/ 4): 3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 1/18): 4430es2panda
-
-Obsolete Kconfig symbols:
-    FAIL ( 3/21): omap1_defconfig, omap2plus_defconfig,
-		  multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc5 (81f70ba233d5f660e1ea5fe23260ee323af5d53a)):
-   text     data      bss    total  kernel
-  +1756     +128      +32    +1916  omap1_defconfig
-  +1756     +128      +32    +1916  omap1_defconfig_1510innovator_only
-  +1764     +128      +32    +1924  omap1_defconfig_5912osk_only
-  +1860     +160     +256    +2276  multi_v7_defconfig
-  +2240     +192        0    +2432  omap2plus_defconfig
-  +1792     +192      +32    +2016  omap2plus_defconfig_2430sdp_only
-  +2168     +192        0    +2360  omap2plus_defconfig_am33xx_only
-  +2168     +192        0    +2360  omap2plus_defconfig_am43xx_only
-  +2176     +192        0    +2368  omap2plus_defconfig_cpupm
-  +2168     +192        0    +2360  omap2plus_defconfig_dra7xx_only
-   +688     +192        0     +880  omap2plus_defconfig_n800_multi_omap2xxx
-  +1196     +128      +32    +1356  omap2plus_defconfig_n800_only_a
-  +2164     +192        0    +2356  omap2plus_defconfig_no_pm
-  +2092     +192        0    +2284  omap2plus_defconfig_omap2_4_only
-  +2252     +192        0    +2444  omap2plus_defconfig_omap3_4_only
-  +2168     +192        0    +2360  omap2plus_defconfig_omap5_only
-  +1772     +192        0    +1964  omap2plus_defconfig_ti81xx_only
-   +632        0     -128     +504  rmk_omap3430_ldp_allnoconfig
-  +1720        0        0    +1720  rmk_omap3430_ldp_oldconfig
-   +536        0     -128     +408  rmk_omap4430_sdp_allnoconfig
-  +1544        0        0    +1544  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc5 (81f70ba233d5f660e1ea5fe23260ee323af5d53a))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+-- 
+Shannon
