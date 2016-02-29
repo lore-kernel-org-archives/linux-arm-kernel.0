@@ -1,66 +1,106 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 29 Feb 2016 12:44:58 +0000
-Subject: Tegra baseline test results for v4.5-rc6
-Message-ID: <56D43D4A.4030300@nvidia.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 29 Feb 2016 12:47:16 +0000
+Subject: [PATCH][RFC] arm64: kaslr: add pseudo-RNG in kernel
+In-Reply-To: <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
+References: <56D030A4.5050205@nxp.com>
+ <CAKv+Gu_UdfQyGx7dU59b5vMqmCKs53XjHbG-UEYmvAZ+0=aQ0g@mail.gmail.com>
+ <20160226121819.GB8728@leverpostej>
+ <CAKv+Gu-KEF1MdWbxx_mQHuw9tK3xgTCzEbu1cWG_8ug=dMdR1g@mail.gmail.com>
+Message-ID: <56D43DD3.9010508@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.5-rc6.
-Logs and other details at:
+On 02/26/2016 02:37 PM, Ard Biesheuvel wrote:
+> On 26 February 2016 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Fri, Feb 26, 2016 at 12:51:25PM +0100, Ard Biesheuvel wrote:
+>>> On 26 February 2016 at 12:01, Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
+>>>> In case the bootloader doesn't provide randomness
+>>>> (through device tree or by uefi protocol) generate
+>>>> a pseudo-random seed based on the timer counter.
+>>>> People might find this "week rng" approach convenient
+>>>> as it gets rid of the bootloader dependency.
+>>>>
+>>>> The patch tries to mimic the x86's rdtsc
+>>>> based implementation authored by Kees Cook.
+>>>>
+>>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> Cc: Kees Cook <keescook@chromium.org>
+>>>
+>>> Hi Laurentiu,
+>>>
+>>> I appreciate the interest in this work, but to be honest, I don't like
+>>> this at all. I went out of my way to ensure that
+>>> a) the kernel itself does not take part in generating the random bits, and
+>>> b) the random bits are used in such a way that there is no correlation
+>>> between the randomization of the core kernel, the module region and
+>>> the linear region if there is no correlation between the random bits.
+>>>
+>>> The limited entropy of the cycle counter at early boot defeats that,
+>>> and even worse, it will not encourage platform vendors to implement
+>>> this properly in their boot code, given that it will appear to work,
+>>> and the only thing more dangerous than no security is a false sense of
+>>> security imo.
+>>
+>> I agree that a false sense of security is a worry here.
+>>
+>> Either way, I think we need numbers. It's non-obvious how much entropy
+>> we can acquire through counters or other means at early boot time.
+>>
+>> Has anyone done an analysis of environmental entropy available (through
+>> any means) at early boot, VM vs native?
+>>
+> 
+> Define 'environmental'. The only architected thing you can rely on is
+> the timer, which really does not hold a lot of entropy on modern solid
+> state platforms. I don't have the numbers, but I do have the
+> experience to back this up, unfortunately (at my former employer).
+> 
+> You could argue that KASLR does not require strong entropy like key
+> generation, but I would prefer to simply steer clear of that entire
+> debate. The bootloader simply needs to do the best job it can, either
+> based on some peripheral that the kernel has no awareness of this
+> early in the boot, or perhaps by other means if it doesn't (which
+> could include storing a random seed in the file system, or even in a
+> EFI variable). Punting it to the kernel is really the last resort.
+> 
+>> It's also not obvious that vendors will correctly implement the EFI RNG
+>> protocol; depending on the above we may want to mix in additional entropy
+>> regardless.
+>>
+> 
+> True, but that is not the point. The main risk I see is that vendors
+> will not bother at all once the digits start to look random to the
+> human eye.
+> 
+>>> What I would ack, for development purposes, is something similar to
+>>> what Mark Rutland implemented for randomizing TEXT_OFFSET, so that
+>>> developers get to exercise this code even if their boot environment
+>>> does not provide any entropy. Anything beyond that is a nack as far as
+>>> I am concerned.
+>>
+>> FWIW, I would not like to see that approach. I can easily see a build-time
+>> constant KASLR seed being abused to give a false sense of security. Having a
+>> bootloader or hypervisor provide different random seeds to the same Image gives
+>> you a much better turnaround time for testing regardless (vs rebuilding,
+>> copying, etc).
+>>
 
-    https://nvtb.github.io//linux/test_v4.5-rc6/20160228090104/
+Hi guys,
 
+And thanks for all the great comments. In conclusion, seems that this
+patch is not the right direction, at least not in its current form.
+ 
+> If it would be *instead* of the ordinary handling, with a big fat
+> blurb saying that KASLR is disabled, I would not mind.
 
-Test summary
-------------
+Ard,
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Let me see if i understood your thoughts correctly.
+Have something like a KConfig option (suggestions for name, please?
+CONFIG_DEBUG_RANDOMIZE_BASE?) that disables the normal RNG seed
+handling and replaces it with this counter based weak rng,
+plus the big fat warning.
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 4): tegra114-dalmore-a04
-    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
-		   tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc5 (81f70ba233d5f660e1ea5fe23260ee323af5d53a)):
-   text     data      bss    total  kernel
-    -32        0        0      -32  defconfig
-  +2152     +160     +192    +2504  multi_v7_defconfig
-  +1976     +160        0    +2136  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc5 (81f70ba233d5f660e1ea5fe23260ee323af5d53a))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-      -8k       8k        .       4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-      -8k       8k        .       4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-      -8k       8k        .       4k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-      -8k       8k        .       4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+---
+Best Regards, Laurentiu
