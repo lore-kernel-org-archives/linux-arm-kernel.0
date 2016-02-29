@@ -1,84 +1,112 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 29 Feb 2016 11:39:22 +0000
-Subject: [PATCH 6/6] clk: bcm2835: clean up coding style issues
-In-Reply-To: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
-References: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456745963-2403-7-git-send-email-kernel@martin.sperl.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 12:47:05 +0100
+Subject: [PATCH, RESEND] ntb: perf test: fix address space confusion
+Message-ID: <1456746438-3842627-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+The ntb driver assigns between pointers an __iomem tokens, and
+also casts them to 64-bit integers, which results in compiler
+warnings on 32-bit systems:
 
-Fix all the checkpatch complaints for clk-bcm2835.c
+drivers/ntb/test/ntb_perf.c: In function 'perf_copy':
+drivers/ntb/test/ntb_perf.c:213:10: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+  vbase = (u64)(u64 *)mw->vbase;
+          ^
+drivers/ntb/test/ntb_perf.c:214:14: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+  dst_vaddr = (u64)(u64 *)dst;
+              ^
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+This adds __iomem annotations where needed and changes the temporary
+variables to iomem pointers to avoid casting them to u64. I did not
+see the problem in linux-next earlier, but it show showed up in
+4.5-rc1.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Dave Jiang <dave.jiang@intel.com>
+Fixes: 8a7b6a778a85 ("ntb: ntb perf tool")
 ---
- drivers/clk/bcm/clk-bcm2835.c |   14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+I sent this out on Jan 26, but the problem still persists in linux-next
+as of Feb 29.
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index da77069..105a42f 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -12,9 +12,6 @@
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-  *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
- 
- /**
-@@ -300,7 +297,7 @@
- struct bcm2835_cprman {
- 	struct device *dev;
- 	void __iomem *regs;
--	spinlock_t regs_lock;
-+	spinlock_t regs_lock; /* spinlock for all clocks */
- 	const char *osc_name;
- 
- 	struct clk_onecell_data onecell;
-@@ -328,12 +325,12 @@ void __init bcm2835_init_clocks(void)
- 	int ret;
- 
- 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
--					126000000);
-+				      126000000);
- 	if (IS_ERR(clk))
- 		pr_err("apb_pclk not registered\n");
- 
- 	clk = clk_register_fixed_rate(NULL, "uart0_pclk", NULL, CLK_IS_ROOT,
--					3000000);
-+				      3000000);
- 	if (IS_ERR(clk))
- 		pr_err("uart0_pclk not registered\n");
- 	ret = clk_register_clkdev(clk, NULL, "20201000.uart");
-@@ -341,7 +338,7 @@ void __init bcm2835_init_clocks(void)
- 		pr_err("uart0_pclk alias not registered\n");
- 
- 	clk = clk_register_fixed_rate(NULL, "uart1_pclk", NULL, CLK_IS_ROOT,
--					125000000);
-+				      125000000);
- 	if (IS_ERR(clk))
- 		pr_err("uart1_pclk not registered\n");
- 	ret = clk_register_clkdev(clk, NULL, "20215000.uart");
-@@ -1332,7 +1329,7 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
+ drivers/ntb/test/ntb_perf.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/ntb/test/ntb_perf.c b/drivers/ntb/test/ntb_perf.c
+index c8a37ba4b4f9..6bdc1e7b7503 100644
+--- a/drivers/ntb/test/ntb_perf.c
++++ b/drivers/ntb/test/ntb_perf.c
+@@ -178,7 +178,7 @@ static void perf_copy_callback(void *data)
+ 	atomic_dec(&pctx->dma_sync);
  }
  
- static int bcm2835_clock_determine_rate(struct clk_hw *hw,
--		struct clk_rate_request *req)
-+					struct clk_rate_request *req)
+-static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
++static ssize_t perf_copy(struct pthr_ctx *pctx, char __iomem *dst,
+ 			 char *src, size_t size)
  {
- 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
- 	struct clk_hw *parent, *best_parent = NULL;
-@@ -1390,7 +1387,6 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
- 	return (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
+ 	struct perf_ctx *perf = pctx->perf;
+@@ -189,7 +189,8 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
+ 	dma_cookie_t cookie;
+ 	size_t src_off, dst_off;
+ 	struct perf_mw *mw = &perf->mw;
+-	u64 vbase, dst_vaddr;
++	void __iomem *vbase;
++	void __iomem *dst_vaddr;
+ 	dma_addr_t dst_phys;
+ 	int retries = 0;
+ 
+@@ -204,14 +205,14 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
+ 	}
+ 
+ 	device = chan->device;
+-	src_off = (size_t)src & ~PAGE_MASK;
+-	dst_off = (size_t)dst & ~PAGE_MASK;
++	src_off = (uintptr_t)src & ~PAGE_MASK;
++	dst_off = (uintptr_t __force)dst & ~PAGE_MASK;
+ 
+ 	if (!is_dma_copy_aligned(device, src_off, dst_off, size))
+ 		return -ENODEV;
+ 
+-	vbase = (u64)(u64 *)mw->vbase;
+-	dst_vaddr = (u64)(u64 *)dst;
++	vbase = mw->vbase;
++	dst_vaddr = dst;
+ 	dst_phys = mw->phys_addr + (dst_vaddr - vbase);
+ 
+ 	unmap = dmaengine_get_unmap_data(device->dev, 1, GFP_NOWAIT);
+@@ -261,13 +262,13 @@ err_get_unmap:
+ 	return 0;
  }
  
--
- static const struct clk_ops bcm2835_clock_clk_ops = {
- 	.is_prepared = bcm2835_clock_is_on,
- 	.prepare = bcm2835_clock_on,
+-static int perf_move_data(struct pthr_ctx *pctx, char *dst, char *src,
++static int perf_move_data(struct pthr_ctx *pctx, char __iomem *dst, char *src,
+ 			  u64 buf_size, u64 win_size, u64 total)
+ {
+ 	int chunks, total_chunks, i;
+ 	int copied_chunks = 0;
+ 	u64 copied = 0, result;
+-	char *tmp = dst;
++	char __iomem *tmp = dst;
+ 	u64 perf, diff_us;
+ 	ktime_t kstart, kstop, kdiff;
+ 
+@@ -324,7 +325,7 @@ static int ntb_perf_thread(void *data)
+ 	struct perf_ctx *perf = pctx->perf;
+ 	struct pci_dev *pdev = perf->ntb->pdev;
+ 	struct perf_mw *mw = &perf->mw;
+-	char *dst;
++	char __iomem *dst;
+ 	u64 win_size, buf_size, total;
+ 	void *src;
+ 	int rc, node, i;
+@@ -364,7 +365,7 @@ static int ntb_perf_thread(void *data)
+ 	if (buf_size > MAX_TEST_SIZE)
+ 		buf_size = MAX_TEST_SIZE;
+ 
+-	dst = (char *)mw->vbase;
++	dst = (char __iomem *)mw->vbase;
+ 
+ 	atomic_inc(&perf->tsync);
+ 	while (atomic_read(&perf->tsync) != perf->perf_threads)
 -- 
-1.7.10.4
+2.7.0
