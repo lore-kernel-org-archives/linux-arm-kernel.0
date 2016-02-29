@@ -1,40 +1,316 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 29 Feb 2016 20:07:44 +0200
-Subject: [GIT PULL] omap gpmc enhancements for v4.6
-Message-ID: <56D488F0.8070406@ti.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 29 Feb 2016 23:39:59 +0530
+Subject: [PATCH 11/12] iommu/arm-smmu: Generic IOMMU DT bindings support
+In-Reply-To: <a3edd4225fe8b39440fb9b6a70a70883d3cb103b.1456514380.git.robin.murphy@arm.com>
+References: <cover.1456514380.git.robin.murphy@arm.com>
+ <a3edd4225fe8b39440fb9b6a70a70883d3cb103b.1456514380.git.robin.murphy@arm.com>
+Message-ID: <004c01d1731c$968ebb30$c3ac3190$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
+Hi Robin,
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Robin Murphy
+> Sent: Monday, February 29, 2016 7:16 PM
+> To: iommu at lists.linux-foundation.org;
+linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org
+> Cc: Thomas.Lendacky at amd.com; anup.patel at broadcom.com;
+> thunder.leizhen at huawei.com; will.deacon at arm.com;
+> stuart.yoder at nxp.com; Suravee.Suthikulpanit at amd.com;
+> tchalamarla at caviumnetworks.com
+> Subject: [PATCH 11/12] iommu/arm-smmu: Generic IOMMU DT bindings
+> support
+> 
+> Implement an of_xlate callback and the appropriate registration so that we
+> can configure masters via generic DT bindings. Initially, we have the
+> equivalent level of functionality with respect to groups, stream ID
+limits, etc.
+> as for the old bindings, but the door is now open for further
+improvements.
+> 
+> Since of_iommmu_configure() is not yet clever enough to enforce the
+> necessary probe ordering dependencies, employ the same explicit device
+> creation tactic as the Exynos IOMMU driver to ensure our actual SMMU
+> instance is up and running in time to handle of_xlate calls.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 144
+> ++++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 106 insertions(+), 38 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
+> 91b0a1b..8fcf27a 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -39,6 +39,8 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_iommu.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/pci.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> @@ -421,6 +423,9 @@ static struct arm_smmu_master
+> *find_smmu_master(struct device_node *dev_node)  {
+>  	struct arm_smmu_master *master;
+> 
+> +	if (!dev_node)
+> +		return NULL;
+> +
+>  	read_lock(&arm_smmu_masters_lock);
+>  	list_for_each_entry(master, &arm_smmu_masters, list)
+>  		if (master->of_node == dev_node)
+> @@ -1011,13 +1016,6 @@ static int arm_smmu_domain_add_master(struct
+> arm_smmu_domain *smmu_domain,
+>  	if (ret)
+>  		return ret;
+> 
+> -	/*
+> -	 * FIXME: This won't be needed once we have IOMMU-backed DMA
+> ops
+> -	 * for all devices behind the SMMU.
+> -	 */
+> -	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
+> -		return 0;
+> -
+>  	for (i = 0; i < cfg->num_streamids; ++i) {
+>  		u32 idx = cfg->streamids[i].s2cr_idx - 1;
+>  		u32 s2cr = S2CR_TYPE_TRANS | S2CR_PRIVCFG_UNPRIV |
+> @@ -1206,57 +1204,79 @@ static bool arm_smmu_capable(enum
+> iommu_cap cap)
+>  	}
+>  }
+> 
+> +static int arm_smmu_add_dev_streamid(struct arm_smmu_device *smmu,
+> +				     struct device *dev, u16 sid)
+> +{
+> +	struct arm_smmu_master_cfg *cfg = dev->archdata.iommu;
+> +	int i;
+> +
+> +	if (!cfg) {
+> +		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+> +		if (!cfg)
+> +			return -ENOMEM;
+> +
+> +		cfg->smmu = smmu;
+> +		dev->archdata.iommu = cfg;
+> +	}
+> +
+> +	if (cfg->num_streamids >= MAX_MASTER_STREAMIDS)
+> +		return -ENOSPC;
+> +
+> +	/* Avoid duplicate SIDs, as this can lead to SMR conflicts */
+> +	for (i = 0; i < cfg->num_streamids; ++i)
+> +		if (cfg->streamids[i].id == sid) {
+> +			dev_warn(dev, "Stream ID 0x%hx repeated;
+> ignoring\n",
+> +				 sid);
+> +			return 0;
+> +		}
+> +
+> +	cfg->streamids[cfg->num_streamids++].id = sid;
+> +
+> +	return 0;
+> +}
+> +
+>  static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void
+> *data)  {
+>  	*((u16 *)data) = alias;
+>  	return 0; /* Continue walking */
+>  }
+> 
+> -static int arm_smmu_init_pci_device(struct arm_smmu_device *smmu,
+> -				    struct pci_dev *pdev)
+> +static int arm_smmu_init_legacy_master(struct device *dev)
+>  {
+> -	struct arm_smmu_master_cfg *cfg;
+> +	struct arm_smmu_master *master;
+> +	struct device_node *np = dev_get_dev_node(dev);
+>  	u16 sid;
+> 
+> -	cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+> -	if (!cfg)
+> -		return -ENOMEM;
+> -	/*
+> -	 * Assume Stream ID == Requester ID for now.
+> -	 * We need a way to describe the ID mappings in FDT.
+> -	 */
+> -	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+> +	master = find_smmu_master(np);
+> +	if (!master)
+> +		return -ENODEV;
+> 
+> -	cfg->streamids[0].id = sid;
+> -	cfg->num_streamids = 1;
+> +	if (!dev_is_pci(dev)) {
+> +		dev->archdata.iommu = &master->cfg;
+> +		return 0;
+> +	}
+> 
+> -	cfg->smmu = smmu;
+> -	pdev->dev.archdata.iommu = cfg;
+> -
+> -	return 0;
+> +	/* Legacy bindings assume Stream ID == Requester ID */
+> +	pci_for_each_dma_alias(to_pci_dev(dev),
+> __arm_smmu_get_pci_sid, &sid);
+> +	return arm_smmu_add_dev_streamid(master->cfg.smmu, dev, sid);
+>  }
+> 
+>  static int arm_smmu_add_device(struct device *dev)  {
+>  	struct iommu_group *group;
+> -	struct arm_smmu_master *master;
+> 
+> -	if (dev->archdata.iommu)
+> -		return -EEXIST;
+> +	if (!dev->archdata.iommu) {
+> +		int ret = arm_smmu_init_legacy_master(dev);
+> 
+> -	master = find_smmu_master(dev_get_dev_node(dev));
+> -	if (!master)
+> -		return -ENODEV;
+> -
+> -	if (dev_is_pci(dev)) {
+> -		int ret = arm_smmu_init_pci_device(master->cfg.smmu,
+> -						   to_pci_dev(dev));
+>  		if (ret)
+>  			return ret;
+> -	} else {
+> -		dev->archdata.iommu = &master->cfg;
+>  	}
+> 
+> +	/*
+> +	 * For now, assume that the default group allocators suffice.
+> +	 * We might have to do some preparatory work here to properly
+> +	 * handle multiple devices sharing stream IDs.
+> +	 */
+>  	group = iommu_group_get_for_dev(dev);
+>  	if (IS_ERR(group))
+>  		return PTR_ERR(group);
+> @@ -1268,7 +1288,7 @@ static int arm_smmu_add_device(struct device
+> *dev)  static void arm_smmu_remove_device(struct device *dev)  {
+>  	iommu_group_remove_device(dev);
+> -	if (dev_is_pci(dev))
+> +	if (!find_smmu_master(dev->of_node))
+>  		kfree(dev->archdata.iommu);
+>  }
+> 
+> @@ -1381,6 +1401,20 @@ out_unlock:
+>  	return ret;
+>  }
+> 
+> +static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args
+> +*args) {
+> +	struct arm_smmu_device *smmu;
+> +	struct platform_device *smmu_pdev;
+> +
+> +	smmu_pdev = of_find_device_by_node(args->np);
+> +	if (!smmu_pdev)
+> +		return -ENODEV;
+> +
+> +	smmu = platform_get_drvdata(smmu_pdev);
+> +
+> +	return arm_smmu_add_dev_streamid(smmu, dev, args->args[0]); }
+> +
+>  static struct iommu_ops arm_smmu_ops = {
+>  	.capable		= arm_smmu_capable,
+>  	.domain_alloc		= arm_smmu_domain_alloc,
+> @@ -1395,6 +1429,7 @@ static struct iommu_ops arm_smmu_ops = {
+>  	.device_group		= arm_smmu_device_group,
+>  	.domain_get_attr	= arm_smmu_domain_get_attr,
+>  	.domain_set_attr	= arm_smmu_domain_set_attr,
+> +	.of_xlate		= arm_smmu_of_xlate,
+>  	.pgsize_bitmap		= -1UL, /* Restricted during device attach
+*/
+>  };
+> 
+> @@ -1731,6 +1766,9 @@ static int arm_smmu_probe_mmu_masters(struct
+> arm_smmu_device *smmu)
+>  	struct of_phandle_args masterspec;
+>  	int err, i = 0;
+> 
+> +	dev_notice(smmu->dev,
+> +		   "Deprecated \"mmu-masters\" property found; update DT
+> to
+> +\"iommus\" property if possible\n");
+> +
+>  	while (!of_parse_phandle_with_args(smmu->dev->of_node, "mmu-
+> masters",
+>  			"#stream-id-cells", i,
+>  			&masterspec)) {
+> @@ -1838,7 +1876,9 @@ static int arm_smmu_device_dt_probe(struct
+> platform_device *pdev)
+>  	}
+> 
+>  	platform_set_drvdata(pdev, smmu);
+> -	arm_smmu_probe_mmu_masters(smmu);
+> +	/* Check first to avoid of_parse_phandle_with_args complaining */
+> +	if (of_property_read_bool(dev->of_node, "mmu-masters"))
+> +		arm_smmu_probe_mmu_masters(smmu);
+>  	arm_smmu_device_reset(smmu);
+>  	return 0;
+> 
+> @@ -1881,8 +1921,11 @@ static struct platform_driver arm_smmu_driver = {
+> static int __init arm_smmu_init(void)  {
+>  	struct device_node *np;
+> +	static bool done;
+>  	int ret;
+> 
+> +	if (done)
+> +		return 0;
+>  	/*
+>  	 * Play nice with systems that don't have an ARM SMMU by checking
+> that
+>  	 * an ARM SMMU exists in the system before proceeding with the
+> driver @@ -1912,6 +1955,7 @@ static int __init arm_smmu_init(void)
+>  		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);  #endif
+> 
+> +	done = true;
+>  	return 0;
+>  }
+> 
+> @@ -1923,6 +1967,30 @@ static void __exit arm_smmu_exit(void)
+> subsys_initcall(arm_smmu_init);  module_exit(arm_smmu_exit);
+> 
+> +static int __init arm_smmu_of_init(struct device_node *np) {
+> +	struct arm_smmu_device *smmu;
+> +	struct platform_device *pdev;
+> +	int ret = arm_smmu_init();
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	pdev = of_platform_device_create(np, NULL,
+> platform_bus_type.dev_root);
+> +	if (!pdev)
+> +		return -ENODEV;
+> +
+> +	smmu = platform_get_drvdata(pdev);
+> +	of_iommu_set_ops(np, &arm_smmu_ops);
+> +
+> +	return 0;
+> +}
+> +IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1",
+> arm_smmu_of_init);
+> +IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2",
+> arm_smmu_of_init);
+> +IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400",
+> arm_smmu_of_init);
+> +IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401",
+> arm_smmu_of_init);
+> +IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500",
+> arm_smmu_of_init);
+> +
+ Thanks for this series. I am going to use and test this. Also I wanted to
+ ask about the iommu probe deferral series [1] to avoid early device
+registration and wanted know the direction on that ?
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1505.3/03280.html
 
-are available in the git repository at:
-
-  git at github.com:rogerq/linux.git tags/gpmc-omap-for-v4.6
-
-for you to fetch changes up to e116c0545d17be6cc95a559aa5a68c221330501b:
-
-  dt-bindings: bus: ti-gpmc: Add AAD timings properties (2016-02-08 16:22:03 +0200)
-
-----------------------------------------------------------------
-OMAP-GPMC: Add address/data muxed timings
-
-* Add support for the GPMC Advanced AAD (address/data muxed) timings
-on hardware supporting the feature like the AM335x and DM816X.
-
-----------------------------------------------------------------
-Neil Armstrong (2):
-      memory: omap-gpmc: Add support for AAD timings
-      dt-bindings: bus: ti-gpmc: Add AAD timings properties
-
- Documentation/devicetree/bindings/bus/ti-gpmc.txt |  5 +++++
- drivers/memory/omap-gpmc.c                        | 30 ++++++++++++++++++++++++++++++
- include/linux/omap-gpmc.h                         |  5 +++++
- 3 files changed, 40 insertions(+)
-
---
-cheers,
--roger
+Regards,
+ Sricharan
