@@ -1,72 +1,44 @@
-From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
-Date: Mon, 29 Feb 2016 14:22:39 +0000
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN support
-Message-ID: <1456755759-51288-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 15:35:09 +0100
+Subject: [PATCH] lz4c: shut up lz4c output
+In-Reply-To: <56D44065.4070005@suse.com>
+References: <1456749618-1067584-1-git-send-email-arnd@arndb.de>
+ <56D44065.4070005@suse.com>
+Message-ID: <2781274.5SXPMrqOdg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CAN controller nodes for r8a7795.
+On Monday 29 February 2016 13:58:13 Michal Marek wrote:
+> On 2016-02-29 13:40, Arnd Bergmann wrote:
+> > When KERNEL_LZ4 is set, we always get an output even when building
+> > with 'make -s':
+> > 
+> >     *** LZ4 Compression CLI , by Yann Collet (May 31 2013) ***
+> >     ! Generating compressed LZ4 using Legacy format (deprecated !) !
+> >     Using stdin for input
+> >     Using stdout for output
+> >     Compressed 11213376 bytes into 4555781 bytes ==> 40.63%
+> >     Done in 0.63 s ==> 16.97 MB/s
+> > 
+> > The output is not helpful in the context of building the kernel,
+> > so this patch hides the stdout output of the lz4 binary completely.
+> 
+> > -     lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
+> > +     lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ 2>&1 || \
+> >       (rm -f $@ ; false)
+> 
+> Hi Arnd,
+> 
+> this redirection does not hide it, but rather includes it in the
+> compressed image file.
 
-Note: CAN channel register base address mentioned in R-Car Gen3 Hardware
-User Manual v0.5E is incorrect. The corrected base addresses are:
+Oops, you are right. I was cleaning out some older patches I had in my
+queue and hadn't realized it was completely botched this way.
 
-CAN Channel 0 - 0xe6c30000
-CAN Channel 1 - 0xe6c38000
+> BTW, my copy of lz4c only displays this warning with -v.
 
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
----
-Hi All,
+I've updated my copy of lz4c now and can confirm that the output
+is completely gone (without -v). I won't follow up with a fixed version
+then, as the problem is already solved elsewhere.
 
-   This patch is based on linux-next (tag:next-20160225) with following patch
-   applied on top
-
-   [PATCH v2] arm64: dts: r8a7795: Add CAN external clock support
-
-   The respective CAN subsystem changes are submitted separately here (http://marc.info/?l=linux-can&m=145674974416086&w=2)
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 4049182..a88f8d8 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -523,6 +523,36 @@
- 			#size-cells = <0>;
- 		};
- 
-+		can0: can at e6c30000 {
-+			compatible = "renesas,can-r8a7795",
-+				     "renesas,rcar-gen3-can";
-+			reg = <0 0xe6c30000 0 0x1000>;
-+			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 916>,
-+			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
-+			power-domains = <&cpg>;
-+			status = "disabled";
-+		};
-+
-+		can1: can at e6c38000 {
-+			compatible = "renesas,can-r8a7795",
-+				     "renesas,rcar-gen3-can";
-+			reg = <0 0xe6c38000 0 0x1000>;
-+			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 915>,
-+			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
-+			power-domains = <&cpg>;
-+			status = "disabled";
-+		};
-+
- 		hscif0: serial at e6540000 {
- 			compatible = "renesas,hscif-r8a7795",
- 				     "renesas,rcar-gen3-hscif",
--- 
-1.9.1
+	Arnd
