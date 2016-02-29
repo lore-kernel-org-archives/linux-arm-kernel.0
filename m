@@ -1,112 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 12:47:05 +0100
-Subject: [PATCH, RESEND] ntb: perf test: fix address space confusion
-Message-ID: <1456746438-3842627-1-git-send-email-arnd@arndb.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 29 Feb 2016 11:47:28 +0000
+Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
+In-Reply-To: <5357325.sBkT8ESvOS@wuerfel>
+References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
+ <2734684.OJWJHS6snX@wuerfel> <56D429F0.7010409@arm.com>
+ <5357325.sBkT8ESvOS@wuerfel>
+Message-ID: <56D42FD0.8030302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ntb driver assigns between pointers an __iomem tokens, and
-also casts them to 64-bit integers, which results in compiler
-warnings on 32-bit systems:
+On 29/02/16 11:29, Arnd Bergmann wrote:
+> On Monday 29 February 2016 11:22:24 Robin Murphy wrote:
+>>>>> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+>>>>> index b325954cf8f8..ea0998921702 100644
+>>>>> --- a/drivers/iommu/Kconfig
+>>>>> +++ b/drivers/iommu/Kconfig
+>>>>> @@ -341,6 +341,7 @@ config MTK_IOMMU
+>>>>>      bool "MTK IOMMU Support"
+>>>>>      depends on ARM || ARM64
+>>>>>      depends on ARCH_MEDIATEK || COMPILE_TEST
+>>>>> +   select ARM_DMA_USE_IOMMU
+>>>>
+>>>> If going down this route, I'd be inclined to add an "if ARM" there, just
+>>>> for clarity.
+>>>
+>>> That would run into the NEED_SG_DMA_LENGTH problem on other architectures
+>>> that don't already set it, right?
+>>
+>> Sorry, I'm lost - wouldn't "depends on ARM || ARM64" make other
+>> architectures moot? arm64 already has NEED_SG_DMA_LENGTH=y by default.
+>>
+>
+> Nevermind, I didn't notice the dependency on the architecture.
+>
+> What is keeping us from having 'depends on ARM || ARM64 || COMPILE_TEST'?
 
-drivers/ntb/test/ntb_perf.c: In function 'perf_copy':
-drivers/ntb/test/ntb_perf.c:213:10: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-  vbase = (u64)(u64 *)mw->vbase;
-          ^
-drivers/ntb/test/ntb_perf.c:214:14: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-  dst_vaddr = (u64)(u64 *)dst;
-              ^
+IIRC it got changed because the kbuild test robot was consistently 
+blowing up due to missing definitions on things like parisc.
 
-This adds __iomem annotations where needed and changes the temporary
-variables to iomem pointers to avoid casting them to u64. I did not
-see the problem in linux-next earlier, but it show showed up in
-4.5-rc1.
+Robin.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Dave Jiang <dave.jiang@intel.com>
-Fixes: 8a7b6a778a85 ("ntb: ntb perf tool")
----
-I sent this out on Jan 26, but the problem still persists in linux-next
-as of Feb 29.
-
- drivers/ntb/test/ntb_perf.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/ntb/test/ntb_perf.c b/drivers/ntb/test/ntb_perf.c
-index c8a37ba4b4f9..6bdc1e7b7503 100644
---- a/drivers/ntb/test/ntb_perf.c
-+++ b/drivers/ntb/test/ntb_perf.c
-@@ -178,7 +178,7 @@ static void perf_copy_callback(void *data)
- 	atomic_dec(&pctx->dma_sync);
- }
- 
--static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
-+static ssize_t perf_copy(struct pthr_ctx *pctx, char __iomem *dst,
- 			 char *src, size_t size)
- {
- 	struct perf_ctx *perf = pctx->perf;
-@@ -189,7 +189,8 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
- 	dma_cookie_t cookie;
- 	size_t src_off, dst_off;
- 	struct perf_mw *mw = &perf->mw;
--	u64 vbase, dst_vaddr;
-+	void __iomem *vbase;
-+	void __iomem *dst_vaddr;
- 	dma_addr_t dst_phys;
- 	int retries = 0;
- 
-@@ -204,14 +205,14 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
- 	}
- 
- 	device = chan->device;
--	src_off = (size_t)src & ~PAGE_MASK;
--	dst_off = (size_t)dst & ~PAGE_MASK;
-+	src_off = (uintptr_t)src & ~PAGE_MASK;
-+	dst_off = (uintptr_t __force)dst & ~PAGE_MASK;
- 
- 	if (!is_dma_copy_aligned(device, src_off, dst_off, size))
- 		return -ENODEV;
- 
--	vbase = (u64)(u64 *)mw->vbase;
--	dst_vaddr = (u64)(u64 *)dst;
-+	vbase = mw->vbase;
-+	dst_vaddr = dst;
- 	dst_phys = mw->phys_addr + (dst_vaddr - vbase);
- 
- 	unmap = dmaengine_get_unmap_data(device->dev, 1, GFP_NOWAIT);
-@@ -261,13 +262,13 @@ err_get_unmap:
- 	return 0;
- }
- 
--static int perf_move_data(struct pthr_ctx *pctx, char *dst, char *src,
-+static int perf_move_data(struct pthr_ctx *pctx, char __iomem *dst, char *src,
- 			  u64 buf_size, u64 win_size, u64 total)
- {
- 	int chunks, total_chunks, i;
- 	int copied_chunks = 0;
- 	u64 copied = 0, result;
--	char *tmp = dst;
-+	char __iomem *tmp = dst;
- 	u64 perf, diff_us;
- 	ktime_t kstart, kstop, kdiff;
- 
-@@ -324,7 +325,7 @@ static int ntb_perf_thread(void *data)
- 	struct perf_ctx *perf = pctx->perf;
- 	struct pci_dev *pdev = perf->ntb->pdev;
- 	struct perf_mw *mw = &perf->mw;
--	char *dst;
-+	char __iomem *dst;
- 	u64 win_size, buf_size, total;
- 	void *src;
- 	int rc, node, i;
-@@ -364,7 +365,7 @@ static int ntb_perf_thread(void *data)
- 	if (buf_size > MAX_TEST_SIZE)
- 		buf_size = MAX_TEST_SIZE;
- 
--	dst = (char *)mw->vbase;
-+	dst = (char __iomem *)mw->vbase;
- 
- 	atomic_inc(&perf->tsync);
- 	while (atomic_read(&perf->tsync) != perf->perf_threads)
--- 
-2.7.0
+> I assume it doesn't work yet, but it would be nice to get that done
+> at some point so we can take advantage of automated build testing like
+> coverity.
+>
+> 	Arnd
+>
