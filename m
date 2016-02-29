@@ -1,35 +1,77 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Mon, 29 Feb 2016 13:58:13 +0100
-Subject: [PATCH] lz4c: shut up lz4c output
-In-Reply-To: <1456749618-1067584-1-git-send-email-arnd@arndb.de>
-References: <1456749618-1067584-1-git-send-email-arnd@arndb.de>
-Message-ID: <56D44065.4070005@suse.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Feb 2016 13:07:23 +0000
+Subject: [PATCH v13 01/20] ARM64: Move PMU register related defines to
+ asm/perf_event.h
+In-Reply-To: <56CE6098.8070001@huawei.com>
+References: <1456290520-10012-1-git-send-email-zhaoshenglong@huawei.com>
+ <1456290520-10012-2-git-send-email-zhaoshenglong@huawei.com>
+ <20160224175247.GE12471@arm.com> <56CE6098.8070001@huawei.com>
+Message-ID: <56D4428B.5000505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-02-29 13:40, Arnd Bergmann wrote:
-> When KERNEL_LZ4 is set, we always get an output even when building
-> with 'make -s':
+Shannon,
+
+On 25/02/16 02:02, Shannon Zhao wrote:
 > 
->     *** LZ4 Compression CLI , by Yann Collet (May 31 2013) ***
->     ! Generating compressed LZ4 using Legacy format (deprecated !) !
->     Using stdin for input
->     Using stdout for output
->     Compressed 11213376 bytes into 4555781 bytes ==> 40.63%
->     Done in 0.63 s ==> 16.97 MB/s
 > 
-> The output is not helpful in the context of building the kernel,
-> so this patch hides the stdout output of the lz4 binary completely.
+> On 2016/2/25 1:52, Will Deacon wrote:
+>> On Wed, Feb 24, 2016 at 01:08:21PM +0800, Shannon Zhao wrote:
+>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>
+>>> To use the ARMv8 PMU related register defines from the KVM code, we move
+>>> the relevant definitions to asm/perf_event.h header file and rename them
+>>> with prefix ARMV8_PMU_.
+>>>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> Reviewed-by: Andrew Jones <drjones@redhat.com>
+>>> ---
+>>>  arch/arm64/include/asm/perf_event.h | 35 +++++++++++++++++++
+>>>  arch/arm64/kernel/perf_event.c      | 68 ++++++++++---------------------------
+>>>  2 files changed, 52 insertions(+), 51 deletions(-)
+>>
+>> Looks fine to me, but we're going to get some truly horrible conflicts
+>> in -next.
+>>
+>> I'm open to suggestions on the best way to handle this, but one way
+>> would be:
+>>
+>>   1. Duplicate all the #defines privately in KVM (queue via kvm tree)
+> This way seems not proper I think.
+> 
+>>   2. Rebase this patch onto my perf/updates branch [1] (queue via me)
+> While to this series, it really relies on the perf_event.h to compile
+> and test, so maybe for KVM-ARM and KVM maintainers it's not proper.
+> 
+>>   3. Patch at -rc1 dropping the #defines from (1) and moving to the new
+>>      perf_event.h stuff
+>>
+> I vote for this way. Since the patch in [1] is small and nothing else
+> relies on them, I think it would be simple to rebase them onto this series.
+> 
+>> Thoughts?
+>>
+> Anyway, there are only 3 lines which have conflicts. I'm not sure
+> whether we could handle this when we merge them.
 
-> -	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
-> +	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ 2>&1 || \
->  	(rm -f $@ ; false)
+I think you're missing the point:
 
-Hi Arnd,
+- We want both the arm64 perf and KVM trees to be easy to merge
+- The conflicts are not that simple to resolve
+- We want these conflicts to be solved before it hits Linus' tree
 
-this redirection does not hide it, but rather includes it in the
-compressed image file.
+With that in mind, here's what I'm suggesting we merge as a first patch:
 
-BTW, my copy of lz4c only displays this warning with -v.
+https://git.kernel.org/cgit/linux/kernel/git/kvmarm/kvmarm.git/commit/?h=queue&id=2029b4b02691ec6ebba3d281068e783353d7e108
 
-Michal
+Once this and the perf/updates branch are merged, we can add one last
+patch reverting this hack and actually doing the renaming work (Will has
+posted a resolution for most of the new things).
+
+Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
