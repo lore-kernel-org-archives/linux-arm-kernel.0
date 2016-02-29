@@ -1,33 +1,24 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 29 Feb 2016 11:13:39 +0000
-Subject: [PATCH] iommu/dma: Fix NEED_SG_DMA_LENGTH dependency
-Message-ID: <189f8d7a6b1598108dc8e9f1777c67b07a4bd781.1456744313.git.robin.murphy@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 29 Feb 2016 20:13:59 +0900
+Subject: [PATCH] ASoC: trace: fix printing jack name
+In-Reply-To: <s5hlh65i5js.wl-tiwai@suse.de>
+References: <1456331903-3999234-1-git-send-email-arnd@arndb.de>
+ <20160224115037.40772a90@gandalf.local.home>
+ <s5hlh65i5js.wl-tiwai@suse.de>
+Message-ID: <20160229111359.GX18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU_DMA does indeed depend on scatterlists having a DMA length, but
-the NEED_SG_DMA_LENGTH symbol should be selected, not depended upon.
+On Sun, Feb 28, 2016 at 09:48:39AM +0100, Takashi Iwai wrote:
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> In anyway, the breakage came from my tree, so I'm going to apply the
+> fix directly on mine.
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index b325954..83f1a65 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -70,9 +70,9 @@ config OF_IOMMU
- # IOMMU-agnostic DMA-mapping layer
- config IOMMU_DMA
- 	bool
--	depends on NEED_SG_DMA_LENGTH
- 	select IOMMU_API
- 	select IOMMU_IOVA
-+	select NEED_SG_DMA_LENGTH
- 
- config FSL_PAMU
- 	bool "Freescale IOMMU support"
--- 
-2.7.2.333.g70bd996.dirty
+I applied it to ASoC a few days ago.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/349a812e/attachment.sig>
