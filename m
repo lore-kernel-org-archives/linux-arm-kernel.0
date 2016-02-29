@@ -1,83 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 17:39:59 +0100
-Subject: [PATCH v2] video: exynos: fix modular build
-In-Reply-To: <56D46DFD.6090706@ti.com>
-References: <1456490307-823812-1-git-send-email-arnd@arndb.de>
- <56D46DFD.6090706@ti.com>
-Message-ID: <6291541.7IMAnfX0g2@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 29 Feb 2016 16:47:51 +0000
+Subject: [PATCH 04/12] arm64/dma-mapping: Extend DMA ops workaround to
+ PCI devices
+In-Reply-To: <ffcca878210c916962c562d3d1341aae93d593d0.1456514380.git.robin.murphy@arm.com>
+References: <cover.1456514380.git.robin.murphy@arm.com>
+ <ffcca878210c916962c562d3d1341aae93d593d0.1456514380.git.robin.murphy@arm.com>
+Message-ID: <20160229164750.GA15650@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 February 2016 18:12:45 Tomi Valkeinen wrote:
-> Hi,
+On Mon, Feb 29, 2016 at 01:46:13PM +0000, Robin Murphy wrote:
+> PCI devices now suffer the same hiccup as platform devices, in that they
+> get their DMA ops configured before they have been added to their bus,
+> and thus before we know whether they have successfully registered with
+> an IOMMU or not. Until the necessary driver core changes to reorder
+> calls during device creation have been worked out, extend our delayed
+> notifier trick onto the PCI bus so as to avoid broken DMA ops for IOMMUs
+> there.
 > 
-> On 26/02/16 14:38, Arnd Bergmann wrote:
-> > The s6e8ax0 driver has a dependency on BACKLIGHT_CLASS_DEVICE,
-> > which can be configured as a loadable module, so we have to
-> > make the driver a tristate symbol as well, to avoid this error:
-> > 
-> > drivers/built-in.o: In function `s6e8ax0_probe':
-> > :(.text+0x23a48): undefined reference to `devm_backlight_device_register'
-> 
-> If a 'bool' Kconfig option depends on BACKLIGHT_CLASS_DEVICE, shouldn't
-> the Kconfig dependency take care of having BACKLIGHT_CLASS_DEVICE as
-> built-in?
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-No, that's not how Kconfig interprets it. There are many bool option
-that depend on tristate options but can be enabled if the dependency
-is built-in.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Take this one for example:
-
-config FIRMWARE_EDID
-       bool "Enable firmware EDID"
-       depends on FB
-
-We clearly want to be able to turn this on even for FB=m.
-
-> > This also means we get another error from a missing export, which
-> > this fixes as well:
-> > 
-> > ERROR: "exynos_mipi_dsi_register_lcd_driver" [drivers/video/fbdev/exynos/s6e8ax0.ko] undefined!
-> > 
-> > The drivers are all written to be loadable modules already,
-> > except the Kconfig options for that are missing, which makes
-> > the patch really easy.
-> 
-> Looks and sound fine, except doesn't this tell that the drivers have
-> never been tested as modules? Did you or someone else actually test these?
-
-No, this is not runtime tested. Generally there is very little that
-can go wrong here though.
-
-An alternative would be to change the dependency to
-
-	depends on BACKLIGHT_CLASS_DEVICE=y
-
-which doesn't allow the driver to be turned on for the =m case.
-However, no other framebuffer driver does this.
-
-> > diff --git a/drivers/video/fbdev/exynos/Makefile b/drivers/video/fbdev/exynos/Makefile
-> > index b5b1bd228abb..02d8dc522fea 100644
-> > --- a/drivers/video/fbdev/exynos/Makefile
-> > +++ b/drivers/video/fbdev/exynos/Makefile
-> > @@ -2,6 +2,8 @@
-> >  # Makefile for the exynos video drivers.
-> >  #
-> >  
-> > -obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
-> > -				     	exynos_mipi_dsi_lowlevel.o
-> > +obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
-> > +
-> > +exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
-> > +					   exynos_mipi_dsi_lowlevel.o
-> 
-> Hmm, why is this makefile change needed?
-
-The original Makefile would link each file into a separate module, but that
-cannot work, because they reference symbols from each other that are not
-exported to other modules.
-
-With my change, all the files get linked into a single module.
-
-	Arnd
+-- 
+Catalin
