@@ -1,159 +1,43 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 29 Feb 2016 16:27:13 +0100
-Subject: [RFC v4 09/14] msi: IOMMU map the doorbell address when needed
-In-Reply-To: <alpine.DEB.2.11.1602261907050.3638@nanos>
-References: <1456508154-2253-1-git-send-email-eric.auger@linaro.org>
- <1456508154-2253-10-git-send-email-eric.auger@linaro.org>
- <alpine.DEB.2.11.1602261907050.3638@nanos>
-Message-ID: <56D46351.5060701@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 Feb 2016 12:34:55 -0300
+Subject: Booting MX7Solo with 4.5-rc6
+In-Reply-To: <AMSPR04MB263126AA78BEE3D8818F80388BA0@AMSPR04MB263.eurprd04.prod.outlook.com>
+References: <CAOMZO5A6AO1n+fiwYBa=7VS3i1qk6zZ_ifym1yPt6+ApcTAuoA@mail.gmail.com>
+ <AMSPR04MB263126AA78BEE3D8818F80388BA0@AMSPR04MB263.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5BX4+AB59SGCUGyk2RKyi706wOxgMp15beyGR9Dg6HWPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-On 02/26/2016 07:19 PM, Thomas Gleixner wrote:
-> On Fri, 26 Feb 2016, Eric Auger wrote:
->> +static int msi_map_doorbell(struct iommu_domain *d, struct msi_msg *msg)
->> +{
->> +#ifdef CONFIG_IOMMU_DMA_RESERVED
->> +	dma_addr_t iova;
->> +	phys_addr_t addr;
->> +	int ret;
->> +
->> +#ifdef CONFIG_PHYS_ADDR_T_64BIT
->> +	addr = ((phys_addr_t)(msg->address_hi) << 32) | msg->address_lo;
->> +#else
->> +	addr = msg->address_lo;
->> +#endif
->> +
->> +	ret = iommu_get_single_reserved(d, addr, IOMMU_WRITE, &iova);
->> +	if (!ret) {
->> +		msg->address_lo = lower_32_bits(iova);
->> +		msg->address_hi = upper_32_bits(iova);
->> +	}
->> +	return ret;
->> +#else
->> +	return -ENODEV;
->> +#endif
-> 
-> This is completely unreadable. Please make this in a way which is parseable.
-> A few small inline functions do the trick.
-OK I will rewrite this.
-> 
->> +static void msi_unmap_doorbell(struct iommu_domain *d, struct msi_msg *msg)
->> +{
->> +#ifdef CONFIG_IOMMU_DMA_RESERVED
->> +	dma_addr_t iova;
->> +
->> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
->> +	iova = ((dma_addr_t)(msg->address_hi) << 32) | msg->address_lo;
->> +#else
->> +	iova = msg->address_lo;
->> +#endif
->> +
->> +	iommu_put_single_reserved(d, iova);
->> +#endif
-> 
-> Ditto.
-ok
-> 
->> +}
->> +
->> +#ifdef CONFIG_IOMMU_API
->> +static struct iommu_domain *
->> +	irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
-> 
-> If you split lines, then the function name starts at the beginning of the line
-> and not at some randome place.
-ok
-> 
->> +{
->> +
->> +	struct msi_desc *desc;
->> +	struct device *dev;
->> +	struct iommu_domain *d;
->> +	int ret;
-> 
-> Please order variables by descending length
-ok
-> 
->> +	desc = irq_data_get_msi_desc(irq_data);
->> +	if (!desc)
->> +		return NULL;
->> +
->> +	dev = msi_desc_to_dev(desc);
->> +
->> +	d = iommu_get_domain_for_dev(dev);
->> +	if (!d)
->> +		return NULL;
->> +
->> +	ret = iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_MAPPING, NULL);
->> +	if (!ret)
->> +		return d;
->> +	else
->> +		return NULL;
-> 
-> Does anyone except you understand the purpose of the function? Comments have
-> been invented for a reason.
-ok I will comment on the role of those functions.
-> 
->> +}
->> +#else
->> +static inline iommu_domain *
->> +		irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
->> +{
->> +	return NULL;
->> +}
->> +#endif /* CONFIG_IOMMU_API */
->> +
->> +static int msi_compose(struct irq_data *irq_data,
->> +		       struct msi_msg *msg, bool erase)
->> +{
->> +	struct msi_msg old_msg;
->> +	struct iommu_domain *d;
->> +	int ret = 0;
->> +
->> +	d = irq_data_to_msi_mapping_domain(irq_data);
->> +	if (unlikely(d))
->> +		get_cached_msi_msg(irq_data->irq, &old_msg);
->> +
->> +	if (erase)
->> +		memset(msg, 0, sizeof(*msg));
->> +	else
->> +		ret = irq_chip_compose_msi_msg(irq_data, msg);
->> +
->> +	if (!d)
->> +		goto out;
->> +
->> +	/* handle (re-)mapping of MSI doorbell */
->> +	if ((old_msg.address_lo != msg->address_lo) ||
->> +	    (old_msg.address_hi != msg->address_hi))
->> +		msi_unmap_doorbell(d, &old_msg);
->> +
->> +	if (!erase)
->> +		WARN_ON(msi_map_doorbell(d, msg));
->> +
->> +out:
->> +	return ret;
->> +}
-> 
-> No, this is not the way we do this. You replace existing functionality by some
-> new fangled thing. which behaves differently.
-> 
-> This wants to be seperate patches, which first create a wrapper for
-> irq_chip_compose_msi_msg() and then adds the new functionality to it including
-> a proper explanation.
-> 
-> I have no idea how the above is supposed to be the same as the existing code
-> for the non iommu case.
-Sure I will decompose things and provide more explanation.
+On Mon, Feb 29, 2016 at 12:23 PM, Frank Li <frank.li@nxp.com> wrote:
+>
+>
+>> -----Original Message-----
+>> From: Fabio Estevam [mailto:festevam at gmail.com]
+>> Sent: Monday, February 29, 2016 8:23 AM
+>> To: Frank Li <frank.li@nxp.com>; Hui Liu <jason.hui.liu@nxp.com>
+>> Cc: Peng Fan <peng.fan@nxp.com>; linux-arm-kernel at lists.infradead.org;
+>> Dong Aisheng <dongas86@gmail.com>
+>> Subject: Booting MX7Solo with 4.5-rc6
+>>
+>> Hi,
+>>
+>> I am trying to boot linux-next 20160229 on a m7solo warp board and this is
+>> what I get:
+>>
+>> http://pastebin.com/TmQdqd2B
+>>
+>> I can boot this board fine using NXP 3.14.52 kernel.
+>>
+>> These clock warnings also happen on a mx7d sabresd board, but the boot
+>> proceed fine.
+>
+> It caused usleep_range(50, 500) in clk_pllv3_wait_lock.
+> Need aisheng's patch to fix it.
 
-Thank you for your time.
+Yes, I know, but they should not prevent the boot from happening.
 
-Best Regards
+>> Any ideas as to what needs to be done in order to boot a MX7S?
+>
+> Can you try to disable arch_timer in dts?
 
-Eric
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+Just disabled it, but it did not help. Thanks
