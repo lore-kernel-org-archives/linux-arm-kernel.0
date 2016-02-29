@@ -1,29 +1,60 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 29 Feb 2016 11:39:16 +0000
-Subject: [PATCH 0/6] clk: bcm2835: fixes clk-bcm2835 driver issues
-Message-ID: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
+Date: Mon, 29 Feb 2016 11:39:18 +0000
+Subject: [PATCH 2/6] clk: bcm2835: add locking to pll*_on/off methods
+In-Reply-To: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
+References: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456745963-2403-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-This patchset - as recommended by Stefan Wahren - is a split
-of the original V5 patchset that now only includes bugfixes
-to the clock driver not adding new clocks or functionality.
+Add missing locking to:
+* bcm2835_pll_divider_on
+* bcm2835_pll_divider_off
+to protect the read modify write cycle for the
+register access protecting both cm_ctl and a2w_ctl
+registers.
 
-There will be another patchset that implements the
-changes required to add all missing clocks of the SOC.
+Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the
+audio domain clocks")
 
-Martin Sperl (6):
-  clk: bcm2835: pll_off should only set CM_PLL_ANARST
-  clk: bcm2835: add locking to pll*_on/off methods
-  clk: bcm2835: enable clocks that have been enabled by firmware
-  clk: bcm2835: divider value has to be 1 or more
-  clk: bcm2835: correctly enable fractional clock support
-  clk: bcm2835: clean up coding style issues
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ drivers/clk/bcm/clk-bcm2835.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
- drivers/clk/bcm/clk-bcm2835.c |   87 +++++++++++++++++++++++++++++++++--------
- 1 file changed, 70 insertions(+), 17 deletions(-)
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 2b7c6af..30d6486 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1088,10 +1088,12 @@ static void bcm2835_pll_divider_off(struct clk_hw *hw)
+ 	struct bcm2835_cprman *cprman = divider->cprman;
+ 	const struct bcm2835_pll_divider_data *data = divider->data;
 
++	spin_lock(&cprman->regs_lock);
+ 	cprman_write(cprman, data->cm_reg,
+ 		     (cprman_read(cprman, data->cm_reg) &
+ 		      ~data->load_mask) | data->hold_mask);
+ 	cprman_write(cprman, data->a2w_reg, A2W_PLL_CHANNEL_DISABLE);
++	spin_unlock(&cprman->regs_lock);
+ }
+
+ static int bcm2835_pll_divider_on(struct clk_hw *hw)
+@@ -1100,12 +1102,14 @@ static int bcm2835_pll_divider_on(struct clk_hw *hw)
+ 	struct bcm2835_cprman *cprman = divider->cprman;
+ 	const struct bcm2835_pll_divider_data *data = divider->data;
+
++	spin_lock(&cprman->regs_lock);
+ 	cprman_write(cprman, data->a2w_reg,
+ 		     cprman_read(cprman, data->a2w_reg) &
+ 		     ~A2W_PLL_CHANNEL_DISABLE);
+
+ 	cprman_write(cprman, data->cm_reg,
+ 		     cprman_read(cprman, data->cm_reg) & ~data->hold_mask);
++	spin_unlock(&cprman->regs_lock);
+
+ 	return 0;
+ }
 --
 1.7.10.4
