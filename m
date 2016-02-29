@@ -1,75 +1,49 @@
-From: cmetcalf@ezchip.com (Chris Metcalf)
-Date: Mon, 29 Feb 2016 16:40:23 -0500
-Subject: [PATCH 3/4] nmi_backtrace: do a local dump_stack() instead of a
- self-NMI
-In-Reply-To: <1456782024-7122-1-git-send-email-cmetcalf@ezchip.com>
-References: <1456782024-7122-1-git-send-email-cmetcalf@ezchip.com>
-Message-ID: <1456782024-7122-4-git-send-email-cmetcalf@ezchip.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Feb 2016 13:51:37 -0800
+Subject: [PATCH v4 1/5] ARM: dts: LG Optimus Black codename sniper basic
+ support
+In-Reply-To: <1456663185-14170-2-git-send-email-contact@paulk.fr>
+References: <1456663185-14170-1-git-send-email-contact@paulk.fr>
+ <1456663185-14170-2-git-send-email-contact@paulk.fr>
+Message-ID: <20160229215136.GO13417@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently on arm there is code that checks whether it should call
-dump_stack() explicitly, to avoid trying to raise an NMI when the
-current context is not preemptible by the backtrace IPI.  Similarly,
-the forthcoming arch/tile support uses an IPI mechanism that does
-not support generating an NMI to self.
+Hi,
 
-Accordingly, move the code that guards this case into the generic
-mechanism, and invoke it unconditionally whenever we want a
-backtrace of the current cpu.  It seems plausible that in all cases,
-dump_stack() will generate better information than generating a
-stack from the NMI handler.  The register state will be missing,
-but that state is likely not particularly helpful in any case.
+* Paul Kocialkowski <contact@paulk.fr> [160228 04:40]:
+> The LG Optimus Black codename sniper is a smartphone that was designed and
+> manufactured by LG Electronics (LGE) and released back in 2011.
+> It is using an OMAP3630 SoC, GP version.
+> 
+> This adds devicetree support for the device, with only a few basic features
+> supported, such as debug uart, i2c, internal emmc and external mmc.
+...
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins>;
+> +
+> +	clock-frequency = <2600000>;
+> +
+> +	twl: twl at 48 {
+> +		reg = <0x48>;
+> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +		interrupt-parent = <&intc>;
+> +
+> +		power {
+> +			compatible = "ti,twl4030-power";
+> +			ti,use_poweroff;
+> +		};
+> +	};
+> +};
 
-Or, if we think it is helpful, we should be capturing and emitting
-the current register state in all cases when regs == NULL is passed
-to nmi_cpu_backtrace().
+Chances are this devices supports cutting off the voltages and
+the high frequency oscillator during idle. So you may want to
+at some point set compatible = "ti,twl4030-power-idle-osc-off"
+here.
 
-Signed-off-by: Chris Metcalf <cmetcalf@ezchip.com>
----
- arch/arm/kernel/smp.c | 9 ---------
- lib/nmi_backtrace.c   | 9 +++++++++
- 2 files changed, 9 insertions(+), 9 deletions(-)
+Anyways, applying the dts changes into omap-for-v4.6/dt thanks.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 208125658e56..26a9ac6bc616 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -746,15 +746,6 @@ core_initcall(register_cpufreq_notifier);
- 
- static void raise_nmi(cpumask_t *mask)
- {
--	/*
--	 * Generate the backtrace directly if we are running in a calling
--	 * context that is not preemptible by the backtrace IPI. Note
--	 * that nmi_cpu_backtrace() automatically removes the current cpu
--	 * from mask.
--	 */
--	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
--		nmi_cpu_backtrace(NULL);
--
- 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
- }
- 
-diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
-index f878efc9e851..b9a92b90b914 100644
---- a/lib/nmi_backtrace.c
-+++ b/lib/nmi_backtrace.c
-@@ -76,6 +76,15 @@ void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
- 		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
- 	}
- 
-+	/*
-+	 * Don't try to send an NMI to this cpu; it may work on some
-+	 * architectures, but on others it may not, and we'll get
-+	 * information at least as useful just by doing a dump_stack() here.
-+	 * Note that nmi_cpu_backtrace(NULL) will clear the cpu bit.
-+	 */
-+	if (cpumask_test_cpu(this_cpu, to_cpumask(backtrace_mask)))
-+		nmi_cpu_backtrace(NULL);
-+
- 	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
- 		pr_info("Sending NMI from CPU %d to CPUs %*pbl:\n",
- 			this_cpu, nr_cpumask_bits, to_cpumask(backtrace_mask));
--- 
-2.1.2
+Regards,
+
+Tony
