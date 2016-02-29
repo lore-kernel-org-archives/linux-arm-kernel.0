@@ -1,85 +1,75 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 29 Feb 2016 17:43:15 -0600
-Subject: [GIT PULL] Qualcomm ARM64 Updates for 4.6
-Message-ID: <1456789395-28868-1-git-send-email-andy.gross@linaro.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 29 Feb 2016 15:44:16 -0800
+Subject: [PATCH 5/6] clk: bcm2835: correctly enable fractional clock
+ support
+In-Reply-To: <0ED2FB7F-B112-487B-B222-08E5FAEE27F9@martin.sperl.org>
+References: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
+ <1456745963-2403-6-git-send-email-kernel@martin.sperl.org>
+ <87mvqj5k9r.fsf@eliezer.anholt.net>
+ <0ED2FB7F-B112-487B-B222-08E5FAEE27F9@martin.sperl.org>
+Message-ID: <87lh63jd4f.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+Martin Sperl <kernel@martin.sperl.org> writes:
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+>> On 29.02.2016, at 21:33, Eric Anholt <eric@anholt.net> wrote:
+>> 
+>> kernel at martin.sperl.org writes:
+>> 
+>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>> 
+>>> The current driver calculates the clock divider with
+>>> fractional support enabled.
+>>> 
+>>> But it does not enable fractional support in the
+>>> control register itself resulting in an integer only divider,
+>>> but in clk_set_rate responds back the fractionally divided
+>>> clock frequency.
+>>> 
+>>> This patch enables fractional support in the control register
+>>> whenever there is a fractional bit set in the requested clock divider.
+>>> 
+>>> Mash clock limits are are also handled for the PWM clock
+>>> applying the correct divider limits (2 and max_int) applicable to
+>>> basic fractional divider support (mash order of 1).
+>>> 
+>>> It also adds locking to protect the read/modify/write cycle of
+>>> the register modification.
+>>> 
+>>> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the
+>>> audio domain clocks")
+>>> 
+>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> Rewrite of the commit message:
+>> 
+>> The driver has been using fractional dividers for all clocks with
+>> fractional bits.  However, MASH clocks (those used to drive audio) only
+>> do fractional division when in MASH mode, which is used to push clock
+>> jitter out of the audio band.  The PWM clock (used to drive i2s audio)
+>> is the only MASH clock currently enabled in the driver.
+>> 
+>> Additional MASH modes are available that widen the frequency range, but
+>> only 1-level MASH is used for now, until we characterize some better
+>> policy.
+>> 
+>> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the
+>> audio domain clocks?)
+>
+> That is not 100% true - non mash modes have CM_FRAC and CM_FRAC = CM_MASH0
+> so these map each other
 
-are available in the git repository at:
+Once again, trusting the docs turns out to be a bad idea.  You're right,
+the non-MASH clocks *do* have a bit 9 to enable fractional mode.  Sigh.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.6
+So, this patch is:
 
-for you to fetch changes up to 4bd40f6cebaca4a4fa023f27300d8268b15156e7:
-
-  arm64: dts: qcom: Fix MPP's function used for LED control (2016-02-29 16:17:45 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.6
-
-* Add MSM8996 support
-* Cleanups for MSM8916
-* Updates for APQ8016 SBC
-* Fixup pmic reg properties
-* Add RPMCC node for 8916
-* Add LPASS audio nodes
-* Add USB support on MSM8916
-
-----------------------------------------------------------------
-Georgi Djakov (1):
-      arm64: dts: qcom: msm8916: Add RPMCC DT node
-
-Ivan T. Ivanov (1):
-      arm64: dts: qcom: Fix MPP's function used for LED control
-
-Rajendra Nayak (1):
-      arm64: dts: msm8996: Add #power-domain-cells property
-
-Srinivas Kandagatla (15):
-      arm64: dts: apq8016-sbc: Add aliases to spi device.
-      arm64: dts: qcom: remove redundant spi cs pins from pinconf
-      arm64: dts: qcom: add correct drive strenght on cs pins
-      arm64: dts: remove s2 regulator from smd regulators.
-      arm64: dts: qcom: add lable for smd rpm regulators
-      arm64: dts: apq8016-sbc: add regulators support
-      arm64: dts: apq8016-sbc: make 1.8v available on LS expansion
-      arm64: dts: apq8016-sbc: move sdhci node under soc node
-      arm64: dts: apq8016-sbc: Add real regulators and pinctrl for sdhc
-      arm64: dts: qcom: add manual pullup setting to otg.
-      arm64: dts: qcom: apq8016-sbc: add usb support
-      arm64: dts: qcom: add audio pinctrls
-      arm64: dts: qcom: add lpass node
-      arm64: dts: qcom: apq8016-sbc: enable lpass on DB410c
-      arm64: dts: qcom: fix usb digital voltage levels
-
-Stephen Boyd (6):
-      arm64: dts: Add msm8996 SoC and MTP board support
-      arm64: dts: qcom: Add pm8994, pmi8994, pm8004 PMIC skeletons
-      arm64: dts: qcom: Add pm8994 gpios and MPPs
-      arm64: dts: Rename qcom,gcc node to clock-controller
-      arm64: dts: Add L2 cache node to msm8916
-      ARM64: dts: qcom: Remove size elements from pmic reg properties
-
- arch/arm64/boot/dts/qcom/Makefile                  |   1 +
- .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |   2 +-
- arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  14 ++
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 170 ++++++++++++-
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi         | 238 +++++++++++++++++-
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |  48 +++-
- arch/arm64/boot/dts/qcom/msm8996-mtp.dts           |  21 ++
- arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi          |  30 +++
- arch/arm64/boot/dts/qcom/msm8996.dtsi              | 269 +++++++++++++++++++++
- arch/arm64/boot/dts/qcom/pm8004.dtsi               |  19 ++
- arch/arm64/boot/dts/qcom/pm8916.dtsi               |  10 +-
- arch/arm64/boot/dts/qcom/pm8994.dtsi               |  62 +++++
- arch/arm64/boot/dts/qcom/pmi8994.dtsi              |  19 ++
- 13 files changed, 880 insertions(+), 23 deletions(-)
- create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dts
- create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/msm8996.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/pm8004.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/pm8994.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/pmi8994.dtsi
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/9a4365e6/attachment.sig>
