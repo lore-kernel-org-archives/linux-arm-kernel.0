@@ -1,60 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 29 Feb 2016 22:38:50 +0100
-Subject: [PATCH 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
-In-Reply-To: <CAOMZO5BN-1U6vX0HAHWX30t+23NnqEpOw6AttSgvqaZnq=cN6Q@mail.gmail.com>
-References: <1456761156-27664-1-git-send-email-s.trumtrar@pengutronix.de>
- <1456761156-27664-3-git-send-email-s.trumtrar@pengutronix.de>
- <CAOMZO5BN-1U6vX0HAHWX30t+23NnqEpOw6AttSgvqaZnq=cN6Q@mail.gmail.com>
-Message-ID: <20160229213850.GS2613@pengutronix.de>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Mon, 29 Feb 2016 16:40:20 -0500
+Subject: [PATCH 0/4] improvements to the nmi_backtrace code
+Message-ID: <1456782024-7122-1-git-send-email-cmetcalf@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 06:16:50PM -0300, Fabio Estevam wrote:
-> On Mon, Feb 29, 2016 at 12:52 PM, Steffen Trumtrar
-> <s.trumtrar@pengutronix.de> wrote:
-> 
-> > +       ret = clk_prepare_enable(rngc->clk);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       rngc->irq = platform_get_irq(pdev, 0);
-> > +       if (!rngc->irq) {
-> > +               dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
-> > +               clk_disable_unprepare(rngc->clk);
-> > +
-> > +               return ret;
-> 
-> You are returning the wrong error code here:
-> 
-> Better do like this:
-> 
->        rngc->irq = platform_get_irq(pdev, 0);
->        if (rngc->irq < 0) {
+This patch series modifies the trigger_xxx_backtrace() NMI-based
+remote backtracing code to make it more flexible, and makes a few
+small improvements along the way.
 
-rngc->irq is unsigned, so this is never true.
+The motivation comes from the task isolation code, where there are
+scenarios where we want to be able to diagnose a case where some cpu
+is about to interrupt a task-isolated cpu.  It can be helpful to
+see both where the interrupting cpu is, and also an approximation
+of where the cpu that is being interrupted is.  The nmi_backtrace
+framework allows us to discover the stack of the interrupted cpu.
 
->                dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
->                clk_disable_unprepare(rngc->clk);
->                return rngc->irq;
->        }
+The first change adds support for trigger_single_cpu_backtrace(), and
+as an "API side-effect", trigger_cpumask_backtrace().  The underlying
+abstraction is changed to use cpumasks instead of a "bool except_self".
 
-So here comes my better approach:
+The second and third changes provide small improvements to the
+behavior of the existing nmi_backtrace code: omitting full backtrace
+dumps for idle cores, and doing local dump_stack backtraces when we
+try to do a "remote" dump of the local core.  Some of this reflects
+changes from integrating the arch/tile code into the generic code.
 
-	ret = platform_get_irq(pdev, 0);
-	if (ret <= 0) {
-		if (ret == 0)
-			ret = -EINVAL;
-		dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
-		clk_disable_unprepare(rngc->clk);
+The fourth change hooks the arch/tile backtrace mechanism into
+the nmi_backtrace code to share code and take advantage of other
+improvements of nmi_backtrace not present in the original arch/tile
+code, like co-opting printk to use local buffers instead of just
+spewing to the console and hoping for the best.
 
-		return ret;
-	}
+The changes have been runtime tested on tile, and build-tested on
+x86 and arm.
 
-	rngc->irq = ret;
+Chris Metcalf (4):
+  nmi_backtrace: add more trigger_*_cpu_backtrace() methods
+  nmi_backtrace: generate one-line reports for idle cpus
+  nmi_backtrace: do a local dump_stack() instead of a self-NMI
+  arch/tile: adopt the new nmi_backtrace framework
 
-Best regards
-Uwe
+ arch/arm/include/asm/irq.h    |  4 +--
+ arch/arm/kernel/smp.c         | 13 ++------
+ arch/tile/include/asm/irq.h   |  4 +--
+ arch/tile/kernel/pmc.c        |  3 --
+ arch/tile/kernel/process.c    | 72 ++++++++++---------------------------------
+ arch/tile/kernel/traps.c      |  7 +++--
+ arch/x86/include/asm/irq.h    |  4 +--
+ arch/x86/kernel/apic/hw_nmi.c |  6 ++--
+ include/linux/nmi.h           | 63 +++++++++++++++++++++++++++++--------
+ lib/nmi_backtrace.c           | 48 ++++++++++++++++++++---------
+ 10 files changed, 116 insertions(+), 108 deletions(-)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.1.2
