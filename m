@@ -1,43 +1,49 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Mon, 29 Feb 2016 22:01:18 +0100
-Subject: [PATCH] ARM: tegra: beaver: allow SD card voltage to be changed
-Message-ID: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Mon, 29 Feb 2016 22:11:19 +0100
+Subject: [PATCH 2/2] clk: bcm2835: expose current divider,
+ parent and mash via debugfs
+In-Reply-To: <87h9gr5jt3.fsf@eliezer.anholt.net>
+References: <1456755616-2472-1-git-send-email-kernel@martin.sperl.org>
+ <1456755616-2472-3-git-send-email-kernel@martin.sperl.org>
+ <87h9gr5jt3.fsf@eliezer.anholt.net>
+Message-ID: <058897BC-1090-4171-B239-D2A289F1D626@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to switch the card signal voltage level to 1.8V,
-which is needed for any ultra high speed modes to work.
 
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
----
-This needs the SDMMC memcomp pad calibration patches I just
-sent out to be applied, otherwise the card voltage change will
-fail with a message in the kernel log and a fall back to
-high speed operation.
----
- arch/arm/boot/dts/tegra30-beaver.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> On 29.02.2016, at 21:43, Eric Anholt <eric@anholt.net> wrote:
+> 
+> kernel at martin.sperl.org writes:
+> 
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> For each clock expose the following values via debugfs:
+>> * current_parent - the currently selected parent
+>> * current_divi - the integer portion of the currently set divider
+>> * current_divf - the fractional portion of the currently set divider
+>> * current_frac - the current frac/mash settings for the divider
+> 
+> current_parent can already be found through /debug/clk/clk_summary quite
+> nicely I think.  If we wanted a per-clock parent file, that seems like
+> something the core ought to be doing.
+> 
+> current_frac is looking at a bit that doesn't exist for non-MASH clocks.
+> 
+> divi/divf are OK, I guess, but don't seem particularly useful given the
+> raw register output already.  A cooked floating point point divider
+> debugfs entry would be nice, but I don't know if we can do that.
 
-diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-index 1daed40..6b237f2 100644
---- a/arch/arm/boot/dts/tegra30-beaver.dts
-+++ b/arch/arm/boot/dts/tegra30-beaver.dts
-@@ -1848,7 +1848,7 @@
- 
- 				ldo5_reg: ldo5 {
- 					regulator-name = "vddio_sdmmc,avdd_vdac";
--					regulator-min-microvolt = <3300000>;
-+					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-always-on;
- 				};
-@@ -1919,6 +1919,7 @@
- 
- 	sdhci at 78000000 {
- 		status = "okay";
-+		vqmmc-supply = <&ldo5_reg>;
- 		cd-gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
- 		wp-gpios = <&gpio TEGRA_GPIO(T, 3) GPIO_ACTIVE_HIGH>;
- 		power-gpios = <&gpio TEGRA_GPIO(D, 7) GPIO_ACTIVE_HIGH>;
--- 
-2.5.0
+The reason I had those is because I wanted to allow people to
+see quickly what is the parent clock and what is the used 
+parent and divider?
+
+While discussing with the PCM/I2s people they were always concerned
+about those details - so I needed to provide them with a way to access
+those things easily. And explaining to them the register format was -
+for me - out of the question.
+
+Especially the mapping of ?id? to real parent was a bit of a pain.
+
+What do you mean by cooked? Something like: "33+27/4096??
+
+Martin
