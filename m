@@ -1,70 +1,66 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Mon, 29 Feb 2016 16:30:53 -0600
-Subject: [PATCH v3 1/5] pwms: pwm-ti*: Remove support for local clock
- gating
-In-Reply-To: <20160229220444.GQ13417@atomide.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-2-git-send-email-fcooper@ti.com>
- <20160229220444.GQ13417@atomide.com>
-Message-ID: <56D4C69D.1090100@ti.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 29 Feb 2016 16:33:26 -0600
+Subject: [PATCH 3/3] arm: davinci: use IRQCHIP_DECLARE for cp_intc
+In-Reply-To: <1456785206-2280-1-git-send-email-david@lechnology.com>
+References: <1456785206-2280-1-git-send-email-david@lechnology.com>
+Message-ID: <1456785206-2280-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Remove boilerplate code by using IRQCHIP_DECLARE macro.
 
-On 02/29/2016 04:04 PM, Tony Lindgren wrote:
-> * Franklin S Cooper Jr <fcooper@ti.com> [160225 14:37]:
->> The PWMSS local clock gating registers have no real purpose on OMAP ARM
->> devices. These registers were left over registers from DSP IP where the
->> PRCM doesn't exist. There is a silicon bug where gating and ungating clocks
->> don't function properly. TRMs will be update to indicate that these
->> registers shouldn't be touched.
->>
->> Therefore, all code that accesses the PWMSS_CLKCONFIG or PWMSS_CLKSTATUS
->> will be removed by this patch with zero loss of functionality by the ECAP
->> and EPWM drivers.
->> @@ -243,40 +240,15 @@ static int ecap_pwm_probe(struct platform_device *pdev)
->>  	}
->>  
->>  	pm_runtime_enable(&pdev->dev);
->> -	pm_runtime_get_sync(&pdev->dev);
->> -
->> -	status = pwmss_submodule_state_change(pdev->dev.parent,
->> -			PWMSS_ECAPCLK_EN);
->> -	if (!(status & PWMSS_ECAPCLK_EN_ACK)) {
->> -		dev_err(&pdev->dev, "PWMSS config space clock enable failed\n");
->> -		ret = -EINVAL;
->> -		goto pwmss_clk_failure;
->> -	}
->> -
->> -	pm_runtime_put_sync(&pdev->dev);
->>  
->>  	platform_set_drvdata(pdev, pc);
->>  	return 0;
->> -
->> -pwmss_clk_failure:
->> -	pm_runtime_put_sync(&pdev->dev);
->> -	pm_runtime_disable(&pdev->dev);
->> -	pwmchip_remove(&pc->chip);
->> -	return ret;
->>  }
-> Hmm but why are you also removing the pm_runtime calls? Those
-> actually do take care of gating the clocks via the interconnect
-> level code that is hwmod in this case.
-I removed all PM runtime calls that revolved around
-pwmss_submodule_state_change. Originally the driver would do
-a pm_runtime_get_sync then call pwmss_submodule_state_change
-and then immediately call pm_runtime_put_sync. Without
-pwmss_submodule_state_change those calls would be
-meaningless.  I also removed pm_runtime calls in error paths
-that no longer existed.
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/mach-davinci/cp_intc.c  |  3 +++
+ arch/arm/mach-davinci/da8xx-dt.c | 11 -----------
+ 2 files changed, 3 insertions(+), 11 deletions(-)
 
-Within ecap and epwm driver pm_runtime_get is done when
-pwm_enable is called  and pm_runtime_sync calls are done
-when pwm_disable is called. Similar pm_runtime_get and
-pm_runtime_sync calls are done in functions that ended up
-touching register's within the IP.
->
-> Regards,
->
-> Tony
+diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+index 1a68d24..94085d2 100644
+--- a/arch/arm/mach-davinci/cp_intc.c
++++ b/arch/arm/mach-davinci/cp_intc.c
+@@ -12,6 +12,7 @@
+ #include <linux/export.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/irqdomain.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+@@ -210,3 +211,5 @@ void __init cp_intc_init(void)
+ {
+ 	cp_intc_of_init(NULL, NULL);
+ }
++
++IRQCHIP_DECLARE(cp_intc, "ti,cp-intc", cp_intc_of_init);
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 08880e7..fac6d43 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -18,16 +18,6 @@
+ #include "cp_intc.h"
+ #include <mach/da8xx.h>
+ 
+-static const struct of_device_id const da8xx_irq_match[] __initconst = {
+-	{ .compatible = "ti,cp-intc", .data = cp_intc_of_init, },
+-	{ }
+-};
+-
+-static void __init da8xx_init_irq(void)
+-{
+-	of_irq_init(da8xx_irq_match);
+-}
+-
+ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+ 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "davinci-wdt", NULL),
+@@ -64,7 +54,6 @@ static const char *const da850_boards_compat[] __initconst = {
+ 
+ DT_MACHINE_START(DA850_DT, "Generic DA850/OMAP-L138/AM18x")
+ 	.map_io		= da850_init,
+-	.init_irq	= da8xx_init_irq,
+ 	.init_time	= davinci_timer_init,
+ 	.init_machine	= da850_init_machine,
+ 	.dt_compat	= da850_boards_compat,
+-- 
+1.9.1
