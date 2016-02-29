@@ -1,24 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Mar 2016 00:00:53 +0100
-Subject: [GIT PULL] ARM: mvebu: defconfig for v4.6 (#2)
-In-Reply-To: <87bn73o885.fsf@free-electrons.com>
-References: <87bn73o885.fsf@free-electrons.com>
-Message-ID: <2820325.orlLQWWEvZ@wuerfel>
+Date: Tue, 01 Mar 2016 00:02:25 +0100
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.6 (#2)
+In-Reply-To: <87a8mno87e.fsf@free-electrons.com>
+References: <87a8mno87e.fsf@free-electrons.com>
+Message-ID: <6009689.7nqjgKWjcV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 February 2016 15:29:46 Gregory CLEMENT wrote:
-> mvebu defconfig for 4.6 (part 2)
+On Friday 26 February 2016 15:30:13 Gregory CLEMENT wrote:
+> mvebu arm64 for 4.6 (part 2)
 > 
-> enable SRAM support in mvebu_v7_defconfig
+> Add initial support for Armada 7K/8K
+> Update Marvell documentation
 > 
 > 
 
-Merged into next/defconfig.
-
-I see that the SRAM support is not enabled in multi_v7_defconfig, can
-you enable that as well?
-
-Thanks!
+Merged into next/arm64, thanks!
 
 	Arnd
