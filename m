@@ -1,46 +1,169 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 09:45:59 +0100
-Subject: [PATCH] iommu: exynos: pointers are nto physical addresses
-Message-ID: <1456735568-3886545-1-git-send-email-arnd@arndb.de>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Mon, 29 Feb 2016 16:46:46 +0800
+Subject: [PATCH v14 0/4] Watchdog: introduce ARM SBSA watchdog driver
+Message-ID: <1456735610-22012-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos iommu driver changed an incorrect cast from pointer
-to 'unsigned int' to an equally incorrect cast to a 'phys_addr_t',
-which results in an obvious compile-time error when phys_addr_t
-is wider than pointers are:
+From: Fu Wei <fu.wei@linaro.org>
 
-drivers/iommu/exynos-iommu.c: In function 'alloc_lv2entry':
-drivers/iommu/exynos-iommu.c:918:32: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+This patchset:
+    (1)Introduce Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+    for FDT info of SBSA Generic Watchdog, and give two examples of
+    adding SBSA Generic Watchdog device node into the dts files:
+    foundation-v8.dts and amd-seattle-soc.dtsi.
 
-The code does not actually want the physical address (which would
-involve using virt_to_phys()), but just checks the alignment,
-so we can change it to use a cast to uintptr_t instead.
+    (2)Introduce ARM SBSA watchdog driver:
+        a.Use linux kernel watchdog framework;
+        b.Work with FDT on ARM64;
+        c.Support getting timeout from parameter and FDT at the driver
+          init stage.
+        d.The driver works in two modes:
+          (1) single stage timeout (ignore WS0 interrupt)
+          (2) two stages timeout (register WS0 interrupt, do panic in routine)
+        e.User can config working mode by module parameter "action".
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 740a01eee9ad ("iommu/exynos: Add support for v5 SYSMMU")
----
-I also see that some incorrect __raw_writel() calls have crept in
-around the same time, which breaks running big-endian kernels when
-this driver is loaded.
+This patchset has been tested with watchdog daemon
+(ACPI/FDT, module/build-in) on the following platforms:
+    (1)ARM Foundation v8 model
+    (2)AMD Seattle platform
 
-Please fix and that that as well.
+This patchset has been tested with kdump successfully.
 
- drivers/iommu/exynos-iommu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changelog:
+v14:Fix a bug of registering interrupt routine: do a ping before
+    registering interrupt routine, in case where is a pending interrupt.
+    Reorder the initialization code to postpone registering interrupt routine.
+    Improve some code style:
+        (1)add some macro of string
+        (2)use watchdog_get_drvdata instead of to_sbsa_gwdt,
+           delete to_sbsa_gwdt.
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index b0665042bf29..484b3b37631f 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -915,7 +915,7 @@ static sysmmu_pte_t *alloc_lv2entry(struct exynos_iommu_domain *domain,
- 		bool need_flush_flpd_cache = lv1ent_zero(sent);
- 
- 		pent = kmem_cache_zalloc(lv2table_kmem_cache, GFP_ATOMIC);
--		BUG_ON((phys_addr_t)pent & (LV2TABLE_SIZE - 1));
-+		BUG_ON((uintptr_t)pent & (LV2TABLE_SIZE - 1));
- 		if (!pent)
- 			return ERR_PTR(-ENOMEM);
- 
+v13:https://lkml.org/lkml/2016/2/16/713
+    Fix a dev_warn message typo"signle"-->"single"
+    Add MODULE_ALIAS
+    Add more *ed-by in commit message.
+
+v12:https://lkml.org/lkml/2016/2/16/154
+    Fix a dev_warn message typo"fall"--"falling"
+    Remove unnecessary "status" in dts
+    Add more *ed-by in commit message.
+
+v11:https://lkml.org/lkml/2016/2/9/577
+    Merge patch 4 and 5.
+    Improve some comments.
+    The driver works in two modes, it's configured by "action"(instead of
+    panic_enabled).
+    Improve the initialization of the timeout limits.
+    Feeding dog by writing "0" to WRR.
+
+v10:https://lkml.org/lkml/2016/2/3/817
+    Delete pretimeout support.
+    Separate the driver to two parts:
+        (1) single stage timeout driver(ignore WS0 interrupt);
+        (2) register WS0 interrupt for the half timeout panic.
+    timeout == (enable --> WS1).
+
+v9: https://lkml.org/lkml/2015/11/9/57
+    Rebase to latest kernel version(4.3).
+    Update the Documentation of sbsa-gwdt device node info of FDT:
+        (1) move some introduction to pretimeout patch
+        (2) delete WS1 value from "interrupts" of binding documentation,
+            since WS1 won't be handled by Linux.
+
+v8: https://lkml.org/lkml/2015/10/27/466
+    Rebase to latest kernel version(4.3-rc7).
+    Separate the patches of GTDT support and arm_arch_timer. This
+    clocksource relevant patch will upstreamed in a individual patchset.
+    Update all the default timeout and pretimeout to 30s and 60s.
+    Improve documentation and inline comments.
+    Fix a bug in pretimeout support which makes timeout and pretimeout
+    parameters initialization fail.
+
+v7: https://lkml.org/lkml/2015/8/24/611
+    Rebase to latest kernel version(4.2-rc7).
+    Improve FDT support: geting resource by order, instead of name.
+    According to the FDT support, Update the example dts file, gtdt.c
+    and sbsa_gwdt.c.
+    Pass the sparse test, and fix the warning.
+    Fix the max_pretimeout and max_timeout value overflow bug.
+    Delete the WCV output value.
+    
+
+v6: https://lkml.org/lkml/2015/6/23/359
+    Improve the dtb example files: reduce the register frame size to 4K.
+    Improve pretimeout support:
+        (1) improve watchdog_init_timeouts function
+	(2) rename watchdog_check_min_max_timeouts back to the original name
+        (1) improve watchdog_timeout_invalid/watchdog_pretimeout_invalid
+    Add the new features in the sbsa_gwdt driver:
+	(1) In the second stage, user can feed the dog without cleaning WS0.
+	(2) In the second stage, user can trigger WS1 by setting pretimeout = 0.
+	(3) expand the max value of pretimeout, in case 10 second is not enough
+	    for a kdump kernel reboot in panic.
+
+v5: https://lkml.org/lkml/2015/6/10/357
+    Improve pretimeout support:
+        (1)fix typo in documentation and comments.
+	(2)fix the timeout limits validation bug.
+    Simplify sbsa_gwdt driver:
+	(1)integrate all the registers access functions into caller.
+
+v4: https://lkml.org/lkml/2015/6/2/4
+    Refactor GTDT support code: remove it from arch/arm64/kernel/acpi.c,
+    put it into drivers/acpi/gtdt.c file.
+    Integrate the GTDT code of drivers/clocksource/arm_arch_timer.c into
+    drivers/acpi/gtdt.c.
+    Improve pretimeout support, fix "pretimeout == 0" problem.
+    Simplify sbsa_gwdt driver:
+        (1)timeout/pretimeout limits setup;
+        (2)keepalive function;
+        (3)delete "clk == 0" check;
+        (4)delete WS0 status bit check in interrupt routine;
+        (5)sbsa_gwdt_set_wcv function.
+
+v3: https://lkml.org/lkml/2015/5/25/111
+    Delete "export arch_timer_get_rate" patch.
+    Driver back to use arch_timer_get_cntfrq.
+    Improve watchdog_init_timeouts function and update relevant documentation.
+    Improve watchdog_timeout_invalid and watchdog_pretimeout_invalid.
+    Improve foundation-v8.dts: delete the unnecessary tag of device node.
+    Remove "ARM64 || COMPILE_TEST" from Kconfig.
+    Add comments in arch/arm64/kernel/acpi.c
+    Fix typoes and incorrect comments.
+
+v2: https://lkml.org/lkml/2015/5/21/172
+    Improve watchdog-kernel-api.txt documentation for pretimeout support.
+    Export "arch_timer_get_rate" in arm_arch_timer.c.
+    Add watchdog_init_timeouts API for pretimeout support in framework.
+    Improve suspend and resume foundation in driver
+    Improve timeout/pretimeout values init code in driver.
+    Delete unnecessary items of the sbsa_gwdt struct and #define.
+    Delete all unnecessary debug info in driver.
+    Fix 64bit division bug.
+    Use the arch_timer interface to get watchdog clock rate.
+    Add MODULE_DEVICE_TABLE for platform device id.
+    Fix typoes.
+
+v1: https://lkml.org/lkml/2015/5/15/279
+    The first version upstream patchset to linux mailing list.
+
+Fu Wei (4):
+  Documentation: add sbsa-gwdt driver documentation
+  ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts
+  ARM64: add SBSA Generic Watchdog device node in amd-seattle-soc.dtsi
+  Watchdog: introduce ARM SBSA watchdog driver
+
+ .../devicetree/bindings/watchdog/sbsa-gwdt.txt     |  31 ++
+ Documentation/watchdog/watchdog-parameters.txt     |   7 +
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi       |   8 +
+ arch/arm64/boot/dts/arm/foundation-v8.dts          |   7 +
+ drivers/watchdog/Kconfig                           |  20 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/sbsa_gwdt.c                       | 408 +++++++++++++++++++++
+ 7 files changed, 482 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
+ create mode 100644 drivers/watchdog/sbsa_gwdt.c
+
 -- 
-2.7.0
+2.5.0
