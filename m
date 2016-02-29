@@ -1,195 +1,160 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 29 Feb 2016 14:20:15 +0000
-Subject: [PATCH 1/2] clk: bcm2835: expose raw clock-registers via debugfs
+Date: Mon, 29 Feb 2016 14:20:16 +0000
+Subject: [PATCH 2/2] clk: bcm2835: expose current divider,
+ parent and mash via debugfs
 In-Reply-To: <1456755616-2472-1-git-send-email-kernel@martin.sperl.org>
 References: <1456755616-2472-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1456755616-2472-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456755616-2472-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-For debugging purposes under some circumstance
-it helps to be able to see the actual clock registers.
-
-E.g: when looking at the clock divider it is helpful to
-see what the actual clock divider is.
-
-This patch exposes all the clock registers specific to each
-clock/pll/pll-divider via debugfs.
+For each clock expose the following values via debugfs:
+* current_parent - the currently selected parent
+* current_divi - the integer portion of the currently set divider
+* current_divf - the fractional portion of the currently set divider
+* current_frac - the current frac/mash settings for the divider
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |  101 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 101 insertions(+)
+ drivers/clk/bcm/clk-bcm2835.c |  110 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 0b2fd9d..89de3d6 100644
+index 89de3d6..01a48cb 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -38,6 +38,7 @@
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/clk/bcm2835.h>
-+#include <linux/debugfs.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-@@ -314,6 +315,27 @@ static inline u32 cprman_read(struct bcm2835_cprman *cprman, u32 reg)
- 	return readl(cprman->regs + reg);
- }
- 
-+static int bcm2835_debugfs_regset(struct bcm2835_cprman *cprman, u32 base,
-+				  struct debugfs_reg32 *regs, size_t nregs,
-+				  struct dentry *dentry)
-+{
-+	struct dentry *regdump;
-+	struct debugfs_regset32 *regset;
-+
-+	regset = devm_kzalloc(cprman->dev, sizeof(*regset), GFP_KERNEL);
-+	if (!regset)
-+		return -ENOMEM;
-+
-+	regset->regs = regs;
-+	regset->nregs = nregs;
-+	regset->base = cprman->regs + base;
-+
-+	regdump = debugfs_create_regset32("regdump", S_IRUGO, dentry,
-+					  regset);
-+
-+	return regdump ? 0 : -ENOMEM;
-+}
-+
- /*
-  * These are fixed clocks. They're probably not all root clocks and it may
-  * be possible to turn them on and off but until this is mapped out better
-@@ -643,6 +665,36 @@ static int bcm2835_pll_set_rate(struct clk_hw *hw,
- 	return 0;
- }
- 
-+static int bcm2835_pll_debug_init(struct clk_hw *hw,
-+				  struct dentry *dentry)
-+{
-+	struct bcm2835_pll *pll = container_of(hw, struct bcm2835_pll, hw);
-+	struct bcm2835_cprman *cprman = pll->cprman;
-+	const struct bcm2835_pll_data *data = pll->data;
-+	struct debugfs_reg32 *regs;
-+
-+	regs = devm_kzalloc(cprman->dev, 7 * sizeof(*regs), GFP_KERNEL);
-+	if (!regs)
-+		return -ENOMEM;
-+
-+	regs[0].name = "cm_ctrl";
-+	regs[0].offset = data->cm_ctrl_reg;
-+	regs[1].name = "a2w_ctrl";
-+	regs[1].offset = data->a2w_ctrl_reg;
-+	regs[2].name = "frac";
-+	regs[2].offset = data->frac_reg;
-+	regs[3].name = "ana0";
-+	regs[3].offset = data->ana_reg_base + 0 * 4;
-+	regs[4].name = "ana1";
-+	regs[4].offset = data->ana_reg_base + 1 * 4;
-+	regs[5].name = "ana2";
-+	regs[5].offset = data->ana_reg_base + 2 * 4;
-+	regs[6].name = "ana3";
-+	regs[6].offset = data->ana_reg_base + 3 * 4;
-+
-+	return bcm2835_debugfs_regset(cprman, 0, regs, 7, dentry);
-+}
-+
- static const struct clk_ops bcm2835_pll_clk_ops = {
- 	.is_prepared = bcm2835_pll_is_on,
- 	.prepare = bcm2835_pll_on,
-@@ -650,6 +702,7 @@ static const struct clk_ops bcm2835_pll_clk_ops = {
- 	.recalc_rate = bcm2835_pll_get_rate,
- 	.set_rate = bcm2835_pll_set_rate,
- 	.round_rate = bcm2835_pll_round_rate,
-+	.debug_init = bcm2835_pll_debug_init,
- };
- 
- struct bcm2835_pll_divider {
-@@ -741,6 +794,26 @@ static int bcm2835_pll_divider_set_rate(struct clk_hw *hw,
- 	return 0;
- }
- 
-+static int bcm2835_pll_divider_debug_init(struct clk_hw *hw,
-+					  struct dentry *dentry)
-+{
-+	struct bcm2835_pll_divider *divider = bcm2835_pll_divider_from_hw(hw);
-+	struct bcm2835_cprman *cprman = divider->cprman;
-+	const struct bcm2835_pll_divider_data *data = divider->data;
-+	struct debugfs_reg32 *regs;
-+
-+	regs = devm_kzalloc(cprman->dev, 7 * sizeof(*regs), GFP_KERNEL);
-+	if (!regs)
-+		return -ENOMEM;
-+
-+	regs[0].name = "cm";
-+	regs[0].offset = data->cm_reg;
-+	regs[1].name = "a2w";
-+	regs[1].offset = data->a2w_reg;
-+
-+	return bcm2835_debugfs_regset(cprman, 0, regs, 2, dentry);
-+}
-+
- static const struct clk_ops bcm2835_pll_divider_clk_ops = {
- 	.is_prepared = bcm2835_pll_divider_is_on,
- 	.prepare = bcm2835_pll_divider_on,
-@@ -748,6 +821,7 @@ static const struct clk_ops bcm2835_pll_divider_clk_ops = {
- 	.recalc_rate = bcm2835_pll_divider_get_rate,
- 	.set_rate = bcm2835_pll_divider_set_rate,
- 	.round_rate = bcm2835_pll_divider_round_rate,
-+	.debug_init = bcm2835_pll_divider_debug_init,
- };
- 
- /*
-@@ -989,6 +1063,31 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
+@@ -129,6 +129,10 @@
+ # define CM_BUSY			BIT(7)
+ # define CM_BUSYD			BIT(8)
+ # define CM_FRAC			BIT(9)
++# define CM_MASH0			BIT(9)
++# define CM_MASH1			BIT(10)
++# define CM_MASH_MASK			(CM_MASH0 | CM_MASH1)
++# define CM_MASH_SHIFT			9
+ # define CM_SRC_SHIFT			0
+ # define CM_SRC_BITS			4
+ # define CM_SRC_MASK			0xf
+@@ -1063,6 +1067,99 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
  	return (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
  }
  
-+static struct debugfs_reg32 bcm2835_debugfs_clock_reg32[] = {
-+	{
-+		.name = "ctl",
-+		.offset = 0,
-+	},
-+	{
-+		.name = "div",
-+		.offset = 4,
-+	},
++static const char *bcm2835_clock_get_parent_name(struct clk_hw *hw)
++{
++	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
++	const struct bcm2835_clock_data *data = clock->data;
++	u8 id = bcm2835_clock_get_parent(hw);
++
++	return (id < data->num_mux_parents) ?
++		data->parents[id] : "unknown";
++}
++
++static int bcm2835_clock_debug_current_parent_open(struct inode *inode,
++						   struct file *file)
++{
++	const char *parent = bcm2835_clock_get_parent_name(inode->i_private);
++	size_t len = strlen(parent);
++	char *buf;
++
++	/* create string with trailing newline */
++	buf = kmalloc(len + 2, GFP_KERNEL);
++	memcpy(buf, parent, len);
++	buf[len] = '\n';
++	buf[len + 1] = 0;
++
++	file->private_data = buf;
++
++	return 0;
++}
++
++static ssize_t bcm2835_clock_debug_current_parent_read(struct file *file,
++						       char __user *buf,
++						       size_t len,
++						       loff_t *ppos)
++{
++	const char *parent = file->private_data;
++	size_t size = strlen(parent);
++
++	return simple_read_from_buffer(buf, len, ppos, parent, size);
++}
++
++static const struct file_operations bcm2835_clock_debug_current_parent_fops = {
++	.owner   = THIS_MODULE,
++	.open    = bcm2835_clock_debug_current_parent_open,
++	.release = simple_attr_release,
++	.read    = bcm2835_clock_debug_current_parent_read,
++	.llseek  = generic_file_llseek,
 +};
 +
-+static int bcm2835_clock_debug_init(struct clk_hw *hw,
-+				    struct dentry *dentry)
++static int bcm2835_clock_debug_current_divi_get(void *hw, u64 *val)
 +{
 +	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
 +	struct bcm2835_cprman *cprman = clock->cprman;
 +	const struct bcm2835_clock_data *data = clock->data;
++	u32 div = cprman_read(cprman, data->div_reg);
 +
-+	return bcm2835_debugfs_regset(
-+		cprman, data->ctl_reg,
-+		bcm2835_debugfs_clock_reg32,
-+		ARRAY_SIZE(bcm2835_debugfs_clock_reg32),
-+		dentry);
++	*val = div >> CM_DIV_FRAC_BITS;
++	return 0;
 +}
++DEFINE_SIMPLE_ATTRIBUTE(bcm2835_clock_debug_current_divi_fops,
++			bcm2835_clock_debug_current_divi_get,
++			NULL, "%llu\n");
 +
- static const struct clk_ops bcm2835_clock_clk_ops = {
- 	.is_prepared = bcm2835_clock_is_on,
- 	.prepare = bcm2835_clock_on,
-@@ -998,6 +1097,7 @@ static const struct clk_ops bcm2835_clock_clk_ops = {
- 	.determine_rate = bcm2835_clock_determine_rate,
- 	.set_parent = bcm2835_clock_set_parent,
- 	.get_parent = bcm2835_clock_get_parent,
-+	.debug_init = bcm2835_clock_debug_init,
- };
++static int bcm2835_clock_debug_current_divf_get(void *hw, u64 *val)
++{
++	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
++	struct bcm2835_cprman *cprman = clock->cprman;
++	const struct bcm2835_clock_data *data = clock->data;
++	u32 div = cprman_read(cprman, data->div_reg);
++
++	*val = div & CM_DIV_FRAC_MASK;
++	return 0;
++}
++DEFINE_SIMPLE_ATTRIBUTE(bcm2835_clock_debug_current_divf_fops,
++			bcm2835_clock_debug_current_divf_get,
++			NULL, "%llu\n");
++
++static int bcm2835_clock_debug_current_frac_get(void *hw, u64 *val)
++{
++	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
++	struct bcm2835_cprman *cprman = clock->cprman;
++	const struct bcm2835_clock_data *data = clock->data;
++	u32 ctl = cprman_read(cprman, data->ctl_reg);
++
++	if (data->is_mash_clock)
++		*val = (ctl & CM_MASH_MASK) >> CM_MASH_SHIFT;
++	else
++		*val = ctl & CM_FRAC ? 1 : 0;
++
++	return 0;
++}
++DEFINE_SIMPLE_ATTRIBUTE(bcm2835_clock_debug_current_frac_fops,
++			bcm2835_clock_debug_current_frac_get,
++			NULL, "%llu\n");
++
+ static struct debugfs_reg32 bcm2835_debugfs_clock_reg32[] = {
+ 	{
+ 		.name = "ctl",
+@@ -1081,6 +1178,19 @@ static int bcm2835_clock_debug_init(struct clk_hw *hw,
+ 	struct bcm2835_cprman *cprman = clock->cprman;
+ 	const struct bcm2835_clock_data *data = clock->data;
  
- static int bcm2835_vpu_clock_is_on(struct clk_hw *hw)
-@@ -1016,6 +1116,7 @@ static const struct clk_ops bcm2835_vpu_clock_clk_ops = {
- 	.determine_rate = bcm2835_clock_determine_rate,
- 	.set_parent = bcm2835_clock_set_parent,
- 	.get_parent = bcm2835_clock_get_parent,
-+	.debug_init = bcm2835_clock_debug_init,
- };
- 
- static struct clk *bcm2835_register_pll(struct bcm2835_cprman *cprman,
++	/* expose the current parrent */
++	debugfs_create_file("current_parent", S_IRUGO, dentry, hw,
++			    &bcm2835_clock_debug_current_parent_fops);
++
++	/* expose the current divider components */
++	debugfs_create_file("current_divi", S_IRUGO, dentry, hw,
++			    &bcm2835_clock_debug_current_divi_fops);
++	debugfs_create_file("current_divf", S_IRUGO, dentry, hw,
++			    &bcm2835_clock_debug_current_divf_fops);
++	debugfs_create_file("current_frac", S_IRUGO, dentry, hw,
++			    &bcm2835_clock_debug_current_frac_fops);
++
++	/* add the regset */
+ 	return bcm2835_debugfs_regset(
+ 		cprman, data->ctl_reg,
+ 		bcm2835_debugfs_clock_reg32,
 -- 
 1.7.10.4
