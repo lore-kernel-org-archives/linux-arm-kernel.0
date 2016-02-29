@@ -1,35 +1,42 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 29 Feb 2016 15:44:37 +0100
-Subject: [PATCH v2 2/9] arm64: mm: free __init memory via the linear mapping
+Date: Mon, 29 Feb 2016 15:44:36 +0100
+Subject: [PATCH v2 1/9] arm64: vdso: avoid virt_to_page() translations on
+ kernel symbols
 In-Reply-To: <1456757084-1078-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1456757084-1078-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456757084-1078-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456757084-1078-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The implementation of free_initmem_default() expects __init_begin
-and __init_end to be covered by the linear mapping, which is no
-longer the case. So open code it instead, using addresses that are
-explicitly translated from kernel virtual to linear virtual.
+The translation performed by virt_to_page() is only valid for linear
+addresses, and kernel symbols are no longer in the linear mapping.
+So perform the __pa() translation explicitly, which does the right
+thing in either case, and only then translate to a struct page offset.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/init.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/vdso.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index a08153c99ffa..cebad6cceda8 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -416,7 +416,8 @@ void __init mem_init(void)
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 97bc68f4c689..fb3c17f031aa 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -131,11 +131,12 @@ static int __init vdso_init(void)
+ 		return -ENOMEM;
  
- void free_initmem(void)
- {
--	free_initmem_default(0);
-+	free_reserved_area(__va(__pa(__init_begin)), __va(__pa(__init_end)),
-+			   0, "unused kernel");
- 	fixup_init();
- }
+ 	/* Grab the vDSO data page. */
+-	vdso_pagelist[0] = virt_to_page(vdso_data);
++	vdso_pagelist[0] = pfn_to_page(__pa(vdso_data) >> PAGE_SHIFT);
  
+ 	/* Grab the vDSO code pages. */
+-	for (i = 0; i < vdso_pages; i++)
+-		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
++	vdso_pagelist[1] = pfn_to_page(__pa(&vdso_start) >> PAGE_SHIFT);
++	for (i = 1; i < vdso_pages; i++)
++		vdso_pagelist[i + 1] = vdso_pagelist[1] + i;
+ 
+ 	/* Populate the special mapping structures */
+ 	vdso_spec[0] = (struct vm_special_mapping) {
 -- 
 2.5.0
