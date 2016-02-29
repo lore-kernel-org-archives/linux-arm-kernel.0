@@ -1,68 +1,99 @@
-From: harvey.hunt@imgtec.com (Harvey Hunt)
-Date: Mon, 29 Feb 2016 10:33:49 +0000
-Subject: [PATCH v3 07/52] mtd: nand: core: use mtd_ooblayout_xxx() helpers
- where appropriate
-In-Reply-To: <20160226193325.2d84a8c8@bbrezillon>
-References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
- <1456448280-27788-8-git-send-email-boris.brezillon@free-electrons.com>
- <56D0629C.9080805@imgtec.com> <20160226161054.3477cd4b@bbrezillon>
- <56D06C88.9080608@imgtec.com> <20160226193325.2d84a8c8@bbrezillon>
-Message-ID: <56D41E8D.1010901@imgtec.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 29 Feb 2016 11:34:39 +0100
+Subject: [PATCH] ARM: dts: stm32429i-eval: Add USB HS host mode support
+Message-ID: <1456742079-8648-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+This patch adds USB HS support in host mode only.
+This port supports OTG mode, but the device more is not working
+properly as of now.
+Once the device mode fixed, the node will be updated to support OTG.
 
-On 26/02/16 18:33, Boris Brezillon wrote:
-> Hi Harvey,
->
-> On Fri, 26 Feb 2016 15:17:28 +0000
-> Harvey Hunt <harvey.hunt@imgtec.com> wrote:
->
->> Hi Boris,
->>
->> On 26/02/16 15:10, Boris Brezillon wrote:
->>> Hi Harvey,
->>>
->>> On Fri, 26 Feb 2016 14:35:08 +0000
->>> Harvey Hunt <harvey.hunt@imgtec.com> wrote:
->>>
->>>> [...]
->>>> I'll look into this more later today, but wanted to run it by you in
->>>> case you have any thoughts.
->>>
->>> Can you apply this patch [1], and let me know if you see the additional
->>> trace?
->>
->> I applied the patch, the following is the (unchanged) output:
->>
->> [    0.256375] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0x88
->> [    0.262887] nand: Micron MT29F64G08CBAAAWP
->> [    0.266995] nand: 8192 MiB, MLC, erase size: 2048 KiB, page size:
->> 8192, OOB size: 448
->> [    0.274881] jz4780-nand 1b000000.nand-controller: using hardware BCH
->> (strength 24, size 1024, bytes 42)
->> [    0.289046] Bad block table not found for chip 0
->> [    0.297769] Bad block table not found for chip 0
->> [    0.302425] Scanning device for bad blocks
->> [    0.320239] Bad eraseblock 90 at 0x00000b400000
->> [    0.324934] Bad eraseblock 91 at 0x00000b600000
->> [    0.931054] Bad eraseblock 4092 at 0x0001ff800000
->> [    0.935917] Bad eraseblock 4093 at 0x0001ffa00000
->> [    0.944660] nand_bbt: error while writing bad block table -34
->> [    0.950448] jz4780-nand: probe of 1b000000.nand-controller failed
->> with error -34
->> [    0.958079] UBI error: cannot open mtd 3, error -19
->> [    0.962788] UBI error: cannot open mtd 4, error -19[    0.970229]
->> clk: Not disabling unused clocks
->>
->
-> Can you test with this one [1]?
->
-> [1]http://code.bulix.org/36oytz-91960
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ arch/arm/boot/dts/stm32429i-eval.dts | 16 ++++++++++++++++
+ arch/arm/boot/dts/stm32f429.dtsi     | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
 
-With that patch applied, my Ci20 successfully boots again.
-
-Thanks for looking into it :-)
-
-Harvey
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+index 1ae57fa..76a10d3 100644
+--- a/arch/arm/boot/dts/stm32429i-eval.dts
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -81,6 +81,13 @@
+ 			gpios = <&gpiog 12 1>;
+ 		};
+ 	};
++
++	usbotg_hs_phy: usbphy {
++		#phy-cells = <0>;
++		compatible = "usb-nop-xceiv";
++		clocks = <&rcc 0 30>;
++		clock-names = "main_clk";
++	};
+ };
+ 
+ &clk_hse {
+@@ -92,3 +99,12 @@
+ 	pinctrl-names = "default";
+ 	status = "okay";
+ };
++
++&usbotg_hs {
++	dr_mode = "host";
++	phys = <&usbotg_hs_phy>;
++	phy-names = "usb2-phy";
++	pinctrl-0 = <&usbotg_hs_pins_a>;
++	pinctrl-names = "default";
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 598362e..ee82756 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -278,6 +278,26 @@
+ 					bias-disable;
+ 				};
+ 			};
++
++			usbotg_hs_pins_a: usbotg_hs at 0 {
++				pins {
++					pinmux = <STM32F429_PH4_FUNC_OTG_HS_ULPI_NXT>,
++						 <STM32F429_PI11_FUNC_OTG_HS_ULPI_DIR>,
++						 <STM32F429_PC0_FUNC_OTG_HS_ULPI_STP>,
++						 <STM32F429_PA5_FUNC_OTG_HS_ULPI_CK>,
++						 <STM32F429_PA3_FUNC_OTG_HS_ULPI_D0>,
++						 <STM32F429_PB0_FUNC_OTG_HS_ULPI_D1>,
++						 <STM32F429_PB1_FUNC_OTG_HS_ULPI_D2>,
++						 <STM32F429_PB10_FUNC_OTG_HS_ULPI_D3>,
++						 <STM32F429_PB11_FUNC_OTG_HS_ULPI_D4>,
++						 <STM32F429_PB12_FUNC_OTG_HS_ULPI_D5>,
++						 <STM32F429_PB13_FUNC_OTG_HS_ULPI_D6>,
++						 <STM32F429_PB5_FUNC_OTG_HS_ULPI_D7>;
++					bias-disable;
++					drive-push-pull;
++					slew-rate = <2>;
++				};
++			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
+@@ -318,6 +338,16 @@
+ 			st,mem2mem;
+ 		};
+ 
++		usbotg_hs: usb at 40040000 {
++			compatible = "snps,dwc2";
++			dma-ranges;
++			reg = <0x40040000 0x40000>;
++			interrupts = <77>;
++			clocks = <&rcc 0 29>;
++			clock-names = "otg";
++			status = "disabled";
++		};
++
+ 		rng: rng at 50060800 {
+ 			compatible = "st,stm32-rng";
+ 			reg = <0x50060800 0x400>;
+-- 
+1.9.1
