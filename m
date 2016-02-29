@@ -1,212 +1,101 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 29 Feb 2016 11:54:25 -0700
-Subject: [PATCH 6/8] coresight: etm4x: moving etm_drvdata::enable to atomic
- field
+Date: Mon, 29 Feb 2016 11:54:26 -0700
+Subject: [PATCH 7/8] coresight: etm4x: implementing user/kernel mode tracing
 In-Reply-To: <1456772067-18085-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1456772067-18085-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1456772067-18085-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1456772067-18085-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to ETMv3, moving etmv4_drvdata::enable to an atomic
-type that gives the 'mode' of a tracer and prevents multiple,
-simultanious access by different subsystems.
+Adding new mode to limit tracing to kernel or user space.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 69 +++++++++++++++++++++++----
- drivers/hwtracing/coresight/coresight-etm4x.h |  5 +-
- 2 files changed, 63 insertions(+), 11 deletions(-)
+ .../hwtracing/coresight/coresight-etm4x-sysfs.c    |  3 ++
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 35 ++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.h      |  5 +++-
+ 3 files changed, 42 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+index a996db7ef2fc..0e80ec668402 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+@@ -440,6 +440,9 @@ static ssize_t mode_store(struct device *dev,
+ 	else
+ 		config->vinst_ctrl &= ~BIT(11);
+ 
++	if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
++		etm4_config_trace_mode(config);
++
+ 	spin_unlock(&drvdata->spinlock);
+ 
+ 	return size;
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 4b83a753256b..738acee18967 100644
+index 738acee18967..743c34b92a80 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -35,6 +35,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/perf_event.h>
- #include <asm/sections.h>
-+#include <asm/local.h>
- 
- #include "coresight-etm4x.h"
- 
-@@ -77,7 +78,7 @@ static int etm4_trace_id(struct coresight_device *csdev)
- 	unsigned long flags;
- 	int trace_id = -1;
- 
--	if (!drvdata->enable)
-+	if (!local_read(&drvdata->mode))
- 		return drvdata->trcid;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
-@@ -189,8 +190,7 @@ static void etm4_enable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+@@ -567,6 +567,41 @@ static void etm4_set_default(struct etmv4_config *config)
+ 	config->vissctlr = 0x0;
  }
  
--static int etm4_enable(struct coresight_device *csdev,
--		       struct perf_event_attr *attr, u32 mode)
-+static int etm4_enable_sysfs(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 	int ret;
-@@ -205,18 +205,46 @@ static int etm4_enable(struct coresight_device *csdev,
- 				       etm4_enable_hw, drvdata, 1);
- 	if (ret)
- 		goto err;
--	drvdata->enable = true;
--	drvdata->sticky_enable = true;
- 
-+	drvdata->sticky_enable = true;
- 	spin_unlock(&drvdata->spinlock);
- 
- 	dev_info(drvdata->dev, "ETM tracing enabled\n");
- 	return 0;
-+
- err:
- 	spin_unlock(&drvdata->spinlock);
- 	return ret;
- }
- 
-+static int etm4_enable(struct coresight_device *csdev,
-+		       struct perf_event_attr *attr, u32 mode)
++void etm4_config_trace_mode(struct etmv4_config *config)
 +{
-+	int ret;
-+	u32 val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	u32 addr_acc, mode;
 +
-+	val = local_cmpxchg(&drvdata->mode, CS_MODE_DISABLED, mode);
++	mode = config->mode;
++	mode &= (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER);
 +
-+	/* Someone is already using the tracer */
-+	if (val)
-+		return -EBUSY;
++	/* excluding kernel AND user space doesn't make sense */
++	WARN_ON_ONCE(mode == (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER));
 +
-+	switch (mode) {
-+	case CS_MODE_SYSFS:
-+		ret = etm4_enable_sysfs(csdev);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+	}
++	/* nothing to do if neither flags are set */
++	if (!(mode & ETM_MODE_EXCL_KERN) && !(mode & ETM_MODE_EXCL_USER))
++		return;
 +
-+	/* The tracer didn't start */
-+	if (ret)
-+		local_set(&drvdata->mode, CS_MODE_DISABLED);
-+
-+	return ret;
-+}
-+
- static void etm4_disable_hw(void *info)
- {
- 	u32 control;
-@@ -239,7 +267,7 @@ static void etm4_disable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
- }
- 
--static void etm4_disable(struct coresight_device *csdev)
-+static void etm4_disable_sysfs(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -257,7 +285,6 @@ static void etm4_disable(struct coresight_device *csdev)
- 	 * ensures that register writes occur when cpu is powered.
- 	 */
- 	smp_call_function_single(drvdata->cpu, etm4_disable_hw, drvdata, 1);
--	drvdata->enable = false;
- 
- 	spin_unlock(&drvdata->spinlock);
- 	put_online_cpus();
-@@ -265,6 +292,30 @@ static void etm4_disable(struct coresight_device *csdev)
- 	dev_info(drvdata->dev, "ETM tracing disabled\n");
- }
- 
-+static void etm4_disable(struct coresight_device *csdev)
-+{
-+	u32 mode;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	addr_acc = config->addr_acc[ETM_DEFAULT_ADDR_COMP];
++	/* clear default config */
++	addr_acc &= ~(ETM_EXLEVEL_NS_APP | ETM_EXLEVEL_NS_OS);
 +
 +	/*
-+	 * For as long as the tracer isn't disabled another entity can't
-+	 * change its status.  As such we can read the status here without
-+	 * fearing it will change under us.
++	 * EXLEVEL_NS, bits[15:12]
++	 * The Exception levels are:
++	 *   Bit[12] Exception level 0 - Application
++	 *   Bit[13] Exception level 1 - OS
++	 *   Bit[14] Exception level 2 - Hypervisor
++	 *   Bit[15] Never implemented
 +	 */
-+	mode = local_read(&drvdata->mode);
++	if (mode & ETM_MODE_EXCL_KERN)
++		addr_acc |= ETM_EXLEVEL_NS_OS;
++	else
++		addr_acc |= ETM_EXLEVEL_NS_APP;
 +
-+	switch (mode) {
-+	case CS_MODE_DISABLED:
-+		break;
-+	case CS_MODE_SYSFS:
-+		etm4_disable_sysfs(csdev);
-+		break;
-+	}
-+
-+	if (mode)
-+		local_set(&drvdata->mode, CS_MODE_DISABLED);
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP] = addr_acc;
++	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = addr_acc;
 +}
 +
- static const struct coresight_ops_source etm4_source_ops = {
- 	.cpu_id		= etm4_cpu_id,
- 	.trace_id	= etm4_trace_id,
-@@ -532,7 +583,7 @@ static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
- 			etmdrvdata[cpu]->os_unlock = true;
- 		}
- 
--		if (etmdrvdata[cpu]->enable)
-+		if (local_read(&etmdrvdata[cpu]->mode))
- 			etm4_enable_hw(etmdrvdata[cpu]);
- 		spin_unlock(&etmdrvdata[cpu]->spinlock);
- 		break;
-@@ -545,7 +596,7 @@ static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
- 
- 	case CPU_DYING:
- 		spin_lock(&etmdrvdata[cpu]->spinlock);
--		if (etmdrvdata[cpu]->enable)
-+		if (local_read(&etmdrvdata[cpu]->mode))
- 			etm4_disable_hw(etmdrvdata[cpu]);
- 		spin_unlock(&etmdrvdata[cpu]->spinlock);
- 		break;
+ static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
+ 			    void *hcpu)
+ {
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index 6ff499bfb2f2..f7748ae63451 100644
+index f7748ae63451..a291d4cc8bd8 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.h
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -13,6 +13,7 @@
- #ifndef _CORESIGHT_CORESIGHT_ETM_H
- #define _CORESIGHT_CORESIGHT_ETM_H
+@@ -176,7 +176,9 @@
+ #define ETM_MODE_TRACE_RESET		BIT(25)
+ #define ETM_MODE_TRACE_ERR		BIT(26)
+ #define ETM_MODE_VIEWINST_STARTSTOP	BIT(27)
+-#define ETMv4_MODE_ALL			0xFFFFFFF
++#define ETMv4_MODE_ALL			(GENMASK(27, 0) | \
++					 ETM_MODE_EXCL_KERN | \
++					 ETM_MODE_EXCL_USER)
  
-+#include <asm/local.h>
- #include <linux/spinlock.h>
- #include "coresight-priv.h"
+ #define TRCSTATR_IDLE_BIT		0
+ #define ETM_DEFAULT_ADDR_COMP		0
+@@ -414,4 +416,5 @@ enum etm_addr_type {
+ };
  
-@@ -290,6 +291,7 @@ struct etmv4_config {
-  * @dev:        The device entity associated to this component.
-  * @csdev:      Component vitals needed by the framework.
-  * @spinlock:   Only one at a time pls.
-+ * @mode:	This tracer's mode, i.e sysFS, Perf or disabled.
-  * @cpu:        The cpu this component is affined to.
-  * @arch:       ETM version number.
-  * @nr_pe:	The number of processing entity available for tracing.
-@@ -316,7 +318,6 @@ struct etmv4_config {
-  *		supported for the corresponding Exception level.
-  * @ns_ex_level:In non-secure state, indicates whether instruction tracing is
-  *		supported for the corresponding Exception level.
-- * @enable:	Is this ETM currently tracing.
-  * @sticky_enable: true if ETM base configuration has been done.
-  * @boot_enable:True if we should start tracing at boot time.
-  * @os_unlock:  True if access to management registers is allowed.
-@@ -346,6 +347,7 @@ struct etmv4_drvdata {
- 	struct device			*dev;
- 	struct coresight_device		*csdev;
- 	spinlock_t			spinlock;
-+	local_t				mode;
- 	int				cpu;
- 	u8				arch;
- 	u8				nr_pe;
-@@ -368,7 +370,6 @@ struct etmv4_drvdata {
- 	u8				ccitmin;
- 	u8				s_ex_level;
- 	u8				ns_ex_level;
--	bool				enable;
- 	bool				sticky_enable;
- 	bool				boot_enable;
- 	bool				os_unlock;
+ extern const struct attribute_group *coresight_etmv4_groups[];
++void etm4_config_trace_mode(struct etmv4_config *config);
+ #endif
 -- 
 2.1.4
