@@ -1,47 +1,36 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue,  1 Mar 2016 00:44:17 +0100
-Subject: [PATCH 0/8] ARM64: meson: GXBaby (S905) and Vega S95 enablement
-Message-ID: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+Date: Tue,  1 Mar 2016 00:44:18 +0100
+Subject: [PATCH 1/8] ARM64: Enable Amlogic Meson GXBaby platform
+In-Reply-To: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+Message-ID: <1456789465-2962-2-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Provide the ARCH_MESON Kconfig symbol to allow enabling existing serial
+and i2c drivers.
 
-This series adds initial support for the Amlogic S905 based
-Tronsmart Vega S95 Pro, Meta and Telos TV boxes.
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Regards,
-Andreas
-
-Cc: devicetree at vger.kernel.org
-
-Andreas F?rber (8):
-  ARM64: Enable Amlogic Meson GXBaby platform
-  Documentation: devicetree: amlogic: Document Meson GXBaby
-  ARM64: dts: Prepare configs for Amlogic Meson GXBaby
-  Documentation: devicetree: Document Tronsmart vendor prefix
-  Documentation: devicetree: amlogic: Document Tronsmart Vega S95 boards
-  ARM64: dts: amlogic: Add Tronsmart Vega S95 configs
-  ARM64: dts: amlogic: Extend GXBaby GIC node
-  ARM64: dts: amlogic: Add arch timer node for Meson GXBaby
-
- Documentation/devicetree/bindings/arm/amlogic.txt  |   7 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm64/Kconfig.platforms                       |   6 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/amlogic/Makefile               |   7 +
- .../boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |  55 ++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |  55 ++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |  55 ++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  73 +++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 142 +++++++++++++++++++++
- 10 files changed, 402 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/Makefile
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index a0a69589e46c..17d0ddaa0516 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -56,6 +56,12 @@ config ARCH_MEDIATEK
+ 	help
+ 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+ 
++config ARCH_MESON
++	bool "Amlogic Platforms"
++	select ARM_GIC
++	help
++	  This enables support for the S905 SoCs
++
+ config ARCH_MVEBU
+ 	bool "Marvell EBU SoC Family"
+ 	select ARMADA_AP806_CORE_CLK
 -- 
 2.6.2
