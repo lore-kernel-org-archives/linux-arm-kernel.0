@@ -1,54 +1,45 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 29 Feb 2016 20:48:23 +0800
-Subject: [PATCH 5/5] clk: rockchip: add clock controller for the RK3399
-In-Reply-To: <1456745466-13090-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <201602292017.8iHnbU5b%fengguang.wu@intel.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 29 Feb 2016 15:42:03 +0300
+Subject: [PATCH v3 6/7] ACPI: enable ACPI_DBG2_TABLE on ARM64
+In-Reply-To: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1456749726-30261-7-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing,
+SBBR mentions DBG2 as a mandatory ACPI table.
+So enable it for ARM64
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on next-20160229]
-[cannot apply to v4.5-rc6]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-
-url:    https://github.com/0day-ci/linux/commits/Xing-Zheng/Add-more-clock-compatible-features-and-support-the-RK3399-clock/20160229-193423
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm-defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> drivers/clk/rockchip/clk-rk3399.c:21:42: fatal error: dt-bindings/clock/rk3399-cru.h: No such file or directory
-    #include <dt-bindings/clock/rk3399-cru.h>
-                                             ^
-   compilation terminated.
-
-vim +21 drivers/clk/rockchip/clk-rk3399.c
-
-    15	
-    16	#include <linux/clk-provider.h>
-    17	#include <linux/of.h>
-    18	#include <linux/of_address.h>
-    19	#include <linux/platform_device.h>
-    20	#include <linux/regmap.h>
-  > 21	#include <dt-bindings/clock/rk3399-cru.h>
-    22	#include "clk.h"
-    23	
-    24	#define RK3399_PMUGRF_SOC_CON0			0x180
-
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36561 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/7c9af9b9/attachment-0001.obj>
+ arch/arm64/Kconfig       | 1 +
+ arch/arm64/kernel/acpi.c | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9dc5209..0b614d4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
++	select ACPI_DBG2_TABLE if ACPI
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..3370046 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -208,6 +208,8 @@ void __init acpi_boot_table_init(void)
+ 		pr_err("Failed to init ACPI tables\n");
+ 		if (!param_acpi_force)
+ 			disable_acpi();
++	} else {
++		acpi_probe_device_table(dbg2);
+ 	}
+ }
+ 
+-- 
+2.7.1
