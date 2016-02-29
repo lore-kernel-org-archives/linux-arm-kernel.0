@@ -1,34 +1,22 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Mon, 29 Feb 2016 15:13:54 -0800
-Subject: [PATCH] platform/x86: never 'select DMI' from a driver
-In-Reply-To: <20160229230711.GH7499@dvhart-mobl5.amr.corp.intel.com>
-References: <1456748014-358588-1-git-send-email-arnd@arndb.de>
- <CALCETrVxj0rt=5k7-tfTqwWOfshkkQkajQdhF6OE1we1h_2trw@mail.gmail.com>
- <20160229230711.GH7499@dvhart-mobl5.amr.corp.intel.com>
-Message-ID: <CALCETrXCvX_btgePvpW7=BU+u3qg+rkZEfM5pbREcF-VJ-2-ow@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 29 Feb 2016 15:17:49 -0800
+Subject: [PATCH v2 4/4] drivers: dma-coherent: use memset_io for
+ DMA_MEMORY_IO mappings
+In-Reply-To: <7942c970d1071643f3763de6eaf6d55a3945a069.1456225103.git.brian.starkey@arm.com>
+References: <cover.1456225103.git.brian.starkey@arm.com>
+ <7942c970d1071643f3763de6eaf6d55a3945a069.1456225103.git.brian.starkey@arm.com>
+Message-ID: <20160229151749.a972ae993adffb667140548d@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 3:07 PM, Darren Hart <dvhart@infradead.org> wrote:
-> On Mon, Feb 29, 2016 at 07:46:58AM -0800, Andy Lutomirski wrote:
->> On Mon, Feb 29, 2016 at 4:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > CONFIG_DMI is a user-selectable Kconfig symbol that some drivers
->> > depend on. As part of a recent patch, other drivers started
->> > adding a 'select' for the same symbol, which now causes
->> > a recursive dependency:
->>
->> Darren, it may make sense for you to fold the DELL_LAPTOP change in.
->
-> Andy, I didn't quite follow you. Are you referring to this patch from Arnd, or
-> from the dell-smbios series from Micha??
->
-> I'm planning on merging both (Micha?'s is pending a v5).
->
+On Mon, 29 Feb 2016 16:09:24 +0000 Brian Starkey <brian.starkey@arm.com> wrote:
 
-I meant to fold the "select DMI" -> "depends on DMI" for DELL_WMI into my patch.
+> Use memset_io() for DMA_MEMORY_IO mappings which are mapped as I/O
+> memory, and regular memset() for DMA_MEMORY_MAP mappings.
+> 
+> This fixes the below alignment fault on arm64 for DMA_MEMORY_IO
+> mappings, where memset() uses the DC ZVA instruction which is
+> invalid on device memory.
 
---Andy
-
--- 
-Andy Lutomirski
-AMA Capital Management, LLC
+What's the urgency of this fix?  "Hair on fire needed in stable asap"
+or "Nice to have in there for 4.6" or what?
