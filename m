@@ -1,266 +1,42 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 29 Feb 2016 13:46:11 +0000
-Subject: [PATCH 02/12] of/irq: Break out msi-map lookup (again)
+Date: Mon, 29 Feb 2016 13:46:13 +0000
+Subject: [PATCH 04/12] arm64/dma-mapping: Extend DMA ops workaround to PCI
+ devices
 In-Reply-To: <cover.1456514380.git.robin.murphy@arm.com>
 References: <cover.1456514380.git.robin.murphy@arm.com>
-Message-ID: <ce50f6b3ec3e1bb181b5c7584179f65bb1bc8ee8.1456514380.git.robin.murphy@arm.com>
+Message-ID: <ffcca878210c916962c562d3d1341aae93d593d0.1456514380.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI msi-map code is already doing double-duty translating IDs and
-retrieving MSI parents, which unsurprisingly is the same functionality
-we need for the identically-formatted PCI iommu-map property. Drag the
-core parsing routine up yet another layer into the general OF-PCI code,
-and further generalise it for either kind of lookup in either flavour
-of map property.
+PCI devices now suffer the same hiccup as platform devices, in that they
+get their DMA ops configured before they have been added to their bus,
+and thus before we know whether they have successfully registered with
+an IOMMU or not. Until the necessary driver core changes to reorder
+calls during device creation have been worked out, extend our delayed
+notifier trick onto the PCI bus so as to avoid broken DMA ops for IOMMUs
+there.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Frank Rowand <frowand.list@gmail.com>
-CC: Marc Zyngier <marc.zyngier@arm.com>
-CC: David Daney <david.daney@cavium.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/of/irq.c       |  70 ++-------------------------------
- drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_pci.h |   8 ++++
- 3 files changed, 114 insertions(+), 66 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index e7bfc17..0c9118d 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -24,6 +24,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-+#include <linux/of_pci.h>
- #include <linux/string.h>
- #include <linux/slab.h>
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index a6e757c..607e709 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -933,6 +933,10 @@ static int __init __iommu_dma_init(void)
+ 		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
+ 	if (!ret)
+ 		ret = register_iommu_dma_ops_notifier(&amba_bustype);
++#ifdef CONFIG_PCI
++	if (!ret)
++		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
++#endif
  
-@@ -586,13 +587,7 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
- 			    u32 rid_in)
- {
- 	struct device *parent_dev;
--	struct device_node *msi_controller_node;
--	struct device_node *msi_np = *np;
--	u32 map_mask, masked_rid, rid_base, msi_base, rid_len, phandle;
--	int msi_map_len;
--	bool matched;
- 	u32 rid_out = rid_in;
--	const __be32 *msi_map = NULL;
- 
- 	/*
- 	 * Walk up the device parent links looking for one with a
-@@ -602,71 +597,14 @@ static u32 __of_msi_map_rid(struct device *dev, struct device_node **np,
- 		if (!parent_dev->of_node)
- 			continue;
- 
--		msi_map = of_get_property(parent_dev->of_node,
--					  "msi-map", &msi_map_len);
--		if (!msi_map)
-+		if (!of_property_read_bool(parent_dev->of_node, "msi-map"))
- 			continue;
- 
--		if (msi_map_len % (4 * sizeof(__be32))) {
--			dev_err(parent_dev, "Error: Bad msi-map length: %d\n",
--				msi_map_len);
--			return rid_out;
--		}
- 		/* We have a good parent_dev and msi_map, let's use them. */
-+		of_pci_map_rid(parent_dev->of_node, "msi-map", rid_in, np,
-+			       &rid_out);
- 		break;
- 	}
--	if (!msi_map)
--		return rid_out;
--
--	/* The default is to select all bits. */
--	map_mask = 0xffffffff;
--
--	/*
--	 * Can be overridden by "msi-map-mask" property.  If
--	 * of_property_read_u32() fails, the default is used.
--	 */
--	of_property_read_u32(parent_dev->of_node, "msi-map-mask", &map_mask);
--
--	masked_rid = map_mask & rid_in;
--	matched = false;
--	while (!matched && msi_map_len >= 4 * sizeof(__be32)) {
--		rid_base = be32_to_cpup(msi_map + 0);
--		phandle = be32_to_cpup(msi_map + 1);
--		msi_base = be32_to_cpup(msi_map + 2);
--		rid_len = be32_to_cpup(msi_map + 3);
--
--		if (rid_base & ~map_mask) {
--			dev_err(parent_dev,
--				"Invalid msi-map translation - msi-map-mask (0x%x) ignores rid-base (0x%x)\n",
--				map_mask, rid_base);
--			return rid_out;
--		}
--
--		msi_controller_node = of_find_node_by_phandle(phandle);
--
--		matched = (masked_rid >= rid_base &&
--			   masked_rid < rid_base + rid_len);
--		if (msi_np)
--			matched &= msi_np == msi_controller_node;
--
--		if (matched && !msi_np) {
--			*np = msi_np = msi_controller_node;
--			break;
--		}
--
--		of_node_put(msi_controller_node);
--		msi_map_len -= 4 * sizeof(__be32);
--		msi_map += 4;
--	}
--	if (!matched)
--		return rid_out;
--
--	rid_out = masked_rid - rid_base + msi_base;
--	dev_dbg(dev,
--		"msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
--		dev_name(parent_dev), map_mask, rid_base, msi_base,
--		rid_len, rid_in, rid_out);
--
- 	return rid_out;
- }
- 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index b1449f7..15c4a64b 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -307,3 +307,105 @@ struct msi_controller *of_pci_find_msi_chip_by_node(struct device_node *of_node)
- EXPORT_SYMBOL_GPL(of_pci_find_msi_chip_by_node);
- 
- #endif /* CONFIG_PCI_MSI */
-+
-+#define MASK_NAME_LEN	32	/* Safely longer than "iommu-map-mask" */
-+
-+/**
-+ * of_pci_map_rid - Translate a requester ID through a downstream mapping.
-+ * @np: root complex device node.
-+ * @map_name: property name of the map to use.
-+ * @target: optional pointer to a target device node.
-+ * @id_out: optional pointer to receive the translated ID.
-+ *
-+ * Given a PCI requester ID, look up the appropriate implementation-defined
-+ * platform ID and/or the target device which receives transactions on that
-+ * ID, as per the "iommu-map" and "msi-map" bindings. @target or @id_out may
-+ * be NULL if not required. If @target points to a device node pointer, only
-+ * entries targeting that node will be matched; if it points to a NULL
-+ * value, it will receive the device node for the first matching target entry,
-+ * with a reference held.
-+ *
-+ * Return: 0 on success or a standard error code on failure.
-+ */
-+int of_pci_map_rid(struct device_node *np, const char *map_name, u32 rid_in,
-+		   struct device_node **target, u32 *rid_out)
-+{
-+	u32 map_mask, masked_rid;
-+	int map_len;
-+	const __be32 *map = NULL;
-+	char mask_name[MASK_NAME_LEN];
-+
-+	if (!np || !map_name || (!target && !rid_out))
-+		return -EINVAL;
-+
-+	map = of_get_property(np, map_name, &map_len);
-+	if (!map) {
-+		if (target)
-+			return -ENODEV;
-+		/* Otherwise, no map implies no translation */
-+		*rid_out = rid_in;
-+		return 0;
-+	}
-+
-+	if (!map_len || map_len % (4 * sizeof(*map))) {
-+		pr_err("%s: Error: Bad %s length: %d\n", np->full_name,
-+			map_name, map_len);
-+		return -EINVAL;
-+	}
-+
-+	/* The default is to select all bits. */
-+	map_mask = 0xffffffff;
-+
-+	/*
-+	 * Can be overridden by "{iommu,msi}-map-mask" property.
-+	 * If of_property_read_u32() fails, the default is used.
-+	 */
-+	snprintf(mask_name, MASK_NAME_LEN, "%s-mask", map_name);
-+	of_property_read_u32(np, mask_name, &map_mask);
-+
-+	masked_rid = map_mask & rid_in;
-+	for ( ; map_len > 0; map_len -= 4 * sizeof(*map), map += 4) {
-+		struct device_node *phandle_node;
-+		u32 rid_base = be32_to_cpup(map + 0);
-+		u32 phandle = be32_to_cpup(map + 1);
-+		u32 out_base = be32_to_cpup(map + 2);
-+		u32 rid_len = be32_to_cpup(map + 3);
-+
-+		if (rid_base & ~map_mask) {
-+			pr_err("%s: Invalid %s translation - %s-mask (0x%x) ignores rid-base (0x%x)\n",
-+				np->full_name, map_name, map_name,
-+				map_mask, rid_base);
-+			return -EINVAL;
-+		}
-+
-+		if (masked_rid < rid_base || masked_rid >= rid_base + rid_len)
-+			continue;
-+
-+		phandle_node = of_find_node_by_phandle(phandle);
-+		if (!phandle_node)
-+			return -ENODEV;
-+
-+		if (target) {
-+			if (*target)
-+				of_node_put(phandle_node);
-+			else
-+				*target = phandle_node;
-+
-+			if (*target != phandle_node)
-+				continue;
-+		}
-+
-+		if (rid_out)
-+			*rid_out = masked_rid - rid_base + out_base;
-+
-+		pr_debug("%s: %s, using mask %08x, rid-base: %08x, out-base: %08x, length: %08x, rid: %08x -> %08x\n",
-+			np->full_name, map_name, map_mask, rid_base, out_base,
-+			rid_len, rid_in, *rid_out);
-+		return 0;
-+	}
-+
-+	pr_err("%s: Invalid %s translation - no match for rid 0x%x on %s\n",
-+		np->full_name, map_name, rid_in,
-+		target && *target ? (*target)->full_name : "any target");
-+	return -EINVAL;
-+}
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index f6e9e85..070f883 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -17,6 +17,8 @@ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- int of_get_pci_domain_nr(struct device_node *node);
- void of_pci_check_probe_only(void);
-+int of_pci_map_rid(struct device_node *np, const char *map_name, u32 rid_in,
-+		   struct device_node **target, u32 *rid_out);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -52,6 +54,12 @@ of_get_pci_domain_nr(struct device_node *node)
- 	return -1;
- }
- 
-+static inline int of_pci_map_rid(struct device_node *np, const char *map_name,
-+			u32 rid_in, struct device_node **target, u32 *rid_out)
-+{
-+	return -EINVAL;
-+}
-+
- static inline void of_pci_check_probe_only(void) { }
- #endif
- 
+ 	/* handle devices queued before this arch_initcall */
+ 	if (!ret)
 -- 
 2.7.2.333.g70bd996.dirty
