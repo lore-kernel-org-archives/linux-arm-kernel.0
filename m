@@ -1,32 +1,37 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 29 Feb 2016 10:38:45 +0100
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Feb 2016 10:54:19 +0100
 Subject: [PATCH 1/2] can: rcar_can: Add r8a7795 support
 In-Reply-To: <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
 References: <1456737661-20538-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
  <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <56D411A5.9070706@pengutronix.de>
+Message-ID: <CAMuHMdV3EsvN=sqiB2npB=cH8Bz4D6UVcQj-BKqfdHerKSDowQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2016 10:21 AM, Ramesh Shanmugasundaram wrote:
-> Added r8a7795 SoC support.
-> 
-> For smoother bit timing calculation, the rounded clock frequency is used.
+Hi Ramesh,
 
-Why this? From my point of view this introduces a clock error.
+On Mon, Feb 29, 2016 at 10:21 AM, Ramesh Shanmugasundaram
+<ramesh.shanmugasundaram@bp.renesas.com> wrote:
+> --- a/drivers/net/can/rcar_can.c
+> +++ b/drivers/net/can/rcar_can.c
+> @@ -808,6 +808,10 @@ static int rcar_can_probe(struct platform_device *pdev)
+>         priv->regs = addr;
+>         priv->clock_select = clock_select;
+>         priv->can.clock.freq = clk_get_rate(priv->can_clk);
+> +
+> +       /* Use the rounded clock value (nearest kHz) */
+> +       priv->can.clock.freq = 1000 * DIV_ROUND_UP(priv->can.clock.freq, 1000);
 
-Marc
+The comment and the implementation don't match.
+To get the nearest kHz, you have to useDIV_ROUND_CLOSEST().
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Gr{oetje,eeting}s,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/9839c034/attachment.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
