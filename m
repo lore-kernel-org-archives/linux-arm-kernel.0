@@ -1,37 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Feb 2016 10:54:19 +0100
-Subject: [PATCH 1/2] can: rcar_can: Add r8a7795 support
-In-Reply-To: <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-References: <1456737661-20538-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <1456737661-20538-2-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <CAMuHMdV3EsvN=sqiB2npB=cH8Bz4D6UVcQj-BKqfdHerKSDowQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Feb 2016 10:54:49 +0100
+Subject: [PATCH] iommu: exynos: pointers are nto physical addresses
+In-Reply-To: <56D41087.60506@samsung.com>
+References: <1456735568-3886545-1-git-send-email-arnd@arndb.de>
+ <56D41087.60506@samsung.com>
+Message-ID: <26472865.zD5Ep58Exn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ramesh,
+On Monday 29 February 2016 10:33:59 Marek Szyprowski wrote:
+> > ---
+> > I also see that some incorrect __raw_writel() calls have crept in
+> > around the same time, which breaks running big-endian kernels when
+> > this driver is loaded.
+> >
+> > Please fix and that that as well.
+> 
+> Okay, so in the driver code all __raw_writel should be replaced by
+> writel(), right?
 
-On Mon, Feb 29, 2016 at 10:21 AM, Ramesh Shanmugasundaram
-<ramesh.shanmugasundaram@bp.renesas.com> wrote:
-> --- a/drivers/net/can/rcar_can.c
-> +++ b/drivers/net/can/rcar_can.c
-> @@ -808,6 +808,10 @@ static int rcar_can_probe(struct platform_device *pdev)
->         priv->regs = addr;
->         priv->clock_select = clock_select;
->         priv->can.clock.freq = clk_get_rate(priv->can_clk);
-> +
-> +       /* Use the rounded clock value (nearest kHz) */
-> +       priv->can.clock.freq = 1000 * DIV_ROUND_UP(priv->can.clock.freq, 1000);
+Yes, writel() is always the safe choice if you don't know what to
+use. __raw_writel() should be considered an implementation detail
+and not used in drivers at all. There is also writel_relaxed(),
+which is faster than writel() because it leaves out all the
+barriers (as __raw_writel does too), and you can sometimes use that
+in the fast path if you can prove that no barriers are needed.
 
-The comment and the implementation don't match.
-To get the nearest kHz, you have to useDIV_ROUND_CLOSEST().
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
