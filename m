@@ -1,23 +1,102 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 29 Feb 2016 16:51:53 +0000
-Subject: [PATCH 05/12] arm64/dma-mapping: Remove default domain workaround
-In-Reply-To: <698ecf1450da8b56a8f297b83815d2fe866ca0e1.1456514380.git.robin.murphy@arm.com>
-References: <cover.1456514380.git.robin.murphy@arm.com>
- <698ecf1450da8b56a8f297b83815d2fe866ca0e1.1456514380.git.robin.murphy@arm.com>
-Message-ID: <20160229165153.GB15650@localhost.localdomain>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 29 Feb 2016 18:55:39 +0200
+Subject: [PATCH v2] video: exynos: fix modular build
+In-Reply-To: <6291541.7IMAnfX0g2@wuerfel>
+References: <1456490307-823812-1-git-send-email-arnd@arndb.de>
+ <56D46DFD.6090706@ti.com> <6291541.7IMAnfX0g2@wuerfel>
+Message-ID: <56D4780B.2070406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 01:46:14PM +0000, Robin Murphy wrote:
-> With the IOMMU core now taking care of default domains for groups
-> regardless of bus type, we can gleefully rip out this stop-gap, as
-> slight recompense for having to expand the other one.
+On 29/02/16 18:39, Arnd Bergmann wrote:
+> On Monday 29 February 2016 18:12:45 Tomi Valkeinen wrote:
+>> Hi,
+>>
+>> On 26/02/16 14:38, Arnd Bergmann wrote:
+>>> The s6e8ax0 driver has a dependency on BACKLIGHT_CLASS_DEVICE,
+>>> which can be configured as a loadable module, so we have to
+>>> make the driver a tristate symbol as well, to avoid this error:
+>>>
+>>> drivers/built-in.o: In function `s6e8ax0_probe':
+>>> :(.text+0x23a48): undefined reference to `devm_backlight_device_register'
+>>
+>> If a 'bool' Kconfig option depends on BACKLIGHT_CLASS_DEVICE, shouldn't
+>> the Kconfig dependency take care of having BACKLIGHT_CLASS_DEVICE as
+>> built-in?
 > 
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> No, that's not how Kconfig interprets it. There are many bool option
+> that depend on tristate options but can be enabled if the dependency
+> is built-in.
+> 
+> Take this one for example:
+> 
+> config FIRMWARE_EDID
+>        bool "Enable firmware EDID"
+>        depends on FB
+> 
+> We clearly want to be able to turn this on even for FB=m.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Right.
 
--- 
-Catalin
+>>> This also means we get another error from a missing export, which
+>>> this fixes as well:
+>>>
+>>> ERROR: "exynos_mipi_dsi_register_lcd_driver" [drivers/video/fbdev/exynos/s6e8ax0.ko] undefined!
+>>>
+>>> The drivers are all written to be loadable modules already,
+>>> except the Kconfig options for that are missing, which makes
+>>> the patch really easy.
+>>
+>> Looks and sound fine, except doesn't this tell that the drivers have
+>> never been tested as modules? Did you or someone else actually test these?
+> 
+> No, this is not runtime tested. Generally there is very little that
+> can go wrong here though.
+> 
+> An alternative would be to change the dependency to
+> 
+> 	depends on BACKLIGHT_CLASS_DEVICE=y
+> 
+> which doesn't allow the driver to be turned on for the =m case.
+> However, no other framebuffer driver does this.
+
+No, I think it's clearly better to make them tristate. I think all
+drivers should be buildable as modules. It just makes me a bit
+uncomfortable to enable code that has never been ran.
+
+>>> diff --git a/drivers/video/fbdev/exynos/Makefile b/drivers/video/fbdev/exynos/Makefile
+>>> index b5b1bd228abb..02d8dc522fea 100644
+>>> --- a/drivers/video/fbdev/exynos/Makefile
+>>> +++ b/drivers/video/fbdev/exynos/Makefile
+>>> @@ -2,6 +2,8 @@
+>>>  # Makefile for the exynos video drivers.
+>>>  #
+>>>  
+>>> -obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
+>>> -				     	exynos_mipi_dsi_lowlevel.o
+>>> +obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
+>>> +
+>>> +exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
+>>> +					   exynos_mipi_dsi_lowlevel.o
+>>
+>> Hmm, why is this makefile change needed?
+> 
+> The original Makefile would link each file into a separate module, but that
+> cannot work, because they reference symbols from each other that are not
+> exported to other modules.
+> 
+> With my change, all the files get linked into a single module.
+
+Yes, of course.
+
+Thanks, I'll queue this up for 4.6.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/cf158edd/attachment.sig>
