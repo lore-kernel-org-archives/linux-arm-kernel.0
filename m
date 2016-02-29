@@ -1,44 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Feb 2016 10:19:06 +0100
-Subject: [PATCH 1/2] iommu/mediatek: select ARM_DMA_USE_IOMMU
-Message-ID: <1456737553-496245-1-git-send-email-arnd@arndb.de>
+Date: Mon, 29 Feb 2016 10:19:07 +0100
+Subject: [PATCH 2/2] iommu/mediatek: mark PM functions as __maybe_unused
+In-Reply-To: <1456737553-496245-1-git-send-email-arnd@arndb.de>
+References: <1456737553-496245-1-git-send-email-arnd@arndb.de>
+Message-ID: <1456737553-496245-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added Mediatek IOMMU driver uses the IOMMU_DMA infrastructure,
-but unlike other such drivers, it does not select 'ARM_DMA_USE_IOMMU',
-which is a prerequisite, leading to a link error:
+When CONFIG_PM is unset, we get a harmless warning for this driver:
 
-warning: (MTK_IOMMU) selects IOMMU_DMA which has unmet direct dependencies (IOMMU_SUPPORT && NEED_SG_DMA_LENGTH)
-drivers/iommu/built-in.o: In function `iommu_put_dma_cookie':
-mtk_iommu.c:(.text+0x11fe): undefined reference to `put_iova_domain'
-drivers/iommu/built-in.o: In function `iommu_dma_init_domain':
-mtk_iommu.c:(.text+0x1316): undefined reference to `init_iova_domain'
-drivers/iommu/built-in.o: In function `__iommu_dma_unmap':
-mtk_iommu.c:(.text+0x1380): undefined reference to `find_iova'
+drivers/iommu/mtk_iommu.c:665:12: error: 'mtk_iommu_suspend' defined but not used [-Werror=unused-function]
+drivers/iommu/mtk_iommu.c:680:12: error: 'mtk_iommu_resume' defined but not used [-Werror=unused-function]
 
-This adds the same select that the other drivers have. On a related
-note, I wonder if we should just always select ARM_DMA_USE_IOMMU
-whenever any IOMMU driver is enabled. Are there any cases where
-we would enable an IOMMU but not use it?
+Marking the functions as __maybe_unused gits rid of the two functions
+and lets the compiler silently drop the object code, while still
+doing syntax checking on them for build-time verification.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
 ---
- drivers/iommu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iommu/mtk_iommu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index b325954cf8f8..ea0998921702 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -341,6 +341,7 @@ config MTK_IOMMU
- 	bool "MTK IOMMU Support"
- 	depends on ARM || ARM64
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	select ARM_DMA_USE_IOMMU
- 	select IOMMU_API
- 	select IOMMU_DMA
- 	select IOMMU_IO_PGTABLE_ARMV7S
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index 721ffdb296d6..f3c160e4c25d 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -662,7 +662,7 @@ static int mtk_iommu_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int mtk_iommu_suspend(struct device *dev)
++static int __maybe_unused mtk_iommu_suspend(struct device *dev)
+ {
+ 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+ 	struct mtk_iommu_suspend_reg *reg = &data->reg;
+@@ -677,7 +677,7 @@ static int mtk_iommu_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int mtk_iommu_resume(struct device *dev)
++static int __maybe_unused mtk_iommu_resume(struct device *dev)
+ {
+ 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+ 	struct mtk_iommu_suspend_reg *reg = &data->reg;
 -- 
 2.7.0
