@@ -1,24 +1,39 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 29 Feb 2016 11:35:56 +0530
-Subject: [PATCH] asm-generic: remove old nonatomic-io wrapper files
-In-Reply-To: <1456496980-1852604-1-git-send-email-arnd@arndb.de>
-References: <1456496980-1852604-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160229060556.GF11154@localhost>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Feb 2016 07:54:24 +0100
+Subject: [PATCH V3] ARM64: tegra: Add support for Google Pixel C
+In-Reply-To: <1455020809-17531-1-git-send-email-jonathanh@nvidia.com>
+References: <1454949199-27050-1-git-send-email-jonathanh@nvidia.com>
+ <1455020809-17531-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20160229065424.GD23745@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 03:29:05PM +0100, Arnd Bergmann wrote:
-> The two header files got moved to include/linux, and most
-> users were already converted, this changes the remaining drivers
-> and removes the files.
+On Tue, Feb 09, 2016 at 12:26:49PM +0000, Jon Hunter wrote:
+> Add initial device-tree support for Google Pixel C (a.k.a. Smaug) based
+> upon Tegra210 SoC with 3 GiB of LPDDR4 RAM.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > ---
->  drivers/dma/idma64.h                                | 2 +-
-For this:
+> 
+> Changes v2 -> v3:
+> - Added PSCI information to enable all 4 CPUs on boot
+> 
+> Changes v1 -> v2:
+> - Removed console boot parameter and added stdout-path
+> - Added 32k clock for PMC
+> 
+>  arch/arm64/boot/dts/nvidia/Makefile           |  1 +
+>  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 83 +++++++++++++++++++++++++++
+>  2 files changed, 84 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
 
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+Applied, thanks.
 
-Thanks
--- 
-~Vinod
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/5c33bdce/attachment.sig>
