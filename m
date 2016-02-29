@@ -1,50 +1,75 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 29 Feb 2016 18:29:56 +0100
-Subject: [PATCH v12 3/5] dt, numa: Add NUMA dt binding implementation.
-In-Reply-To: <1456192703-2274-4-git-send-email-ddaney.cavm@gmail.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-4-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160229172956.GF31343@rric.localdomain>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 29 Feb 2016 12:31:02 -0500
+Subject: [PATCH v5 0/6] watchdog: pnx4008: add restart handler
+Message-ID: <1456767068-14449-1-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.02.16 17:58:21, David Daney wrote:
-> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> 
-> ADD device tree node parsing for NUMA topology using device
-> "numa-node-id" property distance-map.
-> 
-> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/of/Kconfig   |   3 +
->  drivers/of/Makefile  |   1 +
->  drivers/of/of_numa.c | 211 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of.h   |   9 +++
->  4 files changed, 224 insertions(+)
->  create mode 100644 drivers/of/of_numa.c
-> 
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index e2a4841..b3bec3a 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -112,4 +112,7 @@ config OF_OVERLAY
->  	  While this option is selected automatically when needed, you can
->  	  enable it manually to improve device tree unit test coverage.
->  
-> +config OF_NUMA
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-In arch/arm64/Kconfig you now need to:
+The LPC32xx provide the capability to perform a soft or hard reset;
+a soft reset will no reset the external peripheral
+(i.e. RESOUT_N output not asserted).
 
-	select OF_NUMA if NUMA && OF
+This changeset migrate the restart code from the "mach-lpc32xx" to
+the "pnx-4008" watchdog driver and add the soft reset capability.
 
-This should depend here on OF and NUMA and enabled in that case. Why
-moving that to arch code? This duplicates code as the same needs to be
-implemented for every arch.
+The default behavior (i.e. hard reset) remain unchanged.
 
--Robert
+This patchset have a dependency on the following patch:
+watchdog: Add 'action' and 'data' parameters to restart handler callback
+http://permalink.gmane.org/gmane.linux.watchdog/3364/
 
-> +	bool
-> +
->  endif # OF
+Note:
+Patch #5 was generated with the option "--unified=2" to ensure
+it can be apply before or after the changes for the new 
+LPC32xx irqchip driver:
+- http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
+---
+Changes from v4 to v5:
+* Rebased on the following patch:
+  http://permalink.gmane.org/gmane.linux.watchdog/3364/
+
+Changes from v3 to v4:
+* Update the patch as per the feedback received from:
+  Arnd: http://permalink.gmane.org/gmane.linux.watchdog/3329
+  - Switch patch #5 and #6 order.
+
+Changes from v2 to v3:
+* Update the patch as per the feedback received from:
+  Joachim: http://permalink.gmane.org/gmane.linux.watchdog/3303
+  - remove explicit clock enable from restart handler.
+  - verify "register_restart_handler" return value.
+  - add call to unregister_restart_handler".
+  - do the restart handling directly in "pnx4008_restart_handler".
+* Move the change to "phy3250.c" into a separate patch and generate
+  the new patch with the "--unified=2" option.
+
+Changes from v1 to v2:
+* Rename patch title;
+  was "arm: lpc32xx: restart: add support for soft reset"
+* Update the patch as per the feedback received from:
+  Joachim: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/479791
+  - migrate restart code from "mach-lpc32xx" to "pnx-4008" driver.
+* Add soft reset support to "pnx-4008" driver instead of "mach-lpc32xx".
+* Use define available in "pnx-4008" when writting to watchdog register.
+* Remove restart handler from "mach-lpc32xx".
+* Remove restart hook from "phy3250.c".
+* Update driver logging during power-on. 
+
+Sylvain Lemieux (6):
+  watchdog: pnx4008: update logging during power-on
+  watchdog: pnx4008: add restart handler
+  watchdog: pnx4008: add support for soft reset
+  watchdog: pnx4008: restart: support "cmd" from userspace
+  arm: lpc32xx: phy3250 remove restart hook
+  arm: lpc32xx: remove restart handler
+
+ arch/arm/mach-lpc32xx/common.c  | 15 ---------------
+ arch/arm/mach-lpc32xx/common.h  |  1 -
+ arch/arm/mach-lpc32xx/phy3250.c |  1 -
+ drivers/watchdog/pnx4008_wdt.c  | 42 +++++++++++++++++++++++++++++++++++++++--
+ 4 files changed, 40 insertions(+), 19 deletions(-)
+
+-- 
+1.8.3.1
