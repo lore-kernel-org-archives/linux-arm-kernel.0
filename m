@@ -1,68 +1,112 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 29 Feb 2016 15:43:54 +0000
-Subject: [PATCH 0/8] clk: bcm2835: add most missing clocks of bcm2835
-Message-ID: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
+Date: Mon, 29 Feb 2016 15:43:56 +0000
+Subject: [PATCH 2/8] clk: bcm2835: add missing PLL clock divider
+In-Reply-To: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
+References: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1456760642-2412-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Add a graphviz dot file containing the (currently) best known
-representation of the bcm2835 clock tree.
-This information has mostly been gleaned/guessed from the headerfiles
-that broadcom shared for VideoCore4 at:
-http://www.broadcom.com/docs/support/videocore/Brcm_Android_ICS_Graphics_Stack.tar.gz
+Add the missing pll clock divider definitions.
 
-These headers have been transformed and the extracted information
-is more easily consumable at:
-*  https://github.com/msperl/rpi-registers/blob/master/md/Region_A2W.md
-*  https://github.com/msperl/rpi-registers/blob/master/md/Region_CM.md
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ drivers/clk/bcm/clk-bcm2835.c       |   50 +++++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/bcm2835.h |    8 ++++++
+ 2 files changed, 58 insertions(+)
 
-Based on this information most of the missing clocks
-are added in separate patches with logical grouping:
-* pll-divider
-* oscillator and peripherial clocks
-* camera
-* dsi/display
-* arm
-* gate clocks
-* testdebug clock generator clocks
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 01a48cb..710cf15 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1497,6 +1497,22 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.load_mask = CM_PLLA_LOADPER,
+ 		.hold_mask = CM_PLLA_HOLDPER,
+ 		.fixed_divider = 1),
++	[BCM2835_PLLA_DSI0]	= REGISTER_PLL_DIV(
++		.name = "plla_dsi0",
++		.source_pll = "plla",
++		.cm_reg = CM_PLLA,
++		.a2w_reg = A2W_PLLA_DSI0,
++		.load_mask = CM_PLLA_LOADDSI0,
++		.hold_mask = CM_PLLA_HOLDDSI0,
++		.fixed_divider = 1),
++	[BCM2835_PLLA_CCP2]	= REGISTER_PLL_DIV(
++		.name = "plla_ccp2",
++		.source_pll = "plla",
++		.cm_reg = CM_PLLA,
++		.a2w_reg = A2W_PLLA_DSI0,
++		.load_mask = CM_PLLA_LOADCCP2,
++		.hold_mask = CM_PLLA_HOLDCCP2,
++		.fixed_divider = 1),
 
-Note that the biggest possible problem can be identification of
-the correct parent clocks for the relevant muxes.
+ 	/* PLLB is used for the ARM's clock. */
+ 	[BCM2835_PLLB]		= REGISTER_PLL(
+@@ -1521,6 +1537,24 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.load_mask = CM_PLLB_LOADARM,
+ 		.hold_mask = CM_PLLB_HOLDARM,
+ 		.fixed_divider = 1),
++	[BCM2835_PLLB_SP0]	= REGISTER_PLL_DIV(
++		.name = "pllb_sp0",
++		.source_pll = "pllb",
++		.cm_reg = CM_PLLB,
++		.a2w_reg = A2W_PLLB_SP0,
++		.fixed_divider = 1),
++	[BCM2835_PLLB_SP1]	= REGISTER_PLL_DIV(
++		.name = "pllb_sp1",
++		.source_pll = "pllb",
++		.cm_reg = CM_PLLB,
++		.a2w_reg = A2W_PLLB_SP1,
++		.fixed_divider = 1),
++	[BCM2835_PLLB_SP2]	= REGISTER_PLL_DIV(
++		.name = "pllb_sp2",
++		.source_pll = "pllb",
++		.cm_reg = CM_PLLB,
++		.a2w_reg = A2W_PLLB_SP2,
++		.fixed_divider = 1),
 
-The patches try to be conservative using only the "standard" pattern
-(=osc clocks) where it seems a new mux is used for a specific clock(group).
-It would be helpfull if someone with access to the HW documentation
-can report the actual parents that are used so that the parents can get
-corrected.
+ 	/*
+ 	 * PLLC is the core PLL, used to drive the core VPU clock.
+@@ -1611,6 +1645,22 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.load_mask = CM_PLLD_LOADPER,
+ 		.hold_mask = CM_PLLD_HOLDPER,
+ 		.fixed_divider = 1),
++	[BCM2835_PLLD_DSI0]	= REGISTER_PLL_DIV(
++		.name = "plld_dsi0",
++		.source_pll = "plld",
++		.cm_reg = CM_PLLD,
++		.a2w_reg = A2W_PLLD_DSI0,
++		.load_mask = CM_PLLD_LOADDSI0,
++		.hold_mask = CM_PLLD_HOLDDSI0,
++		.fixed_divider = 1),
++	[BCM2835_PLLD_DSI1]	= REGISTER_PLL_DIV(
++		.name = "plld_dsi1",
++		.source_pll = "plld",
++		.cm_reg = CM_PLLD,
++		.a2w_reg = A2W_PLLD_DSI1,
++		.load_mask = CM_PLLD_LOADDSI1,
++		.hold_mask = CM_PLLD_HOLDDSI1,
++		.fixed_divider = 1),
 
-Having all those clocks in place should reduce the risk
-that we disable another pll used by the firmware,
-which can bring down the system
-See: "clk: bcm2835: enable clocks that have been enabled by firmware"
-
-Note that this patchset (except for the graphviz file)
-requires at least the following patches from the new clock
-initialization patch-set to be applied:
-  clk: bcm2835: remove use of BCM2835_CLOCK_COUNT in driver
-  clk: bcm2835: reorganize bcm2835_clock_array assignment
-
-Martin Sperl (8):
-  clk: bcm2835: documenentation: add graphiz bcm2835 clock tree
-  clk: bcm2835: add missing PLL clock divider
-  clk: bcm2835: add missing osc and per clocks
-  clk: bcm2835: add the camera related clocks cam0, cam1 and ccp2
-  clk: bcm2835: add the dsi clocks
-  clk: bcm2835: add arm clock
-  clk: bcm2835: add gates that require PM_DEBUG to be set
-  clk: bcm2835: add the testdebug clock generators
-
- Documentation/clk/bcrm,bcm2835-clock-tree.dot |  350 +++++++++++++++++++++++++
- drivers/clk/bcm/clk-bcm2835.c                 |  329 ++++++++++++++++++++++-
- include/dt-bindings/clock/bcm2835.h           |   30 +++
- 3 files changed, 708 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/clk/bcrm,bcm2835-clock-tree.dot
-
+ 	/*
+ 	 * PLLH is used to supply the pixel clock or the AUX clock for the
+diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
+index 9a7b4a5..9689812 100644
+--- a/include/dt-bindings/clock/bcm2835.h
++++ b/include/dt-bindings/clock/bcm2835.h
+@@ -45,3 +45,11 @@
+ #define BCM2835_CLOCK_PERI_IMAGE	29
+ #define BCM2835_CLOCK_PWM		30
+ #define BCM2835_CLOCK_PCM		31
++
++#define BCM2835_PLLA_DSI0		32
++#define BCM2835_PLLA_CCP2		33
++#define BCM2835_PLLB_SP0		34
++#define BCM2835_PLLB_SP1		35
++#define BCM2835_PLLB_SP2		36
++#define BCM2835_PLLD_DSI0		37
++#define BCM2835_PLLD_DSI1		38
 --
 1.7.10.4
