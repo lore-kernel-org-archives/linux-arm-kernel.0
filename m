@@ -1,67 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Feb 2016 10:14:28 +0000
-Subject: [PATCH 2/2 v3] irqchip/Layerscape: Add SCFG MSI controller support
-In-Reply-To: <VI1PR04MB1615735FD9B40547228B7B51E8A60@VI1PR04MB1615.eurprd04.prod.outlook.com>
-References: <1454403648-5551-1-git-send-email-Minghuan.Lian@nxp.com>
- <1454403648-5551-2-git-send-email-Minghuan.Lian@nxp.com>
- <56C4AE17.4050301@arm.com>
- <VI1PR04MB1615735FD9B40547228B7B51E8A60@VI1PR04MB1615.eurprd04.prod.outlook.com>
-Message-ID: <56D41A04.8030302@arm.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Mon, 29 Feb 2016 11:23:39 +0100
+Subject: [PATCH 1/2] ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
+In-Reply-To: <20160229025822.GO22051@tiger>
+References: <1456325867-5309-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20160229025822.GO22051@tiger>
+Message-ID: <20160229102339.GA4754@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/02/16 03:21, Minghuan Lian wrote:
-> Hi Marc,
+On Mon, Feb 29, 2016 at 10:58:22AM +0800, Shawn Guo wrote:
+> On Wed, Feb 24, 2016 at 03:57:46PM +0100, Michael Grzeschik wrote:
+> > @@ -169,12 +167,11 @@ CONFIG_RTC_DRV_IMXDI=y
+> >  CONFIG_RTC_DRV_MC13XXX=y
+> >  CONFIG_RTC_DRV_MXC=y
+> >  CONFIG_DMADEVICES=y
+> > -CONFIG_IMX_SDMA=y
+> >  CONFIG_IMX_DMA=y
+> > +CONFIG_IMX_SDMA=y
+> >  # CONFIG_IOMMU_SUPPORT is not set
+> >  CONFIG_EXT2_FS=y
+> >  CONFIG_EXT3_FS=y
+> > -CONFIG_EXT4_FS=y
 > 
-> I am sorry for the delayed response due to the Chinese Spring Festival holiday.
-> Thank you very much for the review.
-> Please see my comments inline.
-> 
-> Thanks,
-> Minghuan
-> 
+> I guess that Arnd's comment about keeping CONFIG_EXT4_FS and dropping
+> the other two applies here too?
 
-[...]
-
->>> +static int ls_scfg_msi_probe(struct platform_device *pdev) {
->>> +	struct ls_scfg_msi *msi_data;
->>> +	struct resource *res;
->>> +	int ret;
->>> +
->>> +	msi_data = devm_kzalloc(&pdev->dev, sizeof(*msi_data), GFP_KERNEL);
->>> +	if (!msi_data)
->>> +		return -ENOMEM;
->>> +
->>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +	msi_data->regs = devm_ioremap_resource(&pdev->dev, res);
->>> +	if (IS_ERR(msi_data->regs)) {
->>> +		dev_err(&pdev->dev, "failed to initialize 'regs'\n");
->>> +		return PTR_ERR(msi_data->regs);
->>> +	}
->>> +	msi_data->msiir_addr = res->start;
->>> +
->>> +	msi_data->irq = platform_get_irq(pdev, 0);
->>> +	if (msi_data->irq <= 0) {
->>> +		dev_err(&pdev->dev, "failed to get MSI irq\n");
->>> +		return -ENODEV;
->>> +	}
->>> +
->>> +	msi_data->pdev = pdev;
->>> +	msi_data->nr_irqs = MSI_MAX_IRQS;
->>
->> So this is hardcoded, always. Why do you need a nr_irqs variable at all?
-> [Lian Minghuan-B31939] Currently, nr_irqs is always 32, but in the
-> future, the MSI controller may be extended to support more IRQs. And,
-> we may set nr_irqs the value of less than 32 to reserve some IRQs for
-> special usage. So nr_irqs can bring flexibility
-
-You have to choose: either this is configurable and you describe it in
-DT, or this is not and you drop this field from the structure.
-
-As for the "reserved interrupts", that would need to be described too.
+Sure, I missed that. Will send v2 in a second.
 
 Thanks,
+Michael
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
