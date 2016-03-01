@@ -1,71 +1,76 @@
 From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 1 Mar 2016 15:05:03 -0600
-Subject: [PATCH net-next V2 02/16] net: fec: pass rxq to fec_enet_rx_queue
+Date: Tue, 1 Mar 2016 15:06:40 -0600
+Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
  instead of queue_id
-In-Reply-To: <1456360619-24390-3-git-send-email-troy.kisky@boundarydevices.com>
+In-Reply-To: <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
 References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-3-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <CAHrpEqRUEdJDX4Omf+xU6XM7BB+iKZGEOn=vnRPwG5VZjzh9-w@mail.gmail.com>
+ <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <CAHrpEqSyuToC6QFEZygO0YyA=gV2cZEtkpRJMeZFOjhgTLdexQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Feb 24, 2016 at 6:36 PM, Troy Kisky
 <troy.kisky@boundarydevices.com> wrote:
-> The queue_id is the qid member of struct bufdesc_prop.
+> queue_id is the qid member of struct bufdesc_prop.
 >
 > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 > ---
->  drivers/net/ethernet/freescale/fec_main.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
+>  drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
+>  1 file changed, 6 insertions(+), 11 deletions(-)
 >
 > diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-> index dbac975..9619b9e 100644
+> index 9619b9e..c517194 100644
 > --- a/drivers/net/ethernet/freescale/fec_main.c
 > +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1328,11 +1328,9 @@ static bool fec_enet_copybreak(struct net_device *ndev, struct sk_buff **skb,
->   * not been given to the system, we just set the empty indicator,
->   * effectively tossing the packet.
->   */
-> -static int
-> -fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
-> +static int fec_rxq(struct net_device *ndev, struct fec_enet_private *fep,
-> +                  struct fec_enet_priv_rx_q *rxq, int budget)
+> @@ -1156,25 +1156,18 @@ fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
+>         hwtstamps->hwtstamp = ns_to_ktime(ns);
+>  }
+>
+> -static void
+> -fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+> +static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
+> +                   struct fec_enet_priv_tx_q *txq)
 
-feq is not necessary.
-you can get it from ndev.
+you can get fep from ndev.
 
 best regards
 Frank Li
 
 >  {
-> -       struct fec_enet_private *fep = netdev_priv(ndev);
-> -       struct fec_enet_priv_rx_q *rxq;
+> -       struct  fec_enet_private *fep;
 >         struct bufdesc *bdp;
 >         unsigned short status;
->         struct  sk_buff *skb_new = NULL;
-> @@ -1350,8 +1348,6 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
->  #ifdef CONFIG_M532x
->         flush_cache_all();
->  #endif
+>         struct  sk_buff *skb;
+> -       struct fec_enet_priv_tx_q *txq;
+>         struct netdev_queue *nq;
+>         int     index = 0;
+>         int     entries_free;
+>
+> -       fep = netdev_priv(ndev);
+> -
 > -       queue_id = FEC_ENET_GET_QUQUE(queue_id);
-> -       rxq = fep->rx_queue[queue_id];
+> -
+> -       txq = fep->tx_queue[queue_id];
+>         /* get next bdp of dirty_tx */
+> -       nq = netdev_get_tx_queue(ndev, queue_id);
+> +       nq = netdev_get_tx_queue(ndev, txq->bd.qid);
+>         bdp = txq->dirty_tx;
 >
->         /* First, grab all of the stats for the incoming packet.
->          * These get messed up if we get called due to a busy condition.
-> @@ -1519,11 +1515,12 @@ fec_enet_rx(struct net_device *ndev, int budget)
->         int     pkt_received = 0;
->         u16     queue_id;
+>         /* get next bdp of dirty_tx */
+> @@ -1268,11 +1261,13 @@ static void
+>  fec_enet_tx(struct net_device *ndev)
+>  {
 >         struct fec_enet_private *fep = netdev_priv(ndev);
-> +       struct fec_enet_priv_rx_q *rxq;
->
->         for_each_set_bit(queue_id, &fep->work_rx, FEC_ENET_MAX_RX_QS) {
->                 clear_bit(queue_id, &fep->work_rx);
-> -               pkt_received += fec_enet_rx_queue(ndev,
-> -                                       budget - pkt_received, queue_id);
-> +               rxq = fep->rx_queue[FEC_ENET_GET_QUQUE(queue_id)];
-> +               pkt_received += fec_rxq(ndev, fep, rxq, budget - pkt_received);
+> +       struct fec_enet_priv_tx_q *txq;
+>         u16 queue_id;
+>         /* First process class A queue, then Class B and Best Effort queue */
+>         for_each_set_bit(queue_id, &fep->work_tx, FEC_ENET_MAX_TX_QS) {
+>                 clear_bit(queue_id, &fep->work_tx);
+> -               fec_enet_tx_queue(ndev, queue_id);
+> +               txq = fep->tx_queue[FEC_ENET_GET_QUQUE(queue_id)];
+> +               fec_txq(ndev, fep, txq);
 >         }
->         return pkt_received;
+>         return;
 >  }
 > --
 > 2.5.0
