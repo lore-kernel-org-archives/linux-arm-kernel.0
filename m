@@ -1,43 +1,45 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Tue, 1 Mar 2016 06:52:46 +0100
-Subject: [PATCH 5/6] clk: bcm2835: correctly enable fractional clock
- support
-In-Reply-To: <87lh63jd4f.fsf@eliezer.anholt.net>
-References: <1456745963-2403-1-git-send-email-kernel@martin.sperl.org>
- <1456745963-2403-6-git-send-email-kernel@martin.sperl.org>
- <87mvqj5k9r.fsf@eliezer.anholt.net>
- <0ED2FB7F-B112-487B-B222-08E5FAEE27F9@martin.sperl.org>
- <87lh63jd4f.fsf@eliezer.anholt.net>
-Message-ID: <79C68128-C4B6-4AE2-9177-6A961573F90B@martin.sperl.org>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Tue, 01 Mar 2016 07:07:18 +0100
+Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr() on ARM
+Message-ID: <m337sapw89.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Many ARM platforms use a wrapper:
+/*
+ * Compatibility wrapper for older platforms that do not care about
+ * passing the parent device.
+ */
+static inline void pci_common_init(struct hw_pci *hw)
+{
+        pci_common_init_dev(NULL, hw);
+}
 
-> On 01.03.2016, at 00:44, Eric Anholt <eric@anholt.net> wrote:
-> 
-> Once again, trusting the docs turns out to be a bad idea.  You're right,
-> the non-MASH clocks *do* have a bit 9 to enable fractional mode.  Sigh.
-> 
-> So, this patch is:
-> 
-> Reviewed-by: Eric Anholt <eric@anholt.net>
+which means that pci_bus_assign_domain_nr() can be called without
+a parent. This patch fixes the NULL pointer dereference.
 
-The only really reliable ?docs? on registers I have found outside
-of probably signing a NDA are those header files for the VC4 provided
-by broadcom. 
+Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Cc: stable at vger.kernel.org
 
-That is why I have taken the effort to translate those into something
-much more easily readable/searchable (i.e html pages on the web).
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 602eb42..f89db3a 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4772,8 +4772,10 @@ int pci_get_new_domain_nr(void)
+ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ {
+ 	static int use_dt_domains = -1;
+-	int domain = of_get_pci_domain_nr(parent->of_node);
++	int domain = -1;
+ 
++	if (parent)
++		domain = of_get_pci_domain_nr(parent->of_node);
+ 	/*
+ 	 * Check DT domain and use_dt_domains values.
+ 	 *
 
-And that is where I have ?guessed? all the information on the clock
-tree structure.
+-- 
+Krzysztof Halasa
 
-The main thing that is sometimes missing from those documents is
-some extra context like: what is that pllt clock with a mux of
-8 parent clocks (not 4 or 16 as typical) and what do those
-corresponding 4 counter really do?
-
-See:
-https://github.com/msperl/rpi-registers/blob/master/md/Region_CM.md#cm_plltctl
-
-Martin
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
