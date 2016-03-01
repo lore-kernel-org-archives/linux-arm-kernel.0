@@ -1,48 +1,46 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 1 Mar 2016 21:37:10 +0800
-Subject: [PATCH 2/3] ARM: i.MX25: add RNGC node to dtsi
-In-Reply-To: <1456761156-27664-2-git-send-email-s.trumtrar@pengutronix.de>
-References: <1456761156-27664-1-git-send-email-s.trumtrar@pengutronix.de>
- <1456761156-27664-2-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20160301133710.GV22051@tiger>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Mar 2016 13:40:44 +0000
+Subject: [PATCHv3] arm64: Rework valid_user_regs
+In-Reply-To: <CAFEAcA9PmQYFYBw0GstA88MGHwGivB+VJdowBf6T1ggneZKihg@mail.gmail.com>
+References: <1455646517-22903-1-git-send-email-mark.rutland@arm.com>
+ <20160216182005.GN14509@arm.com>
+ <20160301124701.GC30602@leverpostej>
+ <CAFEAcA9PmQYFYBw0GstA88MGHwGivB+VJdowBf6T1ggneZKihg@mail.gmail.com>
+Message-ID: <20160301134043.GA14022@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 04:52:35PM +0100, Steffen Trumtrar wrote:
-> Add a devicetree entry for the Random Number Generator Version C (RNGC).
+On Tue, Mar 01, 2016 at 01:08:33PM +0000, Peter Maydell wrote:
+> On 1 March 2016 at 12:47, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Feb 16, 2016 at 06:20:05PM +0000, Will Deacon wrote:
+> >> > +static int valid_native_regs(struct user_pt_regs *regs)
+> >> > +{
+> >> > +   regs->pstate &= ~SPSR_EL1_AARCH64_RES0_BITS;
+> >> > +
+> >> > +   if (user_mode(regs) && !(regs->pstate & PSR_MODE32_BIT) &&
+> >> > +       (regs->pstate & PSR_D_BIT) == 0 &&
+> >> > +       (regs->pstate & PSR_A_BIT) == 0 &&
+> >> > +       (regs->pstate & PSR_I_BIT) == 0 &&
+> >> > +       (regs->pstate & PSR_F_BIT) == 0) {
+> >> > +           return 1;
+> >> > +   }
+> >> > +
+> >> > +   /* Force PSR to a valid 64-bit EL0t */
+> >> > +   regs->pstate &= PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT;
+> >>
+> >> Can we not just zap the pstate to PSR_MODE_EL0t and be done with it?
+> >
+> > I'm worried that some userspace might be relying on these being
+> > preserved.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx25.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index cde329e9b9e3..ec44ed125057 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -397,6 +397,15 @@
->  				interrupts = <41>;
->  			};
->  
-> +			rng: rng at 53fb0000 {
-> +				compatible = "fsl,imx25-rng";
-> +				reg = <0x53fb0000 0x4000>;
-> +				clocks = <&clks 109>;
-> +				clock-names = "ipg";
-> +				interrupts = <22>;
-> +				interrupt-names = "rng";
+> This function is called as part of signal-return, right?
+> You clearly can't just zap the flag registers in that code
+> path, because you'd then be corrupting the flags of the
+> bit of userspace code that was interrupted by the signal.
+> (Or am I missing something?)
 
-I do not see interrupt-names in the binding doc (patch #1).  IMO, it
-should be dropped.
+Well, it would only occur if the signal handler had tried to set pstate
+to an invalid value. That said, it is a change in behaviour, so we can
+leave it as Mark has suggested.
 
-Shawn
-
-> +			};
-> +
->  			esdhc1: esdhc at 53fb4000 {
->  				compatible = "fsl,imx25-esdhc";
->  				reg = <0x53fb4000 0x4000>;
-> -- 
-> 2.7.0
-> 
-> 
+Will
