@@ -1,52 +1,45 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue,  1 Mar 2016 18:37:20 +0900
-Subject: [GIT PULL] ARM: EXYNOS: dts for 4.6, 2nd pull
-Message-ID: <1456825042-23733-1-git-send-email-k.kozlowski@samsung.com>
+Date: Tue,  1 Mar 2016 18:37:21 +0900
+Subject: [GIT PULL] ARM64: EXYNOS: defconfig for 4.6
+In-Reply-To: <1456825042-23733-1-git-send-email-k.kozlowski@samsung.com>
+References: <1456825042-23733-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1456825042-23733-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Second pull request with DT changes for v4.6.
-This is on top of previous DT changes.
+Defconfig changes for v4.6, for ARM64 (second pull request for defconfig).
+This is on top of previous defconfig changes.
+
+This may conflict with other changes to arch/arm64/configs/defconfig.
+Just add everything.
 
 Best regards,
 Krzysztof
 
 
-The following changes since commit 36a0282a41493400428d7df8c99701fb4ee344c2:
+The following changes since commit 5d51f1dde207f2d5d43158da75c6608f7bfcec03:
 
-  ARM: dts: Replace legacy *,wakeup property with wakeup-source for exynos boards (2016-01-29 09:09:49 +0900)
+  ARM: multi_v7_defconfig: Remove MAX77802 RTC Kconfig symbol (2016-02-05 09:11:32 +0900)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.6-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.6-2
 
-for you to fetch changes up to 52e8e5927050055f2b26ce5f0eaa6f66377145f3:
+for you to fetch changes up to 6bb8371893889ba877652107ae59eecb8d86edc4:
 
-  ARM: dts: exynos: Don't overheat the Odroid XU3-Lite on high load (2016-03-01 18:04:00 +0900)
-
-----------------------------------------------------------------
-Samsung DeviceTree updates and improvements for v4.6, second round:
-1. Split common reboot/poweroff node to separate DTSI.
-2. Don't overheat Odroid XU3 by cooling CPU with cpufreq.
+  arm64: defconfig: Enable Samsung MFD and related configs (2016-03-01 17:55:03 +0900)
 
 ----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: exynos: Move syscon reboot/poweroff to common dtsi
+ARM64 defconfig changes for Exynos based boards for v4.6:
+1. We want thermal for Exynos7 TMU unit to monitor the temperature.
+2. Enable the drivers for PMIC used on Exynos7-based Espresso board.
 
-Krzysztof Kozlowski (3):
-      ARM: dts: exynos: Add cooling levels for Exynos5420 CPUs
-      ARM: dts: exynos: Add cooling levels for Exynos5422/5800 CPUs
-      ARM: dts: exynos: Don't overheat the Odroid XU3-Lite on high load
+----------------------------------------------------------------
+Alim Akhtar (2):
+      arm64: defconfig: Enable exynos thermal config
+      arm64: defconfig: Enable Samsung MFD and related configs
 
- arch/arm/boot/dts/exynos-syscon-restart.dtsi  | 27 ++++++++++++++++
- arch/arm/boot/dts/exynos3250.dtsi             | 15 +--------
- arch/arm/boot/dts/exynos4.dtsi                | 15 +--------
- arch/arm/boot/dts/exynos5.dtsi                | 15 +--------
- arch/arm/boot/dts/exynos5410.dtsi             | 15 +--------
- arch/arm/boot/dts/exynos5420-cpus.dtsi        | 24 ++++++++++++++
- arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi | 46 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/exynos5422-cpus.dtsi        | 24 ++++++++++++++
- 8 files changed, 124 insertions(+), 57 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos-syscon-restart.dtsi
+ arch/arm64/configs/defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
