@@ -1,84 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  1 Mar 2016 18:00:01 +0100
-Subject: [PATCH 5/6] sh: rtc: provide rtc_class_ops directly
-In-Reply-To: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
-References: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456851608-3374907-6-git-send-email-arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 1 Mar 2016 17:03:35 +0000 (UTC)
+Subject: [RFC PATCH] ARM: OMAP2+: Fix updating of sysconfig register
+In-Reply-To: <1456832887-5312-1-git-send-email-lokeshvutla@ti.com>
+References: <1456832887-5312-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <alpine.DEB.2.02.1603011703170.14948@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rtc-generic driver provides an architecture specific
-wrapper on top of the generic rtc_class_ops abstraction,
-and on sh, that goes through another indirection using
-the rtc_sh_get_time/rtc_sh_set_time functions.
++ Jon Hunter
 
-This changes the sh rtc-generic device to provide its
-rtc_class_ops directly, skipping one of the abstraction
-levels.
+On Tue, 1 Mar 2016, Lokesh Vutla wrote:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/sh/kernel/time.c | 32 +++++++++++++++++++-------------
- 1 file changed, 19 insertions(+), 13 deletions(-)
+> commit 127500ccb766f ("ARM: OMAP2+: Only write the sysconfig on idle
+> when necessary") talks about verification of sysconfig cache value before
+> updating it, only during idle path. But the patch is adding the
+> verification in the enable path. So, adding the check in a proper place
+> as per the commit description.
+> 
+> Not keeping this check during enable path as there is a chance of losing
+> context and it is safe to do on idle as the context of the register will
+> never be lost while the device is active.
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index e9f65fe..71b3747 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1416,9 +1416,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
+>  	    (sf & SYSC_HAS_CLOCKACTIVITY))
+>  		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
+>  
+> -	/* If the cached value is the same as the new value, skip the write */
+> -	if (oh->_sysc_cache != v)
+> -		_write_sysconfig(v, oh);
+> +	_write_sysconfig(v, oh);
+>  
+>  	/*
+>  	 * Set the autoidle bit only after setting the smartidle bit
+> @@ -1481,7 +1479,9 @@ static void _idle_sysc(struct omap_hwmod *oh)
+>  		_set_master_standbymode(oh, idlemode, &v);
+>  	}
+>  
+> -	_write_sysconfig(v, oh);
+> +	/* If the cached value is the same as the new value, skip the write */
+> +	if (oh->_sysc_cache != v)
+> +		_write_sysconfig(v, oh);
+>  }
+>  
+>  /**
+> -- 
+> 2.1.4
+> 
 
-diff --git a/arch/sh/kernel/time.c b/arch/sh/kernel/time.c
-index d6d0a986c6e9..92cd676970d9 100644
---- a/arch/sh/kernel/time.c
-+++ b/arch/sh/kernel/time.c
-@@ -50,27 +50,30 @@ int update_persistent_clock(struct timespec now)
- }
- #endif
- 
--unsigned int get_rtc_time(struct rtc_time *tm)
-+static int rtc_generic_get_time(struct device *dev, struct rtc_time *tm)
- {
--	if (rtc_sh_get_time != null_rtc_get_time) {
--		struct timespec tv;
-+	struct timespec tv;
- 
--		rtc_sh_get_time(&tv);
--		rtc_time_to_tm(tv.tv_sec, tm);
--	}
--
--	return RTC_24H;
-+	rtc_sh_get_time(&tv);
-+	rtc_time_to_tm(tv.tv_sec, tm);
-+	return 0;
- }
--EXPORT_SYMBOL(get_rtc_time);
- 
--int set_rtc_time(struct rtc_time *tm)
-+static int rtc_generic_set_time(struct device *dev, struct rtc_time *tm)
- {
- 	unsigned long secs;
- 
- 	rtc_tm_to_time(tm, &secs);
--	return rtc_sh_set_time(secs);
-+	if (!rtc_sh_set_time || rtc_sh_set_time(secs) < 0)
-+		return -EOPNOTSUPP;
-+
-+	return 0;
- }
--EXPORT_SYMBOL(set_rtc_time);
-+
-+static const struct rtc_class_ops rtc_generic_ops = {
-+	.read_time = rtc_generic_get_time,
-+	.set_time = rtc_generic_set_time,
-+};
- 
- static int __init rtc_generic_init(void)
- {
-@@ -79,7 +82,10 @@ static int __init rtc_generic_init(void)
- 	if (rtc_sh_get_time == null_rtc_get_time)
- 		return -ENODEV;
- 
--	pdev = platform_device_register_simple("rtc-generic", -1, NULL, 0);
-+	pdev = platform_device_register_data(NULL, "rtc-generic", -1,
-+					     &rtc_generic_ops,
-+					     sizeof(rtc_generic_ops));
-+
- 
- 	return PTR_ERR_OR_ZERO(pdev);
- }
--- 
-2.7.0
+
+- Paul
