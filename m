@@ -1,10 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 01 Mar 2016 23:54:42 +0000
-Subject: [PATCH 4.4 131/342] clockevents/tcb_clksrc: Prevent disabling an
- already disabled clock
+Date: Tue, 01 Mar 2016 23:55:29 +0000
+Subject: [PATCH 4.4 312/342] xen/arm: correctly handle DMA mapping of compound
+ pages
 In-Reply-To: <20160301234527.990448862@linuxfoundation.org>
 References: <20160301234527.990448862@linuxfoundation.org>
-Message-ID: <20160301234532.180551567@linuxfoundation.org>
+Message-ID: <20160301234537.959099259@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,60 +12,67 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 ------------------
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+From: Ian Campbell <ian.campbell@citrix.com>
 
-commit f02b4b72d12cbae7020a959e2ed0410a464b4cc4 upstream.
+commit 52ba0746b3b44c86aee121babf3b2fd9b8f84090 upstream.
 
-clockevents_exchange_device is calling clockevents_shutdown() on the new
-clockenvents device but it may have never been enabled in the first place.
-This results in the tcb clock being disabled without being enabled first:
+Currently xen_dma_map_page concludes that DMA to anything other than
+the head page of a compound page must be foreign, since the PFN of the
+page is that of the head.
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:680 clk_disable+0x28/0x34()
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 4.4.0+ #6
-Hardware name: Atmel AT91SAM9
-[<c000f2b8>] (unwind_backtrace) from [<c000d01c>] (show_stack+0x10/0x14)
-[<c000d01c>] (show_stack) from [<c00172f0>] (warn_slowpath_common+0x78/0xa0)
-[<c00172f0>] (warn_slowpath_common) from [<c00173a8>] (warn_slowpath_null+0x18/0x20)
-[<c00173a8>] (warn_slowpath_null) from [<c0361528>] (clk_disable+0x28/0x34)
-[<c0361528>] (clk_disable) from [<c034d560>] (tc_shutdown+0x38/0x4c)
-[<c034d560>] (tc_shutdown) from [<c0059ad4>] (clockevents_switch_state+0x38/0x6c)
-[<c0059ad4>] (clockevents_switch_state) from [<c0059b18>] (clockevents_shutdown+0x10/0x24)
-[<c0059b18>] (clockevents_shutdown) from [<c005a458>] (tick_check_new_device+0x84/0xac)
-[<c005a458>] (tick_check_new_device) from [<c0059660>] (clockevents_register_device+0x7c/0x108)
-[<c0059660>] (clockevents_register_device) from [<c06b5a68>] (tcb_clksrc_init+0x390/0x3e8)
-[<c06b5a68>] (tcb_clksrc_init) from [<c00097cc>] (do_one_initcall+0x114/0x1d4)
-[<c00097cc>] (do_one_initcall) from [<c069bd54>] (kernel_init_freeable+0xfc/0x1b8)
-[<c069bd54>] (kernel_init_freeable) from [<c04c3818>] (kernel_init+0x8/0xe0)
-[<c04c3818>] (kernel_init) from [<c000a410>] (ret_from_fork+0x14/0x24)
----[ end trace 0000000000000001 ]---
+Fix the check to instead consider the whole of a compound page to be
+local if the PFN of the head passes the 1:1 check.
 
-Check what state we were in before trying to disable the clock.
+We can never see a compound page which is a mixture of foreign and
+local sub-pages.
 
-Fixes: cf4541c101ea ("clockevents/drivers/tcb_clksrc: Migrate to new 'set-state' interface")
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+The comment already correctly described the intention, but fixup the
+spelling and some grammar.
+
+This fixes the various SSH protocol errors which we have been seeing
+on the cubietrucks in our automated test infrastructure.
+
+This has been broken since commit 3567258d281b ("xen/arm: use
+hypercall to flush caches in map_page"), which was in v3.19-rc1.
+
+NB arch/arm64/.../xen/page-coherent.h also includes this file.
+
+Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: xen-devel at lists.xenproject.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Link: http://lkml.kernel.org/r/1452854061-30370-1-git-send-email-alexandre.belloni at free-electrons.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
----
- drivers/clocksource/tcb_clksrc.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -98,7 +98,8 @@ static int tc_shutdown(struct clock_even
- 
- 	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
- 	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
--	clk_disable(tcd->clk);
-+	if (!clockevent_state_detached(d))
-+		clk_disable(tcd->clk);
- 
- 	return 0;
- }
+diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+index 0375c8caa061..9408a994cc91 100644
+--- a/arch/arm/include/asm/xen/page-coherent.h
++++ b/arch/arm/include/asm/xen/page-coherent.h
+@@ -35,14 +35,21 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+ 	     enum dma_data_direction dir, struct dma_attrs *attrs)
+ {
+-	bool local = XEN_PFN_DOWN(dev_addr) == page_to_xen_pfn(page);
++	unsigned long page_pfn = page_to_xen_pfn(page);
++	unsigned long dev_pfn = XEN_PFN_DOWN(dev_addr);
++	unsigned long compound_pages =
++		(1<<compound_order(page)) * XEN_PFN_PER_PAGE;
++	bool local = (page_pfn <= dev_pfn) &&
++		(dev_pfn - page_pfn < compound_pages);
++
+ 	/*
+-	 * Dom0 is mapped 1:1, while the Linux page can be spanned accross
+-	 * multiple Xen page, it's not possible to have a mix of local and
+-	 * foreign Xen page. So if the first xen_pfn == mfn the page is local
+-	 * otherwise it's a foreign page grant-mapped in dom0. If the page is
+-	 * local we can safely call the native dma_ops function, otherwise we
+-	 * call the xen specific function.
++	 * Dom0 is mapped 1:1, while the Linux page can span across
++	 * multiple Xen pages, it's not possible for it to contain a
++	 * mix of local and foreign Xen pages. So if the first xen_pfn
++	 * == mfn the page is local otherwise it's a foreign page
++	 * grant-mapped in dom0. If the page is local we can safely
++	 * call the native dma_ops function, otherwise we call the xen
++	 * specific function.
+ 	 */
+ 	if (local)
+ 		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
