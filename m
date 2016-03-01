@@ -1,52 +1,37 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 01 Mar 2016 15:32:25 +0530
-Subject: [PATCH v3] arm64: defconfig: Enable samsung MFD and related
- configs
-In-Reply-To: <CAJKOXPc_U0fkHzcyJd+KBKoyYLC0GRmrKH0sgna5fYqfRp0gUA@mail.gmail.com>
-References: <1454652269-6100-1-git-send-email-alim.akhtar@samsung.com>
- <56C00BBB.4080807@samsung.com>
- <CAJKOXPc_U0fkHzcyJd+KBKoyYLC0GRmrKH0sgna5fYqfRp0gUA@mail.gmail.com>
-Message-ID: <56D568B1.10808@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 01 Mar 2016 11:03:26 +0100
+Subject: [RESEND PATCH 7/8] ARM: dts: rockchip: add the thermal main info
+ found on rk3228
+In-Reply-To: <1455521613-27340-8-git-send-email-wxt@rock-chips.com>
+References: <1455521613-27340-1-git-send-email-wxt@rock-chips.com>
+ <1455521613-27340-8-git-send-email-wxt@rock-chips.com>
+Message-ID: <1971048.7T2zBta3A8@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Montag, 15. Februar 2016, 15:33:32 schrieb Caesar Wang:
+> This patch adds the thermal needed main information for rk3228 SoCS.
+> 
+> Basically has the following content:
+> 
+> 1) TSADC controller:
+> Add the needed attributes for rk3036 TSADC controller.
+> 
+> Especially for the TSHUT, in some cases if we are unable to shut it down
+> in orderly fashion (says: kernel is stuck holding a lock or similar), then
+> hardware TSHUT will reset it.
+> If the temperature is over 95C over a period of time the thermal shutdown
+> of the tsadc is invoked with can either reset the entire chip via the CRU,
+> or notify the PMIC via a GPIO. This should be set in the specific board.
+> 
+> 2) Thermal zones:
+> Add the needed device mode for thermal generic framework.
+> Detail in Documentation/devicetree/bindings/thermal/thermal.txt.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
+applied to my dts32 branch for 4.6
 
 
-On 03/01/2016 02:27 PM, Krzysztof Kozlowski wrote:
-> 2016-02-14 14:08 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> W dniu 05.02.2016 o 15:04, Alim Akhtar pisze:
->>> Exynos7 based espresso board uses S2MPS15, a multifunction device.
->>> This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
->>> the same.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> ---
->>> Changes since v2:
->>> * Added Reviewed-by from Krzysztof
->>> * rebased on next-20160204
->>>
->>> Changes since v1:
->>> * updated the comment message to describe which platfrom uses it.
->>> * enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
->>>
->>>   arch/arm64/configs/defconfig |    3 +++
->>>   1 file changed, 3 insertions(+)
->>>
->>
->> Applying this to my tree would cause conflicts with commit efdda175c07f:
->> arm64: defconfig: add spmi and usb related configs
->> Conflicts are trivial (simple additions) but maybe it is better to avoid
->> them.
->>
->> Olof/Arnd/Kevin, can you apply this directly to arm-soc?
->
-> Never mind, applied because I have one more defconfig patch. The
-> conflict will be still there but easy to solve.
->
-Thanks Krzysztof, will take care of conflict with your tree in future.
-
-> Best regards,
-> Krzysztof
->
->
+Thanks
+Heiko
