@@ -1,213 +1,95 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue,  1 Mar 2016 18:27:46 +0000
-Subject: [RFC v5 06/17] dma-reserved-iommu: iommu_get/put_single_reserved
+Date: Tue,  1 Mar 2016 18:27:47 +0000
+Subject: [RFC v5 07/17] dma-reserved-iommu: iommu_unmap_reserved
 In-Reply-To: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
 References: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1456856877-4817-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <1456856877-4817-8-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces iommu_get/put_single_reserved.
-
-iommu_get_single_reserved allows to allocate a new reserved iova page
-and map it onto the physical page that contains a given physical address.
-Page size is the IOMMU page one. It is the responsability of the
-system integrator to make sure the in use IOMMU page size corresponds
-to the granularity of the MSI frame.
-
-It returns the iova that is mapped onto the provided physical address.
-Hence the physical address passed in argument does not need to be aligned.
-
-In case a mapping already exists between both pages, the IOVA mapped
-to the PA is directly returned.
-
-Each time an iova is successfully returned a binding ref count is
-incremented.
-
-iommu_put_single_reserved decrements the ref count and when this latter
-is null, the mapping is destroyed and the iova is released.
+Introduce a new function whose role is to unmap all allocated
+reserved IOVAs and free the reserved iova domain
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Ankit Jindal <ajindal@apm.com>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
 
 ---
 
 v3 -> v4:
-- formerly in iommu: iommu_get/put_single_reserved &
-  iommu/arm-smmu: implement iommu_get/put_single_reserved
-- Attempted to address Marc's doubts about missing size/alignment
-  at VFIO level (user-space knows the IOMMU page size and the number
-  of IOVA pages to provision)
-
-v2 -> v3:
-- remove static implementation of iommu_get_single_reserved &
-  iommu_put_single_reserved when CONFIG_IOMMU_API is not set
-
-v1 -> v2:
-- previously a VFIO API, named vfio_alloc_map/unmap_free_reserved_iova
+- previously "iommu/arm-smmu: relinquish reserved resources on
+  domain deletion"
 ---
- drivers/iommu/dma-reserved-iommu.c | 115 +++++++++++++++++++++++++++++++++++++
- include/linux/dma-reserved-iommu.h |  26 +++++++++
- 2 files changed, 141 insertions(+)
+ drivers/iommu/dma-reserved-iommu.c | 27 ++++++++++++++++++++++++---
+ include/linux/dma-reserved-iommu.h |  7 +++++++
+ 2 files changed, 31 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
-index 30d54d0..537c83e 100644
+index 537c83e..7217bb7 100644
 --- a/drivers/iommu/dma-reserved-iommu.c
 +++ b/drivers/iommu/dma-reserved-iommu.c
-@@ -132,3 +132,118 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+@@ -116,7 +116,7 @@ unlock:
+ }
+ EXPORT_SYMBOL_GPL(iommu_alloc_reserved_iova_domain);
+ 
+-void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
++void __iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+ {
+ 	struct iova_domain *iovad =
+ 		(struct iova_domain *)domain->reserved_iova_cookie;
+@@ -124,11 +124,14 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
+ 	if (!iovad)
+ 		return;
+ 
+-	mutex_lock(&domain->reserved_mutex);
+-
+ 	put_iova_domain(iovad);
+ 	kfree(iovad);
++}
+ 
++void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
++{
++	mutex_lock(&domain->reserved_mutex);
++	__iommu_free_reserved_iova_domain(domain);
  	mutex_unlock(&domain->reserved_mutex);
  }
  EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
-+
-+int iommu_get_single_reserved(struct iommu_domain *domain,
-+			      phys_addr_t addr, int prot,
-+			      dma_addr_t *iova)
+@@ -245,5 +248,23 @@ unlock:
+ }
+ EXPORT_SYMBOL_GPL(iommu_put_single_reserved);
+ 
++void iommu_unmap_reserved(struct iommu_domain *domain)
 +{
-+	unsigned long order = __ffs(domain->ops->pgsize_bitmap);
-+	size_t page_size = 1 << order;
-+	phys_addr_t mask = page_size - 1;
-+	phys_addr_t aligned_addr = addr & ~mask;
-+	phys_addr_t offset  = addr - aligned_addr;
-+	struct iommu_reserved_binding *b;
-+	struct iova *p_iova;
-+	struct iova_domain *iovad =
-+		(struct iova_domain *)domain->reserved_iova_cookie;
-+	int ret;
-+
-+	if (!iovad)
-+		return -EINVAL;
++	struct rb_node *node;
 +
 +	mutex_lock(&domain->reserved_mutex);
++	while ((node = rb_first(&domain->reserved_binding_list))) {
++		struct iommu_reserved_binding *b =
++			rb_entry(node, struct iommu_reserved_binding, node);
 +
-+	b = find_reserved_binding(domain, aligned_addr, page_size);
-+	if (b) {
-+		*iova = b->iova + offset;
-+		kref_get(&b->kref);
-+		ret = 0;
-+		goto unlock;
++		while (!kref_put(&b->kref, reserved_binding_release))
++			;
 +	}
-+
-+	/* there is no existing reserved iova for this pa */
-+	p_iova = alloc_iova(iovad, 1, iovad->dma_32bit_pfn, true);
-+	if (!p_iova) {
-+		ret = -ENOMEM;
-+		goto unlock;
-+	}
-+	*iova = p_iova->pfn_lo << order;
-+
-+	b = kzalloc(sizeof(*b), GFP_KERNEL);
-+	if (!b) {
-+		ret = -ENOMEM;
-+		goto free_iova_unlock;
-+	}
-+
-+	ret = iommu_map(domain, *iova, aligned_addr, page_size, prot);
-+	if (ret)
-+		goto free_binding_iova_unlock;
-+
-+	kref_init(&b->kref);
-+	kref_get(&b->kref);
-+	b->domain = domain;
-+	b->addr = aligned_addr;
-+	b->iova = *iova;
-+	b->size = page_size;
-+
-+	link_reserved_binding(domain, b);
-+
-+	*iova += offset;
-+	goto unlock;
-+
-+free_binding_iova_unlock:
-+	kfree(b);
-+free_iova_unlock:
-+	free_iova(iovad, *iova >> order);
-+unlock:
-+	mutex_unlock(&domain->reserved_mutex);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(iommu_get_single_reserved);
-+
-+/* called with reserved_mutex locked */
-+static void reserved_binding_release(struct kref *kref)
-+{
-+	struct iommu_reserved_binding *b =
-+		container_of(kref, struct iommu_reserved_binding, kref);
-+	struct iommu_domain *d = b->domain;
-+	struct iova_domain *iovad =
-+		(struct iova_domain *)d->reserved_iova_cookie;
-+	unsigned long order = __ffs(b->size);
-+
-+	iommu_unmap(d, b->iova, b->size);
-+	free_iova(iovad, b->iova >> order);
-+	unlink_reserved_binding(d, b);
-+	kfree(b);
-+}
-+
-+void iommu_put_single_reserved(struct iommu_domain *domain, dma_addr_t iova)
-+{
-+	unsigned long order;
-+	phys_addr_t aligned_addr;
-+	dma_addr_t aligned_iova, page_size, mask, offset;
-+	struct iommu_reserved_binding *b;
-+
-+	order = __ffs(domain->ops->pgsize_bitmap);
-+	page_size = (uint64_t)1 << order;
-+	mask = page_size - 1;
-+
-+	aligned_iova = iova & ~mask;
-+	offset = iova - aligned_iova;
-+
-+	aligned_addr = iommu_iova_to_phys(domain, aligned_iova);
-+
-+	mutex_lock(&domain->reserved_mutex);
-+
-+	b = find_reserved_binding(domain, aligned_addr, page_size);
-+	if (!b)
-+		goto unlock;
-+	kref_put(&b->kref, reserved_binding_release);
-+
-+unlock:
++	domain->reserved_binding_list = RB_ROOT;
++	__iommu_free_reserved_iova_domain(domain);
 +	mutex_unlock(&domain->reserved_mutex);
 +}
-+EXPORT_SYMBOL_GPL(iommu_put_single_reserved);
++EXPORT_SYMBOL_GPL(iommu_unmap_reserved);
 +
-+
-+
+ 
+ 
 diff --git a/include/linux/dma-reserved-iommu.h b/include/linux/dma-reserved-iommu.h
-index 5bf863b..71ec800 100644
+index 71ec800..766c58c 100644
 --- a/include/linux/dma-reserved-iommu.h
 +++ b/include/linux/dma-reserved-iommu.h
-@@ -40,6 +40,32 @@ int iommu_alloc_reserved_iova_domain(struct iommu_domain *domain,
+@@ -66,6 +66,13 @@ int iommu_get_single_reserved(struct iommu_domain *domain,
   */
- void iommu_free_reserved_iova_domain(struct iommu_domain *domain);
+ void iommu_put_single_reserved(struct iommu_domain *domain, dma_addr_t iova);
  
 +/**
-+ * iommu_get_single_reserved: allocate a reserved iova page and bind
-+ * it onto the page that contains a physical address (@addr)
++ * iommu_unmap_reserved: unmap & destroy the reserved iova bindings
 + *
 + * @domain: iommu domain handle
-+ * @addr: physical address to bind
-+ * @prot: mapping protection attribute
-+ * @iova: returned iova
-+ *
-+ * In case the 2 pages already are bound simply return @iova and
-+ * increment a ref count
 + */
-+int iommu_get_single_reserved(struct iommu_domain *domain,
-+			      phys_addr_t addr, int prot,
-+			      dma_addr_t *iova);
-+
-+/**
-+ * iommu_put_single_reserved: decrement a ref count of the iova page
-+ *
-+ * @domain: iommu domain handle
-+ * @iova: iova whose binding ref count is decremented
-+ *
-+ * if the binding ref count is null, unmap the iova page and release the iova
-+ */
-+void iommu_put_single_reserved(struct iommu_domain *domain, dma_addr_t iova);
++void iommu_unmap_reserved(struct iommu_domain *domain);
 +
  #endif	/* CONFIG_IOMMU_DMA_RESERVED */
  #endif	/* __KERNEL__ */
