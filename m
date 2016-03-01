@@ -1,24 +1,11 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue,  1 Mar 2016 23:00:02 +0800
-Subject: [GIT PULL 3/4] arm64: nxp: device tree changes for 4.6
+Date: Tue,  1 Mar 2016 23:00:03 +0800
+Subject: [GIT PULL 4/4] ARM: imx: defconfig updates for 4.6
 In-Reply-To: <1456844403-26176-1-git-send-email-shawnguo@kernel.org>
 References: <1456844403-26176-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1456844403-26176-3-git-send-email-shawnguo@kernel.org>
+Message-ID: <1456844403-26176-4-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi arm-soc maintainers,
-
-This is the first time I help to collect NXP/Freescale arm64 dts
-patches.  I used to ignore such patches, because they do not belong
-to i.MX family.  But since people keep sending me patches, I decided
-to help accelerate the process for getting these patches land on
-mainline.
-
-I should probably start naming my branches and tags like nxp/* from the
-next cycle.
-
-Shawn
 
 The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
@@ -26,25 +13,42 @@ The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.6
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.6
 
-for you to fetch changes up to 4c1d9ea7402dd808fc511ef6622f957aa795852f:
+for you to fetch changes up to c73a1f13d07fc89734f28760554fc365b91c750a:
 
-  arm64: dts: ls1043a: Add quirk for Erratum A009116 (2016-02-14 16:44:15 +0800)
-
-----------------------------------------------------------------
-The NXP/Freescale arm64 dts update for 4.6:
-- Add "snps,quirk-frame-length-adjustment" property to USB3 node for
-  erratum A009116, which affects NXP/Freescale arm64 SoCs LS1043A and
-  LS2080A.
+  ARM: imx_v4_v5_defconfig: Enable initramfs support (2016-03-01 21:32:51 +0800)
 
 ----------------------------------------------------------------
-Lijun Pan (1):
-      arm64: dts: ls2080a: Add quirk for Erratum A009116
+The i.MX defconfig update for 4.6:
+- Enable i.MX25 Touchscreen controller and ADC support
+- Enable NVMEM OCOTP driver support
+- Clean up mxs_defconfig and imx_v4_v5_defconfig
+- Enable initramfs support
+- Enable PSCI, SAHARA and more Vybrid driver support
 
-Rajesh Bhagat (1):
-      arm64: dts: ls1043a: Add quirk for Erratum A009116
+----------------------------------------------------------------
+Denis Carikli (1):
+      ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen controller and ADC support.
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 3 +++
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 2 ++
- 2 files changed, 5 insertions(+)
+Fabio Estevam (3):
+      ARM: imx_v6_v7_defconfig: Select CONFIG_NVMEM_IMX_OCOTP
+      ARM: mxs_defconfig: Select CONFIG_NVMEM_MXS_OCOTP
+      ARM: imx_v6_v7_defconfig: Select CONFIG_CRYPTO_DEV_SAHARA
+
+Frank Li (1):
+      ARM: imx_v6_v7_defconfig: enable psci default
+
+Jan Luebbe (4):
+      ARM: mxs_defconfig: Cleanup mxs_defconfig
+      ARM: mxs_defconfig: Enable initramfs support
+      ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
+      ARM: imx_v4_v5_defconfig: Enable initramfs support
+
+Stefan Agner (1):
+      ARM: imx_v6_v7_defconfig: enable useful configurations for Vybrid
+
+ arch/arm/configs/imx_v4_v5_defconfig | 14 +++++++-------
+ arch/arm/configs/imx_v6_v7_defconfig | 23 +++++++++++++++--------
+ arch/arm/configs/mxs_defconfig       |  7 +++----
+ 3 files changed, 25 insertions(+), 19 deletions(-)
