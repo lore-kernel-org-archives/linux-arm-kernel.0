@@ -1,750 +1,989 @@
 From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Tue,  1 Mar 2016 14:40:00 +0800
-Subject: [PATCH v3 2/3] clk: rockchip: add dt-binding header for rk3399
+Date: Tue,  1 Mar 2016 14:40:01 +0800
+Subject: [PATCH v3 3/3] ARM64: dts: rockchip: add core dtsi file for rk3399
 In-Reply-To: <1456814401-10711-1-git-send-email-jay.xu@rock-chips.com>
 References: <1456456341-14282-1-git-send-email-jay.xu@rock-chips.com>
  <1456814401-10711-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1456814401-10711-3-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1456814401-10711-4-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xing Zheng <zhengxing@rock-chips.com>
+This patch adds core dtsi file for rk3399 found on Rockchip new SoCs
+rk3399, which integrates dual-core Cortex-A72 and quad-core Cortex-A53
+with separately NEON coprocessor.
 
-Add the dt-bindings header for the rk3399, that gets shared between
-the clock controller and the clock references in the dts.
+The dtsi file has been tested on rk3399 board with simple boot system,
+the uart and spi IPs are same as from rk3288.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Separate pmu nodes should be added for the A72 and A53 PMUs, and more
+nodes should be added later.
+
 Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 ---
 changes in v3:
-- add pmucru definations
+- modify SCLK_SPI3 to SCLK_SPI3_PMU, and same change to uart4
+- add blank line before includes head files
 
- include/dt-bindings/clock/rk3399-cru.h | 716 +++++++++++++++++++++++++++++++++
- 1 file changed, 716 insertions(+)
- create mode 100644 include/dt-bindings/clock/rk3399-cru.h
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 951 +++++++++++++++++++++++++++++++
+ 1 file changed, 951 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
 
-diff --git a/include/dt-bindings/clock/rk3399-cru.h b/include/dt-bindings/clock/rk3399-cru.h
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
 new file mode 100644
-index 0000000..77bb1ec
+index 0000000..fa8523d
 --- /dev/null
-+++ b/include/dt-bindings/clock/rk3399-cru.h
-@@ -0,0 +1,716 @@
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -0,0 +1,951 @@
 +/*
-+ * Copyright (c) 2015 Rockchip Electronics Co. Ltd.
-+ * Author: Xing Zheng <zhengxing@rock-chips.com>
++ * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#ifndef _DT_BINDINGS_CLK_ROCKCHIP_RK3399_H
-+#define _DT_BINDINGS_CLK_ROCKCHIP_RK3399_H
++#include <dt-bindings/clock/rk3399-cru.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/rockchip.h>
 +
-+/* core clocks */
-+#define PLL_APLLL			1
-+#define PLL_APLLB			2
-+#define PLL_DPLL			3
-+#define PLL_CPLL			4
-+#define PLL_GPLL			5
-+#define PLL_NPLL			6
-+#define PLL_VPLL			7
-+#define PLL_PPLL			8
-+#define ARMCLKL				9
-+#define ARMCLKB				10
++/ {
++	compatible = "rockchip,rk3399";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
 +
-+/* sclk gates (special clocks) */
-+#define SCLK_I2C1			65
-+#define SCLK_I2C2			66
-+#define SCLK_I2C3			67
-+#define SCLK_I2C5			68
-+#define SCLK_I2C6			69
-+#define SCLK_I2C7			70
-+#define SCLK_SPI0			71
-+#define SCLK_SPI1			72
-+#define SCLK_SPI2			73
-+#define SCLK_SPI4			74
-+#define SCLK_SPI5			75
-+#define SCLK_SDMMC			76
-+#define SCLK_SDIO			77
-+#define SCLK_EMMC			78
-+#define SCLK_TSADC			79
-+#define SCLK_SARADC			80
-+#define SCLK_UART0			81
-+#define SCLK_UART1			82
-+#define SCLK_UART2			83
-+#define SCLK_UART3			84
-+#define SCLK_SPDIF_8CH			85
-+#define SCLK_I2S0_8CH			86
-+#define SCLK_I2S1_8CH			87
-+#define SCLK_I2S2_8CH			88
-+#define SCLK_I2S_8CH_OUT		89
-+#define SCLK_TIMER00			90
-+#define SCLK_TIMER01			91
-+#define SCLK_TIMER02			92
-+#define SCLK_TIMER03			93
-+#define SCLK_TIMER04			94
-+#define SCLK_TIMER05			95
-+#define SCLK_TIMER06			96
-+#define SCLK_TIMER07			97
-+#define SCLK_TIMER08			98
-+#define SCLK_TIMER09			99
-+#define SCLK_TIMER10			100
-+#define SCLK_TIMER11			101
-+#define SCLK_MACREF			102
-+#define SCLK_MAC_RX			103
-+#define SCLK_MAC_TX			104
-+#define SCLK_MAC			105
-+#define SCLK_MACREF_OUT			106
-+#define SCLK_VOP0_PWM			107
-+#define SCLK_VOP1_PWM			108
-+#define SCLK_RGA			109
-+#define SCLK_ISP0			110
-+#define SCLK_ISP1			111
-+#define SCLK_HDMI_CEC			112
-+#define SCLK_HDMI_SFR			113
-+#define SCLK_DP_CORE_SRC		114
-+#define SCLK_PVTM_CORE_L		115
-+#define SCLK_PVTM_CORE_B		116
-+#define SCLK_PVTM_GPU			117
-+#define SCLK_PVTM_DDR			118
-+#define SCLK_MIPIDPHY_REF		119
-+#define SCLK_MIPIDPHY_CFG		120
-+#define SCLK_HSICPHY			121
-+#define SCLK_USBPHY480M			122
-+#define SCLK_USB2PHY0_REF		123
-+#define SCLK_USB2PHY1_REF		124
-+#define SCLK_UPHY0_TCPDPHY_REF		125
-+#define SCLK_UPHY0_TCPDCORE		126
-+#define SCLK_UPHY1_TCPDPHY_REF		127
-+#define SCLK_UPHY1_TCPDCORE		128
-+#define SCLK_USB3OTG0_REF		129
-+#define SCLK_USB3OTG1_REF		130
-+#define SCLK_USB3OTG0_SUSPEND		131
-+#define SCLK_USB3OTG1_SUSPEND		132
-+#define SCLK_CRYPTO0			133
-+#define SCLK_CRYPTO1			134
-+#define SCLK_CCI_TRACE			135
-+#define SCLK_CS				136
-+#define SCLK_CIF_OUT			137
-+#define SCLK_PCIEPHY_REF		138
-+#define SCLK_PCIE_CORE			139
-+#define SCLK_MO_PERILP			140
-+#define SCLK_M0_PERILP_DEC		141
-+#define SCLK_CM0S			142
-+#define SCLK_DBG_NOC			143
-+#define SCLK_DBG_PD_CORE_B		144
-+#define SCLK_DBG_PD_CORE_L		145
-+#define SCLK_DFIMON0_TIMER		146
-+#define SCLK_DFIMON1_TIMER		147
-+#define SCLK_INTMEM0			148
-+#define SCLK_INTMEM1			149
-+#define SCLK_INTMEM2			150
-+#define SCLK_INTMEM3			151
-+#define SCLK_INTMEM4			152
-+#define SCLK_INTMEM5			153
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
 +
-+#define DCLK_VOP0			170
-+#define DCLK_VOP1			171
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
 +
-+/* aclk gates */
-+#define ACLK_PERIHP			192
-+#define ACLK_PERIHP_NOC			193
-+#define ACLK_PERILP0			194
-+#define ACLK_PERILP0_NOC		195
-+#define ACLK_PERF_PCIE			196
-+#define ACLK_PCIE			197
-+#define ACLK_INTMEM			198
-+#define ACLK_TZMA			199
-+#define ACLK_DCF			200
-+#define ACLK_CCI			201
-+#define ACLK_CCI_NOC0			202
-+#define ACLK_CCI_NOC1			203
-+#define ACLK_CCI_GRF			204
-+#define ACLK_CENTER			205
-+#define ACLK_CENTER_MAIN_NOC		206
-+#define ACLK_CENTER_PERI_NOC		207
-+#define ACLK_GPU			208
-+#define ACLK_PERF_GPU			209
-+#define ACLK_GPU_GRF			210
-+#define ACLK_DMAC0_PERILP		211
-+#define ACLK_DMAC1_PERILP		212
-+#define ACLK_GMAC			213
-+#define ACLK_GMAC_NOC			214
-+#define ACLK_PERF_GMAC			215
-+#define ACLK_VOP0_NOC			216
-+#define ACLK_VOP0			217
-+#define ACLK_VOP1_NOC			218
-+#define ACLK_VOP1			219
-+#define ACLK_RGA			220
-+#define ACLK_RGA_NOC			221
-+#define ACLK_HDCP			222
-+#define ACLK_HDCP_NOC			223
-+#define ACLK_HDCP22			224
-+#define ACLK_IEP			225
-+#define ACLK_IEP_NOC			226
-+#define ACLK_VIO			227
-+#define ACLK_VIO_NOC			228
-+#define ACLK_ISP0			229
-+#define ACLK_ISP1			230
-+#define ACLK_ISP0_NOC			231
-+#define ACLK_ISP1_NOC			232
-+#define ACLK_ISP0_WRAPPER		233
-+#define ACLK_ISP1_WRAPPER		234
-+#define ACLK_VCODEC			235
-+#define ACLK_VCODEC_NOC			236
-+#define ACLK_VDU			237
-+#define ACLK_VDU_NOC			238
-+#define ACLK_PERI			239
-+#define ACLK_EMMC			240
-+#define ACLK_EMMC_CORE			241
-+#define ACLK_EMMC_NOC			242
-+#define ACLK_EMMC_GRF			243
-+#define ACLK_USB3			244
-+#define ACLK_USB3_NOC			245
-+#define ACLK_USB3OTG0			246
-+#define ACLK_USB3OTG1			247
-+#define ACLK_USB3_RKSOC_AXI_PERF	248
-+#define ACLK_USB3_GRF			249
-+#define ACLK_GIC			250
-+#define ACLK_GIC_NOC			251
-+#define ACLK_GIC_ADB400_CORE_L_2_GIC	252
-+#define ACLK_GIC_ADB400_CORE_B_2_GIC	253
-+#define ACLK_GIC_ADB400_GIC_2_CORE_L	254
-+#define ACLK_GIC_ADB400_GIC_2_CORE_B	255
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&cpu_l0>;
++				};
++				core1 {
++					cpu = <&cpu_l1>;
++				};
++				core2 {
++					cpu = <&cpu_l2>;
++				};
++				core3 {
++					cpu = <&cpu_l3>;
++				};
++			};
 +
-+/* pclk gates */
-+#define PCLK_PERIHP			320
-+#define PCLK_PERIHP_NOC			321
-+#define PCLK_PERILP0			322
-+#define PCLK_PERILP1			323
-+#define PCLK_PERILP1_NOC		324
-+#define PCLK_PERILP_SGRF		325
-+#define PCLK_PERIHP_GRF			326
-+#define PCLK_PCIE			327
-+#define PCLK_SGRF			328
-+#define PCLK_INTR_ARB			329
-+#define PCLK_CENTER_MAIN_NOC		330
-+#define PCLK_CIC			331
-+#define PCLK_COREDBG_B			332
-+#define PCLK_COREDBG_L			333
-+#define PCLK_DBG_CXCS_PD_CORE_B		334
-+#define PCLK_DCF			335
-+#define PCLK_GPIO2			336
-+#define PCLK_GPIO3			337
-+#define PCLK_GPIO4			338
-+#define PCLK_GRF			339
-+#define PCLK_HSICPHY			340
-+#define PCLK_I2C1			341
-+#define PCLK_I2C2			342
-+#define PCLK_I2C3			343
-+#define PCLK_I2C5			344
-+#define PCLK_I2C6			345
-+#define PCLK_I2C7			346
-+#define PCLK_SPI0			347
-+#define PCLK_SPI1			348
-+#define PCLK_SPI2			349
-+#define PCLK_SPI4			350
-+#define PCLK_SPI5			351
-+#define PCLK_UART0			352
-+#define PCLK_UART1			353
-+#define PCLK_UART2			354
-+#define PCLK_UART3			355
-+#define PCLK_TSADC			356
-+#define PCLK_SARADC			357
-+#define PCLK_GMAC			358
-+#define PCLK_GMAC_NOC			359
-+#define PCLK_TIMER0			360
-+#define PCLK_TIMER1			361
-+#define PCLK_EDP			362
-+#define PCLK_EDP_NOC			363
-+#define PCLK_EDP_CTRL			364
-+#define PCLK_VIO			365
-+#define PCLK_VIO_NOC			366
-+#define PCLK_VIO_GRF			367
-+#define PCLK_MIPI_DSI0			368
-+#define PCLK_MIPI_DSI1			369
-+#define PCLK_HDCP			370
-+#define PCLK_HDCP_NOC			371
-+#define PCLK_HDMI_CTRL			372
-+#define PCLK_DP_CTRL			373
-+#define PCLK_HDCP22			374
-+#define PCLK_GASKET			375
-+#define PCLK_DDR			376
-+#define PCLK_DDR_MON			377
-+#define PCLK_DDR_SGRF			378
-+#define PCLK_ISP1_WRAPPER		379
-+#define PCLK_WDT			380
-+#define PCLK_EFUSE1024NS		381
-+#define PCLK_EFUSE1024S			382
-+#define PCLK_PMU_INTR_ARB		383
-+#define PCLK_MAILBOX0			384
++			cluster1 {
++				core0 {
++					cpu = <&cpu_b0>;
++				};
++				core1 {
++					cpu = <&cpu_b1>;
++				};
++			};
++		};
 +
-+/* hclk gates */
-+#define HCLK_PERIHP			448
-+#define HCLK_PERILP0			449
-+#define HCLK_PERILP1			450
-+#define HCLK_PERILP0_NOC		451
-+#define HCLK_PERILP1_NOC		452
-+#define HCLK_M0_PERILP			453
-+#define HCLK_M0_PERILP_NOC		454
-+#define HCLK_AHB1TOM			455
-+#define HCLK_HOST0			456
-+#define HCLK_HOST0_ARB			457
-+#define HCLK_HOST1			458
-+#define HCLK_HOST1_ARB			459
-+#define HCLK_HSIC			460
-+#define HCLK_SD				461
-+#define HCLK_SDMMC			462
-+#define HCLK_SDMMC_NOC			463
-+#define HCLK_M_CRYPTO0			464
-+#define HCLK_M_CRYPTO1			465
-+#define HCLK_S_CRYPTO0			466
-+#define HCLK_S_CRYPTO1			467
-+#define HCLK_I2S0_8CH			468
-+#define HCLK_I2S1_8CH			469
-+#define HCLK_I2S2_8CH			470
-+#define HCLK_SPDIF			471
-+#define HCLK_VOP0_NOC			472
-+#define HCLK_VOP0			473
-+#define HCLK_VOP1_NOC			474
-+#define HCLK_VOP1			475
-+#define HCLK_ROM			476
-+#define HCLK_IEP			477
-+#define HCLK_IEP_NOC			478
-+#define HCLK_ISP0			479
-+#define HCLK_ISP1			480
-+#define HCLK_ISP0_NOC			481
-+#define HCLK_ISP1_NOC			482
-+#define HCLK_ISP0_WRAPPER		483
-+#define HCLK_ISP1_WRAPPER		484
-+#define HCLK_RGA			485
-+#define HCLK_RGA_NOC			486
-+#define HCLK_HDCP			487
-+#define HCLK_HDCP_NOC			488
-+#define HCLK_HDCP22			489
-+#define HCLK_VCODEC			490
-+#define HCLK_VCODEC_NOC			491
-+#define HCLK_VDU			492
-+#define HCLK_VDU_NOC			493
-+#define HCLK_SDIO			494
-+#define HCLK_SDIO_NOC			495
-+#define HCLK_SDIOAUDIO_NOC		496
++		cpu_l0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x0>;
++		};
 +
-+#define CLK_NR_CLKS			(HCLK_SDIOAUDIO_NOC + 1)
++		cpu_l1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x1>;
++		};
 +
-+/* pmu-clocks indices */
-+#define SCLK_32K_SUSPEND_PMU		521
-+#define SCLK_SPI3_PMU			522
-+#define SCLK_TIMER12_PMU		523
-+#define SCLK_TIMER13_PMU		524
-+#define SCLK_UART4_PMU			525
-+#define SCLK_PVTM_PMU			526
-+#define SCLK_WIFI_PMU			527
-+#define SCLK_I2C0_PMU			528
-+#define SCLK_I2C4_PMU			529
-+#define SCLK_I2C8_PMU			530
++		cpu_l2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x2>;
++		};
 +
-+#define PCLK_PMU			540
-+#define PCLK_PMUGRF_PMU			541
-+#define PCLK_INTMEM1_PMU		542
-+#define PCLK_GPIO0_PMU			543
-+#define PCLK_GPIO1_PMU			544
-+#define PCLK_SGRF_PMU			545
-+#define PCLK_NOC_PMU			546
-+#define PCLK_I2C0_PMU			547
-+#define PCLK_I2C4_PMU			548
-+#define PCLK_I2C8_PMU			549
-+#define PCLK_RKPWM_PMU			550
-+#define PCLK_SPI3_PMU			551
-+#define PCLK_TIMER_PMU			552
-+#define PCLK_MAILBOX_PMU		553
-+#define PCLK_UART4_PMU			554
-+#define PCLK_WDT_M0_PMU			555
++		cpu_l3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x3>;
++		};
 +
-+#define FCLK_CM0S_PMU			560
-+#define SCLK_CM0S_PMU			561
-+#define HCLK_CM0S_PMU			562
-+#define DCLK_CM0S_PMU			563
-+#define PCLK_INTR_ARB_PMU		564
-+#define HCLK_NOC_PMU			565
++		cpu_b0: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x100>;
++		};
 +
-+#define CLKPMU_NR_CLKS			(HCLK_NOC_PMU - SCLK_32K_SUSPEND_PMU + 1)
++		cpu_b1: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a72", "arm,armv8";
++			reg = <0x0 0x101>;
++		};
++	};
 +
-+/* soft-reset indices */
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
++	};
 +
-+/* cru_softrst_con0 */
-+#define SRST_CORE_L0			0
-+#define SRST_CORE_B0			1
-+#define SRST_CORE_PO_L0			2
-+#define SRST_CORE_PO_B0			3
-+#define SRST_L2_L			4
-+#define SRST_L2_B			5
-+#define SRST_ADB_L			6
-+#define SRST_ADB_B			7
-+#define SRST_A_CCI			8
-+#define SRST_A_CCIM0_NOC		9
-+#define SRST_A_CCIM1_NOC		10
-+#define SRST_DBG_NOC			11
++	xin24m: xin24m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-output-names = "xin24m";
++	};
 +
-+/* cru_softrst_con1 */
-+#define SRST_CORE_L0_T			16
-+#define SRST_CORE_L1			17
-+#define SRST_CORE_L2			18
-+#define SRST_CORE_L3			19
-+#define SRST_CORE_PO_L0_T		20
-+#define SRST_CORE_PO_L1			21
-+#define SRST_CORE_PO_L2			22
-+#define SRST_CORE_PO_L3			23
-+#define SRST_A_ADB400_GIC2COREL		24
-+#define SRST_A_ADB400_COREL2GIC		25
-+#define SRST_P_DBG_L			26
-+#define SRST_L2_L_T			28
-+#define SRST_ADB_L_T			29
-+#define SRST_A_RKPERF_L			30
-+#define SRST_PVTM_CORE_L		31
++	gic: interrupt-controller at fee00000 {
++		compatible = "arm,gic-v3";
++		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		interrupt-controller;
 +
-+/* cru_softrst_con2 */
-+#define SRST_CORE_B0_T			32
-+#define SRST_CORE_B1			33
-+#define SRST_CORE_PO_B0_T		36
-+#define SRST_CORE_PO_B1			37
-+#define SRST_A_ADB400_GIC2COREB		40
-+#define SRST_A_ADB400_COREB2GIC		41
-+#define SRST_P_DBG_B			42
-+#define SRST_L2_B_T			43
-+#define SRST_ADB_B_T			45
-+#define SRST_A_RKPERF_B			46
-+#define SRST_PVTM_CORE_B		47
++		reg = <0x0 0xfee00000 0 0x10000>, /* GICD */
++		      <0x0 0xfef00000 0 0xc0000>, /* GICR */
++		      <0x0 0xfff00000 0 0x10000>, /* GICC */
++		      <0x0 0xfff10000 0 0x10000>, /* GICH */
++		      <0x0 0xfff20000 0 0x10000>; /* GICV */
++		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++		its: interrupt-controller at fee20000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0xfee20000 0x0 0x20000>;
++		};
++	};
 +
-+/* cru_softrst_con3 */
-+#define SRST_A_CCI_T			50
-+#define SRST_A_CCIM0_NOC_T		51
-+#define SRST_A_CCIM1_NOC_T		52
-+#define SRST_A_ADB400M_PD_CORE_B_T	53
-+#define SRST_A_ADB400M_PD_CORE_L_T	54
-+#define SRST_DBG_NOC_T			55
-+#define SRST_DBG_CXCS			56
-+#define SRST_CCI_TRACE			57
-+#define SRST_P_CCI_GRF			58
++	amba {
++		compatible = "arm,amba-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
-+/* cru_softrst_con4 */
-+#define SRST_A_CENTER_MAIN_NOC		64
-+#define SRST_A_CENTER_PERI_NOC		65
-+#define SRST_P_CENTER_MAIN		66
-+#define SRST_P_DDRMON			67
-+#define SRST_P_CIC			68
-+#define SRST_P_CENTER_SGRF		69
-+#define SRST_DDR0_MSCH			70
-+#define SRST_DDRCFG0_MSCH		71
-+#define SRST_DDR0			72
-+#define SRST_DDRPHY0			73
-+#define SRST_DDR1_MSCH			74
-+#define SRST_DDRCFG1_MSCH		75
-+#define SRST_DDR1			76
-+#define SRST_DDRPHY1			77
-+#define SRST_DDR_CIC			78
-+#define SRST_PVTM_DDR			79
++		dmac_bus: dma-controller at ff6d0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x0 0xff6d0000 0x0 0x4000>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC0_PERILP>;
++			clock-names = "apb_pclk";
++		};
 +
-+/* cru_softrst_con5 */
-+#define SRST_A_VCODEC_NOC		80
-+#define SRST_A_VCODEC			81
-+#define SRST_H_VCODEC_NOC		82
-+#define SRST_H_VCODEC			83
-+#define SRST_A_VDU_NOC			88
-+#define SRST_A_VDU			89
-+#define SRST_H_VDU_NOC			90
-+#define SRST_H_VDU			91
-+#define SRST_VDU_CORE			92
-+#define SRST_VDU_CA			93
++		dmac_peri: dma-controller at ff6e0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x0 0xff6e0000 0x0 0x4000>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC1_PERILP>;
++			clock-names = "apb_pclk";
++		};
++	};
 +
-+/* cru_softrst_con6 */
-+#define SRST_A_IEP_NOC			96
-+#define SRST_A_VOP_IEP			97
-+#define SRST_A_IEP			98
-+#define SRST_H_IEP_NOC			99
-+#define SRST_H_IEP			100
-+#define SRST_A_RGA_NOC			102
-+#define SRST_A_RGA			103
-+#define SRST_H_RGA_NOC			104
-+#define SRST_H_RGA			105
-+#define SRST_RGA_CORE			106
-+#define SRST_EMMC_NOC			108
-+#define SRST_EMMC			109
-+#define SRST_EMMC_GRF			110
++	uart0: serial at ff180000 {
++		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff180000 0x0 0x100>;
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con7 */
-+#define SRST_A_PERIHP_NOC		112
-+#define SRST_P_PERIHP_GRF		113
-+#define SRST_H_PERIHP_NOC		114
-+#define SRST_USBHOST0			115
-+#define SRST_HOSTC0_AUX			116
-+#define SRST_HOST0_ARB			117
-+#define SRST_USBHOST1			118
-+#define SRST_HOSTC1_AUX			119
-+#define SRST_HOST1_ARB			120
-+#define SRST_SDIO0			121
-+#define SRST_SDMMC			122
-+#define SRST_HSIC			123
-+#define SRST_HSIC_AUX			124
-+#define SRST_AHB1TOM			125
-+#define SRST_P_PERIHP_NOC		126
-+#define SRST_HSICPHY			127
++	uart1: serial at ff190000 {
++		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff190000 0x0 0x100>;
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
++		clock-names = "baudclk", "apb_pclk";
++		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con8 */
-+#define SRST_A_PCIE			128
-+#define SRST_P_PCIE			129
-+#define SRST_PCIE_CORE			130
-+#define SRST_PCIE_MGMT			131
-+#define SRST_PCIE_MGMT_STICKY		132
-+#define SRST_PCIE_PIPE			133
-+#define SRST_PCIE_PM			134
-+#define SRST_PCIEPHY			135
-+#define SRST_A_GMAC_NOC			136
-+#define SRST_A_GMAC			137
-+#define SRST_P_GMAC_NOC			138
-+#define SRST_P_GMAC_GRF			140
-+#define SRST_HSICPHY_POR		142
-+#define SRST_HSICPHY_UTMI		143
++	uart2: serial at ff1a0000 {
++		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff1a0000 0x0 0x100>;
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con9 */
-+#define SRST_USB2PHY0_POR		144
-+#define SRST_USB2PHY0_UTMI_PORT0	145
-+#define SRST_USB2PHY0_UTMI_PORT1	146
-+#define SRST_USB2PHY0_EHCIPHY		147
-+#define SRST_UPHY0_PIPE_L00		148
-+#define SRST_UPHY0			149
-+#define SRST_UPHY0_TCPDPWRUP		150
-+#define SRST_USB2PHY1_POR		152
-+#define SRST_USB2PHY1_UTMI_PORT0	153
-+#define SRST_USB2PHY1_UTMI_PORT1	154
-+#define SRST_USB2PHY1_EHCIPHY		155
-+#define SRST_UPHY1_PIPE_L00		156
-+#define SRST_UPHY1			157
-+#define SRST_UPHY1_TCPDPWRUP		158
++	uart3: serial at ff1b0000 {
++		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff1b0000 0x0 0x100>;
++		clocks = <&cru SCLK_UART3>, <&cru PCLK_UART3>;
++		clock-names = "baudclk", "apb_pclk";
++		interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con10 */
-+#define SRST_A_PERILP0_NOC		160
-+#define SRST_A_DCF			161
-+#define SRST_GIC500			162
-+#define SRST_DMAC0_PERILP0		163
-+#define SRST_DMAC1_PERILP0		164
-+#define SRST_TZMA			165
-+#define SRST_INTMEM			166
-+#define SRST_ADB400_MST0		167
-+#define SRST_ADB400_MST1		168
-+#define SRST_ADB400_SLV0		169
-+#define SRST_ADB400_SLV1		170
-+#define SRST_H_PERILP0			171
-+#define SRST_H_PERILP0_NOC		172
-+#define SRST_ROM			173
-+#define SRST_CRYPTO_S			174
-+#define SRST_CRYPTO_M			175
++	spi0: spi at ff1c0000 {
++		compatible = "rockchip,rk3399-spi", "rockchip,rk3066-spi";
++		reg = <0x0 0xff110000 0x0 0x1000>;
++		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con11 */
-+#define SRST_P_DCF			176
-+#define SRST_CM0S_NOC			177
-+#define SRST_CM0S			178
-+#define SRST_CM0S_DBG			179
-+#define SRST_CM0S_PO			180
-+#define SRST_CRYPTO			181
-+#define SRST_P_PERILP1_SGRF		182
-+#define SRST_P_PERILP1_GRF		183
-+#define SRST_CRYPTO1_S			184
-+#define SRST_CRYPTO1_M			185
-+#define SRST_CRYPTO1			186
-+#define SRST_GIC_NOC			188
-+#define SRST_SD_NOC			189
-+#define SRST_SDIOAUDIO_BRG		190
++	spi1: spi at ff1d0000 {
++		compatible = "rockchip,rk3399-spi", "rockchip,rk3066-spi";
++		reg = <0x0 0xff120000 0x0 0x1000>;
++		clocks = <&cru SCLK_SPI1>, <&cru PCLK_SPI1>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con12 */
-+#define SRST_H_PERILP1			192
-+#define SRST_H_PERILP1_NOC		193
-+#define SRST_H_I2S0_8CH			194
-+#define SRST_H_I2S1_8CH			195
-+#define SRST_H_I2S2_8CH			196
-+#define SRST_H_SPDIF_8CH		197
-+#define SRST_P_PERILP1_NOC		198
-+#define SRST_P_EFUSE_1024		199
-+#define SRST_P_EFUSE_1024S		200
-+#define SRST_P_I2C0			201
-+#define SRST_P_I2C1			202
-+#define SRST_P_I2C2			203
-+#define SRST_P_I2C3			204
-+#define SRST_P_I2C4			205
-+#define SRST_P_I2C5			206
-+#define SRST_P_MAILBOX0			207
++	spi2: spi at ff1e0000 {
++		compatible = "rockchip,rk3399-spi", "rockchip,rk3066-spi";
++		reg = <0x0 0xff130000 0x0 0x1000>;
++		clocks = <&cru SCLK_SPI2>, <&cru PCLK_SPI2>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi2_clk &spi2_tx &spi2_rx &spi2_cs0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con13 */
-+#define SRST_P_UART0			208
-+#define SRST_P_UART1			209
-+#define SRST_P_UART2			210
-+#define SRST_P_UART3			211
-+#define SRST_P_SARADC			212
-+#define SRST_P_TSADC			213
-+#define SRST_P_SPI0			214
-+#define SRST_P_SPI1			215
-+#define SRST_P_SPI2			216
-+#define SRST_P_SPI3			217
-+#define SRST_P_SPI4			218
-+#define SRST_SPI0			219
-+#define SRST_SPI1			220
-+#define SRST_SPI2			221
-+#define SRST_SPI3			222
-+#define SRST_SPI4			223
++	spi4: spi at ff1f0000 {
++		compatible = "rockchip,rk3399-spi", "rockchip,rk3066-spi";
++		reg = <0x0 0xff120000 0x0 0x1000>;
++		clocks = <&cru SCLK_SPI4>, <&cru PCLK_SPI4>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi4_clk &spi4_tx &spi4_rx &spi4_cs0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con14 */
-+#define SRST_I2S0_8CH			224
-+#define SRST_I2S1_8CH			225
-+#define SRST_I2S2_8CH			226
-+#define SRST_SPDIF_8CH			227
-+#define SRST_UART0			228
-+#define SRST_UART1			229
-+#define SRST_UART2			230
-+#define SRST_UART3			231
-+#define SRST_TSADC			232
-+#define SRST_I2C0			233
-+#define SRST_I2C1			234
-+#define SRST_I2C2			235
-+#define SRST_I2C3			236
-+#define SRST_I2C4			237
-+#define SRST_I2C5			238
-+#define SRST_SDIOAUDIO_NOC		239
++	spi5: spi at ff200000 {
++		compatible = "rockchip,rk3399-spi", "rockchip,rk3066-spi";
++		reg = <0x0 0xff130000 0x0 0x1000>;
++		clocks = <&cru SCLK_SPI5>, <&cru PCLK_SPI5>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi5_clk &spi5_tx &spi5_rx &spi5_cs0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con15 */
-+#define SRST_A_VIO_NOC			240
-+#define SRST_A_HDCP_NOC			241
-+#define SRST_A_HDCP			242
-+#define SRST_H_HDCP_NOC			243
-+#define SRST_H_HDCP			244
-+#define SRST_P_HDCP_NOC			245
-+#define SRST_P_HDCP			246
-+#define SRST_P_HDMI_CTRL		247
-+#define SRST_P_DP_CTRL			248
-+#define SRST_S_DP_CTRL			249
-+#define SRST_C_DP_CTRL			250
-+#define SRST_P_MIPI_DSI0		251
-+#define SRST_P_MIPI_DSI1		252
-+#define SRST_DP_CORE			253
-+#define SRST_DP_I2S			254
++	pmugrf: syscon at ff320000 {
++		compatible = "rockchip,rk3399-pmugrf", "syscon";
++		reg = <0x0 0xff320000 0x0 0x1000>;
++	};
 +
-+/* cru_softrst_con16 */
-+#define SRST_GASKET			256
-+#define SRST_VIO_GRF			258
-+#define SRST_DPTX_SPDIF_REC		259
-+#define SRST_HDMI_CTRL			260
-+#define SRST_HDCP_CTRL			261
-+#define SRST_A_ISP0_NOC			262
-+#define SRST_A_ISP1_NOC			263
-+#define SRST_H_ISP0_NOC			266
-+#define SRST_H_ISP1_NOC			267
-+#define SRST_H_ISP0			268
-+#define SRST_H_ISP1			269
-+#define SRST_ISP0			270
-+#define SRST_ISP1			271
++	spi3: spi at ff350000 {
++		compatible = "rockchip,rk3399-spi", "rockchip,rk3066-spi";
++		reg = <0x0 0xff110000 0x0 0x1000>;
++		clocks = <&cru SCLK_SPI3_PMU>, <&cru PCLK_SPI3_PMU>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi3_clk &spi3_tx &spi3_rx &spi3_cs0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con17 */
-+#define SRST_A_VOP0_NOC			272
-+#define SRST_A_VOP1_NOC			273
-+#define SRST_A_VOP0			274
-+#define SRST_A_VOP1			275
-+#define SRST_H_VOP0_NOC			276
-+#define SRST_H_VOP1_NOC			277
-+#define SRST_H_VOP0			278
-+#define SRST_H_VOP1			279
-+#define SRST_D_VOP0			280
-+#define SRST_D_VOP1			281
-+#define SRST_VOP0_PWM			282
-+#define SRST_VOP1_PWM			283
-+#define SRST_P_EDP_NOC			284
-+#define SRST_P_EDP_CTRL			285
++	uart4: serial at ff370000 {
++		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff370000 0x0 0x100>;
++		clocks = <&cru SCLK_UART4_PMU>, <&cru PCLK_UART4_PMU>;
++		clock-names = "baudclk", "apb_pclk";
++		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		status = "disabled";
++	};
 +
-+/* cru_softrst_con18 */
-+#define SRST_A_GPU_NOC			289
-+#define SRST_A_GPU_GRF			290
-+#define SRST_PVTM_GPU			291
-+#define SRST_A_USB3_NOC			292
-+#define SRST_A_USB3_OTG0		293
-+#define SRST_A_USB3_OTG1		294
-+#define SRST_A_USB3_GRF			295
-+#define SRST_PMU			296
++	pmucru: pmu-clock-controller at ff750000 {
++		compatible = "rockchip,rk3399-pmucru";
++		reg = <0x0 0xff750000 0x0 0x1000>;
++		rockchip,grf = <&pmugrf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
 +
-+/* cru_softrst_con19 */
-+#define SRST_P_TIMER0_5			304
-+#define SRST_TIMER0			305
-+#define SRST_TIMER1			306
-+#define SRST_TIMER2			307
-+#define SRST_TIMER3			308
-+#define SRST_TIMER4			309
-+#define SRST_TIMER5			310
-+#define SRST_P_TIMER6_11		311
-+#define SRST_TIMER6			312
-+#define SRST_TIMER7			313
-+#define SRST_TIMER8			314
-+#define SRST_TIMER9			315
-+#define SRST_TIMER10			316
-+#define SRST_TIMER11			317
-+#define SRST_P_INTR_ARB_PMU		318
-+#define SRST_P_ALIVE_SGRF		319
++	cru: clock-controller at ff760000 {
++		compatible = "rockchip,rk3399-cru";
++		reg = <0x0 0xff760000 0x0 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
 +
-+/* cru_softrst_con20 */
-+#define SRST_P_GPIO2			320
-+#define SRST_P_GPIO3			321
-+#define SRST_P_GPIO4			322
-+#define SRST_P_GRF			323
-+#define SRST_P_ALIVE_NOC		324
-+#define SRST_P_WDT0			325
-+#define SRST_P_WDT1			326
-+#define SRST_P_INTR_ARB			327
-+#define SRST_P_UPHY0_DPTX		328
-+#define SRST_P_UPHY0_APB		330
-+#define SRST_P_UPHY0_TCPHY		332
-+#define SRST_P_UPHY1_TCPHY		333
-+#define SRST_P_UPHY0_TCPDCTRL		334
-+#define SRST_P_UPHY1_TCPDCTRL		335
++	grf: syscon at ff770000 {
++		compatible = "rockchip,rk3399-grf", "syscon";
++		reg = <0x0 0xff770000 0x0 0x10000>;
++	};
 +
-+/* pmu soft-reset indices */
++	i2s0: i2s at ff880000 {
++		compatible = "rockchip,rk3399-i2s", "rockchip,rk3066-i2s";
++		reg = <0x0 0xff880000 0x0 0x1000>;
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dmas = <&dmac_bus 0>, <&dmac_bus 1>;
++		dma-names = "tx", "rx";
++		clock-names = "i2s_hclk", "i2s_clk";
++		clocks = <&cru HCLK_I2S0_8CH>, <&cru SCLK_I2S0_8CH>;
++		status = "disabled";
++	};
 +
-+/* pmu_cru_softrst_con0 */
-+#define SRST_P_NOC			0
-+#define SRST_P_INTMEM			1
-+#define SRST_H_CM0S			2
-+#define SRST_H_CM0S_NOC			3
-+#define SRST_DBG_CM0S			4
-+#define SRST_PO_CM0S			5
-+#define SRST_P_SPI6			6
-+#define SRST_SPI6			7
-+#define SRST_P_TIMER_0_1		8
-+#define SRST_P_TIMER_0			9
-+#define SRST_P_TIMER_1			10
-+#define SRST_P_UART4			11
-+#define SRST_UART4			12
-+#define SRST_P_WDT			13
++	i2s1: i2s at ff890000 {
++		compatible = "rockchip,rk3399-i2s", "rockchip,rk3066-i2s";
++		reg = <0x0 0xff890000 0x0 0x1000>;
++		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dmas = <&dmac_bus 2>, <&dmac_bus 3>;
++		dma-names = "tx", "rx";
++		clock-names = "i2s_hclk", "i2s_clk";
++		clocks = <&cru HCLK_I2S1_8CH>, <&cru SCLK_I2S1_8CH>;
++		status = "disabled";
++	};
 +
-+/* pmu_cru_softrst_con1 */
-+#define SRST_P_I2C6			16
-+#define SRST_P_I2C7			17
-+#define SRST_P_I2C8			18
-+#define SRST_P_MAILBOX			19
-+#define SRST_P_RKPWM			20
-+#define SRST_P_PMUGRF			21
-+#define SRST_P_SGRF			22
-+#define SRST_P_GPIO0			23
-+#define SRST_P_GPIO1			24
-+#define SRST_P_CRU			25
-+#define SRST_P_INTR			26
-+#define SRST_PVTM			27
-+#define SRST_I2C6			28
-+#define SRST_I2C7			29
-+#define SRST_I2C8			30
++	i2s2: i2s at ff8a0000 {
++		compatible = "rockchip,rk3399-i2s", "rockchip,rk3066-i2s";
++		reg = <0x0 0xff8a0000 0x0 0x1000>;
++		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dmas = <&dmac_bus 4>, <&dmac_bus 5>;
++		dma-names = "tx", "rx";
++		clock-names = "i2s_hclk", "i2s_clk";
++		clocks = <&cru HCLK_I2S2_8CH>, <&cru SCLK_I2S2_8CH>;
++		status = "disabled";
++	};
 +
-+#endif
++	pinctrl: pinctrl {
++		compatible = "rockchip,rk3399-pinctrl";
++		rockchip,grf = <&grf>;
++		rockchip,pmu = <&pmugrf>;
++		#address-cells = <0x2>;
++		#size-cells = <0x2>;
++		ranges;
++
++		gpio0: gpio0 at ff720000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff720000 0x0 0x100>;
++			clocks = <&xin24m>;
++			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++
++			gpio-controller;
++			#gpio-cells = <0x2>;
++
++			interrupt-controller;
++			#interrupt-cells = <0x2>;
++		};
++
++		gpio1: gpio1 at ff730000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff730000 0x0 0x100>;
++			clocks = <&xin24m>;
++			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++
++			gpio-controller;
++			#gpio-cells = <0x2>;
++
++			interrupt-controller;
++			#interrupt-cells = <0x2>;
++		};
++
++		gpio2: gpio2 at ff780000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff780000 0x0 0x100>;
++			clocks = <&xin24m>;
++			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++
++			gpio-controller;
++			#gpio-cells = <0x2>;
++
++			interrupt-controller;
++			#interrupt-cells = <0x2>;
++		};
++
++		gpio3: gpio3 at ff788000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff788000 0x0 0x100>;
++			clocks = <&xin24m>;
++			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++
++			gpio-controller;
++			#gpio-cells = <0x2>;
++
++			interrupt-controller;
++			#interrupt-cells = <0x2>;
++		};
++
++		gpio4: gpio4 at ff790000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff790000 0x0 0x100>;
++			clocks = <&xin24m>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++
++			gpio-controller;
++			#gpio-cells = <0x2>;
++
++			interrupt-controller;
++			#interrupt-cells = <0x2>;
++		};
++
++		pcfg_pull_up: pcfg-pull-up {
++			bias-pull-up;
++		};
++
++		pcfg_pull_down: pcfg-pull-down {
++			bias-pull-down;
++		};
++
++		pcfg_pull_none: pcfg-pull-none {
++			bias-disable;
++		};
++
++		pcfg_pull_none_12ma: pcfg-pull-none-12ma {
++			bias-disable;
++			drive-strength = <12>;
++		};
++
++		pcfg_pull_up_8ma: pcfg-pull-up-8ma {
++			bias-pull-up;
++			drive-strength = <8>;
++		};
++
++		pcfg_pull_down_4ma: pcfg-pull-down-4ma {
++			bias-pull-down;
++			drive-strength = <4>;
++		};
++
++		pcfg_pull_up_2ma: pcfg-pull-up-2ma {
++			bias-pull-up;
++			drive-strength = <2>;
++		};
++
++		pcfg_pull_down_12ma: pcfg-pull-down-12ma {
++			bias-pull-down;
++			drive-strength = <12>;
++		};
++
++		emmc {
++			emmc_pwr: emmc-pwr {
++				rockchip,pins =
++					<0 5 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		gmac {
++			rgmii_pins: rgmii-pins {
++				rockchip,pins =
++					<3 11 RK_FUNC_1 &pcfg_pull_none>,
++					<3 13 RK_FUNC_1 &pcfg_pull_none>,
++					<3 8 RK_FUNC_1 &pcfg_pull_none>,
++					<3 4 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 5 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 0 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 1 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 17 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 12 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 6 RK_FUNC_1 &pcfg_pull_none>,
++					<3 7 RK_FUNC_1 &pcfg_pull_none>,
++					<3 2 RK_FUNC_1 &pcfg_pull_none>,
++					<3 3 RK_FUNC_1 &pcfg_pull_none>,
++					<3 14 RK_FUNC_1 &pcfg_pull_none>,
++					<3 9 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			rmii_pins: rmii-pins {
++				rockchip,pins =
++					<3 11 RK_FUNC_1 &pcfg_pull_none>,
++					<3 13 RK_FUNC_1 &pcfg_pull_none>,
++					<3 8 RK_FUNC_1 &pcfg_pull_none>,
++					<3 4 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 5 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 12 RK_FUNC_1 &pcfg_pull_none_12ma>,
++					<3 6 RK_FUNC_1 &pcfg_pull_none>,
++					<3 7 RK_FUNC_1 &pcfg_pull_none>,
++					<3 9 RK_FUNC_1 &pcfg_pull_none>,
++					<3 10 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c0 {
++			i2c0_xfer: i2c0-xfer {
++				rockchip,pins =
++					<1 15 RK_FUNC_2 &pcfg_pull_none>,
++					<1 16 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		i2c1 {
++			i2c1_xfer: i2c1-xfer {
++				rockchip,pins =
++					<4 2 RK_FUNC_1 &pcfg_pull_none>,
++					<4 1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c2 {
++			i2c2_xfer: i2c2-xfer {
++				rockchip,pins =
++					<2 1 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					<2 0 RK_FUNC_2 &pcfg_pull_none_12ma>;
++			};
++		};
++
++		i2c3 {
++			i2c3_xfer: i2c3-xfer {
++				rockchip,pins =
++					<4 17 RK_FUNC_1 &pcfg_pull_none>,
++					<4 16 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c4 {
++			i2c4_xfer: i2c4-xfer {
++				rockchip,pins =
++					<1 12 RK_FUNC_1 &pcfg_pull_none>,
++					<1 11 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c5 {
++			i2c5_xfer: i2c5-xfer {
++				rockchip,pins =
++					<3 11 RK_FUNC_2 &pcfg_pull_none>,
++					<3 10 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		i2c6 {
++			i2c6_xfer: i2c6-xfer {
++				rockchip,pins =
++					<2 10 RK_FUNC_2 &pcfg_pull_none>,
++					<2 9 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		i2c7 {
++			i2c7_xfer: i2c7-xfer {
++				rockchip,pins =
++					<2 8 RK_FUNC_2 &pcfg_pull_none>,
++					<2 7 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		i2c8 {
++			i2c8_xfer: i2c8-xfer {
++				rockchip,pins =
++					<1 21 RK_FUNC_1 &pcfg_pull_none>,
++					<1 20 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2s0 {
++			i2s0_8ch_bus: i2s0-8ch-bus {
++				rockchip,pins =
++					<3 24 RK_FUNC_1 &pcfg_pull_none>,
++					<3 25 RK_FUNC_1 &pcfg_pull_none>,
++					<3 26 RK_FUNC_1 &pcfg_pull_none>,
++					<3 27 RK_FUNC_1 &pcfg_pull_none>,
++					<3 28 RK_FUNC_1 &pcfg_pull_none>,
++					<3 29 RK_FUNC_1 &pcfg_pull_none>,
++					<3 30 RK_FUNC_1 &pcfg_pull_none>,
++					<3 31 RK_FUNC_1 &pcfg_pull_none>,
++					<4 0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2s1 {
++			i2s1_2ch_bus: i2s1-2ch-bus {
++				rockchip,pins =
++					<4 3 RK_FUNC_1 &pcfg_pull_none>,
++					<4 4 RK_FUNC_1 &pcfg_pull_none>,
++					<4 5 RK_FUNC_1 &pcfg_pull_none>,
++					<4 6 RK_FUNC_1 &pcfg_pull_none>,
++					<4 7 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		sdio0 {
++			sdio0_bus1: sdio0-bus1 {
++				rockchip,pins =
++					<2 20 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_bus4: sdio0-bus4 {
++				rockchip,pins =
++					<2 20 RK_FUNC_1 &pcfg_pull_up>,
++					<2 21 RK_FUNC_1 &pcfg_pull_up>,
++					<2 22 RK_FUNC_1 &pcfg_pull_up>,
++					<2 23 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_cmd: sdio0-cmd {
++				rockchip,pins =
++					<2 24 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_clk: sdio0-clk {
++				rockchip,pins =
++					<2 25 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			sdio0_cd: sdio0-cd {
++				rockchip,pins =
++					<2 26 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_pwr: sdio0-pwr {
++				rockchip,pins =
++					<2 27 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_bkpwr: sdio0-bkpwr {
++				rockchip,pins =
++					<2 28 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_wp: sdio0-wp {
++				rockchip,pins =
++					<0 3 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_int: sdio0-int {
++				rockchip,pins =
++					<0 4 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		sdmmc {
++			sdmmc_bus1: sdmmc-bus1 {
++				rockchip,pins =
++					<4 8 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdmmc_bus4: sdmmc-bus4 {
++				rockchip,pins =
++					<4 8 RK_FUNC_1 &pcfg_pull_up>,
++					<4 9 RK_FUNC_1 &pcfg_pull_up>,
++					<4 10 RK_FUNC_1 &pcfg_pull_up>,
++					<4 11 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdmmc_clk: sdmmc-clk {
++				rockchip,pins =
++					<4 12 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			sdmmc_cmd: sdmmc-cmd {
++				rockchip,pins =
++					<4 13 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdmmc_cd: sdmcc-cd {
++				rockchip,pins =
++					<0 7 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdmmc_wp: sdmmc-wp {
++				rockchip,pins =
++					<0 8 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		spi0 {
++			spi0_clk: spi0-clk {
++				rockchip,pins =
++					<3 6 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_cs0: spi0-cs0 {
++				rockchip,pins =
++					<3 7 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_cs1: spi0-cs1 {
++				rockchip,pins =
++					<3 8 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_tx: spi0-tx {
++				rockchip,pins =
++					<3 5 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_rx: spi0-rx {
++				rockchip,pins =
++					<3 4 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
++		spi1 {
++			spi1_clk: spi1-clk {
++				rockchip,pins =
++					<1 9 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_cs0: spi1-cs0 {
++				rockchip,pins =
++					<1 10 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_rx: spi1-rx {
++				rockchip,pins =
++					<1 7 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_tx: spi1-tx {
++				rockchip,pins =
++					<1 8 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
++		spi2 {
++			spi2_clk: spi2-clk {
++				rockchip,pins =
++					<2 11 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi2_cs0: spi2-cs0 {
++				rockchip,pins =
++					<2 12 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi2_rx: spi2-rx {
++				rockchip,pins =
++					<2 9 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi2_tx: spi2-tx {
++				rockchip,pins =
++					<2 10 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		spi3 {
++			spi3_clk: spi3-clk {
++				rockchip,pins =
++					<1 17 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi3_cs0: spi3-cs0 {
++				rockchip,pins =
++					<1 18 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi3_rx: spi3-rx {
++				rockchip,pins =
++					<1 15 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi3_tx: spi3-tx {
++				rockchip,pins =
++					<1 16 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		spi4 {
++			spi4_clk: spi4-clk {
++				rockchip,pins =
++					<3 2 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi4_cs0: spi4-cs0 {
++				rockchip,pins =
++					<3 3 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi4_rx: spi4-rx {
++				rockchip,pins =
++					<3 0 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi4_tx: spi4-tx {
++				rockchip,pins =
++					<3 1 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
++		spi5 {
++			spi5_clk: spi5-clk {
++				rockchip,pins =
++					<2 22 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi5_cs0: spi5-cs0 {
++				rockchip,pins =
++					<2 23 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi5_rx: spi5-rx {
++				rockchip,pins =
++					<2 20 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi5_tx: spi5-tx {
++				rockchip,pins =
++					<2 21 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
++		uart0 {
++			uart0_xfer: uart0-xfer {
++				rockchip,pins =
++					<2 16 RK_FUNC_1 &pcfg_pull_up>,
++					<2 17 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_cts: uart0-cts {
++				rockchip,pins =
++					<2 18 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_rts: uart0-rts {
++				rockchip,pins =
++					<2 19 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart1 {
++			uart1_xfer: uart1-xfer {
++				rockchip,pins =
++					<3 12 RK_FUNC_2 &pcfg_pull_up>,
++					<3 13 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		uart2a {
++			uart2a_xfer: uart2a-xfer {
++				rockchip,pins =
++					<4 8 RK_FUNC_2 &pcfg_pull_up>,
++					<4 9 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		uart2b {
++			uart2b_xfer: uart2b-xfer {
++				rockchip,pins =
++					<4 16 RK_FUNC_2 &pcfg_pull_up>,
++					<4 17 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		uart2c {
++			uart2c_xfer: uart2c-xfer {
++				rockchip,pins =
++					<4 19 RK_FUNC_1 &pcfg_pull_up>,
++					<4 20 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart3 {
++			uart3_xfer: uart3-xfer {
++				rockchip,pins =
++					<3 14 RK_FUNC_2 &pcfg_pull_up>,
++					<3 15 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			uart3_cts: uart3-cts {
++				rockchip,pins =
++					<3 18 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			uart3_rts: uart3-rts {
++				rockchip,pins =
++					<3 19 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		uart4 {
++			uart4_xfer: uart4-xfer {
++				rockchip,pins =
++					<1 7 RK_FUNC_1 &pcfg_pull_up>,
++					<1 8 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uarthdcp {
++			uarthdcp_xfer: uarthdcp-xfer {
++				rockchip,pins =
++					<4 21 RK_FUNC_2 &pcfg_pull_up>,
++					<4 22 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins =
++					<4 18 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			vop0_pwm_pin: vop0-pwm-pin {
++				rockchip,pins =
++					<4 18 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins =
++					<4 22 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			vop1_pwm_pin: vop1-pwm-pin {
++				rockchip,pins =
++					<4 18 RK_FUNC_3 &pcfg_pull_none>;
++			};
++		};
++	};
++};
 -- 
 1.9.1
