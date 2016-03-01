@@ -1,111 +1,133 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 1 Mar 2016 10:44:22 -0700
-Subject: [RFC v2 02/12] PM / Domains: Support IRQ safe PM domains
-In-Reply-To: <20160226181753.GU28849@codeaurora.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-3-git-send-email-lina.iyer@linaro.org>
- <20160226181753.GU28849@codeaurora.org>
-Message-ID: <20160301174422.GJ1440@linaro.org>
+From: amakarov.linux@gmail.com (Aleksey Makarov)
+Date: Tue, 1 Mar 2016 20:52:45 +0300
+Subject: [PATCH v3 1/7] of/serial: move earlycon early_param handling to
+ serial
+In-Reply-To: <56D5D035.2060704@hurleysoftware.com>
+References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456749726-30261-2-git-send-email-aleksey.makarov@linaro.org>
+ <56D5AC3B.3090806@hurleysoftware.com> <56D5C3F8.5050102@linaro.org>
+ <56D5D035.2060704@hurleysoftware.com>
+Message-ID: <56D5D6ED.7050806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26 2016 at 11:17 -0700, Stephen Boyd wrote:
->On 02/12, Lina Iyer wrote:
->> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
->> index 8ba6625..c06f0b6 100644
->> --- a/Documentation/power/devices.txt
->> +++ b/Documentation/power/devices.txt
->> @@ -607,7 +607,16 @@ individually.  Instead, a set of devices sharing a power resource can be put
->>  into a low-power state together at the same time by turning off the shared
->>  power resource.  Of course, they also need to be put into the full-power state
->>  together, by turning the shared power resource on.  A set of devices with this
->> -property is often referred to as a power domain.
->> +property is often referred to as a power domain. A power domain may also be
->> +nested inside another power domain.
->> +
->> +Devices, by default, operate in process context and if a device can operate in
->> +IRQ safe context, has to be explicitly set as IRQ safe. Power domains by
->
->Devices, by default, operate in process context. If a device can
->operate in IRQ safe context that has to be explicitly indicated
->by setting the irq_safe boolean inside struct generic_pm_domain
->to true. Power domains typically operate in process context...
->
-Done.
 
->> +default, operate in process context but could have devices that are IRQ safe.
->> +Such power domains cannot be powered on/off during runtime PM. On the other
->> +hand, an IRQ safe PM domains that have IRQ safe devices may be powered off
->
->On the other hand, IRQ safe PM domains that have ..
->
-Done.
 
->> +when all the devices are in idle. An IRQ safe domain may only be attached as a
->
->all the devices in the domain?
->
-Devices need not be IRQ safe.
-
-<...>
-
->> +static struct genpd_lock_fns no_sleep_lock = {
->
->const?
->
-OK
-
-...
-
->> +	/*
->> +	 * As we dont power off a non IRQ safe domain, which holds
->
->s/dont/don't/
->
->> +	 * an IRQ safe device, we dont need to restore power to it.
->
->s/dont/don't/
->
-Done to both.
->> +	 */
->> +	if (dev->power.irq_safe && !genpd->irq_safe) {
->>  		timed = false;
->>  		goto out;
->>  	}
->> @@ -1296,6 +1359,13 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
->>  	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev))
->>  		return -EINVAL;
+On 03/01/2016 08:24 PM, Peter Hurley wrote:
+> On 03/01/2016 08:31 AM, Aleksey Makarov wrote:
 >>
->> +	if (genpd->irq_safe && !dev->power.irq_safe) {
->> +		dev_err(dev,
->> +			"PM Domain %s is IRQ safe; device has to IRQ safe.\n",
->
->has to be?
->
-This is a remenant. This limitation need not exist. Removed.
-
->> +			genpd->name);
->> +		return -EINVAL;
->> +	}
->> +
->>  	gpd_data = genpd_alloc_dev_data(dev, genpd, td);
->>  	if (IS_ERR(gpd_data))
->>  		return PTR_ERR(gpd_data);
->> @@ -1394,6 +1464,17 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
->>  	    || genpd == subdomain)
->>  		return -EINVAL;
 >>
->> +	/*
->> +	 * If the domain can be powered on/off in an IRQ safe
->> +	 * context, ensure that the subdomain can also be
->> +	 * powered on/off in that context.
->> +	 */
->> +	if (!genpd->irq_safe && subdomain->irq_safe) {
->> +		WARN("Parent %s of subdomain %s must be IRQ-safe\n",
->
->Nitpick! IRQ-safe or IRQ safe? Use one consistently please.
->
-Sorry. It will be IRQ safe.
+>> On 03/01/2016 05:50 PM, Peter Hurley wrote:
+>>> On 02/29/2016 04:41 AM, Aleksey Makarov wrote:
+>>>> From: Leif Lindholm <leif.lindholm@linaro.org>
+>>>>
+>>>> We have multiple "earlycon" early_param handlers - merge the DT one into
+>>>> the main earlycon one. This means the earlycon early_param handler does
+>>>> not just return success if no options are specified.
+>>>
+>>> Why is this patch necessary?
+>>>
+>>> Is this cleanup or required for some reason in other parts of this
+>>> series?
+>>
+>> It's a cleanup.
+>>
+>> Also, without this, the series has to introduce a new (third) handler for "earlycon=".
+> 
+> Not if it were opt-in like OF is via the same blank
+> "earlycon" parameter.
 
-Thank,
-Lina
+So you are suggesting to enable ACPI earlycon with just "earlyon" without 
+any arguments to this paramener, right?  That's good idea as OF and ACPI
+can not be used simultaneously to specify earlycon.  Actually that is
+how it worked in the original submussion. I will change this in the next version.
+
+Still I think that having this parameter parsed in one place is a good idea.
+Or would you prefer to drop this patch?
+
+>>>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>>>> ---
+>>>>  drivers/of/fdt.c              | 11 +----------
+>>>>  drivers/tty/serial/earlycon.c |  3 ++-
+>>>>  include/linux/of_fdt.h        |  2 ++
+>>>>  3 files changed, 5 insertions(+), 11 deletions(-)
+>>>>
+>>>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>>>> index 3349d2a..0547256 100644
+>>>> --- a/drivers/of/fdt.c
+>>>> +++ b/drivers/of/fdt.c
+>>>> @@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+>>>>  
+>>>>  #ifdef CONFIG_SERIAL_EARLYCON
+>>>>  
+>>>> -static int __init early_init_dt_scan_chosen_serial(void)
+>>>> +int __init early_init_dt_scan_chosen_serial(void)
+>>>>  {
+>>>>  	int offset;
+>>>>  	const char *p, *q, *options = NULL;
+>>>> @@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+>>>>  	}
+>>>>  	return -ENODEV;
+>>>>  }
+>>>> -
+>>>> -static int __init setup_of_earlycon(char *buf)
+>>>> -{
+>>>> -	if (buf)
+>>>> -		return 0;
+>>>> -
+>>>> -	return early_init_dt_scan_chosen_serial();
+>>>> -}
+>>>> -early_param("earlycon", setup_of_earlycon);
+>>>>  #endif
+>>>>  
+>>>>  /**
+>>>> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+>>>> index 067783f..d217366 100644
+>>>> --- a/drivers/tty/serial/earlycon.c
+>>>> +++ b/drivers/tty/serial/earlycon.c
+>>>> @@ -17,6 +17,7 @@
+>>>>  #include <linux/kernel.h>
+>>>>  #include <linux/init.h>
+>>>>  #include <linux/io.h>
+>>>> +#include <linux/of_fdt.h>
+>>>>  #include <linux/serial_core.h>
+>>>>  #include <linux/sizes.h>
+>>>>  #include <linux/of.h>
+>>>> @@ -209,7 +210,7 @@ static int __init param_setup_earlycon(char *buf)
+>>>>  	 * don't generate a warning from parse_early_params() in that case
+>>>>  	 */
+>>>>  	if (!buf || !buf[0])
+>>>> -		return 0;
+>>>> +		return early_init_dt_scan_chosen_serial();
+>>>>  
+>>>>  	err = setup_earlycon(buf);
+>>>>  	if (err == -ENOENT || err == -EALREADY)
+>>>> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+>>>> index 2fbe868..56b2a43 100644
+>>>> --- a/include/linux/of_fdt.h
+>>>> +++ b/include/linux/of_fdt.h
+>>>> @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+>>>>  				     int depth, void *data);
+>>>>  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+>>>>  				     int depth, void *data);
+>>>> +extern int early_init_dt_scan_chosen_serial(void);
+>>>>  extern void early_init_fdt_scan_reserved_mem(void);
+>>>>  extern void early_init_fdt_reserve_self(void);
+>>>>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+>>>> @@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
+>>>>  extern u64 of_flat_dt_translate_address(unsigned long node);
+>>>>  extern void of_fdt_limit_memory(int limit);
+>>>>  #else /* CONFIG_OF_FLATTREE */
+>>>> +static inline int early_init_dt_scan_chosen_serial(void) { return -ENODEV; }
+>>>>  static inline void early_init_fdt_scan_reserved_mem(void) {}
+>>>>  static inline void early_init_fdt_reserve_self(void) {}
+>>>>  static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+>>>>
+>>>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
