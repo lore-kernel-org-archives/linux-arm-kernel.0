@@ -1,154 +1,206 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 1 Mar 2016 13:40:29 +0100
-Subject: [PATCH 0/2] arm64, cma, gicv3-its: Use CMA for allocation of
- large device tables
-In-Reply-To: <56D4D1A1.9060305@redhat.com>
-References: <1456398164-16864-1-git-send-email-rrichter@caviumnetworks.com>
- <56D42199.7040207@arm.com>
- <20160229122511.GS24726@rric.localdomain>
- <56D44812.6000309@arm.com> <56D4D1A1.9060305@redhat.com>
-Message-ID: <20160301124029.GV24726@rric.localdomain>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Tue, 1 Mar 2016 18:10:57 +0530
+Subject: [PATCH v6 05/11] drm/hisilicon: Add vblank driver for ADE
+In-Reply-To: <CAGd==07Rkx4Kb8EVJs5X513XpOhzrpRAXWs0mN85wrMQ5oWaqw@mail.gmail.com>
+References: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
+ <1456476028-36880-6-git-send-email-xinliang.liu@linaro.org>
+ <56D4928A.1070501@codeaurora.org>
+ <CAGd==07Rkx4Kb8EVJs5X513XpOhzrpRAXWs0mN85wrMQ5oWaqw@mail.gmail.com>
+Message-ID: <56D58DD9.9050207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.02.16 15:17:53, Laura Abbott wrote:
-> On 02/29/2016 05:30 AM, Marc Zyngier wrote:
-> >On 29/02/16 12:25, Robert Richter wrote:
-> >>On 29.02.16 10:46:49, Marc Zyngier wrote:
-> >>>On 25/02/16 11:02, Robert Richter wrote:
-> >>>>From: Robert Richter <rrichter@cavium.com>
-> >>>>
-> >>>>This series implements the use of CMA for allocation of large device
-> >>>>tables for the arm64 gicv3 interrupt controller.
-> >>>>
-> >>>>There are 2 patches, the first is for early activation of cma, which
-> >>>>needs to be done before interrupt initialization to make it available
-> >>>>to the gicv3. The second implements the use of CMA to allocate
-> >>>>gicv3-its device tables.
-> >>>>
-> >>>>This solves the problem where mem allocation is limited to 4MB. A
-> >>>>previous patch sent to the list to address this that instead increases
-> >>>>FORCE_MAX_ZONEORDER becomes obsolete.
-> >>>
-> >>>I think you're looking at the problem the wrong way. Instead of going
-> >>>through CMA directly, I'd rather go through the normal DMA API
-> >>>(dma_alloc_coherent), which can itself try CMA (should it be enabled).
-> >>>
-> >>>That will give you all the benefit of the CMA allocation, and also make
-> >>>the driver more robust. I meant to do this for a while, and never found
-> >>>the time. Any chance you could have a look?
-> >>
-> >>I was considering this first, and in fact the backend used is the
-> >>same. The problem is that irq initialization is much more earlier than
-> >>standard device probing. The gic even does not have its own struct
-> >>device and is not initialized like devices are. This makes the whole
-> >>dma_alloc_coherent() approach not feasable, at least this would
-> >>require introducing and using a dev struct for the gic. But still this
-> >>migth not work as it could be too early during boot. I also think
-> >>there were reasons not implementing the gic as a device.
-> >>
-> >>I was following more the approach of iommu/mmu implementations which
-> >>use dma_alloc_from_contiguous() directly. I think this is more close
-> >>to the device tables for its.
-> >>
-> >>Code path of dma_alloc_coherent():
-> >>
-> >>  dma_alloc_coherent()
-> >>     v
-> >>  dma_alloc_attrs()             <---- Requires get_dma_ops(dev) != NULL
-> >>     v
-> >>  dma_alloc_from_coherent()
-> >>     v
-> >>  ...
-> >>
-> >>The difference it that dma_alloc_coherent() tries cma first and then
-> >>proceeds with ops->alloc() (which is __dma_alloc() for arm64) if
-> >>dma_alloc_from_coherent() fails. In my implementation I am directly
-> >>using dma_alloc_from_coherent() and only for large mem sizes.
-> >>
-> >>So both approaches uses finally the same allocation, but for gicv3-its
-> >>the generic dma framework is not used since the gic is not implemented
-> >>as a device.
-> >
-> >And that's what I propose we change.
-> >
-> >The core GIC itself indeed isn't a device, and I'm not proposing we make
-> >it a device (yet). But the ITS is only used much later in the game, and
-> >we could move the table allocation to a different time (when the actual
-> >domains are allocated, for example...). Then, we'd have a set of devices
-> >available, and the DMA API is our friend again.
-> >
-> >	M.
-> >
-> 
-> I did the first drop of CMA in the DMA APIs for arm64. When adding that,
-> it was decided to disallow dma_alloc calls without a valid device pointer
-> (c666e8d5cae7 "arm64: Warn on NULL device structure for dma APIs") so
-> if the GIC code wants to use dma_alloc it _must_ have a proper device.
-> 
-> If the device shift still isn't feasible, a better approach might be
-> what powerpc did for kvm (arch/powerpc/kvm/book3s_hv_builtin.c). This
-> calls the cma_alloc functions directly and skips trying to work around
-> the DMA layer.
-> 
-> With either option, I don't think the early initialization approach
-> proposed is great. If we want CMA early, it's probably be just to
-> explicitly initialize it early rather than trying to do it from
-> two places. Something like:
 
-I wasn't sure whether this works for all archs if called directly in
-mm_init(). If so, ok your proposed change would be better, though a
-stub for !CONFIG_CMA needs to be added. Any comment on the change
-below as a replacement for patch #1?
 
-On the other side, if we use device enablement for its, then early cma
-enablement is not needed anymore. Will check how that could work.
+On 3/1/2016 3:44 PM, Xinliang Liu wrote:
+> Hi,
+>
+> On 1 March 2016 at 02:48, Archit Taneja <architt@codeaurora.org> wrote:
+>>
+>>
+>> On 2/26/2016 2:10 PM, Xinliang Liu wrote:
+>>>
+>>> Add vblank irq handle.
+>>>
+>>> v6: None.
+>>> v5: None.
+>>> v4: None.
+>>> v3:
+>>> - Remove hisi_get_crtc_from_index func.
+>>> - A few cleanup.
+>>> v2:
+>>> - Remove abtraction layer.
+>>>
+>>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>>> ---
+>>>    drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 62
+>>> +++++++++++++++++++++++++
+>>>    drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c | 14 +++++-
+>>>    2 files changed, 75 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>>> b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>>> index aa2cf75cab39..749382952ab7 100644
+>>> --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>>> +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+>>> @@ -292,6 +292,59 @@ static void ade_set_medianoc_qos(struct ade_crtc
+>>> *acrtc)
+>>>                             SOCKET_QOS_EN, SOCKET_QOS_EN);
+>>>    }
+>>>
+>>> +static int ade_enable_vblank(struct drm_device *dev, unsigned int pipe)
+>>> +{
+>>> +       struct kirin_drm_private *priv = dev->dev_private;
+>>> +       struct ade_crtc *acrtc = to_ade_crtc(priv->crtc[pipe]);
+>>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
+>>> +       void __iomem *base = ctx->base;
+>>> +
+>>> +       if (!ctx->power_on)
+>>> +               (void)ade_power_up(ctx);
+>>> +
+>>> +       ade_update_bits(base + LDI_INT_EN, FRAME_END_INT_EN_OFST,
+>>> +                       MASK(1), 1);
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +static void ade_disable_vblank(struct drm_device *dev, unsigned int pipe)
+>>> +{
+>>> +       struct kirin_drm_private *priv = dev->dev_private;
+>>> +       struct ade_crtc *acrtc = to_ade_crtc(priv->crtc[pipe]);
+>>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
+>>> +       void __iomem *base = ctx->base;
+>>> +
+>>> +       if (!ctx->power_on) {
+>>> +               DRM_ERROR("power is down! vblank disable fail\n");
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       ade_update_bits(base + LDI_INT_EN, FRAME_END_INT_EN_OFST,
+>>> +                       MASK(1), 0);
+>>> +}
+>>> +
+>>> +static irqreturn_t ade_irq_handler(int irq, void *data)
+>>> +{
+>>> +       struct ade_crtc *acrtc = data;
+>>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
+>>> +       struct drm_crtc *crtc = &acrtc->base;
+>>> +       void __iomem *base = ctx->base;
+>>> +       u32 status;
+>>> +
+>>> +       status = readl(base + LDI_MSK_INT);
+>>> +       DRM_DEBUG_VBL("LDI IRQ: status=0x%X\n", status);
+>>> +
+>>> +       /* vblank irq */
+>>> +       if (status & BIT(FRAME_END_INT_EN_OFST)) {
+>>> +               ade_update_bits(base + LDI_INT_CLR, FRAME_END_INT_EN_OFST,
+>>> +                               MASK(1), 1);
+>>> +               drm_crtc_handle_vblank(crtc);
+>>> +       }
+>>> +
+>>> +       return IRQ_HANDLED;
+>>> +}
+>>> +
+>>>    static void ade_display_enable(struct ade_crtc *acrtc)
+>>>    {
+>>>          struct ade_hw_ctx *ctx = acrtc->ctx;
+>>> @@ -967,6 +1020,15 @@ int ade_drm_init(struct drm_device *dev)
+>>>          if (ret)
+>>>                  return ret;
+>>>
+>>> +       /* vblank irq init */
+>>> +       ret = devm_request_irq(dev->dev, ctx->irq, ade_irq_handler,
+>>> +                              DRIVER_IRQ_SHARED, dev->driver->name,
+>>> acrtc);
+>>
+>>
+>> This isn't the way we set up interrupts for kms drivers. We need to
+>> provide the handler in drm_driver and call drm_irq_install.
+>
+> I prefer to set up interrupts here for two reasons.
+> One is that it is easy to pass any interrupt private "void * data" to
+> the interrupt handler here.
+> As I discussed with Daniel Vetter before: https://lkml.org/lkml/2015/9/10/204.
+>
+> Second is setting up interrupt here in the specific SoC display
+> controller driver, make other SoC reuse the kirin_drm_drv.c code
+> easily.
+> Different Hisilicon SoC may has different display controller interrupts.
 
--Robert
+Sure, as long as this has been discussed before.
 
-> 
-> diff --git a/include/linux/cma.h b/include/linux/cma.h
-> index 29f9e77..a26712a 100644
-> --- a/include/linux/cma.h
-> +++ b/include/linux/cma.h
-> @@ -28,4 +28,5 @@ extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
->                                         struct cma **res_cma);
->  extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align);
->  extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
-> +extern int __init cma_init_reserved_areas(void);
->  #endif
-> diff --git a/init/main.c b/init/main.c
-> index 58c9e37..a92bdb8 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -81,6 +81,7 @@
->  #include <linux/integrity.h>
->  #include <linux/proc_ns.h>
->  #include <linux/io.h>
-> +#include <linux/cma.h>
->  #include <asm/io.h>
->  #include <asm/bugs.h>
-> @@ -492,6 +493,7 @@ static void __init mm_init(void)
->         pgtable_init();
->         vmalloc_init();
->         ioremap_huge_init();
-> +       cma_init_reserved_areas();
->  }
->  asmlinkage __visible void __init start_kernel(void)
-> diff --git a/mm/cma.c b/mm/cma.c
-> index ea506eb..42278d4 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -142,7 +142,7 @@ err:
->         return -EINVAL;
->  }
-> -static int __init cma_init_reserved_areas(void)
-> +int __init cma_init_reserved_areas(void)
->  {
->         int i;
-> @@ -155,7 +155,6 @@ static int __init cma_init_reserved_areas(void)
->         return 0;
->  }
-> -core_initcall(cma_init_reserved_areas);
->  /**
->   * cma_init_reserved_mem() - create custom contiguous area from reserved memory
+>
+>>
+>>
+>>> +       if (ret)
+>>> +               return ret;
+>>> +       dev->driver->get_vblank_counter = drm_vblank_no_hw_counter;
+>>> +       dev->driver->enable_vblank = ade_enable_vblank;
+>>> +       dev->driver->disable_vblank = ade_disable_vblank;
+>>> +
+>>>          return 0;
+>>>    }
+>>>
+>>> diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+>>> b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+>>> index 055729c1889c..723888feb760 100644
+>>> --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+>>> +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+>>> @@ -32,6 +32,7 @@ static int kirin_drm_kms_cleanup(struct drm_device *dev)
+>>>    {
+>>>          struct kirin_drm_private *priv = dev->dev_private;
+>>>
+>>> +       drm_vblank_cleanup(dev);
+>>>          dc_ops->cleanup(dev);
+>>>          drm_mode_config_cleanup(dev);
+>>>          devm_kfree(dev->dev, priv);
+>>> @@ -85,11 +86,22 @@ static int kirin_drm_kms_init(struct drm_device *dev)
+>>>                  goto err_dc_cleanup;
+>>>          }
+>>>
+>>> +       /* vblank init */
+>>> +       ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
+>>> +       if (ret) {
+>>> +               DRM_ERROR("failed to initialize vblank.\n");
+>>> +               goto err_unbind_all;
+>>> +       }
+>>> +       /* with irq_enabled = true, we can use the vblank feature. */
+>>> +       dev->irq_enabled = true;
+>>> +
+>>>          /* reset all the states of crtc/plane/encoder/connector */
+>>>          drm_mode_config_reset(dev);
+>>>
+>>>          return 0;
+>>>
+>>> +err_unbind_all:
+>>> +       component_unbind_all(dev->dev, dev);
+>>>    err_dc_cleanup:
+>>>          dc_ops->cleanup(dev);
+>>>    err_mode_config_cleanup:
+>>> @@ -123,7 +135,7 @@ static int kirin_gem_cma_dumb_create(struct drm_file
+>>> *file,
+>>>
+>>>    static struct drm_driver kirin_drm_driver = {
+>>>          .driver_features        = DRIVER_GEM | DRIVER_MODESET |
+>>> DRIVER_PRIME |
+>>> -                                 DRIVER_ATOMIC,
+>>> +                                 DRIVER_ATOMIC | DRIVER_HAVE_IRQ,
+>>
+>>
+>> DRIVER_IRQ_SHARED should be added here if you want IRQF_SHARED flag set
+>> when requesting the handler.
+>
+> If not using the drm_irq_install to set up interrupts,
+> DRIVER_IRQ_SHARED may not be required to set.
+>
+
+Yes. In any case, you should use IRQF_SHARED and not DRIVER_IRQ_SHARED
+in the call to devm_request_irq(). The latter is a drm flag meant to be
+used only for driver_features.
+
+Thanks,
+Archit
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
