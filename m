@@ -1,85 +1,55 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  1 Mar 2016 14:15:31 -0700
-Subject: [RFC v3 12/12] ARM64: dts: Define CPU power domain for MSM8916
-In-Reply-To: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
+Date: Tue, 1 Mar 2016 14:17:05 -0700
+Subject: [BUG FIX] PM / cpu_domains: Check for NULL callbacks
+In-Reply-To: <1456866931-37851-2-git-send-email-lina.iyer@linaro.org>
 References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1456866931-37851-14-git-send-email-lina.iyer@linaro.org>
+ <1456866931-37851-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20160301211705.GQ1440@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define power domain and the power states for the domain as defined by
-the PSCI firmware. The 8916 firmware supports OS initiated method of
-powering off the CPU clusters.
+Ignore this patch pls. This change has been folded in.
 
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Thanks,
+Lina
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index b7839a8..62dade8 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -63,6 +63,7 @@
- 			reg = <0x0>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU1: cpu at 1 {
-@@ -71,6 +72,7 @@
- 			reg = <0x1>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU2: cpu at 2 {
-@@ -79,6 +81,7 @@
- 			reg = <0x2>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		CPU3: cpu at 3 {
-@@ -87,6 +90,7 @@
- 			reg = <0x3>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SPC>;
-+			power-domains = <&CPU_PD>;
- 		};
- 
- 		idle-states {
-@@ -101,6 +105,27 @@
- 		};
- 	};
- 
-+	CPU_PD: cpu-pd at 0 {
-+		#power-domain-cells = <0>;
-+		power-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
-+	};
-+
-+	pd-power-states {
-+		CLUSTER_RET: power-state at 1 {
-+			state-param = <0x1000010>;
-+			entry-latency-us = <500>;
-+			exit-latency-us = <500>;
-+			residency-us = <2000>;
-+		 };
-+
-+		CLUSTER_PWR_DWN: power-state at 2 {
-+			state-param = <0x1000030>;
-+			entry-latency-us = <2000>;
-+			exit-latency-us = <2000>;
-+			residency-us = <6000>;
-+		};
-+	};
-+
- 	psci {
- 		compatible = "arm,psci-1.0";
- 		method = "smc";
--- 
-2.1.4
+On Tue, Mar 01 2016 at 14:15 -0700, Lina Iyer wrote:
+>Check for NULL platform callback before calling.
+>
+>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>---
+> drivers/base/power/cpu_domains.c | 10 ++++++++--
+> 1 file changed, 8 insertions(+), 2 deletions(-)
+>
+>diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
+>index 7069411..bcaa474 100644
+>--- a/drivers/base/power/cpu_domains.c
+>+++ b/drivers/base/power/cpu_domains.c
+>@@ -157,16 +157,22 @@ static int cpu_pd_power_on(struct generic_pm_domain *genpd)
+> {
+> 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+>
+>-	return pd->ops.power_on();
+>+	if (pd->ops.power_on)
+>+		return pd->ops.power_on();
+>+
+>+	return 0;
+> }
+>
+> static int cpu_pd_power_off(struct generic_pm_domain *genpd)
+> {
+> 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+>
+>-	return pd->ops.power_off(genpd->state_idx,
+>+	if (pd->ops.power_off)
+>+		return pd->ops.power_off(genpd->state_idx,
+> 			genpd->states[genpd->state_idx].param,
+> 			pd->cpus);
+>+
+>+	return 0;
+> }
+>
+> /**
+>-- 
+>2.1.4
+>
