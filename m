@@ -1,67 +1,41 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 01 Mar 2016 09:05:06 +0100
-Subject: [PATCH v4 1/5] ARM: dts: LG Optimus Black codename sniper basic
- support
-In-Reply-To: <20160229215136.GO13417@atomide.com>
-References: <1456663185-14170-1-git-send-email-contact@paulk.fr>
- <1456663185-14170-2-git-send-email-contact@paulk.fr>
- <20160229215136.GO13417@atomide.com>
-Message-ID: <1456819506.1157.0.camel@paulk.fr>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 1 Mar 2016 09:12:42 +0100
+Subject: [PATCH] arm64: dts: r8a7795: Add CAN support
+In-Reply-To: <1456755759-51288-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+References: <1456755759-51288-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+Message-ID: <56D54EFA.6020105@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi 29 f?vrier 2016 ? 13:51 -0800, Tony Lindgren a ?crit?:
-> Hi,
+On 02/29/2016 03:22 PM, Ramesh Shanmugasundaram wrote:
+> Adds CAN controller nodes for r8a7795.
 > 
-> * Paul Kocialkowski <contact@paulk.fr> [160228 04:40]:
-> > The LG Optimus Black codename sniper is a smartphone that was designed and
-> > manufactured by LG Electronics (LGE) and released back in 2011.
-> > It is using an OMAP3630 SoC, GP version.
-> > 
-> > This adds devicetree support for the device, with only a few basic features
-> > supported, such as debug uart, i2c, internal emmc and external mmc.
-> ...
-> > +&i2c1 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&i2c1_pins>;
-> > +
-> > +	clock-frequency = <2600000>;
-> > +
-> > +	twl: twl at 48 {
-> > +		reg = <0x48>;
-> > +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> > +		interrupt-parent = <&intc>;
-> > +
-> > +		power {
-> > +			compatible = "ti,twl4030-power";
-> > +			ti,use_poweroff;
-> > +		};
-> > +	};
-> > +};
+> Note: CAN channel register base address mentioned in R-Car Gen3 Hardware
+> User Manual v0.5E is incorrect. The corrected base addresses are:
 > 
-> Chances are this devices supports cutting off the voltages and
-> the high frequency oscillator during idle. So you may want to
-> at some point set compatible = "ti,twl4030-power-idle-osc-off"
-> here.
+> CAN Channel 0 - 0xe6c30000
+> CAN Channel 1 - 0xe6c38000
+> 
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> ---
+> Hi All,
+> 
+>    This patch is based on linux-next (tag:next-20160225) with following patch
+>    applied on top
 
-Thanks for the pointer, I'll consider adding this in the future!
+Who should take this patch?
 
-> Anyways, applying the dts changes into omap-for-v4.6/dt thanks.
-
-Nice, thanks!
-
-Cheers,
-
+Marc
 -- 
-Paul Kocialkowski, low-level free software developer on embedded devices
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/60df0e74/attachment.sig>
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/dd48dafe/attachment.sig>
