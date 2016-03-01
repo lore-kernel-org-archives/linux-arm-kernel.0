@@ -1,45 +1,83 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 01 Mar 2016 07:07:18 +0100
-Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr() on ARM
-Message-ID: <m337sapw89.fsf@t19.piap.pl>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Tue,  1 Mar 2016 14:35:05 +0800
+Subject: [PATCH V4 0/4] Introduce CoreSight STM support
+Message-ID: <1456814109-21311-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many ARM platforms use a wrapper:
-/*
- * Compatibility wrapper for older platforms that do not care about
- * passing the parent device.
- */
-static inline void pci_common_init(struct hw_pci *hw)
-{
-        pci_common_init_dev(NULL, hw);
-}
+This patchset adds support for the CoreSight STM IP block.
 
-which means that pci_bus_assign_domain_nr() can be called without
-a parent. This patch fixes the NULL pointer dereference.
+In this fourth version, comments from various people have been
+addressed.  Representing configurations where channels are shared
+between multiple masterIDs has been kept unchanged from the previous
+version because a viable alternative hasn't been suggested.
 
-Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-Cc: stable at vger.kernel.org
+Changes from V3:
+ - Removed ioctl get_options interface from the generic STM code and CoreSight STM driver.
+ - Removed 'write_max' from the structure 'stm_drvdata', and changed 'write_64bit' to 'write_bytes'.
+ - Revised stm_fundamental_data_size() to return the fundamental data size instead of 0/1.
+ - Removed stm_remove() from the driver.
+ - Revised the return value of ::packet() callback function according to [2].
+ - Modified stm_send() to send one STP packet at a time.
+ - Added comments to invariant/guaranteed CoreSight STM transaction mode.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 602eb42..f89db3a 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4772,8 +4772,10 @@ int pci_get_new_domain_nr(void)
- void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- {
- 	static int use_dt_domains = -1;
--	int domain = of_get_pci_domain_nr(parent->of_node);
-+	int domain = -1;
- 
-+	if (parent)
-+		domain = of_get_pci_domain_nr(parent->of_node);
- 	/*
- 	 * Check DT domain and use_dt_domains values.
- 	 *
+Changes from V2:
+ - Changed to return -EFAULT if failed on the command STP_GET_OPTIONS.
+ - Used Alex's patch [1] instead of the last 2/6.
+ - Removed the while loop from stm_send(), since the packet size passed
+   to it isn't larger than 4 bytes on 32-bit system and 8 bytes on
+   64-bit system.
+ - Removed stm_send_64bit(), since the process of packets on 64-bit
+   CS-STM should be basically the same with on 32-bit system, except the 
+   maximum length of writing STM at a time.
+ - Removed the support of writing 64-bit to CoreSight STM buffer at a time
+   on 32-bit ARM architecture according to an ARM engineer suggestion.  As
+   he said that the STM might receive a 64-bit write, or might receive a
+   pair of 32-bit writes to the two addressed words in either order.
+   So 64-bit write isn't guaranteed to work on the ARM 32-bit architecture.
+
+Changes from v1:
+ - Added a definition of coresight_simple_func() in CS-STM driver to
+   avoid the kbuild test robot error for the time being.  This
+   modification will be removed when merging the code in which the
+   coresight_simple_func() has been moved to the header file.
+ - Calculate the channel number according to the channel memory space size.
+
+
+Thanks,
+Chunyan
+
+[1] https://lkml.org/lkml/2016/2/4/652
+[2] https://lkml.org/lkml/2016/2/12/397
+
+Chunyan Zhang (1):
+  Documentations: Add explanations of the case for non-configurable
+    masters
+
+Mathieu Poirier (2):
+  stm class: provision for statically assigned masterIDs
+  coresight-stm: Bindings for System Trace Macrocell
+
+Pratik Patel (1):
+  coresight-stm: adding driver for CoreSight STM component
+
+ .../ABI/testing/sysfs-bus-coresight-devices-stm    |  53 ++
+ .../devicetree/bindings/arm/coresight.txt          |  28 +
+ Documentation/trace/coresight.txt                  |  37 +-
+ Documentation/trace/stm.txt                        |   6 +
+ drivers/hwtracing/coresight/Kconfig                |  11 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-stm.c        | 890 +++++++++++++++++++++
+ drivers/hwtracing/stm/core.c                       |  18 +-
+ drivers/hwtracing/stm/policy.c                     |  18 +-
+ include/linux/coresight-stm.h                      |   6 +
+ include/linux/stm.h                                |   8 +
+ include/uapi/linux/coresight-stm.h                 |  21 +
+ 12 files changed, 1091 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+ create mode 100644 drivers/hwtracing/coresight/coresight-stm.c
+ create mode 100644 include/linux/coresight-stm.h
+ create mode 100644 include/uapi/linux/coresight-stm.h
 
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+1.9.1
