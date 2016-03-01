@@ -1,69 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 1 Mar 2016 15:02:37 +0100
-Subject: [PATCH 3/3] ARM: dts: at91: sama5d2 Xplained: add leds node
-In-Reply-To: <cover.1456840819.git.nicolas.ferre@atmel.com>
-References: <cover.1456840819.git.nicolas.ferre@atmel.com>
-Message-ID: <3d95be152295ec59381d64e984d63f62fad6abc3.1456840819.git.nicolas.ferre@atmel.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 1 Mar 2016 14:04:20 +0000
+Subject: [PATCH v3 4/4] printk/nmi: Increase the size of NMI buffer and
+ make it configurable
+In-Reply-To: <56743BA0.1030409@linaro.org>
+References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
+ <1449667265-17525-5-git-send-email-pmladek@suse.com>
+ <CAMuHMdXVgr58YjoePGrRbMyMncQ27f85prL7G5SpeHeNxoYrXQ@mail.gmail.com>
+ <20151211124159.GB3729@pathway.suse.cz>
+ <20151211145725.b0e81bb4bb18fcd72ef5f557@linux-foundation.org>
+ <20151211232113.GZ8644@n2100.arm.linux.org.uk>
+ <alpine.LNX.2.00.1512120024370.9922@cbobk.fhfr.pm>
+ <5673DD60.7080302@linaro.org> <20151218145207.GK3729@pathway.suse.cz>
+ <56743BA0.1030409@linaro.org>
+Message-ID: <56D5A164.3000000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenyou Yang <wenyou.yang@atmel.com>
+On 18/12/15 17:00, Daniel Thompson wrote:
+>>> The MCE handlers should only call printk() when they decide to panic
+>>> and *after* busting the spinlocks. At this point deferring printk()
+>>> until it is safe is not very helpful.
+>>>
+>>> When we bust the spinlocks we should probably restore the normal
+>>> printk() function to give best chance of the failure messages making
+>>> it out.
+>>
+>> The problem is that we do not know what locks need to be busted. There
+>> are too many consoles and too many locks involved. Also busting locks
+>> open another can of worms.
+>
+> Yes, I agree that busting the spinlocks doesn't avoid all risk of deadlock.
+>
+> Probably I've been placing too much weight on the importance of getting
+> messages out when dying. You're right that surviving far enough through
+> a panic to trigger kdump or reset is equally (or more) important in many
+> scenarios than getting a failure message out.
+>
+> However on a system with nothing but "while(1) {}" hooked up to panic()
+> then its worth risking a lock up. In this case restoring normal printk()
+> behavior and dumping the NMI buffers would be worthwhile.
 
-Add the three leds on the sama5d2 Xplained board with their pinctrl node.
-The blue led is positioned with the "heartbeat" trigger.
+An a (much) later thread[1] Andrew Morton described this comment as 
+non-committal. Sorry for that.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-[nicolas.ferre at atmel.com: add commit message and adapt to newer kernel]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 30 +++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+I don't object to the overall approach taken by Petr, merely that I 
+think there are cases where the current patchset doesn't put in quite 
+enough effort to issue messages.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index d20d4033d64c..2636b9e2d124 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -307,6 +307,13 @@
- 					bias-pull-up;
- 				};
- 
-+				pinctrl_led_gpio_default: led_gpio_default {
-+					pinmux = <PIN_PB0__GPIO>,
-+						 <PIN_PB5__GPIO>,
-+						 <PIN_PB6__GPIO>;
-+					bias-pull-up;
-+				};
-+
- 				pinctrl_macb0_default: macb0_default {
- 					pinmux = <PIN_PB14__GTXCK>,
- 						 <PIN_PB15__GTXEN>,
-@@ -418,4 +425,27 @@
- 			linux,code = <0x104>;
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_led_gpio_default>;
-+		status = "okay";
-+
-+		red {
-+			label = "red";
-+			gpios = <&pioA 38 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		green {
-+			label = "green";
-+			gpios = <&pioA 37 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		blue {
-+			label = "blue";
-+			gpios = <&pioA 32 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
- };
--- 
-2.1.3
+Panic triggered during NMI is the only case I can think of and that, I 
+think, could be addressed by adding an extra call to printk_nmi_flush() 
+during panic(). It should probably only cover cases where we *don't* 
+call kdump and the panic handler doesn't restart the machine... so just 
+after the pr_emerg("...end kernel panic") would be OK for me.
+
+
+Daniel.
+
+
+[1]: http://thread.gmane.org/gmane.linux.ports.arm.kernel/482845
