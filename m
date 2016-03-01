@@ -1,169 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  1 Mar 2016 20:01:05 +0000
-Subject: [PATCHv2] arm64: kasan: clear stale stack poison
-Message-ID: <1456862465-31505-1-git-send-email-mark.rutland@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 2 Mar 2016 04:05:48 +0800
+Subject: [PATCH] sched/kasan: clear stale stack poison
+In-Reply-To: <20160301194204.GB335@leverpostej>
+Message-ID: <201603020407.MpuzPX1T%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is shut down or placed into a low power state, the functions
-on the critical path to firmware never return, and hence their epilogues
-never execute. When using KASAN, this means that the shadow entries for
-the corresponding stack are poisoned but never unpoisoned. When a CPU
-subsequently re-enters the kernel via another path, and begins using
-the stack, it may hit stale poison values, leading to false-positive
-KASAN failures.
+Hi Mark,
 
-We can't ensure that all functions on the critical path are not
-instrumented. For CPU hotplug this includes lots of core code starting
-from secondary_start_kernel, and for CPU idle we can't ensure that
-specific functions are not instrumented, as the compiler always poisons
-the stack even when told to not instrument a function:
+[auto build test WARNING on tip/sched/core]
+[also build test WARNING on v4.5-rc6 next-20160301]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69863
+url:    https://github.com/0day-ci/linux/commits/Mark-Rutland/sched-kasan-clear-stale-stack-poison/20160302-034556
+config: sparc64-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sparc64 
 
-This patch works around the issue by forcefully unpoisoning the shadow
-region for all stack on the critical path, before we return to
-instrumented C code. As we cannot statically determine the stack usage
-of code in the critical path, we must clear the shadow for all remaining
-stack, meaning that we must clear up to 2K of shadow memory each time a
-CPU enters the kernel from idle or hotplug.
+All warnings (new ones prefixed by >>):
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Alexander Potapenko <glider@google.com>
-Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+   In file included from kernel/sched/core.c:29:0:
+   include/linux/kasan.h:71:53: warning: 'struct task_struct' declared inside parameter list
+    static inline void kasan_unpoison_task_stack(struct task_struct *idle) {}
+                                                        ^
+   include/linux/kasan.h:71:53: warning: its scope is only this definition or declaration, which is probably not what you want
+   kernel/sched/core.c: In function 'init_idle':
+>> kernel/sched/core.c:5026:2: warning: passing argument 1 of 'kasan_unpoison_task_stack' from incompatible pointer type
+     kasan_unpoison_task_stack(idle);
+     ^
+   In file included from kernel/sched/core.c:29:0:
+   include/linux/kasan.h:71:20: note: expected 'struct task_struct *' but argument is of type 'struct task_struct *'
+    static inline void kasan_unpoison_task_stack(struct task_struct *idle) {}
+                       ^
+
+vim +/kasan_unpoison_task_stack +5026 kernel/sched/core.c
+
+  5010	 *
+  5011	 * NOTE: this function does not set the idle thread's NEED_RESCHED
+  5012	 * flag, to make booting more robust.
+  5013	 */
+  5014	void init_idle(struct task_struct *idle, int cpu)
+  5015	{
+  5016		struct rq *rq = cpu_rq(cpu);
+  5017		unsigned long flags;
+  5018	
+  5019		raw_spin_lock_irqsave(&idle->pi_lock, flags);
+  5020		raw_spin_lock(&rq->lock);
+  5021	
+  5022		__sched_fork(0, idle);
+  5023		idle->state = TASK_RUNNING;
+  5024		idle->se.exec_start = sched_clock();
+  5025	
+> 5026		kasan_unpoison_task_stack(idle);
+  5027	
+  5028	#ifdef CONFIG_SMP
+  5029		/*
+  5030		 * Its possible that init_idle() gets called multiple times on a task,
+  5031		 * in that case do_set_cpus_allowed() will not do the right thing.
+  5032		 *
+  5033		 * And since this is boot we can forgo the serialization.
+  5034		 */
+
 ---
- arch/arm64/include/asm/kasan.h  | 40 ++++++++++++++++++++++++++++++++++------
- arch/arm64/kernel/asm-offsets.c |  1 +
- arch/arm64/kernel/head.S        |  2 ++
- arch/arm64/kernel/sleep.S       |  2 ++
- 4 files changed, 39 insertions(+), 6 deletions(-)
-
-Since v1 [1]:
-* Remove unneeded offset
-* Simplify calculation
-
-For the timebeing I've retained the arm64-specific hotplug fix, though it might
-be possible to handle the hotplug case in common code (e.g. [2]). 
-
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409466.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/412923.html
-
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index 2774fa3..6f00b76 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -1,10 +1,30 @@
- #ifndef __ASM_KASAN_H
- #define __ASM_KASAN_H
- 
--#ifndef __ASSEMBLY__
--
-+#ifndef LINKER_SCRIPT
- #ifdef CONFIG_KASAN
- 
-+#ifdef __ASSEMBLY__
-+
-+#include <asm/asm-offsets.h>
-+#include <asm/thread_info.h>
-+
-+	/*
-+	 * Remove stale shadow posion for the stack left over from a prior
-+	 * hot-unplug or idle exit, from the lowest stack address in the
-+	 * thread_union up to the covering up to the current stack pointer.
-+	 * Shadow poison above this is preserved.
-+	 */
-+	.macro kasan_unpoison_stack
-+	mov	x1, sp
-+	and	x0, x1, #~(THREAD_SIZE - 1)
-+	add	x0, x0, #(THREAD_INFO_SIZE)
-+	sub	x1, x1, x0
-+	bl	kasan_unpoison_shadow
-+	.endm
-+
-+#else /* __ASSEMBLY__ */
-+
- #include <linux/linkage.h>
- #include <asm/memory.h>
- 
-@@ -30,9 +50,17 @@
- void kasan_init(void);
- asmlinkage void kasan_early_init(void);
- 
--#else
-+#endif /* __ASSEMBLY__ */
-+
-+#else /* CONFIG_KASAN */
-+
-+#ifdef __ASSEMBLY__
-+	.macro kasan_unpoison_stack
-+	.endm
-+#else /* __ASSEMBLY */
- static inline void kasan_init(void) { }
--#endif
-+#endif /* __ASSEMBLY__ */
- 
--#endif
--#endif
-+#endif /* CONFIG_KASAN */
-+#endif /* LINKER_SCRIPT */
-+#endif /* __ASM_KASAN_H */
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index fffa4ac6..c615fa3 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -39,6 +39,7 @@ int main(void)
-   DEFINE(TI_ADDR_LIMIT,		offsetof(struct thread_info, addr_limit));
-   DEFINE(TI_TASK,		offsetof(struct thread_info, task));
-   DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
-+  DEFINE(THREAD_INFO_SIZE,	sizeof(struct thread_info));
-   BLANK();
-   DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
-   BLANK();
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 917d981..35ae2cb 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -29,6 +29,7 @@
- #include <asm/asm-offsets.h>
- #include <asm/cache.h>
- #include <asm/cputype.h>
-+#include <asm/kasan.h>
- #include <asm/kernel-pgtable.h>
- #include <asm/memory.h>
- #include <asm/pgtable-hwdef.h>
-@@ -616,6 +617,7 @@ ENTRY(__secondary_switched)
- 	and	x0, x0, #~(THREAD_SIZE - 1)
- 	msr	sp_el0, x0			// save thread_info
- 	mov	x29, #0
-+	kasan_unpoison_stack
- 	b	secondary_start_kernel
- ENDPROC(__secondary_switched)
- 
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index e33fe33..3ad7681 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -2,6 +2,7 @@
- #include <linux/linkage.h>
- #include <asm/asm-offsets.h>
- #include <asm/assembler.h>
-+#include <asm/kasan.h>
- 
- 	.text
- /*
-@@ -145,6 +146,7 @@ ENTRY(cpu_resume_mmu)
- ENDPROC(cpu_resume_mmu)
- 	.popsection
- cpu_resume_after_mmu:
-+	kasan_unpoison_stack
- 	mov	x0, #0			// return zero on success
- 	ldp	x19, x20, [sp, #16]
- 	ldp	x21, x22, [sp, #32]
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45097 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160302/d02ef05f/attachment-0001.obj>
