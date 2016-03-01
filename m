@@ -1,42 +1,70 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 1 Mar 2016 20:35:25 +0300
-Subject: [PATCH v4 2/4] ACPI: enable ACPI_SPCR_TABLE on ARM64
-In-Reply-To: <56D5B4E8.1050309@hurleysoftware.com>
-References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
- <1456747355-15692-3-git-send-email-aleksey.makarov@linaro.org>
- <56D5B4E8.1050309@hurleysoftware.com>
-Message-ID: <56D5D2DD.30105@linaro.org>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 1 Mar 2016 18:36:28 +0100
+Subject: [PATCH v3 4/4] ARM: STM32: Enable Ethernet in stm32_defconfig
+In-Reply-To: <1456483912-32090-5-git-send-email-alexandre.torgue@gmail.com>
+References: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
+ <1456483912-32090-5-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <56D5D31C.7050908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Alex, Arnd,
 
+On 02/26/2016 11:51 AM, Alexandre TORGUE wrote:
+> Enable basic Ethernet support (IPV4) for stm32 defconfig.
+>
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+>
+> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+> index ec52505..8b8abe0 100644
+> --- a/arch/arm/configs/stm32_defconfig
+> +++ b/arch/arm/configs/stm32_defconfig
+> @@ -33,11 +33,20 @@ CONFIG_XIP_PHYS_ADDR=0x08008000
+>   CONFIG_BINFMT_FLAT=y
+>   CONFIG_BINFMT_SHARED_FLAT=y
+>   # CONFIG_COREDUMP is not set
+> +CONFIG_NET=y
+> +CONFIG_INET=y
+> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+> +# CONFIG_INET_XFRM_MODE_BEET is not set
+> +# CONFIG_IPV6 is not set
+>   CONFIG_DEVTMPFS=y
+>   CONFIG_DEVTMPFS_MOUNT=y
+>   # CONFIG_FW_LOADER is not set
+>   # CONFIG_BLK_DEV is not set
+>   CONFIG_EEPROM_93CX6=y
+> +CONFIG_NETDEVICES=y
+> +CONFIG_STMMAC_ETH=y
+> +# CONFIG_WLAN is not set
+>   # CONFIG_INPUT is not set
+>   # CONFIG_SERIO is not set
+>   # CONFIG_VT is not set
+>
 
-On 03/01/2016 06:27 PM, Peter Hurley wrote:
-> On 02/29/2016 04:02 AM, Aleksey Makarov wrote:
->> SBBR mentions SPCR as a mandatory ACPI table.
->> So enable it for ARM64
-> 
-> Why is this opt-in per-arch?
+The patch looks good, but I'm not sure I should apply it.
+Indeed, not all the stm32 boards have Ethernet interface, and stm32 
+internal flash size is rather limited (2MB).
+Note that your glue layer can be compiled with COMPILE_TEST, so its 
+build will be covered anyway.
 
-It could depend only on CONFIG_ACPI.
-I will do that in the next version, thank you
+Arnd, do you think we could use Kconfig fragments to enable features 
+like USB, Ethernet, MTD, etc...?
+Maybe we could have a subdirectory in arch/arm/configs where these stm32 
+specifics fragments could leave?
 
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->> ---
->>  arch/arm64/Kconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 9dc5209..544af2e 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -3,6 +3,7 @@ config ARM64
->>  	select ACPI_CCA_REQUIRED if ACPI
->>  	select ACPI_GENERIC_GSI if ACPI
->>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->> +	select ACPI_SPCR_TABLE if ACPI
->>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->>  	select ARCH_HAS_ELF_RANDOMIZE
->>
-> 
+For example, we could have:
+arch/arm/configs/stm32/eth.config
+arch/arm/configs/stm32/usb.config
+
+For configuring the Discovery board we would use:
+make stm32_defconfig stm32/usb.config
+
+For the Eval board, we cwould use:
+make stm32_defconfig eth.config
+
+It would make easy to be able to boot every boards without multiplying 
+the defconfigs.
+
+Regards,
+Maxime
