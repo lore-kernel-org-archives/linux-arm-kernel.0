@@ -1,37 +1,100 @@
-From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
-Date: Tue, 1 Mar 2016 08:20:25 +0000
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN support
-In-Reply-To: <56D54EFA.6020105@pengutronix.de>
-References: <1456755759-51288-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <56D54EFA.6020105@pengutronix.de>
-Message-ID: <SG2PR06MB103895394DED2A849E2A801BC3BB0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 1 Mar 2016 08:25:58 +0000 (UTC)
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56CD4BE1.3010701@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+ <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
+ <56CAA82D.6000507@ti.com>
+ <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
+ <56CADB23.8020202@ti.com> <56CC490F.3040301@ti.com>
+ <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
+ <56CD4BE1.3010701@ti.com>
+Message-ID: <alpine.DEB.2.02.1603010825090.14948@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
 
-> On 02/29/2016 03:22 PM, Ramesh Shanmugasundaram wrote:
-> > Adds CAN controller nodes for r8a7795.
-> >
-> > Note: CAN channel register base address mentioned in R-Car Gen3
-> > Hardware User Manual v0.5E is incorrect. The corrected base addresses
-> are:
-> >
-> > CAN Channel 0 - 0xe6c30000
-> > CAN Channel 1 - 0xe6c38000
-> >
-> > Signed-off-by: Ramesh Shanmugasundaram
-> > <ramesh.shanmugasundaram@bp.renesas.com>
-> > ---
-> > Hi All,
-> >
-> >    This patch is based on linux-next (tag:next-20160225) with following
-> patch
-> >    applied on top
-> 
-> Who should take this patch?
+Folks, the following is what I've queued for this.
 
-If acked, I think it is Simon (who consolidates all Renesas ARM64 DT changes and make one pull request). Copied Geert too.
 
-Thanks,
-Ramesh
+- Paul
+
+
+From: Sekhar Nori <nsekhar@ti.com>
+Date: Thu, 18 Feb 2016 16:49:56 +0530
+Subject: [PATCH] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+
+Add a custom reset handler for DRA7x PCIeSS. This
+handler is required to deassert PCIe hardreset lines
+after they have been asserted.
+
+This enables the PCIe driver to access registers after
+PCIeSS has been runtime enabled without having to
+deassert hardreset lines itself.
+
+With this patch applied, used lspci to make sure
+connected PCIe device enumerates on DRA74x and DRA72x
+EVMs.
+
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Reported-by: Richard Cochran <richardcochran@gmail.com>
+Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Suman Anna <s-anna@ti.com>
+Cc: Dave Gerlach <d-gerlach@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index b61355e2a771..252b74633e31 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+  *
+  */
+ 
++/*
++ * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
++ * functionality of OMAP HWMOD layer does not deassert the hardreset lines
++ * associated with an IP automatically leaving the driver to handle that
++ * by itself. This does not work for PCIeSS which needs the reset lines
++ * deasserted for the driver to start accessing registers.
++ *
++ * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
++ * lines after asserting them.
++ */
++static int dra7xx_pciess_reset(struct omap_hwmod *oh)
++{
++	int i;
++
++	for (i = 0; i < oh->rst_lines_cnt; i++) {
++		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
++		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
++	}
++
++	return 0;
++}
++
+ static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
+ 	.name	= "pcie",
++	.reset	= dra7xx_pciess_reset,
+ };
+ 
+ /* pcie1 */
+-- 
+2.7.0
