@@ -1,45 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Mar 2016 15:11:21 +0000
-Subject: [PATCHv4] arm64: Rework valid_user_regs
-In-Reply-To: <1456841930-16602-1-git-send-email-mark.rutland@arm.com>
-References: <1456841930-16602-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160301151121.GB14022@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 1 Mar 2016 23:13:19 +0800
+Subject: [PATCH 1/2] ARM: dts: at91: sama5d2: add classD node
+In-Reply-To: <ce1de34a6c36c17ce46bc39b675749c151aafad0.1456837347.git.nicolas.ferre@atmel.com>
+Message-ID: <201603012330.j9rW3uaV%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2016 at 02:18:50PM +0000, Mark Rutland wrote:
-> We validate pstate using PSR_MODE32_BIT, which is part of the
-> user-provided pstate (and cannot be trusted). Also, we conflate
-> validation of AArch32 and AArch64 pstate values, making the code
-> difficult to reason about.
-> 
-> Instead, validate the pstate value based on the associated task. The
-> task may or may not be current (e.g. when using ptrace), so this must be
-> passed explicitly by callers. To avoid circular header dependencies via
-> sched.h, is_compat_task is pulled out of asm/ptrace.h.
-> 
-> To make the code possible to reason about, the AArch64 and AArch32
-> validation is split into separate functions. Software must respect the
-> RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
-> policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
-> architected meaning writes may be permitted (potentially with additional
-> validation).
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/ptrace.h | 33 +++--------------
->  arch/arm64/kernel/ptrace.c      | 80 +++++++++++++++++++++++++++++++++++++++--
->  arch/arm64/kernel/signal.c      |  4 +--
->  arch/arm64/kernel/signal32.c    |  2 +-
->  4 files changed, 85 insertions(+), 34 deletions(-)
+Hi Songjun,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+[auto build test ERROR on abelloni/rtc-next]
+[also build test ERROR on v4.5-rc6 next-20160301]
+[cannot apply to at91/at91-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-We'll also need to backport this to the various stable trees.
+url:    https://github.com/0day-ci/linux/commits/Nicolas-Ferre/ARM-dts-at91-sama5d2-add-classD-node/20160301-210755
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
+config: arm-multi_v7_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Will
+All errors (new ones prefixed by >>):
+
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 36569 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/959274a8/attachment-0001.obj>
