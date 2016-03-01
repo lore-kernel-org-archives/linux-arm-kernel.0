@@ -1,137 +1,108 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  1 Mar 2016 14:15:26 -0700
-Subject: [RFC v3 07/12] PM / cpu_domains: Add PM Domain governor for CPUs
+Date: Tue,  1 Mar 2016 14:15:27 -0700
+Subject: [RFC v3 08/12] Documentation / cpu_domains: Describe CPU PM domains
+ setup and governor
 In-Reply-To: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
 References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1456866931-37851-9-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1456866931-37851-10-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A PM domain comprising of CPUs may be powered off when all the CPUs in
-the domain are powered down. Powering down a CPU domain is generally a
-expensive operation and therefore the power performance trade offs
-should be considered. The time between the last CPU powering down and
-the first CPU powering up in a domain, is the time available for the
-domain to sleep. Ideally, the sleep time of the domain should fulfill
-the residency requirement of the domains' idle state.
-
-To do this effectively, read the time before the wakeup of the cluster's
-CPUs and ensure that the domain's idle state sleep time guarantees the
-QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
-state's residency.
+A generic CPU PM domain functionality is provided by
+drivers/base/power/cpu_domains.c. This document describes the generic
+usecase of CPU's PM domains, the setup of such domains and a CPU
+specific genpd governor.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/power/cpu_domains.c | 80 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 79 insertions(+), 1 deletion(-)
+ Documentation/power/cpu_domains.txt | 79 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
+ create mode 100644 Documentation/power/cpu_domains.txt
 
-diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
-index 62c1ab9..6ba05f8 100644
---- a/drivers/base/power/cpu_domains.c
-+++ b/drivers/base/power/cpu_domains.c
-@@ -17,9 +17,12 @@
- #include <linux/list.h>
- #include <linux/of.h>
- #include <linux/pm_domain.h>
-+#include <linux/pm_qos.h>
-+#include <linux/pm_runtime.h>
- #include <linux/rculist.h>
- #include <linux/rcupdate.h>
- #include <linux/slab.h>
-+#include <linux/tick.h>
- 
- #define CPU_PD_NAME_MAX 36
- 
-@@ -52,6 +55,81 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
- 	return res;
- }
- 
-+static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
-+{
-+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-+	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
-+	int qos_ns = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-+	u64 sleep_ns;
-+	ktime_t earliest, next_wakeup;
-+	int cpu;
-+	int i;
+diff --git a/Documentation/power/cpu_domains.txt b/Documentation/power/cpu_domains.txt
+new file mode 100644
+index 0000000..bd99e92
+--- /dev/null
++++ b/Documentation/power/cpu_domains.txt
+@@ -0,0 +1,79 @@
++CPU PM domains
++==============
 +
-+	/* Reset the last set genpd state, default to index 0 */
-+	genpd->state_idx = 0;
++Newer CPUs are grouped in SoCs as clusters. A cluster in addition to the CPUs
++may have caches, floating point units and other architecture specific power
++controller that share resources when any of the CPUs are active. When the CPUs
++are in idle, some of these cluster components may also idle. A cluster may
++also be nested inside another cluster that provides common coherency
++interfaces to share data between the clusters. The organization of such
++clusters and CPU may be descibed in DT, since they are SoC specific.
 +
-+	/* We don't want to power down, if QoS is 0 */
-+	if (!qos_ns)
-+		return false;
++CPUIdle framework enables the CPUs to determine the sleep time and enter low
++power state to save power during periods of idle. CPUs in a cluster may enter
++and exit idle state independently of each other. During the time when all the
++CPUs are in idle state, the cluster may safely put some of the shared
++resources in their idle state. The time between the last CPU to enter idle and
++the first CPU to wake up is the time available for the cluster to enter its
++idle state.
 +
-+	/*
-+	 * Find the sleep time for the cluster.
-+	 * The time between now and the first wake up of any CPU that
-+	 * are in this domain hierarchy is the time available for the
-+	 * domain to be idle.
-+	 *
-+	 * We only care about the next wakeup for any online CPU in that
-+	 * cluster. Hotplug off any of the CPUs that we care about will
-+	 * wait on the genpd lock, until we are done. Any other CPU hotplug
-+	 * is not of consequence to our sleep time.
-+	 */
-+	earliest = ktime_set(KTIME_SEC_MAX, 0);
-+	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
-+		next_wakeup = tick_nohz_get_next_wakeup(cpu);
-+		if (earliest.tv64 > next_wakeup.tv64)
-+			earliest = next_wakeup;
-+	}
++When SoCs power down the CPU during cpuidle, they generally have supplemental
++hardware that can handshake with the CPU with a signal that indicates that the
++CPU has stopped execution. The hardware is also responsible for warm booting
++the CPU on receiving an interrupt. In a cluster architecture, common resources
++that are shared by a cluster may also be powered down by an external
++microcontroller or a processor. The microcontroller may be programmed in
++advance to put the hardware blocks in a low power state, when the last active
++CPU sends the idle signal. When the signal is received, the microcontroller
++may trigger the hardware blocks to enter their low power state. When an
++interrupt to wakeup the processor is received, the microcontroller is
++responsible for bringing up the hardware blocks to its active state, before
++waking up the CPU. The timelines for such operations should be in the
++acceptable range for for CPU idle to get power benefits.
 +
-+	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
-+	if (sleep_ns <= 0)
-+		return false;
++CPU PM Domain Setup
++-------------------
 +
-+	/*
-+	 * Find the deepest sleep state that satisfies the residency
-+	 * requirement and the QoS constraint
-+	 */
-+	for (i = genpd->state_count - 1; i >= 0; i--) {
-+		u64 state_sleep_ns;
++PM domains are represented in the DT as domain consumers and providers. A
++device may have a domain provider and a domain provider may support multiple
++domain consumers. Domains like clusters, may also be nested inside one
++another. A domain that has no active consumer, may be powered off and any
++resuming consumer would trigger the domain back to active. Parent domains may
++be powered off when the child domains are powered off. The CPU cluster can be
++fashioned as a PM domain. When the CPU devices are powered off, the PM domain
++may be powered off.
 +
-+		state_sleep_ns = genpd->states[i].power_off_latency_ns +
-+			genpd->states[i].power_on_latency_ns +
-+			genpd->states[i].residency_ns;
++Device idle is reference counted by runtime PM. When there is no active need
++for the device, runtime PM invokes callbacks to suspend the parent domain.
++Generic PM domain (genpd) handles the hierarchy of devices, domains and the
++reference counting of objects leading to last man down and first man up in the
++domain. The CPU domains helper functions defines PM domains for each CPU
++cluster and attaches the CPU devices to the respective PM domains.
 +
-+		/*
-+		 * If we can't sleep to save power in the state, move on
-+		 * to the next lower idle state.
-+		 */
-+		if (state_sleep_ns > sleep_ns)
-+			continue;
++Platform drivers may use the following API to register their CPU PM domains.
 +
-+		/*
-+		 * We also don't want to sleep more than we should to
-+		 * gaurantee QoS.
-+		 */
-+		if (state_sleep_ns < (qos_ns * NSEC_PER_USEC))
-+			break;
-+	}
++of_setup_cpu_pd() -
++Provides a single step registration of the CPU PM domain and attach CPUs to
++the genpd. Platform drivers may additionally register callbacks for power_on
++and power_off operations for the PM domain.
 +
-+	if (i >= 0)
-+		genpd->state_idx = i;
++of_setup_cpu_pd_single() -
++Define PM domain for a single CPU and attach the CPU to its domain.
 +
-+	return (i >= 0);
-+}
 +
-+static struct dev_power_governor cpu_pd_gov = {
-+	.power_down_ok = cpu_pd_down_ok,
-+};
++CPU PM Domain governor
++----------------------
 +
- static int cpu_pd_attach_cpu(struct cpu_pm_domain *cpu_pd, int cpu)
- {
- 	int ret;
-@@ -143,7 +221,7 @@ static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
- 
- 	/* Register the CPU genpd */
- 	pr_debug("adding %s as CPU PM domain\n", pd->genpd->name);
--	ret = of_pm_genpd_init(dn, pd->genpd, &simple_qos_governor, false);
-+	ret = of_pm_genpd_init(dn, pd->genpd, &cpu_pd_gov, false);
- 	if (ret) {
- 		pr_err("Unable to initialize domain %s\n", dn->full_name);
- 		goto fail;
++CPUs have a unique ability to determine their next wakeup. CPUs may wake up
++for known timer interrupts and unknown interrupts from idle. Prediction
++algorithms and heuristic based algorithms like the Menu governor for cpuidle
++can determine the next wakeup of the CPU. However, determining the wakeup
++across a group of CPUs is a tough problem to solve.
++
++A simplistic approach would be to resort to known wakeups of the CPUs in
++determining the next wakeup of any CPU in the cluster. The CPU PM domain
++governor does just that. By looking into the tick device of the CPUs, the
++governor can determine the sleep time between the last CPU and the first
++scheduled wakeup of any CPU in that domain. This combined with the PM QoS
++requirement for CPU_DMA_LATENCY can be used to determine the deepest possible
++idle state of the CPU domain.
 -- 
 2.1.4
