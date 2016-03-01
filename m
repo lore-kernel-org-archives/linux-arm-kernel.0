@@ -1,39 +1,34 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 2 Mar 2016 00:19:23 +0300
-Subject: [PATCH v2 0/8] arm64: Support for systems without AArch32 state
-In-Reply-To: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
-References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160301211923.GA1325@yury-N73SV>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Mar 2016 22:21:19 +0100
+Subject: [PATCH] target/cxgbit: add INET dependency
+In-Reply-To: <1456810108.19657.187.camel@haakon3.risingtidesystems.com>
+References: <1456744504-3011977-1-git-send-email-arnd@arndb.de>
+ <1456810108.19657.187.camel@haakon3.risingtidesystems.com>
+Message-ID: <2941855.lXKcTvDzjQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 09:52:40AM +0000, Suzuki K Poulose wrote:
-> This series add checks to make sure that the AArch32 state is
-> supported before we process the 32bit ID registers. Also
-> checks the same for COMPAT binary execution.
+On Monday 29 February 2016 21:28:28 Nicholas A. Bellinger wrote:
+> > diff --git a/drivers/target/iscsi/cxgbit/Kconfig b/drivers/target/iscsi/cxgbit/Kconfig
+> > index cf335b4dbb4e..ce6f5cca315d 100644
+> > --- a/drivers/target/iscsi/cxgbit/Kconfig
+> > +++ b/drivers/target/iscsi/cxgbit/Kconfig
+> > @@ -1,6 +1,7 @@
+> >  config ISCSI_TARGET_CXGB4
+> >       tristate "Chelsio iSCSI target offload driver"
+> >       depends on ISCSI_TARGET && CHELSIO_T4
+> > +     depends on INET
+> >       select CHELSIO_T4_UWIRE
+> >       ---help---
+> >       To compile this driver as module, choose M here: the module
 > 
-> (Painfully) applies on top of 4.5-rc5 + [1] + [2].
+> Odd, ISCSI_TARGET already depends on NET, but I guess that's not enough
+> for cxgbit..  ;)
 > 
-> Or it is available here :
->   git://linux-arm.org/linux-skp.git noaarch32/v2-4.5-rc5
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/410556.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401913.html
-> 
-> Changes since V1:
->   - Prevent changing the personality to PER_LINUX32 by adding
->     wrapper for personality() syscall.
->   - Add the check to KVM before initialising a AArch32 vcpu
->   - Tested on hardware.
-> 
-> Btw, linux32 doesn't complain when the personality() syscall fails to change
-> to PER_LINUX32. You can verify the personality by running 
->  $ cat /proc/cpuinfo
->  which would still list the 64bit features for the CPUs.
 
-Hi Suzuki,
+The problem is that you can have CONFIG_NET=y but CONFIG_INET=n
 
-I have some troubles with access to appropriate hardware to test
-it, but I didn't forget.
+It would probably be reasonable to make the ISCSI_TARGET option depend
+on CONFIG_INET directly, which would solve the problem as well.
 
-Yury.
+	Arnd
