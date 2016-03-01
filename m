@@ -1,44 +1,45 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 1 Mar 2016 17:57:26 +0900
-Subject: [PATCH v3] arm64: defconfig: Enable samsung MFD and related
- configs
-In-Reply-To: <56C00BBB.4080807@samsung.com>
-References: <1454652269-6100-1-git-send-email-alim.akhtar@samsung.com>
- <56C00BBB.4080807@samsung.com>
-Message-ID: <CAJKOXPc_U0fkHzcyJd+KBKoyYLC0GRmrKH0sgna5fYqfRp0gUA@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 1 Mar 2016 10:01:52 +0100
+Subject: [PATCH 5/8] drivers/pinctrl: make stm32/pinctrl-stm32f429.c
+ explicitly non-modular
+In-Reply-To: <1456778924-20730-6-git-send-email-paul.gortmaker@windriver.com>
+References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
+ <1456778924-20730-6-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CALszF6A4U6fh5Sbb1=JAotmwXcsO6juftTG4rYZnXjH8dbwNxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-14 14:08 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> W dniu 05.02.2016 o 15:04, Alim Akhtar pisze:
->> Exynos7 based espresso board uses S2MPS15, a multifunction device.
->> This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
->> the same.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->> Changes since v2:
->> * Added Reviewed-by from Krzysztof
->> * rebased on next-20160204
->>
->> Changes since v1:
->> * updated the comment message to describe which platfrom uses it.
->> * enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
->>
->>  arch/arm64/configs/defconfig |    3 +++
->>  1 file changed, 3 insertions(+)
->>
+2016-02-29 21:48 GMT+01:00 Paul Gortmaker <paul.gortmaker@windriver.com>:
+> The Kconfig currently controlling compilation of this code is:
 >
-> Applying this to my tree would cause conflicts with commit efdda175c07f:
-> arm64: defconfig: add spmi and usb related configs
-> Conflicts are trivial (simple additions) but maybe it is better to avoid
-> them.
+> drivers/pinctrl/stm32/Kconfig:config PINCTRL_STM32F429
+> drivers/pinctrl/stm32/Kconfig:  bool "STMicroelectronics STM32F429 pin control" if COMPILE_TEST && !MACH_STM32F429
 >
-> Olof/Arnd/Kevin, can you apply this directly to arm-soc?
+> ...meaning that it currently is not being built as a module by anyone.
+>
+> Lets remove the modular code that is essentially orphaned, so that
+> when reading the driver there is no doubt it is builtin-only.
+>
+> Since module_init translates to device_initcall in the non-modular
+> case, the init ordering remains unchanged with this commit.
+>
+> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+>
+> We also delete the MODULE_LICENSE tag etc. since all that information
+> is already contained at the top of the file in the comments.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+>  drivers/pinctrl/stm32/pinctrl-stm32f429.c | 9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
 
-Never mind, applied because I have one more defconfig patch. The
-conflict will be still there but easy to solve.
+Thanks for the patch:
+Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-Best regards,
-Krzysztof
+Regards,
+Maxime
