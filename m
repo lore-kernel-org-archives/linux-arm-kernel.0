@@ -1,38 +1,42 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 1 Mar 2016 23:13:19 +0800
-Subject: [PATCH 1/2] ARM: dts: at91: sama5d2: add classD node
-In-Reply-To: <ce1de34a6c36c17ce46bc39b675749c151aafad0.1456837347.git.nicolas.ferre@atmel.com>
-Message-ID: <201603012330.j9rW3uaV%fengguang.wu@intel.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 1 Mar 2016 16:18:45 +0100
+Subject: [PATCH 3/8] ARM64: dts: Prepare configs for Amlogic Meson GXBaby
+In-Reply-To: <56D5AA87.7020401@arm.com>
+References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+ <1456789465-2962-4-git-send-email-afaerber@suse.de>
+ <56D5AA87.7020401@arm.com>
+Message-ID: <56D5B2D5.9010405@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Songjun,
+Am 01.03.2016 um 15:43 schrieb Sudeep Holla:
+> On 29/02/16 23:44, Andreas F?rber wrote:
+>> +    psci {
+>> +        compatible = "arm,psci";
+> 
+> Any particular reason why PSCI v0.2 or above is not supported on this
+> platform. PSCI v0.1 is very old now and I assume this platform is
+> relatively new.
 
-[auto build test ERROR on abelloni/rtc-next]
-[also build test ERROR on v4.5-rc6 next-20160301]
-[cannot apply to at91/at91-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+I am not affiliated with Amlogic or Tronsmart, so I cannot answer why.
 
-url:    https://github.com/0day-ci/linux/commits/Nicolas-Ferre/ARM-dts-at91-sama5d2-add-classD-node/20160301-210755
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
-config: arm-multi_v7_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+>> +        method = "smc";
+>> +        cpu_suspend = <0xc4000001>;
+>> +        cpu_off = <0x84000002>;
+>> +        cpu_on = <0xc4000003>;
+>> +        migrate = <0xc4000005>;
+> 
+> Atleast the functions ids look like v0.2 or above. So check if it's
+> actually v0.2 or above
 
-All errors (new ones prefixed by >>):
+If you let me know how! Just change the compatible string to -0.2 and
+wait for some big boom or watch out for any misbehavior in particular?
+Are there any memory locations to check the version or something visible
+in U-Boot source code indicating it?
 
->> ERROR: Input tree has errors, aborting (use -f to force output)
+Regards,
+Andreas
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36569 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/959274a8/attachment-0001.obj>
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
