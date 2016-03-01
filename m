@@ -1,178 +1,211 @@
 From: dave.long@linaro.org (David Long)
-Date: Mon, 29 Feb 2016 21:57:18 -0500
-Subject: [PATCH v10 0/9] arm64: Add kernel probes (kprobes) support
-Message-ID: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
+Date: Mon, 29 Feb 2016 21:57:19 -0500
+Subject: [PATCH v10 1/9] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
+References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1456801047-29014-2-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-first seen in October 2013. This version attempts to address concerns raised by
-reviewers and also fixes problems discovered during testing.
+Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
 
-This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-and return probes(kretprobes) support for ARM64.
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/include/asm/ptrace.h |  31 +++++++++++
+ arch/arm64/kernel/ptrace.c      | 117 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 149 insertions(+)
 
-The kprobes mechanism makes use of software breakpoint and single stepping
-support available in the ARM v8 kernel.
-
-Changes since v2 include:
-
-1) Removal of NOP padding in kprobe XOL slots. Slots are now exactly one
-instruction long.
-2) Disabling of interrupts during execution in single-step mode.
-3) Fixing of numerous problems in instruction simulation code (mostly
-thanks to Will Cohen).
-4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to allow
-access to kprobes through debugfs.
-5) kprobes is *not* enabled in defconfig.
-6) Numerous complaints from checkpatch have been cleaned up, although a couple
-remain as removing the function pointer typedefs results in ugly code.
-
-Changes since v3 include:
-
-1) Remove table-driven instruction parsing and replace with an if statement
-calling out to old and new instruction test functions in insn.c.
-2) I removed the addition of orig_x0 to ptrace.h.
-3) Reorder the patches.
-4) Replace the previous interrupt disabling (from Will Cohen) with
-an improved solution (from Steve Capper).
-
-Changes since v4 include:
-
-1) Added insn.c functions to detect exception instructions and DAIF
-   read/write instructions, and use them to reject probing same.
-2) Changed adr detect function to also recognize adrp. Reject both.
-3) Added missing __kprobes for some new functions.
-4) Added call to kprobes_fault_handler from mm do_page_fault.
-5) Reject all non-simulated branch/ret instructions, not just those
-   that use an immediate offset.
-6) Moved software breakpoint definitions into debug-monitors.h.
-7) Removed "!XIP_KERNEL" from Kconfig.
-8) changed kprobes_condition_check_t and kprobes_prepare_t to probes_*,
-   for future sharing with uprobes.
-9) Removed bogus call to kprobes_restore_local_irqflag() from 
-   trampoline_probe_handler().
-
-Changes since v5 include:
-
-1) Replaced installation of breakpoint hook with direct call from the
-handlers in debug-monitors.c, as requested.
-2) Reject probing of instructions that read the interrupt mask, in
-addition to instructions that set it.
-3) Cleaned up comments describing usage of Debug Mask.
-4) Added KPROBE_REENTER case in reenter_kprobe.
-5) Corrected the ifdef'd definitions for notify_page_fault() to be
-consistent when KPROBES is not configed.
-6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
-7) Added back in missing new files in previous patch.
-8) Changed two instances of pr_warning() to pr_warn().
-
-Note that there seems to be at least a potential issue with kprobes
-on multiple (possibly all) platforms having to do with use of kfree
-inside of the kretprobes trampoline handler.  This has manifested
-occasionally in systemtap testing on arm64.  There does not appear to
-be an simple solution to the problem.
-
-Changes since v6 include:
-
-1) New trampoline code from Will Cohen fixes the occasional failure seen
-when processing kretprobes by replacing the software breakpoint with
-assembly code to implement the return to the original execution stream.
-2) Changed ip0, ip1, fp, and lr to plain numbered registers for purposes
-of recognizing them as an ascii string in the stack/reg access code.
-3) Removed orig_x0.
-4) Moved ARM_x* defines from arch/arm64/include/uapi/asm/ptrace.h to
-arch/arm64/kernel/ptrace.c.
-
-Changes since v7 include:
-
-1) Move trampoline entry/return code into separate ".S" file instead
-of making it a macro in a header file.
-2) Add missing register name definitions in asm-offsets.c and use them
-in place of hard-coded integer offsets in the trampoline code.
-3) Correct the values used to decode MSR immediate instructions, in insn.h.
-4) Remove the currently unused simulate_none() function.
-
-Changes since v8 include:
-
-1) Replaced use of REG_OFFSET_NAME with GPR_OFFSET_NAME for numbered
-registers.
-2) Added an alias for "lr" in the register name lookup table, which perf
-tools need to be able to recognize.
-3) Changed the code for checking instruction types for probeability and
-steppability as per review feedback.
-4) Fixed the size of cache being flushed when filling single-step slot.
-5) Fixed big-endian issues.
-6) Blacklisted copy_to/from_user to avoid aborts while single-stepping.
-7) Record conditional instructions that fail the conditional test just
-like any other probed (non-conditional) instruction.
-8) Removed use of magic number for detecting jprobe return and just
-check the breakpoint address instead.
-9) Got rid of the unnecessary arch/arm64/kprobes.h.
-10) The PSTATE and SP are now properly saved in the kretprobe trampoline
-code.
-11) This patch no longer depends on the "Consolidate redundant
-register/stack access code" patch set.
-12) Remove call to fixup_exception from kprobe_fault_handler.
-
-Changes since v9 include:
-
-1) Remove arch/arm/opcodes.c from the arm64 build and move the renamed
-arm64_check_condition() function to armv8_deprecated.c. Remove the
-asmlinkage.
-2) Various other type and style changes suggested by Marc Zyngier.
-3) Put back the call to fixup_exception from kprobe_fault_handler.
-It proved to be necessary for correct operation.
-
-David A. Long (4):
-  arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-  arm64: Add more test functions to insn.c
-  arm64: add copy_to/from_user to kprobes blacklist
-  arm64: add conditional instruction simulation support
-
-Sandeepa Prabhu (4):
-  arm64: Kprobes with single stepping support
-  arm64: kprobes instruction simulation support
-  arm64: Add kernel return probes support (kretprobes)
-  kprobes: Add arm64 case in kprobe example module
-
-William Cohen (1):
-  arm64: Add trampoline code for kretprobes
-
- arch/arm64/Kconfig                       |   3 +
- arch/arm64/include/asm/debug-monitors.h  |   5 +
- arch/arm64/include/asm/insn.h            |  41 ++
- arch/arm64/include/asm/kprobes.h         |  62 ++++
- arch/arm64/include/asm/probes.h          |  45 +++
- arch/arm64/include/asm/ptrace.h          |  33 +-
- arch/arm64/kernel/Makefile               |   6 +-
- arch/arm64/kernel/armv8_deprecated.c     |  19 +-
- arch/arm64/kernel/asm-offsets.c          |  22 ++
- arch/arm64/kernel/debug-monitors.c       |  18 +-
- arch/arm64/kernel/insn.c                 | 131 +++++++
- arch/arm64/kernel/kprobes-arm64.c        | 150 ++++++++
- arch/arm64/kernel/kprobes-arm64.h        |  35 ++
- arch/arm64/kernel/kprobes.c              | 616 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/kprobes_trampoline.S   |  67 ++++
- arch/arm64/kernel/probes-simulate-insn.c | 187 ++++++++++
- arch/arm64/kernel/probes-simulate-insn.h |  28 ++
- arch/arm64/kernel/ptrace.c               | 117 ++++++
- arch/arm64/kernel/vmlinux.lds.S          |   1 +
- arch/arm64/lib/copy_from_user.S          |   1 +
- arch/arm64/lib/copy_to_user.S            |   1 +
- arch/arm64/mm/fault.c                    |  25 ++
- samples/kprobes/kprobe_example.c         |   8 +
- 23 files changed, 1613 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/include/asm/kprobes.h
- create mode 100644 arch/arm64/include/asm/probes.h
- create mode 100644 arch/arm64/kernel/kprobes-arm64.c
- create mode 100644 arch/arm64/kernel/kprobes-arm64.h
- create mode 100644 arch/arm64/kernel/kprobes.c
- create mode 100644 arch/arm64/kernel/kprobes_trampoline.S
- create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
- create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8cc6228..4211b0d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -78,6 +78,7 @@ config ARM64
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
+ 	select HAVE_PERF_USER_STACK_DUMP
++	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_RCU_TABLE_FREE
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select IOMMU_DMA if IOMMU_SUPPORT
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index e9e5467..7bd6445 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -118,6 +118,8 @@ struct pt_regs {
+ 	u64 syscallno;
+ };
+ 
++#define MAX_REG_OFFSET offsetof(struct user_pt_regs, pstate)
++
+ #define arch_has_single_step()	(1)
+ 
+ #ifdef CONFIG_COMPAT
+@@ -146,6 +148,35 @@ struct pt_regs {
+ #define user_stack_pointer(regs) \
+ 	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+ 
++extern int regs_query_register_offset(const char *name);
++extern const char *regs_query_register_name(unsigned int offset);
++extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
++extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
++					       unsigned int n);
++
++/**
++ * regs_get_register() - get register value from its offset
++ * @regs:	   pt_regs from which register value is gotten
++ * @offset:    offset number of the register.
++ *
++ * regs_get_register returns the value of a register whose offset from @regs.
++ * The @offset is the offset of the register in struct pt_regs.
++ * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
++ */
++static inline u64 regs_get_register(struct pt_regs *regs,
++					      unsigned int offset)
++{
++	if (unlikely(offset > MAX_REG_OFFSET))
++		return 0;
++	return *(u64 *)((u64)regs + offset);
++}
++
++/* Valid only for Kernel mode traps. */
++static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
++{
++	return regs->sp;
++}
++
+ static inline unsigned long regs_return_value(struct pt_regs *regs)
+ {
+ 	return regs->regs[0];
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index ff7f132..efebf0f 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -48,6 +48,123 @@
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/syscalls.h>
+ 
++struct pt_regs_offset {
++	const char *name;
++	int offset;
++};
++
++#define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
++#define REG_OFFSET_END {.name = NULL, .offset = 0}
++#define	GPR_OFFSET_NAME(r)	\
++	{.name = "x" #r, .offset = offsetof(struct pt_regs, regs[r])}
++
++static const struct pt_regs_offset regoffset_table[] = {
++	GPR_OFFSET_NAME(0),
++	GPR_OFFSET_NAME(1),
++	GPR_OFFSET_NAME(2),
++	GPR_OFFSET_NAME(3),
++	GPR_OFFSET_NAME(4),
++	GPR_OFFSET_NAME(5),
++	GPR_OFFSET_NAME(6),
++	GPR_OFFSET_NAME(7),
++	GPR_OFFSET_NAME(8),
++	GPR_OFFSET_NAME(9),
++	GPR_OFFSET_NAME(10),
++	GPR_OFFSET_NAME(11),
++	GPR_OFFSET_NAME(12),
++	GPR_OFFSET_NAME(13),
++	GPR_OFFSET_NAME(14),
++	GPR_OFFSET_NAME(15),
++	GPR_OFFSET_NAME(16),
++	GPR_OFFSET_NAME(17),
++	GPR_OFFSET_NAME(18),
++	GPR_OFFSET_NAME(19),
++	GPR_OFFSET_NAME(20),
++	GPR_OFFSET_NAME(21),
++	GPR_OFFSET_NAME(22),
++	GPR_OFFSET_NAME(23),
++	GPR_OFFSET_NAME(24),
++	GPR_OFFSET_NAME(25),
++	GPR_OFFSET_NAME(26),
++	GPR_OFFSET_NAME(27),
++	GPR_OFFSET_NAME(28),
++	GPR_OFFSET_NAME(29),
++	GPR_OFFSET_NAME(30),
++	{.name = "lr", .offset = offsetof(struct pt_regs, regs[30])},
++	REG_OFFSET_NAME(sp),
++	REG_OFFSET_NAME(pc),
++	REG_OFFSET_NAME(pstate),
++	REG_OFFSET_END,
++};
++
++/**
++ * regs_query_register_offset() - query register offset from its name
++ * @name:	the name of a register
++ *
++ * regs_query_register_offset() returns the offset of a register in struct
++ * pt_regs from its name. If the name is invalid, this returns -EINVAL;
++ */
++int regs_query_register_offset(const char *name)
++{
++	const struct pt_regs_offset *roff;
++
++	for (roff = regoffset_table; roff->name != NULL; roff++)
++		if (!strcmp(roff->name, name))
++			return roff->offset;
++	return -EINVAL;
++}
++
++/**
++ * regs_query_register_name() - query register name from its offset
++ * @offset:	the offset of a register in struct pt_regs.
++ *
++ * regs_query_register_name() returns the name of a register from its
++ * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
++ */
++const char *regs_query_register_name(unsigned int offset)
++{
++	const struct pt_regs_offset *roff;
++
++	for (roff = regoffset_table; roff->name != NULL; roff++)
++		if (roff->offset == offset)
++			return roff->name;
++	return NULL;
++}
++
++/**
++ * regs_within_kernel_stack() - check the address in the stack
++ * @regs:      pt_regs which contains kernel stack pointer.
++ * @addr:      address which is checked.
++ *
++ * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
++ * If @addr is within the kernel stack, it returns true. If not, returns false.
++ */
++bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
++{
++	return ((addr & ~(THREAD_SIZE - 1))  ==
++		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
++}
++
++/**
++ * regs_get_kernel_stack_nth() - get Nth entry of the stack
++ * @regs:	pt_regs which contains kernel stack pointer.
++ * @n:		stack entry number.
++ *
++ * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
++ * is specified by @regs. If the @n th entry is NOT in the kernel stack,
++ * this returns 0.
++ */
++unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
++{
++	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
++
++	addr += n;
++	if (regs_within_kernel_stack(regs, (unsigned long)addr))
++		return *addr;
++	else
++		return 0;
++}
++
+ /*
+  * TODO: does not yet catch signals sent when the child dies.
+  * in exit.c or in signal.c.
 -- 
 2.5.0
