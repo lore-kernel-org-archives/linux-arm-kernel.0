@@ -1,57 +1,50 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Tue, 1 Mar 2016 22:58:42 +0000
-Subject: [PATCH 7/8] ARM64: dts: amlogic: Extend GXBaby GIC node
-In-Reply-To: <56D61BE3.90505@suse.de>
-References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
- <1456789465-2962-8-git-send-email-afaerber@suse.de>
- <56D57673.8030702@arm.com> <56D57A7F.5020806@suse.de>
- <56D58E88.2080700@arm.com> <56D61BE3.90505@suse.de>
-Message-ID: <56D61EA2.8090103@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue,  1 Mar 2016 15:01:20 -0800
+Subject: [GIT PULL 3/4] omap defconfig changes for v4.6 merge window
+In-Reply-To: <pull-1456872971-400983>
+References: <pull-1456872971-400983>
+Message-ID: <pull-1456872971-400983-3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/16 22:46, Andreas F?rber wrote:
-> Am 01.03.2016 um 13:43 schrieb Andre Przywara:
->> On 01/03/16 11:18, Andreas F?rber wrote:
->>> Am 01.03.2016 um 12:01 schrieb Andre Przywara:
->>>> On 29/02/16 23:44, Andreas F?rber wrote:
->>>>>  			reg = <0x0 0xc4301000 0 0x1000>,
->>>>> -			      <0x0 0xc4302000 0 0x0100>;
->>>>> +			      <0x0 0xc4302000 0 0x0100>,
->>>>
->>>> Please use 0x2000 for the size here. I guess this is really the GIC-400
->>>> from ARM, and in this case this is the right size, [1] is the reference
->>>> here. This will enable EOI mode 1 for KVM.
->>>
->>> Will test later.
->>>
->>> Is there any easy way to find out whether or not this is that GIC-400?
->>
->> If you can read registers: GICD_IIDR and PIDRx have some info:
->> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/CHDIFAEE.html
->> So if your U-Boot for instance supports md, a dump of:
->> md.l c4301008 1
->> md.l c4301fd0 30
->>
->> would help to identify the GIC.
-> 
-> gxb_p200_v1#md.l c4301008 1
-> c4301008: 0200143b                               ;...
-> gxb_p200_v1#md.l c4301fd0 30
-> c4301fd0: 00000004 00000000 00000000 00000000    ................
-> c4301fe0: 00000090 000000b4 0000002b 00000000    ........+.......
-> c4301ff0: 0000000d 000000f0 00000005 000000b1    ................
-> c4302000: 00000060 000000f0 00000003 000003ff    `...............
-> c4302010: 00000000 000000ff 000003ff 00000000    ................
-> c4302020: 00000000 00000000 00000000 00000000    ................
-> c4302030: 00000000 00000000 00000000 00000000    ................
-> c4302040: 00000000 00000000 00000000 00000000    ................
-> c4302050: 00000000 00000000 00000000 00000000    ................
-> c4302060: 00000000 00000000 00000000 00000000    ................
-> c4302070: 00000000 00000000 00000000 00000000    ................
-> c4302080: 00000000 00000000 00000000 00000000    ................
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-Yes, that matches exactly the values from the GIC-400 TRM.
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-Thanks!
-Andre.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/defconfig-signed
+
+for you to fetch changes up to 4e550018df068f6b14d36c72c723a507240f6456:
+
+  ARM: multi_v7_defconfig: Enable LP872x regulator support (2016-02-29 14:58:01 -0800)
+
+----------------------------------------------------------------
+Defconfig changes for omap2plus_defconfig and multi_v7_defconfig
+for v4.6 merge window:
+
+- Enable IOMMU and omap3isp so we can enable TVP5150/1 video
+  decoder
+
+- Enable at24 eeprom for revision detection on beagle-x15
+
+- Enable LP872x regulator for both omap2plus_defconfig and
+  multi_v7_defconfig as it's needed at least by LG Optimus
+  Black
+
+----------------------------------------------------------------
+Javier Martinez Canillas (3):
+      ARM: omap2plus_defconfig: Enable OMAP IOMMU support
+      ARM: omap2plus_defconfig: Enable ISP support and dependencies
+      ARM: omap2plus_defconfig: Enable TI TVP5150 video decoder support
+
+Nishanth Menon (1):
+      ARM: omap2plus_defconfig: Enable AT24 eeprom
+
+Paul Kocialkowski (2):
+      ARM: omap2plus_defconfig: Enable LP872x regulator support
+      ARM: multi_v7_defconfig: Enable LP872x regulator support
+
+ arch/arm/configs/multi_v7_defconfig  |  1 +
+ arch/arm/configs/omap2plus_defconfig | 13 ++++++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
