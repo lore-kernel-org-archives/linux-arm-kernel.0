@@ -1,120 +1,84 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 1 Mar 2016 12:36:42 -0700
-Subject: [RFC v2 08/12] Documentation / cpu_domains: Describe CPU PM
- domains setup and governor
-In-Reply-To: <20160226194329.GZ28849@codeaurora.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-9-git-send-email-lina.iyer@linaro.org>
- <20160226194329.GZ28849@codeaurora.org>
-Message-ID: <20160301193642.GO1440@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 1 Mar 2016 19:37:16 +0000
+Subject: [PATCH v1] kasan, arm64: Unpoison dirty stack frames when
+ resuming from suspend.
+In-Reply-To: <CAG_fn=XowizL_=tt5aiHBF=_UNYKZsGWQOR7Ju-NYz2kre-7bA@mail.gmail.com>
+References: <c08aa050cb03e40098775dc8d200f073451c342e.1456489933.git.glider@google.com>
+ <20160226135335.GC8728@leverpostej>
+ <CAG_fn=XowizL_=tt5aiHBF=_UNYKZsGWQOR7Ju-NYz2kre-7bA@mail.gmail.com>
+Message-ID: <20160301193529.GA335@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26 2016 at 12:43 -0700, Stephen Boyd wrote:
->On 02/12, Lina Iyer wrote:
->> diff --git a/Documentation/power/cpu_domains.txt b/Documentation/power/cpu_domains.txt
->> new file mode 100644
->> index 0000000..5fdc66d
->> --- /dev/null
->> +++ b/Documentation/power/cpu_domains.txt
->> @@ -0,0 +1,79 @@
->> +CPU PM domains
->> +==============
->> +
->> +Newer CPUs are grouped in SoCs as clusters. A cluster in addition to the CPUs
->> +may have caches, VFP and architecture specific power controller that share the
->
->caches, floating point units, and other architecture specific
->hardware that share resources when any of the CPUs are active.
->
-All comments addressed.
+On Fri, Feb 26, 2016 at 06:28:27PM +0100, Alexander Potapenko wrote:
+> On Fri, Feb 26, 2016 at 2:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi,
+> >
+> > On Fri, Feb 26, 2016 at 01:38:37PM +0100, Alexander Potapenko wrote:
+> >> Before an ARM64 CPU is suspended, the kernel saves the context which will
+> >> be used to initialize the register state upon resume. After that and
+> >> before the actual execution of the SMC instruction the kernel creates
+> >> several stack frames which are never unpoisoned because arm_smccc_smc()
+> >> does not return. This may cause false positive stack buffer overflow
+> >> reports from KASAN.
+> >>
+> >> The solution is to record the stack pointer value just before the CPU is
+> >> suspended, and unpoison the part of stack between the saved value and
+> >> the stack pointer upon resume.
+> >
+> > Thanks for looking into this! That's much appreciated.
+> >
+> > I think the general approach (unposioning the stack upon cold return to
+> > the kernel) is fine, but I have concerns with the implementation, which
+> > I've noted below.
+> >
+> > The problem also applies for hotplug, as leftover poison from the
+> > hot-unplug path isn't cleaned before a CPU is hotplugged back on. The
+> > first few functions are likely deterministic in their stack usage, so
+> > it's not seen with a defconfig, but I think it's possible to trigger,
+> > and it's also a cross-architecture problem shared with x86.
+> Agreed, but since I haven't yet seen problems with hotplug, it's hard
+> to test the fix for them.
 
-Thanks,
-Lina
+For testing, I used the below to deliberately hit stale poison after a
+hotplug. It deliberately creates large stack frames, accessing as much
+of the stack as possible to increase the chance of hitting any posion.
 
->> +resources when any of the CPUs are active. When the CPUs are in idle, some of
->> +these cluster components may also idle. A cluster may also be nested inside
->> +another cluster that provides common coherency interfaces to share data
->> +between the clusters. The organization of such clusters and CPU may be
->> +descibed in DT, since they are SoC specific.
->> +
->> +CPUIdle framework enables the CPUs to determine the sleep time and enter low
->> +power state to save power during periods of idle. CPUs in a cluster may enter
->> +and exit idle state independently of each other. During the time when all the
->> +CPUs are in idle state, the cluster may safely put some of the shared
->> +resources in their idle state. The time between the last CPU to enter idle and
->> +the first CPU to wake up is the time available for the cluster to enter its
->> +idle state.
->> +
->> +When SoCs power down the CPU during cpuidle, they generally have supplemental
->> +hardware that can handshake with the CPU with a signal that indicates that the
->> +CPU has stopped execution. The hardware is also responsible for warm booting
->> +the CPU on receiving an interrupt. With cluster architecture, common resources
->
->In a cluster architecture,
->
->> +that are shared by the cluster may also be powered down by an external
->
->shared by a cluster
->
->> +microcontroller or a processor. The microcontroller may be programmed in
->> +advance to put the hardware blocks in a low power state, when the last active
->> +CPU sends the idle signal. When the signal is received, the microcontroller
->> +may trigger the hardware blocks to enter their low power state. When an
->> +interrupt to wakeup the processor is received, the microcontroller is
->> +responsible for bringing up the hardware blocks to its active state, before
->> +waking up the CPU. The timelines for such operations should be in the
->> +acceptable range for the for CPU idle to get power benefits.
->
->acceptable range for CPU idle to get power benefits.
->
->> +
->> +CPU PM Domain Setup
->> +-------------------
->> +
->> +PM domains  are represented in the DT as domain consumers and providers. A
->
->              ^ extra space here
->
->> +device may have a domain provider and a domain provider may support multiple
->> +domain consumers. Domains like clusters, may also be nested inside one
->> +another. A domain that has no active consumer, may be powered off and any
->> +resuming consumer would trigger the domain back to active. Parent domains may
->> +be powered off when the child domains are powered off. The CPU cluster can be
->> +fashioned as a PM domain. When the CPU devices are powered off, the PM domain
->> +may be powered off.
->> +
->> +Device idle is reference counted by runtime PM. When there is no active need
->> +for the device, runtime PM invokes callbacks to suspend the parent domain.
->> +Generic PM domain (genpd) handles the hierarchy of devices, domains and the
->> +reference counting of objects leading to last man down and first man up in the
->> +domain. The CPU domains helper functions defines PM domains for each CPU
->> +cluster and attaches the CPU devices to the respective PM domains.
->> +
->> +Platform drivers may use the following API to register their CPU PM domains.
->> +
->> +of_setup_cpu_pd() -
->> +Provides a single step registration of the CPU PM domain and attach CPUs to
->> +the genpd. Platform drivers may additionally register callbacks for power_on
->> +and power_off operations for the PM domain.
->> +
->> +of_setup_cpu_pd_single() -
->> +Define PM domain for a single CPU and attach the CPU to its domain.
->> +
->> +
->> +CPU PM Domain governor
->> +----------------------
->> +
->> +CPUs have an unique ability to determine their next wakeup. CPUs may wake up
->
->a unique
->
->> +for known timer interrupts and unknown interrupts from idle. Prediction
->> +algorithms and heuristic based algorithms like the Menu governor for cpuidle
->> +can determine the next wakeup of the CPU. However, determining the wakeup
->> +across a group of CPUs is a tough problem to solve.
->> +
->
->-- 
->Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->a Linux Foundation Collaborative Project
+Mark.
+
+---->8----
+diff --git a/kernel/sched/idle.c b/kernel/sched/idle.c
+index 544a713..ef4693f 100644
+--- a/kernel/sched/idle.c
++++ b/kernel/sched/idle.c
+@@ -195,6 +195,21 @@ exit_idle:
+ 
+ DEFINE_PER_CPU(bool, cpu_dead_idle);
+ 
++#define NR_STACK_ELEMS 128
++static noinline void hit_stale_poison(unsigned int frames)
++{
++       volatile unsigned long magic[NR_STACK_ELEMS];
++       int i;
++
++       for (i = 0; i < NR_STACK_ELEMS; i++)
++               magic[i] = 0;
++
++       if (frames)
++               hit_stale_poison(frames - 1);
++
++       return;
++}
++
+ /*
+  * Generic idle loop implementation
+  *
+@@ -202,6 +217,8 @@ DEFINE_PER_CPU(bool, cpu_dead_idle);
+  */
+ static void cpu_idle_loop(void)
+ {
++       hit_stale_poison(4);
++
+        while (1) {
+                /*
+                 * If the arch has a polling bit, we maintain an invariant:
