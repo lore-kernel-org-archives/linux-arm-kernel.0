@@ -1,38 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 1 Mar 2016 12:51:22 +0000
-Subject: for-next/pgtable branch: OOM error with 16K page size
-In-Reply-To: <56D58872.2010506@arm.com>
-References: <BY1PR0701MB159476A9E0E9B5DD9F17EC4BE1BA0@BY1PR0701MB1594.namprd07.prod.outlook.com>
- <BY1PR0701MB159496D44DB36F8C3699D3A5E1BB0@BY1PR0701MB1594.namprd07.prod.outlook.com>
- <56D57B9D.7020604@arm.com>
- <BY1PR0701MB1594A21349ED87C30F900102E1BB0@BY1PR0701MB1594.namprd07.prod.outlook.com>
- <56D58872.2010506@arm.com>
-Message-ID: <56D5904A.3050300@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 1 Mar 2016 14:53:13 +0200
+Subject: [GIT PULL][RESEND] omap gpmc enhancements for v4.6
+In-Reply-To: <56D488F0.8070406@ti.com>
+References: <56D488F0.8070406@ti.com>
+Message-ID: <56D590B9.4050307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/16 12:17, Suzuki K. Poulose wrote:
->
->> http://pastebin.com/Eszwp1cS
->
->> HugePages_Total:    2019
->> HugePages_Free:     2019
->> HugePages_Rsvd:        0
->> HugePages_Surp:        0
->> Hugepagesize:      32768 kB
->
-> That clearly tells you whats wrong. You have 2019x32M in hugepages.
-> Could you try releasing them and see if it solves the memory issue ?
->
-> $ echo 0 > /sys/kernel/mm/hugepages/hugepages-32768kB/nr_hugepages
->
->
-> btw, whats your root file system(to be more precise, the init) ?
+Hi Arnd/Olof,
 
-Also, could you get the number of HugePages_Total with 4K and 64K ?
+Fixed the pull URL this time.
 
-May be your init (or whatever allocates the hugepages) requires some
-hints about 16K and do something similar to what it does for 64K.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-Thanks
-Suzuki
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  https://github.com/rogerq/linux.git tags/gpmc-omap-for-v4.6
+
+for you to fetch changes up to e116c0545d17be6cc95a559aa5a68c221330501b:
+
+  dt-bindings: bus: ti-gpmc: Add AAD timings properties (2016-02-08 16:22:03 +0200)
+
+----------------------------------------------------------------
+OMAP-GPMC: Add address/data muxed timings
+
+* Add support for the GPMC Advanced AAD (address/data muxed) timings
+on hardware supporting the feature like the AM335x and DM816X.
+
+----------------------------------------------------------------
+Neil Armstrong (2):
+      memory: omap-gpmc: Add support for AAD timings
+      dt-bindings: bus: ti-gpmc: Add AAD timings properties
+
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt |  5 +++++
+ drivers/memory/omap-gpmc.c                        | 30 ++++++++++++++++++++++++++++++
+ include/linux/omap-gpmc.h                         |  5 +++++
+ 3 files changed, 40 insertions(+)
+
+--
+cheers,
+-roger
