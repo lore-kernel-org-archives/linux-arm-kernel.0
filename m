@@ -1,49 +1,111 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Tue, 1 Mar 2016 23:31:30 +0000
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
- ESRT table in memory
-In-Reply-To: <20160301233040.GA31476@codeblueprint.co.uk>
-References: <20160218104407.GC2651@codeblueprint.co.uk>
- <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
- <20160218132824.GE2651@codeblueprint.co.uk>
- <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
- <20160218134324.GG2651@codeblueprint.co.uk>
- <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
- <20160218141544.GH2651@codeblueprint.co.uk>
- <20160218191624.GA1515@redhat.com>
- <20160226144114.GA7475@codeblueprint.co.uk>
- <20160301233040.GA31476@codeblueprint.co.uk>
-Message-ID: <20160301233130.GB31476@codeblueprint.co.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 02 Mar 2016 08:44:57 +0900
+Subject: [RFC PATCH] watchdog: s3c2410_wdt: Add max and min timeout values
+In-Reply-To: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
+References: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <56D62979.5040009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 01 Mar, at 11:30:40PM, Matt Fleming wrote:
-> On Fri, 26 Feb, at 02:41:14PM, Matt Fleming wrote:
-> > On Thu, 18 Feb, at 02:16:24PM, Peter Jones wrote:
-> > > 
-> > > So the question I have is: would you rather chop up regions and reserve
-> > > the space, or allocate a new copy and update the configuration table
-> > > (after ExitBootServices()) to point to it?  The latter makes it pretty
-> > > easy to do from an API that all these drivers can use, and it makes the
-> > > kexec case completely transparent.
-> > > 
-> > > Up to you.
-> > 
-> > I think it makes the most sense to chop up the regions we care about
-> > (i.e. the ones we have drivers for) because not only does that save us
-> > the effort of copying out the data on every kexec reboot, it also
-> > prevents us from leaking each copy since we don't free them at the
-> > moment.
-> > 
-> > Then we just need to maintain a separate list of regions to free in
-> > efi_free_boot_services() or have some other way to distinguish between
-> > them.
-> > 
-> > Oh, and save_runtime_map() would need updating to save Boot Services
-> > regions too.
+On 02.03.2016 01:45, Javier Martinez Canillas wrote:
+> The watchdog maximum timeout value is determined by the number of bits
+> for the interval timer counter, its source clock frequency, the number
+> of bits of the prescaler and maximum divider value.
 > 
-> I have a very rough draft of patches that implement this strategy on
-> the 'experiemntal/efi-memmap' branch in the EFI tree if anyone is
-> curious and wants to take a look. The series will be sent out soon.
+> This can be calculated with the following equation:
+> 
+> max_timeout = counter / (freq / (max_prescale + 1) / max_divider)
+> 
+> Setting a maximum timeout value will allow the watchdog core to refuse
+> user-space calls to the WDIOC_SETTIMEOUT ioctl that sets not supported
+> timeout values.
+> 
+> For example, systemd tries to set a timeout of 10 minutes on reboot to
+> ensure that the machine will be rebooted even if a reboot failed. This
+> leads to the following error message on an Exynos5422 Odroid XU4 board:
+> 
+> [  147.986045] s3c2410-wdt 101d0000.watchdog: timeout 600 too big
+> 
+> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> Hello,
+> 
+> I'm sending this as an RFC because I don't have access to user manuals
+> for all the Exynos SoCs that this driver supports. But at least in all
+> the ones I have here, the maximum prescaler and divider values are the
+> same and also all have a 16-bit interval timer counter.
+> 
+> So this patch assumes that all IP blocks supported by this driver are
+> the same on that regard, if that's not the case then we can move these
+> values on a per IP block basis using struct of_device_id .data field.
 
-Obviously that's supposed to read: experimental/efi-memmap
+It looks correct at least for Exynos4210 and newer.
+
+> 
+> Best regards,
+> Javier
+> 
+>  drivers/watchdog/s3c2410_wdt.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> index 0093450441fe..f289c9fc353a 100644
+> --- a/drivers/watchdog/s3c2410_wdt.c
+> +++ b/drivers/watchdog/s3c2410_wdt.c
+> @@ -47,6 +47,8 @@
+>  #define S3C2410_WTDAT		0x04
+>  #define S3C2410_WTCNT		0x08
+>  
+> +#define S3C2410_WTCNT_MAXCNT	0xffff
+> +
+>  #define S3C2410_WTCON_RSTEN	(1 << 0)
+>  #define S3C2410_WTCON_INTEN	(1 << 2)
+>  #define S3C2410_WTCON_ENABLE	(1 << 5)
+> @@ -56,8 +58,11 @@
+>  #define S3C2410_WTCON_DIV64	(2 << 3)
+>  #define S3C2410_WTCON_DIV128	(3 << 3)
+>  
+> +#define S3C2410_WTCON_MAXDIV	0x80
+> +
+>  #define S3C2410_WTCON_PRESCALE(x)	((x) << 8)
+>  #define S3C2410_WTCON_PRESCALE_MASK	(0xff << 8)
+> +#define S3C2410_WTCON_PRESCALE_MAX	0xff
+>  
+>  #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+>  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+> @@ -198,6 +203,14 @@ do {							\
+>  
+>  /* functions */
+>  
+> +static inline unsigned int s3c2410wdt_max_timeout(struct clk *clock)
+> +{
+> +	unsigned long freq = clk_get_rate(clock);
+> +
+> +	return S3C2410_WTCNT_MAXCNT / (freq / (S3C2410_WTCON_PRESCALE_MAX + 1)
+> +				       / S3C2410_WTCON_MAXDIV);
+> +}
+> +
+>  static inline struct s3c2410_wdt *freq_to_wdt(struct notifier_block *nb)
+>  {
+>  	return container_of(nb, struct s3c2410_wdt, freq_transition);
+> @@ -567,6 +580,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> +	wdt->wdt_device.min_timeout = 1;
+> +	wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
+
+Can the frequency of clock change? E.g. with devfreq? No problem if it
+goes lower but if it gets higher than initial, then the problem will
+appear again.
+
+Best regards,
+Krzysztof
+
+> +
+>  	ret = s3c2410wdt_cpufreq_register(wdt);
+>  	if (ret < 0) {
+>  		dev_err(dev, "failed to register cpufreq\n");
+> 
