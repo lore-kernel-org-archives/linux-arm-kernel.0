@@ -1,65 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  1 Mar 2016 17:59:58 +0100
-Subject: [PATCH 2/6] m68k: rtc: provide rtc_class_ops directly
-In-Reply-To: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
-References: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456851608-3374907-3-git-send-email-arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 1 Mar 2016 17:01:25 +0000 (UTC)
+Subject: [PATCH 10/11] ARM: DRA7: hwmod: Add data for
+ McASP1/2/4/5/6/7/8
+In-Reply-To: <56D5C6B1.6040005@ti.com>
+References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
+ <1456411827-23962-11-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1603010900590.14948@utopia.booyaka.com>
+ <56D5C6B1.6040005@ti.com>
+Message-ID: <alpine.DEB.2.02.1603011657260.14948@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rtc-generic driver provides an architecture specific
-wrapper on top of the generic rtc_class_ops abstraction,
-and m68k has another abstraction on top, which is a bit
-silly.
+Hi P?ter,
 
-This changes the m68k rtc-generic device to provide its
-rtc_class_ops directly, to reduce the number of layers
-by one.
+On Tue, 1 Mar 2016, Peter Ujfalusi wrote:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/m68k/kernel/time.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+> Hi Paul,
+> 
+> On 03/01/2016 11:11 AM, Paul Walmsley wrote:
+> > Hi P?ter
+> > 
+> > A few questions:
+> > 
+> > On Thu, 25 Feb 2016, Peter Ujfalusi wrote:
+> > 
+> >> Add missing data for all McASP ports for the dra7 family
+> >>
+> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > 
+> > 1. The patch doesn't set the HWMOD_OPT_CLKS_NEEDED flag for McASP1 and 2, 
+> > but does set it for McASP4-8.  Could you please confirm that this is 
+> > intentional, and if so, why?
+> 
+> All should have the HWMOD_OPT_CLKS_NEEDED as both fclk and ahclkx is treated
+> as functional clock and needs to be available in order to be able to access
+> McASP registers.
+> Sorry, I can only test McASP3 and somehow I overlooked this when copy-pasting
+> the data.
 
-diff --git a/arch/m68k/kernel/time.c b/arch/m68k/kernel/time.c
-index 3857737e3958..773b2187210d 100644
---- a/arch/m68k/kernel/time.c
-+++ b/arch/m68k/kernel/time.c
-@@ -87,6 +87,23 @@ void read_persistent_clock(struct timespec *ts)
- }
- 
- #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
-+static int rtc_generic_get_time(struct device *dev, struct rtc_time *tm)
-+{
-+	mach_hwclk(0, tm);
-+	return rtc_valid_tm(tm);
-+}
-+
-+static int rtc_generic_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	if (mach_hwclk(1, tm) < 0)
-+		return -EOPNOTSUPP;
-+	return 0;
-+}
-+
-+static const struct rtc_class_ops generic_rtc_ops = {
-+	.read_time = rtc_generic_get_time,
-+	.set_time = rtc_generic_set_time,
-+};
- 
- static int __init rtc_init(void)
- {
-@@ -95,7 +112,10 @@ static int __init rtc_init(void)
- 	if (!mach_hwclk)
- 		return -ENODEV;
- 
--	pdev = platform_device_register_simple("rtc-generic", -1, NULL, 0);
-+	/* or just call devm_rtc_device_register instead? */
-+	pdev = platform_device_register_data(NULL, "rtc-generic", -1,
-+					     &generic_rtc_ops,
-+					     sizeof(generic_rtc_ops));
- 	return PTR_ERR_OR_ZERO(pdev);
- }
- 
--- 
-2.7.0
+OK
+
+> > 2. The patch sets HWMOD_SWSUP_SIDLE for McASP1 and 2, but doesn't set it 
+> > for McASP4-8.  Could you please confirm that this is intentional, and if 
+> > so, why?  The descriptions of the MODULEMODE fields in SPRUHZ6 look 
+> > identical.
+> 
+> I need to confirm this, but all McASP should have the same set of flags.
+
+OK.  Looking at McASP3 data this morning, they probably shouldn't need 
+HWMOD_SWSUP_SIDLE, but probably all need 
+
+                        .modulemode   = MODULEMODE_SWCTRL,
+
+> > 3. Can McASP1,2,3 bus-master onto the L3?  If so, then there should be 
+> > "dra7xx_mcasp1__l3_main_1"-style links to indicate this.
+> 
+> I need to check this, but I don't think McASP1,2,3 can be bus-master onto L3.
+
+OK.  When you get back, maybe doublecheck this - it looks to me from 
+SPRUHZ6 that McASP1-3 have built-in DMA controllers.
+
+> I can resend the series next week as I'm out of office this week.
+
+That's fine.  It's most likely v4.7 material at this point.
+
+
+- Paul
