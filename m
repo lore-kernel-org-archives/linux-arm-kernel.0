@@ -1,147 +1,169 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Mar 2016 19:42:04 +0000
-Subject: [PATCH v1] kasan, arm64: Unpoison dirty stack frames when
- resuming from suspend.
-In-Reply-To: <CAG_fn=XowizL_=tt5aiHBF=_UNYKZsGWQOR7Ju-NYz2kre-7bA@mail.gmail.com>
-References: <c08aa050cb03e40098775dc8d200f073451c342e.1456489933.git.glider@google.com>
- <20160226135335.GC8728@leverpostej>
- <CAG_fn=XowizL_=tt5aiHBF=_UNYKZsGWQOR7Ju-NYz2kre-7bA@mail.gmail.com>
-Message-ID: <20160301194204.GB335@leverpostej>
+Date: Tue,  1 Mar 2016 20:01:05 +0000
+Subject: [PATCHv2] arm64: kasan: clear stale stack poison
+Message-ID: <1456862465-31505-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 06:28:27PM +0100, Alexander Potapenko wrote:
-> On Fri, Feb 26, 2016 at 2:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
-> >
-> > On Fri, Feb 26, 2016 at 01:38:37PM +0100, Alexander Potapenko wrote:
-> >> Before an ARM64 CPU is suspended, the kernel saves the context which will
-> >> be used to initialize the register state upon resume. After that and
-> >> before the actual execution of the SMC instruction the kernel creates
-> >> several stack frames which are never unpoisoned because arm_smccc_smc()
-> >> does not return. This may cause false positive stack buffer overflow
-> >> reports from KASAN.
-> >>
-> >> The solution is to record the stack pointer value just before the CPU is
-> >> suspended, and unpoison the part of stack between the saved value and
-> >> the stack pointer upon resume.
-> >
-> > Thanks for looking into this! That's much appreciated.
-> >
-> > I think the general approach (unposioning the stack upon cold return to
-> > the kernel) is fine, but I have concerns with the implementation, which
-> > I've noted below.
+When a CPU is shut down or placed into a low power state, the functions
+on the critical path to firmware never return, and hence their epilogues
+never execute. When using KASAN, this means that the shadow entries for
+the corresponding stack are poisoned but never unpoisoned. When a CPU
+subsequently re-enters the kernel via another path, and begins using
+the stack, it may hit stale poison values, leading to false-positive
+KASAN failures.
 
-For the idle case I intend to respin my patch [1] which calls
-kasan_unpoison_shadow from assembly in the resume path, as I think
-that's the only reliable approach.
+We can't ensure that all functions on the critical path are not
+instrumented. For CPU hotplug this includes lots of core code starting
+from secondary_start_kernel, and for CPU idle we can't ensure that
+specific functions are not instrumented, as the compiler always poisons
+the stack even when told to not instrument a function:
 
-> > The problem also applies for hotplug, as leftover poison from the
-> > hot-unplug path isn't cleaned before a CPU is hotplugged back on. The
-> > first few functions are likely deterministic in their stack usage, so
-> > it's not seen with a defconfig, but I think it's possible to trigger,
-> > and it's also a cross-architecture problem shared with x86.
-> Agreed, but since I haven't yet seen problems with hotplug, it's hard
-> to test the fix for them.
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69863
 
-For the common hotplug case, how about the below?
+This patch works around the issue by forcefully unpoisoning the shadow
+region for all stack on the critical path, before we return to
+instrumented C code. As we cannot statically determine the stack usage
+of code in the critical path, we must clear the shadow for all remaining
+stack, meaning that we must clear up to 2K of shadow memory each time a
+CPU enters the kernel from idle or hotplug.
 
-I've given it a spin locally on arm64 with the reproducer I posted
-earlier.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Alexander Potapenko <glider@google.com>
+Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kasan.h  | 40 ++++++++++++++++++++++++++++++++++------
+ arch/arm64/kernel/asm-offsets.c |  1 +
+ arch/arm64/kernel/head.S        |  2 ++
+ arch/arm64/kernel/sleep.S       |  2 ++
+ 4 files changed, 39 insertions(+), 6 deletions(-)
 
-Thanks,
+Since v1 [1]:
+* Remove unneeded offset
+* Simplify calculation
+
+For the timebeing I've retained the arm64-specific hotplug fix, though it might
+be possible to handle the hotplug case in common code (e.g. [2]). 
+
 Mark.
 
 [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409466.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/412923.html
 
----->8----
->From 34839286826c88338cd91a142b1bcc3c077a87aa Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Tue, 1 Mar 2016 19:27:23 +0000
-Subject: [PATCH] sched/kasan: clear stale stack poison
-
-CPUs get hotplugged out some levels deep in C code, and hence when KASAN
-is in use, the instrumented function preambles will have left the stack
-shadow area poisoned.
-
-This poison is not cleared, so when a CPU re-enters the kernel, it is
-possible for accesses in instrumented functions to hit this stale
-poison, resulting in (spurious) KASAN splats.
-
-This patch forcefully unpoisons an idle task's stack shadow when it is
-re-initialised prior to a hotplug, avoiding spurious hits against stale
-poison.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- include/linux/kasan.h |  4 ++++
- kernel/sched/core.c   |  3 +++
- mm/kasan/kasan.c      | 10 ++++++++++
- 3 files changed, 17 insertions(+)
-
-diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 4b9f85c..e00486f 100644
---- a/include/linux/kasan.h
-+++ b/include/linux/kasan.h
-@@ -43,6 +43,8 @@ static inline void kasan_disable_current(void)
+diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
+index 2774fa3..6f00b76 100644
+--- a/arch/arm64/include/asm/kasan.h
++++ b/arch/arm64/include/asm/kasan.h
+@@ -1,10 +1,30 @@
+ #ifndef __ASM_KASAN_H
+ #define __ASM_KASAN_H
  
- void kasan_unpoison_shadow(const void *address, size_t size);
+-#ifndef __ASSEMBLY__
+-
++#ifndef LINKER_SCRIPT
+ #ifdef CONFIG_KASAN
  
-+void kasan_unpoison_task_stack(struct task_struct *idle);
++#ifdef __ASSEMBLY__
 +
- void kasan_alloc_pages(struct page *page, unsigned int order);
- void kasan_free_pages(struct page *page, unsigned int order);
- 
-@@ -66,6 +68,8 @@ void kasan_free_shadow(const struct vm_struct *vm);
- 
- static inline void kasan_unpoison_shadow(const void *address, size_t size) {}
- 
-+static inline void kasan_unpoison_task_stack(struct task_struct *idle) {}
++#include <asm/asm-offsets.h>
++#include <asm/thread_info.h>
 +
- static inline void kasan_enable_current(void) {}
- static inline void kasan_disable_current(void) {}
- 
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 9503d59..41f6b22 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -26,6 +26,7 @@
-  *              Thomas Gleixner, Mike Kravetz
-  */
- 
-+#include <linux/kasan.h>
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/nmi.h>
-@@ -5096,6 +5097,8 @@ void init_idle(struct task_struct *idle, int cpu)
- 	idle->state = TASK_RUNNING;
- 	idle->se.exec_start = sched_clock();
- 
-+	kasan_unpoison_task_stack(idle);
++	/*
++	 * Remove stale shadow posion for the stack left over from a prior
++	 * hot-unplug or idle exit, from the lowest stack address in the
++	 * thread_union up to the covering up to the current stack pointer.
++	 * Shadow poison above this is preserved.
++	 */
++	.macro kasan_unpoison_stack
++	mov	x1, sp
++	and	x0, x1, #~(THREAD_SIZE - 1)
++	add	x0, x0, #(THREAD_INFO_SIZE)
++	sub	x1, x1, x0
++	bl	kasan_unpoison_shadow
++	.endm
 +
- #ifdef CONFIG_SMP
- 	/*
- 	 * Its possible that init_idle() gets called multiple times on a task,
-diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
-index bc0a8d8..467f394 100644
---- a/mm/kasan/kasan.c
-+++ b/mm/kasan/kasan.c
-@@ -60,6 +60,16 @@ void kasan_unpoison_shadow(const void *address, size_t size)
- 	}
- }
- 
-+/*
-+ * Remove any poison left on the stack from a prior hot-unplug.
-+ */
-+void kasan_unpoison_task_stack(struct task_struct *idle)
-+{
-+	void *base = task_stack_page(idle) + sizeof(struct thread_info);
-+	size_t size = THREAD_SIZE - sizeof(struct thread_info);
++#else /* __ASSEMBLY__ */
 +
-+	kasan_unpoison_shadow(base, size);
-+}
+ #include <linux/linkage.h>
+ #include <asm/memory.h>
  
+@@ -30,9 +50,17 @@
+ void kasan_init(void);
+ asmlinkage void kasan_early_init(void);
+ 
+-#else
++#endif /* __ASSEMBLY__ */
++
++#else /* CONFIG_KASAN */
++
++#ifdef __ASSEMBLY__
++	.macro kasan_unpoison_stack
++	.endm
++#else /* __ASSEMBLY */
+ static inline void kasan_init(void) { }
+-#endif
++#endif /* __ASSEMBLY__ */
+ 
+-#endif
+-#endif
++#endif /* CONFIG_KASAN */
++#endif /* LINKER_SCRIPT */
++#endif /* __ASM_KASAN_H */
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index fffa4ac6..c615fa3 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -39,6 +39,7 @@ int main(void)
+   DEFINE(TI_ADDR_LIMIT,		offsetof(struct thread_info, addr_limit));
+   DEFINE(TI_TASK,		offsetof(struct thread_info, task));
+   DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
++  DEFINE(THREAD_INFO_SIZE,	sizeof(struct thread_info));
+   BLANK();
+   DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
+   BLANK();
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 917d981..35ae2cb 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -29,6 +29,7 @@
+ #include <asm/asm-offsets.h>
+ #include <asm/cache.h>
+ #include <asm/cputype.h>
++#include <asm/kasan.h>
+ #include <asm/kernel-pgtable.h>
+ #include <asm/memory.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -616,6 +617,7 @@ ENTRY(__secondary_switched)
+ 	and	x0, x0, #~(THREAD_SIZE - 1)
+ 	msr	sp_el0, x0			// save thread_info
+ 	mov	x29, #0
++	kasan_unpoison_stack
+ 	b	secondary_start_kernel
+ ENDPROC(__secondary_switched)
+ 
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index e33fe33..3ad7681 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -2,6 +2,7 @@
+ #include <linux/linkage.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/assembler.h>
++#include <asm/kasan.h>
+ 
+ 	.text
  /*
-  * All functions below always inlined so compiler could
+@@ -145,6 +146,7 @@ ENTRY(cpu_resume_mmu)
+ ENDPROC(cpu_resume_mmu)
+ 	.popsection
+ cpu_resume_after_mmu:
++	kasan_unpoison_stack
+ 	mov	x0, #0			// return zero on success
+ 	ldp	x19, x20, [sp, #16]
+ 	ldp	x21, x22, [sp, #32]
 -- 
 1.9.1
