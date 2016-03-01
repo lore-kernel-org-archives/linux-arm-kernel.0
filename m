@@ -1,75 +1,49 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 1 Mar 2016 09:55:12 -0700
-Subject: [RFC v2 01/12] PM / Domains: Abstract genpd locking
-In-Reply-To: <20160226180844.GT28849@codeaurora.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-2-git-send-email-lina.iyer@linaro.org>
- <20160226180844.GT28849@codeaurora.org>
-Message-ID: <20160301165512.GI1440@linaro.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 1 Mar 2016 10:55:54 -0600
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56D5834C.5030800@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+ <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
+ <56CAA82D.6000507@ti.com>
+ <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
+ <56CADB23.8020202@ti.com> <56CC490F.3040301@ti.com>
+ <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
+ <56CD4BE1.3010701@ti.com>
+ <alpine.DEB.2.02.1603010825090.14948@utopia.booyaka.com>
+ <56D5834C.5030800@ti.com>
+Message-ID: <56D5C99A.1050109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26 2016 at 11:08 -0700, Stephen Boyd wrote:
->On 02/12, Lina Iyer wrote:
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 3ddd05d..8204615 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -40,6 +40,46 @@
->>  static LIST_HEAD(gpd_list);
->>  static DEFINE_MUTEX(gpd_list_lock);
+On 03/01/2016 05:55 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Tuesday 01 March 2016 01:55 PM, Paul Walmsley wrote:
 >>
->> +struct genpd_lock_fns {
->> +	void (*lock)(struct generic_pm_domain *genpd);
->> +	void (*lock_nested)(struct generic_pm_domain *genpd, int depth);
->> +	int (*lock_interruptible)(struct generic_pm_domain *genpd);
->> +	void (*unlock)(struct generic_pm_domain *genpd);
->> +};
->> +
->> +static void genpd_lock_irq(struct generic_pm_domain *genpd)
->> +{
->> +	mutex_lock(&genpd->mlock);
->> +}
->> +
->> +static void genpd_lock_irq_nested(struct generic_pm_domain *genpd,
->> +					int depth)
->> +{
->> +	mutex_lock_nested(&genpd->mlock, depth);
->> +}
->> +
->> +static int genpd_lock_interruptible_irq(struct generic_pm_domain *genpd)
->> +{
->> +	return mutex_lock_interruptible(&genpd->mlock);
->> +}
->> +
->> +static void genpd_unlock_irq(struct generic_pm_domain *genpd)
->> +{
->> +	return mutex_unlock(&genpd->mlock);
->> +}
->> +
->> +static struct genpd_lock_fns irq_lock = {
->
->Can this be const? Also, why is this called irq_lock when the
->lock functions are mutex based?
->
-hmm.. well IRQs are allowed, but I guess, I should come up with a better
-name.
+>> Folks, the following is what I've queued for this.
+> 
+> Thanks Paul.
+> 
+> Bjorn,
+> 
+> With this patch merged, enabling pci-dra7xx won't result in system freeze
+> anymore. I can send a patch to revert depends on BROKEN.
 
->> +	.lock = genpd_lock_irq,
->> +	.lock_nested = genpd_lock_irq_nested,
->> +	.lock_interruptible = genpd_lock_interruptible_irq,
->> +	.unlock = genpd_unlock_irq,
->> +};
->> +
->> @@ -74,6 +75,8 @@ struct generic_pm_domain {
->>  	struct genpd_power_state *states;
->>  	unsigned int state_count; /* number of states */
->>  	unsigned int state_idx; /* state that genpd will go to when off */
->> +	struct genpd_lock_fns *lock_fns;
->
->const?
->
-Sure will fix both.
+Kishon,
+Make sure you send only that after both this patch and the pcie reset
+data are in. I see the pcie reset data in Paul's for-4.6 branch.
 
-Thanks,
-Lina
+regards
+Suman
+
+[snip]
