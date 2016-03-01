@@ -1,79 +1,105 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 1 Mar 2016 14:54:24 +0200
-Subject: [PATCH v3 3/5] ARM: dts: DRA7: Add TBCLK for PWMSS
-In-Reply-To: <20160229232348.GV13417@atomide.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-4-git-send-email-fcooper@ti.com>
- <20160229232348.GV13417@atomide.com>
-Message-ID: <56D59100.3060803@ti.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue,  1 Mar 2016 06:55:01 -0600
+Subject: [PATCH v3] irqchip/gicv3-its: Don't allow devices whose ID is outside
+ range
+Message-ID: <1456836901-20976-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2016 01:23 AM, Tony Lindgren wrote:
-> * Franklin S Cooper Jr <fcooper@ti.com> [160225 14:37]:
->> From: Vignesh R <vigneshr@ti.com>
->>
->> tbclk is used by ehrpwm to generate PWM waveform on DRA7 SoC. Add Linux
->> clock to control ehrpwm tbclk.
->> The TRM says, tbclk is derived from SYSCLKOUT. SYSCLKOUT is nothing but
->> ehrpwm functional clock derived from the gateable interface and
->> functional clock of PWMSS(l4_root_clk_div).
->> Refer AM57x TRM SPRUHZ6[1], October 2014, Table 29-4 and Section 29.2.2.1,
->> Table 29-19 and the NOTE at the end of the table.
->>
->> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
->
-> Applying this into omap-for-v4.6/dt thanks.
->
-> Note for Tero, let's plan on getting rid of the duplicate
-> reg entries by using the standard clock output offset within
-> the clock register. I think we should easily be able to add
-> a binding for this and then deprecate the overlapping reg
-> entries.
+We are not checking whether the requested device identifier fits into
+the device table memory or not. The function its_create_device()
+assumes that enough memory has been allocated for whole DevID space
+(reported by ITS_TYPER.Devbits) during the ITS probe() and continues
+to initialize ITS hardware.
 
-Yeah, we have been discussing this offline a bit, but haven't had time 
-to look at this. I believe the hwmod clock conversion is of higher 
-priority still.
+This assumption is not perfect, sometimes we reduce memory size either
+because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
+MAPD command fails if 'Device ID' is outside of device table range.
 
--Tero
+Add a simple validation check to avoid MAPD failures since we are
+not handling ITS command errors. This change also helps to return an
+error -ENOMEM instead of success to caller.
 
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+[v1]->[v2]
+  Rebase to v4.5-rc6, edit commit text and simplify code changes.
 
->
-> Regards,
->
-> Tony
->
->> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
->> @@ -2146,4 +2146,28 @@
->>   		ti,bit-shift = <0>;
->>   		reg = <0x558>;
->>   	};
->> +
->> +       ehrpwm0_tbclk: ehrpwm0_tbclk {
->> +		#clock-cells = <0>;
->> +		compatible = "ti,gate-clock";
->> +		clocks = <&l4_root_clk_div>;
->> +		ti,bit-shift = <20>;
->> +		reg = <0x0558>;
->> +	};
->> +
->> +	ehrpwm1_tbclk: ehrpwm1_tbclk {
->> +		#clock-cells = <0>;
->> +		compatible = "ti,gate-clock";
->> +		clocks = <&l4_root_clk_div>;
->> +		ti,bit-shift = <21>;
->> +		reg = <0x0558>;
->> +	};
->> +
->> +	ehrpwm2_tbclk: ehrpwm2_tbclk {
->> +		#clock-cells = <0>;
->> +		compatible = "ti,gate-clock";
->> +		clocks = <&l4_root_clk_div>;
->> +		ti,bit-shift = <22>;
->> +		reg = <0x0558>;
->> +	};
->>   };
->> --
->> 2.7.0
->>
+[v2]->[v3]
+   Fix typo.
+
+ drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 43dfd15..6d986ac 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -55,6 +55,16 @@ struct its_collection {
+ };
+ 
+ /*
++ * The ITS_BASER structure - contains memory information and table
++ * entry size in bytes.
++ */
++struct its_baser {
++	void		*base;
++	u32		order;
++	u32		entry_size;
++};
++
++/*
+  * The ITS structure - contains most of the infrastructure, with the
+  * top-level MSI domain, the command queue, the collections, and the
+  * list of devices writing to it.
+@@ -66,14 +76,12 @@ struct its_node {
+ 	unsigned long		phys_base;
+ 	struct its_cmd_block	*cmd_base;
+ 	struct its_cmd_block	*cmd_write;
+-	struct {
+-		void		*base;
+-		u32		order;
+-	} tables[GITS_BASER_NR_REGS];
++	struct its_baser	tables[GITS_BASER_NR_REGS];
+ 	struct its_collection	*collections;
+ 	struct list_head	its_device_list;
+ 	u64			flags;
+ 	u32			ite_size;
++	struct its_baser	*device_table;
+ };
+ 
+ #define ITS_ITT_ALIGN		SZ_256
+@@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		 * For other tables, only allocate a single page.
+ 		 */
+ 		if (type == GITS_BASER_TYPE_DEVICE) {
++			its->device_table = &its->tables[i];
+ 			/*
+ 			 * 'order' was initialized earlier to the default page
+ 			 * granule of the the ITS.  We can't have an allocation
+@@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 					node_name, order);
+ 			}
+ 		}
++		its->tables[i].entry_size = entry_size;
+ 
+ retry_alloc_baser:
+ 		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+@@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	int nr_ites;
+ 	int sz;
+ 
++	/* Don't allow 'dev_id' that exceeds single, flat table limit */
++	if (its->device_table &&
++	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
++	    its->device_table->entry_size)))
++		return NULL;
++
+ 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+ 	/*
+ 	 * At least one bit of EventID is being used, hence a minimum
+-- 
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
+a Linux Foundation Collaborative Project
