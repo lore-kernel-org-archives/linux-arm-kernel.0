@@ -1,123 +1,69 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 29 Feb 2016 21:57:26 -0500
-Subject: [PATCH v10 8/9] arm64: Add kernel return probes support (kretprobes)
-In-Reply-To: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
-References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1456801047-29014-9-git-send-email-dave.long@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 29 Feb 2016 20:03:30 -0800
+Subject: [PATCH v5 3/6] watchdog: pnx4008: add support for soft reset
+In-Reply-To: <1456767068-14449-4-git-send-email-slemieux.tyco@gmail.com>
+References: <1456767068-14449-1-git-send-email-slemieux.tyco@gmail.com>
+ <1456767068-14449-4-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <56D51492.4000405@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+On 02/29/2016 09:31 AM, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
+>
+> Add support for explicit soft reset using the reboot mode.
+>
+> The default reboot mode behavior is unchanged;
+> you can overwrite the default reboot type in the board specific file
+> "DT_MACHINE_START" definition using the "reboot_mode" parameter.
+>
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> ---
+> Changes from v4 to v5:
+> - no logical change; updated to work with new revision of patch #2.
+>
+> Changes from v3 to v4:
+> - none.
+>
+> Changes from v2 to v3:
+> - no logical change; updated to work with new revision of patch #2.
+>
+> Changes from v1 to v2:
+> - Rename patch title;
+>    was "arm: lpc32xx: restart: add support for soft reset"
+> - Add change to "pnx-4008" driver instead of "mach-lpc32xx".
+> - Use define available in "pnx-4008" when writting to watchdog register.
+>
+>   drivers/watchdog/pnx4008_wdt.c | 13 ++++++++++---
+>   1 file changed, 10 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+> index f3be522..e05bfecf 100644
+> --- a/drivers/watchdog/pnx4008_wdt.c
+> +++ b/drivers/watchdog/pnx4008_wdt.c
+> @@ -129,9 +129,16 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+>   static int pnx4008_restart_handler(struct watchdog_device *wdd,
+>   				   unsigned long mode, void *cmd)
+>   {
+> -	/* Instant assert of RESETOUT_N with pulse length 1mS */
+> -	writel(13000, WDTIM_PULSE(wdt_base));
+> -	writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
+> +	if (mode == (unsigned long)REBOOT_SOFT) {
 
-The pre-handler of this special 'trampoline' kprobe executes the return
-probe handler functions and restores original return address in ELR_EL1.
-This way the saved pt_regs still hold the original register context to be
-carried back to the probed kernel function.
+Are those typecasts really necessary ?
 
-Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-Signed-off-by: David A. Long <dave.long@linaro.org>
----
- arch/arm64/Kconfig          |  1 +
- arch/arm64/kernel/kprobes.c | 75 ++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 75 insertions(+), 1 deletion(-)
+Guenter
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c395386..72412de 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -82,6 +82,7 @@ config ARM64
- 	select HAVE_RCU_TABLE_FREE
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_KPROBES
-+	select HAVE_KRETPROBES if HAVE_KPROBES
- 	select IOMMU_DMA if IOMMU_SUPPORT
- 	select IRQ_DOMAIN
- 	select IRQ_FORCED_THREADING
-diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-index 98f4fe5..13d3333 100644
---- a/arch/arm64/kernel/kprobes.c
-+++ b/arch/arm64/kernel/kprobes.c
-@@ -534,7 +534,80 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
- 
- void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
- {
--	return (void *) 0;
-+	struct kretprobe_instance *ri = NULL;
-+	struct hlist_head *head, empty_rp;
-+	struct hlist_node *tmp;
-+	unsigned long flags, orig_ret_addr = 0;
-+	unsigned long trampoline_address =
-+		(unsigned long)&kretprobe_trampoline;
-+
-+	INIT_HLIST_HEAD(&empty_rp);
-+	kretprobe_hash_lock(current, &head, &flags);
-+
-+	/*
-+	 * It is possible to have multiple instances associated with a given
-+	 * task either because multiple functions in the call path have
-+	 * a return probe installed on them, and/or more than one return
-+	 * probe was registered for a target function.
-+	 *
-+	 * We can handle this because:
-+	 *     - instances are always inserted at the head of the list
-+	 *     - when multiple return probes are registered for the same
-+	 *       function, the first instance's ret_addr will point to the
-+	 *       real return address, and all the rest will point to
-+	 *       kretprobe_trampoline
-+	 */
-+	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
-+		if (ri->task != current)
-+			/* another task is sharing our hash bucket */
-+			continue;
-+
-+		if (ri->rp && ri->rp->handler) {
-+			__this_cpu_write(current_kprobe, &ri->rp->kp);
-+			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
-+			ri->rp->handler(ri, regs);
-+			__this_cpu_write(current_kprobe, NULL);
-+		}
-+
-+		orig_ret_addr = (unsigned long)ri->ret_addr;
-+		recycle_rp_inst(ri, &empty_rp);
-+
-+		if (orig_ret_addr != trampoline_address)
-+			/*
-+			 * This is the real return address. Any other
-+			 * instances associated with this task are for
-+			 * other calls deeper on the call stack
-+			 */
-+			break;
-+	}
-+
-+	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
-+	/* restore the original return address */
-+	instruction_pointer(regs) = orig_ret_addr;
-+	reset_current_kprobe();
-+	kretprobe_hash_unlock(current, &flags);
-+
-+	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
-+		hlist_del(&ri->hlist);
-+		kfree(ri);
-+	}
-+
-+	/* return 1 so that post handlers not called */
-+	return (void *) orig_ret_addr;
-+}
-+
-+void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
-+				      struct pt_regs *regs)
-+{
-+	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
-+
-+	/* replace return addr (x30) with trampoline */
-+	regs->regs[30] = (long)&kretprobe_trampoline;
-+}
-+
-+int __kprobes arch_trampoline_kprobe(struct kprobe *p)
-+{
-+	return 0;
- }
- 
- int __init arch_init_kprobes(void)
--- 
-2.5.0
+> +		/* Force match output active */
+> +		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
+> +		/* Internal reset on match output (RESOUT_N not asserted) */
+> +		writel(M_RES1, WDTIM_MCTRL(wdt_base));
+> +	} else {
+> +		/* Instant assert of RESETOUT_N with pulse length 1mS */
+> +		writel(13000, WDTIM_PULSE(wdt_base));
+> +		writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
+> +	}
+>
+>   	/* Wait for watchdog to reset system */
+>   	mdelay(1000);
+>
