@@ -1,70 +1,135 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  1 Mar 2016 14:44:06 +0000
-Subject: [PATCH v2 0/3] arm/arm64: pci: PCI_PROBE_ONLY clean-up
-Message-ID: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Tue,  1 Mar 2016 14:44:07 +0000
+Subject: [PATCH v2 1/3] drivers: pci: add generic code to claim bus resources
+In-Reply-To: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1456843449-19393-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current arm/arm64 code prevents enabling resources in the respective
-pcibios_enable_device() callbacks if the PCI_PROBE_ONLY flag is set,
-in that on those platforms the resources tree was not validated properly
-since PCI resources are not currently claimed on arm/arm64 PCI_PROBE_ONLY
-systems.
+From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
 
-This is a temporary kludge, in that PCI_PROBE_ONLY flag is used to
-describe systems with fixed resources, that can nonetheless be enabled
-through the standard pci_enable_resources() call present in PCI core code,
-(ie via the generic pcibios_enable_device() call).
+PCI core code contains a set of functions, eg:
 
-To remove the PCI_PROBE_ONLY flag in arm/arm64 pcibios_enable_device()
-callbacks, the PCI host controllers that can be used with
-PCI_PROBE_ONLY configurations must make sure that devices resources are
-validated and inserted in the kernel resource tree even on PCI_PROBE_ONLY
-systems so that the generic pcibios_enable_device() generic code, while
-enabling resources (pci_enable_resources()), does not find dangling
-resources pointers (ie missing parent pointers) that are omens of
-an incomplete resource tree, causing failures in resources enablement.
+pci_assign_unassigned_bus_resources()
 
-PCI core code provides interfaces to assign/reassign/reallocate PCI
-bus resources but it is currently lacking an interface to claim
-resources for a specific bus. Arches implement resources claiming through
-ad-hoc code built on top of pci_claim_resource() API, but that code
-cannot be leveraged on architectures like arm/arm64 that rely on the
-generic PCI infrastructure to carry out resources claiming/assignment.
+that allow to assign the PCI resources for a given bus after
+enumeration.
 
-Therefore, to clean up the arm/arm64 resources enablement on PCI_PROBE_ONLY
-systems this patchset implements three patches:
+On systems where the PCI BARs are immutable (ie they must not and can
+not be assigned), PCI bus resources should still be inserted in the PCI
+resources tree (even if they are not (re)-assigned), but there is
+no generic PCI kernel function for that purpose. Currently the PCI bus
+resources insertion in the resources tree is implemented in an arch
+specific fashion through arch specific callbacks that rely on the PCI
+resources claiming API (for bridges and devices) which resulted in arches
+implementations that contain duplicated code to claim resources for a
+given PCI bus hierarchy.
 
-PATCH 1: Create PCI core code infrastructure to claim bus resources
-PATCH 2: Leverage the infrastructure in PATCH 1 to claim resources in
-         the PCI generic host controller on PCI_PROBE_ONLY systems
-PATCH 3: Remove PCI_PROBE_ONLY kludges from arm/arm64 PCI back-ends to
-         complete the clean-up and leverage the PCI generic
-         pcibios_enable_device() implementation
+This patch, based on the x86/ia64 resources claiming arch implementations,
+implements a set of functions in core PCI code that provides a PCI core
+interface for resources claiming for a given PCI bus hierarchy, paving
+the way for further resource claiming consolidation across architectures.
 
-Tested on arm/arm64 systems with kvmtool and PCI host generic.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Yinghai Lu <yinghai@kernel.org>
+---
+ drivers/pci/setup-bus.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pci.h     |  1 +
+ 2 files changed, 69 insertions(+)
 
-v1 -> v2
-
-- Rewrote patch 1 to recursively claim resources for the whole PCI bus
-  hierarchy
-- Updated commits logs/tags
-- Rebased against v4.5-rc6
-
-v1: https://patchwork.ozlabs.org/patch/545669/
-
-Lorenzo Pieralisi (3):
-  drivers: pci: add generic code to claim bus resources
-  drivers: pci: host-generic: claim bus resources on PCI_PROBE_ONLY
-    set-ups
-  arm/arm64: pci: remove arch specific pcibios_enable_device()
-
- arch/arm/kernel/bios32.c            | 12 -------
- arch/arm64/kernel/pci.c             | 13 -------
- drivers/pci/host/pci-host-generic.c |  5 ++-
- drivers/pci/setup-bus.c             | 68 +++++++++++++++++++++++++++++++++++++
- include/linux/pci.h                 |  1 +
- 5 files changed, 73 insertions(+), 26 deletions(-)
-
+diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+index 7796d0a..95f0906 100644
+--- a/drivers/pci/setup-bus.c
++++ b/drivers/pci/setup-bus.c
+@@ -1424,6 +1424,74 @@ void pci_bus_assign_resources(const struct pci_bus *bus)
+ }
+ EXPORT_SYMBOL(pci_bus_assign_resources);
+ 
++static void pci_claim_device_resources(struct pci_dev *dev)
++{
++	int i;
++
++	for (i = 0; i < PCI_BRIDGE_RESOURCES; i++) {
++		struct resource *r = &dev->resource[i];
++
++		if (!r->flags || r->parent)
++			continue;
++
++		pci_claim_resource(dev, i);
++	}
++}
++
++static void pci_claim_bridge_resources(struct pci_dev *dev)
++{
++	int i;
++
++	for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
++		struct resource *r = &dev->resource[i];
++
++		if (!r->flags || r->parent)
++			continue;
++
++		pci_claim_bridge_resource(dev, i);
++	}
++}
++
++static void pci_bus_allocate_dev_resources(struct pci_bus *b)
++{
++	struct pci_dev *dev;
++	struct pci_bus *child;
++
++	list_for_each_entry(dev, &b->devices, bus_list) {
++		pci_claim_device_resources(dev);
++
++		child = dev->subordinate;
++		if (child)
++			pci_bus_allocate_dev_resources(child);
++	}
++}
++
++static void pci_bus_allocate_resources(struct pci_bus *b)
++{
++	struct pci_bus *child;
++
++	/*
++	 * Carry out a depth-first search on the PCI bus
++	 * tree to allocate bridge apertures. Read the
++	 * programmed bridge bases and recursively claim
++	 * the respective bridge resources.
++	 */
++	if (b->self) {
++		pci_read_bridge_bases(b);
++		pci_claim_bridge_resources(b->self);
++	}
++
++	list_for_each_entry(child, &b->children, node)
++		pci_bus_allocate_resources(child);
++}
++
++void pci_bus_claim_resources(struct pci_bus *b)
++{
++	pci_bus_allocate_resources(b);
++	pci_bus_allocate_dev_resources(b);
++}
++EXPORT_SYMBOL(pci_bus_claim_resources);
++
+ static void __pci_bridge_assign_resources(const struct pci_dev *bridge,
+ 					  struct list_head *add_head,
+ 					  struct list_head *fail_head)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 2771625..e66eba7 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1102,6 +1102,7 @@ ssize_t pci_write_vpd(struct pci_dev *dev, loff_t pos, size_t count, const void
+ /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
+ resource_size_t pcibios_retrieve_fw_addr(struct pci_dev *dev, int idx);
+ void pci_bus_assign_resources(const struct pci_bus *bus);
++void pci_bus_claim_resources(struct pci_bus *bus);
+ void pci_bus_size_bridges(struct pci_bus *bus);
+ int pci_claim_resource(struct pci_dev *, int);
+ int pci_claim_bridge_resource(struct pci_dev *bridge, int i);
 -- 
 2.5.1
