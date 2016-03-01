@@ -1,60 +1,49 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 2 Mar 2016 00:31:23 +0100
-Subject: [PATCH 7/8] ARM64: dts: amlogic: Extend GXBaby GIC node
-In-Reply-To: <56D58E88.2080700@arm.com>
-References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
- <1456789465-2962-8-git-send-email-afaerber@suse.de>
- <56D57673.8030702@arm.com> <56D57A7F.5020806@suse.de>
- <56D58E88.2080700@arm.com>
-Message-ID: <56D6264B.2090507@suse.de>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Tue, 1 Mar 2016 23:31:30 +0000
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <20160301233040.GA31476@codeblueprint.co.uk>
+References: <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <20160218191624.GA1515@redhat.com>
+ <20160226144114.GA7475@codeblueprint.co.uk>
+ <20160301233040.GA31476@codeblueprint.co.uk>
+Message-ID: <20160301233130.GB31476@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 01.03.2016 um 13:43 schrieb Andre Przywara:
-> On 01/03/16 11:18, Andreas F?rber wrote:
->> Am 01.03.2016 um 12:01 schrieb Andre Przywara:
->>> On 29/02/16 23:44, Andreas F?rber wrote:
->>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->>>> index 0ae089bd1806..5088ae3ff653 100644
->>>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->>>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->>>> @@ -117,7 +117,9 @@
->>>>  		gic: interrupt-controller at c4301000 {
->>>>  			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->>>
->>> I think "arm,gic-400" is the name to use here these days, especially for
->>> arm64.
->>
->> I took what /proc/device-tree showed on Android and verified that this
->> compatible is in use in mainline.
+On Tue, 01 Mar, at 11:30:40PM, Matt Fleming wrote:
+> On Fri, 26 Feb, at 02:41:14PM, Matt Fleming wrote:
+> > On Thu, 18 Feb, at 02:16:24PM, Peter Jones wrote:
+> > > 
+> > > So the question I have is: would you rather chop up regions and reserve
+> > > the space, or allocate a new copy and update the configuration table
+> > > (after ExitBootServices()) to point to it?  The latter makes it pretty
+> > > easy to do from an API that all these drivers can use, and it makes the
+> > > kexec case completely transparent.
+> > > 
+> > > Up to you.
+> > 
+> > I think it makes the most sense to chop up the regions we care about
+> > (i.e. the ones we have drivers for) because not only does that save us
+> > the effort of copying out the data on every kexec reboot, it also
+> > prevents us from leaking each copy since we don't free them at the
+> > moment.
+> > 
+> > Then we just need to maintain a separate list of regions to free in
+> > efi_free_boot_services() or have some other way to distinguish between
+> > them.
+> > 
+> > Oh, and save_runtime_map() would need updating to save Boot Services
+> > regions too.
 > 
-> Some vendor Android kernel is not a good reference for mainline work ;-)
-> Better look at other DTs in arch/arm64/boot/dts.
+> I have a very rough draft of patches that implement this strategy on
+> the 'experiemntal/efi-memmap' branch in the EFI tree if anyone is
+> curious and wants to take a look. The series will be sent out soon.
 
-Yes, that's what "in use in mainline" refers to:
-
-$ git grep "cortex-a15-gic" -- arch/arm64/boot/dts/ | grep -v gic-400
-arch/arm64/boot/dts/apm/apm-shadowcat.dtsi: compatible =
-"arm,cortex-a15-gic";
-arch/arm64/boot/dts/apm/apm-storm.dtsi: compatible = "arm,cortex-a15-gic";
-arch/arm64/boot/dts/arm/foundation-v8.dts: compatible =
-"arm,cortex-a15-gic", "arm,cortex-a9-gic";
-arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts: compatible =
-"arm,cortex-a15-gic", "arm,cortex-a9-gic";
-arch/arm64/boot/dts/nvidia/tegra132.dtsi: compatible = "arm,cortex-a15-gic";
-
-> You could keep "arm,cortex-a15-gic" in there if you care about
-> compatibility with older (vendor) kernels, but I guess there are other
-> issues which prevent this anyway, so you could drop this as well.
-
-Yeah, I don't care about backwards compatibility with downstream
-kernels, they use weird compatible strings with spaces anyway.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Obviously that's supposed to read: experimental/efi-memmap
