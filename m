@@ -1,31 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Mar 2016 10:11:10 -0800
-Subject: [PATCH v3 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <1456439796-28546-3-git-send-email-fcooper@ti.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-3-git-send-email-fcooper@ti.com>
-Message-ID: <20160301181109.GB13417@atomide.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue,  1 Mar 2016 18:17:38 +0000
+Subject: [PATCH] iommu/io-pgtable-armv7s: Fix kmem_cache_alloc() flags
+Message-ID: <cbd13a3db3924a67f8aa8a352f04c883c47d8815.1456856051.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Franklin S Cooper Jr <fcooper@ti.com> [160225 14:37]:
-> From: Vignesh R <vigneshr@ti.com>
-> 
-> Add hwmod entries for the PWMSS on DRA7.
-> 
-> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
-> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
-> As per AM57x TRM SPRUHZ6[1], October 2014, Section 29.1.3 Table 29-4,
-> clock source to PWMSS is L4PER2_L3_GICLK. But it is actually
-> L4PER2_L3_GICLK/2. The TRM does not show the division by 2.
-> 
-> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
+Whilst the default SLUB allocator happily just merges the original
+allocation flags from kmem_cache_create() with those passed through
+kmem_cache_alloc(), there is a code path in the SLAB allocator which
+will aggressively BUG_ON() if the cache was created with SLAB_CACHE_DMA
+but GFP_DMA is not specified for an allocation.
 
-Looks OK to me, assuming Paul will pick this one or ack it.
+Keep the peace by adding GFP_DMA when allocating a table.
 
-FYI, the URL above is outdated, looks like there's spruhz7a.pdf
-available. Not sure if that's been corrected for the divider?
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/io-pgtable-arm-v7s.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index 9fcceb1..9488e3c 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -192,7 +192,7 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
+ 	if (lvl == 1)
+ 		table = (void *)__get_dma_pages(__GFP_ZERO, get_order(size));
+ 	else if (lvl == 2)
+-		table = kmem_cache_zalloc(data->l2_tables, gfp);
++		table = kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA);
+ 	if (table && !selftest_running) {
+ 		dma = dma_map_single(dev, table, size, DMA_TO_DEVICE);
+ 		if (dma_mapping_error(dev, dma))
+-- 
+2.7.2.333.g70bd996.dirty
