@@ -1,87 +1,116 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  1 Mar 2016 14:44:09 +0000
-Subject: [PATCH v2 3/3] arm/arm64: pci: remove arch specific
- pcibios_enable_device()
-In-Reply-To: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1456843449-19393-4-git-send-email-lorenzo.pieralisi@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 1 Mar 2016 14:43:19 +0000
+Subject: [PATCH 3/8] ARM64: dts: Prepare configs for Amlogic Meson GXBaby
+In-Reply-To: <1456789465-2962-4-git-send-email-afaerber@suse.de>
+References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+ <1456789465-2962-4-git-send-email-afaerber@suse.de>
+Message-ID: <56D5AA87.7020401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm/arm64 pcibios_enable_device() implementations exist solely
-to prevent enabling PCI resources on PROBE_ONLY systems, since
-on those systems the PCI resources are currently not claimed (ie
-validated and inserted in the PCI resource tree) therefore they can
-not be enabled since this would trigger PCI set-ups failures.
 
-By introducing resources claiming in the PCI host controllers set-ups
-that have PROBE_ONLY as a probe option, there is no need for arch specific
-pcibios_enable_device() implementations anymore in that the kernel can
-rely on the generic pcibios_enable_device() implementation without
-resorting to arch specific code to work around the missing resources
-claiming enumeration step.
 
-This patch removes the pcibios_enable_device() implementations from
-the arm/arm64 arches back-end.
+On 29/02/16 23:44, Andreas F?rber wrote:
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>   arch/arm64/boot/dts/Makefile                |   1 +
+>   arch/arm64/boot/dts/amlogic/Makefile        |   3 +
+>   arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 128 ++++++++++++++++++++++++++++
+>   3 files changed, 132 insertions(+)
+>   create mode 100644 arch/arm64/boot/dts/amlogic/Makefile
+>   create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index fd80617a9c6f..330fae966cf3 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,6 +1,7 @@
+>   dts-dirs += al
+>   dts-dirs += altera
+>   dts-dirs += amd
+> +dts-dirs += amlogic
+>   dts-dirs += apm
+>   dts-dirs += arm
+>   dts-dirs += broadcom
+> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+> new file mode 100644
+> index 000000000000..1b06c28c67eb
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/Makefile
+> @@ -0,0 +1,3 @@
+> +always		:= $(dtb-y)
+> +subdir-y	:= $(dts-dirs)
+> +clean-files	:= *.dtb
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> new file mode 100644
+> index 000000000000..0ae089bd1806
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -0,0 +1,128 @@
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/kernel/bios32.c | 12 ------------
- arch/arm64/kernel/pci.c  | 13 -------------
- 2 files changed, 25 deletions(-)
+[...]
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 05e61a2..488545f 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -590,18 +590,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return start;
- }
- 
--/**
-- * pcibios_enable_device - Enable I/O and memory.
-- * @dev: PCI device to be enabled
-- */
--int pcibios_enable_device(struct pci_dev *dev, int mask)
--{
--	if (pci_has_flag(PCI_PROBE_ONLY))
--		return 0;
--
--	return pci_enable_resources(dev, mask);
--}
--
- int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 			enum pci_mmap_state mmap_state, int write_combine)
- {
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index b3d098b..4095379 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -38,19 +38,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return res->start;
- }
- 
--/**
-- * pcibios_enable_device - Enable I/O and memory.
-- * @dev: PCI device to be enabled
-- * @mask: bitmask of BARs to enable
-- */
--int pcibios_enable_device(struct pci_dev *dev, int mask)
--{
--	if (pci_has_flag(PCI_PROBE_ONLY))
--		return 0;
--
--	return pci_enable_resources(dev, mask);
--}
--
- /*
-  * Try to assign the IRQ number from DT when adding a new device
-  */
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "amlogic,meson-gxbb";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	cpus {
+> +		#address-cells = <0x2>;
+> +		#size-cells = <0x0>;
+> +
+
+[...]
+
+> +	};
+> +
+> +	arm-pmu {
+> +		compatible = "arm,armv8-pmuv3";
+
+Please use "arm,cortex-a53-pmu" instead
+
+> +		interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci";
+
+Any particular reason why PSCI v0.2 or above is not supported on this
+platform. PSCI v0.1 is very old now and I assume this platform is
+relatively new.
+
+> +		method = "smc";
+> +		cpu_suspend = <0xc4000001>;
+> +		cpu_off = <0x84000002>;
+> +		cpu_on = <0xc4000003>;
+> +		migrate = <0xc4000005>;
+
+Atleast the functions ids look like v0.2 or above. So check if it's 
+actually v0.2 or above in which case you can drop all the function ids above
+
+[...]
+
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		gic: interrupt-controller at c4301000 {
+> +			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+
+Preferably "arm,gic-400" ?
+
 -- 
-2.5.1
+Regards,
+Sudeep
