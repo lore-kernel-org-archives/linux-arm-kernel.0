@@ -1,94 +1,111 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 1 Mar 2016 11:43:42 -0600
-Subject: [PATCH v11 08/10] dt, numa: Add NUMA dt binding implementation.
-In-Reply-To: <56D5C9FF.8020500@caviumnetworks.com>
-References: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
- <1455930799-5371-9-git-send-email-ddaney.cavm@gmail.com>
- <20160223193651.GA8491@rob-hp-laptop>
- <56CFA9CA.6090803@caviumnetworks.com>
- <CAL_JsqLoTh_ZTUT26g4wz=6sofuRpFDCc_Aw+Oq66p8cGMp19g@mail.gmail.com>
- <56D5C9FF.8020500@caviumnetworks.com>
-Message-ID: <CAL_JsqKQP6hLKZ3ja9RtFQdcnibFSwfdb_BhXp9DqnCFyb0r6g@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 1 Mar 2016 10:44:22 -0700
+Subject: [RFC v2 02/12] PM / Domains: Support IRQ safe PM domains
+In-Reply-To: <20160226181753.GU28849@codeaurora.org>
+References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
+ <1455310238-8963-3-git-send-email-lina.iyer@linaro.org>
+ <20160226181753.GU28849@codeaurora.org>
+Message-ID: <20160301174422.GJ1440@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 1, 2016 at 10:57 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 03/01/2016 08:47 AM, Rob Herring wrote:
+On Fri, Feb 26 2016 at 11:17 -0700, Stephen Boyd wrote:
+>On 02/12, Lina Iyer wrote:
+>> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
+>> index 8ba6625..c06f0b6 100644
+>> --- a/Documentation/power/devices.txt
+>> +++ b/Documentation/power/devices.txt
+>> @@ -607,7 +607,16 @@ individually.  Instead, a set of devices sharing a power resource can be put
+>>  into a low-power state together at the same time by turning off the shared
+>>  power resource.  Of course, they also need to be put into the full-power state
+>>  together, by turning the shared power resource on.  A set of devices with this
+>> -property is often referred to as a power domain.
+>> +property is often referred to as a power domain. A power domain may also be
+>> +nested inside another power domain.
+>> +
+>> +Devices, by default, operate in process context and if a device can operate in
+>> +IRQ safe context, has to be explicitly set as IRQ safe. Power domains by
+>
+>Devices, by default, operate in process context. If a device can
+>operate in IRQ safe context that has to be explicitly indicated
+>by setting the irq_safe boolean inside struct generic_pm_domain
+>to true. Power domains typically operate in process context...
+>
+Done.
+
+>> +default, operate in process context but could have devices that are IRQ safe.
+>> +Such power domains cannot be powered on/off during runtime PM. On the other
+>> +hand, an IRQ safe PM domains that have IRQ safe devices may be powered off
+>
+>On the other hand, IRQ safe PM domains that have ..
+>
+Done.
+
+>> +when all the devices are in idle. An IRQ safe domain may only be attached as a
+>
+>all the devices in the domain?
+>
+Devices need not be IRQ safe.
+
+<...>
+
+>> +static struct genpd_lock_fns no_sleep_lock = {
+>
+>const?
+>
+OK
+
+...
+
+>> +	/*
+>> +	 * As we dont power off a non IRQ safe domain, which holds
+>
+>s/dont/don't/
+>
+>> +	 * an IRQ safe device, we dont need to restore power to it.
+>
+>s/dont/don't/
+>
+Done to both.
+>> +	 */
+>> +	if (dev->power.irq_safe && !genpd->irq_safe) {
+>>  		timed = false;
+>>  		goto out;
+>>  	}
+>> @@ -1296,6 +1359,13 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+>>  	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev))
+>>  		return -EINVAL;
 >>
->> On Thu, Feb 25, 2016 at 7:26 PM, David Daney <ddaney@caviumnetworks.com>
->> wrote:
->>>
->>> On 02/23/2016 11:36 AM, Rob Herring wrote:
->>>>
->>>>
->>>> On Fri, Feb 19, 2016 at 05:13:17PM -0800, David Daney wrote:
->>>>>
->>>>>
->>>>> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->>>>>
->>>>> ADD device tree node parsing for NUMA topology using device
->>>>> "numa-node-id" property distance-map.
->>>>
->>>>
->>>>
->>>> I still want an adequate explanation why NUMA setup cannot be done with
->>>> an unflattened tree. PowerPC manages to do that and should have a
->>>> similar init flow being memblock based, so I would expect arm64 can too.
->>>
->>>
->>>
->>> Many things could be done.  Really, we want to know what *should* be
->>> done.
->>>
->>> In the context of the current arm64 memory initialization we (more or
->>> less)
->>> do:
->>>
->>>   1) early_init_fdt_scan_reserved_mem();
->>>   2) memory_present()
->>>   3) sparse_init()
->>>   4) other things
->>>   5) unflatten_device_tree()
->>>
->>> We are already reading information out of the FDT at #1.
->>>
->>> This patch set adds a step between 1 and 2 where we read NUMA information
->>> out of the FDT.
+>> +	if (genpd->irq_safe && !dev->power.irq_safe) {
+>> +		dev_err(dev,
+>> +			"PM Domain %s is IRQ safe; device has to IRQ safe.\n",
+>
+>has to be?
+>
+This is a remenant. This limitation need not exist. Removed.
+
+>> +			genpd->name);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>>  	gpd_data = genpd_alloc_dev_data(dev, genpd, td);
+>>  	if (IS_ERR(gpd_data))
+>>  		return PTR_ERR(gpd_data);
+>> @@ -1394,6 +1464,17 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>>  	    || genpd == subdomain)
+>>  		return -EINVAL;
 >>
->>
->> The dependency on unflattening is that memblock is up and we can
->> allocate a chunk from it. Isn't that dependency met by step 1
+>> +	/*
+>> +	 * If the domain can be powered on/off in an IRQ safe
+>> +	 * context, ensure that the subdomain can also be
+>> +	 * powered on/off in that context.
+>> +	 */
+>> +	if (!genpd->irq_safe && subdomain->irq_safe) {
+>> +		WARN("Parent %s of subdomain %s must be IRQ-safe\n",
 >
+>Nitpick! IRQ-safe or IRQ safe? Use one consistently please.
 >
-> No.
+Sorry. It will be IRQ safe.
 
-Really, because it seems that numa_alloc_distance is essentially doing
-a memblock alloc and that happens before memory_present.
-
->
->> or is
->> there a dependency on sparsemem (or something else)?
->
->
-> Will Deacon talked about this over here:
->
-> https://lkml.org/lkml/2016/2/26/782
-
-I'm not saying to move memblock setup earlier nor before the MMU is
-on, so I don't see how Will's reply is relevant other than PPC doesn't
-serve as an example. Maybe PPC should be ignored because I think maybe
-NUMA is only used on non-FDT systems.
-
-In any case, no one has clearly explained what the dependencies are or
-what happens if you moved the unflattening up sooner. You told me what
-the current order is which doesn't equate to dependencies. For
-example, step 4 may or may not be a dependency of step 5. These are
-the dependencies I'm aware of:
-
-memblock dependent on DT memory and reserved-memory parsing
-unflattening dependent on memblock_alloc()
-sparsemem dependent on NUMA parsing and memblock
-
-What am I missing from here?
-
-Rob
+Thank,
+Lina
