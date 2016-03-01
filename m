@@ -1,70 +1,84 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  1 Mar 2016 18:00:02 +0100
-Subject: [PATCH 6/6] rtc: generic: remove get_rtc_time/set_rtc_time wrappers
+Date: Tue,  1 Mar 2016 18:00:01 +0100
+Subject: [PATCH 5/6] sh: rtc: provide rtc_class_ops directly
 In-Reply-To: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
 References: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456851608-3374907-7-git-send-email-arnd@arndb.de>
+Message-ID: <1456851608-3374907-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All architectures using this driver are now converted to
-provide their own operations, so this one can be turned
-into a trivial stub driver relying on its platform data.
+The rtc-generic driver provides an architecture specific
+wrapper on top of the generic rtc_class_ops abstraction,
+and on sh, that goes through another indirection using
+the rtc_sh_get_time/rtc_sh_set_time functions.
+
+This changes the sh rtc-generic device to provide its
+rtc_class_ops directly, skipping one of the abstraction
+levels.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/rtc/rtc-generic.c | 36 +-----------------------------------
- 1 file changed, 1 insertion(+), 35 deletions(-)
+ arch/sh/kernel/time.c | 32 +++++++++++++++++++-------------
+ 1 file changed, 19 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/rtc/rtc-generic.c b/drivers/rtc/rtc-generic.c
-index d726c6aa96a8..1bf5d2347928 100644
---- a/drivers/rtc/rtc-generic.c
-+++ b/drivers/rtc/rtc-generic.c
-@@ -9,44 +9,10 @@
- #include <linux/platform_device.h>
- #include <linux/rtc.h>
+diff --git a/arch/sh/kernel/time.c b/arch/sh/kernel/time.c
+index d6d0a986c6e9..92cd676970d9 100644
+--- a/arch/sh/kernel/time.c
++++ b/arch/sh/kernel/time.c
+@@ -50,27 +50,30 @@ int update_persistent_clock(struct timespec now)
+ }
+ #endif
  
--#if defined(CONFIG_M68K) || defined(CONFIG_PARISC) || \
--    defined(CONFIG_PPC) || defined(CONFIG_SUPERH32)
--#include <asm/rtc.h>
--
--static int generic_get_time(struct device *dev, struct rtc_time *tm)
--{
--	unsigned int ret = get_rtc_time(tm);
--
--	if (ret & RTC_BATT_BAD)
--		return -EOPNOTSUPP;
--
--	return rtc_valid_tm(tm);
--}
--
--static int generic_set_time(struct device *dev, struct rtc_time *tm)
--{
--	if (set_rtc_time(tm) < 0)
--		return -EOPNOTSUPP;
--
--	return 0;
--}
--
--static const struct rtc_class_ops generic_rtc_ops = {
--	.read_time = generic_get_time,
--	.set_time = generic_set_time,
--};
--#else
--#define generic_rtc_ops *(struct rtc_class_ops*)NULL
--#endif
--
- static int __init generic_rtc_probe(struct platform_device *dev)
+-unsigned int get_rtc_time(struct rtc_time *tm)
++static int rtc_generic_get_time(struct device *dev, struct rtc_time *tm)
  {
- 	struct rtc_device *rtc;
--	const struct rtc_class_ops *ops;
--
--	ops = dev_get_platdata(&dev->dev);
--	if (!ops)
--		ops = &generic_rtc_ops;
-+	const struct rtc_class_ops *ops = dev_get_platdata(&dev->dev);
+-	if (rtc_sh_get_time != null_rtc_get_time) {
+-		struct timespec tv;
++	struct timespec tv;
  
- 	rtc = devm_rtc_device_register(&dev->dev, "rtc-generic",
- 					ops, THIS_MODULE);
+-		rtc_sh_get_time(&tv);
+-		rtc_time_to_tm(tv.tv_sec, tm);
+-	}
+-
+-	return RTC_24H;
++	rtc_sh_get_time(&tv);
++	rtc_time_to_tm(tv.tv_sec, tm);
++	return 0;
+ }
+-EXPORT_SYMBOL(get_rtc_time);
+ 
+-int set_rtc_time(struct rtc_time *tm)
++static int rtc_generic_set_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	unsigned long secs;
+ 
+ 	rtc_tm_to_time(tm, &secs);
+-	return rtc_sh_set_time(secs);
++	if (!rtc_sh_set_time || rtc_sh_set_time(secs) < 0)
++		return -EOPNOTSUPP;
++
++	return 0;
+ }
+-EXPORT_SYMBOL(set_rtc_time);
++
++static const struct rtc_class_ops rtc_generic_ops = {
++	.read_time = rtc_generic_get_time,
++	.set_time = rtc_generic_set_time,
++};
+ 
+ static int __init rtc_generic_init(void)
+ {
+@@ -79,7 +82,10 @@ static int __init rtc_generic_init(void)
+ 	if (rtc_sh_get_time == null_rtc_get_time)
+ 		return -ENODEV;
+ 
+-	pdev = platform_device_register_simple("rtc-generic", -1, NULL, 0);
++	pdev = platform_device_register_data(NULL, "rtc-generic", -1,
++					     &rtc_generic_ops,
++					     sizeof(rtc_generic_ops));
++
+ 
+ 	return PTR_ERR_OR_ZERO(pdev);
+ }
 -- 
 2.7.0
