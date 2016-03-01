@@ -1,67 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 1 Mar 2016 11:55:51 +0100
-Subject: [PATCH 0/8] drm: atmel-hlcdc: various fixes/improvements
-In-Reply-To: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160301115551.52f0887b@bbrezillon>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 1 Mar 2016 11:01:07 +0000
+Subject: [PATCH 7/8] ARM64: dts: amlogic: Extend GXBaby GIC node
+In-Reply-To: <1456789465-2962-8-git-send-email-afaerber@suse.de>
+References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+ <1456789465-2962-8-git-send-email-afaerber@suse.de>
+Message-ID: <56D57673.8030702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  6 Jan 2016 11:19:21 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hi Andreas,
 
-> Hello,
-> 
-> This series is a collection of fixes and improvements for the
-> atmel-hlcdc driver.
-> 
-> The main feature added here is the support for external RGB -> XXX
-> bridges (patch 6 and 7).
-> 
-> The first patch is a fix preventing a potential memory leak.
-> Patch 2 is adding support for asynchronous mode setting, which was
-> supported before the migration to atomic mode setting.
-> 
-> Patch 3 is just a minor fix to expose the real encoder and connector
-> types (we are currently exposing an LVDS encoder/connector, which is
-> wrong since the display controller output the pixel stream in raw
-> RGB).
-> 
-> Patch 4 is removing useless fields and functions which were left
-> when moving to atomic modesetting.
-> 
-> And patch 8 is just a cosmetic patch moving the mode checking code
-> from ->atomic_check() to ->mode_fixup().
+On 29/02/16 23:44, Andreas F?rber wrote:
+> Add GICH and GICV resources for HYP mode - guess based on other vendors.
 
-Dave, Daniel, any comment on this series (AKA ping)?
+Do you know if the firmware allows the kernel to be entered in EL2
+(which is the arm64 name for HYP)?
+So can we run kvm?
+If you have a booted kernel, can you grep for "EL2" and "kvm" in the dmesg?
 
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Boris Brezillon (8):
->   drm: atmel-hlcdc: add a ->cleanup_fb() operation
->   drm: atmel-hlcdc: support asynchronous atomic commit operations
->   drm: atmel-hlcdc: fix connector and encoder types
->   drm: atmel-hlcdc: remove leftovers from atomic mode setting migration
->   drm: atmel-hlcdc: support extended timing ranges on sama5d4 and
->     sama5d2
->   drm: atmel-hlcdc: move output mode selection in CRTC implementation
->   drm: atmel-hlcdc: rework the output code to support drm bridges
->   drm: atmel-hlcdc: check display mode validity in crtc->mode_fixup()
-> 
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 148 +++++++++++++-
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 123 ++++++++++-
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  16 ++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 249 ++++++++++-------------
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  22 +-
->  5 files changed, 400 insertions(+), 158 deletions(-)
-> 
+Also you should merge this patch into 3/8, same for 8/8.
 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index 0ae089bd1806..5088ae3ff653 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -117,7 +117,9 @@
+>  		gic: interrupt-controller at c4301000 {
+>  			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
 
+I think "arm,gic-400" is the name to use here these days, especially for
+arm64.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>  			reg = <0x0 0xc4301000 0 0x1000>,
+> -			      <0x0 0xc4302000 0 0x0100>;
+> +			      <0x0 0xc4302000 0 0x0100>,
+
+Please use 0x2000 for the size here. I guess this is really the GIC-400
+from ARM, and in this case this is the right size, [1] is the reference
+here. This will enable EOI mode 1 for KVM.
+
+Cheers,
+Andre.
+
+[1]
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0471b/CHDIFAEE.html
+
+> +			      <0x0 0xc4304000 0 0x2000>,
+> +			      <0x0 0xc4306000 0 0x2000>;
+>  			interrupt-controller;
+>  			interrupts = <GIC_PPI 9
+>  				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+> 
