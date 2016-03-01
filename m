@@ -1,38 +1,27 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 1 Mar 2016 09:38:30 +0100
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-In-Reply-To: <20160301150054.2cb0e728@canb.auug.org.au>
-References: <20160301145700.784f5fcf@canb.auug.org.au>
- <20160301150054.2cb0e728@canb.auug.org.au>
-Message-ID: <56D55506.4050007@atmel.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 1 Mar 2016 08:55:39 +0000 (UTC)
+Subject: [PATCH 02/11] ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0,
+ tptc1
+In-Reply-To: <1456411827-23962-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
+ <1456411827-23962-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <alpine.DEB.2.02.1603010855210.14948@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/03/2016 05:00, Stephen Rothwell a ?crit :
-> Hi all,
+On Thu, 25 Feb 2016, Peter Ujfalusi wrote:
+
+> Add hwmod data for the eDMA blocks:
+>  - TPCC: Third-party channel controller
+>  - TPTC0: Third-party transfer controller 0
+>  - TPTC1: Third-party transfer controller 1
 > 
-> On Tue, 1 Mar 2016 14:57:00 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>
->> Today's linux-next merge of the clk tree got a conflict in:
->>
->>   drivers/clk/at91/clk-main.c
->>
->> between commit:
->>
->>   99a81706526f ("clk: at91: remove IRQ handling and use polling")
->>
->> from the arm-soc tree and commit:
->>
->>   8c1b1e54faed ("clk: at91: Remove impossible checks for of_clk_get_parent_count()")
->>
->> from the clk tree.
+> The TPCC is following it's clock and power domain. This means that
+> the hwmod can not control it's status.
 > 
-> And the same for drivers/clk/at91/clk-master.c
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Stephen,
+Thanks, queued.
 
-Both fixes seem good. Thanks!
 
-Bye,
--- 
-Nicolas Ferre
+- Paul
