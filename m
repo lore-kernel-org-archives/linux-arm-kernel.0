@@ -1,59 +1,63 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  1 Mar 2016 15:01:19 -0800
-Subject: [GIT PULL 2/4] omap soc changes for v4.6 merge window
-In-Reply-To: <pull-1456872971-400983>
-References: <pull-1456872971-400983>
-Message-ID: <pull-1456872971-400983-2>
+Date: Tue,  1 Mar 2016 15:01:18 -0800
+Subject: [GIT PULL 1/4] omap non-urgent fixes for v4.6 merge window
+Message-ID: <pull-1456872971-400983>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8fe097a3d99e22355fb8e3bcee59542bf3f46b2d:
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-  ARM: DRA7: hwmod: Add reset data for PCIe (2016-02-09 02:18:52 -0700)
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/soc-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-not-urgent-signed
 
-for you to fetch changes up to e80499190db2fd752a60468f0fa462f87f993d49:
+for you to fetch changes up to 4f5395f0d1a5b7c8921331ef81081da00302a37c:
 
-  Merge tag 'for-v4.6/omap-hwmod-b' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v4.6/soc (2016-03-01 09:59:38 -0800)
-
-----------------------------------------------------------------
-SoC related changes for omaps for v4.6 merge window:
-
-- Enable runtime revision detection for dra7 to avoid multiple dts
-  files for various variants
-
-- Add dma_slave_map for omap1/2/3 legacy mode booting
-
-- Add RTC interconnect target data for ti81xx and am43x
-
-- Add custom reset handler for PCIeSS
-
-- Add eDMA interconnect target data for dra7
+  ARM: OMAP2+: Fix hwmod clock for l4_ls (2016-02-26 11:03:07 -0800)
 
 ----------------------------------------------------------------
-Keerthy (2):
-      ARM: AM43XX: hwmod: Add rtc hwmod
-      ARM: OMAP: DRA7: Make use of omap_revision information for soc_is* calls
+Fixes for omaps for v4.6 merge window that are not urgent
+for the v4.5-rc cycle:
 
-Peter Ujfalusi (3):
-      ARM: OMAP1: DMA: Provide dma_slave_map to omap-dma
-      ARM: OMAP2+: DMA: Provide dma_slave_map to omap-dma for legacy boot
-      ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1
+- Add back optimized cpuidle parameters for 34xx that were
+  incorrecly removed earlier with cpuidle cleanup
 
-Sekhar Nori (1):
-      ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+- Fix SSI for omap36xx to get modem working on N950/N9
 
-Tony Lindgren (2):
-      ARM: OMAP2+: Add rtc hwmod configuration for ti81xx
-      Merge tag 'for-v4.6/omap-hwmod-b' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.6/soc
+- A series of omap hwmod fixes via Paul Walmsley <paul@pwsan.com>
+  to fix SSI for omap36xx for modem on N950/N9, fix for
+  OCP2SCP sysconfig idle mode, and reset data for PCIe on
+  dra7
 
- arch/arm/mach-omap1/dma.c                  |  45 +++++++++++
- arch/arm/mach-omap2/dma.c                  | 117 +++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c |  14 +++-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 111 +++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c |  38 ++++++++++
- arch/arm/mach-omap2/soc.h                  |  23 +++++-
- 6 files changed, 344 insertions(+), 4 deletions(-)
+- Fix out of range register access for omap3 control module
+  if syscon max_register is initialized like v4.6 will be
+  doing
+
+- Fix l4_ls interconnect clocks for 81xx, it should always
+  be sysclk6_ck
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (2):
+      ARM: DRA7: hwmod: Fix OCP2SCP sysconfig
+      ARM: DRA7: hwmod: Add reset data for PCIe
+
+Pali Roh?r (1):
+      ARM: OMAP3: Add cpuidle parameters table for omap3430
+
+Sebastian Reichel (1):
+      ARM: OMAP2+: hwmod data: Add SSI data for omap36xx
+
+Tony Lindgren (3):
+      Merge tag 'for-v4.6/omap-hwmod-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.6/fixes-not-urgent
+      ARM: OMAP2+: Fix out of range register access with syscon_config.max_register
+      ARM: OMAP2+: Fix hwmod clock for l4_ls
+
+ arch/arm/mach-omap2/control.c              | 21 +--------
+ arch/arm/mach-omap2/cpuidle34xx.c          | 69 +++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 13 +++---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 18 +++++++-
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c |  9 +++-
+ arch/arm/mach-omap2/prm7xx.h               |  1 +
+ 6 files changed, 101 insertions(+), 30 deletions(-)
