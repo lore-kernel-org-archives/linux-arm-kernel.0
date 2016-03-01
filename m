@@ -1,81 +1,144 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  1 Mar 2016 14:15:24 -0700
-Subject: [RFC v3 05/12] timer: Export next wake up of a CPU
+Date: Tue,  1 Mar 2016 14:15:25 -0700
+Subject: [RFC v3 06/12] PM / cpu_domains: Record CPUs that are part of the
+ domain
 In-Reply-To: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
 References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1456866931-37851-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1456866931-37851-8-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Knowing the sleep length of the CPU is useful for the power state
-determination on idle. However, when the common sleep time between
-multiple CPUs is needed, the sleep length of a CPU is not useful.
+In order to power down a CPU domain, the domain needs information about
+the CPUs in that domain. The reference counting for the CPU devices in a
+domain is done by genpd. In order to understand the idle time for the
+domain, it is necessary to know which CPUs are part of the domain, so
+the domain governor may understand the sleep durations of the comprising
+CPU devices and make a judicious decision on the domain's idle state.
+This extends to the parent of such domains, which may have multiple such
+CPU domains and therefore would need to know the sleep patterns of all
+the CPUs in all the CPU domains.
 
-By reading the next wake up event of a CPU, governors can determine the
-first CPU to wake up (due to timer) amongst a cluster of CPUs and the
-sleep time available between the last CPU to idle and the first CPU to
-resume. This information is useful to determine if the caches and other
-common hardware blocks can also be put in idle during this common period
-of inactivity.
+To aid this functionality, traverse up the parent chain and set the CPU
+in the cpumasks while attaching a CPU to its domain. This mask is
+provided in the callback to the platform driver to help identify the
+CPUs in the domain that is being powered off.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- include/linux/tick.h     | 10 ++++++++++
- kernel/time/tick-sched.c | 13 +++++++++++++
- 2 files changed, 23 insertions(+)
+ drivers/base/power/cpu_domains.c | 28 ++++++++++++++++++++++++----
+ include/linux/cpu_domains.h      |  4 +++-
+ 2 files changed, 27 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/tick.h b/include/linux/tick.h
-index 97fd4e5..b8a2e06 100644
---- a/include/linux/tick.h
-+++ b/include/linux/tick.h
-@@ -104,6 +104,7 @@ extern void tick_nohz_idle_enter(void);
- extern void tick_nohz_idle_exit(void);
- extern void tick_nohz_irq_exit(void);
- extern ktime_t tick_nohz_get_sleep_length(void);
-+extern ktime_t tick_nohz_get_next_wakeup(int cpu);
- extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
- extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
- #else /* !CONFIG_NO_HZ_COMMON */
-@@ -118,6 +119,15 @@ static inline ktime_t tick_nohz_get_sleep_length(void)
+diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
+index 62704e6..62c1ab9 100644
+--- a/drivers/base/power/cpu_domains.c
++++ b/drivers/base/power/cpu_domains.c
+@@ -9,6 +9,7 @@
+  */
  
- 	return len;
- }
-+
-+static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
-+{
-+	ktime_t len = { .tv64 = NSEC_PER_SEC/HZ };
-+
-+	/* Next wake up is the tick period, assume it starts now */
-+	return ktime_add(len, ktime_get());
-+}
-+
- static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
- static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
- #endif /* !CONFIG_NO_HZ_COMMON */
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 0b17424..f0ddaec 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -888,6 +888,19 @@ ktime_t tick_nohz_get_sleep_length(void)
- 	return ts->sleep_length;
+ #include <linux/cpu.h>
++#include <linux/cpumask.h>
+ #include <linux/cpu_domains.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/device.h>
+@@ -27,6 +28,7 @@ struct cpu_pm_domain {
+ 	struct cpu_pd_ops ops;
+ 	struct generic_pm_domain *genpd;
+ 	struct cpu_pm_domain *parent;
++	cpumask_var_t cpus;
+ };
+ 
+ /* List of CPU PM domains we care about */
+@@ -50,7 +52,7 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
+ 	return res;
  }
  
-+/**
-+ * tick_nohz_get_next_wakeup - return the next wake up of the CPU
-+ *
-+ * Called with interrupts disabled on the cpu
-+ */
-+ktime_t tick_nohz_get_next_wakeup(int cpu)
-+{
-+	struct clock_event_device *dev =
-+			per_cpu(tick_cpu_device.evtdev, cpu);
-+
-+	return dev->next_event;
-+}
-+
- static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+-static int cpu_pd_attach_cpu(int cpu)
++static int cpu_pd_attach_cpu(struct cpu_pm_domain *cpu_pd, int cpu)
  {
- #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+ 	int ret;
+ 	struct device *cpu_dev;
+@@ -70,6 +72,11 @@ static int cpu_pd_attach_cpu(int cpu)
+ 	else
+ 		dev_dbg(cpu_dev, "Attached to domain\n");
+ 
++	while (!ret && cpu_pd) {
++		cpumask_set_cpu(cpu, cpu_pd->cpus);
++		cpu_pd = cpu_pd->parent;
++	};
++
+ 	return ret;
+ }
+ 
+@@ -85,8 +92,8 @@ static int cpu_pd_power_off(struct generic_pm_domain *genpd)
+ 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+ 
+ 	return pd->ops.power_off ? pd->ops.power_off(genpd->state_idx,
+-					genpd->states[genpd->state_idx].param),
+-					: 0;
++					genpd->states[genpd->state_idx].param,
++					pd->cpus) : 0;
+ }
+ 
+ /**
+@@ -119,6 +126,9 @@ static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
+ 	if (!pd)
+ 		goto fail;
+ 
++	if (!zalloc_cpumask_var(&pd->cpus, GFP_KERNEL))
++		goto fail;
++
+ 	pd->genpd = genpd;
+ 	pd->genpd->power_off = cpu_pd_power_off;
+ 	pd->genpd->power_on = cpu_pd_power_on;
+@@ -149,6 +159,8 @@ fail:
+ 
+ 	kfree(genpd->name);
+ 	kfree(genpd);
++	if (pd)
++		kfree(pd->cpus);
+ 	kfree(pd);
+ 	return ERR_PTR(ret);
+ }
+@@ -224,6 +236,7 @@ int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
+ 
+ 	struct device_node *dn;
+ 	struct generic_pm_domain *genpd;
++	struct cpu_pm_domain *cpu_pd;
+ 
+ 	dn = of_get_cpu_node(cpu, NULL);
+ 	if (!dn)
+@@ -239,7 +252,14 @@ int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
+ 		return PTR_ERR(genpd);
+ 
+ 	of_node_put(dn);
+-	return cpu_pd_attach_cpu(cpu);
++	cpu_pd = to_cpu_pd(genpd);
++	if (!cpu_pd) {
++		pr_err("%s: Genpd was created outside CPU PM domains\n",
++				__func__);
++		return -ENOENT;
++	}
++
++	return cpu_pd_attach_cpu(cpu_pd, cpu);
+ }
+ EXPORT_SYMBOL(of_setup_cpu_pd_single);
+ 
+diff --git a/include/linux/cpu_domains.h b/include/linux/cpu_domains.h
+index 9530b2d..50e3321 100644
+--- a/include/linux/cpu_domains.h
++++ b/include/linux/cpu_domains.h
+@@ -13,8 +13,10 @@
+ 
+ #include <linux/types.h>
+ 
++struct cpumask;
++
+ struct cpu_pd_ops {
+-	int (*power_off)(u32 state_idx, u32 param);
++	int (*power_off)(u32 state_idx, u32 param, const struct cpumask *mask);
+ 	int (*power_on)(void);
+ };
+ 
 -- 
 2.1.4
