@@ -1,9 +1,16 @@
 From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 01 Mar 2016 08:47:40 +0100
+Date: Tue, 01 Mar 2016 08:49:10 +0100
 Subject: [PATCH] CNS3xxx: remove unused *_VIRT definitions
-Message-ID: <m3y4a2od0j.fsf@t19.piap.pl>
+In-Reply-To: <m3y4a2od0j.fsf@t19.piap.pl> ("Krzysztof
+ \=\?utf-8\?Q\?Ha\=C5\=82as\?\=
+ \=\?utf-8\?Q\?a\=22's\?\= message of
+ "Tue, 01 Mar 2016 08:47:40 +0100")
+References: <m3y4a2od0j.fsf@t19.piap.pl>
+Message-ID: <m3twkqocy1.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
 
 diff --git a/arch/arm/mach-cns3xxx/cns3xxx.h b/arch/arm/mach-cns3xxx/cns3xxx.h
 index a0f5b60..a642ba5 100644
