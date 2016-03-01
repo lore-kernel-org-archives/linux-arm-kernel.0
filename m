@@ -1,95 +1,38 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 1 Mar 2016 11:36:30 -0700
-Subject: [RFC v2 04/12] ARM: cpuidle: Add runtime PM support for CPUs
-In-Reply-To: <20160226182419.GV28849@codeaurora.org>
-References: <1455310238-8963-1-git-send-email-lina.iyer@linaro.org>
- <1455310238-8963-5-git-send-email-lina.iyer@linaro.org>
- <20160226182419.GV28849@codeaurora.org>
-Message-ID: <20160301183630.GL1440@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 2 Mar 2016 02:37:14 +0800
+Subject: [PATCH 3/6] powerpc: rtc: provide rtc_class_ops directly
+In-Reply-To: <1456851608-3374907-4-git-send-email-arnd@arndb.de>
+Message-ID: <201603020228.jios50eU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26 2016 at 11:24 -0700, Stephen Boyd wrote:
->On 02/12, Lina Iyer wrote:
->> @@ -45,6 +48,8 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->>
->>  	ret = cpu_pm_enter();
->>  	if (!ret) {
->> +		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
->
->Can you add a comment on why we need to use RCU_NONIDLE here?
->It's not super obvious.
->
-OK.
+Hi Arnd,
 
->> +
->>  		/*
->>  		 * Pass idle state index to cpu_suspend which in turn will
->>  		 * call the CPU ops suspend protocol with idle index as a
->> @@ -52,6 +57,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->>  		 */
->>  		arm_cpuidle_suspend(idx);
->>
->> +		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
->>  		cpu_pm_exit();
->>  	}
->>
->> @@ -84,6 +90,30 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
->>  	{ },
->>  };
->>
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +static int cpu_hotplug(struct notifier_block *nb,
->
->This function is pretty generically named. Maybe something more
->runtime PM specific or cpu idle specific?
->
-OK
+[auto build test ERROR on abelloni/rtc-next]
+[also build test ERROR on v4.5-rc6 next-20160301]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
->> +			unsigned long action, void *data)
->> +{
->> +	struct device *cpu_dev = get_cpu_device(smp_processor_id());
->> +
->> +	/* Execute CPU runtime PM on that CPU */
->> +	switch (action) {
->
->We could do the & ~CPU_TASKS_FROZEN trick here to save a few cases.
->
-OK
+url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/rtc-generic-follow-up-for-COMPILE_TEST/20160302-011032
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
+config: powerpc-allnoconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=powerpc 
 
->> +	case CPU_DYING:
->> +	case CPU_DYING_FROZEN:
->> +		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
->
->And do we actually need to use it for hotplug path? These
->notifiers don't run from idle context do they?
->
-True. Will remove.
+All errors (new ones prefixed by >>):
 
-> +
->>  /*
->>   * arm_idle_init
->>   *
->> @@ -96,6 +126,7 @@ static int __init arm_idle_init(void)
->>  	int cpu, ret;
->>  	struct cpuidle_driver *drv = &arm_idle_driver;
->>  	struct cpuidle_device *dev;
->> +	struct device *cpu_dev;
->>
->>  	/*
->>  	 * Initialize idle states data, starting at index 1.
->> @@ -148,10 +189,17 @@ static int __init arm_idle_init(void)
->>  		}
->>  	}
->>
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +	/* Register for hotplug notifications for runtime PM */
->> +	hotcpu_notifier(cpu_hotplug, 0);
->
->Define an empty cpu_hotplug() function for !CONFIG_HOTPLUG_CPU
->and then always call this without the ifdef?
->
-I did this so we dont even register a hotplug notifier. Will change.
+   arch/powerpc/kernel/built-in.o: In function `rtc_generic_get_time':
+>> time.c:(.text+0x4c58): undefined reference to `rtc_valid_tm'
 
-Thanks,
-Lina
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 5708 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160302/fb4fdc17/attachment.obj>
