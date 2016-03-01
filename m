@@ -1,68 +1,62 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  1 Mar 2016 19:07:03 +0000
-Subject: [PATCH v2] iommu/io-pgtable-armv7s: Fix kmem_cache_alloc() flags
-Message-ID: <526555051e63e72a4b1e68461e51a7b6e33df352.1456859025.git.robin.murphy@arm.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 01 Mar 2016 20:19:16 +0100
+Subject: [PATCH v4 3/5] ARM: dts: omap3-sniper: TWL4030 keypad support
+In-Reply-To: <1456663185-14170-4-git-send-email-contact@paulk.fr>
+References: <1456663185-14170-1-git-send-email-contact@paulk.fr>
+ <1456663185-14170-4-git-send-email-contact@paulk.fr>
+Message-ID: <1456859956.1031.39.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst the default SLUB allocator happily just merges the original
-allocation flags from kmem_cache_create() with those passed through
-kmem_cache_alloc(), there is a code path in the SLAB allocator which
-will aggressively BUG_ON() if the cache was created with SLAB_CACHE_DMA
-but GFP_DMA is not specified for an allocation:
+Hi,
 
-  kernel BUG at mm/slab.c:2536!
-  Internal error: Oops - BUG: 0 [#1] SMP ARM
-  Modules linked in:[    1.299311] Modules linked in:
+Le dimanche 28 f?vrier 2016 ? 13:39 +0100, Paul Kocialkowski a ?crit?:
+> This adds support for the volume and gesture keys, using TWL4030 keypad.
 
-  CPU: 1 PID: 1 Comm: swapper/0 Not tainted
-  4.5.0-rc6-koelsch-05892-ge7e45ad53ab6795e #2270
-  Hardware name: Generic R8A7791 (Flattened Device Tree)
-  task: ef422040 ti: ef442000 task.ti: ef442000
-  PC is at cache_alloc_refill+0x2a0/0x530
-  LR is at _raw_spin_unlock+0x8/0xc
-...
-  [<c02c6928>] (cache_alloc_refill) from [<c02c6630>] (kmem_cache_alloc+0x7c/0xd4)
-  [<c02c6630>] (kmem_cache_alloc) from [<c04444bc>]
-  (__arm_v7s_alloc_table+0x5c/0x278)
-  [<c04444bc>] (__arm_v7s_alloc_table) from [<c0444e1c>]
-  (__arm_v7s_map.constprop.6+0x68/0x25c)
-  [<c0444e1c>] (__arm_v7s_map.constprop.6) from [<c0445044>]
-  (arm_v7s_map+0x34/0xa4)
-  [<c0445044>] (arm_v7s_map) from [<c0c18ee4>] (arm_v7s_do_selftests+0x140/0x418)
-  [<c0c18ee4>] (arm_v7s_do_selftests) from [<c0201760>]
-  (do_one_initcall+0x100/0x1b4)
-  [<c0201760>] (do_one_initcall) from [<c0c00d4c>]
-  (kernel_init_freeable+0x120/0x1e8)
-  [<c0c00d4c>] (kernel_init_freeable) from [<c067a364>] (kernel_init+0x8/0xec)
-  [<c067a364>] (kernel_init) from [<c0206b68>] (ret_from_fork+0x14/0x2c)
-  Code: 1a000003 e7f001f2 e3130001 0a000000 (e7f001f2)
-  ---[ end trace 190f6f6b84352efd ]---
+I noticed this patch hadn't been picked up in:?https://git.kernel.org/cgit/linux
+/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.6/dt
 
-Keep the peace by adding GFP_DMA when allocating a table.
+Should I submit it somewhere else instead?
 
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-v2: Add the backtrace to the commit log, add Will's ack.
- 
- drivers/iommu/io-pgtable-arm-v7s.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 9fcceb1..9488e3c 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -192,7 +192,7 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
- 	if (lvl == 1)
- 		table = (void *)__get_dma_pages(__GFP_ZERO, get_order(size));
- 	else if (lvl == 2)
--		table = kmem_cache_zalloc(data->l2_tables, gfp);
-+		table = kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA);
- 	if (table && !selftest_running) {
- 		dma = dma_map_single(dev, table, size, DMA_TO_DEVICE);
- 		if (dma_mapping_error(dev, dma))
--- 
-2.7.2.333.g70bd996.dirty
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+> ?arch/arm/boot/dts/omap3-sniper.dts | 9 +++++++++
+> ?1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-sniper.dts b/arch/arm/boot/dts/omap3-
+> sniper.dts
+> index 6e31daf..78a1184 100644
+> --- a/arch/arm/boot/dts/omap3-sniper.dts
+> +++ b/arch/arm/boot/dts/omap3-sniper.dts
+> @@ -8,6 +8,7 @@
+> ?/dts-v1/;
+> ?
+> ?#include "omap36xx.dtsi"
+> +#include <dt-bindings/input/input.h>
+> ?
+> ?/ {
+> ?	model = "LG Optimus Black";
+> @@ -226,6 +227,14 @@
+> ?#include "twl4030.dtsi"
+> ?#include "twl4030_omap3.dtsi"
+> ?
+> +&twl_keypad {
+> +	linux,keymap = <
+> +		MATRIX_KEY(0x00, 0x00, KEY_VOLUMEUP)
+> +		MATRIX_KEY(0x01, 0x00, KEY_VOLUMEDOWN)
+> +		MATRIX_KEY(0x02, 0x00, KEY_SELECT)
+> +	>;
+> +};
+> +
+> ?/*
+> ? * The TWL4030 VAUX2 and VDAC regulators power sensors that are slaves on
+> I2C3.
+> ? * When not powered, these sensors cause the I2C3 clock to stay low at all
+> times,
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/b4af7293/attachment-0001.sig>
