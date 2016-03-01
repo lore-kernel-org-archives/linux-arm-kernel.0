@@ -1,43 +1,54 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 1 Mar 2016 12:17:54 +0000
-Subject: for-next/pgtable branch: OOM error with 16K page size
-In-Reply-To: <BY1PR0701MB1594A21349ED87C30F900102E1BB0@BY1PR0701MB1594.namprd07.prod.outlook.com>
-References: <BY1PR0701MB159476A9E0E9B5DD9F17EC4BE1BA0@BY1PR0701MB1594.namprd07.prod.outlook.com>
- <BY1PR0701MB159496D44DB36F8C3699D3A5E1BB0@BY1PR0701MB1594.namprd07.prod.outlook.com>
- <56D57B9D.7020604@arm.com>
- <BY1PR0701MB1594A21349ED87C30F900102E1BB0@BY1PR0701MB1594.namprd07.prod.outlook.com>
-Message-ID: <56D58872.2010506@arm.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Tue, 1 Mar 2016 13:21:12 +0100
+Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
+In-Reply-To: <56D4D782.3010503@gmail.com>
+References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
+ <20160229173446.GG31343@rric.localdomain>
+ <56D4D782.3010503@gmail.com>
+Message-ID: <20160301122112.GU24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/16 12:03, Jaggi, Manish wrote:
->>> From: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
->>> Sent: Tuesday, March 1, 2016 4:53 PM
->>> To: Jaggi, Manish
->>> Cc: linux-arm-kernel at lists.infradead.org; mark.rutland at arm.com
->>> Subject: Re: for-next/pgtable branch: OOM error with 16K page size
->>>
+On 29.02.16 15:42:58, David Daney wrote:
+> On 02/29/2016 09:34 AM, Robert Richter wrote:
+> >On 22.02.16 17:58:22, David Daney wrote:
+> >>From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 
->>> Could you please provide the complete o/p of the following
->>> with 16K ?
->>>
->>> 1) /proc/meminfo
+> >>+static int __init numa_init(int (*init_func)(void))
+> >>+{
+> >>+	int ret;
+> >>+
+> >>+	nodes_clear(numa_nodes_parsed);
+> >>+	nodes_clear(node_possible_map);
+> >>+	nodes_clear(node_online_map);
+> >>+	numa_free_distance();
+> 
+>         ^^^^^^^^^^^^^
+>      Cleanup for any previous numa_alloc_distance()
+> 
+> >>+
+> >>+	ret = numa_alloc_distance();
+> >>+	if (ret < 0)
+> >>+		return ret;
+> >
+> >If you move this before the remaining initializers, you will need to
+> >clean this up on error.
+> 
+> Yes, we do this.  See above.
+> 
+> >So better move it back after
+> >numa_register_nodes() as it was in v10. This should work since
+> >distances are used not earlier than numa is enabled.
+> 
+> I moved it here for a reason.
+> 
+> The init_func (of_numa_init() in this case) makes callbacks that use the
+> numa_distance object.  We need to allocate it before using it. Allocating it
+> after calling the init_func() is too late.
 
-> http://pastebin.com/Eszwp1cS
+Sounds reasonable and looks sane now.
 
-> HugePages_Total:    2019
-> HugePages_Free:     2019
-> HugePages_Rsvd:        0
-> HugePages_Surp:        0
-> Hugepagesize:      32768 kB
+Thanks,
 
-That clearly tells you whats wrong. You have 2019x32M in hugepages.
-Could you try releasing them and see if it solves the memory issue ?
-
-$ echo 0 > /sys/kernel/mm/hugepages/hugepages-32768kB/nr_hugepages
-
-
-btw, whats your root file system(to be more precise, the init) ?
-
-Cheers
-Suzuki
+-Robert
