@@ -1,77 +1,55 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 1 Mar 2016 15:06:40 -0600
-Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
- instead of queue_id
-In-Reply-To: <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <CAHrpEqSyuToC6QFEZygO0YyA=gV2cZEtkpRJMeZFOjhgTLdexQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 01 Mar 2016 23:15:03 +0200
+Subject: [PATCH] drm: rcar-du: clarify vsp dependency
+In-Reply-To: <1456487546-3886345-1-git-send-email-arnd@arndb.de>
+References: <1456487546-3886345-1-git-send-email-arnd@arndb.de>
+Message-ID: <1889313.6DCL1oqnHh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 6:36 PM, Troy Kisky
-<troy.kisky@boundarydevices.com> wrote:
-> queue_id is the qid member of struct bufdesc_prop.
->
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+Hi Arnd,
+
+Thank you for the patch.
+
+On Friday 26 February 2016 12:52:20 Arnd Bergmann wrote:
+> The VSP1 compositor code in DRM links against the respective V4L
+> driver, but the dependency is not expressed correctly in Kconfig,
+> which leads to a build error when the DRM driver is built-in
+> and the V4L driver is a module:
+> 
+> drivers/gpu/built-in.o: In function `rcar_du_vsp_plane_atomic_update':
+> rcar-du/rcar_du_vsp.c:183: undefined reference to `vsp1_du_atomic_update'
+> 
+> This patch avoids the problem by ensuring that the DRM VSP code can
+> only be enabled if the V4L driver is linked into the kernel, or
+> both are loadable modules.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 6d62ef3ac30b ("drm: rcar-du: Expose the VSP1 compositor through KMS
+> planes")
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Dave, could you please queue this for v4.6 ?
+
 > ---
->  drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
->  1 file changed, 6 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-> index 9619b9e..c517194 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1156,25 +1156,18 @@ fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
->         hwtstamps->hwtstamp = ns_to_ktime(ns);
->  }
->
-> -static void
-> -fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
-> +static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
-> +                   struct fec_enet_priv_tx_q *txq)
+>  drivers/gpu/drm/rcar-du/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/rcar-du/Kconfig
+> b/drivers/gpu/drm/rcar-du/Kconfig index 1f10fa0928b4..eb1e6d5cfed9 100644
+> --- a/drivers/gpu/drm/rcar-du/Kconfig
+> +++ b/drivers/gpu/drm/rcar-du/Kconfig
+> @@ -27,6 +27,6 @@ config DRM_RCAR_LVDS
+>  config DRM_RCAR_VSP
+>  	bool "R-Car DU VSP Compositor Support"
+>  	depends on DRM_RCAR_DU
+> -	depends on VIDEO_RENESAS_VSP1
+> +	depends on VIDEO_RENESAS_VSP1=y || (VIDEO_RENESAS_VSP1 && DRM_RCAR_DU=m)
+>  	help
+>  	  Enable support to expose the R-Car VSP Compositor as KMS planes.
 
-you can get fep from ndev.
+-- 
+Regards,
 
-best regards
-Frank Li
-
->  {
-> -       struct  fec_enet_private *fep;
->         struct bufdesc *bdp;
->         unsigned short status;
->         struct  sk_buff *skb;
-> -       struct fec_enet_priv_tx_q *txq;
->         struct netdev_queue *nq;
->         int     index = 0;
->         int     entries_free;
->
-> -       fep = netdev_priv(ndev);
-> -
-> -       queue_id = FEC_ENET_GET_QUQUE(queue_id);
-> -
-> -       txq = fep->tx_queue[queue_id];
->         /* get next bdp of dirty_tx */
-> -       nq = netdev_get_tx_queue(ndev, queue_id);
-> +       nq = netdev_get_tx_queue(ndev, txq->bd.qid);
->         bdp = txq->dirty_tx;
->
->         /* get next bdp of dirty_tx */
-> @@ -1268,11 +1261,13 @@ static void
->  fec_enet_tx(struct net_device *ndev)
->  {
->         struct fec_enet_private *fep = netdev_priv(ndev);
-> +       struct fec_enet_priv_tx_q *txq;
->         u16 queue_id;
->         /* First process class A queue, then Class B and Best Effort queue */
->         for_each_set_bit(queue_id, &fep->work_tx, FEC_ENET_MAX_TX_QS) {
->                 clear_bit(queue_id, &fep->work_tx);
-> -               fec_enet_tx_queue(ndev, queue_id);
-> +               txq = fep->tx_queue[FEC_ENET_GET_QUQUE(queue_id)];
-> +               fec_txq(ndev, fep, txq);
->         }
->         return;
->  }
-> --
-> 2.5.0
->
+Laurent Pinchart
