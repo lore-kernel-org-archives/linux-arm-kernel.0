@@ -1,40 +1,51 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 1 Mar 2016 13:08:33 +0000
-Subject: [PATCHv3] arm64: Rework valid_user_regs
-In-Reply-To: <20160301124701.GC30602@leverpostej>
-References: <1455646517-22903-1-git-send-email-mark.rutland@arm.com>
- <20160216182005.GN14509@arm.com> <20160301124701.GC30602@leverpostej>
-Message-ID: <CAFEAcA9PmQYFYBw0GstA88MGHwGivB+VJdowBf6T1ggneZKihg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 1 Mar 2016 16:12:24 +0300
+Subject: [PATCH] arm64: dts: r8a7795: Add CAN FD support
+In-Reply-To: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+References: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+Message-ID: <56D59538.2060100@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2016 at 12:47, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Feb 16, 2016 at 06:20:05PM +0000, Will Deacon wrote:
->> > +static int valid_native_regs(struct user_pt_regs *regs)
->> > +{
->> > +   regs->pstate &= ~SPSR_EL1_AARCH64_RES0_BITS;
->> > +
->> > +   if (user_mode(regs) && !(regs->pstate & PSR_MODE32_BIT) &&
->> > +       (regs->pstate & PSR_D_BIT) == 0 &&
->> > +       (regs->pstate & PSR_A_BIT) == 0 &&
->> > +       (regs->pstate & PSR_I_BIT) == 0 &&
->> > +       (regs->pstate & PSR_F_BIT) == 0) {
->> > +           return 1;
->> > +   }
->> > +
->> > +   /* Force PSR to a valid 64-bit EL0t */
->> > +   regs->pstate &= PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT;
->>
->> Can we not just zap the pstate to PSR_MODE_EL0t and be done with it?
+Hello.
+
+On 3/1/2016 1:04 PM, Ramesh Shanmugasundaram wrote:
+
+> Adds CAN FD controller node for r8a7795.
 >
-> I'm worried that some userspace might be relying on these being
-> preserved.
+> Note: CAN FD controller register base address specified in R-Car Gen3
+> Hardware User Manual v0.5E is incorrect. The correct address is:
+>
+> CAN FD - 0xe66c0000
+>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> ---
+> Hi All,
+>
+>     This patch is based on linux-next (tag:next-20160225) with the following
+>     patches applied on top.
+>
+>     [PATCH v2] arm64: dts: r8a7795: Add CAN external clock support
+>     [PATCH] arm64: dts: r8a7795: Add CAN support
+>
+>     The respective CAN subsystem changes are submitted separately here (https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg01388.html)
+>
+> Thanks,
+> Ramesh
+> ---
+>   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
+>   1 file changed, 24 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> index a88f8d8..5049ba6 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -553,6 +553,30 @@
+>   			status = "disabled";
+>   		};
+>
+> +		canfd: canfd at e66c0000 {
 
-This function is called as part of signal-return, right?
-You clearly can't just zap the flag registers in that code
-path, because you'd then be corrupting the flags of the
-bit of userspace code that was interrupted by the signal.
-(Or am I missing something?)
+    The node name should still be "can at e66c0000", I think.
 
-thanks
--- PMM
+MBR, Sergei
