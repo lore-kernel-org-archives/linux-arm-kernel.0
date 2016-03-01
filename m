@@ -1,53 +1,87 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  1 Mar 2016 14:44:08 +0000
-Subject: [PATCH v2 2/3] drivers: pci: host-generic: claim bus resources on
- PCI_PROBE_ONLY set-ups
+Date: Tue,  1 Mar 2016 14:44:09 +0000
+Subject: [PATCH v2 3/3] arm/arm64: pci: remove arch specific
+ pcibios_enable_device()
 In-Reply-To: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1456843449-19393-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1456843449-19393-4-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI host generic driver does not reassign bus resources on systems
-that require the BARs set-up to be immutable (ie PCI_PROBE_ONLY) since
-that would trigger system failures. Nonetheless, PCI bus resources
-allocated to PCI bridge and devices must be claimed in order to be
-validated and inserted in the kernel resource tree, but the current
-driver omits the resources claiming and relies on arch specific kludges
-to prevent probing failure (ie preventing resources enablement on
-PCI_PROBE_ONLY systems).
+The arm/arm64 pcibios_enable_device() implementations exist solely
+to prevent enabling PCI resources on PROBE_ONLY systems, since
+on those systems the PCI resources are currently not claimed (ie
+validated and inserted in the PCI resource tree) therefore they can
+not be enabled since this would trigger PCI set-ups failures.
 
-This patch adds code to the PCI host generic driver that correctly
-claims bus resources upon probe on systems that are required to
-prevent reassignment after bus enumeration, so that the allocated
-resources can be enabled successfully upon PCI device drivers probing,
-without resorting to arch back-ends workarounds.
+By introducing resources claiming in the PCI host controllers set-ups
+that have PROBE_ONLY as a probe option, there is no need for arch specific
+pcibios_enable_device() implementations anymore in that the kernel can
+rely on the generic pcibios_enable_device() implementation without
+resorting to arch specific code to work around the missing resources
+claiming enumeration step.
+
+This patch removes the pcibios_enable_device() implementations from
+the arm/arm64 arches back-end.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: David Daney <david.daney@cavium.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- drivers/pci/host/pci-host-generic.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/kernel/bios32.c | 12 ------------
+ arch/arm64/kernel/pci.c  | 13 -------------
+ 2 files changed, 25 deletions(-)
 
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 1652bc7..e529825 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -252,7 +252,10 @@ static int gen_pci_probe(struct platform_device *pdev)
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 05e61a2..488545f 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -590,18 +590,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	return start;
+ }
  
- 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+-/**
+- * pcibios_enable_device - Enable I/O and memory.
+- * @dev: PCI device to be enabled
+- */
+-int pcibios_enable_device(struct pci_dev *dev, int mask)
+-{
+-	if (pci_has_flag(PCI_PROBE_ONLY))
+-		return 0;
+-
+-	return pci_enable_resources(dev, mask);
+-}
+-
+ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+ 			enum pci_mmap_state mmap_state, int write_combine)
+ {
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index b3d098b..4095379 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -38,19 +38,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	return res->start;
+ }
  
--	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-+
-+	if (pci_has_flag(PCI_PROBE_ONLY)) {
-+		pci_bus_claim_resources(bus);
-+	} else {
- 		pci_bus_size_bridges(bus);
- 		pci_bus_assign_resources(bus);
- 
+-/**
+- * pcibios_enable_device - Enable I/O and memory.
+- * @dev: PCI device to be enabled
+- * @mask: bitmask of BARs to enable
+- */
+-int pcibios_enable_device(struct pci_dev *dev, int mask)
+-{
+-	if (pci_has_flag(PCI_PROBE_ONLY))
+-		return 0;
+-
+-	return pci_enable_resources(dev, mask);
+-}
+-
+ /*
+  * Try to assign the IRQ number from DT when adding a new device
+  */
 -- 
 2.5.1
