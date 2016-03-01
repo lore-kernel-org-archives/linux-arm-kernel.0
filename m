@@ -1,44 +1,34 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Tue, 1 Mar 2016 09:13:01 +0000
-Subject: [PATCH] pinctrl-bcm2835: Fix cut-and-paste error in "pull" parsing
-In-Reply-To: <1456795808-1449-1-git-send-email-eric@anholt.net>
-References: <1456795808-1449-1-git-send-email-eric@anholt.net>
-Message-ID: <56D55D1D.8090701@raspberrypi.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 1 Mar 2016 18:15:08 +0900
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.6
+In-Reply-To: <2850636.ecdOjeBnf0@wuerfel>
+References: <cover.1456442918.git.horms+renesas@verge.net.au>
+ <2850636.ecdOjeBnf0@wuerfel>
+Message-ID: <20160301091506.GA4363@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2016 01:30, Eric Anholt wrote:
-> From: Phil Elwell <phil@raspberrypi.org>
->
-> The DT bindings for pinctrl-bcm2835 allow both the function and pull
-> to contain either one entry or one per pin. However, an error in the
-> DT parsing can cause failures if the number of pulls differs from the
-> number of functions.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Cc: stable at vger.kernel.org
-> ---
->
-> Yes, the s-o-b differs from the author of the commit, but this falls
-> under part b) of the process.
->
-> Phil, any chance you could start putting Signed-off-by lines on your
-> kernel commits?
->
->  drivers/pinctrl/bcm/pinctrl-bcm2835.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> index 0f5997c..08b1d93 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> @@ -779,7 +779,7 @@ static int bcm2835_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
->  		}
->  		if (num_pulls) {
->  			err = of_property_read_u32_index(np, "brcm,pull",
-> -					(num_funcs > 1) ? i : 0, &pull);
-> +					(num_pulls > 1) ? i : 0, &pull);
->  			if (err)
->  				goto out;
->  			err = bcm2835_pctl_dt_node_to_map_pull(pc, np, pin,
-Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+On Mon, Feb 29, 2016 at 04:18:37PM +0100, Arnd Bergmann wrote:
+> On Friday 26 February 2016 08:51:45 Simon Horman wrote:
+> > Please consider these Renesas ARM64 based SoC defconfig updates for v4.6.
+> > 
+> > This pull request is based on the previous round of
+> > such requests, tagged as v4.5-rc2,
+> > which I have already sent a pull-request for.
+> 
+> It looks like your script generated a funny text here, as you
+> did not send -rc2 ;-)
+
+Oops, I'll have to teach my script to be a bit smarter.
+
+> > I based this pull request on v4.5-rc2 instead of rc1 to avoid
+> > a minor conflict. However I believe this may have been in vein
+> > as there appears to be a separate minor conflict present in linux-next.
+> 
+> Doesn't really matter here, the trivial conflicts are never a
+> problem, and the branches are already based on -rc3, so you are
+> not introducing a backmerge.
+> 
+> Pulled into next/arm64, thanks!
+> 
+> 	Arnd
