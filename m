@@ -1,55 +1,79 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 1 Mar 2016 13:53:42 +0100
-Subject: [PATCH 7/8] ARM64: dts: amlogic: Extend GXBaby GIC node
-In-Reply-To: <56D58E88.2080700@arm.com>
-References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
- <1456789465-2962-8-git-send-email-afaerber@suse.de>
- <56D57673.8030702@arm.com> <56D57A7F.5020806@suse.de>
- <56D58E88.2080700@arm.com>
-Message-ID: <CAOQ7t2aev5fycZxNEkChWkYYVAV3pn9qnsXnO56V6J7Z3Mi-Rg@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 1 Mar 2016 14:54:24 +0200
+Subject: [PATCH v3 3/5] ARM: dts: DRA7: Add TBCLK for PWMSS
+In-Reply-To: <20160229232348.GV13417@atomide.com>
+References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
+ <1456439796-28546-4-git-send-email-fcooper@ti.com>
+ <20160229232348.GV13417@atomide.com>
+Message-ID: <56D59100.3060803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 1, 2016 at 1:43 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi,
->
-> On 01/03/16 11:18, Andreas F?rber wrote:
->> Hi Andre,
+On 03/01/2016 01:23 AM, Tony Lindgren wrote:
+> * Franklin S Cooper Jr <fcooper@ti.com> [160225 14:37]:
+>> From: Vignesh R <vigneshr@ti.com>
 >>
->> Am 01.03.2016 um 12:01 schrieb Andre Przywara:
->>> On 29/02/16 23:44, Andreas F?rber wrote:
->>>> Add GICH and GICV resources for HYP mode - guess based on other vendors.
->>>
->>> Do you know if the firmware allows the kernel to be entered in EL2
->>> (which is the arm64 name for HYP)?
->>> So can we run kvm?
->>> If you have a booted kernel, can you grep for "EL2" and "kvm" in the dmesg?
+>> tbclk is used by ehrpwm to generate PWM waveform on DRA7 SoC. Add Linux
+>> clock to control ehrpwm tbclk.
+>> The TRM says, tbclk is derived from SYSCLKOUT. SYSCLKOUT is nothing but
+>> ehrpwm functional clock derived from the gateable interface and
+>> functional clock of PWMSS(l4_root_clk_div).
+>> Refer AM57x TRM SPRUHZ6[1], October 2014, Table 29-4 and Section 29.2.2.1,
+>> Table 29-19 and the NOTE at the end of the table.
 >>
->> I do not have a rootfs yet (MMC v5 patches by Carlo are still waiting
->> for review), but with this change the KVM driver initializes okay - the
->> purpose of this patch!
->>
->>> Also you should merge this patch into 3/8, same for 8/8.
->>
->> If people confirm this is generally or specifically for this SoC correct
->> then sure. So far 3/8 seems a safe subset for lack of public documentation.
+>> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
 >
-> The GIC is an integral part of the SoC, so this clearly belongs in there.
+> Applying this into omap-for-v4.6/dt thanks.
 >
->>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>>> ---
->>>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 +++-
->
-> In general I was wondering if this naming is correct?
-> Shouldn't it be something with "s905" in it? Because this the SoC that
-> is driving all those hardware and the peripherals that you describe in
-> there are clearly within the SoC.
-> So something like meson-s905.dtsi or the like?
+> Note for Tero, let's plan on getting rid of the duplicate
+> reg entries by using the standard clock output offset within
+> the clock register. I think we should easily be able to add
+> a binding for this and then deprecate the overlapping reg
+> entries.
 
-When I first submitted support for the meson8 and meson8b I picked up
-the names according to the Amlogic SDK.
-In the latest Amlogic drop this SoC is identified as meson-gxbb so
-probably we should stick to this name.
+Yeah, we have been discussing this offline a bit, but haven't had time 
+to look at this. I believe the hwmod clock conversion is of higher 
+priority still.
 
--- 
-Carlo Caione
+-Tero
+
+
+>
+> Regards,
+>
+> Tony
+>
+>> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+>> @@ -2146,4 +2146,28 @@
+>>   		ti,bit-shift = <0>;
+>>   		reg = <0x558>;
+>>   	};
+>> +
+>> +       ehrpwm0_tbclk: ehrpwm0_tbclk {
+>> +		#clock-cells = <0>;
+>> +		compatible = "ti,gate-clock";
+>> +		clocks = <&l4_root_clk_div>;
+>> +		ti,bit-shift = <20>;
+>> +		reg = <0x0558>;
+>> +	};
+>> +
+>> +	ehrpwm1_tbclk: ehrpwm1_tbclk {
+>> +		#clock-cells = <0>;
+>> +		compatible = "ti,gate-clock";
+>> +		clocks = <&l4_root_clk_div>;
+>> +		ti,bit-shift = <21>;
+>> +		reg = <0x0558>;
+>> +	};
+>> +
+>> +	ehrpwm2_tbclk: ehrpwm2_tbclk {
+>> +		#clock-cells = <0>;
+>> +		compatible = "ti,gate-clock";
+>> +		clocks = <&l4_root_clk_div>;
+>> +		ti,bit-shift = <22>;
+>> +		reg = <0x0558>;
+>> +	};
+>>   };
+>> --
+>> 2.7.0
+>>
