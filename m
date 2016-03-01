@@ -1,54 +1,121 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 1 Mar 2016 13:21:12 +0100
-Subject: [PATCH v12 4/5] arm64, numa: Add NUMA support for arm64 platforms.
-In-Reply-To: <56D4D782.3010503@gmail.com>
-References: <1456192703-2274-1-git-send-email-ddaney.cavm@gmail.com>
- <1456192703-2274-5-git-send-email-ddaney.cavm@gmail.com>
- <20160229173446.GG31343@rric.localdomain>
- <56D4D782.3010503@gmail.com>
-Message-ID: <20160301122112.GU24726@rric.localdomain>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 1 Mar 2016 06:27:45 -0600
+Subject: [PATCH v2] irqchip/gicv3-its: Don't allow devices whose ID is
+ outside range
+In-Reply-To: <56D56411.1070002@linaro.org>
+References: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
+ <56D56411.1070002@linaro.org>
+Message-ID: <56D58AC1.2010702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.02.16 15:42:58, David Daney wrote:
-> On 02/29/2016 09:34 AM, Robert Richter wrote:
-> >On 22.02.16 17:58:22, David Daney wrote:
-> >>From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+Hi Eric,
 
-> >>+static int __init numa_init(int (*init_func)(void))
-> >>+{
-> >>+	int ret;
-> >>+
-> >>+	nodes_clear(numa_nodes_parsed);
-> >>+	nodes_clear(node_possible_map);
-> >>+	nodes_clear(node_online_map);
-> >>+	numa_free_distance();
-> 
->         ^^^^^^^^^^^^^
->      Cleanup for any previous numa_alloc_distance()
-> 
-> >>+
-> >>+	ret = numa_alloc_distance();
-> >>+	if (ret < 0)
-> >>+		return ret;
-> >
-> >If you move this before the remaining initializers, you will need to
-> >clean this up on error.
-> 
-> Yes, we do this.  See above.
-> 
-> >So better move it back after
-> >numa_register_nodes() as it was in v10. This should work since
-> >distances are used not earlier than numa is enabled.
-> 
-> I moved it here for a reason.
-> 
-> The init_func (of_numa_init() in this case) makes callbacks that use the
-> numa_distance object.  We need to allocate it before using it. Allocating it
-> after calling the init_func() is too late.
+On 03/01/2016 03:42 AM, Eric Auger wrote:
+> Hi Shanker,
+> On 02/28/2016 08:22 PM, Shanker Donthineni wrote:
+>> We are not checking whether the requested device identifier fits into
+>> the device table memory or not. The function its_create_device()
+>> assumes that enough memory has been allocated for whole DevID sparse
+> space?
+Sure, I will change to space.
+>> (reported by ITS_TYPER.Devbits) during the ITS probe() and continues
+>> to initialize ITS hardware.
+>>
+>> This assumption is not perfect, sometimes we reduce memory size either
+>> because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
+>> MAPD command fails if 'Device ID' is outside of device table range.
+>>
+>> Add a simple validation check to avoid MAPD failures since we are
+>> not handling ITS command errors. This change also helps to return an
+>> error -ENOMEM instead of success to caller.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>> [v1]->[v2]
+>>    Rebase to v4.5-rc6, edit commit text and simplify code changes
+>>
+>>   drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
+>>   1 file changed, 20 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 43dfd15..6d986ac 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -55,6 +55,16 @@ struct its_collection {
+>>   };
+>>   
+>>   /*
+>> + * The ITS_BASER structure - contains memeory information and table
+> typo: memory
 
-Sounds reasonable and looks sane now.
+Thanks, I will fix in next patch.
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+>
+> Best Regards
+>
+> Eric
+>> + * entry size in bytes.
+>> + */
+>> +struct its_baser {
+>> +	void		*base;
+>> +	u32		order;
+>> +	u32		entry_size;
+>> +};
+>> +
+>> +/*
+>>    * The ITS structure - contains most of the infrastructure, with the
+>>    * top-level MSI domain, the command queue, the collections, and the
+>>    * list of devices writing to it.
+>> @@ -66,14 +76,12 @@ struct its_node {
+>>   	unsigned long		phys_base;
+>>   	struct its_cmd_block	*cmd_base;
+>>   	struct its_cmd_block	*cmd_write;
+>> -	struct {
+>> -		void		*base;
+>> -		u32		order;
+>> -	} tables[GITS_BASER_NR_REGS];
+>> +	struct its_baser	tables[GITS_BASER_NR_REGS];
+>>   	struct its_collection	*collections;
+>>   	struct list_head	its_device_list;
+>>   	u64			flags;
+>>   	u32			ite_size;
+>> +	struct its_baser	*device_table;
+>>   };
+>>   
+>>   #define ITS_ITT_ALIGN		SZ_256
+>> @@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>   		 * For other tables, only allocate a single page.
+>>   		 */
+>>   		if (type == GITS_BASER_TYPE_DEVICE) {
+>> +			its->device_table = &its->tables[i];
+>>   			/*
+>>   			 * 'order' was initialized earlier to the default page
+>>   			 * granule of the the ITS.  We can't have an allocation
+>> @@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>   					node_name, order);
+>>   			}
+>>   		}
+>> +		its->tables[i].entry_size = entry_size;
+>>   
+>>   retry_alloc_baser:
+>>   		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+>> @@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>   	int nr_ites;
+>>   	int sz;
+>>   
+>> +	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+>> +	if (its->device_table &&
+>> +	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
+>> +	    its->device_table->entry_size)))
+>> +		return NULL;
+>> +
+>>   	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>>   	/*
+>>   	 * At least one bit of EventID is being used, hence a minimum
+>>
 
-Thanks,
-
--Robert
+-- 
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
