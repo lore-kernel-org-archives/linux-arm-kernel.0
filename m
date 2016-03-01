@@ -1,137 +1,198 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 1 Mar 2016 10:54:29 +0100
-Subject: [RESEND PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
-Message-ID: <1456826069-30955-1-git-send-email-nicolas.ferre@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 1 Mar 2016 10:54:18 +0100
+Subject: [PATCH v2 3/3] mmc: pwrseq: convert to proper platform device
+In-Reply-To: <CAPDyKFp+LhGfGF5vW85Tk7WCvPU6ovktsunE+8fN+NkUYbGn8Q@mail.gmail.com>
+References: <1453975315-13424-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1453975435-13564-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <CAPDyKFp+LhGfGF5vW85Tk7WCvPU6ovktsunE+8fN+NkUYbGn8Q@mail.gmail.com>
+Message-ID: <CAPDyKFrDN3spHog4=icyAfySc2GsvfbarJNns4S=i3PSEy54Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Songjun Wu <songjun.wu@atmel.com>
+On 1 March 2016 at 10:51, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 28 January 2016 at 11:03, Srinivas Kandagatla
+> <srinivas.kandagatla@linaro.org> wrote:
+>> simple-pwrseq and emmc-pwrseq drivers rely on platform_device
+>> structure from of_find_device_by_node(), this works mostly. But, as there
+>> is no driver associated with this devices, cases like default/init pinctrl
+>> setup would never be performed by pwrseq. This becomes problem when the
+>> gpios used in pwrseq require pinctrl setup.
+>>
+>> Currently most of the common pinctrl setup is done in
+>> drivers/base/pinctrl.c by pinctrl_bind_pins().
+>>
+>> There are two ways to solve this issue on either convert pwrseq drivers
+>> to a proper platform drivers or copy the exact code from
+>> pcintrl_bind_pins(). I prefer converting pwrseq to proper drivers so that
+>> other cases like setting up clks/parents from dt would also be possible.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>  drivers/mmc/Kconfig              |   2 +
+>>  drivers/mmc/core/Kconfig         |   7 +++
+>>  drivers/mmc/core/Makefile        |   4 +-
+>>  drivers/mmc/core/pwrseq.c        | 115 +++++++++++++++++++++------------------
+>>  drivers/mmc/core/pwrseq.h        |  19 +++++--
+>>  drivers/mmc/core/pwrseq_emmc.c   |  81 +++++++++++++++++++--------
+>>  drivers/mmc/core/pwrseq_simple.c |  85 ++++++++++++++++++++---------
+>>  7 files changed, 207 insertions(+), 106 deletions(-)
+>>
+>> diff --git a/drivers/mmc/Kconfig b/drivers/mmc/Kconfig
+>> index f2eeb38..7b2412a 100644
+>> --- a/drivers/mmc/Kconfig
+>> +++ b/drivers/mmc/Kconfig
+>> @@ -5,6 +5,8 @@
+>>  menuconfig MMC
+>>         tristate "MMC/SD/SDIO card support"
+>>         depends on HAS_IOMEM
+>> +       select PWRSEQ_SIMPLE if OF
+>> +       select PWRSEQ_EMMC if OF
+>
+> In general I don't like "select" and for this case I think there is a
+> better way. See below.
+>
+>>         help
+>>           This selects MultiMediaCard, Secure Digital and Secure
+>>           Digital I/O support.
+>> diff --git a/drivers/mmc/core/Kconfig b/drivers/mmc/core/Kconfig
+>> index 4c33d76..b26f756 100644
+>> --- a/drivers/mmc/core/Kconfig
+>> +++ b/drivers/mmc/core/Kconfig
+>> @@ -1,3 +1,10 @@
+>>  #
+>>  # MMC core configuration
+>>  #
+>> +config PWRSEQ_EMMC
+>> +       tristate "PwrSeq EMMC"
+>
+> I suggest change this to:
+> bool "HW reset support for eMMC"
+>
+>> +       depends on OF
+>
+> Add:
+> default y
+>
+> Also I think some brief "help" text, describing the feature would be nice.
+>
+>> +
+>> +config PWRSEQ_SIMPLE
+>> +       tristate "PwrSeq Simple"
+>> +       depends on OF
+>
+> Similar comments as above for PWRSEQ_EMMC.
+>
+>> diff --git a/drivers/mmc/core/Makefile b/drivers/mmc/core/Makefile
+>> index 2c25138..f007151 100644
+>> --- a/drivers/mmc/core/Makefile
+>> +++ b/drivers/mmc/core/Makefile
+>> @@ -8,5 +8,7 @@ mmc_core-y                      := core.o bus.o host.o \
+>>                                    sdio.o sdio_ops.o sdio_bus.o \
+>>                                    sdio_cis.o sdio_io.o sdio_irq.o \
+>>                                    quirks.o slot-gpio.o
+>> -mmc_core-$(CONFIG_OF)          += pwrseq.o pwrseq_simple.o pwrseq_emmc.o
+>> +mmc_core-$(CONFIG_OF)          += pwrseq.o
+>> +obj-$(CONFIG_PWRSEQ_SIMPLE)    += pwrseq_simple.o
+>> +obj-$(CONFIG_PWRSEQ_EMMC)      += pwrseq_emmc.o
+>>  mmc_core-$(CONFIG_DEBUG_FS)    += debugfs.o
+>> diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
+>> index 4c1d175..64c7c79 100644
+>> --- a/drivers/mmc/core/pwrseq.c
+>> +++ b/drivers/mmc/core/pwrseq.c
+>> @@ -8,80 +8,64 @@
+>>   *  MMC power sequence management
+>>   */
+>>  #include <linux/kernel.h>
+>> -#include <linux/platform_device.h>
+>>  #include <linux/err.h>
+>> +#include <linux/module.h>
+>>  #include <linux/of.h>
+>> -#include <linux/of_platform.h>
+>>
+>>  #include <linux/mmc/host.h>
+>>
+>>  #include "pwrseq.h"
+>>
+>> -struct mmc_pwrseq_match {
+>> -       const char *compatible;
+>> -       struct mmc_pwrseq *(*alloc)(struct mmc_host *host, struct device *dev);
+>> -};
+>> -
+>> -static struct mmc_pwrseq_match pwrseq_match[] = {
+>> -       {
+>> -               .compatible = "mmc-pwrseq-simple",
+>> -               .alloc = mmc_pwrseq_simple_alloc,
+>> -       }, {
+>> -               .compatible = "mmc-pwrseq-emmc",
+>> -               .alloc = mmc_pwrseq_emmc_alloc,
+>> -       },
+>> -};
+>> -
+>> -static struct mmc_pwrseq_match *mmc_pwrseq_find(struct device_node *np)
+>> +static DEFINE_MUTEX(pwrseq_list_mutex);
+>> +static LIST_HEAD(pwrseq_list);
+>> +
+>> +static struct mmc_pwrseq *of_find_mmc_pwrseq(struct mmc_host *host)
+>>  {
+>> -       struct mmc_pwrseq_match *match = ERR_PTR(-ENODEV);
+>> -       int i;
+>> +       struct device_node *np;
+>> +       struct mmc_pwrseq *p, *pwrseq = NULL;
+>>
+>> -       for (i = 0; i < ARRAY_SIZE(pwrseq_match); i++) {
+>> -               if (of_device_is_compatible(np, pwrseq_match[i].compatible)) {
+>> -                       match = &pwrseq_match[i];
+>> +       np = of_parse_phandle(host->parent->of_node, "mmc-pwrseq", 0);
+>> +       if (!np)
+>> +               return NULL;
+>> +
+>> +       mutex_lock(&pwrseq_list_mutex);
+>> +       list_for_each_entry(p, &pwrseq_list, list) {
+>> +               if (p->dev->of_node == np) {
+>> +                       pwrseq = p;
+>>                         break;
+>>                 }
+>>         }
+>>
+>> -       return match;
+>> +       of_node_put(np);
+>> +       mutex_unlock(&pwrseq_list_mutex);
+>> +
+>> +       return pwrseq ? : ERR_PTR(-EPROBE_DEFER);
+>>  }
+>>
+>>  int mmc_pwrseq_alloc(struct mmc_host *host)
+>>  {
+>> -       struct platform_device *pdev;
+>> -       struct device_node *np;
+>> -       struct mmc_pwrseq_match *match;
+>>         struct mmc_pwrseq *pwrseq;
+>>         int ret = 0;
+>>
+>> -       np = of_parse_phandle(host->parent->of_node, "mmc-pwrseq", 0);
+>> -       if (!np)
+>> -               return 0;
+>> +       pwrseq = of_find_mmc_pwrseq(host);
+>>
+>
+> I think you can remove another empty line here.
+>
+>> -       pdev = of_find_device_by_node(np);
+>> -       if (!pdev) {
+>> -               ret = -ENODEV;
+>> -               goto err;
+>> -       }
+>> +       if (IS_ERR_OR_NULL(pwrseq))
+>> +               return PTR_ERR(pwrseq);
+>
+> You need "return PTR_ERR_OR_ZERO(pwrseq)", as pwrse is what you want here.
+>
 
-Cpu_dai id always equals 0, can't distinguish the
-different SSC. Use platform_device id to record
-and distinguish the different SSC.
+Argh, slipped with my fingers in the middle of review and manage to
+send on half the review. Please ignore it, I will send a new one with
+a full review.
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/misc/atmel-ssc.c        |  1 +
- sound/soc/atmel/atmel_ssc_dai.c | 27 ++++++++++++++++++---------
- 2 files changed, 19 insertions(+), 9 deletions(-)
+Sorry for noise.
 
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index e11a0bd6c66e..0516ecda54d3 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -34,6 +34,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
- 		if (ssc->pdev->dev.of_node) {
- 			if (of_alias_get_id(ssc->pdev->dev.of_node, "ssc")
- 				== ssc_num) {
-+				ssc->pdev->id = ssc_num;
- 				ssc_valid = 1;
- 				break;
- 			}
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index ba8def5665c4..276897033639 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -285,7 +285,8 @@ static int atmel_ssc_hw_rule_rate(struct snd_pcm_hw_params *params,
- static int atmel_ssc_startup(struct snd_pcm_substream *substream,
- 			     struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir, dir_mask;
- 	int ret;
-@@ -346,7 +347,8 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
- static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
- 			       struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir, dir_mask;
- 
-@@ -392,7 +394,8 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
- static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
- 		unsigned int fmt)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 
- 	ssc_p->daifmt = fmt;
- 	return 0;
-@@ -404,7 +407,8 @@ static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
- static int atmel_ssc_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
- 	int div_id, int div)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 
- 	switch (div_id) {
- 	case ATMEL_SSC_CMR_DIV:
-@@ -445,7 +449,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_pcm_hw_params *params,
- 	struct snd_soc_dai *dai)
- {
--	int id = dai->id;
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	int id = pdev->id;
- 	struct atmel_ssc_info *ssc_p = &ssc_info[id];
- 	struct ssc_device *ssc = ssc_p->ssc;
- 	struct atmel_pcm_dma_params *dma_params;
-@@ -772,7 +777,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
- 			     struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir;
- 
-@@ -795,7 +801,8 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
- static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
- 			     int cmd, struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir;
- 
-@@ -824,11 +831,12 @@ static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
- static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
- {
- 	struct atmel_ssc_info *ssc_p;
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
- 
- 	if (!cpu_dai->active)
- 		return 0;
- 
--	ssc_p = &ssc_info[cpu_dai->id];
-+	ssc_p = &ssc_info[pdev->id];
- 
- 	/* Save the status register before disabling transmit and receive */
- 	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
-@@ -852,12 +860,13 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
- static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
- {
- 	struct atmel_ssc_info *ssc_p;
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
- 	u32 cr;
- 
- 	if (!cpu_dai->active)
- 		return 0;
- 
--	ssc_p = &ssc_info[cpu_dai->id];
-+	ssc_p = &ssc_info[pdev->id];
- 
- 	/* restore SSC register settings */
- 	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
--- 
-2.1.3
+Kind regards
+Uffe
