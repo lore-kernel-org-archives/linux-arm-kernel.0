@@ -1,144 +1,137 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  1 Mar 2016 14:15:25 -0700
-Subject: [RFC v3 06/12] PM / cpu_domains: Record CPUs that are part of the
- domain
+Date: Tue,  1 Mar 2016 14:15:26 -0700
+Subject: [RFC v3 07/12] PM / cpu_domains: Add PM Domain governor for CPUs
 In-Reply-To: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
 References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1456866931-37851-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1456866931-37851-9-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to power down a CPU domain, the domain needs information about
-the CPUs in that domain. The reference counting for the CPU devices in a
-domain is done by genpd. In order to understand the idle time for the
-domain, it is necessary to know which CPUs are part of the domain, so
-the domain governor may understand the sleep durations of the comprising
-CPU devices and make a judicious decision on the domain's idle state.
-This extends to the parent of such domains, which may have multiple such
-CPU domains and therefore would need to know the sleep patterns of all
-the CPUs in all the CPU domains.
+A PM domain comprising of CPUs may be powered off when all the CPUs in
+the domain are powered down. Powering down a CPU domain is generally a
+expensive operation and therefore the power performance trade offs
+should be considered. The time between the last CPU powering down and
+the first CPU powering up in a domain, is the time available for the
+domain to sleep. Ideally, the sleep time of the domain should fulfill
+the residency requirement of the domains' idle state.
 
-To aid this functionality, traverse up the parent chain and set the CPU
-in the cpumasks while attaching a CPU to its domain. This mask is
-provided in the callback to the platform driver to help identify the
-CPUs in the domain that is being powered off.
+To do this effectively, read the time before the wakeup of the cluster's
+CPUs and ensure that the domain's idle state sleep time guarantees the
+QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
+state's residency.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/power/cpu_domains.c | 28 ++++++++++++++++++++++++----
- include/linux/cpu_domains.h      |  4 +++-
- 2 files changed, 27 insertions(+), 5 deletions(-)
+ drivers/base/power/cpu_domains.c | 80 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 79 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
-index 62704e6..62c1ab9 100644
+index 62c1ab9..6ba05f8 100644
 --- a/drivers/base/power/cpu_domains.c
 +++ b/drivers/base/power/cpu_domains.c
-@@ -9,6 +9,7 @@
-  */
+@@ -17,9 +17,12 @@
+ #include <linux/list.h>
+ #include <linux/of.h>
+ #include <linux/pm_domain.h>
++#include <linux/pm_qos.h>
++#include <linux/pm_runtime.h>
+ #include <linux/rculist.h>
+ #include <linux/rcupdate.h>
+ #include <linux/slab.h>
++#include <linux/tick.h>
  
- #include <linux/cpu.h>
-+#include <linux/cpumask.h>
- #include <linux/cpu_domains.h>
- #include <linux/cpu_pm.h>
- #include <linux/device.h>
-@@ -27,6 +28,7 @@ struct cpu_pm_domain {
- 	struct cpu_pd_ops ops;
- 	struct generic_pm_domain *genpd;
- 	struct cpu_pm_domain *parent;
-+	cpumask_var_t cpus;
- };
+ #define CPU_PD_NAME_MAX 36
  
- /* List of CPU PM domains we care about */
-@@ -50,7 +52,7 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
+@@ -52,6 +55,81 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
  	return res;
  }
  
--static int cpu_pd_attach_cpu(int cpu)
-+static int cpu_pd_attach_cpu(struct cpu_pm_domain *cpu_pd, int cpu)
- {
- 	int ret;
- 	struct device *cpu_dev;
-@@ -70,6 +72,11 @@ static int cpu_pd_attach_cpu(int cpu)
- 	else
- 		dev_dbg(cpu_dev, "Attached to domain\n");
- 
-+	while (!ret && cpu_pd) {
-+		cpumask_set_cpu(cpu, cpu_pd->cpus);
-+		cpu_pd = cpu_pd->parent;
-+	};
++static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
++{
++	struct generic_pm_domain *genpd = pd_to_genpd(pd);
++	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
++	int qos_ns = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
++	u64 sleep_ns;
++	ktime_t earliest, next_wakeup;
++	int cpu;
++	int i;
 +
- 	return ret;
- }
- 
-@@ -85,8 +92,8 @@ static int cpu_pd_power_off(struct generic_pm_domain *genpd)
- 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
- 
- 	return pd->ops.power_off ? pd->ops.power_off(genpd->state_idx,
--					genpd->states[genpd->state_idx].param),
--					: 0;
-+					genpd->states[genpd->state_idx].param,
-+					pd->cpus) : 0;
- }
- 
- /**
-@@ -119,6 +126,9 @@ static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
- 	if (!pd)
- 		goto fail;
- 
-+	if (!zalloc_cpumask_var(&pd->cpus, GFP_KERNEL))
-+		goto fail;
++	/* Reset the last set genpd state, default to index 0 */
++	genpd->state_idx = 0;
 +
- 	pd->genpd = genpd;
- 	pd->genpd->power_off = cpu_pd_power_off;
- 	pd->genpd->power_on = cpu_pd_power_on;
-@@ -149,6 +159,8 @@ fail:
- 
- 	kfree(genpd->name);
- 	kfree(genpd);
-+	if (pd)
-+		kfree(pd->cpus);
- 	kfree(pd);
- 	return ERR_PTR(ret);
- }
-@@ -224,6 +236,7 @@ int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
- 
- 	struct device_node *dn;
- 	struct generic_pm_domain *genpd;
-+	struct cpu_pm_domain *cpu_pd;
- 
- 	dn = of_get_cpu_node(cpu, NULL);
- 	if (!dn)
-@@ -239,7 +252,14 @@ int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
- 		return PTR_ERR(genpd);
- 
- 	of_node_put(dn);
--	return cpu_pd_attach_cpu(cpu);
-+	cpu_pd = to_cpu_pd(genpd);
-+	if (!cpu_pd) {
-+		pr_err("%s: Genpd was created outside CPU PM domains\n",
-+				__func__);
-+		return -ENOENT;
++	/* We don't want to power down, if QoS is 0 */
++	if (!qos_ns)
++		return false;
++
++	/*
++	 * Find the sleep time for the cluster.
++	 * The time between now and the first wake up of any CPU that
++	 * are in this domain hierarchy is the time available for the
++	 * domain to be idle.
++	 *
++	 * We only care about the next wakeup for any online CPU in that
++	 * cluster. Hotplug off any of the CPUs that we care about will
++	 * wait on the genpd lock, until we are done. Any other CPU hotplug
++	 * is not of consequence to our sleep time.
++	 */
++	earliest = ktime_set(KTIME_SEC_MAX, 0);
++	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
++		next_wakeup = tick_nohz_get_next_wakeup(cpu);
++		if (earliest.tv64 > next_wakeup.tv64)
++			earliest = next_wakeup;
 +	}
 +
-+	return cpu_pd_attach_cpu(cpu_pd, cpu);
- }
- EXPORT_SYMBOL(of_setup_cpu_pd_single);
- 
-diff --git a/include/linux/cpu_domains.h b/include/linux/cpu_domains.h
-index 9530b2d..50e3321 100644
---- a/include/linux/cpu_domains.h
-+++ b/include/linux/cpu_domains.h
-@@ -13,8 +13,10 @@
- 
- #include <linux/types.h>
- 
-+struct cpumask;
++	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
++	if (sleep_ns <= 0)
++		return false;
 +
- struct cpu_pd_ops {
--	int (*power_off)(u32 state_idx, u32 param);
-+	int (*power_off)(u32 state_idx, u32 param, const struct cpumask *mask);
- 	int (*power_on)(void);
- };
++	/*
++	 * Find the deepest sleep state that satisfies the residency
++	 * requirement and the QoS constraint
++	 */
++	for (i = genpd->state_count - 1; i >= 0; i--) {
++		u64 state_sleep_ns;
++
++		state_sleep_ns = genpd->states[i].power_off_latency_ns +
++			genpd->states[i].power_on_latency_ns +
++			genpd->states[i].residency_ns;
++
++		/*
++		 * If we can't sleep to save power in the state, move on
++		 * to the next lower idle state.
++		 */
++		if (state_sleep_ns > sleep_ns)
++			continue;
++
++		/*
++		 * We also don't want to sleep more than we should to
++		 * gaurantee QoS.
++		 */
++		if (state_sleep_ns < (qos_ns * NSEC_PER_USEC))
++			break;
++	}
++
++	if (i >= 0)
++		genpd->state_idx = i;
++
++	return (i >= 0);
++}
++
++static struct dev_power_governor cpu_pd_gov = {
++	.power_down_ok = cpu_pd_down_ok,
++};
++
+ static int cpu_pd_attach_cpu(struct cpu_pm_domain *cpu_pd, int cpu)
+ {
+ 	int ret;
+@@ -143,7 +221,7 @@ static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
  
+ 	/* Register the CPU genpd */
+ 	pr_debug("adding %s as CPU PM domain\n", pd->genpd->name);
+-	ret = of_pm_genpd_init(dn, pd->genpd, &simple_qos_governor, false);
++	ret = of_pm_genpd_init(dn, pd->genpd, &cpu_pd_gov, false);
+ 	if (ret) {
+ 		pr_err("Unable to initialize domain %s\n", dn->full_name);
+ 		goto fail;
 -- 
 2.1.4
