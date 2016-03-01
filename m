@@ -1,50 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  1 Mar 2016 18:03:12 +0100
-Subject: [PATCH] rtc: vr41xx: remove unused function:
-Message-ID: <1456851797-3510153-1-git-send-email-arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 1 Mar 2016 17:10:29 +0000 (UTC)
+Subject: [PATCH] soc: qcom: smp2p: Use memset_io to zero out new
+ entries
+In-Reply-To: <20160225220224.GA9986@hector.attlocal.net>
+References: <1456417057-17591-1-git-send-email-bjorn.andersson@linaro.org>
+ <20160225220224.GA9986@hector.attlocal.net>
+Message-ID: <alpine.DEB.2.02.1603011706210.14948@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vr41xx_rtc_alarm_irq_enable function is never called
-has no effect other than producing a warning:
+On Thu, 25 Feb 2016, Andy Gross wrote:
 
-drivers/rtc/rtc-vr41xx.c:228:12: error: 'vr41xx_rtc_alarm_irq_enable' defined but not used [-Werror=unused-function]
+> On Thu, Feb 25, 2016 at 08:17:37AM -0800, Bjorn Andersson wrote:
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > ---
+> >  drivers/soc/qcom/smp2p.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/soc/qcom/smp2p.c b/drivers/soc/qcom/smp2p.c
+> > index f1eed7f9dd67..61df598444e6 100644
+> > --- a/drivers/soc/qcom/smp2p.c
+> > +++ b/drivers/soc/qcom/smp2p.c
+> > @@ -379,7 +379,7 @@ static int qcom_smp2p_alloc_outbound_item(struct qcom_smp2p *smp2p)
+> >  		return PTR_ERR(out);
+> >  	}
+> >  
+> > -	memset(out, 0, sizeof(*out));
+> > +	memset_io(out, 0, sizeof(*out));
+> >  	out->magic = SMP2P_MAGIC;
+> >  	out->local_pid = smp2p->local_pid;
+> >  	out->remote_pid = smp2p->remote_pid;
+> 
+> Good catch.  I'll add this fix for the pull.
 
-This removes it.
+Folks, is qmem_smem_get() intended to return pointers to device-mapped 
+memory, as implied by this change?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/rtc/rtc-vr41xx.c | 18 ------------------
- 1 file changed, 18 deletions(-)
+If so, shouldn't the return type of qmem_smem_get() et al. be void 
+__iomem * rather than void *?
 
-diff --git a/drivers/rtc/rtc-vr41xx.c b/drivers/rtc/rtc-vr41xx.c
-index f64c282275b3..68cb63ef1e44 100644
---- a/drivers/rtc/rtc-vr41xx.c
-+++ b/drivers/rtc/rtc-vr41xx.c
-@@ -225,24 +225,6 @@ static int vr41xx_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long
- 	return 0;
- }
- 
--static int vr41xx_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
--{
--	spin_lock_irq(&rtc_lock);
--	if (enabled) {
--		if (!alarm_enabled) {
--			enable_irq(aie_irq);
--			alarm_enabled = 1;
--		}
--	} else {
--		if (alarm_enabled) {
--			disable_irq(aie_irq);
--			alarm_enabled = 0;
--		}
--	}
--	spin_unlock_irq(&rtc_lock);
--	return 0;
--}
--
- static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
- {
- 	struct platform_device *pdev = (struct platform_device *)dev_id;
--- 
-2.7.0
+
+- Paul
