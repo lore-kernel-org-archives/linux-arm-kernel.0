@@ -1,59 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 1 Mar 2016 09:56:24 +0100
-Subject: [PATCH] ARM: at91: avoid defining CONFIG_* symbols in source code
-In-Reply-To: <1456238384-882646-1-git-send-email-arnd@arndb.de>
-References: <1456238384-882646-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160301085624.GD2627@piout.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 1 Mar 2016 17:57:26 +0900
+Subject: [PATCH v3] arm64: defconfig: Enable samsung MFD and related
+ configs
+In-Reply-To: <56C00BBB.4080807@samsung.com>
+References: <1454652269-6100-1-git-send-email-alim.akhtar@samsung.com>
+ <56C00BBB.4080807@samsung.com>
+Message-ID: <CAJKOXPc_U0fkHzcyJd+KBKoyYLC0GRmrKH0sgna5fYqfRp0gUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/2016 at 15:39:38 +0100, Arnd Bergmann wrote :
-> In an invalid randconfig build (fixed by another patch),
-> I ran across this warning:
-> 
-> arch/arm/include/debug/at91.S:18:0: error: "CONFIG_DEBUG_UART_VIRT" redefined [-Werror]
->  #define CONFIG_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
-> 
-> As Russell pointed out, we should never #define a macro starting
-> with CONFIG_ in a source file, as that is rather confusing.
-> 
-> This renames the macro to avoid the symbol clash.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Suggested-by: Russell King <linux@arm.linux.org.uk>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+2016-02-14 14:08 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> W dniu 05.02.2016 o 15:04, Alim Akhtar pisze:
+>> Exynos7 based espresso board uses S2MPS15, a multifunction device.
+>> This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
+>> the same.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>> Changes since v2:
+>> * Added Reviewed-by from Krzysztof
+>> * rebased on next-20160204
+>>
+>> Changes since v1:
+>> * updated the comment message to describe which platfrom uses it.
+>> * enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
+>>
+>>  arch/arm64/configs/defconfig |    3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>
+> Applying this to my tree would cause conflicts with commit efdda175c07f:
+> arm64: defconfig: add spmi and usb related configs
+> Conflicts are trivial (simple additions) but maybe it is better to avoid
+> them.
+>
+> Olof/Arnd/Kevin, can you apply this directly to arm-soc?
 
-> ---
->  arch/arm/include/debug/at91.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
-> index 43243be94cfc..d4ae3b8e2426 100644
-> --- a/arch/arm/include/debug/at91.S
-> +++ b/arch/arm/include/debug/at91.S
-> @@ -15,7 +15,7 @@
->  #define AT91_IO_P2V(x) (x)
->  #endif
->  
-> -#define CONFIG_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
-> +#define AT91_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
->  
->  #define AT91_DBGU_SR		(0x14)	/* Status Register */
->  #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
-> @@ -24,7 +24,7 @@
->  
->  	.macro	addruart, rp, rv, tmp
->  	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
-> -	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
-> +	ldr	\rv, =AT91_DEBUG_UART_VIRT		@ System peripherals (virt address)
->  	.endm
->  
->  	.macro	senduart,rd,rx
-> -- 
-> 2.7.0
-> 
+Never mind, applied because I have one more defconfig patch. The
+conflict will be still there but easy to solve.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best regards,
+Krzysztof
