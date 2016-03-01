@@ -1,51 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue,  1 Mar 2016 08:14:02 +0100
-Subject: [PATCH] ARM: dts: imx53-qsb: Fix gpio button polarity
-Message-ID: <1456816442-29104-1-git-send-email-s.hauer@pengutronix.de>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Tue, 1 Mar 2016 08:21:06 +0100
+Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
+In-Reply-To: <20160229153934.GB14848@arm.com>
+References: <cover.1455810755.git.jglauber@cavium.com>
+ <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
+ <20160229153934.GB14848@arm.com>
+Message-ID: <20160301072106.GA6326@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The polarity of the gpio buttons is defined to '0' which is
-active high. The buttons are active low though which has been verified by
-testing it and by looking into the schematics. While at it use
-defines rathers than numbers for the key codes.
+On Mon, Feb 29, 2016 at 03:39:35PM +0000, Will Deacon wrote:
+> Hi Jan,
+> 
+> I've queued this lot on my perf/updates branch, but I just noticed an
+> oddity whilst dealing with some potential conflicts with the kvm tree.
+> 
+> On Thu, Feb 18, 2016 at 05:50:13PM +0100, Jan Glauber wrote:
+> > With the long cycle counter bit (LC) disabled the cycle counter is not
+> > working on ThunderX SOC (ThunderX only implements Aarch64).
+> > Also, according to documentation LC == 0 is deprecated.
+> > 
+> > To keep the code simple the patch does not introduce 64 bit wide counter
+> > functions. Instead writing the cycle counter always sets the upper
+> > 32 bits so overflow interrupts are generated as before.
+> > 
+> > Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
+> > 
+> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> > ---
+> >  arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
+> >  1 file changed, 16 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > index 0ed05f6..c68fa98 100644
+> > --- a/arch/arm64/kernel/perf_event.c
+> > +++ b/arch/arm64/kernel/perf_event.c
+> > @@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+> >  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+> >  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+> >  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
+> > +#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
+> >  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+> >  #define	ARMV8_PMCR_N_MASK	0x1f
+> >  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+> 
+> You haven't extended this mask to cover the LC bit, so it will be ignored
+> by armv8pmu_pmcr_write afaict.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx53-qsb-common.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+This is weird. I've double checked and I missed this mask. Annoying.
+Nevertheless it works for me without the LC bit set.
 
-diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-index 53fd75c..e340bcc 100644
---- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-+++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-@@ -59,21 +59,21 @@
+> How did you test this? I can easily update the mask, but it would be
+> good to know that it doesn't end up cause a breakage.
  
- 		power {
- 			label = "Power Button";
--			gpios = <&gpio1 8 0>;
--			linux,code = <116>; /* KEY_POWER */
-+			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
- 		};
- 
- 		volume-up {
- 			label = "Volume Up";
--			gpios = <&gpio2 14 0>;
--			linux,code = <115>; /* KEY_VOLUMEUP */
-+			gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEUP>;
- 			gpio-key,wakeup;
- 		};
- 
- 		volume-down {
- 			label = "Volume Down";
--			gpios = <&gpio2 15 0>;
--			linux,code = <114>; /* KEY_VOLUMEDOWN */
-+			gpios = <&gpio2 15 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEDOWN>;
- 			gpio-key,wakeup;
- 		};
- 	};
--- 
-2.7.0
+For testing I used:
+- perf top and perf record & report
+- looked at interrupt numbers in /proc/interrupts
+
+Without the patch _no_ samples at all are recorded and the interrupt does
+not occur. With the patch I get samples and see a reasonable number of
+interrupts.
+
+Extending the mask so the LC bit is covered would make sense, I'm going
+to test this now.
+
+Jan
+
+> Will
