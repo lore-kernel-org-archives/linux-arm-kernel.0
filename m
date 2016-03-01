@@ -1,223 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 1 Mar 2016 17:43:40 +0000
-Subject: [PATCH v10 4/9] arm64: add conditional instruction simulation
- support
-In-Reply-To: <1456801047-29014-5-git-send-email-dave.long@linaro.org>
-References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
- <1456801047-29014-5-git-send-email-dave.long@linaro.org>
-Message-ID: <56D5D4CC.8010808@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 1 Mar 2016 11:43:42 -0600
+Subject: [PATCH v11 08/10] dt, numa: Add NUMA dt binding implementation.
+In-Reply-To: <56D5C9FF.8020500@caviumnetworks.com>
+References: <1455930799-5371-1-git-send-email-ddaney.cavm@gmail.com>
+ <1455930799-5371-9-git-send-email-ddaney.cavm@gmail.com>
+ <20160223193651.GA8491@rob-hp-laptop>
+ <56CFA9CA.6090803@caviumnetworks.com>
+ <CAL_JsqLoTh_ZTUT26g4wz=6sofuRpFDCc_Aw+Oq66p8cGMp19g@mail.gmail.com>
+ <56D5C9FF.8020500@caviumnetworks.com>
+Message-ID: <CAL_JsqKQP6hLKZ3ja9RtFQdcnibFSwfdb_BhXp9DqnCFyb0r6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/16 02:57, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> Cease using the arm32 arm_check_condition() function and replace it with
-> a local version for use in deprecated instruction support on arm64. Also
-> make the function table used by this available for future use by kprobes
-> and/or uprobes.
-> 
-> This function is dervied from code written by Sandeepa Prabhu.
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  arch/arm64/include/asm/insn.h        |  3 ++
->  arch/arm64/kernel/Makefile           |  3 +-
->  arch/arm64/kernel/armv8_deprecated.c | 19 ++++++-
->  arch/arm64/kernel/insn.c             | 96 ++++++++++++++++++++++++++++++++++++
->  4 files changed, 117 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index 662b42a..72dda48 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -405,6 +405,9 @@ u32 aarch64_extract_system_register(u32 insn);
->  u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
->  u32 aarch32_insn_mcr_extract_opc2(u32 insn);
->  u32 aarch32_insn_mcr_extract_crm(u32 insn);
-> +
-> +typedef bool (pstate_check_t)(unsigned long);
-> +extern pstate_check_t * const opcode_condition_checks[16];
->  #endif /* __ASSEMBLY__ */
->  
->  #endif	/* __ASM_INSN_H */
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 83cd7e6..fd5f163 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -26,8 +26,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
->  	$(call if_changed,objcopy)
->  
->  arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
-> -					   sys_compat.o entry32.o		\
-> -					   ../../arm/kernel/opcodes.o
-> +					   sys_compat.o entry32.o
->  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
->  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
->  arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
-> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-> index 3e01207..6d4d6fe 100644
-> --- a/arch/arm64/kernel/armv8_deprecated.c
-> +++ b/arch/arm64/kernel/armv8_deprecated.c
-> @@ -369,6 +369,21 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
->  	return res;
->  }
->  
-> +#define	ARM_OPCODE_CONDITION_UNCOND	0xf
-> +
-> +static unsigned int __kprobes arm64_check_condition(u32 opcode, u32 psr)
+On Tue, Mar 1, 2016 at 10:57 AM, David Daney <ddaney@caviumnetworks.com> wrote:
+> On 03/01/2016 08:47 AM, Rob Herring wrote:
+>>
+>> On Thu, Feb 25, 2016 at 7:26 PM, David Daney <ddaney@caviumnetworks.com>
+>> wrote:
+>>>
+>>> On 02/23/2016 11:36 AM, Rob Herring wrote:
+>>>>
+>>>>
+>>>> On Fri, Feb 19, 2016 at 05:13:17PM -0800, David Daney wrote:
+>>>>>
+>>>>>
+>>>>> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>>>>>
+>>>>> ADD device tree node parsing for NUMA topology using device
+>>>>> "numa-node-id" property distance-map.
+>>>>
+>>>>
+>>>>
+>>>> I still want an adequate explanation why NUMA setup cannot be done with
+>>>> an unflattened tree. PowerPC manages to do that and should have a
+>>>> similar init flow being memblock based, so I would expect arm64 can too.
+>>>
+>>>
+>>>
+>>> Many things could be done.  Really, we want to know what *should* be
+>>> done.
+>>>
+>>> In the context of the current arm64 memory initialization we (more or
+>>> less)
+>>> do:
+>>>
+>>>   1) early_init_fdt_scan_reserved_mem();
+>>>   2) memory_present()
+>>>   3) sparse_init()
+>>>   4) other things
+>>>   5) unflatten_device_tree()
+>>>
+>>> We are already reading information out of the FDT at #1.
+>>>
+>>> This patch set adds a step between 1 and 2 where we read NUMA information
+>>> out of the FDT.
+>>
+>>
+>> The dependency on unflattening is that memblock is up and we can
+>> allocate a chunk from it. Isn't that dependency met by step 1
+>
+>
+> No.
 
-Nit: since this is exclusively targeted at emulating 32bit code, having
-arm64_ as a prefix is mildly confusing. Either keep the arm_ prefix, or
-turn it into arm32_.
+Really, because it seems that numa_alloc_distance is essentially doing
+a memblock alloc and that happens before memory_present.
 
-> +{
-> +	u32 cc_bits  = opcode >> 28;
-> +
-> +	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
-> +		if ((*opcode_condition_checks[cc_bits])(psr))
-> +			return ARM_OPCODE_CONDTEST_PASS;
-> +		else
-> +			return ARM_OPCODE_CONDTEST_FAIL;
-> +	}
-> +	return ARM_OPCODE_CONDTEST_UNCOND;
-> +}
-> +
->  /*
->   * swp_handler logs the id of calling process, dissects the instruction, sanity
->   * checks the memory location, calls emulate_swpX for the actual operation and
-> @@ -383,7 +398,7 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
->  
->  	type = instr & TYPE_SWPB;
->  
-> -	switch (arm_check_condition(instr, regs->pstate)) {
-> +	switch (arm64_check_condition(instr, regs->pstate)) {
->  	case ARM_OPCODE_CONDTEST_PASS:
->  		break;
->  	case ARM_OPCODE_CONDTEST_FAIL:
-> @@ -464,7 +479,7 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
->  {
->  	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
->  
-> -	switch (arm_check_condition(instr, regs->pstate)) {
-> +	switch (arm64_check_condition(instr, regs->pstate)) {
->  	case ARM_OPCODE_CONDTEST_PASS:
->  		break;
->  	case ARM_OPCODE_CONDTEST_FAIL:
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 60c1c71..f7f2f95 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -1234,3 +1234,99 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
->  {
->  	return insn & CRM_MASK;
->  }
-> +
-> +#define ARM_OPCODE_CONDITION_UNCOND 0xf
+>
+>> or is
+>> there a dependency on sparsemem (or something else)?
+>
+>
+> Will Deacon talked about this over here:
+>
+> https://lkml.org/lkml/2016/2/26/782
 
-This is the second time you define this, which makes me think that this
-should live in some include file. On the other hand, it doesn't seem to
-be used in the following code, so maybe get rid of it altogether?
+I'm not saying to move memblock setup earlier nor before the MMU is
+on, so I don't see how Will's reply is relevant other than PPC doesn't
+serve as an example. Maybe PPC should be ignored because I think maybe
+NUMA is only used on non-FDT systems.
 
-> +
-> +static bool __kprobes __check_eq(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_Z_BIT) != 0;
-> +}
-> +
-> +static bool __kprobes __check_ne(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_Z_BIT) == 0;
-> +}
-> +
-> +static bool __kprobes __check_cs(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_C_BIT) != 0;
-> +}
-> +
-> +static bool __kprobes __check_cc(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_C_BIT) == 0;
-> +}
-> +
-> +static bool __kprobes __check_mi(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_N_BIT) != 0;
-> +}
-> +
-> +static bool __kprobes __check_pl(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_N_BIT) == 0;
-> +}
-> +
-> +static bool __kprobes __check_vs(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_V_BIT) != 0;
-> +}
-> +
-> +static bool __kprobes __check_vc(unsigned long pstate)
-> +{
-> +	return (pstate & PSR_V_BIT) == 0;
-> +}
-> +
-> +static bool __kprobes __check_hi(unsigned long pstate)
-> +{
-> +	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
-> +	return (pstate & PSR_C_BIT) != 0;
-> +}
-> +
-> +static bool __kprobes __check_ls(unsigned long pstate)
-> +{
-> +	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
-> +	return (pstate & PSR_C_BIT) == 0;
-> +}
-> +
-> +static bool __kprobes __check_ge(unsigned long pstate)
-> +{
-> +	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
-> +	return (pstate & PSR_N_BIT) == 0;
-> +}
-> +
-> +static bool __kprobes __check_lt(unsigned long pstate)
-> +{
-> +	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
-> +	return (pstate & PSR_N_BIT) != 0;
-> +}
-> +
-> +static bool __kprobes __check_gt(unsigned long pstate)
-> +{
-> +	/*PSR_N_BIT ^= PSR_V_BIT */
-> +	unsigned long temp = pstate ^ (pstate << 3);
-> +
-> +	temp |= (pstate << 1);	/*PSR_N_BIT |= PSR_Z_BIT */
-> +	return (temp & PSR_N_BIT) == 0;
-> +}
-> +
-> +static bool __kprobes __check_le(unsigned long pstate)
-> +{
-> +	/*PSR_N_BIT ^= PSR_V_BIT */
-> +	unsigned long temp = pstate ^ (pstate << 3);
-> +
-> +	temp |= (pstate << 1);	/*PSR_N_BIT |= PSR_Z_BIT */
-> +	return (temp & PSR_N_BIT) != 0;
-> +}
-> +
-> +static bool __kprobes __check_al(unsigned long pstate)
-> +{
-> +	return true;
-> +}
-> +
-> +pstate_check_t * const opcode_condition_checks[16] = {
-> +	__check_eq, __check_ne, __check_cs, __check_cc,
-> +	__check_mi, __check_pl, __check_vs, __check_vc,
-> +	__check_hi, __check_ls, __check_ge, __check_lt,
-> +	__check_gt, __check_le, __check_al, __check_al
-> +};
-> 
+In any case, no one has clearly explained what the dependencies are or
+what happens if you moved the unflattening up sooner. You told me what
+the current order is which doesn't equate to dependencies. For
+example, step 4 may or may not be a dependency of step 5. These are
+the dependencies I'm aware of:
 
-Thanks,
+memblock dependent on DT memory and reserved-memory parsing
+unflattening dependent on memblock_alloc()
+sparsemem dependent on NUMA parsing and memblock
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+What am I missing from here?
+
+Rob
