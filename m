@@ -1,138 +1,77 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Tue, 1 Mar 2016 18:34:59 +0800
-Subject: [PATCH v6 09/11] drm/hisilicon: Add support for external bridge
-In-Reply-To: <56D49391.1070500@codeaurora.org>
-References: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
- <1456476028-36880-10-git-send-email-xinliang.liu@linaro.org>
- <56D49391.1070500@codeaurora.org>
-Message-ID: <CAGd==043yRA0s3rwLOZyjuRjty3k=Zh8=faMdv6Nudv-iTWJKg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  1 Mar 2016 11:47:03 +0100
+Subject: [PATCH RFC] video: fbdev: imxfb: make the driver cooperate
+Message-ID: <1456829223-1526-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2016 at 02:53, Archit Taneja <architt@codeaurora.org> wrote:
->
->
-> On 2/26/2016 2:10 PM, Xinliang Liu wrote:
->>
->> Add support for external HDMI bridge.
->>
->> v6: None.
->> v5: None.
->> v4: None.
->> v3:
->> - Fix a typo: s/exteranl/external.
->> v2:
->> - Remove abtraction layer.
->>
->
-> Reviewed-by: Archit Taneja <architt@codeaurora.org>
+The .get_power and .set_power callbacks didn't adhere to the expected(?)
+convention to enable the power when the power parameter is zero.
+Moreover ensure that the regulator is enabled together with the lcd
+controller.
 
-Thanks :-)
+Without these changes there is nothing visible after bootup because the
+regulator is kept off (or disabled by the regulator core because it's not
+used). The lcd regulator is enabled only after 10 minutes of idle when it
+should really go off.
 
-Best,
--xinliang
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
->
->
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> ---
->>   drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c | 52
->> ++++++++++++++++++++++++++++
->>   1 file changed, 52 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
->> b/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
->> index f15798b61451..c2c406446513 100644
->> --- a/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
->> +++ b/drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
->> @@ -79,6 +79,7 @@ struct dsi_hw_ctx {
->>
->>   struct dw_dsi {
->>         struct drm_encoder encoder;
->> +       struct drm_bridge *bridge;
->>         struct mipi_dsi_host host;
->>         struct drm_display_mode cur_mode;
->>         struct dsi_hw_ctx *ctx;
->> @@ -688,6 +689,25 @@ static int dsi_host_init(struct device *dev, struct
->> dw_dsi *dsi)
->>         return 0;
->>   }
->>
->> +static int dsi_bridge_init(struct drm_device *dev, struct dw_dsi *dsi)
->> +{
->> +       struct drm_encoder *encoder = &dsi->encoder;
->> +       struct drm_bridge *bridge = dsi->bridge;
->> +       int ret;
->> +
->> +       /* associate the bridge to dsi encoder */
->> +       encoder->bridge = bridge;
->> +       bridge->encoder = encoder;
->> +
->> +       ret = drm_bridge_attach(dev, bridge);
->> +       if (ret) {
->> +               DRM_ERROR("failed to attach external bridge\n");
->> +               return ret;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->>   static int dsi_bind(struct device *dev, struct device *master, void
->> *data)
->>   {
->>         struct dsi_data *ddata = dev_get_drvdata(dev);
->> @@ -703,6 +723,10 @@ static int dsi_bind(struct device *dev, struct device
->> *master, void *data)
->>         if (ret)
->>                 return ret;
->>
->> +       ret = dsi_bridge_init(drm_dev, dsi);
->> +       if (ret)
->> +               return ret;
->> +
->>         return 0;
->>   }
->>
->> @@ -719,8 +743,36 @@ static const struct component_ops dsi_ops = {
->>   static int dsi_parse_dt(struct platform_device *pdev, struct dw_dsi
->> *dsi)
->>   {
->>         struct dsi_hw_ctx *ctx = dsi->ctx;
->> +       struct device_node *np = pdev->dev.of_node;
->> +       struct device_node *endpoint, *bridge_node;
->> +       struct drm_bridge *bridge;
->>         struct resource *res;
->>
->> +       /*
->> +        * Get the endpoint node. In our case, dsi has one output port1
->> +        * to which the external HDMI bridge is connected.
->> +        */
->> +       endpoint = of_graph_get_endpoint_by_regs(np, 1, -1);
->> +       if (!endpoint) {
->> +               DRM_ERROR("no valid endpoint node\n");
->> +               return -ENODEV;
->> +       }
->> +       of_node_put(endpoint);
->> +
->> +       bridge_node = of_graph_get_remote_port_parent(endpoint);
->> +       if (!bridge_node) {
->> +               DRM_ERROR("no valid bridge node\n");
->> +               return -ENODEV;
->> +       }
->> +       of_node_put(bridge_node);
->> +
->> +       bridge = of_drm_find_bridge(bridge_node);
->> +       if (!bridge) {
->> +               DRM_INFO("wait for external HDMI bridge driver.\n");
->> +               return -EPROBE_DEFER;
->> +       }
->> +       dsi->bridge = bridge;
->> +
->>         ctx->pclk = devm_clk_get(&pdev->dev, "pclk");
->>         if (IS_ERR(ctx->pclk)) {
->>                 DRM_ERROR("failed to get pclk clock\n");
->>
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+this introduces a new warning because the return value of regulator_enable
+isn't checked. If it's agreed that the patch is ok in general I can fix this
+up, but I don't know if fbdev is already too dead even for fixes like this.
+
+Best regards
+Uwe
+
+ drivers/video/fbdev/imxfb.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+index cee88603efc9..7d763164820c 100644
+--- a/drivers/video/fbdev/imxfb.c
++++ b/drivers/video/fbdev/imxfb.c
+@@ -499,6 +499,9 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 	clk_prepare_enable(fbi->clk_ipg);
+ 	clk_prepare_enable(fbi->clk_ahb);
+ 	clk_prepare_enable(fbi->clk_per);
++	if (!IS_ERR(fbi->lcd_pwr))
++		regulator_enable(fbi->lcd_pwr);
++
+ 	fbi->enabled = true;
+ }
+ 
+@@ -513,6 +516,8 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	clk_disable_unprepare(fbi->clk_ipg);
+ 	clk_disable_unprepare(fbi->clk_ahb);
+ 	fbi->enabled = false;
++	if (!IS_ERR(fbi->lcd_pwr))
++		regulator_disable(fbi->lcd_pwr);
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
+ }
+@@ -759,9 +764,9 @@ static int imxfb_lcd_get_power(struct lcd_device *lcddev)
+ 	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+ 
+ 	if (!IS_ERR(fbi->lcd_pwr))
+-		return regulator_is_enabled(fbi->lcd_pwr);
++		return !regulator_is_enabled(fbi->lcd_pwr);
+ 
+-	return 1;
++	return 0;
+ }
+ 
+ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
+@@ -769,7 +774,7 @@ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
+ 	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+ 
+ 	if (!IS_ERR(fbi->lcd_pwr)) {
+-		if (power)
++		if (!power)
+ 			return regulator_enable(fbi->lcd_pwr);
+ 		else
+ 			return regulator_disable(fbi->lcd_pwr);
+-- 
+2.7.0
