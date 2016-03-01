@@ -1,55 +1,39 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 1 Mar 2016 14:17:05 -0700
-Subject: [BUG FIX] PM / cpu_domains: Check for NULL callbacks
-In-Reply-To: <1456866931-37851-2-git-send-email-lina.iyer@linaro.org>
-References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
- <1456866931-37851-2-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160301211705.GQ1440@linaro.org>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 2 Mar 2016 00:19:23 +0300
+Subject: [PATCH v2 0/8] arm64: Support for systems without AArch32 state
+In-Reply-To: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160301211923.GA1325@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ignore this patch pls. This change has been folded in.
+On Thu, Feb 25, 2016 at 09:52:40AM +0000, Suzuki K Poulose wrote:
+> This series add checks to make sure that the AArch32 state is
+> supported before we process the 32bit ID registers. Also
+> checks the same for COMPAT binary execution.
+> 
+> (Painfully) applies on top of 4.5-rc5 + [1] + [2].
+> 
+> Or it is available here :
+>   git://linux-arm.org/linux-skp.git noaarch32/v2-4.5-rc5
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/410556.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401913.html
+> 
+> Changes since V1:
+>   - Prevent changing the personality to PER_LINUX32 by adding
+>     wrapper for personality() syscall.
+>   - Add the check to KVM before initialising a AArch32 vcpu
+>   - Tested on hardware.
+> 
+> Btw, linux32 doesn't complain when the personality() syscall fails to change
+> to PER_LINUX32. You can verify the personality by running 
+>  $ cat /proc/cpuinfo
+>  which would still list the 64bit features for the CPUs.
 
-Thanks,
-Lina
+Hi Suzuki,
 
-On Tue, Mar 01 2016 at 14:15 -0700, Lina Iyer wrote:
->Check for NULL platform callback before calling.
->
->Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->---
-> drivers/base/power/cpu_domains.c | 10 ++++++++--
-> 1 file changed, 8 insertions(+), 2 deletions(-)
->
->diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
->index 7069411..bcaa474 100644
->--- a/drivers/base/power/cpu_domains.c
->+++ b/drivers/base/power/cpu_domains.c
->@@ -157,16 +157,22 @@ static int cpu_pd_power_on(struct generic_pm_domain *genpd)
-> {
-> 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
->
->-	return pd->ops.power_on();
->+	if (pd->ops.power_on)
->+		return pd->ops.power_on();
->+
->+	return 0;
-> }
->
-> static int cpu_pd_power_off(struct generic_pm_domain *genpd)
-> {
-> 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
->
->-	return pd->ops.power_off(genpd->state_idx,
->+	if (pd->ops.power_off)
->+		return pd->ops.power_off(genpd->state_idx,
-> 			genpd->states[genpd->state_idx].param,
-> 			pd->cpus);
->+
->+	return 0;
-> }
->
-> /**
->-- 
->2.1.4
->
+I have some troubles with access to appropriate hardware to test
+it, but I didn't forget.
+
+Yury.
