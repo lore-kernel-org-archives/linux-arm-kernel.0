@@ -1,42 +1,64 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 01 Mar 2016 23:04:45 +0100
-Subject: [PATCH v4 3/5] ARM: dts: omap3-sniper: TWL4030 keypad support
-In-Reply-To: <20160301205928.GB4469@atomide.com>
-References: <1456663185-14170-1-git-send-email-contact@paulk.fr>
- <1456663185-14170-4-git-send-email-contact@paulk.fr>
- <1456859956.1031.39.camel@paulk.fr> <20160301205928.GB4469@atomide.com>
-Message-ID: <1456869885.1031.40.camel@paulk.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Mar 2016 23:12:20 +0100
+Subject: [PATCH] pcmcia: db1xxx: use correct irq_to_gpio helper
+Message-ID: <1547427.xN2rd1Mon4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 01 mars 2016 ? 12:59 -0800, Tony Lindgren a ?crit?:
-> * Paul Kocialkowski <contact@paulk.fr> [160301 11:19]:
-> > Hi,
-> > 
-> > Le dimanche 28 f?vrier 2016 ? 13:39 +0100, Paul Kocialkowski a ?crit?:
-> > > This adds support for the volume and gesture keys, using TWL4030 keypad.
-> > 
-> > I noticed this patch hadn't been picked up in:?https://git.kernel.org/cgit/l
-> > inux
-> > /kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.6/dt
-> > 
-> > Should I submit it somewhere else instead?
-> 
-> No sorry I missed it. I've now applied it to omap-for-v4.6/dt
-> and pushed out.
+After the removal of asm/gpio.h and asm/mach-au1x00/gpio.h, the db1xxx_ss
+pcmcia driver picked up the wrong irq_to_gpio function from the generic
+headers.
 
-Great, thanks a lot!
+This restores the old __au_irq_to_gpio() implementation, but keeps
+it local to the only file that uses it.
 
--- 
-Paul Kocialkowski, low-level free software developer on embedded devices
+It would be nicer to just pass the gpio number from platform code,
+but restoring the previous implementation seems safer.
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/99dd0dbc/attachment.sig>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: stable at vger.kernel.org # v4.3
+Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h")
+---
+I think this is now the last holdout of the irq_to_gpio function,
+and it's been broken for a while. Maybe Ralf can queue it up through
+the MIPS tree along with the other fix for irq_to_gpio?
+
+Linus, maybe you can queue up the include/linux/gpio.h change to
+remove the function as well for 4.6. We have two users of this function
+on MIPS that are already broken, and adding the patch turns the
+runtime bug into a compile-time bug, which seems like a good thing
+to me. The other patch is already queued in the mips tree.
+
+diff --git a/drivers/pcmcia/db1xxx_ss.c b/drivers/pcmcia/db1xxx_ss.c
+index 4c2fa05b4589..41f28879bfef 100644
+--- a/drivers/pcmcia/db1xxx_ss.c
++++ b/drivers/pcmcia/db1xxx_ss.c
+@@ -35,6 +35,19 @@
+ 
+ #include <asm/mach-au1x00/au1000.h>
+ #include <asm/mach-db1x00/bcsr.h>
++#include <asm/mach-au1x00/gpio-au1000.h>
++#include <asm/mach-au1x00/gpio-au1300.h>
++
++static inline int __au_irq_to_gpio(unsigned int irq)
++{
++	switch (alchemy_get_cputype()) {
++	case ALCHEMY_CPU_AU1000...ALCHEMY_CPU_AU1200:
++		return alchemy_irq_to_gpio(irq);
++	case ALCHEMY_CPU_AU1300:
++		return au1300_irq_to_gpio(irq);
++	}
++	return -EINVAL;
++}
+ 
+ #define MEM_MAP_SIZE	0x400000
+ #define IO_MAP_SIZE	0x1000
+@@ -83,7 +96,7 @@ static int db1200_card_inserted(struct db1x_pcmcia_sock *sock)
+ /* carddetect gpio: low-active */
+ static int db1000_card_inserted(struct db1x_pcmcia_sock *sock)
+ {
+-	return !gpio_get_value(irq_to_gpio(sock->insert_irq));
++	return !gpio_get_value(__au_irq_to_gpio(sock->insert_irq));
+ }
+ 
+ static int db1x_card_inserted(struct db1x_pcmcia_sock *sock)
