@@ -1,111 +1,71 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Mar 2016 08:44:57 +0900
-Subject: [RFC PATCH] watchdog: s3c2410_wdt: Add max and min timeout values
-In-Reply-To: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
-References: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <56D62979.5040009@samsung.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 01 Mar 2016 23:54:42 +0000
+Subject: [PATCH 4.4 131/342] clockevents/tcb_clksrc: Prevent disabling an
+ already disabled clock
+In-Reply-To: <20160301234527.990448862@linuxfoundation.org>
+References: <20160301234527.990448862@linuxfoundation.org>
+Message-ID: <20160301234532.180551567@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.03.2016 01:45, Javier Martinez Canillas wrote:
-> The watchdog maximum timeout value is determined by the number of bits
-> for the interval timer counter, its source clock frequency, the number
-> of bits of the prescaler and maximum divider value.
-> 
-> This can be calculated with the following equation:
-> 
-> max_timeout = counter / (freq / (max_prescale + 1) / max_divider)
-> 
-> Setting a maximum timeout value will allow the watchdog core to refuse
-> user-space calls to the WDIOC_SETTIMEOUT ioctl that sets not supported
-> timeout values.
-> 
-> For example, systemd tries to set a timeout of 10 minutes on reboot to
-> ensure that the machine will be rebooted even if a reboot failed. This
-> leads to the following error message on an Exynos5422 Odroid XU4 board:
-> 
-> [  147.986045] s3c2410-wdt 101d0000.watchdog: timeout 600 too big
-> 
-> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> Hello,
-> 
-> I'm sending this as an RFC because I don't have access to user manuals
-> for all the Exynos SoCs that this driver supports. But at least in all
-> the ones I have here, the maximum prescaler and divider values are the
-> same and also all have a 16-bit interval timer counter.
-> 
-> So this patch assumes that all IP blocks supported by this driver are
-> the same on that regard, if that's not the case then we can move these
-> values on a per IP block basis using struct of_device_id .data field.
+4.4-stable review patch.  If anyone has any objections, please let me know.
 
-It looks correct at least for Exynos4210 and newer.
+------------------
 
-> 
-> Best regards,
-> Javier
-> 
->  drivers/watchdog/s3c2410_wdt.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> index 0093450441fe..f289c9fc353a 100644
-> --- a/drivers/watchdog/s3c2410_wdt.c
-> +++ b/drivers/watchdog/s3c2410_wdt.c
-> @@ -47,6 +47,8 @@
->  #define S3C2410_WTDAT		0x04
->  #define S3C2410_WTCNT		0x08
->  
-> +#define S3C2410_WTCNT_MAXCNT	0xffff
-> +
->  #define S3C2410_WTCON_RSTEN	(1 << 0)
->  #define S3C2410_WTCON_INTEN	(1 << 2)
->  #define S3C2410_WTCON_ENABLE	(1 << 5)
-> @@ -56,8 +58,11 @@
->  #define S3C2410_WTCON_DIV64	(2 << 3)
->  #define S3C2410_WTCON_DIV128	(3 << 3)
->  
-> +#define S3C2410_WTCON_MAXDIV	0x80
-> +
->  #define S3C2410_WTCON_PRESCALE(x)	((x) << 8)
->  #define S3C2410_WTCON_PRESCALE_MASK	(0xff << 8)
-> +#define S3C2410_WTCON_PRESCALE_MAX	0xff
->  
->  #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
->  #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
-> @@ -198,6 +203,14 @@ do {							\
->  
->  /* functions */
->  
-> +static inline unsigned int s3c2410wdt_max_timeout(struct clk *clock)
-> +{
-> +	unsigned long freq = clk_get_rate(clock);
-> +
-> +	return S3C2410_WTCNT_MAXCNT / (freq / (S3C2410_WTCON_PRESCALE_MAX + 1)
-> +				       / S3C2410_WTCON_MAXDIV);
-> +}
-> +
->  static inline struct s3c2410_wdt *freq_to_wdt(struct notifier_block *nb)
->  {
->  	return container_of(nb, struct s3c2410_wdt, freq_transition);
-> @@ -567,6 +580,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	wdt->wdt_device.min_timeout = 1;
-> +	wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Can the frequency of clock change? E.g. with devfreq? No problem if it
-goes lower but if it gets higher than initial, then the problem will
-appear again.
+commit f02b4b72d12cbae7020a959e2ed0410a464b4cc4 upstream.
 
-Best regards,
-Krzysztof
+clockevents_exchange_device is calling clockevents_shutdown() on the new
+clockenvents device but it may have never been enabled in the first place.
+This results in the tcb clock being disabled without being enabled first:
 
-> +
->  	ret = s3c2410wdt_cpufreq_register(wdt);
->  	if (ret < 0) {
->  		dev_err(dev, "failed to register cpufreq\n");
-> 
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:680 clk_disable+0x28/0x34()
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 4.4.0+ #6
+Hardware name: Atmel AT91SAM9
+[<c000f2b8>] (unwind_backtrace) from [<c000d01c>] (show_stack+0x10/0x14)
+[<c000d01c>] (show_stack) from [<c00172f0>] (warn_slowpath_common+0x78/0xa0)
+[<c00172f0>] (warn_slowpath_common) from [<c00173a8>] (warn_slowpath_null+0x18/0x20)
+[<c00173a8>] (warn_slowpath_null) from [<c0361528>] (clk_disable+0x28/0x34)
+[<c0361528>] (clk_disable) from [<c034d560>] (tc_shutdown+0x38/0x4c)
+[<c034d560>] (tc_shutdown) from [<c0059ad4>] (clockevents_switch_state+0x38/0x6c)
+[<c0059ad4>] (clockevents_switch_state) from [<c0059b18>] (clockevents_shutdown+0x10/0x24)
+[<c0059b18>] (clockevents_shutdown) from [<c005a458>] (tick_check_new_device+0x84/0xac)
+[<c005a458>] (tick_check_new_device) from [<c0059660>] (clockevents_register_device+0x7c/0x108)
+[<c0059660>] (clockevents_register_device) from [<c06b5a68>] (tcb_clksrc_init+0x390/0x3e8)
+[<c06b5a68>] (tcb_clksrc_init) from [<c00097cc>] (do_one_initcall+0x114/0x1d4)
+[<c00097cc>] (do_one_initcall) from [<c069bd54>] (kernel_init_freeable+0xfc/0x1b8)
+[<c069bd54>] (kernel_init_freeable) from [<c04c3818>] (kernel_init+0x8/0xe0)
+[<c04c3818>] (kernel_init) from [<c000a410>] (ret_from_fork+0x14/0x24)
+---[ end trace 0000000000000001 ]---
+
+Check what state we were in before trying to disable the clock.
+
+Fixes: cf4541c101ea ("clockevents/drivers/tcb_clksrc: Migrate to new 'set-state' interface")
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Link: http://lkml.kernel.org/r/1452854061-30370-1-git-send-email-alexandre.belloni at free-electrons.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/clocksource/tcb_clksrc.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -98,7 +98,8 @@ static int tc_shutdown(struct clock_even
+ 
+ 	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+ 	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+-	clk_disable(tcd->clk);
++	if (!clockevent_state_detached(d))
++		clk_disable(tcd->clk);
+ 
+ 	return 0;
+ }
