@@ -1,42 +1,60 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 29 Feb 2016 17:30:08 -0800
-Subject: [PATCH] pinctrl-bcm2835: Fix cut-and-paste error in "pull" parsing
-Message-ID: <1456795808-1449-1-git-send-email-eric@anholt.net>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 29 Feb 2016 20:43:43 -0600
+Subject: [GIT PULL v2] Qualcomm SoC Updates for 4.6
+Message-ID: <1456800223-29655-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Elwell <phil@raspberrypi.org>
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-The DT bindings for pinctrl-bcm2835 allow both the function and pull
-to contain either one entry or one per pin. However, an error in the
-DT parsing can cause failures if the number of pulls differs from the
-number of functions.
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Cc: stable at vger.kernel.org
----
+are available in the git repository at:
 
-Yes, the s-o-b differs from the author of the commit, but this falls
-under part b) of the process.
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.6
 
-Phil, any chance you could start putting Signed-off-by lines on your
-kernel commits?
+for you to fetch changes up to 3a70e3cddc493dca2555e2911f6ee18e1eaefa7f:
 
- drivers/pinctrl/bcm/pinctrl-bcm2835.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  soc: qcom: smp2p: Use memset_io to zero out new entries (2016-02-29 18:02:27 -0600)
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index 0f5997c..08b1d93 100644
---- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -779,7 +779,7 @@ static int bcm2835_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 		}
- 		if (num_pulls) {
- 			err = of_property_read_u32_index(np, "brcm,pull",
--					(num_funcs > 1) ? i : 0, &pull);
-+					(num_pulls > 1) ? i : 0, &pull);
- 			if (err)
- 				goto out;
- 			err = bcm2835_pctl_dt_node_to_map_pull(pc, np, pin,
--- 
-2.7.0
+----------------------------------------------------------------
+Qualcomm ARM Based SoC Updates for v4.6
+
+* Add stubs for smem_state to fix build issues
+* Fix module usage in SPM driver
+* Add i2c and spi entries into QCOM MAINTAINERS entry
+* Add SMD multi channel support
+* Drop ARCH_MSM* configs and fixup clocksource support
+* Add clks to QCOM MAINTAINERS
+* Fix smp2p memset issue
+
+----------------------------------------------------------------
+Bjorn Andersson (7):
+      soc: qcom: smem_state: Add stubs for disabled smem_state
+      soc: qcom: smd: Introduce callback setter
+      soc: qcom: smd: Split discovery and state change work
+      soc: qcom: smd: Refactor channel open and close handling
+      soc: qcom: smd: Support multiple channels per sdev
+      soc: qcom: smd: Support opening additional channels
+      soc: qcom: smp2p: Use memset_io to zero out new entries
+
+Lina Iyer (1):
+      drivers: qcom: spm: avoid module usage in non-modular SPM driver
+
+Srinivas Kandagatla (2):
+      MAINTAINERS: add qcom i2c and spi drivers to list
+      MAINTAINERS: add qcom clocks to the maintainers list
+
+Stephen Boyd (2):
+      ARM: qcom: Make an option for qcom 'a-family' platforms
+      ARM: qcom: Drop ARCH_MSM* configs
+
+ MAINTAINERS                         |   3 +
+ arch/arm/Makefile                   |   3 +-
+ arch/arm/mach-qcom/Kconfig          |  17 +--
+ drivers/soc/qcom/smd.c              | 229 +++++++++++++++++++++++++++---------
+ drivers/soc/qcom/smp2p.c            |   2 +-
+ drivers/soc/qcom/spm.c              |   8 +-
+ include/linux/soc/qcom/smd.h        |   8 +-
+ include/linux/soc/qcom/smem_state.h |  35 ++++++
+ 8 files changed, 231 insertions(+), 74 deletions(-)
