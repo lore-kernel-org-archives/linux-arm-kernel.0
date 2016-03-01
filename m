@@ -1,35 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 1 Mar 2016 22:49:20 +0100
-Subject: [PATCH] rtc: mt6397: Remove plaform module alias
-In-Reply-To: <1456334780-17380-1-git-send-email-javier@osg.samsung.com>
-References: <1456334780-17380-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20160301214920.GI23985@piout.net>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Tue, 1 Mar 2016 14:51:26 -0700
+Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
+ instead of queue_id
+In-Reply-To: <CAHrpEqSyuToC6QFEZygO0YyA=gV2cZEtkpRJMeZFOjhgTLdexQ@mail.gmail.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
+ <CAHrpEqSyuToC6QFEZygO0YyA=gV2cZEtkpRJMeZFOjhgTLdexQ@mail.gmail.com>
+Message-ID: <56D60EDE.7090100@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/2016 at 14:26:20 -0300, Javier Martinez Canillas wrote :
-> The driver uses the MODULE_ALIAS() macro to export a platform module alias
-> to allow the module to be autoloaded if the device is registered using the
-> legacy platform registration mechanism but the driver is always used by OF
-> only machines so the alias is not needed and should just be removed.
+On 3/1/2016 2:06 PM, Zhi Li wrote:
+> On Wed, Feb 24, 2016 at 6:36 PM, Troy Kisky
+> <troy.kisky@boundarydevices.com> wrote:
+>> queue_id is the qid member of struct bufdesc_prop.
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> ---
+>>  drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
+>>  1 file changed, 6 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+>> index 9619b9e..c517194 100644
+>> --- a/drivers/net/ethernet/freescale/fec_main.c
+>> +++ b/drivers/net/ethernet/freescale/fec_main.c
+>> @@ -1156,25 +1156,18 @@ fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
+>>         hwtstamps->hwtstamp = ns_to_ktime(ns);
+>>  }
+>>
+>> -static void
+>> -fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+>> +static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
+>> +                   struct fec_enet_priv_tx_q *txq)
 > 
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> you can get fep from ndev.
 > 
-> ---
-> Hello,
-> 
-> This patch supersedes "rtc: mt6397: Add platform device ID table":
-> https://lkml.org/lkml/2016/2/9/192.
-> 
-> Best regards,
-> Javier
-> 
->  drivers/rtc/rtc-mt6397.c | 1 -
->  1 file changed, 1 deletion(-)
-Applied, thanks.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+True, but fec_txq/fec_rxq is called in a loop. Why not pass it, rather than
+look it up again?
