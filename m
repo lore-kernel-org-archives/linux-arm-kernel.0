@@ -1,60 +1,100 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 29 Feb 2016 20:43:43 -0600
-Subject: [GIT PULL v2] Qualcomm SoC Updates for 4.6
-Message-ID: <1456800223-29655-1-git-send-email-andy.gross@linaro.org>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 29 Feb 2016 21:55:50 -0500
+Subject: [PATCH 5/8] arm64: kprobes instruction simulation support
+In-Reply-To: <56CDCA6B.7000207@arm.com>
+References: <1455839301-26464-1-git-send-email-dave.long@linaro.org>
+ <1455839301-26464-6-git-send-email-dave.long@linaro.org>
+ <56C720F0.9080108@arm.com> <56CD5434.30108@linaro.org>
+ <20160224090530.5e86e867@arm.com> <56CDC734.4000201@linaro.org>
+ <56CDCA6B.7000207@arm.com>
+Message-ID: <56D504B6.7010305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+On 02/24/2016 10:21 AM, Marc Zyngier wrote:
+> On 24/02/16 15:07, David Long wrote:
+>> On 02/24/2016 04:05 AM, Marc Zyngier wrote:
+>>> On Wed, 24 Feb 2016 01:56:52 -0500
+>>> David Long <dave.long@linaro.org> wrote:
+>>>
+>>>> On 02/19/2016 09:04 AM, Marc Zyngier wrote:
+>>>>> Hi David,
+>>>>>
+>>>>> On 18/02/16 23:48, David Long wrote:
+>>>>>> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>>>>>>
+>>>>>> Kprobes needs simulation of instructions that cannot be stepped
+>>>>>> from different memory location, e.g.: those instructions
+>>>>>> that uses PC-relative addressing. In simulation, the behaviour
+>>>>>> of the instruction is implemented using a copy of pt_regs.
+>>>>>>
+>>>>>> Following instruction catagories are simulated:
+>>>>>>     - All branching instructions(conditional, register, and immediate)
+>>>>>>     - Literal access instructions(load-literal, adr/adrp)
+>>>>>>
+>>>>>> Conditional execution is limited to branching instructions in
+>>>>>> ARM v8. If conditions at PSTATE do not match the condition fields
+>>>>>> of opcode, the instruction is effectively NOP. Kprobes considers
+>>>>>> this case as 'miss'.
+>>>>>>
+>>>>>> This code also replaces the use of arch/arm/opcodes.c for
+>>>>>> arm_check_condition().
+>>>>>>
+>>>>>> Thanks to Will Cohen for assorted suggested changes.
+>>>>>>
+>>>>>> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>>>>>> Signed-off-by: William Cohen <wcohen@redhat.com>
+>>>>>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>>>
+>>> [...]
+>>>
+>>>>>> +};
+>>>>>> +
+>>>>>> +asmlinkage unsigned int __kprobes arm_check_condition(u32 opcode, u32 psr)
+>>>>>
+>>>>> Why asmlinkage? This function is never called from assembly code on arm64.
+>>>>>
+>>>>
+>>>> This comes from the 32-bit ARM code that tests the condition from
+>>>> entry.S.  We include arch/arm/include/asm/opcodes.h in
+>>>> arch/arm64/include/asm/opcodes.h so it gets declared there with
+>>>> asmlinkage. I can remove the asmlinkage in the actual function
+>>>> definition and it still compiles but I'm not sure that is kosher.
+>>>
+>>> asmlinkage is only meaningful if you're calling it from assembly code.
+>>> As you seem to only call it from C code, having asmlinkage is both
+>>> pointless and confusing.
+>>>
+>>>> Will Deacon was advocating getting rid of the include of the 32-bit header
+>>>> file but it looked to me like this would mean a lot of duplicated
+>>>> defines and the work would be mostly unrelated to kprobes.
+>>>
+>>> Arguably, arm_check_condition() (which only matters to 32bit code,
+>>> hence userspace) is also completely unrelated to kprobes. I still think
+>>> Will's point stands.
+>>>
+>>
+>> Yes, I would not argue about that cross-architecture include needing to
+>> be fixed.  Can I assume you agree that need not be a part of this
+>> kprobes patch though, nor a prerequisite patch for it?
+>
+> My usual stand on this kind of issue is that if you start digging in the
+> middle of the road, you're also responsible for cleaning the pavement
+> (sorry if that's a bad analogy).
+>
+> In the end, this is the arm64 maintainers that decide what they want to
+> see, and by the look of it, Will has made his point clear...
+>
+> Thanks,
+>
+> 	M.
+>
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+Just to close the loop on this, after working on this it does make sense 
+to me to bundle this change when considering just opcodes.c (and not its 
+associated include file).  My patch patch now removes 
+arm/kernel/opcodes.c from the arm64 build. I still don't see a way to 
+get rid of the cross-architecture include except by making a copy of 
+opcodes.h, which seems to me the greater of two evils.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.6
-
-for you to fetch changes up to 3a70e3cddc493dca2555e2911f6ee18e1eaefa7f:
-
-  soc: qcom: smp2p: Use memset_io to zero out new entries (2016-02-29 18:02:27 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for v4.6
-
-* Add stubs for smem_state to fix build issues
-* Fix module usage in SPM driver
-* Add i2c and spi entries into QCOM MAINTAINERS entry
-* Add SMD multi channel support
-* Drop ARCH_MSM* configs and fixup clocksource support
-* Add clks to QCOM MAINTAINERS
-* Fix smp2p memset issue
-
-----------------------------------------------------------------
-Bjorn Andersson (7):
-      soc: qcom: smem_state: Add stubs for disabled smem_state
-      soc: qcom: smd: Introduce callback setter
-      soc: qcom: smd: Split discovery and state change work
-      soc: qcom: smd: Refactor channel open and close handling
-      soc: qcom: smd: Support multiple channels per sdev
-      soc: qcom: smd: Support opening additional channels
-      soc: qcom: smp2p: Use memset_io to zero out new entries
-
-Lina Iyer (1):
-      drivers: qcom: spm: avoid module usage in non-modular SPM driver
-
-Srinivas Kandagatla (2):
-      MAINTAINERS: add qcom i2c and spi drivers to list
-      MAINTAINERS: add qcom clocks to the maintainers list
-
-Stephen Boyd (2):
-      ARM: qcom: Make an option for qcom 'a-family' platforms
-      ARM: qcom: Drop ARCH_MSM* configs
-
- MAINTAINERS                         |   3 +
- arch/arm/Makefile                   |   3 +-
- arch/arm/mach-qcom/Kconfig          |  17 +--
- drivers/soc/qcom/smd.c              | 229 +++++++++++++++++++++++++++---------
- drivers/soc/qcom/smp2p.c            |   2 +-
- drivers/soc/qcom/spm.c              |   8 +-
- include/linux/soc/qcom/smd.h        |   8 +-
- include/linux/soc/qcom/smem_state.h |  35 ++++++
- 8 files changed, 231 insertions(+), 74 deletions(-)
+-dl
