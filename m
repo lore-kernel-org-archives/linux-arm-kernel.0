@@ -1,40 +1,34 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue, 1 Mar 2016 14:51:26 -0700
-Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
- instead of queue_id
-In-Reply-To: <CAHrpEqSyuToC6QFEZygO0YyA=gV2cZEtkpRJMeZFOjhgTLdexQ@mail.gmail.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
- <CAHrpEqSyuToC6QFEZygO0YyA=gV2cZEtkpRJMeZFOjhgTLdexQ@mail.gmail.com>
-Message-ID: <56D60EDE.7090100@boundarydevices.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue,  1 Mar 2016 23:04:32 +0100
+Subject: [PATCH 0/4] Refactor pinctrl driver for aobus / cbus
+Message-ID: <1456869876-19320-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/1/2016 2:06 PM, Zhi Li wrote:
-> On Wed, Feb 24, 2016 at 6:36 PM, Troy Kisky
-> <troy.kisky@boundarydevices.com> wrote:
->> queue_id is the qid member of struct bufdesc_prop.
->>
->> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
->> ---
->>  drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
->>  1 file changed, 6 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
->> index 9619b9e..c517194 100644
->> --- a/drivers/net/ethernet/freescale/fec_main.c
->> +++ b/drivers/net/ethernet/freescale/fec_main.c
->> @@ -1156,25 +1156,18 @@ fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
->>         hwtstamps->hwtstamp = ns_to_ktime(ns);
->>  }
->>
->> -static void
->> -fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
->> +static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
->> +                   struct fec_enet_priv_tx_q *txq)
-> 
-> you can get fep from ndev.
-> 
+From: Carlo Caione <carlo@endlessm.com>
 
-True, but fec_txq/fec_rxq is called in a loop. Why not pass it, rather than
-look it up again?
+The rationale behind this patchset is in this thread
+http://www.spinics.net/lists/devicetree/msg115019.html
+
+We basically want to introduce in the Amlogic Meson device-tree the CBUS and
+AOBUS nodes. To do this we need to split / refactor the pinctrl driver that is
+currently accessing at the same time registers on both these buses.
+
+Carlo Caione (4):
+  pinctrl: amlogic: Separate some pin functions for Meson8 / Meson8b
+  pinctrl: amlogic: Make driver independent from two-domain
+    configuration
+  ARM: dts: amlogic: Split pinctrl device for Meson8 / Meson8b
+  documentation: Fix pinctrl documentation for Meson8 / Meson8b
+
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |  36 +---
+ arch/arm/boot/dts/meson8.dtsi                      |  57 ++++---
+ arch/arm/boot/dts/meson8b.dtsi                     |  12 +-
+ drivers/pinctrl/meson/pinctrl-meson.c              | 135 +++++++--------
+ drivers/pinctrl/meson/pinctrl-meson.h              |  21 +--
+ drivers/pinctrl/meson/pinctrl-meson8.c             | 137 +++++++++-------
+ drivers/pinctrl/meson/pinctrl-meson8b.c            | 182 ++++++++++++---------
+ 7 files changed, 296 insertions(+), 284 deletions(-)
+
+-- 
+1.9.1
