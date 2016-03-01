@@ -1,41 +1,50 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 1 Mar 2016 17:07:23 +0530
-Subject: [PATCH 1/1] arm64: defconfig: Enable Maxim PMIC max77620 config
-In-Reply-To: <3235756.j5eVi1g2v0@wuerfel>
-References: <1456750972-13972-1-git-send-email-ldewangan@nvidia.com>
- <3235756.j5eVi1g2v0@wuerfel>
-Message-ID: <56D57EF3.6060805@nvidia.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 1 Mar 2016 17:18:07 +0530
+Subject: [RFC PATCH] ARM: OMAP2+: Fix updating of sysconfig register
+Message-ID: <1456832887-5312-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+commit 127500ccb766f ("ARM: OMAP2+: Only write the sysconfig on idle
+when necessary") talks about verification of sysconfig cache value before
+updating it, only during idle path. But the patch is adding the
+verification in the enable path. So, adding the check in a proper place
+as per the commit description.
 
-On Tuesday 01 March 2016 05:02 AM, Arnd Bergmann wrote:
-> On Monday 29 February 2016 18:32:52 Laxman Dewangan wrote:
->> Enable following configs for the Maxim Semiconductor's PMIC
->> MAX77620/MAX20024. This is used on NVIDIA's Tegra 210 platform
->> Jetson-TX1.
->>
->>   CONFIG_MFD_MAX77620 For MFD driver.
->>   CONFIG_PINCTRL_MAX77620 For pin control support
->>   CONFIG_GPIO_MAX77620 for GPIO Support.
->>   CONFIG_REGULATOR_MAX77620 for regulator support.
->>   CONFIG_RTC_DRV_MAX77686 for RTC support.
->>
->> Enable Tegra I2C config to enable I2C in NVIDIA's Tegra 210
->> platforms.
->>
->> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
->> ---
->> The patches for drivers of MFD/GPIO/Pincontrol are in flight.
->>
-> I'm not entirely sure what you had meant to happen to this patch,
-> as you have a lot of people in the 'To' line.
->
-> Do you want us to pick it up into arm-soc with Thierry's Ack,
-> or should he forward it, or is there a reason for Catalin and
-> Will to put it into the arm64 tree?
->
->
+Not keeping this check during enable path as there is a chance of losing
+context and it is safe to do on idle as the context of the register will
+never be lost while the device is active.
 
-Not sure how will it go (via Tegra or arm-soc) but I will need Thierry's 
-or Rhyland Klein's ACK.
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e9f65fe..71b3747 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1416,9 +1416,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
+ 	    (sf & SYSC_HAS_CLOCKACTIVITY))
+ 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
+ 
+-	/* If the cached value is the same as the new value, skip the write */
+-	if (oh->_sysc_cache != v)
+-		_write_sysconfig(v, oh);
++	_write_sysconfig(v, oh);
+ 
+ 	/*
+ 	 * Set the autoidle bit only after setting the smartidle bit
+@@ -1481,7 +1479,9 @@ static void _idle_sysc(struct omap_hwmod *oh)
+ 		_set_master_standbymode(oh, idlemode, &v);
+ 	}
+ 
+-	_write_sysconfig(v, oh);
++	/* If the cached value is the same as the new value, skip the write */
++	if (oh->_sysc_cache != v)
++		_write_sysconfig(v, oh);
+ }
+ 
+ /**
+-- 
+2.1.4
