@@ -1,140 +1,146 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue,  1 Mar 2016 14:15:29 -0700
-Subject: [RFC v3 10/12] ARM64: psci: Support cluster idle states for
- OS-Initiated
+Date: Tue,  1 Mar 2016 14:15:28 -0700
+Subject: [RFC v3 09/12] drivers: firmware: psci: Allow OS Initiated suspend
+ mode
 In-Reply-To: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
 References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1456866931-37851-12-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1456866931-37851-11-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI OS initiated firmware may allow Linux to determine the state of the
-CPU cluster and the cluster at coherency level to enter idle states when
-there are no active CPUs. Since Linux has a better idea of the QoS and
-the wakeup pattern of the CPUs, the cluster idle states may be better
-determined by the OS instead of the firmware.
+PSCI firmware v1.0 onwards may support 2 different modes for
+CPU_SUSPEND. Platform coordinated mode is the default and every firmware
+should support it. The firmware shall also be the default mode.
 
-The last CPU entering idle in a cluster, is responsible for selecting
-the state of the cluster. Only one CPU in a cluster may provide the
-cluster idle state to the firmware. Similarly, the last CPU in the
-system may provide the state of the coherency domain along with the
-cluster and the CPU state IDs.
-
-Utilize the CPU PM domain framework's helper functions to build up the
-hierarchy of cluster topology using Generic PM domains. We provide
-callbacks for domain power_on and power_off. By appending the state IDs
-at each domain level in the -power_off() callbacks, we build up a
-composite state ID that can be passed onto the firmware to idle the CPU,
-the cluster and the coherency interface.
+With the kernel capable of deciding the state for CPU cluster and
+coherency domains, the OS Initiated mode may now be used by the kernel,
+provided the firmware supports it. SET_SUSPEND_MODE is a PSCI function
+available on v1.0 onwards and can be used to set the mode in the
+firmware.
 
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm64/kernel/psci.c | 46 +++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 43 insertions(+), 3 deletions(-)
+ drivers/firmware/psci.c   | 45 ++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/psci.h      |  2 ++
+ include/uapi/linux/psci.h |  5 +++++
+ 3 files changed, 51 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index f67f35b..75b1707 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -15,6 +15,7 @@
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index f25cd79..03c084e 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -49,12 +49,19 @@
+  * require cooperation with a Trusted OS driver.
+  */
+ static int resident_cpu = -1;
++static bool has_osi_pd;
++static bool psci_suspend_mode_is_osi;
  
- #define pr_fmt(fmt) "psci: " fmt
- 
-+#include <linux/cpu_domains.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/smp.h>
-@@ -31,6 +32,24 @@
- #include <asm/suspend.h>
- 
- static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+static DEFINE_PER_CPU(u32, cluster_state_id);
-+
-+static inline u32 psci_get_composite_state_id(u32 cpu_state)
-+{
-+	return cpu_state | this_cpu_read(cluster_state_id);
-+}
-+
-+static inline void psci_reset_composite_state_id(void)
-+{
-+	this_cpu_write(cluster_state_id, 0);
-+}
-+
-+static int psci_pd_power_off(u32 state_idx, u32 param,
-+		const struct cpumask *mask)
-+{
-+	__this_cpu_add(cluster_state_id, param);
-+	return 0;
-+}
- 
- static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
+ bool psci_tos_resident_on(int cpu)
  {
-@@ -89,6 +108,19 @@ static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
- 	}
- 	/* Idle states parsed correctly, initialize per-cpu pointer */
- 	per_cpu(psci_power_state, cpu) = psci_states;
-+
-+	if (psci_has_osi_pd_support()) {
-+		const struct cpu_pd_ops psci_pd_ops = {
-+			.power_off = psci_pd_power_off,
-+		};
-+
-+		ret = of_setup_cpu_pd_single(cpu, &psci_pd_ops);
-+		if (!ret)
-+			ret = psci_set_suspend_mode_osi(true);
-+		if (ret)
-+			pr_warn("CPU%d: Error setting PSCI OSI mode\n", cpu);
-+	}
-+
- 	return 0;
+ 	return cpu == resident_cpu;
+ }
  
- free_mem:
-@@ -117,6 +149,8 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
- 	if (err)
- 		pr_err("failed to boot CPU%d (%d)\n", cpu, err);
++bool psci_has_osi_pd_support(void)
++{
++	return has_osi_pd;
++}
++
+ struct psci_operations psci_ops;
  
-+	/* Reset CPU cluster states */
-+	psci_reset_composite_state_id();
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+@@ -250,6 +257,26 @@ static int psci_system_suspend(unsigned long unused)
+ 			      virt_to_phys(cpu_resume), 0, 0);
+ }
+ 
++int psci_set_suspend_mode_osi(bool enable)
++{
++	int ret;
++	int mode;
++
++	if (enable && !psci_has_osi_pd_support())
++		return -ENODEV;
++
++	if (enable == psci_suspend_mode_is_osi)
++		return 0;
++
++	mode = enable ? PSCI_1_0_SUSPEND_MODE_OSI : PSCI_1_0_SUSPEND_MODE_PC;
++	ret = invoke_psci_fn(PSCI_FN_NATIVE(1_0, SET_SUSPEND_MODE),
++			     mode, 0, 0);
++	if (!ret)
++		psci_suspend_mode_is_osi = enable;
++
++	return psci_to_linux_errno(ret);
++}
++
+ static int psci_system_suspend_enter(suspend_state_t state)
+ {
+ 	return cpu_suspend(0, psci_system_suspend);
+@@ -443,10 +470,26 @@ out_put_node:
  	return err;
  }
  
-@@ -181,15 +215,16 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
- static int psci_suspend_finisher(unsigned long index)
- {
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
++static int __init psci_1_0_init(struct device_node *np)
++{
++	int ret;
++
++	ret = psci_0_2_init(np);
++	if (ret)
++		return ret;
++
++	/* Check if PSCI OSI mode is available */
++	ret = psci_features(PSCI_FN_NATIVE(0_2, CPU_SUSPEND));
++	if (ret & PSCI_1_0_OS_INITIATED)
++		has_osi_pd = true;
++
++	return 0;
++}
++
+ static const struct of_device_id const psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+-	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
++	{ .compatible = "arm,psci-1.0",	.data = psci_1_0_init},
+ 	{},
+ };
  
--	return psci_ops.cpu_suspend(state[index - 1],
--				    virt_to_phys(cpu_resume));
-+	return psci_ops.cpu_suspend(ext_state, virt_to_phys(cpu_resume));
- }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 12c4865..deae633 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -23,6 +23,8 @@
+ bool psci_tos_resident_on(int cpu);
+ bool psci_power_state_loses_context(u32 state);
+ bool psci_power_state_is_valid(u32 state);
++bool psci_has_osi_pd_support(void);
++int psci_set_suspend_mode_osi(bool enable);
  
- static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- {
- 	int ret;
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
- 	/*
- 	 * idle state index 0 corresponds to wfi, should never be called
- 	 * from the cpu_suspend operations
-@@ -198,10 +233,15 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- 		return -EINVAL;
+ struct psci_operations {
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 3d7a0fc..eaab6e3 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -50,6 +50,7 @@
+ #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
  
- 	if (!psci_power_state_loses_context(state[index - 1]))
--		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-+		ret = psci_ops.cpu_suspend(ext_state, 0);
- 	else
- 		ret = cpu_suspend(index, psci_suspend_finisher);
+ #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
++#define PSCI_1_0_FN64_SET_SUSPEND_MODE		PSCI_0_2_FN64(15)
  
-+	/*
-+	 * Clear the CPU's cluster states, we start afresh after coming
-+	 * out of idle.
-+	 */
-+	psci_reset_composite_state_id();
- 	return ret;
- }
+ /* PSCI v0.2 power state encoding for CPU_SUSPEND function */
+ #define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
+@@ -93,6 +94,10 @@
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
+ 			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
  
++#define PSCI_1_0_OS_INITIATED			BIT(0)
++#define PSCI_1_0_SUSPEND_MODE_PC		0
++#define PSCI_1_0_SUSPEND_MODE_OSI		1
++
+ /* PSCI return values (inclusive of all PSCI versions) */
+ #define PSCI_RET_SUCCESS			0
+ #define PSCI_RET_NOT_SUPPORTED			-1
 -- 
 2.1.4
