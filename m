@@ -1,58 +1,114 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 1 Mar 2016 12:53:55 +0100
-Subject: [PATCH 4/8] Documentation: devicetree: Document Tronsmart vendor
- prefix
-In-Reply-To: <56D57EED.1090901@suse.com>
-References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
- <1456789465-2962-5-git-send-email-afaerber@suse.de>
- <56D57EED.1090901@suse.com>
-Message-ID: <56D582D3.3040902@suse.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 1 Mar 2016 17:25:56 +0530
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <alpine.DEB.2.02.1603010825090.14948@utopia.booyaka.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com> <56B087AD.4000505@ti.com>
+ <alpine.DEB.2.02.1602080208070.2182@utopia.booyaka.com>
+ <56B900E9.9040306@ti.com>
+ <alpine.DEB.2.02.1602090846480.2906@utopia.booyaka.com>
+ <56BA2495.9020407@ti.com>
+ <alpine.DEB.2.02.1602091932160.2906@utopia.booyaka.com>
+ <56BA958A.1020503@ti.com> <56BACCDB.2070507@ti.com>
+ <alpine.DEB.2.02.1602111921090.20757@utopia.booyaka.com>
+ <56BD8091.4090007@ti.com> <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
+ <56CAA82D.6000507@ti.com>
+ <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
+ <56CADB23.8020202@ti.com> <56CC490F.3040301@ti.com>
+ <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
+ <56CD4BE1.3010701@ti.com>
+ <alpine.DEB.2.02.1603010825090.14948@utopia.booyaka.com>
+Message-ID: <56D5834C.5030800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.03.2016 um 12:37 schrieb Matthias Brugger:
-> On 01/03/16 00:44, Andreas F?rber wrote:
->> Choose the obvious prefix, "tronsmart".
->>
->> Cc: Matthias Brugger <mbrugger@suse.com>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
+Hi,
+
+On Tuesday 01 March 2016 01:55 PM, Paul Walmsley wrote:
 > 
-> Same as a older patch I send some month ago. So also this is a trivial
-> one, for the record:
+> Folks, the following is what I've queued for this.
+
+Thanks Paul.
+
+Bjorn,
+
+With this patch merged, enabling pci-dra7xx won't result in system freeze
+anymore. I can send a patch to revert depends on BROKEN.
+
+Thanks
+Kishon
+
 > 
-> Singed-off-by: Matthias Brugger <mbrugger@suse.com>
-
-Hm, I see yours got an Acked-by from Rob on Jan 17. Through whose queue
-is this supposed to go?
-
-Searching for it, I even found a similar 2014 patch from Beniamino
-Galvani (CC'ed), without any review replies.
-
-I'll happily pick up one of the previous patches instead. Sorry, was in
-a hurry to clean this series up for Nicolas (Mini Mx) and to avoid any
-Odroid-C2 users duplicating my work.
-
-Cheers,
-Andreas
-
->>   Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index f871e8e7e98f..662edc7bce04 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -243,6 +243,7 @@ toshiba    Toshiba Corporation
->>   toumaz    Toumaz
->>   tplink    TP-LINK Technologies Co., Ltd.
->>   tronfy    Tronfy
->> +tronsmart    Tronsmart
->>   truly    Truly Semiconductors Limited
->>   upisemi    uPI Semiconductor Corp.
->>   urt    United Radiant Technology Corporation
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+> 
+> - Paul
+> 
+> 
+> From: Sekhar Nori <nsekhar@ti.com>
+> Date: Thu, 18 Feb 2016 16:49:56 +0530
+> Subject: [PATCH] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+> 
+> Add a custom reset handler for DRA7x PCIeSS. This
+> handler is required to deassert PCIe hardreset lines
+> after they have been asserted.
+> 
+> This enables the PCIe driver to access registers after
+> PCIeSS has been runtime enabled without having to
+> deassert hardreset lines itself.
+> 
+> With this patch applied, used lspci to make sure
+> connected PCIe device enumerates on DRA74x and DRA72x
+> EVMs.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Reported-by: Richard Cochran <richardcochran@gmail.com>
+> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Suman Anna <s-anna@ti.com>
+> Cc: Dave Gerlach <d-gerlach@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index b61355e2a771..252b74633e31 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
+>   *
+>   */
+>  
+> +/*
+> + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
+> + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
+> + * associated with an IP automatically leaving the driver to handle that
+> + * by itself. This does not work for PCIeSS which needs the reset lines
+> + * deasserted for the driver to start accessing registers.
+> + *
+> + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
+> + * lines after asserting them.
+> + */
+> +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < oh->rst_lines_cnt; i++) {
+> +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
+> +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
+>  	.name	= "pcie",
+> +	.reset	= dra7xx_pciess_reset,
+>  };
+>  
+>  /* pcie1 */
+> 
