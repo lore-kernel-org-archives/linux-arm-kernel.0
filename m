@@ -1,144 +1,163 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 1 Mar 2016 10:26:12 -0800
-Subject: [PATCH v3 1/7] of/serial: move earlycon early_param handling to
- serial
-In-Reply-To: <56D5D6ED.7050806@gmail.com>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
- <1456749726-30261-2-git-send-email-aleksey.makarov@linaro.org>
- <56D5AC3B.3090806@hurleysoftware.com> <56D5C3F8.5050102@linaro.org>
- <56D5D035.2060704@hurleysoftware.com> <56D5D6ED.7050806@gmail.com>
-Message-ID: <56D5DEC4.6070209@hurleysoftware.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue,  1 Mar 2016 18:27:40 +0000
+Subject: [RFC v5 00/17] KVM PCIe/MSI passthrough on ARM/ARM64
+Message-ID: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2016 09:52 AM, Aleksey Makarov wrote:
-> 
-> 
-> On 03/01/2016 08:24 PM, Peter Hurley wrote:
->> On 03/01/2016 08:31 AM, Aleksey Makarov wrote:
->>>
->>>
->>> On 03/01/2016 05:50 PM, Peter Hurley wrote:
->>>> On 02/29/2016 04:41 AM, Aleksey Makarov wrote:
->>>>> From: Leif Lindholm <leif.lindholm@linaro.org>
->>>>>
->>>>> We have multiple "earlycon" early_param handlers - merge the DT one into
->>>>> the main earlycon one. This means the earlycon early_param handler does
->>>>> not just return success if no options are specified.
->>>>
->>>> Why is this patch necessary?
->>>>
->>>> Is this cleanup or required for some reason in other parts of this
->>>> series?
->>>
->>> It's a cleanup.
->>>
->>> Also, without this, the series has to introduce a new (third) handler for "earlycon=".
->>
->> Not if it were opt-in like OF is via the same blank
->> "earlycon" parameter.
-> 
-> So you are suggesting to enable ACPI earlycon with just "earlyon" without 
-> any arguments to this paramener, right?  That's good idea as OF and ACPI
-> can not be used simultaneously to specify earlycon.  Actually that is
-> how it worked in the original submussion. I will change this in the next version.
-> 
-> Still I think that having this parameter parsed in one place is a good idea.
-> Or would you prefer to drop this patch?
+This series addresses KVM PCIe passthrough with MSI enabled on ARM/ARM64.
+It pursues the efforts done on [1], [2], [3]. It also aims at covering the
+same need on PowerPC platforms although the same kind of integration
+should be carried out.
 
-No need to drop it, imo; the cleanup is fine with me.
+On x86 all accesses to the 1MB PA region [FEE0_0000h - FEF0_000h] are directed
+as interrupt messages: accesses to this special PA window directly target the
+APIC configuration space and not DRAM, meaning the downstream IOMMU is bypassed.
 
-But it really helps if either the commit message or the cover letter
-describes the purpose and not just the effect (ie., the why and not just
-the what).
+This is not the case on above mentionned platforms where MSI messages emitted
+by devices are conveyed through the IOMMU. This means an IOVA/host PA mapping
+must exist for the MSI to reach the MSI controller. Normal way to create
+IOVA bindings consists in using VFIO DMA MAP API. However in this case
+the MSI IOVA is not mapped onto guest RAM but on host physical page (the MSI
+controller frame).
 
-Regards,
-Peter Hurley
+In a nutshell, this series does:
+- introduce a new DMA-RESERVED-IOMMU API to register a IOVA window usable for
+  reserved mapping and allocate/bind IOVA to host physical addresses
+- reuse VFIO DMA MAP ioctl with a new flag to plug onto that new API
+- check if the MSI mapping is safe when attaching the vfio group to the
+  container (allow_unsafe_interrupts modality)
+- allow the MSI subsystem to map/unmap the doorbell on MSI message composition
+- allow the user-space to know how many IOVA pages are requested
+
+Best Regards
+
+Eric
+
+Testing:
+- functional on ARM64 AMD Overdrive HW (single GICv2m frame) with
+  x Intel e1000e PCIe card
+  x Intel X540-T2 (SR-IOV capable)
+- Not tested: ARM GICv3 ITS
+
+References:
+[1] [RFC 0/2] VFIO: Add virtual MSI doorbell support
+    (https://lkml.org/lkml/2015/7/24/135)
+[2] [RFC PATCH 0/6] vfio: Add interface to map MSI pages
+    (https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016607.html)
+[3] [PATCH v2 0/3] Introduce MSI hardware mapping for VFIO
+    (http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/3858)
+
+Git:
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.5-rc6-pcie-passthrough-rfcv5
+
+previous version at
+v3: https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.5-rc5-pcie-passthrough-rfcv4
+
+QEMU Integration:
+[RFC v2 0/8] KVM PCI/MSI passthrough with mach-virt
+(http://lists.gnu.org/archive/html/qemu-arm/2016-01/msg00444.html)
+https://git.linaro.org/people/eric.auger/qemu.git/shortlog/refs/heads/v2.5.0-pci-passthrough-rfc-v2
+
+User Hints:
+To allow PCI/MSI passthrough with GICv2M, compile VFIO as a module and
+load the vfio_iommu_type1 module with allow_unsafe_interrupts param:
+sudo modprobe -v vfio-pci
+sudo modprobe -r vfio_iommu_type1
+sudo modprobe -v vfio_iommu_type1 allow_unsafe_interrupts=1
+
+History:
+
+RFC v4 -> RFC v5:
+- take into account Thomas' comments on MSI related patches
+  - split "msi: IOMMU map the doorbell address when needed"
+  - increase readability and add comments
+  - fix style issues
+ - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
+ - platform ITS now advertises IOMMU_CAP_INTR_REMAP
+ - fix compilation issue with CONFIG_IOMMU API unset
+ - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
+
+RFC v3 -> v4:
+- Move doorbell mapping/unmapping in msi.c
+- fix ref count issue on set_affinity: in case of a change in the address
+  the previous address is decremented
+- doorbell map/unmap now is done on msi composition. Should allow the use
+  case for platform MSI controllers
+- create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
+  to reserved IOVA management (looking like dma-iommu glue)
+- series reordering to ease the review:
+  - first part is related to IOMMU
+  - second related to MSI sub-system
+  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
+- expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
+  [this partially addresses Marc's comments on iommu_get/put_single_reserved
+   size/alignment problematic - which I did not ignore - but I don't know
+   how much I can do at the moment]
+
+RFC v2 -> RFC v3:
+- should fix wrong handling of some CONFIG combinations:
+  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
+- fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
+
+PATCH v1 -> RFC v2:
+- reverted to RFC since it looks more reasonable ;-) the code is split
+  between VFIO, IOMMU, MSI controller and I am not sure I did the right
+  choices. Also API need to be further discussed.
+- iova API usage in arm-smmu.c.
+- MSI controller natively programs the MSI addr with either the PA or IOVA.
+  This is not done anymore in vfio-pci driver as suggested by Alex.
+- check irq remapping capability of the group
+
+RFC v1 [2] -> PATCH v1:
+- use the existing dma map/unmap ioctl interface with a flag to register a
+  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+- a single reserved IOVA contiguous region now is allowed
+- use of an RB tree indexed by PA to store allocated reserved slots
+- use of a vfio_domain iova_domain to manage iova allocation within the
+  window provided by the userspace
+- vfio alloc_map/unmap_free take a vfio_group handle
+- vfio_group handle is cached in vfio_pci_device
+- add ref counting to bindings
+- user modality enabled at the end of the series
 
 
->>>>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
->>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->>>>> ---
->>>>>  drivers/of/fdt.c              | 11 +----------
->>>>>  drivers/tty/serial/earlycon.c |  3 ++-
->>>>>  include/linux/of_fdt.h        |  2 ++
->>>>>  3 files changed, 5 insertions(+), 11 deletions(-)
->>>>>
->>>>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
->>>>> index 3349d2a..0547256 100644
->>>>> --- a/drivers/of/fdt.c
->>>>> +++ b/drivers/of/fdt.c
->>>>> @@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
->>>>>  
->>>>>  #ifdef CONFIG_SERIAL_EARLYCON
->>>>>  
->>>>> -static int __init early_init_dt_scan_chosen_serial(void)
->>>>> +int __init early_init_dt_scan_chosen_serial(void)
->>>>>  {
->>>>>  	int offset;
->>>>>  	const char *p, *q, *options = NULL;
->>>>> @@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
->>>>>  	}
->>>>>  	return -ENODEV;
->>>>>  }
->>>>> -
->>>>> -static int __init setup_of_earlycon(char *buf)
->>>>> -{
->>>>> -	if (buf)
->>>>> -		return 0;
->>>>> -
->>>>> -	return early_init_dt_scan_chosen_serial();
->>>>> -}
->>>>> -early_param("earlycon", setup_of_earlycon);
->>>>>  #endif
->>>>>  
->>>>>  /**
->>>>> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
->>>>> index 067783f..d217366 100644
->>>>> --- a/drivers/tty/serial/earlycon.c
->>>>> +++ b/drivers/tty/serial/earlycon.c
->>>>> @@ -17,6 +17,7 @@
->>>>>  #include <linux/kernel.h>
->>>>>  #include <linux/init.h>
->>>>>  #include <linux/io.h>
->>>>> +#include <linux/of_fdt.h>
->>>>>  #include <linux/serial_core.h>
->>>>>  #include <linux/sizes.h>
->>>>>  #include <linux/of.h>
->>>>> @@ -209,7 +210,7 @@ static int __init param_setup_earlycon(char *buf)
->>>>>  	 * don't generate a warning from parse_early_params() in that case
->>>>>  	 */
->>>>>  	if (!buf || !buf[0])
->>>>> -		return 0;
->>>>> +		return early_init_dt_scan_chosen_serial();
->>>>>  
->>>>>  	err = setup_earlycon(buf);
->>>>>  	if (err == -ENOENT || err == -EALREADY)
->>>>> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
->>>>> index 2fbe868..56b2a43 100644
->>>>> --- a/include/linux/of_fdt.h
->>>>> +++ b/include/linux/of_fdt.h
->>>>> @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
->>>>>  				     int depth, void *data);
->>>>>  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
->>>>>  				     int depth, void *data);
->>>>> +extern int early_init_dt_scan_chosen_serial(void);
->>>>>  extern void early_init_fdt_scan_reserved_mem(void);
->>>>>  extern void early_init_fdt_reserve_self(void);
->>>>>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
->>>>> @@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
->>>>>  extern u64 of_flat_dt_translate_address(unsigned long node);
->>>>>  extern void of_fdt_limit_memory(int limit);
->>>>>  #else /* CONFIG_OF_FLATTREE */
->>>>> +static inline int early_init_dt_scan_chosen_serial(void) { return -ENODEV; }
->>>>>  static inline void early_init_fdt_scan_reserved_mem(void) {}
->>>>>  static inline void early_init_fdt_reserve_self(void) {}
->>>>>  static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
->>>>>
->>>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+Eric Auger (17):
+  iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+  iommu/arm-smmu: advertise DOMAIN_ATTR_MSI_MAPPING attribute
+  iommu: introduce a reserved iova cookie
+  dma-reserved-iommu: alloc/free_reserved_iova_domain
+  dma-reserved-iommu: reserved binding rb-tree and helpers
+  dma-reserved-iommu: iommu_get/put_single_reserved
+  dma-reserved-iommu: iommu_unmap_reserved
+  msi: Add a new MSI_FLAG_IRQ_REMAPPING flag
+  irqchip/gic-v3-its: ITS advertises MSI_FLAG_IRQ_REMAPPING
+  msi: export msi_get_domain_info
+  msi: msi_compose wrapper
+  msi: IOMMU map the doorbell address when needed
+  vfio: introduce VFIO_IOVA_RESERVED vfio_dma type
+  vfio: allow the user to register reserved iova range for MSI mapping
+  vfio/type1: also check IRQ remapping capability at msi domain
+  iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
+  vfio/type1: return MSI mapping requirements with VFIO_IOMMU_GET_INFO
+
+ drivers/iommu/Kconfig                         |   8 +
+ drivers/iommu/Makefile                        |   1 +
+ drivers/iommu/arm-smmu-v3.c                   |   2 +
+ drivers/iommu/arm-smmu.c                      |   4 +-
+ drivers/iommu/dma-reserved-iommu.c            | 270 ++++++++++++++++++++
+ drivers/iommu/iommu.c                         |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   3 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c |   3 +-
+ drivers/vfio/vfio_iommu_type1.c               | 351 +++++++++++++++++++++++++-
+ include/linux/dma-reserved-iommu.h            |  78 ++++++
+ include/linux/iommu.h                         |   6 +
+ include/linux/msi.h                           |  17 ++
+ include/uapi/linux/vfio.h                     |  14 +-
+ kernel/irq/msi.c                              | 139 +++++++++-
+ 14 files changed, 885 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/iommu/dma-reserved-iommu.c
+ create mode 100644 include/linux/dma-reserved-iommu.h
+
+-- 
+1.9.1
