@@ -1,34 +1,101 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 1 Mar 2016 14:58:28 +0800
-Subject: [GIT PULL]Hisilicon Hip05 SoC defconfig updates for 4.6
-In-Reply-To: <2832856.9ipoSEhECG@wuerfel>
-References: <56D1709E.90109@hisilicon.com> <2832856.9ipoSEhECG@wuerfel>
-Message-ID: <56D53D94.5090108@hisilicon.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue,  1 Mar 2016 15:00:48 +0800
+Subject: [PATCH] arm64: defconfig: Enable devices for Hi6220 and 96boards HiKey
+Message-ID: <1456815648-10935-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+This patch enables a number of devices currently supported by the Hi6220
+and 96boards HiKey. These include
+a) Hi655x PMIC and regulator
+b) Hi6220 I2C, USB, MMC, mailbox, reset
+c) CONFIG_PINCTRL_SINGLE, and CONFIG_LEDS_GPIO
 
-On 01/03/2016 07:30, Arnd Bergmann wrote:
-> On Saturday 27 February 2016 17:47:10 Wei Xu wrote:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hip05-config-for-4.6
->>
->> for you to fetch changes up to c966f0521db49f561d18820107654b0895c1c394:
->>
->>   arm64: defconfig: Enable DesignWare APB GPIO controller (2016-02-25 21:21:26 +0800)
->>
->>
-> 
-> Merged into next/arm64, thanks!
+CONFIG_MMC_BLOCK_MINORS is set to 16 (default is 8).
 
-Thanks!
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+---
+ arch/arm64/configs/defconfig | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Best Regards,
-Wei
-
-> 
-> 	Arnd
-> 
-> .
-> 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 86581f7..83ef419 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -138,12 +138,15 @@ CONFIG_SERIAL_XILINX_PS_UART=y
+ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
+ CONFIG_VIRTIO_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_QUP=y
+ CONFIG_I2C_UNIPHIER_F=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_QUP=y
++CONFIG_PINCTRL_SINGLE=y
+ CONFIG_PINCTRL_MSM8916=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_RCAR=y
+@@ -151,8 +154,10 @@ CONFIG_GPIO_XGENE=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
+ # CONFIG_HWMON is not set
++CONFIG_MFD_HI655X_PMIC=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_HI655X=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+@@ -171,9 +176,10 @@ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
++CONFIG_USB_DWC2=y
+ CONFIG_USB_ISP1760=y
+-CONFIG_USB_ULPI=y
+ CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+@@ -181,8 +187,10 @@ CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SPI=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_EXYNOS=y
++CONFIG_MMC_DW_K3=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_SYSCON=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+@@ -207,12 +215,16 @@ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_MSM_GCC_8916=y
+ CONFIG_HWSPINLOCK_QCOM=y
+ CONFIG_ARM_SMMU=y
++CONFIG_MAILBOX=y
++CONFIG_HI6220_MBOX=y
+ CONFIG_QCOM_SMEM=y
+ CONFIG_QCOM_SMD=y
+ CONFIG_QCOM_SMD_RPM=y
+ CONFIG_ARCH_TEGRA_132_SOC=y
+ CONFIG_ARCH_TEGRA_210_SOC=y
+ CONFIG_HISILICON_IRQ_MBIGEN=y
++CONFIG_COMMON_RESET_HI6220=y
++CONFIG_PHY_HI6220_USB=y
+ CONFIG_PHY_XGENE=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+@@ -225,6 +237,7 @@ CONFIG_CUSE=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_HUGETLBFS=y
++CONFIG_CONFIGFS_FS=y
+ CONFIG_EFIVAR_FS=y
+ CONFIG_SQUASHFS=y
+ CONFIG_NFS_FS=y
+-- 
+1.9.1
