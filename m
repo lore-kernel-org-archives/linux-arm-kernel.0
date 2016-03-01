@@ -1,45 +1,41 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 1 Mar 2016 10:01:52 +0100
-Subject: [PATCH 5/8] drivers/pinctrl: make stm32/pinctrl-stm32f429.c
- explicitly non-modular
-In-Reply-To: <1456778924-20730-6-git-send-email-paul.gortmaker@windriver.com>
-References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
- <1456778924-20730-6-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CALszF6A4U6fh5Sbb1=JAotmwXcsO6juftTG4rYZnXjH8dbwNxw@mail.gmail.com>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Tue, 1 Mar 2016 09:03:22 +0000
+Subject: [PATCH v2 4/4] drivers: dma-coherent: use memset_io for
+ DMA_MEMORY_IO mappings
+In-Reply-To: <20160229151749.a972ae993adffb667140548d@linux-foundation.org>
+References: <cover.1456225103.git.brian.starkey@arm.com>
+ <7942c970d1071643f3763de6eaf6d55a3945a069.1456225103.git.brian.starkey@arm.com>
+ <20160229151749.a972ae993adffb667140548d@linux-foundation.org>
+Message-ID: <20160301090322.GA6013@e106950-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-29 21:48 GMT+01:00 Paul Gortmaker <paul.gortmaker@windriver.com>:
-> The Kconfig currently controlling compilation of this code is:
->
-> drivers/pinctrl/stm32/Kconfig:config PINCTRL_STM32F429
-> drivers/pinctrl/stm32/Kconfig:  bool "STMicroelectronics STM32F429 pin control" if COMPILE_TEST && !MACH_STM32F429
->
-> ...meaning that it currently is not being built as a module by anyone.
->
-> Lets remove the modular code that is essentially orphaned, so that
-> when reading the driver there is no doubt it is builtin-only.
->
-> Since module_init translates to device_initcall in the non-modular
-> case, the init ordering remains unchanged with this commit.
->
-> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
->
-> We also delete the MODULE_LICENSE tag etc. since all that information
-> is already contained at the top of the file in the comments.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
->  drivers/pinctrl/stm32/pinctrl-stm32f429.c | 9 +--------
->  1 file changed, 1 insertion(+), 8 deletions(-)
+Hi Andrew,
 
-Thanks for the patch:
-Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+On Mon, Feb 29, 2016 at 03:17:49PM -0800, Andrew Morton wrote:
+>On Mon, 29 Feb 2016 16:09:24 +0000 Brian Starkey <brian.starkey@arm.com> wrote:
+>
+>> Use memset_io() for DMA_MEMORY_IO mappings which are mapped as I/O
+>> memory, and regular memset() for DMA_MEMORY_MAP mappings.
+>>
+>> This fixes the below alignment fault on arm64 for DMA_MEMORY_IO
+>> mappings, where memset() uses the DC ZVA instruction which is
+>> invalid on device memory.
+>
+>What's the urgency of this fix?  "Hair on fire needed in stable asap"
+>or "Nice to have in there for 4.6" or what?
+>
 
-Regards,
-Maxime
+No-one else is complaining so probably not the former. If it could
+make 4.6 though that would be grand.
+
+As for stable, anything before 3.15 doesn't hit the fault (on arm64)
+because memset() is different, so probably not needed there.
+For anything after that this patch in isolation isn't a full fix,
+because dma_init_coherent_memory() will still use the wrong mapping
+function for DMA_MEMORY_MAP. In that case, I think it needs to be the
+whole series or nothing. I don't have a strong opinion either way, but
+perhaps someone else does.
+
+Thanks
+Brian
