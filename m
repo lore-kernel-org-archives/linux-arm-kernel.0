@@ -1,69 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 1 Mar 2016 09:58:51 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: second set of hwmod changes for v4.6
-Message-ID: <alpine.DEB.2.02.1603010958120.14948@utopia.booyaka.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Tue, 1 Mar 2016 11:01:31 +0100
+Subject: [PATCH 0/4] improvements to the nmi_backtrace code
+In-Reply-To: <20160229164956.8613016895bef966b6460081@linux-foundation.org>
+References: <1456782024-7122-1-git-send-email-cmetcalf@ezchip.com>
+ <20160229164956.8613016895bef966b6460081@linux-foundation.org>
+Message-ID: <20160301100131.GN3305@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Mon 2016-02-29 16:49:56, Andrew Morton wrote:
+> On Mon, 29 Feb 2016 16:40:20 -0500 Chris Metcalf <cmetcalf@ezchip.com> wrote:
+> 
+> > This patch series modifies the trigger_xxx_backtrace() NMI-based
+> > remote backtracing code to make it more flexible, and makes a few
+> > small improvements along the way.
+> > 
+> > The motivation comes from the task isolation code, where there are
+> > scenarios where we want to be able to diagnose a case where some cpu
+> > is about to interrupt a task-isolated cpu.  It can be helpful to
+> > see both where the interrupting cpu is, and also an approximation
+> > of where the cpu that is being interrupted is.  The nmi_backtrace
+> > framework allows us to discover the stack of the interrupted cpu.
+> > 
+> > The first change adds support for trigger_single_cpu_backtrace(), and
+> > as an "API side-effect", trigger_cpumask_backtrace().  The underlying
+> > abstraction is changed to use cpumasks instead of a "bool except_self".
+> > 
+> > The second and third changes provide small improvements to the
+> > behavior of the existing nmi_backtrace code: omitting full backtrace
+> > dumps for idle cores, and doing local dump_stack backtraces when we
+> > try to do a "remote" dump of the local core.  Some of this reflects
+> > changes from integrating the arch/tile code into the generic code.
+> > 
+> > The fourth change hooks the arch/tile backtrace mechanism into
+> > the nmi_backtrace code to share code and take advantage of other
+> > improvements of nmi_backtrace not present in the original arch/tile
+> > code, like co-opting printk to use local buffers instead of just
+> > spewing to the console and hoping for the best.
+> > 
+> > The changes have been runtime tested on tile, and build-tested on
+> > x86 and arm.
+> 
+> The patchset looks rather nice but unfortuntely conflicts pretty
+> significantly with Petr's "Cleaning printk stuff in NMI context"
+> patchset:
+> 
+> http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-generic-solution-for-safe-printk-in-nmi.patch
+> http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-use-irq-work-only-when-ready.patch
+> http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-warn-when-some-message-has-been-lost-in-nmi-context.patch
+> http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-increase-the-size-of-nmi-buffer-and-make-it-configurable.patch
+> 
+> Could we please have a think about what to do about this?
+> 
+> Petr's patchset does have a few outstanding issues (a bug reported by
+> Sergey Senozhatsky and noncommittal review comments from Daniel
+> Thompson) so one approach would be to merge this (Chris's) patchset
+> (which looks rather more straightforward) and to ask Petr to rebase
+> things on top once he gets back onto his work.
 
-Hi Tony
+Sounds reasonable. Let's handle Chris's patchset first. I am
+playing with the panic and could rebase the patchset
+when resending.
 
-The following changes since commit 8fe097a3d99e22355fb8e3bcee59542bf3f46b2d:
-
-  ARM: DRA7: hwmod: Add reset data for PCIe (2016-02-09 02:18:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6/omap-hwmod-b
-
-for you to fetch changes up to 34b4182ce5fd284bff38764f8e73e2160b49d8e9:
-
-  ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1 (2016-03-01 01:55:59 -0700)
-
-- ----------------------------------------------------------------
-ARM: OMAP2+: second set of hwmod changes for v4.6
-
-These patches add RTC support for the AM43xx, and add support for
-the DRA7xx eDMA controller's TPCC, TPTC0, and TPTC1 IP blocks.
-Also included is a workaround for PRCM hardreset control of the DRA7xx
-PCIe subsystem.
-
-Note that I do not have a DRA7xx board, and therefore cannot
-test any patches for that SoC family.
-
-Basic build, boot, and PM test logs can be found here:
-
-http://www.pwsan.com/omap/testlogs/omap-hwmod-b-for-v4.6/20160301021258/
-
-- ----------------------------------------------------------------
-Keerthy (1):
-      ARM: AM43XX: hwmod: Add rtc hwmod
-
-Peter Ujfalusi (1):
-      ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1
-
-Sekhar Nori (1):
-      ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
-
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c |  14 +++-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 111 +++++++++++++++++++++++++++++
- 2 files changed, 124 insertions(+), 1 deletion(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJW1WeoAAoJEMePsQ0LvSpLF2gP/1Lyz4yF9QQrcsroDq8164M1
-NbYFWQnR5FzFWrpUZL72/zfn3iZTGWP8+t4Muy3qgjMCwWb2ciB3tX6v2+DL1Agw
-xTVeB9EJ6QeMogDELw3A9Fv68ZesIaOn/VnKQqQeAi4FQKi9bfc05+fSF2cQZk5a
-SwIqgQbf7bdZc1n4oDDEboQClHjIthYXwdoTtWk4JcUr+6xxF7MnWrQtpEhD/p2n
-WwFw8TCAdOu56Y+/wqSmLNdFhHFkPBHDfS7LnDbLD2RVN7iS7QubamixcnjlKEWa
-dE8ayf+6PU+l583VjJTGfMm5+fm9g+oyUCkr9eCOVrQGga0/en23/1ag0R9X3fYz
-4XNV3ng0PD0q31nvnh9tToGV5Lodhs0cKwx4yg2tcFh1BTvziSZwYeJPpBlgUcjW
-I/1SWZ5gaSSZf5EcEXV4Kv7SFx48xvpp95gog5mrqzqQPqz++Z3//gGqiJkcZHh9
-Pqk7/s03BUaB2DmXY9+uV1USx3/4biyeOlgTqShtZ5ManmNAlY9+wfwPmpCz6cWW
-BpsuEK8T4UQJiiS2mo73g+gxAIF+0uS0doSHaNsJrinX50xd05IxyWOdCEpZTfx1
-O/p48BiwRBqTkjvXCSxWBlIMKf6zQb1oeWbkYfx9flnqPbElbvPAG9yNzu10lYah
-gbPl8f4LFnKKIXaMVJag
-=bfW4
------END PGP SIGNATURE-----
+Best Regards,
+Petr
