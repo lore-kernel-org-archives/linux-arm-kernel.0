@@ -1,49 +1,59 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 29 Feb 2016 15:56:21 -0800
-Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for
- v4.6 - part2
-In-Reply-To: <CABb+yY3cFCYZ3da4zp2UdCTMY6ubjfgMBEkMJ9pe+5OSE=p5+g@mail.gmail.com>
-References: <CADaLNDkF8_DVYWPFtGU8tYsbbxDWZF9tozW=Zs3EuV4BqO6OuA@mail.gmail.com>
- <CABb+yY2A6bLoNqak5Y8YVLgv=mL1Cx6axnD1trMhKx646NNWFw@mail.gmail.com>
- <CADaLNDnqRkOqam1Xt+Oc+7BXnQKr2EQqSL-1AGsn5fKOWEDnvw@mail.gmail.com>
- <CABb+yY3cFCYZ3da4zp2UdCTMY6ubjfgMBEkMJ9pe+5OSE=p5+g@mail.gmail.com>
-Message-ID: <CADaLNDnkFUDH250M4bPO14iCQXt5ciHgC0a_CU0fFTGQXhgC1A@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 29 Feb 2016 16:49:56 -0800
+Subject: [PATCH 0/4] improvements to the nmi_backtrace code
+In-Reply-To: <1456782024-7122-1-git-send-email-cmetcalf@ezchip.com>
+References: <1456782024-7122-1-git-send-email-cmetcalf@ezchip.com>
+Message-ID: <20160229164956.8613016895bef966b6460081@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 3:22 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Fri, Feb 26, 2016 at 2:20 PM, Duc Dang <dhdang@apm.com> wrote:
->> On Thu, Feb 25, 2016 at 8:28 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>> On Fri, Feb 26, 2016 at 8:21 AM, Duc Dang <dhdang@apm.com> wrote:
->>>> Hi Arnd, Olof,
->>>>
->>>> This is the second part of DT changes on X-Gene platforms for v4.6,
->>>> which enables mailbox driver for X-Gene v2 platforms and also enable
->>>> SLIMpro Mailbox I2C driver (a client of the mailbox driver) for both
->>>> X-Gene v1 and v2 platforms.
->>>>
->>>> This series depends on the 3rd patch
->>>> (http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm64/boot/dts/apm?id=be9c09bcca039d6df9ec736989cdafc68c93fed4)
->>>> of the series "mailbox: Add APM X-Gene platform mailbox driver"
->>>> (https://lkml.org/lkml/2016/2/12/749), which was already in linux-next
->>>> since Feb-15.
->>>>
->>>> Hi Jassi,
->>>>
->>>> Are you going to get the 3rd patch (dts patch) of series "mailbox: Add
->>>> APM X-Gene platform mailbox driver" to your tree? Otherwise, I will
->>>> need to create another pull request for Arnd and Olof.
->>>>
->>> Please create the pull request, I don't think mailbox tree is the
->>> right path for the patch.
->>
->> Thanks for your confirmation, Jassi.
->>
-> I overlooked I had already applied it. Not sure if its better to revert it now.
-Hi Jassi,
+On Mon, 29 Feb 2016 16:40:20 -0500 Chris Metcalf <cmetcalf@ezchip.com> wrote:
 
-Arnd merged the mailbox DT node to arm-soc tree. So I think you can
-revert the DT changes in your mailbox tree.
+> This patch series modifies the trigger_xxx_backtrace() NMI-based
+> remote backtracing code to make it more flexible, and makes a few
+> small improvements along the way.
+> 
+> The motivation comes from the task isolation code, where there are
+> scenarios where we want to be able to diagnose a case where some cpu
+> is about to interrupt a task-isolated cpu.  It can be helpful to
+> see both where the interrupting cpu is, and also an approximation
+> of where the cpu that is being interrupted is.  The nmi_backtrace
+> framework allows us to discover the stack of the interrupted cpu.
+> 
+> The first change adds support for trigger_single_cpu_backtrace(), and
+> as an "API side-effect", trigger_cpumask_backtrace().  The underlying
+> abstraction is changed to use cpumasks instead of a "bool except_self".
+> 
+> The second and third changes provide small improvements to the
+> behavior of the existing nmi_backtrace code: omitting full backtrace
+> dumps for idle cores, and doing local dump_stack backtraces when we
+> try to do a "remote" dump of the local core.  Some of this reflects
+> changes from integrating the arch/tile code into the generic code.
+> 
+> The fourth change hooks the arch/tile backtrace mechanism into
+> the nmi_backtrace code to share code and take advantage of other
+> improvements of nmi_backtrace not present in the original arch/tile
+> code, like co-opting printk to use local buffers instead of just
+> spewing to the console and hoping for the best.
+> 
+> The changes have been runtime tested on tile, and build-tested on
+> x86 and arm.
 
-Thanks,
-Duc Dang.
+The patchset looks rather nice but unfortuntely conflicts pretty
+significantly with Petr's "Cleaning printk stuff in NMI context"
+patchset:
+
+http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-generic-solution-for-safe-printk-in-nmi.patch
+http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-use-irq-work-only-when-ready.patch
+http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-warn-when-some-message-has-been-lost-in-nmi-context.patch
+http://ozlabs.org/~akpm/mmots/broken-out/printk-nmi-increase-the-size-of-nmi-buffer-and-make-it-configurable.patch
+
+Could we please have a think about what to do about this?
+
+Petr's patchset does have a few outstanding issues (a bug reported by
+Sergey Senozhatsky and noncommittal review comments from Daniel
+Thompson) so one approach would be to merge this (Chris's) patchset
+(which looks rather more straightforward) and to ask Petr to rebase
+things on top once he gets back onto his work.
+
+Thanks.
