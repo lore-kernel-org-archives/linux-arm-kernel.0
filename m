@@ -1,31 +1,70 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 1 Mar 2016 15:28:12 +0100
-Subject: [PATCH 1/2] arm64: tegra: Add DT entry for keys used in Jetson-TX1
-In-Reply-To: <1456751211-14341-1-git-send-email-ldewangan@nvidia.com>
-References: <1456751211-14341-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <20160301142812.GB26201@ulmo>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue,  1 Mar 2016 14:44:06 +0000
+Subject: [PATCH v2 0/3] arm/arm64: pci: PCI_PROBE_ONLY clean-up
+Message-ID: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 06:36:50PM +0530, Laxman Dewangan wrote:
-> Add DT entry for keys used in Jetson-TX p2371-2180. This has
-> three keys, POWER, VOLUME-UP and VOLUME-DOWN.
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> ---
->  arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts | 25 ++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
+Current arm/arm64 code prevents enabling resources in the respective
+pcibios_enable_device() callbacks if the PCI_PROBE_ONLY flag is set,
+in that on those platforms the resources tree was not validated properly
+since PCI resources are not currently claimed on arm/arm64 PCI_PROBE_ONLY
+systems.
 
-I've applied this with a slightly modified commit message and moved the
-gpio-keys node into the tegra210-p2597.dtsi file, because the GPIO keys
-are part of the P2597 I/O board.
+This is a temporary kludge, in that PCI_PROBE_ONLY flag is used to
+describe systems with fixed resources, that can nonetheless be enabled
+through the standard pci_enable_resources() call present in PCI core code,
+(ie via the generic pcibios_enable_device() call).
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/43c15f99/attachment.sig>
+To remove the PCI_PROBE_ONLY flag in arm/arm64 pcibios_enable_device()
+callbacks, the PCI host controllers that can be used with
+PCI_PROBE_ONLY configurations must make sure that devices resources are
+validated and inserted in the kernel resource tree even on PCI_PROBE_ONLY
+systems so that the generic pcibios_enable_device() generic code, while
+enabling resources (pci_enable_resources()), does not find dangling
+resources pointers (ie missing parent pointers) that are omens of
+an incomplete resource tree, causing failures in resources enablement.
+
+PCI core code provides interfaces to assign/reassign/reallocate PCI
+bus resources but it is currently lacking an interface to claim
+resources for a specific bus. Arches implement resources claiming through
+ad-hoc code built on top of pci_claim_resource() API, but that code
+cannot be leveraged on architectures like arm/arm64 that rely on the
+generic PCI infrastructure to carry out resources claiming/assignment.
+
+Therefore, to clean up the arm/arm64 resources enablement on PCI_PROBE_ONLY
+systems this patchset implements three patches:
+
+PATCH 1: Create PCI core code infrastructure to claim bus resources
+PATCH 2: Leverage the infrastructure in PATCH 1 to claim resources in
+         the PCI generic host controller on PCI_PROBE_ONLY systems
+PATCH 3: Remove PCI_PROBE_ONLY kludges from arm/arm64 PCI back-ends to
+         complete the clean-up and leverage the PCI generic
+         pcibios_enable_device() implementation
+
+Tested on arm/arm64 systems with kvmtool and PCI host generic.
+
+v1 -> v2
+
+- Rewrote patch 1 to recursively claim resources for the whole PCI bus
+  hierarchy
+- Updated commits logs/tags
+- Rebased against v4.5-rc6
+
+v1: https://patchwork.ozlabs.org/patch/545669/
+
+Lorenzo Pieralisi (3):
+  drivers: pci: add generic code to claim bus resources
+  drivers: pci: host-generic: claim bus resources on PCI_PROBE_ONLY
+    set-ups
+  arm/arm64: pci: remove arch specific pcibios_enable_device()
+
+ arch/arm/kernel/bios32.c            | 12 -------
+ arch/arm64/kernel/pci.c             | 13 -------
+ drivers/pci/host/pci-host-generic.c |  5 ++-
+ drivers/pci/setup-bus.c             | 68 +++++++++++++++++++++++++++++++++++++
+ include/linux/pci.h                 |  1 +
+ 5 files changed, 73 insertions(+), 26 deletions(-)
+
+-- 
+2.5.1
