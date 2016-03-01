@@ -1,46 +1,33 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 1 Mar 2016 16:07:41 +0000
-Subject: [PATCH 1/8] ARM64: Enable Amlogic Meson GXBaby platform
-In-Reply-To: <56D5B490.5080604@suse.de>
-References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
- <1456789465-2962-2-git-send-email-afaerber@suse.de>
- <56D5AA8E.4010305@arm.com> <56D5B490.5080604@suse.de>
-Message-ID: <56D5BE4D.7090107@arm.com>
+From: kdasu.kdev@gmail.com (Kamal Dasu)
+Date: Tue, 1 Mar 2016 11:14:51 -0500
+Subject: [PATCH] i2c: brcmstb: allocate correct amount of memory for regmap
+In-Reply-To: <CAC=U0a0FR8u3=zYU7xDW4dJxbwFUY4RHxMdK9zoEHdXcWyNDPg@mail.gmail.com>
+References: <CAC=U0a0FR8u3=zYU7xDW4dJxbwFUY4RHxMdK9zoEHdXcWyNDPg@mail.gmail.com>
+Message-ID: <CAC=U0a0sq4F4YLiJ7W57ZBktpWkGjUHLcTScoZ0v_Lxoth5=Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Wolfram,
 
+I found a minor checkpatch issue with the change while applying the
+patch to my local branch.
 
-On 01/03/16 15:26, Andreas F?rber wrote:
-> Am 01.03.2016 um 15:43 schrieb Sudeep Holla:
->> On 29/02/16 23:44, Andreas F?rber wrote:
->>> Provide the ARCH_MESON Kconfig symbol to allow enabling existing serial
->>> and i2c drivers.
->>>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>>    arch/arm64/Kconfig.platforms | 6 ++++++
->>>    1 file changed, 6 insertions(+)
->>>
->>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->>> index a0a69589e46c..17d0ddaa0516 100644
->>> --- a/arch/arm64/Kconfig.platforms
->>> +++ b/arch/arm64/Kconfig.platforms
->>> @@ -56,6 +56,12 @@ config ARCH_MEDIATEK
->>>        help
->>>          Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
->>>
->>> +config ARCH_MESON
->>> +    bool "Amlogic Platforms"
->>> +    select ARM_GIC
->>
->> Why do you need this ? CONFIG_ARM64 selects GIC for you.
+WARNING: line over 80 characters
+#11: FILE: drivers/i2c/busses/i2c-brcmstb.c:589:
++       dev->bsc_regmap = devm_kzalloc(&pdev->dev,
+sizeof(*dev->bsc_regmap), GFP_KERNEL);
+
+Kamal
+
+On Thu, Feb 25, 2016 at 2:32 PM, Kamal Dasu <kdasu.kdev@gmail.com> wrote:
+>> We want the size of the struct, not of a pointer to it. To be future proof,
+>> just dereference the pointer to get the desired type.
 >
-> ARCH_MEDIATEK above does and should be fixed too then.
-
-Yes I did see that when I checked before replying to you and assumed you
-might have taken it as reference as it's just above this entry :)
-
--- 
-Regards,
-Sudeep
+> Thanks for catching and fixing this.
+>
+>>
+>> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+>
+> Reviewed-by: Kamal Dasu <kdasu.kdev@gmail.com>
+>
+> Kamal
