@@ -1,77 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  1 Mar 2016 11:47:03 +0100
-Subject: [PATCH RFC] video: fbdev: imxfb: make the driver cooperate
-Message-ID: <1456829223-1526-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: Manish.Jaggi@caviumnetworks.com (Jaggi, Manish)
+Date: Tue, 1 Mar 2016 10:48:02 +0000
+Subject: for-next/pgtable branch: OOM error with 16K page size
+In-Reply-To: <BY1PR0701MB159476A9E0E9B5DD9F17EC4BE1BA0@BY1PR0701MB1594.namprd07.prod.outlook.com>
+References: <BY1PR0701MB159476A9E0E9B5DD9F17EC4BE1BA0@BY1PR0701MB1594.namprd07.prod.outlook.com>
+Message-ID: <BY1PR0701MB159496D44DB36F8C3699D3A5E1BB0@BY1PR0701MB1594.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .get_power and .set_power callbacks didn't adhere to the expected(?)
-convention to enable the power when the power parameter is zero.
-Moreover ensure that the regulator is enabled together with the lcd
-controller.
 
-Without these changes there is nothing visible after bootup because the
-regulator is kept off (or disabled by the regulator core because it's not
-used). The lcd regulator is enabled only after 10 minutes of idle when it
-should really go off.
+>>From: linux-arm-kernel <linux-arm-kernel-bounces@lists.infradead.org> on behalf of Jaggi, Manish <Manish.Jaggi@caviumnetworks.com>
+>>Sent: Monday, February 29, 2016 5:56 PM
+>>To: linux-arm-kernel at lists.infradead.org
+>>Subject: for-next/pgtable branch: OOM error with 16K page size
+>>
+>>Hi All,
+>>
+>>I am trying to use the for-next/pgtable branch with the top commit,
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+The same issue is observed with for-next/core branch
 
-this introduces a new warning because the return value of regulator_enable
-isn't checked. If it's agreed that the patch is ok in general I can fix this
-up, but I don't know if fbdev is already too dead even for fixes like this.
-
-Best regards
-Uwe
-
- drivers/video/fbdev/imxfb.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
-index cee88603efc9..7d763164820c 100644
---- a/drivers/video/fbdev/imxfb.c
-+++ b/drivers/video/fbdev/imxfb.c
-@@ -499,6 +499,9 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
- 	clk_prepare_enable(fbi->clk_ipg);
- 	clk_prepare_enable(fbi->clk_ahb);
- 	clk_prepare_enable(fbi->clk_per);
-+	if (!IS_ERR(fbi->lcd_pwr))
-+		regulator_enable(fbi->lcd_pwr);
-+
- 	fbi->enabled = true;
- }
- 
-@@ -513,6 +516,8 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
- 	clk_disable_unprepare(fbi->clk_ipg);
- 	clk_disable_unprepare(fbi->clk_ahb);
- 	fbi->enabled = false;
-+	if (!IS_ERR(fbi->lcd_pwr))
-+		regulator_disable(fbi->lcd_pwr);
- 
- 	writel(0, fbi->regs + LCDC_RMCR);
- }
-@@ -759,9 +764,9 @@ static int imxfb_lcd_get_power(struct lcd_device *lcddev)
- 	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
- 
- 	if (!IS_ERR(fbi->lcd_pwr))
--		return regulator_is_enabled(fbi->lcd_pwr);
-+		return !regulator_is_enabled(fbi->lcd_pwr);
- 
--	return 1;
-+	return 0;
- }
- 
- static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
-@@ -769,7 +774,7 @@ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
- 	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
- 
- 	if (!IS_ERR(fbi->lcd_pwr)) {
--		if (power)
-+		if (!power)
- 			return regulator_enable(fbi->lcd_pwr);
- 		else
- 			return regulator_disable(fbi->lcd_pwr);
--- 
-2.7.0
+>>
+>>
+>>commit 068a17a5805dfbca4bbf03e664ca6b19709cc7a8
+>>Author: Mark Rutland <mark.rutland@arm.com>
+>>Date:   Mon Jan 25 11:45:12 2016 +0000
+>>
+>>   arm64: mm: create new fine-grained mappings at boot
+>>
+>>Setup: ARMv8, Cavium ThunderX, 48Cores 64G ram.
+>>linux config: defconfig + 16k page size.
+>>
+>>Observations:
+>>a) During linux boot I see some oom messages
+>>http://pastebin.com/8jSMFhqf
+>>
+>>b) cat /proc/meminfo
+>>
+>>MemTotal:         66613760 kB
+>>MemFree:          307328 kB
+>>MemAvailable:      22416 kB
+>>
+>>Available memory is very less compared to total.
+>>
+>>c) With 64K pagesize
+>>MemTotal:       66831552 kB
+>>MemFree:         3541184 kB
+>>MemAvailable:    3298752 kB
+>>
+>>So it seems there is some issue with 16k only.
+>>Need some inputs how to fix this
+>>
+>> Regards,
+>>Manish Jaggi
