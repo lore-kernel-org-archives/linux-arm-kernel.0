@@ -1,58 +1,153 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 1 Mar 2016 20:02:58 +0300
-Subject: [PATCH v3 6/7] ACPI: enable ACPI_DBG2_TABLE on ARM64
-In-Reply-To: <56D5ACBB.50408@hurleysoftware.com>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
- <1456749726-30261-7-git-send-email-aleksey.makarov@linaro.org>
- <56D5ACBB.50408@hurleysoftware.com>
-Message-ID: <56D5CB42.3030806@linaro.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 1 Mar 2016 12:04:14 -0500
+Subject: [PATCH v2] PCI: keystone: fix msi code that retrieves the pp
+ struct ptr
+In-Reply-To: <20160229232034.GF3653@localhost>
+References: <1456761113-8416-1-git-send-email-m-karicheri2@ti.com>
+ <20160229232034.GF3653@localhost>
+Message-ID: <56D5CB8E.1090709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/01/2016 05:52 PM, Peter Hurley wrote:
-> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
->> SBBR mentions DBG2 as a mandatory ACPI table.
->> So enable it for ARM64
+On 02/29/2016 06:20 PM, Bjorn Helgaas wrote:
+> [-cc stable, +cc Zhou]
 > 
-> Why does this have to be opted-in per-arch?
+> On Mon, Feb 29, 2016 at 10:51:53AM -0500, Murali Karicheri wrote:
+>> Recent update to pcie-designware core driver, 
+>> 'commit cbce7900598c ("PCI: designware: Make driver arch-agnostic")'
+>> broke the keystone PCI driver. After this commit, we see a kernel crash on
+>> Keystone SoC as shown below in the boot log. This is because, the way pp
+>> struct ptr is retrieved from  msi desc has changed and require similar
+>> update in pci-keystone-dw.c as well. This patch fixes this issue. 
+>>
+>> [    1.012999] pci 0000:00:00.0: PCI bridge to [bus 01]
+>> [    1.018073] pci 0000:00:00.0:   bridge window [io  0x1000-0x1fff]
+>> [    1.024308] pci 0000:00:00.0:   bridge window [mem 0x60000000-0x600fffff]
+>> [    1.031216] pci 0000:00:00.0:   bridge window [mem 0x60100000-0x601fffff
+>> pref]
+>> [    1.038736] Unable to handle kernel NULL pointer dereference at virtual
+>> address 00000030
+>> [    1.046950] pgd = c0003000
+>> [    1.049750] [00000030] *pgd=80000800004003, *pmd=00000000
+>> [    1.055265] Internal error: Oops: 206 [#1] PREEMPT SMP ARM
+>> [    1.060860] Modules linked in:
+>> [    1.064013] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.2-00139-gb74f926 #2
+>> [    1.071266] Hardware name: Keystone
+>> [    1.074853] task: eb888000 ti: eb890000 task.ti: eb890000
+>> [    1.080364] PC is at ks_dw_pcie_msi_irq_unmask+0x24/0x58
+>> [    1.085785] LR is at ks_dw_pcie_msi_irq_unmask+0x18/0x58
+>> [    1.091206] pc : [<c02f65c8>]    lr : [<c02f65bc>]    psr: 60000093
+>> [    1.091206] sp : eb891bc8  ip : 00000000  fp : ebb15010
+>> [    1.102915] r10: 00000051  r9 : 60000013  r8 : ebafaa20
+>> [    1.108247] r7 : ebaa9f80  r6 : eb9fd0c0  r5 : ebafa9d0  r4 : ebafa9c0
+>> [    1.114889] r3 : 00000051  r2 : 00000000  r1 : 00000001  r0 : ebb14c18
+>> [    1.121533] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment
+>> kernel
+>> [    1.129049] Control: 30c5387d  Table: 00003000  DAC: fffffffd
+>> [    1.134905] Process swapper/0 (pid: 1, stack limit = 0xeb890210)
+>> [    1.141023] Stack: (0xeb891bc8 to 0xeb892000)
+>>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: <stable@vger.kernel.org> # 4.4.x
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> 
+> This fixes a regression, so I applied this to for-linus for v4.5, with
+> changelog as follows:
+> 
+Thanks Bjorn,
 
-DBG2 can specify earlycons.  They should start as soon as possible.
-On ARM64 it is just after boot tables become available (in arch_init()).
-So it has to be per-arch unless we decide not to start earlycons on 
-DBG2 ports.
+Regards,
 
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Murali
+> commit 79e3f4a853ed161cd4c06d84b50beebf961a47c6
+> Author: Murali Karicheri <m-karicheri2@ti.com>
+> Date:   Mon Feb 29 17:18:22 2016 -0600
+> 
+>     PCI: keystone: Fix MSI code that retrieves struct pcie_port pointer
+>     
+>     Commit cbce7900598c ("PCI: designware: Make driver arch-agnostic") changed
+>     the host bridge sysdata pointer from the ARM pci_sys_data to the DesignWare
+>     pcie_port structure, and changed pcie-designware.c to reflect that.  But it
+>     did not change the corresponding code in pci-keystone-dw.c, so it caused
+>     crashes on Keystone:
+>     
+>       Unable to handle kernel NULL pointer dereference at virtual address 00000030
+>       pgd = c0003000
+>       [00000030] *pgd=80000800004003, *pmd=00000000
+>       Internal error: Oops: 206 [#1] PREEMPT SMP ARM
+>       CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.2-00139-gb74f926 #2
+>       Hardware name: Keystone
+>       PC is at ks_dw_pcie_msi_irq_unmask+0x24/0x58
+>     
+>     Change pci-keystone-dw.c to expect sysdata to be the struct pcie_port
+>     pointer.
+>     
+>     [bhelgaas: changelog]
+>     Fixes: cbce7900598c ("PCI: designware: Make driver arch-agnostic")
+>     Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>     CC: stable at vger.kernel.org	# v4.4+
+>     CC: Zhou Wang <wangzhou1@hisilicon.com>
+> 
 >> ---
->>  arch/arm64/Kconfig       | 1 +
->>  arch/arm64/kernel/acpi.c | 2 ++
->>  2 files changed, 3 insertions(+)
+>>  v2 - Looks like I missed the fix version format for stable.
+>>       Fixed it per best of my knowledge.
+>>  v1 - Resending as per stable submission procedure
+>>  drivers/pci/host/pci-keystone-dw.c | 11 +++--------
+>>  1 file changed, 3 insertions(+), 8 deletions(-)
 >>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 9dc5209..0b614d4 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -3,6 +3,7 @@ config ARM64
->>  	select ACPI_CCA_REQUIRED if ACPI
->>  	select ACPI_GENERIC_GSI if ACPI
->>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->> +	select ACPI_DBG2_TABLE if ACPI
->>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->>  	select ARCH_HAS_ELF_RANDOMIZE
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index d1ce8e2..3370046 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -208,6 +208,8 @@ void __init acpi_boot_table_init(void)
->>  		pr_err("Failed to init ACPI tables\n");
->>  		if (!param_acpi_force)
->>  			disable_acpi();
->> +	} else {
->> +		acpi_probe_device_table(dbg2);
->>  	}
->>  }
+>> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+>> index ed34c95..6153853 100644
+>> --- a/drivers/pci/host/pci-keystone-dw.c
+>> +++ b/drivers/pci/host/pci-keystone-dw.c
+>> @@ -58,11 +58,6 @@
 >>  
+>>  #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
+>>  
+>> -static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+>> -{
+>> -	return sys->private_data;
+>> -}
+>> -
+>>  static inline void update_reg_offset_bit_pos(u32 offset, u32 *reg_offset,
+>>  					     u32 *bit_pos)
+>>  {
+>> @@ -108,7 +103,7 @@ static void ks_dw_pcie_msi_irq_ack(struct irq_data *d)
+>>  	struct pcie_port *pp;
+>>  
+>>  	msi = irq_data_get_msi_desc(d);
+>> -	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
+>> +	pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
+>>  	ks_pcie = to_keystone_pcie(pp);
+>>  	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
+>>  	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
+>> @@ -146,7 +141,7 @@ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
+>>  	u32 offset;
+>>  
+>>  	msi = irq_data_get_msi_desc(d);
+>> -	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
+>> +	pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
+>>  	ks_pcie = to_keystone_pcie(pp);
+>>  	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
+>>  
+>> @@ -167,7 +162,7 @@ static void ks_dw_pcie_msi_irq_unmask(struct irq_data *d)
+>>  	u32 offset;
+>>  
+>>  	msi = irq_data_get_msi_desc(d);
+>> -	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
+>> +	pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
+>>  	ks_pcie = to_keystone_pcie(pp);
+>>  	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
+>>  
+>> -- 
+>> 1.9.1
 >>
-> 
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
