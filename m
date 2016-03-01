@@ -1,209 +1,298 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue,  1 Mar 2016 18:27:52 +0000
-Subject: [RFC v5 12/17] msi: IOMMU map the doorbell address when needed
+Date: Tue,  1 Mar 2016 18:27:54 +0000
+Subject: [RFC v5 14/17] vfio: allow the user to register reserved iova range
+ for MSI mapping
 In-Reply-To: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
 References: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1456856877-4817-13-git-send-email-eric.auger@linaro.org>
+Message-ID: <1456856877-4817-15-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the msi is emitted by a device attached to an iommu
-domain and this iommu domain requires MSI mapping, the msi
-address (aka doorbell) must be mapped in the IOMMU. Else
-MSI write transaction will cause a fault.
+The user is allowed to [un]register a reserved IOVA range by using the
+DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
+It provides the base address and the size. This region is stored in the
+vfio_dma rb tree. At that point the iova range is not mapped to any target
+address yet. The host kernel will use those iova when needed, typically
+when the VFIO-PCI device allocates its MSIs.
 
-We perform this action at msi message composition time. On any
-MSI address change and MSI message erasure we decrement the reference
-counter to the IOMMU binding.
-
-In case the mapping fails we just WARN_ON.
+This patch also handles the destruction of the reserved binding RB-tree and
+domain's iova_domains.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
 
 ---
+v3 -> v4:
+- use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
+- protect vfio_register_reserved_iova_range implementation with
+  CONFIG_IOMMU_DMA_RESERVED
+- handle unregistration by user-space and on vfio_iommu_type1 release
 
-v5:
-- use macros to increase the readability
-- add comments
-- fix a typo that caused a compilation error if CONFIG_IOMMU_API
-  is not set
+v1 -> v2:
+- set returned value according to alloc_reserved_iova_domain result
+- free the iova domains in case any error occurs
+
+RFC v1 -> v1:
+- takes into account Alex comments, based on
+  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
+- use the existing dma map/unmap ioctl interface with a flag to register
+  a reserved IOVA range. A single reserved iova region is allowed.
 ---
- include/linux/msi.h |  15 +++++++
- kernel/irq/msi.c    | 119 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 134 insertions(+)
+ drivers/vfio/vfio_iommu_type1.c | 141 +++++++++++++++++++++++++++++++++++++++-
+ include/uapi/linux/vfio.h       |  12 +++-
+ 2 files changed, 150 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 03eda72..b920cac 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -10,6 +10,21 @@ struct msi_msg {
- 	u32	data;		/* 16 bits of msi message data */
- };
- 
-+/* Helpers to convert the msi message address to a an iova/physical address */
-+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-+#define msg_to_dma_addr(msg) \
-+	(((dma_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
-+#else
-+#define msg_to_dma_addr(msg) ((msg)->address_lo)
-+#endif
-+
-+#ifdef CONFIG_PHYS_ADDR_T_64BIT
-+#define msg_to_phys_addr(msg) \
-+	(((phys_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
-+#else
-+#define msg_to_phys_addr(msg)	((msg)->address_lo)
-+#endif
-+
- extern int pci_msi_ignore_mask;
- /* Helper functions */
- struct irq_data;
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 72bf4d6..8ddbe57 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -17,6 +17,8 @@
- 
- /* Temparory solution for building, will be removed later */
- #include <linux/pci.h>
-+#include <linux/iommu.h>
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 692e9a2..4e01ebe 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -36,6 +36,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/vfio.h>
+ #include <linux/workqueue.h>
 +#include <linux/dma-reserved-iommu.h>
  
- struct msi_desc *alloc_msi_entry(struct device *dev)
- {
-@@ -55,16 +57,133 @@ static inline void irq_chip_write_msi_msg(struct irq_data *data,
- 	data->chip->irq_write_msi_msg(data, msg);
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -403,10 +404,22 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ 	vfio_lock_acct(-unlocked);
  }
  
-+/**
-+ * msi_map_doorbell: make sure an IOMMU mapping exists on domain @d
-+ * for the message physical address (aka. doorbell)
-+ *
-+ * Either allocate an IOVA and create a mapping or simply increment
-+ * a reference count on the existing IOMMU mapping
-+ * @d: iommu domain handle the mapping belongs to
-+ * @msg: msi message handle
-+ */
-+static int msi_map_doorbell(struct iommu_domain *d, struct msi_msg *msg)
++static void vfio_unmap_reserved(struct vfio_iommu *iommu)
 +{
 +#ifdef CONFIG_IOMMU_DMA_RESERVED
-+	phys_addr_t addr;
-+	dma_addr_t iova;
-+	int ret;
++	struct vfio_domain *d;
 +
-+	addr = msg_to_phys_addr(msg);
-+	ret = iommu_get_single_reserved(d, addr, IOMMU_WRITE, &iova);
-+	if (!ret) {
-+		msg->address_lo = lower_32_bits(iova);
-+		msg->address_hi = upper_32_bits(iova);
++	list_for_each_entry(d, &iommu->domain_list, next)
++		iommu_unmap_reserved(d->domain);
++#endif
++}
++
+ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ {
+ 	if (likely(dma->type != VFIO_IOVA_RESERVED))
+ 		vfio_unmap_unpin(iommu, dma);
++	else
++		vfio_unmap_reserved(iommu);
+ 	vfio_unlink_dma(iommu, dma);
+ 	kfree(dma);
+ }
+@@ -489,7 +502,8 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+ 	 */
+ 	if (iommu->v2) {
+ 		dma = vfio_find_dma(iommu, unmap->iova, 0);
+-		if (dma && dma->iova != unmap->iova) {
++		if (dma && (dma->iova != unmap->iova ||
++			   (dma->type == VFIO_IOVA_RESERVED))) {
+ 			ret = -EINVAL;
+ 			goto unlock;
+ 		}
+@@ -501,6 +515,10 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+ 	}
+ 
+ 	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size))) {
++		if (dma->type == VFIO_IOVA_RESERVED) {
++			ret = -EINVAL;
++			goto unlock;
++		}
+ 		if (!iommu->v2 && unmap->iova > dma->iova)
+ 			break;
+ 		unmapped += dma->size;
+@@ -650,6 +668,114 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+ 	return ret;
+ }
+ 
++static int vfio_register_reserved_iova_range(struct vfio_iommu *iommu,
++			   struct vfio_iommu_type1_dma_map *map)
++{
++#ifdef CONFIG_IOMMU_DMA_RESERVED
++	dma_addr_t iova = map->iova;
++	size_t size = map->size;
++	uint64_t mask;
++	struct vfio_dma *dma;
++	int ret = 0;
++	struct vfio_domain *d;
++	unsigned long order;
++
++	/* Verify that none of our __u64 fields overflow */
++	if (map->size != size || map->iova != iova)
++		return -EINVAL;
++
++	order =  __ffs(vfio_pgsize_bitmap(iommu));
++	mask = ((uint64_t)1 << order) - 1;
++
++	WARN_ON(mask & PAGE_MASK);
++
++	if (!size || (size | iova) & mask)
++		return -EINVAL;
++
++	/* Don't allow IOVA address wrap */
++	if (iova + size - 1 < iova)
++		return -EINVAL;
++
++	mutex_lock(&iommu->lock);
++
++	if (vfio_find_dma(iommu, iova, size)) {
++		ret =  -EEXIST;
++		goto out;
 +	}
++
++	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
++	if (!dma) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	dma->iova = iova;
++	dma->size = size;
++	dma->type = VFIO_IOVA_RESERVED;
++
++	list_for_each_entry(d, &iommu->domain_list, next)
++		ret |= iommu_alloc_reserved_iova_domain(d->domain, iova,
++							size, order);
++
++	if (ret) {
++		list_for_each_entry(d, &iommu->domain_list, next)
++			iommu_free_reserved_iova_domain(d->domain);
++		goto out;
++	}
++
++	vfio_link_dma(iommu, dma);
++
++out:
++	mutex_unlock(&iommu->lock);
 +	return ret;
-+#else
++#else /* CONFIG_IOMMU_DMA_RESERVED */
 +	return -ENODEV;
 +#endif
 +}
 +
-+/**
-+ * msi_unmap_doorbell: decrements the reference count on an existing
-+ * doorbell IOMMU mapping
-+ *
-+ * @d: iommu domain the mapping is attached to
-+ * @msg: msi message containing the doorbell IOVA to unbind
-+ */
-+static void msi_unmap_doorbell(struct iommu_domain *d, struct msi_msg *msg)
++static void vfio_unregister_reserved_iova_range(struct vfio_iommu *iommu,
++				struct vfio_iommu_type1_dma_unmap *unmap)
 +{
 +#ifdef CONFIG_IOMMU_DMA_RESERVED
-+	dma_addr_t iova;
++	dma_addr_t iova = unmap->iova;
++	struct vfio_dma *dma;
++	size_t size = unmap->size;
++	uint64_t mask;
++	unsigned long order;
 +
-+	iova = msg_to_dma_addr(msg);
-+	iommu_put_single_reserved(d, iova);
++	/* Verify that none of our __u64 fields overflow */
++	if (unmap->size != size || unmap->iova != iova)
++		return;
++
++	order =  __ffs(vfio_pgsize_bitmap(iommu));
++	mask = ((uint64_t)1 << order) - 1;
++
++	WARN_ON(mask & PAGE_MASK);
++
++	if (!size || (size | iova) & mask)
++		return;
++
++	/* Don't allow IOVA address wrap */
++	if (iova + size - 1 < iova)
++		return;
++
++	mutex_lock(&iommu->lock);
++
++	dma = vfio_find_dma(iommu, iova, size);
++
++	if (!dma || (dma->type != VFIO_IOVA_RESERVED)) {
++		unmap->size = 0;
++		goto out;
++	}
++
++	unmap->size =  dma->size;
++	vfio_remove_dma(iommu, dma);
++
++out:
++	mutex_unlock(&iommu->lock);
 +#endif
 +}
 +
-+#ifdef CONFIG_IOMMU_API
-+/**
-+ * irq_data_to_msi_mapping_domain: checks if an irq corresponds to
-+ * an MSI whose write address must be mapped in an IOMMU domain
-+ *
-+ * determine whether the irq corresponds to an MSI emitted by a device,
-+ * upstream to an IOMMU, and if this IOMMU requires a binding of the
-+ * MSI address
-+ *
-+ * @irq_data: irq data handle
-+ */
-+static struct iommu_domain *
-+irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
-+{
-+	struct iommu_domain *d;
-+	struct msi_desc *desc;
-+	struct device *dev;
-+	int ret;
-+
-+	desc = irq_data_get_msi_desc(irq_data);
-+	if (!desc)
-+		return NULL;
-+
-+	dev = msi_desc_to_dev(desc);
-+
-+	d = iommu_get_domain_for_dev(dev);
-+	if (!d)
-+		return NULL;
-+
-+	ret = iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_MAPPING, NULL);
-+	if (!ret)
-+		return d;
-+	else
-+		return NULL;
-+}
-+#else
-+static inline struct iommu_domain *
-+irq_data_to_msi_mapping_domain(struct irq_data *irq_data)
-+{
-+	return NULL;
-+}
-+#endif /* CONFIG_IOMMU_API */
-+
- static int msi_compose(struct irq_data *irq_data,
- 		       struct msi_msg *msg, bool erase)
+ static int vfio_bus_type(struct device *dev, void *data)
  {
-+	struct msi_msg old_msg;
-+	struct iommu_domain *d;
- 	int ret = 0;
+ 	struct bus_type **bus = data;
+@@ -946,6 +1072,7 @@ static void vfio_iommu_type1_release(void *iommu_data)
+ 	struct vfio_group *group, *group_tmp;
  
-+	/*
-+	 * Does this IRQ require an MSI address mapping in an IOMMU?
-+	 * If it does, read the existing cached message. This will allow
-+	 * to check if the IOMMU mapping needs an update
-+	 */
-+	d = irq_data_to_msi_mapping_domain(irq_data);
-+	if (unlikely(d))
-+		get_cached_msi_msg(irq_data->irq, &old_msg);
-+
- 	if (erase)
- 		memset(msg, 0, sizeof(*msg));
- 	else
- 		ret = irq_chip_compose_msi_msg(irq_data, msg);
+ 	vfio_iommu_unmap_unpin_all(iommu);
++	vfio_unmap_reserved(iommu);
  
-+	if (!d)
-+		goto out;
+ 	list_for_each_entry_safe(domain, domain_tmp,
+ 				 &iommu->domain_list, next) {
+@@ -1019,7 +1146,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+ 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
+ 		struct vfio_iommu_type1_dma_map map;
+ 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
+-				VFIO_DMA_MAP_FLAG_WRITE;
++				VFIO_DMA_MAP_FLAG_WRITE |
++				VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA;
+ 
+ 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
+ 
+@@ -1029,6 +1157,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+ 		if (map.argsz < minsz || map.flags & ~mask)
+ 			return -EINVAL;
+ 
++		if (map.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA)
++			return vfio_register_reserved_iova_range(iommu, &map);
 +
-+	/*
-+	 * An MSI address IOMMU binding needs to be handled.
-+	 * In case we have a change in the MSI address or an MSI
-+	 * message erasure, destroy the existing binding.
-+	 * In case we have an actual MSI message composition
-+	 * bind the new MSI address
-+	 */
-+	if ((old_msg.address_lo != msg->address_lo) ||
-+	    (old_msg.address_hi != msg->address_hi))
-+		msi_unmap_doorbell(d, &old_msg);
+ 		return vfio_dma_do_map(iommu, &map);
+ 
+ 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
+@@ -1043,10 +1174,16 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+ 		if (unmap.argsz < minsz || unmap.flags)
+ 			return -EINVAL;
+ 
++		if (unmap.flags & VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA) {
++			vfio_unregister_reserved_iova_range(iommu, &unmap);
++			goto out;
++		}
 +
-+	if (!erase)
-+		WARN_ON(msi_map_doorbell(d, msg));
-+
+ 		ret = vfio_dma_do_unmap(iommu, &unmap);
+ 		if (ret)
+ 			return ret;
+ 
 +out:
- 	return ret;
- }
+ 		return copy_to_user((void __user *)arg, &unmap, minsz);
+ 	}
  
+diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+index 7d7a4c6..d5a48e7 100644
+--- a/include/uapi/linux/vfio.h
++++ b/include/uapi/linux/vfio.h
+@@ -410,12 +410,21 @@ struct vfio_iommu_type1_info {
+  *
+  * Map process virtual addresses to IO virtual addresses using the
+  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
++ *
++ * In case MSI_RESERVED_IOVA flag is set, the API only aims@registering an
++ * IOVA region which will be used on some platforms to map the host MSI frame.
++ * in that specific case, vaddr and prot are ignored. The requirement for
++ * provisioning such IOVA range can be checked by calling VFIO_IOMMU_GET_INFO
++ * with the VFIO_IOMMU_INFO_REQUIRE_MSI_MAP attribute. A single
++ * MSI_RESERVED_IOVA region can be registered
+  */
+ struct vfio_iommu_type1_dma_map {
+ 	__u32	argsz;
+ 	__u32	flags;
+ #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
+ #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
++/* reserved iova for MSI vectors*/
++#define VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA (1 << 2)
+ 	__u64	vaddr;				/* Process virtual address */
+ 	__u64	iova;				/* IO virtual address */
+ 	__u64	size;				/* Size of mapping (bytes) */
+@@ -431,7 +440,8 @@ struct vfio_iommu_type1_dma_map {
+  * Caller sets argsz.  The actual unmapped size is returned in the size
+  * field.  No guarantee is made to the user that arbitrary unmaps of iova
+  * or size different from those used in the original mapping call will
+- * succeed.
++ * succeed. A Reserved DMA region must be unmapped with MSI_RESERVED_IOVA
++ * flag set.
+  */
+ struct vfio_iommu_type1_dma_unmap {
+ 	__u32	argsz;
 -- 
 1.9.1
