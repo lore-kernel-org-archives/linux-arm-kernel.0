@@ -1,64 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Mar 2016 23:12:20 +0100
-Subject: [PATCH] pcmcia: db1xxx: use correct irq_to_gpio helper
-Message-ID: <1547427.xN2rd1Mon4@wuerfel>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 2 Mar 2016 09:14:50 +1100
+Subject: linux-next: manual merge of the samsung-krzk tree with the arm-soc
+ tree
+Message-ID: <20160302091450.6b1463bf@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the removal of asm/gpio.h and asm/mach-au1x00/gpio.h, the db1xxx_ss
-pcmcia driver picked up the wrong irq_to_gpio function from the generic
-headers.
+Hi Krzysztof,
 
-This restores the old __au_irq_to_gpio() implementation, but keeps
-it local to the only file that uses it.
+Today's linux-next merge of the samsung-krzk tree got a conflict in:
 
-It would be nicer to just pass the gpio number from platform code,
-but restoring the previous implementation seems safer.
+  arch/arm64/configs/defconfig
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: stable at vger.kernel.org # v4.3
-Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h")
----
-I think this is now the last holdout of the irq_to_gpio function,
-and it's been broken for a while. Maybe Ralf can queue it up through
-the MIPS tree along with the other fix for irq_to_gpio?
+between commit:
 
-Linus, maybe you can queue up the include/linux/gpio.h change to
-remove the function as well for 4.6. We have two users of this function
-on MIPS that are already broken, and adding the patch turns the
-runtime bug into a compile-time bug, which seems like a good thing
-to me. The other patch is already queued in the mips tree.
+  efdda175c07f ("arm64: defconfig: add spmi and usb related configs")
 
-diff --git a/drivers/pcmcia/db1xxx_ss.c b/drivers/pcmcia/db1xxx_ss.c
-index 4c2fa05b4589..41f28879bfef 100644
---- a/drivers/pcmcia/db1xxx_ss.c
-+++ b/drivers/pcmcia/db1xxx_ss.c
-@@ -35,6 +35,19 @@
- 
- #include <asm/mach-au1x00/au1000.h>
- #include <asm/mach-db1x00/bcsr.h>
-+#include <asm/mach-au1x00/gpio-au1000.h>
-+#include <asm/mach-au1x00/gpio-au1300.h>
-+
-+static inline int __au_irq_to_gpio(unsigned int irq)
-+{
-+	switch (alchemy_get_cputype()) {
-+	case ALCHEMY_CPU_AU1000...ALCHEMY_CPU_AU1200:
-+		return alchemy_irq_to_gpio(irq);
-+	case ALCHEMY_CPU_AU1300:
-+		return au1300_irq_to_gpio(irq);
-+	}
-+	return -EINVAL;
-+}
- 
- #define MEM_MAP_SIZE	0x400000
- #define IO_MAP_SIZE	0x1000
-@@ -83,7 +96,7 @@ static int db1200_card_inserted(struct db1x_pcmcia_sock *sock)
- /* carddetect gpio: low-active */
- static int db1000_card_inserted(struct db1x_pcmcia_sock *sock)
- {
--	return !gpio_get_value(irq_to_gpio(sock->insert_irq));
-+	return !gpio_get_value(__au_irq_to_gpio(sock->insert_irq));
- }
- 
- static int db1x_card_inserted(struct db1x_pcmcia_sock *sock)
+from the arm-soc tree and commit:
+
+  617fe7196d54 ("arm64: defconfig: Enable exynos thermal config")
+  6bb837189388 ("arm64: defconfig: Enable Samsung MFD and related configs")
+
+from the samsung-krzk tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm64/configs/defconfig
+index 459e96aec818,df8f580b60e0..000000000000
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@@ -30,11 -31,9 +30,11 @@@ CONFIG_MODULES=
+  CONFIG_MODULE_UNLOAD=y
+  # CONFIG_BLK_DEV_BSG is not set
+  # CONFIG_IOSCHED_DEADLINE is not set
+ +CONFIG_ARCH_SUNXI=y
+ +CONFIG_ARCH_ALPINE=y
+  CONFIG_ARCH_BCM_IPROC=y
+  CONFIG_ARCH_BERLIN=y
+- CONFIG_ARCH_EXYNOS7=y
++ CONFIG_ARCH_EXYNOS=y
+  CONFIG_ARCH_LAYERSCAPE=y
+  CONFIG_ARCH_HISI=y
+  CONFIG_ARCH_MEDIATEK=y
+@@@ -164,11 -147,14 +164,16 @@@ CONFIG_GPIO_XGENE=
+  CONFIG_POWER_RESET_XGENE=y
+  CONFIG_POWER_RESET_SYSCON=y
+  # CONFIG_HWMON is not set
++ CONFIG_THERMAL=y
++ CONFIG_THERMAL_EMULATION=y
++ CONFIG_EXYNOS_THERMAL=y
++ CONFIG_MFD_SEC_CORE=y
+ +CONFIG_MFD_SPMI_PMIC=y
+  CONFIG_REGULATOR=y
+  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+  CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ +CONFIG_REGULATOR_QCOM_SPMI=y
++ CONFIG_REGULATOR_S2MPS11=y
+  CONFIG_FB=y
+  CONFIG_FB_ARMCLCD=y
+  CONFIG_FRAMEBUFFER_CONSOLE=y
+@@@ -215,16 -191,13 +220,17 @@@ CONFIG_LEDS_TRIGGERS=
+  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+  CONFIG_LEDS_TRIGGER_CPU=y
+  CONFIG_RTC_CLASS=y
++ CONFIG_RTC_DRV_S5M=y
+  CONFIG_RTC_DRV_EFI=y
+ +CONFIG_RTC_DRV_PL031=y
+ +CONFIG_RTC_DRV_SUN6I=y
+  CONFIG_RTC_DRV_XGENE=y
+  CONFIG_DMADEVICES=y
+ -CONFIG_RCAR_DMAC=y
+  CONFIG_QCOM_BAM_DMA=y
+  CONFIG_TEGRA20_APB_DMA=y
+ +CONFIG_RCAR_DMAC=y
+ +CONFIG_VFIO=y
+ +CONFIG_VFIO_PCI=y
+  CONFIG_VIRTIO_PCI=y
+  CONFIG_VIRTIO_BALLOON=y
+  CONFIG_VIRTIO_MMIO=y
