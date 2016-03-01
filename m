@@ -1,35 +1,56 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Mar 2016 08:20:30 +0900
-Subject: linux-next: manual merge of the samsung-krzk tree with the arm-soc
- tree
-In-Reply-To: <20160302091450.6b1463bf@canb.auug.org.au>
-References: <20160302091450.6b1463bf@canb.auug.org.au>
-Message-ID: <56D623BE.3050303@samsung.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Tue, 1 Mar 2016 23:30:40 +0000
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <20160226144114.GA7475@codeblueprint.co.uk>
+References: <1455535953-5056-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <20160218191624.GA1515@redhat.com>
+ <20160226144114.GA7475@codeblueprint.co.uk>
+Message-ID: <20160301233040.GA31476@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.03.2016 07:14, Stephen Rothwell wrote:
-> Hi Krzysztof,
+On Fri, 26 Feb, at 02:41:14PM, Matt Fleming wrote:
+> On Thu, 18 Feb, at 02:16:24PM, Peter Jones wrote:
+> > 
+> > So the question I have is: would you rather chop up regions and reserve
+> > the space, or allocate a new copy and update the configuration table
+> > (after ExitBootServices()) to point to it?  The latter makes it pretty
+> > easy to do from an API that all these drivers can use, and it makes the
+> > kexec case completely transparent.
+> > 
+> > Up to you.
 > 
-> Today's linux-next merge of the samsung-krzk tree got a conflict in:
+> I think it makes the most sense to chop up the regions we care about
+> (i.e. the ones we have drivers for) because not only does that save us
+> the effort of copying out the data on every kexec reboot, it also
+> prevents us from leaking each copy since we don't free them at the
+> moment.
 > 
->   arch/arm64/configs/defconfig
+> Then we just need to maintain a separate list of regions to free in
+> efi_free_boot_services() or have some other way to distinguish between
+> them.
 > 
-> between commit:
-> 
->   efdda175c07f ("arm64: defconfig: add spmi and usb related configs")
-> 
-> from the arm-soc tree and commit:
-> 
->   617fe7196d54 ("arm64: defconfig: Enable exynos thermal config")
->   6bb837189388 ("arm64: defconfig: Enable Samsung MFD and related configs")
-> 
-> from the samsung-krzk tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
+> Oh, and save_runtime_map() would need updating to save Boot Services
+> regions too.
 
-Yeah, that was expected... Thanks for the fix, looks fine from Samsung's
-side.
+I have a very rough draft of patches that implement this strategy on
+the 'experiemntal/efi-memmap' branch in the EFI tree if anyone is
+curious and wants to take a look. The series will be sent out soon.
 
-Best regards,
-Krzysztof
+I wouldn't necessarily try running them or anything as there's a few
+things that I know are broken; ia64 build, EFI mixed mode boot,
+probably arm64 regressions.
+
+The upshot of the patch series is that there's a whole lot of code we
+can share for manipulating memory maps between all EFI architectures
+and by fixing this "reserve boot services regions" in a generic way it
+should mean kexec under EFI on arm64 should be fairly trivial to
+implement, along with ESRT, etc.
