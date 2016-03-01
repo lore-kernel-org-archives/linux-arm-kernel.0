@@ -1,69 +1,50 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Tue, 1 Mar 2016 08:21:06 +0100
-Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
-In-Reply-To: <20160229153934.GB14848@arm.com>
-References: <cover.1455810755.git.jglauber@cavium.com>
- <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
- <20160229153934.GB14848@arm.com>
-Message-ID: <20160301072106.GA6326@hardcore>
+From: varun@chelsio.com (Varun Prakash)
+Date: Tue, 1 Mar 2016 12:58:29 +0530
+Subject: [PATCH] target/cxgbit: add INET dependency
+In-Reply-To: <1456810108.19657.187.camel@haakon3.risingtidesystems.com>
+References: <1456744504-3011977-1-git-send-email-arnd@arndb.de>
+ <1456810108.19657.187.camel@haakon3.risingtidesystems.com>
+Message-ID: <20160301072828.GA1704@chelsio.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 03:39:35PM +0000, Will Deacon wrote:
-> Hi Jan,
+On Tue, Mar 01, 2016 at 10:58:28AM +0530, Nicholas A. Bellinger wrote:
+> Hi Arnd,
 > 
-> I've queued this lot on my perf/updates branch, but I just noticed an
-> oddity whilst dealing with some potential conflicts with the kvm tree.
-> 
-> On Thu, Feb 18, 2016 at 05:50:13PM +0100, Jan Glauber wrote:
-> > With the long cycle counter bit (LC) disabled the cycle counter is not
-> > working on ThunderX SOC (ThunderX only implements Aarch64).
-> > Also, according to documentation LC == 0 is deprecated.
+> On Mon, 2016-02-29 at 12:14 +0100, Arnd Bergmann wrote:
+> > The newly added cxgbit driver directly calls functions of the
+> > IPv4 network stack, which fails if that is disabled:
 > > 
-> > To keep the code simple the patch does not introduce 64 bit wide counter
-> > functions. Instead writing the cycle counter always sets the upper
-> > 32 bits so overflow interrupts are generated as before.
+> > ERROR: "ip_route_output_flow" [drivers/target/iscsi/cxgbit/cxgbit.ko] undefined!
+> > ERROR: "__ip_dev_find" [drivers/target/iscsi/cxgbit/cxgbit.ko] undefined!
 > > 
-> > Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
+> > This adds a Kconfig dependency to ensure we can't enable this
+> > driver without the complete network stack it needs.
 > > 
-> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: b7ca3321e114 ("cxgbit: add Kconfig and Makefile")
 > > ---
-> >  arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
-> >  1 file changed, 16 insertions(+), 5 deletions(-)
+> >  drivers/target/iscsi/cxgbit/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
 > > 
-> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> > index 0ed05f6..c68fa98 100644
-> > --- a/arch/arm64/kernel/perf_event.c
-> > +++ b/arch/arm64/kernel/perf_event.c
-> > @@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
-> >  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
-> >  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
-> >  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-> > +#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
-> >  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
-> >  #define	ARMV8_PMCR_N_MASK	0x1f
-> >  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+> > diff --git a/drivers/target/iscsi/cxgbit/Kconfig b/drivers/target/iscsi/cxgbit/Kconfig
+> > index cf335b4dbb4e..ce6f5cca315d 100644
+> > --- a/drivers/target/iscsi/cxgbit/Kconfig
+> > +++ b/drivers/target/iscsi/cxgbit/Kconfig
+> > @@ -1,6 +1,7 @@
+> >  config ISCSI_TARGET_CXGB4
+> >  	tristate "Chelsio iSCSI target offload driver"
+> >  	depends on ISCSI_TARGET && CHELSIO_T4
+> > +	depends on INET
+> >  	select CHELSIO_T4_UWIRE
+> >  	---help---
+> >  	To compile this driver as module, choose M here: the module
 > 
-> You haven't extended this mask to cover the LC bit, so it will be ignored
-> by armv8pmu_pmcr_write afaict.
+> Odd, ISCSI_TARGET already depends on NET, but I guess that's not enough
+> for cxgbit..  ;)
+> 
+> Varun, please pick this up and fold it into the original commit, with
+> proper credit to Arnd for finding this in the commit log.
 
-This is weird. I've double checked and I missed this mask. Annoying.
-Nevertheless it works for me without the LC bit set.
-
-> How did you test this? I can easily update the mask, but it would be
-> good to know that it doesn't end up cause a breakage.
- 
-For testing I used:
-- perf top and perf record & report
-- looked at interrupt numbers in /proc/interrupts
-
-Without the patch _no_ samples at all are recorded and the interrupt does
-not occur. With the patch I get samples and see a reasonable number of
-interrupts.
-
-Extending the mask so the LC bit is covered would make sense, I'm going
-to test this now.
-
-Jan
-
-> Will
+I will update the original commit in v2 series, thanks Arnd for
+finding this.
