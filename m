@@ -1,48 +1,69 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 1 Mar 2016 09:58:33 +0000
-Subject: [RFC PATCH] arm: kernel: pci: remove pci=firmware command line
- parameter handling
-In-Reply-To: <20160229174258.GL5891@wantstofly.org>
-References: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20160229174258.GL5891@wantstofly.org>
-Message-ID: <20160301095832.GC31766@red-moon>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 1 Mar 2016 09:58:51 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: second set of hwmod changes for v4.6
+Message-ID: <alpine.DEB.2.02.1603010958120.14948@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 07:42:58PM +0200, Lennert Buytenhek wrote:
-> On Mon, Feb 29, 2016 at 05:43:20PM +0000, Lorenzo Pieralisi wrote:
-> 
-> > According to kernel documentation, the pci=firmware command line
-> > parameter is only meant to be used on IXP2000 ARM platforms to prevent
-> > the kernel from assigning PCI resources configured by the bootloader.
-> > 
-> > Since the IXP2000 ARM platforms support has been removed from the
-> > kernel in commit:
-> > 
-> > commit c65f2abf54a6 ("ARM: remove ixp23xx and ixp2000 platforms")
-> > 
-> > its platforms specific kernel parameters should be removed
-> > too from the kernel documentation along with the kernel code
-> > currently handling them in that they have just become obsolete.
-> > 
-> > This patch removes the pci=firmware command line parameter handling
-> > from ARM code and the related kernel parameters documentation
-> > section.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> > Cc: Jonathan Corbet <corbet@lwn.net>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> 
-> Acked-by: Lennert Buytenhek <kernel@wantstofly.org>
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Thank you Lennert, I take this as an acknowledgement that you are not
-aware of any other ARM platform using that kernel parameter other than
-IXP2000s, according to documentation there should not be any but it is a
-bit complicated to figure out.
+Hi Tony
 
-Thanks,
-Lorenzo
+The following changes since commit 8fe097a3d99e22355fb8e3bcee59542bf3f46b2d:
+
+  ARM: DRA7: hwmod: Add reset data for PCIe (2016-02-09 02:18:52 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6/omap-hwmod-b
+
+for you to fetch changes up to 34b4182ce5fd284bff38764f8e73e2160b49d8e9:
+
+  ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1 (2016-03-01 01:55:59 -0700)
+
+- ----------------------------------------------------------------
+ARM: OMAP2+: second set of hwmod changes for v4.6
+
+These patches add RTC support for the AM43xx, and add support for
+the DRA7xx eDMA controller's TPCC, TPTC0, and TPTC1 IP blocks.
+Also included is a workaround for PRCM hardreset control of the DRA7xx
+PCIe subsystem.
+
+Note that I do not have a DRA7xx board, and therefore cannot
+test any patches for that SoC family.
+
+Basic build, boot, and PM test logs can be found here:
+
+http://www.pwsan.com/omap/testlogs/omap-hwmod-b-for-v4.6/20160301021258/
+
+- ----------------------------------------------------------------
+Keerthy (1):
+      ARM: AM43XX: hwmod: Add rtc hwmod
+
+Peter Ujfalusi (1):
+      ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1
+
+Sekhar Nori (1):
+      ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c |  14 +++-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 111 +++++++++++++++++++++++++++++
+ 2 files changed, 124 insertions(+), 1 deletion(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJW1WeoAAoJEMePsQ0LvSpLF2gP/1Lyz4yF9QQrcsroDq8164M1
+NbYFWQnR5FzFWrpUZL72/zfn3iZTGWP8+t4Muy3qgjMCwWb2ciB3tX6v2+DL1Agw
+xTVeB9EJ6QeMogDELw3A9Fv68ZesIaOn/VnKQqQeAi4FQKi9bfc05+fSF2cQZk5a
+SwIqgQbf7bdZc1n4oDDEboQClHjIthYXwdoTtWk4JcUr+6xxF7MnWrQtpEhD/p2n
+WwFw8TCAdOu56Y+/wqSmLNdFhHFkPBHDfS7LnDbLD2RVN7iS7QubamixcnjlKEWa
+dE8ayf+6PU+l583VjJTGfMm5+fm9g+oyUCkr9eCOVrQGga0/en23/1ag0R9X3fYz
+4XNV3ng0PD0q31nvnh9tToGV5Lodhs0cKwx4yg2tcFh1BTvziSZwYeJPpBlgUcjW
+I/1SWZ5gaSSZf5EcEXV4Kv7SFx48xvpp95gog5mrqzqQPqz++Z3//gGqiJkcZHh9
+Pqk7/s03BUaB2DmXY9+uV1USx3/4biyeOlgTqShtZ5ManmNAlY9+wfwPmpCz6cWW
+BpsuEK8T4UQJiiS2mo73g+gxAIF+0uS0doSHaNsJrinX50xd05IxyWOdCEpZTfx1
+O/p48BiwRBqTkjvXCSxWBlIMKf6zQb1oeWbkYfx9flnqPbElbvPAG9yNzu10lYah
+gbPl8f4LFnKKIXaMVJag
+=bfW4
+-----END PGP SIGNATURE-----
