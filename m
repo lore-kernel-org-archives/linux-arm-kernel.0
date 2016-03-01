@@ -1,117 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  1 Mar 2016 15:01:21 -0800
-Subject: [GIT PULL 4/4] omap device tree changes for v4.6 merge window, part 2
-In-Reply-To: <pull-1456872971-400983>
-References: <pull-1456872971-400983>
-Message-ID: <pull-1456872971-400983-4>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 02 Mar 2016 08:20:30 +0900
+Subject: linux-next: manual merge of the samsung-krzk tree with the arm-soc
+ tree
+In-Reply-To: <20160302091450.6b1463bf@canb.auug.org.au>
+References: <20160302091450.6b1463bf@canb.auug.org.au>
+Message-ID: <56D623BE.3050303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b9d3ec1d98c658226606e66e55c940491447e617:
+On 02.03.2016 07:14, Stephen Rothwell wrote:
+> Hi Krzysztof,
+> 
+> Today's linux-next merge of the samsung-krzk tree got a conflict in:
+> 
+>   arch/arm64/configs/defconfig
+> 
+> between commit:
+> 
+>   efdda175c07f ("arm64: defconfig: add spmi and usb related configs")
+> 
+> from the arm-soc tree and commit:
+> 
+>   617fe7196d54 ("arm64: defconfig: Enable exynos thermal config")
+>   6bb837189388 ("arm64: defconfig: Enable Samsung MFD and related configs")
+> 
+> from the samsung-krzk tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
 
-  ARM: dts: am57xx-beagle-x15: Add eeprom information (2016-02-22 11:18:40 -0800)
+Yeah, that was expected... Thanks for the fix, looks fine from Samsung's
+side.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/dt-pt2
-
-for you to fetch changes up to 5193523ba644d60283986495d410659922660b5b:
-
-  ARM: dts: omap3-sniper: TWL4030 keypad support (2016-03-01 12:57:06 -0800)
-
-----------------------------------------------------------------
-Part 2 of device tree changes for omaps for v4.6 merge window:
-
-- A series of GPMC related interrupt changes from
-  Rogeq Quadros <rogerq@ti.com> to prepare adding interrupt
-  support to the NAND driver
-
-- Add RTC support for ti81xx
-
-- Correct LogicPD Torpedo mode description
-
-- Add basic support for LG Optimus Black phone in several
-  patches by Paul Kocialkowski <contact@paulk.fr>
-
-- Change address-cells for dra7 for LPAE
-
-- Add TBCLK for PWMSS on dra7
-
-----------------------------------------------------------------
-Adam Ford (1):
-      ARM: dts: dm3730-torpedo-devkit: Add "Wireless" to model
-
-Lokesh Vutla (1):
-      ARM: dts: DRA7: change address-cells and size-cells
-
-Paul Kocialkowski (3):
-      ARM: dts: LG Optimus Black codename sniper basic support
-      ARM: dts: omap3-sniper: USB OTG support
-      ARM: dts: omap3-sniper: TWL4030 keypad support
-
-Roger Quadros (11):
-      ARM: dts: dra7: Fix NAND device nodes
-      ARM: dts: dra7: Remove redundant nand property
-      ARM: dts: am437x: Fix NAND device nodes
-      ARM: dts: am437x: Disable wait pin monitoring for NAND
-      ARM: dts: am335x: Fix NAND device nodes
-      ARM: dts: am335x: Disable wait pin monitoring for NAND
-      ARM: dts: dm816x: Fix NAND device nodes
-      ARM: dts: dm8168-evm: ARM: dts: Disable wait pin monitoring for NAND
-      ARM: dts: omap3: Fix NAND device nodes
-      ARM: dts: dm814x: dra62x: Fix NAND device nodes
-      ARM: dts: dm814x: dra62x: Disable wait pin monitoring for NAND
-
-Tony Lindgren (4):
-      Merge branch 'omap-for-v4.6/dt-gpmc' into omap-for-v4.6/dt
-      ARM: dts: Add RTC entry for dm814x and dra62x
-      ARM: dts: Add RTC entry for dm816x
-      Revert "ARM: dts: DRA7: Add dt nodes for PWMSS"
-
-Vignesh R (2):
-      ARM: dts: DRA7: Add TBCLK for PWMSS
-      ARM: dts: DRA7: Add dt nodes for PWMSS
-
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/am335x-baltos-ir5221.dts        |   9 +-
- arch/arm/boot/dts/am335x-chilisom.dtsi            |   8 +-
- arch/arm/boot/dts/am335x-cm-t335.dts              |   9 +-
- arch/arm/boot/dts/am335x-evm.dts                  |   7 +-
- arch/arm/boot/dts/am335x-igep0033.dtsi            |   8 +-
- arch/arm/boot/dts/am335x-phycore-som.dtsi         |   8 +-
- arch/arm/boot/dts/am33xx.dtsi                     |   2 +
- arch/arm/boot/dts/am4372.dtsi                     |   2 +
- arch/arm/boot/dts/am437x-cm-t43.dts               |  11 +-
- arch/arm/boot/dts/am437x-gp-evm.dts               |   8 +-
- arch/arm/boot/dts/am43x-epos-evm.dts              |   8 +-
- arch/arm/boot/dts/am57xx-beagle-x15.dts           |   2 +-
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts         |   2 +-
- arch/arm/boot/dts/dm8148-evm.dts                  |  10 +-
- arch/arm/boot/dts/dm814x.dtsi                     |   9 +
- arch/arm/boot/dts/dm8168-evm.dts                  |   8 +-
- arch/arm/boot/dts/dm816x.dtsi                     |   9 +
- arch/arm/boot/dts/dra62x-j5eco-evm.dts            |  10 +-
- arch/arm/boot/dts/dra7-evm.dts                    |   9 +-
- arch/arm/boot/dts/dra7.dtsi                       |  22 +-
- arch/arm/boot/dts/dra72-evm.dts                   |   9 +-
- arch/arm/boot/dts/dra7xx-clocks.dtsi              |  24 ++
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts |   5 +-
- arch/arm/boot/dts/logicpd-torpedo-som.dtsi        |   8 +-
- arch/arm/boot/dts/omap3-beagle.dts                |   5 +-
- arch/arm/boot/dts/omap3-cm-t3x.dtsi               |   6 +-
- arch/arm/boot/dts/omap3-devkit8000-common.dtsi    |   4 +
- arch/arm/boot/dts/omap3-evm-37xx.dts              |   8 +-
- arch/arm/boot/dts/omap3-gta04.dtsi                |   4 +
- arch/arm/boot/dts/omap3-igep.dtsi                 |   6 +-
- arch/arm/boot/dts/omap3-igep0020-common.dtsi      |   4 +-
- arch/arm/boot/dts/omap3-igep0030-common.dtsi      |   4 +
- arch/arm/boot/dts/omap3-ldp.dts                   |  10 +-
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi           |   6 +-
- arch/arm/boot/dts/omap3-overo-base.dtsi           |   6 +-
- arch/arm/boot/dts/omap3-pandora-common.dtsi       |   4 +
- arch/arm/boot/dts/omap3-sniper.dts                | 254 ++++++++++++++++++++++
- arch/arm/boot/dts/omap3-tao3530.dtsi              |   6 +-
- arch/arm/boot/dts/omap3.dtsi                      |   2 +
- arch/arm/boot/dts/omap3430-sdp.dts                |   6 +-
- 41 files changed, 464 insertions(+), 79 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-sniper.dts
+Best regards,
+Krzysztof
