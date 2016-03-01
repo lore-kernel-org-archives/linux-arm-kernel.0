@@ -1,24 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  1 Mar 2016 17:59:56 +0100
-Subject: [PATCH 0/6] rtc: generic: follow up for COMPILE_TEST
-Message-ID: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
+Date: Tue,  1 Mar 2016 17:59:57 +0100
+Subject: [PATCH 1/6] rtc: generic: allow building on all architectures
+In-Reply-To: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
+References: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
+Message-ID: <1456851608-3374907-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Today's linux-next kernel allowed building the rtc-generic
-driver (and most other rtc drivers) on all architectures,
-but this caused some errors on architectures without asm/rtc.h.
+There are four architectures using this driver, but since we can
+build it with COMPILE_TEST, we should try dealing with the absence
+of the asm/rtc.h header file, to avoid getting a build error:
 
-This series reworks that driver to avoid the dependency,
-and simplifies all four implementations. My first approach
-was to split the driver into four separate drivers, but
-that didn't feel right when three of them have their own
-multiplexors.
+drivers/rtc/rtc-generic.c:12:21: fatal error: asm/rtc.h: No such file or directory
 
-The first five patches can be applied independent of one other,
-while patch 6 is optional and can be applied when all others
-are merged. Alternatively, they can all go in through the
-rtc tree. I compile-tested only the powerpc and sh targets for
-which I happened to have cross-compilers installed.
+This creates an alternative use of the driver, allowing architectures
+to pass a set of rtc_class_ops in platform data. We can convert the
+four architectures to use this and then remove the original
+code.
 
-	Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/rtc/rtc-generic.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/rtc/rtc-generic.c b/drivers/rtc/rtc-generic.c
+index e782ebd719b2..d726c6aa96a8 100644
+--- a/drivers/rtc/rtc-generic.c
++++ b/drivers/rtc/rtc-generic.c
+@@ -9,6 +9,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/rtc.h>
+ 
++#if defined(CONFIG_M68K) || defined(CONFIG_PARISC) || \
++    defined(CONFIG_PPC) || defined(CONFIG_SUPERH32)
+ #include <asm/rtc.h>
+ 
+ static int generic_get_time(struct device *dev, struct rtc_time *tm)
+@@ -33,13 +35,21 @@ static const struct rtc_class_ops generic_rtc_ops = {
+ 	.read_time = generic_get_time,
+ 	.set_time = generic_set_time,
+ };
++#else
++#define generic_rtc_ops *(struct rtc_class_ops*)NULL
++#endif
+ 
+ static int __init generic_rtc_probe(struct platform_device *dev)
+ {
+ 	struct rtc_device *rtc;
++	const struct rtc_class_ops *ops;
++
++	ops = dev_get_platdata(&dev->dev);
++	if (!ops)
++		ops = &generic_rtc_ops;
+ 
+ 	rtc = devm_rtc_device_register(&dev->dev, "rtc-generic",
+-					&generic_rtc_ops, THIS_MODULE);
++					ops, THIS_MODULE);
+ 	if (IS_ERR(rtc))
+ 		return PTR_ERR(rtc);
+ 
+-- 
+2.7.0
