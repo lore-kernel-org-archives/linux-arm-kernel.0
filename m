@@ -1,51 +1,106 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 1 Mar 2016 10:48:05 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d2 Xplained: Correct the macb irq
- pinctrl node
-In-Reply-To: <1455790866-13301-1-git-send-email-romain.izard.pro@gmail.com>
-References: <1455790866-13301-1-git-send-email-romain.izard.pro@gmail.com>
-Message-ID: <56D56555.1030703@atmel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 1 Mar 2016 09:51:08 +0000
+Subject: [RFC PATCH] arm: kernel: pci: remove pci=firmware command line
+ parameter handling
+In-Reply-To: <20160229225653.GE3653@localhost>
+References: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160229225653.GE3653@localhost>
+Message-ID: <20160301095108.GB31766@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/02/2016 11:21, Romain Izard a ?crit :
-> All pinctrl nodes for the Atmel pinctrl controller need to have their
-> bias configuration explicitly defined. Otherwise, the pinctrl mapping
-> is not valid.
+On Mon, Feb 29, 2016 at 04:56:53PM -0600, Bjorn Helgaas wrote:
+> On Mon, Feb 29, 2016 at 05:43:20PM +0000, Lorenzo Pieralisi wrote:
+> > According to kernel documentation, the pci=firmware command line
+> > parameter is only meant to be used on IXP2000 ARM platforms to prevent
+> > the kernel from assigning PCI resources configured by the bootloader.
+> > 
+> > Since the IXP2000 ARM platforms support has been removed from the
+> > kernel in commit:
+> > 
+> > commit c65f2abf54a6 ("ARM: remove ixp23xx and ixp2000 platforms")
+> > 
+> > its platforms specific kernel parameters should be removed
+> > too from the kernel documentation along with the kernel code
+> > currently handling them in that they have just become obsolete.
+> > 
+> > This patch removes the pci=firmware command line parameter handling
+> > from ARM code and the related kernel parameters documentation
+> > section.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> It works for now as the pinctrl driver proceeds even with invalid
-> mappings, but this can become an issue, if the pinctrl driver starts
-> to require valid mappings. Additionally, the pin is not protected from
-> being remapped later by an other driver.
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+Thank you !
+
+> It looks like Rob merged c65f2abf54a6, so maybe he will merge this as
+> well?  Otherwise I'd be happy to merge it; just let me know if you
+> want me to.
+
+Hopefully the kernel parameter description matches current usage
+on ARM systems, it could affect all ARM 32-bit platforms (if any ?) that
+abused the pci=firmware parameter, it is just impossible for me to check
+(that's why I posted it as an RFC. It would be very good to remove that
+kernel parameter though).
+
+Having said that, either way of merging it is fine by me, I can send it
+to Russell's patch system too, given that there are already patches queued
+to remove PCI_PROBE_ONLY from some PCI host controllers I am happy for it
+to go via PCI tree.
+
+Rob, Russell, any preferences ?
+
+Thanks !
+Lorenzo
+
 > 
-> There is an external 1k? pull-up to 3.3V, so no bias is required on
-> the Ethernet PHY's interrupt line.
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> > Cc: Jonathan Corbet <corbet@lwn.net>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > ---
+> >  Documentation/kernel-parameters.txt | 5 -----
+> >  arch/arm/kernel/bios32.c            | 3 ---
+> >  2 files changed, 8 deletions(-)
+> > 
+> > diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> > index 9a53c92..e213acc 100644
+> > --- a/Documentation/kernel-parameters.txt
+> > +++ b/Documentation/kernel-parameters.txt
+> > @@ -2875,11 +2875,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+> >  				for broken drivers that don't call it.
+> >  		skip_isa_align	[X86] do not align io start addr, so can
+> >  				handle more pci cards
+> > -		firmware	[ARM] Do not re-enumerate the bus but instead
+> > -				just use the configuration from the
+> > -				bootloader. This is currently used on
+> > -				IXP2000 systems where the bus has to be
+> > -				configured a certain way for adjunct CPUs.
+> >  		noearly		[X86] Don't do any early type 1 scanning.
+> >  				This might help on some broken boards which
+> >  				machine check when some devices' config space
+> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> > index 066f7f9..05e61a2 100644
+> > --- a/arch/arm/kernel/bios32.c
+> > +++ b/arch/arm/kernel/bios32.c
+> > @@ -550,9 +550,6 @@ char * __init pcibios_setup(char *str)
+> >  	if (!strcmp(str, "debug")) {
+> >  		debug_pci = 1;
+> >  		return NULL;
+> > -	} else if (!strcmp(str, "firmware")) {
+> > -		pci_add_flags(PCI_PROBE_ONLY);
+> > -		return NULL;
+> >  	}
+> >  	return str;
+> >  }
+> > -- 
+> > 2.5.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-And queued on at91-4.5-dt.
-
-Thanks! Bye,
-
-> ---
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> index e683856c507c..75341eec2dfd 100644
-> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> @@ -308,6 +308,7 @@
->  
->  				pinctrl_macb0_phy_irq: macb0_phy_irq {
->  					pinmux = <PIN_PC9__GPIO>;
-> +					bias-disable;
->  				};
->  
->  				pinctrl_pdmic_default: pdmic_default {
-> 
-
-
--- 
-Nicolas Ferre
