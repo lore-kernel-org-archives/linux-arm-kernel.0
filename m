@@ -1,186 +1,368 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue,  1 Mar 2016 18:07:37 +0800
-Subject: [PATCH 1/5] clk: rockchip: add more mux parameters for new pll sources
+Date: Tue,  1 Mar 2016 18:07:39 +0800
+Subject: [PATCH 3/5] clk: rockchip: add new pll-type for rk3399 and similar
+ socs
 In-Reply-To: <1456826861-7612-1-git-send-email-zhengxing@rock-chips.com>
 References: <1456826861-7612-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1456826861-7612-2-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1456826861-7612-4-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thers are only two parent PLLs that APLL and GPLL for core on the
-previous SoCs (RK3066/RK3188/RK3288/RK3368). Hence, we set fixed
-GPLL as alternate parent when core is switching freq.
-
-Since RK3399 big.LITTLE architecture, we need to select and adapt
-more PLLs (ALPLL/ABPLL/DPLL/GPLL) sources.
+The rk3399's pll and clock are similar with rk3036's, it different
+with base on the rk3066(rk3188, rk3288, rk3368 use it), there are
+different adjust foctors and control registers, so these should be
+independent and separate from the series of rk3066s.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
 
- drivers/clk/rockchip/clk-cpu.c    |   14 ++++++++++----
- drivers/clk/rockchip/clk-rk3036.c |    3 +++
- drivers/clk/rockchip/clk-rk3188.c |    6 ++++++
- drivers/clk/rockchip/clk-rk3228.c |    3 +++
- drivers/clk/rockchip/clk-rk3288.c |    3 +++
- drivers/clk/rockchip/clk-rk3368.c |    6 ++++++
- drivers/clk/rockchip/clk.h        |    6 ++++++
- 7 files changed, 37 insertions(+), 4 deletions(-)
+ drivers/clk/rockchip/clk-pll.c |  279 +++++++++++++++++++++++++++++++++++++++-
+ drivers/clk/rockchip/clk.h     |   15 ++-
+ 2 files changed, 292 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
-index 4e73ed5..5556849 100644
---- a/drivers/clk/rockchip/clk-cpu.c
-+++ b/drivers/clk/rockchip/clk-cpu.c
-@@ -158,12 +158,16 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
- 
- 		writel(HIWORD_UPDATE(alt_div, reg_data->div_core_mask,
- 					      reg_data->div_core_shift) |
--		       HIWORD_UPDATE(1, 1, reg_data->mux_core_shift),
-+		       HIWORD_UPDATE(reg_data->mux_core_alt,
-+				     reg_data->mux_core_mask,
-+				     reg_data->mux_core_shift),
- 		       cpuclk->reg_base + reg_data->core_reg);
- 	} else {
- 		/* select alternate parent */
--		writel(HIWORD_UPDATE(1, 1, reg_data->mux_core_shift),
--			cpuclk->reg_base + reg_data->core_reg);
-+		writel(HIWORD_UPDATE(reg_data->mux_core_alt,
-+				     reg_data->mux_core_mask,
-+				     reg_data->mux_core_shift),
-+		       cpuclk->reg_base + reg_data->core_reg);
- 	}
- 
- 	spin_unlock_irqrestore(cpuclk->lock, flags);
-@@ -198,7 +202,9 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
- 
- 	writel(HIWORD_UPDATE(0, reg_data->div_core_mask,
- 				reg_data->div_core_shift) |
--	       HIWORD_UPDATE(0, 1, reg_data->mux_core_shift),
-+	       HIWORD_UPDATE(reg_data->mux_core_main,
-+				reg_data->mux_core_mask,
-+				reg_data->mux_core_shift),
- 	       cpuclk->reg_base + reg_data->core_reg);
- 
- 	if (ndata->old_rate > ndata->new_rate)
-diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
-index 5759d75..1dae248 100644
---- a/drivers/clk/rockchip/clk-rk3036.c
-+++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -113,7 +113,10 @@ static const struct rockchip_cpuclk_reg_data rk3036_cpuclk_data = {
- 	.core_reg = RK2928_CLKSEL_CON(0),
- 	.div_core_shift = 0,
- 	.div_core_mask = 0x1f,
-+	.mux_core_alt = 1,
-+	.mux_core_main = 0,
- 	.mux_core_shift = 7,
-+	.mux_core_mask = 0x1,
+diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
+index 27be66a..c6996be 100644
+--- a/drivers/clk/rockchip/clk-pll.c
++++ b/drivers/clk/rockchip/clk-pll.c
+@@ -593,6 +593,275 @@ static const struct clk_ops rockchip_rk3066_pll_clk_ops = {
+ 	.init = rockchip_rk3066_pll_init,
  };
  
- PNAME(mux_pll_p)		= { "xin24m", "xin24m" };
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index 40bab39..e832403 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -155,7 +155,10 @@ static const struct rockchip_cpuclk_reg_data rk3066_cpuclk_data = {
- 	.core_reg = RK2928_CLKSEL_CON(0),
- 	.div_core_shift = 0,
- 	.div_core_mask = 0x1f,
-+	.mux_core_alt = 1,
-+	.mux_core_main = 0,
- 	.mux_core_shift = 8,
-+	.mux_core_mask = 0x1,
- };
++/**
++ * PLL used in RK3399
++ */
++
++#define RK3399_PLLCON(i)			(i * 0x4)
++#define RK3399_PLLCON0_FBDIV_MASK		0xfff
++#define RK3399_PLLCON0_FBDIV_SHIFT		0
++#define RK3399_PLLCON1_REFDIV_MASK		0x3f
++#define RK3399_PLLCON1_REFDIV_SHIFT		0
++#define RK3399_PLLCON1_POSTDIV1_MASK		0x7
++#define RK3399_PLLCON1_POSTDIV1_SHIFT		8
++#define RK3399_PLLCON1_POSTDIV2_MASK		0x7
++#define RK3399_PLLCON1_POSTDIV2_SHIFT		12
++#define RK3399_PLLCON2_FRAC_MASK		0xffffff
++#define RK3399_PLLCON2_FRAC_SHIFT		0
++#define RK3399_PLLCON3_DSMPD_MASK		0x1
++#define RK3399_PLLCON3_DSMPD_SHIFT		12
++
++#define RK3399_PLLCON2_LOCK_STATUS		(31 << 0)
++#define RK3399_PLLCON3_PWRDOWN			(1 << 0)
++
++static int rockchip_rk3399_pll_wait_lock(struct rockchip_clk_pll *pll)
++{
++	u32 pllcon;
++	int delay = 24000000;
++
++	/* poll check the lock status in rk3399 xPLLCON2 */
++	while (delay > 0) {
++		pllcon = readl_relaxed(pll->reg_base + RK3399_PLLCON(2));
++		if (pllcon & RK3399_PLLCON2_LOCK_STATUS)
++			return 0;
++
++		delay--;
++	}
++
++	pr_err("%s: timeout waiting for pll to lock\n", __func__);
++	return -ETIMEDOUT;
++}
++
++static void rockchip_rk3399_pll_get_params(struct rockchip_clk_pll *pll,
++					struct rockchip_pll_rate_table *rate)
++{
++	u32 pllcon;
++
++	pllcon = readl_relaxed(pll->reg_base + RK3399_PLLCON(0));
++	rate->fbdiv = ((pllcon >> RK3399_PLLCON0_FBDIV_SHIFT)
++				& RK3399_PLLCON0_FBDIV_MASK);
++
++	pllcon = readl_relaxed(pll->reg_base + RK3399_PLLCON(1));
++	rate->refdiv = ((pllcon >> RK3399_PLLCON1_REFDIV_SHIFT)
++				& RK3399_PLLCON1_REFDIV_MASK);
++	rate->postdiv1 = ((pllcon >> RK3399_PLLCON1_POSTDIV1_SHIFT)
++				& RK3399_PLLCON1_POSTDIV1_MASK);
++	rate->postdiv2 = ((pllcon >> RK3399_PLLCON1_POSTDIV2_SHIFT)
++				& RK3399_PLLCON1_POSTDIV2_MASK);
++
++	pllcon = readl_relaxed(pll->reg_base + RK3399_PLLCON(2));
++	rate->frac = ((pllcon >> RK3399_PLLCON2_FRAC_SHIFT)
++				& RK3399_PLLCON2_FRAC_MASK);
++
++	pllcon = readl_relaxed(pll->reg_base + RK3399_PLLCON(3));
++	rate->dsmpd = ((pllcon >> RK3399_PLLCON3_DSMPD_SHIFT)
++				& RK3399_PLLCON3_DSMPD_MASK);
++}
++
++static unsigned long rockchip_rk3399_pll_recalc_rate(struct clk_hw *hw,
++						     unsigned long prate)
++{
++	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
++	struct rockchip_pll_rate_table cur;
++	u64 rate64 = prate;
++
++	rockchip_rk3399_pll_get_params(pll, &cur);
++
++	rate64 *= cur.fbdiv;
++	do_div(rate64, cur.refdiv);
++
++	if (cur.dsmpd == 0) {
++		/* fractional mode */
++		u64 frac_rate64 = prate * cur.frac;
++
++		do_div(frac_rate64, cur.refdiv);
++		rate64 += frac_rate64 >> 24;
++	}
++
++	do_div(rate64, cur.postdiv1);
++	do_div(rate64, cur.postdiv2);
++
++	return (unsigned long)rate64;
++}
++
++static int rockchip_rk3399_pll_set_params(struct rockchip_clk_pll *pll,
++				const struct rockchip_pll_rate_table *rate)
++{
++	const struct clk_ops *pll_mux_ops = pll->pll_mux_ops;
++	struct clk_mux *pll_mux = &pll->pll_mux;
++	struct rockchip_pll_rate_table cur;
++	u32 pllcon;
++	int rate_change_remuxed = 0;
++	int cur_parent;
++	int ret;
++
++	pr_debug("%s: rate settings for %lu fbdiv: %d, postdiv1: %d, refdiv: %d, postdiv2: %d, dsmpd: %d, frac: %d\n",
++		__func__, rate->rate, rate->fbdiv, rate->postdiv1, rate->refdiv,
++		rate->postdiv2, rate->dsmpd, rate->frac);
++
++	rockchip_rk3399_pll_get_params(pll, &cur);
++	cur.rate = 0;
++
++	cur_parent = pll_mux_ops->get_parent(&pll_mux->hw);
++	if (cur_parent == PLL_MODE_NORM) {
++		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_SLOW);
++		rate_change_remuxed = 1;
++	}
++
++	/* update pll values */
++	writel_relaxed(HIWORD_UPDATE(rate->fbdiv, RK3399_PLLCON0_FBDIV_MASK,
++					  RK3399_PLLCON0_FBDIV_SHIFT),
++		       pll->reg_base + RK3399_PLLCON(0));
++
++	writel_relaxed(HIWORD_UPDATE(rate->refdiv, RK3399_PLLCON1_REFDIV_MASK,
++						   RK3399_PLLCON1_REFDIV_SHIFT) |
++		       HIWORD_UPDATE(rate->postdiv1, RK3399_PLLCON1_POSTDIV1_MASK,
++					     RK3399_PLLCON1_POSTDIV1_SHIFT) |
++		       HIWORD_UPDATE(rate->postdiv2, RK3399_PLLCON1_POSTDIV2_MASK,
++						     RK3399_PLLCON1_POSTDIV2_SHIFT),
++		       pll->reg_base + RK3399_PLLCON(1));
++
++	/* GPLL CON2 is not HIWORD_MASK */
++	pllcon = readl_relaxed(pll->reg_base + RK3399_PLLCON(2));
++	pllcon &= ~(RK3399_PLLCON2_FRAC_MASK << RK3399_PLLCON2_FRAC_SHIFT);
++	pllcon |= rate->frac << RK3399_PLLCON2_FRAC_SHIFT;
++	writel_relaxed(pllcon, pll->reg_base + RK3399_PLLCON(2));
++
++	writel_relaxed(HIWORD_UPDATE(rate->dsmpd, RK3399_PLLCON3_DSMPD_MASK,
++					    RK3399_PLLCON3_DSMPD_SHIFT),
++		       pll->reg_base + RK3399_PLLCON(3));
++
++	/* wait for the pll to lock */
++	ret = rockchip_rk3399_pll_wait_lock(pll);
++	if (ret) {
++		pr_warn("%s: pll update unsucessful, trying to restore old params\n",
++			__func__);
++		rockchip_rk3399_pll_set_params(pll, &cur);
++	}
++
++	if (rate_change_remuxed)
++		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_NORM);
++
++	return ret;
++}
++
++static int rockchip_rk3399_pll_set_rate(struct clk_hw *hw, unsigned long drate,
++					unsigned long prate)
++{
++	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
++	const struct rockchip_pll_rate_table *rate;
++	unsigned long old_rate = rockchip_rk3399_pll_recalc_rate(hw, prate);
++	struct regmap *grf = rockchip_clk_get_grf(pll->ctx);
++
++	if (IS_ERR(grf)) {
++		pr_debug("%s: grf regmap not available, aborting rate change\n",
++			 __func__);
++		return PTR_ERR(grf);
++	}
++
++	pr_debug("%s: changing %s from %lu to %lu with a parent rate of %lu\n",
++		 __func__, __clk_get_name(hw->clk), old_rate, drate, prate);
++
++	/* Get required rate settings from table */
++	rate = rockchip_get_pll_settings(pll, drate);
++	if (!rate) {
++		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
++			drate, __clk_get_name(hw->clk));
++		return -EINVAL;
++	}
++
++	return rockchip_rk3399_pll_set_params(pll, rate);
++}
++
++static int rockchip_rk3399_pll_enable(struct clk_hw *hw)
++{
++	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
++
++	writel(HIWORD_UPDATE(0, RK3399_PLLCON3_PWRDOWN, 0),
++	       pll->reg_base + RK3399_PLLCON(3));
++
++	return 0;
++}
++
++static void rockchip_rk3399_pll_disable(struct clk_hw *hw)
++{
++	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
++
++	writel(HIWORD_UPDATE(RK3399_PLLCON3_PWRDOWN,
++			     RK3399_PLLCON3_PWRDOWN, 0),
++	       pll->reg_base + RK3399_PLLCON(3));
++}
++
++static int rockchip_rk3399_pll_is_enabled(struct clk_hw *hw)
++{
++	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
++	u32 pllcon = readl(pll->reg_base + RK3399_PLLCON(3));
++
++	return !(pllcon & RK3399_PLLCON3_PWRDOWN);
++}
++
++static void rockchip_rk3399_pll_init(struct clk_hw *hw)
++{
++	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
++	const struct rockchip_pll_rate_table *rate;
++	struct rockchip_pll_rate_table cur;
++	unsigned long drate;
++
++	if (!(pll->flags & ROCKCHIP_PLL_SYNC_RATE))
++		return;
++
++	drate = clk_hw_get_rate(hw);
++	rate = rockchip_get_pll_settings(pll, drate);
++
++	/* when no rate setting for the current rate, rely on clk_set_rate */
++	if (!rate)
++		return;
++
++	rockchip_rk3399_pll_get_params(pll, &cur);
++
++	pr_debug("%s: pll %s@%lu: Hz\n", __func__, __clk_get_name(hw->clk),
++		 drate);
++	pr_debug("old - fbdiv: %d, postdiv1: %d, refdiv: %d, postdiv2: %d, dsmpd: %d, frac: %d\n",
++		 cur.fbdiv, cur.postdiv1, cur.refdiv, cur.postdiv2,
++		 cur.dsmpd, cur.frac);
++	pr_debug("new - fbdiv: %d, postdiv1: %d, refdiv: %d, postdiv2: %d, dsmpd: %d, frac: %d\n",
++		 rate->fbdiv, rate->postdiv1, rate->refdiv, rate->postdiv2,
++		 rate->dsmpd, rate->frac);
++
++	if (rate->fbdiv != cur.fbdiv || rate->postdiv1 != cur.postdiv1 ||
++		rate->refdiv != cur.refdiv || rate->postdiv2 != cur.postdiv2 ||
++		rate->dsmpd != cur.dsmpd || rate->frac != cur.frac) {
++		struct clk *parent = clk_get_parent(hw->clk);
++
++		if (!parent) {
++			pr_warn("%s: parent of %s not available\n",
++				__func__, __clk_get_name(hw->clk));
++			return;
++		}
++
++		pr_debug("%s: pll %s: rate params do not match rate table, adjusting\n",
++			 __func__, __clk_get_name(hw->clk));
++		rockchip_rk3399_pll_set_params(pll, rate);
++	}
++}
++
++static const struct clk_ops rockchip_rk3399_pll_clk_norate_ops = {
++	.recalc_rate = rockchip_rk3399_pll_recalc_rate,
++	.enable = rockchip_rk3399_pll_enable,
++	.disable = rockchip_rk3399_pll_disable,
++	.is_enabled = rockchip_rk3399_pll_is_enabled,
++};
++
++static const struct clk_ops rockchip_rk3399_pll_clk_ops = {
++	.recalc_rate = rockchip_rk3399_pll_recalc_rate,
++	.round_rate = rockchip_pll_round_rate,
++	.set_rate = rockchip_rk3399_pll_set_rate,
++	.enable = rockchip_rk3399_pll_enable,
++	.disable = rockchip_rk3399_pll_disable,
++	.is_enabled = rockchip_rk3399_pll_is_enabled,
++	.init = rockchip_rk3399_pll_init,
++};
++
+ /*
+  * Common registering of pll clocks
+  */
+@@ -634,7 +903,9 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
+ 	pll_mux->lock = &ctx->lock;
+ 	pll_mux->hw.init = &init;
  
- #define RK3188_DIV_ACLK_CORE_MASK	0x7
-@@ -191,7 +194,10 @@ static const struct rockchip_cpuclk_reg_data rk3188_cpuclk_data = {
- 	.core_reg = RK2928_CLKSEL_CON(0),
- 	.div_core_shift = 9,
- 	.div_core_mask = 0x1f,
-+	.mux_core_alt = 1,
-+	.mux_core_main = 0,
- 	.mux_core_shift = 8,
-+	.mux_core_mask = 0x1,
- };
+-	if (pll_type == pll_rk3036 || pll_type == pll_rk3066)
++	if (pll_type == pll_rk3036 ||
++	    pll_type == pll_rk3066 ||
++	    pll_type == pll_rk3399)
+ 		pll_mux->flags |= CLK_MUX_HIWORD_MASK;
  
- PNAME(mux_pll_p)		= { "xin24m", "xin32k" };
-diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
-index c515915..55628b5 100644
---- a/drivers/clk/rockchip/clk-rk3228.c
-+++ b/drivers/clk/rockchip/clk-rk3228.c
-@@ -111,7 +111,10 @@ static const struct rockchip_cpuclk_reg_data rk3228_cpuclk_data = {
- 	.core_reg = RK2928_CLKSEL_CON(0),
- 	.div_core_shift = 0,
- 	.div_core_mask = 0x1f,
-+	.mux_core_alt = 1,
-+	.mux_core_main = 0,
- 	.mux_core_shift = 6,
-+	.mux_core_mask = 0x1,
- };
- 
- PNAME(mux_pll_p)		= { "clk_24m", "xin24m" };
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 3cb7216..00faf3f 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -165,7 +165,10 @@ static const struct rockchip_cpuclk_reg_data rk3288_cpuclk_data = {
- 	.core_reg = RK3288_CLKSEL_CON(0),
- 	.div_core_shift = 8,
- 	.div_core_mask = 0x1f,
-+	.mux_core_alt = 1,
-+	.mux_core_main = 0,
- 	.mux_core_shift = 15,
-+	.mux_core_mask = 0x1,
- };
- 
- PNAME(mux_pll_p)		= { "xin24m", "xin32k" };
-diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-index 31facd8..aaff724 100644
---- a/drivers/clk/rockchip/clk-rk3368.c
-+++ b/drivers/clk/rockchip/clk-rk3368.c
-@@ -165,14 +165,20 @@ static const struct rockchip_cpuclk_reg_data rk3368_cpuclkb_data = {
- 	.core_reg = RK3368_CLKSEL_CON(0),
- 	.div_core_shift = 0,
- 	.div_core_mask = 0x1f,
-+	.mux_core_alt = 1,
-+	.mux_core_main = 0,
- 	.mux_core_shift = 7,
-+	.mux_core_mask = 0x1,
- };
- 
- static const struct rockchip_cpuclk_reg_data rk3368_cpuclkl_data = {
- 	.core_reg = RK3368_CLKSEL_CON(2),
- 	.div_core_shift = 0,
-+	.mux_core_alt = 1,
-+	.mux_core_main = 0,
- 	.div_core_mask = 0x1f,
- 	.mux_core_shift = 7,
-+	.mux_core_mask = 0x1,
- };
- 
- #define RK3368_DIV_ACLKM_MASK		0x1f
+ 	/* the actual muxing is xin24m, pll-output, xin32k */
+@@ -691,6 +962,12 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
+ 		else
+ 			init.ops = &rockchip_rk3066_pll_clk_ops;
+ 		break;
++	case pll_rk3399:
++		if (!pll->rate_table)
++			init.ops = &rockchip_rk3399_pll_clk_norate_ops;
++		else
++			init.ops = &rockchip_rk3399_pll_clk_ops;
++		break;
+ 	default:
+ 		pr_warn("%s: Unknown pll type for pll clk %s\n",
+ 			__func__, name);
 diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 39c198b..7aafe18 100644
+index b7affb6..36b4938 100644
 --- a/drivers/clk/rockchip/clk.h
 +++ b/drivers/clk/rockchip/clk.h
-@@ -217,14 +217,20 @@ struct rockchip_cpuclk_rate_table {
-  * @core_reg:		register offset of the core settings register
-  * @div_core_shift:	core divider offset used to divide the pll value
-  * @div_core_mask:	core divider mask
-+ * @mux_core_alt:	mux value to select alternate parent
-+ * @mux_core_main:	mux value to select main parent of core
-  * @mux_core_shift:	offset of the core multiplexer
-+ * @mux_core_mask:	core multiplexer mask
-  */
- struct rockchip_cpuclk_reg_data {
- 	int		core_reg;
- 	u8		div_core_shift;
- 	u32		div_core_mask;
- 	int		mux_core_reg;
-+	u8		mux_core_alt;
-+	u8		mux_core_main;
- 	u8		mux_core_shift;
-+	u32		mux_core_mask;
+@@ -96,6 +96,7 @@ struct clk;
+ enum rockchip_pll_type {
+ 	pll_rk3036,
+ 	pll_rk3066,
++	pll_rk3399,
  };
  
- struct clk *rockchip_clk_register_cpuclk(const char *name,
+ #define RK3036_PLL_RATE(_rate, _refdiv, _fbdiv, _postdiv1,	\
+@@ -128,6 +129,18 @@ enum rockchip_pll_type {
+ 	.nb = _nb,						\
+ }
+ 
++#define RK3399_PLL_RATE(_rate, _refdiv, _fbdiv, _postdiv1,	\
++			_postdiv2, _dsmpd, _frac)		\
++{								\
++	.rate	= _rate##U,					\
++	.fbdiv = _fbdiv,					\
++	.postdiv1 = _postdiv1,					\
++	.refdiv = _refdiv,					\
++	.postdiv2 = _postdiv2,					\
++	.dsmpd = _dsmpd,					\
++	.frac = _frac,						\
++}
++
+ /**
+  * struct rockchip_clk_provider: information about clock provider
+  * @reg_base: virtual address for the register base.
+@@ -148,7 +161,7 @@ struct rockchip_pll_rate_table {
+ 	unsigned int nf;
+ 	unsigned int no;
+ 	unsigned int nb;
+-	/* for RK3036 */
++	/* for RK3036/RK3399 */
+ 	unsigned int fbdiv;
+ 	unsigned int postdiv1;
+ 	unsigned int refdiv;
 -- 
 1.7.9.5
