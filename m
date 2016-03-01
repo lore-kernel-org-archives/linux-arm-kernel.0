@@ -1,98 +1,239 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 1 Mar 2016 08:43:36 -0600
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56D5834C.5030800@ti.com>
-References: <56BE1454.3030002@ti.com> <56C5D377.50901@ti.com>
- <56CAA82D.6000507@ti.com>
- <alpine.DEB.2.02.1602220631300.3418@utopia.booyaka.com>
- <56CADB23.8020202@ti.com> <56CC490F.3040301@ti.com>
- <alpine.DEB.2.02.1602231827300.27173@utopia.booyaka.com>
- <56CD4BE1.3010701@ti.com>
- <alpine.DEB.2.02.1603010825090.14948@utopia.booyaka.com>
- <56D5834C.5030800@ti.com>
-Message-ID: <20160301144335.GA11916@localhost>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 1 Mar 2016 06:49:05 -0800
+Subject: [PATCH v3 4/7] ACPI: parse DBG2 table
+In-Reply-To: <1456749726-30261-5-git-send-email-aleksey.makarov@linaro.org>
+References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456749726-30261-5-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <56D5ABE1.7010905@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2016 at 05:25:56PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
+On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
+> 'ARM Server Base Boot Requirements' [1] mentions DBG2 (Microsoft Debug
+> Port Table 2) [2] as a mandatory ACPI table that specifies debug ports.
 > 
-> On Tuesday 01 March 2016 01:55 PM, Paul Walmsley wrote:
-> > 
-> > Folks, the following is what I've queued for this.
+> - Implement macros
 > 
-> Thanks Paul.
+> 	ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)
 > 
-> Bjorn,
+>   that defines a handler for the port of given type and subtype.
 > 
-> With this patch merged, enabling pci-dra7xx won't result in system freeze
-> anymore. I can send a patch to revert depends on BROKEN.
+> - For each declared port that is also described in the ACPI DBG2 table
+>   call the provided callback.
 
-Great!  Please send me that patch, and I'll merge it for v4.6.
+On 02/22/2016 06:43 AM, Aleksey Makarov wrote:
+> On 02/19/2016 08:20 PM, Christopher Covington wrote:
+>> Can the device specified in DBG2 be used for both earlycon and KGDB? If it can only be used for one, let's make sure the choice of earlycon vs KGDB is intentional rather than accidental.
+> 
+> I just sent the DBG2 series.  It enables an earlycon on DBG2 port with
+> an "earlycon=acpi_dbg2" option (we can discuss particular name).
+> If you need KGDB on that port just support it for that port in the kernel
+> (i. e. add a new instance of ACPI_DBG2_DECLARE() macros for that port, see the patches)
+> and change the command line options.
+> I hope that is OK.  We could continue this discussion in the DBG2 thread.
 
-> > From: Sekhar Nori <nsekhar@ti.com>
-> > Date: Thu, 18 Feb 2016 16:49:56 +0530
-> > Subject: [PATCH] ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
-> > 
-> > Add a custom reset handler for DRA7x PCIeSS. This
-> > handler is required to deassert PCIe hardreset lines
-> > after they have been asserted.
-> > 
-> > This enables the PCIe driver to access registers after
-> > PCIeSS has been runtime enabled without having to
-> > deassert hardreset lines itself.
-> > 
-> > With this patch applied, used lspci to make sure
-> > connected PCIe device enumerates on DRA74x and DRA72x
-> > EVMs.
-> > 
-> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> > Reported-by: Richard Cochran <richardcochran@gmail.com>
-> > Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > Cc: Suman Anna <s-anna@ti.com>
-> > Cc: Dave Gerlach <d-gerlach@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
-> >  1 file changed, 23 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> > index b61355e2a771..252b74633e31 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> > @@ -1526,8 +1526,31 @@ static struct omap_hwmod dra7xx_ocp2scp3_hwmod = {
-> >   *
-> >   */
-> >  
-> > +/*
-> > + * As noted in documentation for _reset() in omap_hwmod.c, the stock reset
-> > + * functionality of OMAP HWMOD layer does not deassert the hardreset lines
-> > + * associated with an IP automatically leaving the driver to handle that
-> > + * by itself. This does not work for PCIeSS which needs the reset lines
-> > + * deasserted for the driver to start accessing registers.
-> > + *
-> > + * We use a PCIeSS HWMOD class specific reset handler to deassert the hardreset
-> > + * lines after asserting them.
-> > + */
-> > +static int dra7xx_pciess_reset(struct omap_hwmod *oh)
-> > +{
-> > +	int i;
-> > +
-> > +	for (i = 0; i < oh->rst_lines_cnt; i++) {
-> > +		omap_hwmod_assert_hardreset(oh, oh->rst_lines[i].name);
-> > +		omap_hwmod_deassert_hardreset(oh, oh->rst_lines[i].name);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
-> >  	.name	= "pcie",
-> > +	.reset	= dra7xx_pciess_reset,
-> >  };
-> >  
-> >  /* pcie1 */
-> > 
+This method will not work for kgdb, since kgdb doesn't actually
+implement the i/o but rather runs on top of a console.
+
+
+> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+> [2] http://go.microsoft.com/fwlink/p/?LinkId=234837
+> 
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  drivers/acpi/Kconfig              |  3 ++
+>  drivers/acpi/Makefile             |  1 +
+>  drivers/acpi/dbg2.c               | 88 +++++++++++++++++++++++++++++++++++++++
+>  include/asm-generic/vmlinux.lds.h |  1 +
+>  include/linux/acpi_dbg2.h         | 48 +++++++++++++++++++++
+>  5 files changed, 141 insertions(+)
+>  create mode 100644 drivers/acpi/dbg2.c
+>  create mode 100644 include/linux/acpi_dbg2.h
+> 
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 65fb483..660666e 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
+>  config ACPI_CCA_REQUIRED
+>  	bool
+>  
+> +config ACPI_DBG2_TABLE
+> +	bool
+> +
+>  config ACPI_DEBUGGER
+>  	bool "AML debugger interface"
+>  	select ACPI_DEBUG
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 7395928..3b5f1ea 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -83,6 +83,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+>  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+>  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
+> +obj-$(CONFIG_ACPI_DBG2_TABLE)	+= dbg2.o
+>  
+>  # processor has its own "processor." module_param namespace
+>  processor-y			:= processor_driver.o
+> diff --git a/drivers/acpi/dbg2.c b/drivers/acpi/dbg2.c
+> new file mode 100644
+> index 0000000..0f0f6ca
+> --- /dev/null
+> +++ b/drivers/acpi/dbg2.c
+> @@ -0,0 +1,88 @@
+> +/*
+> + * Copyright (c) 2012, Intel Corporation
+> + * Copyright (c) 2015, 2016 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: DBG2: " fmt
+> +
+> +#include <linux/acpi_dbg2.h>
+> +#include <linux/acpi.h>
+> +#include <linux/kernel.h>
+> +
+> +static const char * __init type2string(u16 type)
+> +{
+> +	switch (type) {
+> +	case ACPI_DBG2_SERIAL_PORT:
+> +		return "SERIAL";
+> +	case ACPI_DBG2_1394_PORT:
+> +		return "1394";
+> +	case ACPI_DBG2_USB_PORT:
+> +		return "USB";
+> +	case ACPI_DBG2_NET_PORT:
+> +		return "NET";
+> +	default:
+> +		return "?";
+> +	}
+> +}
+> +
+> +static const char * __init subtype2string(u16 subtype)
+> +{
+> +	switch (subtype) {
+> +	case ACPI_DBG2_16550_COMPATIBLE:
+> +		return "16550_COMPATIBLE";
+> +	case ACPI_DBG2_16550_SUBSET:
+> +		return "16550_SUBSET";
+> +	case ACPI_DBG2_ARM_PL011:
+> +		return "ARM_PL011";
+> +	case ACPI_DBG2_ARM_SBSA_32BIT:
+> +		return "ARM_SBSA_32BIT";
+> +	case ACPI_DBG2_ARM_SBSA_GENERIC:
+> +		return "ARM_SBSA_GENERIC";
+> +	case ACPI_DBG2_ARM_DCC:
+> +		return "ARM_DCC";
+> +	case ACPI_DBG2_BCM2835:
+> +		return "BCM2835";
+> +	default:
+> +		return "?";
+> +	}
+> +}
+> +
+> +int __init acpi_dbg2_setup(struct acpi_table_header *table, const void *data)
+> +{
+> +	struct acpi_table_dbg2 *dbg2 = (struct acpi_table_dbg2 *)table;
+> +	struct acpi_dbg2_data *dbg2_data = (struct acpi_dbg2_data *)data;
+> +	struct acpi_dbg2_device *dbg2_device, *dbg2_end;
+> +	int i;
+> +
+> +	dbg2_device = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2,
+> +				   dbg2->info_offset);
+> +	dbg2_end = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2, table->length);
+> +
+> +	for (i = 0; i < dbg2->info_count; i++) {
+> +		if (dbg2_device + 1 > dbg2_end) {
+> +			pr_err("device pointer overflows, bad table\n");
+> +			return 0;
+> +		}
+> +
+> +		if (dbg2_device->port_type == dbg2_data->port_type &&
+> +		    dbg2_device->port_subtype == dbg2_data->port_subtype) {
+> +			if (dbg2_device->port_type == ACPI_DBG2_SERIAL_PORT)
+> +				pr_info("debug port: SERIAL; subtype: %s\n",
+> +				     subtype2string(dbg2_device->port_subtype));
+> +			else
+> +				pr_info("debug port: %s\n",
+> +					type2string(dbg2_device->port_type));
+> +			dbg2_data->setup(dbg2_device, dbg2_data->data);
+> +		}
+> +
+> +		dbg2_device = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2_device,
+> +					   dbg2_device->length);
+> +	}
+> +
+> +	return 0;
+> +}
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index 8f5a12a..8cc49ba 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -526,6 +526,7 @@
+>  	IRQCHIP_OF_MATCH_TABLE()					\
+>  	ACPI_PROBE_TABLE(irqchip)					\
+>  	ACPI_PROBE_TABLE(clksrc)					\
+> +	ACPI_PROBE_TABLE(dbg2)						\
+>  	EARLYCON_TABLE()
+>  
+>  #define INIT_TEXT							\
+> diff --git a/include/linux/acpi_dbg2.h b/include/linux/acpi_dbg2.h
+> new file mode 100644
+> index 0000000..125ae7e
+> --- /dev/null
+> +++ b/include/linux/acpi_dbg2.h
+> @@ -0,0 +1,48 @@
+> +#ifndef _ACPI_DBG2_H_
+> +#define _ACPI_DBG2_H_
+> +
+> +#ifdef CONFIG_ACPI_DBG2_TABLE
+> +
+> +#include <linux/kernel.h>
+> +
+> +struct acpi_dbg2_device;
+> +struct acpi_table_header;
+> +
+> +struct acpi_dbg2_data {
+> +	u16 port_type;
+> +	u16 port_subtype;
+> +	int (*setup)(struct acpi_dbg2_device *, void *);
+> +	void *data;
+> +};
+> +
+> +int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
+> +
+> +/**
+> + * ACPI_DBG2_DECLARE() - Define handler for ACPI DBG2 port
+> + * @name:	Identifier to compose name of table data
+> + * @type:	Type of the port
+> + * @subtype:	Subtype of the port
+> + * @setup_fn:	Function to be called to setup the port
+> + *		(of type int (*)(struct acpi_dbg2_device *, void *);)
+> + * @data_ptr:	Sideband data provided back to the driver
+> + */
+> +#define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
+> +	static const struct acpi_dbg2_data				\
+> +		__acpi_dbg2_data_##name __used = {			\
+> +			.port_type = type,				\
+> +			.port_subtype = subtype,			\
+> +			.setup = setup_fn,				\
+> +			.data = data_ptr,				\
+> +		   };							\
+> +	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
+> +				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
+> +
+> +#else
+> +
+> +#define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
+> +	static const void *__acpi_dbg_data_##name[]			\
+> +		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
+> +
+> +#endif
+> +
+> +#endif
+> 
