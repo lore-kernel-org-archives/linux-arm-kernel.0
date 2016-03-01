@@ -1,44 +1,55 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 1 Mar 2016 14:53:13 +0200
-Subject: [GIT PULL][RESEND] omap gpmc enhancements for v4.6
-In-Reply-To: <56D488F0.8070406@ti.com>
-References: <56D488F0.8070406@ti.com>
-Message-ID: <56D590B9.4050307@ti.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 1 Mar 2016 13:53:42 +0100
+Subject: [PATCH 7/8] ARM64: dts: amlogic: Extend GXBaby GIC node
+In-Reply-To: <56D58E88.2080700@arm.com>
+References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+ <1456789465-2962-8-git-send-email-afaerber@suse.de>
+ <56D57673.8030702@arm.com> <56D57A7F.5020806@suse.de>
+ <56D58E88.2080700@arm.com>
+Message-ID: <CAOQ7t2aev5fycZxNEkChWkYYVAV3pn9qnsXnO56V6J7Z3Mi-Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd/Olof,
+On Tue, Mar 1, 2016 at 1:43 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
+>
+> On 01/03/16 11:18, Andreas F?rber wrote:
+>> Hi Andre,
+>>
+>> Am 01.03.2016 um 12:01 schrieb Andre Przywara:
+>>> On 29/02/16 23:44, Andreas F?rber wrote:
+>>>> Add GICH and GICV resources for HYP mode - guess based on other vendors.
+>>>
+>>> Do you know if the firmware allows the kernel to be entered in EL2
+>>> (which is the arm64 name for HYP)?
+>>> So can we run kvm?
+>>> If you have a booted kernel, can you grep for "EL2" and "kvm" in the dmesg?
+>>
+>> I do not have a rootfs yet (MMC v5 patches by Carlo are still waiting
+>> for review), but with this change the KVM driver initializes okay - the
+>> purpose of this patch!
+>>
+>>> Also you should merge this patch into 3/8, same for 8/8.
+>>
+>> If people confirm this is generally or specifically for this SoC correct
+>> then sure. So far 3/8 seems a safe subset for lack of public documentation.
+>
+> The GIC is an integral part of the SoC, so this clearly belongs in there.
+>
+>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>> ---
+>>>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 +++-
+>
+> In general I was wondering if this naming is correct?
+> Shouldn't it be something with "s905" in it? Because this the SoC that
+> is driving all those hardware and the peripherals that you describe in
+> there are clearly within the SoC.
+> So something like meson-s905.dtsi or the like?
 
-Fixed the pull URL this time.
+When I first submitted support for the meson8 and meson8b I picked up
+the names according to the Amlogic SDK.
+In the latest Amlogic drop this SoC is identified as meson-gxbb so
+probably we should stick to this name.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  https://github.com/rogerq/linux.git tags/gpmc-omap-for-v4.6
-
-for you to fetch changes up to e116c0545d17be6cc95a559aa5a68c221330501b:
-
-  dt-bindings: bus: ti-gpmc: Add AAD timings properties (2016-02-08 16:22:03 +0200)
-
-----------------------------------------------------------------
-OMAP-GPMC: Add address/data muxed timings
-
-* Add support for the GPMC Advanced AAD (address/data muxed) timings
-on hardware supporting the feature like the AM335x and DM816X.
-
-----------------------------------------------------------------
-Neil Armstrong (2):
-      memory: omap-gpmc: Add support for AAD timings
-      dt-bindings: bus: ti-gpmc: Add AAD timings properties
-
- Documentation/devicetree/bindings/bus/ti-gpmc.txt |  5 +++++
- drivers/memory/omap-gpmc.c                        | 30 ++++++++++++++++++++++++++++++
- include/linux/omap-gpmc.h                         |  5 +++++
- 3 files changed, 40 insertions(+)
-
---
-cheers,
--roger
+-- 
+Carlo Caione
