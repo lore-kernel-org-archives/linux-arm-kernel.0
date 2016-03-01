@@ -1,38 +1,55 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 2 Mar 2016 02:37:14 +0800
-Subject: [PATCH 3/6] powerpc: rtc: provide rtc_class_ops directly
-In-Reply-To: <1456851608-3374907-4-git-send-email-arnd@arndb.de>
-Message-ID: <201603020228.jios50eU%fengguang.wu@intel.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 01 Mar 2016 10:41:40 -0800
+Subject: [PATCH 1/2] clk: bcm2835: expose raw clock-registers via debugfs
+In-Reply-To: <56D59998.8060301@martin.sperl.org>
+References: <1456755616-2472-1-git-send-email-kernel@martin.sperl.org>
+ <1456755616-2472-2-git-send-email-kernel@martin.sperl.org>
+ <87k2ln5k09.fsf@eliezer.anholt.net> <56D59998.8060301@martin.sperl.org>
+Message-ID: <874mcqrqfv.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Martin Sperl <kernel@martin.sperl.org> writes:
 
-[auto build test ERROR on abelloni/rtc-next]
-[also build test ERROR on v4.5-rc6 next-20160301]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> On 29.02.2016 21:39, Eric Anholt wrote:
+>> kernel at martin.sperl.org writes:
+>>
+>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>
+>>> For debugging purposes under some circumstance
+>>> it helps to be able to see the actual clock registers.
+>>>
+>>> E.g: when looking at the clock divider it is helpful to
+>>> see what the actual clock divider is.
+>>>
+>>> This patch exposes all the clock registers specific to each
+>>> clock/pll/pll-divider via debugfs.
+>>>
+>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>>
+>> This one definitely seems useful to me.  I think the debugfs bits need
+>> to be under #ifdef CONFIG_DEBUG_FS though.
+>>
+>> With that fixed,
+>>
+>> Acked-by: Eric Anholt <eric@anholt.net>
+>>
+> Note that include/linux/debugfs.h contains such ifdef and generates
+> dummy code like this:
+> static inline struct dentry *debugfs_create_regset32(const char *name,
+>                                     umode_t mode, struct dentry *parent,
+>                                     struct debugfs_regset32 *regset)
+> {
+>          return ERR_PTR(-ENODEV);
+> }
+> (see also Documentation/filesystem/debugfs.txt )
 
-url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/rtc-generic-follow-up-for-COMPILE_TEST/20160302-011032
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
-config: powerpc-allnoconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=powerpc 
-
-All errors (new ones prefixed by >>):
-
-   arch/powerpc/kernel/built-in.o: In function `rtc_generic_get_time':
->> time.c:(.text+0x4c58): undefined reference to `rtc_valid_tm'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+OK, looks like the CONFIG_DEBUG_FS ifdefs I've seen in other drivers are
+just noise.  The patch should be good as-is, then.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 5708 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160302/fb4fdc17/attachment.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160301/cbbb2f9d/attachment.sig>
