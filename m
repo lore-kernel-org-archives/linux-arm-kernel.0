@@ -1,66 +1,63 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 1 Mar 2016 16:04:38 +0100
-Subject: [PATCH 2/2] cpufreq: mediatek: allow building as a module
-In-Reply-To: <1456761867-1742824-2-git-send-email-arnd@arndb.de>
-References: <1456761867-1742824-1-git-send-email-arnd@arndb.de>
- <1456761867-1742824-2-git-send-email-arnd@arndb.de>
-Message-ID: <56D5AF86.7000809@gmail.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Tue, 1 Mar 2016 16:10:34 +0100
+Subject: [PATCH v4 4/5] arm64/perf: Enable PMCR long cycle counter bit
+In-Reply-To: <20160229153934.GB14848@arm.com>
+References: <cover.1455810755.git.jglauber@cavium.com>
+ <467597048eda3004bd69f1fbe3981aab111e00dd.1455810755.git.jglauber@cavium.com>
+ <20160229153934.GB14848@arm.com>
+Message-ID: <20160301151034.GA8514@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 29, 2016 at 03:39:35PM +0000, Will Deacon wrote:
+> Hi Jan,
+> 
+> I've queued this lot on my perf/updates branch, but I just noticed an
+> oddity whilst dealing with some potential conflicts with the kvm tree.
+> 
+> On Thu, Feb 18, 2016 at 05:50:13PM +0100, Jan Glauber wrote:
+> > With the long cycle counter bit (LC) disabled the cycle counter is not
+> > working on ThunderX SOC (ThunderX only implements Aarch64).
+> > Also, according to documentation LC == 0 is deprecated.
+> > 
+> > To keep the code simple the patch does not introduce 64 bit wide counter
+> > functions. Instead writing the cycle counter always sets the upper
+> > 32 bits so overflow interrupts are generated as before.
+> > 
+> > Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
+> > 
+> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> > ---
+> >  arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
+> >  1 file changed, 16 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > index 0ed05f6..c68fa98 100644
+> > --- a/arch/arm64/kernel/perf_event.c
+> > +++ b/arch/arm64/kernel/perf_event.c
+> > @@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+> >  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+> >  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+> >  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
+> > +#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
+> >  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+> >  #define	ARMV8_PMCR_N_MASK	0x1f
+> >  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+> 
+> You haven't extended this mask to cover the LC bit, so it will be ignored
+> by armv8pmu_pmcr_write afaict.
+> 
+> How did you test this? I can easily update the mask, but it would be
+> good to know that it doesn't end up cause a breakage.
 
+Please update the mask, I've tested with ARMV8_PMCR_MASK set to 0x7f
+and it works fine.
 
-On 29/02/16 17:04, Arnd Bergmann wrote:
-> The MT8173 cpufreq driver can currently only be built-in, but
-> it has a Kconfig dependency on the thermal core. THERMAL
-> can be a loadable module, which in turn makes this driver
-> impossible to build.
->
-> It is nicer to make the cpufreq driver a module as well, so
-> this patch turns the option in to a 'tristate' and adapts
-> the dependency accordingly.
->
-> The driver has no module_exit() function, so it will continue
-> to not support unloading, but it can be built as a module
-> and loaded at runtime now.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 5269e7067cd6 ("cpufreq: Add ARM_MT8173_CPUFREQ dependency on THERMAL")
-> ---
+It seems like it would work even without the LC bit set because we
+set the upper bits again after an interrupt, but reading the documentation
+we should really use ARMV8_PMCR_LC.
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+thanks,
+Jan
 
->   drivers/cpufreq/Kconfig.arm      | 4 ++--
->   drivers/cpufreq/mt8173-cpufreq.c | 1 +
->   2 files changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 0031069b64c9..14b1f9393b05 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -84,10 +84,10 @@ config ARM_KIRKWOOD_CPUFREQ
->   	  SoCs.
->
->   config ARM_MT8173_CPUFREQ
-> -	bool "Mediatek MT8173 CPUFreq support"
-> +	tristate "Mediatek MT8173 CPUFreq support"
->   	depends on ARCH_MEDIATEK && REGULATOR
->   	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
-> -	depends on !CPU_THERMAL || THERMAL=y
-> +	depends on !CPU_THERMAL || THERMAL
->   	select PM_OPP
->   	help
->   	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
-> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-> index 1efba340456d..2058e6d292ce 100644
-> --- a/drivers/cpufreq/mt8173-cpufreq.c
-> +++ b/drivers/cpufreq/mt8173-cpufreq.c
-> @@ -17,6 +17,7 @@
->   #include <linux/cpu_cooling.h>
->   #include <linux/cpufreq.h>
->   #include <linux/cpumask.h>
-> +#include <linux/module.h>
->   #include <linux/of.h>
->   #include <linux/platform_device.h>
->   #include <linux/pm_opp.h>
->
+> Will
