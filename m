@@ -1,47 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 Mar 2016 12:33:09 -0600
-Subject: [PATCH v3 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <1456483912-32090-3-git-send-email-alexandre.torgue@gmail.com>
-References: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
- <1456483912-32090-3-git-send-email-alexandre.torgue@gmail.com>
-Message-ID: <20160302183309.GA2449@rob-hp-laptop>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 2 Mar 2016 13:34:35 -0500
+Subject: [PATCH V14 8/9] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <56D08843.5020306@linaro.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
+ <56D08843.5020306@linaro.org>
+Message-ID: <56D7323B.4040100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 11:51:50AM +0100, Alexandre TORGUE wrote:
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
-> 
-> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
-> new file mode 100644
-> index 0000000..67fceda
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
-> @@ -0,0 +1,40 @@
-> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
-> +
-> +This file documents platform glue layer for stmmac.
-> +Please see stmmac.txt for the other unchanged properties.
-> +
-> +The device node has following properties.
-> +
-> +Required properties:
-> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
-> +	       "snps,dwmac-3.50a" to select IP vesrion.
-> +- clocks: Should contain the GMAC main clock, and tx clock
-> +- compatible:  Should be "st,stm32-dwmac" to select glue and
-> +	       "snps,dwmac-3.50a" to select IP version.
-> +- clocks: Should contain the MAC main clock
-> +- clock-names: Should contain the clock names "stmmaceth".
-> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
-> +	      encompases the glue register, and the offset of the control register.
-> +
-> +Optional properties:
-> +- clocks: Could contain:
-> +	- the tx clock,
-> +	- the rx clock
-> +- clock-names: Could contain the clock names "tx-clk", "rx-clk"
+On 2/26/2016 12:15 PM, Eric Auger wrote:
+>> -module_init(reset ## _module_init);				\
+>> > +#define module_vfio_reset_handler(compat, acpihid, reset)		\
+>> > +MODULE_ALIAS("vfio-reset:" compat);					\
+> Here you need to handle alias for hid case I think
 
-Either the IP block has 3 clocks or it has 1. If you have a case where 1 
-clock feeds all 3 inputs, then list the clock 3 times.
+I'm wondering what happens when Compat or ACPI string is NULL.
 
-Rob
+MODULE_ALIAS("vfio-reset:" NULL)
+
+Would the kernel like it? 
+
+I'd rather create an alias only when the string is not NULL. Given
+this is a macro, I believe it won't work. 
+
+Can you think of any other way in the code to create the alias?
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
