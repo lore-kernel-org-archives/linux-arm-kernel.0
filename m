@@ -1,77 +1,60 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 2 Mar 2016 18:07:21 +0300
-Subject: [PATCH v2 0/8] arm64: Support for systems without AArch32 state
-In-Reply-To: <20160301211923.GA1325@yury-N73SV>
-References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
- <20160301211923.GA1325@yury-N73SV>
-Message-ID: <20160302150721.GA16286@yury-N73SV>
+From: kirill.shutemov@linux.intel.com (Kirill A. Shutemov)
+Date: Wed, 2 Mar 2016 18:11:52 +0300
+Subject: [PATCH] arm: mm: Fix definition of pmd_mknotpresent
+In-Reply-To: <1456880580-22311-1-git-send-email-steve.capper@arm.com>
+References: <1456880580-22311-1-git-send-email-steve.capper@arm.com>
+Message-ID: <20160302151152.GA94701@black.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 12:19:23AM +0300, Yury Norov wrote:
-> On Thu, Feb 25, 2016 at 09:52:40AM +0000, Suzuki K Poulose wrote:
-> > This series add checks to make sure that the AArch32 state is
-> > supported before we process the 32bit ID registers. Also
-> > checks the same for COMPAT binary execution.
-> > 
-> > (Painfully) applies on top of 4.5-rc5 + [1] + [2].
-> > 
-> > Or it is available here :
-> >   git://linux-arm.org/linux-skp.git noaarch32/v2-4.5-rc5
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/410556.html
-> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401913.html
-> > 
-> > Changes since V1:
-> >   - Prevent changing the personality to PER_LINUX32 by adding
-> >     wrapper for personality() syscall.
-> >   - Add the check to KVM before initialising a AArch32 vcpu
-> >   - Tested on hardware.
-> > 
-> > Btw, linux32 doesn't complain when the personality() syscall fails to change
-> > to PER_LINUX32. You can verify the personality by running 
-> >  $ cat /proc/cpuinfo
-> >  which would still list the 64bit features for the CPUs.
+On Wed, Mar 02, 2016 at 01:03:00AM +0000, Steve Capper wrote:
+> Currently pmd_mknotpresent will use a zero entry to respresent an
+> invalidated pmd.
 > 
-> Hi Suzuki,
+> Unfortunately this definition clashes with pmd_none, thus it is
+> possible for a race condition to occur if zap_pmd_range sees pmd_none
+> whilst __split_huge_pmd_locked is running too with pmdp_invalidate
+> just called.
 > 
-> I have some troubles with access to appropriate hardware to test
-> it, but I didn't forget.
+> This patch fixes the race condition by modifying pmd_mknotpresent to
+> create non-zero faulting entries (as is done in other architectures),
+> removing the ambiguity with pmd_none.
 > 
-> Yury.
+> Fixes: 8d9625070073 ("ARM: mm: Transparent huge page support for LPAE systems.")
+> Reported-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> ---
+> 
+> This patch addresses an issue discussed at:
+> http://lkml.iu.edu/hypermail/linux/kernel/1602.3/01846.html
+> 
+> ---
+>  arch/arm/include/asm/pgtable-3level.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index dc46398..451b6e7 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -249,10 +249,10 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+>  #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+>  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+>  
+> -/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
+> +/* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
+>  static inline pmd_t pmd_mknotpresent(pmd_t pmd)
+>  {
+> -	return __pmd(0);
+> +	return __pmd(pmd_val(pmd) & ~PMD_TYPE_MASK);
 
-Hi Suzuki,
+I'm confused. Wouldn't it still be present?
 
-ubuntu at arm64:~$ uname -a
-Linux arm64 4.5.0-rc5-00019-g3e330b9 #76 SMP PREEMPT Wed Mar 2 17:46:57 MSK 2016 aarch64 aarch64 aarch64 GNU/Linux
+arch/arm/include/asm/pgtable.h:#define pmd_present(pmd) (pmd_val(pmd))
 
-ubuntu at arm64:~$ cat /proc/cpuinfo
-processor       : 0-47
-BogoMIPS        : 200.00
-Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-CPU implementer : 0x43
-CPU architecture: 8
-CPU variant     : 0x1
-CPU part        : 0x0a1
-CPU revision    : 0
+Shouldn't pmd_present() be re-defined as (pmd_val(pmd) & PMD_TYPE_MASK) or
+something?
 
-ubuntu at arm64:~$ file readdir
-readdir: ELF 32-bit LSB  executable, ARM, EABI5 version 1 (SYSV), statically linked, for GNU/Linux 2.6.32,
-BuildID[sha1]=aeebc12494450b55a2ab0d39ebd2e121e9085d5c, not stripped
-
-W/o 32_EL0:
-ubuntu at arm64:~$ ./readdir 
--bash: ./readdir: cannot execute binary file: Exec format error
-
-With 32_ELO but w/o your patchset: kernel just hangs (on 4.2 it
-printed errors, but it was other machine);
-
-With 32_EL0 and with your patchset:
-ubuntu at arm64:~$ ./readdir 
--bash: ./readdir: cannot execute binary file: Exec format error
-
-So, everything is looking OK. 
-
-Tested-by: Yury Norov <ynorov@caviumnetworks.com>
-
-Yury.
+-- 
+ Kirill A. Shutemov
