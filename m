@@ -1,23 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 23:18:58 +0100
-Subject: [GIT PULL 4/4] ARM: imx: defconfig updates for 4.6
-In-Reply-To: <1456844403-26176-4-git-send-email-shawnguo@kernel.org>
-References: <1456844403-26176-1-git-send-email-shawnguo@kernel.org>
- <1456844403-26176-4-git-send-email-shawnguo@kernel.org>
-Message-ID: <3158655.cBRKP8lPCB@wuerfel>
+From: vishalm@ti.com (Vishal Mahaveer)
+Date: Wed, 2 Mar 2016 16:21:15 -0600
+Subject: [PATCH] ARM: DRA722: remove redundant definition of 1.0 device
+Message-ID: <1456957275-2025-1-git-send-email-vishalm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 March 2016 23:00:03 Shawn Guo wrote:
-> The i.MX defconfig update for 4.6:
-> - Enable i.MX25 Touchscreen controller and ADC support
-> - Enable NVMEM OCOTP driver support
-> - Clean up mxs_defconfig and imx_v4_v5_defconfig
-> - Enable initramfs support
-> - Enable PSCI, SAHARA and more Vybrid driver support
-> 
-> 
+Remove duplicate definition of Rev 1.0 device.
+Fixes: 81032e34e184 ("ARM: DRA752: Add ID detect for ES2.0")
 
-Pulled into next/defconfig, thanks!
+Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
+---
+ arch/arm/mach-omap2/soc.h |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 79ca3c3..83d3547 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -471,7 +471,6 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
+ #define DRA752_REV_ES2_0	(DRA7XX_CLASS | (0x52 << 16) | (0x20 << 8))
+ #define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+-#define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+ 
+ void omap2xxx_check_revision(void);
+ void omap3xxx_check_revision(void);
+-- 
+1.7.4.1
