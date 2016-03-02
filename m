@@ -1,84 +1,82 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  2 Mar 2016 15:32:00 +0000
-Subject: [RESEND 02/11] pwm: sysfs: Add PWM Capture support
+Date: Wed,  2 Mar 2016 15:32:03 +0000
+Subject: [RESEND 05/11] pwm: sti: Supply PWM Capture register addresses and
+ bit locations
 In-Reply-To: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
 References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1456932729-9667-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1456932729-9667-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a user to read PWM Capture results from /sysfs. First,
-the user must tell PWM Capture which channel they wish to
-read from:
-
-  $ echo 2 > $PWMCHIP/capture
-
-To start a capture and read the result, simply read the file:
-
-  $ cat $PWMCHIP/capture
-
-The output format is left to the device.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pwm/sysfs.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/pwm/pwm-sti.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-index 9c90886..3572ef4 100644
---- a/drivers/pwm/sysfs.c
-+++ b/drivers/pwm/sysfs.c
-@@ -23,6 +23,8 @@
- #include <linux/kdev_t.h>
- #include <linux/pwm.h>
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index aa217e2..2336bac 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -22,26 +22,48 @@
+ #include <linux/time.h>
  
-+static int capture_channel;
-+
- struct pwm_export {
- 	struct device child;
- 	struct pwm_device *pwm;
-@@ -167,16 +169,42 @@ static ssize_t polarity_store(struct device *child,
- 	return ret ? : size;
- }
+ #define PWM_OUT_VAL(x)	(0x00 + (4 * (x))) /* Channel's Duty Cycle register */
++#define PWM_CPT_VAL(x)	(0x10 + (4 * (x))) /* Capture value */
++#define PWM_CPT_EDGE(x) (0x30 + (4 * (x))) /* Edge to capture on */
  
-+static ssize_t capture_show(struct device *child,
-+			    struct device_attribute *attr,
-+			    char *buf)
-+{
-+	struct pwm_device *pwm = child_to_pwm_device(child);
+ #define STI_PWM_CTRL	0x50		/* Control/Config register */
+ #define STI_INT_EN	0x54		/* Interrupt Enable/Disable register */
++#define STI_INT_STA	0x58		/* Interrupt Status register */
++#define PWM_INT_ACK			0x5c
+ #define PWM_PRESCALE_LOW_MASK		0x0f
+ #define PWM_PRESCALE_HIGH_MASK		0xf0
++#define PWM_CPT_EDGE_MASK		0x03
++#define PWM_INT_ACK_MASK		0x1ff
 +
-+	return pwm_capture(pwm, capture_channel, buf);
-+}
-+
-+static ssize_t capture_store(struct device *child,
-+			     struct device_attribute *attr,
-+			     const char *buf, size_t size)
-+{
-+	int val, ret;
-+
-+	ret = kstrtoint(buf, 0, &val);
-+	if (ret)
-+		return ret;
-+
-+	capture_channel = val;
-+
-+	return size;
-+}
-+
- static DEVICE_ATTR_RW(period);
- static DEVICE_ATTR_RW(duty_cycle);
- static DEVICE_ATTR_RW(enable);
- static DEVICE_ATTR_RW(polarity);
-+static DEVICE_ATTR_RW(capture);
++#define STI_MAX_CPT_CHANS		4
++#define CPT_DC_MAX			0xff
  
- static struct attribute *pwm_attrs[] = {
- 	&dev_attr_period.attr,
- 	&dev_attr_duty_cycle.attr,
- 	&dev_attr_enable.attr,
- 	&dev_attr_polarity.attr,
-+	&dev_attr_capture.attr,
- 	NULL
+ /* Regfield IDs */
+ enum {
+ 	/* Bits in PWM_CTRL*/
+ 	PWMCLK_PRESCALE_LOW,
+ 	PWMCLK_PRESCALE_HIGH,
++	CPTCLK_PRESCALE,
+ 
+ 	PWM_OUT_EN,
++	PWM_CPT_EN,
+ 
+ 	PWM_CPT_INT_EN,
++	PWM_CPT_INT_STAT,
+ 
+ 	/* Keep last */
+ 	MAX_REGFIELDS
  };
- ATTRIBUTE_GROUPS(pwm);
+ 
++/* Each capture input can be programmed to detect rising-edge, falling-edge,
++ * either edge or neither egde
++ */
++enum sti_cpt_edge {
++	CPT_EDGE_DISABLED,
++	CPT_EDGE_RISING,
++	CPT_EDGE_FALLING,
++	CPT_EDGE_BOTH,
++};
++
+ struct sti_pwm_compat_data {
+ 	const struct reg_field *reg_fields;
+ 	unsigned int num_chan;
+@@ -69,8 +91,11 @@ struct sti_pwm_chip {
+ static const struct reg_field sti_pwm_regfields[MAX_REGFIELDS] = {
+ 	[PWMCLK_PRESCALE_LOW]	= REG_FIELD(STI_PWM_CTRL, 0, 3),
+ 	[PWMCLK_PRESCALE_HIGH]	= REG_FIELD(STI_PWM_CTRL, 11, 14),
++	[CPTCLK_PRESCALE]	= REG_FIELD(STI_PWM_CTRL, 4, 8),
+ 	[PWM_OUT_EN]		= REG_FIELD(STI_PWM_CTRL, 9, 9),
++	[PWM_CPT_EN]		= REG_FIELD(STI_PWM_CTRL, 10, 10),
+ 	[PWM_CPT_INT_EN]	= REG_FIELD(STI_INT_EN, 1, 4),
++	[PWM_CPT_INT_STAT]	= REG_FIELD(STI_INT_STA, 1, 4),
+ };
+ 
+ static inline struct sti_pwm_chip *to_sti_pwmchip(struct pwm_chip *chip)
 -- 
 1.9.1
