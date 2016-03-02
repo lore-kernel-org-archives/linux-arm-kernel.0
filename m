@@ -1,19 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:59:01 +0100
-Subject: [PATCH 09/14] amd-xgbe: use __maybe_unused to hide pm functions
+Date: Wed,  2 Mar 2016 16:58:59 +0100
+Subject: [PATCH 07/14] hw_random: exynos: use __maybe_unused to hide pm
+ functions
 In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-10-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The amd-xgbe ethernet driver hides its suspend/resume functions
-in #ifdef CONFIG_PM, but uses SIMPLE_DEV_PM_OPS() to make the
-reference conditional on CONFIG_PM_SLEEP, which results in a
-warning when PM_SLEEP is not set but PM is:
+The exynos random driver uses #ifdef to check for CONFIG_PM, but
+then uses SIMPLE_DEV_PM_OPS, which leaves the references out when
+CONFIG_PM_SLEEP is not defined, so we get a warning with
+PM=y && PM_SLEEP=n:
 
-drivers/net/ethernet/amd/xgbe/xgbe-main.c:833:12: warning: 'xgbe_suspend' defined but not used [-Wunused-function]
-drivers/net/ethernet/amd/xgbe/xgbe-main.c:853:12: warning: 'xgbe_resume' defined but not used [-Wunused-function]
+drivers/char/hw_random/exynos-rng.c:166:12: error: 'exynos_rng_suspend' defined but not used [-Werror=unused-function]
+drivers/char/hw_random/exynos-rng.c:171:12: error: 'exynos_rng_resume' defined but not used [-Werror=unused-function]
 
 This removes the incorrect #ifdef and instead uses a __maybe_unused
 annotation to let the compiler know it can silently drop
@@ -21,39 +22,54 @@ the function definition.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/ethernet/amd/xgbe/xgbe-main.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/char/hw_random/exynos-rng.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/amd/xgbe/xgbe-main.c b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-index 3eee3201b58f..a86f32106639 100644
---- a/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-+++ b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-@@ -829,8 +829,7 @@ static int xgbe_remove(struct platform_device *pdev)
- 	return 0;
+diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
+index 30cf4623184f..ada081232528 100644
+--- a/drivers/char/hw_random/exynos-rng.c
++++ b/drivers/char/hw_random/exynos-rng.c
+@@ -144,8 +144,7 @@ static int exynos_rng_probe(struct platform_device *pdev)
+ 	return devm_hwrng_register(&pdev->dev, &exynos_rng->rng);
  }
  
 -#ifdef CONFIG_PM
--static int xgbe_suspend(struct device *dev)
-+static int __maybe_unused xgbe_suspend(struct device *dev)
+-static int exynos_rng_runtime_suspend(struct device *dev)
++static int __maybe_unused exynos_rng_runtime_suspend(struct device *dev)
  {
- 	struct net_device *netdev = dev_get_drvdata(dev);
- 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
-@@ -850,7 +849,7 @@ static int xgbe_suspend(struct device *dev)
- 	return ret;
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct exynos_rng *exynos_rng = platform_get_drvdata(pdev);
+@@ -155,7 +154,7 @@ static int exynos_rng_runtime_suspend(struct device *dev)
+ 	return 0;
  }
  
--static int xgbe_resume(struct device *dev)
-+static int __maybe_unused xgbe_resume(struct device *dev)
+-static int exynos_rng_runtime_resume(struct device *dev)
++static int __maybe_unused exynos_rng_runtime_resume(struct device *dev)
  {
- 	struct net_device *netdev = dev_get_drvdata(dev);
- 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
-@@ -868,7 +867,6 @@ static int xgbe_resume(struct device *dev)
- 
- 	return ret;
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct exynos_rng *exynos_rng = platform_get_drvdata(pdev);
+@@ -163,12 +162,12 @@ static int exynos_rng_runtime_resume(struct device *dev)
+ 	return clk_prepare_enable(exynos_rng->clk);
  }
--#endif /* CONFIG_PM */
  
- #ifdef CONFIG_ACPI
- static const struct acpi_device_id xgbe_acpi_match[] = {
+-static int exynos_rng_suspend(struct device *dev)
++static int __maybe_unused exynos_rng_suspend(struct device *dev)
+ {
+ 	return pm_runtime_force_suspend(dev);
+ }
+ 
+-static int exynos_rng_resume(struct device *dev)
++static int __maybe_unused exynos_rng_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct exynos_rng *exynos_rng = platform_get_drvdata(pdev);
+@@ -180,7 +179,6 @@ static int exynos_rng_resume(struct device *dev)
+ 
+ 	return exynos_rng_configure(exynos_rng);
+ }
+-#endif
+ 
+ static const struct dev_pm_ops exynos_rng_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(exynos_rng_suspend, exynos_rng_resume)
 -- 
 2.7.0
