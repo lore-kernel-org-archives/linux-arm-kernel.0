@@ -1,20 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 20:05:35 +0100
-Subject: [GIT PULL][RESEND] omap gpmc enhancements for v4.6
-In-Reply-To: <56D590B9.4050307@ti.com>
-References: <56D488F0.8070406@ti.com> <56D590B9.4050307@ti.com>
-Message-ID: <6407706.rWZ3nVIFX1@wuerfel>
+Date: Wed,  2 Mar 2016 20:06:45 +0100
+Subject: [PATCH 1/2] isdn: icn: remove a #warning
+Message-ID: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 March 2016 14:53:13 Roger Quadros wrote:
-> OMAP-GPMC: Add address/data muxed timings
-> 
-> * Add support for the GPMC Advanced AAD (address/data muxed) timings
-> on hardware supporting the feature like the AM335x and DM816X.
-> 
-> 
+The icn driver currently produces an unconditional #warning whenever
+we build it, introduced by Karsten Keil back in 2003:
 
-Pulled into next/drivers, thanks!
+ #warning TODO test headroom or use skb->nb to flag ACK
 
-	Arnd
+Karsten's original commit (from BitKeeper) contains this description:
+
+    - here are lot of bugs left, so ISDN is not stable yet but
+      I think it's really time to fix it, even if it need some cycles
+      to get it right (normally I'm only send patches if it works 100% for
+      me).
+    - I add some additional #warnings to address places which need fixing
+      (I hope that some of the other ISDN developer jump in)
+
+Apparently this has not happened, and it is unlikely that it ever will,
+given that the driver doesn't seem to work. No substantial bug fixes
+other than janitorial cleanups have happened in the driver since then,
+and I see no indication that anyone who patched it had the hardware.
+
+We should probably either remove the driver, or remove all of i4l,
+but for now, this shuts up the distracting #warning by turning it
+into a comment.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Link: http://git.meleeweb.net/linux.git/commit/?id=b0deac0886b0056765afd149e9834373b38e096b
+---
+ drivers/isdn/icn/icn.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/isdn/icn/icn.c b/drivers/isdn/icn/icn.c
+index 358a574d9e8b..46d957c34be1 100644
+--- a/drivers/isdn/icn/icn.c
++++ b/drivers/isdn/icn/icn.c
+@@ -718,7 +718,7 @@ icn_sendbuf(int channel, int ack, struct sk_buff *skb, icn_card *card)
+ 			return 0;
+ 		if (card->sndcount[channel] > ICN_MAX_SQUEUE)
+ 			return 0;
+-#warning TODO test headroom or use skb->nb to flag ACK
++		/* TODO test headroom or use skb->nb to flag ACK */
+ 		nskb = skb_clone(skb, GFP_ATOMIC);
+ 		if (nskb) {
+ 			/* Push ACK flag as one
+-- 
+2.7.0
