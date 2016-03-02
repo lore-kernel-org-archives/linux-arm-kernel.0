@@ -1,56 +1,27 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 3 Mar 2016 00:08:23 +0100
-Subject: [PATCH v2 12/17] arm64: KVM: vgic-v2: Make GICD_SGIR quicker to
- hit
-In-Reply-To: <1455727249-24752-13-git-send-email-marc.zyngier@arm.com>
-References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
- <1455727249-24752-13-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160302230823.GF9634@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Mar 2016 00:27:43 +0100
+Subject: [GIT PULL] NXP LPC32xx Platform Updates for v4.6 #1
+In-Reply-To: <56D76FAB.9090908@mleia.com>
+References: <56BBE6E6.4080802@mleia.com> <20160224213633.GF10126@localhost>
+ <56D76FAB.9090908@mleia.com>
+Message-ID: <11608683.muXZLfFRbg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 04:40:44PM +0000, Marc Zyngier wrote:
-> The GICD_SGIR register lives a long way from the beginning of
-> the handler array, which is searched linearly. As this is hit
-> pretty often, let's move it up. This saves us some precious
-> cycles when the guest is generating IPIs.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Thursday 03 March 2016 00:56:43 Vladimir Zapolskiy wrote:
+> I would really appreciate, if this pull request is accepted for v4.6, if it
+> happens then most probably v4.7 will contain all needed irqchip fixes --
+> this pull request removes a duplicated timer driver, which in turn strictly
+> depends on a legacy platform clock driver (removed) and on hardware irq
+> numbering provided by a legacy irqchip driver (will be removed in v4.7
+> hopefully).
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+As far as I can tell, Olof merged the series into the next/cleanup
+branch on Feb 24, but did not make that clear enough in his reply.
 
-> ---
->  virt/kvm/arm/vgic-v2-emul.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
-> index 1390797..1b0bee0 100644
-> --- a/virt/kvm/arm/vgic-v2-emul.c
-> +++ b/virt/kvm/arm/vgic-v2-emul.c
-> @@ -321,6 +321,11 @@ static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
->  
->  static const struct vgic_io_range vgic_dist_ranges[] = {
->  	{
-> +		.base		= GIC_DIST_SOFTINT,
-> +		.len		= 4,
-> +		.handle_mmio	= handle_mmio_sgi_reg,
-> +	},
-> +	{
->  		.base		= GIC_DIST_CTRL,
->  		.len		= 12,
->  		.bits_per_irq	= 0,
-> @@ -387,11 +392,6 @@ static const struct vgic_io_range vgic_dist_ranges[] = {
->  		.handle_mmio	= handle_mmio_cfg_reg,
->  	},
->  	{
-> -		.base		= GIC_DIST_SOFTINT,
-> -		.len		= 4,
-> -		.handle_mmio	= handle_mmio_sgi_reg,
-> -	},
-> -	{
->  		.base		= GIC_DIST_SGI_PENDING_CLEAR,
->  		.len		= VGIC_NR_SGIS,
->  		.handle_mmio	= handle_mmio_sgi_clear,
-> -- 
-> 2.1.4
-> 
+I don't see anything holding up your patches from going into 4.6,
+everything should be fine, let me know if there are any other
+problems here, and please check if the arm-soc/for-next branch
+works for you.
+
+	Arnd
