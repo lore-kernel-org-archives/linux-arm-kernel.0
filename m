@@ -1,25 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:24:02 +0100
-Subject: usb: avoid warnings for unused pm functions
-Message-ID: <1456932255-71725-1-git-send-email-arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 2 Mar 2016 15:24:30 +0000
+Subject: [PATCH v2 0/8] arm64: Support for systems without AArch32 state
+In-Reply-To: <20160302150721.GA16286@yury-N73SV>
+References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+ <20160301211923.GA1325@yury-N73SV>
+ <20160302150721.GA16286@yury-N73SV>
+Message-ID: <20160302152429.GE11670@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series addresses a couple of similar warnings in USB
-host and phy drivers. In each case, there is a mismatch between
-the references to some functions and the #ifdef hiding those
-functions (if any).
+On Wed, Mar 02, 2016 at 06:07:21PM +0300, Yury Norov wrote:
+> ubuntu at arm64:~$ uname -a
+> Linux arm64 4.5.0-rc5-00019-g3e330b9 #76 SMP PREEMPT Wed Mar 2 17:46:57 MSK 2016 aarch64 aarch64 aarch64 GNU/Linux
+> 
+> ubuntu at arm64:~$ cat /proc/cpuinfo
+> processor       : 0-47
+> BogoMIPS        : 200.00
+> Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+> CPU implementer : 0x43
+> CPU architecture: 8
+> CPU variant     : 0x1
+> CPU part        : 0x0a1
+> CPU revision    : 0
 
-The series gets rid of all those #ifdes and instead changes
-the drivers that don't already get it wrong to annotate
-the functions as __maybe_unused. However, I am not changing
-any files that consistently get the #ifdefs right.
+As an aside, please do not hack up custom /proc/cpuinfo formats.
 
-	Arnd
+It is a compatibility nightmare for everyone.
 
-[PATCH 1/6] usb: host: unhide suspend/resume declarations
-[PATCH 2/6] usb: xhci-mtk: use __maybe_unused to hide pm functions
-[PATCH 3/6] usb: ohci-at91: use __maybe_unused to hide pm functions
-[PATCH 4/6] usb: ehci-atmel: use __maybe_unused to hide pm functions
-[PATCH 5/6] phy: dm816x: use __maybe_unused to hide pm functions
-[PATCH 6/6] phy: twl4030: use __maybe_unused to hide pm functions
+Mark.
