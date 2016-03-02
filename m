@@ -1,48 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:59:00 +0100
-Subject: [PATCH 08/14] scsi: mvumi: use __maybe_unused to hide pm functions
+Date: Wed,  2 Mar 2016 16:59:01 +0100
+Subject: [PATCH 09/14] amd-xgbe: use __maybe_unused to hide pm functions
 In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-9-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvumi scsi hides the references to its suspend/resume functions
-in an #ifdef but does not hide the implementation the same way:
+The amd-xgbe ethernet driver hides its suspend/resume functions
+in #ifdef CONFIG_PM, but uses SIMPLE_DEV_PM_OPS() to make the
+reference conditional on CONFIG_PM_SLEEP, which results in a
+warning when PM_SLEEP is not set but PM is:
 
-drivers/scsi/mvumi.c:2632:12: error: 'mvumi_suspend' defined but not used [-Werror=unused-function]
-drivers/scsi/mvumi.c:2651:12: error: 'mvumi_resume' defined but not used [-Werror=unused-function]
+drivers/net/ethernet/amd/xgbe/xgbe-main.c:833:12: warning: 'xgbe_suspend' defined but not used [-Wunused-function]
+drivers/net/ethernet/amd/xgbe/xgbe-main.c:853:12: warning: 'xgbe_resume' defined but not used [-Wunused-function]
 
-This adds __maybe_unused annotations so the compiler knows
-it can silently drop them instead of warning, while avoiding
-the addition of another #ifdef.
+This removes the incorrect #ifdef and instead uses a __maybe_unused
+annotation to let the compiler know it can silently drop
+the function definition.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/scsi/mvumi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/amd/xgbe/xgbe-main.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/scsi/mvumi.c b/drivers/scsi/mvumi.c
-index 02360de6b7e0..39285070f3b5 100644
---- a/drivers/scsi/mvumi.c
-+++ b/drivers/scsi/mvumi.c
-@@ -2629,7 +2629,7 @@ static void mvumi_shutdown(struct pci_dev *pdev)
- 	mvumi_flush_cache(mhba);
- }
- 
--static int mvumi_suspend(struct pci_dev *pdev, pm_message_t state)
-+static int __maybe_unused mvumi_suspend(struct pci_dev *pdev, pm_message_t state)
- {
- 	struct mvumi_hba *mhba = NULL;
- 
-@@ -2648,7 +2648,7 @@ static int mvumi_suspend(struct pci_dev *pdev, pm_message_t state)
+diff --git a/drivers/net/ethernet/amd/xgbe/xgbe-main.c b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
+index 3eee3201b58f..a86f32106639 100644
+--- a/drivers/net/ethernet/amd/xgbe/xgbe-main.c
++++ b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
+@@ -829,8 +829,7 @@ static int xgbe_remove(struct platform_device *pdev)
  	return 0;
  }
  
--static int mvumi_resume(struct pci_dev *pdev)
-+static int __maybe_unused mvumi_resume(struct pci_dev *pdev)
+-#ifdef CONFIG_PM
+-static int xgbe_suspend(struct device *dev)
++static int __maybe_unused xgbe_suspend(struct device *dev)
  {
- 	int ret;
- 	struct mvumi_hba *mhba = NULL;
+ 	struct net_device *netdev = dev_get_drvdata(dev);
+ 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
+@@ -850,7 +849,7 @@ static int xgbe_suspend(struct device *dev)
+ 	return ret;
+ }
+ 
+-static int xgbe_resume(struct device *dev)
++static int __maybe_unused xgbe_resume(struct device *dev)
+ {
+ 	struct net_device *netdev = dev_get_drvdata(dev);
+ 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
+@@ -868,7 +867,6 @@ static int xgbe_resume(struct device *dev)
+ 
+ 	return ret;
+ }
+-#endif /* CONFIG_PM */
+ 
+ #ifdef CONFIG_ACPI
+ static const struct acpi_device_id xgbe_acpi_match[] = {
 -- 
 2.7.0
