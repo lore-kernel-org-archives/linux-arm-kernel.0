@@ -1,67 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:59:05 +0100
-Subject: [PATCH 13/14] [media] omap3isp: use IS_ENABLED() to hide pm functions
-In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 2 Mar 2016 17:06:58 +0100
+Subject: [PATCH 01/14] pinctrl: at91: use __maybe_unused to hide pm
+ functions
+In-Reply-To: <1456934350-1389172-2-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-14-git-send-email-arnd@arndb.de>
+ <1456934350-1389172-2-git-send-email-arnd@arndb.de>
+Message-ID: <56D70FA2.30608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap3isp driver hides is power management functions using #ifdef
-but it fails to hide the isp_suspend_modules/isp_resume_modules
-functions in the same way, which leads to a build warning when
-CONFIG_PM is disabled:
+Le 02/03/2016 16:58, Arnd Bergmann a ?crit :
+> The at91-pio4 pinctrl driver uses SET_SYSTEM_SLEEP_PM_OPS() to
+> conditionally set the correct suspend/resume options, but they
+> become unused when CONFIG_PM is disabled:
+> 
+> drivers/pinctrl/pinctrl-at91-pio4.c:827:12: error: 'atmel_pctrl_suspend' defined but not used [-Werror=unused-function]
+> drivers/pinctrl/pinctrl-at91-pio4.c:847:12: error: 'atmel_pctrl_resume' defined but not used [-Werror=unused-function]
+> 
+> This adds __maybe_unused annotations so the compiler knows
+> it can silently drop them instead of warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-drivers/media/platform/omap3isp/isp.c:1183:12: error: 'isp_suspend_modules' defined but not used [-Werror=unused-function]
-drivers/media/platform/omap3isp/isp.c:1217:13: error: 'isp_resume_modules' defined but not used [-Werror=unused-function]
+Indeed, nice like this:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-As the driver manually defines its dev_pm_ops structure and all
-members are NULL without CONFIG_PM, we can simply avoid referencing
-the structure using an IS_ENABLED() check, and drop all the #ifdef
-to avoid all warnings.
+Thanks, bye.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/media/platform/omap3isp/isp.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
-index f9e5245f26ac..7f118baca270 100644
---- a/drivers/media/platform/omap3isp/isp.c
-+++ b/drivers/media/platform/omap3isp/isp.c
-@@ -1713,8 +1713,6 @@ void omap3isp_print_status(struct isp_device *isp)
- 	dev_dbg(isp->dev, "--------------------------------------------\n");
- }
- 
--#ifdef CONFIG_PM
--
- /*
-  * Power management support.
-  *
-@@ -1785,15 +1783,6 @@ static void isp_pm_complete(struct device *dev)
- 	isp_resume_modules(isp);
- }
- 
--#else
--
--#define isp_pm_prepare	NULL
--#define isp_pm_suspend	NULL
--#define isp_pm_resume	NULL
--#define isp_pm_complete	NULL
--
--#endif /* CONFIG_PM */
--
- static void isp_unregister_entities(struct isp_device *isp)
- {
- 	omap3isp_csi2_unregister_entities(&isp->isp_csi2a);
-@@ -2611,7 +2600,7 @@ static struct platform_driver omap3isp_driver = {
- 	.id_table = omap3isp_id_table,
- 	.driver = {
- 		.name = "omap3isp",
--		.pm	= &omap3isp_pm_ops,
-+		.pm	= IS_ENABLED(CONFIG_PM) ? &omap3isp_pm_ops : NULL,
- 		.of_match_table = omap3isp_of_table,
- 	},
- };
+> ---
+>  drivers/pinctrl/pinctrl-at91-pio4.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+> index ee69db6ae1c7..4429312e848d 100644
+> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
+> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+> @@ -824,7 +824,7 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
+>  	.pmxops		= &atmel_pmxops,
+>  };
+>  
+> -static int atmel_pctrl_suspend(struct device *dev)
+> +static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
+> @@ -844,7 +844,7 @@ static int atmel_pctrl_suspend(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int atmel_pctrl_resume(struct device *dev)
+> +static int __maybe_unused atmel_pctrl_resume(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
+> 
+
+
 -- 
-2.7.0
+Nicolas Ferre
