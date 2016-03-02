@@ -1,56 +1,29 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 2 Mar 2016 17:47:57 +0100
-Subject: [PATCH 01/14] pinctrl: at91: use __maybe_unused to hide pm
- functions
-In-Reply-To: <1456934350-1389172-2-git-send-email-arnd@arndb.de>
-References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
- <1456934350-1389172-2-git-send-email-arnd@arndb.de>
-Message-ID: <20160302164757.GA2690@odux.rfo.atmel.com>
+From: asamson@codeaurora.org (Azriel Samson)
+Date: Wed, 2 Mar 2016 09:51:08 -0700
+Subject: [PATCH 00/19] arm64 kexec kernel patches v13
+In-Reply-To: <20160302123328.GB19241@dhcppc3.redhat.com>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <c7575f853ccc491bb0212e025aab1cc9@NASANEXM01H.na.qualcomm.com>
+ <56D5D763.4030304@codeaurora.org> <20160302123328.GB19241@dhcppc3.redhat.com>
+Message-ID: <56D719FC.704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 04:58:53PM +0100, Arnd Bergmann wrote:
-> The at91-pio4 pinctrl driver uses SET_SYSTEM_SLEEP_PM_OPS() to
-> conditionally set the correct suspend/resume options, but they
-> become unused when CONFIG_PM is disabled:
-> 
-> drivers/pinctrl/pinctrl-at91-pio4.c:827:12: error: 'atmel_pctrl_suspend' defined but not used [-Werror=unused-function]
-> drivers/pinctrl/pinctrl-at91-pio4.c:847:12: error: 'atmel_pctrl_resume' defined but not used [-Werror=unused-function]
-> 
-> This adds __maybe_unused annotations so the compiler knows
-> it can silently drop them instead of warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Thanks
 
-> ---
->  drivers/pinctrl/pinctrl-at91-pio4.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-> index ee69db6ae1c7..4429312e848d 100644
-> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
-> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-> @@ -824,7 +824,7 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
->  	.pmxops		= &atmel_pmxops,
->  };
->  
-> -static int atmel_pctrl_suspend(struct device *dev)
-> +static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-> @@ -844,7 +844,7 @@ static int atmel_pctrl_suspend(struct device *dev)
->  	return 0;
->  }
->  
-> -static int atmel_pctrl_resume(struct device *dev)
-> +static int __maybe_unused atmel_pctrl_resume(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-> -- 
-> 2.7.0
-> 
+On 3/2/2016 5:33 AM, Pratyush Anand wrote:
+
+> If you just want rebased set then you may take it from my branch, until next
+> version is released.
+>
+> https://github.com/pratyushanand/linux.git : kexec/upstream_arm64_devel
+>
+
+Thanks Pratyush,
+This should help for now.
+-- 
+Thanks,
+Azriel Samson
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
