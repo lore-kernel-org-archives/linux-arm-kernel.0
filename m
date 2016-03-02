@@ -1,39 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 23:27:48 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Fixes for v4.5
-In-Reply-To: <cover.1456880499.git.horms+renesas@verge.net.au>
-References: <cover.1456880499.git.horms+renesas@verge.net.au>
-Message-ID: <2175554.AmiFhZ4OFM@wuerfel>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Thu, 3 Mar 2016 00:31:42 +0200
+Subject: [RFC PATCH] arm: kernel: pci: remove pci=firmware command line
+ parameter handling
+In-Reply-To: <20160301095832.GC31766@red-moon>
+References: <1456767800-6609-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160229174258.GL5891@wantstofly.org>
+ <20160301095832.GC31766@red-moon>
+Message-ID: <20160302223142.GS5891@wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2016 10:05:38 Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Tue, Mar 01, 2016 at 09:58:33AM +0000, Lorenzo Pieralisi wrote:
+
+> > > According to kernel documentation, the pci=firmware command line
+> > > parameter is only meant to be used on IXP2000 ARM platforms to prevent
+> > > the kernel from assigning PCI resources configured by the bootloader.
+> > > 
+> > > Since the IXP2000 ARM platforms support has been removed from the
+> > > kernel in commit:
+> > > 
+> > > commit c65f2abf54a6 ("ARM: remove ixp23xx and ixp2000 platforms")
+> > > 
+> > > its platforms specific kernel parameters should be removed
+> > > too from the kernel documentation along with the kernel code
+> > > currently handling them in that they have just become obsolete.
+> > > 
+> > > This patch removes the pci=firmware command line parameter handling
+> > > from ARM code and the related kernel parameters documentation
+> > > section.
+> > > 
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> > > Cc: Jonathan Corbet <corbet@lwn.net>
+> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > Cc: Rob Herring <robh@kernel.org>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > 
+> > Acked-by: Lennert Buytenhek <kernel@wantstofly.org>
 > 
-> Please consider these second round of Renesas ARM based SoC DT fixes for v4.5.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt-fixes-for-v4.5,
-> which you have already pulled.
-> 
-> If this pull-request is too late for v4.5 then please consider it for v4.6.
+> Thank you Lennert, I take this as an acknowledgement that you are not
+> aware of any other ARM platform using that kernel parameter other than
+> IXP2000s, according to documentation there should not be any but it is a
+> bit complicated to figure out.
 
-I've added it to both the next/dt and the fixes branch now.
-
-At the moment it's the only bug fix we have queued up for 4.5,
-if anything else comes up it will definitely be in there,
-otherwise we'll decide by the end of the week.
-
-My feeling is that we'll likely send this.
- 
-> HS-USB DT support was added to the porter board in v4.5-rc1.
-> Unfortunately it was developed against an early revision of the
-> board and newer revisions do not include the Maxim Integrated MAX3355 OTG
-> chip and thus there should not be a renesas,enable-gpio property.
-> 
-> It is my understanding at this time that the early-revision boards in
-> question have not been observed in the wild.
-
-ok. Thanks for the detailed background info.
-
-	Arnd
+I'm not aware of other platforms using this, but that might not say
+much, I've been out of the loop on Linux/ARM things for a while now.
