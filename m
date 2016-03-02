@@ -1,75 +1,90 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:58:59 +0100
-Subject: [PATCH 07/14] hw_random: exynos: use __maybe_unused to hide pm
- functions
+Date: Wed,  2 Mar 2016 16:59:02 +0100
+Subject: [PATCH 10/14] wireless: cw1200: use __maybe_unused to hide pm
+ functions_
 In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-8-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos random driver uses #ifdef to check for CONFIG_PM, but
-then uses SIMPLE_DEV_PM_OPS, which leaves the references out when
+The cw1200 uses #ifdef to check for CONFIG_PM, but then
+uses SIMPLE_DEV_PM_OPS, which leaves the references out when
 CONFIG_PM_SLEEP is not defined, so we get a warning with
 PM=y && PM_SLEEP=n:
 
-drivers/char/hw_random/exynos-rng.c:166:12: error: 'exynos_rng_suspend' defined but not used [-Werror=unused-function]
-drivers/char/hw_random/exynos-rng.c:171:12: error: 'exynos_rng_resume' defined but not used [-Werror=unused-function]
+drivers/net/wireless/st/cw1200/cw1200_spi.c:450:12: error: 'cw1200_spi_suspend' defined but not used [-Werror=unused-function]
 
 This removes the incorrect #ifdef and instead uses a __maybe_unused
 annotation to let the compiler know it can silently drop
 the function definition.
 
+For the DEV_PM_OPS definition, we can use an IS_ENABLED() check
+to avoid defining the structure when CONFIG_PM is not set without
+the #ifdef.
+
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/char/hw_random/exynos-rng.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/net/wireless/st/cw1200/cw1200_spi.c | 9 ++-------
+ drivers/net/wireless/st/cw1200/pm.h         | 9 +++++++--
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
-index 30cf4623184f..ada081232528 100644
---- a/drivers/char/hw_random/exynos-rng.c
-+++ b/drivers/char/hw_random/exynos-rng.c
-@@ -144,8 +144,7 @@ static int exynos_rng_probe(struct platform_device *pdev)
- 	return devm_hwrng_register(&pdev->dev, &exynos_rng->rng);
- }
- 
--#ifdef CONFIG_PM
--static int exynos_rng_runtime_suspend(struct device *dev)
-+static int __maybe_unused exynos_rng_runtime_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct exynos_rng *exynos_rng = platform_get_drvdata(pdev);
-@@ -155,7 +154,7 @@ static int exynos_rng_runtime_suspend(struct device *dev)
+diff --git a/drivers/net/wireless/st/cw1200/cw1200_spi.c b/drivers/net/wireless/st/cw1200/cw1200_spi.c
+index a740083634d8..63f95e9c2992 100644
+--- a/drivers/net/wireless/st/cw1200/cw1200_spi.c
++++ b/drivers/net/wireless/st/cw1200/cw1200_spi.c
+@@ -446,8 +446,7 @@ static int cw1200_spi_disconnect(struct spi_device *func)
  	return 0;
  }
  
--static int exynos_rng_runtime_resume(struct device *dev)
-+static int __maybe_unused exynos_rng_runtime_resume(struct device *dev)
+-#ifdef CONFIG_PM
+-static int cw1200_spi_suspend(struct device *dev)
++static int __maybe_unused cw1200_spi_suspend(struct device *dev)
  {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct exynos_rng *exynos_rng = platform_get_drvdata(pdev);
-@@ -163,12 +162,12 @@ static int exynos_rng_runtime_resume(struct device *dev)
- 	return clk_prepare_enable(exynos_rng->clk);
- }
+ 	struct hwbus_priv *self = spi_get_drvdata(to_spi_device(dev));
  
--static int exynos_rng_suspend(struct device *dev)
-+static int __maybe_unused exynos_rng_suspend(struct device *dev)
- {
- 	return pm_runtime_force_suspend(dev);
- }
+@@ -460,16 +459,12 @@ static int cw1200_spi_suspend(struct device *dev)
  
--static int exynos_rng_resume(struct device *dev)
-+static int __maybe_unused exynos_rng_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct exynos_rng *exynos_rng = platform_get_drvdata(pdev);
-@@ -180,7 +179,6 @@ static int exynos_rng_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(cw1200_pm_ops, cw1200_spi_suspend, NULL);
  
- 	return exynos_rng_configure(exynos_rng);
- }
 -#endif
+-
+ static struct spi_driver spi_driver = {
+ 	.probe		= cw1200_spi_probe,
+ 	.remove		= cw1200_spi_disconnect,
+ 	.driver = {
+ 		.name		= "cw1200_wlan_spi",
+-#ifdef CONFIG_PM
+-		.pm		= &cw1200_pm_ops,
+-#endif
++		.pm		= IS_ENABLED(CONFIG_PM) ? &cw1200_pm_ops : NULL,
+ 	},
+ };
  
- static const struct dev_pm_ops exynos_rng_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(exynos_rng_suspend, exynos_rng_resume)
+diff --git a/drivers/net/wireless/st/cw1200/pm.h b/drivers/net/wireless/st/cw1200/pm.h
+index 3ed90ff22bb8..534548470ebc 100644
+--- a/drivers/net/wireless/st/cw1200/pm.h
++++ b/drivers/net/wireless/st/cw1200/pm.h
+@@ -31,13 +31,18 @@ int cw1200_pm_init(struct cw1200_pm_state *pm,
+ void cw1200_pm_deinit(struct cw1200_pm_state *pm);
+ int cw1200_wow_suspend(struct ieee80211_hw *hw,
+ 		       struct cfg80211_wowlan *wowlan);
+-int cw1200_wow_resume(struct ieee80211_hw *hw);
+ int cw1200_can_suspend(struct cw1200_common *priv);
++int cw1200_wow_resume(struct ieee80211_hw *hw);
+ void cw1200_pm_stay_awake(struct cw1200_pm_state *pm,
+ 			  unsigned long tmo);
+ #else
+ static inline void cw1200_pm_stay_awake(struct cw1200_pm_state *pm,
+-					unsigned long tmo) {
++					unsigned long tmo)
++{
++}
++static inline int cw1200_can_suspend(struct cw1200_common *priv)
++{
++	return 0;
+ }
+ #endif
+ #endif
 -- 
 2.7.0
