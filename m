@@ -1,95 +1,69 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed,  2 Mar 2016 14:55:57 -0800
-Subject: [PATCH v13 1/6] efi: ARM/arm64: ignore DT memory nodes instead of
- removing them
+Date: Wed,  2 Mar 2016 14:56:00 -0800
+Subject: [PATCH v13 4/6] arm64: Move unflatten_device_tree() call earlier.
 In-Reply-To: <1456959362-2036-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1456959362-2036-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1456959362-2036-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1456959362-2036-5-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: David Daney <david.daney@cavium.com>
 
-There are two problems with the UEFI stub DT memory node removal
-routine:
-- it deletes nodes as it traverses the tree, which happens to work
-  but is not supported, as deletion invalidates the node iterator;
-- deleting memory nodes entirely may discard annotations in the form
-  of additional properties on the nodes.
+In order to extract NUMA information from the device tree, we need to
+have the tree in its unflattened form.
 
-Since the discovery of DT memory nodes occurs strictly before the
-UEFI init sequence, we can simply clear the memblock memory table
-before parsing the UEFI memory map. This way, it is no longer
-necessary to remove the nodes, so we can remove that logic from the
-stub as well.
+Move the call to unflatten_device_tree() into paging_init().  This
+puts it before the call to bootmem_init(), which is where the NUMA
+information is extracted.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/firmware/efi/arm-init.c    |  8 ++++++++
- drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
- 2 files changed, 9 insertions(+), 23 deletions(-)
+ arch/arm64/kernel/setup.c | 7 +++----
+ arch/arm64/mm/mmu.c       | 5 +++++
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 9e15d57..40c9d85 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -143,6 +143,14 @@ static __init void reserve_regions(void)
- 	if (efi_enabled(EFI_DBG))
- 		pr_info("Processing EFI memory map:\n");
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..feae073 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -328,12 +328,11 @@ void __init setup_arch(char **cmdline_p)
  
-+	/*
-+	 * Discard memblocks discovered so far: if there are any at this
-+	 * point, they originate from memory nodes in the DT, and UEFI
-+	 * uses its own memory map instead.
-+	 */
-+	memblock_dump_all();
-+	memblock_remove(0, ULLONG_MAX);
-+
- 	for_each_efi_memory_desc(&memmap, md) {
- 		paddr = md->phys_addr;
- 		npages = md->num_pages;
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index cf7b7d4..9df1560 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, prev, num_rsv;
-+	int node, num_rsv;
- 	int status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
-@@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 		goto fdt_set_fail;
+ 	early_ioremap_reset();
  
- 	/*
--	 * Delete any memory nodes present. We must delete nodes which
--	 * early_init_dt_scan_memory may try to use.
--	 */
--	prev = 0;
--	for (;;) {
--		const char *type;
--		int len;
--
--		node = fdt_next_node(fdt, prev, NULL);
--		if (node < 0)
--			break;
--
--		type = fdt_getprop(fdt, node, "device_type", &len);
--		if (type && strncmp(type, "memory", len) == 0) {
--			fdt_del_node(fdt, node);
--			continue;
--		}
--
--		prev = node;
+-	if (acpi_disabled) {
+-		unflatten_device_tree();
++	if (acpi_disabled)
+ 		psci_dt_init();
+-	} else {
++	else
+ 		psci_acpi_init();
 -	}
--
--	/*
- 	 * Delete all memory reserve map entries. When booting via UEFI,
- 	 * kernel will use the UEFI memory map to find reserved regions.
- 	 */
++
+ 	xen_early_init();
+ 
+ 	cpu_read_bootcpu_ops();
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 58faeaa..ee6e6b0 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -29,6 +29,8 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/stop_machine.h>
++#include <linux/acpi.h>
++#include <linux/of_fdt.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/fixmap.h>
+@@ -459,6 +461,9 @@ void __init paging_init(void)
+ 	map_mem();
+ 	fixup_executable();
+ 
++	if (acpi_disabled)
++		unflatten_device_tree();
++
+ 	/* allocate the zero page. */
+ 	zero_page = early_alloc(PAGE_SIZE);
+ 
 -- 
 1.8.3.1
