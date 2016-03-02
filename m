@@ -1,40 +1,76 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:58:54 +0100
-Subject: [PATCH 02/14] irqchip: st: use __maybe_unused to hide
- st_irq_syscfg_resume
+Date: Wed,  2 Mar 2016 16:58:58 +0100
+Subject: [PATCH 06/14] dma: sirf: use __maybe_unused to hide pm functions
 In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-3-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the st irqchip driver uses SIMPLE_DEV_PM_OPS to conditionally
-set its power management functions, but we get a warning
-about st_irq_syscfg_resume being unused when CONFIG_PM is not
-set:
+The sirf dma driver uses #ifdef to check for CONFIG_PM_SLEEP
+for its suspend/resume code but then has no #ifdef for the
+respective runtime PM code, so we get a warning if CONFIG_PM
+is disabled altogether:
 
-drivers/irqchip/irq-st.c:183:12: error: 'st_irq_syscfg_resume' defined but not used [-Werror=unused-function]
+drivers/dma/sirf-dma.c:1000:12: error: 'sirfsoc_dma_runtime_resume' defined but not used [-Werror=unused-function]
 
-This adds a __maybe_unused annotation so the compiler knows
-it can silently drop it instead of warning.
+This removes the existing #ifdef and instead uses __maybe_unused
+annotations for all four functions to let the compiler know it
+can silently drop the function definition.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/irqchip/irq-st.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/sirf-dma.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/irqchip/irq-st.c b/drivers/irqchip/irq-st.c
-index 9af48a85c16f..5e0e250db0be 100644
---- a/drivers/irqchip/irq-st.c
-+++ b/drivers/irqchip/irq-st.c
-@@ -180,7 +180,7 @@ static int st_irq_syscfg_probe(struct platform_device *pdev)
- 	return st_irq_syscfg_enable(pdev);
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index 22ea2419ee56..e48350e65089 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -989,7 +989,7 @@ static int sirfsoc_dma_remove(struct platform_device *op)
+ 	return 0;
  }
  
--static int st_irq_syscfg_resume(struct device *dev)
-+static int __maybe_unused st_irq_syscfg_resume(struct device *dev)
+-static int sirfsoc_dma_runtime_suspend(struct device *dev)
++static int __maybe_unused sirfsoc_dma_runtime_suspend(struct device *dev)
  {
- 	struct st_irq_syscfg *ddata = dev_get_drvdata(dev);
+ 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
  
+@@ -997,7 +997,7 @@ static int sirfsoc_dma_runtime_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int sirfsoc_dma_runtime_resume(struct device *dev)
++static int __maybe_unused sirfsoc_dma_runtime_resume(struct device *dev)
+ {
+ 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
+ 	int ret;
+@@ -1010,8 +1010,7 @@ static int sirfsoc_dma_runtime_resume(struct device *dev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM_SLEEP
+-static int sirfsoc_dma_pm_suspend(struct device *dev)
++static int __maybe_unused sirfsoc_dma_pm_suspend(struct device *dev)
+ {
+ 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
+ 	struct sirfsoc_dma_regs *save = &sdma->regs_save;
+@@ -1062,7 +1061,7 @@ static int sirfsoc_dma_pm_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int sirfsoc_dma_pm_resume(struct device *dev)
++static int __maybe_unused sirfsoc_dma_pm_resume(struct device *dev)
+ {
+ 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
+ 	struct sirfsoc_dma_regs *save = &sdma->regs_save;
+@@ -1121,7 +1120,6 @@ static int sirfsoc_dma_pm_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+ static const struct dev_pm_ops sirfsoc_dma_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(sirfsoc_dma_runtime_suspend, sirfsoc_dma_runtime_resume, NULL)
 -- 
 2.7.0
