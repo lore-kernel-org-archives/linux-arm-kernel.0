@@ -1,11 +1,11 @@
 From: fugang.duan@nxp.com (Fugang Duan)
-Date: Wed, 2 Mar 2016 14:57:32 +0000
-Subject: [PATCH net-next V2 01/16] net: fec: only check queue 0 if
- RXF_0/TXF_0 interrupt is set
-In-Reply-To: <1456360619-24390-2-git-send-email-troy.kisky@boundarydevices.com>
+Date: Wed, 2 Mar 2016 15:01:34 +0000
+Subject: [PATCH net-next V2 02/16] net: fec: pass rxq to fec_enet_rx_queue
+ instead of queue_id
+In-Reply-To: <1456360619-24390-3-git-send-email-troy.kisky@boundarydevices.com>
 References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-2-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB18556705FA5E8111DF0C6A44FFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <1456360619-24390-3-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <VI1PR0401MB18551D7754A6D2EC350E1D9BFFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,41 +17,65 @@ From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2
 > johannes at sipsolutions.net; stillcompiling at gmail.com;
 > sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
 > <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net-next V2 01/16] net: fec: only check queue 0 if
-> RXF_0/TXF_0 interrupt is set
+> Subject: [PATCH net-next V2 02/16] net: fec: pass rxq to fec_enet_rx_queue
+> instead of queue_id
 > 
-> Before queue 0 was always checked if any queue caused an interrupt.
-> It is better to just mark queue 0 if queue 0 has caused an interrupt.
+> The queue_id is the qid member of struct bufdesc_prop.
 > 
 > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 > ---
->  drivers/net/ethernet/freescale/fec_main.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/net/ethernet/freescale/fec_main.c | 13 +++++--------
+>  1 file changed, 5 insertions(+), 8 deletions(-)
 > 
 > diff --git a/drivers/net/ethernet/freescale/fec_main.c
 > b/drivers/net/ethernet/freescale/fec_main.c
-> index bad0ba2..dbac975 100644
+> index dbac975..9619b9e 100644
 > --- a/drivers/net/ethernet/freescale/fec_main.c
 > +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1534,14 +1534,14 @@ fec_enet_collect_events(struct fec_enet_private
-> *fep, uint int_events)
->  	if (int_events == 0)
->  		return false;
+> @@ -1328,11 +1328,9 @@ static bool fec_enet_copybreak(struct net_device
+> *ndev, struct sk_buff **skb,
+>   * not been given to the system, we just set the empty indicator,
+>   * effectively tossing the packet.
+>   */
+> -static int
+> -fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
+> +static int fec_rxq(struct net_device *ndev, struct fec_enet_private *fep,
+> +		   struct fec_enet_priv_rx_q *rxq, int budget)
+>  {
+> -	struct fec_enet_private *fep = netdev_priv(ndev);
+> -	struct fec_enet_priv_rx_q *rxq;
+>  	struct bufdesc *bdp;
+>  	unsigned short status;
+>  	struct  sk_buff *skb_new = NULL;
+> @@ -1350,8 +1348,6 @@ fec_enet_rx_queue(struct net_device *ndev, int
+> budget, u16 queue_id)  #ifdef CONFIG_M532x
+>  	flush_cache_all();
+>  #endif
+> -	queue_id = FEC_ENET_GET_QUQUE(queue_id);
+> -	rxq = fep->rx_queue[queue_id];
 > 
-> -	if (int_events & FEC_ENET_RXF)
-> +	if (int_events & FEC_ENET_RXF_0)
->  		fep->work_rx |= (1 << 2);
->  	if (int_events & FEC_ENET_RXF_1)
->  		fep->work_rx |= (1 << 0);
->  	if (int_events & FEC_ENET_RXF_2)
->  		fep->work_rx |= (1 << 1);
+>  	/* First, grab all of the stats for the incoming packet.
+>  	 * These get messed up if we get called due to a busy condition.
+> @@ -1519,11 +1515,12 @@ fec_enet_rx(struct net_device *ndev, int budget)
+>  	int     pkt_received = 0;
+>  	u16	queue_id;
+>  	struct fec_enet_private *fep = netdev_priv(ndev);
+> +	struct fec_enet_priv_rx_q *rxq;
 > 
-> -	if (int_events & FEC_ENET_TXF)
-> +	if (int_events & FEC_ENET_TXF_0)
->  		fep->work_tx |= (1 << 2);
->  	if (int_events & FEC_ENET_TXF_1)
->  		fep->work_tx |= (1 << 0);
+>  	for_each_set_bit(queue_id, &fep->work_rx, FEC_ENET_MAX_RX_QS)
+> {
+>  		clear_bit(queue_id, &fep->work_rx);
+> -		pkt_received += fec_enet_rx_queue(ndev,
+> -					budget - pkt_received, queue_id);
+> +		rxq = fep->rx_queue[FEC_ENET_GET_QUQUE(queue_id)];
+> +		pkt_received += fec_rxq(ndev, fep, rxq, budget -
+> pkt_received);
+>  	}
+>  	return pkt_received;
+>  }
 > --
 > 2.5.0
 
-Acked-by: Fugang Duan <Fugang.duan@nxp.com>
+This is one clean up patch that you introduce struct bufdesc_prop.
+
+Acked-by: Fugang Duan <fugang.duan@nxp.com>
