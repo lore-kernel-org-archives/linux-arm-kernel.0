@@ -1,89 +1,127 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 2 Mar 2016 09:13:39 -0700
-Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
- instead of queue_id
-In-Reply-To: <VI1PR0401MB18555F637F86F38461B3442BFFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
- <VI1PR0401MB18555F637F86F38461B3442BFFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
-Message-ID: <56D71133.4000708@boundarydevices.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 2 Mar 2016 08:16:29 -0800
+Subject: [RFC PATCH] watchdog: s3c2410_wdt: Add max and min timeout values
+In-Reply-To: <56D62979.5040009@samsung.com>
+References: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
+ <56D62979.5040009@samsung.com>
+Message-ID: <56D711DD.1040904@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/2/2016 8:16 AM, Fugang Duan wrote:
-> From: Troy Kisky <troy.kisky@boundarydevices.com>  Sent: Thursday, February 25, 2016 8:37 AM
->> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
->> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
->> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
->> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
->> johannes at sipsolutions.net; stillcompiling at gmail.com;
->> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
->> <troy.kisky@boundarydevices.com>
->> Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
->> instead of queue_id
+On 03/01/2016 03:44 PM, Krzysztof Kozlowski wrote:
+> On 02.03.2016 01:45, Javier Martinez Canillas wrote:
+>> The watchdog maximum timeout value is determined by the number of bits
+>> for the interval timer counter, its source clock frequency, the number
+>> of bits of the prescaler and maximum divider value.
 >>
->> queue_id is the qid member of struct bufdesc_prop.
+>> This can be calculated with the following equation:
 >>
->> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> max_timeout = counter / (freq / (max_prescale + 1) / max_divider)
+>>
+>> Setting a maximum timeout value will allow the watchdog core to refuse
+>> user-space calls to the WDIOC_SETTIMEOUT ioctl that sets not supported
+>> timeout values.
+>>
+>> For example, systemd tries to set a timeout of 10 minutes on reboot to
+>> ensure that the machine will be rebooted even if a reboot failed. This
+>> leads to the following error message on an Exynos5422 Odroid XU4 board:
+>>
+>> [  147.986045] s3c2410-wdt 101d0000.watchdog: timeout 600 too big
+>>
+>> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
 >> ---
->>  drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
->>  1 file changed, 6 insertions(+), 11 deletions(-)
+>> Hello,
 >>
->> diff --git a/drivers/net/ethernet/freescale/fec_main.c
->> b/drivers/net/ethernet/freescale/fec_main.c
->> index 9619b9e..c517194 100644
->> --- a/drivers/net/ethernet/freescale/fec_main.c
->> +++ b/drivers/net/ethernet/freescale/fec_main.c
->> @@ -1156,25 +1156,18 @@ fec_enet_hwtstamp(struct fec_enet_private *fep,
->> unsigned ts,
->>  	hwtstamps->hwtstamp = ns_to_ktime(ns);  }
+>> I'm sending this as an RFC because I don't have access to user manuals
+>> for all the Exynos SoCs that this driver supports. But at least in all
+>> the ones I have here, the maximum prescaler and divider values are the
+>> same and also all have a 16-bit interval timer counter.
 >>
->> -static void
->> -fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
->> +static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
->> +		    struct fec_enet_priv_tx_q *txq)
->>  {
->> -	struct	fec_enet_private *fep;
->>  	struct bufdesc *bdp;
->>  	unsigned short status;
->>  	struct	sk_buff	*skb;
->> -	struct fec_enet_priv_tx_q *txq;
->>  	struct netdev_queue *nq;
->>  	int	index = 0;
->>  	int	entries_free;
+>> So this patch assumes that all IP blocks supported by this driver are
+>> the same on that regard, if that's not the case then we can move these
+>> values on a per IP block basis using struct of_device_id .data field.
+>
+> It looks correct at least for Exynos4210 and newer.
+>
 >>
->> -	fep = netdev_priv(ndev);
->> -
->> -	queue_id = FEC_ENET_GET_QUQUE(queue_id);
->> -
->> -	txq = fep->tx_queue[queue_id];
->>  	/* get next bdp of dirty_tx */
->> -	nq = netdev_get_tx_queue(ndev, queue_id);
->> +	nq = netdev_get_tx_queue(ndev, txq->bd.qid);
->>  	bdp = txq->dirty_tx;
+>> Best regards,
+>> Javier
 >>
->>  	/* get next bdp of dirty_tx */
->> @@ -1268,11 +1261,13 @@ static void
->>  fec_enet_tx(struct net_device *ndev)
->>  {
->>  	struct fec_enet_private *fep = netdev_priv(ndev);
->> +	struct fec_enet_priv_tx_q *txq;
->>  	u16 queue_id;
->>  	/* First process class A queue, then Class B and Best Effort queue */
->>  	for_each_set_bit(queue_id, &fep->work_tx, FEC_ENET_MAX_TX_QS)
->> {
->>  		clear_bit(queue_id, &fep->work_tx);
->> -		fec_enet_tx_queue(ndev, queue_id);
->> +		txq = fep->tx_queue[FEC_ENET_GET_QUQUE(queue_id)];
->> +		fec_txq(ndev, fep, txq);
->>  	}
->>  	return;
->>  }
->> --
->> 2.5.0
-> 
-> The patch should merge with patch#1.
-> 
+>>   drivers/watchdog/s3c2410_wdt.c | 16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+>> index 0093450441fe..f289c9fc353a 100644
+>> --- a/drivers/watchdog/s3c2410_wdt.c
+>> +++ b/drivers/watchdog/s3c2410_wdt.c
+>> @@ -47,6 +47,8 @@
+>>   #define S3C2410_WTDAT		0x04
+>>   #define S3C2410_WTCNT		0x08
+>>
+>> +#define S3C2410_WTCNT_MAXCNT	0xffff
+>> +
+>>   #define S3C2410_WTCON_RSTEN	(1 << 0)
+>>   #define S3C2410_WTCON_INTEN	(1 << 2)
+>>   #define S3C2410_WTCON_ENABLE	(1 << 5)
+>> @@ -56,8 +58,11 @@
+>>   #define S3C2410_WTCON_DIV64	(2 << 3)
+>>   #define S3C2410_WTCON_DIV128	(3 << 3)
+>>
+>> +#define S3C2410_WTCON_MAXDIV	0x80
+>> +
+>>   #define S3C2410_WTCON_PRESCALE(x)	((x) << 8)
+>>   #define S3C2410_WTCON_PRESCALE_MASK	(0xff << 8)
+>> +#define S3C2410_WTCON_PRESCALE_MAX	0xff
+>>
+>>   #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+>>   #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+>> @@ -198,6 +203,14 @@ do {							\
+>>
+>>   /* functions */
+>>
+>> +static inline unsigned int s3c2410wdt_max_timeout(struct clk *clock)
+>> +{
+>> +	unsigned long freq = clk_get_rate(clock);
+>> +
+>> +	return S3C2410_WTCNT_MAXCNT / (freq / (S3C2410_WTCON_PRESCALE_MAX + 1)
+>> +				       / S3C2410_WTCON_MAXDIV);
+>> +}
+>> +
+>>   static inline struct s3c2410_wdt *freq_to_wdt(struct notifier_block *nb)
+>>   {
+>>   	return container_of(nb, struct s3c2410_wdt, freq_transition);
+>> @@ -567,6 +580,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+>>   		return ret;
+>>   	}
+>>
+>> +	wdt->wdt_device.min_timeout = 1;
+>> +	wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
+>
+> Can the frequency of clock change? E.g. with devfreq? No problem if it
+> goes lower but if it gets higher than initial, then the problem will
+> appear again.
+>
 
+If that happens, we are probably in deep trouble. If the clock frequency changes,
+the watchdog timeout most likely changes as well. This means the watchdog may
+and likely will time out unexpectedly, or it won't time out when it is expected
+to time out.
 
-Why ?  That would only hide the change in patch #1.
+Guenter
+
+> Best regards,
+> Krzysztof
+>
+>> +
+>>   	ret = s3c2410wdt_cpufreq_register(wdt);
+>>   	if (ret < 0) {
+>>   		dev_err(dev, "failed to register cpufreq\n");
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
