@@ -1,41 +1,47 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 Mar 2016 12:29:52 -0600
-Subject: [PATCH v6 01/11] drm/hisilicon: Add device tree binding for
- hi6220 display subsystem
-In-Reply-To: <1456476028-36880-2-git-send-email-xinliang.liu@linaro.org>
-References: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
- <1456476028-36880-2-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <20160302182952.GA1184@rob-hp-laptop>
+Date: Wed, 2 Mar 2016 12:33:09 -0600
+Subject: [PATCH v3 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <1456483912-32090-3-git-send-email-alexandre.torgue@gmail.com>
+References: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
+ <1456483912-32090-3-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <20160302183309.GA2449@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 04:40:18PM +0800, Xinliang Liu wrote:
-> Add ADE display controller binding doc.
-> Add DesignWare DSI Host Controller v1.20a binding doc.
+On Fri, Feb 26, 2016 at 11:51:50AM +0100, Alexandre TORGUE wrote:
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
 > 
-> v6:
-> - Cleanup values part of reg and clocks properties.
-> - Change "pclk_dsi" clock name to "pclk".
-> v5:
-> - Remove endpoint unit address of dsi output port.
-> - Add "hisilicon,noc-syscon" property for ADE NOC QoS syscon.
-> - Add "resets" property for ADE reset.
-> v4:
-> - Describe more specific of clocks and ports.
-> - Fix indentation.
-> v3:
-> - Make ade as the drm master node.
-> - Use assigned-clocks to set clock rate.
-> - Use ports to connect display relavant nodes.
-> v2:
-> - Move dt binding docs to bindings/display/hisilicon directory.
-> 
-> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-> ---
->  .../bindings/display/hisilicon/dw-dsi.txt          | 72 ++++++++++++++++++++++
->  .../bindings/display/hisilicon/hisi-ade.txt        | 64 +++++++++++++++++++
->  2 files changed, 136 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
->  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> new file mode 100644
+> index 0000000..67fceda
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> @@ -0,0 +1,40 @@
+> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
+> +
+> +This file documents platform glue layer for stmmac.
+> +Please see stmmac.txt for the other unchanged properties.
+> +
+> +The device node has following properties.
+> +
+> +Required properties:
+> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
+> +	       "snps,dwmac-3.50a" to select IP vesrion.
+> +- clocks: Should contain the GMAC main clock, and tx clock
+> +- compatible:  Should be "st,stm32-dwmac" to select glue and
+> +	       "snps,dwmac-3.50a" to select IP version.
+> +- clocks: Should contain the MAC main clock
+> +- clock-names: Should contain the clock names "stmmaceth".
+> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
+> +	      encompases the glue register, and the offset of the control register.
+> +
+> +Optional properties:
+> +- clocks: Could contain:
+> +	- the tx clock,
+> +	- the rx clock
+> +- clock-names: Could contain the clock names "tx-clk", "rx-clk"
 
-Acked-by: Rob Herring <robh@kernel.org>
+Either the IP block has 3 clocks or it has 1. If you have a case where 1 
+clock feeds all 3 inputs, then list the clock 3 times.
+
+Rob
