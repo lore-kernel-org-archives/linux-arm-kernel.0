@@ -1,22 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 21:45:45 +0100
-Subject: [GIT PULL] STM32 DT updates for v4.6 #2
-In-Reply-To: <56D6C62C.5070206@gmail.com>
-References: <56D6C62C.5070206@gmail.com>
-Message-ID: <4220145.ta0tb7E0c9@wuerfel>
+Date: Wed, 02 Mar 2016 21:50:59 +0100
+Subject: [GIT PULL] at91: dt for 4.6 #2
+In-Reply-To: <1456934722-7023-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1456934722-7023-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1634323.MskpPxvyZt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2016 11:53:32 Maxime Coquelin wrote:
-> Highlights:
-> -----------
->   - Fix clock references in GPIO nodes
->   - Add early support to stm32f469 MCU
->   - Add USB HS support in host mdoe to stm32429-eval board
->   - Add Ethernet support to stm32429-eval board
-> 
-> 
+On Wednesday 02 March 2016 17:05:22 Nicolas Ferre wrote:
+> A second batch of DT updates for 4.6. This time it is based on 4.5-rc3 as one
+> of the patches fixes an node that was changed during 4.5-rc phase. As I saw
+> that your "next/dt" branches are based on 4.5-rc3, I thought it wouldn't be a
+> problem.
 
-Pulled into next/dt, thanks!
+Right, thanks for checking.
+
+> Overall a pretty simple series with mainly node addition for the latest SoC
+> and its Xplained board.
+> The tag doesn't embed Alexandre's previous DT Pull-Request for 4.6 that was
+> based on 4.5-rc1. I verified though that  it doesn't conflict with it during a
+> merge.
+
+Ok, that is good too. Pulled into next/dt now.
+
+I see that your gpg key has expired last week, you may want to do something
+about that, I think you can just update the date rather than creating a
+new key.
 
 	Arnd
