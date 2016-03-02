@@ -1,32 +1,33 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 2 Mar 2016 13:40:58 -0500
-Subject: [PATCH V14 0/9] dma: add Qualcomm Technologies HIDMA driver
-In-Reply-To: <56D082D7.1050002@codeaurora.org>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <56D07B71.4080209@codeaurora.org> <56D082D7.1050002@codeaurora.org>
-Message-ID: <56D733BA.6030203@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 02 Mar 2016 13:46:03 -0500 (EST)
+Subject: [PATCH] batman-adv: clarify CFG80211 dependency
+In-Reply-To: <20160302144607.GH7704@prodigo.lan>
+References: <1456926882-2941809-1-git-send-email-arnd@arndb.de>
+ <20160302144607.GH7704@prodigo.lan>
+Message-ID: <20160302.134603.447218907358875583.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/26/2016 11:52 AM, Timur Tabi wrote:
-> Sinan Kaya wrote:
->> Hi Marc Zyngier, Mark Rutland;
->>
->> I'm looking forward to hear your feedback on this series.
+From: Antonio Quartulli <a@unstable.cc>
+Date: Wed, 2 Mar 2016 22:46:07 +0800
+
+> On Wed, Mar 02, 2016 at 02:54:35PM +0100, Arnd Bergmann wrote:
+>> The driver calls cfg80211_get_station, which may be part of a
+>> module, so we must not enable BATMAN_ADV_BATMAN_V if
+>> BATMAN_ADV=y and CFG80211=m:
+>> 
+>> net/built-in.o: In function `batadv_v_elp_get_throughput':
+>> (text+0x5c62c): undefined reference to `cfg80211_get_station'
+>> 
+>> This clarifies the dependency to cover all combinations.
+>> 
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes: c833484e5f38 ("batman-adv: ELP - compute the metric based on the estimated throughput")
 > 
-> Would it be possible to get this patchset into 4.6?  We're already at v14, and there have been no review comments since this patch was posted on the fourth (over three weeks ago).
+> Acked-by: Antonio Quartulli <a@unstable.cc>
+> 
+> Thanks a lot Arnd!
+> 
+> David, could you please merge this change in net-next directly ?
 
-Vinod?
-
-I have my DT ACK from Rob Herring as you initially asked. I responded to 
-Mark Rutland and Marc Zyngier's comments by improving the cover letter 
-and adding IOMMU binding. 
-
-I pinged both Mark and Marc twice with no response.
-
-I don't know what else it takes besides waiting.
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Done, applied, thanks everyone.
