@@ -1,90 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:59:02 +0100
-Subject: [PATCH 10/14] wireless: cw1200: use __maybe_unused to hide pm
- functions_
+Date: Wed,  2 Mar 2016 16:59:03 +0100
+Subject: [PATCH 11/14] input: spear-keyboard: use __maybe_unused to hide pm
+ functions
 In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-11-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cw1200 uses #ifdef to check for CONFIG_PM, but then
-uses SIMPLE_DEV_PM_OPS, which leaves the references out when
-CONFIG_PM_SLEEP is not defined, so we get a warning with
-PM=y && PM_SLEEP=n:
+The spear keyboard driver uses #ifdef CONFIG_PM to hide its
+power management functions, but then uses references from
+SIMPLE_DEV_PM_OPS that are only present if both CONFIG_PM
+and CONFIG_PM_SLEEP are set, resulting in a warning about unused
+functions:
 
-drivers/net/wireless/st/cw1200/cw1200_spi.c:450:12: error: 'cw1200_spi_suspend' defined but not used [-Werror=unused-function]
+drivers/input/keyboard/spear-keyboard.c:292:12: error: 'spear_kbd_suspend' defined but not used [-Werror=unused-function]
+drivers/input/keyboard/spear-keyboard.c:345:12: error: 'spear_kbd_resume' defined but not used [-Werror=unused-function]
 
-This removes the incorrect #ifdef and instead uses a __maybe_unused
-annotation to let the compiler know it can silently drop
-the function definition.
-
-For the DEV_PM_OPS definition, we can use an IS_ENABLED() check
-to avoid defining the structure when CONFIG_PM is not set without
-the #ifdef.
+This removes the #ifdef and instead uses a __maybe_unused
+annotation.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/wireless/st/cw1200/cw1200_spi.c | 9 ++-------
- drivers/net/wireless/st/cw1200/pm.h         | 9 +++++++--
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/input/keyboard/spear-keyboard.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/wireless/st/cw1200/cw1200_spi.c b/drivers/net/wireless/st/cw1200/cw1200_spi.c
-index a740083634d8..63f95e9c2992 100644
---- a/drivers/net/wireless/st/cw1200/cw1200_spi.c
-+++ b/drivers/net/wireless/st/cw1200/cw1200_spi.c
-@@ -446,8 +446,7 @@ static int cw1200_spi_disconnect(struct spi_device *func)
+diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+index 623d451767e3..8083eaa0524a 100644
+--- a/drivers/input/keyboard/spear-keyboard.c
++++ b/drivers/input/keyboard/spear-keyboard.c
+@@ -288,8 +288,7 @@ static int spear_kbd_remove(struct platform_device *pdev)
  	return 0;
  }
  
 -#ifdef CONFIG_PM
--static int cw1200_spi_suspend(struct device *dev)
-+static int __maybe_unused cw1200_spi_suspend(struct device *dev)
+-static int spear_kbd_suspend(struct device *dev)
++static int __maybe_unused spear_kbd_suspend(struct device *dev)
  {
- 	struct hwbus_priv *self = spi_get_drvdata(to_spi_device(dev));
- 
-@@ -460,16 +459,12 @@ static int cw1200_spi_suspend(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(cw1200_pm_ops, cw1200_spi_suspend, NULL);
- 
--#endif
--
- static struct spi_driver spi_driver = {
- 	.probe		= cw1200_spi_probe,
- 	.remove		= cw1200_spi_disconnect,
- 	.driver = {
- 		.name		= "cw1200_wlan_spi",
--#ifdef CONFIG_PM
--		.pm		= &cw1200_pm_ops,
--#endif
-+		.pm		= IS_ENABLED(CONFIG_PM) ? &cw1200_pm_ops : NULL,
- 	},
- };
- 
-diff --git a/drivers/net/wireless/st/cw1200/pm.h b/drivers/net/wireless/st/cw1200/pm.h
-index 3ed90ff22bb8..534548470ebc 100644
---- a/drivers/net/wireless/st/cw1200/pm.h
-+++ b/drivers/net/wireless/st/cw1200/pm.h
-@@ -31,13 +31,18 @@ int cw1200_pm_init(struct cw1200_pm_state *pm,
- void cw1200_pm_deinit(struct cw1200_pm_state *pm);
- int cw1200_wow_suspend(struct ieee80211_hw *hw,
- 		       struct cfg80211_wowlan *wowlan);
--int cw1200_wow_resume(struct ieee80211_hw *hw);
- int cw1200_can_suspend(struct cw1200_common *priv);
-+int cw1200_wow_resume(struct ieee80211_hw *hw);
- void cw1200_pm_stay_awake(struct cw1200_pm_state *pm,
- 			  unsigned long tmo);
- #else
- static inline void cw1200_pm_stay_awake(struct cw1200_pm_state *pm,
--					unsigned long tmo) {
-+					unsigned long tmo)
-+{
-+}
-+static inline int cw1200_can_suspend(struct cw1200_common *priv)
-+{
-+	return 0;
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+@@ -342,7 +341,7 @@ static int spear_kbd_suspend(struct device *dev)
+ 	return 0;
  }
- #endif
- #endif
+ 
+-static int spear_kbd_resume(struct device *dev)
++static int __maybe_unused spear_kbd_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+@@ -368,7 +367,6 @@ static int spear_kbd_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+ static SIMPLE_DEV_PM_OPS(spear_kbd_pm_ops, spear_kbd_suspend, spear_kbd_resume);
+ 
 -- 
 2.7.0
