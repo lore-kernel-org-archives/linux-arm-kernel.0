@@ -1,49 +1,42 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 2 Mar 2016 11:03:12 +0100
-Subject: [PATCH 2/2] char: genrtc: replace blacklist with whitelist
-In-Reply-To: <1456912137-1578635-2-git-send-email-arnd@arndb.de>
-References: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
- <1456912137-1578635-2-git-send-email-arnd@arndb.de>
-Message-ID: <20160302100312.GM23985@piout.net>
+From: jiri@resnulli.us (Jiri Pirko)
+Date: Wed, 2 Mar 2016 11:10:16 +0100
+Subject: [PATCH] net: mellanox: add DEVLINK dependencies
+In-Reply-To: <1456911665-1424389-1-git-send-email-arnd@arndb.de>
+References: <1456911665-1424389-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160302101016.GA2122@nanopsycho.orion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2016 at 10:48:51 +0100, Arnd Bergmann wrote :
-> Every new architecture has to add itself to the growing list of those
-> that do not support the old "generic" RTC driver.
-> 
-> This replaces the long list of architectures that don't support it
-> with a shorter list of those that do.
-> 
-> The list is taken from those architectures that have a non-empty
-> asm/rtc.h header file and were not explicitly blacklisted.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Wed, Mar 02, 2016 at 10:40:54AM CET, arnd at arndb.de wrote:
+>The new NET_DEVLINK infrastructure can be a loadable module, but the drivers
+>using it might be built-in, which causes link errors like:
+>
+>drivers/net/built-in.o: In function `mlx4_load_one':
+>:(.text+0x2fbfda): undefined reference to `devlink_port_register'
+>:(.text+0x2fc084): undefined reference to `devlink_port_unregister'
+>drivers/net/built-in.o: In function `mlxsw_sx_port_remove':
+>:(.text+0x33a03a): undefined reference to `devlink_port_type_clear'
+>:(.text+0x33a04e): undefined reference to `devlink_port_unregister'
+>
+>There are multiple ways to avoid this:
+>
+>a) add 'depends on NET_DEVLINK || !NET_DEVLINK' dependencies
+>   for each user
+>b) use 'select NET_DEVLINK' from each driver that uses it
+>   and hide the symbol in Kconfig.
+>c) make NET_DEVLINK a 'bool' option so we don't have to
+>   list it as a dependency, and rely on the APIs to be
+>   stubbed out when it is disabled
+>d) use IS_REACHABLE() rather than IS_ENABLED() to check for
+>   NET_DEVLINK in include/net/devlink.h
+>
+>This implements a variation of approach a) by adding an
+>intermediate symbol that drivers can depend on, and changes
+>the three drivers using it.
 
-> ---
->  drivers/char/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-> index 9716bc36495a..629f1ff389b6 100644
-> --- a/drivers/char/Kconfig
-> +++ b/drivers/char/Kconfig
-> @@ -327,7 +327,8 @@ config JS_RTC
->  
->  config GEN_RTC
->  	tristate "Generic /dev/rtc emulation"
-> -	depends on RTC!=y && !IA64 && !ARM && !M32R && !MIPS && !SPARC && !FRV && !S390 && !SUPERH && !AVR32 && !BLACKFIN && !UML
-> +	depends on RTC!=y
-> +	depends on ALPHA || M68K || MN10300 || PARISC || PPC || X86
->  	---help---
->  	  If you say Y here and create a character special file /dev/rtc with
->  	  major number 10 and minor number 135 using mknod ("man mknod"), you
-> -- 
-> 2.7.0
-> 
+Approach a) looks like the best. Thanks for taking care of this.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+>Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Acked-by: Jiri Pirko <jiri@mellanox.com>
