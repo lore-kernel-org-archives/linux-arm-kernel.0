@@ -1,34 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 2 Mar 2016 17:12:36 +0100
-Subject: [PATCH v2 2/2] drm/panel: Support for LG lp120up1 panel with eDP
- input
-In-Reply-To: <1456138904-15258-2-git-send-email-jitao.shi@mediatek.com>
-References: <1456138904-15258-1-git-send-email-jitao.shi@mediatek.com>
- <1456138904-15258-2-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <20160302161236.GC23204@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  2 Mar 2016 16:59:04 +0100
+Subject: [PATCH 12/14] keyboard: snvs-pwrkey: use __maybe_unused to hide pm
+ functions
+In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-13-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 07:01:44PM +0800, Jitao Shi wrote:
-> The LG lp120up1 TFT LCD panel with eDP interface is a 12.0" 1920x1280
-> panel, which can be supported by the simple panel driver
-> 
-> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-> ---
-> Changes since v1:
->  - Add eDP panel type in comment msg
->  - Fixed comment msg with 72 characters width
-> ---
->  drivers/gpu/drm/panel/panel-simple.c |   26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+The SNVS power key driver has suspend/resume functions that
+are accessed using SIMPLE_DEV_PM_OPS, which hide the reference
+when CONFIG_PM_SLEEP is not set, resulting in a warning about
+unused functions:
 
-Applied, thanks.
+drivers/input/keyboard/snvs_pwrkey.c:183:12: error: 'imx_snvs_pwrkey_suspend' defined but not used [-Werror=unused-function]
+drivers/input/keyboard/snvs_pwrkey.c:194:12: error: 'imx_snvs_pwrkey_resume' defined but not used [-Werror=unused-function]
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160302/9b3f9772/attachment.sig>
+This adds __maybe_unused annotations to let the compiler know
+it can silently drop the function definition.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/input/keyboard/snvs_pwrkey.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/input/keyboard/snvs_pwrkey.c b/drivers/input/keyboard/snvs_pwrkey.c
+index 9adf13a5864a..b0ffadeb208c 100644
+--- a/drivers/input/keyboard/snvs_pwrkey.c
++++ b/drivers/input/keyboard/snvs_pwrkey.c
+@@ -180,7 +180,7 @@ static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int imx_snvs_pwrkey_suspend(struct device *dev)
++static int __maybe_unused imx_snvs_pwrkey_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
+@@ -191,7 +191,7 @@ static int imx_snvs_pwrkey_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int imx_snvs_pwrkey_resume(struct device *dev)
++static int __maybe_unused imx_snvs_pwrkey_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
+-- 
+2.7.0
