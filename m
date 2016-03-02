@@ -1,164 +1,79 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 2 Mar 2016 10:03:27 -0600
-Subject: [PATCH 1/3] Device tree binding documentation for gpio-switch
-In-Reply-To: <1488914.9p6SgUg6XA@adelgunde>
-References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
- <CACRpkdYvU6YG5yRCLsyS7sq816t3shWw51OTR2-fkp-FqSeESg@mail.gmail.com>
- <CAL_JsqJXX71Bwbm21H3QAJxYDO60kyHgKVzXxxrH9ze6ZWYtXw@mail.gmail.com>
- <1488914.9p6SgUg6XA@adelgunde>
-Message-ID: <CAL_JsqLX-F=-k83_-5-QL2QZpAArQqOHjE+19c1wvNKWayYfMw@mail.gmail.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Thu, 3 Mar 2016 00:04:22 +0800
+Subject: [PATCH v2 13/13] ARM: sunxi: Introduce MACH_SUN8I_A83T option
+In-Reply-To: <20160301071253.GI8418@lukather>
+References: <1456672738-4993-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1456672738-4993-14-git-send-email-vishnupatekar0510@gmail.com>
+ <20160301071253.GI8418@lukather>
+Message-ID: <CAEzqOZt2khVambkoCcBNwvQU2pQiWzbEs5cKZJBaAqD0p3T++g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviving this thread...
+Hello Maxime,
 
-On Tue, Dec 15, 2015 at 3:09 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+On Tue, Mar 1, 2016 at 3:12 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 > Hi,
 >
-> On Monday 14 December 2015 09:45:48 Rob Herring wrote:
->> On Mon, Dec 14, 2015 at 8:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> > On Fri, Dec 11, 2015 at 3:06 PM, Rob Herring <robh+dt@kernel.org> wrote:
->> >> On Fri, Dec 11, 2015 at 6:39 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> >>> On Fri, Dec 4, 2015 at 6:31 PM, Martyn Welch
->> >>> <martyn.welch@collabora.co.uk> wrote:
+> On Sun, Feb 28, 2016 at 11:18:58PM +0800, Vishnu Patekar wrote:
+>> A83T has CPUS clock similar to A80's. currently, a80 cpus clock only
+>> compiled for A80. So, Introduce MACH_SUN8I_A83T to compile it for
+>> A83T as well.
 >>
->> [...]
+>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> ---
+>>  arch/arm/mach-sunxi/Kconfig | 5 +++++
+>>  drivers/clk/sunxi/Makefile  | 3 +++
+>>  2 files changed, 8 insertions(+)
 >>
->> >>> Markus Pargmann also did a series that add initial values to
->> >>> hogs, which is the inverse usecase of this, where you want to
->> >>> *output* something by default, then maybe also make it available
->> >>> to userspace.
->> >>>
->> >>> So what we need to see here is a patch series that does all of these
->> >>> things:
->> >>>
->> >>> - Name lines
->> >>>
->> >>> - Sets them to initial values
->> >>>
->> >>> - Mark them as read-only
->> >>>
->> >>> - Mark them as "not used by the operating system" so that they
->> >>>   can be default-exported to userspace.
->> >>
->> >> No! This should not be a DT property.
->> >>
->> >> Whether I want to control a GPIO in the kernel or userspace is not
->> >> known and can change over time. It could simply depend on kernel
->> >> config. There is also the case that a GPIO has no connection or kernel
->> >> driver until some time later when a DT overlay for an expansion board
->> >> is applied.
->> >
->> > That's correct. So from a DT point of view, what really matters is
->> > to give things a name, and the hogs and initvals syntax already
->> > has a structure for this that is in use
->> > (from Documentation/devicetree/bindings/gpio/gpio.txt):
->> >
->> >         qe_pio_a: gpio-controller at 1400 {
->> >                 compatible = "fsl,qe-pario-bank-a", "fsl,qe-pario-bank";
->> >                 reg = <0x1400 0x18>;
->> >                 gpio-controller;
->> >                 #gpio-cells = <2>;
->> >
->> >                 line_b {
->> >                         gpio-hog;
->> >                         gpios = <6 0>;
->> >                         output-low;
->> >                         line-name = "foo-bar-gpio";
->> >                 };
->> >         };
->> >
->> > Markus use this also for initial values. That could easily be used in
->> > a budget version like this:
->> >
->> >                 line_b {
->> >                         /* Just naming */
->> >                         gpios = <6 0>;
->> >                         line-name = "foo-bar-gpio";
->> >                 };
->> >
->> > That could grow kind of big though. Or maybe not? How many
->> > GPIO lines are actually properly named in a typical system?
+>> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+>> index c124d65..424b76d 100644
+>> --- a/arch/arm/mach-sunxi/Kconfig
+>> +++ b/arch/arm/mach-sunxi/Kconfig
+>> @@ -41,6 +41,11 @@ config MACH_SUN8I
+>>       select ARM_GIC
+>>       select MFD_SUN6I_PRCM
 >>
->> We should limit it to GPIOs with no connection to another node. For
->> example, I don't want to see a SD card detect in the list as that
->> should be in the SD host node. However, that is hard to enforce and
->> can change over time. Removing it would break userspace potentially.
->> Of course if the kernel starts own a signal that userspace used, then
->> that potentially breaks userspace regardless of the DT changing. OTOH,
->> using GPIOs in userspace is kind of use at your own risk.
+>> +config MACH_SUN8I_A83T
+>> +     bool "Allwinner A83T (sun8i) SoCs support"
+>> +     default ARCH_SUNXI
+>> +     select ARM_GIC
+>> +
+>>  config MACH_SUN9I
+>>       bool "Allwinner (sun9i) SoCs support"
+>>       default ARCH_SUNXI
+>> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> index 3fd7901..2aabfc4 100644
+>> --- a/drivers/clk/sunxi/Makefile
+>> +++ b/drivers/clk/sunxi/Makefile
+>> @@ -20,6 +20,9 @@ obj-y += clk-usb.o
+>>  obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
+>>  obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
+>>
+>> +obj-$(CONFIG_MACH_SUN8I_A83T) += clk-sun8i-apb0.o
+>> +obj-$(CONFIG_MACH_SUN8I_A83T) += clk-sun9i-cpus.o
+>> +
 >
-> I see this a bit differently. I would really like to see the each GPIO having
-> two different names:
-
-I think we are saying the same thing...
-
-> - GPIO label: This is the name of the GPIO line in the schematic for example
-
-Yes.
-
-> - GPIO use (this is the current semantic of the GPIO name): The use of a GPIO,
->   e.g. 'sd-card-detect', 'LED', ...
-
-This should be determined from the compatible string and/or -gpios
-prefix. This is the what the function is and "label" is which one.
-
-> I think it would be good to describe all GPIO labels in gpiochip subnodes as
-> gpio-hogging introduced it. This would offer a use-independent naming. The use
-> of the function could be defined in the device node that is using this gpio.
-
-I think I agree here. You may have a defined function without any
-connection to another node. I also think we should encourage simple
-GPIO bindings like gpio-leds to be child nodes. Having them at the
-top-level is kind of arbitrary. Of course, allowing for both is
-required.
-
-> As an example perhaps something like this:
+> This is not how it should be done. You should rather create a Kconfig
+> option for these clocks, and use def_bool CONFIG_MACH_SUN8I || CONFIG_MACH_SUN9I
 >
->         &gpiochip {
->                 some_interrupt {
->                         gpios = <4 0>;
->                         line-name = "some_interrupt_line";
->                 };
+> Switching to Kconfig for the clocks has been on my todo-list for quite
+> some time, I guess these two clocks would be a good start.
+Okie, I'll create Kconfig in clk/sunxi as below:
+config CLK_SUN8I_APB0
+def_bool MACH_SUN9I || MACH_SUN8I_A83T
+
+config CLK_SUN9I_CPUS
+def_bool MACH_SUN9I || MACH_SUN8I_A83T
+
+We still need to have MACH_SUN8I_A83T to differentiate between
+MFD_SUN6I_PRCM which is used by other sun8i platforms.
+
 >
->                 line_b {
->                         gpios = <6 0>;
->                         line-name = "line-b";
->                 };
->         };
+> Thanks!
+> Maxime
 >
->         randomswitch {
->                 compatible = "gpio-switch";
->                 gpios = <&gpiochip 4 0>;
->                 use = "action-trigger";
->                 read-only;
->         };
->
-> Also this does seem kind of inconsistent with gpio-hogging and the proposed
-> gpio-initval. gpio-hogging is defined in subnodes of the gpio chip while
-> gpio-switches are not. As "gpio-switch" is not really any kind of device it
-> would perhaps make sense to keep this consistent with gpio-hogging as well and
-> define it in the same subnodes?
-> I would be happy about any consistent way.
-
-Yes, as well as gpio leds, keys, etc. bindings. The key is you would
-need to be able to start with something minimal and extend it with
-specific compatibles.
-
-[...]
-
->> We also have to consider how to handle add-on boards. We probably need
->> a connector node which can remap connector signals to host signals in
->> order to have overlays independent of the host board DT. For GPIOs
->> this is probably a gpio-map property similar to interrupt-map. The
->> complicated part will be connectors that require pinmux setup of the
->> host.
->
-> Also what about hotplugging gpio-chips? Is there any mechanism to let the
-> 'gpio-switch' know that the GPIO is not there anymore?
-
-There are certainly issues around hotplug and GPIOs. If the
-gpio-switch device is a child of the gpio controller, then it should
-be possible.
-
-Rob
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
