@@ -1,71 +1,67 @@
-From: frank.li@nxp.com (Frank Li)
-Date: Wed, 2 Mar 2016 16:04:46 +0000
-Subject: [PATCH 12/14] keyboard: snvs-pwrkey: use __maybe_unused to hide
- pm functions
-In-Reply-To: <1456934350-1389172-13-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  2 Mar 2016 16:59:05 +0100
+Subject: [PATCH 13/14] [media] omap3isp: use IS_ENABLED() to hide pm functions
+In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
- <1456934350-1389172-13-git-send-email-arnd@arndb.de>
-Message-ID: <AMSPR04MB263BDF6CE19C8B5432ECAE588BC0@AMSPR04MB263.eurprd04.prod.outlook.com>
+Message-ID: <1456934350-1389172-14-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The omap3isp driver hides is power management functions using #ifdef
+but it fails to hide the isp_suspend_modules/isp_resume_modules
+functions in the same way, which leads to a build warning when
+CONFIG_PM is disabled:
 
+drivers/media/platform/omap3isp/isp.c:1183:12: error: 'isp_suspend_modules' defined but not used [-Werror=unused-function]
+drivers/media/platform/omap3isp/isp.c:1217:13: error: 'isp_resume_modules' defined but not used [-Werror=unused-function]
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, March 02, 2016 9:59 AM
-> To: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org; Arnd Bergmann <arnd@arndb.de>;
-> Shawn Guo <shawnguo@kernel.org>; b38343 at freescale.com; Javier
-> Martinez Canillas <javier@osg.samsung.com>; Frank Li
-> <Frank.Li@freescale.com>; linux-input at vger.kernel.org; linux-
-> kernel at vger.kernel.org
-> Subject: [PATCH 12/14] keyboard: snvs-pwrkey: use __maybe_unused to hide
-> pm functions
-> 
-> The SNVS power key driver has suspend/resume functions that are accessed
-> using SIMPLE_DEV_PM_OPS, which hide the reference when
-> CONFIG_PM_SLEEP is not set, resulting in a warning about unused functions:
-> 
-> drivers/input/keyboard/snvs_pwrkey.c:183:12: error:
-> 'imx_snvs_pwrkey_suspend' defined but not used [-Werror=unused-function]
-> drivers/input/keyboard/snvs_pwrkey.c:194:12: error:
-> 'imx_snvs_pwrkey_resume' defined but not used [-Werror=unused-function]
-> 
-> This adds __maybe_unused annotations to let the compiler know it can
-> silently drop the function definition.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+As the driver manually defines its dev_pm_ops structure and all
+members are NULL without CONFIG_PM, we can simply avoid referencing
+the structure using an IS_ENABLED() check, and drop all the #ifdef
+to avoid all warnings.
 
-Acked-by: Frank Li <Frank.Li@nxp.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/media/platform/omap3isp/isp.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-> ---
->  drivers/input/keyboard/snvs_pwrkey.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/input/keyboard/snvs_pwrkey.c
-> b/drivers/input/keyboard/snvs_pwrkey.c
-> index 9adf13a5864a..b0ffadeb208c 100644
-> --- a/drivers/input/keyboard/snvs_pwrkey.c
-> +++ b/drivers/input/keyboard/snvs_pwrkey.c
-> @@ -180,7 +180,7 @@ static int imx_snvs_pwrkey_probe(struct
-> platform_device *pdev)
->  	return 0;
->  }
-> 
-> -static int imx_snvs_pwrkey_suspend(struct device *dev)
-> +static int __maybe_unused imx_snvs_pwrkey_suspend(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev); @@ -
-> 191,7 +191,7 @@ static int imx_snvs_pwrkey_suspend(struct device *dev)
->  	return 0;
->  }
-> 
-> -static int imx_snvs_pwrkey_resume(struct device *dev)
-> +static int __maybe_unused imx_snvs_pwrkey_resume(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
-> --
-> 2.7.0
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index f9e5245f26ac..7f118baca270 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -1713,8 +1713,6 @@ void omap3isp_print_status(struct isp_device *isp)
+ 	dev_dbg(isp->dev, "--------------------------------------------\n");
+ }
+ 
+-#ifdef CONFIG_PM
+-
+ /*
+  * Power management support.
+  *
+@@ -1785,15 +1783,6 @@ static void isp_pm_complete(struct device *dev)
+ 	isp_resume_modules(isp);
+ }
+ 
+-#else
+-
+-#define isp_pm_prepare	NULL
+-#define isp_pm_suspend	NULL
+-#define isp_pm_resume	NULL
+-#define isp_pm_complete	NULL
+-
+-#endif /* CONFIG_PM */
+-
+ static void isp_unregister_entities(struct isp_device *isp)
+ {
+ 	omap3isp_csi2_unregister_entities(&isp->isp_csi2a);
+@@ -2611,7 +2600,7 @@ static struct platform_driver omap3isp_driver = {
+ 	.id_table = omap3isp_id_table,
+ 	.driver = {
+ 		.name = "omap3isp",
+-		.pm	= &omap3isp_pm_ops,
++		.pm	= IS_ENABLED(CONFIG_PM) ? &omap3isp_pm_ops : NULL,
+ 		.of_match_table = omap3isp_of_table,
+ 	},
+ };
+-- 
+2.7.0
