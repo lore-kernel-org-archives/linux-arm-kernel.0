@@ -1,29 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 20:10:37 +0100
-Subject: [PATCH] CNS3xxx: remove unused *_VIRT definitions
-In-Reply-To: <m3twkqocy1.fsf@t19.piap.pl>
-References: <m3y4a2od0j.fsf@t19.piap.pl> <m3twkqocy1.fsf@t19.piap.pl>
-Message-ID: <3497977.bq3igK6eXq@wuerfel>
+Date: Wed, 02 Mar 2016 20:31:54 +0100
+Subject: [GIT PULL] Qualcomm DT Updates for 4.6
+In-Reply-To: <1456789331-28780-1-git-send-email-andy.gross@linaro.org>
+References: <1456789331-28780-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <5343488.9abLtxbmqB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 March 2016 08:49:10 Krzysztof Ha?asa wrote:
-> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+On Monday 29 February 2016 17:42:11 Andy Gross wrote:
+> Qualcomm ARM Based Device Tree Updates for v4.6
 > 
+> * Add documentation for Kryo
+> * Add RPMCC node for APQ8064
+> * Updates for MSM8974
+> * Add board clocks
+> * Add support for Nexus7 device
+> * Fixup pmic reg properties
+> * Various updates/cleanups for APQ8064 based boards
 
-Applied to next/fixes-non-critical, with this changelog
-added:
+That is a little more than I'd hope to get for a first pull
+request near the end of the cycle.
 
-commit 59e430525b1f966edf2573256d78bf63c7561433
-Author: Krzysztof Ha?asa <khalasa@piap.pl>
-Date:   Tue Mar 1 08:49:10 2016 +0100
+Please try to stage your pull requests out a little more in 
+the future to get the bulk of your changes in during the
+first half of the cycle, especially when it looks like there
+is a lot of stuff.
 
-    CNS3xxx: remove unused *_VIRT definitions
-    
-    All PCI mmio ranges are dynamically mapped now, so we
-    can remove the fixed virtual address definitions.
-    
-    Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Pulled into next/dt for this time.
 
 	Arnd
