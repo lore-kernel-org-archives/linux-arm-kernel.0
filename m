@@ -1,48 +1,132 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Wed, 2 Mar 2016 17:29:54 +0000
-Subject: [PATCH] Change the spin_lock/unlock_irq interface in
- proc_alloc_inum() function
-In-Reply-To: <56D688FC.9020202@huawei.com>
-References: <1456886879-28128-1-git-send-email-majun258@huawei.com>
- <20160302030941.GH17997@ZenIV.linux.org.uk>
- <56D688FC.9020202@huawei.com>
-Message-ID: <20160302172954.GI17997@ZenIV.linux.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 2 Mar 2016 14:30:35 -0300
+Subject: [RFC PATCH] watchdog: s3c2410_wdt: Add max and min timeout values
+In-Reply-To: <56D62979.5040009@samsung.com>
+References: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
+ <56D62979.5040009@samsung.com>
+Message-ID: <56D7233B.50907@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 02:32:28PM +0800, majun (F) wrote:
+Hello Krzysztof,
 
-> Sorry,I made a wrong example for this problem.
-> I want to say this interface may change the irq status after this function
-> be called.
+On 03/01/2016 08:44 PM, Krzysztof Kozlowski wrote:
+> On 02.03.2016 01:45, Javier Martinez Canillas wrote:
+>> The watchdog maximum timeout value is determined by the number of bits
+>> for the interval timer counter, its source clock frequency, the number
+>> of bits of the prescaler and maximum divider value.
+>>
+>> This can be calculated with the following equation:
+>>
+>> max_timeout = counter / (freq / (max_prescale + 1) / max_divider)
+>>
+>> Setting a maximum timeout value will allow the watchdog core to refuse
+>> user-space calls to the WDIOC_SETTIMEOUT ioctl that sets not supported
+>> timeout values.
+>>
+>> For example, systemd tries to set a timeout of 10 minutes on reboot to
+>> ensure that the machine will be rebooted even if a reboot failed. This
+>> leads to the following error message on an Exynos5422 Odroid XU4 board:
+>>
+>> [  147.986045] s3c2410-wdt 101d0000.watchdog: timeout 600 too big
+>>
+>> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
+>> ---
+>> Hello,
+>>
+>> I'm sending this as an RFC because I don't have access to user manuals
+>> for all the Exynos SoCs that this driver supports. But at least in all
+>> the ones I have here, the maximum prescaler and divider values are the
+>> same and also all have a 16-bit interval timer counter.
+>>
+>> So this patch assumes that all IP blocks supported by this driver are
+>> the same on that regard, if that's not the case then we can move these
+>> values on a per IP block basis using struct of_device_id .data field.
+>
+> It looks correct at least for Exynos4210 and newer.
+>
 
-It can't - either it's called with irqs enabled, in which case it returns
-the same way, or it's called with irqs disabled, in which case it's a trouble
-waiting to happen as soon as the allocation there (or in proc_mkdir(), etc.)
-happens to block and failure to restore irq state is the least of your
-concerns, because when you return from schedule() you *will* have irq enabled,
-no matter what.
+Great, thanks a lot for the confirmation.
 
-Take a look at __schedule():
-...
-        local_irq_disable();
-        rcu_note_context_switch();
+>>
+>> Best regards,
+>> Javier
+>>
+>>   drivers/watchdog/s3c2410_wdt.c | 16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+>> index 0093450441fe..f289c9fc353a 100644
+>> --- a/drivers/watchdog/s3c2410_wdt.c
+>> +++ b/drivers/watchdog/s3c2410_wdt.c
+>> @@ -47,6 +47,8 @@
+>>   #define S3C2410_WTDAT		0x04
+>>   #define S3C2410_WTCNT		0x08
+>>
+>> +#define S3C2410_WTCNT_MAXCNT	0xffff
+>> +
+>>   #define S3C2410_WTCON_RSTEN	(1 << 0)
+>>   #define S3C2410_WTCON_INTEN	(1 << 2)
+>>   #define S3C2410_WTCON_ENABLE	(1 << 5)
+>> @@ -56,8 +58,11 @@
+>>   #define S3C2410_WTCON_DIV64	(2 << 3)
+>>   #define S3C2410_WTCON_DIV128	(3 << 3)
+>>
+>> +#define S3C2410_WTCON_MAXDIV	0x80
+>> +
+>>   #define S3C2410_WTCON_PRESCALE(x)	((x) << 8)
+>>   #define S3C2410_WTCON_PRESCALE_MASK	(0xff << 8)
+>> +#define S3C2410_WTCON_PRESCALE_MAX	0xff
+>>
+>>   #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+>>   #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+>> @@ -198,6 +203,14 @@ do {							\
+>>
+>>   /* functions */
+>>
+>> +static inline unsigned int s3c2410wdt_max_timeout(struct clk *clock)
+>> +{
+>> +	unsigned long freq = clk_get_rate(clock);
+>> +
+>> +	return S3C2410_WTCNT_MAXCNT / (freq / (S3C2410_WTCON_PRESCALE_MAX + 1)
+>> +				       / S3C2410_WTCON_MAXDIV);
+>> +}
+>> +
+>>   static inline struct s3c2410_wdt *freq_to_wdt(struct notifier_block *nb)
+>>   {
+>>   	return container_of(nb, struct s3c2410_wdt, freq_transition);
+>> @@ -567,6 +580,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+>>   		return ret;
+>>   	}
+>>
+>> +	wdt->wdt_device.min_timeout = 1;
+>> +	wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
+>
+> Can the frequency of clock change? E.g. with devfreq? No problem if it
+> goes lower but if it gets higher than initial, then the problem will
+> appear again.
+>
 
-        /*
-         * Make sure that signal_pending_state()->signal_pending() below
-         * can't be reordered with __set_current_state(TASK_INTERRUPTIBLE)
-         * done by the caller to avoid the race with signal_wake_up().
-         */
-        smp_mb__before_spinlock();
-        raw_spin_lock(&rq->lock);
-...
-                rq = context_switch(rq, prev, next); /* unlocks the rq */
-and in context_switch() (right after switch_to()) we call finish_task_switch(),
-which calls finish_lock_switch(), which does raw_spin_unlock_irq(&rq->lock),
-which does local_irq_enable().
+That's a very good question. As Guenter said we will be in deep troubles
+if that ever happens since the driver doesn't take that into account.
 
-And no, it doesn't save the irq state anywhere - both disable and enable
-are unconditional.  schedule() always returns with irqs enabled.
+The .set_timeout handler just sets the counter according to the current
+frequency and that's never updated, unless a new timeout is set of course.
 
-Don't call blocking things with irqs disabled.  If design of some of your
-drivers depends on being able to do that, sorry, but it'll have to be changed.
+So in other words, I just made the same assumptions that the driver is
+currently doing. At least the Exynos SoCs manual don't mention frequency
+scaling for the watchdog timer source clock and AFAICT none of the CLK_WDT
+parents scale their frequencies but I don't know if that's true for all
+the machines using this driver (i.e: out-of-tree boards).
+  
+> Best regards,
+> Krzysztof
+>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
