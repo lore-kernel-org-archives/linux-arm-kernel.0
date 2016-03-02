@@ -1,12 +1,12 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 2 Mar 2016 15:10:28 +0100
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed, 2 Mar 2016 15:10:40 +0100
 Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
  and SLIT
 In-Reply-To: <20160201180944.GV24726@rric.localdomain>
 References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
  <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
  <20160201180944.GV24726@rric.localdomain>
-Message-ID: <56D6F454.3050306@gmail.com>
+Message-ID: <56D6F460.40704@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
