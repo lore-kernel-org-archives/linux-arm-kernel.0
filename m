@@ -1,105 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  2 Mar 2016 15:32:04 +0000
-Subject: [RESEND 06/11] pwm: sti: Supply PWM Capture clock handling
-In-Reply-To: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
-References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1456932729-9667-7-git-send-email-lee.jones@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 2 Mar 2016 16:34:29 +0100
+Subject: [PATCH 4/6] usb: ehci-atmel: use __maybe_unused to hide pm
+ functions
+In-Reply-To: <1456932255-71725-5-git-send-email-arnd@arndb.de>
+References: <1456932255-71725-1-git-send-email-arnd@arndb.de>
+ <1456932255-71725-5-git-send-email-arnd@arndb.de>
+Message-ID: <56D70805.805@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST's PWM IP is supplied by 2 different clocks.  One for PWM
-Output and the other for Capture.  This patch provides clock
-handling for the latter.
+Le 02/03/2016 16:24, Arnd Bergmann a ?crit :
+> The ehci-atmel driver uses #ifdef to check for CONFIG_PM, but then
+> uses SIMPLE_DEV_PM_OPS, which leaves the references out when
+> CONFIG_PM_SLEEP is not defined, so we get a warning with
+> PM=y && PM_SLEEP=n:
+> 
+> drivers/usb/host/ehci-atmel.c:189:12: error: 'ehci_atmel_drv_suspend' defined but not used [-Werror=unused-function]
+> drivers/usb/host/ehci-atmel.c:203:12: error: 'ehci_atmel_drv_resume' defined but not used [-Werror=unused-function]
+> 
+> This removes the incorrect #ifdef and instead uses a __maybe_unused
+> annotation to let the compiler know it can silently drop
+> the function definition.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/pwm/pwm-sti.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-index 2336bac..9e6b1c8 100644
---- a/drivers/pwm/pwm-sti.c
-+++ b/drivers/pwm/pwm-sti.c
-@@ -74,6 +74,7 @@ struct sti_pwm_compat_data {
- struct sti_pwm_chip {
- 	struct device *dev;
- 	struct clk *pwm_clk;
-+	struct clk *cpt_clk;
- 	struct regmap *regmap;
- 	struct sti_pwm_compat_data *cdata;
- 	struct regmap_field *prescale_low;
-@@ -183,6 +184,10 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 		if (ret)
- 			return ret;
- 
-+		ret = clk_enable(pc->cpt_clk);
-+		if (ret)
-+			return ret;
-+
- 		if (!period_same) {
- 			ret = sti_pwm_get_prescale(pc, period_ns, &prescale);
- 			if (ret)
-@@ -227,6 +232,7 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 
- clk_dis:
- 	clk_disable(pc->pwm_clk);
-+	clk_disable(pc->cpt_clk);
- 	return ret;
- }
- 
-@@ -246,6 +252,10 @@ static int sti_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 		if (ret)
- 			goto out;
- 
-+		ret = clk_enable(pc->cpt_clk);
-+		if (ret)
-+			goto out;
-+
- 		ret = regmap_field_write(pc->pwm_out_en, 1);
- 		if (ret) {
- 			dev_err(dev, "failed to enable PWM device:%d\n",
-@@ -271,6 +281,7 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	regmap_field_write(pc->pwm_out_en, 0);
- 
- 	clk_disable(pc->pwm_clk);
-+	clk_disable(pc->cpt_clk);
- 	mutex_unlock(&pc->sti_pwm_lock);
- }
- 
-@@ -390,6 +401,18 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	pc->cpt_clk = of_clk_get_by_name(dev->of_node, "capture");
-+	if (IS_ERR(pc->cpt_clk)) {
-+		dev_err(dev, "failed to get PWM capture clock\n");
-+		return PTR_ERR(pc->cpt_clk);
-+	}
-+
-+	ret = clk_prepare(pc->cpt_clk);
-+	if (ret) {
-+		dev_err(dev, "failed to prepare clock\n");
-+		return ret;
-+	}
-+
- 	pc->chip.dev = dev;
- 	pc->chip.ops = &sti_pwm_ops;
- 	pc->chip.base = -1;
-@@ -399,6 +422,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 	ret = pwmchip_add(&pc->chip);
- 	if (ret < 0) {
- 		clk_unprepare(pc->pwm_clk);
-+		clk_unprepare(pc->cpt_clk);
- 		return ret;
- 	}
- 
-@@ -416,6 +440,7 @@ static int sti_pwm_remove(struct platform_device *pdev)
- 		pwm_disable(&pc->chip.pwms[i]);
- 
- 	clk_unprepare(pc->pwm_clk);
-+	clk_unprepare(pc->cpt_clk);
- 
- 	return pwmchip_remove(&pc->chip);
- }
+> ---
+>  drivers/usb/host/ehci-atmel.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+> index be0964a801e8..7440722bfbf0 100644
+> --- a/drivers/usb/host/ehci-atmel.c
+> +++ b/drivers/usb/host/ehci-atmel.c
+> @@ -185,8 +185,7 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_PM
+> -static int ehci_atmel_drv_suspend(struct device *dev)
+> +static int __maybe_unused ehci_atmel_drv_suspend(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
+> @@ -200,7 +199,7 @@ static int ehci_atmel_drv_suspend(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int ehci_atmel_drv_resume(struct device *dev)
+> +static int __maybe_unused ehci_atmel_drv_resume(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
+> @@ -208,7 +207,6 @@ static int ehci_atmel_drv_resume(struct device *dev)
+>  	atmel_start_clock(atmel_ehci);
+>  	return ehci_resume(hcd, false);
+>  }
+> -#endif
+>  
+>  #ifdef CONFIG_OF
+>  static const struct of_device_id atmel_ehci_dt_ids[] = {
+> 
+
+
 -- 
-1.9.1
+Nicolas Ferre
