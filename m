@@ -1,59 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:24:06 +0100
-Subject: [PATCH 4/6] usb: ehci-atmel: use __maybe_unused to hide pm functions
+Date: Wed,  2 Mar 2016 16:24:08 +0100
+Subject: [PATCH 6/6] phy: twl4030: use __maybe_unused to hide pm functions
 In-Reply-To: <1456932255-71725-1-git-send-email-arnd@arndb.de>
 References: <1456932255-71725-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456932255-71725-5-git-send-email-arnd@arndb.de>
+Message-ID: <1456932255-71725-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ehci-atmel driver uses #ifdef to check for CONFIG_PM, but then
-uses SIMPLE_DEV_PM_OPS, which leaves the references out when
-CONFIG_PM_SLEEP is not defined, so we get a warning with
-PM=y && PM_SLEEP=n:
+The twl4030 USB PHY driver uses UNIVERSAL_DEV_PM_OPS to access
+its suspend/resume functions, which causes a warning about
+unused symbols when CONFIG_PM is disabled:
 
-drivers/usb/host/ehci-atmel.c:189:12: error: 'ehci_atmel_drv_suspend' defined but not used [-Werror=unused-function]
-drivers/usb/host/ehci-atmel.c:203:12: error: 'ehci_atmel_drv_resume' defined but not used [-Werror=unused-function]
+drivers/phy/phy-twl4030-usb.c:394:12: error: 'twl4030_usb_runtime_suspend' defined but not used [-Werror=unused-function]
+drivers/phy/phy-twl4030-usb.c:408:12: error: 'twl4030_usb_runtime_resume' defined but not used [-Werror=unused-function]
 
-This removes the incorrect #ifdef and instead uses a __maybe_unused
-annotation to let the compiler know it can silently drop
-the function definition.
+This adds __maybe_unused annotations to let the compiler know
+it can silently drop the function definition.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/usb/host/ehci-atmel.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/phy/phy-twl4030-usb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index be0964a801e8..7440722bfbf0 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -185,8 +185,7 @@ static int ehci_atmel_drv_remove(struct platform_device *pdev)
+diff --git a/drivers/phy/phy-twl4030-usb.c b/drivers/phy/phy-twl4030-usb.c
+index 840f3eae428b..6b6af6cba454 100644
+--- a/drivers/phy/phy-twl4030-usb.c
++++ b/drivers/phy/phy-twl4030-usb.c
+@@ -391,7 +391,7 @@ static void __twl4030_phy_power(struct twl4030_usb *twl, int on)
+ 	WARN_ON(twl4030_usb_write_verify(twl, PHY_PWR_CTRL, pwr) < 0);
+ }
+ 
+-static int twl4030_usb_runtime_suspend(struct device *dev)
++static int __maybe_unused twl4030_usb_runtime_suspend(struct device *dev)
+ {
+ 	struct twl4030_usb *twl = dev_get_drvdata(dev);
+ 
+@@ -405,7 +405,7 @@ static int twl4030_usb_runtime_suspend(struct device *dev)
  	return 0;
  }
  
--#ifdef CONFIG_PM
--static int ehci_atmel_drv_suspend(struct device *dev)
-+static int __maybe_unused ehci_atmel_drv_suspend(struct device *dev)
+-static int twl4030_usb_runtime_resume(struct device *dev)
++static int __maybe_unused twl4030_usb_runtime_resume(struct device *dev)
  {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
-@@ -200,7 +199,7 @@ static int ehci_atmel_drv_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int ehci_atmel_drv_resume(struct device *dev)
-+static int __maybe_unused ehci_atmel_drv_resume(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	struct atmel_ehci_priv *atmel_ehci = hcd_to_atmel_ehci_priv(hcd);
-@@ -208,7 +207,6 @@ static int ehci_atmel_drv_resume(struct device *dev)
- 	atmel_start_clock(atmel_ehci);
- 	return ehci_resume(hcd, false);
- }
--#endif
- 
- #ifdef CONFIG_OF
- static const struct of_device_id atmel_ehci_dt_ids[] = {
+ 	struct twl4030_usb *twl = dev_get_drvdata(dev);
+ 	int res;
 -- 
 2.7.0
