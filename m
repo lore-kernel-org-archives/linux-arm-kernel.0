@@ -1,72 +1,37 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 2 Mar 2016 16:34:12 +0100
-Subject: [PATCH 3/6] usb: ohci-at91: use __maybe_unused to hide pm
- functions
-In-Reply-To: <1456932255-71725-4-git-send-email-arnd@arndb.de>
-References: <1456932255-71725-1-git-send-email-arnd@arndb.de>
- <1456932255-71725-4-git-send-email-arnd@arndb.de>
-Message-ID: <56D707F4.9030903@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  2 Mar 2016 15:31:58 +0000
+Subject: [RESEND 00/11] pwm: Add support for PWM Capture
+Message-ID: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/03/2016 16:24, Arnd Bergmann a ?crit :
-> The ohci-at91 driver uses #ifdef to check for CONFIG_PM, but then
-> uses SIMPLE_DEV_PM_OPS, which leaves the references out when
-> CONFIG_PM_SLEEP is not defined, so we get a warning with
-> PM=y && PM_SLEEP=n:
-> 
-> drivers/usb/host/ohci-at91.c:587:1: error: 'ohci_hcd_at91_drv_suspend' defined but not used [-Werror=unused-function]
-> drivers/usb/host/ohci-at91.c:631:12: error: 'ohci_hcd_at91_drv_resume' defined but not used [-Werror=unused-function]
-> 
-> This removes the incorrect #ifdef and instead uses a __maybe_unused
-> annotation to let the compiler know it can silently drop
-> the function definition.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+The first part of this set extends the current PWM API to allow external
+code to request a PWM Capture.  Subsequent patches then make use of the
+new API by providing a userspace offering via /sysfs.  The final part of
+the set supplies PWM Capture functionality into the already existing STi
+PWM driver.
+ 
+This patch-set has been tested end to end via /sysfs.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Lee Jones (11):
+  pwm: Add PWM Capture support
+  pwm: sysfs: Add PWM Capture support
+  pwm: sti: Reorganise register names in preparation for new
+    functionality
+  pwm: sti: Only request clock rate when you need to
+  pwm: sti: Supply PWM Capture register addresses and bit locations
+  pwm: sti: Supply PWM Capture clock handling
+  pwm: sti: Initialise PWM Capture channel data
+  pwm: sti: Add support for PWM Capture IRQs
+  pwm: sti: Add PWM Capture call-back
+  pwm: sti: Enable PWM Capture
+  pwm: sti: Take the opportunity to conduct a little house keeping
 
-Thanks Arnd, bye.
-
-> ---
->  drivers/usb/host/ohci-at91.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 95c8ddde0725..d177372bb357 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -581,9 +581,7 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_PM
-> -
-> -static int
-> +static int __maybe_unused
->  ohci_hcd_at91_drv_suspend(struct device *dev)
->  {
->  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
-> @@ -628,7 +626,8 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
->  	return ret;
->  }
->  
-> -static int ohci_hcd_at91_drv_resume(struct device *dev)
-> +static int __maybe_unused
-> +ohci_hcd_at91_drv_resume(struct device *dev)
->  {
->  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
->  	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
-> @@ -641,7 +640,6 @@ static int ohci_hcd_at91_drv_resume(struct device *dev)
->  	ohci_resume(hcd, false);
->  	return 0;
->  }
-> -#endif
->  
->  static SIMPLE_DEV_PM_OPS(ohci_hcd_at91_pm_ops, ohci_hcd_at91_drv_suspend,
->  					ohci_hcd_at91_drv_resume);
-> 
-
+ drivers/pwm/core.c    |  26 ++++
+ drivers/pwm/pwm-sti.c | 384 ++++++++++++++++++++++++++++++++++++++++++--------
+ drivers/pwm/sysfs.c   |  28 ++++
+ include/linux/pwm.h   |  13 ++
+ 4 files changed, 392 insertions(+), 59 deletions(-)
 
 -- 
-Nicolas Ferre
+1.9.1
