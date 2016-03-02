@@ -1,60 +1,56 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  2 Mar 2016 18:11:49 +0100
-Subject: [PATCH 0/3] arm64: more granular KASLR
-Message-ID: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed,  2 Mar 2016 18:11:50 +0100
+Subject: [PATCH 1/3] arm64: don't map TEXT_OFFSET bytes below the kernel if we
+ can avoid it
+In-Reply-To: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1456938712-11089-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out we can squeeze out 5 to 7 bits of additional KASLR entropy in
-the new arm64 implementation. This is based on the observation that the
-minimal 2 MB alignment of the kernel image is only required for kernels
-that are non-relocatable, and since KASLR already implies a relocatable
-kernel anyway, we get this additional wiggle room almost [1] for free.
+For historical reasons, there is a 512 KB hole called TEXT_OFFSET below
+the kernel image in memory. Since this hole is part of the kernel footprint
+in the early mapping when running with 4 KB pages, we cannot avoid mapping
+it, but in other cases, e.g., when running with larger page sizes, or in
+the future, with more granular KASLR, there is no reason to map it explicitly
+like we do currently.
 
-The idea is that, since we need to fix up all absolute symbol references
-anyway, the hardcoded virtual start address of the kernel does not need to
-be 2 MB aligned (+ TEXT_OFFSET), and the only thing we need to ensure is
-that the physical misalignment and the virtual misalignment are equal modulo
-the swapper block size.
+So update the logic so that the hole is mapped only if it occurs as a result
+of rounding the start address of the kernel to swapper block size, and leave
+it unmapped otherwise.
 
-Patch #1 removes the explicit mapping of the TEXT_OFFSET region below the
-kernel, and only maps it if the rounding to swapper block size of the kernel
-start address ends up covering it.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/head.S | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Patch #2 updates the early boot code to treat the physical misalignment as
-the initial KASLR displacement. Note that this only affects code that is
-compiled conditionally if CONFIG_RANDOMIZE_BASE=y
-
-Patch #3 updates the stub allocation strategy to allow a more granular mapping.
-Note that the allocation itself is still rounded to 2 MB as before, to prevent
-the early mapping to cover adjacent regions inadvertently. As is the case for
-patch #2, this only affects the new code under CONFIG_RANDOMIZE_BASE=y
-
-Sample output from a 4k/4 levels kernel, where we have 33 bits of entropy
-in the kernel addresses:
-
-Virtual kernel memory layout:
-    modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
-    vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
-      .init : 0xffff0bbbe14a6000 - 0xffff0bbbe17d5000   (  3260 KB)
-      .text : 0xffff0bbbe0c24000 - 0xffff0bbbe120a000   (  6040 KB)
-    .rodata : 0xffff0bbbe120a000 - 0xffff0bbbe14a6000   (  2672 KB)
-      .data : 0xffff0bbbe17d5000 - 0xffff0bbbe1866e00   (   584 KB)
-      fixed : 0xffff7dfffe7fd000 - 0xffff7dfffec00000   (  4108 KB)
-    PCI I/O : 0xffff7dfffee00000 - 0xffff7dffffe00000   (    16 MB)
-    vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
-              0xffff7e1333000000 - 0xffff7e1337000000   (    64 MB actual)
-     memory : 0xffff84ccc0000000 - 0xffff84cdc0000000   (  4096 MB)
-
-Ard Biesheuvel (3):
-  arm64: don't map TEXT_OFFSET bytes below the kernel if we can avoid it
-  arm64: kaslr: deal with physically misaligned kernel images
-  arm64: kaslr: increase randomization granularity
-
- arch/arm64/kernel/head.S                  | 22 +++++++++++++-------
- arch/arm64/kernel/kaslr.c                 |  6 +++---
- drivers/firmware/efi/libstub/arm64-stub.c | 14 ++++++++++---
- 3 files changed, 29 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 50c2134a4aaf..1d4ae36db0bb 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -393,12 +393,12 @@ __create_page_tables:
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
+ 	 */
+ 	mov	x0, x26				// swapper_pg_dir
+-	ldr	x5, =KIMAGE_VADDR
++	ldr	x5, =KIMAGE_VADDR + TEXT_OFFSET	// compile time virt addr of _text
+ 	add	x5, x5, x23			// add KASLR displacement
+ 	create_pgd_entry x0, x5, x3, x6
+ 	ldr	w6, kernel_img_size
+ 	add	x6, x6, x5
+-	mov	x3, x24				// phys offset
++	adrp	x3, KERNEL_START		// runtime phys addr of _text
+ 	create_block_map x0, x7, x3, x5, x6
+ 
+ 	/*
+@@ -415,7 +415,7 @@ __create_page_tables:
+ ENDPROC(__create_page_tables)
+ 
+ kernel_img_size:
+-	.long	_end - (_head - TEXT_OFFSET)
++	.long	_end - _head
+ 	.ltorg
+ 
+ /*
 -- 
 2.5.0
