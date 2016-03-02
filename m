@@ -1,114 +1,263 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed,  2 Mar 2016 15:14:40 +0900
-Subject: [PATCH] pinctrl: uniphier: rename CONFIG options and file names
-Message-ID: <1456899280-8641-1-git-send-email-yamada.masahiro@socionext.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Wed, 2 Mar 2016 14:11:22 +0800
+Subject: [PATCH] ARM: dts: ls102xa: Use new clock binding
+Message-ID: <1456899082-29762-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current "CONFIG_PINCTRL_UNIPHIER_PH1_*" is too long.  It would
-not hurt to drop "PH1_" because "UNIPHIER_" already well specifies
-the SoC family.  Also, rename files for consistency.
+According to the current clock driver for Freescale QorIQ platform, new
+clock binding will be used for LS1021A.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Alison Wang <alison.wang@nxp.com>
 ---
+ arch/arm/boot/dts/ls1021a.dtsi | 97 +++++++++++++++++-------------------------
+ 1 file changed, 40 insertions(+), 57 deletions(-)
 
- drivers/pinctrl/uniphier/Kconfig                           | 12 ++++++------
- drivers/pinctrl/uniphier/Makefile                          | 14 +++++++-------
- .../uniphier/{pinctrl-ph1-ld4.c => pinctrl-uniphier-ld4.c} |  0
- .../{pinctrl-ph1-ld6b.c => pinctrl-uniphier-ld6b.c}        |  0
- .../{pinctrl-ph1-pro4.c => pinctrl-uniphier-pro4.c}        |  0
- .../{pinctrl-ph1-pro5.c => pinctrl-uniphier-pro5.c}        |  0
- .../{pinctrl-proxstream2.c => pinctrl-uniphier-pxs2.c}     |  0
- .../{pinctrl-ph1-sld8.c => pinctrl-uniphier-sld8.c}        |  0
- 8 files changed, 13 insertions(+), 13 deletions(-)
- rename drivers/pinctrl/uniphier/{pinctrl-ph1-ld4.c => pinctrl-uniphier-ld4.c} (100%)
- rename drivers/pinctrl/uniphier/{pinctrl-ph1-ld6b.c => pinctrl-uniphier-ld6b.c} (100%)
- rename drivers/pinctrl/uniphier/{pinctrl-ph1-pro4.c => pinctrl-uniphier-pro4.c} (100%)
- rename drivers/pinctrl/uniphier/{pinctrl-ph1-pro5.c => pinctrl-uniphier-pro5.c} (100%)
- rename drivers/pinctrl/uniphier/{pinctrl-proxstream2.c => pinctrl-uniphier-pxs2.c} (100%)
- rename drivers/pinctrl/uniphier/{pinctrl-ph1-sld8.c => pinctrl-uniphier-sld8.c} (100%)
-
-diff --git a/drivers/pinctrl/uniphier/Kconfig b/drivers/pinctrl/uniphier/Kconfig
-index 43f689f..0b40ded 100644
---- a/drivers/pinctrl/uniphier/Kconfig
-+++ b/drivers/pinctrl/uniphier/Kconfig
-@@ -8,27 +8,27 @@ menuconfig PINCTRL_UNIPHIER
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 726372d..5483728 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -74,14 +74,14 @@
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0xf00>;
+-			clocks = <&cluster1_clk>;
++			clocks = <&clockgen 1 0>;
+ 		};
  
- if PINCTRL_UNIPHIER
+ 		cpu at f01 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0xf01>;
+-			clocks = <&cluster1_clk>;
++			clocks = <&clockgen 1 0>;
+ 		};
+ 	};
  
--config PINCTRL_UNIPHIER_PH1_LD4
-+config PINCTRL_UNIPHIER_LD4
- 	tristate "UniPhier PH1-LD4 SoC pinctrl driver"
- 	default y
+@@ -99,6 +99,20 @@
+ 			     <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
  
--config PINCTRL_UNIPHIER_PH1_PRO4
-+config PINCTRL_UNIPHIER_PRO4
- 	tristate "UniPhier PH1-Pro4 SoC pinctrl driver"
- 	default y
++	sysclk: sysclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++		clock-output-names = "sysclk";
++	};
++
++	clk32k: clk32k {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "clk32k";
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+@@ -149,7 +163,7 @@
+ 			      <0x0 0x20220520 0x0 0x4>;
+ 			reg-names = "ahci", "sata-ecc";
+ 			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 0>;
+ 			dma-coherent;
+ 			status = "disabled";
+ 		};
+@@ -200,41 +214,10 @@
+ 		};
  
--config PINCTRL_UNIPHIER_PH1_SLD8
-+config PINCTRL_UNIPHIER_SLD8
- 	tristate "UniPhier PH1-sLD8 SoC pinctrl driver"
- 	default y
+ 		clockgen: clocking at 1ee1000 {
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges = <0x0 0x0 0x1ee1000 0x10000>;
+-
+-			sysclk: sysclk {
+-				compatible = "fixed-clock";
+-				#clock-cells = <0>;
+-				clock-output-names = "sysclk";
+-			};
+-
+-			cga_pll1: pll at 800 {
+-				compatible = "fsl,qoriq-core-pll-2.0";
+-				#clock-cells = <1>;
+-				reg = <0x800 0x10>;
+-				clocks = <&sysclk>;
+-				clock-output-names = "cga-pll1", "cga-pll1-div2",
+-						     "cga-pll1-div4";
+-			};
+-
+-			platform_clk: pll at c00 {
+-				compatible = "fsl,qoriq-core-pll-2.0";
+-				#clock-cells = <1>;
+-				reg = <0xc00 0x10>;
+-				clocks = <&sysclk>;
+-				clock-output-names = "platform-clk", "platform-clk-div2";
+-			};
+-
+-			cluster1_clk: clk0c0 at 0 {
+-				compatible = "fsl,qoriq-core-mux-2.0";
+-				#clock-cells = <0>;
+-				reg = <0x0 0x10>;
+-				clock-names = "pll1cga", "pll1cga-div2", "pll1cga-div4";
+-				clocks = <&cga_pll1 0>, <&cga_pll1 1>, <&cga_pll1 2>;
+-				clock-output-names = "cluster1-clk";
+-			};
++			compatible = "fsl,ls1021a-clockgen";
++			reg = <0x0 0x1ee1000 0x0 0x1000>;
++			#clock-cells = <2>;
++			clocks = <&sysclk>;
+ 		};
  
--config PINCTRL_UNIPHIER_PH1_PRO5
-+config PINCTRL_UNIPHIER_PRO5
- 	tristate "UniPhier PH1-Pro5 SoC pinctrl driver"
- 	default y
+ 		dspi0: dspi at 2100000 {
+@@ -244,7 +227,7 @@
+ 			reg = <0x0 0x2100000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "dspi";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			spi-num-chipselects = <5>;
+ 			big-endian;
+ 			status = "disabled";
+@@ -257,7 +240,7 @@
+ 			reg = <0x0 0x2110000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "dspi";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			spi-num-chipselects = <5>;
+ 			big-endian;
+ 			status = "disabled";
+@@ -270,7 +253,7 @@
+ 			reg = <0x0 0x2180000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "i2c";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			status = "disabled";
+ 		};
  
--config PINCTRL_UNIPHIER_PROXSTREAM2
-+config PINCTRL_UNIPHIER_PXS2
- 	tristate "UniPhier ProXstream2 SoC pinctrl driver"
- 	default y
+@@ -281,7 +264,7 @@
+ 			reg = <0x0 0x2190000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "i2c";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			status = "disabled";
+ 		};
  
--config PINCTRL_UNIPHIER_PH1_LD6B
-+config PINCTRL_UNIPHIER_LD6B
- 	tristate "UniPhier PH1-LD6b SoC pinctrl driver"
- 	default y
+@@ -292,7 +275,7 @@
+ 			reg = <0x0 0x21a0000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "i2c";
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			status = "disabled";
+ 		};
  
-diff --git a/drivers/pinctrl/uniphier/Makefile b/drivers/pinctrl/uniphier/Makefile
-index e7ce967..3b8f9ee 100644
---- a/drivers/pinctrl/uniphier/Makefile
-+++ b/drivers/pinctrl/uniphier/Makefile
-@@ -1,8 +1,8 @@
--obj-y						+= pinctrl-uniphier-core.o
-+obj-y					+= pinctrl-uniphier-core.o
+@@ -336,7 +319,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2950000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&sysclk>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -345,7 +328,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2960000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -354,7 +337,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2970000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -363,7 +346,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2980000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -372,7 +355,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2990000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -381,7 +364,7 @@
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x29a0000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clockgen 4 1>;
+ 			clock-names = "ipg";
+ 			status = "disabled";
+ 		};
+@@ -390,7 +373,7 @@
+ 			compatible = "fsl,imx21-wdt";
+ 			reg = <0x0 0x2ad0000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
++			clocks = <&clk32k>;
+ 			clock-names = "wdog-en";
+ 			big-endian;
+ 		};
+@@ -400,8 +383,8 @@
+ 			compatible = "fsl,vf610-sai";
+ 			reg = <0x0 0x2b50000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>, <&platform_clk 1>,
+-				 <&platform_clk 1>, <&platform_clk 1>;
++			clocks = <&clockgen 4 1>, <&clockgen 4 1>,
++				 <&clockgen 4 1>, <&clockgen 4 1>;
+ 			clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 			dma-names = "tx", "rx";
+ 			dmas = <&edma0 1 47>,
+@@ -414,8 +397,8 @@
+ 			compatible = "fsl,vf610-sai";
+ 			reg = <0x0 0x2b60000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>, <&platform_clk 1>,
+-				 <&platform_clk 1>, <&platform_clk 1>;
++			clocks = <&clockgen 4 1>, <&clockgen 4 1>,
++				 <&clockgen 4 1>, <&clockgen 4 1>;
+ 			clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 			dma-names = "tx", "rx";
+ 			dmas = <&edma0 1 45>,
+@@ -435,15 +418,15 @@
+ 			dma-channels = <32>;
+ 			big-endian;
+ 			clock-names = "dmamux0", "dmamux1";
+-			clocks = <&platform_clk 1>,
+-				 <&platform_clk 1>;
++			clocks = <&clockgen 4 1>,
++				 <&clockgen 4 1>;
+ 		};
  
--obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_LD4)		+= pinctrl-ph1-ld4.o
--obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_PRO4)		+= pinctrl-ph1-pro4.o
--obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_SLD8)		+= pinctrl-ph1-sld8.o
--obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_PRO5)		+= pinctrl-ph1-pro5.o
--obj-$(CONFIG_PINCTRL_UNIPHIER_PROXSTREAM2)	+= pinctrl-proxstream2.o
--obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_LD6B)		+= pinctrl-ph1-ld6b.o
-+obj-$(CONFIG_PINCTRL_UNIPHIER_LD4)	+= pinctrl-uniphier-ld4.o
-+obj-$(CONFIG_PINCTRL_UNIPHIER_PRO4)	+= pinctrl-uniphier-pro4.o
-+obj-$(CONFIG_PINCTRL_UNIPHIER_SLD8)	+= pinctrl-uniphier-sld8.o
-+obj-$(CONFIG_PINCTRL_UNIPHIER_PRO5)	+= pinctrl-uniphier-pro5.o
-+obj-$(CONFIG_PINCTRL_UNIPHIER_PXS2)	+= pinctrl-uniphier-pxs2.o
-+obj-$(CONFIG_PINCTRL_UNIPHIER_LD6B)	+= pinctrl-uniphier-ld6b.o
-diff --git a/drivers/pinctrl/uniphier/pinctrl-ph1-ld4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-similarity index 100%
-rename from drivers/pinctrl/uniphier/pinctrl-ph1-ld4.c
-rename to drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-diff --git a/drivers/pinctrl/uniphier/pinctrl-ph1-ld6b.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-similarity index 100%
-rename from drivers/pinctrl/uniphier/pinctrl-ph1-ld6b.c
-rename to drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-diff --git a/drivers/pinctrl/uniphier/pinctrl-ph1-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-similarity index 100%
-rename from drivers/pinctrl/uniphier/pinctrl-ph1-pro4.c
-rename to drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-diff --git a/drivers/pinctrl/uniphier/pinctrl-ph1-pro5.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-similarity index 100%
-rename from drivers/pinctrl/uniphier/pinctrl-ph1-pro5.c
-rename to drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-diff --git a/drivers/pinctrl/uniphier/pinctrl-proxstream2.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-similarity index 100%
-rename from drivers/pinctrl/uniphier/pinctrl-proxstream2.c
-rename to drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-diff --git a/drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-similarity index 100%
-rename from drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c
-rename to drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
+ 		dcu: dcu at 2ce0000 {
+ 			compatible = "fsl,ls1021a-dcu";
+ 			reg = <0x0 0x2ce0000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 0>;
++			clocks = <&clockgen 4 0>;
+ 			clock-names = "dcu";
+ 			big-endian;
+ 			status = "disabled";
 -- 
-1.9.1
+2.1.0.27.g96db324
