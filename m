@@ -1,61 +1,63 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 2 Mar 2016 17:06:58 +0100
-Subject: [PATCH 01/14] pinctrl: at91: use __maybe_unused to hide pm
- functions
-In-Reply-To: <1456934350-1389172-2-git-send-email-arnd@arndb.de>
-References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
- <1456934350-1389172-2-git-send-email-arnd@arndb.de>
-Message-ID: <56D70FA2.30608@atmel.com>
+Date: Wed, 2 Mar 2016 17:05:22 +0100
+Subject: [GIT PULL] at91: dt for 4.6 #2
+Message-ID: <1456934722-7023-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/03/2016 16:58, Arnd Bergmann a ?crit :
-> The at91-pio4 pinctrl driver uses SET_SYSTEM_SLEEP_PM_OPS() to
-> conditionally set the correct suspend/resume options, but they
-> become unused when CONFIG_PM is disabled:
-> 
-> drivers/pinctrl/pinctrl-at91-pio4.c:827:12: error: 'atmel_pctrl_suspend' defined but not used [-Werror=unused-function]
-> drivers/pinctrl/pinctrl-at91-pio4.c:847:12: error: 'atmel_pctrl_resume' defined but not used [-Werror=unused-function]
-> 
-> This adds __maybe_unused annotations so the compiler knows
-> it can silently drop them instead of warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Arnd, Olof, Kevin,
 
-Indeed, nice like this:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+A second batch of DT updates for 4.6. This time it is based on 4.5-rc3 as one
+of the patches fixes an node that was changed during 4.5-rc phase. As I saw
+that your "next/dt" branches are based on 4.5-rc3, I thought it wouldn't be a
+problem.
+Overall a pretty simple series with mainly node addition for the latest SoC
+and its Xplained board.
+The tag doesn't embed Alexandre's previous DT Pull-Request for 4.6 that was
+based on 4.5-rc1. I verified though that  it doesn't conflict with it during a
+merge.
 
-Thanks, bye.
+Thanks, best regards,
 
+The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
 
-> ---
->  drivers/pinctrl/pinctrl-at91-pio4.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-> index ee69db6ae1c7..4429312e848d 100644
-> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
-> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-> @@ -824,7 +824,7 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
->  	.pmxops		= &atmel_pmxops,
->  };
->  
-> -static int atmel_pctrl_suspend(struct device *dev)
-> +static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-> @@ -844,7 +844,7 @@ static int atmel_pctrl_suspend(struct device *dev)
->  	return 0;
->  }
->  
-> -static int atmel_pctrl_resume(struct device *dev)
-> +static int __maybe_unused atmel_pctrl_resume(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-> 
+  Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt2
+
+for you to fetch changes up to ed0f4b3ffcdbd2b47a0b24035bb6f22464c9fef1:
+
+  ARM: dts: at91: sama5d2 Xplained: add leds node (2016-03-02 16:55:37 +0100)
+
+----------------------------------------------------------------
+Second 4.6 DT series, all patches for sama5d2 and its Xplained board:
+- addition of the NAND flash node
+- addition of the dma properties for UART/USART nodes
+- one update of the sama5d2 Xplained phy node
+- addition of USB pinmux, button and leds
+
+----------------------------------------------------------------
+Cyrille Pitchen (1):
+      ARM: dts: at91: sama5d2 Xplained: set pin muxing for usb gadget and usb host
+
+Ludovic Desroches (1):
+      ARM: dts: at91: sama5d2 Xplained: add user push button
+
+Nicolas Ferre (1):
+      ARM: dts: at91: sama5d2: add dma properties to UART nodes
+
+Romain Izard (2):
+      ARM: dts: at91: sama5d2 Xplained: Correct the macb irq pinctrl node
+      ARM: dts: at91: sama5d2: add nand0 and nfc0 nodes
+
+Wenyou Yang (1):
+      ARM: dts: at91: sama5d2 Xplained: add leds node
+
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 70 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/sama5d2.dtsi              | 73 +++++++++++++++++++++++++++++
+ 2 files changed, 143 insertions(+)
 
 -- 
 Nicolas Ferre
