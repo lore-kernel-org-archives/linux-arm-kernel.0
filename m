@@ -1,52 +1,64 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Wed,  2 Mar 2016 01:03:00 +0000
-Subject: [PATCH] arm: mm: Fix definition of pmd_mknotpresent
-Message-ID: <1456880580-22311-1-git-send-email-steve.capper@arm.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 2 Mar 2016 09:16:19 +0800
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <20160301233040.GA31476@codeblueprint.co.uk>
+References: <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <20160218191624.GA1515@redhat.com>
+ <20160226144114.GA7475@codeblueprint.co.uk>
+ <20160301233040.GA31476@codeblueprint.co.uk>
+Message-ID: <20160302011619.GA3192@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently pmd_mknotpresent will use a zero entry to respresent an
-invalidated pmd.
+On 03/01/16 at 11:30pm, Matt Fleming wrote:
+> On Fri, 26 Feb, at 02:41:14PM, Matt Fleming wrote:
+> > On Thu, 18 Feb, at 02:16:24PM, Peter Jones wrote:
+> > > 
+> > > So the question I have is: would you rather chop up regions and reserve
+> > > the space, or allocate a new copy and update the configuration table
+> > > (after ExitBootServices()) to point to it?  The latter makes it pretty
+> > > easy to do from an API that all these drivers can use, and it makes the
+> > > kexec case completely transparent.
+> > > 
+> > > Up to you.
+> > 
+> > I think it makes the most sense to chop up the regions we care about
+> > (i.e. the ones we have drivers for) because not only does that save us
+> > the effort of copying out the data on every kexec reboot, it also
+> > prevents us from leaking each copy since we don't free them at the
+> > moment.
+> > 
+> > Then we just need to maintain a separate list of regions to free in
+> > efi_free_boot_services() or have some other way to distinguish between
+> > them.
+> > 
+> > Oh, and save_runtime_map() would need updating to save Boot Services
+> > regions too.
+> 
+> I have a very rough draft of patches that implement this strategy on
+> the 'experiemntal/efi-memmap' branch in the EFI tree if anyone is
+> curious and wants to take a look. The series will be sent out soon.
+> 
+> I wouldn't necessarily try running them or anything as there's a few
+> things that I know are broken; ia64 build, EFI mixed mode boot,
+> probably arm64 regressions.
+> 
+> The upshot of the patch series is that there's a whole lot of code we
+> can share for manipulating memory maps between all EFI architectures
+> and by fixing this "reserve boot services regions" in a generic way it
+> should mean kexec under EFI on arm64 should be fairly trivial to
+> implement, along with ESRT, etc.
 
-Unfortunately this definition clashes with pmd_none, thus it is
-possible for a race condition to occur if zap_pmd_range sees pmd_none
-whilst __split_huge_pmd_locked is running too with pmdp_invalidate
-just called.
+Matt, thanks. One question is for the acpi patches you sent before, do you
+think they are still necessary as a fix for the bgrt problem and coexist
+with the "reserve useful boot services" proposal?
 
-This patch fixes the race condition by modifying pmd_mknotpresent to
-create non-zero faulting entries (as is done in other architectures),
-removing the ambiguity with pmd_none.
-
-Fixes: 8d9625070073 ("ARM: mm: Transparent huge page support for LPAE systems.")
-Reported-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-
----
-
-This patch addresses an issue discussed at:
-http://lkml.iu.edu/hypermail/linux/kernel/1602.3/01846.html
-
----
- arch/arm/include/asm/pgtable-3level.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index dc46398..451b6e7 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -249,10 +249,10 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
- #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
- #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
- 
--/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
-+/* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
- static inline pmd_t pmd_mknotpresent(pmd_t pmd)
- {
--	return __pmd(0);
-+	return __pmd(pmd_val(pmd) & ~PMD_TYPE_MASK);
- }
- 
- static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
--- 
-2.1.0
+Thanks
+Dave
