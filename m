@@ -1,38 +1,39 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 2 Mar 2016 16:24:20 -0600
-Subject: [PATCH] ARM: DRA722: remove redundant definition of 1.0 device
-In-Reply-To: <1456957275-2025-1-git-send-email-vishalm@ti.com>
-References: <1456957275-2025-1-git-send-email-vishalm@ti.com>
-Message-ID: <56D76814.20804@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Mar 2016 23:27:48 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Fixes for v4.5
+In-Reply-To: <cover.1456880499.git.horms+renesas@verge.net.au>
+References: <cover.1456880499.git.horms+renesas@verge.net.au>
+Message-ID: <2175554.AmiFhZ4OFM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2016 04:21 PM, Vishal Mahaveer wrote:
-> Remove duplicate definition of Rev 1.0 device.
-> Fixes: 81032e34e184 ("ARM: DRA752: Add ID detect for ES2.0")
+On Wednesday 02 March 2016 10:05:38 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-If tony is ok fixing the beautification...
+> Please consider these second round of Renesas ARM based SoC DT fixes for v4.5.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt-fixes-for-v4.5,
+> which you have already pulled.
+> 
+> If this pull-request is too late for v4.5 then please consider it for v4.6.
 
-> Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
-> ---
->  arch/arm/mach-omap2/soc.h |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-> index 79ca3c3..83d3547 100644
-> --- a/arch/arm/mach-omap2/soc.h
-> +++ b/arch/arm/mach-omap2/soc.h
-> @@ -471,7 +471,6 @@ IS_OMAP_TYPE(3430, 0x3430)
->  #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
->  #define DRA752_REV_ES2_0	(DRA7XX_CLASS | (0x52 << 16) | (0x20 << 8))
->  #define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
-> -#define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
->  
->  void omap2xxx_check_revision(void);
->  void omap3xxx_check_revision(void);
-> 
-Acked-by: Nishanth Menon <nm@ti.com>
+I've added it to both the next/dt and the fixes branch now.
 
--- 
-Regards,
-Nishanth Menon
+At the moment it's the only bug fix we have queued up for 4.5,
+if anything else comes up it will definitely be in there,
+otherwise we'll decide by the end of the week.
+
+My feeling is that we'll likely send this.
+ 
+> HS-USB DT support was added to the porter board in v4.5-rc1.
+> Unfortunately it was developed against an early revision of the
+> board and newer revisions do not include the Maxim Integrated MAX3355 OTG
+> chip and thus there should not be a renesas,enable-gpio property.
+> 
+> It is my understanding at this time that the early-revision boards in
+> question have not been observed in the wild.
+
+ok. Thanks for the detailed background info.
+
+	Arnd
