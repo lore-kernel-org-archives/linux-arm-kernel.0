@@ -1,42 +1,63 @@
-From: jiri@resnulli.us (Jiri Pirko)
-Date: Wed, 2 Mar 2016 11:10:16 +0100
-Subject: [PATCH] net: mellanox: add DEVLINK dependencies
-In-Reply-To: <1456911665-1424389-1-git-send-email-arnd@arndb.de>
-References: <1456911665-1424389-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160302101016.GA2122@nanopsycho.orion>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 2 Mar 2016 11:16:41 +0100
+Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
+ amba_match()
+In-Reply-To: <20160217200828.GH19428@n2100.arm.linux.org.uk>
+References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
+ <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
+ <20160215175250.GJ10826@n2100.arm.linux.org.uk>
+ <56C426C4.7040907@samsung.com>
+ <20160217200828.GH19428@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFph8O+P9F124R859+OqY7B0YXCm=oOGxviyOo6tkNPQzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wed, Mar 02, 2016 at 10:40:54AM CET, arnd at arndb.de wrote:
->The new NET_DEVLINK infrastructure can be a loadable module, but the drivers
->using it might be built-in, which causes link errors like:
+On 17 February 2016 at 21:08, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Feb 17, 2016 at 08:52:36AM +0100, Marek Szyprowski wrote:
+>> Then the only solution right now I see is to get back to v1:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388199.html
+>> which at least handles correctly device registration when power domain
+>> driver is available.
 >
->drivers/net/built-in.o: In function `mlx4_load_one':
->:(.text+0x2fbfda): undefined reference to `devlink_port_register'
->:(.text+0x2fc084): undefined reference to `devlink_port_unregister'
->drivers/net/built-in.o: In function `mlxsw_sx_port_remove':
->:(.text+0x33a03a): undefined reference to `devlink_port_type_clear'
->:(.text+0x33a04e): undefined reference to `devlink_port_unregister'
+> ... and which has the ability to break platforms if the PM domain is
+> not already available.
 >
->There are multiple ways to avoid this:
->
->a) add 'depends on NET_DEVLINK || !NET_DEVLINK' dependencies
->   for each user
->b) use 'select NET_DEVLINK' from each driver that uses it
->   and hide the symbol in Kconfig.
->c) make NET_DEVLINK a 'bool' option so we don't have to
->   list it as a dependency, and rely on the APIs to be
->   stubbed out when it is disabled
->d) use IS_REACHABLE() rather than IS_ENABLED() to check for
->   NET_DEVLINK in include/net/devlink.h
->
->This implements a variation of approach a) by adding an
->intermediate symbol that drivers can depend on, and changes
->the three drivers using it.
+> What's wrong with the patch in the link above _combined_ with a patch
+> which addresses the concern I have with that patch: build a list of
+> the failed-to-register devices, and retry them later - maybe from a
+> late_initcall(), or a similar mechanism?
 
-Approach a) looks like the best. Thanks for taking care of this.
+This will improve the robustness of the device registration process,
+but I wonder if it's really worth the efforts of complicating the amba
+device registration code.
+
+The problem I see with such approach, is to know *when* shall we retry
+to register the devices.
+
+We will rely on the PM domain driver to be probed, as to have the
+corresponding OF genpd provider registered, else the device
+registration will continue to fail.
+Now, I don't think there are PM domain drivers as removable modules
+(yet), but in such cases a late_initcall won't help much.
 
 >
->Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> My view is the risk to existing systems is _too_ high to apply either
+> this patch, or the patch you link to above, and I refuse to play the
+> "lets apply it and see if we break anything" lottery with this.
 
-Acked-by: Jiri Pirko <jiri@mellanox.com>
+I agree!
+
+Although I think with some adjustments, perhaps we can move forward with v1?
+
+The adjustments I think is needed:
+Instead of propagating the error code from dev_pm_domain_attach(),
+let's print a debug message and continue the device registration.
+In that way, we shouldn't introduce regressions for cases where the OF
+genpd provider hasn't yet been registered, but the issue Marek is
+trying to solve for Exynos should be fixed.
+
+What do you think?
+
+Kind regards
+Uffe
