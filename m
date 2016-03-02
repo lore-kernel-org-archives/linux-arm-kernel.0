@@ -1,27 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Mar 2016 00:27:43 +0100
-Subject: [GIT PULL] NXP LPC32xx Platform Updates for v4.6 #1
-In-Reply-To: <56D76FAB.9090908@mleia.com>
-References: <56BBE6E6.4080802@mleia.com> <20160224213633.GF10126@localhost>
- <56D76FAB.9090908@mleia.com>
-Message-ID: <11608683.muXZLfFRbg@wuerfel>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 3 Mar 2016 00:28:29 +0100
+Subject: [PATCH v2] pwm: pwm-lpc18xx-sct: test clock rate to avoid
+ division by 0
+In-Reply-To: <1456959443-10032-1-git-send-email-wsa@the-dreams.de>
+References: <1456959443-10032-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAGhQ9Vw+JoRv2vtiJ8m4NMnnYtC8t3okbDN=3DAUQMj78YxArw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2016 00:56:43 Vladimir Zapolskiy wrote:
-> I would really appreciate, if this pull request is accepted for v4.6, if it
-> happens then most probably v4.7 will contain all needed irqchip fixes --
-> this pull request removes a duplicated timer driver, which in turn strictly
-> depends on a legacy platform clock driver (removed) and on hardware irq
-> numbering provided by a legacy irqchip driver (will be removed in v4.7
-> hopefully).
+Hi Wolfram,
 
-As far as I can tell, Olof merged the series into the next/cleanup
-branch on Feb 24, but did not make that clear enough in his reply.
+On 2 March 2016 at 23:57, Wolfram Sang <wsa@the-dreams.de> wrote:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>
+> The clk API may return 0 on clk_get_rate, so we should check the result before
+> using it as a divisor.
+>
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+>  drivers/pwm/pwm-lpc18xx-sct.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
+> index 9163085101bc94..9861fed4e67d04 100644
+> --- a/drivers/pwm/pwm-lpc18xx-sct.c
+> +++ b/drivers/pwm/pwm-lpc18xx-sct.c
+> @@ -360,6 +360,11 @@ static int lpc18xx_pwm_probe(struct platform_device *pdev)
+>         }
+>
+>         lpc18xx_pwm->clk_rate = clk_get_rate(lpc18xx_pwm->pwm_clk);
+> +       if (!lpc18xx_pwm->clk_rate) {
+> +               dev_err(&pdev->dev, "pwm clock has no frequency\n");
+> +               ret = -EINVAL;
+> +               goto disable_pwmclk;
+> +       }
 
-I don't see anything holding up your patches from going into 4.6,
-everything should be fine, let me know if there are any other
-problems here, and please check if the arm-soc/for-next branch
-works for you.
+Acked-by: Joachim Eastwood <manabian@gmail.com>
 
-	Arnd
+Thanks for fixing this.
+
+
+regards,
+Joachim Eastwood
