@@ -1,66 +1,46 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 2 Mar 2016 09:11:06 +0100
-Subject: [PATCH v5 2/4] mmc: meson: Add driver for the SD/MMC host found
- on Amlogic Meson SoCs
-In-Reply-To: <56D64C9A.3030004@suse.de>
-References: <1456596108-1406-1-git-send-email-carlo@caione.org>
- <1456596108-1406-3-git-send-email-carlo@caione.org>
- <56D64C9A.3030004@suse.de>
-Message-ID: <CAOQ7t2b0NBuBh913xGenUsdqu2KTfZ-cbkvEfbrhk0vdsQMBaQ@mail.gmail.com>
+From: Manish.Jaggi@caviumnetworks.com (Jaggi, Manish)
+Date: Wed, 2 Mar 2016 08:11:31 +0000
+Subject: [RFC v5 00/17] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
+References: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <BY1PR0701MB1594168E79366B507B7C8A16E1BC0@BY1PR0701MB1594.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2016 at 3:14 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hi Carlo,
->
-> Am 27.02.2016 um 19:01 schrieb Carlo Caione:
->> Add a driver for the SD/MMC host found on the Amlogic Meson SoCs. This
->> is an MMC controller which provides an interface between the application
->> processor and various memory cards. It supports the SD specification
->> v2.0 and the eMMC specification v4.41.
+
+
+>>From: Eric Auger <eric.auger@linaro.org>
+>>Sent: Tuesday, March 1, 2016 11:57 PM
+>>To: eric.auger at st.com; eric.auger at linaro.org; robin.murphy at arm.com; alex.williamson at redhat.com; will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de; >>jason at lakedaemon.net; marc.zyngier at arm.com; christoffer.dall at linaro.org; linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org
+>>Cc: suravee.suthikulpanit at amd.com; patches at linaro.org; linux-kernel at vger.kernel.org; Jaggi, Manish; Bharat.Bhushan at freescale.com; >>pranav.sawargaonkar at gmail.com; p.fedin at samsung.com; iommu at lists.linux-foundation.org
+>>Subject: [RFC v5 00/17] KVM PCIe/MSI passthrough on ARM/ARM64
+
+>>This series addresses KVM PCIe passthrough with MSI enabled on ARM/ARM64.
+>>It pursues the efforts done on [1], [2], [3]. It also aims at covering the
+>>same need on PowerPC platforms although the same kind of integration
+>>.should be carried out.
 >>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->
-> Enabling this driver on top of my v2 arm64 gxbb series, I get:
->
->   CC      drivers/mmc/host/meson-mmc.o
-> drivers/mmc/host/meson-mmc.c: In function 'meson_mmc_probe':
-> drivers/mmc/host/meson-mmc.c:471:12: error: implicit declaration of
-> function 'devm_pinctrl_get' [-Werror=implicit-function-declaration]
->   pinctrl = devm_pinctrl_get(&pdev->dev);
->             ^
-> drivers/mmc/host/meson-mmc.c:471:10: warning: assignment makes pointer
-> from integer without a cast [-Wint-conversion]
->   pinctrl = devm_pinctrl_get(&pdev->dev);
->           ^
-> cc1: some warnings being treated as errors
-> scripts/Makefile.build:258: recipe for target
-> 'drivers/mmc/host/meson-mmc.o' failed
-> make[3]: *** [drivers/mmc/host/meson-mmc.o] Error 1
-> scripts/Makefile.build:407: recipe for target 'drivers/mmc/host' failed
-> make[2]: *** [drivers/mmc/host] Error 2
-> scripts/Makefile.build:407: recipe for target 'drivers/mmc' failed
-> make[1]: *** [drivers/mmc] Error 2
-> Makefile:959: recipe for target 'drivers' failed
-> make: *** [drivers] Error 2
->
-> Either this is missing a Kconfig dependency on PINCTRL, or should be
-> using #ifdef CONFIG_PINCTRL or some other guard.
+[snip]
+>>- Not tested: ARM GICv3 ITS
 
-I think that we can actually drop the whole devm_pinctrl_get().
-I'll wait for some comments from Ulf before submitting a fix.
+[snip]
+>>QEMU Integration:
+>>[RFC v2 0/8] KVM PCI/MSI passthrough with mach-virt
+>>(http://lists.gnu.org/archive/html/qemu-arm/2016-01/msg00444.html)
+>>https://git.linaro.org/people/eric.auger/qemu.git/shortlog/refs/heads/v2.5.0-pci-passthrough-rfc-v2
 
-> For gxbb we could just ignore this in the hopes that Nicolas will have a
-> working pinctrl driver soon, but it might reappear for COMPILE_TEST.
+For gicv3 its, I believe, the below series for qemu and kernel is required for gicv3-its
 
-AFAIR from a discussion with Amlogic it seems that they totally
-changed the SD controller in the S905 so probably we will need a new
-driver for the gxbb. At this point I also wonder if it's not worthy it
-already to change the compatible for this driver to something more
-specific for Meson8 / Meson8b.
-Probably we will have some more news when the documentation will be available.
+[RFC PATCH v3 0/5] vITS support
+https://lists.gnu.org/archive/html/qemu-devel/2015-11/msg05197.html
 
-Thank you for testing this,
+and in kernel CONFIG_HAVE_KVM_MSI must be enabled so that qemu sees MSI capability KVM_CAP_SIGNAL_MSI
 
--- 
-Carlo Caione
+This has a dependency on gsi routing support
+KVM: arm/arm64: gsi routing support
+https://lkml.org/lkml/2015/6/29/290
+
+I had both the above series in 4.2 in my local 4.2 tree. 
+
+BR
+-Manish
