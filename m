@@ -1,51 +1,28 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 2 Mar 2016 23:44:02 +0100
-Subject: [PATCH 4/6] pwm: pwm-lpc18xx-sct: test clock rate to avoid
- division by 0
-In-Reply-To: <1456958018-7849-5-git-send-email-wsa@the-dreams.de>
-References: <1456958018-7849-1-git-send-email-wsa@the-dreams.de>
- <1456958018-7849-5-git-send-email-wsa@the-dreams.de>
-Message-ID: <CAGhQ9VzQLfhT4erDam_69-Zf4vp3gzKx+jbanXM8Ky+fmG=6EQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Mar 2016 23:45:32 +0100
+Subject: [GIT PULL v2] Qualcomm SoC Updates for 4.6
+In-Reply-To: <1456800223-29655-1-git-send-email-andy.gross@linaro.org>
+References: <1456800223-29655-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <5104383.iHbTzhTmfy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Monday 29 February 2016 20:43:43 Andy Gross wrote:
+> Qualcomm ARM Based SoC Updates for v4.6
+> 
+> * Add stubs for smem_state to fix build issues
+> * Fix module usage in SPM driver
+> * Add i2c and spi entries into QCOM MAINTAINERS entry
+> * Add SMD multi channel support
+> * Drop ARCH_MSM* configs and fixup clocksource support
+> * Add clks to QCOM MAINTAINERS
+> * Fix smp2p memset issue
 
-On 2 March 2016 at 23:33, Wolfram Sang <wsa@the-dreams.de> wrote:
-> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
->
-> The clk API may return 0 on clk_get_rate, so we should check the result before
-> using it as a divisor.
->
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
->
-> Should go individually via subsystem tree.
->
->  drivers/pwm/pwm-lpc18xx-sct.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
-> index 9163085101bc94..6487962c355c03 100644
-> --- a/drivers/pwm/pwm-lpc18xx-sct.c
-> +++ b/drivers/pwm/pwm-lpc18xx-sct.c
-> @@ -360,6 +360,8 @@ static int lpc18xx_pwm_probe(struct platform_device *pdev)
->         }
->
->         lpc18xx_pwm->clk_rate = clk_get_rate(lpc18xx_pwm->pwm_clk);
-> +       if (!lpc18xx_pwm->clk_rate)
-> +               return -EINVAL;
+I never really know how to categorize drivers/soc here. I was
+about to put it all into next/drivers, but you also have
+a few changes that normally go into next/soc.
 
-This needs to be:
-if (!lpc18xx_pwm->clk_rate) {
-    ret = -EINVAL;
-    goto disable_pwmclk;
-}
+If it's ok for you, could you respin this once more into
+two separate series to split out drivers/soc/*
 
-I would also prefer an explicit check against 0 here. ie.:
-'lpc18xx_pwm->clk_rate == 0'
-A dev_err() message would also be nice to have.
-
-
-regards,
-Joachim Eastwood
+	Arnd
