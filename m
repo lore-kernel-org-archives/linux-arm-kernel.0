@@ -1,64 +1,83 @@
-From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
-Date: Wed, 2 Mar 2016 07:29:04 +0000
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN FD support
-In-Reply-To: <56D59538.2060100@cogentembedded.com>
-References: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <56D59538.2060100@cogentembedded.com>
-Message-ID: <SG2PR06MB1038FBA247777C89F70E2633C3BC0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 2 Mar 2016 09:38:43 +0200
+Subject: [RFC PATCH] ARM: OMAP2+: Fix updating of sysconfig register
+In-Reply-To: <56D65FD4.4090206@ti.com>
+References: <1456832887-5312-1-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1603011703170.14948@utopia.booyaka.com>
+ <56D65FD4.4090206@ti.com>
+Message-ID: <56D69883.6070603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 03/02/2016 05:36 AM, Lokesh Vutla wrote:
+>
+>
+> On Tuesday 01 March 2016 10:33 PM, Paul Walmsley wrote:
+>> + Jon Hunter
+>>
+>> On Tue, 1 Mar 2016, Lokesh Vutla wrote:
+>>
+>>> commit 127500ccb766f ("ARM: OMAP2+: Only write the sysconfig on idle
+>>> when necessary") talks about verification of sysconfig cache value before
+>>> updating it, only during idle path. But the patch is adding the
+>>> verification in the enable path. So, adding the check in a proper place
+>>> as per the commit description.
+>>>
+>>> Not keeping this check during enable path as there is a chance of losing
+>>> context and it is safe to do on idle as the context of the register will
+>>> never be lost while the device is active.
+>
+> When the patch was originally posted[1], this check was in proper place
+> itself. Not sure what happened after that.
 
-> On 3/1/2016 1:04 PM, Ramesh Shanmugasundaram wrote:
-> 
-> > Adds CAN FD controller node for r8a7795.
-> >
-> > Note: CAN FD controller register base address specified in R-Car Gen3
-> > Hardware User Manual v0.5E is incorrect. The correct address is:
-> >
-> > CAN FD - 0xe66c0000
-> >
-> > Signed-off-by: Ramesh Shanmugasundaram
-> > <ramesh.shanmugasundaram@bp.renesas.com>
-> > ---
-> > Hi All,
-> >
-> >     This patch is based on linux-next (tag:next-20160225) with the
-> following
-> >     patches applied on top.
-> >
-> >     [PATCH v2] arm64: dts: r8a7795: Add CAN external clock support
-> >     [PATCH] arm64: dts: r8a7795: Add CAN support
-> >
-> >     The respective CAN subsystem changes are submitted separately here
-> > (https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg013
-> > 88.html)
-> >
-> > Thanks,
-> > Ramesh
-> > ---
-> >   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
-> >   1 file changed, 24 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > index a88f8d8..5049ba6 100644
-> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > @@ -553,6 +553,30 @@
-> >   			status = "disabled";
-> >   		};
-> >
-> > +		canfd: canfd at e66c0000 {
-> 
->     The node name should still be "can at e66c0000", I think.
+Looks like a merge conflict to me.
 
-Thanks for the review.
+The patch from Lokesh fixes it, so:
 
-The SoC has CAN controller too and hence I chose this node name to differentiate. A grep of canfd on sysfs would tell if the controller is enabled. The channels on "net" would still be named "canx".
+Acked-by: Tero Kristo <t-kristo@ti.com>
 
-I'll change it if you still feel "can at e66c0000" is more appropriate.
-
-Thanks,
-Ramesh
+>
+> [1] https://www.mail-archive.com/linux-omap%40vger.kernel.org/msg78032.html
+>
+> Thanks and regards,
+> Lokesh
+>
+>>>
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>>   arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
+>>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>>> index e9f65fe..71b3747 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>>> @@ -1416,9 +1416,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
+>>>   	    (sf & SYSC_HAS_CLOCKACTIVITY))
+>>>   		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
+>>>
+>>> -	/* If the cached value is the same as the new value, skip the write */
+>>> -	if (oh->_sysc_cache != v)
+>>> -		_write_sysconfig(v, oh);
+>>> +	_write_sysconfig(v, oh);
+>>>
+>>>   	/*
+>>>   	 * Set the autoidle bit only after setting the smartidle bit
+>>> @@ -1481,7 +1479,9 @@ static void _idle_sysc(struct omap_hwmod *oh)
+>>>   		_set_master_standbymode(oh, idlemode, &v);
+>>>   	}
+>>>
+>>> -	_write_sysconfig(v, oh);
+>>> +	/* If the cached value is the same as the new value, skip the write */
+>>> +	if (oh->_sysc_cache != v)
+>>> +		_write_sysconfig(v, oh);
+>>>   }
+>>>
+>>>   /**
+>>> --
+>>> 2.1.4
+>>>
+>>
+>>
+>> - Paul
+>>
