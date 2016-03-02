@@ -1,78 +1,64 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 01 Mar 2016 23:55:29 +0000
-Subject: [PATCH 4.4 312/342] xen/arm: correctly handle DMA mapping of compound
- pages
-In-Reply-To: <20160301234527.990448862@linuxfoundation.org>
-References: <20160301234527.990448862@linuxfoundation.org>
-Message-ID: <20160301234537.959099259@linuxfoundation.org>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Wed, 2 Mar 2016 00:03:04 +0000
+Subject: [PATCH 7/8] ARM64: dts: amlogic: Extend GXBaby GIC node
+In-Reply-To: <56D6264B.2090507@suse.de>
+References: <1456789465-2962-1-git-send-email-afaerber@suse.de>
+ <1456789465-2962-8-git-send-email-afaerber@suse.de>
+ <56D57673.8030702@arm.com> <56D57A7F.5020806@suse.de>
+ <56D58E88.2080700@arm.com> <56D6264B.2090507@suse.de>
+Message-ID: <56D62DB8.2080301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.4-stable review patch.  If anyone has any objections, please let me know.
+On 01/03/16 23:31, Andreas F?rber wrote:
+> Hi,
+> 
+> Am 01.03.2016 um 13:43 schrieb Andre Przywara:
+>> On 01/03/16 11:18, Andreas F?rber wrote:
+>>> Am 01.03.2016 um 12:01 schrieb Andre Przywara:
+>>>> On 29/02/16 23:44, Andreas F?rber wrote:
+>>>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>>>>> index 0ae089bd1806..5088ae3ff653 100644
+>>>>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>>>>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>>>>> @@ -117,7 +117,9 @@
+>>>>>  		gic: interrupt-controller at c4301000 {
+>>>>>  			compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>>>>
+>>>> I think "arm,gic-400" is the name to use here these days, especially for
+>>>> arm64.
+>>>
+>>> I took what /proc/device-tree showed on Android and verified that this
+>>> compatible is in use in mainline.
+>>
+>> Some vendor Android kernel is not a good reference for mainline work ;-)
+>> Better look at other DTs in arch/arm64/boot/dts.
+> 
+> Yes, that's what "in use in mainline" refers to:
+> 
+> $ git grep "cortex-a15-gic" -- arch/arm64/boot/dts/ | grep -v gic-400
+> arch/arm64/boot/dts/apm/apm-shadowcat.dtsi: compatible =
+> "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/apm/apm-storm.dtsi: compatible = "arm,cortex-a15-gic";
+> arch/arm64/boot/dts/arm/foundation-v8.dts: compatible =
+> "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts: compatible =
+> "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> arch/arm64/boot/dts/nvidia/tegra132.dtsi: compatible = "arm,cortex-a15-gic";
 
-------------------
+Which is mainly because those DTs predate the introduction of
+"arm,gic-400". Other DTs kept the cortex strings in additionally to stay
+compatible with older kernels.
 
-From: Ian Campbell <ian.campbell@citrix.com>
+>> You could keep "arm,cortex-a15-gic" in there if you care about
+>> compatibility with older (vendor) kernels, but I guess there are other
+>> issues which prevent this anyway, so you could drop this as well.
+> 
+> Yeah, I don't care about backwards compatibility with downstream
+> kernels, they use weird compatible strings with spaces anyway.
 
-commit 52ba0746b3b44c86aee121babf3b2fd9b8f84090 upstream.
+So please drop it and use only "arm,gic-400" to be in line with all the
+other more recent SoCs.
 
-Currently xen_dma_map_page concludes that DMA to anything other than
-the head page of a compound page must be foreign, since the PFN of the
-page is that of the head.
-
-Fix the check to instead consider the whole of a compound page to be
-local if the PFN of the head passes the 1:1 check.
-
-We can never see a compound page which is a mixture of foreign and
-local sub-pages.
-
-The comment already correctly described the intention, but fixup the
-spelling and some grammar.
-
-This fixes the various SSH protocol errors which we have been seeing
-on the cubietrucks in our automated test infrastructure.
-
-This has been broken since commit 3567258d281b ("xen/arm: use
-hypercall to flush caches in map_page"), which was in v3.19-rc1.
-
-NB arch/arm64/.../xen/page-coherent.h also includes this file.
-
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: xen-devel at lists.xenproject.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
-diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
-index 0375c8caa061..9408a994cc91 100644
---- a/arch/arm/include/asm/xen/page-coherent.h
-+++ b/arch/arm/include/asm/xen/page-coherent.h
-@@ -35,14 +35,21 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
- 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
- 	     enum dma_data_direction dir, struct dma_attrs *attrs)
- {
--	bool local = XEN_PFN_DOWN(dev_addr) == page_to_xen_pfn(page);
-+	unsigned long page_pfn = page_to_xen_pfn(page);
-+	unsigned long dev_pfn = XEN_PFN_DOWN(dev_addr);
-+	unsigned long compound_pages =
-+		(1<<compound_order(page)) * XEN_PFN_PER_PAGE;
-+	bool local = (page_pfn <= dev_pfn) &&
-+		(dev_pfn - page_pfn < compound_pages);
-+
- 	/*
--	 * Dom0 is mapped 1:1, while the Linux page can be spanned accross
--	 * multiple Xen page, it's not possible to have a mix of local and
--	 * foreign Xen page. So if the first xen_pfn == mfn the page is local
--	 * otherwise it's a foreign page grant-mapped in dom0. If the page is
--	 * local we can safely call the native dma_ops function, otherwise we
--	 * call the xen specific function.
-+	 * Dom0 is mapped 1:1, while the Linux page can span across
-+	 * multiple Xen pages, it's not possible for it to contain a
-+	 * mix of local and foreign Xen pages. So if the first xen_pfn
-+	 * == mfn the page is local otherwise it's a foreign page
-+	 * grant-mapped in dom0. If the page is local we can safely
-+	 * call the native dma_ops function, otherwise we call the xen
-+	 * specific function.
- 	 */
- 	if (local)
- 		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
+Thanks!
+Andre
