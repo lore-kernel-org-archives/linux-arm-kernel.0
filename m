@@ -1,47 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Mar 2016 01:38:48 +0000
-Subject: [PATCH 00/19] arm64 kexec kernel patches v13
-In-Reply-To: <1456881475.6738.18.camel@infradead.org>
-References: <cover.1452884156.git.geoff@infradead.org>
- <c7575f853ccc491bb0212e025aab1cc9@NASANEXM01H.na.qualcomm.com>
- <56D5D763.4030304@codeaurora.org>
- <1456881475.6738.18.camel@infradead.org>
-Message-ID: <20160302013848.GG14022@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 1 Mar 2016 17:43:40 -0800
+Subject: [GIT PULL] i.MX clock driver update for 4.6
+In-Reply-To: <20160229080607.GT22051@tiger>
+References: <20160229080607.GT22051@tiger>
+Message-ID: <20160302014340.GE24999@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2016 at 05:17:55PM -0800, Geoff Levand wrote:
-> On Tue, 2016-03-01 at 10:54 -0700, Azriel Samson wrote:
+On 02/29, Shawn Guo wrote:
+> Hi Mike, Stephen,
 > 
-> > We have been using the kexec/kdump patches on ARM64 and would like to
-> > use them from upstream.
-> > 
-> > Assuming these are not going to be in Linux-4.5, a rebased set on 
-> > Linux-4.5 would be very useful.
+> The following are the i.MX clock patches I queued for 4.6.  Please pull
+> and keep it stable, as I need to pull it into my DT branch to resolve
+> the dependency on those new clock IDs.
 > 
-> I'm waiting for one of two things to happen, either Marc Zyngier gives
-> an ack for the patch 'arm64: kvm: allows kvm cpu hotplug', or the arm64
-> maintainers decide they will accept my proposal to merge kexec with a
-> conditional in the Kconfig that only allows one of KVM or kexec to be
-> selected.
+> Thanks,
+> Shawn
+> 
+> 
+> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> 
+>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.6
+> 
+> for you to fetch changes up to f6c3aec2f7a218abec9e5c00353abc02224be49e:
+> 
+>   clk: imx: add kpp clock for i.MX6UL (2016-02-28 10:45:29 +0800)
 
-Depending on !KVM isn't even an option as far as I'm concerned. It basically
-makes this all dead code.
+Thanks. Pulled.
 
-As for awaiting an ack on the kvm hotplug patch, afaict, Akashi was going
-to address James's comments on the last posting [1].
-
-> The kexec patches have been in review for 20 months now, with only
-> minor changes in the past 15.  I don't expect much would be gained in
-> posting the kexec series again unless there is a chance they would be
-> merged.
-
-Why do you say that? v13 attracted lots of comments from a variety of
-reviewers, so the onus is on you to address that feedback and post a
-new version. Alternatively, declare that you no longer to intend to work
-on the series, and perhaps then somebody else can pick it up and finish
-the job.
-
-Will
-
-[1] http://lkml.kernel.org/r/56A873C0.6090406 at linaro.org
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
