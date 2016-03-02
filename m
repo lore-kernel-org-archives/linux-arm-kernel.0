@@ -1,50 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:59:04 +0100
-Subject: [PATCH 12/14] keyboard: snvs-pwrkey: use __maybe_unused to hide pm
- functions
-In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-13-git-send-email-arnd@arndb.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 2 Mar 2016 09:13:39 -0700
+Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
+ instead of queue_id
+In-Reply-To: <VI1PR0401MB18555F637F86F38461B3442BFFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18555F637F86F38461B3442BFFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+Message-ID: <56D71133.4000708@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SNVS power key driver has suspend/resume functions that
-are accessed using SIMPLE_DEV_PM_OPS, which hide the reference
-when CONFIG_PM_SLEEP is not set, resulting in a warning about
-unused functions:
+On 3/2/2016 8:16 AM, Fugang Duan wrote:
+> From: Troy Kisky <troy.kisky@boundarydevices.com>  Sent: Thursday, February 25, 2016 8:37 AM
+>> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
+>> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
+>> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+>> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
+>> johannes at sipsolutions.net; stillcompiling at gmail.com;
+>> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
+>> <troy.kisky@boundarydevices.com>
+>> Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
+>> instead of queue_id
+>>
+>> queue_id is the qid member of struct bufdesc_prop.
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> ---
+>>  drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
+>>  1 file changed, 6 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>> b/drivers/net/ethernet/freescale/fec_main.c
+>> index 9619b9e..c517194 100644
+>> --- a/drivers/net/ethernet/freescale/fec_main.c
+>> +++ b/drivers/net/ethernet/freescale/fec_main.c
+>> @@ -1156,25 +1156,18 @@ fec_enet_hwtstamp(struct fec_enet_private *fep,
+>> unsigned ts,
+>>  	hwtstamps->hwtstamp = ns_to_ktime(ns);  }
+>>
+>> -static void
+>> -fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+>> +static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
+>> +		    struct fec_enet_priv_tx_q *txq)
+>>  {
+>> -	struct	fec_enet_private *fep;
+>>  	struct bufdesc *bdp;
+>>  	unsigned short status;
+>>  	struct	sk_buff	*skb;
+>> -	struct fec_enet_priv_tx_q *txq;
+>>  	struct netdev_queue *nq;
+>>  	int	index = 0;
+>>  	int	entries_free;
+>>
+>> -	fep = netdev_priv(ndev);
+>> -
+>> -	queue_id = FEC_ENET_GET_QUQUE(queue_id);
+>> -
+>> -	txq = fep->tx_queue[queue_id];
+>>  	/* get next bdp of dirty_tx */
+>> -	nq = netdev_get_tx_queue(ndev, queue_id);
+>> +	nq = netdev_get_tx_queue(ndev, txq->bd.qid);
+>>  	bdp = txq->dirty_tx;
+>>
+>>  	/* get next bdp of dirty_tx */
+>> @@ -1268,11 +1261,13 @@ static void
+>>  fec_enet_tx(struct net_device *ndev)
+>>  {
+>>  	struct fec_enet_private *fep = netdev_priv(ndev);
+>> +	struct fec_enet_priv_tx_q *txq;
+>>  	u16 queue_id;
+>>  	/* First process class A queue, then Class B and Best Effort queue */
+>>  	for_each_set_bit(queue_id, &fep->work_tx, FEC_ENET_MAX_TX_QS)
+>> {
+>>  		clear_bit(queue_id, &fep->work_tx);
+>> -		fec_enet_tx_queue(ndev, queue_id);
+>> +		txq = fep->tx_queue[FEC_ENET_GET_QUQUE(queue_id)];
+>> +		fec_txq(ndev, fep, txq);
+>>  	}
+>>  	return;
+>>  }
+>> --
+>> 2.5.0
+> 
+> The patch should merge with patch#1.
+> 
 
-drivers/input/keyboard/snvs_pwrkey.c:183:12: error: 'imx_snvs_pwrkey_suspend' defined but not used [-Werror=unused-function]
-drivers/input/keyboard/snvs_pwrkey.c:194:12: error: 'imx_snvs_pwrkey_resume' defined but not used [-Werror=unused-function]
 
-This adds __maybe_unused annotations to let the compiler know
-it can silently drop the function definition.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/input/keyboard/snvs_pwrkey.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/input/keyboard/snvs_pwrkey.c b/drivers/input/keyboard/snvs_pwrkey.c
-index 9adf13a5864a..b0ffadeb208c 100644
---- a/drivers/input/keyboard/snvs_pwrkey.c
-+++ b/drivers/input/keyboard/snvs_pwrkey.c
-@@ -180,7 +180,7 @@ static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int imx_snvs_pwrkey_suspend(struct device *dev)
-+static int __maybe_unused imx_snvs_pwrkey_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
-@@ -191,7 +191,7 @@ static int imx_snvs_pwrkey_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int imx_snvs_pwrkey_resume(struct device *dev)
-+static int __maybe_unused imx_snvs_pwrkey_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
--- 
-2.7.0
+Why ?  That would only hide the change in patch #1.
