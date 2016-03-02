@@ -1,75 +1,162 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 2 Mar 2016 15:03:57 +0300
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN FD support
-In-Reply-To: <SG2PR06MB1038FBA247777C89F70E2633C3BC0@SG2PR06MB1038.apcprd06.prod.outlook.com>
-References: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <56D59538.2060100@cogentembedded.com>
- <SG2PR06MB1038FBA247777C89F70E2633C3BC0@SG2PR06MB1038.apcprd06.prod.outlook.com>
-Message-ID: <56D6D6AD.7080207@cogentembedded.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 2 Mar 2016 12:10:36 +0000
+Subject: [PATCH 2/5] arm64: efi: apply strict permissons for UEFI Runtime
+ Services regions
+In-Reply-To: <1456151158-25849-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1456151158-25849-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456151158-25849-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160302121036.GD2649@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, 22 Feb, at 03:25:55PM, Ard Biesheuvel wrote:
+> Recent UEFI versions expose permission attributes for runtime services
+> memory regions, either in the UEFI memory map or in the separate memory
+> attributes table. This allows the kernel to map these regions with
+> stricter permissions, rather than the RWX permissions that are used by
+> default. So wire this up in our mapping routine.
+> 
+> Note that in the absence of permission attributes, we still only map
+> regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
+> Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
+> type directly rather than on the absence of the EFI_MEMORY_WB attribute.
+> This is more correct, but is also required for compatibility with the
+> upcoming support for the Memory Attributes Table, which only carries
+> permission attributes, not memory type attributes.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 27 ++++++++++++++++----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index b6abc852f2a1..3364408c154f 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -24,15 +24,32 @@ int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+>  	/*
+>  	 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+>  	 * executable, everything else can be mapped with the XN bits
+> -	 * set.
+> +	 * set. Also take the new (optional) RO/XP bits into account.
+>  	 */
+> -	if ((md->attribute & EFI_MEMORY_WB) == 0)
+> +	if (md->type == EFI_MEMORY_MAPPED_IO)
+>  		prot_val = PROT_DEVICE_nGnRE;
+> -	else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+> -		 !PAGE_ALIGNED(md->phys_addr))
+> +	else if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
+> +			   "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
+> +		/*
+> +		 * If the region is not aligned to the page size of the OS, we
+> +		 * can not use strict permissions, since that would also affect
+> +		 * the mapping attributes of the adjacent regions.
+> +		 */
+>  		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
+> -	else
+> +	else if ((md->attribute & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
+> +		 (EFI_MEMORY_XP | EFI_MEMORY_RO))
+> +		/* R-- */
+> +		prot_val = pgprot_val(PAGE_KERNEL_RO);
+> +	else if (md->attribute & EFI_MEMORY_RO)
+> +		/* R-X */
+> +		prot_val = pgprot_val(PAGE_KERNEL_ROX);
+> +	else if (md->attribute & EFI_MEMORY_XP ||
+> +		 md->type != EFI_RUNTIME_SERVICES_CODE)
+> +		/* RW- */
+>  		prot_val = pgprot_val(PAGE_KERNEL);
+> +	else
+> +		/* RWX */
+> +		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
+>  
+>  	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+>  			   md->num_pages << EFI_PAGE_SHIFT,
 
-On 3/2/2016 10:29 AM, Ramesh Shanmugasundaram wrote:
+The actual logic looks fine but it seems like there's quite a lot
+going on in this function which is fairly difficult to decipher with
+the if/else if clauses.
 
->>> Adds CAN FD controller node for r8a7795.
->>>
->>> Note: CAN FD controller register base address specified in R-Car Gen3
->>> Hardware User Manual v0.5E is incorrect. The correct address is:
->>>
->>> CAN FD - 0xe66c0000
->>>
->>> Signed-off-by: Ramesh Shanmugasundaram
->>> <ramesh.shanmugasundaram@bp.renesas.com>
->>> ---
->>> Hi All,
->>>
->>>      This patch is based on linux-next (tag:next-20160225) with the
->> following
->>>      patches applied on top.
->>>
->>>      [PATCH v2] arm64: dts: r8a7795: Add CAN external clock support
->>>      [PATCH] arm64: dts: r8a7795: Add CAN support
->>>
->>>      The respective CAN subsystem changes are submitted separately here
->>> (https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg013
->>> 88.html)
->>>
->>> Thanks,
->>> Ramesh
->>> ---
->>>    arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
->>>    1 file changed, 24 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> index a88f8d8..5049ba6 100644
->>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>> @@ -553,6 +553,30 @@
->>>    			status = "disabled";
->>>    		};
->>>
->>> +		canfd: canfd at e66c0000 {
->>
->>      The node name should still be "can at e66c0000", I think.
->
-> Thanks for the review.
->
-> The SoC has CAN controller too
+Would you be open to splitting this out a little? It's just a
+suggestion, but maybe something like this,
 
-    Yes, I figured. BTW, is the CAN-FD identical to the older CAN on the 
-hardware level? I haven't see you posting the CAN-FD driver yet...
+---
 
-> and hence I chose this node name to differentiate. A grep of canfd on sysfs would tell if the controller is enabled. The channels on "net" would still be named "canx".
->
-> I'll change it if you still feel "can at e66c0000" is more appropriate.
-
-    It is -- the node names should be generic and ePAPR even has the "can" 
-name listed explicitly in the section 2.2.2.
-
-> Thanks,
-> Ramesh
-
-MBR, Sergei
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 3364408c154f..33a6da160a50 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -17,39 +17,48 @@
+ 
+ #include <asm/efi.h>
+ 
+-int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
++/*
++ * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
++ * executable, everything else can be mapped with the XN bits
++ * set. Also take the new (optional) RO/XP bits into account.
++ */
++static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
+ {
+-	pteval_t prot_val;
++	u64 attr = md->attribute;
++	u32 type = md->type;
+ 
+-	/*
+-	 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+-	 * executable, everything else can be mapped with the XN bits
+-	 * set. Also take the new (optional) RO/XP bits into account.
+-	 */
+-	if (md->type == EFI_MEMORY_MAPPED_IO)
+-		prot_val = PROT_DEVICE_nGnRE;
+-	else if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
+-			   "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
++	if (type == EFI_MEMORY_MAPPED_IO)
++		return PROT_DEVICE_nGnRE;
++
++	if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
++		      "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
+ 		/*
+ 		 * If the region is not aligned to the page size of the OS, we
+ 		 * can not use strict permissions, since that would also affect
+ 		 * the mapping attributes of the adjacent regions.
+ 		 */
+-		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
+-	else if ((md->attribute & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
+-		 (EFI_MEMORY_XP | EFI_MEMORY_RO))
+-		/* R-- */
+-		prot_val = pgprot_val(PAGE_KERNEL_RO);
+-	else if (md->attribute & EFI_MEMORY_RO)
+-		/* R-X */
+-		prot_val = pgprot_val(PAGE_KERNEL_ROX);
+-	else if (md->attribute & EFI_MEMORY_XP ||
+-		 md->type != EFI_RUNTIME_SERVICES_CODE)
+-		/* RW- */
+-		prot_val = pgprot_val(PAGE_KERNEL);
+-	else
+-		/* RWX */
+-		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
++		return pgprot_val(PAGE_KERNEL_EXEC);
++
++	/* R-- */
++	if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
++	    (EFI_MEMORY_XP | EFI_MEMORY_RO))
++		return pgprot_val(PAGE_KERNEL_RO);
++
++	/* R-X */
++	if (attr & EFI_MEMORY_RO)
++		return pgprot_val(PAGE_KERNEL_ROX);
++
++	/* RW- */
++	if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
++		return pgprot_val(PAGE_KERNEL);
++
++	/* RWX */
++	return pgprot_val(PAGE_KERNEL_EXEC);
++}
++
++int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
++{
++	pteval_t prot_val = create_mapping_protection(md);
+ 
+ 	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+ 			   md->num_pages << EFI_PAGE_SHIFT,
