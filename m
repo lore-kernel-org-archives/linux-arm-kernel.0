@@ -1,67 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  2 Mar 2016 18:11:52 +0100
-Subject: [PATCH 3/3] arm64: kaslr: increase randomization granularity
-In-Reply-To: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1456938712-11089-4-git-send-email-ard.biesheuvel@linaro.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 2 Mar 2016 09:12:38 -0800
+Subject: [PATCH 12/14] keyboard: snvs-pwrkey: use __maybe_unused to hide
+ pm functions
+In-Reply-To: <AMSPR04MB263BDF6CE19C8B5432ECAE588BC0@AMSPR04MB263.eurprd04.prod.outlook.com>
+References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+ <1456934350-1389172-13-git-send-email-arnd@arndb.de>
+ <AMSPR04MB263BDF6CE19C8B5432ECAE588BC0@AMSPR04MB263.eurprd04.prod.outlook.com>
+Message-ID: <20160302171238.GA4318@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, our KASLR implementation randomizes the placement of the core
-kernel at 2 MB granularity. This is based on the arm64 kernel boot
-protocol, which mandates that the kernel is loaded TEXT_OFFSET bytes above
-a 2 MB aligned base address. This requirement is a result of the fact that
-the block size used by the early mapping code may be 2 MB at the most (for
-a 4 KB granule kernel)
+On Wed, Mar 02, 2016 at 04:04:46PM +0000, Frank Li wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Wednesday, March 02, 2016 9:59 AM
+> > To: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; Arnd Bergmann <arnd@arndb.de>;
+> > Shawn Guo <shawnguo@kernel.org>; b38343 at freescale.com; Javier
+> > Martinez Canillas <javier@osg.samsung.com>; Frank Li
+> > <Frank.Li@freescale.com>; linux-input at vger.kernel.org; linux-
+> > kernel at vger.kernel.org
+> > Subject: [PATCH 12/14] keyboard: snvs-pwrkey: use __maybe_unused to hide
+> > pm functions
+> > 
+> > The SNVS power key driver has suspend/resume functions that are accessed
+> > using SIMPLE_DEV_PM_OPS, which hide the reference when
+> > CONFIG_PM_SLEEP is not set, resulting in a warning about unused functions:
+> > 
+> > drivers/input/keyboard/snvs_pwrkey.c:183:12: error:
+> > 'imx_snvs_pwrkey_suspend' defined but not used [-Werror=unused-function]
+> > drivers/input/keyboard/snvs_pwrkey.c:194:12: error:
+> > 'imx_snvs_pwrkey_resume' defined but not used [-Werror=unused-function]
+> > 
+> > This adds __maybe_unused annotations to let the compiler know it can
+> > silently drop the function definition.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Acked-by: Frank Li <Frank.Li@nxp.com>
 
-But we can do better than that: since a KASLR kernel needs to be relocated
-in any case, we can tolerate a physical misalignment as long as the virtual
-misalignment is equal in size, and code to deal with this is already in
-place.
+Applied, thank you.
 
-The actual minimal alignment of the core kernel is either PAGE_SIZE or
-THREAD_SIZE, whichever is greater. The former is obvious, but the latter
-is due to the fact that the init stack is expected to live at an offset
-which is a round multiple of its size.
+> 
+> > ---
+> >  drivers/input/keyboard/snvs_pwrkey.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/input/keyboard/snvs_pwrkey.c
+> > b/drivers/input/keyboard/snvs_pwrkey.c
+> > index 9adf13a5864a..b0ffadeb208c 100644
+> > --- a/drivers/input/keyboard/snvs_pwrkey.c
+> > +++ b/drivers/input/keyboard/snvs_pwrkey.c
+> > @@ -180,7 +180,7 @@ static int imx_snvs_pwrkey_probe(struct
+> > platform_device *pdev)
+> >  	return 0;
+> >  }
+> > 
+> > -static int imx_snvs_pwrkey_suspend(struct device *dev)
+> > +static int __maybe_unused imx_snvs_pwrkey_suspend(struct device *dev)
+> >  {
+> >  	struct platform_device *pdev = to_platform_device(dev);
+> >  	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev); @@ -
+> > 191,7 +191,7 @@ static int imx_snvs_pwrkey_suspend(struct device *dev)
+> >  	return 0;
+> >  }
+> > 
+> > -static int imx_snvs_pwrkey_resume(struct device *dev)
+> > +static int __maybe_unused imx_snvs_pwrkey_resume(struct device *dev)
+> >  {
+> >  	struct platform_device *pdev = to_platform_device(dev);
+> >  	struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
+> > --
+> > 2.7.0
+> 
 
-The higher granularity adds between 5 and 7 bits of entropy, depending on
-page size.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/arm64-stub.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index e0e6b74fef8f..84584e7847df 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -61,15 +61,23 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && phys_seed != 0) {
- 		/*
-+		 * Produce a displacement in the interval [0, MIN_KIMG_ALIGN)
-+		 * that is a multiple of the actual minimal kernel alignment
-+		 * (either PAGE_SIZE or THREAD_SIZE, whichever is greater)
-+		 */
-+		const u32 offset = (phys_seed >> 32) & (MIN_KIMG_ALIGN - 1) &
-+				   ~(max_t(u32, PAGE_SIZE, THREAD_SIZE) - 1);
-+
-+		/*
- 		 * If KASLR is enabled, and we have some randomness available,
- 		 * locate the kernel at a randomized offset in physical memory.
- 		 */
--		*reserve_size = kernel_memsize + TEXT_OFFSET;
-+		*reserve_size = kernel_memsize + offset;
- 		status = efi_random_alloc(sys_table_arg, *reserve_size,
- 					  MIN_KIMG_ALIGN, reserve_addr,
--					  phys_seed);
-+					  (u32)phys_seed);
- 
--		*image_addr = *reserve_addr + TEXT_OFFSET;
-+		*image_addr = *reserve_addr + offset;
- 	} else {
- 		/*
- 		 * Else, try a straight allocation at the preferred offset.
 -- 
-2.5.0
+Dmitry
