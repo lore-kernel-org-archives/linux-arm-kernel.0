@@ -1,64 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Mar 2016 15:55:55 +0000
-Subject: [PATCH] arm: mm: Fix definition of pmd_mknotpresent
-In-Reply-To: <20160302151152.GA94701@black.fi.intel.com>
-References: <1456880580-22311-1-git-send-email-steve.capper@arm.com>
- <20160302151152.GA94701@black.fi.intel.com>
-Message-ID: <20160302155554.GF7637@arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 2 Mar 2016 10:58:09 -0500 (EST)
+Subject: [PATCH 1/6] usb: host: unhide suspend/resume declarations
+In-Reply-To: <1456932255-71725-2-git-send-email-arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1603021057530.1438-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 06:11:52PM +0300, Kirill A. Shutemov wrote:
-> On Wed, Mar 02, 2016 at 01:03:00AM +0000, Steve Capper wrote:
-> > Currently pmd_mknotpresent will use a zero entry to respresent an
-> > invalidated pmd.
-> > 
-> > Unfortunately this definition clashes with pmd_none, thus it is
-> > possible for a race condition to occur if zap_pmd_range sees pmd_none
-> > whilst __split_huge_pmd_locked is running too with pmdp_invalidate
-> > just called.
-> > 
-> > This patch fixes the race condition by modifying pmd_mknotpresent to
-> > create non-zero faulting entries (as is done in other architectures),
-> > removing the ambiguity with pmd_none.
-> > 
-> > Fixes: 8d9625070073 ("ARM: mm: Transparent huge page support for LPAE systems.")
-> > Reported-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> > Signed-off-by: Steve Capper <steve.capper@arm.com>
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > ---
-> > 
-> > This patch addresses an issue discussed at:
-> > http://lkml.iu.edu/hypermail/linux/kernel/1602.3/01846.html
-> > 
-> > ---
-> >  arch/arm/include/asm/pgtable-3level.h | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> > index dc46398..451b6e7 100644
-> > --- a/arch/arm/include/asm/pgtable-3level.h
-> > +++ b/arch/arm/include/asm/pgtable-3level.h
-> > @@ -249,10 +249,10 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
-> >  #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
-> >  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
-> >  
-> > -/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
-> > +/* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
-> >  static inline pmd_t pmd_mknotpresent(pmd_t pmd)
-> >  {
-> > -	return __pmd(0);
-> > +	return __pmd(pmd_val(pmd) & ~PMD_TYPE_MASK);
-> 
-> I'm confused. Wouldn't it still be present?
-> 
-> arch/arm/include/asm/pgtable.h:#define pmd_present(pmd) (pmd_val(pmd))
-> 
-> Shouldn't pmd_present() be re-defined as (pmd_val(pmd) & PMD_TYPE_MASK) or
-> something?
+On Wed, 2 Mar 2016, Arnd Bergmann wrote:
 
-Hmm, we have ths same issue on arm64 in that case. Do we also need to
-handle PROT_NONE for pmds?
+> There is no need to hide function declarations, and making
+> these visible to the SoC specific host drivers lets us
+> use __maybe_unused and IS_ENABLED() checks to control
+> their use, rather than having to use #ifdef to hide all
+> callers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/usb/host/ehci.h | 2 --
+>  drivers/usb/host/ohci.h | 2 --
+>  2 files changed, 4 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+> index 2ddf35203c05..3f3b74aeca97 100644
+> --- a/drivers/usb/host/ehci.h
+> +++ b/drivers/usb/host/ehci.h
+> @@ -888,12 +888,10 @@ extern int	ehci_handshake(struct ehci_hcd *ehci, void __iomem *ptr,
+>  				u32 mask, u32 done, int usec);
+>  extern int	ehci_reset(struct ehci_hcd *ehci);
+>  
+> -#ifdef CONFIG_PM
+>  extern int	ehci_suspend(struct usb_hcd *hcd, bool do_wakeup);
+>  extern int	ehci_resume(struct usb_hcd *hcd, bool force_reset);
+>  extern void	ehci_adjust_port_wakeup_flags(struct ehci_hcd *ehci,
+>  			bool suspending, bool do_wakeup);
+> -#endif	/* CONFIG_PM */
+>  
+>  extern int	ehci_hub_control(struct usb_hcd	*hcd, u16 typeReq, u16 wValue,
+>  				 u16 wIndex, char *buf, u16 wLength);
+> diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
+> index bc462288cfb0..37f1725e7a46 100644
+> --- a/drivers/usb/host/ohci.h
+> +++ b/drivers/usb/host/ohci.h
+> @@ -735,10 +735,8 @@ extern void	ohci_init_driver(struct hc_driver *drv,
+>  				const struct ohci_driver_overrides *over);
+>  extern int	ohci_restart(struct ohci_hcd *ohci);
+>  extern int	ohci_setup(struct usb_hcd *hcd);
+> -#ifdef CONFIG_PM
+>  extern int	ohci_suspend(struct usb_hcd *hcd, bool do_wakeup);
+>  extern int	ohci_resume(struct usb_hcd *hcd, bool hibernated);
+> -#endif
+>  extern int	ohci_hub_control(struct usb_hcd	*hcd, u16 typeReq, u16 wValue,
+>  				 u16 wIndex, char *buf, u16 wLength);
+>  extern int	ohci_hub_status_data(struct usb_hcd *hcd, char *buf);
 
-Will
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
