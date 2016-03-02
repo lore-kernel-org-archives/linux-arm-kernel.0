@@ -1,24 +1,64 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 2 Mar 2016 18:03:28 +0530
-Subject: [PATCH 00/19] arm64 kexec kernel patches v13
-In-Reply-To: <56D5D763.4030304@codeaurora.org>
-References: <cover.1452884156.git.geoff@infradead.org>
- <c7575f853ccc491bb0212e025aab1cc9@NASANEXM01H.na.qualcomm.com>
- <56D5D763.4030304@codeaurora.org>
-Message-ID: <20160302123328.GB19241@dhcppc3.redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Mar 2016 12:47:24 +0000
+Subject: [PATCHv2] arm64: kasan: clear stale stack poison
+In-Reply-To: <20160302114833.GA11670@leverpostej>
+References: <1456862465-31505-1-git-send-email-mark.rutland@arm.com>
+ <20160302105620.GB25547@red-moon>
+ <20160302114833.GA11670@leverpostej>
+Message-ID: <20160302124723.GA11086@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2016:10:54:43 AM, Azriel Samson wrote:
-> We have been using the kexec/kdump patches on ARM64 and would like to use
-> them from upstream.
+On Wed, Mar 02, 2016 at 11:48:34AM +0000, Mark Rutland wrote:
+> On Wed, Mar 02, 2016 at 10:56:20AM +0000, Lorenzo Pieralisi wrote:
+> > On Tue, Mar 01, 2016 at 08:01:05PM +0000, Mark Rutland wrote:
+> > 
+> > [...]
+> > 
+> > > diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
+> > > index 2774fa3..6f00b76 100644
+> > > --- a/arch/arm64/include/asm/kasan.h
+> > > +++ b/arch/arm64/include/asm/kasan.h
+> > > @@ -1,10 +1,30 @@
+> > >  #ifndef __ASM_KASAN_H
+> > >  #define __ASM_KASAN_H
+> > >  
+> > > -#ifndef __ASSEMBLY__
+> > > -
+> > > +#ifndef LINKER_SCRIPT
+> > >  #ifdef CONFIG_KASAN
+> > >  
+> > > +#ifdef __ASSEMBLY__
+> > > +
+> > > +#include <asm/asm-offsets.h>
+> > > +#include <asm/thread_info.h>
+> > > +
+> > > +	/*
+> > > +	 * Remove stale shadow posion for the stack left over from a prior
+> > > +	 * hot-unplug or idle exit, from the lowest stack address in the
+> > > +	 * thread_union up to the covering up to the current stack pointer.
+> > > +	 * Shadow poison above this is preserved.
+> > > +	 */
+> > > +	.macro kasan_unpoison_stack
+> > > +	mov	x1, sp
+> > > +	and	x0, x1, #~(THREAD_SIZE - 1)
+> > 
+> > I suspect you did not use sp_el0 on purpose here (that contains a
+> > pointer to thread_info), just asking.
 > 
-> Assuming these are not going to be in Linux-4.5, a rebased set on Linux-4.5
-> would be very useful.
+> I worked on the assumption that the arithmetic was likely to be faster
+> than a system register access, but I do not have numbers to back that
+> up.
+> 
+> I'm happy to use sp_el0 if that's preferrable.
 
-If you just want rebased set then you may take it from my branch, until next
-version is released.
+Since we need sp anyway, it is probably faster. But, I think the current
+patch is more to the point - clearing from the bottom of the current
+stack up to the current sp, we don't need any assumption about sp_el0 (I
+guess we never call cpu_suspend() on an IRQ stack, though I'm not 100%
+sure).
 
-https://github.com/pratyushanand/linux.git : kexec/upstream_arm64_devel
+I don't think Will wants to send this as a fix for 4.5, probably not
+urgent but I'll let him decide. In any case:
 
-~Pratyush
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
