@@ -1,56 +1,41 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 Mar 2016 12:26:34 -0600
-Subject: [PATCH v3 5/5] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <1456439796-28546-6-git-send-email-fcooper@ti.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-6-git-send-email-fcooper@ti.com>
-Message-ID: <20160302182634.GA26055@rob-hp-laptop>
+Date: Wed, 2 Mar 2016 12:29:52 -0600
+Subject: [PATCH v6 01/11] drm/hisilicon: Add device tree binding for
+ hi6220 display subsystem
+In-Reply-To: <1456476028-36880-2-git-send-email-xinliang.liu@linaro.org>
+References: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
+ <1456476028-36880-2-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <20160302182952.GA1184@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 04:36:36PM -0600, Franklin S Cooper Jr wrote:
-> From: Vignesh R <vigneshr@ti.com>
+On Fri, Feb 26, 2016 at 04:40:18PM +0800, Xinliang Liu wrote:
+> Add ADE display controller binding doc.
+> Add DesignWare DSI Host Controller v1.20a binding doc.
 > 
-> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
-> for dt bindings.
+> v6:
+> - Cleanup values part of reg and clocks properties.
+> - Change "pclk_dsi" clock name to "pclk".
+> v5:
+> - Remove endpoint unit address of dsi output port.
+> - Add "hisilicon,noc-syscon" property for ADE NOC QoS syscon.
+> - Add "resets" property for ADE reset.
+> v4:
+> - Describe more specific of clocks and ports.
+> - Fix indentation.
+> v3:
+> - Make ade as the drm master node.
+> - Use assigned-clocks to set clock rate.
+> - Use ports to connect display relavant nodes.
+> v2:
+> - Move dt binding docs to bindings/display/hisilicon directory.
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
 > ---
-> Version 3 changes:
-> None
-> 
->  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  8 +++
->  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 17 +++++-
->  arch/arm/boot/dts/dra7.dtsi                        | 64 ++++++++++++++++++++++
->  3 files changed, 88 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-> index 9c100b2..25d91ae 100644
-> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-> @@ -4,6 +4,7 @@ Required properties:
->  - compatible: Must be "ti,<soc>-ehrpwm".
->    for am33xx - compatible = "ti,am33xx-ehrpwm";
->    for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-> +  for dra7xx - compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
+>  .../bindings/display/hisilicon/dw-dsi.txt          | 72 ++++++++++++++++++++++
+>  .../bindings/display/hisilicon/hisi-ade.txt        | 64 +++++++++++++++++++
+>  2 files changed, 136 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
 
-We're starting to push back on wildcards in compatible strings. I guess 
-this is okay...
-
->  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
->    the cells format. The only third cell flag supported by this binding is
->    PWM_POLARITY_INVERTED.
-> @@ -27,3 +28,10 @@ ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
->  	#pwm-cells = <3>;
->  	reg = <0x300000 0x2000>;
->  };
-> +
-> +ehrpwm0: ehrpwm at 0 { /* EHRPWM on dra7xx */
-
-Should be pwm at 48440200
-
-> +	compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
-> +	#pwm-cells = <3>;
-> +	reg = <0x48440200 0x80>;
-> +	ti,hwmods = "ehrpwm0";
-> +};
+Acked-by: Rob Herring <robh@kernel.org>
