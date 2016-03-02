@@ -1,58 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  2 Mar 2016 09:27:29 +0000
-Subject: [PATCH] arm/arm64: KVM: Fix ioctl error handling
-In-Reply-To: <1456910849-16049-1-git-send-email-marc.zyngier@arm.com>
-References: <1456910849-16049-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1456910849-16049-2-git-send-email-marc.zyngier@arm.com>
+From: schwab@linux-m68k.org (Andreas Schwab)
+Date: Wed, 02 Mar 2016 10:28:40 +0100
+Subject: [PATCH 1/6] rtc: generic: allow building on all architectures
+In-Reply-To: <CAMuHMdW5+jZ1n9WnCwBrGSGjUa8ziNTTqf-H15EFTQC_iwnw+Q@mail.gmail.com>
+ (Geert Uytterhoeven's message of "Wed, 2 Mar 2016 09:57:27 +0100")
+References: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
+ <1456851608-3374907-2-git-send-email-arnd@arndb.de>
+ <CAMuHMdW5+jZ1n9WnCwBrGSGjUa8ziNTTqf-H15EFTQC_iwnw+Q@mail.gmail.com>
+Message-ID: <mvmwpplns8n.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Michael S. Tsirkin" <mst@redhat.com>
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-Calling return copy_to_user(...) in an ioctl will not
-do the right thing if there's a pagefault:
-copy_to_user returns the number of bytes not copied
-in this case.
+>> +#else
+>> +#define generic_rtc_ops *(struct rtc_class_ops*)NULL
+>> +#endif
+>>
+>>  static int __init generic_rtc_probe(struct platform_device *dev)
+>>  {
+>>         struct rtc_device *rtc;
+>> +       const struct rtc_class_ops *ops;
+>> +
+>> +       ops = dev_get_platdata(&dev->dev);
+>> +       if (!ops)
+>> +               ops = &generic_rtc_ops;
+>
+> I hope no compiler version treats "&*(struct rtc_class_ops*)NULL" as
+> undefined behavior?
 
-Fix up kvm to do
-	return copy_to_user(...)) ?  -EFAULT : 0;
+Yes, that is guaranteed, the operations cancel each other (6.5.3.2#3: If
+the operand is the result of a unary * operator, neither that operator
+nor the & operator is evaluated and the result is as if both were
+omitted).
 
-everywhere.
+Andreas.
 
-Cc: stable at vger.kernel.org
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/guest.c   | 2 +-
- arch/arm64/kvm/guest.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 5fa69d7..99361f1 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -161,7 +161,7 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	u64 val;
- 
- 	val = kvm_arm_timer_get_reg(vcpu, reg->id);
--	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
-+	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
- }
- 
- static unsigned long num_core_regs(void)
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index fcb7788..9e54ad7 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -194,7 +194,7 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	u64 val;
- 
- 	val = kvm_arm_timer_get_reg(vcpu, reg->id);
--	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
-+	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
- }
- 
- /**
 -- 
-2.1.4
+Andreas Schwab, schwab at linux-m68k.org
+GPG Key fingerprint = 58CA 54C7 6D53 942B 1756  01D3 44D5 214B 8276 4ED5
+"And now for something completely different."
