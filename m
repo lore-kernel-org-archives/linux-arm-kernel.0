@@ -1,34 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 2 Mar 2016 11:48:43 +0100
-Subject: [PATCH v10 0/5] MT8173 IOMMU SUPPORT
-In-Reply-To: <20160226110633.GE22747@8bytes.org>
-References: <1456161651-6136-1-git-send-email-yong.wu@mediatek.com>
- <20160225155007.GA19092@8bytes.org> <1456476955.3383.21.camel@pengutronix.de>
- <20160226110633.GE22747@8bytes.org>
-Message-ID: <56D6C50B.3040108@gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 2 Mar 2016 11:52:54 +0100
+Subject: [GIT PULL] STM32 SoC updates for v4.6 #2
+Message-ID: <56D6C606.7070107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Hi Olof, Arnd and Kevin,
 
-On 26/02/16 12:06, Joerg Roedel wrote:
-> Hi Philipp,
->
-> On Fri, Feb 26, 2016 at 09:55:55AM +0100, Philipp Zabel wrote:
->> Do you have a stable branch that I could base the mediatek-drm patches
->> on and that I may include in a pull request to be merged via drm-next?
->
-> You can base it on the arm/mediatek branch of the iommu tree. I'll push
-> it out in the next minutes.
->
+Please consider this second round of STM32 SoC updates for v4.6:
 
-I realized that Joerg accidentally merged the dts parts as well through 
-his branch.
+The following changes since commit f64e980450027e15dce5e9ec4ee19bab98aee4c5:
 
-As expected this patches conflict when merging the arm-soc tree.
+   ARM: mach-stm32: Select pinctrl (2016-01-27 19:45:57 +0100)
 
-Shall Joerg drops the patches and you take it through your branch, or
-I queue them for the next release cycle?
+are available in the git repository at:
 
-Regards,
-Matthias
+   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git 
+tags/stm32-soc-for-v4.6-2
+
+for you to fetch changes up to 6391503bbf4508ca97e9806b5347d3fd5d3c8c3c:
+
+   ARM: stm32: Identify a new SoC - STM32F469 (2016-02-17 17:30:44 +0100)
+
+----------------------------------------------------------------
+Highlights:
+-----------
+  - Add a new stm32f469 SoC
+
+----------------------------------------------------------------
+Lee Jones (1):
+       ARM: stm32: Identify a new SoC - STM32F469
+
+  arch/arm/mach-stm32/board-dt.c | 1 +
+  1 file changed, 1 insertion(+)
