@@ -1,44 +1,31 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 2 Mar 2016 10:22:39 +0000
-Subject: [PATCH v2 8/8] arm64: kvm: Check support for AArch32 for 32bit
- guests
-In-Reply-To: <56D6AD72.8010108@arm.com>
-References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
- <1456393968-17386-9-git-send-email-suzuki.poulose@arm.com>
- <56D6AD72.8010108@arm.com>
-Message-ID: <56D6BEEF.3000208@arm.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 2 Mar 2016 10:23:49 +0000
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <20160302011619.GA3192@dhcp-128-65.nay.redhat.com>
+References: <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <20160218191624.GA1515@redhat.com>
+ <20160226144114.GA7475@codeblueprint.co.uk>
+ <20160301233040.GA31476@codeblueprint.co.uk>
+ <20160302011619.GA3192@dhcp-128-65.nay.redhat.com>
+Message-ID: <20160302102349.GA2649@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/16 09:08, Marc Zyngier wrote:
-> On 25/02/16 09:52, Suzuki K Poulose wrote:
+On Wed, 02 Mar, at 09:16:19AM, Dave Young wrote:
+> 
+> Matt, thanks. One question is for the acpi patches you sent before, do you
+> think they are still necessary as a fix for the bgrt problem and coexist
+> with the "reserve useful boot services" proposal?
 
->> I really wanted to pass kvm_vcpu down to the helpers. But then, I can't
->> define the arch specific helper in asm/kvm_host.h due to lack of kvm_vcpu's
->> definition yet:
->>
->>   In file included from include/linux/kvm_host.h:35:0,
->>                    from arch/arm64/kernel/asm-offsets.c:24:
->>   ./arch/arm64/include/asm/kvm_host.h: In function ?kvm_arch_vcpu_validate_features?:
->>   ./arch/arm64/include/asm/kvm_host.h:344:48: error: dereferencing pointer to incomplete type
->>     return  !test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features) ||
->
-> Why don't you just have the prototype in kvm_host.h, and move the actual
-> implementation to something like guest.c? But I think there is a better
-> approach, see below.
+No, the previous ACPI patches I sent can be thrown in the bin if we go
+with the approach outlined in this email.
 
-I thought it would better be a static inline. But, the GCC can do that, silly me :)
-
->
-> This is really convoluted (it took me 5 minutes staring at the
-> expression and remembering that AArch32 EL1 implies AArch32 EL0 to get it).
->
-> Now, we already have kvm_reset_vcpu() that validates AArch32 support. It
-> would probably be better to move things there. Thoughts?
-
-Definitely. I overlooked the function name to do something
-specific to resetting the CPU than doing some checks :(.
-I will respin it.
-
-Cheers
-Suzuki
+This approach is superior because it allows useful features such as
+ESRT and the new memory attributes to be used for kexec boot - the
+ACPI patches prevented a crash by disabling BGRT.
