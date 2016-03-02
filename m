@@ -1,65 +1,56 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 2 Mar 2016 16:53:04 +0900
-Subject: [PATCH] arm64: dts: r8a7795: Add CAN FD support
-In-Reply-To: <SG2PR06MB1038FBA247777C89F70E2633C3BC0@SG2PR06MB1038.apcprd06.prod.outlook.com>
-References: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
- <56D59538.2060100@cogentembedded.com>
- <SG2PR06MB1038FBA247777C89F70E2633C3BC0@SG2PR06MB1038.apcprd06.prod.outlook.com>
-Message-ID: <20160302075304.GA8904@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 2 Mar 2016 08:07:47 +0000
+Subject: [PATCH 00/19] arm64 kexec kernel patches v13
+In-Reply-To: <1456881475.6738.18.camel@infradead.org>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <c7575f853ccc491bb0212e025aab1cc9@NASANEXM01H.na.qualcomm.com>
+ <56D5D763.4030304@codeaurora.org>
+ <1456881475.6738.18.camel@infradead.org>
+Message-ID: <20160302080747.05f0c01a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 07:29:04AM +0000, Ramesh Shanmugasundaram wrote:
-> Hi Sergei,
-> 
-> > On 3/1/2016 1:04 PM, Ramesh Shanmugasundaram wrote:
-> > 
-> > > Adds CAN FD controller node for r8a7795.
-> > >
-> > > Note: CAN FD controller register base address specified in R-Car Gen3
-> > > Hardware User Manual v0.5E is incorrect. The correct address is:
-> > >
-> > > CAN FD - 0xe66c0000
-> > >
-> > > Signed-off-by: Ramesh Shanmugasundaram
-> > > <ramesh.shanmugasundaram@bp.renesas.com>
-> > > ---
-> > > Hi All,
-> > >
-> > >     This patch is based on linux-next (tag:next-20160225) with the
-> > following
-> > >     patches applied on top.
-> > >
-> > >     [PATCH v2] arm64: dts: r8a7795: Add CAN external clock support
-> > >     [PATCH] arm64: dts: r8a7795: Add CAN support
-> > >
-> > >     The respective CAN subsystem changes are submitted separately here
-> > > (https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg013
-> > > 88.html)
-> > >
-> > > Thanks,
-> > > Ramesh
-> > > ---
-> > >   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
-> > >   1 file changed, 24 insertions(+)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > > b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > > index a88f8d8..5049ba6 100644
-> > > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > > @@ -553,6 +553,30 @@
-> > >   			status = "disabled";
-> > >   		};
-> > >
-> > > +		canfd: canfd at e66c0000 {
-> > 
-> >     The node name should still be "can at e66c0000", I think.
-> 
-> Thanks for the review.
-> 
-> The SoC has CAN controller too and hence I chose this node name to differentiate. A grep of canfd on sysfs would tell if the controller is enabled. The channels on "net" would still be named "canx".
-> 
-> I'll change it if you still feel "can at e66c0000" is more appropriate.
+On Tue, 1 Mar 2016 17:17:55 -0800
+Geoff Levand <geoff@infradead.org> wrote:
 
-FWIW, "can at e66c0000" seems more appropriate to me.
+Geoff,
+
+> Hi,
+> 
+> On Tue, 2016-03-01 at 10:54 -0700, Azriel Samson wrote:
+> 
+> > We have been using the kexec/kdump patches on ARM64 and would like to
+> > use them from upstream.
+> > 
+> > Assuming these are not going to be in Linux-4.5, a rebased set on 
+> > Linux-4.5 would be very useful.
+> 
+> I'm waiting for one of two things to happen, either Marc Zyngier gives
+> an ack for the patch 'arm64: kvm: allows kvm cpu hotplug', or the arm64
+> maintainers decide they will accept my proposal to merge kexec with a
+> conditional in the Kconfig that only allows one of KVM or kexec to be
+> selected.
+
+Do you expect me to give my Ack on a series that I cannot even apply
+(let alone test) with mainline?
+
+> The kexec patches have been in review for 20 months now, with only
+> minor changes in the past 15.
+
+Given the amount of comment each posting of this series has attracted, I
+think we have a different appreciation of what a minor change is.
+
+> I don't expect much would be gained in posting the kexec series again
+> unless there is a chance they would be merged.
+
+I think that's perfectly fine. Akashi Takahiro and James Morse have
+been working together for a while now, reusing part of the kexec series
+for the hibernate support (and not breaking KVM, oddly enough). My vote
+is that they both take over the maintenance of this series on top the
+the hibernate support, and finish the job.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
