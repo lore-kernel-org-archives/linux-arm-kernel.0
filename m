@@ -1,40 +1,52 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 Mar 2016 10:05:44 +0900
-Subject: [PATCH] ARM: dts: porter: remove enable prop from HS-USB device node
-In-Reply-To: <cover.1456880499.git.horms+renesas@verge.net.au>
-References: <cover.1456880499.git.horms+renesas@verge.net.au>
-Message-ID: <949024d6702d1da8a266f42226d8402f0df078dc.1456880499.git.horms+renesas@verge.net.au>
+From: steve.capper@arm.com (Steve Capper)
+Date: Wed,  2 Mar 2016 01:03:00 +0000
+Subject: [PATCH] arm: mm: Fix definition of pmd_mknotpresent
+Message-ID: <1456880580-22311-1-git-send-email-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Currently pmd_mknotpresent will use a zero entry to respresent an
+invalidated pmd.
 
-In  the final versions of the Porter board (called "PORTER_C") Renesas
-decided to get rid  of the Maxim Integrated MAX3355 OTG chip and didn't
-add any other provision to differ the host/gadget mode, so we'll have to
-remove  no longer valid "renesas,enable-gpio" property from the HS-USB
-device node.  Hopefully, the earlier revisions of the board were never
-seen in the wild...
+Unfortunately this definition clashes with pmd_none, thus it is
+possible for a race condition to occur if zap_pmd_range sees pmd_none
+whilst __split_huge_pmd_locked is running too with pmdp_invalidate
+just called.
 
-Fixes: c794f6a09a25 ("ARM: shmobile: porter: add HS-USB DT support")
-Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+This patch fixes the race condition by modifying pmd_mknotpresent to
+create non-zero faulting entries (as is done in other architectures),
+removing the ambiguity with pmd_none.
+
+Fixes: 8d9625070073 ("ARM: mm: Transparent huge page support for LPAE systems.")
+Reported-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+
 ---
- arch/arm/boot/dts/r8a7791-porter.dts | 1 -
- 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index 6713b1ea732b..01d239c3eaaa 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -283,7 +283,6 @@
- 	pinctrl-names = "default";
+This patch addresses an issue discussed at:
+http://lkml.iu.edu/hypermail/linux/kernel/1602.3/01846.html
+
+---
+ arch/arm/include/asm/pgtable-3level.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index dc46398..451b6e7 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -249,10 +249,10 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+ #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
  
- 	status = "okay";
--	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
- };
+-/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
++/* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
+ static inline pmd_t pmd_mknotpresent(pmd_t pmd)
+ {
+-	return __pmd(0);
++	return __pmd(pmd_val(pmd) & ~PMD_TYPE_MASK);
+ }
  
- &usbphy {
+ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
 -- 
-2.1.4
+2.1.0
