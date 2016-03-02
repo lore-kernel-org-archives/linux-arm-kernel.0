@@ -1,41 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Mar 2016 16:00:25 +0000
-Subject: [PATCHv4] arm64: Rework valid_user_regs
-In-Reply-To: <1456841930-16602-1-git-send-email-mark.rutland@arm.com>
-References: <1456841930-16602-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160302160024.GA14434@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  2 Mar 2016 16:59:06 +0100
+Subject: [PATCH 14/14] ASoC: rockchip: use __maybe_unused to hide
+ st_irq_syscfg_resume
+In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2016 at 02:18:50PM +0000, Mark Rutland wrote:
-> We validate pstate using PSR_MODE32_BIT, which is part of the
-> user-provided pstate (and cannot be trusted). Also, we conflate
-> validation of AArch32 and AArch64 pstate values, making the code
-> difficult to reason about.
-> 
-> Instead, validate the pstate value based on the associated task. The
-> task may or may not be current (e.g. when using ptrace), so this must be
-> passed explicitly by callers. To avoid circular header dependencies via
-> sched.h, is_compat_task is pulled out of asm/ptrace.h.
-> 
-> To make the code possible to reason about, the AArch64 and AArch32
-> validation is split into separate functions. Software must respect the
-> RES0 policy for SPSR bits, and thus the kernel mirrors the hardware
-> policy (RAZ/WI) for bits as-yet unallocated. When these acquire an
-> architected meaning writes may be permitted (potentially with additional
-> validation).
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+The rockchip spdif driver uses SIMPLE_DEV_PM_OPS to conditionally
+set its power management functions, but we get a warning
+about rk_spdif_runtime_resume being unused when CONFIG_PM is not
+set:
 
-Applied. Thanks.
+sound/soc/rockchip/rockchip_spdif.c:67:12: error: 'rk_spdif_runtime_resume' defined but not used [-Werror=unused-function]
 
-(just remember, once it gets a bit more testing in -next and mainline,
-to send a back-port to stable)
+This adds a __maybe_unused annotation so the compiler knows
+it can silently drop it instead of warning.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ sound/soc/rockchip/rockchip_spdif.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
+index 5a806da89f42..274599d4caeb 100644
+--- a/sound/soc/rockchip/rockchip_spdif.c
++++ b/sound/soc/rockchip/rockchip_spdif.c
+@@ -54,7 +54,7 @@ static const struct of_device_id rk_spdif_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, rk_spdif_match);
+ 
+-static int rk_spdif_runtime_suspend(struct device *dev)
++static int __maybe_unused rk_spdif_runtime_suspend(struct device *dev)
+ {
+ 	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
+ 
+@@ -64,7 +64,7 @@ static int rk_spdif_runtime_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int rk_spdif_runtime_resume(struct device *dev)
++static int __maybe_unused rk_spdif_runtime_resume(struct device *dev)
+ {
+ 	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
+ 	int ret;
 -- 
-Catalin
+2.7.0
