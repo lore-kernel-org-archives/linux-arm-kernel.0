@@ -1,65 +1,118 @@
-From: ramesh.shanmugasundaram@bp.renesas.com (Ramesh Shanmugasundaram)
-Date: Wed,  2 Mar 2016 08:15:50 +0000
-Subject: [PATCH v2] arm64: dts: r8a7795: Add CAN FD support
-In-Reply-To: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-References: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
-Message-ID: <1456906550-4849-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+From: alexandre.torgue@gmail.com (Alexandre Torgue)
+Date: Wed, 2 Mar 2016 09:23:31 +0100
+Subject: [PATCH 2/3] ARM: dts: stm32f429: Add Ethernet support
+In-Reply-To: <56D5D031.9080609@gmail.com>
+References: <1456763376-21457-1-git-send-email-alexandre.torgue@gmail.com>
+ <1456763376-21457-3-git-send-email-alexandre.torgue@gmail.com>
+ <56D5D031.9080609@gmail.com>
+Message-ID: <CAJgp7zz6+7=ZKsvvL5b1sK_EjJ81ZDLrN1YinSYBHUgJiGS-ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CAN FD controller node for r8a7795.
+Hi Maxime,
 
-Note: CAN FD controller register base address specified in R-Car Gen3
-Hardware User Manual v0.5E is incorrect. The correct address is:
+2016-03-01 18:24 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+> Hi Alex,
+>
+>     I have made a handful of changes on your patch, let me know if this is
+> ok for you.
+>     If ok, it will be part of the PR I'll send tomorrow.
 
-CAN FD - 0xe66c0000
+I agree with modifications.
 
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
----
-Thanks Sergei, Simon for the comments.
+Regards
 
-	Changes since v1:
-	As suggested by Sergei, Simon
-	* Changed node name from canfd@ to can@
+alex
 
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index a88f8d8..9185688 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -553,6 +553,30 @@
- 			status = "disabled";
- 		};
- 
-+		canfd: can at e66c0000 {
-+			compatible = "renesas,r8a7795-canfd",
-+				     "renesas,rcar-gen3-canfd";
-+			reg = <0 0xe66c0000 0 0x8000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 914>,
-+			       <&cpg CPG_CORE R8A7795_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "fck", "canfd", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7795_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
-+			power-domains = <&cpg>;
-+			status = "disabled";
-+
-+			channel0 {
-+				status = "disabled";
-+			};
-+
-+			channel1 {
-+				status = "disabled";
-+			};
-+		};
-+
- 		hscif0: serial at e6540000 {
- 			compatible = "renesas,hscif-r8a7795",
- 				     "renesas,rcar-gen3-hscif",
--- 
-1.9.1
+>
+> On 02/29/2016 05:29 PM, Alexandre TORGUE wrote:
+>>
+>> Add Ethernet support (Synopsys MAC IP 3.50a) on stm32f429 SOC.
+>>
+>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+>>
+>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
+>> b/arch/arm/boot/dts/stm32f429.dtsi
+>> index bb7a736..af0367c 100644
+>> --- a/arch/arm/boot/dts/stm32f429.dtsi
+>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+>> @@ -283,6 +283,26 @@
+>>                                         bias-disable;
+>>                                 };
+>>                         };
+>> +
+>> +                       ethernet0_mii: mii at 0 {
+>> +                               mii {
+>> +                                       slew-rate = <2>;
+>
+> I moved slew-rate property below the pinmux one for consistency with other
+> pin configs in the file.
+>>
+>> +                                       pinmux =
+>> <STM32F429_PG13_FUNC_ETH_MII_TXD0_ETH_RMII_TXD0>,
+>> +
+>> <STM32F429_PG14_FUNC_ETH_MII_TXD1_ETH_RMII_TXD1>,
+>> +
+>> <STM32F429_PC2_FUNC_ETH_MII_TXD2>,
+>> +
+>> <STM32F429_PB8_FUNC_ETH_MII_TXD3>,
+>> +
+>> <STM32F429_PC3_FUNC_ETH_MII_TX_CLK>,
+>> +
+>> <STM32F429_PG11_FUNC_ETH_MII_TX_EN_ETH_RMII_TX_EN>,
+>> +
+>> <STM32F429_PA2_FUNC_ETH_MDIO>,
+>> +
+>> <STM32F429_PC1_FUNC_ETH_MDC>,
+>> +
+>> <STM32F429_PA1_FUNC_ETH_MII_RX_CLK_ETH_RMII_REF_CLK>,
+>> +
+>> <STM32F429_PA7_FUNC_ETH_MII_RX_DV_ETH_RMII_CRS_DV>,
+>> +
+>> <STM32F429_PC4_FUNC_ETH_MII_RXD0_ETH_RMII_RXD0>,
+>> +
+>> <STM32F429_PC5_FUNC_ETH_MII_RXD1_ETH_RMII_RXD1>,
+>> +
+>> <STM32F429_PH6_FUNC_ETH_MII_RXD2>,
+>> +
+>> <STM32F429_PH7_FUNC_ETH_MII_RXD3>;
+>> +                               };
+>> +                       };
+>>                 };
+>>                 rcc: rcc at 40023810 {
+>> @@ -323,6 +343,21 @@
+>>                         st,mem2mem;
+>>                 };
+>>   +             ethernet0: dwmac at 40028000 {
+>> +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
+>> +                       status = "disabled";
+>
+> I moved status property at the end of the node for consistency
+>>
+>> +                       reg = <0x40028000 0x8000>;
+>> +                       reg-names = "stmmaceth";
+>> +                       interrupts = <0 61 0>, <0 62 0>;
+>
+> #interrupt-cells is set to 1 in the nvic node, meaning that a single cell is
+> expected here:
+>
+> interrupts = <61>, <62>;
+>
+>> +                       interrupt-names = "macirq", "eth_wake_irq";
+>> +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
+>> +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
+>> +                       st,syscon = <&syscfg 0x4>;
+>> +                       snps,pbl = <8>;
+>> +                       snps,mixed-burst;
+>> +                       dma-ranges;
+>> +               };
+>> +
+>>                 rng: rng at 50060800 {
+>>                         compatible = "st,stm32-rng";
+>>                         reg = <0x50060800 0x400>;
+>
+>
+> Regards,
+> Maxime
+>
+>
