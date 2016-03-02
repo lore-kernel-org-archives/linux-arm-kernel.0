@@ -1,45 +1,40 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed,  2 Mar 2016 11:29:13 -0500
-Subject: [PATCH] ARM: dts: imx: ba16: Add correct PCIe Tx Values
-Message-ID: <1456936153-6386-1-git-send-email-akshay.bhat@timesys.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Mar 2016 17:31:44 +0100
+Subject: [PATCH] ARM: at91: avoid defining CONFIG_* symbols in source code
+In-Reply-To: <56D70ADB.2050008@atmel.com>
+References: <1456238384-882646-1-git-send-email-arnd@arndb.de>
+ <56D70ADB.2050008@atmel.com>
+Message-ID: <2506540.Af9r4eEVXL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Justin Waters <justin.waters@timesys.com>
+On Wednesday 02 March 2016 16:46:35 Nicolas Ferre wrote:
+> Le 23/02/2016 15:39, Arnd Bergmann a ?crit :
+> > In an invalid randconfig build (fixed by another patch),
+> > I ran across this warning:
+> > 
+> > arch/arm/include/debug/at91.S:18:0: error: "CONFIG_DEBUG_UART_VIRT" redefined [-Werror]
+> >  #define CONFIG_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
+> > 
+> > As Russell pointed out, we should never #define a macro starting
+> > with CONFIG_ in a source file, as that is rather confusing.
+> > 
+> > This renames the macro to avoid the symbol clash.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Suggested-by: Russell King <linux@arm.linux.org.uk>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Arnd,
+> 
+> Can you please add this patch on top of the arm-soc branches "soc" or
+> "cleanup" for 4.6.
+> I don't think that we will have more material for these branches to send
+> to you before the opening of the merge window.
+> 
+> Thanks for your patch, bye.
 
-Utilize the new PCIe Tx configuration to properly support the correct
-values.
+Applied to next/soc, thanks!
 
-Signed-off-by: Justin Waters <justin.waters@timesys.com>
-Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
----
-
-Hi Shawn,
-
-A patch for setting PCIe PHY properties in imx6 GPR8 register has been accepted
-and is in PCIe maintainers git tree.
-https://patchwork.ozlabs.org/patch/568166/
-
-Updating the ba16 based boards to set the correct tx-swing values.
-
-Thanks,
-Akshay
-
- arch/arm/boot/dts/imx6q-ba16.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
-index 8f6e603..fcc7b50 100644
---- a/arch/arm/boot/dts/imx6q-ba16.dtsi
-+++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
-@@ -323,6 +323,8 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pcie>;
- 	reset-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-+	fsl,tx-swing-full = <103>;
-+	fsl,tx-swing-low = <103>;
- 	status = "okay";
- };
- 
--- 
-2.7.2
+	Arnd
