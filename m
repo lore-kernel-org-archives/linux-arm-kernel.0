@@ -1,32 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 2 Mar 2016 10:02:47 +0100
-Subject: [RESEND PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
-In-Reply-To: <20160302010453.GJ18327@sirena.org.uk>
-References: <1456826069-30955-1-git-send-email-nicolas.ferre@atmel.com>
- <20160302010453.GJ18327@sirena.org.uk>
-Message-ID: <56D6AC37.8080302@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Mar 2016 10:05:18 +0100
+Subject: [PATCH 1/6] rtc: generic: allow building on all architectures
+In-Reply-To: <CAMuHMdW5+jZ1n9WnCwBrGSGjUa8ziNTTqf-H15EFTQC_iwnw+Q@mail.gmail.com>
+References: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
+ <1456851608-3374907-2-git-send-email-arnd@arndb.de>
+ <CAMuHMdW5+jZ1n9WnCwBrGSGjUa8ziNTTqf-H15EFTQC_iwnw+Q@mail.gmail.com>
+Message-ID: <1620536.OtjnSSLgCT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/03/2016 02:04, Mark Brown a ?crit :
-> On Tue, Mar 01, 2016 at 10:54:29AM +0100, Nicolas Ferre wrote:
+On Wednesday 02 March 2016 09:57:27 Geert Uytterhoeven wrote:
+> > @@ -33,13 +35,21 @@ static const struct rtc_class_ops generic_rtc_ops = {
+> >         .read_time = generic_get_time,
+> >         .set_time = generic_set_time,
+> >  };
+> > +#else
+> > +#define generic_rtc_ops *(struct rtc_class_ops*)NULL
+> > +#endif
+> >
+> >  static int __init generic_rtc_probe(struct platform_device *dev)
+> >  {
+> >         struct rtc_device *rtc;
+> > +       const struct rtc_class_ops *ops;
+> > +
+> > +       ops = dev_get_platdata(&dev->dev);
+> > +       if (!ops)
+> > +               ops = &generic_rtc_ops;
 > 
->>
->> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
-> 
-> I can't look at patches that aren't signed off, please see
-> SubmittingPatches for details.
+> I hope no compiler version treats "&*(struct rtc_class_ops*)NULL" as
+> undefined behavior?
 
-Songjun did sign the patch, I'm puzzled...
+It's a bit odd, but I think it's syntactically correct C, and not
+much too different from 
 
-Ah, you mean that I should have signed it myself as well as I am the
-actual sender... ok, as it's a "resend" like the subject says and that
-the first patch was actually sent by Songjun, I though it would be legit.
+#define offsetof(TYPE, MEMBER)  ((size_t)&((TYPE *)0)->MEMBER)
 
-Anyway, I'll resend it with my own Signed tag.
+is it? My last patch gets rid of it again.
 
-Bye,
--- 
-Nicolas Ferre
+	Arnd
