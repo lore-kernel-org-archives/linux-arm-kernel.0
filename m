@@ -1,286 +1,118 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed,  2 Mar 2016 03:35:01 +0100
-Subject: [PATCH v2 6/6] ARM64: dts: amlogic: Add Tronsmart Vega S95 configs
-In-Reply-To: <1456886101-22967-1-git-send-email-afaerber@suse.de>
-References: <1456886101-22967-1-git-send-email-afaerber@suse.de>
-Message-ID: <1456886101-22967-7-git-send-email-afaerber@suse.de>
+Date: Wed,  2 Mar 2016 03:49:09 +0100
+Subject: [PATCH v3] tty: serial: meson: Implement earlycon support
+Message-ID: <1456886949-26503-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Device Trees for Tronsmart Vega S95 Pro, Meta and Telos TV boxes.
+Split off the bulk of the existing meson_serial_console_write()
+implementation into meson_serial_port_write() for implementing
+meson_serial_early_console_write().
 
+Use "meson" as the earlycon driver name, courtesy of Nicolas.
+
+Signed-off-by: Nicolas Saenz Julienne <nicolassaenzj@gmail.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v1 -> v2:
- * Dropped aliases (moved to Meson gxbb .dtsi)
- * Override only status of uart node (moved to Meson gxbb .dtsi)
+ v2 -> v3:
+ * Rename from "meson_serial" to just "meson" (Nicolas)
  
- arch/arm64/boot/dts/amlogic/Makefile               |  4 ++
- .../boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  | 55 ++++++++++++++++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   | 55 ++++++++++++++++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts | 55 ++++++++++++++++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 55 ++++++++++++++++++++++
- 5 files changed, 224 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+ v1 -> v2:
+ * Implement meson_serial_early_console_write() instead of reusing
+   meson_serial_console_write() (Peter)
+ 
+ Documentation/kernel-parameters.txt |  6 ++++++
+ drivers/tty/serial/meson_uart.c     | 42 ++++++++++++++++++++++++++++++-------
+ 2 files changed, 41 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index 1b06c28c67eb..eb672f38f89e 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -1,3 +1,7 @@
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index e0a21e4556a6..a7c1377fd80f 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -1039,6 +1039,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			the driver will use only 32-bit accessors to read/write
+ 			the device registers.
+ 
++		meson,<addr>
++			Start an early, polled-mode console on a meson serial
++			port at the specified address. The serial port must
++			already be setup and configured. Options are not yet
++			supported.
 +
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
-new file mode 100644
-index 000000000000..399aff9e7975
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+ 		msm_serial,<addr>
+ 			Start an early, polled-mode console on an msm serial
+ 			port at the specified address. The serial port
+diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+index 024445aa0521..6aea0f4a9165 100644
+--- a/drivers/tty/serial/meson_uart.c
++++ b/drivers/tty/serial/meson_uart.c
+@@ -481,18 +481,13 @@ static void meson_console_putchar(struct uart_port *port, int ch)
+ 	writel(ch, port->membase + AML_UART_WFIFO);
+ }
+ 
+-static void meson_serial_console_write(struct console *co, const char *s,
+-				       u_int count)
++static void meson_serial_port_write(struct uart_port *port, const char *s,
++				    u_int count)
+ {
+-	struct uart_port *port;
+ 	unsigned long flags;
+ 	int locked;
+ 	u32 val, tmp;
+ 
+-	port = meson_ports[co->index];
+-	if (!port)
+-		return;
+-
+ 	local_irq_save(flags);
+ 	if (port->sysrq) {
+ 		locked = 0;
+@@ -516,6 +511,18 @@ static void meson_serial_console_write(struct console *co, const char *s,
+ 	local_irq_restore(flags);
+ }
+ 
++static void meson_serial_console_write(struct console *co, const char *s,
++				       u_int count)
++{
++	struct uart_port *port;
 +
-+/dts-v1/;
++	port = meson_ports[co->index];
++	if (!port)
++		return;
 +
-+#include "meson-gxbb-vega-s95.dtsi"
++	meson_serial_port_write(port, s, count);
++}
 +
-+/ {
-+	compatible = "tronsmart,vega-s95-meta", "tronsmart,vega-s95", "amlogic,meson-gxbb";
-+	model = "Tronsmart Vega S95 Meta";
+ static int meson_serial_console_setup(struct console *co, char *options)
+ {
+ 	struct uart_port *port;
+@@ -554,6 +561,27 @@ static int __init meson_serial_console_init(void)
+ }
+ console_initcall(meson_serial_console_init);
+ 
++static void meson_serial_early_console_write(struct console *co,
++					     const char *s,
++					     u_int count)
++{
++	struct earlycon_device *dev = co->data;
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
-new file mode 100644
-index 000000000000..ac5a241b5ec2
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
++	meson_serial_port_write(&dev->port, s, count);
++}
 +
-+/dts-v1/;
++static int __init
++meson_serial_early_console_setup(struct earlycon_device *device, const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
 +
-+#include "meson-gxbb-vega-s95.dtsi"
++	device->con->write = meson_serial_early_console_write;
++	return 0;
++}
++OF_EARLYCON_DECLARE(meson, "amlogic,meson-uart",
++		    meson_serial_early_console_setup);
 +
-+/ {
-+	compatible = "tronsmart,vega-s95-pro", "tronsmart,vega-s95", "amlogic,meson-gxbb";
-+	model = "Tronsmart Vega S95 Pro";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x40000000>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
-new file mode 100644
-index 000000000000..fff7bfa2aa39
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxbb-vega-s95.dtsi"
-+
-+/ {
-+	compatible = "tronsmart,vega-s95-telos", "tronsmart,vega-s95", "amlogic,meson-gxbb";
-+	model = "Tronsmart Vega S95 Telos";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-new file mode 100644
-index 000000000000..c1fa2667ec5c
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "meson-gxbb.dtsi"
-+
-+/ {
-+	compatible = "tronsmart,vega-s95", "amlogic,meson-gxbb";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+};
+ #define MESON_SERIAL_CONSOLE	(&meson_serial_console)
+ #else
+ #define MESON_SERIAL_CONSOLE	NULL
 -- 
 2.6.2
