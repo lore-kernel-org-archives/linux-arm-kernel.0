@@ -1,21 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 23:21:59 +0100
-Subject: [GIT PULL] STM32 defconfig updates for v4.6 #1
-In-Reply-To: <56D6C623.8030908@gmail.com>
-References: <56D6C623.8030908@gmail.com>
-Message-ID: <2216821.q30YMIK6pX@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 2 Mar 2016 16:24:20 -0600
+Subject: [PATCH] ARM: DRA722: remove redundant definition of 1.0 device
+In-Reply-To: <1456957275-2025-1-git-send-email-vishalm@ti.com>
+References: <1456957275-2025-1-git-send-email-vishalm@ti.com>
+Message-ID: <56D76814.20804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2016 11:53:23 Maxime Coquelin wrote:
-> Highlights:
-> -----------
->   - Enable GPIO led driver in stm32_defconfig
->   - Introduce a config fragment to override RAM base address
+On 03/02/2016 04:21 PM, Vishal Mahaveer wrote:
+> Remove duplicate definition of Rev 1.0 device.
+> Fixes: 81032e34e184 ("ARM: DRA752: Add ID detect for ES2.0")
 > 
+If tony is ok fixing the beautification...
 
-Our first config fragment ;-)
+> Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
+> ---
+>  arch/arm/mach-omap2/soc.h |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+> index 79ca3c3..83d3547 100644
+> --- a/arch/arm/mach-omap2/soc.h
+> +++ b/arch/arm/mach-omap2/soc.h
+> @@ -471,7 +471,6 @@ IS_OMAP_TYPE(3430, 0x3430)
+>  #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
+>  #define DRA752_REV_ES2_0	(DRA7XX_CLASS | (0x52 << 16) | (0x20 << 8))
+>  #define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+> -#define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+>  
+>  void omap2xxx_check_revision(void);
+>  void omap3xxx_check_revision(void);
+> 
+Acked-by: Nishanth Menon <nm@ti.com>
 
-Merged into next/defconfig, thanks!
-
-	Arnd
+-- 
+Regards,
+Nishanth Menon
