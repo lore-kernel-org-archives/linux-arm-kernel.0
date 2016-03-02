@@ -1,48 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:24:07 +0100
-Subject: [PATCH 5/6] phy: dm816x: use __maybe_unused to hide pm functions
-In-Reply-To: <1456932255-71725-1-git-send-email-arnd@arndb.de>
-References: <1456932255-71725-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456932255-71725-6-git-send-email-arnd@arndb.de>
+From: a@unstable.cc (Antonio Quartulli)
+Date: Wed, 2 Mar 2016 22:46:07 +0800
+Subject: [PATCH] batman-adv: clarify CFG80211 dependency
+In-Reply-To: <1456926882-2941809-1-git-send-email-arnd@arndb.de>
+References: <1456926882-2941809-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160302144607.GH7704@prodigo.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dm816x USB PHY driver uses UNIVERSAL_DEV_PM_OPS to access
-its suspend/resume functions, which causes a warning about
-unused symbols when CONFIG_PM is disabled:
+On Wed, Mar 02, 2016 at 02:54:35PM +0100, Arnd Bergmann wrote:
+> The driver calls cfg80211_get_station, which may be part of a
+> module, so we must not enable BATMAN_ADV_BATMAN_V if
+> BATMAN_ADV=y and CFG80211=m:
+> 
+> net/built-in.o: In function `batadv_v_elp_get_throughput':
+> (text+0x5c62c): undefined reference to `cfg80211_get_station'
+> 
+> This clarifies the dependency to cover all combinations.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: c833484e5f38 ("batman-adv: ELP - compute the metric based on the estimated throughput")
 
-drivers/phy/phy-dm816x-usb.c:121:12: error: 'dm816x_usb_phy_runtime_suspend' defined but not used [-Werror=unused-function]
-drivers/phy/phy-dm816x-usb.c:139:12: error: 'dm816x_usb_phy_runtime_resume' defined but not used [-Werror=unused-function]
+Acked-by: Antonio Quartulli <a@unstable.cc>
 
-This adds __maybe_unused annotations to let the compiler know
-it can silently drop the function definition.
+Thanks a lot Arnd!
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/phy/phy-dm816x-usb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+David, could you please merge this change in net-next directly ?
 
-diff --git a/drivers/phy/phy-dm816x-usb.c b/drivers/phy/phy-dm816x-usb.c
-index b4bbef664d20..cbcce7cf0028 100644
---- a/drivers/phy/phy-dm816x-usb.c
-+++ b/drivers/phy/phy-dm816x-usb.c
-@@ -118,7 +118,7 @@ static const struct phy_ops ops = {
- 	.owner		= THIS_MODULE,
- };
- 
--static int dm816x_usb_phy_runtime_suspend(struct device *dev)
-+static int __maybe_unused dm816x_usb_phy_runtime_suspend(struct device *dev)
- {
- 	struct dm816x_usb_phy *phy = dev_get_drvdata(dev);
- 	unsigned int mask, val;
-@@ -136,7 +136,7 @@ static int dm816x_usb_phy_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int dm816x_usb_phy_runtime_resume(struct device *dev)
-+static int __maybe_unused dm816x_usb_phy_runtime_resume(struct device *dev)
- {
- 	struct dm816x_usb_phy *phy = dev_get_drvdata(dev);
- 	unsigned int mask, val;
+Regards,
+
 -- 
-2.7.0
+Antonio Quartulli
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160302/e9d4294e/attachment.sig>
