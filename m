@@ -1,54 +1,48 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 2 Mar 2016 10:35:51 +0100
-Subject: [PULL] KVM/ARM updates for 4.5-rc7
-In-Reply-To: <1456910849-16049-1-git-send-email-marc.zyngier@arm.com>
-References: <1456910849-16049-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <56D6B3F7.1010402@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 2 Mar 2016 10:39:15 +0100
+Subject: [PATCH 1/6] rtc: generic: allow building on all architectures
+In-Reply-To: <mvmwpplns8n.fsf@hawking.suse.de>
+References: <1456851608-3374907-1-git-send-email-arnd@arndb.de>
+ <1456851608-3374907-2-git-send-email-arnd@arndb.de>
+ <CAMuHMdW5+jZ1n9WnCwBrGSGjUa8ziNTTqf-H15EFTQC_iwnw+Q@mail.gmail.com>
+ <mvmwpplns8n.fsf@hawking.suse.de>
+Message-ID: <CAMuHMdX2Jc4dT5omKmiie7GK+xDYDgJwm34hwANx3HzHt7LzxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Mar 2, 2016 at 10:28 AM, Andreas Schwab <schwab@linux-m68k.org> wrote:
+> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>
+>>> +#else
+>>> +#define generic_rtc_ops *(struct rtc_class_ops*)NULL
+>>> +#endif
+>>>
+>>>  static int __init generic_rtc_probe(struct platform_device *dev)
+>>>  {
+>>>         struct rtc_device *rtc;
+>>> +       const struct rtc_class_ops *ops;
+>>> +
+>>> +       ops = dev_get_platdata(&dev->dev);
+>>> +       if (!ops)
+>>> +               ops = &generic_rtc_ops;
+>>
+>> I hope no compiler version treats "&*(struct rtc_class_ops*)NULL" as
+>> undefined behavior?
+>
+> Yes, that is guaranteed, the operations cancel each other (6.5.3.2#3: If
+> the operand is the result of a unary * operator, neither that operator
+> nor the & operator is evaluated and the result is as if both were
+> omitted).
 
+Thanks for confirming.
 
-On 02/03/2016 10:27, Marc Zyngier wrote:
-> Hi Paolo,
-> 
-> I really thought that the previous PR was the last for this release,
-> but Michael rightly decided to prove me wrong. Oh well.
-> 
-> Please pull!
-> 
->        M.
-> 
-> The following changes since commit fd451b90e78c4178bcfc5072f2b2b637500c109a:
-> 
->   arm64: KVM: vgic-v3: Restore ICH_APR0Rn_EL2 before ICH_APR1Rn_EL2 (2016-02-24 17:25:58 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc7
-> 
-> for you to fetch changes up to 4cad67fca3fc952d6f2ed9e799621f07666a560f:
-> 
->   arm/arm64: KVM: Fix ioctl error handling (2016-02-29 09:56:40 +0000)
-> 
-> ----------------------------------------------------------------
-> KVM/ARM fixes for 4.5-rc7
-> 
-> - Fix ioctl error handling on the timer path
-> 
-> ----------------------------------------------------------------
-> Michael S. Tsirkin (1):
->       arm/arm64: KVM: Fix ioctl error handling
-> 
->  arch/arm/kvm/guest.c   | 2 +-
->  arch/arm64/kvm/guest.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Gr{oetje,eeting}s,
 
-Pulled, thanks.
+                        Geert
 
-Paolo
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
