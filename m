@@ -1,57 +1,34 @@
-From: linux@baker-net.org.uk (Adam Baker)
-Date: Wed, 2 Mar 2016 23:43:32 +0000
-Subject: [PATCH v3 2/3] hwmon: Create an NSA320 hardware monitoring driver
-In-Reply-To: <56D3948D.6000805@roeck-us.net>
-References: <1456698614-15176-1-git-send-email-linux@baker-net.org.uk>
- <1456698614-15176-3-git-send-email-linux@baker-net.org.uk>
- <56D3948D.6000805@roeck-us.net>
-Message-ID: <56D77AA4.2080908@baker-net.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 03 Mar 2016 08:43:54 +0900
+Subject: [PATCH 07/14] hw_random: exynos: use __maybe_unused to hide pm
+ functions
+In-Reply-To: <1456934350-1389172-8-git-send-email-arnd@arndb.de>
+References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+ <1456934350-1389172-8-git-send-email-arnd@arndb.de>
+Message-ID: <56D77ABA.1040505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/02/16 00:45, Guenter Roeck wrote:
+On 03.03.2016 00:58, Arnd Bergmann wrote:
+> The exynos random driver uses #ifdef to check for CONFIG_PM, but
+> then uses SIMPLE_DEV_PM_OPS, which leaves the references out when
+> CONFIG_PM_SLEEP is not defined, so we get a warning with
+> PM=y && PM_SLEEP=n:
+> 
+> drivers/char/hw_random/exynos-rng.c:166:12: error: 'exynos_rng_suspend' defined but not used [-Werror=unused-function]
+> drivers/char/hw_random/exynos-rng.c:171:12: error: 'exynos_rng_resume' defined but not used [-Werror=unused-function]
+> 
+> This removes the incorrect #ifdef and instead uses a __maybe_unused
+> annotation to let the compiler know it can silently drop
+> the function definition.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/char/hw_random/exynos-rng.c | 10 ++++------
+>  1 file changed, 4 insertions(+), 6 deletions(-)
+> 
 
->> +
->> +/*
->> + * Although this protocol looks similar to SPI the long delay
->> + * between the active (aka chip select) signal and the shorter
->> + * delay between clock pulses are needed for reliable operation.
->> + * The delays provided are taken from the manufacturer kernel,
->> + * testing suggest they probably incorporate a reasonable safety
->> + * margin. (The single device tested became unreliable if the
->> + * delay was reduced to 1/10th of this value.)
->> + */
->> +static unsigned long nsa320_hwmon_update(struct device *dev)
->
-> Please make this either int or s32.
->
->> +{
->> +    u32 mcu_data;
->
-> You can (and should) still use u32 here.
->
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-
-I'm a bit puzzled by your reasoning for preferring a signed value for 
-the return value. The only reason I can think of is that the error 
-return value is negative, however the macro to test if it is an error 
-value is not looking at whether the value is negative
-
-#define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-MAX_ERRNO)
-
-Functionally using any of s32, int or unsigned long will make no 
-difference, the mask operations ensure that the top bit can't possibly 
-be set so using a signed type doesn't, in this circumstance, risk an 
-undefined result from the shift operation. The choice of type is 
-therefore a matter of readability rather than function so if you still 
-prefer s32 I'll respin it to use that.
-
-The length does need to be at least 32 bits (to represent the returned 
-data range) and no longer than unsigned long (to avoid breaking 
-IS_ERR_VALUE). Whilst int is 32 bits on the only processor that is 
-expected to use this device that doesn't feel like a good thing to 
-depend upon so s32 seems preferable to int.
-
-Regards
-
-Adam
+Best regards,
+Krzysztof
