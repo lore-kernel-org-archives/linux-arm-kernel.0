@@ -1,206 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 2 Mar 2016 13:10:48 +0000
-Subject: [PATCH] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-In-Reply-To: <1456348433-3337-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1456348433-3337-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <56D6E658.1060201@arm.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 2 Mar 2016 13:14:31 +0000
+Subject: [PATCH 1/5] ARM: efi: apply strict permissons for UEFI Runtime
+ Services regions
+In-Reply-To: <CAKv+Gu81V9TjhjikmQd=4ahWeqry8U1w5Fa+BTcY+S=2xYJmrA@mail.gmail.com>
+References: <1456151158-25849-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456151158-25849-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160302114901.GC2649@codeblueprint.co.uk>
+ <CAKv+Gu81V9TjhjikmQd=4ahWeqry8U1w5Fa+BTcY+S=2xYJmrA@mail.gmail.com>
+Message-ID: <20160302131431.GG2649@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/16 21:13, Tirumalesh Chalamarla wrote:
-> Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-> namespaces; specifically within a given node SMMU0 and SMMU1 share,
-> as does SMMU2 and SMMU3.
->
-> This patch address these issuee by supplying asid and vmid
-> while calculating ASID and VMID for Thunder SMMUv2.
->
-> NOTE: resending with commit message fix.
->
-> changes from V2:
-> 	- removed *_base from DT, and replaced with compatible string
->
-> changes from V1:
-> 	- rebased on top of 16 bit VMID patch
-> 	- removed redundent options from DT
-> 	- insted of transform, DT now supplies starting ASID/VMID
->
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-> Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
-> ---
->   .../devicetree/bindings/iommu/arm,smmu.txt         |  1 +
->   drivers/iommu/arm-smmu.c                           | 48 +++++++++++++++++-----
+On Wed, 02 Mar, at 02:07:36PM, Ard Biesheuvel wrote:
+> On 2 March 2016 at 12:49, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > On Mon, 22 Feb, at 03:25:54PM, Ard Biesheuvel wrote:
+> >> Recent UEFI versions expose permission attributes for runtime services
+> >> memory regions, either in the UEFI memory map or in the separate memory
+> >> attributes table.  This allows the kernel to map these regions with
+> >> stricter permissions, rather than the RWX permissions that are used by
+> >> default. So wire this up in our mapping routine.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm/include/asm/efi.h |  1 +
+> >>  arch/arm/kernel/efi.c      | 41 ++++++++++++++++++++
+> >>  2 files changed, 42 insertions(+)
+> >
+> > Looks fine from an EFI perspective, but it would be nice for somebody
+> > else with ARM knowledge to ACK it.
+> 
+> I agree.
+> 
+> Note that the whole memory attribute series needs to wait for some
+> memremap() changes that I proposed for ARM (or at least the bits where
+> we wire it up for arm64+ARM)
 
-I guess Documentation/arm64/silicon-errata.txt wants updating too?
-
->   2 files changed, 38 insertions(+), 11 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index 7180745..19fe6f2 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -16,6 +16,7 @@ conditions.
->                           "arm,mmu-400"
->                           "arm,mmu-401"
->                           "arm,mmu-500"
-> +                        "cavium,smmu-v2"
-
-That seems a rather broad name for a compatible - will there definitely 
-never be another Cavium implementation of SMMUv2? Even then, if there is 
-future respin of CN88xx silicon where the SMMU needs some other 
-workaround for some other issue, will that be discoverable from 
-SMMU_IDR7 or similar? Even an absurdly over-specific compatible such as 
-"cavium,thunderx-cn88xx-pass2-smmu" would be preferable to something 
-which later turns out to be insufficient to uniquely identify a specific 
-implementation.
-
-Otherwise, modulo Will's comments, this looks a lot more reasonable than 
-before, thanks.
-
-Robin.
-
->                     depending on the particular implementation and/or the
->                     version of the architecture implemented.
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 247a469..c704f88 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -326,6 +326,12 @@ struct arm_smmu_device {
->
->   	struct list_head		list;
->   	struct rb_root			masters;
-> +	/*
-> +	 *The following fields are specific to Cavium, Thunder
-> +	 */
-> +	u32				cavium_smmu_id;
-> +	u32				cavium_id_base;
-> +
->   };
->
->   struct arm_smmu_cfg {
-> @@ -335,8 +341,8 @@ struct arm_smmu_cfg {
->   };
->   #define INVALID_IRPTNDX			0xff
->
-> -#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
-> -#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-> +#define ARM_SMMU_CB_ASID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx)
-> +#define ARM_SMMU_CB_VMID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx + 1)
->
->   enum arm_smmu_domain_stage {
->   	ARM_SMMU_DOMAIN_S1 = 0,
-> @@ -364,6 +370,8 @@ struct arm_smmu_option_prop {
->   	const char *prop;
->   };
->
-> +static int cavium_smmu_count;
-> +
->   static struct arm_smmu_option_prop arm_smmu_options[] = {
->   	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
->   	{ 0, NULL},
-> @@ -575,11 +583,11 @@ static void arm_smmu_tlb_inv_context(void *cookie)
->
->   	if (stage1) {
->   		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-> -		writel_relaxed(ARM_SMMU_CB_ASID(cfg),
-> +		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
->   			       base + ARM_SMMU_CB_S1_TLBIASID);
->   	} else {
->   		base = ARM_SMMU_GR0(smmu);
-> -		writel_relaxed(ARM_SMMU_CB_VMID(cfg),
-> +		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
->   			       base + ARM_SMMU_GR0_TLBIVMID);
->   	}
->
-> @@ -601,7 +609,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->
->   		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
->   			iova &= ~12UL;
-> -			iova |= ARM_SMMU_CB_ASID(cfg);
-> +			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
->   			do {
->   				writel_relaxed(iova, reg);
->   				iova += granule;
-> @@ -609,7 +617,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->   #ifdef CONFIG_64BIT
->   		} else {
->   			iova >>= 12;
-> -			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
-> +			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
->   			do {
->   				writeq_relaxed(iova, reg);
->   				iova += granule >> 12;
-> @@ -629,7 +637,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->   #endif
->   	} else {
->   		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
-> -		writel_relaxed(ARM_SMMU_CB_VMID(cfg), reg);
-> +		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
->   	}
->   }
->
-> @@ -738,7 +746,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->   #endif
->   		/* if 16bit VMID supported set VMID in CBA2R */
->   		if (smmu->features & ARM_SMMU_FEAT_VMID16)
-> -			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
-> +			reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
->
->   		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
->   	}
-> @@ -757,7 +765,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->   			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
->   	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
->   		/*16 bit VMID is not supported set 8 bit VMID here */
-> -		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
-> +		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
->   	}
->   	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
->
-> @@ -765,11 +773,11 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->   	if (stage1) {
->   		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
->
-> -		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-> +		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
->   		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
->
->   		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
-> -		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-> +		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
->   		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
->   	} else {
->   		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-> @@ -1717,6 +1725,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
->   	{ .compatible = "arm,mmu-400", .data = (void *)ARM_SMMU_V1 },
->   	{ .compatible = "arm,mmu-401", .data = (void *)ARM_SMMU_V1 },
->   	{ .compatible = "arm,mmu-500", .data = (void *)ARM_SMMU_V2 },
-> +	{ .compatible = "cavium,smmu-v2", .data = (void *)ARM_SMMU_V2 },
->   	{ },
->   };
->   MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
-> @@ -1827,6 +1836,23 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->   		}
->   	}
->
-> +	/*
-> +	 * Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-> +	 * namespaces; specifically within a given node SMMU0 and SMMU1 share,
-> +	 * as does SMMU2 and SMMU3. see if this is a Cavium SMMU, if so
-> +	 * set asid and vmid base such that each SMMU gets unique
-> +	 * asid/vmid space.
-> +	 */
-> +	if (!strcasecmp(of_id->compatible, "cavium,smmu-v2")) {
-> +		/* VMID16 must be present on Cavium SMMUv2*/
-> +		if (!(smmu->features & ARM_SMMU_FEAT_VMID16))
-> +			goto out_free_irqs;
-> +		smmu->cavium_smmu_id = cavium_smmu_count;
-> +		cavium_smmu_count++;
-> +		smmu->cavium_id_base =
-> +			(smmu->cavium_smmu_id * ARM_SMMU_MAX_CBS);
-> +	}
-> +
->   	INIT_LIST_HEAD(&smmu->list);
->   	spin_lock(&arm_smmu_devices_lock);
->   	list_add(&smmu->list, &arm_smmu_devices);
->
+Thanks for the reminder. I'll definitely hold off on applying this for
+now.
