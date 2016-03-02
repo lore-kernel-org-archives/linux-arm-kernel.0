@@ -1,33 +1,290 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Wed, 2 Mar 2016 17:57:51 +0000
-Subject: [PATCH] Change the spin_lock/unlock_irq interface in
- proc_alloc_inum() function
-In-Reply-To: <20160302172954.GI17997@ZenIV.linux.org.uk>
-References: <1456886879-28128-1-git-send-email-majun258@huawei.com>
- <20160302030941.GH17997@ZenIV.linux.org.uk>
- <56D688FC.9020202@huawei.com>
- <20160302172954.GI17997@ZenIV.linux.org.uk>
-Message-ID: <20160302175751.GJ17997@ZenIV.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 2 Mar 2016 12:07:28 -0600
+Subject: [PATCH V7 1/2] regulator: Add document for MT6323 regulator
+In-Reply-To: <1456396631-12788-1-git-send-email-blogic@openwrt.org>
+References: <1456396631-12788-1-git-send-email-blogic@openwrt.org>
+Message-ID: <20160302180728.GA21394@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 05:29:54PM +0000, Al Viro wrote:
+On Thu, Feb 25, 2016 at 11:37:10AM +0100, John Crispin wrote:
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Cc: devicetree at vger.kernel.org
+> ---
+> This patch needs to be merged post-rc1 as it depends on the MFD series of
+> the PMIC which is already inside Lee's tree pending the PR.
 
-> And no, it doesn't save the irq state anywhere - both disable and enable
-> are unconditional.  schedule() always returns with irqs enabled.
+Why? It is an indpendent change with no actual dependency.
 
-PS: look at it that way: how would you expect a context switch to behave?
-Suppose we blocked because we needed to write some dirty pages on disk
-to be able to free them; we *can't* keep irqs disabled through all of that,
-right?  After all, disk controller needs to be able to tell us it's done
-writing; hard to do that with interrupts disabled, not to mention that
-keeping them disabled for typical duration of disk write would be rather
-antisocial.  So no matter how schedule() behaves wrt irqs, doing it with
-irqs disabled would either invite deadlocks, or enable irqs at least for
-a while.  Even if it remembered that you used to have them disabled and
-re-disabled them when switching back, you would still lose whatever protection
-you were getting from having them disabled in the first place.  If e.g.
-you call request_irq() before being done setting the things up for
-interrupt handler and count on finishing that before reenabling irqs, you
-would need irqs to _stay_ disabled through all of that.  And with any
-blocking allocations there's no way to guarantee that.
+> 
+> Changes in V7
+> * remove another compatible string
+> * small wording changes
+> 
+> Changes in V6
+> * remove the compatible string
+> 
+> Changes in V5
+> * regulator vs regulators
+> 
+> Changes in V4
+> * regulator is a subnode and not a property
+> 
+>  .../bindings/regulator/mt6323-regulator.txt        |  239 ++++++++++++++++++++
+>  1 file changed, 239 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+> new file mode 100644
+> index 0000000..9fd95e7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+> @@ -0,0 +1,239 @@
+> +Mediatek MT6323 Regulator Driver
+> +
+> +All voltage regulators are defined as subnodes of the regulators node. A list
+> +of regulators provided by this controller are defined as subnodes of the
+> +PMIC's node. Each regulator is named according to its regulator type,
+> +buck_<name> and ldo_<name>. The definition for each of these nodes is defined
+> +using the standard binding for regulators at
+> +Documentation/devicetree/bindings/regulator/regulator.txt.
+> +
+> +The valid names for regulators are::
+> +BUCK:
+> +  buck_vproc, buck_vsys, buck_vpa
+> +LDO:
+> +  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
+> +  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
+> +  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
+> +  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
+> +
+> +Example:
+> +
+> +	pmic: mt6323 {
+> +		compatible = "mediatek,mt6323";
+> +
+> +		mt6323regulator: regulators {
+> +			mt6323_vproc_reg: buck_vproc{
+> +				regulator-name = "vproc";
+> +				regulator-min-microvolt = < 700000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-ramp-delay = <12500>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vsys_reg: buck_vsys{
+> +				regulator-name = "vsys";
+> +				regulator-min-microvolt = <1400000>;
+> +				regulator-max-microvolt = <2987500>;
+> +				regulator-ramp-delay = <25000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vpa_reg: buck_vpa{
+> +				regulator-name = "vpa";
+> +				regulator-min-microvolt = < 500000>;
+> +				regulator-max-microvolt = <3650000>;
+> +			};
+> +
+> +			mt6323_vtcxo_reg: ldo_vtcxo{
+> +				regulator-name = "vtcxo";
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-enable-ramp-delay = <90>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vcn28_reg: ldo_vcn28{
+> +				regulator-name = "vcn28";
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-enable-ramp-delay = <185>;
+> +			};
+> +
+> +			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
+> +				regulator-name = "vcn33_bt";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-enable-ramp-delay = <185>;
+> +			};
+> +
+> +			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
+> +				regulator-name = "vcn33_wifi";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-enable-ramp-delay = <185>;
+> +			};
+> +
+> +			mt6323_va_reg: ldo_va{
+> +				regulator-name = "va";
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vcama_reg: ldo_vcama{
+> +				regulator-name = "vcama";
+> +				regulator-min-microvolt = <1500000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vio28_reg: ldo_vio28{
+> +				regulator-name = "vio28";
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vusb_reg: ldo_vusb{
+> +				regulator-name = "vusb";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vmc_reg: ldo_vmc{
+> +				regulator-name = "vmc";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <36>;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vmch_reg: ldo_vmch{
+> +				regulator-name = "vmch";
+> +				regulator-min-microvolt = <3000000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <36>;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vemc3v3_reg: ldo_vemc3v3{
+> +				regulator-name = "vemc3v3";
+> +				regulator-min-microvolt = <3000000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <36>;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vgp1_reg: ldo_vgp1{
+> +				regulator-name = "vgp1";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vgp2_reg: ldo_vgp2{
+> +				regulator-name = "vgp2";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vgp3_reg: ldo_vgp3{
+> +				regulator-name = "vgp3";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vcn18_reg: ldo_vcn18{
+> +				regulator-name = "vcn18";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vsim1_reg: ldo_vsim1{
+> +				regulator-name = "vsim1";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vsim2_reg: ldo_vsim2{
+> +				regulator-name = "vsim2";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vrtc_reg: ldo_vrtc{
+> +				regulator-name = "vrtc";
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vcamaf_reg: ldo_vcamaf{
+> +				regulator-name = "vcamaf";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vibr_reg: ldo_vibr{
+> +				regulator-name = "vibr";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-enable-ramp-delay = <36>;
+> +			};
+> +
+> +			mt6323_vrf18_reg: ldo_vrf18{
+> +				regulator-name = "vrf18";
+> +				regulator-min-microvolt = <1825000>;
+> +				regulator-max-microvolt = <1825000>;
+> +				regulator-enable-ramp-delay = <187>;
+> +			};
+> +
+> +			mt6323_vm_reg: ldo_vm{
+> +				regulator-name = "vm";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vio18_reg: ldo_vio18{
+> +				regulator-name = "vio18";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			mt6323_vcamd_reg: ldo_vcamd{
+> +				regulator-name = "vcamd";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +
+> +			mt6323_vcamio_reg: ldo_vcamio{
+> +				regulator-name = "vcamio";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-enable-ramp-delay = <216>;
+> +			};
+> +		};
+> +	};
+> -- 
+> 1.7.10.4
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
