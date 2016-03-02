@@ -1,27 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 09:58:07 +0100
-Subject: [PATCH] pcmcia: db1xxx: use correct irq_to_gpio helper
-In-Reply-To: <CAOLZvyHH4-uq_fnpjrRptkMfjR1+1kzxXM+AUtj_Zb5V3AL-yQ@mail.gmail.com>
-References: <1547427.xN2rd1Mon4@wuerfel>
- <CAOLZvyHH4-uq_fnpjrRptkMfjR1+1kzxXM+AUtj_Zb5V3AL-yQ@mail.gmail.com>
-Message-ID: <60750044.6kqqL7c64M@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 2 Mar 2016 10:02:47 +0100
+Subject: [RESEND PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
+In-Reply-To: <20160302010453.GJ18327@sirena.org.uk>
+References: <1456826069-30955-1-git-send-email-nicolas.ferre@atmel.com>
+ <20160302010453.GJ18327@sirena.org.uk>
+Message-ID: <56D6AC37.8080302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2016 07:50:28 Manuel Lauss wrote:
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: stable at vger.kernel.org # v4.3
-> > Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h")
-> > ---
-> > I think this is now the last holdout of the irq_to_gpio function,
-> > and it's been broken for a while. Maybe Ralf can queue it up through
-> > the MIPS tree along with the other fix for irq_to_gpio?
+Le 02/03/2016 02:04, Mark Brown a ?crit :
+> On Tue, Mar 01, 2016 at 10:54:29AM +0100, Nicolas Ferre wrote:
 > 
-> It's not broken though..  this driver on current linus-git works fine!
+>>
+>> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+> 
+> I can't look at patches that aren't signed off, please see
+> SubmittingPatches for details.
 
-Ah, so it doesn't actually need the gpio line then?
+Songjun did sign the patch, I'm puzzled...
 
-irq_to_gpio() unconditionally returns -EINVAL since 4.3, so the easiest
-fix would be to remove the card-detect function in the driver, right?
+Ah, you mean that I should have signed it myself as well as I am the
+actual sender... ok, as it's a "resend" like the subject says and that
+the first patch was actually sent by Songjun, I though it would be legit.
 
-	Arnd
+Anyway, I'll resend it with my own Signed tag.
+
+Bye,
+-- 
+Nicolas Ferre
