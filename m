@@ -1,60 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 Mar 2016 11:12:45 -0600
-Subject: [PATCH] dt-bindings: interrupt-controller: add SoC-specific
- compatible string to Marvell ODMI
-In-Reply-To: <1456327494-31358-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1456327494-31358-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160302171245.GA25012@rob-hp-laptop>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 2 Mar 2016 09:12:57 -0800
+Subject: [PATCH 11/14] input: spear-keyboard: use __maybe_unused to hide
+ pm functions
+In-Reply-To: <1456934350-1389172-12-git-send-email-arnd@arndb.de>
+References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
+ <1456934350-1389172-12-git-send-email-arnd@arndb.de>
+Message-ID: <20160302171257.GB4318@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 04:24:54PM +0100, Thomas Petazzoni wrote:
-> As requested by Rob Herring, this commit adds a SoC-specific
-> compatible string to the Marvell ODMI DT binding.
+On Wed, Mar 02, 2016 at 04:59:03PM +0100, Arnd Bergmann wrote:
+> The spear keyboard driver uses #ifdef CONFIG_PM to hide its
+> power management functions, but then uses references from
+> SIMPLE_DEV_PM_OPS that are only present if both CONFIG_PM
+> and CONFIG_PM_SLEEP are set, resulting in a warning about unused
+> functions:
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> This commit applies on top of the Marvell ODMI driver patch, which has
-> already been merged.
-> ---
->  .../bindings/interrupt-controller/marvell,odmi-controller.txt      | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-
-I see this is already merged, but for the record:
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-There is a typo in the example though.
-
+> drivers/input/keyboard/spear-keyboard.c:292:12: error: 'spear_kbd_suspend' defined but not used [-Werror=unused-function]
+> drivers/input/keyboard/spear-keyboard.c:345:12: error: 'spear_kbd_resume' defined but not used [-Werror=unused-function]
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
-> index 252d5c9..8af0a8e 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,odmi-controller.txt
-> @@ -6,7 +6,9 @@ which can be used by on-board peripheral for MSI interrupts.
->  
->  Required properties:
->  
-> -- compatible           : The value here should contain "marvell,odmi-controller".
-> +- compatible           : The value here should contain:
-> +
-> +    "marvell,ap806-odmi-controller", "marvell,odmi-controller".
->  
->  - interrupt,controller : Identifies the node as an interrupt controller.
->  
-> @@ -29,7 +31,8 @@ Required properties:
->  Example:
->  
->  	odmi: odmi at 300000 {
-> -		compatible = "marvell,odmi-controller";
-> +		compatible = "marvell,ap806-odm-controller",
+> This removes the #ifdef and instead uses a __maybe_unused
+> annotation.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-s/odm/odmi/
+Applied, thank you.
 
-> +			     "marvell,odmi-controller";
->  		interrupt-controller;
->  		msi-controller;
->  		marvell,odmi-frames = <4>;
+> ---
+>  drivers/input/keyboard/spear-keyboard.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+> index 623d451767e3..8083eaa0524a 100644
+> --- a/drivers/input/keyboard/spear-keyboard.c
+> +++ b/drivers/input/keyboard/spear-keyboard.c
+> @@ -288,8 +288,7 @@ static int spear_kbd_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_PM
+> -static int spear_kbd_suspend(struct device *dev)
+> +static int __maybe_unused spear_kbd_suspend(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+> @@ -342,7 +341,7 @@ static int spear_kbd_suspend(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int spear_kbd_resume(struct device *dev)
+> +static int __maybe_unused spear_kbd_resume(struct device *dev)
+>  {
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	struct spear_kbd *kbd = platform_get_drvdata(pdev);
+> @@ -368,7 +367,6 @@ static int spear_kbd_resume(struct device *dev)
+>  
+>  	return 0;
+>  }
+> -#endif
+>  
+>  static SIMPLE_DEV_PM_OPS(spear_kbd_pm_ops, spear_kbd_suspend, spear_kbd_resume);
+>  
 > -- 
-> 2.6.4
+> 2.7.0
 > 
+
+-- 
+Dmitry
