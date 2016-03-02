@@ -1,36 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  1 Mar 2016 17:55:02 -0800
-Subject: [PATCH] ARM: OMAP2+: Use srst_udelay for USB on dm814x
-Message-ID: <1456883702-32377-1-git-send-email-tony@atomide.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 2 Mar 2016 03:14:50 +0100
+Subject: [PATCH v5 2/4] mmc: meson: Add driver for the SD/MMC host found
+ on Amlogic Meson SoCs
+In-Reply-To: <1456596108-1406-3-git-send-email-carlo@caione.org>
+References: <1456596108-1406-1-git-send-email-carlo@caione.org>
+ <1456596108-1406-3-git-send-email-carlo@caione.org>
+Message-ID: <56D64C9A.3030004@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this booting t410 can fail randomly with no output
-depending on the .config options chosen. Enabling debug_ll
-causes the problem to go away. I narrowed this down to USB
-by disabling one module at a time.
+Hi Carlo,
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 2 ++
- 1 file changed, 2 insertions(+)
+Am 27.02.2016 um 19:01 schrieb Carlo Caione:
+> Add a driver for the SD/MMC host found on the Amlogic Meson SoCs. This
+> is an MMC controller which provides an interface between the application
+> processor and various memory cards. It supports the SD specification
+> v2.0 and the eMMC specification v4.41.
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-index 39736ad..df83277 100644
---- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -582,9 +582,11 @@ static struct omap_hwmod_ocp_if dm81xx_alwon_l3_slow__gpmc = {
- 	.user		= OCP_USER_MPU,
- };
- 
-+/* USB needs udelay 1 after reset at least on hp t410, use 2 for margin */
- static struct omap_hwmod_class_sysconfig dm81xx_usbhsotg_sysc = {
- 	.rev_offs	= 0x0,
- 	.sysc_offs	= 0x10,
-+	.srst_udelay	= 2,
- 	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
- 				SYSC_HAS_SOFTRESET,
- 	.idlemodes	= SIDLE_SMART | MSTANDBY_FORCE | MSTANDBY_SMART,
+Enabling this driver on top of my v2 arm64 gxbb series, I get:
+
+  CC      drivers/mmc/host/meson-mmc.o
+drivers/mmc/host/meson-mmc.c: In function 'meson_mmc_probe':
+drivers/mmc/host/meson-mmc.c:471:12: error: implicit declaration of
+function 'devm_pinctrl_get' [-Werror=implicit-function-declaration]
+  pinctrl = devm_pinctrl_get(&pdev->dev);
+            ^
+drivers/mmc/host/meson-mmc.c:471:10: warning: assignment makes pointer
+from integer without a cast [-Wint-conversion]
+  pinctrl = devm_pinctrl_get(&pdev->dev);
+          ^
+cc1: some warnings being treated as errors
+scripts/Makefile.build:258: recipe for target
+'drivers/mmc/host/meson-mmc.o' failed
+make[3]: *** [drivers/mmc/host/meson-mmc.o] Error 1
+scripts/Makefile.build:407: recipe for target 'drivers/mmc/host' failed
+make[2]: *** [drivers/mmc/host] Error 2
+scripts/Makefile.build:407: recipe for target 'drivers/mmc' failed
+make[1]: *** [drivers/mmc] Error 2
+Makefile:959: recipe for target 'drivers' failed
+make: *** [drivers] Error 2
+
+Either this is missing a Kconfig dependency on PINCTRL, or should be
+using #ifdef CONFIG_PINCTRL or some other guard.
+
+For gxbb we could just ignore this in the hopes that Nicolas will have a
+working pinctrl driver soon, but it might reappear for COMPILE_TEST.
+
+Regards,
+Andreas
+
 -- 
-2.7.0
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
