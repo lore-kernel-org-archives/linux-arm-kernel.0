@@ -1,51 +1,38 @@
-From: majun258@huawei.com (majun (F))
-Date: Wed, 2 Mar 2016 14:32:28 +0800
-Subject: [PATCH] Change the spin_lock/unlock_irq interface in
- proc_alloc_inum() function
-In-Reply-To: <20160302030941.GH17997@ZenIV.linux.org.uk>
-References: <1456886879-28128-1-git-send-email-majun258@huawei.com>
- <20160302030941.GH17997@ZenIV.linux.org.uk>
-Message-ID: <56D688FC.9020202@huawei.com>
+From: manuel.lauss@gmail.com (Manuel Lauss)
+Date: Wed, 2 Mar 2016 07:50:28 +0100
+Subject: [PATCH] pcmcia: db1xxx: use correct irq_to_gpio helper
+In-Reply-To: <1547427.xN2rd1Mon4@wuerfel>
+References: <1547427.xN2rd1Mon4@wuerfel>
+Message-ID: <CAOLZvyHH4-uq_fnpjrRptkMfjR1+1kzxXM+AUtj_Zb5V3AL-yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ Hi Arnd,
 
 
-? 2016/3/2 11:09, Al Viro ??:
-> On Wed, Mar 02, 2016 at 10:47:59AM +0800, MaJun wrote:
->> From: Ma Jun <majun258@huawei.com>
->>
->> The spin_lock/unlock_irq interface is not safe when this function is called
->> at some case which need irq disabled.
-> 
->> For example:
->> 	spin_lock_irqsave()
->> 	|
->> 	request_irq() --> proc_alloc_inum()
->> 	|
->> 	spin_unlock_irqrestore()
-> 
-> Do you even read your own patch?
-> 
->>  	if (!ida_pre_get(&proc_inum_ida, GFP_KERNEL))
-> 					 ^^^^^^^^^^
-> 					 This.
-> 
-> It can block.  You *can't* call that under spin_lock_irqsave().  At all.
-> You also can't do request_irq() under a spinlock, no matter whether you
-> disable irqs or not - it also blocks.  So does proc_mkdir(), for that
-> matter, and not only in proc_alloc_inum().
-> 
-> NAKed.  Don't do it.  request_irq() is not to be called under spinlocks,
-> with or without irqs disabled.
-> 
+On Tue, Mar 1, 2016 at 11:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> After the removal of asm/gpio.h and asm/mach-au1x00/gpio.h, the db1xxx_ss
+> pcmcia driver picked up the wrong irq_to_gpio function from the generic
+> headers.
+>
+> This restores the old __au_irq_to_gpio() implementation, but keeps
+> it local to the only file that uses it.
+>
+> It would be nicer to just pass the gpio number from platform code,
+> but restoring the previous implementation seems safer.
 
-Sorry,I made a wrong example for this problem.
-I want to say this interface may change the irq status after this function
-be called.
+Give me a few hours and I'll fix this driver for good.
 
-Thanks!
-MaJun
 
-> .
-> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: stable at vger.kernel.org # v4.3
+> Fixes: 832f5dacfa0b ("MIPS: Remove all the uses of custom gpio.h")
+> ---
+> I think this is now the last holdout of the irq_to_gpio function,
+> and it's been broken for a while. Maybe Ralf can queue it up through
+> the MIPS tree along with the other fix for irq_to_gpio?
+
+It's not broken though..  this driver on current linus-git works fine!
+
+Thank you,
+      Manuel
