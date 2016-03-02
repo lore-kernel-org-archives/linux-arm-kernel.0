@@ -1,89 +1,107 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Wed, 2 Mar 2016 13:41:26 -0600
-Subject: [PATCH v3 1/5] pwms: pwm-ti*: Remove support for local clock
- gating
-In-Reply-To: <20160229232011.GU13417@atomide.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-2-git-send-email-fcooper@ti.com>
- <20160229220444.GQ13417@atomide.com> <56D4C69D.1090100@ti.com>
- <20160229225536.GR13417@atomide.com> <56D4D032.7040801@ti.com>
- <20160229232011.GU13417@atomide.com>
-Message-ID: <56D741E6.3000708@ti.com>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Wed, 2 Mar 2016 15:09:35 -0500
+Subject: [PATCH v10 11/12] arm64: factor work_pending state machine to C
+In-Reply-To: <1456949376-4910-1-git-send-email-cmetcalf@ezchip.com>
+References: <1456949376-4910-1-git-send-email-cmetcalf@ezchip.com>
+Message-ID: <1456949376-4910-12-git-send-email-cmetcalf@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+state machine that can be difficult to reason about due to duplicated
+code and a large number of branch targets.
 
+This patch factors the common logic out into the existing
+do_notify_resume function, converting the code to C in the process,
+making the code more legible.
 
-On 02/29/2016 05:20 PM, Tony Lindgren wrote:
-> * Franklin S Cooper Jr. <fcooper@ti.com> [160229 15:12]:
->>
->> On 02/29/2016 04:55 PM, Tony Lindgren wrote:
->>> * Franklin S Cooper Jr. <fcooper@ti.com> [160229 14:31]:
->>>> On 02/29/2016 04:04 PM, Tony Lindgren wrote:
->>>>> Hmm but why are you also removing the pm_runtime calls? Those
->>>>> actually do take care of gating the clocks via the interconnect
->>>>> level code that is hwmod in this case.
->>>> I removed all PM runtime calls that revolved around
->>>> pwmss_submodule_state_change. Originally the driver would do
->>>> a pm_runtime_get_sync then call pwmss_submodule_state_change
->>>> and then immediately call pm_runtime_put_sync. Without
->>>> pwmss_submodule_state_change those calls would be
->>>> meaningless.  I also removed pm_runtime calls in error paths
->>>> that no longer existed.
->>> Typically the interconnect level code can gate the clkctrl bit
->>> for the module with PM runtime even with no other driver specific
->>> registers. If you remove the pm_runtime calls, that does not
->>> happen.
->> So the clocks should be unlocked when ever the IP registers are
->> being read/written or if the peripheral is being used for
->> example
->> the pwm signal is being generated. All these cases are already
->> being handled.
->>
->> Using ecap driver as an example.
->>
->> Pm_runtime_get_sync is called within ecap_pwm_enable when
->> the pwm signal is to be generated. Pm_runtime_put_sync is called
->> when the pwm signal is to be stopped.
->>
->> When either the pwm signal polarity is set or pwm
->> configuration is made
->> then a pm_runtime_get_sync and pm_runtime_put_sync are
->> called within
->> the same function surrounding calls to the IP's registers.
->>
->> Probe is calling pm_runtime_enable while remove is calling
->> pm_runtime_disable.
-> OK good to hear you have considered this. The above answers
-> my questions then thanks.
->
->> So the correct pm_runtime calls are being made from what I
->> can see.
->> I'm not sure I understand the concern since removing those
->> calls aren't
->> creating any kind of imbalance.
-> OK thanks for checking.
->
->> If I'm not addressing your concern please give me an example
->> of where
->> you see a possible issue.
-> No that's fine. I thought you're ripping out all of the the
-> pm_runtime based on just looking at the patch :)
->
->>> Also, how do you know this change does not affect the other
->>> SoC variants using the same driver?
->> I've tested these changes on AM335x GP and AM437x GP evms.
->> AM335x
->> and AM437x were the only other users of this driver. Sorry 
->> I should of
->> documented this in my cover-letter.
-> OK good to hear.
->
-> Thanks,
->
-> Tony
+This patch tries to closely mirror the existing behaviour while using
+the usual C control flow primitives. As local_irq_{disable,enable} may
+be instrumented, we balance exception entry (where we will almost most
+likely enable IRQs) with a call to trace_hardirqs_on just before the
+return to userspace.
 
-I know there are some comments regarding other patches in
-this patchset but this patch is unrelated and can be pulled
-in separately. Any objections to this or should I just
-resubmit this patch by itself?
+Signed-off-by: Chris Metcalf <cmetcalf@ezchip.com>
+---
+ arch/arm64/kernel/entry.S  | 12 ++++--------
+ arch/arm64/kernel/signal.c | 30 ++++++++++++++++++++++--------
+ 2 files changed, 26 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 1f7f5a2b61bf..966d0d4308f2 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -674,18 +674,13 @@ ret_fast_syscall_trace:
+  * Ok, we need to do extra processing, enter the slow path.
+  */
+ work_pending:
+-	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+-	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+ 	mov	x0, sp				// 'regs'
+-	enable_irq				// enable interrupts for do_notify_resume()
+ 	bl	do_notify_resume
+-	b	ret_to_user
+-work_resched:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
++	bl	trace_hardirqs_on		// enabled while in userspace
+ #endif
+-	bl	schedule
+-
++	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
++	b	finish_ret_to_user
+ /*
+  * "slow" syscall return path.
+  */
+@@ -694,6 +689,7 @@ ret_to_user:
+ 	ldr	x1, [tsk, #TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
++finish_ret_to_user:
+ 	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ENDPROC(ret_to_user)
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index e18c48cb6db1..3432e14b7d6e 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -402,15 +402,29 @@ static void do_signal(struct pt_regs *regs)
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 				 unsigned int thread_flags)
+ {
+-	if (thread_flags & _TIF_SIGPENDING)
+-		do_signal(regs);
++	while (true) {
+ 
+-	if (thread_flags & _TIF_NOTIFY_RESUME) {
+-		clear_thread_flag(TIF_NOTIFY_RESUME);
+-		tracehook_notify_resume(regs);
+-	}
++		if (thread_flags & _TIF_NEED_RESCHED) {
++			schedule();
++		} else {
++			local_irq_enable();
++
++			if (thread_flags & _TIF_SIGPENDING)
++				do_signal(regs);
+ 
+-	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+-		fpsimd_restore_current_state();
++			if (thread_flags & _TIF_NOTIFY_RESUME) {
++				clear_thread_flag(TIF_NOTIFY_RESUME);
++				tracehook_notify_resume(regs);
++			}
++
++			if (thread_flags & _TIF_FOREIGN_FPSTATE)
++				fpsimd_restore_current_state();
++		}
+ 
++		local_irq_disable();
++
++		thread_flags = READ_ONCE(current_thread_info()->flags);
++		if (!(thread_flags & _TIF_WORK_MASK))
++			break;
++	}
+ }
+-- 
+2.1.2
