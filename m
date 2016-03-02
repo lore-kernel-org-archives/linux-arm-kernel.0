@@ -1,50 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 Mar 2016 10:05:38 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Fixes for v4.5
-Message-ID: <cover.1456880499.git.horms+renesas@verge.net.au>
+Date: Wed,  2 Mar 2016 10:05:44 +0900
+Subject: [PATCH] ARM: dts: porter: remove enable prop from HS-USB device node
+In-Reply-To: <cover.1456880499.git.horms+renesas@verge.net.au>
+References: <cover.1456880499.git.horms+renesas@verge.net.au>
+Message-ID: <949024d6702d1da8a266f42226d8402f0df078dc.1456880499.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please consider these second round of Renesas ARM based SoC DT fixes for v4.5.
+In  the final versions of the Porter board (called "PORTER_C") Renesas
+decided to get rid  of the Maxim Integrated MAX3355 OTG chip and didn't
+add any other provision to differ the host/gadget mode, so we'll have to
+remove  no longer valid "renesas,enable-gpio" property from the HS-USB
+device node.  Hopefully, the earlier revisions of the board were never
+seen in the wild...
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt-fixes-for-v4.5,
-which you have already pulled.
-
-If this pull-request is too late for v4.5 then please consider it for v4.6.
-
-
-HS-USB DT support was added to the porter board in v4.5-rc1.
-Unfortunately it was developed against an early revision of the
-board and newer revisions do not include the Maxim Integrated MAX3355 OTG
-chip and thus there should not be a renesas,enable-gpio property.
-
-It is my understanding at this time that the early-revision boards in
-question have not been observed in the wild.
-
-
-The following changes since commit 8bc403b78ffb774d8dc944abb0826c46c0dca09d:
-
-  ARM: dts: silk: Add compatible property to "partitions" node (2016-01-07 08:39:06 +1100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-fixes2-for-v4.5
-
-for you to fetch changes up to 949024d6702d1da8a266f42226d8402f0df078dc:
-
-  ARM: dts: porter: remove enable prop from HS-USB device node (2016-03-02 09:46:56 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Fixes for v4.5
-
-* remove enable prop from HS-USB device node on porter board
-
-----------------------------------------------------------------
-Sergei Shtylyov (1):
-      ARM: dts: porter: remove enable prop from HS-USB device node
-
+Fixes: c794f6a09a25 ("ARM: shmobile: porter: add HS-USB DT support")
+Reported-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/boot/dts/r8a7791-porter.dts | 1 -
  1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index 6713b1ea732b..01d239c3eaaa 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -283,7 +283,6 @@
+ 	pinctrl-names = "default";
+ 
+ 	status = "okay";
+-	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
+ };
+ 
+ &usbphy {
+-- 
+2.1.4
