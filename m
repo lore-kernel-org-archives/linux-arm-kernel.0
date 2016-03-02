@@ -1,74 +1,29 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Wed, 2 Mar 2016 09:06:52 +0530
-Subject: [RFC PATCH] ARM: OMAP2+: Fix updating of sysconfig register
-In-Reply-To: <alpine.DEB.2.02.1603011703170.14948@utopia.booyaka.com>
-References: <1456832887-5312-1-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1603011703170.14948@utopia.booyaka.com>
-Message-ID: <56D65FD4.4090206@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 2 Mar 2016 12:46:45 +0900
+Subject: [PATCH] arm64: defconfig: Enable devices for Hi6220 and 96boards
+ HiKey
+In-Reply-To: <1456815648-10935-1-git-send-email-guodong.xu@linaro.org>
+References: <1456815648-10935-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <20160302034645.GA24414@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On Tuesday 01 March 2016 10:33 PM, Paul Walmsley wrote:
-> + Jon Hunter
+On Tue, Mar 01, 2016 at 03:00:48PM +0800, Guodong Xu wrote:
+> This patch enables a number of devices currently supported by the Hi6220
+> and 96boards HiKey. These include
+> a) Hi655x PMIC and regulator
+> b) Hi6220 I2C, USB, MMC, mailbox, reset
+> c) CONFIG_PINCTRL_SINGLE, and CONFIG_LEDS_GPIO
 > 
-> On Tue, 1 Mar 2016, Lokesh Vutla wrote:
+> CONFIG_MMC_BLOCK_MINORS is set to 16 (default is 8).
 > 
->> commit 127500ccb766f ("ARM: OMAP2+: Only write the sysconfig on idle
->> when necessary") talks about verification of sysconfig cache value before
->> updating it, only during idle path. But the patch is adding the
->> verification in the enable path. So, adding the check in a proper place
->> as per the commit description.
->>
->> Not keeping this check during enable path as there is a chance of losing
->> context and it is safe to do on idle as the context of the register will
->> never be lost while the device is active.
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+>  arch/arm64/configs/defconfig | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
 
-When the patch was originally posted[1], this check was in proper place
-itself. Not sure what happened after that.
-
-[1] https://www.mail-archive.com/linux-omap%40vger.kernel.org/msg78032.html
-
-Thanks and regards,
-Lokesh
-
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>  arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->> index e9f65fe..71b3747 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->> @@ -1416,9 +1416,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
->>  	    (sf & SYSC_HAS_CLOCKACTIVITY))
->>  		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
->>  
->> -	/* If the cached value is the same as the new value, skip the write */
->> -	if (oh->_sysc_cache != v)
->> -		_write_sysconfig(v, oh);
->> +	_write_sysconfig(v, oh);
->>  
->>  	/*
->>  	 * Set the autoidle bit only after setting the smartidle bit
->> @@ -1481,7 +1479,9 @@ static void _idle_sysc(struct omap_hwmod *oh)
->>  		_set_master_standbymode(oh, idlemode, &v);
->>  	}
->>  
->> -	_write_sysconfig(v, oh);
->> +	/* If the cached value is the same as the new value, skip the write */
->> +	if (oh->_sysc_cache != v)
->> +		_write_sysconfig(v, oh);
->>  }
->>  
->>  /**
->> -- 
->> 2.1.4
->>
-> 
-> 
-> - Paul
-> 
+In general updates to the above file go through platform maintainer's trees.
+I was unable to work out who the Hi6220 and 96boards HiKey maintainers are,
+but you should probably send this patch to them.
