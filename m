@@ -1,75 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:24:04 +0100
-Subject: [PATCH 2/6] usb: xhci-mtk: use __maybe_unused to hide pm functions
+Date: Wed,  2 Mar 2016 16:24:05 +0100
+Subject: [PATCH 3/6] usb: ohci-at91: use __maybe_unused to hide pm functions
 In-Reply-To: <1456932255-71725-1-git-send-email-arnd@arndb.de>
 References: <1456932255-71725-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456932255-71725-3-git-send-email-arnd@arndb.de>
+Message-ID: <1456932255-71725-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mediatek XHCI glue driver uses SET_SYSTEM_SLEEP_PM_OPS() to
-conditionally set the correct suspend/resume options, and
-also puts both the dev_pm_ops and the functions inside of
-an #ifdef testing for CONFIG_PM_SLEEP, but those functions
-then call other code that becomes unused:
+The ohci-at91 driver uses #ifdef to check for CONFIG_PM, but then
+uses SIMPLE_DEV_PM_OPS, which leaves the references out when
+CONFIG_PM_SLEEP is not defined, so we get a warning with
+PM=y && PM_SLEEP=n:
 
-drivers/usb/host/xhci-mtk.c:135:12: error: 'xhci_mtk_host_disable' defined but not used [-Werror=unused-function]
-drivers/usb/host/xhci-mtk.c:313:13: error: 'usb_wakeup_enable' defined but not used [-Werror=unused-function]
-drivers/usb/host/xhci-mtk.c:321:13: error: 'usb_wakeup_disable' defined but not used [-Werror=unused-function]
+drivers/usb/host/ohci-at91.c:587:1: error: 'ohci_hcd_at91_drv_suspend' defined but not used [-Werror=unused-function]
+drivers/usb/host/ohci-at91.c:631:12: error: 'ohci_hcd_at91_drv_resume' defined but not used [-Werror=unused-function]
 
-This replaces the #ifdef with __maybe_unused annotations so the
-compiler knows it can silently drop them instead of warning.
-
-For the DEV_PM_OPS definition, we can use an IS_ENABLED() check
-to avoid defining the structure when CONFIG_PM is not set without
-the #ifdef.
+This removes the incorrect #ifdef and instead uses a __maybe_unused
+annotation to let the compiler know it can silently drop
+the function definition.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/usb/host/xhci-mtk.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ drivers/usb/host/ohci-at91.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 9532f5aef71b..79959f17c38c 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -695,7 +695,6 @@ static int xhci_mtk_remove(struct platform_device *dev)
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 95c8ddde0725..d177372bb357 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -581,9 +581,7 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
  	return 0;
  }
  
--#ifdef CONFIG_PM_SLEEP
- /*
-  * if ip sleep fails, and all clocks are disabled, access register will hang
-  * AHB bus, so stop polling roothubs to avoid regs access on bus suspend.
-@@ -703,7 +702,7 @@ static int xhci_mtk_remove(struct platform_device *dev)
-  * to wake up system immediately after system suspend complete if ip sleep
-  * fails, it is what we wanted.
-  */
--static int xhci_mtk_suspend(struct device *dev)
-+static int __maybe_unused xhci_mtk_suspend(struct device *dev)
+-#ifdef CONFIG_PM
+-
+-static int
++static int __maybe_unused
+ ohci_hcd_at91_drv_suspend(struct device *dev)
  {
- 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
- 	struct usb_hcd *hcd = mtk->hcd;
-@@ -722,7 +721,7 @@ static int xhci_mtk_suspend(struct device *dev)
- 	return 0;
+ 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+@@ -628,7 +626,8 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
+ 	return ret;
  }
  
--static int xhci_mtk_resume(struct device *dev)
-+static int __maybe_unused xhci_mtk_resume(struct device *dev)
+-static int ohci_hcd_at91_drv_resume(struct device *dev)
++static int __maybe_unused
++ohci_hcd_at91_drv_resume(struct device *dev)
  {
- 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
- 	struct usb_hcd *hcd = mtk->hcd;
-@@ -744,10 +743,7 @@ static int xhci_mtk_resume(struct device *dev)
- static const struct dev_pm_ops xhci_mtk_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(xhci_mtk_suspend, xhci_mtk_resume)
- };
--#define DEV_PM_OPS	(&xhci_mtk_pm_ops)
--#else
--#define DEV_PM_OPS	NULL
--#endif /* CONFIG_PM */
-+#define DEV_PM_OPS IS_ENABLED(CONFIG_PM) ? &xhci_mtk_pm_ops : NULL
+ 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+ 	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
+@@ -641,7 +640,6 @@ static int ohci_hcd_at91_drv_resume(struct device *dev)
+ 	ohci_resume(hcd, false);
+ 	return 0;
+ }
+-#endif
  
- #ifdef CONFIG_OF
- static const struct of_device_id mtk_xhci_of_match[] = {
+ static SIMPLE_DEV_PM_OPS(ohci_hcd_at91_pm_ops, ohci_hcd_at91_drv_suspend,
+ 					ohci_hcd_at91_drv_resume);
 -- 
 2.7.0
