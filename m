@@ -1,54 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 2 Mar 2016 18:16:46 +0100
-Subject: [PATCH 0/3] arm64: more granular KASLR
-In-Reply-To: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu90DPQwMD7W9_jydBAFOaA3Mu0RgbOPODTdmuY01zLoKw@mail.gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Wed, 2 Mar 2016 17:29:54 +0000
+Subject: [PATCH] Change the spin_lock/unlock_irq interface in
+ proc_alloc_inum() function
+In-Reply-To: <56D688FC.9020202@huawei.com>
+References: <1456886879-28128-1-git-send-email-majun258@huawei.com>
+ <20160302030941.GH17997@ZenIV.linux.org.uk>
+ <56D688FC.9020202@huawei.com>
+Message-ID: <20160302172954.GI17997@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 March 2016 at 18:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> It turns out we can squeeze out 5 to 7 bits of additional KASLR entropy in
-> the new arm64 implementation. This is based on the observation that the
-> minimal 2 MB alignment of the kernel image is only required for kernels
-> that are non-relocatable, and since KASLR already implies a relocatable
-> kernel anyway, we get this additional wiggle room almost [1] for free.
->
-> The idea is that, since we need to fix up all absolute symbol references
-> anyway, the hardcoded virtual start address of the kernel does not need to
-> be 2 MB aligned (+ TEXT_OFFSET), and the only thing we need to ensure is
-> that the physical misalignment and the virtual misalignment are equal modulo
-> the swapper block size.
->
-> Patch #1 removes the explicit mapping of the TEXT_OFFSET region below the
-> kernel, and only maps it if the rounding to swapper block size of the kernel
-> start address ends up covering it.
->
-> Patch #2 updates the early boot code to treat the physical misalignment as
-> the initial KASLR displacement. Note that this only affects code that is
-> compiled conditionally if CONFIG_RANDOMIZE_BASE=y
->
-> Patch #3 updates the stub allocation strategy to allow a more granular mapping.
-> Note that the allocation itself is still rounded to 2 MB as before, to prevent
-> the early mapping to cover adjacent regions inadvertently. As is the case for
-> patch #2, this only affects the new code under CONFIG_RANDOMIZE_BASE=y
->
-> Sample output from a 4k/4 levels kernel, where we have 33 bits of entropy
-> in the kernel addresses:
->
-> Virtual kernel memory layout:
->     modules : 0xffff000000000000 - 0xffff000008000000   (   128 MB)
->     vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000   (129022 GB)
->       .init : 0xffff0bbbe14a6000 - 0xffff0bbbe17d5000   (  3260 KB)
->       .text : 0xffff0bbbe0c24000 - 0xffff0bbbe120a000   (  6040 KB)
->     .rodata : 0xffff0bbbe120a000 - 0xffff0bbbe14a6000   (  2672 KB)
->       .data : 0xffff0bbbe17d5000 - 0xffff0bbbe1866e00   (   584 KB)
->       fixed : 0xffff7dfffe7fd000 - 0xffff7dfffec00000   (  4108 KB)
->     PCI I/O : 0xffff7dfffee00000 - 0xffff7dffffe00000   (    16 MB)
->     vmemmap : 0xffff7e0000000000 - 0xffff800000000000   (  2048 GB maximum)
->               0xffff7e1333000000 - 0xffff7e1337000000   (    64 MB actual)
->      memory : 0xffff84ccc0000000 - 0xffff84cdc0000000   (  4096 MB)
->
+On Wed, Mar 02, 2016 at 02:32:28PM +0800, majun (F) wrote:
 
-[1] this does defeat the performance benefit resulting from the
-increased alignment implemented by CONFIG_DEBUG_ALIGN_RODATA=y
+> Sorry,I made a wrong example for this problem.
+> I want to say this interface may change the irq status after this function
+> be called.
+
+It can't - either it's called with irqs enabled, in which case it returns
+the same way, or it's called with irqs disabled, in which case it's a trouble
+waiting to happen as soon as the allocation there (or in proc_mkdir(), etc.)
+happens to block and failure to restore irq state is the least of your
+concerns, because when you return from schedule() you *will* have irq enabled,
+no matter what.
+
+Take a look at __schedule():
+...
+        local_irq_disable();
+        rcu_note_context_switch();
+
+        /*
+         * Make sure that signal_pending_state()->signal_pending() below
+         * can't be reordered with __set_current_state(TASK_INTERRUPTIBLE)
+         * done by the caller to avoid the race with signal_wake_up().
+         */
+        smp_mb__before_spinlock();
+        raw_spin_lock(&rq->lock);
+...
+                rq = context_switch(rq, prev, next); /* unlocks the rq */
+and in context_switch() (right after switch_to()) we call finish_task_switch(),
+which calls finish_lock_switch(), which does raw_spin_unlock_irq(&rq->lock),
+which does local_irq_enable().
+
+And no, it doesn't save the irq state anywhere - both disable and enable
+are unconditional.  schedule() always returns with irqs enabled.
+
+Don't call blocking things with irqs disabled.  If design of some of your
+drivers depends on being able to do that, sorry, but it'll have to be changed.
