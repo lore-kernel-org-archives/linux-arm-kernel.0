@@ -1,162 +1,54 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 2 Mar 2016 12:10:36 +0000
-Subject: [PATCH 2/5] arm64: efi: apply strict permissons for UEFI Runtime
- Services regions
-In-Reply-To: <1456151158-25849-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456151158-25849-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456151158-25849-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160302121036.GD2649@codeblueprint.co.uk>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 2 Mar 2016 07:13:10 -0500
+Subject: [PATCH 0/2] Tracking user space vDSO remaping
+In-Reply-To: <cover.1426866405.git.ldufour@linux.vnet.ibm.com>
+References: <cover.1426866405.git.ldufour@linux.vnet.ibm.com>
+Message-ID: <56D6D8D6.6060306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Feb, at 03:25:55PM, Ard Biesheuvel wrote:
-> Recent UEFI versions expose permission attributes for runtime services
-> memory regions, either in the UEFI memory map or in the separate memory
-> attributes table. This allows the kernel to map these regions with
-> stricter permissions, rather than the RWX permissions that are used by
-> default. So wire this up in our mapping routine.
+Hi,
+
+On 03/20/2015 11:53 AM, Laurent Dufour wrote:
+> CRIU is recreating the process memory layout by remapping the checkpointee
+> memory area on top of the current process (criu). This includes remapping
+> the vDSO to the place it has at checkpoint time.
 > 
-> Note that in the absence of permission attributes, we still only map
-> regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
-> Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
-> type directly rather than on the absence of the EFI_MEMORY_WB attribute.
-> This is more correct, but is also required for compatibility with the
-> upcoming support for the Memory Attributes Table, which only carries
-> permission attributes, not memory type attributes.
+> However some architectures like powerpc are keeping a reference to the vDSO
+> base address to build the signal return stack frame by calling the vDSO
+> sigreturn service. So once the vDSO has been moved, this reference is no
+> more valid and the signal frame built later are not usable.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c | 27 ++++++++++++++++----
->  1 file changed, 22 insertions(+), 5 deletions(-)
+> This patch serie is introducing a new mm hook 'arch_remap' which is called
+> when mremap is done and the mm lock still hold. The next patch is adding the
+> vDSO remap and unmap tracking to the powerpc architecture.
 > 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index b6abc852f2a1..3364408c154f 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -24,15 +24,32 @@ int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
->  	/*
->  	 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
->  	 * executable, everything else can be mapped with the XN bits
-> -	 * set.
-> +	 * set. Also take the new (optional) RO/XP bits into account.
->  	 */
-> -	if ((md->attribute & EFI_MEMORY_WB) == 0)
-> +	if (md->type == EFI_MEMORY_MAPPED_IO)
->  		prot_val = PROT_DEVICE_nGnRE;
-> -	else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
-> -		 !PAGE_ALIGNED(md->phys_addr))
-> +	else if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
-> +			   "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
-> +		/*
-> +		 * If the region is not aligned to the page size of the OS, we
-> +		 * can not use strict permissions, since that would also affect
-> +		 * the mapping attributes of the adjacent regions.
-> +		 */
->  		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
-> -	else
-> +	else if ((md->attribute & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
-> +		 (EFI_MEMORY_XP | EFI_MEMORY_RO))
-> +		/* R-- */
-> +		prot_val = pgprot_val(PAGE_KERNEL_RO);
-> +	else if (md->attribute & EFI_MEMORY_RO)
-> +		/* R-X */
-> +		prot_val = pgprot_val(PAGE_KERNEL_ROX);
-> +	else if (md->attribute & EFI_MEMORY_XP ||
-> +		 md->type != EFI_RUNTIME_SERVICES_CODE)
-> +		/* RW- */
->  		prot_val = pgprot_val(PAGE_KERNEL);
-> +	else
-> +		/* RWX */
-> +		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
->  
->  	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
->  			   md->num_pages << EFI_PAGE_SHIFT,
+> Laurent Dufour (2):
+>   mm: Introducing arch_remap hook
+>   powerpc/mm: Tracking vDSO remap
+> 
+>  arch/powerpc/include/asm/mmu_context.h   | 35 +++++++++++++++++++++++++++++++-
+>  arch/s390/include/asm/mmu_context.h      |  6 ++++++
+>  arch/um/include/asm/mmu_context.h        |  5 +++++
+>  arch/unicore32/include/asm/mmu_context.h |  6 ++++++
+>  arch/x86/include/asm/mmu_context.h       |  6 ++++++
+>  include/asm-generic/mm_hooks.h           |  6 ++++++
+>  mm/mremap.c                              |  9 ++++++--
+>  7 files changed, 70 insertions(+), 3 deletions(-)
 
-The actual logic looks fine but it seems like there's quite a lot
-going on in this function which is fairly difficult to decipher with
-the if/else if clauses.
+We would like to be able to remap/unmap the VDSO on arm and arm64 as
+well. When I proposed a patch with mmu_context.h and mmu-arch-hooks.h
+changes to arm64 that were nearly identical to those done to powerpc,
+Will Deacon reasonably suggested [1] attempting to combine the code and
+provide generic VDSO accessors. Unfortunately, I no prior experience
+with generic MM code. Can anyone advise on how to get started with that?
 
-Would you be open to splitting this out a little? It's just a
-suggestion, but maybe something like this,
+1. http://www.spinics.net/lists/linux-arm-msm/msg18441.html
 
----
+Thanks,
+Christopher Covington
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 3364408c154f..33a6da160a50 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -17,39 +17,48 @@
- 
- #include <asm/efi.h>
- 
--int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
-+/*
-+ * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
-+ * executable, everything else can be mapped with the XN bits
-+ * set. Also take the new (optional) RO/XP bits into account.
-+ */
-+static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
- {
--	pteval_t prot_val;
-+	u64 attr = md->attribute;
-+	u32 type = md->type;
- 
--	/*
--	 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
--	 * executable, everything else can be mapped with the XN bits
--	 * set. Also take the new (optional) RO/XP bits into account.
--	 */
--	if (md->type == EFI_MEMORY_MAPPED_IO)
--		prot_val = PROT_DEVICE_nGnRE;
--	else if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
--			   "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
-+	if (type == EFI_MEMORY_MAPPED_IO)
-+		return PROT_DEVICE_nGnRE;
-+
-+	if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
-+		      "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
- 		/*
- 		 * If the region is not aligned to the page size of the OS, we
- 		 * can not use strict permissions, since that would also affect
- 		 * the mapping attributes of the adjacent regions.
- 		 */
--		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
--	else if ((md->attribute & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
--		 (EFI_MEMORY_XP | EFI_MEMORY_RO))
--		/* R-- */
--		prot_val = pgprot_val(PAGE_KERNEL_RO);
--	else if (md->attribute & EFI_MEMORY_RO)
--		/* R-X */
--		prot_val = pgprot_val(PAGE_KERNEL_ROX);
--	else if (md->attribute & EFI_MEMORY_XP ||
--		 md->type != EFI_RUNTIME_SERVICES_CODE)
--		/* RW- */
--		prot_val = pgprot_val(PAGE_KERNEL);
--	else
--		/* RWX */
--		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
-+		return pgprot_val(PAGE_KERNEL_EXEC);
-+
-+	/* R-- */
-+	if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
-+	    (EFI_MEMORY_XP | EFI_MEMORY_RO))
-+		return pgprot_val(PAGE_KERNEL_RO);
-+
-+	/* R-X */
-+	if (attr & EFI_MEMORY_RO)
-+		return pgprot_val(PAGE_KERNEL_ROX);
-+
-+	/* RW- */
-+	if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
-+		return pgprot_val(PAGE_KERNEL);
-+
-+	/* RWX */
-+	return pgprot_val(PAGE_KERNEL_EXEC);
-+}
-+
-+int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
-+{
-+	pteval_t prot_val = create_mapping_protection(md);
- 
- 	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
- 			   md->num_pages << EFI_PAGE_SHIFT,
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
