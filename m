@@ -1,39 +1,81 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 2 Mar 2016 13:14:31 +0000
-Subject: [PATCH 1/5] ARM: efi: apply strict permissons for UEFI Runtime
- Services regions
-In-Reply-To: <CAKv+Gu81V9TjhjikmQd=4ahWeqry8U1w5Fa+BTcY+S=2xYJmrA@mail.gmail.com>
-References: <1456151158-25849-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456151158-25849-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160302114901.GC2649@codeblueprint.co.uk>
- <CAKv+Gu81V9TjhjikmQd=4ahWeqry8U1w5Fa+BTcY+S=2xYJmrA@mail.gmail.com>
-Message-ID: <20160302131431.GG2649@codeblueprint.co.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 2 Mar 2016 13:30:43 +0000
+Subject: [PATCH 11/12] iommu/arm-smmu: Generic IOMMU DT bindings support
+In-Reply-To: <004c01d1731c$968ebb30$c3ac3190$@codeaurora.org>
+References: <cover.1456514380.git.robin.murphy@arm.com>
+ <a3edd4225fe8b39440fb9b6a70a70883d3cb103b.1456514380.git.robin.murphy@arm.com>
+ <004c01d1731c$968ebb30$c3ac3190$@codeaurora.org>
+Message-ID: <56D6EB03.403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 02 Mar, at 02:07:36PM, Ard Biesheuvel wrote:
-> On 2 March 2016 at 12:49, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> > On Mon, 22 Feb, at 03:25:54PM, Ard Biesheuvel wrote:
-> >> Recent UEFI versions expose permission attributes for runtime services
-> >> memory regions, either in the UEFI memory map or in the separate memory
-> >> attributes table.  This allows the kernel to map these regions with
-> >> stricter permissions, rather than the RWX permissions that are used by
-> >> default. So wire this up in our mapping routine.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm/include/asm/efi.h |  1 +
-> >>  arch/arm/kernel/efi.c      | 41 ++++++++++++++++++++
-> >>  2 files changed, 42 insertions(+)
-> >
-> > Looks fine from an EFI perspective, but it would be nice for somebody
-> > else with ARM knowledge to ACK it.
-> 
-> I agree.
-> 
-> Note that the whole memory attribute series needs to wait for some
-> memremap() changes that I proposed for ARM (or at least the bits where
-> we wire it up for arm64+ARM)
+On 29/02/16 18:09, Sricharan wrote:
+> Hi Robin,
+>
+>> -----Original Message-----
 
-Thanks for the reminder. I'll definitely hold off on applying this for
-now.
+[...]
+
+>> +static int __init arm_smmu_of_init(struct device_node *np) {
+>> +	struct arm_smmu_device *smmu;
+>> +	struct platform_device *pdev;
+>> +	int ret = arm_smmu_init();
+>> +
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	pdev = of_platform_device_create(np, NULL,
+>> platform_bus_type.dev_root);
+>> +	if (!pdev)
+>> +		return -ENODEV;
+>> +
+>> +	smmu = platform_get_drvdata(pdev);
+>> +	of_iommu_set_ops(np, &arm_smmu_ops);
+>> +
+>> +	return 0;
+>> +}
+>> +IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1",
+>> arm_smmu_of_init);
+>> +IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2",
+>> arm_smmu_of_init);
+>> +IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400",
+>> arm_smmu_of_init);
+>> +IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401",
+>> arm_smmu_of_init);
+>> +IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500",
+>> arm_smmu_of_init);
+>> +
+>   Thanks for this series. I am going to use and test this. Also I wanted to
+>   ask about the iommu probe deferral series [1] to avoid early device
+> registration and wanted know the direction on that ?
+
+It's certainly on my near-term to-do list to revisit. I recall running 
+into problems with that series if the IOMMU was ready but the device 
+itself then requested probe deferral, and I have vague memories of 
+thinking more needed to be done generally around the failure/device 
+teardown path too. I also had high hopes for the on-demand device 
+probing series from around the same time[2], which would have helped 
+simplify things quite a bit, but that also seems to have died after a 
+brief stint breaking things in -next.
+
+Anyway, Marc reckons that we also have the exact same probe-dependency 
+problem for things like IRQ-MSI bridges, so I'll be looking into a more 
+general solution at some point unless anyone wants to beat me to it ;)
+
+Thanks,
+Robin.
+
+[2]:http://thread.gmane.org/gmane.linux.acpi.devel/78833
+
+>
+> [1] http://lkml.iu.edu/hypermail/linux/kernel/1505.3/03280.html
+>
+> Regards,
+>   Sricharan
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
