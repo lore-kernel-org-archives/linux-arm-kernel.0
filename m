@@ -1,25 +1,39 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 2 Mar 2016 09:40:01 +0100
-Subject: [PATCH v3] tty: serial: meson: Implement earlycon support
-In-Reply-To: <1456886949-26503-1-git-send-email-afaerber@suse.de>
-References: <1456886949-26503-1-git-send-email-afaerber@suse.de>
-Message-ID: <CAOQ7t2a7-5qRDXZDGDpOCiwczHy-MmQcG0LH9GMKLMaXs98Sig@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  2 Mar 2016 09:47:13 +0100
+Subject: [PATCH] arm64: mm: check at build time that PAGE_OFFSET divides the
+ VA space evenly
+Message-ID: <1456908433-27149-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2016 at 3:49 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Split off the bulk of the existing meson_serial_console_write()
-> implementation into meson_serial_port_write() for implementing
-> meson_serial_early_console_write().
->
-> Use "meson" as the earlycon driver name, courtesy of Nicolas.
->
-> Signed-off-by: Nicolas Saenz Julienne <nicolassaenzj@gmail.com>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+Commit 8439e62a1561 ("arm64: mm: use bit ops rather than arithmetic in
+pa/va translations") changed the boundary check against PAGE_OFFSET from
+an arithmetic comparison to a bit test. This means we now silently assume
+that PAGE_OFFSET is a power of 2 that divides the kernel virtual address
+space into two equal halves. So make that assumption explicit.
 
-Acked-by: Carlo Caione <carlo@endlessm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/init.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Thanks,
-
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 9cfe94b41b54..ea136b904f56 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -171,6 +171,13 @@ void __init arm64_memblock_init(void)
+ 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+ 
+ 	/*
++	 * Ensure that the linear region takes up exactly half of the kernel
++	 * virtual address space. This way, we can distinguish a linear address
++	 * from a kernel/module/vmalloc address by testing a single bit.
++	 */
++	BUILD_BUG_ON(linear_region_size != BIT(VA_BITS - 1));
++
++	/*
+ 	 * Select a suitable value for the base of physical memory.
+ 	 */
+ 	memstart_addr = round_down(memblock_start_of_DRAM(),
 -- 
-Carlo Caione
+2.5.0
