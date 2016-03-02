@@ -1,109 +1,236 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 2 Mar 2016 19:11:25 +0100
-Subject: [PATCH 2/3] arm64: kaslr: deal with physically misaligned kernel
- images
-In-Reply-To: <1456938712-11089-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456938712-11089-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456938712-11089-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-xEz_f8ZMtRttrR0iO6FfeHPhgZyDGDX2eJr5tn-Ez7A@mail.gmail.com>
+From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
+Date: Wed, 2 Mar 2016 10:12:50 -0800
+Subject: [PATCH] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
+In-Reply-To: <56D6E658.1060201@arm.com>
+References: <1456348433-3337-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <56D6E658.1060201@arm.com>
+Message-ID: <56D72D22.9010307@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 March 2016 at 18:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Since KASLR requires a relocatable kernel image anyway, there is no
-> practical reason to refuse an image whose load address is not exactly
-> TEXT_OFFSET bytes above a 2 MB aligned base address, as long as the
-> physical and virtual misalignment with respect to the swapper block
-> size are equal. So treat the misalignment of the physical load address
-> as the initial KASLR offset, and fix up the remaining code to deal with
-> that.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/head.S  | 16 ++++++++++++----
->  arch/arm64/kernel/kaslr.c |  6 +++---
->  2 files changed, 15 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 1d4ae36db0bb..934d6dcd7a57 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -25,6 +25,7 @@
->  #include <linux/irqchip/arm-gic-v3.h>
->
->  #include <asm/assembler.h>
-> +#include <asm/boot.h>
->  #include <asm/ptrace.h>
->  #include <asm/asm-offsets.h>
->  #include <asm/cache.h>
-> @@ -211,8 +212,12 @@ section_table:
->  ENTRY(stext)
->         bl      preserve_boot_args
->         bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
-> -       mov     x23, xzr                        // KASLR offset, defaults to 0
->         adrp    x24, __PHYS_OFFSET
-> +#ifdef CONFIG_RANDOMIZE_BASE
 
-This should be ifndef. (I moved this around right before posting, but
-failed to invert the condition)
 
-> +       mov     x23, xzr                        // KASLR offset, defaults to 0
-> +#else
-> +       and     x23, x24, MIN_KIMG_ALIGN - 1    // unless loaded phys misaligned
-> +#endif
->         bl      set_cpu_boot_mode_flag
->         bl      __create_page_tables            // x25=TTBR0, x26=TTBR1
->         /*
-> @@ -489,11 +494,13 @@ __mmap_switched:
->         bl      kasan_early_init
->  #endif
->  #ifdef CONFIG_RANDOMIZE_BASE
-> -       cbnz    x23, 0f                         // already running randomized?
-> +       tst     x23, ~(MIN_KIMG_ALIGN - 1)      // already running randomized?
-> +       b.ne    0f
->         mov     x0, x21                         // pass FDT address in x0
-> +       mov     x1, x23                         // pass modulo offset in x1
->         bl      kaslr_early_init                // parse FDT for KASLR options
->         cbz     x0, 0f                          // KASLR disabled? just proceed
-> -       mov     x23, x0                         // record KASLR offset
-> +       orr     x23, x23, x0                    // record KASLR offset
->         ret     x28                             // we must enable KASLR, return
->                                                 // to __enable_mmu()
->  0:
-> @@ -753,7 +760,8 @@ __enable_mmu:
->         isb
->  #ifdef CONFIG_RANDOMIZE_BASE
->         mov     x19, x0                         // preserve new SCTLR_EL1 value
-> -       blr     x27
-> +       add     x30, x27, x23
-> +       blr     x30
+On 03/02/2016 05:10 AM, Robin Murphy wrote:
+> On 24/02/16 21:13, Tirumalesh Chalamarla wrote:
+>> Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
+>> namespaces; specifically within a given node SMMU0 and SMMU1 share,
+>> as does SMMU2 and SMMU3.
+>>
+>> This patch address these issuee by supplying asid and vmid
+>> while calculating ASID and VMID for Thunder SMMUv2.
+>>
+>> NOTE: resending with commit message fix.
+>>
+>> changes from V2:
+>>     - removed *_base from DT, and replaced with compatible string
+>>
+>> changes from V1:
+>>     - rebased on top of 16 bit VMID patch
+>>     - removed redundent options from DT
+>>     - insted of transform, DT now supplies starting ASID/VMID
+>>
+>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
+>> Signed-off-by: Akula Geethasowjanya
+>> <Geethasowjanya.Akula@caviumnetworks.com>
+>> ---
+>>   .../devicetree/bindings/iommu/arm,smmu.txt         |  1 +
+>>   drivers/iommu/arm-smmu.c                           | 48
+>> +++++++++++++++++-----
 >
->         /*
->          * If we return here, we have a KASLR displacement in x23 which we need
-> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-> index 582983920054..b05469173ba5 100644
-> --- a/arch/arm64/kernel/kaslr.c
-> +++ b/arch/arm64/kernel/kaslr.c
-> @@ -74,7 +74,7 @@ extern void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size,
->   * containing function pointers) to be reinitialized, and zero-initialized
->   * .bss variables will be reset to 0.
->   */
-> -u64 __init kaslr_early_init(u64 dt_phys)
-> +u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
->  {
->         void *fdt;
->         u64 seed, offset, mask, module_range;
-> @@ -132,8 +132,8 @@ u64 __init kaslr_early_init(u64 dt_phys)
->          * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
->          * happens, increase the KASLR offset by the size of the kernel image.
->          */
-> -       if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
-> -           (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT))
-> +       if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
-> +           (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT))
->                 offset = (offset + (u64)(_end - _text)) & mask;
+> I guess Documentation/arm64/silicon-errata.txt wants updating too?
 >
->         if (IS_ENABLED(CONFIG_KASAN))
-> --
-> 2.5.0
+YES, will update it.
+>>   2 files changed, 38 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index 7180745..19fe6f2 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -16,6 +16,7 @@ conditions.
+>>                           "arm,mmu-400"
+>>                           "arm,mmu-401"
+>>                           "arm,mmu-500"
+>> +                        "cavium,smmu-v2"
+>
+> That seems a rather broad name for a compatible - will there definitely
+> never be another Cavium implementation of SMMUv2? Even then, if there is
+> future respin of CN88xx silicon where the SMMU needs some other
+> workaround for some other issue, will that be discoverable from
+> SMMU_IDR7 or similar? Even an absurdly over-specific compatible such as
+> "cavium,thunderx-cn88xx-pass2-smmu" would be preferable to something
+> which later turns out to be insufficient to uniquely identify a specific
+> implementation.
+>
+
+i don't think there is a SMMUv2 from Cavium again, there will be SMMUv3 
+of course.
+
+there will be other flavors like 86xx etc, which has same implementation 
+as 88xx so will have same errata. i think this name is more appropriate.
+
+> Otherwise, modulo Will's comments, this looks a lot more reasonable than
+> before, thanks.
+>
+> Robin.
+>
+>>                     depending on the particular implementation and/or the
+>>                     version of the architecture implemented.
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 247a469..c704f88 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -326,6 +326,12 @@ struct arm_smmu_device {
+>>
+>>       struct list_head        list;
+>>       struct rb_root            masters;
+>> +    /*
+>> +     *The following fields are specific to Cavium, Thunder
+>> +     */
+>> +    u32                cavium_smmu_id;
+>> +    u32                cavium_id_base;
+>> +
+>>   };
+>>
+>>   struct arm_smmu_cfg {
+>> @@ -335,8 +341,8 @@ struct arm_smmu_cfg {
+>>   };
+>>   #define INVALID_IRPTNDX            0xff
+>>
+>> -#define ARM_SMMU_CB_ASID(cfg)        ((cfg)->cbndx)
+>> -#define ARM_SMMU_CB_VMID(cfg)        ((cfg)->cbndx + 1)
+>> +#define ARM_SMMU_CB_ASID(smmu, cfg) ((u16)(smmu)->cavium_id_base +
+>> (cfg)->cbndx)
+>> +#define ARM_SMMU_CB_VMID(smmu, cfg) ((u16)(smmu)->cavium_id_base +
+>> (cfg)->cbndx + 1)
+>>
+>>   enum arm_smmu_domain_stage {
+>>       ARM_SMMU_DOMAIN_S1 = 0,
+>> @@ -364,6 +370,8 @@ struct arm_smmu_option_prop {
+>>       const char *prop;
+>>   };
+>>
+>> +static int cavium_smmu_count;
+>> +
+>>   static struct arm_smmu_option_prop arm_smmu_options[] = {
+>>       { ARM_SMMU_OPT_SECURE_CFG_ACCESS,
+>> "calxeda,smmu-secure-config-access" },
+>>       { 0, NULL},
+>> @@ -575,11 +583,11 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+>>
+>>       if (stage1) {
+>>           base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+>> -        writel_relaxed(ARM_SMMU_CB_ASID(cfg),
+>> +        writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
+>>                      base + ARM_SMMU_CB_S1_TLBIASID);
+>>       } else {
+>>           base = ARM_SMMU_GR0(smmu);
+>> -        writel_relaxed(ARM_SMMU_CB_VMID(cfg),
+>> +        writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
+>>                      base + ARM_SMMU_GR0_TLBIVMID);
+>>       }
+>>
+>> @@ -601,7 +609,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned
+>> long iova, size_t size,
+>>
+>>           if (!IS_ENABLED(CONFIG_64BIT) || smmu->version ==
+>> ARM_SMMU_V1) {
+>>               iova &= ~12UL;
+>> -            iova |= ARM_SMMU_CB_ASID(cfg);
+>> +            iova |= ARM_SMMU_CB_ASID(smmu, cfg);
+>>               do {
+>>                   writel_relaxed(iova, reg);
+>>                   iova += granule;
+>> @@ -609,7 +617,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned
+>> long iova, size_t size,
+>>   #ifdef CONFIG_64BIT
+>>           } else {
+>>               iova >>= 12;
+>> -            iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
+>> +            iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
+>>               do {
+>>                   writeq_relaxed(iova, reg);
+>>                   iova += granule >> 12;
+>> @@ -629,7 +637,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned
+>> long iova, size_t size,
+>>   #endif
+>>       } else {
+>>           reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
+>> -        writel_relaxed(ARM_SMMU_CB_VMID(cfg), reg);
+>> +        writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
+>>       }
+>>   }
+>>
+>> @@ -738,7 +746,7 @@ static void arm_smmu_init_context_bank(struct
+>> arm_smmu_domain *smmu_domain,
+>>   #endif
+>>           /* if 16bit VMID supported set VMID in CBA2R */
+>>           if (smmu->features & ARM_SMMU_FEAT_VMID16)
+>> -            reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
+>> +            reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
+>>
+>>           writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
+>>       }
+>> @@ -757,7 +765,7 @@ static void arm_smmu_init_context_bank(struct
+>> arm_smmu_domain *smmu_domain,
+>>               (CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
+>>       } else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
+>>           /*16 bit VMID is not supported set 8 bit VMID here */
+>> -        reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
+>> +        reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
+>>       }
+>>       writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
+>>
+>> @@ -765,11 +773,11 @@ static void arm_smmu_init_context_bank(struct
+>> arm_smmu_domain *smmu_domain,
+>>       if (stage1) {
+>>           reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+>>
+>> -        reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
+>> +        reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
+>>           smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
+>>
+>>           reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+>> -        reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
+>> +        reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
+>>           smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
+>>       } else {
+>>           reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+>> @@ -1717,6 +1725,7 @@ static const struct of_device_id
+>> arm_smmu_of_match[] = {
+>>       { .compatible = "arm,mmu-400", .data = (void *)ARM_SMMU_V1 },
+>>       { .compatible = "arm,mmu-401", .data = (void *)ARM_SMMU_V1 },
+>>       { .compatible = "arm,mmu-500", .data = (void *)ARM_SMMU_V2 },
+>> +    { .compatible = "cavium,smmu-v2", .data = (void *)ARM_SMMU_V2 },
+>>       { },
+>>   };
+>>   MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+>> @@ -1827,6 +1836,23 @@ static int arm_smmu_device_dt_probe(struct
+>> platform_device *pdev)
+>>           }
+>>       }
+>>
+>> +    /*
+>> +     * Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID
+>> and VMID
+>> +     * namespaces; specifically within a given node SMMU0 and SMMU1
+>> share,
+>> +     * as does SMMU2 and SMMU3. see if this is a Cavium SMMU, if so
+>> +     * set asid and vmid base such that each SMMU gets unique
+>> +     * asid/vmid space.
+>> +     */
+>> +    if (!strcasecmp(of_id->compatible, "cavium,smmu-v2")) {
+>> +        /* VMID16 must be present on Cavium SMMUv2*/
+>> +        if (!(smmu->features & ARM_SMMU_FEAT_VMID16))
+>> +            goto out_free_irqs;
+>> +        smmu->cavium_smmu_id = cavium_smmu_count;
+>> +        cavium_smmu_count++;
+>> +        smmu->cavium_id_base =
+>> +            (smmu->cavium_smmu_id * ARM_SMMU_MAX_CBS);
+>> +    }
+>> +
+>>       INIT_LIST_HEAD(&smmu->list);
+>>       spin_lock(&arm_smmu_devices_lock);
+>>       list_add(&smmu->list, &arm_smmu_devices);
+>>
 >
