@@ -1,76 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Mar 2016 16:58:58 +0100
-Subject: [PATCH 06/14] dma: sirf: use __maybe_unused to hide pm functions
+Date: Wed,  2 Mar 2016 16:59:00 +0100
+Subject: [PATCH 08/14] scsi: mvumi: use __maybe_unused to hide pm functions
 In-Reply-To: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
-Message-ID: <1456934350-1389172-7-git-send-email-arnd@arndb.de>
+Message-ID: <1456934350-1389172-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sirf dma driver uses #ifdef to check for CONFIG_PM_SLEEP
-for its suspend/resume code but then has no #ifdef for the
-respective runtime PM code, so we get a warning if CONFIG_PM
-is disabled altogether:
+The mvumi scsi hides the references to its suspend/resume functions
+in an #ifdef but does not hide the implementation the same way:
 
-drivers/dma/sirf-dma.c:1000:12: error: 'sirfsoc_dma_runtime_resume' defined but not used [-Werror=unused-function]
+drivers/scsi/mvumi.c:2632:12: error: 'mvumi_suspend' defined but not used [-Werror=unused-function]
+drivers/scsi/mvumi.c:2651:12: error: 'mvumi_resume' defined but not used [-Werror=unused-function]
 
-This removes the existing #ifdef and instead uses __maybe_unused
-annotations for all four functions to let the compiler know it
-can silently drop the function definition.
+This adds __maybe_unused annotations so the compiler knows
+it can silently drop them instead of warning, while avoiding
+the addition of another #ifdef.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/dma/sirf-dma.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/scsi/mvumi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 22ea2419ee56..e48350e65089 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -989,7 +989,7 @@ static int sirfsoc_dma_remove(struct platform_device *op)
+diff --git a/drivers/scsi/mvumi.c b/drivers/scsi/mvumi.c
+index 02360de6b7e0..39285070f3b5 100644
+--- a/drivers/scsi/mvumi.c
++++ b/drivers/scsi/mvumi.c
+@@ -2629,7 +2629,7 @@ static void mvumi_shutdown(struct pci_dev *pdev)
+ 	mvumi_flush_cache(mhba);
+ }
+ 
+-static int mvumi_suspend(struct pci_dev *pdev, pm_message_t state)
++static int __maybe_unused mvumi_suspend(struct pci_dev *pdev, pm_message_t state)
+ {
+ 	struct mvumi_hba *mhba = NULL;
+ 
+@@ -2648,7 +2648,7 @@ static int mvumi_suspend(struct pci_dev *pdev, pm_message_t state)
  	return 0;
  }
  
--static int sirfsoc_dma_runtime_suspend(struct device *dev)
-+static int __maybe_unused sirfsoc_dma_runtime_suspend(struct device *dev)
+-static int mvumi_resume(struct pci_dev *pdev)
++static int __maybe_unused mvumi_resume(struct pci_dev *pdev)
  {
- 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
- 
-@@ -997,7 +997,7 @@ static int sirfsoc_dma_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int sirfsoc_dma_runtime_resume(struct device *dev)
-+static int __maybe_unused sirfsoc_dma_runtime_resume(struct device *dev)
- {
- 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
  	int ret;
-@@ -1010,8 +1010,7 @@ static int sirfsoc_dma_runtime_resume(struct device *dev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--static int sirfsoc_dma_pm_suspend(struct device *dev)
-+static int __maybe_unused sirfsoc_dma_pm_suspend(struct device *dev)
- {
- 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
- 	struct sirfsoc_dma_regs *save = &sdma->regs_save;
-@@ -1062,7 +1061,7 @@ static int sirfsoc_dma_pm_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int sirfsoc_dma_pm_resume(struct device *dev)
-+static int __maybe_unused sirfsoc_dma_pm_resume(struct device *dev)
- {
- 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
- 	struct sirfsoc_dma_regs *save = &sdma->regs_save;
-@@ -1121,7 +1120,6 @@ static int sirfsoc_dma_pm_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif
- 
- static const struct dev_pm_ops sirfsoc_dma_pm_ops = {
- 	SET_RUNTIME_PM_OPS(sirfsoc_dma_runtime_suspend, sirfsoc_dma_runtime_resume, NULL)
+ 	struct mvumi_hba *mhba = NULL;
 -- 
 2.7.0
