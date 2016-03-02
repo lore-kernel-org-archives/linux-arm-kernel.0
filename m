@@ -1,34 +1,37 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 Mar 2016 11:25:10 +0100
-Subject: [PATCH 2/2] char: genrtc: replace blacklist with whitelist
-In-Reply-To: <1456912137-1578635-2-git-send-email-arnd@arndb.de>
-References: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
- <1456912137-1578635-2-git-send-email-arnd@arndb.de>
-Message-ID: <CAMuHMdVRBLd0hhBLC_pxbzCv3qwjPWhHyvVV3+ikgqytiaLqfQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Mar 2016 19:33:05 +0900
+Subject: [RESEND PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
+In-Reply-To: <56D6AC37.8080302@atmel.com>
+References: <1456826069-30955-1-git-send-email-nicolas.ferre@atmel.com>
+ <20160302010453.GJ18327@sirena.org.uk> <56D6AC37.8080302@atmel.com>
+Message-ID: <20160302103304.GF18327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2016 at 10:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Every new architecture has to add itself to the growing list of those
-> that do not support the old "generic" RTC driver.
->
-> This replaces the long list of architectures that don't support it
-> with a shorter list of those that do.
->
-> The list is taken from those architectures that have a non-empty
-> asm/rtc.h header file and were not explicitly blacklisted.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Wed, Mar 02, 2016 at 10:02:47AM +0100, Nicolas Ferre wrote:
+> Le 02/03/2016 02:04, Mark Brown a ?crit :
+> > On Tue, Mar 01, 2016 at 10:54:29AM +0100, Nicolas Ferre wrote:
 
-Reviewed-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> >> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+> >> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Gr{oetje,eeting}s,
+> > I can't look at patches that aren't signed off, please see
+> > SubmittingPatches for details.
 
-                        Geert
+> Songjun did sign the patch, I'm puzzled...
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> Ah, you mean that I should have signed it myself as well as I am the
+> actual sender... ok, as it's a "resend" like the subject says and that
+> the first patch was actually sent by Songjun, I though it would be legit.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Anyway, I'll resend it with my own Signed tag.
+
+Yes, if you are posting a patch you need to include your signoff -
+please see SubmittingPatches for details.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160302/de04b8fa/attachment.sig>
