@@ -1,308 +1,55 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Wed, 2 Mar 2016 19:13:56 +0100
-Subject: [PATCH V7 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <20160302180728.GA21394@rob-hp-laptop>
-References: <1456396631-12788-1-git-send-email-blogic@openwrt.org>
- <20160302180728.GA21394@rob-hp-laptop>
-Message-ID: <56D72D64.4020705@openwrt.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 2 Mar 2016 19:25:27 +0100
+Subject: [PATCH 2/2] devicetree: document NXP LPC1850 PINT irq controller
+ binding
+In-Reply-To: <20160302181314.GA25030@rob-hp-laptop>
+References: <1456437887-24432-1-git-send-email-manabian@gmail.com>
+ <1456437887-24432-3-git-send-email-manabian@gmail.com>
+ <20160302181314.GA25030@rob-hp-laptop>
+Message-ID: <CAGhQ9Vw4DrhOn8=ACzTsX5ykbnq0Gp-qAjOrMhEHjgpz=8hO=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/03/2016 19:07, Rob Herring wrote:
-> On Thu, Feb 25, 2016 at 11:37:10AM +0100, John Crispin wrote:
->> Signed-off-by: John Crispin <blogic@openwrt.org>
->> Cc: devicetree at vger.kernel.org
+On 2 March 2016 at 19:13, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Feb 25, 2016 at 11:04:47PM +0100, Joachim Eastwood wrote:
+>> Add binding documentation for NXP LPC1850 GPIO Pin Interrupt (PINT)
+>> controller.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 >> ---
->> This patch needs to be merged post-rc1 as it depends on the MFD series of
->> the PMIC which is already inside Lee's tree pending the PR.
-> 
-> Why? It is an indpendent change with no actual dependency.
-> 
-
-that comment applies to the whole series and not just the one patch as
-2/2 uses registers contained within a header file which is part of the
-series adding the actual MFD driver. adding the doc without the driver
-seemed wrong to me.
-
-
-
+>>  .../interrupt-controller/nxp,lpc1850-gpio-pint.txt | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nxp,lpc1850-gpio-pint.txt
 >>
->> Changes in V7
->> * remove another compatible string
->> * small wording changes
->>
->> Changes in V6
->> * remove the compatible string
->>
->> Changes in V5
->> * regulator vs regulators
->>
->> Changes in V4
->> * regulator is a subnode and not a property
->>
->>  .../bindings/regulator/mt6323-regulator.txt        |  239 ++++++++++++++++++++
->>  1 file changed, 239 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
->>
->> diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/nxp,lpc1850-gpio-pint.txt b/Documentation/devicetree/bindings/interrupt-controller/nxp,lpc1850-gpio-pint.txt
 >> new file mode 100644
->> index 0000000..9fd95e7
+>> index 000000000000..dc43f187ebda
 >> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
->> @@ -0,0 +1,239 @@
->> +Mediatek MT6323 Regulator Driver
+>> +++ b/Documentation/devicetree/bindings/interrupt-controller/nxp,lpc1850-gpio-pint.txt
+>> @@ -0,0 +1,22 @@
+>> +NXP LPC18xx/43xx GPIO Pin Interrupt (PINT) controller
 >> +
->> +All voltage regulators are defined as subnodes of the regulators node. A list
->> +of regulators provided by this controller are defined as subnodes of the
->> +PMIC's node. Each regulator is named according to its regulator type,
->> +buck_<name> and ldo_<name>. The definition for each of these nodes is defined
->> +using the standard binding for regulators at
->> +Documentation/devicetree/bindings/regulator/regulator.txt.
+>> +Required properties:
 >> +
->> +The valid names for regulators are::
->> +BUCK:
->> +  buck_vproc, buck_vsys, buck_vpa
->> +LDO:
->> +  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
->> +  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
->> +  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
->> +  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
->> +
->> +Example:
->> +
->> +	pmic: mt6323 {
->> +		compatible = "mediatek,mt6323";
->> +
->> +		mt6323regulator: regulators {
->> +			mt6323_vproc_reg: buck_vproc{
->> +				regulator-name = "vproc";
->> +				regulator-min-microvolt = < 700000>;
->> +				regulator-max-microvolt = <1350000>;
->> +				regulator-ramp-delay = <12500>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vsys_reg: buck_vsys{
->> +				regulator-name = "vsys";
->> +				regulator-min-microvolt = <1400000>;
->> +				regulator-max-microvolt = <2987500>;
->> +				regulator-ramp-delay = <25000>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vpa_reg: buck_vpa{
->> +				regulator-name = "vpa";
->> +				regulator-min-microvolt = < 500000>;
->> +				regulator-max-microvolt = <3650000>;
->> +			};
->> +
->> +			mt6323_vtcxo_reg: ldo_vtcxo{
->> +				regulator-name = "vtcxo";
->> +				regulator-min-microvolt = <2800000>;
->> +				regulator-max-microvolt = <2800000>;
->> +				regulator-enable-ramp-delay = <90>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vcn28_reg: ldo_vcn28{
->> +				regulator-name = "vcn28";
->> +				regulator-min-microvolt = <2800000>;
->> +				regulator-max-microvolt = <2800000>;
->> +				regulator-enable-ramp-delay = <185>;
->> +			};
->> +
->> +			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
->> +				regulator-name = "vcn33_bt";
->> +				regulator-min-microvolt = <3300000>;
->> +				regulator-max-microvolt = <3600000>;
->> +				regulator-enable-ramp-delay = <185>;
->> +			};
->> +
->> +			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
->> +				regulator-name = "vcn33_wifi";
->> +				regulator-min-microvolt = <3300000>;
->> +				regulator-max-microvolt = <3600000>;
->> +				regulator-enable-ramp-delay = <185>;
->> +			};
->> +
->> +			mt6323_va_reg: ldo_va{
->> +				regulator-name = "va";
->> +				regulator-min-microvolt = <2800000>;
->> +				regulator-max-microvolt = <2800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vcama_reg: ldo_vcama{
->> +				regulator-name = "vcama";
->> +				regulator-min-microvolt = <1500000>;
->> +				regulator-max-microvolt = <2800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vio28_reg: ldo_vio28{
->> +				regulator-name = "vio28";
->> +				regulator-min-microvolt = <2800000>;
->> +				regulator-max-microvolt = <2800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vusb_reg: ldo_vusb{
->> +				regulator-name = "vusb";
->> +				regulator-min-microvolt = <3300000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vmc_reg: ldo_vmc{
->> +				regulator-name = "vmc";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-enable-ramp-delay = <36>;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vmch_reg: ldo_vmch{
->> +				regulator-name = "vmch";
->> +				regulator-min-microvolt = <3000000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-enable-ramp-delay = <36>;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vemc3v3_reg: ldo_vemc3v3{
->> +				regulator-name = "vemc3v3";
->> +				regulator-min-microvolt = <3000000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-enable-ramp-delay = <36>;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vgp1_reg: ldo_vgp1{
->> +				regulator-name = "vgp1";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vgp2_reg: ldo_vgp2{
->> +				regulator-name = "vgp2";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <3000000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vgp3_reg: ldo_vgp3{
->> +				regulator-name = "vgp3";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <1800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vcn18_reg: ldo_vcn18{
->> +				regulator-name = "vcn18";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <1800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vsim1_reg: ldo_vsim1{
->> +				regulator-name = "vsim1";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <3000000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vsim2_reg: ldo_vsim2{
->> +				regulator-name = "vsim2";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <3000000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vrtc_reg: ldo_vrtc{
->> +				regulator-name = "vrtc";
->> +				regulator-min-microvolt = <2800000>;
->> +				regulator-max-microvolt = <2800000>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vcamaf_reg: ldo_vcamaf{
->> +				regulator-name = "vcamaf";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vibr_reg: ldo_vibr{
->> +				regulator-name = "vibr";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-enable-ramp-delay = <36>;
->> +			};
->> +
->> +			mt6323_vrf18_reg: ldo_vrf18{
->> +				regulator-name = "vrf18";
->> +				regulator-min-microvolt = <1825000>;
->> +				regulator-max-microvolt = <1825000>;
->> +				regulator-enable-ramp-delay = <187>;
->> +			};
->> +
->> +			mt6323_vm_reg: ldo_vm{
->> +				regulator-name = "vm";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <1800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vio18_reg: ldo_vio18{
->> +				regulator-name = "vio18";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <1800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +				regulator-always-on;
->> +				regulator-boot-on;
->> +			};
->> +
->> +			mt6323_vcamd_reg: ldo_vcamd{
->> +				regulator-name = "vcamd";
->> +				regulator-min-microvolt = <1200000>;
->> +				regulator-max-microvolt = <1800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +
->> +			mt6323_vcamio_reg: ldo_vcamio{
->> +				regulator-name = "vcamio";
->> +				regulator-min-microvolt = <1800000>;
->> +				regulator-max-microvolt = <1800000>;
->> +				regulator-enable-ramp-delay = <216>;
->> +			};
->> +		};
->> +	};
->> -- 
->> 1.7.10.4
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
+>> +- compatible : should be "nxp,lpc1850-gpio-pint".
+>> +- reg : Specifies base physical address and size of the registers.
+>> +- interrupt-controller : Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source. The value shall be 2.
+>> +- interrupts : Specifies the CPU interrupts the controller is connected to.
+>
+> How many (8?) and what's the ordering?
+
+The PINT on has 8 interrupts, but this is device dependent. Up to 32
+could be supported.
+
+The order is also device dependent. The interrupts on PINT are merely
+mapped onto the main interrupt controller.
+
+I tried to keep the wording in the binding generic so it could support
+the PINT on different devices. I'll update the text with some more
+details.
+
+
+regards,
+Joachim Eastwood
