@@ -1,64 +1,33 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Wed, 2 Mar 2016 09:16:19 +0800
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
- ESRT table in memory
-In-Reply-To: <20160301233040.GA31476@codeblueprint.co.uk>
-References: <20160218104407.GC2651@codeblueprint.co.uk>
- <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
- <20160218132824.GE2651@codeblueprint.co.uk>
- <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
- <20160218134324.GG2651@codeblueprint.co.uk>
- <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
- <20160218141544.GH2651@codeblueprint.co.uk>
- <20160218191624.GA1515@redhat.com>
- <20160226144114.GA7475@codeblueprint.co.uk>
- <20160301233040.GA31476@codeblueprint.co.uk>
-Message-ID: <20160302011619.GA3192@dhcp-128-65.nay.redhat.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 01 Mar 2016 17:17:55 -0800
+Subject: [PATCH 00/19] arm64 kexec kernel patches v13
+In-Reply-To: <56D5D763.4030304@codeaurora.org>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <c7575f853ccc491bb0212e025aab1cc9@NASANEXM01H.na.qualcomm.com>
+ <56D5D763.4030304@codeaurora.org>
+Message-ID: <1456881475.6738.18.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/16 at 11:30pm, Matt Fleming wrote:
-> On Fri, 26 Feb, at 02:41:14PM, Matt Fleming wrote:
-> > On Thu, 18 Feb, at 02:16:24PM, Peter Jones wrote:
-> > > 
-> > > So the question I have is: would you rather chop up regions and reserve
-> > > the space, or allocate a new copy and update the configuration table
-> > > (after ExitBootServices()) to point to it?  The latter makes it pretty
-> > > easy to do from an API that all these drivers can use, and it makes the
-> > > kexec case completely transparent.
-> > > 
-> > > Up to you.
-> > 
-> > I think it makes the most sense to chop up the regions we care about
-> > (i.e. the ones we have drivers for) because not only does that save us
-> > the effort of copying out the data on every kexec reboot, it also
-> > prevents us from leaking each copy since we don't free them at the
-> > moment.
-> > 
-> > Then we just need to maintain a separate list of regions to free in
-> > efi_free_boot_services() or have some other way to distinguish between
-> > them.
-> > 
-> > Oh, and save_runtime_map() would need updating to save Boot Services
-> > regions too.
-> 
-> I have a very rough draft of patches that implement this strategy on
-> the 'experiemntal/efi-memmap' branch in the EFI tree if anyone is
-> curious and wants to take a look. The series will be sent out soon.
-> 
-> I wouldn't necessarily try running them or anything as there's a few
-> things that I know are broken; ia64 build, EFI mixed mode boot,
-> probably arm64 regressions.
-> 
-> The upshot of the patch series is that there's a whole lot of code we
-> can share for manipulating memory maps between all EFI architectures
-> and by fixing this "reserve boot services regions" in a generic way it
-> should mean kexec under EFI on arm64 should be fairly trivial to
-> implement, along with ESRT, etc.
+Hi,
 
-Matt, thanks. One question is for the acpi patches you sent before, do you
-think they are still necessary as a fix for the bgrt problem and coexist
-with the "reserve useful boot services" proposal?
+On Tue, 2016-03-01 at 10:54 -0700, Azriel Samson wrote:
 
-Thanks
-Dave
+> We have been using the kexec/kdump patches on ARM64 and would like to
+> use them from upstream.
+> 
+> Assuming these are not going to be in Linux-4.5, a rebased set on 
+> Linux-4.5 would be very useful.
+
+I'm waiting for one of two things to happen, either Marc Zyngier gives
+an ack for the patch 'arm64: kvm: allows kvm cpu hotplug', or the arm64
+maintainers decide they will accept my proposal to merge kexec with a
+conditional in the Kconfig that only allows one of KVM or kexec to be
+selected.
+
+The kexec patches have been in review for 20 months now, with only
+minor changes in the past 15.  I don't expect much would be gained in
+posting the kexec series again unless there is a chance they would be
+merged.
+
+-Geoff
