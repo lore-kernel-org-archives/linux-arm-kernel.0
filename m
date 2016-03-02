@@ -1,132 +1,58 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 2 Mar 2016 14:30:35 -0300
-Subject: [RFC PATCH] watchdog: s3c2410_wdt: Add max and min timeout values
-In-Reply-To: <56D62979.5040009@samsung.com>
-References: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
- <56D62979.5040009@samsung.com>
-Message-ID: <56D7233B.50907@osg.samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 2 Mar 2016 11:53:19 -0600
+Subject: [RESPIN 1/6] dt-bindings: EXYNOS: Add exynos-srom device tree
+ binding
+In-Reply-To: <1456389222-12738-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1456389222-12738-1-git-send-email-pankaj.dubey@samsung.com>
+ <1456389222-12738-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20160302175319.GA11155@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Thu, Feb 25, 2016 at 02:03:37PM +0530, Pankaj Dubey wrote:
+> This patch adds exynos-srom binding information for SROM Controller
+> driver on Exynos SoCs.
+> 
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Mark Rutland <mark.rutland@arm.com>
+> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> CC: devicetree at vger.kernel.org
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene@kernel.org>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  .../devicetree/bindings/memory-controllers/exynos-srom.txt   | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt b/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+> new file mode 100644
+> index 0000000..33886d5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+> @@ -0,0 +1,12 @@
+> +SAMSUNG Exynos SoCs SROM Controller driver.
+> +
+> +Required properties:
+> +- compatible : Should contain "samsung,exynos-srom".
 
-On 03/01/2016 08:44 PM, Krzysztof Kozlowski wrote:
-> On 02.03.2016 01:45, Javier Martinez Canillas wrote:
->> The watchdog maximum timeout value is determined by the number of bits
->> for the interval timer counter, its source clock frequency, the number
->> of bits of the prescaler and maximum divider value.
->>
->> This can be calculated with the following equation:
->>
->> max_timeout = counter / (freq / (max_prescale + 1) / max_divider)
->>
->> Setting a maximum timeout value will allow the watchdog core to refuse
->> user-space calls to the WDIOC_SETTIMEOUT ioctl that sets not supported
->> timeout values.
->>
->> For example, systemd tries to set a timeout of 10 minutes on reboot to
->> ensure that the machine will be rebooted even if a reboot failed. This
->> leads to the following error message on an Exynos5422 Odroid XU4 board:
->>
->> [  147.986045] s3c2410-wdt 101d0000.watchdog: timeout 600 too big
->>
->> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->> Hello,
->>
->> I'm sending this as an RFC because I don't have access to user manuals
->> for all the Exynos SoCs that this driver supports. But at least in all
->> the ones I have here, the maximum prescaler and divider values are the
->> same and also all have a 16-bit interval timer counter.
->>
->> So this patch assumes that all IP blocks supported by this driver are
->> the same on that regard, if that's not the case then we can move these
->> values on a per IP block basis using struct of_device_id .data field.
->
-> It looks correct at least for Exynos4210 and newer.
->
+There should be SoC specific compatible strings in addition to this.
 
-Great, thanks a lot for the confirmation.
+> +
+> +- reg: offset and length of the register set
+> +
+> +Example:
+> +	sromc at 12570000 {
 
->>
->> Best regards,
->> Javier
->>
->>   drivers/watchdog/s3c2410_wdt.c | 16 ++++++++++++++++
->>   1 file changed, 16 insertions(+)
->>
->> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
->> index 0093450441fe..f289c9fc353a 100644
->> --- a/drivers/watchdog/s3c2410_wdt.c
->> +++ b/drivers/watchdog/s3c2410_wdt.c
->> @@ -47,6 +47,8 @@
->>   #define S3C2410_WTDAT		0x04
->>   #define S3C2410_WTCNT		0x08
->>
->> +#define S3C2410_WTCNT_MAXCNT	0xffff
->> +
->>   #define S3C2410_WTCON_RSTEN	(1 << 0)
->>   #define S3C2410_WTCON_INTEN	(1 << 2)
->>   #define S3C2410_WTCON_ENABLE	(1 << 5)
->> @@ -56,8 +58,11 @@
->>   #define S3C2410_WTCON_DIV64	(2 << 3)
->>   #define S3C2410_WTCON_DIV128	(3 << 3)
->>
->> +#define S3C2410_WTCON_MAXDIV	0x80
->> +
->>   #define S3C2410_WTCON_PRESCALE(x)	((x) << 8)
->>   #define S3C2410_WTCON_PRESCALE_MASK	(0xff << 8)
->> +#define S3C2410_WTCON_PRESCALE_MAX	0xff
->>
->>   #define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
->>   #define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
->> @@ -198,6 +203,14 @@ do {							\
->>
->>   /* functions */
->>
->> +static inline unsigned int s3c2410wdt_max_timeout(struct clk *clock)
->> +{
->> +	unsigned long freq = clk_get_rate(clock);
->> +
->> +	return S3C2410_WTCNT_MAXCNT / (freq / (S3C2410_WTCON_PRESCALE_MAX + 1)
->> +				       / S3C2410_WTCON_MAXDIV);
->> +}
->> +
->>   static inline struct s3c2410_wdt *freq_to_wdt(struct notifier_block *nb)
->>   {
->>   	return container_of(nb, struct s3c2410_wdt, freq_transition);
->> @@ -567,6 +580,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
->>   		return ret;
->>   	}
->>
->> +	wdt->wdt_device.min_timeout = 1;
->> +	wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
->
-> Can the frequency of clock change? E.g. with devfreq? No problem if it
-> goes lower but if it gets higher than initial, then the problem will
-> appear again.
->
+This should be memory-controller at ...
 
-That's a very good question. As Guenter said we will be in deep troubles
-if that ever happens since the driver doesn't take that into account.
+> +		compatible = "samsung,exynos-srom";
+> +		reg = <0x12570000 0x10>;
 
-The .set_timeout handler just sets the counter according to the current
-frequency and that's never updated, unless a new timeout is set of course.
+The next patch changes the size to 0x14?
 
-So in other words, I just made the same assumptions that the driver is
-currently doing. At least the Exynos SoCs manual don't mention frequency
-scaling for the watchdog timer source clock and AFAICT none of the CLK_WDT
-parents scale their frequencies but I don't know if that's true for all
-the machines using this driver (i.e: out-of-tree boards).
-  
-> Best regards,
-> Krzysztof
->
+BTW, you could just combine both patches. I guess you didn't to maintain 
+authorship?
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Rob
