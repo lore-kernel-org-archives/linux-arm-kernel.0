@@ -1,118 +1,61 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed,  2 Mar 2016 03:49:09 +0100
-Subject: [PATCH v3] tty: serial: meson: Implement earlycon support
-Message-ID: <1456886949-26503-1-git-send-email-afaerber@suse.de>
+From: majun258@huawei.com (MaJun)
+Date: Wed, 2 Mar 2016 10:47:59 +0800
+Subject: [PATCH] Change the spin_lock/unlock_irq interface in
+ proc_alloc_inum() function
+Message-ID: <1456886879-28128-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split off the bulk of the existing meson_serial_console_write()
-implementation into meson_serial_port_write() for implementing
-meson_serial_early_console_write().
+From: Ma Jun <majun258@huawei.com>
 
-Use "meson" as the earlycon driver name, courtesy of Nicolas.
+The spin_lock/unlock_irq interface is not safe when this function is called
+at some case which need irq disabled.
 
-Signed-off-by: Nicolas Saenz Julienne <nicolassaenzj@gmail.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
+For example:
+	spin_lock_irqsave()
+	|
+	request_irq() --> proc_alloc_inum()
+	|
+	spin_unlock_irqrestore()
+
+Reported-by: Fan Jinke <fanjinke1@huawei.com>
+Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- v2 -> v3:
- * Rename from "meson_serial" to just "meson" (Nicolas)
- 
- v1 -> v2:
- * Implement meson_serial_early_console_write() instead of reusing
-   meson_serial_console_write() (Peter)
- 
- Documentation/kernel-parameters.txt |  6 ++++++
- drivers/tty/serial/meson_uart.c     | 42 ++++++++++++++++++++++++++++++-------
- 2 files changed, 41 insertions(+), 7 deletions(-)
+ fs/proc/generic.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index e0a21e4556a6..a7c1377fd80f 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -1039,6 +1039,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			the driver will use only 32-bit accessors to read/write
- 			the device registers.
- 
-+		meson,<addr>
-+			Start an early, polled-mode console on a meson serial
-+			port at the specified address. The serial port must
-+			already be setup and configured. Options are not yet
-+			supported.
-+
- 		msm_serial,<addr>
- 			Start an early, polled-mode console on an msm serial
- 			port at the specified address. The serial port
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 024445aa0521..6aea0f4a9165 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -481,18 +481,13 @@ static void meson_console_putchar(struct uart_port *port, int ch)
- 	writel(ch, port->membase + AML_UART_WFIFO);
- }
- 
--static void meson_serial_console_write(struct console *co, const char *s,
--				       u_int count)
-+static void meson_serial_port_write(struct uart_port *port, const char *s,
-+				    u_int count)
+diff --git a/fs/proc/generic.c b/fs/proc/generic.c
+index ff3ffc7..4fc1502 100644
+--- a/fs/proc/generic.c
++++ b/fs/proc/generic.c
+@@ -191,23 +191,24 @@ int proc_alloc_inum(unsigned int *inum)
  {
--	struct uart_port *port;
- 	unsigned long flags;
- 	int locked;
- 	u32 val, tmp;
+ 	unsigned int i;
+ 	int error;
++	unsigned long flags;
  
--	port = meson_ports[co->index];
--	if (!port)
--		return;
--
- 	local_irq_save(flags);
- 	if (port->sysrq) {
- 		locked = 0;
-@@ -516,6 +511,18 @@ static void meson_serial_console_write(struct console *co, const char *s,
- 	local_irq_restore(flags);
- }
+ retry:
+ 	if (!ida_pre_get(&proc_inum_ida, GFP_KERNEL))
+ 		return -ENOMEM;
  
-+static void meson_serial_console_write(struct console *co, const char *s,
-+				       u_int count)
-+{
-+	struct uart_port *port;
-+
-+	port = meson_ports[co->index];
-+	if (!port)
-+		return;
-+
-+	meson_serial_port_write(port, s, count);
-+}
-+
- static int meson_serial_console_setup(struct console *co, char *options)
- {
- 	struct uart_port *port;
-@@ -554,6 +561,27 @@ static int __init meson_serial_console_init(void)
- }
- console_initcall(meson_serial_console_init);
+-	spin_lock_irq(&proc_inum_lock);
++	spin_lock_irqsave(&proc_inum_lock, flags);
+ 	error = ida_get_new(&proc_inum_ida, &i);
+-	spin_unlock_irq(&proc_inum_lock);
++	spin_unlock_irqrestore(&proc_inum_lock, flags);
+ 	if (error == -EAGAIN)
+ 		goto retry;
+ 	else if (error)
+ 		return error;
  
-+static void meson_serial_early_console_write(struct console *co,
-+					     const char *s,
-+					     u_int count)
-+{
-+	struct earlycon_device *dev = co->data;
-+
-+	meson_serial_port_write(&dev->port, s, count);
-+}
-+
-+static int __init
-+meson_serial_early_console_setup(struct earlycon_device *device, const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = meson_serial_early_console_write;
-+	return 0;
-+}
-+OF_EARLYCON_DECLARE(meson, "amlogic,meson-uart",
-+		    meson_serial_early_console_setup);
-+
- #define MESON_SERIAL_CONSOLE	(&meson_serial_console)
- #else
- #define MESON_SERIAL_CONSOLE	NULL
+ 	if (i > UINT_MAX - PROC_DYNAMIC_FIRST) {
+-		spin_lock_irq(&proc_inum_lock);
++		spin_lock_irqsave(&proc_inum_lock, flags);
+ 		ida_remove(&proc_inum_ida, i);
+-		spin_unlock_irq(&proc_inum_lock);
++		spin_unlock_irqrestore(&proc_inum_lock, flags);
+ 		return -ENOSPC;
+ 	}
+ 	*inum = PROC_DYNAMIC_FIRST + i;
 -- 
-2.6.2
+1.7.1
