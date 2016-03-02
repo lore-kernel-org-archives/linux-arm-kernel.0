@@ -1,26 +1,75 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 2 Mar 2016 11:49:01 +0000
-Subject: [PATCH 1/5] ARM: efi: apply strict permissons for UEFI Runtime
- Services regions
-In-Reply-To: <1456151158-25849-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1456151158-25849-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456151158-25849-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160302114901.GC2649@codeblueprint.co.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 2 Mar 2016 15:03:57 +0300
+Subject: [PATCH] arm64: dts: r8a7795: Add CAN FD support
+In-Reply-To: <SG2PR06MB1038FBA247777C89F70E2633C3BC0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+References: <1456826640-23237-1-git-send-email-ramesh.shanmugasundaram@bp.renesas.com>
+ <56D59538.2060100@cogentembedded.com>
+ <SG2PR06MB1038FBA247777C89F70E2633C3BC0@SG2PR06MB1038.apcprd06.prod.outlook.com>
+Message-ID: <56D6D6AD.7080207@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Feb, at 03:25:54PM, Ard Biesheuvel wrote:
-> Recent UEFI versions expose permission attributes for runtime services
-> memory regions, either in the UEFI memory map or in the separate memory
-> attributes table.  This allows the kernel to map these regions with
-> stricter permissions, rather than the RWX permissions that are used by
-> default. So wire this up in our mapping routine.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/include/asm/efi.h |  1 +
->  arch/arm/kernel/efi.c      | 41 ++++++++++++++++++++
->  2 files changed, 42 insertions(+)
+Hello.
 
-Looks fine from an EFI perspective, but it would be nice for somebody
-else with ARM knowledge to ACK it.
+On 3/2/2016 10:29 AM, Ramesh Shanmugasundaram wrote:
+
+>>> Adds CAN FD controller node for r8a7795.
+>>>
+>>> Note: CAN FD controller register base address specified in R-Car Gen3
+>>> Hardware User Manual v0.5E is incorrect. The correct address is:
+>>>
+>>> CAN FD - 0xe66c0000
+>>>
+>>> Signed-off-by: Ramesh Shanmugasundaram
+>>> <ramesh.shanmugasundaram@bp.renesas.com>
+>>> ---
+>>> Hi All,
+>>>
+>>>      This patch is based on linux-next (tag:next-20160225) with the
+>> following
+>>>      patches applied on top.
+>>>
+>>>      [PATCH v2] arm64: dts: r8a7795: Add CAN external clock support
+>>>      [PATCH] arm64: dts: r8a7795: Add CAN support
+>>>
+>>>      The respective CAN subsystem changes are submitted separately here
+>>> (https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg013
+>>> 88.html)
+>>>
+>>> Thanks,
+>>> Ramesh
+>>> ---
+>>>    arch/arm64/boot/dts/renesas/r8a7795.dtsi | 24 ++++++++++++++++++++++++
+>>>    1 file changed, 24 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> index a88f8d8..5049ba6 100644
+>>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>>> @@ -553,6 +553,30 @@
+>>>    			status = "disabled";
+>>>    		};
+>>>
+>>> +		canfd: canfd at e66c0000 {
+>>
+>>      The node name should still be "can at e66c0000", I think.
+>
+> Thanks for the review.
+>
+> The SoC has CAN controller too
+
+    Yes, I figured. BTW, is the CAN-FD identical to the older CAN on the 
+hardware level? I haven't see you posting the CAN-FD driver yet...
+
+> and hence I chose this node name to differentiate. A grep of canfd on sysfs would tell if the controller is enabled. The channels on "net" would still be named "canx".
+>
+> I'll change it if you still feel "can at e66c0000" is more appropriate.
+
+    It is -- the node names should be generic and ePAPR even has the "can" 
+name listed explicitly in the section 2.2.2.
+
+> Thanks,
+> Ramesh
+
+MBR, Sergei
