@@ -1,25 +1,96 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 2 Mar 2016 22:07:50 +0100
-Subject: [GIT PULL] at91: dt for 4.6 #2
-In-Reply-To: <1634323.MskpPxvyZt@wuerfel>
-References: <1456934722-7023-1-git-send-email-nicolas.ferre@atmel.com>
- <1634323.MskpPxvyZt@wuerfel>
-Message-ID: <20160302210750.GA2567@piout.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 02 Mar 2016 22:16:35 +0100
+Subject: [PATCH 1/5] PM / AVS: rockchip-io: make io-domains a child of the
+ GRF
+In-Reply-To: <7hio22bwr7.fsf@baylibre.com>
+References: <1454707218-23676-1-git-send-email-heiko@sntech.de>
+ <1454707218-23676-2-git-send-email-heiko@sntech.de>
+ <7hio22bwr7.fsf@baylibre.com>
+Message-ID: <3201731.IRj8F3jnGs@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rafael,
 
-On 02/03/2016 at 21:50:59 +0100, Arnd Bergmann wrote :
-> I see that your gpg key has expired last week, you may want to do something
-> about that, I think you can just update the date rather than creating a
-> new key.
+Am Freitag, 5. Februar 2016, 14:47:08 schrieb Kevin Hilman:
+> Heiko Stuebner <heiko@sntech.de> writes:
+> > IO-domain handling is part of the general register files, so should live
+> > under the grf directly. This change allows the grf to be a simple-mfd and
+> > the io-domains fetching the syscon regmap from that parent-node.
+> > 
+> > The old binding is of course preserved, though deprecated.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > 
+> Acked-by: Kevin Hilman <khilman@baylibre.com>
 
-You probably want to pull his key, it was updated today.
+As before, I guess that means you could apply that patch directly, as nothing 
+else is pending from Kevin's side.
 
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks
+Heiko
+
+> > ---
+> > 
+> >  Documentation/devicetree/bindings/power/rockchip-io-domain.txt |  4 +++-
+> >  drivers/power/avs/rockchip-io-domain.c                         | 10
+> >  +++++++++- 2 files changed, 12 insertions(+), 2 deletions(-)
+> > 
+> > diff --git
+> > a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> > b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt index
+> > b8627e7..7ed5518 100644
+> > --- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> > +++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> > 
+> > @@ -35,8 +35,10 @@ Required properties:
+> >    - "rockchip,rk3288-io-voltage-domain" for rk3288
+> >    - "rockchip,rk3368-io-voltage-domain" for rk3368
+> >    - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
+> > 
+> > -- rockchip,grf: phandle to the syscon managing the "general register
+> > files"
+> > 
+> > +Deprecated properties:
+> > +- rockchip,grf: phandle to the syscon managing the "general register
+> > files" +    Systems should move the io-domains to a sub-node of the grf
+> > simple-mfd.> 
+> >  You specify supplies using the standard regulator bindings by including
+> >  a phandle the relevant regulator.  All specified supplies must be able
+> > 
+> > diff --git a/drivers/power/avs/rockchip-io-domain.c
+> > b/drivers/power/avs/rockchip-io-domain.c index 8099456..a5a07d8 100644
+> > --- a/drivers/power/avs/rockchip-io-domain.c
+> > +++ b/drivers/power/avs/rockchip-io-domain.c
+> > @@ -278,6 +278,7 @@ static int rockchip_iodomain_probe(struct
+> > platform_device *pdev)> 
+> >  	struct device_node *np = pdev->dev.of_node;
+> >  	const struct of_device_id *match;
+> >  	struct rockchip_iodomain *iod;
+> > 
+> > +	struct device *parent;
+> > 
+> >  	int i, ret = 0;
+> >  	
+> >  	if (!np)
+> > 
+> > @@ -293,7 +294,14 @@ static int rockchip_iodomain_probe(struct
+> > platform_device *pdev)> 
+> >  	match = of_match_node(rockchip_iodomain_match, np);
+> >  	iod->soc_data = (struct rockchip_iodomain_soc_data *)match->data;
+> > 
+> > -	iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> > +	parent = pdev->dev.parent;
+> > +	if (parent && parent->of_node) {
+> > +		iod->grf = syscon_node_to_regmap(parent->of_node);
+> > +	} else {
+> > +		dev_dbg(&pdev->dev, "falling back to old binding\n");
+> > +		iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> > +	}
+> > +
+> > 
+> >  	if (IS_ERR(iod->grf)) {
+> >  	
+> >  		dev_err(&pdev->dev, "couldn't find grf regmap\n");
+> >  		return PTR_ERR(iod->grf);
