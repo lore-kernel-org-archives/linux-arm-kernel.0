@@ -1,81 +1,77 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Wed, 2 Mar 2016 15:01:34 +0000
-Subject: [PATCH net-next V2 02/16] net: fec: pass rxq to fec_enet_rx_queue
- instead of queue_id
-In-Reply-To: <1456360619-24390-3-git-send-email-troy.kisky@boundarydevices.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-3-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB18551D7754A6D2EC350E1D9BFFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 2 Mar 2016 18:07:21 +0300
+Subject: [PATCH v2 0/8] arm64: Support for systems without AArch32 state
+In-Reply-To: <20160301211923.GA1325@yury-N73SV>
+References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+ <20160301211923.GA1325@yury-N73SV>
+Message-ID: <20160302150721.GA16286@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2016 8:37 AM
-> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
-> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
-> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
-> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
-> johannes at sipsolutions.net; stillcompiling at gmail.com;
-> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
-> <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net-next V2 02/16] net: fec: pass rxq to fec_enet_rx_queue
-> instead of queue_id
+On Wed, Mar 02, 2016 at 12:19:23AM +0300, Yury Norov wrote:
+> On Thu, Feb 25, 2016 at 09:52:40AM +0000, Suzuki K Poulose wrote:
+> > This series add checks to make sure that the AArch32 state is
+> > supported before we process the 32bit ID registers. Also
+> > checks the same for COMPAT binary execution.
+> > 
+> > (Painfully) applies on top of 4.5-rc5 + [1] + [2].
+> > 
+> > Or it is available here :
+> >   git://linux-arm.org/linux-skp.git noaarch32/v2-4.5-rc5
+> > 
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/410556.html
+> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401913.html
+> > 
+> > Changes since V1:
+> >   - Prevent changing the personality to PER_LINUX32 by adding
+> >     wrapper for personality() syscall.
+> >   - Add the check to KVM before initialising a AArch32 vcpu
+> >   - Tested on hardware.
+> > 
+> > Btw, linux32 doesn't complain when the personality() syscall fails to change
+> > to PER_LINUX32. You can verify the personality by running 
+> >  $ cat /proc/cpuinfo
+> >  which would still list the 64bit features for the CPUs.
 > 
-> The queue_id is the qid member of struct bufdesc_prop.
+> Hi Suzuki,
 > 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  drivers/net/ethernet/freescale/fec_main.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
+> I have some troubles with access to appropriate hardware to test
+> it, but I didn't forget.
 > 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c
-> index dbac975..9619b9e 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1328,11 +1328,9 @@ static bool fec_enet_copybreak(struct net_device
-> *ndev, struct sk_buff **skb,
->   * not been given to the system, we just set the empty indicator,
->   * effectively tossing the packet.
->   */
-> -static int
-> -fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
-> +static int fec_rxq(struct net_device *ndev, struct fec_enet_private *fep,
-> +		   struct fec_enet_priv_rx_q *rxq, int budget)
->  {
-> -	struct fec_enet_private *fep = netdev_priv(ndev);
-> -	struct fec_enet_priv_rx_q *rxq;
->  	struct bufdesc *bdp;
->  	unsigned short status;
->  	struct  sk_buff *skb_new = NULL;
-> @@ -1350,8 +1348,6 @@ fec_enet_rx_queue(struct net_device *ndev, int
-> budget, u16 queue_id)  #ifdef CONFIG_M532x
->  	flush_cache_all();
->  #endif
-> -	queue_id = FEC_ENET_GET_QUQUE(queue_id);
-> -	rxq = fep->rx_queue[queue_id];
-> 
->  	/* First, grab all of the stats for the incoming packet.
->  	 * These get messed up if we get called due to a busy condition.
-> @@ -1519,11 +1515,12 @@ fec_enet_rx(struct net_device *ndev, int budget)
->  	int     pkt_received = 0;
->  	u16	queue_id;
->  	struct fec_enet_private *fep = netdev_priv(ndev);
-> +	struct fec_enet_priv_rx_q *rxq;
-> 
->  	for_each_set_bit(queue_id, &fep->work_rx, FEC_ENET_MAX_RX_QS)
-> {
->  		clear_bit(queue_id, &fep->work_rx);
-> -		pkt_received += fec_enet_rx_queue(ndev,
-> -					budget - pkt_received, queue_id);
-> +		rxq = fep->rx_queue[FEC_ENET_GET_QUQUE(queue_id)];
-> +		pkt_received += fec_rxq(ndev, fep, rxq, budget -
-> pkt_received);
->  	}
->  	return pkt_received;
->  }
-> --
-> 2.5.0
+> Yury.
 
-This is one clean up patch that you introduce struct bufdesc_prop.
+Hi Suzuki,
 
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
+ubuntu at arm64:~$ uname -a
+Linux arm64 4.5.0-rc5-00019-g3e330b9 #76 SMP PREEMPT Wed Mar 2 17:46:57 MSK 2016 aarch64 aarch64 aarch64 GNU/Linux
+
+ubuntu at arm64:~$ cat /proc/cpuinfo
+processor       : 0-47
+BogoMIPS        : 200.00
+Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+CPU implementer : 0x43
+CPU architecture: 8
+CPU variant     : 0x1
+CPU part        : 0x0a1
+CPU revision    : 0
+
+ubuntu at arm64:~$ file readdir
+readdir: ELF 32-bit LSB  executable, ARM, EABI5 version 1 (SYSV), statically linked, for GNU/Linux 2.6.32,
+BuildID[sha1]=aeebc12494450b55a2ab0d39ebd2e121e9085d5c, not stripped
+
+W/o 32_EL0:
+ubuntu at arm64:~$ ./readdir 
+-bash: ./readdir: cannot execute binary file: Exec format error
+
+With 32_ELO but w/o your patchset: kernel just hangs (on 4.2 it
+printed errors, but it was other machine);
+
+With 32_EL0 and with your patchset:
+ubuntu at arm64:~$ ./readdir 
+-bash: ./readdir: cannot execute binary file: Exec format error
+
+So, everything is looking OK. 
+
+Tested-by: Yury Norov <ynorov@caviumnetworks.com>
+
+Yury.
