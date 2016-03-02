@@ -1,28 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 10:19:54 +0100
-Subject: [PATCH v3] tty: serial: meson: Implement earlycon support
-In-Reply-To: <1456886949-26503-1-git-send-email-afaerber@suse.de>
-References: <1456886949-26503-1-git-send-email-afaerber@suse.de>
-Message-ID: <2758553.xUr6zr8gHg@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  2 Mar 2016 09:27:28 +0000
+Subject: [PULL] KVM/ARM updates for 4.5-rc7
+Message-ID: <1456910849-16049-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2016 03:49:09 Andreas F?rber wrote:
-> Split off the bulk of the existing meson_serial_console_write()
-> implementation into meson_serial_port_write() for implementing
-> meson_serial_early_console_write().
-> 
-> Use "meson" as the earlycon driver name, courtesy of Nicolas.
-> 
-> Signed-off-by: Nicolas Saenz Julienne <nicolassaenzj@gmail.com>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
+Hi Paolo,
 
-I think you also have to add
+I really thought that the previous PR was the last for this release,
+but Michael rightly decided to prove me wrong. Oh well.
 
-	select SERIAL_EARLYCON
+Please pull!
 
-in the Kconfig file now, to avoid build errors when no other
-driver selects that.
+       M.
 
-	Arnd
+The following changes since commit fd451b90e78c4178bcfc5072f2b2b637500c109a:
+
+  arm64: KVM: vgic-v3: Restore ICH_APR0Rn_EL2 before ICH_APR1Rn_EL2 (2016-02-24 17:25:58 +0000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc7
+
+for you to fetch changes up to 4cad67fca3fc952d6f2ed9e799621f07666a560f:
+
+  arm/arm64: KVM: Fix ioctl error handling (2016-02-29 09:56:40 +0000)
+
+----------------------------------------------------------------
+KVM/ARM fixes for 4.5-rc7
+
+- Fix ioctl error handling on the timer path
+
+----------------------------------------------------------------
+Michael S. Tsirkin (1):
+      arm/arm64: KVM: Fix ioctl error handling
+
+ arch/arm/kvm/guest.c   | 2 +-
+ arch/arm64/kvm/guest.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
