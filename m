@@ -1,63 +1,127 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 2 Mar 2016 13:30:11 +0100
-Subject: [RFC v5 00/17] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <BY1PR0701MB1594168E79366B507B7C8A16E1BC0@BY1PR0701MB1594.namprd07.prod.outlook.com>
-References: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
- <BY1PR0701MB1594168E79366B507B7C8A16E1BC0@BY1PR0701MB1594.namprd07.prod.outlook.com>
-Message-ID: <56D6DCD3.7070004@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 2 Mar 2016 12:31:42 +0000
+Subject: [PATCH 1/2] iommu/io-pgtable: Add MTK 4GB mode in Short-descriptor
+In-Reply-To: <1456268552-16635-2-git-send-email-yong.wu@mediatek.com>
+References: <1456268552-16635-1-git-send-email-yong.wu@mediatek.com>
+ <1456268552-16635-2-git-send-email-yong.wu@mediatek.com>
+Message-ID: <56D6DD2E.4030207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manish,
-On 03/02/2016 09:11 AM, Jaggi, Manish wrote:
-> 
-> 
->>> From: Eric Auger <eric.auger@linaro.org>
->>> Sent: Tuesday, March 1, 2016 11:57 PM
->>> To: eric.auger at st.com; eric.auger at linaro.org; robin.murphy at arm.com; alex.williamson at redhat.com; will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de; >>jason at lakedaemon.net; marc.zyngier at arm.com; christoffer.dall at linaro.org; linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org
->>> Cc: suravee.suthikulpanit at amd.com; patches at linaro.org; linux-kernel at vger.kernel.org; Jaggi, Manish; Bharat.Bhushan at freescale.com; >>pranav.sawargaonkar at gmail.com; p.fedin at samsung.com; iommu at lists.linux-foundation.org
->>> Subject: [RFC v5 00/17] KVM PCIe/MSI passthrough on ARM/ARM64
-> 
->>> This series addresses KVM PCIe passthrough with MSI enabled on ARM/ARM64.
->>> It pursues the efforts done on [1], [2], [3]. It also aims at covering the
->>> same need on PowerPC platforms although the same kind of integration
->>> .should be carried out.
->>>
-> [snip]
->>> - Not tested: ARM GICv3 ITS
-> 
-> [snip]
->>> QEMU Integration:
->>> [RFC v2 0/8] KVM PCI/MSI passthrough with mach-virt
->>> (http://lists.gnu.org/archive/html/qemu-arm/2016-01/msg00444.html)
->>> https://git.linaro.org/people/eric.auger/qemu.git/shortlog/refs/heads/v2.5.0-pci-passthrough-rfc-v2
-> 
-> For gicv3 its, I believe, the below series for qemu and kernel is required for gicv3-its
-> 
-> [RFC PATCH v3 0/5] vITS support
-> https://lists.gnu.org/archive/html/qemu-devel/2015-11/msg05197.html
-> 
-> and in kernel CONFIG_HAVE_KVM_MSI must be enabled so that qemu sees MSI capability KVM_CAP_SIGNAL_MSI
-> 
-> This has a dependency on gsi routing support
-> KVM: arm/arm64: gsi routing support
-> https://lkml.org/lkml/2015/6/29/290
+Hi Yong,
 
-which has a dependency on Andre's ITS emulation series too.
+On 23/02/16 23:02, Yong Wu wrote:
+> Mediatek extend bit9 in the lvl1 and lvl2 pgtable descriptor of the
+> Short-descriptor as the 4GB mode in which the dram size will be
+> over 4GB.
+>
+> We add a special quirk for this MTK-4GB mode, And in the standard
+> spec, Bit9 in the lvl1 is "IMPLEMENTATION DEFINED", while it's AP[2]
+> in the lvl2, therefore if this quirk is enabled, NO_PERMS is also
+> expected.
 
-The Kernel series will be resent soon on top on new vgic design.
-> 
-> I had both the above series in 4.2 in my local 4.2 tree. 
+Would you be able to explain exactly what this "4GB mode" actually is? 
+I've been trying to make sense of it from the original M4U patches and 
+the patch for the I2C driver, but it has me completely baffled.
 
-Did you have a chance to test with GICv3 ITS already?
+Is it simply used as an extra physical address bit (although surely that 
+would make it "8GB mode"?), or does it do something crazier like 
+toggling an interconnect remap that shifts the output addresses up by 
+1GB to be relative to the base of DRAM, like a dma_pfn_offset?
 
-Best Regards
+I guess from the look of these patches that it doesn't change anything 
+between the masters and the M4U, so input addresses are still 32 bits 
+and we don't need extended tables, right? Furthermore, what about the 
+TTBRs? Does the level 1 table still have to be below 4GB?
 
-Eric
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+> In arm_v7s_init_pte, We add bit9 if the 4GB mode is enabled no matter
+> the current pa is over 4GB or not.
 
+Either way I can't comprehend how it could be fine to just enable 
+unconditionally without doing _something_ with the actual addresses.
 
-> 
-> BR
-> -Manish
-> 
-> 
+>   drivers/iommu/io-pgtable-arm-v7s.c | 14 +++++++++++++-
+>   drivers/iommu/io-pgtable.h         |  6 ++++++
+>   2 files changed, 19 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> index 9fcceb1..bf6a6f0 100644
+> --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> @@ -121,6 +121,8 @@
+>   #define ARM_V7S_TEX_MASK		0x7
+>   #define ARM_V7S_ATTR_TEX(val)		(((val) & ARM_V7S_TEX_MASK) << ARM_V7S_TEX_SHIFT)
+>
+> +#define ARM_V7S_ATTR_MTK_4GB		BIT(9) /* MTK extend it for 4GB mode */
+> +
+>   /* *well, except for TEX on level 2 large pages, of course :( */
+>   #define ARM_V7S_CONT_PAGE_TEX_SHIFT	6
+>   #define ARM_V7S_CONT_PAGE_TEX_MASK	(ARM_V7S_TEX_MASK << ARM_V7S_CONT_PAGE_TEX_SHIFT)
+> @@ -364,6 +366,9 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
+>   	if (lvl == 1 && (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS))
+>   		pte |= ARM_V7S_ATTR_NS_SECTION;
+>
+> +	if (cfg->quirks & IO_PGTABLE_QUIRK_MTK_4GB_EXT)
+> +		pte |= ARM_V7S_ATTR_MTK_4GB;
+> +
+>   	if (num_entries > 1)
+>   		pte = arm_v7s_pte_to_cont(pte, lvl);
+>
+> @@ -625,9 +630,16 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
+>
+>   	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS |
+>   			    IO_PGTABLE_QUIRK_NO_PERMS |
+> -			    IO_PGTABLE_QUIRK_TLBI_ON_MAP))
+> +			    IO_PGTABLE_QUIRK_TLBI_ON_MAP |
+> +			    IO_PGTABLE_QUIRK_MTK_4GB_EXT))
+>   		return NULL;
+>
+> +	/* If MTK_4GB_EXT is enabled, the NO_PERMS is also expected. */
+> +	if (cfg->quirks & IO_PGTABLE_QUIRK_MTK_4GB_EXT) {
+> +		if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_PERMS))
+
+Ha, I wasn't expecting to see Will's argument against generic 
+quirk-checking be vindicated quite so soon :)
+
+Anyway, no need for braces and nested ifs:
+
+	if (cfg->quirks & IO_PGTABLE_QUIRK_MTK_4GB_EXT &&
+	    !(cfg->quirks & IO_PGTABLE_QUIRK_NO_PERMS))
+
+> +			return NULL;
+> +	}
+> +
+>   	data = kmalloc(sizeof(*data), GFP_KERNEL);
+>   	if (!data)
+>   		return NULL;
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index d4f5027..a84a60a 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -60,10 +60,16 @@ struct io_pgtable_cfg {
+>   	 * IO_PGTABLE_QUIRK_TLBI_ON_MAP: If the format forbids caching invalid
+>   	 *	(unmapped) entries but the hardware might do so anyway, perform
+>   	 *	TLB maintenance when mapping as well as when unmapping.
+> +	 *
+> +	 * IO_PGTABLE_QUIRK_MTK_4GB_EXT: Mediatek extend bit9 in the lvl1 and
+> +	 *	lvl2 descriptor of the Short-descriptor as the 4GB mode.
+> +	 *	Note that: Bit9 in the lvl1 is "IMPLEMENTATION DEFINED", while
+> +	 *	it is AP[2] in the lvl2.
+
+Unfortunately that comment doesn't really explain anything - I'd be 
+happy to suggest a more helpful wording, If only I understood what it 
+actually did.
+
+Robin.
+
+>   	 */
+>   	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
+>   	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
+>   	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
+> +	#define IO_PGTABLE_QUIRK_MTK_4GB_EXT	BIT(3)
+>   	unsigned long			quirks;
+>   	unsigned long			pgsize_bitmap;
+>   	unsigned int			ias;
+>
