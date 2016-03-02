@@ -1,50 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 Mar 2016 11:22:04 +0100
-Subject: [PATCH 1/2] char: PC rtc: replace blacklist with whitelist
-In-Reply-To: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
-References: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
-Message-ID: <CAMuHMdU26GkyUYxs3DJOFRB5LTdYCOaGTMUwFMd9YXYhkS1W3g@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 2 Mar 2016 10:22:39 +0000
+Subject: [PATCH v2 8/8] arm64: kvm: Check support for AArch32 for 32bit
+ guests
+In-Reply-To: <56D6AD72.8010108@arm.com>
+References: <1456393968-17386-1-git-send-email-suzuki.poulose@arm.com>
+ <1456393968-17386-9-git-send-email-suzuki.poulose@arm.com>
+ <56D6AD72.8010108@arm.com>
+Message-ID: <56D6BEEF.3000208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2016 at 10:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Every new architecture has to add itself to the growing list of those
-> that do not support the legacy PC RTC driver.
+On 02/03/16 09:08, Marc Zyngier wrote:
+> On 25/02/16 09:52, Suzuki K Poulose wrote:
+
+>> I really wanted to pass kvm_vcpu down to the helpers. But then, I can't
+>> define the arch specific helper in asm/kvm_host.h due to lack of kvm_vcpu's
+>> definition yet:
+>>
+>>   In file included from include/linux/kvm_host.h:35:0,
+>>                    from arch/arm64/kernel/asm-offsets.c:24:
+>>   ./arch/arm64/include/asm/kvm_host.h: In function ?kvm_arch_vcpu_validate_features?:
+>>   ./arch/arm64/include/asm/kvm_host.h:344:48: error: dereferencing pointer to incomplete type
+>>     return  !test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features) ||
 >
-> This replaces the long list of architectures that don't support it
-> with a shorter list of those that do.
+> Why don't you just have the prototype in kvm_host.h, and move the actual
+> implementation to something like guest.c? But I think there is a better
+> approach, see below.
+
+I thought it would better be a static inline. But, the GCC can do that, silly me :)
+
 >
-> The list is taken from those architectures that have a non-empty
-> asm/mc146818rtc.h header file and were not explicitly blacklisted.
-
-M68K was blacklisted...
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/char/Kconfig | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+> This is really convoluted (it took me 5 minutes staring at the
+> expression and remembering that AArch32 EL1 implies AArch32 EL0 to get it).
 >
-> diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-> index a043107da2af..9716bc36495a 100644
-> --- a/drivers/char/Kconfig
-> +++ b/drivers/char/Kconfig
-> @@ -279,8 +279,7 @@ if RTC_LIB=n
->
->  config RTC
->         tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
-> -       depends on !PPC && !PARISC && !IA64 && !M68K && !SPARC && !FRV \
-> -                       && !ARM && !SUPERH && !S390 && !AVR32 && !BLACKFIN && !UML
-> +       depends on ALPHA || M32R || M68K || MIPS || MN10300 || PPC || X86
+> Now, we already have kvm_reset_vcpu() that validates AArch32 support. It
+> would probably be better to move things there. Thoughts?
 
-... so please drop it here.
+Definitely. I overlooked the function name to do something
+specific to resetting the CPU than doing some checks :(.
+I will respin it.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers
+Suzuki
