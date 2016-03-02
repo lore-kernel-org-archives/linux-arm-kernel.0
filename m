@@ -1,38 +1,38 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed,  2 Mar 2016 03:34:56 +0100
-Subject: [PATCH v2 1/6] ARM64: Enable Amlogic Meson GXBaby platform
+Date: Wed,  2 Mar 2016 03:34:57 +0100
+Subject: [PATCH v2 2/6] devicetree: bindings: Add vendor prefix for Tronsmart
 In-Reply-To: <1456886101-22967-1-git-send-email-afaerber@suse.de>
 References: <1456886101-22967-1-git-send-email-afaerber@suse.de>
-Message-ID: <1456886101-22967-2-git-send-email-afaerber@suse.de>
+Message-ID: <1456886101-22967-3-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the ARCH_MESON Kconfig symbol to allow enabling existing serial
-and i2c drivers.
+From: Matthias Brugger <matthias.bgg@gmail.com>
 
+Tronsmart is a China based company building consumer electronic
+devices.
+
+Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v1 -> v2:
- * Dropped ARM_GIC selection (Sudeep)
+ * Replaced with older identical patch (Matthias)
  
- arch/arm64/Kconfig.platforms | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index a0a69589e46c..a14e024b63a9 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -56,6 +56,11 @@ config ARCH_MEDIATEK
- 	help
- 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
- 
-+config ARCH_MESON
-+	bool "Amlogic Platforms"
-+	help
-+	  This enables support for the Amlogic S905 SoCs.
-+
- config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
- 	select ARMADA_AP806_CORE_CLK
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index f871e8e7e98f..662edc7bce04 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -243,6 +243,7 @@ toshiba	Toshiba Corporation
+ toumaz	Toumaz
+ tplink	TP-LINK Technologies Co., Ltd.
+ tronfy	Tronfy
++tronsmart	Tronsmart
+ truly	Truly Semiconductors Limited
+ upisemi	uPI Semiconductor Corp.
+ urt	United Radiant Technology Corporation
 -- 
 2.6.2
