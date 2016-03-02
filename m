@@ -1,290 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 Mar 2016 12:07:28 -0600
-Subject: [PATCH V7 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <1456396631-12788-1-git-send-email-blogic@openwrt.org>
-References: <1456396631-12788-1-git-send-email-blogic@openwrt.org>
-Message-ID: <20160302180728.GA21394@rob-hp-laptop>
+From: kirill.shutemov@linux.intel.com (Kirill A. Shutemov)
+Date: Wed, 2 Mar 2016 21:07:24 +0300
+Subject: [PATCH] arm: mm: Fix definition of pmd_mknotpresent
+In-Reply-To: <20160302155554.GF7637@arm.com>
+References: <1456880580-22311-1-git-send-email-steve.capper@arm.com>
+ <20160302151152.GA94701@black.fi.intel.com>
+ <20160302155554.GF7637@arm.com>
+Message-ID: <20160302180724.GA143879@black.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 11:37:10AM +0100, John Crispin wrote:
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
-> ---
-> This patch needs to be merged post-rc1 as it depends on the MFD series of
-> the PMIC which is already inside Lee's tree pending the PR.
+On Wed, Mar 02, 2016 at 03:55:55PM +0000, Will Deacon wrote:
+> On Wed, Mar 02, 2016 at 06:11:52PM +0300, Kirill A. Shutemov wrote:
+> > On Wed, Mar 02, 2016 at 01:03:00AM +0000, Steve Capper wrote:
+> > > Currently pmd_mknotpresent will use a zero entry to respresent an
+> > > invalidated pmd.
+> > > 
+> > > Unfortunately this definition clashes with pmd_none, thus it is
+> > > possible for a race condition to occur if zap_pmd_range sees pmd_none
+> > > whilst __split_huge_pmd_locked is running too with pmdp_invalidate
+> > > just called.
+> > > 
+> > > This patch fixes the race condition by modifying pmd_mknotpresent to
+> > > create non-zero faulting entries (as is done in other architectures),
+> > > removing the ambiguity with pmd_none.
+> > > 
+> > > Fixes: 8d9625070073 ("ARM: mm: Transparent huge page support for LPAE systems.")
+> > > Reported-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> > > Signed-off-by: Steve Capper <steve.capper@arm.com>
+> > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > > 
+> > > ---
+> > > 
+> > > This patch addresses an issue discussed at:
+> > > http://lkml.iu.edu/hypermail/linux/kernel/1602.3/01846.html
+> > > 
+> > > ---
+> > >  arch/arm/include/asm/pgtable-3level.h | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> > > index dc46398..451b6e7 100644
+> > > --- a/arch/arm/include/asm/pgtable-3level.h
+> > > +++ b/arch/arm/include/asm/pgtable-3level.h
+> > > @@ -249,10 +249,10 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+> > >  #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+> > >  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+> > >  
+> > > -/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
+> > > +/* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
+> > >  static inline pmd_t pmd_mknotpresent(pmd_t pmd)
+> > >  {
+> > > -	return __pmd(0);
+> > > +	return __pmd(pmd_val(pmd) & ~PMD_TYPE_MASK);
+> > 
+> > I'm confused. Wouldn't it still be present?
+> > 
+> > arch/arm/include/asm/pgtable.h:#define pmd_present(pmd) (pmd_val(pmd))
+> > 
+> > Shouldn't pmd_present() be re-defined as (pmd_val(pmd) & PMD_TYPE_MASK) or
+> > something?
+> 
+> Hmm, we have ths same issue on arm64 in that case. Do we also need to
+> handle PROT_NONE for pmds?
 
-Why? It is an indpendent change with no actual dependency.
+I think so.
 
-> 
-> Changes in V7
-> * remove another compatible string
-> * small wording changes
-> 
-> Changes in V6
-> * remove the compatible string
-> 
-> Changes in V5
-> * regulator vs regulators
-> 
-> Changes in V4
-> * regulator is a subnode and not a property
-> 
->  .../bindings/regulator/mt6323-regulator.txt        |  239 ++++++++++++++++++++
->  1 file changed, 239 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+There's no use-cases where it would matter at the moment as far as I can
+see. But if we would implement huge migration/swap entries, proper
+pmd_present() will be required.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-> new file mode 100644
-> index 0000000..9fd95e7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-> @@ -0,0 +1,239 @@
-> +Mediatek MT6323 Regulator Driver
-> +
-> +All voltage regulators are defined as subnodes of the regulators node. A list
-> +of regulators provided by this controller are defined as subnodes of the
-> +PMIC's node. Each regulator is named according to its regulator type,
-> +buck_<name> and ldo_<name>. The definition for each of these nodes is defined
-> +using the standard binding for regulators at
-> +Documentation/devicetree/bindings/regulator/regulator.txt.
-> +
-> +The valid names for regulators are::
-> +BUCK:
-> +  buck_vproc, buck_vsys, buck_vpa
-> +LDO:
-> +  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
-> +  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
-> +  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
-> +  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
-> +
-> +Example:
-> +
-> +	pmic: mt6323 {
-> +		compatible = "mediatek,mt6323";
-> +
-> +		mt6323regulator: regulators {
-> +			mt6323_vproc_reg: buck_vproc{
-> +				regulator-name = "vproc";
-> +				regulator-min-microvolt = < 700000>;
-> +				regulator-max-microvolt = <1350000>;
-> +				regulator-ramp-delay = <12500>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vsys_reg: buck_vsys{
-> +				regulator-name = "vsys";
-> +				regulator-min-microvolt = <1400000>;
-> +				regulator-max-microvolt = <2987500>;
-> +				regulator-ramp-delay = <25000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vpa_reg: buck_vpa{
-> +				regulator-name = "vpa";
-> +				regulator-min-microvolt = < 500000>;
-> +				regulator-max-microvolt = <3650000>;
-> +			};
-> +
-> +			mt6323_vtcxo_reg: ldo_vtcxo{
-> +				regulator-name = "vtcxo";
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-enable-ramp-delay = <90>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vcn28_reg: ldo_vcn28{
-> +				regulator-name = "vcn28";
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-enable-ramp-delay = <185>;
-> +			};
-> +
-> +			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
-> +				regulator-name = "vcn33_bt";
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3600000>;
-> +				regulator-enable-ramp-delay = <185>;
-> +			};
-> +
-> +			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
-> +				regulator-name = "vcn33_wifi";
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3600000>;
-> +				regulator-enable-ramp-delay = <185>;
-> +			};
-> +
-> +			mt6323_va_reg: ldo_va{
-> +				regulator-name = "va";
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vcama_reg: ldo_vcama{
-> +				regulator-name = "vcama";
-> +				regulator-min-microvolt = <1500000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vio28_reg: ldo_vio28{
-> +				regulator-name = "vio28";
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vusb_reg: ldo_vusb{
-> +				regulator-name = "vusb";
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vmc_reg: ldo_vmc{
-> +				regulator-name = "vmc";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <36>;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vmch_reg: ldo_vmch{
-> +				regulator-name = "vmch";
-> +				regulator-min-microvolt = <3000000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <36>;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vemc3v3_reg: ldo_vemc3v3{
-> +				regulator-name = "vemc3v3";
-> +				regulator-min-microvolt = <3000000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <36>;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vgp1_reg: ldo_vgp1{
-> +				regulator-name = "vgp1";
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vgp2_reg: ldo_vgp2{
-> +				regulator-name = "vgp2";
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vgp3_reg: ldo_vgp3{
-> +				regulator-name = "vgp3";
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vcn18_reg: ldo_vcn18{
-> +				regulator-name = "vcn18";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vsim1_reg: ldo_vsim1{
-> +				regulator-name = "vsim1";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vsim2_reg: ldo_vsim2{
-> +				regulator-name = "vsim2";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vrtc_reg: ldo_vrtc{
-> +				regulator-name = "vrtc";
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vcamaf_reg: ldo_vcamaf{
-> +				regulator-name = "vcamaf";
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vibr_reg: ldo_vibr{
-> +				regulator-name = "vibr";
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-enable-ramp-delay = <36>;
-> +			};
-> +
-> +			mt6323_vrf18_reg: ldo_vrf18{
-> +				regulator-name = "vrf18";
-> +				regulator-min-microvolt = <1825000>;
-> +				regulator-max-microvolt = <1825000>;
-> +				regulator-enable-ramp-delay = <187>;
-> +			};
-> +
-> +			mt6323_vm_reg: ldo_vm{
-> +				regulator-name = "vm";
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vio18_reg: ldo_vio18{
-> +				regulator-name = "vio18";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +
-> +			mt6323_vcamd_reg: ldo_vcamd{
-> +				regulator-name = "vcamd";
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +
-> +			mt6323_vcamio_reg: ldo_vcamio{
-> +				regulator-name = "vcamio";
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-enable-ramp-delay = <216>;
-> +			};
-> +		};
-> +	};
-> -- 
-> 1.7.10.4
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+ Kirill A. Shutemov
