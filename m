@@ -1,148 +1,146 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 3 Mar 2016 00:08:01 +0100
-Subject: [PATCH v2 07/17] arm64: KVM: vgic-v2: Avoid accessing GICH
- registers
-In-Reply-To: <1455727249-24752-8-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 3 Mar 2016 00:08:06 +0100
+Subject: [PATCH v2 08/17] arm64: KVM: vgic-v2: Save maintenance interrupt
+ state only if required
+In-Reply-To: <1455727249-24752-9-git-send-email-marc.zyngier@arm.com>
 References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
- <1455727249-24752-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160302230801.GA9634@cbox>
+ <1455727249-24752-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160302230806.GB9634@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 04:40:39PM +0000, Marc Zyngier wrote:
-> GICv2 registers are *slow*. As in "terrifyingly slow". Which is bad.
-> But we're equaly bad, as we make a point in accessing them even if
-> we don't have any interrupt in flight.
+On Wed, Feb 17, 2016 at 04:40:40PM +0000, Marc Zyngier wrote:
+> Next on our list of useless accesses is the maintenance interrupt
+> status registers (GICH_MISR, GICH_EISR{0,1}).
 > 
-> A good solution is to first find out if we have anything useful to
-> write into the GIC, and if we don't, to simply not do it. This
-> involves tracking which LRs actually have something valid there.
+> It is pointless to save them if we haven't asked for a maintenance
+> interrupt the first place, which can only happen for two reasons:
+> - Underflow: GICH_HCR_UIE will be set,
+> - EOI: GICH_LR_EOI will be set.
 > 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> These conditions can be checked on the in-memory copies of the regs.
+> Should any of these two condition be valid, we must read GICH_MISR.
+> We can then check for GICH_MISR_EOI, and only when set read
+> GICH_EISR*.
+> 
+> This means that in most case, we don't have to save them at all.
+> 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-nice find with the APR in this one, my review-by is still valid here.
-
-Thanks,
--Christoffer
-
 > ---
->  arch/arm64/kvm/hyp/vgic-v2-sr.c | 72 ++++++++++++++++++++++++++++-------------
->  include/kvm/arm_vgic.h          |  2 ++
->  2 files changed, 52 insertions(+), 22 deletions(-)
+>  arch/arm64/kvm/hyp/vgic-v2-sr.c | 54 +++++++++++++++++++++++++++++++++++------
+>  1 file changed, 47 insertions(+), 7 deletions(-)
 > 
 > diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> index e717612..5ab8d63 100644
+> index 5ab8d63..1bda5ce 100644
 > --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
 > +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> @@ -38,28 +38,41 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+> @@ -23,6 +23,49 @@
 >  
->  	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
->  	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
-> -	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
-> -	eisr0  = readl_relaxed(base + GICH_EISR0);
-> -	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-> -	if (unlikely(nr_lr > 32)) {
-> -		eisr1  = readl_relaxed(base + GICH_EISR1);
-> -		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
-> -	} else {
-> -		eisr1 = elrsr1 = 0;
-> -	}
-> +
-> +	if (vcpu->arch.vgic_cpu.live_lrs) {
-> +		eisr0  = readl_relaxed(base + GICH_EISR0);
-> +		elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-> +		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
-> +		cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
-> +
-> +		if (unlikely(nr_lr > 32)) {
-> +			eisr1  = readl_relaxed(base + GICH_EISR1);
-> +			elrsr1 = readl_relaxed(base + GICH_ELRSR1);
-> +		} else {
-> +			eisr1 = elrsr1 = 0;
-> +		}
-> +
->  #ifdef CONFIG_CPU_BIG_ENDIAN
-> -	cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
-> -	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
-> +		cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
-> +		cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
->  #else
-> -	cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
-> -	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
-> +		cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
-> +		cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
->  #endif
-> -	cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
+>  #include "hyp.h"
 >  
-> -	writel_relaxed(0, base + GICH_HCR);
-> +		for (i = 0; i < nr_lr; i++)
-> +			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
-> +				cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
->  
-> -	for (i = 0; i < nr_lr; i++)
-> -		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-> +		writel_relaxed(0, base + GICH_HCR);
+> +static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+> +					    void __iomem *base)
+> +{
+> +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> +	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+> +	u32 eisr0, eisr1;
+> +	int i;
+> +	bool expect_mi;
 > +
-> +		vcpu->arch.vgic_cpu.live_lrs = 0;
-> +	} else {
-> +		cpu_if->vgic_eisr = 0;
-> +		cpu_if->vgic_elrsr = ~0UL;
-> +		cpu_if->vgic_misr = 0;
-> +		cpu_if->vgic_apr = 0;
+> +	expect_mi = !!(cpu_if->vgic_hcr & GICH_HCR_UIE);
+> +
+> +	for (i = 0; i < nr_lr; i++) {
+> +		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
+> +				continue;
+> +
+> +		expect_mi |= (!(cpu_if->vgic_lr[i] & GICH_LR_HW) &&
+> +			      (cpu_if->vgic_lr[i] & GICH_LR_EOI));
 > +	}
->  }
->  
+
+Just eye balling the code it really feels crazy that this is faster than
+reading two registers, but I believe that may just be the case given the
+speed of the GIC.
+
+As an alternative to this loop, you could keep a counter for the number
+of requested EOI MIs and whenever we program an LR with the EOI bit set,
+then we increment the counter, and whenever we clear such an LR, we
+decrement the counter, and then you can just check here if it's
+non-zero.  What do you think?  Is it worth it?  Does it make the code
+even worse?
+
+I can also write that on top of this patch if you'd like.
+
+In any case, for this functionality:
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+> +
+> +	if (expect_mi) {
+> +		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
+> +
+> +		if (cpu_if->vgic_misr & GICH_MISR_EOI) {
+> +			eisr0  = readl_relaxed(base + GICH_EISR0);
+> +			if (unlikely(nr_lr > 32))
+> +				eisr1  = readl_relaxed(base + GICH_EISR1);
+> +			else
+> +				eisr1 = 0;
+> +		} else {
+> +			eisr0 = eisr1 = 0;
+> +		}
+> +	} else {
+> +		cpu_if->vgic_misr = 0;
+> +		eisr0 = eisr1 = 0;
+> +	}
+> +
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	cpu_if->vgic_eisr = ((u64)eisr0 << 32) | eisr1;
+> +#else
+> +	cpu_if->vgic_eisr = ((u64)eisr1 << 32) | eisr0;
+> +#endif
+> +}
+> +
 >  /* vcpu is already in the HYP VA space */
-> @@ -70,15 +83,30 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+>  void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+>  {
+> @@ -30,7 +73,7 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+>  	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
 >  	struct vgic_dist *vgic = &kvm->arch.vgic;
 >  	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+> -	u32 eisr0, eisr1, elrsr0, elrsr1;
+> +	u32 elrsr0, elrsr1;
 >  	int i, nr_lr;
-> +	u64 live_lrs = 0;
 >  
 >  	if (!base)
->  		return;
+> @@ -40,26 +83,23 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+>  	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
 >  
-> -	writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
-> -	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
-> -	writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
-> -
->  	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
-> +
->  	for (i = 0; i < nr_lr; i++)
-> -		writel_relaxed(cpu_if->vgic_lr[i], base + GICH_LR0 + (i * 4));
-> +		if (cpu_if->vgic_lr[i] & GICH_LR_STATE)
-> +			live_lrs |= 1UL << i;
-> +
-> +	if (live_lrs) {
-> +		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
-> +		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
-> +		for (i = 0; i < nr_lr; i++) {
-> +			u32 val = 0;
-> +
-> +			if (live_lrs & (1UL << i))
-> +				val = cpu_if->vgic_lr[i];
-> +
-> +			writel_relaxed(val, base + GICH_LR0 + (i * 4));
-> +		}
-> +	}
-> +
-> +	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
-> +	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
->  }
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 13a3d53..f473fd6 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -321,6 +321,8 @@ struct vgic_cpu {
+>  	if (vcpu->arch.vgic_cpu.live_lrs) {
+> -		eisr0  = readl_relaxed(base + GICH_EISR0);
+>  		elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+> -		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
+>  		cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
 >  
->  	/* Protected by the distributor's irq_phys_map_lock */
->  	struct list_head	irq_phys_map_list;
-> +
-> +	u64		live_lrs;
->  };
+>  		if (unlikely(nr_lr > 32)) {
+> -			eisr1  = readl_relaxed(base + GICH_EISR1);
+>  			elrsr1 = readl_relaxed(base + GICH_ELRSR1);
+>  		} else {
+> -			eisr1 = elrsr1 = 0;
+> +			elrsr1 = 0;
+>  		}
 >  
->  #define LR_EMPTY	0xff
+>  #ifdef CONFIG_CPU_BIG_ENDIAN
+> -		cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
+>  		cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
+>  #else
+> -		cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
+>  		cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
+>  #endif
+>  
+> +		save_maint_int_state(vcpu, base);
+> + 
+>  		for (i = 0; i < nr_lr; i++)
+>  			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
+>  				cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
 > -- 
 > 2.1.4
 > 
