@@ -1,30 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Mar 2016 21:50:59 +0100
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 2 Mar 2016 22:07:50 +0100
 Subject: [GIT PULL] at91: dt for 4.6 #2
-In-Reply-To: <1456934722-7023-1-git-send-email-nicolas.ferre@atmel.com>
+In-Reply-To: <1634323.MskpPxvyZt@wuerfel>
 References: <1456934722-7023-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1634323.MskpPxvyZt@wuerfel>
+ <1634323.MskpPxvyZt@wuerfel>
+Message-ID: <20160302210750.GA2567@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2016 17:05:22 Nicolas Ferre wrote:
-> A second batch of DT updates for 4.6. This time it is based on 4.5-rc3 as one
-> of the patches fixes an node that was changed during 4.5-rc phase. As I saw
-> that your "next/dt" branches are based on 4.5-rc3, I thought it wouldn't be a
-> problem.
+Hi,
 
-Right, thanks for checking.
+On 02/03/2016 at 21:50:59 +0100, Arnd Bergmann wrote :
+> I see that your gpg key has expired last week, you may want to do something
+> about that, I think you can just update the date rather than creating a
+> new key.
+> 
 
-> Overall a pretty simple series with mainly node addition for the latest SoC
-> and its Xplained board.
-> The tag doesn't embed Alexandre's previous DT Pull-Request for 4.6 that was
-> based on 4.5-rc1. I verified though that  it doesn't conflict with it during a
-> merge.
+You probably want to pull his key, it was updated today.
 
-Ok, that is good too. Pulled into next/dt now.
 
-I see that your gpg key has expired last week, you may want to do something
-about that, I think you can just update the date rather than creating a
-new key.
-
-	Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
