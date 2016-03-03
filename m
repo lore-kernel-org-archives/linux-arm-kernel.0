@@ -1,60 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  3 Mar 2016 16:54:27 +0000
-Subject: [PATCHv2 2/3] sched/kasan: remove stale KASAN poison after hotplug
-In-Reply-To: <1457024068-2236-1-git-send-email-mark.rutland@arm.com>
-References: <1457024068-2236-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1457024068-2236-3-git-send-email-mark.rutland@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 3 Mar 2016 17:56:08 +0100
+Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
+In-Reply-To: <000201d17562$5f6f0090$1e4d01b0$@gmail.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
+ <000201d17562$5f6f0090$1e4d01b0$@gmail.com>
+Message-ID: <56D86CA8.6030301@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Functions which the compiler has instrumented for ASAN place poison on
-the stack shadow upon entry and remove this poision prior to returning.
+On 03/03/2016 04:32 PM, Ma Haijun wrote:
+> Hi Neil,
+> 
+> Glad to see the mainline efforts of this SoC family.
+> 
+> Previously, I did not really understand what this "RPS" stood for.
+> After some digging(1)., now I believe it means ARM's Reference Peripheral
+> Specification
+> though the spec itself seems not publicly available, the peripheral specs
+> are accessible.
+> The interrupt controller is an AMBA Interrupt Controller(2) and the timers
+> are
+> AMBA Timer(3). Besides, ARM Dual-Timer Module (SP804)(4) looks like an
+> extended version
+> of the AMBA timer
+> 
+> 1)
+> http://infocenter.arm.com/help/topic/com.arm.doc.dai0030a/DAI0030A_sw_int_ap
+> psnote.pdf
+> 2) http://infocenter.arm.com/help/topic/com.arm.doc.ddi0047d/DDI0047.pdf
+> 3) http://infocenter.arm.com/help/topic/com.arm.doc.ddi0049c/AMBA_Timer.pdf
+> 4) http://infocenter.arm.com/help/topic/com.arm.doc.ddi0271d/DDI0271.pdf
+> 
+> Regards,
+> Haijun
 
-In the case of CPU hotplug, CPUs exit the kernel a number of levels deep
-in C code. Any instrumented functions on this critical path will leave
-portions of the stack shadow poisoned.
+Hi Haijun,
 
-When a CPU is subsequently brought back into the kernel via a different
-path, depending on stackframe, layout calls to instrumented functions
-may hit this stale poison, resulting in (spurious) KASAN splats to the
-console.
+Thanks for the tips !
 
-To avoid this, clear any stale poison from the idle thread for a CPU
-prior to bringing a CPU online.
+Indeed the timer looks like the timer-sp804 actually upstream, I'll try this driver before posting a v2.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Reviewed-by: Ingo Molnar <mingo@kernel.org>
-Cc: Alexander Potapenko <glider@google.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- kernel/sched/core.c | 3 +++
- 1 file changed, 3 insertions(+)
+Concerning the IRQ controller, I did not find any similar drivers.
 
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 9503d59..41f6b22 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -26,6 +26,7 @@
-  *              Thomas Gleixner, Mike Kravetz
-  */
- 
-+#include <linux/kasan.h>
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/nmi.h>
-@@ -5096,6 +5097,8 @@ void init_idle(struct task_struct *idle, int cpu)
- 	idle->state = TASK_RUNNING;
- 	idle->se.exec_start = sched_clock();
- 
-+	kasan_unpoison_task_stack(idle);
-+
- #ifdef CONFIG_SMP
- 	/*
- 	 * Its possible that init_idle() gets called multiple times on a task,
--- 
-1.9.1
+Marc, Arnd, should I create a specific "arm RPS irq controller" instead ?
+
+Neil
