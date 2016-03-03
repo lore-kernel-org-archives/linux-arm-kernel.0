@@ -1,102 +1,148 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  3 Mar 2016 19:44:15 +0100
-Subject: [PATCH v2 2/3] arm64: kaslr: deal with physically misaligned kernel
- images
-In-Reply-To: <1457030656-29584-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1457030656-29584-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1457030656-29584-3-git-send-email-ard.biesheuvel@linaro.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 3 Mar 2016 10:52:17 -0800
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56D832BD.5080305@huawei.com>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com>
+Message-ID: <56D887E1.8000602@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since KASLR requires a relocatable kernel image anyway, there is no
-practical reason to refuse an image whose load address is not exactly
-TEXT_OFFSET bytes above a 2 MB aligned base address, as long as the
-physical and virtual misalignment with respect to the swapper block
-size are equal. So treat the misalignment of the physical load address
-as the initial KASLR offset, and fix up the remaining code to deal with
-that.
+On 03/03/2016 04:49 AM, Hanjun Guo wrote:
+> On 2016/3/3 15:42, Joonsoo Kim wrote:
+>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+>>> (cc -mm and Joonsoo Kim)
+>>>
+>>>
+>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+>>>> Hi,
+>>>>
+>>>> I came across a suspicious error for CMA stress test:
+>>>>
+>>>> Before the test, I got:
+>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>> CmaTotal:         204800 kB
+>>>> CmaFree:          195044 kB
+>>>>
+>>>>
+>>>> After running the test:
+>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>> CmaTotal:         204800 kB
+>>>> CmaFree:         6602584 kB
+>>>>
+>>>> So the freed CMA memory is more than total..
+>>>>
+>>>> Also the the MemFree is more than mem total:
+>>>>
+>>>> -bash-4.3# cat /proc/meminfo
+>>>> MemTotal:       16342016 kB
+>>>> MemFree:        22367268 kB
+>>>> MemAvailable:   22370528 kB
+> [...]
+>>>
+>>> I played with this a bit and can see the same problem. The sanity
+>>> check of CmaFree < CmaTotal generally triggers in
+>>> __move_zone_freepage_state in unset_migratetype_isolate.
+>>> This also seems to be present as far back as v4.0 which was the
+>>> first version to have the updated accounting from Joonsoo.
+>>> Were there known limitations with the new freepage accounting,
+>>> Joonsoo?
+>> I don't know. I also played with this and looks like there is
+>> accounting problem, however, for my case, number of free page is slightly less
+>> than total. I will take a look.
+>>
+>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+>> look like your case.
+>
+> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+> did some other test:
+>
+>   - run with single thread with 100000 times, everything is fine.
+>
+>   - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+>     the same test with 100 multi-thread, then I got:
+>
+> -bash-4.3# cat /proc/meminfo | grep Cma
+> CmaTotal: 204800 kB
+> CmaFree: 225112 kB
+>
+> It only increased about 30M for free, not 6G+ in previous test, although
+> the problem is not solved, the problem is less serious, is it a synchronization
+> problem?
+>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S  | 16 ++++++++++++----
- arch/arm64/kernel/kaslr.c |  6 +++---
- 2 files changed, 15 insertions(+), 7 deletions(-)
+'only' 30M is still an issue although I think you are right about something related
+to synchronization. When I put the cma_mutex around free_contig_range I don't see
+the issue. I wonder if free of the pages is racing with the undo_isolate_page_range
+on overlapping ranges caused by outer_start?
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index ca8ba19df786..32ab24ebde0c 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -25,6 +25,7 @@
- #include <linux/irqchip/arm-gic-v3.h>
- 
- #include <asm/assembler.h>
-+#include <asm/boot.h>
- #include <asm/ptrace.h>
- #include <asm/asm-offsets.h>
- #include <asm/cache.h>
-@@ -212,8 +213,12 @@ efi_header_end:
- ENTRY(stext)
- 	bl	preserve_boot_args
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
--	mov	x23, xzr			// KASLR offset, defaults to 0
- 	adrp	x24, __PHYS_OFFSET
-+#ifndef CONFIG_RANDOMIZE_BASE
-+	mov	x23, xzr			// KASLR offset, defaults to 0
-+#else
-+	and	x23, x24, MIN_KIMG_ALIGN - 1	// unless loaded phys misaligned
-+#endif
- 	bl	set_cpu_boot_mode_flag
- 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
- 	/*
-@@ -487,11 +492,13 @@ __mmap_switched:
- 	bl	kasan_early_init
- #endif
- #ifdef CONFIG_RANDOMIZE_BASE
--	cbnz	x23, 0f				// already running randomized?
-+	tst	x23, ~(MIN_KIMG_ALIGN - 1)	// already running randomized?
-+	b.ne	0f
- 	mov	x0, x21				// pass FDT address in x0
-+	mov	x1, x23				// pass modulo offset in x1
- 	bl	kaslr_early_init		// parse FDT for KASLR options
- 	cbz	x0, 0f				// KASLR disabled? just proceed
--	mov	x23, x0				// record KASLR offset
-+	orr	x23, x23, x0			// record KASLR offset
- 	ret	x28				// we must enable KASLR, return
- 						// to __enable_mmu()
- 0:
-@@ -751,7 +758,8 @@ __enable_mmu:
- 	isb
- #ifdef CONFIG_RANDOMIZE_BASE
- 	mov	x19, x0				// preserve new SCTLR_EL1 value
--	blr	x27
-+	add	x30, x27, x23
-+	blr	x30
- 
- 	/*
- 	 * If we return here, we have a KASLR displacement in x23 which we need
-diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-index 582983920054..b05469173ba5 100644
---- a/arch/arm64/kernel/kaslr.c
-+++ b/arch/arm64/kernel/kaslr.c
-@@ -74,7 +74,7 @@ extern void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size,
-  * containing function pointers) to be reinitialized, and zero-initialized
-  * .bss variables will be reset to 0.
-  */
--u64 __init kaslr_early_init(u64 dt_phys)
-+u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
- {
- 	void *fdt;
- 	u64 seed, offset, mask, module_range;
-@@ -132,8 +132,8 @@ u64 __init kaslr_early_init(u64 dt_phys)
- 	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
- 	 * happens, increase the KASLR offset by the size of the kernel image.
- 	 */
--	if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
--	    (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT))
-+	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
-+	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT))
- 		offset = (offset + (u64)(_end - _text)) & mask;
- 
- 	if (IS_ENABLED(CONFIG_KASAN))
--- 
-2.5.0
+Thanks,
+Laura
+
+
+> Thanks
+> Hanjun
+>
+> [1]:
+> index ea506eb..4447494 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -379,6 +379,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+>          if (!count)
+>                  return NULL;
+>
+> + mutex_lock(&cma_mutex);
+>          mask = cma_bitmap_aligned_mask(cma, align);
+>          offset = cma_bitmap_aligned_offset(cma, align);
+>          bitmap_maxno = cma_bitmap_maxno(cma);
+> @@ -402,17 +403,16 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+>                  mutex_unlock(&cma->lock);
+>
+>                  pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+> -           mutex_lock(&cma_mutex);
+>                  ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
+> -           mutex_unlock(&cma_mutex);
+>                  if (ret == 0) {
+>                          page = pfn_to_page(pfn);
+>                          break;
+>                  }
+>
+>                  cma_clear_bitmap(cma, pfn, count);
+> -           if (ret != -EBUSY)
+> +         if (ret != -EBUSY) {
+>                          break;
+> +         }
+>
+>                  pr_debug("%s(): memory range at %p is busy, retrying\n",
+>                           __func__, pfn_to_page(pfn));
+> @@ -420,6 +420,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+>                  start = bitmap_no + mask + 1;
+>          }
+>
+> + mutex_unlock(&cma_mutex);
+>          trace_cma_alloc(pfn, page, count, align);
+>
+>          pr_debug("%s(): returned %p\n", __func__, page);
+> @@ -445,15 +446,19 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
+>
+>          pr_debug("%s(page %p)\n", __func__, (void *)pages);
+>
+> + mutex_lock(&cma_mutex);
+>          pfn = page_to_pfn(pages);
+>
+> -   if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
+> + if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count) {
+> +         mutex_unlock(&cma_mutex);
+>                  return false;
+> + }
+>
+>          VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
+>
+>          free_contig_range(pfn, count);
+>          cma_clear_bitmap(cma, pfn, count);
+> + mutex_unlock(&cma_mutex);
+>          trace_cma_release(pfn, pages, count);
+>
+>          return true;
+>
