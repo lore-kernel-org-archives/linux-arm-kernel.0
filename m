@@ -1,72 +1,163 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 3 Mar 2016 17:09:14 +0100
-Subject: [PATCH 2/3] iio:adc:at91-sama5d2: fix identation
+Date: Thu, 3 Mar 2016 17:09:15 +0100
+Subject: [PATCH 3/3] iio:adc:at91-sama5d2: add support for signed conversion
 In-Reply-To: <1457021355-23898-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1457021355-23898-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1457021355-23898-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1457021355-23898-4-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove some extra tabs.
+The at91-sama5d2 ADC controller can achieve unsigned and signed
+conversion. For each channel, a signed and an unsigned variant are
+created.
+We can't set the sign mode for each channel. For that reason, the
+controller has to be configured upon conversion requests.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/iio/adc/at91-sama5d2_adc.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ drivers/iio/adc/at91-sama5d2_adc.c | 81 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 67 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-index 33bacec..5bc038f 100644
+index 5bc038f..d4bf73f 100644
 --- a/drivers/iio/adc/at91-sama5d2_adc.c
 +++ b/drivers/iio/adc/at91-sama5d2_adc.c
-@@ -92,13 +92,13 @@
- /* Last Converted Data Register */
- #define AT91_SAMA5D2_LCDR	0x20
- /* Interrupt Enable Register */
--#define AT91_SAMA5D2_IER		0x24
-+#define AT91_SAMA5D2_IER	0x24
- /* Interrupt Disable Register */
--#define AT91_SAMA5D2_IDR		0x28
-+#define AT91_SAMA5D2_IDR	0x28
- /* Interrupt Mask Register */
--#define AT91_SAMA5D2_IMR		0x2c
-+#define AT91_SAMA5D2_IMR	0x2c
- /* Interrupt Status Register */
--#define AT91_SAMA5D2_ISR		0x30
-+#define AT91_SAMA5D2_ISR	0x30
- /* Last Channel Trigger Mode Register */
- #define AT91_SAMA5D2_LCTMR	0x34
- /* Last Channel Compare Window Register */
-@@ -106,17 +106,17 @@
+@@ -105,8 +105,26 @@
+ #define AT91_SAMA5D2_LCCWR	0x38
  /* Overrun Status Register */
  #define AT91_SAMA5D2_OVER	0x3c
++
  /* Extended Mode Register */
--#define AT91_SAMA5D2_EMR		0x40
-+#define AT91_SAMA5D2_EMR	0x40
+ #define AT91_SAMA5D2_EMR	0x40
++/* Sign Mode */
++#define AT91_SAMA5D2_EMR_SIGNMODE(v)		((v) << 25)
++/*
++ * Single-Ended channels: Unsigned conversions.
++ * Differential channels: Signed conversions.
++ */
++#define AT91_SAMA5D2_EMR_SE_UNSG_DF_SIGN	0
++/*
++ * Single-Ended channels: Signed conversions.
++ * Differential channels: Unsigned conversions.
++ */
++#define AT91_SAMA5D2_EMR_SE_SIGN_DF_UNSG	1
++/* All channels: Unsigned conversions */
++#define AT91_SAMA5D2_EMR_ALL_UNSIGNED		2
++/* All channels: Signed conversions */
++#define AT91_SAMA5D2_EMR_ALL_SIGNED		3
++
  /* Compare Window Register */
--#define AT91_SAMA5D2_CWR		0x44
-+#define AT91_SAMA5D2_CWR	0x44
+ #define AT91_SAMA5D2_CWR	0x44
  /* Channel Gain Register */
--#define AT91_SAMA5D2_CGR		0x48
-+#define AT91_SAMA5D2_CGR	0x48
- /* Channel Offset Register */
--#define AT91_SAMA5D2_COR		0x4c
-+#define AT91_SAMA5D2_COR	0x4c
- /* Channel Data Register 0 */
- #define AT91_SAMA5D2_CDR0	0x50
- /* Analog Control Register */
--#define AT91_SAMA5D2_ACR		0x94
-+#define AT91_SAMA5D2_ACR	0x94
- /* Touchscreen Mode Register */
- #define AT91_SAMA5D2_TSMR	0xb0
- /* Touchscreen X Position Register */
-@@ -130,7 +130,7 @@
- /* Correction Select Register */
- #define AT91_SAMA5D2_COSR	0xd0
- /* Correction Value Register */
--#define AT91_SAMA5D2_CVR		0xd4
-+#define AT91_SAMA5D2_CVR	0xd4
- /* Channel Error Correction Register */
- #define AT91_SAMA5D2_CECR	0xd8
- /* Write Protection Mode Register */
+@@ -140,13 +158,14 @@
+ /* Version Register */
+ #define AT91_SAMA5D2_VERSION	0xfc
+ 
+-#define AT91_SAMA5D2_CHAN(num, addr)					\
++#define AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, sign_mode)		\
+ 	{								\
+ 		.type = IIO_VOLTAGE,					\
+ 		.channel = num,						\
+ 		.address = addr,					\
++		.extend_name = (sign_mode == 's') ? "signed" : "unsigned",\
+ 		.scan_type = {						\
+-			.sign = 'u',					\
++			.sign = sign_mode,				\
+ 			.realbits = 12,					\
+ 		},							\
+ 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+@@ -156,6 +175,12 @@
+ 		.indexed = 1,						\
+ 	}
+ 
++#define AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(num, addr)		\
++	AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, 's')
++
++#define AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(num, addr)	\
++	AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, 'u')
++
+ #define at91_adc_readl(st, reg)		readl_relaxed(st->base + reg)
+ #define at91_adc_writel(st, reg, val)	writel_relaxed(val, st->base + reg)
+ 
+@@ -185,18 +210,30 @@ struct at91_adc_state {
+ };
+ 
+ static const struct iio_chan_spec at91_adc_channels[] = {
+-	AT91_SAMA5D2_CHAN(0, 0x50),
+-	AT91_SAMA5D2_CHAN(1, 0x54),
+-	AT91_SAMA5D2_CHAN(2, 0x58),
+-	AT91_SAMA5D2_CHAN(3, 0x5c),
+-	AT91_SAMA5D2_CHAN(4, 0x60),
+-	AT91_SAMA5D2_CHAN(5, 0x64),
+-	AT91_SAMA5D2_CHAN(6, 0x68),
+-	AT91_SAMA5D2_CHAN(7, 0x6c),
+-	AT91_SAMA5D2_CHAN(8, 0x70),
+-	AT91_SAMA5D2_CHAN(9, 0x74),
+-	AT91_SAMA5D2_CHAN(10, 0x78),
+-	AT91_SAMA5D2_CHAN(11, 0x7c),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(0, 0x50),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(1, 0x54),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(2, 0x58),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(3, 0x5c),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(4, 0x60),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(5, 0x64),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(6, 0x68),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(7, 0x6c),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(8, 0x70),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(9, 0x74),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(10, 0x78),
++	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(11, 0x7c),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(0, 0x50),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(1, 0x54),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(2, 0x58),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(3, 0x5c),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(4, 0x60),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(5, 0x64),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(6, 0x68),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(7, 0x6c),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(8, 0x70),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(9, 0x74),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(10, 0x78),
++	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(11, 0x7c),
+ };
+ 
+ static unsigned at91_adc_startup_time(unsigned startup_time_min,
+@@ -278,6 +315,7 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
+ 			     int *val, int *val2, long mask)
+ {
+ 	struct at91_adc_state *st = iio_priv(indio_dev);
++	u32 emr;
+ 	int ret;
+ 
+ 	switch (mask) {
+@@ -286,6 +324,19 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
+ 
+ 		st->chan = chan;
+ 
++		/* Read EMR register and clear 'sign mode' field */
++		emr = at91_adc_readl(st, AT91_SAMA5D2_EMR)
++		      & AT91_SAMA5D2_EMR_SIGNMODE(0);
++		/*
++		 * Check if the user requested a conversion on a signed or
++		 * unsigned channel.
++		 */
++		if (chan->scan_type.sign == 's')
++			emr |= AT91_SAMA5D2_EMR_SIGNMODE(AT91_SAMA5D2_EMR_ALL_SIGNED);
++		else
++			emr |= AT91_SAMA5D2_EMR_SIGNMODE(AT91_SAMA5D2_EMR_ALL_UNSIGNED);
++
++		at91_adc_writel(st, AT91_SAMA5D2_EMR, emr);
+ 		at91_adc_writel(st, AT91_SAMA5D2_CHER, BIT(chan->channel));
+ 		at91_adc_writel(st, AT91_SAMA5D2_IER, BIT(chan->channel));
+ 		at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_START);
+@@ -298,6 +349,8 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
+ 
+ 		if (ret > 0) {
+ 			*val = st->conversion_value;
++			if (chan->scan_type.sign == 's')
++				*val = sign_extend32(*val, 11);
+ 			ret = IIO_VAL_INT;
+ 			st->conversion_done = false;
+ 		}
 -- 
 2.5.0
