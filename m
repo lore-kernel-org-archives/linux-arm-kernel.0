@@ -1,41 +1,30 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 3 Mar 2016 21:35:17 +0900
-Subject: [rtc-linux] Re: [RFC 11/15] power: reset: keystone: Add missing
- MFD_SYSCON dependency on HAS_IOMEM
-In-Reply-To: <20160303123343.GB5687@earth>
-References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
- <1456992221-26712-12-git-send-email-k.kozlowski@samsung.com>
- <5230562.E0gg2SNP0m@wuerfel> <20160303123343.GB5687@earth>
-Message-ID: <CAJKOXPdp=n43=foh2y-zNUnuVOmk0qK8AxjriO5Hnq-ANgpM8w@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 3 Mar 2016 13:36:07 +0100
+Subject: [PATCH 00/17] Add Initial support for PLX Technology OX810SE
+In-Reply-To: <2685005.KXG3SqulNM@wuerfel>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <2685005.KXG3SqulNM@wuerfel>
+Message-ID: <56D82FB7.8020006@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-03 21:33 GMT+09:00 Sebastian Reichel <sre@kernel.org>:
-> Hi,
->
-> On Thu, Mar 03, 2016 at 12:00:14PM +0100, Arnd Bergmann wrote:
->> On Thursday 03 March 2016 17:03:37 Krzysztof Kozlowski wrote:
->> > diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
->> > index 0a6408a39c66..0f34846ae80d 100644
->> > --- a/drivers/power/reset/Kconfig
->> > +++ b/drivers/power/reset/Kconfig
->> > @@ -141,6 +141,7 @@ config POWER_RESET_XGENE
->> >  config POWER_RESET_KEYSTONE
->> >         bool "Keystone reset driver"
->> >         depends on ARCH_KEYSTONE
->> > +       depends on HAS_IOMEM    # For MFD_SYSCON
->> >         select MFD_SYSCON
->> >         help
->> >           Reboot support for the KEYSTONE SoCs.
->> >
->>
->> This is platform specific, but we should probably add || COMPILE_TEST
->> along with the HAS_IOMEM dependency.
->
-> Sounds sensible. Will you guys send an updated patch?
->
+On 03/03/2016 01:23 PM, Arnd Bergmann wrote:
+> Looks very nice overall. I think with the timing, it's a way too
+> late for 4.6 now, but there should be no problem merging this for 4.7.
+> I assume it's not urgent on your end, as this seems to be a somewhat
+> historic platform.
 
-Sure, I'll make some compile tests and send a v2.
+Yes, it's not urgent, I will certainly post a v2 following your device tree comments.
 
-Best regards,
-Krzysztof
+> I had no idea there was an ARM9 based predecessor of OX820SE, so I was
+> surprised to see this one instead. How closely related are they?
+They seem very close, the only differences seems to be in the MP CORE, the SATA
+IP and the pinctrl.
+
+> 
+> 	Arnd
+> 
+
+Thanks !
+
+Neil
