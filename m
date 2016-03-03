@@ -1,146 +1,67 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Thu, 03 Mar 2016 15:39:45 +0200
-Subject: [PATCH net] net: hns: fix the bug about loopback
-In-Reply-To: <1457006579-236479-1-git-send-email-yankejian@huawei.com>
-References: <1457006579-236479-1-git-send-email-yankejian@huawei.com>
-Message-ID: <1457012385.13244.243.camel@linux.intel.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 3 Mar 2016 14:39:02 +0100
+Subject: [PATCH 14/17] arm: boot: dts: Add PLX Technology OX810SE dtsi
+In-Reply-To: <2983013.zAxmIfv4bz@wuerfel>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-15-git-send-email-narmstrong@baylibre.com>
+ <2983013.zAxmIfv4bz@wuerfel>
+Message-ID: <56D83E76.3020705@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-03-03 at 20:02 +0800, Kejian Yan wrote:
-> It will always be passed if the soc is tested the loopback cases.
-> This
-> patch will fix this bug.
+On 03/03/2016 01:15 PM, Arnd Bergmann wrote:
+> On Thursday 03 March 2016 12:40:07 Neil Armstrong wrote:
+>> +
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +		serial1 = &uart1;
+>> +		serial2 = &uart2;
+>> +		serial3 = &uart3;
+>> +		gpio0 = &gpio0;
+>> +		gpio1 = &gpio1;
+>> +	};
+>>
+> Please put the aliases in the per-board file and list only the
+> devices that are actually connected (in case of uart)
+Done.
 
-Few style related comments.
+> 
+>> +			uart0: uart at 200000 {
+> 
+> Make this serial at 200000, to follow the standard naming convention
+Done.
 
-> @@ -686,6 +690,10 @@ static int hns_ae_config_loopback(struct
-> hnae_handle *handle,
-> ?	default:
-> ?		ret = -EINVAL;
-> ?	}
-> +
-> +	if (!ret)
-> +		hns_dsaf_set_inner_lb(mac_cb->dsaf_dev, mac_cb-
-> >mac_id, en);
-> +
-> ?	return ret;
+> 
+>> +
+>> +				reset: reset-controller {
+>> +					compatible = "plxtech,nas782x-reset";
+>> +					#reset-cells = <1>;
+>> +				};
+>> +
+>> +				stdclk: stdclk {
+>> +					compatible = "plxtech,ox810se-stdclk", "plxtech,nas782x-stdclk";
+>> +					#clock-cells = <1>;
+>> +				};
+>> +			};
+> 
+> Please change the compatible strings to have no 'x' wildcards in them, but
+> instead use a specific model.
+Ok, I switched to only oxsemi,ox810se-* strings.
+> 
+> Regarding the vendor prefixes, my understanding is that "ox810se" was the name
+> of the chip from Oxford Semiconductor, while nas7820 is a product name from
+> PLX. I think it would be logical to use "oxford" as the vendor prefix
+> for anything with a ox810se or ox820 ID in it rather than plxtech.
+Ok, I switched to oxsemi but keeped plxtech and added oxsemi in the vendor prefixes.
 
-if (ret)
-?return ret;
+> 
+> Note that both of them are now historic, as PLX itself got bought by
+> Avago and they seem to be discontinuing both the PLX and Oxfor brand
+> names.
+Yes, it's kind of a mess. The ox820 has been rebranded to plx7821, but not the ox810...
+> 
+> 	Arnd
+> 
 
-whatever();
-return 0;
-
-> ?}
-
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-> @@ -230,6 +230,30 @@ static void hns_dsaf_mix_def_qid_cfg(struct
-> dsaf_device *dsaf_dev)
-> ?	}
-> ?}
-> ?
-> +static void hns_dsaf_inner_qid_cfg(struct dsaf_device *dsaf_dev)
-> +{
-> +	u16 max_q_per_vf, max_vfn;
-> +	u32 q_id = 0, q_num_per_port;
-> +	u32 mac_id;
-> +
-> +	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
-> +		return;
-> +
-> +	hns_rcb_get_queue_mode(dsaf_dev->dsaf_mode,
-> +			???????HNS_DSAF_COMM_SERVICE_NW_IDX,
-> +			???????&max_vfn, &max_q_per_vf);
-> +	q_num_per_port = max_vfn * max_q_per_vf;
-> +
-> +	for (mac_id = 0, q_id = 0; mac_id < DSAF_SERVICE_NW_NUM; 
-
-q_id is already assigned to 0. Get rid of either.
-
-> mac_id++) {
-> +		dsaf_set_dev_field(dsaf_dev,
-> +				???DSAFV2_SERDES_LBK_0_REG + 0x4 *
-> mac_id,
-> +				???DSAFV2_SERDES_LBK_QID_M,
-> +				???DSAFV2_SERDES_LBK_QID_S,
-> +				???q_id);
-> +		q_id += q_num_per_port;
-> +	}
-> +}
-
-?
-> +void hns_dsaf_set_inner_lb(struct dsaf_device *dsaf_dev, u32 mac_id,
-> u32 en)
-> +{
-> +	if (AE_IS_VER1(dsaf_dev->dsaf_ver) ||
-> +	????dsaf_dev->mac_cb[mac_id].mac_type == HNAE_PORT_DEBUG)
-> +		return;
-> +
-> +	dsaf_set_dev_bit(dsaf_dev, DSAFV2_SERDES_LBK_0_REG + 0x4 *
-> mac_id,
-
-0x4 -> 4 (it's about register width, right?)
-
-> +			?DSAFV2_SERDES_LBK_EN_B, !!en);
-> +}
-
-> ?#define PPEV2_CFG_RSS_TBL_4N3_S	24
-> ?#define PPEV2_CFG_RSS_TBL_4N3_M	(((1UL << 5) - 1) <<
-> PPEV2_CFG_RSS_TBL_4N3_S)
-> ?
-> +#define DSAFV2_SERDES_LBK_EN_B??8
-> +#define DSAFV2_SERDES_LBK_QID_S 0
-> +#define DSAFV2_SERDES_LBK_QID_M \
-> +	(((1UL << DSAFV2_SERDES_LBK_EN_B) - 1) <<
-> DSAFV2_SERDES_LBK_QID_S)
-
-Why not like above?
-
-#define DSAFV2_SERDES_LBK_QID_M	(((1UL << 8) - 1)
-<<?DSAFV2_SERDES_LBK_QID_S)
-
-> +static void __lb_fill_txt_skb_buff(struct net_device *ndev,
-> +				???struct sk_buff *skb)
-> +{
-> +	struct hns_nic_priv *priv = netdev_priv(ndev);
-> +	struct hnae_handle *h = priv->ae_handle;
-> +	u32 frame_size;
-> +
-> +	frame_size = skb->len;
-> +	memset(skb->data, 0xFF, frame_size);
-> +
-> +	if ((!AE_IS_VER1(priv->enet_ver)) &&
-> +	????(h->port_type == HNAE_PORT_SERVICE)) {
-> +		memcpy(skb->data, ndev->dev_addr, 6);
-
-ether_addr_copy() ?
-
-> +		skb->data[5] += 0x1f;
-
-This has to be explained.
-
-> +	}
-> +
-> +	frame_size &= ~1ul;
-
-And how 1ul is different to plain 1 here?
-
-> +	memset(&skb->data[frame_size / 2], 0xAA, frame_size / 2 -
-> 1);
-> +	memset(&skb->data[frame_size / 2 + 10], 0xBE, frame_size / 2
-> - 11);
-> +	memset(&skb->data[frame_size / 2 + 12], 0xAF, frame_size / 2
-> - 13);
-
-Magic numbers have to be explained.
-Also, what is the logic to overwrite the data if frame_size is big
-enough?
-
-> +}
-> +
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Thanks,
+Neil
