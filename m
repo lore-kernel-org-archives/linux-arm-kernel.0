@@ -1,40 +1,63 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Thu, 3 Mar 2016 17:30:17 +0300
-Subject: [PATCH 0/3] KASAN: clean stale poison upon cold re-entry to kernel
-In-Reply-To: <20160303123809.GA19139@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 3 Mar 2016 14:32:46 +0000
+Subject: [PATCH 3/3] arm64: kasan: clear stale stack poison
+In-Reply-To: <20160303141429.GB19139@leverpostej>
 References: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
- <20160303120227.GA2484@gmail.com> <20160303123809.GA19139@leverpostej>
-Message-ID: <56D84A79.2030303@virtuozzo.com>
+ <1456928778-22491-4-git-send-email-mark.rutland@arm.com>
+ <20160303141429.GB19139@leverpostej>
+Message-ID: <20160303143237.GA29015@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 03:38 PM, Mark Rutland wrote:
-> On Thu, Mar 03, 2016 at 01:02:27PM +0100, Ingo Molnar wrote:
->>>
->>> Mark Rutland (3):
->>>   kasan: add functions to clear stack poison
->>>   sched/kasan: remove stale KASAN poison after hotplug
->>>   arm64: kasan: clear stale stack poison
->>>
->>>  arch/arm64/kernel/sleep.S |  4 ++++
->>>  include/linux/kasan.h     |  6 +++++-
->>>  kernel/sched/core.c       |  3 +++
->>>  mm/kasan/kasan.c          | 20 ++++++++++++++++++++
->>>  4 files changed, 32 insertions(+), 1 deletion(-)
->>
->> Looks good to me - via which tree would you like to see this merged upstream?
+On Thu, Mar 03, 2016 at 02:14:29PM +0000, Mark Rutland wrote:
+> On Wed, Mar 02, 2016 at 02:26:18PM +0000, Mark Rutland wrote:
+> > Functions which the compiler has instrumented for ASAN place poison on
+> > the stack shadow upon entry and remove this poison prior to returning.
+> > 
+> > In the case of cpuidle, CPUs exit the kernel a number of levels deep
+> > in C code. Any instrumented functions on this critical path will leave
+> > portions of the stack shadow poisoned.
+> > 
+> > If CPUs lose context and return to the kernel via a cold path, we
+> > restore a prior context saved in __cpu_suspend_enter are forgotten, and
+> > we never remove the poison they placed in the stack shadow area by
+> > functions calls between this and the actual exit of the kernel.
+> > 
+> > Thus, (depending on stackframe layout) subsequent calls to instrumented
+> > functions may hit this stale poison, resulting in (spurious) KASAN
+> > splats to the console.
+> > 
+> > To avoid this, clear any stale poison from the idle thread for a CPU
+> > prior to bringing a CPU online.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Alexander Potapenko <glider@google.com>
+> > Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/sleep.S | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> > index e33fe33..fd10eb6 100644
+> > --- a/arch/arm64/kernel/sleep.S
+> > +++ b/arch/arm64/kernel/sleep.S
+> > @@ -145,6 +145,10 @@ ENTRY(cpu_resume_mmu)
+> >  ENDPROC(cpu_resume_mmu)
+> >  	.popsection
+> >  cpu_resume_after_mmu:
+> > +#ifdef CONFIG_KASAN
+> > +	mov	x0, sp
+> > +	bl	kasan_unpoison_remaining_stack
+> > +#endif
 > 
-> I'd prefer the arm64 tree as arm64 is (the most) affected by the issue
-> in practice.
+> Lorenzo, as this was following your suggestion [1], I hope that this
+> patch looks ok to you?
 > 
-> I'm happy for this to go via another tree if that's simpler; I'm not
-> aware of anything that's likely to conflict in the arm64 tree.
-> 
-> Catalin, Andrey, Andrew, any preference?
-> 
+> Are you happy to provide an Ack / Reviewed-by?
 
-I don't have any. arm64 tree is fine by me.
+Yes sure, thanks for putting it together:
 
-For the patchset:
-
-	Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
