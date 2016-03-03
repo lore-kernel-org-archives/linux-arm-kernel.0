@@ -1,38 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Mar 2016 13:56:56 +0100
-Subject: [PATCH 12/17] arm: Add new mach-oxnas
-In-Reply-To: <1457005210-18485-13-git-send-email-narmstrong@baylibre.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-13-git-send-email-narmstrong@baylibre.com>
-Message-ID: <3226743.49AyJYeiGh@wuerfel>
+Date: Thu, 03 Mar 2016 13:58:33 +0100
+Subject: [RFC 08/15] rtc: at91sam9: Add missing MFD_SYSCON dependency on
+ HAS_IOMEM
+In-Reply-To: <CAMuHMdXUdz0=n2+Aa74f1LtwiwfV9=gkPBiJKC_DMyr1_jBe7Q@mail.gmail.com>
+References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
+ <2233190.1BxevBAvDE@wuerfel>
+ <CAMuHMdXUdz0=n2+Aa74f1LtwiwfV9=gkPBiJKC_DMyr1_jBe7Q@mail.gmail.com>
+Message-ID: <4070388.ZbRf8kMntA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2016 12:40:05 Neil Armstrong wrote:
-> +
-> +config MACH_OX810SE
-> +	bool "Support OX810SE Based Products"
-> +	select CPU_ARM926T
-> +	select PLXTECH_RPS
-> +	select CLKSRC_RPS_TIMER
-> +	select RESET_OXNAS
-> +	select COMMON_CLK_OXNAS
-> +	select PINCTRL_OXNAS
+On Thursday 03 March 2016 13:27:59 Geert Uytterhoeven wrote:
+> On Thu, Mar 3, 2016 at 11:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 03 March 2016 17:03:34 Krzysztof Kozlowski wrote:
+> >> index 0da40e2e4280..5c530b6b125d 100644
+> >> --- a/drivers/rtc/Kconfig
+> >> +++ b/drivers/rtc/Kconfig
+> >> @@ -1302,6 +1302,7 @@ config RTC_DRV_AT91RM9200
+> >>  config RTC_DRV_AT91SAM9
+> >>         tristate "AT91SAM9 RTT as RTC"
+> >>         depends on ARCH_AT91 || COMPILE_TEST
+> >> +       depends on HAS_IOMEM    # For MFD_SYSCON
+> >>         select MFD_SYSCON
+> >>         help
+> >>           Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
+> >>
+> >
+> > This is technically correct, but the entire RTC menu is hidden
+> > inside of 'depends on !UML && !S390', so we won't ever get there
+> > on any configuration that does not use HAS_IOMEM.
+> >
+> > If we did, all other RTC drivers would also fail.
+> 
+> So UML has no RTC. Should/can it use RTC_DRV_GENERIC?
 
-Please sort these alphabetically
+I think nothing should use that, even if it could ;-)
 
-> +
-> +static void __init oxnas_init(void)
-> +{
-> +	pr_info("OXNAS Device Tree boot\n");
-> +
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
+Funny enough, RTC_DRV_GENERIC would probably actually work if you
+run UML as root and set iopl() to allow port access, but we don't
+really want it to mess with the host RTC.
 
-I think you should at least remove this function, as the pr_info is not
-needed and the rest is the default.
-
-As Russell mentioned, the entire file is not really needed either, but
-so far we have left the trivial per-platform files in place generally.
+I don't know where UML gets it real time, but it doesn't actually
+need much other than calling clock_gettime(CLOCK_REALTIME, ...)
+to get the host time. Presumably it uses some variation of that.
 
 	Arnd
