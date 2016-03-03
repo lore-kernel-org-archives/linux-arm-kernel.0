@@ -1,28 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 3 Mar 2016 16:06:04 +0100
-Subject: [PATCH 03/17] dt-bindings: Add PLX Technology RPS IRQ Controller
- bindings
-In-Reply-To: <56D850C6.1010404@baylibre.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-4-git-send-email-narmstrong@baylibre.com>
- <20160303145348.GI15541@lunn.ch> <56D850C6.1010404@baylibre.com>
-Message-ID: <20160303150604.GJ15541@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Mar 2016 15:12:01 +0000
+Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
+ (kernel 4.5)
+In-Reply-To: <56D85151.9050607@arm.com>
+References: <20160303141752.GA12255@localhost.localdomain>
+ <20160303144215.GC19139@leverpostej> <56D85151.9050607@arm.com>
+Message-ID: <20160303151200.GE19139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 03:57:10PM +0100, Neil Armstrong wrote:
-> Hi Andrew,
+On Thu, Mar 03, 2016 at 02:59:29PM +0000, Suzuki K. Poulose wrote:
+> On 03/03/16 14:42, Mark Rutland wrote:
 > 
-> On 03/03/2016 03:53 PM, Andrew Lunn wrote:
-> > 
-> >> +- compatible: Should be "plxtech,nas782x-rps"
-> > 
-> > Hi Neil
-> > 
-> > It would be nice to be consistent with the naming.
-> The compatible is now oxsemi,os810se-rps-irq which is consistent with the timer.
+> >>However for arm64 it is implemented that cpu_present_mask is
+> >>explicetely set accordingly to 'maxcpus' value. Is it design intent ?
+> >
+> >To some extent, yes.
+> >
+> >Due to the possibility of a heterogeneous system, we must bring all CPUs
+> >online at boot time, and cannot defer this.
+> >
+> >This is necessary to detect the common subset of supported features, and
+> >also to detect the full set of CPUs in the system to correctly apply
+> >errata workarounds which require kernel text patching.
+> 
+> We don't have this limitation anymore, as we can check if the booting CPU
+> has any conflicting/missing features w.r.t the established set and fail the
+> booting if it does.
 
-Ah, i had not read that far down the thread yet.
+While we do this, that's more of a last-ditch effort as opposed to a
+general solution, and I'm not sure it's complete.
 
-Thanks
-	Andrew
+What happens when we online a CPU that we determine needs a new erratum
+workaround applied? I didn't think we prohibited onlining in that case.
+
+I guess maxcpus is effectively the same as physical CPU hotplug, and the
+same caveats apply to both -- we can't reliably support either in the
+general case.
+
+Thanks,
+Mark.
