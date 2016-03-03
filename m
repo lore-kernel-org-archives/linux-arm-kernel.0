@@ -1,20 +1,72 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Mar 2016 16:29:42 -0600
-Subject: [PATCH 10/12] Docs: dt: document ARM SMMU generic binding usage
-In-Reply-To: <af1ce6d7d69e340ac839c69b475728f7aa50ff23.1456514380.git.robin.murphy@arm.com>
-References: <cover.1456514380.git.robin.murphy@arm.com>
- <af1ce6d7d69e340ac839c69b475728f7aa50ff23.1456514380.git.robin.murphy@arm.com>
-Message-ID: <20160303222942.GA8943@rob-hp-laptop>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 03 Mar 2016 14:28:58 -0800
+Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
+ groups.
+In-Reply-To: <56D8ABF4.6060801@wwwdotorg.org>
+References: <1456510756-15337-1-git-send-email-eric@anholt.net>
+ <1456510756-15337-3-git-send-email-eric@anholt.net>
+ <56D8ABF4.6060801@wwwdotorg.org>
+Message-ID: <87bn6v6vrp.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 01:46:19PM +0000, Robin Murphy wrote:
-> Document how the generic "iommus" binding should be used to describe ARM
-> SMMU stream IDs instead of the old "mmu-masters" binding.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  .../devicetree/bindings/iommu/arm,smmu.txt         | 40 ++++++++++++++--------
->  1 file changed, 25 insertions(+), 15 deletions(-)
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> On 02/26/2016 11:19 AM, Eric Anholt wrote:
+>> Since all of these pins were documented, we can use their names to
+>> explain what's going on.
+>
+>> diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+>
+>>   &gpio {
+>> +	pinctrl-0 = <&i2c0_gpio0
+>> +		     &i2c1_gpio2
+>> +		     &gpclk0_gpio4
+>> +		     &gpclk1_gpio5
+>> +		     &spi0_gpio7
+>> +		     &pcm_gpio18
+>> +		     &pwm0_gpio40
+>> +		     &pwm1_gpio45
+>> +		     &gpioout
+>> +		     &alt3>;
+>>   };
+>
+> Why not convert alt3 to the new scheme too?
+
+(covered in the next patch)
+
+> I think this configures too many pins, which in turn makes assumptions 
+> about what those pins are used for that may not be valid.
+>
+> Recent RPi firmware configures almost all expansion connector GPIOs as 
+> GPIO-in. This ensures that no matter what is connected to the expansion 
+> connector, there can be no signal conflicts due to both the bcm283x and 
+> some external device both attempting to drive the same pin. I believe 
+> the default Linux pinmux should adopt the same approach, by simply not 
+> configuring any expansion connector pins except those known to have a 
+> 100% hard-coded usage. For example, the HAT I2C pins must only be used 
+> for that purpose on the RPi, so even if the HW supported using them as 
+> arbitrary GPIO or PWM or ..., we know they're actually I2C.
+>
+> So, I think this list should only include configuration for pins 
+> connected to on-board devices, or expansion pins that have a 100% known 
+> purpose.
+>
+> (I can't quite remember how many pins are being configured in the 
+> upstream kernel's DT files at present; it's possible the complying with 
+> this rule may involve removing some pinctrl settings that are currently 
+> present to avoid conflicts. User-specific additions should come from DT 
+> overlays or manual DT edits.)
+
+If we want to improve on our default pin configurations, I'm into that,
+but I think the first step is to get groups split up so it's clear what
+we're doing with pins in the first place.  This patch is just a no-op
+change to get the board files to use smaller groups for
+enabling/disabling, and we should stack functional changes after that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160303/b44fa64d/attachment.sig>
