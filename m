@@ -1,497 +1,350 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 3 Mar 2016 00:02:43 -0500
-Subject: [PATCH v10 6/9] arm64: kprobes instruction simulation support
-In-Reply-To: <56D5D9A0.9090205@arm.com>
-References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
- <1456801047-29014-7-git-send-email-dave.long@linaro.org>
- <56D5D9A0.9090205@arm.com>
-Message-ID: <56D7C573.8030401@linaro.org>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 3 Mar 2016 10:43:49 +0530
+Subject: [PATCH v13 3/6] of, numa: Add NUMA of binding implementation.
+In-Reply-To: <CAFpQJXWXegmedu_TU4T6W6BkEZeqnZvUC0+qCO9anxDLKeqWYg@mail.gmail.com>
+References: <1456959362-2036-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456959362-2036-4-git-send-email-ddaney.cavm@gmail.com>
+ <CAL_JsqLRP6tmpY7cJ61Ybrrai4ctA7ezyUGmYwdbywe+-qBG5A@mail.gmail.com>
+ <CAFpQJXWXegmedu_TU4T6W6BkEZeqnZvUC0+qCO9anxDLKeqWYg@mail.gmail.com>
+Message-ID: <CAFpQJXXXE5FVB6OXznsji8Ywe2FCqHT9GCf1L4+G-SN+i3zT-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2016 01:04 PM, Marc Zyngier wrote:
-> On 01/03/16 02:57, David Long wrote:
->> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+On Thu, Mar 3, 2016 at 9:55 AM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> On Thu, Mar 3, 2016 at 9:04 AM, Rob Herring <robh+dt@kernel.org> wrote:
+>> On Wed, Mar 2, 2016 at 4:55 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+>>> From: David Daney <david.daney@cavium.com>
+>>>
+>>> Add device tree parsing for NUMA topology using device
+>>> "numa-node-id" property in distance-map and cpu nodes.
+>>>
+>>> This is a complete rewrite of a previous patch by:
+>>>    Ganapatrao Kulkarni<gkulkarni@caviumnetworks.com>
+>>>
+>>> Signed-off-by: David Daney <david.daney@cavium.com>
+>>> ---
+>>>  drivers/of/Kconfig   |   3 +
+>>>  drivers/of/Makefile  |   1 +
+>>>  drivers/of/of_numa.c | 200 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/of.h   |   9 +++
+>>>  4 files changed, 213 insertions(+)
+>>>  create mode 100644 drivers/of/of_numa.c
+>>>
+>>> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+>>> index e2a4841..b3bec3a 100644
+>>> --- a/drivers/of/Kconfig
+>>> +++ b/drivers/of/Kconfig
+>>> @@ -112,4 +112,7 @@ config OF_OVERLAY
+>>>           While this option is selected automatically when needed, you can
+>>>           enable it manually to improve device tree unit test coverage.
+>>>
+>>> +config OF_NUMA
+>>> +       bool
+>>> +
+>>>  endif # OF
+>>> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+>>> index 156c072..bee3fa9 100644
+>>> --- a/drivers/of/Makefile
+>>> +++ b/drivers/of/Makefile
+>>> @@ -14,5 +14,6 @@ obj-$(CONFIG_OF_MTD)  += of_mtd.o
+>>>  obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+>>>  obj-$(CONFIG_OF_RESOLVE)  += resolver.o
+>>>  obj-$(CONFIG_OF_OVERLAY) += overlay.o
+>>> +obj-$(CONFIG_OF_NUMA) += of_numa.o
+>>>
+>>>  obj-$(CONFIG_OF_UNITTEST) += unittest-data/
+>>> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+>>> new file mode 100644
+>>> index 0000000..9727b60
+>>> --- /dev/null
+>>> +++ b/drivers/of/of_numa.c
+>>> @@ -0,0 +1,200 @@
+>>> +/*
+>>> + * OF NUMA Parsing support.
+>>> + *
+>>> + * Copyright (C) 2015 - 2016 Cavium Inc.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License
+>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_fdt.h>
 >>
->> Kprobes needs simulation of instructions that cannot be stepped
->> from different memory location, e.g.: those instructions
->> that uses PC-relative addressing. In simulation, the behaviour
->> of the instruction is implemented using a copy of pt_regs.
+>> This can be dropped now.
 >>
->> Following instruction catagories are simulated:
->>   - All branching instructions(conditional, register, and immediate)
->>   - Literal access instructions(load-literal, adr/adrp)
+>>> +#include <linux/nodemask.h>
+>>> +
+>>> +#include <asm/numa.h>
+>>> +
+>>> +/* define default numa node to 0 */
+>>> +#define DEFAULT_NODE 0
+>>> +
+>>> +/*
+>>> + * Even though we connect cpus to numa domains later in SMP
+>>> + * init, we need to know the node ids now for all cpus.
+>>> +*/
+>>> +static void __init of_find_cpu_nodes(void)
 >>
->> Conditional execution is limited to branching instructions in
->> ARM v8. If conditions at PSTATE do not match the condition fields
->> of opcode, the instruction is effectively NOP. Kprobes considers
->> this case as 'miss'.
+>> Perhaps of_parse_cpu_nodes for consistency.
 >>
->> This code also replaces the use of arch/arm/opcodes.c for
->> arm_check_condition().
->
-> Outdated comment?
->
+>> Actually, if all the functions were prefixed with "of_numa_" that
+>> would be better.
+>>
+>>> +{
+>>> +       u32 nid;
+>>> +       int r;
+>>> +       struct device_node *np = NULL;
+>>> +
+>>> +       for (;;) {
+>>> +               np = of_find_node_by_type(np, "cpu");
+>>> +               if (!np)
+>>> +                       break;
+>>
+>> Can't we use the child node iterator for /cpus here?
+>>
+>>> +
+>>> +               r = of_property_read_u32(np, "numa-node-id", &nid);
+>>> +               if (r)
+>>> +                       continue;
+>>> +
+>>> +               pr_debug("NUMA: CPU on %u\n", nid);
+>>> +               if (nid >= MAX_NUMNODES)
+>>> +                       pr_warn("NUMA: Node id %u exceeds maximum value\n",
+>>> +                               nid);
+>>> +               else
+>>> +                       node_set(nid, numa_nodes_parsed);
+>>
+>> I'm not sure how this works, but don't you need to match this up with
+>> MPIDR of the cpu here?
 
-Yeah.  I'll remove it.
+we are parsing cpu node to know the number of nodes present in the system.
+alone memory will not convey the number of numa nodes present in the
+system(in some cases like node has cpu but no memory).
+we do mapping of cpu logical id and numa node id in smp init when cpu
+logical id is numbered(of_parse_and_init_cpus).
+and logical id is already mapped to hwid/MPIDR.
 
 >>
->> Thanks to Will Cohen for assorted suggested changes.
+>>> +       }
+>>> +}
+>>> +
+>>> +static void __init of_parse_memory_nodes(void)
+>>> +{
+>>> +       struct device_node *np = NULL;
+>>> +       int na, ns;
+>>> +       const __be32 *prop;
+>>> +       unsigned int psize;
+>>> +       u32 nid;
+>>> +       u64 base, size;
+>>> +       int r;
+>>> +
+>>> +       for (;;) {
+>>> +               np = of_find_node_by_type(np, "memory");
+>>> +               if (!np)
+>>> +                       break;
+>>> +
+>>> +               r = of_property_read_u32(np, "numa-node-id", &nid);
+>>> +               if (r)
+>>> +                       continue;
+>>> +
 >>
->> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->> Signed-off-by: William Cohen <wcohen@redhat.com>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->>   arch/arm64/include/asm/insn.h            |   1 +
->>   arch/arm64/include/asm/probes.h          |   5 +-
->>   arch/arm64/kernel/Makefile               |   3 +-
->>   arch/arm64/kernel/insn.c                 |   1 +
->>   arch/arm64/kernel/kprobes-arm64.c        |  29 +++++
->>   arch/arm64/kernel/kprobes.c              |  32 +++++-
->>   arch/arm64/kernel/probes-simulate-insn.c | 187 +++++++++++++++++++++++++++++++
->>   arch/arm64/kernel/probes-simulate-insn.h |  28 +++++
->>   8 files changed, 280 insertions(+), 6 deletions(-)
->>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
->>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
+>>> +               prop = of_get_property(np, "reg", &psize);
+>>> +               if (!prop)
+>>> +                       continue;
+>>> +
+>>> +               psize /= sizeof(__be32);
+>>> +               na = of_n_addr_cells(np);
+>>> +               ns = of_n_size_cells(np);
+>>> +
+>>> +               if (psize < na + ns) {
+>>> +                       pr_err("NUMA: memory reg property too small\n");
+>>> +                       continue;
+>>> +               }
+>>> +               base = of_read_number(prop, na);
+>>> +               size = of_read_number(prop + na, ns);
 >>
->> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
->> index b9567a1..26cee10 100644
->> --- a/arch/arm64/include/asm/insn.h
->> +++ b/arch/arm64/include/asm/insn.h
->> @@ -410,6 +410,7 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn);
+>> You should be able to use of_address_to_resource for all this.
 >>
->>   typedef bool (pstate_check_t)(unsigned long);
->>   extern pstate_check_t * const opcode_condition_checks[16];
->> +
->>   #endif /* __ASSEMBLY__ */
+>>> +
+>>> +               pr_debug("NUMA:  base = %llx len = %llx, node = %u\n",
+>>> +                        base, size, nid);
+>>> +
+>>> +               if (numa_add_memblk(nid, base, size) < 0)
+>>> +                       break;
+>>> +       }
+>>> +
+>>> +       of_node_put(np);
+>>> +}
+>>> +
+>>> +static int __init parse_distance_map_v1(struct device_node *map)
+>>> +{
+>>> +       const __be32 *matrix;
+>>> +       unsigned int matrix_size;
+>>> +       int entry_count;
+>>> +       int i;
+>>> +       int nr_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
 >>
->>   #endif	/* __ASM_INSN_H */
->> diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
->> index c5fcbe6..d524f7d 100644
->> --- a/arch/arm64/include/asm/probes.h
->> +++ b/arch/arm64/include/asm/probes.h
->> @@ -15,11 +15,12 @@
->>   #ifndef _ARM_PROBES_H
->>   #define _ARM_PROBES_H
+>> I believe the defaults are for some old DT files. As this is new, it
+>> should rely on explicit #size-cells in the DT.
 >>
->> +#include <asm/opcodes.h>
->> +
->>   struct kprobe;
->>   struct arch_specific_insn;
->>
->>   typedef u32 kprobe_opcode_t;
->> -typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
->>   typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
->>
->>   enum pc_restore_type {
->> @@ -35,7 +36,7 @@ struct kprobe_pc_restore {
->>   /* architecture specific copy of original instruction */
->>   struct arch_specific_insn {
->>   	kprobe_opcode_t *insn;
->> -	kprobes_pstate_check_t *pstate_cc;
->> +	pstate_check_t *pstate_cc;
->>   	kprobes_handler_t *handler;
->>   	/* restore address after step xol */
->>   	struct kprobe_pc_restore restore;
->> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->> index 4efb791..08325e5 100644
->> --- a/arch/arm64/kernel/Makefile
->> +++ b/arch/arm64/kernel/Makefile
->> @@ -36,7 +36,8 @@ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
->>   arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
->>   arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
->>   arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
->> -arm64-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-arm64.o
->> +arm64-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-arm64.o		\
->> +					   probes-simulate-insn.o
->>   arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
->>   arm64-obj-$(CONFIG_PCI)			+= pci.o
->>   arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index f7f2f95..5a52a88 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -30,6 +30,7 @@
->>   #include <asm/cacheflush.h>
->>   #include <asm/debug-monitors.h>
->>   #include <asm/fixmap.h>
->> +#include <asm/opcodes.h>
->>   #include <asm/insn.h>
->>
->>   #define AARCH64_INSN_SF_BIT	BIT(31)
->> diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
->> index e07727a..487238a 100644
->> --- a/arch/arm64/kernel/kprobes-arm64.c
->> +++ b/arch/arm64/kernel/kprobes-arm64.c
->> @@ -21,6 +21,7 @@
->>   #include <asm/sections.h>
->>
->>   #include "kprobes-arm64.h"
->> +#include "probes-simulate-insn.h"
->>
->>   static bool __kprobes aarch64_insn_is_steppable(u32 insn)
->>   {
->> @@ -62,8 +63,36 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
->>   	 */
->>   	if (aarch64_insn_is_steppable(insn))
->>   		return INSN_GOOD;
->> +
->> +	if (aarch64_insn_is_bcond(insn)) {
->> +		asi->handler = simulate_b_cond;
->> +	} else if (aarch64_insn_is_cbz(insn) ||
->> +	    aarch64_insn_is_cbnz(insn)) {
->> +		asi->handler = simulate_cbz_cbnz;
->> +	} else if (aarch64_insn_is_tbz(insn) ||
->> +	    aarch64_insn_is_tbnz(insn)) {
->> +		asi->handler = simulate_tbz_tbnz;
->> +	} else if (aarch64_insn_is_adr_adrp(insn))
->> +		asi->handler = simulate_adr_adrp;
->> +	else if (aarch64_insn_is_b(insn) ||
->> +	    aarch64_insn_is_bl(insn))
->> +		asi->handler = simulate_b_bl;
->> +	else if (aarch64_insn_is_br(insn) ||
->> +	    aarch64_insn_is_blr(insn) ||
->> +	    aarch64_insn_is_ret(insn))
->> +		asi->handler = simulate_br_blr_ret;
->> +	else if (aarch64_insn_is_ldr_lit(insn))
->> +		asi->handler = simulate_ldr_literal;
->> +	else if (aarch64_insn_is_ldrsw_lit(insn))
->> +		asi->handler = simulate_ldrsw_literal;
->>   	else
->> +		/*
->> +		 * Instruction cannot be stepped out-of-line and we don't
->> +		 * (yet) simulate it.
->> +		 */
->>   		return INSN_REJECTED;
->> +
->> +	return INSN_GOOD_NO_SLOT;
->>   }
->>
->>   static bool __kprobes
->> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
->> index e72dbce..ffc5affd 100644
->> --- a/arch/arm64/kernel/kprobes.c
->> +++ b/arch/arm64/kernel/kprobes.c
->> @@ -40,6 +40,9 @@ void jprobe_return_break(void);
->>   DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
->>   DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
->>
->> +static void __kprobes
->> +post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
->> +
->>   static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
->>   {
->>   	/* prepare insn slot */
->> @@ -57,6 +60,24 @@ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
->>   	p->ainsn.restore.type = RESTORE_PC;
->>   }
->>
->> +static void __kprobes arch_prepare_simulate(struct kprobe *p)
->> +{
->> +	/* This instructions is not executed xol. No need to adjust the PC */
->> +	p->ainsn.restore.addr = 0;
->> +	p->ainsn.restore.type = NO_RESTORE;
->> +}
->> +
->> +static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
->> +{
->> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
->> +
->> +	if (p->ainsn.handler)
->> +		p->ainsn.handler((u32)p->opcode, (long)p->addr, regs);
->> +
->> +	/* single step simulated, now go for post processing */
->> +	post_kprobe_handler(kcb, regs);
->> +}
->> +
->>   int __kprobes arch_prepare_kprobe(struct kprobe *p)
->>   {
->>   	unsigned long probe_addr = (unsigned long)p->addr;
->> @@ -73,7 +94,8 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->>   		return -EINVAL;
->>
->>   	case INSN_GOOD_NO_SLOT:	/* insn need simulation */
->> -		return -EINVAL;
->> +		p->ainsn.insn = NULL;
->> +		break;
->>
->>   	case INSN_GOOD:	/* instruction uses slot */
->>   		p->ainsn.insn = get_insn_slot();
->> @@ -83,7 +105,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
->>   	};
->>
->>   	/* prepare the instruction */
->> -	arch_prepare_ss_slot(p);
->> +	if (p->ainsn.insn)
->> +		arch_prepare_ss_slot(p);
->> +	else
->> +		arch_prepare_simulate(p);
->>
->>   	return 0;
->>   }
->> @@ -225,7 +250,8 @@ static void __kprobes setup_singlestep(struct kprobe *p,
->>   		kernel_enable_single_step(regs);
->>   		instruction_pointer(regs) = slot;
->>   	} else	{
->> -		BUG();
->> +		/* insn simulation */
->> +		arch_simulate_insn(p, regs);
->>   	}
->>   }
->>
->> diff --git a/arch/arm64/kernel/probes-simulate-insn.c b/arch/arm64/kernel/probes-simulate-insn.c
->> new file mode 100644
->> index 0000000..4e6e700
->> --- /dev/null
->> +++ b/arch/arm64/kernel/probes-simulate-insn.c
->> @@ -0,0 +1,187 @@
->> +/*
->> + * arch/arm64/kernel/probes-simulate-insn.c
->> + *
->> + * Copyright (C) 2013 Linaro Limited.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License for more details.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/kprobes.h>
->> +#include <linux/module.h>
->> +
->> +#include "probes-simulate-insn.h"
->> +
->> +#define sign_extend(x, signbit)		\
->> +	((x) | (0 - ((x) & (1 << (signbit)))))
->> +
->> +#define bbl_displacement(insn)		\
->> +	sign_extend(((insn) & 0x3ffffff) << 2, 27)
->> +
->> +#define bcond_displacement(insn)	\
->> +	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
->> +
->> +#define cbz_displacement(insn)	\
->> +	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
->> +
->> +#define tbz_displacement(insn)	\
->> +	sign_extend(((insn >> 5) & 0x3fff) << 2, 15)
->> +
->> +#define ldr_displacement(insn)	\
->> +	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
->> +
->> +
->> +static bool __kprobes check_cbz(u32 opcode, struct pt_regs *regs)
->> +{
->> +	int xn = opcode & 0x1f;
->> +
->> +	return (opcode & (1 << 31)) ?
->> +	    (regs->regs[xn] == 0) : ((regs->regs[xn] & 0xffffffff) == 0);
->> +}
->> +
->> +static bool __kprobes check_cbnz(u32 opcode, struct pt_regs *regs)
->> +{
->> +	int xn = opcode & 0x1f;
->> +
->> +	return (opcode & (1 << 31)) ?
->> +	    (regs->regs[xn] != 0) : ((regs->regs[xn] & 0xffffffff) != 0);
->> +}
->> +
->> +static bool __kprobes check_tbz(u32 opcode, struct pt_regs *regs)
->> +{
->> +	int xn = opcode & 0x1f;
->> +	int bit_pos = ((opcode & (1 << 31)) >> 26) | ((opcode >> 19) & 0x1f);
->> +
->> +	return ((regs->regs[xn] >> bit_pos) & 0x1) == 0;
->> +}
->> +
->> +static bool __kprobes check_tbnz(u32 opcode, struct pt_regs *regs)
->> +{
->> +	int xn = opcode & 0x1f;
->> +	int bit_pos = ((opcode & (1 << 31)) >> 26) | ((opcode >> 19) & 0x1f);
->> +
->> +	return ((regs->regs[xn] >> bit_pos) & 0x1) != 0;
->> +}
->> +
->> +/*
->> + * instruction simulation functions
->> + */
->> +void __kprobes
->> +simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	long imm, xn, val;
->> +
->> +	xn = opcode & 0x1f;
->> +	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
->> +	imm = sign_extend(imm, 20);
->> +	if (opcode & 0x80000000)
->> +		val = (imm<<12) + (addr & 0xfffffffffffff000);
->> +	else
->> +		val = imm + addr;
->> +
->> +	regs->regs[xn] = val;
+>> OTOH, what is point of using #size-cells at all versus fixing the
+>> sizes to 1 cell. The documentation doesn't indicate that it uses
+>> #size-cells. That also means that the sizes basically follow the cell
+>> size for the memory given that this is at the top-level.
 >
-> What happens when you have something like "adr xzr, blah"? I haven't
-> found out where you are writing that back yet, but that could be really
-> fun for SP...
->
+> This property needs only size-cell of 1 (32 bit is sufficient to
+> define numa node id and their relative distance)
+> adding note about cell size of this property in binding will clear the doubt.
+>>
+>>> +
+>>> +       pr_info("NUMA: parsing numa-distance-map-v1\n");
+>>> +
+>>> +       matrix = of_get_property(map, "distance-matrix", &matrix_size);
+>>> +       if (!matrix) {
+>>> +               pr_err("NUMA: No distance-matrix property in distance-map\n");
+>>> +               return -EINVAL;
+>>> +       }
+>>> +
+>>> +       entry_count = matrix_size / (sizeof(__be32) * 3 * nr_size_cells);
+>>> +
+>>> +       for (i = 0; i < entry_count; i++) {
+>>> +               u32 nodea, nodeb, distance;
+>>> +
+>>> +               nodea = of_read_number(matrix, nr_size_cells);
+>>> +               matrix += nr_size_cells;
+>>> +               nodeb = of_read_number(matrix, nr_size_cells);
+>>> +               matrix += nr_size_cells;
+>>> +               distance = of_read_number(matrix, nr_size_cells);
+>>> +               matrix += nr_size_cells;
+>>
+>> Assuming you fix this to 1 cell, you can use
+>> of_property_count_u32_elems and of_property_read_u32_array.
+>>
+>>> +
+>>> +               numa_set_distance(nodea, nodeb, distance);
+>>> +               pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
+>>> +                        nodea, nodeb, distance);
+>>> +
+>>> +               /* Set default distance of node B->A same as A->B */
+>>> +               if (nodeb > nodea)
+>>> +                       numa_set_distance(nodeb, nodea, distance);
+>>> +       }
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +static int __init of_parse_distance_map(void)
+>>> +{
+>>> +       int ret = -EINVAL;
+>>> +       struct device_node *np = of_find_node_by_name(NULL, "distance-map");
+>>> +
+>>> +       if (!np)
+>>> +               return ret;
+>>> +
+>>> +       if (of_device_is_compatible(np, "numa-distance-map-v1")) {
+>>
+>> You can use of_find_compatible_node() instead of these 2 calls.
+>>
+>>> +               ret = parse_distance_map_v1(np);
+>>> +               goto out;
+>>> +       }
+>>> +
+>>> +       pr_err("NUMA: invalid distance-map device node\n");
+>>> +out:
+>>> +       of_node_put(np);
+>>> +       return ret;
+>>> +}
+>>> +
+>>> +int of_node_to_nid(struct device_node *device)
+>>> +{
+>>> +       struct device_node *np;
+>>> +       u32 nid;
+>>> +       int r = -ENODATA;
+>>> +
+>>> +       np = of_node_get(device);
+>>> +
+>>> +       while (np) {
+>>> +               struct device_node *parent;
+>>> +
+>>> +               r = of_property_read_u32(np, "numa-node-id", &nid);
+>>> +               if (r != -EINVAL)
+>>
+>> You want to break for other err values?
+>>
+>>> +                       break;
+>>> +
+>>> +               /* property doesn't exist in this node, look in parent */
+>>> +               parent = of_get_parent(np);
+>>> +               of_node_put(np);
+>>> +               np = parent;
+>>> +       }
+>>> +       if (np && r)
+>>> +               pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
+>>> +                       np->name);
+>>> +       of_node_put(np);
+>>> +
+>>> +       if (!r) {
+>>> +               if (nid >= MAX_NUMNODES)
+>>> +                       pr_warn("NUMA: Node id %u exceeds maximum value\n",
+>>> +                               nid);
+>>> +               else
+>>> +                       return nid;
+>>> +       }
+>>> +
+>>> +       return NUMA_NO_NODE;
+>>> +}
+>>
+>> Needs to be exported?
+>>
+>>> +
+>>> +int __init of_numa_init(void)
+>>> +{
+>>> +       of_find_cpu_nodes();
+>>> +       of_parse_memory_nodes();
+>>> +       return of_parse_distance_map();
+>>> +}
+>>> diff --git a/include/linux/of.h b/include/linux/of.h
+>>> index dc6e396..fe67a4c 100644
+>>> --- a/include/linux/of.h
+>>> +++ b/include/linux/of.h
+>>> @@ -685,6 +685,15 @@ static inline int of_node_to_nid(struct device_node *device)
+>>>  }
+>>>  #endif
+>>>
+>>> +#ifdef CONFIG_OF_NUMA
+>>> +extern int of_numa_init(void);
+>>> +#else
+>>> +static inline int of_numa_init(void)
+>>> +{
+>>> +       return -ENOSYS;
+>>> +}
+>>> +#endif
+>>> +
+>>>  static inline struct device_node *of_find_matching_node(
+>>>         struct device_node *from,
+>>>         const struct of_device_id *matches)
+>>> --
+>>> 1.8.3.1
+>>>
+>>
 
-It hadn't occurred to me that xzr could be an output register. Sigh. 
-That could mean a bit of repeated code to handle this special case.  I 
-wonder what the implications would be of adding xzr to the pt_regs 
-structure to avoid that.
-
->> +
->> +	instruction_pointer(regs) += 4;
->> +}
->> +
->> +void __kprobes
->> +simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	int disp = bbl_displacement(opcode);
->> +
->> +	/* Link register is x30 */
->> +	if (opcode & (1 << 31))
->> +		regs->regs[30] = addr + 4;
->> +
->> +	instruction_pointer(regs) = addr + disp;
->> +}
->> +
->> +void __kprobes
->> +simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	int disp = 4;
->> +
->> +	if (opcode_condition_checks[opcode & 0xf](regs->pstate & 0xffffffff))
->> +		disp = bcond_displacement(opcode);
->> +
->> +	instruction_pointer(regs) = addr + disp;
->> +}
->> +
->> +void __kprobes
->> +simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	int xn = (opcode >> 5) & 0x1f;
->> +
->> +	/* Link register is x30 */
->> +	if (((opcode >> 21) & 0x3) == 1)
->> +		regs->regs[30] = addr + 4;
->> +
->> +	instruction_pointer(regs) = regs->regs[xn];
->> +}
->> +
->> +void __kprobes
->> +simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	int disp = 4;
->> +
->> +	if (opcode & (1 << 24)) {
->> +		if (check_cbnz(opcode, regs))
->> +			disp = cbz_displacement(opcode);
->> +	} else {
->> +		if (check_cbz(opcode, regs))
->> +			disp = cbz_displacement(opcode);
->> +	}
->> +	instruction_pointer(regs) = addr + disp;
->> +}
->> +
->> +void __kprobes
->> +simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	int disp = 4;
->> +
->> +	if (opcode & (1 << 24)) {
->> +		if (check_tbnz(opcode, regs))
->> +			disp = tbz_displacement(opcode);
->> +	} else {
->> +		if (check_tbz(opcode, regs))
->> +			disp = tbz_displacement(opcode);
->> +	}
->> +	instruction_pointer(regs) = addr + disp;
->> +}
->> +
->> +void __kprobes
->> +simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	u64 *load_addr;
->> +	int xn = opcode & 0x1f;
->> +	int disp = ldr_displacement(opcode);
->> +
->> +	load_addr = (u64 *) (addr + disp);
->> +
->> +	if (opcode & (1 << 30))	/* x0-x31 */
->> +		regs->regs[xn] = *load_addr;
->> +	else			/* w0-w31 */
->> +		*(u32 *) (&regs->regs[xn]) = (*(u32 *) (load_addr));
+Ganapat
 >
-> Same here...
+> thanks
+> Ganapat
 >
-
-^^
-
->> +
->> +	instruction_pointer(regs) += 4;
->> +}
->> +
->> +void __kprobes
->> +simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs)
->> +{
->> +	s32 *load_addr;
->> +	int xn = opcode & 0x1f;
->> +	int disp = ldr_displacement(opcode);
->> +
->> +	load_addr = (s32 *) (addr + disp);
->> +	regs->regs[xn] = *load_addr;
->
-> And here.
-
-^^
-
->
->> +
->> +	instruction_pointer(regs) += 4;
->> +}
->> diff --git a/arch/arm64/kernel/probes-simulate-insn.h b/arch/arm64/kernel/probes-simulate-insn.h
->> new file mode 100644
->> index 0000000..d6bb9a5
->> --- /dev/null
->> +++ b/arch/arm64/kernel/probes-simulate-insn.h
->> @@ -0,0 +1,28 @@
->> +/*
->> + * arch/arm64/kernel/probes-simulate-insn.h
->> + *
->> + * Copyright (C) 2013 Linaro Limited
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License for more details.
->> + */
->> +
->> +#ifndef _ARM_KERNEL_PROBES_SIMULATE_INSN_H
->> +#define _ARM_KERNEL_PROBES_SIMULATE_INSN_H
->> +
->> +void simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs);
->> +void simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs);
->> +void simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs);
->> +void simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs);
->> +void simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs);
->> +void simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs);
->> +void simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs);
->> +void simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs);
->> +
->> +#endif /* _ARM_KERNEL_PROBES_SIMULATE_INSN_H */
->>
->
-> Thanks,
->
-> 	M.
->
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
