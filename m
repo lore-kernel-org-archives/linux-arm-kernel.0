@@ -1,93 +1,252 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 3 Mar 2016 16:24:56 -0300
-Subject: mtd: pxa3xx_nand: issue with command time out
-In-Reply-To: <56D61502.1090007@alliedtelesis.co.nz>
-References: <5695CEF0.1080100@alliedtelesis.co.nz>
- <87a8o9ex9r.fsf@belgarion.home>
- <569827BC.10601@alliedtelesis.co.nz>
- <874meddqu5.fsf@belgarion.home> <20160125183022.GA41251@google.com>
- <87fuxl9yil.fsf@belgarion.home>
- <CAAEAJfCNzh9+zRq_Yb=hFyLfP8RFoX+LUsDL4dVwUenVc_gVOA@mail.gmail.com>
- <56D61502.1090007@alliedtelesis.co.nz>
-Message-ID: <CAAEAJfAd2qkcJby3AaKOaxL2LZC=PMNfu7dy5yMcZ1eHhOF7oA@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 3 Mar 2016 11:33:29 -0800
+Subject: [PATCH v3 5/7] ACPI: serial: implement earlycon on ACPI DBG2 port
+In-Reply-To: <56D878D4.4000902@hurleysoftware.com>
+References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456749726-30261-6-git-send-email-aleksey.makarov@linaro.org>
+ <56D5BAFF.6080008@hurleysoftware.com> <56D5C9F5.5060301@linaro.org>
+ <56D878D4.4000902@hurleysoftware.com>
+Message-ID: <56D89189.6090701@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Richard, Boris and Thomas
+On 03/03/2016 09:48 AM, Peter Hurley wrote:
+> On 03/01/2016 08:57 AM, Aleksey Makarov wrote:
+>>
+>>
+>> On 03/01/2016 06:53 PM, Peter Hurley wrote:
+>>> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
+>>>> Add ACPI_DBG2_EARLYCON_DECLARE() macros that declares
+>>>> an earlycon on the serial port specified in the DBG2 ACPI table.
+>>>>
+>>>> Pass the string "earlycon=acpi_dbg2" to the kernel to activate it.
+>>>>
+>>>> Callbacks for EARLYCON_DECLARE() and OF_EARLYCON_DECLARE()
+>>>> can also be used for this macros.
+>>>>
+>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>>>> ---
+>>>>  Documentation/kernel-parameters.txt |  3 ++
+>>>>  drivers/tty/serial/earlycon.c       | 60 +++++++++++++++++++++++++++++++++++++
+>>>>  include/linux/acpi_dbg2.h           | 20 +++++++++++++
+>>>>  3 files changed, 83 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+>>>> index e0a21e4..19b947b 100644
+>>>> --- a/Documentation/kernel-parameters.txt
+>>>> +++ b/Documentation/kernel-parameters.txt
+>>>> @@ -1072,6 +1072,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>>>  			A valid base address must be provided, and the serial
+>>>>  			port must already be setup and configured.
+>>>>  
+>>>> +		acpi_dbg2
+>>>> +			Use serial port specified by the DBG2 ACPI table.
+>>>> +
+>>>>  	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
+>>>>  			earlyprintk=vga
+>>>>  			earlyprintk=efi
+>>>> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+>>>> index d217366..9ba3a04 100644
+>>>> --- a/drivers/tty/serial/earlycon.c
+>>>> +++ b/drivers/tty/serial/earlycon.c
+>>>> @@ -22,6 +22,7 @@
+>>>>  #include <linux/sizes.h>
+>>>>  #include <linux/of.h>
+>>>>  #include <linux/of_fdt.h>
+>>>> +#include <linux/acpi.h>
+>>>>  
+>>>>  #ifdef CONFIG_FIX_EARLYCON_MEM
+>>>>  #include <asm/fixmap.h>
+>>>> @@ -200,6 +201,8 @@ int __init setup_earlycon(char *buf)
+>>>>  	return -ENOENT;
+>>>>  }
+>>>>  
+>>>> +static bool setup_dbg2_earlycon;
+>>>> +
+>>>>  /* early_param wrapper for setup_earlycon() */
+>>>>  static int __init param_setup_earlycon(char *buf)
+>>>>  {
+>>>> @@ -212,6 +215,11 @@ static int __init param_setup_earlycon(char *buf)
+>>>>  	if (!buf || !buf[0])
+>>>>  		return early_init_dt_scan_chosen_serial();
+>>>>  
+>>>> +	if (!strcmp(buf, "acpi_dbg2")) {
+>>>> +		setup_dbg2_earlycon = true;
+>>>> +		return 0;
+>>>> +	}
+>>>
+>>> So this series doesn't start an ACPI earlycon at early_param time?
+>>> That doesn't seem very useful.
+>>>
+>>> When does the ACPI earlycon actually start?
+>>> And don't say "when the DBG2 table is probed"; that much is obvious.
+>>
+>> ACPI earlycon starts as soon as ACPI tables become accessible (setup_arch()).
+>> I think that is still quite early.
+> 
+> I see now; the probe is in patch 6/7.
+> 
+> setup_arch()
+>   acpi_boot_table_init()
+>     acpi_probe_device_table()
+>       ...
+>         acpi_dbg2_setup()
+>           ->setup()
+>             acpi_setup_earlycon()
+> 
+> 
+>>>> +
+>>>>  	err = setup_earlycon(buf);
+>>>>  	if (err == -ENOENT || err == -EALREADY)
+>>>>  		return 0;
+>>>> @@ -286,3 +294,55 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
+>>>>  }
+>>>>  
+>>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>>> +
+>>>> +#ifdef CONFIG_ACPI_DBG2_TABLE
+>>>> +
+>>>> +int __init acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d)
+>>>> +{
+>>>> +	int err;
+>>>> +	struct uart_port *port = &early_console_dev.port;
+>>>> +	int (*setup)(struct earlycon_device *, const char *) = d;
+>>>> +	struct acpi_generic_address *reg;
+>>>> +
+>>>> +	if (!setup_dbg2_earlycon)
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	if (device->register_count < 1)
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	if (device->base_address_offset >= device->length)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	reg = (void *)device + device->base_address_offset;
+>>>> +
+>>>> +	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY &&
+>>>> +	    reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	spin_lock_init(&port->lock);
+>>>> +	port->uartclk = BASE_BAUD * 16;
+>>>> +
+>>>> +	if (reg->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
+>>>> +		if (device->port_type == ACPI_DBG2_ARM_SBSA_32BIT)
+>>>> +			port->iotype = UPIO_MEM32;
+>>>> +		else
+>>>> +			port->iotype = UPIO_MEM;
+>>>> +		port->mapbase = reg->address;
+>>>> +		port->membase = earlycon_map(reg->address, SZ_4K);
+>>>> +	} else {
+>>>> +		port->iotype = UPIO_PORT;
+>>>> +		port->iobase = reg->address;
+>>>> +	}
+>>>> +
+>>>> +	early_console_dev.con->data = &early_console_dev;
+>>>> +	err = setup(&early_console_dev, NULL);
+>>>> +	if (err < 0)
+>>>> +		return err;
+>>>> +	if (!early_console_dev.con->write)
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	register_console(early_console_dev.con);
+>>>> +	return 0;
+>>>> +}
+>>>> +
+>>>> +#endif /* CONFIG_ACPI_DBG2_TABLE */
+>>>> diff --git a/include/linux/acpi_dbg2.h b/include/linux/acpi_dbg2.h
+>>>> index 125ae7e..b653752 100644
+>>>> --- a/include/linux/acpi_dbg2.h
+>>>> +++ b/include/linux/acpi_dbg2.h
+>>>> @@ -37,12 +37,32 @@ int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
+>>>>  	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
+>>>>  				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
+>>>>  
+>>>> +int acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d);
+>>>> +
+>>>> +/**
+>>>> + * ACPI_DBG2_EARLYCON_DECLARE() - Define handler for ACPI GDB2 serial port
+>>>> + * @name:		Identifier to compose name of table data
+>>>> + * @subtype:		Subtype of the port
+>>>> + * @console_setup:	Function to be called to setup the port
+>>>> + *
+>>>> + * Type of the console_setup() callback is
+>>>> + * int (*setup)(struct earlycon_device *, const char *)
+>>>> + * It's the type of callback of of_setup_earlycon().
+>>>> + */
+>>>> +#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
+>>>> +	ACPI_DBG2_DECLARE(name, ACPI_DBG2_SERIAL_PORT, subtype,		\
+>>>> +			  acpi_setup_earlycon, console_setup)
+>>>> +
+>>>>  #else
+>>>>  
+>>>>  #define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
+>>>>  	static const void *__acpi_dbg_data_##name[]			\
+>>>>  		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
+>>>>  
+>>>> +#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
+>>>> +	static const void *__acpi_dbg_data_serial_##name[]		\
+>>>> +		__used __initdata = { (void *)console_setup }
+> 
+> console_setup is a terrible macro argument name; console_setup() is an
+> actual kernel function (although file-scope).
+> Please change it to something short and generic.
+> 
+> Honestly, I'd just prefer you skip all this apparatus that makes
+> ACPI earlycon appear to be like OF earlycon code-wise, but without any of
+> the real underpinning or flexibility.
+> 
+> This would be trivial to parse the ACPI table and invoke
+> setup_earlycon() with a string specifier instead.
+> 
+> For example,
+> 
+> int __init acpi_earlycon_setup(struct acpi_dbg2_device *dbg2)
+> {
+>         char opts[64];
+>         struct acpi_generic_addr *addr = (void*)dbg2 + dbg2->base_address_offset;
 
-On 1 March 2016 at 19:17, Hamish Martin
-<Hamish.Martin@alliedtelesis.co.nz> wrote:
-> Hi Robert, Ezequiel, and Brian,
->
-> I have been working with Michael Wang on this issue and wanted to update
-> you on our results as we think there is a wider issue to resolve here.
->
-> I believe Ezequiel's analysis of the IRQ sequence is correct. The
-> proposed patch from Brian is not needed, not does it resolve our issue.
->
-> Further, we have debugged in more detail with kernel tracing and see
-> that the problem occurs because nothing calls 'schedule()' in the kernel
-> within the timeout period (200ms) to actually allow the IRQ bottom-half
-> thread ((pxa3xx_nand_irq_thread()) to run.
->
-> With the trace enabled we were able to see long delays between the IRQ
-> thread being queued for run as a result of the return with
-> IRQ_WAKE_THREAD in pxa3xx_nand_irq(), and a call to schedule() actually
-> selecting the thread for execution. This delay was tied to whatever else
-> was happening in our system during the boot up when this issue occurs.
-> For instance, if a mutex got unlocked this would ultimately lead to a
-> call to schedule() and our thread (pxa3xx_nand_irq_thread()) would run.
-> If some file system ops happened schedule() would get called. These
-> unrelated activities were required so that schedule() got called and the
-> scheduler would let the bottom-half execute.
-> In our tracing we saw the issue occur whenever the call to schedule()
-> didn't occur before the timeout expired. In short, if we got lucky and
-> something completely unrelated happened that led to a call to
-> 'schedule()', then the issue didn't occur. If we got unlucky and nothing
-> called schedule(), the issue was observed.
->
-> We have enabled CONFIG_PREEMPT in our system to resolve this. This has
-> the effect of leading to a triggering of 'schedule()' at the end of
-> processing interrupts. This means that we now see a nice tight execution
-> of pxa3xx_nand threaded IRQ such that we see all ops completing with
-> less that 20ms delay.
->
-> I wanted to highlight this to you because I think it shows that the
-> change to a threaded IRQ is probably only safe if we can guarantee
-> scheduling of the bottom-half thread within the time out period (200ms).
-> I think this is not safe for systems with CONFIG_PREEMPT not configured.
-> Or perhaps there is a better way to resolve this. Is this a deficiency
-> in the Armada XP code?
->
-> What do you think?
->
+> 	int mmio = addr->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY;
 
-Thanks a lot for updating us. Richard, Boris and I have
-discussed about this on IRC.
+This should be
+         char *mmio = (addr->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) ? "mmio" : "io";
+	
 
-We came to the following conclusions:
 
-1. There's no way to guarantee that the thread will be scheduled
-soon enough to always do the data transfer in time.
-
-Using CONFIG_PREEMPT could prevent a timeout in many (most?)
-cases, but it's not guaranteed to work.
-
-2. The pxa3xx-nand driver is poorly designed, and it shouldn't
-do any data transfer in the IRQ (threaded or not) handler.
-
-Instead, this should be done in {read,write}_buf, i.e. in the
-context of the calling process that asks data to be read/write.
-This is potentially a big rework.
-
-3. Richard proposed to get rid of the timeout
-(using wait_for_completion_interruptible instead?).
-
-I'm wondering if that could avoid these kind of issues (false
-timeouts), as a less invasive solution, until someone steps
-up to rework the driver.
-
-How does it sound?
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+> 
+>         if (dbg2->port_type != ACPI_DBG2_SERIAL_PORT)
+>                 return 0;
+> 
+>         switch (dbg2->port_subtype) {
+>         case ACPI_DBG2_ARM_PL011:
+> 	case ACPI_DBG2_ARM_SBSA_GENERIC:
+> 	case ACPI_DBG2_BCM2835:
+>                 sprintf(opts, "pl011,%s,0x%llx", mmio, addr->address);
+>                 break;
+>         case ACPI_DBG2_ARM_SBSA_32BIT:
+>                 sprintf(opts, "pl011,mmio32,0x%llx", addr->address);
+>                 break;
+>         case ACPI_DBG2_16550_COMPATIBLE:
+>         case ACPI_DBG2_16550_SUBSET:
+>                 sprintf(opts, "uart,%s,0x%llx", mmio, addr->address);
+>                 break;
+>         default:
+>                 return 0;
+>         }
+> 
+> 	return setup_earlycon(opts);
+> }
+> 
+> This supports every earlycon ACPI DBG2 declares, not just the ARM_PL011
+> subtype of your series.
+> 
+> 
+> 
+>>>> +
+>>>>  #endif
+>>>>  
+>>>>  #endif
+>>>>
+>>>
+> 
