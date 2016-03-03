@@ -1,121 +1,139 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 02 Mar 2016 17:18:13 -0800
-Subject: [RFC v3 03/12] PM / cpu_domains: Setup PM domains for
- CPUs/clusters
-In-Reply-To: <1456866931-37851-5-git-send-email-lina.iyer@linaro.org> (Lina
- Iyer's message of "Tue, 1 Mar 2016 14:15:22 -0700")
-References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
- <1456866931-37851-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <7hfuw8xstm.fsf@baylibre.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 2 Mar 2016 17:25:24 -0800
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56D6F008.1050600@huawei.com>
+References: <56D6F008.1050600@huawei.com>
+Message-ID: <56D79284.3030009@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+(cc -mm and Joonsoo Kim)
 
-> Define and add Generic PM domains (genpd) for CPU clusters. Many new
-
-Not sure this is "new". :)
-
-> SoCs group CPUs as clusters. Clusters share common resources like power
-> rails, caches, VFP, Coresight etc. When all CPUs in the cluster are
-> idle, these shared resources may also be put in their idle state.
+On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+> Hi,
 >
-> CPUs may be associated with their domain providers in DT. The domains in
-> turn may be associated with their providers.
-
-Not sure what this sentence means.
-
-> This is clean way to model
-> the cluster hierarchy like that of ARM's big.little architecture.
-
-... or any multi-cluster architecture with independent power rails.
-
-> For each CPU in the DT, we identify the domain provider; initialize and
-> register the PM domain if isn't already registered and attach all the
-> CPU devices to the domain. Usually, when there are multiple clusters of
-> CPUs, there is a top level coherency domain that is dependent on these
-> individual domains. All domains thus created are marked IRQ safe
-> automatically and therefore may be powered down when the CPUs in the
-> domain are powered down by cpuidle.
-
-s/by cpuidle/during the idle path/
-
-A bit about why IRQ safe is needed during the idle path would be good also.
-
-> Reading DT, initializing Generic PM domains, attaching CPUs to it
-
-s/it/their/
-
-> domains are common functionalities across ARM SoCs. Provide a common set
-
-s/ARM/many/
-
-> of APIs to setup PM domains for CPU clusters and its parents. The
-> platform drivers may just call of_setup_cpu_pd() to do a single step
-> setup of CPU domains.
+> I came across a suspicious error for CMA stress test:
 >
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Suggested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  drivers/base/power/Makefile      |   1 +
->  drivers/base/power/cpu_domains.c | 267 +++++++++++++++++++++++++++++++++++++++
->  include/linux/cpu_domains.h      |  35 +++++
-
-nit: cpu_pm_domains.[ch] ?
-
->  3 files changed, 303 insertions(+)
->  create mode 100644 drivers/base/power/cpu_domains.c
->  create mode 100644 include/linux/cpu_domains.h
+> Before the test, I got:
+> -bash-4.3# cat /proc/meminfo | grep Cma
+> CmaTotal:         204800 kB
+> CmaFree:          195044 kB
+>
+>
+> After running the test:
+> -bash-4.3# cat /proc/meminfo | grep Cma
+> CmaTotal:         204800 kB
+> CmaFree:         6602584 kB
+>
+> So the freed CMA memory is more than total..
+>
+> Also the the MemFree is more than mem total:
+>
+> -bash-4.3# cat /proc/meminfo
+> MemTotal:       16342016 kB
+> MemFree:        22367268 kB
+> MemAvailable:   22370528 kB
+>
+> Here is the kernel module doing the stress test below (if the test case
+> is wrong, correct me), any help would be great appreciated.
+>
+> The test is running on ARM64 platform (hisilicon D02) with 4.4 kernel, I think
+> the 4.5-rc is the same as I didn't notice the updates for it.
+>
+> int malloc_dma(void *data)
+> {
+>      void *vaddr;
+>      struct platform_device * pdev=(struct platform_device*)data;
+>      dma_addr_t dma_handle;
+>      int i;
+>
+>      for(i=0; i<1000; i++) {
+>          vaddr=dma_alloc_coherent(&pdev->dev, malloc_size, &dma_handle, GFP_KERNEL);
+>          if (!vaddr)
+>              pr_err("alloc cma memory failed!\n");
+>
+>          mdelay(1);
+>
+>          if (vaddr)
+>                  dma_free_coherent(&pdev->dev,malloc_size,vaddr, dma_handle);
+>      }
+>      pr_info("alloc free cma memory success return!\n");
+>      return 0;
+> }
+>
+> static int dma_alloc_coherent_init(struct platform_device *pdev)
+> {
+>      int i;
+>
+>      for(i=0; i<100; i++)   {
+>          task[i] = kthread_create(malloc_dma,pdev,"malloc_dma_%d",i);
+>          if(!task[i]) {
+>              printk("kthread_create faile %d\n",i);
+>              continue;
+>          }
+>          wake_up_process(task[i]);
+>      }
+>      return 0;
+> }
+>
+> Thanks
+> Hanjun
+>
+> The whole /proc/meminfo:
+>
+> -bash-4.3# cat /proc/meminfo
+> MemTotal:       16342016 kB
+> MemFree:        22367268 kB
+> MemAvailable:   22370528 kB
+> Buffers:            4292 kB
+> Cached:            36444 kB
+> SwapCached:            0 kB
+> Active:            23564 kB
+> Inactive:          25360 kB
+> Active(anon):       8424 kB
+> Inactive(anon):       64 kB
+> Active(file):      15140 kB
+> Inactive(file):    25296 kB
+> Unevictable:           0 kB
+> Mlocked:               0 kB
+> SwapTotal:             0 kB
+> SwapFree:              0 kB
+> Dirty:                 0 kB
+> Writeback:             0 kB
+> AnonPages:          8196 kB
+> Mapped:            16448 kB
+> Shmem:               296 kB
+> Slab:              26832 kB
+> SReclaimable:       6300 kB
+> SUnreclaim:        20532 kB
+> KernelStack:        3088 kB
+> PageTables:          404 kB
+> NFS_Unstable:          0 kB
+> Bounce:                0 kB
+> WritebackTmp:          0 kB
+> CommitLimit:     8171008 kB
+> Committed_AS:      34336 kB
+> VmallocTotal:   258998208 kB
+> VmallocUsed:           0 kB
+> VmallocChunk:          0 kB
+> AnonHugePages:         0 kB
+> CmaTotal:         204800 kB
+> CmaFree:         6602584 kB
+> HugePages_Total:       0
+> HugePages_Free:        0
+> HugePages_Rsvd:        0
+> HugePages_Surp:        0
+> Hugepagesize:       2048 kB
 >
 
-[...]
 
-> +/**
-> + * of_init_cpu_pm_domain() - Initialize a CPU PM domain from a device node
-> + *
-> + * @dn: The domain provider's device node
-> + * @ops: The power_on/_off callbacks for the domain
-> + *
-> + * Returns the generic_pm_domain (genpd) pointer to the domain on success
-> + */
-> +static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
-> +				const struct cpu_pd_ops *ops)
-> +{
-> +	struct cpu_pm_domain *pd = NULL;
-> +	struct generic_pm_domain *genpd = NULL;
-> +	int ret = -ENOMEM;
-> +
-> +	if (!of_device_is_available(dn))
-> +		return ERR_PTR(-ENODEV);
-> +
-> +	genpd = kzalloc(sizeof(*genpd), GFP_KERNEL);
-> +	if (!genpd)
-> +		goto fail;
-> +
-> +	genpd->name = kstrndup(dn->full_name, CPU_PD_NAME_MAX, GFP_KERNEL);
-> +	if (!genpd->name)
-> +		goto fail;
-> +
-> +	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-> +	if (!pd)
-> +		goto fail;
-> +
-> +	pd->genpd = genpd;
-> +	pd->genpd->power_off = cpu_pd_power_off;
-> +	pd->genpd->power_on = cpu_pd_power_on;
-> +	pd->genpd->flags |= GENPD_FLAG_IRQ_SAFE;
+I played with this a bit and can see the same problem. The sanity
+check of CmaFree < CmaTotal generally triggers in
+__move_zone_freepage_state in unset_migratetype_isolate.
+This also seems to be present as far back as v4.0 which was the
+first version to have the updated accounting from Joonsoo.
+Were there known limitations with the new freepage accounting,
+Joonsoo?
 
-Again, just to be thorough, maybe a comment here describing that CPU PM
-domains must be IRQ safe because the callbacks happend during the idle
-path when interrupts are disabled.
-
-[...]
-
-I ran out of time for the day here, but will continue looking at the
-rest implementation later.  Thought it best to send what I already
-reviewed though.
-
-Kevin
+Thanks,
+Laura
