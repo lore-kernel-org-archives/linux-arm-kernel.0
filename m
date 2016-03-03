@@ -1,58 +1,53 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 3 Mar 2016 04:10:15 -0800
-Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
-In-Reply-To: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
-References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
-Message-ID: <56D829A7.1020201@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Mar 2016 13:15:20 +0100
+Subject: [PATCH 14/17] arm: boot: dts: Add PLX Technology OX810SE dtsi
+In-Reply-To: <1457005210-18485-15-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-15-git-send-email-narmstrong@baylibre.com>
+Message-ID: <2983013.zAxmIfv4bz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 02:29 AM, Romain Izard wrote:
-> If the internal counter is not refreshed when the watchdog is started
-> for the first time, the watchdog will trigger very rapidly. For example,
-> opening /dev/watchdog without writing in it will immediately trigger a
-> reboot, instead of waiting for the delay to expire.
+On Thursday 03 March 2016 12:40:07 Neil Armstrong wrote:
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		serial2 = &uart2;
+> +		serial3 = &uart3;
+> +		gpio0 = &gpio0;
+> +		gpio1 = &gpio1;
+> +	};
 >
-> To avoid this problem, reload the timer on opening the watchdog device.
->
-> Command: "while sleep 5; do echo 1; done > /dev/watchdog"
-> Before: system reset
-> After: the watchdog runs correctly
->
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Please put the aliases in the per-board file and list only the
+devices that are actually connected (in case of uart)
 
-Subject might better read "ping watchdog on start" or similar.
+> +			uart0: uart at 200000 {
 
-Does the watchdog have to be pinged before it is enabled ?
-I am a bit concerned that there may still be a 125 uS window
-during which the system could restart.
+Make this serial at 200000, to follow the standard naming convention
 
-Thanks,
-Guenter
+> +
+> +				reset: reset-controller {
+> +					compatible = "plxtech,nas782x-reset";
+> +					#reset-cells = <1>;
+> +				};
+> +
+> +				stdclk: stdclk {
+> +					compatible = "plxtech,ox810se-stdclk", "plxtech,nas782x-stdclk";
+> +					#clock-cells = <1>;
+> +				};
+> +			};
 
-> ---
->   drivers/watchdog/sama5d4_wdt.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index a49634cdc1cc..e162fe140ae1 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -15,6 +15,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/reboot.h>
->   #include <linux/watchdog.h>
-> +#include <linux/delay.h>
->
->   #include "at91sam9_wdt.h"
->
-> @@ -58,6 +59,8 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
->   	reg = wdt_read(wdt, AT91_WDT_MR);
->   	reg &= ~AT91_WDT_WDDIS;
->   	wdt_write(wdt, AT91_WDT_MR, reg);
-> +	udelay(125); /* > 4 cycles at 32,768 Hz */
-> +	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
->
->   	return 0;
->   }
->
+Please change the compatible strings to have no 'x' wildcards in them, but
+instead use a specific model.
+
+Regarding the vendor prefixes, my understanding is that "ox810se" was the name
+of the chip from Oxford Semiconductor, while nas7820 is a product name from
+PLX. I think it would be logical to use "oxford" as the vendor prefix
+for anything with a ox810se or ox820 ID in it rather than plxtech.
+
+Note that both of them are now historic, as PLX itself got bought by
+Avago and they seem to be discontinuing both the PLX and Oxfor brand
+names.
+
+	Arnd
