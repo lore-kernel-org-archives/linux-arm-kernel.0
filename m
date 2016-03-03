@@ -1,301 +1,279 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu,  3 Mar 2016 15:55:35 -0800
-Subject: [PATCH v14 2/6] Documentation, dt, numa: dt bindings for NUMA.
+Date: Thu,  3 Mar 2016 15:55:36 -0800
+Subject: [PATCH v14 3/6] of, numa: Add NUMA of binding implementation.
 In-Reply-To: <1457049339-23351-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1457049339-23351-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1457049339-23351-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1457049339-23351-4-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+From: David Daney <david.daney@cavium.com>
 
-Add DT bindings for numa mapping of memory, CPUs and IOs.
+Add device tree parsing for NUMA topology using device
+"numa-node-id" property in distance-map and cpu nodes.
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+This is a complete rewrite of a previous patch by:
+   Ganapatrao Kulkarni<gkulkarni@caviumnetworks.com>
+
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++++++++++++
- 1 file changed, 272 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/numa.txt
+ drivers/of/Kconfig   |   3 +
+ drivers/of/Makefile  |   1 +
+ drivers/of/of_numa.c | 202 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of.h   |   9 +++
+ 4 files changed, 215 insertions(+)
+ create mode 100644 drivers/of/of_numa.c
 
-diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index e2a4841..b3bec3a 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -112,4 +112,7 @@ config OF_OVERLAY
+ 	  While this option is selected automatically when needed, you can
+ 	  enable it manually to improve device tree unit test coverage.
+ 
++config OF_NUMA
++	bool
++
+ endif # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index 156c072..bee3fa9 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -14,5 +14,6 @@ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+ obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+ obj-$(CONFIG_OF_RESOLVE)  += resolver.o
+ obj-$(CONFIG_OF_OVERLAY) += overlay.o
++obj-$(CONFIG_OF_NUMA) += of_numa.o
+ 
+ obj-$(CONFIG_OF_UNITTEST) += unittest-data/
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
 new file mode 100644
-index 0000000..ec5ed7c
+index 0000000..f08dd69
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/numa.txt
-@@ -0,0 +1,272 @@
-+==============================================================================
-+NUMA binding description.
-+==============================================================================
++++ b/drivers/of/of_numa.c
+@@ -0,0 +1,202 @@
++/*
++ * OF NUMA Parsing support.
++ *
++ * Copyright (C) 2015 - 2016 Cavium Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+==============================================================================
-+1 - Introduction
-+==============================================================================
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/nodemask.h>
 +
-+Systems employing a Non Uniform Memory Access (NUMA) architecture contain
-+collections of hardware resources including processors, memory, and I/O buses,
-+that comprise what is commonly known as a NUMA node.
-+Processor accesses to memory within the local NUMA node is generally faster
-+than processor accesses to memory outside of the local NUMA node.
-+DT defines interfaces that allow the platform to convey NUMA node
-+topology information to OS.
++#include <asm/numa.h>
 +
-+==============================================================================
-+2 - numa-node-id
-+==============================================================================
++/* define default numa node to 0 */
++#define DEFAULT_NODE 0
 +
-+For the purpose of identification, each NUMA node is associated with a unique
-+token known as a node id. For the purpose of this binding
-+a node id is a 32-bit integer.
++/*
++ * Even though we connect cpus to numa domains later in SMP
++ * init, we need to know the node ids now for all cpus.
++*/
++static void __init of_numa_parse_cpu_nodes(void)
++{
++	u32 nid;
++	int r;
++	struct device_node *cpus;
++	struct device_node *np = NULL;
 +
-+A device node is associated with a NUMA node by the presence of a
-+numa-node-id property which contains the node id of the device.
++	cpus = of_find_node_by_path("/cpus");
++	if (!cpus)
++		return;
 +
-+Example:
-+	/* numa node 0 */
-+	numa-node-id = <0>;
++	for_each_child_of_node(cpus, np) {
++		/* Skip things that are not CPUs */
++		if (of_node_cmp(np->type, "cpu") != 0)
++			continue;
 +
-+	/* numa node 1 */
-+	numa-node-id = <1>;
++		r = of_property_read_u32(np, "numa-node-id", &nid);
++		if (r)
++			continue;
 +
-+==============================================================================
-+3 - distance-map
-+==============================================================================
++		pr_debug("NUMA: CPU on %u\n", nid);
++		if (nid >= MAX_NUMNODES)
++			pr_warn("NUMA: Node id %u exceeds maximum value\n",
++				nid);
++		else
++			node_set(nid, numa_nodes_parsed);
++	}
++}
 +
-+The device tree node distance-map describes the relative
-+distance (memory latency) between all numa nodes.
++static void __init of_numa_parse_memory_nodes(void)
++{
++	struct device_node *np = NULL;
++	struct resource rsrc;
++	u32 nid;
++	int r;
 +
-+- compatible : Should at least contain "numa-distance-map-v1".
++	for (;;) {
++		np = of_find_node_by_type(np, "memory");
++		if (!np)
++			break;
 +
-+- distance-matrix
-+  This property defines a matrix to describe the relative distances
-+  between all numa nodes.
-+  It is represented as a list of node pairs and their relative distance.
++		r = of_property_read_u32(np, "numa-node-id", &nid);
++		if (r)
++			continue;
 +
-+  Note:
-+	1. Each entry represents distance from first node to second node.
-+	The distances are equal in either direction.
-+	2. The distance from a node to self (local distance) is represented
-+	with value 10 and all internode distance should be represented with
-+	a value greater than 10.
-+	3. distance-matrix should have entries in lexicographical ascending
-+	order of nodes.
-+	4. There must be only one device node distance-map which must reside in the root node.
++		r = of_address_to_resource(np, 0, &rsrc);
++		if (r) {
++			pr_err("NUMA: bad reg property in memory node\n");
++			continue;
++		}
 +
-+Example:
-+	4 nodes connected in mesh/ring topology as below,
++		pr_debug("NUMA:  base = %llx len = %llx, node = %u\n",
++			 rsrc.start, rsrc.end - rsrc.start + 1, nid);
 +
-+		0_______20______1
-+		|               |
-+		|               |
-+		20             20
-+		|               |
-+		|               |
-+		|_______________|
-+		3       20      2
++		if (numa_add_memblk(nid, rsrc.start,
++				    rsrc.end - rsrc.start + 1) < 0)
++			break;
++	}
 +
-+	if relative distance for each hop is 20,
-+	then internode distance would be,
-+	      0 -> 1 = 20
-+	      1 -> 2 = 20
-+	      2 -> 3 = 20
-+	      3 -> 0 = 20
-+	      0 -> 2 = 40
-+	      1 -> 3 = 40
++	of_node_put(np);
++}
 +
-+     and dt presentation for this distance matrix is,
++static int __init of_numa_parse_distance_map_v1(struct device_node *map)
++{
++	const __be32 *matrix;
++	int entry_count;
++	int i;
 +
-+		distance-map {
-+			 compatible = "numa-distance-map-v1";
-+			 distance-matrix = <0 0  10>,
-+					   <0 1  20>,
-+					   <0 2  40>,
-+					   <0 3  20>,
-+					   <1 0  20>,
-+					   <1 1  10>,
-+					   <1 2  20>,
-+					   <1 3  40>,
-+					   <2 0  40>,
-+					   <2 1  20>,
-+					   <2 2  10>,
-+					   <2 3  20>,
-+					   <3 0  20>,
-+					   <3 1  40>,
-+					   <3 2  20>,
-+					   <3 3  10>;
-+		};
++	pr_info("NUMA: parsing numa-distance-map-v1\n");
 +
-+==============================================================================
-+4 - Example dts
-+==============================================================================
++	matrix = of_get_property(map, "distance-matrix", NULL);
++	if (!matrix) {
++		pr_err("NUMA: No distance-matrix property in distance-map\n");
++		return -EINVAL;
++	}
 +
-+Dual socket system consists of 2 boards connected through ccn bus and
-+each board having one socket/soc of 8 cpus, memory and pci bus.
++	entry_count = of_property_count_u32_elems(map, "distance-matrix");
++	if (entry_count <= 0) {
++		pr_err("NUMA: Invalid distance-matrix\n");
++		return -EINVAL;
++	}
 +
-+	memory at c00000 {
-+		device_type = "memory";
-+		reg = <0x0 0xc00000 0x0 0x80000000>;
-+		/* node 0 */
-+		numa-node-id = <0>;
-+	};
++	for (i = 0; i + 2 < entry_count; i += 3) {
++		u32 nodea, nodeb, distance;
 +
-+	memory at 10000000000 {
-+		device_type = "memory";
-+		reg = <0x100 0x0 0x0 0x80000000>;
-+		/* node 1 */
-+		numa-node-id = <1>;
-+	};
++		nodea = of_read_number(matrix, 1);
++		matrix++;
++		nodeb = of_read_number(matrix, 1);
++		matrix++;
++		distance = of_read_number(matrix, 1);
++		matrix++;
 +
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
++		numa_set_distance(nodea, nodeb, distance);
++		pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
++			 nodea, nodeb, distance);
 +
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+			/* node 0 */
-+			numa-node-id = <0>;
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 4 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x4>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 5 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x5>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 6 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x6>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 7 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x7>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 8 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x8>;
-+			enable-method = "psci";
-+			/* node 1 */
-+			numa-node-id = <1>;
-+		};
-+		cpu at 9 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x9>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at a {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xa>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at b {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xb>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at c {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xc>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at d {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xd>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at e {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xe>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at f {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xf>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+	};
++		/* Set default distance of node B->A same as A->B */
++		if (nodeb > nodea)
++			numa_set_distance(nodeb, nodea, distance);
++	}
 +
-+	pcie0: pcie0 at 848000000000 {
-+		compatible = "arm,armv8";
-+		device_type = "pci";
-+		bus-range = <0 255>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
-+		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>;
-+		/* node 0 */
-+		numa-node-id = <0>;
-+        };
++	return 0;
++}
 +
-+	pcie1: pcie1 at 948000000000 {
-+		compatible = "arm,armv8";
-+		device_type = "pci";
-+		bus-range = <0 255>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		reg = <0x9480 0x00000000 0 0x10000000>;  /* Configuration space */
-+		ranges = <0x03000000 0x9010 0x00000000 0x9010 0x00000000 0x70 0x00000000>;
-+		/* node 1 */
-+		numa-node-id = <1>;
-+        };
++static int __init of_numa_parse_distance_map(void)
++{
++	int ret = -EINVAL;
++	struct device_node *np = of_find_node_by_path("/distance-map");
 +
-+	distance-map {
-+		compatible = "numa-distance-map-v1";
-+		distance-matrix = <0 0 10>,
-+				  <0 1 20>,
-+				  <1 1 10>;
-+	};
++	if (!np)
++		return ret;
++
++	if (of_device_is_compatible(np, "numa-distance-map-v1")) {
++		ret = of_numa_parse_distance_map_v1(np);
++		goto out;
++	}
++
++	pr_err("NUMA: invalid distance-map device node\n");
++out:
++	of_node_put(np);
++	return ret;
++}
++
++int of_node_to_nid(struct device_node *device)
++{
++	struct device_node *np;
++	u32 nid;
++	int r = -ENODATA;
++
++	np = of_node_get(device);
++
++	while (np) {
++		struct device_node *parent;
++
++		r = of_property_read_u32(np, "numa-node-id", &nid);
++		/*
++		 * -EINVAL indicates the property was not found, and
++		 *  we walk up the tree trying to find a parent with a
++		 *  "numa-node-id".  Any other type of error indicates
++		 *  a bad device tree and we give up.
++		 */
++		if (r != -EINVAL)
++			break;
++
++		parent = of_get_parent(np);
++		of_node_put(np);
++		np = parent;
++	}
++	if (np && r)
++		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
++			np->name);
++	of_node_put(np);
++
++	if (!r) {
++		if (nid >= MAX_NUMNODES)
++			pr_warn("NUMA: Node id %u exceeds maximum value\n",
++				nid);
++		else
++			return nid;
++	}
++
++	return NUMA_NO_NODE;
++}
++EXPORT_SYMBOL(of_node_to_nid);
++
++int __init of_numa_init(void)
++{
++	of_numa_parse_cpu_nodes();
++	of_numa_parse_memory_nodes();
++	return of_numa_parse_distance_map();
++}
+diff --git a/include/linux/of.h b/include/linux/of.h
+index dc6e396..fe67a4c 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -685,6 +685,15 @@ static inline int of_node_to_nid(struct device_node *device)
+ }
+ #endif
+ 
++#ifdef CONFIG_OF_NUMA
++extern int of_numa_init(void);
++#else
++static inline int of_numa_init(void)
++{
++	return -ENOSYS;
++}
++#endif
++
+ static inline struct device_node *of_find_matching_node(
+ 	struct device_node *from,
+ 	const struct of_device_id *matches)
 -- 
 1.8.3.1
