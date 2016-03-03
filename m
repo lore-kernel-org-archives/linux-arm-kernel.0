@@ -1,106 +1,41 @@
-From: Hamish.Martin@alliedtelesis.co.nz (Hamish Martin)
-Date: Thu, 3 Mar 2016 20:16:05 +0000
-Subject: mtd: pxa3xx_nand: issue with command time out
-In-Reply-To: <CAAEAJfAd2qkcJby3AaKOaxL2LZC=PMNfu7dy5yMcZ1eHhOF7oA@mail.gmail.com>
-References: <5695CEF0.1080100@alliedtelesis.co.nz>
- <87a8o9ex9r.fsf@belgarion.home> <569827BC.10601@alliedtelesis.co.nz>
- <874meddqu5.fsf@belgarion.home> <20160125183022.GA41251@google.com>
- <87fuxl9yil.fsf@belgarion.home>
- <CAAEAJfCNzh9+zRq_Yb=hFyLfP8RFoX+LUsDL4dVwUenVc_gVOA@mail.gmail.com>
- <56D61502.1090007@alliedtelesis.co.nz>
- <CAAEAJfAd2qkcJby3AaKOaxL2LZC=PMNfu7dy5yMcZ1eHhOF7oA@mail.gmail.com>
-Message-ID: <56D89B85.3090109@alliedtelesis.co.nz>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 3 Mar 2016 14:23:29 -0600
+Subject: [PATCH] ARM: dts: add "simple-bus" to "arm,
+ amba-bus" compatible nodes
+In-Reply-To: <1456999975.2856.18.camel@linaro.org>
+References: <1456804620-8750-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160301114610.GB30602@leverpostej>
+ <CAK7LNAQzkg5F8wUeF+p30jf9CrpNxi7UTNfqXQgybP2XbEKJag@mail.gmail.com>
+ <1456999975.2856.18.camel@linaro.org>
+Message-ID: <CAL_JsqLBNo2YuJGqBo1DaYgzV7=WuX-0BPutoW3f3U1k0wX3_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+On Thu, Mar 3, 2016 at 4:12 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Thu, 2016-03-03 at 12:07 +0900, Masahiro Yamada wrote:
+> [...]
+>> This patch is derived from Rob Herring' comment
+>> "BTW, we should also kill off "amba-bus" which is an ambiguous term"
+>> in the following thread:
+>> http://lkml.iu.edu/hypermail/linux/kernel/1601.0/01822.html
+>>
+>>
+>> So, the plan would be like this:
+>>
+>> [1] Make device trees not depend on "arm,amba-bus"   (this commit)
+>> [2] New device trees should no longer use "arm,amba-bus" alone.
+>> [3] Go though some releases until we do not care about the backward
+>> compatibility
+>
+> Why would we stop caring about backwards compatibility? If I was a user
+> of any of the platforms in question and updated my kernel, I wouldn't
+> expect to have to debug why it was broken, then install a new dtb to fix
+> it - which may be a tricky thing to do, depending on the firmware used
+> to boot Linux.
 
-I'm glad my analysis was correct and we more fully understand the 
-problem now. CONFIG_PREEMPT seems to work for us now, but it does seem 
-like the wrong fix, and if you guys think it will not guarantee 
-preventing the issue then we'd rather back that change out.
+If no one notices, then there is no ABI. Things break all the time
+when nobody cares. It will be more than a few releases for sure. We
+may never get to step 3, but we should do step 1 so people stop
+copy-n-pasting this in step 2.
 
-I had contemplated using wait_for_completion_interruptible() but was a 
-bit unsure if it was safe. Do you have a proposed patch? We would be 
-happy to apply it to our system, turn off CONFIG_PREEMPT, and see how it 
-goes. Out issue is highly reproducible so I think it would be a good 
-first test for a change?
-
-Thanks,
-Hamish M.
-
-On 03/04/2016 08:24 AM, Ezequiel Garcia wrote:
-> +Richard, Boris and Thomas
->
-> On 1 March 2016 at 19:17, Hamish Martin
-> <Hamish.Martin@alliedtelesis.co.nz> wrote:
->> Hi Robert, Ezequiel, and Brian,
->>
->> I have been working with Michael Wang on this issue and wanted to update
->> you on our results as we think there is a wider issue to resolve here.
->>
->> I believe Ezequiel's analysis of the IRQ sequence is correct. The
->> proposed patch from Brian is not needed, not does it resolve our issue.
->>
->> Further, we have debugged in more detail with kernel tracing and see
->> that the problem occurs because nothing calls 'schedule()' in the kernel
->> within the timeout period (200ms) to actually allow the IRQ bottom-half
->> thread ((pxa3xx_nand_irq_thread()) to run.
->>
->> With the trace enabled we were able to see long delays between the IRQ
->> thread being queued for run as a result of the return with
->> IRQ_WAKE_THREAD in pxa3xx_nand_irq(), and a call to schedule() actually
->> selecting the thread for execution. This delay was tied to whatever else
->> was happening in our system during the boot up when this issue occurs.
->> For instance, if a mutex got unlocked this would ultimately lead to a
->> call to schedule() and our thread (pxa3xx_nand_irq_thread()) would run.
->> If some file system ops happened schedule() would get called. These
->> unrelated activities were required so that schedule() got called and the
->> scheduler would let the bottom-half execute.
->> In our tracing we saw the issue occur whenever the call to schedule()
->> didn't occur before the timeout expired. In short, if we got lucky and
->> something completely unrelated happened that led to a call to
->> 'schedule()', then the issue didn't occur. If we got unlucky and nothing
->> called schedule(), the issue was observed.
->>
->> We have enabled CONFIG_PREEMPT in our system to resolve this. This has
->> the effect of leading to a triggering of 'schedule()' at the end of
->> processing interrupts. This means that we now see a nice tight execution
->> of pxa3xx_nand threaded IRQ such that we see all ops completing with
->> less that 20ms delay.
->>
->> I wanted to highlight this to you because I think it shows that the
->> change to a threaded IRQ is probably only safe if we can guarantee
->> scheduling of the bottom-half thread within the time out period (200ms).
->> I think this is not safe for systems with CONFIG_PREEMPT not configured.
->> Or perhaps there is a better way to resolve this. Is this a deficiency
->> in the Armada XP code?
->>
->> What do you think?
->>
-> Thanks a lot for updating us. Richard, Boris and I have
-> discussed about this on IRC.
->
-> We came to the following conclusions:
->
-> 1. There's no way to guarantee that the thread will be scheduled
-> soon enough to always do the data transfer in time.
->
-> Using CONFIG_PREEMPT could prevent a timeout in many (most?)
-> cases, but it's not guaranteed to work.
->
-> 2. The pxa3xx-nand driver is poorly designed, and it shouldn't
-> do any data transfer in the IRQ (threaded or not) handler.
->
-> Instead, this should be done in {read,write}_buf, i.e. in the
-> context of the calling process that asks data to be read/write.
-> This is potentially a big rework.
->
-> 3. Richard proposed to get rid of the timeout
-> (using wait_for_completion_interruptible instead?).
->
-> I'm wondering if that could avoid these kind of issues (false
-> timeouts), as a less invasive solution, until someone steps
-> up to rework the driver.
->
-> How does it sound?
+Rob
