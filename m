@@ -1,159 +1,302 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:40:04 +0100
-Subject: [PATCH 11/17] dt-bindings: Add PLX Technology OXNAS pinctrl and gpio
- bindings
+Date: Thu,  3 Mar 2016 12:40:07 +0100
+Subject: [PATCH 14/17] arm: boot: dts: Add PLX Technology OX810SE dtsi
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-12-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-15-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/gpio/gpio_oxnas.txt        |  27 ++++++
- .../bindings/pinctrl/plxtech,pinctrl.txt           | 100 +++++++++++++++++++++
- 2 files changed, 127 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
+ arch/arm/boot/dts/ox810se.dtsi | 279 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 279 insertions(+)
+ create mode 100644 arch/arm/boot/dts/ox810se.dtsi
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+diff --git a/arch/arm/boot/dts/ox810se.dtsi b/arch/arm/boot/dts/ox810se.dtsi
 new file mode 100644
-index 0000000..0ef6c55
+index 0000000..a86d7f0
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
-@@ -0,0 +1,27 @@
-+PLX Technology OXNAS SoC GPIO Controller
-+==========================================
++++ b/arch/arm/boot/dts/ox810se.dtsi
+@@ -0,0 +1,279 @@
++/*
++ * ox810se.dtsi - Device tree file for PLX Technology OX810SE SoC
++ *
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * Licensed under GPLv2 or later
++ */
 +
-+Required properties:
-+- compatible: "plxtech,nas782x-gpio".
-+- reg: Should contain GPIO controller registers location and length
-+- interrupts: Should be the port interrupt shared by all the pins.
-+- #gpio-cells: Should be two.  The first cell is the pin number and
-+  the second cell is used to specify optional parameters (currently
-+  unused).
-+- gpio-controller: Marks the device node as a GPIO controller.
++/include/ "skeleton.dtsi"
 +
-+optional properties:
-+- #gpio-lines: Number of gpio if absent 32.
++/ {
++	compatible = "plxtech,ox810se";
 +
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
 +
-+Example:
-+	gpio0: gpio at 000000 {
-+		compatible = "plxtech,nas782x-gpio";
-+		reg = <0x000000 0x100000>;
-+		interrupts = <21>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		#gpio-lines = <32>;
-+	};
-diff --git a/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
-new file mode 100644
-index 0000000..30f013f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
-@@ -0,0 +1,100 @@
-+PLX Technology OXNAS SoC Pinmux Controller
-+==========================================
-+
-+The OXNAS Pinmux Controller, enables the IC to share one PAD to several
-+functional blocks. The sharing is done by multiplexing the PAD input/output
-+signals. For each PAD there are up to 8 muxing options (called periph modes).
-+Since different modules require different PAD settings
-+(like pull up, keeper, etc) the contoller controls also the PAD settings
-+parameters.
-+
-+Please refer to pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices, including the meaning of the
-+phrase "pin configuration node".
-+
-+OXNAS pin configuration node is a node of a group of pins which can be
-+used for a specific device or function. This node represents both mux and config
-+of the pins in that group. The 'pins' selects the function mode(also named pin
-+mode) this pin can work on and the 'config' configures various pad settings
-+such as pull-up, multi drive, etc.
-+
-+Required properties for iomux controller:
-+- compatible: "plxtech,nas782x-pinctrl" or "plxtech,ox810se-pinctrl"
-+- plxtech,mux-mask: array of mask (periph per bank) to describe if a pin can be
-+  configured in this periph mode. All the periph and bank need to be describe.
-+- plxtech,sys-ctrl: a phandle to the system controller syscon node
-+
-+How to create such array:
-+
-+Each column will represent the possible peripheral of the pinctrl
-+Each line will represent a pio bank
-+
-+For example :
-+Peripheral: 2 ( A and B)
-+Bank: 2 (A, B and C)
-+=>
-+
-+  /*    A         B     */
-+  0xffffffff 0xffc00c3b  /* pioA */
-+  0xffffffff 0x7fff3ccf  /* pioB */
-+
-+For each peripheral/bank we will descibe in a u32 if a pin can be
-+configured in it by putting 1 to the pin bit (1 << pin)
-+
-+Required properties for pin configuration node:
-+- plxtech,pins: 4 integers array, represents a group of pins mux and config
-+  setting. The format is plxtech,pins = <PIN_BANK PIN_BANK_NUM PERIPH CONFIG>.
-+  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
-+  PIN_BANK 0 is pioA, PIN_BANK 1 is pioB...
-+
-+Bits used for CONFIG:
-+ - None Yet
-+
-+Examples:
-+
-+pinctrl: pinctrl {
-+	compatible = "plxtech,nas782x-pinctrl", "simple-bus";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	/* Regmap for sys registers */
-+	plxtech,sys-ctrl = <&sys>;
-+
-+	/* Default, all-open mux-map */
-+	plxtech,mux-mask = <
-+		 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
-+		 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
-+		 >;
-+
-+	uart0 {
-+		pinctrl_uart0: uart0 {
-+			plxtech,pins = <0 31 3 0
-+					0 32 3 0>;
-+		};
-+		pinctrl_uart0_modem: uart0_modem {
-+			plxtech,pins = <0 27 3 0
-+					0 28 3 0
-+					0 29 3 0
-+					0 30 3 0
-+					0 33 3 0
-+					0 34 3 0>;
++		cpu {
++			device_type = "cpu";
++			compatible = "arm,arm926ej-s";
++			clocks = <&armclk>;
 +		};
 +	};
-+};
 +
-+uart0: uart at 200000 {
-+	compatible = "ns16550a";
-+	reg = <0x200000 0x100000>;
-+	clocks = <&sysclk>;
-+	interrupts = <23>;
-+	reg-shift = <0>;
-+	fifo-size = <16>;
-+	reg-io-width = <1>;
-+	current-speed = <115200>;
-+	no-loopback-test;
-+	status = "disabled";
-+	resets = <&reset 17>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart0>;
++	memory {
++		/* Max 256MB @ 0x48000000 */
++		reg = <0x48000000 0x10000000>;
++	};
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++		gpio0 = &gpio0;
++		gpio1 = &gpio1;
++	};
++
++	clocks {
++		osc: oscillator {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
++
++		gmacclk: gmacclk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <125000000>;
++		};
++
++		rpsclk: rspclk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <1>;
++			clocks = <&osc>;
++		};
++
++		pll400: pll400 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <733333333>;
++		};
++
++		sysclk: sysclk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <4>;
++			clock-mult = <1>;
++			clocks = <&pll400>;
++		};
++
++		armclk: armclk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clocks = <&pll400>;
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
++		interrupt-parent = <&intc>;
++
++		apb-bridge at 44000000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			ranges = <0 0x44000000 0x1000000>;
++
++			pinctrl: pinctrl {
++				compatible = "plxtech,nas782x-pinctrl", "simple-bus";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
++
++				/* Regmap for sys registers */
++				plxtech,sys-ctrl = <&sys>;
++
++				/* Default, all-open mux-map */
++				plxtech,mux-mask = <
++					0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
++					0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
++					>;
++
++				gpio0: gpio at 000000 {
++					compatible = "plxtech,nas782x-gpio";
++					reg = <0x000000 0x100000>;
++					interrupts = <21>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					#gpio-lines = <32>;
++				};
++
++				gpio1: gpio at 100000 {
++					compatible = "plxtech,nas782x-gpio";
++					reg = <0x100000 0x100000>;
++					interrupts = <22>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					#gpio-lines = <3>;
++				};
++
++				uart0 {
++					pinctrl_uart0: uart0 {
++						plxtech,pins = <0 31 3 0
++								0 32 3 0>;
++					};
++					pinctrl_uart0_modem: uart0_modem {
++						plxtech,pins = <0 27 3 0
++								0 28 3 0
++								0 29 3 0
++								0 30 3 0
++								0 33 3 0
++								0 34 3 0>;
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1 {
++						plxtech,pins = <0 20 3 0
++								0 22 3 0>;
++					};
++					pinctrl_uart1_modem: uart1_modem {
++						plxtech,pins = <0 8 3 0
++								0 9 3 0
++								0 23 3 0
++								0 24 3 0
++								0 25 3 0
++								0 26 3 0>;
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2 {
++						plxtech,pins = <0 6 3 0
++								0 7 3 0>;
++					};
++					pinctrl_uart2_modem: uart2_modem {
++						plxtech,pins = <0 0 3 0
++								0 1 3 0
++								0 2 3 0
++								0 3 3 0
++								0 4 3 0
++								0 5 3 0>;
++					};
++				};
++			};
++
++			uart0: uart at 200000 {
++			       compatible = "ns16550a";
++			       reg = <0x200000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <23>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 17>;
++			};
++
++			uart1: uart at 300000 {
++			       compatible = "ns16550a";
++			       reg = <0x300000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <24>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 18>;
++			};
++
++			uart2: uart at 900000 {
++			       compatible = "ns16550a";
++			       reg = <0x900000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <29>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 22>;
++			};
++
++			uart3: uart at a00000 {
++			       compatible = "ns16550a";
++			       reg = <0xa00000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <30>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 23>;
++			};
++		};
++
++		apb-bridge at 45000000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			ranges = <0 0x45000000 0x1000000>;
++
++			sys: sys-ctrl at 000000 {
++				compatible = "plxtech,ox810se-sys-ctrl", "syscon", "simple-mfd";
++				reg = <0x000000 0x100000>;
++
++				reset: reset-controller {
++					compatible = "plxtech,nas782x-reset";
++					#reset-cells = <1>;
++				};
++
++				stdclk: stdclk {
++					compatible = "plxtech,ox810se-stdclk", "plxtech,nas782x-stdclk";
++					#clock-cells = <1>;
++				};
++			};
++
++			rps at 300000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "simple-bus";
++				ranges = <0 0x300000 0x100000>;
++
++				intc: interrupt-controller at 0 {
++					compatible = "plxtech,nas782x-rps";
++					interrupt-controller;
++					reg = <0 0x200>;
++					#interrupt-cells = <1>;
++				};
++
++				timer0: timer at 200 {
++					compatible = "plxtech,nas782x-rps-timer";
++					reg = <0x200 0x40>;
++					clocks = <&rpsclk>;
++					interrupts = <4 5>;
++				};
++			};
++		};
++	};
 +};
 -- 
 1.9.1
