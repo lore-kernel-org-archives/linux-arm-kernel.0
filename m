@@ -1,49 +1,44 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:40:00 +0100
-Subject: [PATCH 07/17] dt-bindings: Add PLX Technology Reset Controller
- bindings
+Date: Thu,  3 Mar 2016 12:40:06 +0100
+Subject: [PATCH 13/17] arm: Add build support for mach-oxnas
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-8-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-14-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add Kconfig and Makefile support for mach-oxnas.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/reset/plxtech,reset.txt    | 25 ++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/plxtech,reset.txt
+ arch/arm/Kconfig  | 2 ++
+ arch/arm/Makefile | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/reset/plxtech,reset.txt b/Documentation/devicetree/bindings/reset/plxtech,reset.txt
-new file mode 100644
-index 0000000..e99648d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/plxtech,reset.txt
-@@ -0,0 +1,25 @@
-+PLX Technology OXNAS SoC Family RESET Controller
-+================================================
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4f799e5..2025fc9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -801,6 +801,8 @@ source "arch/arm/plat-pxa/Kconfig"
+ 
+ source "arch/arm/mach-mmp/Kconfig"
+ 
++source "arch/arm/mach-oxnas/Kconfig"
 +
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
-+
-+Required properties:
-+- compatible: Should be "plxtech,nas782x-reset"
-+- #reset-cells: 1, see below
-+
-+Parent node should have the following properties :
-+- compatible: Should be "plxtech,ox810se-sys-ctrl", "syscon", "simple-mfd"
-+
-+example:
-+
-+sys: sys-ctrl at 000000 {
-+	compatible = "plxtech,ox810se-sys-ctrl", "syscon", "simple-mfd";
-+	reg = <0x000000 0x100000>;
-+
-+	reset: reset-controller {
-+		compatible = "plxtech,nas782x-reset";
-+		#reset-cells = <1>;
-+
-+	};
-+};
+ source "arch/arm/mach-qcom/Kconfig"
+ 
+ source "arch/arm/mach-realview/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index fe25410..0e96c63 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -194,6 +194,7 @@ machine-$(CONFIG_ARCH_NSPIRE)		+= nspire
+ machine-$(CONFIG_ARCH_OMAP1)		+= omap1
+ machine-$(CONFIG_ARCH_OMAP2PLUS)	+= omap2
+ machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
++machine-$(CONFIG_ARCH_OXNAS)		+= oxnas
+ machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
+ machine-$(CONFIG_ARCH_PXA)		+= pxa
+ machine-$(CONFIG_ARCH_QCOM)		+= qcom
 -- 
 1.9.1
