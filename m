@@ -1,94 +1,61 @@
 From: B56489@freescale.com (Yunhui Cui)
-Date: Thu, 3 Mar 2016 14:54:01 +0800
-Subject: [PATCH v3 1/4] mtd:fsl-quadspi:use the property fields of SPI-NOR
-Message-ID: <1456988044-37061-1-git-send-email-B56489@freescale.com>
+Date: Thu, 3 Mar 2016 14:54:03 +0800
+Subject: [PATCH v3 3/4] mtd: spi-nor: fsl-quadspi: add fast-read mode support
+In-Reply-To: <1456988044-37061-1-git-send-email-B56489@freescale.com>
+References: <1456988044-37061-1-git-send-email-B56489@freescale.com>
+Message-ID: <1456988044-37061-3-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can get the read/write/erase opcode from the spi nor framework
-directly. This patch uses the information stored in the SPI-NOR to
-remove the hardcode in the fsl_qspi_init_lut().
+From: Yunhui Cui <yunhui.cui@nxp.com>
 
-Signed-off-by: Yunhui Cui <B56489@freescale.com>
+The qspi driver add generic fast-read mode for different
+flash venders. There are some different board flash work on
+different mode, such fast-read, quad-mode.
+
 Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
- 1 file changed, 12 insertions(+), 28 deletions(-)
+ drivers/mtd/spi-nor/fsl-quadspi.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 9ab2b51..517ffe2 100644
+index 9861290..09adaa4 100644
 --- a/drivers/mtd/spi-nor/fsl-quadspi.c
 +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	void __iomem *base = q->iobase;
- 	int rxfifo = q->devtype_data->rxfifo;
- 	u32 lut_base;
--	u8 cmd, addrlen, dummy;
- 	int i;
+@@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Read */
+ 	lut_base = SEQID_READ * 4;
  
-+	struct spi_nor *nor = &q->nor[0];
-+	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
-+	u8 read_op = nor->read_opcode;
-+	u8 read_dm = nor->read_dummy;
-+
- 	fsl_qspi_unlock_lut(q);
- 
- 	/* Clear all the LUT table */
-@@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Quad Read */
- 	lut_base = SEQID_QUAD_READ * 4;
- 
--	if (q->nor_size <= SZ_16M) {
--		cmd = SPINOR_OP_READ_1_1_4;
--		addrlen = ADDR24BIT;
--		dummy = 8;
--	} else {
--		/* use the 4-byte address */
--		cmd = SPINOR_OP_READ_1_1_4;
--		addrlen = ADDR32BIT;
--		dummy = 8;
--	}
--
--	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-+	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
- 			base + QUADSPI_LUT(lut_base));
--	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
-+	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-+		    LUT1(FSL_READ, PAD4, rxfifo),
- 			base + QUADSPI_LUT(lut_base + 1));
+-	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+-			base + QUADSPI_LUT(lut_base));
+-	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
+-		    LUT1(FSL_READ, PAD4, rxfifo),
+-			base + QUADSPI_LUT(lut_base + 1));
++	if (nor->flash_read == SPI_NOR_FAST) {
++		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
++			    LUT1(ADDR, PAD1, addrlen),
++				base + QUADSPI_LUT(lut_base));
++		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
++			    LUT1(FSL_READ, PAD1, rxfifo),
++				base + QUADSPI_LUT(lut_base + 1));
++	} else if (nor->flash_read == SPI_NOR_QUAD) {
++		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
++			    LUT1(ADDR, PAD1, addrlen),
++				base + QUADSPI_LUT(lut_base));
++		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
++			    LUT1(FSL_READ, PAD4, rxfifo),
++				base + QUADSPI_LUT(lut_base + 1));
++	}
  
  	/* Write enable */
-@@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Page Program */
- 	lut_base = SEQID_PP * 4;
- 
--	if (q->nor_size <= SZ_16M) {
--		cmd = SPINOR_OP_PP;
--		addrlen = ADDR24BIT;
--	} else {
--		/* use the 4-byte address */
--		cmd = SPINOR_OP_PP;
--		addrlen = ADDR32BIT;
--	}
--
--	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-+	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
-+		    LUT1(ADDR, PAD1, addrlen),
- 			base + QUADSPI_LUT(lut_base));
- 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
- 			base + QUADSPI_LUT(lut_base + 1));
-@@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Erase a sector */
- 	lut_base = SEQID_SE * 4;
- 
--	cmd = q->nor[0].erase_opcode;
--	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
--
--	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-+	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
-+		    LUT1(ADDR, PAD1, addrlen),
- 			base + QUADSPI_LUT(lut_base));
- 
- 	/* Erase the whole chip */
+ 	lut_base = SEQID_WREN * 4;
+@@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+ {
+ 	switch (cmd) {
+ 	case SPINOR_OP_READ_1_1_4:
++	case SPINOR_OP_READ_FAST:
+ 		return SEQID_READ;
+ 	case SPINOR_OP_WREN:
+ 		return SEQID_WREN;
 -- 
 2.1.0.27.g96db324
