@@ -1,135 +1,54 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 3 Mar 2016 20:49:01 +0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
-Message-ID: <56D832BD.5080305@huawei.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Thu, 3 Mar 2016 13:53:47 +0100
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+In-Reply-To: <56D829A7.1020201@roeck-us.net>
+References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+ <56D829A7.1020201@roeck-us.net>
+Message-ID: <CAGkQfmMFAJ7dQ-BMXNFdgW8ZvGhJ87h+gh3RHPecgFm9WjKoMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/3/3 15:42, Joonsoo Kim wrote:
-> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
->> (cc -mm and Joonsoo Kim)
+Hi Guenter,
+
+2016-03-03 13:10 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
+> On 03/03/2016 02:29 AM, Romain Izard wrote:
 >>
+>> If the internal counter is not refreshed when the watchdog is started
+>> for the first time, the watchdog will trigger very rapidly. For
+>> example, opening /dev/watchdog without writing in it will immediately
+>> trigger a reboot, instead of waiting for the delay to expire.
 >>
->> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
->>> Hi,
->>>
->>> I came across a suspicious error for CMA stress test:
->>>
->>> Before the test, I got:
->>> -bash-4.3# cat /proc/meminfo | grep Cma
->>> CmaTotal:         204800 kB
->>> CmaFree:          195044 kB
->>>
->>>
->>> After running the test:
->>> -bash-4.3# cat /proc/meminfo | grep Cma
->>> CmaTotal:         204800 kB
->>> CmaFree:         6602584 kB
->>>
->>> So the freed CMA memory is more than total..
->>>
->>> Also the the MemFree is more than mem total:
->>>
->>> -bash-4.3# cat /proc/meminfo
->>> MemTotal:       16342016 kB
->>> MemFree:        22367268 kB
->>> MemAvailable:   22370528 kB
-[...]
+>> To avoid this problem, reload the timer on opening the watchdog
+>> device.
 >>
->> I played with this a bit and can see the same problem. The sanity
->> check of CmaFree < CmaTotal generally triggers in
->> __move_zone_freepage_state in unset_migratetype_isolate.
->> This also seems to be present as far back as v4.0 which was the
->> first version to have the updated accounting from Joonsoo.
->> Were there known limitations with the new freepage accounting,
->> Joonsoo?
-> I don't know. I also played with this and looks like there is
-> accounting problem, however, for my case, number of free page is slightly less
-> than total. I will take a look.
+>> Command: "while sleep 5; do echo 1; done > /dev/watchdog"
+>> Before: system reset
+>> After: the watchdog runs correctly
+>>
+>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 >
-> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
-> look like your case.
+>
+> Subject might better read "ping watchdog on start" or similar.
+>
+OK. I'll change it for a v2.
 
-I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
-did some other test:
+> Does the watchdog have to be pinged before it is enabled ?  I am a bit
+> concerned that there may still be a 125 uS window during which the
+> system could restart.
+>
 
- - run with single thread with 100000 times, everything is fine.
+According to the SAMA5D2 & SAMA5D4 datasheets, the timer ought to be
+reloaded when the watchdog is enabled by a write in the MR register.
+Unfortunately, it does not work as described, as I encountered the
+problem on a SAMA5D2 Xplained board.
 
- - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
-   the same test with 100 multi-thread, then I got:
+The 4 clock delay is not in the datasheet either, but without any delay
+the timer is clearly not reloaded, as my issue stays the same. As there
+is a required delay before writing to MR after writing to CR, I applied
+the same type of delay in the reverse case.
 
--bash-4.3# cat /proc/meminfo | grep Cma
-CmaTotal: 204800 kB
-CmaFree: 225112 kB
+Perhaps Nicolas or Wenyou have more information on this.
 
-It only increased about 30M for free, not 6G+ in previous test, although
-the problem is not solved, the problem is less serious, is it a synchronization
-problem?
-
-Thanks
-Hanjun
-
-[1]:
-index ea506eb..4447494 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -379,6 +379,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
-        if (!count)
-                return NULL;
- 
-+ mutex_lock(&cma_mutex);
-        mask = cma_bitmap_aligned_mask(cma, align);
-        offset = cma_bitmap_aligned_offset(cma, align);
-        bitmap_maxno = cma_bitmap_maxno(cma);
-@@ -402,17 +403,16 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
-                mutex_unlock(&cma->lock);
- 
-                pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
--           mutex_lock(&cma_mutex);
-                ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
--           mutex_unlock(&cma_mutex);
-                if (ret == 0) {
-                        page = pfn_to_page(pfn);
-                        break;
-                }
- 
-                cma_clear_bitmap(cma, pfn, count);
--           if (ret != -EBUSY)
-+         if (ret != -EBUSY) {
-                        break;
-+         }
- 
-                pr_debug("%s(): memory range at %p is busy, retrying\n",
-                         __func__, pfn_to_page(pfn));
-@@ -420,6 +420,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
-                start = bitmap_no + mask + 1;
-        }
- 
-+ mutex_unlock(&cma_mutex);
-        trace_cma_alloc(pfn, page, count, align);
- 
-        pr_debug("%s(): returned %p\n", __func__, page);
-@@ -445,15 +446,19 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
- 
-        pr_debug("%s(page %p)\n", __func__, (void *)pages);
- 
-+ mutex_lock(&cma_mutex);
-        pfn = page_to_pfn(pages);
- 
--   if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
-+ if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count) {
-+         mutex_unlock(&cma_mutex);
-                return false;
-+ }
- 
-        VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
- 
-        free_contig_range(pfn, count);
-        cma_clear_bitmap(cma, pfn, count);
-+ mutex_unlock(&cma_mutex);
-        trace_cma_release(pfn, pages, count);
- 
-        return true;
+Best regards,
+-- 
+Romain Izard
