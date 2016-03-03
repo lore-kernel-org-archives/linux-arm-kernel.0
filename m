@@ -1,59 +1,167 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 3 Mar 2016 09:24:56 -0500
-Subject: [PATCH V5 00/15] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20160303112332.GC28359@red-moon>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <56D49611.2050202@codeaurora.org> <20160303112332.GC28359@red-moon>
-Message-ID: <56D84938.6020102@codeaurora.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 3 Mar 2016 15:29:29 +0100
+Subject: [PATCH 06/17] reset: Add PLX Technology Reset Controller driver
+In-Reply-To: <1457014709.3425.53.camel@pengutronix.de>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-7-git-send-email-narmstrong@baylibre.com>
+ <1457014709.3425.53.camel@pengutronix.de>
+Message-ID: <56D84A49.4010400@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/3/2016 6:23 AM, Lorenzo Pieralisi wrote:
-> x86 and IA64 claim PCI resources on boot and live with that (well, minus
-> the gazillions x86 pci= parameters that change the PCI resources assignment
-> one way or another), comments very welcome in particular on the pci=realloc
-> option and its usage.
+On 03/03/2016 03:18 PM, Philipp Zabel wrote:
+> Hi Neil,
+> 
+>> +config RESET_OXNAS
+>> +	bool
+>> +	select MFD_SYSCON
+> 
+> I'd prefer not to select MFD_SYSCON here, but rather let ARCH_OXNAS do
+> that.
+> 
+OK.
 
-I have been working with Linux PCIe over 3 years. I never used pci=realloc argument.
+>> +#include <linux/io.h>
+> 
+> Is there any need to include linux/io.h ?
 
-The v5 series minus [PATCH V5 11/15] drivers: pci: add generic code to claim bus resources
-is working just fine and is ready to go upstream in my opinion. It passed my internal 
-testing with different types of endpoints.
+No, dropping.
 
-The inclusion of this patch is now requiring everybody to add pci=realloc argument
-otherwise the resources assigned by the UEFI BIOS are not working.
+>> +static int oxnas_reset_reset(struct reset_controller_dev *rcdev,
+>> +			      unsigned long id)
+>> +{
+>> +	struct oxnas_reset *data =
+>> +		container_of(rcdev, struct oxnas_reset, rcdev);
+>> +
+>> +	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
+>> +	msleep(50);
+> 
+> Is this the right delay for all of the resets in this register?
+> If not, I'd drop the .reset callback.
+> 
+The delay is not strictly necessary, but better to avoid any HW issues.
+And the .reset callback is needed since reset_control_reset
+does not assert -> deassert as fallback.
 
-I think there is still some work to be done in this patch and is too early to be included
-into the series. It is blocking progress of the series which is sitting on review over 1 
-year already.
+>> +	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int oxnas_reset_assert(struct reset_controller_dev *rcdev,
+>> +			      unsigned long id)
+>> +{
+>> +	struct oxnas_reset *data =
+>> +		container_of(rcdev, struct oxnas_reset, rcdev);
+>> +
+>> +	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int oxnas_reset_deassert(struct reset_controller_dev *rcdev,
+>> +				unsigned long id)
+>> +{
+>> +	struct oxnas_reset *data =
+>> +		container_of(rcdev, struct oxnas_reset, rcdev);
+>> +
+>> +	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct reset_control_ops oxnas_reset_ops = {
+> 
+> const
+> 
+Something checkpatch should report...
 
-[    0.752916] pci 0000:01:00.0: VF(n) BAR2 space: [mem 0x80360800000-0x8037fffffff 64bit pref] (contains BAR2 for 63 VFs)
-[    0.771799] pci 0000:00:00.0: PCI bridge to [bus 01-06]
-[    0.777054] pci 0000:00:00.0: root [mem 0x80100100000-0x8013fffffff window] res [mem 0x8013ff00000-0x8013fffffff] nr 14
-[    0.787846] pci 0000:00:00.0: pci_claim_bridge_resource:714 1: i:14
-[    0.794135] pci 0000:00:00.0: root [mem 0x80300000000-0x8037fffffff window] res [mem 0x80360000000-0x8037fffffff 64bit pref] nr 15
-[    0.805881] pci 0000:00:00.0: pci_claim_bridge_resource:714 1: i:15
-[    0.812155] pci 0000:01:00.0: root [mem 0x8013ff00000-0x8013fffffff] res [mem 0x8013ff00000-0x8013fffffff 64bit] nr 0
-[    0.822773] pci 0000:01:00.0: root [mem 0x80360000000-0x8037fffffff 64bit pref] res [mem 0x80360000000-0x803607fffff 64bit pref] nr 2
-[    0.834778] pci 0000:01:00.0: root [mem 0x80360000000-0x8037fffffff 64bit pref] res [mem 0x8037ff00000-0x8037fffffff pref] nr 6
-[    0.846265] pci 0000:01:00.0: can't claim BAR 9 [mem 0x80360800000-0x8037fffffff 64bit pref]: address conflict with 0000:01:00.0 [mem 0x8037ff00000-0x8037fffffff pref]
-[    0.861237] pci 0000:01:00.0: BAR 9: no space for [mem size 0x1f800000 64bit pref]
-[    0.868811] pci 0000:01:00.0: BAR 9: failed to assign [mem size 0x1f800000 64bit pref]
+>> +	.reset		= oxnas_reset_reset,
+>> +	.assert		= oxnas_reset_assert,
+>> +	.deassert	= oxnas_reset_deassert,
+>> +};
+>> +
+>> +static const struct of_device_id oxnas_reset_dt_ids[] = {
+>> +	 { .compatible = "plxtech,nas782x-reset", },
+>> +	 { /* sentinel */ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, oxnas_reset_dt_ids);
+>> +
+>> +static int oxnas_reset_probe(struct platform_device *pdev)
+>> +{
+>> +	struct oxnas_reset *data;
+>> +	struct device *parent;
+>> +
+>> +	parent = pdev->dev.parent;
+>> +	if (!parent) {
+>> +		dev_err(&pdev->dev, "no parent\n");
+> 
+> Can this even happen?
+> 
+It's to make sure parent->of_node is valid for syscon_node_to_regmap.
 
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +	if (!data)
+>> +		return -ENOMEM;
+>> +
+>> +	data->regmap = syscon_node_to_regmap(parent->of_node);
+>> +	if (IS_ERR(data->regmap)) {
+>> +		dev_err(&pdev->dev, "failed to get parent regmap\n");
+>> +		return -ENODEV;
+> 
+> Better print the error code and return it.
+> 
+Good point.
 
-I keep saying this but the type of CPU is not important when it comes to PCIe. Both PCIe and
-ACPI are governed by specs. If it is working for x86 and i64; it needs to work for ARM64 as
-well. 
+>> +	}
+>> +
+>> +	data->rcdev.owner = THIS_MODULE;
+>> +	data->rcdev.nr_resets = 32;
+>> +	data->rcdev.ops = &oxnas_reset_ops;
+>> +	data->rcdev.of_node = pdev->dev.of_node;
+>> +	reset_controller_register(&data->rcdev);
+> 
+> Move this down a bit:
+> 
+>> +
+>> +	platform_set_drvdata(pdev, data);
+>> +
+>> +	return 0;
+> 
+> and
+> 	return reset_controller_register(&data->rcdev);
+> here.
+> 
+Yes, sound better...
 
-Even ARM64 has the luxury to omit the old BIOS behaviors. Most ARM64 systems use tianocore based
-UEFI BIOS.
+>> +static struct platform_driver oxnas_reset_driver = {
+>> +	.probe	= oxnas_reset_probe,
+>> +	.remove	= oxnas_reset_remove,
+>> +	.driver = {
+>> +		.name		= "oxnas-reset",
+>> +		.owner		= THIS_MODULE,
+> 
+> The .owner field is overwritten by __platform_driver_register() anyway,
+> just drop it.
+OK
 
-This is pointing to an implementation problem in arm64 adaptation. Need to figure out
-what is different.
+>> +/*
+>> + * Reset controller does not support probe deferral, so it has to be
+>> + * initialized before any user, in particular, PCIE uses subsys_initcall.
+>> + */
+>> +arch_initcall(oxnas_reset_init);
+> 
+> That doesn't sound right. (of_)reset_control_get return -EPROBE_DEFER if
+> the rcdev isn't found in the list. Could you elaborate on this?
+It was an old change, I will put back the generic module platform init.
 
+> 
+> regards
+> Philipp
+> 
+Thanks,
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Neil
