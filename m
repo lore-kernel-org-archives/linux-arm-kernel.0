@@ -1,29 +1,36 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Mar 2016 16:04:12 -0600
-Subject: [PATCH v4 1/3] input: cygnus-update touchscreen dt node document
-In-Reply-To: <1456556396-4759-2-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1456556396-4759-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1456556396-4759-2-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <20160303220412.GA27797@rob-hp-laptop>
+Date: Thu, 3 Mar 2016 16:13:28 -0600
+Subject: [PATCH v4 1/2] ehci-platform: Add support for controllers with
+ multiple reset lines
+In-Reply-To: <1456592339-31767-2-git-send-email-hdegoede@redhat.com>
+References: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
+ <1456592339-31767-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160303221328.GA830@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 27, 2016 at 12:29:54PM +0530, Raveendra Padasalagi wrote:
-> In Cygnus SOC touch screen controller registers are shared
-> with ADC and flex timer. Using readl/writel could lead to
-> race condition. So touch screen driver is enhanced to support
-> register access using syscon framework API's to take care of
-> mutually exclusive access.In addition to this existing touchscreen
-> node name "tsc" is renamed to "touchscreen".
+On Sat, Feb 27, 2016 at 05:58:58PM +0100, Hans de Goede wrote:
+> From: Reinder de Haan <patchesrdh@mveas.com>
 > 
-> Hence touchscreen dt node bindings document is updated to take care
-> of above changes in the touchscreen driver.
+> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+> reset lines, the controller will not initialize while the reset for
+> its companion is still asserted, which means we need to de-assert
+> 2 resets for the controller to work.
 > 
-> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 > ---
->  .../input/touchscreen/brcm,iproc-touchscreen.txt    | 21 ++++++++++++++++-----
->  1 file changed, 16 insertions(+), 5 deletions(-)
+> Changes in v2:
+> -Use the new reset_control_[de]assert_shared reset-controller functions
+> Changes in v3:
+> -Adjust for changes to shared-reset reset-controller functions
+> Changes in v4:
+> -Fix Ugly continuation line
+> ---
+>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/usb/host/ehci-platform.c                   | 41 ++++++++++++----------
+>  2 files changed, 24 insertions(+), 19 deletions(-)
