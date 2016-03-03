@@ -1,48 +1,32 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:40:02 +0100
-Subject: [PATCH 09/17] dt-bindings: Add PLX Technology OXNAS Standard Clocks
- bindings
+Date: Thu,  3 Mar 2016 12:40:08 +0100
+Subject: [PATCH 15/17] dt-bindings: Add OXNAS bindings
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-10-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-16-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/clock/plxtech,stdclk.txt   | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+ Documentation/devicetree/bindings/arm/oxnas.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
 
-diff --git a/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt b/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+diff --git a/Documentation/devicetree/bindings/arm/oxnas.txt b/Documentation/devicetree/bindings/arm/oxnas.txt
 new file mode 100644
-index 0000000..46465c6
+index 0000000..6e17ca4
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
-@@ -0,0 +1,24 @@
-+PLX Technology OXNAS SoC Family Standard Clocks
-+================================================
++++ b/Documentation/devicetree/bindings/arm/oxnas.txt
+@@ -0,0 +1,9 @@
++PLX Technology OXNAS SoCs Family device tree bindings
++-------------------------------------------
 +
-+Please also refer to clock-bindings.txt in this directory for common clock
-+bindings usage.
++Boards with the OX810SE Soc SoC shall have the following properties:
++  Required root node property:
++    compatible: "plxtech,ox810se"
 +
-+Required properties:
-+- compatible: Should be "plxtech,ox810se-stdclk" or "plxtech,nas782x-stdclk"
-+- #clock-cells: 1, see below
-+
-+Parent node should have the following properties :
-+- compatible: Should be "plxtech,ox810se-sys-ctrl", "syscon", "simple-mfd"
-+
-+example:
-+
-+sys: sys-ctrl at 000000 {
-+	compatible = "plxtech,ox810se-sys-ctrl", "syscon", "simple-mfd";
-+	reg = <0x000000 0x100000>;
-+
-+	stdclk: stdclk {
-+		compatible = "plxtech,ox810se-stdclk", "plxtech,nas782x-stdclk";
-+		#reset-cells = <1>;
-+	};
-+};
++Board compatible values:
++  - "wd,mbwe" (OX810SE)
 -- 
 1.9.1
