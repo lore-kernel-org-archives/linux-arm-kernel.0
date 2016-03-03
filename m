@@ -1,22 +1,46 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 3 Mar 2016 21:17:35 +0530
-Subject: [PATCH 2/3] dmaengine: sun4i: support module autoloading
-In-Reply-To: <1456104396-13282-2-git-send-email-emilio@elopez.com.ar>
-References: <1456104396-13282-1-git-send-email-emilio@elopez.com.ar>
- <1456104396-13282-2-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20160303154735.GR11154@localhost>
+Date: Thu, 3 Mar 2016 21:20:35 +0530
+Subject: [PATCH] crypto/async_pq: use __free_page() instead of put_page()
+In-Reply-To: <CAAmzW4Nq8LiFGzyR4YjG8OPev-Pj1dUad+Bus2puSAk_tUcCsA@mail.gmail.com>
+References: <1456738445-876239-1-git-send-email-arnd@arndb.de>
+ <CAPcyv4jJzUieZ0i2jBqANwmYPUBVmQmhoDTPnr0KjPQXnoZqWQ@mail.gmail.com>
+ <CAAmzW4Nq8LiFGzyR4YjG8OPev-Pj1dUad+Bus2puSAk_tUcCsA@mail.gmail.com>
+Message-ID: <20160303155035.GT11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 21, 2016 at 10:26:35PM -0300, Emilio L?pez wrote:
-> From: Emilio L?pez <emilio.lopez@collabora.co.uk>
+On Tue, Mar 01, 2016 at 10:54:50PM +0900, Joonsoo Kim wrote:
+> 2016-03-01 3:04 GMT+09:00 Dan Williams <dan.j.williams@intel.com>:
+> > On Mon, Feb 29, 2016 at 1:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> The addition of tracepoints to the page reference tracking had an
+> >> unfortunate side-effect in at least one driver that calls put_page
+> >> from its exit function, resulting in a link error:
+> >>
+> >> `.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
+> >>
+> >> From a cursory look at that this driver, it seems that it may be
+> >> doing the wrong thing here anyway, as the page gets allocated
+> >> using 'alloc_page()', and should be freed using '__free_page()'
+> >> rather than 'put_page()'.
+> >>
+> >> With this patch, I no longer get any other build errors from the
+> >> page_ref patch, so hopefully we can assume that it's always wrong
+> >> to call any of those functions from __exit code, and that no other
+> >> driver does it.
+> >>
+> >> Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >
+> > Acked-by: Dan Williams <dan.j.williams@intel.com>
+> >
+> > Vinod, will you take this one?
 > 
-> MODULE_DEVICE_TABLE() is missing, so the module isn't auto-loading on
-> supported systems. This commit adds the missing line so it loads
-> automatically when building it as a module and running on a system
-> with the early sunxi DMA engine.
+> Problematic patch ("mm/page_ref: ~~~") is not yet merged one. It is on mmotm
+> and this fix should go together with it or before it. I think that
+> handling this fix by
+> Andrew is easier to all.
 
-Applied, thanks
+Okay fine by me.
 
 -- 
 ~Vinod
