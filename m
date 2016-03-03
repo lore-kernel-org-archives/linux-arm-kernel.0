@@ -1,33 +1,30 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 3 Mar 2016 08:29:44 -0800
-Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
-In-Reply-To: <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
-References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
- <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20160303162942.GA2445@localhost.localdomain>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  3 Mar 2016 17:31:32 +0100
+Subject: [PATCH] arm64: efi: add missing frame pointer assignment
+Message-ID: <1457022692-14043-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+The prologue of the EFI entry point pushes x29 and x30 onto the stack but
+fails to create the stack frame correctly by omitting the assignment of x29
+to the new value of the stack pointer. So fix that.
 
-On Fri, Feb 26, 2016 at 11:43:43AM +0800, Leo Yan wrote:
-> The property "hysteresis" is mandatory for trip points, so if without
-> it the thermal zone cannot register successfully. But "hysteresis" is
-> ignored in the thermal subsystem and only inquired by several thermal
-> sensor drivers.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi-entry.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-I am not sure this a good direction to go. Remember that Linux
-implementation not necessarily has to be the implication of the DT
-binding. Hysteresis is a property that plays a significant role on
-thermal control systems, which in many cases avoid overshooting cooling
-actions. Having the DT writer to explicitly set it to 0 means that zone
-does not suffer of overshooting and does not need hysteresis.
-
-If the Linux thermal subsystem has a problem with handling hysteresis, I
-would rather fix Linux code than relaxing the DT binding. Or if you
-still believe hysteresis is really optional, I would prefer to see a
-better justification than "Linux ignores it".
-
-BR,
-
-Eduardo
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index 936022f0655e..e88c064b845c 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -35,6 +35,7 @@ ENTRY(entry)
+ 	 * for image_addr variable passed to efi_entry().
+ 	 */
+ 	stp	x29, x30, [sp, #-32]!
++	mov	x29, sp
+ 
+ 	/*
+ 	 * Call efi_entry to do the real work.
+-- 
+2.5.0
