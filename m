@@ -1,54 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 3 Mar 2016 14:26:12 -0700
-Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
- groups.
-In-Reply-To: <1456510756-15337-3-git-send-email-eric@anholt.net>
-References: <1456510756-15337-1-git-send-email-eric@anholt.net>
- <1456510756-15337-3-git-send-email-eric@anholt.net>
-Message-ID: <56D8ABF4.6060801@wwwdotorg.org>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 03 Mar 2016 16:48:34 -0500 (EST)
+Subject: [PATCH] net: mellanox: add DEVLINK dependencies
+In-Reply-To: <1456911665-1424389-1-git-send-email-arnd@arndb.de>
+References: <1456911665-1424389-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160303.164834.470402143180960189.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2016 11:19 AM, Eric Anholt wrote:
-> Since all of these pins were documented, we can use their names to
-> explain what's going on.
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed,  2 Mar 2016 10:40:54 +0100
 
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+> The new NET_DEVLINK infrastructure can be a loadable module, but the drivers
+> using it might be built-in, which causes link errors like:
+> 
+> drivers/net/built-in.o: In function `mlx4_load_one':
+> :(.text+0x2fbfda): undefined reference to `devlink_port_register'
+> :(.text+0x2fc084): undefined reference to `devlink_port_unregister'
+> drivers/net/built-in.o: In function `mlxsw_sx_port_remove':
+> :(.text+0x33a03a): undefined reference to `devlink_port_type_clear'
+> :(.text+0x33a04e): undefined reference to `devlink_port_unregister'
+> 
+> There are multiple ways to avoid this:
+> 
+> a) add 'depends on NET_DEVLINK || !NET_DEVLINK' dependencies
+>    for each user
+> b) use 'select NET_DEVLINK' from each driver that uses it
+>    and hide the symbol in Kconfig.
+> c) make NET_DEVLINK a 'bool' option so we don't have to
+>    list it as a dependency, and rely on the APIs to be
+>    stubbed out when it is disabled
+> d) use IS_REACHABLE() rather than IS_ENABLED() to check for
+>    NET_DEVLINK in include/net/devlink.h
+> 
+> This implements a variation of approach a) by adding an
+> intermediate symbol that drivers can depend on, and changes
+> the three drivers using it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 09d4d087cd48 ("mlx4: Implement devlink interface")
+> Fixes: c4745500e988 ("mlxsw: Implement devlink interface")
 
->   &gpio {
-> +	pinctrl-0 = <&i2c0_gpio0
-> +		     &i2c1_gpio2
-> +		     &gpclk0_gpio4
-> +		     &gpclk1_gpio5
-> +		     &spi0_gpio7
-> +		     &pcm_gpio18
-> +		     &pwm0_gpio40
-> +		     &pwm1_gpio45
-> +		     &gpioout
-> +		     &alt3>;
->   };
-
-Why not convert alt3 to the new scheme too?
-
-I think this configures too many pins, which in turn makes assumptions 
-about what those pins are used for that may not be valid.
-
-Recent RPi firmware configures almost all expansion connector GPIOs as 
-GPIO-in. This ensures that no matter what is connected to the expansion 
-connector, there can be no signal conflicts due to both the bcm283x and 
-some external device both attempting to drive the same pin. I believe 
-the default Linux pinmux should adopt the same approach, by simply not 
-configuring any expansion connector pins except those known to have a 
-100% hard-coded usage. For example, the HAT I2C pins must only be used 
-for that purpose on the RPi, so even if the HW supported using them as 
-arbitrary GPIO or PWM or ..., we know they're actually I2C.
-
-So, I think this list should only include configuration for pins 
-connected to on-board devices, or expansion pins that have a 100% known 
-purpose.
-
-(I can't quite remember how many pins are being configured in the 
-upstream kernel's DT files at present; it's possible the complying with 
-this rule may involve removing some pinctrl settings that are currently 
-present to avoid conflicts. User-specific additions should come from DT 
-overlays or manual DT edits.)
+Applied, thanks Arnd.
