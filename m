@@ -1,72 +1,90 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 03 Mar 2016 14:28:58 -0800
-Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
- groups.
-In-Reply-To: <56D8ABF4.6060801@wwwdotorg.org>
-References: <1456510756-15337-1-git-send-email-eric@anholt.net>
- <1456510756-15337-3-git-send-email-eric@anholt.net>
- <56D8ABF4.6060801@wwwdotorg.org>
-Message-ID: <87bn6v6vrp.fsf@eliezer.anholt.net>
+From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
+Date: Thu, 03 Mar 2016 23:30:53 +0100
+Subject: [PATCH 3/3] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
+ property
+In-Reply-To: <1456999276-6315-4-git-send-email-peter.chen@nxp.com>
+References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
+ <1456999276-6315-4-git-send-email-peter.chen@nxp.com>
+Message-ID: <56D8BB1D.6040108@maciej.szmigiero.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Hi Peter,
 
-> On 02/26/2016 11:19 AM, Eric Anholt wrote:
->> Since all of these pins were documented, we can use their names to
->> explain what's going on.
->
->> diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
->
->>   &gpio {
->> +	pinctrl-0 = <&i2c0_gpio0
->> +		     &i2c1_gpio2
->> +		     &gpclk0_gpio4
->> +		     &gpclk1_gpio5
->> +		     &spi0_gpio7
->> +		     &pcm_gpio18
->> +		     &pwm0_gpio40
->> +		     &pwm1_gpio45
->> +		     &gpioout
->> +		     &alt3>;
->>   };
->
-> Why not convert alt3 to the new scheme too?
+On 03.03.2016 11:01, Peter Chen wrote:
+> From: Peter Chen <peter.chen@freescale.com>
+> 
+> The current dts describes USB HUB's property at USB controller's
+> entry, it is improper. The USB HUB should be the child node
+> under USB controller.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-(covered in the next patch)
+Thanks for patches!
 
-> I think this configures too many pins, which in turn makes assumptions 
-> about what those pins are used for that may not be valid.
->
-> Recent RPi firmware configures almost all expansion connector GPIOs as 
-> GPIO-in. This ensures that no matter what is connected to the expansion 
-> connector, there can be no signal conflicts due to both the bcm283x and 
-> some external device both attempting to drive the same pin. I believe 
-> the default Linux pinmux should adopt the same approach, by simply not 
-> configuring any expansion connector pins except those known to have a 
-> 100% hard-coded usage. For example, the HAT I2C pins must only be used 
-> for that purpose on the RPi, so even if the HW supported using them as 
-> arbitrary GPIO or PWM or ..., we know they're actually I2C.
->
-> So, I think this list should only include configuration for pins 
-> connected to on-board devices, or expansion pins that have a 100% known 
-> purpose.
->
-> (I can't quite remember how many pins are being configured in the 
-> upstream kernel's DT files at present; it's possible the complying with 
-> this rule may involve removing some pinctrl settings that are currently 
-> present to avoid conflicts. User-specific additions should come from DT 
-> overlays or manual DT edits.)
+VID:PID for hub on UDOO board is 0424:2514.
 
-If we want to improve on our default pin configurations, I'm into that,
-but I think the first step is to get groups split up so it's clear what
-we're doing with pins in the first place.  This patch is just a no-op
-change to get the board files to use smaller groups for
-enabling/disabling, and we should stack functional changes after that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160303/b44fa64d/attachment.sig>
+I've tested these patches on this board and was able to make USB work
+again with following DT changes:
+diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+index d3e54e4..4956de7 100644
+--- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+@@ -9,6 +9,8 @@
+  *
+  */
+ 
++#include <dt-bindings/gpio/gpio.h>
++
+ / {
+ 	chosen {
+ 		stdout-path = &uart2;
+@@ -18,21 +27,11 @@
+ 		reg = <0x10000000 0x40000000>;
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		reg_usb_h1_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			enable-active-high;
+-			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
+-			gpio = <&gpio7 12 0>;
+-		};
++	usb2415_pwrseq: usb2415_pwrseq {
++		compatible = "usb-pwrseq";
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++		reset-duration-us = <3000>;
+ 	};
+ 
+ 	sound {
+@@ -163,9 +218,16 @@
+ &usbh1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usbh>;
+-	vbus-supply = <&reg_usb_h1_vbus>;
+-	clocks = <&clks 201>;
+ 	status = "okay";
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	hub: usb2415 at 01 {
++		compatible = "usb424,2514";
++		reg = <1>;
++		usb-pwrseq = <&usb2415_pwrseq>;
++	};
+ };
+ 
+ &usdhc3 {
+
+
+Maciej
