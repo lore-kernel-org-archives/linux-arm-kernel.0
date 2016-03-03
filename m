@@ -1,30 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 3 Mar 2016 09:47:24 +0100
-Subject: [GIT PULL] at91: dt for 4.6 #2
-In-Reply-To: <2606050.aoO6PhDv1x@wuerfel>
-References: <1456934722-7023-1-git-send-email-nicolas.ferre@atmel.com>
- <1634323.MskpPxvyZt@wuerfel> <20160302210750.GA2567@piout.net>
- <2606050.aoO6PhDv1x@wuerfel>
-Message-ID: <56D7FA1C.7090902@atmel.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 3 Mar 2016 09:59:35 +0100
+Subject: [GIT PULL] STM32 defconfig updates for v4.6 #1
+In-Reply-To: <2216821.q30YMIK6pX@wuerfel>
+References: <56D6C623.8030908@gmail.com>
+	<2216821.q30YMIK6pX@wuerfel>
+Message-ID: <CALszF6Cgng3Yr_vrag7LY9zYunV_Fca0oHKX45w6t29DFqC5gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/03/2016 22:27, Arnd Bergmann a ?crit :
-> On Wednesday 02 March 2016 22:07:50 Alexandre Belloni wrote:
->> On 02/03/2016 at 21:50:59 +0100, Arnd Bergmann wrote :
->>> I see that your gpg key has expired last week, you may want to do something
->>> about that, I think you can just update the date rather than creating a
->>> new key.
->>>
+2016-03-02 23:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 02 March 2016 11:53:23 Maxime Coquelin wrote:
+>> Highlights:
+>> -----------
+>>   - Enable GPIO led driver in stm32_defconfig
+>>   - Introduce a config fragment to override RAM base address
 >>
->> You probably want to pull his key, it was updated today.
->>
-> 
-> Ah, of course.
+>
+> Our first config fragment ;-)
 
-Yes, with advices from Alexandre and Maxime, I did it just before
-signing my tag.
+Yes! Out of curiosity, did you see the question I asked you about fragments?
+See "Re: [PATCH v3 4/4] ARM: STM32: Enable Ethernet in stm32_defconfig".
+(https://lkml.org/lkml/2016/3/1/474)
 
-Thanks for the heads up. Bye,
--- 
-Nicolas Ferre
+This is not urgent, it can wait for after the merge window, but I will
+be happy to have your view on this.
+
+Thanks!
+Maxime
