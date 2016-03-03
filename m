@@ -1,163 +1,46 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 3 Mar 2016 17:09:15 +0100
-Subject: [PATCH 3/3] iio:adc:at91-sama5d2: add support for signed conversion
-In-Reply-To: <1457021355-23898-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1457021355-23898-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1457021355-23898-4-git-send-email-ludovic.desroches@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Mar 2016 16:11:52 +0000
+Subject: [PATCH 0/3] KASAN: clean stale poison upon cold re-entry to kernel
+In-Reply-To: <20160303123809.GA19139@leverpostej>
+References: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
+ <20160303120227.GA2484@gmail.com>
+ <20160303123809.GA19139@leverpostej>
+Message-ID: <20160303161151.GA2074@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at91-sama5d2 ADC controller can achieve unsigned and signed
-conversion. For each channel, a signed and an unsigned variant are
-created.
-We can't set the sign mode for each channel. For that reason, the
-controller has to be configured upon conversion requests.
+On Thu, Mar 03, 2016 at 12:38:09PM +0000, Mark Rutland wrote:
+> On Thu, Mar 03, 2016 at 01:02:27PM +0100, Ingo Molnar wrote:
+> > Mark Rutland <mark.rutland@arm.com> wrote:
+> > > Mark Rutland (3):
+> > >   kasan: add functions to clear stack poison
+> > >   sched/kasan: remove stale KASAN poison after hotplug
+> > >   arm64: kasan: clear stale stack poison
+> > > 
+> > >  arch/arm64/kernel/sleep.S |  4 ++++
+> > >  include/linux/kasan.h     |  6 +++++-
+> > >  kernel/sched/core.c       |  3 +++
+> > >  mm/kasan/kasan.c          | 20 ++++++++++++++++++++
+> > >  4 files changed, 32 insertions(+), 1 deletion(-)
+> > 
+> > Looks good to me - via which tree would you like to see this merged upstream?
+> 
+> I'd prefer the arm64 tree as arm64 is (the most) affected by the issue
+> in practice.
+> 
+> I'm happy for this to go via another tree if that's simpler; I'm not
+> aware of anything that's likely to conflict in the arm64 tree.
+> 
+> Catalin, Andrey, Andrew, any preference?
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/iio/adc/at91-sama5d2_adc.c | 81 +++++++++++++++++++++++++++++++-------
- 1 file changed, 67 insertions(+), 14 deletions(-)
+I'm happy for this to go via the Andrew's -mm tree. For the series:
 
-diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-index 5bc038f..d4bf73f 100644
---- a/drivers/iio/adc/at91-sama5d2_adc.c
-+++ b/drivers/iio/adc/at91-sama5d2_adc.c
-@@ -105,8 +105,26 @@
- #define AT91_SAMA5D2_LCCWR	0x38
- /* Overrun Status Register */
- #define AT91_SAMA5D2_OVER	0x3c
-+
- /* Extended Mode Register */
- #define AT91_SAMA5D2_EMR	0x40
-+/* Sign Mode */
-+#define AT91_SAMA5D2_EMR_SIGNMODE(v)		((v) << 25)
-+/*
-+ * Single-Ended channels: Unsigned conversions.
-+ * Differential channels: Signed conversions.
-+ */
-+#define AT91_SAMA5D2_EMR_SE_UNSG_DF_SIGN	0
-+/*
-+ * Single-Ended channels: Signed conversions.
-+ * Differential channels: Unsigned conversions.
-+ */
-+#define AT91_SAMA5D2_EMR_SE_SIGN_DF_UNSG	1
-+/* All channels: Unsigned conversions */
-+#define AT91_SAMA5D2_EMR_ALL_UNSIGNED		2
-+/* All channels: Signed conversions */
-+#define AT91_SAMA5D2_EMR_ALL_SIGNED		3
-+
- /* Compare Window Register */
- #define AT91_SAMA5D2_CWR	0x44
- /* Channel Gain Register */
-@@ -140,13 +158,14 @@
- /* Version Register */
- #define AT91_SAMA5D2_VERSION	0xfc
- 
--#define AT91_SAMA5D2_CHAN(num, addr)					\
-+#define AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, sign_mode)		\
- 	{								\
- 		.type = IIO_VOLTAGE,					\
- 		.channel = num,						\
- 		.address = addr,					\
-+		.extend_name = (sign_mode == 's') ? "signed" : "unsigned",\
- 		.scan_type = {						\
--			.sign = 'u',					\
-+			.sign = sign_mode,				\
- 			.realbits = 12,					\
- 		},							\
- 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-@@ -156,6 +175,12 @@
- 		.indexed = 1,						\
- 	}
- 
-+#define AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(num, addr)		\
-+	AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, 's')
-+
-+#define AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(num, addr)	\
-+	AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, 'u')
-+
- #define at91_adc_readl(st, reg)		readl_relaxed(st->base + reg)
- #define at91_adc_writel(st, reg, val)	writel_relaxed(val, st->base + reg)
- 
-@@ -185,18 +210,30 @@ struct at91_adc_state {
- };
- 
- static const struct iio_chan_spec at91_adc_channels[] = {
--	AT91_SAMA5D2_CHAN(0, 0x50),
--	AT91_SAMA5D2_CHAN(1, 0x54),
--	AT91_SAMA5D2_CHAN(2, 0x58),
--	AT91_SAMA5D2_CHAN(3, 0x5c),
--	AT91_SAMA5D2_CHAN(4, 0x60),
--	AT91_SAMA5D2_CHAN(5, 0x64),
--	AT91_SAMA5D2_CHAN(6, 0x68),
--	AT91_SAMA5D2_CHAN(7, 0x6c),
--	AT91_SAMA5D2_CHAN(8, 0x70),
--	AT91_SAMA5D2_CHAN(9, 0x74),
--	AT91_SAMA5D2_CHAN(10, 0x78),
--	AT91_SAMA5D2_CHAN(11, 0x7c),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(0, 0x50),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(1, 0x54),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(2, 0x58),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(3, 0x5c),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(4, 0x60),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(5, 0x64),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(6, 0x68),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(7, 0x6c),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(8, 0x70),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(9, 0x74),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(10, 0x78),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(11, 0x7c),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(0, 0x50),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(1, 0x54),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(2, 0x58),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(3, 0x5c),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(4, 0x60),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(5, 0x64),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(6, 0x68),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(7, 0x6c),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(8, 0x70),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(9, 0x74),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(10, 0x78),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(11, 0x7c),
- };
- 
- static unsigned at91_adc_startup_time(unsigned startup_time_min,
-@@ -278,6 +315,7 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 			     int *val, int *val2, long mask)
- {
- 	struct at91_adc_state *st = iio_priv(indio_dev);
-+	u32 emr;
- 	int ret;
- 
- 	switch (mask) {
-@@ -286,6 +324,19 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 
- 		st->chan = chan;
- 
-+		/* Read EMR register and clear 'sign mode' field */
-+		emr = at91_adc_readl(st, AT91_SAMA5D2_EMR)
-+		      & AT91_SAMA5D2_EMR_SIGNMODE(0);
-+		/*
-+		 * Check if the user requested a conversion on a signed or
-+		 * unsigned channel.
-+		 */
-+		if (chan->scan_type.sign == 's')
-+			emr |= AT91_SAMA5D2_EMR_SIGNMODE(AT91_SAMA5D2_EMR_ALL_SIGNED);
-+		else
-+			emr |= AT91_SAMA5D2_EMR_SIGNMODE(AT91_SAMA5D2_EMR_ALL_UNSIGNED);
-+
-+		at91_adc_writel(st, AT91_SAMA5D2_EMR, emr);
- 		at91_adc_writel(st, AT91_SAMA5D2_CHER, BIT(chan->channel));
- 		at91_adc_writel(st, AT91_SAMA5D2_IER, BIT(chan->channel));
- 		at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_START);
-@@ -298,6 +349,8 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 
- 		if (ret > 0) {
- 			*val = st->conversion_value;
-+			if (chan->scan_type.sign == 's')
-+				*val = sign_extend32(*val, 11);
- 			ret = IIO_VAL_INT;
- 			st->conversion_done = false;
- 		}
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Please report the series to linux-mm at kvack.org with the corresponding
+acks in place and the fix-up on patch 1.
+
+Thanks.
+
 -- 
-2.5.0
+Catalin
