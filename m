@@ -1,154 +1,102 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 3 Mar 2016 15:58:27 +0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
-Message-ID: <56D7EEA3.4090705@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 3 Mar 2016 08:01:39 +0000
+Subject: [PATCH v10 6/9] arm64: kprobes instruction simulation support
+In-Reply-To: <56D7C573.8030401@linaro.org>
+References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
+ <1456801047-29014-7-git-send-email-dave.long@linaro.org>
+ <56D5D9A0.9090205@arm.com> <56D7C573.8030401@linaro.org>
+Message-ID: <20160303080139.3d415d17@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/3/3 15:42, Joonsoo Kim wrote:
-> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
->> (cc -mm and Joonsoo Kim)
->>
->>
->> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
->>> Hi,
->>>
->>> I came across a suspicious error for CMA stress test:
->>>
->>> Before the test, I got:
->>> -bash-4.3# cat /proc/meminfo | grep Cma
->>> CmaTotal:         204800 kB
->>> CmaFree:          195044 kB
->>>
->>>
->>> After running the test:
->>> -bash-4.3# cat /proc/meminfo | grep Cma
->>> CmaTotal:         204800 kB
->>> CmaFree:         6602584 kB
->>>
->>> So the freed CMA memory is more than total..
->>>
->>> Also the the MemFree is more than mem total:
->>>
->>> -bash-4.3# cat /proc/meminfo
->>> MemTotal:       16342016 kB
->>> MemFree:        22367268 kB
->>> MemAvailable:   22370528 kB
->>>
->>> Here is the kernel module doing the stress test below (if the test case
->>> is wrong, correct me), any help would be great appreciated.
->>>
->>> The test is running on ARM64 platform (hisilicon D02) with 4.4 kernel, I
->>> think
->>> the 4.5-rc is the same as I didn't notice the updates for it.
->>>
->>> int malloc_dma(void *data)
->>> {
->>>      void *vaddr;
->>>      struct platform_device * pdev=(struct platform_device*)data;
->>>      dma_addr_t dma_handle;
->>>      int i;
->>>
->>>      for(i=0; i<1000; i++) {
->>>          vaddr=dma_alloc_coherent(&pdev->dev, malloc_size, &dma_handle,
->>> GFP_KERNEL);
->>>          if (!vaddr)
->>>              pr_err("alloc cma memory failed!\n");
->>>
->>>          mdelay(1);
->>>
->>>          if (vaddr)
->>>                  dma_free_coherent(&pdev->dev,malloc_size,vaddr,
->>> dma_handle);
->>>      }
->>>      pr_info("alloc free cma memory success return!\n");
->>>      return 0;
->>> }
->>>
->>> static int dma_alloc_coherent_init(struct platform_device *pdev)
->>> {
->>>      int i;
->>>
->>>      for(i=0; i<100; i++)   {
->>>          task[i] = kthread_create(malloc_dma,pdev,"malloc_dma_%d",i);
->>>          if(!task[i]) {
->>>              printk("kthread_create faile %d\n",i);
->>>              continue;
->>>          }
->>>          wake_up_process(task[i]);
->>>      }
->>>      return 0;
->>> }
->>>
->>> Thanks
->>> Hanjun
->>>
->>> The whole /proc/meminfo:
->>>
->>> -bash-4.3# cat /proc/meminfo
->>> MemTotal:       16342016 kB
->>> MemFree:        22367268 kB
->>> MemAvailable:   22370528 kB
->>> Buffers:            4292 kB
->>> Cached:            36444 kB
->>> SwapCached:            0 kB
->>> Active:            23564 kB
->>> Inactive:          25360 kB
->>> Active(anon):       8424 kB
->>> Inactive(anon):       64 kB
->>> Active(file):      15140 kB
->>> Inactive(file):    25296 kB
->>> Unevictable:           0 kB
->>> Mlocked:               0 kB
->>> SwapTotal:             0 kB
->>> SwapFree:              0 kB
->>> Dirty:                 0 kB
->>> Writeback:             0 kB
->>> AnonPages:          8196 kB
->>> Mapped:            16448 kB
->>> Shmem:               296 kB
->>> Slab:              26832 kB
->>> SReclaimable:       6300 kB
->>> SUnreclaim:        20532 kB
->>> KernelStack:        3088 kB
->>> PageTables:          404 kB
->>> NFS_Unstable:          0 kB
->>> Bounce:                0 kB
->>> WritebackTmp:          0 kB
->>> CommitLimit:     8171008 kB
->>> Committed_AS:      34336 kB
->>> VmallocTotal:   258998208 kB
->>> VmallocUsed:           0 kB
->>> VmallocChunk:          0 kB
->>> AnonHugePages:         0 kB
->>> CmaTotal:         204800 kB
->>> CmaFree:         6602584 kB
->>> HugePages_Total:       0
->>> HugePages_Free:        0
->>> HugePages_Rsvd:        0
->>> HugePages_Surp:        0
->>> Hugepagesize:       2048 kB
->>>
->>
->> I played with this a bit and can see the same problem. The sanity
->> check of CmaFree < CmaTotal generally triggers in
->> __move_zone_freepage_state in unset_migratetype_isolate.
->> This also seems to be present as far back as v4.0 which was the
->> first version to have the updated accounting from Joonsoo.
->> Were there known limitations with the new freepage accounting,
->> Joonsoo?
-> I don't know. I also played with this and looks like there is
-> accounting problem, however, for my case, number of free page is slightly less
-> than total. I will take a look.
->
-> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
-> look like your case.
+On Thu, 3 Mar 2016 00:02:43 -0500
+David Long <dave.long@linaro.org> wrote:
 
- The malloc_size is 1M, and with 200M total (passed via boot commandline cma=200M),
-any more information is needed, please let me know.
+> On 03/01/2016 01:04 PM, Marc Zyngier wrote:
+> > On 01/03/16 02:57, David Long wrote:
+> >> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> >>
+> >> Kprobes needs simulation of instructions that cannot be stepped
+> >> from different memory location, e.g.: those instructions
+> >> that uses PC-relative addressing. In simulation, the behaviour
+> >> of the instruction is implemented using a copy of pt_regs.
+> >>
+> >> Following instruction catagories are simulated:
+> >>   - All branching instructions(conditional, register, and immediate)
+> >>   - Literal access instructions(load-literal, adr/adrp)
+> >>
+> >> Conditional execution is limited to branching instructions in
+> >> ARM v8. If conditions at PSTATE do not match the condition fields
+> >> of opcode, the instruction is effectively NOP. Kprobes considers
+> >> this case as 'miss'.
+> >>
+> >> This code also replaces the use of arch/arm/opcodes.c for
+> >> arm_check_condition().
+> >
+> > Outdated comment?
+> >
+> 
+> Yeah.  I'll remove it.
+> 
+> >>
+> >> Thanks to Will Cohen for assorted suggested changes.
+> >>
+> >> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> >> Signed-off-by: William Cohen <wcohen@redhat.com>
+> >> Signed-off-by: David A. Long <dave.long@linaro.org>
+> >> ---
+> >>   arch/arm64/include/asm/insn.h            |   1 +
+> >>   arch/arm64/include/asm/probes.h          |   5 +-
+> >>   arch/arm64/kernel/Makefile               |   3 +-
+> >>   arch/arm64/kernel/insn.c                 |   1 +
+> >>   arch/arm64/kernel/kprobes-arm64.c        |  29 +++++
+> >>   arch/arm64/kernel/kprobes.c              |  32 +++++-
+> >>   arch/arm64/kernel/probes-simulate-insn.c | 187 +++++++++++++++++++++++++++++++
+> >>   arch/arm64/kernel/probes-simulate-insn.h |  28 +++++
+> >>   8 files changed, 280 insertions(+), 6 deletions(-)
+> >>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
+> >>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
+> >>
 
-Thanks for the help!
-Hanjun
+[...]
+
+> >> +/*
+> >> + * instruction simulation functions
+> >> + */
+> >> +void __kprobes
+> >> +simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
+> >> +{
+> >> +	long imm, xn, val;
+> >> +
+> >> +	xn = opcode & 0x1f;
+> >> +	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
+> >> +	imm = sign_extend(imm, 20);
+> >> +	if (opcode & 0x80000000)
+> >> +		val = (imm<<12) + (addr & 0xfffffffffffff000);
+> >> +	else
+> >> +		val = imm + addr;
+> >> +
+> >> +	regs->regs[xn] = val;
+> >
+> > What happens when you have something like "adr xzr, blah"? I haven't
+> > found out where you are writing that back yet, but that could be really
+> > fun for SP...
+> >
+> 
+> It hadn't occurred to me that xzr could be an output register. Sigh. 
+> That could mean a bit of repeated code to handle this special case.  I 
+> wonder what the implications would be of adding xzr to the pt_regs 
+> structure to avoid that.
+
+xzr is not a register. It is an encoding that tells the CPU to discard
+the result of an operation. As such, there is no need to store it.
+
+An easy fix for this would be to have an accessor that actually checks
+for the register number, and only allows the range 0-30. We've used
+similar things in KVM for the same reasons (vcpu_get_reg/vcpu_set_reg).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
