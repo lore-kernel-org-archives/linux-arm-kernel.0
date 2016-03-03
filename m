@@ -1,34 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Mar 2016 14:08:19 +0100
-Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
-In-Reply-To: <56D83599.2030400@arm.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
- <56D83599.2030400@arm.com>
-Message-ID: <7673826.decBlDRz96@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 3 Mar 2016 14:09:04 +0100
+Subject: [GIT PULL] STM32 defconfig updates for v4.6 #1
+In-Reply-To: <1624048.IcI7yXPN7a@wuerfel>
+References: <56D6C623.8030908@gmail.com> <2216821.q30YMIK6pX@wuerfel>
+ <CALszF6Cgng3Yr_vrag7LY9zYunV_Fca0oHKX45w6t29DFqC5gA@mail.gmail.com>
+ <1624048.IcI7yXPN7a@wuerfel>
+Message-ID: <CALszF6AD7rzV0+1knDUMw_LCxMCvkRRbWV8iOpXx2td+8-Vrpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2016 13:01:13 Marc Zyngier wrote:
-> > +/* Routines to acknowledge, disable and enable interrupts */
-> > +static void rps_mask_irq(struct irq_data *d)
-> > +{
-> > +     u32 mask = BIT(d->hwirq);
-> > +
-> > +     iowrite32(mask, rps_data.base + RPS_MASK);
-> 
-> I do question the use of iowrite32 here (and its ioread32 pendent
-> anywhere else), as it actually translates in a writel, which contains a
-> memory barrier. Do you have any case that requires the use of such a
-> barrier? if not, consider switching to relaxed accessors (which are the
-> 
+2016-03-03 11:33 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 03 March 2016 09:59:35 Maxime Coquelin wrote:
+>> 2016-03-02 23:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Wednesday 02 March 2016 11:53:23 Maxime Coquelin wrote:
+>> >> Highlights:
+>> >> -----------
+>> >>   - Enable GPIO led driver in stm32_defconfig
+>> >>   - Introduce a config fragment to override RAM base address
+>> >>
+>> >
+>> > Our first config fragment
+>>
+>> Yes! Out of curiosity, did you see the question I asked you about fragments?
+>> See "Re: [PATCH v3 4/4] ARM: STM32: Enable Ethernet in stm32_defconfig".
+>> (https://lkml.org/lkml/2016/3/1/474)
+>>
+>> This is not urgent, it can wait for after the merge window, but I will
+>> be happy to have your view on this.
+>>
+>
+> No, I missed that. Generally, I'd say we should limit the use of Kconfig
+> fragments to more fundamental settings, it should not replace the
+> manual configuration that users apply to pick the set of drivers
+> they want. In the end there is not much difference between someone
+> locally turning on CONFIG_INET when they need it, or using a fragment
+> that does the same.
+>
+> Please just pick one default here (ethernet and ipv4 both enabled or
+> both disabled) that makes sense for most users, and have the others
+> change it manually.
 
-I really ask everyone to do the opposite: we have seen several drivers
-blindlessly using the relaxed accessors and actually introducing bugs
-that way, so I'd rather see the readl/writel ones used by default.
+Ok, I understand your point. In this case, I think having a fragment
+for Ethernet
+might not be a good idea because of the quantity of possible combinations.
 
-In any performance critical code, it's reasonable to take a closer
-look and use the relaxed version with an added comment explaining
-why it's safe there.
-
-	Arnd
+Thanks,
+Maxime
