@@ -1,47 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 03 Mar 2016 17:03:41 +0900
-Subject: [RFC 15/15] mfd: syscon: Fix build of missing ioremap on UM
-In-Reply-To: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
-References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1456992221-26712-16-git-send-email-k.kozlowski@samsung.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Thu,  3 Mar 2016 16:03:49 +0800
+Subject: [PATCH v5 2/6] power-domain: allow domains only handling idle requests
+In-Reply-To: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
+References: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1456992233-25164-3-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit c89c0114955a ("mfd: syscon: Set regmap max_register in
-of_syscon_register") the syscon uses ioremap so it fails on COMPILE_TEST
-without HAS_IOMEM:
+On some Rockchip SoC there exist child-domains only handling their
+idle state with the actual power-state handled by a parent-domain.
 
-drivers/mfd/syscon.c: In function ?of_syscon_register?:
-drivers/mfd/syscon.c:67:9: error: implicit declaration of function ?ioremap? [-Werror=implicit-function-declaration]
-  base = ioremap(res.start, resource_size(&res));
-         ^
-drivers/mfd/syscon.c:67:7: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-  base = ioremap(res.start, resource_size(&res));
-       ^
-drivers/mfd/syscon.c:109:2: error: implicit declaration of function ?iounmap? [-Werror=implicit-function-declaration]
-  iounmap(base);
+So allow such types of domains. For them, we can determine their
+state (on/of) by checking the inverse idle-state instead.
 
-When selecting MFD_SYSCON, depend on HAS_IOMEM to avoid unmet direct
-dependencies.
+There exist one special case if both idle as well power handling
+were set as not present, but as the domain-data is defined in the
+code itself, we can expect the reasonable developer to define them
 
-Reported-by: kbuild test robot <lkp@intel.com>
-Fixes: c89c0114955a ("mfd: syscon: Set regmap max_register in of_syscon_register")
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+So allow such types of domains. For them, we can determine their
+state (on/of) by checking the inverse idle-state instead.
+
+There exist one special case if both idle as well power handling
+were set as not present, but as the domain-data is defined in the
+code itself, we can expect the reasonable developer to define them
+in a correct, without adding more checks.
+
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/mfd/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/soc/rockchip/pm_domains.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index aa21dc55eb15..2e5b1e525a1d 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -1034,6 +1034,7 @@ config MFD_SUN6I_PRCM
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index c46312d..0465a06 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -66,8 +66,8 @@ struct rockchip_pmu {
  
- config MFD_SYSCON
- 	bool "System Controller Register R/W Based on Regmap"
-+	depends on HAS_IOMEM
- 	select REGMAP_MMIO
- 	help
- 	  Select this option to enable accessing system control registers
+ #define DOMAIN(pwr, status, req, idle, ack)	\
+ {						\
+-	.pwr_mask = BIT(pwr),			\
+-	.status_mask = BIT(status),		\
++	.pwr_mask = (pwr >= 0) ? BIT(pwr) : 0,		\
++	.status_mask = (status >= 0) ? BIT(status) : 0,	\
+ 	.req_mask = (req >= 0) ? BIT(req) : 0,		\
+ 	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
+ 	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
+@@ -119,6 +119,10 @@ static bool rockchip_pmu_domain_is_on(struct rockchip_pm_domain *pd)
+ 	struct rockchip_pmu *pmu = pd->pmu;
+ 	unsigned int val;
+ 
++	/* check idle status for idle-only domains */
++	if (pd->info->status_mask == 0)
++		return !rockchip_pmu_domain_is_idle(pd);
++
+ 	regmap_read(pmu->regmap, pmu->info->status_offset, &val);
+ 
+ 	/* 1'b0: power on, 1'b1: power off */
+@@ -130,6 +134,9 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
+ {
+ 	struct rockchip_pmu *pmu = pd->pmu;
+ 
++	if (pd->info->pwr_mask == 0)
++		return;
++
+ 	regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
+ 			   pd->info->pwr_mask, on ? 0 : -1U);
+ 
 -- 
-2.5.0
+1.9.1
