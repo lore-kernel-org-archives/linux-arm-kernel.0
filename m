@@ -1,127 +1,78 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Thu,  3 Mar 2016 06:41:41 -0500
-Subject: [PATCH 1/3] pinctrl: Broadcom Northstar2 pinctrl device tree bindings
-In-Reply-To: <1457005303-26829-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1457005303-26829-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1457005303-26829-2-git-send-email-yendapally.reddy@broadcom.com>
+From: amakarov.linux@gmail.com (Aleksey Makarov)
+Date: Thu, 3 Mar 2016 14:41:17 +0300
+Subject: [PATCH v3 6/7] ACPI: enable ACPI_DBG2_TABLE on ARM64
+In-Reply-To: <56D5D08E.3030902@hurleysoftware.com>
+References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456749726-30261-7-git-send-email-aleksey.makarov@linaro.org>
+ <56D5ACBB.50408@hurleysoftware.com> <56D5CB42.3030806@linaro.org>
+ <56D5D08E.3030902@hurleysoftware.com>
+Message-ID: <56D822DD.2030400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree binding documentation for Broadcom NS2 IOMUX
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
----
- .../bindings/pinctrl/brcm,ns2-pinmux.txt           | 102 +++++++++++++++++++++
- 1 file changed, 102 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,ns2-pinmux.txt
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,ns2-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,ns2-pinmux.txt
-new file mode 100644
-index 0000000..e295dda
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/brcm,ns2-pinmux.txt
-@@ -0,0 +1,102 @@
-+Broadcom Northstar2 IOMUX Controller
-+
-+The Northstar2 IOMUX controller supports group based mux configuration. There
-+are some individual pins that support modifying the pinconf parameters.
-+
-+Required properties:
-+
-+- compatible:
-+    Must be "brcm,ns2-pinmux"
-+
-+- reg:
-+    Define the base and range of the I/O address space that contains the
-+    Northstar2 IOMUX and pin configuration registers.
-+
-+Properties in sub nodes:
-+
-+- function:
-+    The mux function to select
-+
-+- groups:
-+    The list of groups to select with a given function
-+
-+- pins:
-+    List of pin names to change configuration
-+
-+The generic properties bias-disable, bias-pull-down, bias-pull-up,
-+drive-strength, slew-rate, input-enable, input-disable are supported
-+for some individual pins listed at the end.
-+
-+For more details, refer to
-+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+
-+For example:
-+
-+	pinctrl: pinctrl at 6501d130 {
-+		compatible = "brcm,ns2-pinmux";
-+		reg = <0x6501d130 0x08>,
-+		      <0x660a0028 0x04>,
-+		      <0x660009b0 0x40>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&nand_sel &uart3_rx &sdio0_d4>;
-+
-+		/* Select nand function */
-+		nand_sel: nand_sel {
-+			function = "nand";
-+			groups = "nand_grp";
-+		};
-+
-+		/* Pull up the uart3 rx pin */
-+		uart3_rx: uart3_rx {
-+			pins = "uart3_sin";
-+			bias-pull-up;
-+		};
-+
-+		/* Set the drive strength of sdio d4 pin */
-+		sdio0_d4: sdio0_d4 {
-+			pins = "sdio0_data4";
-+			drive-strength = <8>;
-+		};
-+	};
-+
-+List of supported functions and groups in Northstar2:
-+
-+"nand": "nand_grp"
-+
-+"nor": "nor_data_grp", "nor_adv_grp", "nor_addr_0_3_grp", "nor_addr_4_5_grp",
-+	"nor_addr_6_7_grp", "nor_addr_8_9_grp", "nor_addr_10_11_grp",
-+	"nor_addr_12_15_grp"
-+
-+"gpio": "gpio_0_1_grp", "gpio_2_5_grp", "gpio_6_7_grp", "gpio_8_9_grp",
-+	"gpio_10_11_grp", "gpio_12_13_grp", "gpio_14_17_grp", "gpio_18_19_grp",
-+	"gpio_20_21_grp", "gpio_22_23_grp", "gpio_24_25_grp", "gpio_26_27_grp",
-+	"gpio_28_29_grp", "gpio_30_31_grp"
-+
-+"pcie": "pcie_ab1_clk_wak_grp", "pcie_a3_clk_wak_grp", "pcie_b3_clk_wak_grp",
-+	"pcie_b2_clk_wak_grp", "pcie_a2_clk_wak_grp"
-+
-+"uart0": "uart0_modem_grp", "uart0_rts_cts_grp", "uart0_in_out_grp"
-+
-+"uart1": "uart1_ext_clk_grp", "uart1_dcd_dsr_grp", "uart1_ri_dtr_grp",
-+	"uart1_rts_cts_grp", "uart1_in_out_grp"
-+
-+"uart2": "uart2_rts_cts_grp"
-+
-+"pwm": "pwm_0_grp", "pwm_1_grp", "pwm_2_grp", "pwm_3_grp"
-+
-+
-+List of pins that support pinconf parameters:
-+
-+"qspi_wp", "qspi_hold", "qspi_cs", "qspi_sck", "uart3_sin", "uart3_sout",
-+"qspi_mosi", "qspi_miso", "spi0_fss", "spi0_rxd", "spi0_txd", "spi0_sck",
-+"spi1_fss", "spi1_rxd", "spi1_txd", "spi1_sck", "sdio0_data7",
-+"sdio0_emmc_rst", "sdio0_led_on", "sdio0_wp", "sdio0_data3", "sdio0_data4",
-+"sdio0_data5", "sdio0_data6", "sdio0_cmd", "sdio0_data0", "sdio0_data1",
-+"sdio0_data2", "sdio1_led_on", "sdio1_wp", "sdio0_cd_l", "sdio0_clk",
-+"sdio1_data5", "sdio1_data6", "sdio1_data7", "sdio1_emmc_rst", "sdio1_data1",
-+"sdio1_data2", "sdio1_data3", "sdio1_data4", "sdio1_cd_l", "sdio1_clk",
-+"sdio1_cmd", "sdio1_data0", "ext_mdio_0", "ext_mdc_0", "usb3_p1_vbus_ppc",
-+"usb3_p1_overcurrent", "usb3_p0_vbus_ppc", "usb3_p0_overcurrent",
-+"usb2_presence_indication", "usb2_vbus_present", "usb2_vbus_ppc",
-+"usb2_overcurrent", "sata_led1", "sata_led0"
--- 
-2.1.0
+On 03/01/2016 08:25 PM, Peter Hurley wrote:
+> On 03/01/2016 09:02 AM, Aleksey Makarov wrote:
+>>
+>>
+>> On 03/01/2016 05:52 PM, Peter Hurley wrote:
+>>> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
+>>>> SBBR mentions DBG2 as a mandatory ACPI table.
+>>>> So enable it for ARM64
+>>>
+>>> Why does this have to be opted-in per-arch?
+>>
+>> DBG2 can specify earlycons.  They should start as soon as possible.
+>> On ARM64 it is just after boot tables become available (in arch_init()).
+>> So it has to be per-arch unless we decide not to start earlycons on 
+>> DBG2 ports.
+> 
+> OF does all that already but the earlycon opt-in is not per-arch.
+
+In the last next-XXXX kernel support for OF earlycon depends on
+CONFIG_OF_EARLY_FLATTREE which *is* per-arch.
+
+Probably we need the same kind of configuration option here,
+something like CONFIG_ACPI_BOOT_TABLES instead of ACPI_DBG2_TABLE.
+
+>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>>>> ---
+>>>>  arch/arm64/Kconfig       | 1 +
+>>>>  arch/arm64/kernel/acpi.c | 2 ++
+>>>>  2 files changed, 3 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>> index 9dc5209..0b614d4 100644
+>>>> --- a/arch/arm64/Kconfig
+>>>> +++ b/arch/arm64/Kconfig
+>>>> @@ -3,6 +3,7 @@ config ARM64
+>>>>  	select ACPI_CCA_REQUIRED if ACPI
+>>>>  	select ACPI_GENERIC_GSI if ACPI
+>>>>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>>>> +	select ACPI_DBG2_TABLE if ACPI
+>>>>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>>>>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>>>>  	select ARCH_HAS_ELF_RANDOMIZE
+>>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>>>> index d1ce8e2..3370046 100644
+>>>> --- a/arch/arm64/kernel/acpi.c
+>>>> +++ b/arch/arm64/kernel/acpi.c
+>>>> @@ -208,6 +208,8 @@ void __init acpi_boot_table_init(void)
+>>>>  		pr_err("Failed to init ACPI tables\n");
+>>>>  		if (!param_acpi_force)
+>>>>  			disable_acpi();
+>>>> +	} else {
+>>>> +		acpi_probe_device_table(dbg2);
+>>>>  	}
+>>>>  }
+>>>>  
+>>>>
+>>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
