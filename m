@@ -1,10 +1,10 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 03 Mar 2016 17:03:40 +0900
-Subject: [RFC 14/15] usb: xhci: mtk: Add missing MFD_SYSCON dependency on
- HAS_IOMEM
+Date: Thu, 03 Mar 2016 17:03:39 +0900
+Subject: [RFC 13/15] staging: media: omap4iss: Add missing MFD_SYSCON
+ dependency on HAS_IOMEM
 In-Reply-To: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
 References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1456992221-26712-15-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1456992221-26712-14-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,20 +13,20 @@ direct dependencies.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/usb/host/Kconfig | 1 +
+ drivers/staging/media/omap4iss/Kconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 8c20ebbc049c..f759a778d606 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -45,6 +45,7 @@ config USB_XHCI_PLATFORM
- 
- config USB_XHCI_MTK
- 	tristate "xHCI support for Mediatek MT65xx"
+diff --git a/drivers/staging/media/omap4iss/Kconfig b/drivers/staging/media/omap4iss/Kconfig
+index 46183464ee79..7dea072172aa 100644
+--- a/drivers/staging/media/omap4iss/Kconfig
++++ b/drivers/staging/media/omap4iss/Kconfig
+@@ -2,6 +2,7 @@ config VIDEO_OMAP4
+ 	tristate "OMAP 4 Camera support"
+ 	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && I2C && ARCH_OMAP4
+ 	depends on HAS_DMA
 +	depends on HAS_IOMEM	# For MFD_SYSCON
  	select MFD_SYSCON
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
+ 	select VIDEOBUF2_DMA_CONTIG
  	---help---
 -- 
 2.5.0
