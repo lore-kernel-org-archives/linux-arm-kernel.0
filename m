@@ -1,30 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  3 Mar 2016 17:31:32 +0100
-Subject: [PATCH] arm64: efi: add missing frame pointer assignment
-Message-ID: <1457022692-14043-1-git-send-email-ard.biesheuvel@linaro.org>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 3 Mar 2016 08:33:37 -0800
+Subject: [PATCH v13 4/6] arm64: Move unflatten_device_tree() call earlier.
+In-Reply-To: <CAL_JsqL0Mzgp_SkycmiZBbt2OoGtE7_rFgD41Jex4nDS7xXrHA@mail.gmail.com>
+References: <1456959362-2036-1-git-send-email-ddaney.cavm@gmail.com>
+ <1456959362-2036-5-git-send-email-ddaney.cavm@gmail.com>
+ <CAL_JsqL0Mzgp_SkycmiZBbt2OoGtE7_rFgD41Jex4nDS7xXrHA@mail.gmail.com>
+Message-ID: <56D86761.9060905@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prologue of the EFI entry point pushes x29 and x30 onto the stack but
-fails to create the stack frame correctly by omitting the assignment of x29
-to the new value of the stack pointer. So fix that.
+On 03/03/2016 05:47 AM, Rob Herring wrote:
+> On Wed, Mar 2, 2016 at 4:56 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> In order to extract NUMA information from the device tree, we need to
+>> have the tree in its unflattened form.
+>>
+>> Move the call to unflatten_device_tree() into paging_init().  This
+>> puts it before the call to bootmem_init(), which is where the NUMA
+>> information is extracted.
+>
+> Can't you just move up unflatten_device_tree in setup_arch rather than
+> hiding in paging_init?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi-entry.S | 1 +
- 1 file changed, 1 insertion(+)
+No.
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 936022f0655e..e88c064b845c 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -35,6 +35,7 @@ ENTRY(entry)
- 	 * for image_addr variable passed to efi_entry().
- 	 */
- 	stp	x29, x30, [sp, #-32]!
-+	mov	x29, sp
- 
- 	/*
- 	 * Call efi_entry to do the real work.
--- 
-2.5.0
+It must come *after* map_mem() and *before* bootmem_init(), both of 
+which are done within paging_init().
+
+One option would be to split the things in paging_init() into two 
+functions, and then do:
+
+.
+.
+.
+    paging_init_first_part();
+    if (acpi_disabled)
+        unflatten_device_tree();
+    paging_init_second_part();
+.
+.
+.
+
+>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   arch/arm64/kernel/setup.c | 7 +++----
+>>   arch/arm64/mm/mmu.c       | 5 +++++
+>>   2 files changed, 8 insertions(+), 4 deletions(-)
