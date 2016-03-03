@@ -1,42 +1,31 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 3 Mar 2016 19:07:05 +0100
-Subject: [PATCH v2 0/3] fix memremap on ARM
-In-Reply-To: <CAPcyv4iDMGsksCh4cHU3xooodn1e2tfSc70xTo-B_C2Ppnwsrw@mail.gmail.com>
-References: <1456508053-15015-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_8Fggh+hnVnj6pM6PbOysWFTNt=ot6nudLur9nzs2FVg@mail.gmail.com>
- <20160303171347.GY19428@n2100.arm.linux.org.uk>
- <CAKv+Gu_5vmxsigsCfsvcjFa-hhOP6vxnMavsQ45oKgMeYzgUSg@mail.gmail.com>
- <CAPcyv4ijokZMTNPsxVOafMUCT_CHyScTkCGbR94mcYOhQOKNqA@mail.gmail.com>
- <CAKv+Gu80AJ+UDGLWpr=1sYT57J+6X8-KZ5HCYSEz9JpgWaTQxA@mail.gmail.com>
- <CAPcyv4j-Pz8uMTnz+OJZGguQqS1jOG4U+JkpsO7cBRFvs=-Ehg@mail.gmail.com>
- <CAKv+Gu_z0B9rK4NJgrZFXLXWhgi+LVj6E9555vx60LSEoRy9tg@mail.gmail.com>
- <CAPcyv4h8ez_nNUNVcOdHzjYB-Fh-VrB24p5aepN_GZ2g3jSxMQ@mail.gmail.com>
- <CAKv+Gu8U+3r-H0Oyru0J9RoS744kzbJDjYkm=_FVSRFjzR5pxQ@mail.gmail.com>
- <CAPcyv4iDMGsksCh4cHU3xooodn1e2tfSc70xTo-B_C2Ppnwsrw@mail.gmail.com>
-Message-ID: <CAKv+Gu8uGiy85vC=2sMuMCCP0J7e0qwnAxACR25bePC0zHw=8w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Mar 2016 18:15:28 +0000
+Subject: [PATCH] arm64: enable CONFIG_DEBUG_RODATA by default
+In-Reply-To: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160303181528.GB2074@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2016 at 19:01, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Thu, Mar 3, 2016 at 9:57 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 3 March 2016 at 18:55, Dan Williams <dan.j.williams@intel.com> wrote:
->>> On Thu, Mar 3, 2016 at 9:41 AM, Ard Biesheuvel
-> [..]
->>> Hmm, then what about Russell's suggestoin, if I'm not
->>> mischaracterizing, that ioremap_cache() move to its old
->>> ioremap_cached() name.  The latter has less cross-arch confusion.
->>
->> That would be appropriate as soon as we get rid of all the abuses of
->> ioremap_cache() (for some of which I am responsible myself, in the ARM
->> UEFI code). If we change it now, we're likely to break stuff.
->>
->
-> Ok, sounds good.  I'll take care of the x86 ioremap_cache() removal
-> and leave the eventual ARM conversion to you.
+On Thu, Mar 03, 2016 at 03:10:59PM +0100, Ard Biesheuvel wrote:
+> In spite of its name, CONFIG_DEBUG_RODATA is an important hardening feature
+> for production kernels, and distros all enable it by default in their
+> kernel configs. However, since enabling it used to result in more granular,
+> and thus less efficient kernel mappings, it is not enabled by default for
+> performance reasons.
+> 
+> However, since commit 2f39b5f91eb4 ("arm64: mm: Mark .rodata as RO"), the
+> various kernel segments (.text, .rodata, .init and .data) are already
+> mapped individually, and the only effect of setting CONFIG_DEBUG_RODATA is
+> that the existing .text and .rodata mappings are updated late in the boot
+> sequence to have their read-only attributes set, which means that any
+> performance concerns related to enabling CONFIG_DEBUG_RODATA are no longer
+> valid.
+> 
+> So from now on, make CONFIG_DEBUG_RODATA default to 'y'
 
+Patch applied. If we later get a command line option as Kees mentioned,
+I'm happy to drop this option entirely.
 
-OK. But I'd still like Russell to indicate whether he agrees with all
-of this, i.e., wire up memremap() to perform MT_MEMORY_RW mappings in
-the vmalloc area of memory regions that may be potentially be covered
-by highmem as well.
+-- 
+Catalin
