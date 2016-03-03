@@ -1,41 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Mar 2016 11:33:34 +0100
-Subject: [GIT PULL] STM32 defconfig updates for v4.6 #1
-In-Reply-To: <CALszF6Cgng3Yr_vrag7LY9zYunV_Fca0oHKX45w6t29DFqC5gA@mail.gmail.com>
-References: <56D6C623.8030908@gmail.com> <2216821.q30YMIK6pX@wuerfel>
- <CALszF6Cgng3Yr_vrag7LY9zYunV_Fca0oHKX45w6t29DFqC5gA@mail.gmail.com>
-Message-ID: <1624048.IcI7yXPN7a@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 03 Mar 2016 11:35:53 +0100
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.6 (#2)
+In-Reply-To: <2820325.orlLQWWEvZ@wuerfel> (Arnd Bergmann's message of "Tue, 01
+ Mar 2016 00:00:53 +0100")
+References: <87bn73o885.fsf@free-electrons.com> <2820325.orlLQWWEvZ@wuerfel>
+Message-ID: <87si07lugm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2016 09:59:35 Maxime Coquelin wrote:
-> 2016-03-02 23:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday 02 March 2016 11:53:23 Maxime Coquelin wrote:
-> >> Highlights:
-> >> -----------
-> >>   - Enable GPIO led driver in stm32_defconfig
-> >>   - Introduce a config fragment to override RAM base address
-> >>
-> >
-> > Our first config fragment 
-> 
-> Yes! Out of curiosity, did you see the question I asked you about fragments?
-> See "Re: [PATCH v3 4/4] ARM: STM32: Enable Ethernet in stm32_defconfig".
-> (https://lkml.org/lkml/2016/3/1/474)
-> 
-> This is not urgent, it can wait for after the merge window, but I will
-> be happy to have your view on this.
-> 
+Hi Arnd,
+ 
+ On mar., mars 01 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-No, I missed that. Generally, I'd say we should limit the use of Kconfig
-fragments to more fundamental settings, it should not replace the
-manual configuration that users apply to pick the set of drivers
-they want. In the end there is not much difference between someone
-locally turning on CONFIG_INET when they need it, or using a fragment
-that does the same.
+> On Friday 26 February 2016 15:29:46 Gregory CLEMENT wrote:
+>> mvebu defconfig for 4.6 (part 2)
+>> 
+>> enable SRAM support in mvebu_v7_defconfig
+>> 
+>> 
+>
+> Merged into next/defconfig.
+>
+> I see that the SRAM support is not enabled in multi_v7_defconfig, can
+> you enable that as well?
 
-Please just pick one default here (ethernet and ipv4 both enabled or
-both disabled) that makes sense for most users, and have the others
-change it manually.
+Actually it is already selected by CONFIG_ARCH_EXYNOS so there is no
+need to add it in multi_v7_defconfig.
 
-	Arnd
+Gregory
+
+>
+> Thanks!
+>
+> 	Arnd
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
