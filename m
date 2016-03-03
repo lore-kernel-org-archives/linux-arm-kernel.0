@@ -1,105 +1,81 @@
 From: blogic@openwrt.org (John Crispin)
-Date: Thu,  3 Mar 2016 21:02:38 +0100
-Subject: [PATCH V3 1/4] net-next: mediatek: document MediaTek SoC ethernet
- binding
+Date: Thu,  3 Mar 2016 21:02:40 +0100
+Subject: [PATCH V3 3/4] net-next: mediatek: add Kconfig and Makefile
 In-Reply-To: <1457035361-57669-1-git-send-email-blogic@openwrt.org>
 References: <1457035361-57669-1-git-send-email-blogic@openwrt.org>
-Message-ID: <1457035361-57669-2-git-send-email-blogic@openwrt.org>
+Message-ID: <1457035361-57669-4-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the binding documentation for the MediaTek Ethernet
-controller.
+This patch adds the Makefile and Kconfig required to make the driver build.
 
 Signed-off-by: John Crispin <blogic@openwrt.org>
-Cc: devicetree at vger.kernel.org
 ---
- .../devicetree/bindings/net/mediatek-net.txt       |   77 ++++++++++++++++++++
- 1 file changed, 77 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/mediatek-net.txt
+ drivers/net/ethernet/Kconfig           |    1 +
+ drivers/net/ethernet/Makefile          |    1 +
+ drivers/net/ethernet/mediatek/Kconfig  |   17 +++++++++++++++++
+ drivers/net/ethernet/mediatek/Makefile |    5 +++++
+ 4 files changed, 24 insertions(+)
+ create mode 100644 drivers/net/ethernet/mediatek/Kconfig
+ create mode 100644 drivers/net/ethernet/mediatek/Makefile
 
-diff --git a/Documentation/devicetree/bindings/net/mediatek-net.txt b/Documentation/devicetree/bindings/net/mediatek-net.txt
+diff --git a/drivers/net/ethernet/Kconfig b/drivers/net/ethernet/Kconfig
+index 0b13af8..be67a19 100644
+--- a/drivers/net/ethernet/Kconfig
++++ b/drivers/net/ethernet/Kconfig
+@@ -106,6 +106,7 @@ config LANTIQ_ETOP
+ 	  Support for the MII0 inside the Lantiq SoC
+ 
+ source "drivers/net/ethernet/marvell/Kconfig"
++source "drivers/net/ethernet/mediatek/Kconfig"
+ source "drivers/net/ethernet/mellanox/Kconfig"
+ source "drivers/net/ethernet/micrel/Kconfig"
+ source "drivers/net/ethernet/microchip/Kconfig"
+diff --git a/drivers/net/ethernet/Makefile b/drivers/net/ethernet/Makefile
+index 38dc1a7..6ffcc80 100644
+--- a/drivers/net/ethernet/Makefile
++++ b/drivers/net/ethernet/Makefile
+@@ -46,6 +46,7 @@ obj-$(CONFIG_JME) += jme.o
+ obj-$(CONFIG_KORINA) += korina.o
+ obj-$(CONFIG_LANTIQ_ETOP) += lantiq_etop.o
+ obj-$(CONFIG_NET_VENDOR_MARVELL) += marvell/
++obj-$(CONFIG_NET_VENDOR_MEDIATEK) += mediatek/
+ obj-$(CONFIG_NET_VENDOR_MELLANOX) += mellanox/
+ obj-$(CONFIG_NET_VENDOR_MICREL) += micrel/
+ obj-$(CONFIG_NET_VENDOR_MICROCHIP) += microchip/
+diff --git a/drivers/net/ethernet/mediatek/Kconfig b/drivers/net/ethernet/mediatek/Kconfig
 new file mode 100644
-index 0000000..5ca7929
+index 0000000..b0229f4
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/net/mediatek-net.txt
-@@ -0,0 +1,77 @@
-+MediaTek Frame Engine Ethernet controller
-+=========================================
++++ b/drivers/net/ethernet/mediatek/Kconfig
+@@ -0,0 +1,17 @@
++config NET_VENDOR_MEDIATEK
++	bool "MediaTek ethernet driver"
++	depends on ARCH_MEDIATEK
++	---help---
++	  If you have a Mediatek SoC with ethernet, say Y.
 +
-+The frame engine ethernet controller can be found on MediaTek SoCs. These SoCs
-+have dual GMAC each represented by a child node..
++if NET_VENDOR_MEDIATEK
 +
-+* Ethernet controller node
++config NET_MEDIATEK_SOC
++	tristate "MediaTek MT7623 Gigabit ethernet support"
++	depends on NET_VENDOR_MEDIATEK #&& (MACH_MT7623 || MACH_MT2701)
++	select PHYLIB
++	---help---
++	  This driver supports the gigabit ethernet MACs in the
++	  MediaTek MT2701/MT7623 chipset family.
 +
-+Required properties:
-+- compatible: Should be "mediatek,mt7623-eth"
-+- reg: Address and length of the register set for the device
-+- interrupts: Should contain the frame engines interrupt
-+- clocks: the clock used by the core
-+- clock-names: the names of the clock listed in the clocks property. These are
-+	"ethif", "esw", "gp2", "gp1"
-+- power-domains: phandle to the power domain that the ethernet is part of
-+- resets: Should contain a phandle to the ethsys reset signal
-+- reset-names: Should contain the reset signal name "eth"
-+- mediatek,ethsys: phandle to the syscon node that handles the port setup
-+- mediatek,pctl: phandle to the syscon node that handles the ports slew rate
-+	and driver current
++endif #NET_VENDOR_MEDIATEK
+diff --git a/drivers/net/ethernet/mediatek/Makefile b/drivers/net/ethernet/mediatek/Makefile
+new file mode 100644
+index 0000000..aa3f1c8
+--- /dev/null
++++ b/drivers/net/ethernet/mediatek/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for the Mediatek SoCs built-in ethernet macs
++#
 +
-+Optional properties:
-+- interrupt-parent: Should be the phandle for the interrupt controller
-+  that services interrupts for this device
-+
-+
-+* Ethernet MAC node
-+
-+Required properties:
-+- compatible: Should be "mediatek,eth-mac"
-+- reg: The number of the MAC
-+- phy-handle: see ethernet.txt file in the same directory.
-+
-+Example:
-+
-+eth: ethernet at 1b100000 {
-+	compatible = "mediatek,mt7623-eth";
-+	reg = <0 0x1b100000 0 0x20000>;
-+	clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-+		 <&ethsys CLK_ETHSYS_ESW>,
-+		 <&ethsys CLK_ETHSYS_GP2>,
-+		 <&ethsys CLK_ETHSYS_GP1>;
-+	clock-names = "ethif", "esw", "gp2", "gp1";
-+	interrupts = <GIC_SPI 200 IRQ_TYPE_LEVEL_LOW>;
-+	power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-+	resets = <&ethsys MT2701_ETHSYS_ETH_RST>;
-+	reset-names = "eth";
-+	mediatek,ethsys = <&ethsys>;
-+	mediatek,pctl = <&syscfg_pctl_a>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	gmac1: mac at 0 {
-+		compatible = "mediatek,eth-mac";
-+		reg = <0>;
-+		phy-handle = <&phy0>;
-+	};
-+
-+	gmac2: mac at 1 {
-+		compatible = "mediatek,eth-mac";
-+		reg = <1>;
-+		phy-handle = <&phy1>;
-+	};
-+
-+	mdio-bus {
-+		phy0: ethernet-phy at 0 {
-+			reg = <0>;
-+			phy-mode = "rgmii";
-+		};
-+
-+		phy1: ethernet-phy at 1 {
-+			reg = <1>;
-+			phy-mode = "rgmii";
-+		};
-+	};
-+};
++obj-$(CONFIG_NET_MEDIATEK_SOC)			+= mtk_eth_soc.o
 -- 
 1.7.10.4
