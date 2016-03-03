@@ -1,48 +1,57 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 3 Mar 2016 20:21:46 +0100
-Subject: [PATCH v2 15/17] arm64: KVM: vgic-v3: Do not save an LR known to
- be empty
-In-Reply-To: <1455727249-24752-16-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 3 Mar 2016 20:21:50 +0100
+Subject: [PATCH v2 16/17] arm64: KVM: vgic-v3: Only wipe LRs on vcpu exit
+In-Reply-To: <1455727249-24752-17-git-send-email-marc.zyngier@arm.com>
 References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
- <1455727249-24752-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160303192146.GH9634@cbox>
+ <1455727249-24752-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160303192150.GI9634@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 04:40:47PM +0000, Marc Zyngier wrote:
-> On exit, any empty LR will be signaled in ICH_ELRSR_EL2. Which
-> means that we do not have to save it, and we can just clear
-> its state in the in-memory copy.
+On Wed, Feb 17, 2016 at 04:40:48PM +0000, Marc Zyngier wrote:
+> So far, we're always writing all possible LRs, setting the empty
+> ones with a zero value. This is obvious doing a low of work for
+> nothing, and we're better off clearing those we've actually
+> dirtied on the exit path (it is very rare to inject more than one
+> interrupt at a time anyway).
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/kvm/hyp/vgic-v3-sr.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
+>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 9 ++++-----
+>  1 file changed, 4 insertions(+), 5 deletions(-)
 > 
 > diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> index 3463c0a..ff67296 100644
+> index ff67296..5f12c57 100644
 > --- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
 > +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> @@ -190,8 +190,15 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  		save_maint_int_state(vcpu, max_lr_idx + 1);
+> @@ -199,6 +199,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  			}
 >  
->  		for (i = 0; i <= max_lr_idx; i++) {
-> -			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
-> -				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
-> +			if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
-> +				continue;
-> +
-> +			if (cpu_if->vgic_elrsr & (1 << i)) {
-> +				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
-> +				continue;
-> +			}
-> +
-> +			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
+>  			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
+> +			__gic_v3_set_lr(0, i);
 >  		}
 >  
 >  		switch (nr_pri_bits) {
+> @@ -296,12 +297,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>  		}
+>  		 	                           
+>  		for (i = 0; i <= max_lr_idx; i++) {
+> -			val = 0;
+> -
+> -			if (live_lrs & (1 << i))
+> -				val = cpu_if->vgic_lr[i];
+> +			if (!(live_lrs & (1 << i)))
+> +				continue;
+>  
+> -			__gic_v3_set_lr(val, i);
+> +			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+>  		}
+>  	}
+>  
 > -- 
 > 2.1.4
 > 
+
+same comment here with initializing the LRs, but otherwise:
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
