@@ -1,53 +1,53 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed,  2 Mar 2016 22:38:21 -0600
-Subject: [GIT PULL V3] Qualcomm SoC Updates for 4.6
-Message-ID: <1456979901-4044-1-git-send-email-andy.gross@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 2 Mar 2016 20:38:54 -0800
+Subject: [PATCH v3 2/3] hwmon: Create an NSA320 hardware monitoring driver
+In-Reply-To: <56D77AA4.2080908@baker-net.org.uk>
+References: <1456698614-15176-1-git-send-email-linux@baker-net.org.uk>
+ <1456698614-15176-3-git-send-email-linux@baker-net.org.uk>
+ <56D3948D.6000805@roeck-us.net> <56D77AA4.2080908@baker-net.org.uk>
+Message-ID: <56D7BFDE.8090804@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+On 03/02/2016 03:43 PM, Adam Baker wrote:
+> On 29/02/16 00:45, Guenter Roeck wrote:
+>
+>>> +
+>>> +/*
+>>> + * Although this protocol looks similar to SPI the long delay
+>>> + * between the active (aka chip select) signal and the shorter
+>>> + * delay between clock pulses are needed for reliable operation.
+>>> + * The delays provided are taken from the manufacturer kernel,
+>>> + * testing suggest they probably incorporate a reasonable safety
+>>> + * margin. (The single device tested became unreliable if the
+>>> + * delay was reduced to 1/10th of this value.)
+>>> + */
+>>> +static unsigned long nsa320_hwmon_update(struct device *dev)
+>>
+>> Please make this either int or s32.
+>>
+>>> +{
+>>> +    u32 mcu_data;
+>>
+>> You can (and should) still use u32 here.
+>>
+>
+>
+> I'm a bit puzzled by your reasoning for preferring a signed value for the return value. The only reason I can think of is that the error return value is negative, however the macro to test if it is an error value is not looking at whether the value is negative
+>
+> #define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-MAX_ERRNO)
+>
+> Functionally using any of s32, int or unsigned long will make no difference, the mask operations ensure that the top bit can't possibly be set so using a signed type doesn't, in this circumstance, risk an undefined result from the shift operation. The choice of type is therefore a matter of readability rather than function so if you still prefer s32 I'll respin it to use that.
+>
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+IS_ERR_VALUE _only_ works with unsigned long if sizeof(long) = sizeof(int).
+Someone may at some point in the future not realize this and change the function
+return value to unsigned int or u32, thinking that an unsigned long is unnecessary,
+and introduce a bug. Many users of IS_ERR_VALUE in the kernel actually
+suffer from this problem. I prefer code which is less prone to such
+unintentionally introduced problems.
 
-are available in the git repository at:
+I also dislike using unsigned variables to return negative error codes unless
+there is a really good reason for doing it. Such a reason does not exist here.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.6
-
-for you to fetch changes up to c1f28712cc33e79b40ffc4456ddc60af50e80187:
-
-  soc: qcom: smp2p: Use memset_io to zero out new entries (2016-03-02 21:53:12 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for v4.6
-
-* Add stubs for smem_state to fix build issues
-* Fix module usage in SPM driver
-* Add i2c and spi entries into QCOM MAINTAINERS entry
-* Add SMD multi channel support
-* Add clks to QCOM MAINTAINERS
-* Fix smp2p memset issue
-
-----------------------------------------------------------------
-Bjorn Andersson (7):
-      soc: qcom: smem_state: Add stubs for disabled smem_state
-      soc: qcom: smd: Introduce callback setter
-      soc: qcom: smd: Split discovery and state change work
-      soc: qcom: smd: Refactor channel open and close handling
-      soc: qcom: smd: Support multiple channels per sdev
-      soc: qcom: smd: Support opening additional channels
-      soc: qcom: smp2p: Use memset_io to zero out new entries
-
-Lina Iyer (1):
-      drivers: qcom: spm: avoid module usage in non-modular SPM driver
-
-Srinivas Kandagatla (2):
-      MAINTAINERS: add qcom i2c and spi drivers to list
-      MAINTAINERS: add qcom clocks to the maintainers list
-
- MAINTAINERS                         |   3 +
- drivers/soc/qcom/smd.c              | 229 +++++++++++++++++++++++++++---------
- drivers/soc/qcom/smp2p.c            |   2 +-
- drivers/soc/qcom/spm.c              |   8 +-
- include/linux/soc/qcom/smd.h        |   8 +-
- include/linux/soc/qcom/smem_state.h |  35 ++++++
- 6 files changed, 221 insertions(+), 64 deletions(-)
+Guenter
