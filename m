@@ -1,147 +1,28 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:40:10 +0100
-Subject: [PATCH 17/17] arm: boot: dts: Add Western Digital My Book World
- Edition device tree
+Date: Thu,  3 Mar 2016 12:40:09 +0100
+Subject: [PATCH 16/17] dt-bindings: Add Western Digital to vendor prefixes
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-18-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-17-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Western Digital My Book World Edition device tree based on
-PLX Technology OX810SE SoC.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/boot/dts/Makefile    |   2 +
- arch/arm/boot/dts/wd-mbwe.dts | 106 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 108 insertions(+)
- create mode 100644 arch/arm/boot/dts/wd-mbwe.dts
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70..0395674 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -520,6 +520,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
- 	orion5x-rd88f5182-nas.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += \
- 	prima2-evb.dtb
-+dtb-$(CONFIG_ARCH_OXNAS) += \
-+	wd-mbwe.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8064-cm-qs600.dtb \
- 	qcom-apq8064-ifc6410.dtb \
-diff --git a/arch/arm/boot/dts/wd-mbwe.dts b/arch/arm/boot/dts/wd-mbwe.dts
-new file mode 100644
-index 0000000..ad97e2f
---- /dev/null
-+++ b/arch/arm/boot/dts/wd-mbwe.dts
-@@ -0,0 +1,106 @@
-+/*
-+ * wd-mbwe.dtsi - Device tree file for Western Digital My Book World Edition
-+ *
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/dts-v1/;
-+#include "ox810se.dtsi"
-+
-+/ {
-+	model = "Western Digital My Book World Edition";
-+
-+	compatible = "wd,mbwe", "plxtech,ox810se";
-+
-+	chosen {
-+		bootargs = "console=ttyS1,115200n8 earlyprintk=serial";
-+	};
-+
-+	memory {
-+		/* 128Mbytes DDR */
-+		reg = <0x48000000 0x8000000>;
-+	};
-+
-+	gpio-keys-polled {
-+		compatible = "gpio-keys-polled";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <100>;
-+
-+		power {
-+			label = "power";
-+			gpios = <&gpio0 0 1>;
-+			linux,code = <0x198>;
-+		};
-+
-+		recovery {
-+			label = "recovery";
-+			gpios = <&gpio0 4 1>;
-+			linux,code = <0xab>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		a0 {
-+			label = "activity0";
-+			gpios = <&gpio0 25 0>;
-+			default-state = "keep";
-+		};
-+
-+		a1 {
-+			label = "activity1";
-+			gpios = <&gpio0 26 0>;
-+			default-state = "keep";
-+		};
-+
-+		a2 {
-+			label = "activity2";
-+			gpios = <&gpio0 5 0>;
-+			default-state = "keep";
-+		};
-+
-+		a3 {
-+			label = "activity3";
-+			gpios = <&gpio0 6 0>;
-+			default-state = "keep";
-+		};
-+
-+		a4 {
-+			label = "activity4";
-+			gpios = <&gpio0 7 0>;
-+			default-state = "keep";
-+		};
-+
-+		a5 {
-+			label = "activity5";
-+			gpios = <&gpio1 2 0>;
-+			default-state = "keep";
-+		};
-+	};
-+
-+	i2c-gpio {
-+		compatible = "i2c-gpio";
-+		gpios = <&gpio0 3 0 /* sda */
-+			 &gpio0 2 0 /* scl */
-+			 >;
-+		i2c-gpio,delay-us = <2>;        /* ~100 kHz */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		rtc0: rtc at 48 {
-+			compatible = "st,m41t00";
-+			reg = <0x68>;
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 03970fb..4055608 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -248,6 +248,7 @@ via	VIA Technologies, Inc.
+ virtio	Virtual I/O Device Specification, developed by the OASIS consortium
+ vivante	Vivante Corporation
+ voipac	Voipac Technologies s.r.o.
++wd	Western Digital Corp.
+ wexler	Wexler
+ winbond Winbond Electronics corp.
+ wlf	Wolfson Microelectronics
 -- 
 1.9.1
