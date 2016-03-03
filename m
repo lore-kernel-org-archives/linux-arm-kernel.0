@@ -1,56 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 3 Mar 2016 15:42:47 +0100
-Subject: [PATCH 2/3] usb: chipidea: host: let the hcd know's parent
- device node
-In-Reply-To: <1456999276-6315-3-git-send-email-peter.chen@nxp.com>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
- <1456999276-6315-3-git-send-email-peter.chen@nxp.com>
-Message-ID: <20160303144247.GH15541@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Mar 2016 14:49:27 +0000
+Subject: [PATCH 0/3] KASAN: clean stale poison upon cold re-entry to kernel
+In-Reply-To: <56D84A79.2030303@virtuozzo.com>
+References: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
+ <20160303120227.GA2484@gmail.com>
+ <20160303123809.GA19139@leverpostej>
+ <56D84A79.2030303@virtuozzo.com>
+Message-ID: <20160303144927.GD19139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 06:01:15PM +0800, Peter Chen wrote:
-> From: Peter Chen <peter.chen@freescale.com>
+On Thu, Mar 03, 2016 at 05:30:17PM +0300, Andrey Ryabinin wrote:
+> On 03/03/2016 03:38 PM, Mark Rutland wrote:
+> > On Thu, Mar 03, 2016 at 01:02:27PM +0100, Ingo Molnar wrote:
+> >>>
+> >>> Mark Rutland (3):
+> >>>   kasan: add functions to clear stack poison
+> >>>   sched/kasan: remove stale KASAN poison after hotplug
+> >>>   arm64: kasan: clear stale stack poison
+> >>>
+> >>>  arch/arm64/kernel/sleep.S |  4 ++++
+> >>>  include/linux/kasan.h     |  6 +++++-
+> >>>  kernel/sched/core.c       |  3 +++
+> >>>  mm/kasan/kasan.c          | 20 ++++++++++++++++++++
+> >>>  4 files changed, 32 insertions(+), 1 deletion(-)
+> >>
+> >> Looks good to me - via which tree would you like to see this merged upstream?
+> > 
+> > I'd prefer the arm64 tree as arm64 is (the most) affected by the issue
+> > in practice.
+> > 
+> > I'm happy for this to go via another tree if that's simpler; I'm not
+> > aware of anything that's likely to conflict in the arm64 tree.
+> > 
+> > Catalin, Andrey, Andrew, any preference?
+> > 
 > 
-> Since the hcd (chipidea core device) has no device node, so
-> if we want to describe the child node under the hcd, we had
-> to put it under its parent's node (glue layer device), and
-> in the code, we need to let the hcd knows glue layer's code,
-> then the USB core can handle this node.
+> I don't have any. arm64 tree is fine by me.
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/host.c | 18 ++++++++++++++----
->  1 file changed, 14 insertions(+), 4 deletions(-)
+> For the patchset:
 > 
-> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> index 053bac9..55120ef 100644
-> --- a/drivers/usb/chipidea/host.c
-> +++ b/drivers/usb/chipidea/host.c
-> @@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
->  	struct ehci_hcd *ehci;
->  	struct ehci_ci_priv *priv;
->  	int ret;
-> +	struct device *dev = ci->dev;
->  
-> -	if (usb_disabled())
-> +	if (usb_disabled() || !dev)
->  		return -ENODEV;
->  
-> -	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
-> +	/*
-> +	 * USB Core will try to get child node under roothub,
-> +	 * but chipidea core has no of_node, and the child node
-> +	 * for controller is located at glue layer's node which
-> +	 * is chipidea core's parent.
-> +	 */
-> +	if (dev->parent && dev->parent->of_node)
-> +		dev->of_node = dev->parent->of_node;
+> 	Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> 
 
-Is this a good idea? Two devices with the same of_node?
+Cheers!
 
-I know the networking code assumes of_node values are unique, and uses
-it to find a device. Are you 100% sure the USB code does not make this
-assumption.
+Following [1], I intend to change patch 1 to start at task_stack_page(t)
+rather than task_thread_info(task) + 1, to keep things simple.
 
-	Andrew
+I assume that your Reviewed-by would still apply in that case?
+
+Thanks,
+Mark.
+
+[1] https://lkml.org/lkml/2016/3/2/428
