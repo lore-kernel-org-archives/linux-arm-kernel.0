@@ -1,11 +1,11 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 3 Mar 2016 21:43:55 +0900
-Subject: [rtc-linux] [RFC 07/15] pinctrl: mvebu: Add missing MFD_SYSCON
+Date: Thu, 3 Mar 2016 21:44:44 +0900
+Subject: [rtc-linux] [RFC 06/15] pinctrl: rockchip: Add missing MFD_SYSCON
  dependency on HAS_IOMEM
-In-Reply-To: <1456992221-26712-8-git-send-email-k.kozlowski@samsung.com>
+In-Reply-To: <1456992221-26712-7-git-send-email-k.kozlowski@samsung.com>
 References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
- <1456992221-26712-8-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAJKOXPeVNrzCJ0TTeBG=H0w2+qHzAcXfTck9gBBmZFvVPpPx0A@mail.gmail.com>
+ <1456992221-26712-7-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAJKOXPcbiscpC_RUe=ft9NTy1ZY1uaa_zkX6rOadnoym-UMR1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,20 +15,19 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/pinctrl/mvebu/Kconfig | 1 +
+>  drivers/pinctrl/Kconfig | 1 +
 >  1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-> index 170602407c0d..13685923729c 100644
-> --- a/drivers/pinctrl/mvebu/Kconfig
-> +++ b/drivers/pinctrl/mvebu/Kconfig
-> @@ -7,6 +7,7 @@ config PINCTRL_MVEBU
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index fb8200b8e8ec..dc7ab58d4d74 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -131,6 +131,7 @@ config PINCTRL_MESON
 >
->  config PINCTRL_DOVE
+>  config PINCTRL_ROCKCHIP
 >         bool
 > +       depends on HAS_IOMEM    # For MFD_SYSCON
->         select PINCTRL_MVEBU
->         select MFD_SYSCON
+>         select PINMUX
 
 False alarm, no need for the patch (non-selectable symbol)
 
