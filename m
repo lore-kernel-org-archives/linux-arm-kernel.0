@@ -1,34 +1,31 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 3 Mar 2016 15:57:10 +0100
-Subject: [PATCH 03/17] dt-bindings: Add PLX Technology RPS IRQ Controller
- bindings
-In-Reply-To: <20160303145348.GI15541@lunn.ch>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-4-git-send-email-narmstrong@baylibre.com>
- <20160303145348.GI15541@lunn.ch>
-Message-ID: <56D850C6.1010404@baylibre.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 3 Mar 2016 14:59:29 +0000
+Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
+ (kernel 4.5)
+In-Reply-To: <20160303144215.GC19139@leverpostej>
+References: <20160303141752.GA12255@localhost.localdomain>
+ <20160303144215.GC19139@leverpostej>
+Message-ID: <56D85151.9050607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On 03/03/16 14:42, Mark Rutland wrote:
 
-On 03/03/2016 03:53 PM, Andrew Lunn wrote:
-> 
->> +- compatible: Should be "plxtech,nas782x-rps"
-> 
-> Hi Neil
-> 
-> It would be nice to be consistent with the naming.
-The compatible is now oxsemi,os810se-rps-irq which is consistent with the timer.
+>> However for arm64 it is implemented that cpu_present_mask is
+>> explicetely set accordingly to 'maxcpus' value. Is it design intent ?
+>
+> To some extent, yes.
+>
+> Due to the possibility of a heterogeneous system, we must bring all CPUs
+> online at boot time, and cannot defer this.
+>
+> This is necessary to detect the common subset of supported features, and
+> also to detect the full set of CPUs in the system to correctly apply
+> errata workarounds which require kernel text patching.
 
-> 
-> Maybe also the filename of the driver itself should be changed. You
-> had an interesting sorting problem in the Makefile, which a consistent
-> name would help with.
-Yes, I will add -irq to the driver name and _IRQ to the config name.
+We don't have this limitation anymore, as we can check if the booting CPU
+has any conflicting/missing features w.r.t the established set and fail the
+booting if it does.
 
-> 
->      Andrew
-> 
-Thanks,
-Neil
+Cheers
+Suzuki
