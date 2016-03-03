@@ -1,37 +1,29 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 3 Mar 2016 13:27:59 +0100
-Subject: [RFC 08/15] rtc: at91sam9: Add missing MFD_SYSCON dependency on
+Date: Thu, 3 Mar 2016 13:28:35 +0100
+Subject: [RFC 09/15] media: platform: Add missing MFD_SYSCON dependency on
  HAS_IOMEM
-In-Reply-To: <2233190.1BxevBAvDE@wuerfel>
+In-Reply-To: <2181866.k24LVvUjTs@wuerfel>
 References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
- <1456992221-26712-9-git-send-email-k.kozlowski@samsung.com>
- <2233190.1BxevBAvDE@wuerfel>
-Message-ID: <CAMuHMdXUdz0=n2+Aa74f1LtwiwfV9=gkPBiJKC_DMyr1_jBe7Q@mail.gmail.com>
+ <1456992221-26712-10-git-send-email-k.kozlowski@samsung.com>
+ <2181866.k24LVvUjTs@wuerfel>
+Message-ID: <CAMuHMdX7UC627aN9wo23EDJ7Y+-ryKhVMKH6cvXhnHj9VoG=MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 3, 2016 at 11:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 03 March 2016 17:03:34 Krzysztof Kozlowski wrote:
->> index 0da40e2e4280..5c530b6b125d 100644
->> --- a/drivers/rtc/Kconfig
->> +++ b/drivers/rtc/Kconfig
->> @@ -1302,6 +1302,7 @@ config RTC_DRV_AT91RM9200
->>  config RTC_DRV_AT91SAM9
->>         tristate "AT91SAM9 RTT as RTC"
->>         depends on ARCH_AT91 || COMPILE_TEST
+On Thu, Mar 3, 2016 at 11:57 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> --- a/drivers/media/platform/exynos4-is/Kconfig
+>> +++ b/drivers/media/platform/exynos4-is/Kconfig
+>> @@ -17,6 +17,7 @@ config VIDEO_S5P_FIMC
+>>         tristate "S5P/EXYNOS4 FIMC/CAMIF camera interface driver"
+>>         depends on I2C
+>>         depends on HAS_DMA
 >> +       depends on HAS_IOMEM    # For MFD_SYSCON
->>         select MFD_SYSCON
->>         help
->>           Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
->>
+>>         select VIDEOBUF2_DMA_CONTIG
+>>         select V4L2_MEM2MEM_DEV
 >
-> This is technically correct, but the entire RTC menu is hidden
-> inside of 'depends on !UML && !S390', so we won't ever get there
-> on any configuration that does not use HAS_IOMEM.
->
-> If we did, all other RTC drivers would also fail.
+> This  is guarded by HAS_DMA, which implies HAS_IOMEM afaik.
 
-So UML has no RTC. Should/can it use RTC_DRV_GENERIC?
+No systems around with HV-based DMA?
 
 Gr{oetje,eeting}s,
 
