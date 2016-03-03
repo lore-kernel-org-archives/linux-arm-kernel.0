@@ -1,96 +1,67 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu,  3 Mar 2016 16:05:54 +0800
-Subject: [PATCH v5 5/6] dt/bindings: rockchip: modify document of Rockchip
- power domains
-In-Reply-To: <[PATCH v5 0_6] rockchip: power-domain: fix pm domain for support
- RK3399 SoC.eml>
-References: <[PATCH v5 0_6] rockchip: power-domain: fix pm domain for support
- RK3399 SoC.eml>
-Message-ID: <1456992354-25237-1-git-send-email-zhangqing@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 3 Mar 2016 08:14:19 +0000
+Subject: [PATCH v2 11/17] arm64: KVM: vgic-v2: Only wipe LRs on vcpu exit
+In-Reply-To: <20160302230819.GE9634@cbox>
+References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+ <1455727249-24752-12-git-send-email-marc.zyngier@arm.com>
+ <20160302230819.GE9634@cbox>
+Message-ID: <20160303081419.40a4df1a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the power domains
-found on Rockchip RK3399 SoCs.
-RK3399 pd on/off not need to enable clk which in this pd.
-So remove the clocks in the rk3399 pd example.
+On Thu, 3 Mar 2016 00:08:19 +0100
+Christoffer Dall <christoffer.dall@linaro.org> wrote:
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- .../bindings/soc/rockchip/power_domain.txt         | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+> On Wed, Feb 17, 2016 at 04:40:43PM +0000, Marc Zyngier wrote:
+> > So far, we're always writing all possible LRs, setting the empty
+> > ones with a zero value. This is obvious doing a low of work for
+> 
+> s/low/lot/
+> 
+> > nothing, and we're better off clearing those we've actually
+> > dirtied on the exit path (it is very rare to inject more than one
+> > interrupt at a time anyway).
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/kvm/hyp/vgic-v2-sr.c | 10 +++++-----
+> >  1 file changed, 5 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > index 3dbbc6b..e53f131 100644
+> > --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > @@ -101,6 +101,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+> >  		}
+> >  
+> >  		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+> > +		writel_relaxed(0, base + GICH_LR0 + (i * 4));
+> >  	}
+> >  }
+> >  
+> > @@ -158,12 +159,11 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+> >  		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+> >  		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+> >  		for (i = 0; i < nr_lr; i++) {
+> > -			u32 val = 0;
+> > -
+> > -			if (live_lrs & (1UL << i))
+> > -				val = cpu_if->vgic_lr[i];
+> > +			if (!(live_lrs & (1UL << i)))
+> > +				continue;
+> 
+> how can we be sure that the LRs are clear when we launch our first VM on
+> a given physical CPU?  Don't we need to flush the LRs during VGIC init
+> time?
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-index 13dc6a3..98085c8 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-@@ -7,6 +7,7 @@ Required properties for power domain controller:
- - compatible: Should be one of the following.
- 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
- 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
-+	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
- - #power-domain-cells: Number of cells in a power-domain specifier.
- 	Should be 1 for multiple PM domains.
- - #address-cells: Should be 1.
-@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
- - reg: index of the power domain, should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
- - clocks (optional): phandles to clocks which need to be enabled while power domain
- 	switches state.
- 
-@@ -45,12 +47,41 @@ Example:
-                 };
-         };
- 
-+Example 2:
-+		power: power-controller {
-+			compatible = "rockchip,rk3399-power-controller";
-+			#power-domain-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			pd_vio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <RK3399_PD_VIO>;
-+
-+				pd_vo {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <RK3399_PD_VO>;
-+
-+					pd_vopb {
-+						reg = <RK3399_PD_VOPB>;
-+					};
-+
-+					pd_vopl {
-+						reg = <RK3399_PD_VOPL>;
-+					};
-+				};
-+			};
-+		};
-+
- Node of a device using power domains must have a power-domains property,
- containing a phandle to the power device node and an index specifying which
- power domain to use.
- The index should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
- 
- Example of the node using power domain:
- 
-@@ -65,3 +96,9 @@ Example of the node using power domain:
-                 power-domains = <&power RK3368_PD_GPU_1>;
-                 /* ... */
-         };
-+
-+	node {
-+		/* ... */
-+		power-domains = <&power RK3399_PD_VOPB>;
-+		/* ... */
-+	};
+Very good point. The registers reset to zero, but there is indeed no
+guarantee that we don't get something clobbered by EL3, or some earlier
+crash.
+
+I'll add a patch to that effect.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny.
