@@ -1,67 +1,31 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 3 Mar 2016 14:39:02 +0100
-Subject: [PATCH 14/17] arm: boot: dts: Add PLX Technology OX810SE dtsi
-In-Reply-To: <2983013.zAxmIfv4bz@wuerfel>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Mar 2016 14:40:25 +0100
+Subject: [PATCH 12/17] arm: Add new mach-oxnas
+In-Reply-To: <20160303132956.GW19428@n2100.arm.linux.org.uk>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-15-git-send-email-narmstrong@baylibre.com>
- <2983013.zAxmIfv4bz@wuerfel>
-Message-ID: <56D83E76.3020705@baylibre.com>
+ <3226743.49AyJYeiGh@wuerfel> <20160303132956.GW19428@n2100.arm.linux.org.uk>
+Message-ID: <2601661.x1MEzJ9CK0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 01:15 PM, Arnd Bergmann wrote:
-> On Thursday 03 March 2016 12:40:07 Neil Armstrong wrote:
->> +
->> +	aliases {
->> +		serial0 = &uart0;
->> +		serial1 = &uart1;
->> +		serial2 = &uart2;
->> +		serial3 = &uart3;
->> +		gpio0 = &gpio0;
->> +		gpio1 = &gpio1;
->> +	};
->>
-> Please put the aliases in the per-board file and list only the
-> devices that are actually connected (in case of uart)
-Done.
-
+On Thursday 03 March 2016 13:29:56 Russell King - ARM Linux wrote:
+> On Thu, Mar 03, 2016 at 01:56:56PM +0100, Arnd Bergmann wrote:
+> > As Russell mentioned, the entire file is not really needed either, but
+> > so far we have left the trivial per-platform files in place generally.
 > 
->> +			uart0: uart at 200000 {
-> 
-> Make this serial at 200000, to follow the standard naming convention
-Done.
-
-> 
->> +
->> +				reset: reset-controller {
->> +					compatible = "plxtech,nas782x-reset";
->> +					#reset-cells = <1>;
->> +				};
->> +
->> +				stdclk: stdclk {
->> +					compatible = "plxtech,ox810se-stdclk", "plxtech,nas782x-stdclk";
->> +					#clock-cells = <1>;
->> +				};
->> +			};
-> 
-> Please change the compatible strings to have no 'x' wildcards in them, but
-> instead use a specific model.
-Ok, I switched to only oxsemi,ox810se-* strings.
-> 
-> Regarding the vendor prefixes, my understanding is that "ox810se" was the name
-> of the chip from Oxford Semiconductor, while nas7820 is a product name from
-> PLX. I think it would be logical to use "oxford" as the vendor prefix
-> for anything with a ox810se or ox820 ID in it rather than plxtech.
-Ok, I switched to oxsemi but keeped plxtech and added oxsemi in the vendor prefixes.
-
-> 
-> Note that both of them are now historic, as PLX itself got bought by
-> Avago and they seem to be discontinuing both the PLX and Oxfor brand
-> names.
-Yes, it's kind of a mess. The ox820 has been rebranded to plx7821, but not the ox810...
-> 
-> 	Arnd
+> I think that's something we should be looking to remove: if the
+> per-platform files give no benefit, then there is no point in
+> having them, and they just increase the size of the code base.
 > 
 
-Thanks,
-Neil
+I agree, I think the main reason it hasn't been done yet is that
+nobody has thought in detail about whether or how to keep
+the last remaining piece of information (the machine name as
+printed in /proc/cpuinfo) when removing the machine descriptors.
+
+If we want to keep that around, we could probably have a global
+lookup table of root node compatible strings, or we decide to
+use the contents of the "model" property instead. This has been
+discussed several times in the pasts, without any real consensus.
+
+	Arnd
