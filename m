@@ -1,59 +1,60 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:39:55 +0100
-Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
+Date: Thu,  3 Mar 2016 12:39:57 +0100
+Subject: [PATCH 04/17] clocksource: Add PLX Technology RPS Timer
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PLX Technology RPS IRQ Controller as irqchip driver.
+Add clocksource and clockevent driver from dual RPS timer.
 
 CC: Ma Haijun <mahaijuns@gmail.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/irqchip/Kconfig   |   5 ++
- drivers/irqchip/Makefile  |   1 +
- drivers/irqchip/irq-rps.c | 128 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 134 insertions(+)
- create mode 100644 drivers/irqchip/irq-rps.c
+ drivers/clocksource/Kconfig     |   6 +
+ drivers/clocksource/Makefile    |   1 +
+ drivers/clocksource/timer-rps.c | 249 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 256 insertions(+)
+ create mode 100644 drivers/clocksource/timer-rps.c
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index fb50911..7892c1a 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -135,6 +135,11 @@ config PIC32_EVIC
- 	select GENERIC_IRQ_CHIP
- 	select IRQ_DOMAIN
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 33db740..f79bc0f 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -276,6 +276,12 @@ config VF_PIT_TIMER
+ 	help
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
  
-+config PLXTECH_RPS
++config CLKSRC_RPS_TIMER
 +	bool
-+	select GENERIC_IRQ_CHIP
-+	select IRQ_DOMAIN
++	select CLKSRC_MMIO
++	help
++	  This enables support for the PLX Tech OXNAS RPS timers.
 +
- config RENESAS_INTC_IRQPIN
- 	bool
- 	select IRQ_DOMAIN
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 18caacb..3eec3a0 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -34,6 +34,7 @@ obj-$(CONFIG_I8259)			+= irq-i8259.o
- obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
- obj-$(CONFIG_IRQ_MIPS_CPU)		+= irq-mips-cpu.o
- obj-$(CONFIG_SIRF_IRQ)			+= irq-sirfsoc.o
-+obj-$(CONFIG_PLXTECH_RPS)		+= irq-rps.o
- obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
- obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
- obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
-diff --git a/drivers/irqchip/irq-rps.c b/drivers/irqchip/irq-rps.c
+ config SYS_SUPPORTS_SH_CMT
+         bool
+ 
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index dc2b899..120bc09 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -46,6 +46,7 @@ obj-$(CONFIG_CLKSRC_QCOM)	+= qcom-timer.o
+ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
+ obj-$(CONFIG_CLKSRC_PISTACHIO)	+= time-pistachio.o
+ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
++obj-$(CONFIG_CLKSRC_RPS_TIMER)	+= timer-rps.o
+ 
+ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+ obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
+diff --git a/drivers/clocksource/timer-rps.c b/drivers/clocksource/timer-rps.c
 new file mode 100644
-index 0000000..bcd4a31
+index 0000000..79621b8
 --- /dev/null
-+++ b/drivers/irqchip/irq-rps.c
-@@ -0,0 +1,128 @@
++++ b/drivers/clocksource/timer-rps.c
+@@ -0,0 +1,249 @@
 +/*
-+ * drivers/irqchip/irq-rps.c
++ * drivers/clocksource/timer-rps.c
 + *
 + * Copyright (C) 2009 Oxford Semiconductor Ltd
 + * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
@@ -72,113 +73,234 @@ index 0000000..bcd4a31
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/irqdomain.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
 +#include <linux/irq.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/err.h>
 +#include <linux/io.h>
-+#include <linux/version.h>
-+#include <linux/irqchip.h>
++#include <linux/clockchips.h>
++#include <linux/clk.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++#include <linux/sched_clock.h>
 +
-+#include <asm/exception.h>
-+
-+struct rps_chip_data {
-+	void __iomem *base;
-+	struct irq_domain *domain;
-+} rps_data;
++/* TIMER1 as tick
++ * TIMER2 as clocksource
++ */
 +
 +enum {
-+	RPS_IRQ_COUNT = 32,
++	TIMER_LOAD = 0,
++	TIMER_CURR = 4,
++	TIMER_CTRL = 8,
++	TIMER_CLRINT = 0xC,
 +
-+	RPS_STATUS = 0,
-+	RPS_RAW_STATUS = 4,
-+	RPS_UNMASK = 8,
-+	RPS_MASK = 0xc,
++	TIMER_BITS = 24,
++
++	TIMER_MAX_VAL = (1 << TIMER_BITS) - 1,
++
++	TIMER_PERIODIC = (1 << 6),
++	TIMER_ENABLE = (1 << 7),
++
++	TIMER_DIV1  = (0 << 2),
++	TIMER_DIV16  = (1 << 2),
++	TIMER_DIV256  = (2 << 2),
++
++	TIMER1_OFFSET = 0,
++	TIMER2_OFFSET = 0x20,
 +};
 +
-+/* Routines to acknowledge, disable and enable interrupts */
-+static void rps_mask_irq(struct irq_data *d)
-+{
-+	u32 mask = BIT(d->hwirq);
++/* Clockevent */
 +
-+	iowrite32(mask, rps_data.base + RPS_MASK);
++static unsigned long timer_period = HZ;
++static unsigned timer_prescaler = 1;
++static void __iomem *timer_base;
++
++static irqreturn_t rps_timer_irq(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	iowrite32(0, timer_base + TIMER_CLRINT);
++
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
 +}
 +
-+static void rps_unmask_irq(struct irq_data *d)
++static void rps_timer_config(unsigned long period, unsigned periodic)
 +{
-+	u32 mask = BIT(d->hwirq);
++	uint32_t cfg = 0;
 +
-+	iowrite32(mask, rps_data.base + RPS_UNMASK);
-+}
++	if (period)
++		cfg |= TIMER_ENABLE;
 +
-+static void rps_ack_irq(struct irq_data *d)
-+{
-+	/* NOP */
-+}
++	if (periodic)
++		cfg |= TIMER_PERIODIC;
 +
-+static void __exception_irq_entry handle_irq(struct pt_regs *regs)
-+{
-+	u32 irqstat;
-+	int hwirq;
-+
-+	irqstat = ioread32(rps_data.base + RPS_STATUS);
-+	hwirq = __ffs(irqstat);
-+
-+	do {
-+		handle_IRQ(irq_find_mapping(rps_data.domain, hwirq), regs);
-+
-+		irqstat = ioread32(rps_data.base + RPS_STATUS);
-+		hwirq = __ffs(irqstat);
-+	} while (irqstat);
-+}
-+
-+int __init rps_of_init(struct device_node *node, struct device_node *parent)
-+{
-+	int ret;
-+	struct irq_chip_generic *gc;
-+
-+	if (WARN_ON(!node))
-+		return -ENODEV;
-+
-+	rps_data.base = of_iomap(node, 0);
-+	WARN(!rps_data.base, "unable to map rps registers\n");
-+
-+	rps_data.domain = irq_domain_add_linear(node, RPS_IRQ_COUNT,
-+						&irq_generic_chip_ops,
-+						NULL);
-+	if (!rps_data.domain) {
-+		pr_err("%s: could add irq domain\n",
-+		       node->full_name);
-+		return -ENOMEM;
++	switch (timer_prescaler) {
++	case 1:
++		cfg |= TIMER_DIV1;
++		break;
++	case 16:
++		cfg |= TIMER_DIV16;
++		break;
++	case 256:
++		cfg |= TIMER_DIV256;
++		break;
 +	}
 +
-+	ret = irq_alloc_domain_generic_chips(rps_data.domain, RPS_IRQ_COUNT, 1,
-+					     "RPS", handle_level_irq,
-+					     0, 0, IRQ_GC_INIT_NESTED_LOCK);
-+	if (ret) {
-+		pr_err("%s: could not allocate generic chip\n",
-+		       node->full_name);
-+		irq_domain_remove(rps_data.domain);
-+		return -EINVAL;
-+	}
++	iowrite32(period, timer_base + TIMER_LOAD);
++	iowrite32(cfg, timer_base + TIMER_CTRL);
++}
 +
-+	gc = irq_get_domain_generic_chip(rps_data.domain, 0);
-+	gc->chip_types[0].chip.irq_ack = rps_ack_irq;
-+	gc->chip_types[0].chip.irq_mask = rps_mask_irq;
-+	gc->chip_types[0].chip.irq_unmask = rps_unmask_irq;
++static int rps_timer_shutdown(struct clock_event_device *evt)
++{
++	if (!clockevent_state_periodic(evt))
++		return 0;
 +
-+	/* Disable all IRQs */
-+	iowrite32(~0, rps_data.base + RPS_MASK);
-+
-+	set_handle_irq(handle_irq);
-+
-+	pr_info("Registered %d rps interrupts\n", RPS_IRQ_COUNT);
++	rps_timer_config(0, 0);
 +
 +	return 0;
 +}
 +
-+IRQCHIP_DECLARE(nas782x, "plxtech,nas782x-rps", rps_of_init);
++static int rps_timer_set_periodic(struct clock_event_device *evt)
++{
++	rps_timer_config(timer_period, 1);
++
++	return 0;
++}
++
++static int rps_timer_set_oneshot(struct clock_event_device *evt)
++{
++	rps_timer_config(timer_period, 0);
++
++	return 0;
++}
++
++static int rps_timer_next_event(unsigned long delta,
++				struct clock_event_device *evt)
++{
++	rps_timer_config(delta, 0);
++
++	return 0;
++}
++
++static struct clock_event_device rps_clockevent = {
++	.name = "rps",
++	.features = CLOCK_EVT_FEAT_PERIODIC |
++		    CLOCK_EVT_FEAT_ONESHOT,
++	.tick_resume = rps_timer_shutdown,
++	.set_state_shutdown = rps_timer_shutdown,
++	.set_state_periodic = rps_timer_set_periodic,
++	.set_state_oneshot = rps_timer_set_oneshot,
++	.set_next_event = rps_timer_next_event,
++	.rating = 200,
++};
++
++static void __init rps_clockevent_init(void __iomem *base, ulong ref_rate,
++				       int irq)
++{
++	timer_base = base;
++
++	/* Start with prescaler 1 */
++	timer_prescaler = 1;
++	timer_period = DIV_ROUND_UP(ref_rate, HZ);
++
++	if (timer_period > TIMER_MAX_VAL) {
++		timer_prescaler = 16;
++		timer_period = DIV_ROUND_UP(ref_rate / timer_prescaler, HZ);
++	}
++	if (timer_period > TIMER_MAX_VAL) {
++		timer_prescaler = 256;
++		timer_period = DIV_ROUND_UP(ref_rate / timer_prescaler, HZ);
++	}
++
++	rps_clockevent.cpumask = cpu_possible_mask;
++	rps_clockevent.irq = irq;
++	clockevents_config_and_register(&rps_clockevent,
++					ref_rate / timer_prescaler,
++					1,
++					TIMER_MAX_VAL);
++
++	pr_info("rps: Registered clock event rate %luHz prescaler %d period %lu\n",
++			ref_rate,
++			timer_prescaler,
++			timer_period);
++}
++
++/* Clocksource */
++
++static void __iomem *timer_curr;
++
++static u64 notrace rps_read_sched_clock(void)
++{
++	return ~readl_relaxed(timer_curr);
++}
++
++static void __init rps_clocksource_init(void __iomem *base, ulong ref_rate)
++{
++	int ret;
++	ulong clock_rate;
++	/* use prescale 16 */
++	clock_rate = ref_rate / 16;
++
++	iowrite32(TIMER_MAX_VAL, base + TIMER_LOAD);
++	iowrite32(TIMER_PERIODIC | TIMER_ENABLE | TIMER_DIV16,
++			base + TIMER_CTRL);
++
++	timer_curr = base + TIMER_CURR;
++	sched_clock_register(rps_read_sched_clock, TIMER_BITS, clock_rate);
++	ret = clocksource_mmio_init(base + TIMER_CURR, "rps_clocksource_timer",
++					clock_rate, 250, TIMER_BITS,
++					clocksource_mmio_readl_down);
++	if (ret)
++		panic("can't register clocksource\n");
++
++	pr_info("rps: Registered clocksource rate %luHz\n", clock_rate);
++}
++
++static struct irqaction rps_timer_irqaction = {
++	.name		= "rps_timer",
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= rps_timer_irq,
++	.dev_id		= &rps_clockevent,
++};
++
++static void __init rps_timer_init(struct device_node *np)
++{
++	struct clk *refclk;
++	unsigned long ref_rate;
++	void __iomem *base;
++	int irq, ret;
++
++	refclk = of_clk_get(np, 0);
++
++	if (IS_ERR(refclk) || clk_prepare_enable(refclk))
++		panic("rps_timer_init: failed to get refclk\n");
++	ref_rate = clk_get_rate(refclk);
++
++	base = of_iomap(np, 0);
++	if (!base)
++		panic("rps_timer_init: failed to map io\n");
++
++	irq = irq_of_parse_and_map(np, 0);
++	if (irq < 0)
++		panic("rps_timer_init: failed to parse IRQ\n");
++
++	/* Disable timers */
++	iowrite32(0, base + TIMER1_OFFSET + TIMER_CTRL);
++	iowrite32(0, base + TIMER2_OFFSET + TIMER_CTRL);
++	iowrite32(0, base + TIMER1_OFFSET + TIMER_LOAD);
++	iowrite32(0, base + TIMER2_OFFSET + TIMER_LOAD);
++	iowrite32(0, base + TIMER1_OFFSET + TIMER_CLRINT);
++	iowrite32(0, base + TIMER2_OFFSET + TIMER_CLRINT);
++
++	rps_clocksource_init(base + TIMER2_OFFSET, ref_rate);
++	rps_clockevent_init(base + TIMER1_OFFSET, ref_rate, irq);
++
++	ret = setup_irq(irq, &rps_timer_irqaction);
++	if (ret)
++		panic("rps_timer_init: failed to request irq\n");
++}
++
++CLOCKSOURCE_OF_DECLARE(nas782x, "plxtech,nas782x-rps-timer", rps_timer_init);
 -- 
 1.9.1
