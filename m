@@ -1,113 +1,76 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu, 3 Mar 2016 08:34:42 -0600
-Subject: [PATCH v3] irqchip/gicv3-its: Don't allow devices whose ID is
- outside range
-In-Reply-To: <1456836901-20976-1-git-send-email-shankerd@codeaurora.org>
-References: <1456836901-20976-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <56D84B82.1090304@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Mar 2016 14:42:16 +0000
+Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
+ (kernel 4.5)
+In-Reply-To: <20160303141752.GA12255@localhost.localdomain>
+References: <20160303141752.GA12255@localhost.localdomain>
+Message-ID: <20160303144215.GC19139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Thu, Mar 03, 2016 at 06:17:52AM -0800, Vadim Lomovtsev wrote:
+> Hi all,
+> 
+> While working with system which has 48 CPUs per one socket it was
+> found that it is not possible to enable (turn on) more CPUs than
+> 'maxcpus' value. The kernel booted with maxcpus=4 argument:
+> 
+>     [root at localhost ~]# cat /proc/cmdline
+>     BOOT_IMAGE=/boot/Image-4.5-rc5 root=UUID=9cece803-ce48-4b84-ae29-1091591c9edc ro crashkernel=2048M at 0M console=ttyAMA0,115200n8 LANG=en_US.UTF-8 earlycon=pl011,0x87e024000000 debug maxcpus=4
+> 
+> Check the overall number of CPUs and online CPUs:
+> 
+>     [root at localhost ~]# cat /sys/devices/system/cpu/possible
+>     0-47
+>     [root at localhost ~]# cat /sys/devices/system/cpu/online
+>     0-3
+> 
+> Now trying to turn on cpu which is out of scope of initial maxcpus value:
+>     [root at localhost ~]# echo 1 >  /sys/devices/system/cpu/cpu4/online
+>     -bash: echo: write error: Invalid argument
+> 
+> Which happens because of cpu_present_mask is set to 0x3 and prevents running more than 'maxcpus' cpus.
+>     [root at localhost ~]# cat /sys/devices/system/cpu/present
+>         0-3
+> 
+> For cpu0-3 it works fine:
+>     [root at localhost ~]# echo 0 >  /sys/devices/system/cpu/cpu3/online
+>     [root at localhost ~]# echo 1 >  /sys/devices/system/cpu/cpu3/online
+> 
+> At the same time at the Documentation/cpu-hotplug.txt it is described that:
+> 
+> >    maxcpus=n    Restrict boot time cpus to n. Say if you have 4 cpus, using
+> >                 maxcpus=2 will only boot 2. You can choose to bring the
+> >                 other cpus later online, read FAQ's for more info.
+> 
+> and
+> 
+> >    cpu_present_mask: Bitmap of CPUs currently present in the system. Not all
+> >    of them may be online. When physical hotplug is processed by the relevant
+> >    subsystem (e.g ACPI) can change and new bit either be added or removed
+> >    from the map depending on the event is hot-add/hot-remove. There are currently
+> >    no locking rules as of now. Typical usage is to init topology during boot,
+> >    at which time hotplug is disabled.
+> 
+> So after system start, according to docs, it should be possible to run
+> more CPUs than 'maxcpus' value and cpu_present_mask should contain
+> mask for all CPUs which currently present at the system.
+>
+> However for arm64 it is implemented that cpu_present_mask is
+> explicetely set accordingly to 'maxcpus' value. Is it design intent ?
 
-Do you have any comments on this patch?
+To some extent, yes.
 
-On 03/01/2016 06:55 AM, Shanker Donthineni wrote:
-> We are not checking whether the requested device identifier fits into
-> the device table memory or not. The function its_create_device()
-> assumes that enough memory has been allocated for whole DevID space
-> (reported by ITS_TYPER.Devbits) during the ITS probe() and continues
-> to initialize ITS hardware.
->
-> This assumption is not perfect, sometimes we reduce memory size either
-> because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
-> MAPD command fails if 'Device ID' is outside of device table range.
->
-> Add a simple validation check to avoid MAPD failures since we are
-> not handling ITS command errors. This change also helps to return an
-> error -ENOMEM instead of success to caller.
->
-> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
-> [v1]->[v2]
->   Rebase to v4.5-rc6, edit commit text and simplify code changes.
->
-> [v2]->[v3]
->    Fix typo.
->
->  drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
->  1 file changed, 20 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 43dfd15..6d986ac 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -55,6 +55,16 @@ struct its_collection {
->  };
->  
->  /*
-> + * The ITS_BASER structure - contains memory information and table
-> + * entry size in bytes.
-> + */
-> +struct its_baser {
-> +	void		*base;
-> +	u32		order;
-> +	u32		entry_size;
-> +};
-> +
-> +/*
->   * The ITS structure - contains most of the infrastructure, with the
->   * top-level MSI domain, the command queue, the collections, and the
->   * list of devices writing to it.
-> @@ -66,14 +76,12 @@ struct its_node {
->  	unsigned long		phys_base;
->  	struct its_cmd_block	*cmd_base;
->  	struct its_cmd_block	*cmd_write;
-> -	struct {
-> -		void		*base;
-> -		u32		order;
-> -	} tables[GITS_BASER_NR_REGS];
-> +	struct its_baser	tables[GITS_BASER_NR_REGS];
->  	struct its_collection	*collections;
->  	struct list_head	its_device_list;
->  	u64			flags;
->  	u32			ite_size;
-> +	struct its_baser	*device_table;
->  };
->  
->  #define ITS_ITT_ALIGN		SZ_256
-> @@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->  		 * For other tables, only allocate a single page.
->  		 */
->  		if (type == GITS_BASER_TYPE_DEVICE) {
-> +			its->device_table = &its->tables[i];
->  			/*
->  			 * 'order' was initialized earlier to the default page
->  			 * granule of the the ITS.  We can't have an allocation
-> @@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->  					node_name, order);
->  			}
->  		}
-> +		its->tables[i].entry_size = entry_size;
->  
->  retry_alloc_baser:
->  		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
-> @@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  	int nr_ites;
->  	int sz;
->  
-> +	/* Don't allow 'dev_id' that exceeds single, flat table limit */
-> +	if (its->device_table &&
-> +	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
-> +	    its->device_table->entry_size)))
-> +		return NULL;
-> +
->  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->  	/*
->  	 * At least one bit of EventID is being used, hence a minimum
+Due to the possibility of a heterogeneous system, we must bring all CPUs
+online at boot time, and cannot defer this.
 
--- 
-Shanker Donthineni
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+This is necessary to detect the common subset of supported features, and
+also to detect the full set of CPUs in the system to correctly apply
+errata workarounds which require kernel text patching. Other things like
+CPU-affine device probing (e.g. PMU) also require specific CPUs to be
+online.
+
+I don't think we can reliably support maxcpus for the above case.
+
+Thanks,
+Mark.
