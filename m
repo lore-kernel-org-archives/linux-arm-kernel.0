@@ -1,44 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Mar 2016 14:05:33 +0100
-Subject: [rtc-linux] Re: [RFC 09/15] media: platform: Add missing
- MFD_SYSCON dependency on HAS_IOMEM
-In-Reply-To: <CAJKOXPe50ira_Qqy7qJ5H_PHa8B_xOinCK6JkncXFYn_eaQFfg@mail.gmail.com>
-References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
- <2181866.k24LVvUjTs@wuerfel>
- <CAJKOXPe50ira_Qqy7qJ5H_PHa8B_xOinCK6JkncXFYn_eaQFfg@mail.gmail.com>
-Message-ID: <13054519.5feSCc5dgv@wuerfel>
+Date: Thu, 03 Mar 2016 14:08:19 +0100
+Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
+In-Reply-To: <56D83599.2030400@arm.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
+ <56D83599.2030400@arm.com>
+Message-ID: <7673826.decBlDRz96@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2016 21:40:23 Krzysztof Kozlowski wrote:
-> >>         select MFD_SYSCON
-> >> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-> >> index 57d42c6172c5..c4317b99d257 100644
-> >> --- a/drivers/media/platform/exynos4-is/Kconfig
-> >> +++ b/drivers/media/platform/exynos4-is/Kconfig
-> >> @@ -17,6 +17,7 @@ config VIDEO_S5P_FIMC
-> >>         tristate "S5P/EXYNOS4 FIMC/CAMIF camera interface driver"
-> >>         depends on I2C
-> >>         depends on HAS_DMA
-> >> +       depends on HAS_IOMEM    # For MFD_SYSCON
-> >>         select VIDEOBUF2_DMA_CONTIG
-> >>         select V4L2_MEM2MEM_DEV
-> >
-> > This  is guarded by HAS_DMA, which implies HAS_IOMEM afaik.
+On Thursday 03 March 2016 13:01:13 Marc Zyngier wrote:
+> > +/* Routines to acknowledge, disable and enable interrupts */
+> > +static void rps_mask_irq(struct irq_data *d)
+> > +{
+> > +     u32 mask = BIT(d->hwirq);
+> > +
+> > +     iowrite32(mask, rps_data.base + RPS_MASK);
 > 
-> Looking at Kconfigs - no, it is not implied (or am I missing
-> something)... and sometimes dependency on HAS_IOMEM is next to
-> HAS_DMA.
-> 
+> I do question the use of iowrite32 here (and its ioread32 pendent
+> anywhere else), as it actually translates in a writel, which contains a
+> memory barrier. Do you have any case that requires the use of such a
+> barrier? if not, consider switching to relaxed accessors (which are the
 > 
 
-Ah, you are right: UML has no DMA and no IOMEM, but s390 can
-have IOMEM (if PCI is enabled) and always sets HAS_DMA.
+I really ask everyone to do the opposite: we have seen several drivers
+blindlessly using the relaxed accessors and actually introducing bugs
+that way, so I'd rather see the readl/writel ones used by default.
 
-In practice, I think the HAS_DMA symbol is not as well-defined
-as it should be, it basically refers to the presence of the dma-mapping.h
-API, and that only really makes sense when you also have IOMEM,
-so there might be an implied dependency between the two, but it's
-not enforced or actually true.
+In any performance critical code, it's reasonable to take a closer
+look and use the relaxed version with an added comment explaining
+why it's safe there.
 
 	Arnd
