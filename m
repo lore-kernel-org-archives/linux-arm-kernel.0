@@ -1,46 +1,88 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 3 Mar 2016 21:20:35 +0530
-Subject: [PATCH] crypto/async_pq: use __free_page() instead of put_page()
-In-Reply-To: <CAAmzW4Nq8LiFGzyR4YjG8OPev-Pj1dUad+Bus2puSAk_tUcCsA@mail.gmail.com>
-References: <1456738445-876239-1-git-send-email-arnd@arndb.de>
- <CAPcyv4jJzUieZ0i2jBqANwmYPUBVmQmhoDTPnr0KjPQXnoZqWQ@mail.gmail.com>
- <CAAmzW4Nq8LiFGzyR4YjG8OPev-Pj1dUad+Bus2puSAk_tUcCsA@mail.gmail.com>
-Message-ID: <20160303155035.GT11154@localhost>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 3 Mar 2016 07:51:49 -0800
+Subject: [PATCH v3 6/7] ACPI: enable ACPI_DBG2_TABLE on ARM64
+In-Reply-To: <56D822DD.2030400@gmail.com>
+References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456749726-30261-7-git-send-email-aleksey.makarov@linaro.org>
+ <56D5ACBB.50408@hurleysoftware.com> <56D5CB42.3030806@linaro.org>
+ <56D5D08E.3030902@hurleysoftware.com> <56D822DD.2030400@gmail.com>
+Message-ID: <56D85D95.5050506@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2016 at 10:54:50PM +0900, Joonsoo Kim wrote:
-> 2016-03-01 3:04 GMT+09:00 Dan Williams <dan.j.williams@intel.com>:
-> > On Mon, Feb 29, 2016 at 1:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> The addition of tracepoints to the page reference tracking had an
-> >> unfortunate side-effect in at least one driver that calls put_page
-> >> from its exit function, resulting in a link error:
-> >>
-> >> `.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
-> >>
-> >> From a cursory look at that this driver, it seems that it may be
-> >> doing the wrong thing here anyway, as the page gets allocated
-> >> using 'alloc_page()', and should be freed using '__free_page()'
-> >> rather than 'put_page()'.
-> >>
-> >> With this patch, I no longer get any other build errors from the
-> >> page_ref patch, so hopefully we can assume that it's always wrong
-> >> to call any of those functions from __exit code, and that no other
-> >> driver does it.
-> >>
-> >> Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
-> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> > Acked-by: Dan Williams <dan.j.williams@intel.com>
-> >
-> > Vinod, will you take this one?
+On 03/03/2016 03:41 AM, Aleksey Makarov wrote:
 > 
-> Problematic patch ("mm/page_ref: ~~~") is not yet merged one. It is on mmotm
-> and this fix should go together with it or before it. I think that
-> handling this fix by
-> Andrew is easier to all.
+> 
+> On 03/01/2016 08:25 PM, Peter Hurley wrote:
+>> On 03/01/2016 09:02 AM, Aleksey Makarov wrote:
+>>>
+>>>
+>>> On 03/01/2016 05:52 PM, Peter Hurley wrote:
+>>>> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
+>>>>> SBBR mentions DBG2 as a mandatory ACPI table.
+>>>>> So enable it for ARM64
+>>>>
+>>>> Why does this have to be opted-in per-arch?
+>>>
+>>> DBG2 can specify earlycons.  They should start as soon as possible.
+>>> On ARM64 it is just after boot tables become available (in arch_init()).
+>>> So it has to be per-arch unless we decide not to start earlycons on 
+>>> DBG2 ports.
+>>
+>> OF does all that already but the earlycon opt-in is not per-arch.
+> 
+> In the last next-XXXX kernel support for OF earlycon depends on
+> CONFIG_OF_EARLY_FLATTREE which *is* per-arch.
 
-Okay fine by me.
+That's true.
 
--- 
-~Vinod
+(of_setup_earlycon() was really always CONFIG_OF_EARLY_FLATTREE because
+its lone caller was CONFIG_OF_EARLY_FLATTREE).
+
+
+> Probably we need the same kind of configuration option here,
+> something like CONFIG_ACPI_BOOT_TABLES instead of ACPI_DBG2_TABLE.
+
+I'll let acpi maintainers sort that.
+
+
+>>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>>>>> ---
+>>>>>  arch/arm64/Kconfig       | 1 +
+>>>>>  arch/arm64/kernel/acpi.c | 2 ++
+>>>>>  2 files changed, 3 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>>> index 9dc5209..0b614d4 100644
+>>>>> --- a/arch/arm64/Kconfig
+>>>>> +++ b/arch/arm64/Kconfig
+>>>>> @@ -3,6 +3,7 @@ config ARM64
+>>>>>  	select ACPI_CCA_REQUIRED if ACPI
+>>>>>  	select ACPI_GENERIC_GSI if ACPI
+>>>>>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>>>>> +	select ACPI_DBG2_TABLE if ACPI
+>>>>>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>>>>>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>>>>>  	select ARCH_HAS_ELF_RANDOMIZE
+>>>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>>>>> index d1ce8e2..3370046 100644
+>>>>> --- a/arch/arm64/kernel/acpi.c
+>>>>> +++ b/arch/arm64/kernel/acpi.c
+>>>>> @@ -208,6 +208,8 @@ void __init acpi_boot_table_init(void)
+>>>>>  		pr_err("Failed to init ACPI tables\n");
+>>>>>  		if (!param_acpi_force)
+>>>>>  			disable_acpi();
+>>>>> +	} else {
+>>>>> +		acpi_probe_device_table(dbg2);
+>>>>>  	}
+>>>>>  }
+>>>>>  
+>>>>>
+>>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
