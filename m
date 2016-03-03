@@ -1,28 +1,51 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 3 Mar 2016 07:47:51 -0600
-Subject: [PATCH v13 4/6] arm64: Move unflatten_device_tree() call earlier.
-In-Reply-To: <1456959362-2036-5-git-send-email-ddaney.cavm@gmail.com>
-References: <1456959362-2036-1-git-send-email-ddaney.cavm@gmail.com>
- <1456959362-2036-5-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <CAL_JsqL0Mzgp_SkycmiZBbt2OoGtE7_rFgD41Jex4nDS7xXrHA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  3 Mar 2016 15:10:59 +0100
+Subject: [PATCH] arm64: enable CONFIG_DEBUG_RODATA by default
+Message-ID: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2016 at 4:56 PM, David Daney <ddaney.cavm@gmail.com> wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> In order to extract NUMA information from the device tree, we need to
-> have the tree in its unflattened form.
->
-> Move the call to unflatten_device_tree() into paging_init().  This
-> puts it before the call to bootmem_init(), which is where the NUMA
-> information is extracted.
+In spite of its name, CONFIG_DEBUG_RODATA is an important hardening feature
+for production kernels, and distros all enable it by default in their
+kernel configs. However, since enabling it used to result in more granular,
+and thus less efficient kernel mappings, it is not enabled by default for
+performance reasons.
 
-Can't you just move up unflatten_device_tree in setup_arch rather than
-hiding in paging_init?
+However, since commit 2f39b5f91eb4 ("arm64: mm: Mark .rodata as RO"), the
+various kernel segments (.text, .rodata, .init and .data) are already
+mapped individually, and the only effect of setting CONFIG_DEBUG_RODATA is
+that the existing .text and .rodata mappings are updated late in the boot
+sequence to have their read-only attributes set, which means that any
+performance concerns related to enabling CONFIG_DEBUG_RODATA are no longer
+valid.
 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  arch/arm64/kernel/setup.c | 7 +++----
->  arch/arm64/mm/mmu.c       | 5 +++++
->  2 files changed, 8 insertions(+), 4 deletions(-)
+So from now on, make CONFIG_DEBUG_RODATA default to 'y'
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/Kconfig.debug | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index e13c4bf84d9e..7e76845a0434 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -50,13 +50,13 @@ config DEBUG_SET_MODULE_RONX
+ 
+ config DEBUG_RODATA
+ 	bool "Make kernel text and rodata read-only"
++	default y
+ 	help
+ 	  If this is set, kernel text and rodata will be made read-only. This
+ 	  is to help catch accidental or malicious attempts to change the
+-	  kernel's executable code. Additionally splits rodata from kernel
+-	  text so it can be made explicitly non-executable.
++	  kernel's executable code.
+ 
+-          If in doubt, say Y
++	  If in doubt, say Y
+ 
+ config DEBUG_ALIGN_RODATA
+ 	depends on DEBUG_RODATA && ARM64_4K_PAGES
+-- 
+2.5.0
