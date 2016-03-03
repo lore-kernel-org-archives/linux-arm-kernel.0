@@ -1,102 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 3 Mar 2016 08:01:39 +0000
-Subject: [PATCH v10 6/9] arm64: kprobes instruction simulation support
-In-Reply-To: <56D7C573.8030401@linaro.org>
-References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
- <1456801047-29014-7-git-send-email-dave.long@linaro.org>
- <56D5D9A0.9090205@arm.com> <56D7C573.8030401@linaro.org>
-Message-ID: <20160303080139.3d415d17@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 03 Mar 2016 17:03:26 +0900
+Subject: [RFC 00/15] tree-wide: mfd: syscon: Fix unmet ioremap dependency
+Message-ID: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Mar 2016 00:02:43 -0500
-David Long <dave.long@linaro.org> wrote:
+Hi,
 
-> On 03/01/2016 01:04 PM, Marc Zyngier wrote:
-> > On 01/03/16 02:57, David Long wrote:
-> >> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> >>
-> >> Kprobes needs simulation of instructions that cannot be stepped
-> >> from different memory location, e.g.: those instructions
-> >> that uses PC-relative addressing. In simulation, the behaviour
-> >> of the instruction is implemented using a copy of pt_regs.
-> >>
-> >> Following instruction catagories are simulated:
-> >>   - All branching instructions(conditional, register, and immediate)
-> >>   - Literal access instructions(load-literal, adr/adrp)
-> >>
-> >> Conditional execution is limited to branching instructions in
-> >> ARM v8. If conditions at PSTATE do not match the condition fields
-> >> of opcode, the instruction is effectively NOP. Kprobes considers
-> >> this case as 'miss'.
-> >>
-> >> This code also replaces the use of arch/arm/opcodes.c for
-> >> arm_check_condition().
-> >
-> > Outdated comment?
-> >
-> 
-> Yeah.  I'll remove it.
-> 
-> >>
-> >> Thanks to Will Cohen for assorted suggested changes.
-> >>
-> >> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> >> Signed-off-by: William Cohen <wcohen@redhat.com>
-> >> Signed-off-by: David A. Long <dave.long@linaro.org>
-> >> ---
-> >>   arch/arm64/include/asm/insn.h            |   1 +
-> >>   arch/arm64/include/asm/probes.h          |   5 +-
-> >>   arch/arm64/kernel/Makefile               |   3 +-
-> >>   arch/arm64/kernel/insn.c                 |   1 +
-> >>   arch/arm64/kernel/kprobes-arm64.c        |  29 +++++
-> >>   arch/arm64/kernel/kprobes.c              |  32 +++++-
-> >>   arch/arm64/kernel/probes-simulate-insn.c | 187 +++++++++++++++++++++++++++++++
-> >>   arch/arm64/kernel/probes-simulate-insn.h |  28 +++++
-> >>   8 files changed, 280 insertions(+), 6 deletions(-)
-> >>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
-> >>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
-> >>
+Building allyesconfig on ARCH=um fails with:
+   drivers/mfd/syscon.c: In function ?of_syscon_register?:
+   drivers/mfd/syscon.c:67:9: error: implicit declaration of function ?ioremap? [-Werror=implicit-function-declaration]
+      base = ioremap(res.start, resource_size(&res));
 
-[...]
+Since commit c89c0114955a ("mfd: syscon: Set regmap max_register in
+of_syscon_register") the syscon depends on HAS_IOMEM because
+it uses the ioremap().
 
-> >> +/*
-> >> + * instruction simulation functions
-> >> + */
-> >> +void __kprobes
-> >> +simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
-> >> +{
-> >> +	long imm, xn, val;
-> >> +
-> >> +	xn = opcode & 0x1f;
-> >> +	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
-> >> +	imm = sign_extend(imm, 20);
-> >> +	if (opcode & 0x80000000)
-> >> +		val = (imm<<12) + (addr & 0xfffffffffffff000);
-> >> +	else
-> >> +		val = imm + addr;
-> >> +
-> >> +	regs->regs[xn] = val;
-> >
-> > What happens when you have something like "adr xzr, blah"? I haven't
-> > found out where you are writing that back yet, but that could be really
-> > fun for SP...
-> >
-> 
-> It hadn't occurred to me that xzr could be an output register. Sigh. 
-> That could mean a bit of repeated code to handle this special case.  I 
-> wonder what the implications would be of adding xzr to the pt_regs 
-> structure to avoid that.
+However syscon is often directly selected... so first the dependency on
+HAS_IOMEM has to be added to all selecting symbols.
 
-xzr is not a register. It is an encoding that tells the CPU to discard
-the result of an operation. As such, there is no need to store it.
+Comments are welcomed whether this is appropriate approach.
 
-An easy fix for this would be to have an accessor that actually checks
-for the register number, and only allows the range 0-30. We've used
-similar things in KVM for the same reasons (vcpu_get_reg/vcpu_set_reg).
 
-Thanks,
+The last patch "mfd: syscon: Fix build of missing ioremap on UM" should
+enter all other to avoid kbuild complains like:
 
-	M.
+warning: (ST_IRQCHIP && HIP04_ETH && STMMAC_PLATFORM && DWMAC_IPQ806X &&
+DWMAC_LPC18XX && DWMAC_ROCKCHIP && DWMAC_SOCFPGA && DWMAC_STI && TI_CPSW
+&& PINCTRL_ROCKCHIP && PINCTRL_DOVE && POWER_RESET_KEYSTONE &&
+S3C2410_WATCHDOG && VIDEO_OMAP3 && VIDEO_S5P_FIMC && USB_XHCI_MTK &&
+RTC_DRV_AT91SAM9 && LPC18XX_DMAMUX && VIDEO_OMAP4 && HWSPINLOCK_QCOM && ATMEL_ST
+&& QCOM_GSBI && PHY_HI6220_USB)
+selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (15):
+  clocksource: atmel: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  dmaengine: nxp: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  hwspinlock: qcom: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  irqchip: st: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  phy: hi6220: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  pinctrl: rockchip: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  pinctrl: mvebu: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  rtc: at91sam9: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  media: platform: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  net: ethernet: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  power: reset: keystone: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  soc: qcom: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  staging: media: omap4iss: Add missing MFD_SYSCON dependency on
+    HAS_IOMEM
+  usb: xhci: mtk: Add missing MFD_SYSCON dependency on HAS_IOMEM
+  mfd: syscon: Fix build of missing ioremap on UM
+
+ drivers/clocksource/Kconfig                 | 1 +
+ drivers/dma/Kconfig                         | 1 +
+ drivers/hwspinlock/Kconfig                  | 1 +
+ drivers/irqchip/Kconfig                     | 1 +
+ drivers/media/platform/Kconfig              | 1 +
+ drivers/media/platform/exynos4-is/Kconfig   | 1 +
+ drivers/mfd/Kconfig                         | 1 +
+ drivers/net/ethernet/hisilicon/Kconfig      | 1 +
+ drivers/net/ethernet/stmicro/stmmac/Kconfig | 6 ++++++
+ drivers/net/ethernet/ti/Kconfig             | 1 +
+ drivers/phy/Kconfig                         | 1 +
+ drivers/pinctrl/Kconfig                     | 1 +
+ drivers/pinctrl/mvebu/Kconfig               | 1 +
+ drivers/power/reset/Kconfig                 | 1 +
+ drivers/rtc/Kconfig                         | 1 +
+ drivers/soc/qcom/Kconfig                    | 1 +
+ drivers/staging/media/omap4iss/Kconfig      | 1 +
+ drivers/usb/host/Kconfig                    | 1 +
+ 18 files changed, 23 insertions(+)
+
 -- 
-Jazz is not dead. It just smells funny.
+2.5.0
