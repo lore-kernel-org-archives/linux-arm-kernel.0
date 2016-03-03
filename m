@@ -1,164 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 3 Mar 2016 20:38:08 +0100
-Subject: [PATCH v2 2/6] KVM: arm/arm64: arch_timer: Rely on the arch
- timer to parse the firmware tables
-In-Reply-To: <1455204804-31830-3-git-send-email-julien.grall@arm.com>
-References: <1455204804-31830-1-git-send-email-julien.grall@arm.com>
- <1455204804-31830-3-git-send-email-julien.grall@arm.com>
-Message-ID: <20160303193808.GK9634@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 3 Mar 2016 20:42:06 +0100
+Subject: [PATCH v2 0/3] fix memremap on ARM
+In-Reply-To: <20160303193625.GZ19428@n2100.arm.linux.org.uk>
+References: <20160303171347.GY19428@n2100.arm.linux.org.uk>
+ <CAKv+Gu_5vmxsigsCfsvcjFa-hhOP6vxnMavsQ45oKgMeYzgUSg@mail.gmail.com>
+ <CAPcyv4ijokZMTNPsxVOafMUCT_CHyScTkCGbR94mcYOhQOKNqA@mail.gmail.com>
+ <CAKv+Gu80AJ+UDGLWpr=1sYT57J+6X8-KZ5HCYSEz9JpgWaTQxA@mail.gmail.com>
+ <CAPcyv4j-Pz8uMTnz+OJZGguQqS1jOG4U+JkpsO7cBRFvs=-Ehg@mail.gmail.com>
+ <CAKv+Gu_z0B9rK4NJgrZFXLXWhgi+LVj6E9555vx60LSEoRy9tg@mail.gmail.com>
+ <CAPcyv4h8ez_nNUNVcOdHzjYB-Fh-VrB24p5aepN_GZ2g3jSxMQ@mail.gmail.com>
+ <CAKv+Gu8U+3r-H0Oyru0J9RoS744kzbJDjYkm=_FVSRFjzR5pxQ@mail.gmail.com>
+ <CAPcyv4iDMGsksCh4cHU3xooodn1e2tfSc70xTo-B_C2Ppnwsrw@mail.gmail.com>
+ <CAKv+Gu8uGiy85vC=2sMuMCCP0J7e0qwnAxACR25bePC0zHw=8w@mail.gmail.com>
+ <20160303193625.GZ19428@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu-UCLeeCU57s3K4-RqXX2h0HxowqUOkrof6XYu3vypOdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 03:33:20PM +0000, Julien Grall wrote:
-> The firmware table is currently parsed by the virt timer code in order
-> to retrieve the virtual interrupt. However, this is already done by the
-> arch timer driver and therefore make the parsing code duplicated twice.
-> 
-> Introduce an helper to get the virtual interrupt number and use it in
-> the virtual timer code.
-> 
-> With this changes, the support for ACPI is coming free.
-> 
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> 
-> ---
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Gleb Natapov <gleb@kernel.org>
-> Cc: Paolo Bonzini <pbonzini@redhat.com>
-> ---
->  drivers/clocksource/arm_arch_timer.c |  2 ++
->  include/clocksource/arm_arch_timer.h |  1 +
->  virt/kvm/arm/arch_timer.c            | 33 +++++++--------------------------
->  3 files changed, 10 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 6eb2c5d..3cdbefd 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -451,6 +451,8 @@ static struct arch_timer_kvm_info arch_timer_kvm_info;
->  
->  struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
->  {
-> +	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
-> +
+On 3 March 2016 at 20:36, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Mar 03, 2016 at 07:07:05PM +0100, Ard Biesheuvel wrote:
+>> OK. But I'd still like Russell to indicate whether he agrees with all
+>> of this, i.e., wire up memremap() to perform MT_MEMORY_RW mappings in
+>> the vmalloc area of memory regions that may be potentially be covered
+>> by highmem as well.
+>
+> I'm happy to go that way: go back to ioremap_cached() for pxa2xx-flash
+> and switch memremap() to MT_MEMORY_RW - I think that makes total sense.
+>
+> I think it is worth putting a comment against ioremap_cached() saying
+> that it's for pxa2xx-flash.c though, and deprecated for new uses.
+>
 
-it feels weird that we set this member on every retrieval of the pointer
-to the struct?
+OK, I will respin the series, and replace patch #1 with two patches that
 
-wouldn't it be more natural to intialize the struct somewhere during
-init and then this function just returns a pointer to the struct?
-
->  	return &arch_timer_kvm_info;
->  }
->  
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index 4d487f8..8890552 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -51,6 +51,7 @@ enum arch_timer_reg {
->  
->  struct arch_timer_kvm_info {
->  	struct timecounter timecounter;
-> +	int virtual_irq;
->  };
->  
->  #ifdef CONFIG_ARM_ARCH_TIMER
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index a669c6a..e4de549 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -17,7 +17,6 @@
->   */
->  
->  #include <linux/cpu.h>
-> -#include <linux/of_irq.h>
->  #include <linux/kvm.h>
->  #include <linux/kvm_host.h>
->  #include <linux/interrupt.h>
-> @@ -375,45 +374,28 @@ static struct notifier_block kvm_timer_cpu_nb = {
->  	.notifier_call = kvm_timer_cpu_notify,
->  };
->  
-> -static const struct of_device_id arch_timer_of_match[] = {
-> -	{ .compatible	= "arm,armv7-timer",	},
-> -	{ .compatible	= "arm,armv8-timer",	},
-> -	{},
-> -};
-> -
->  int kvm_timer_hyp_init(void)
->  {
-> -	struct device_node *np;
-> -	unsigned int ppi;
->  	struct arch_timer_kvm_info *info;
->  	int err;
->  
->  	info = arch_timer_get_kvm_info();
->  	timecounter = &info->timecounter;
->  
-> -	np = of_find_matching_node(NULL, arch_timer_of_match);
-> -	if (!np) {
-> -		kvm_err("kvm_arch_timer: can't find DT node\n");
-> +	host_vtimer_irq = info->virtual_irq;
-> +	if (host_vtimer_irq <= 0) {
-> +		kvm_err("kvm_arch_timer: can't find virtual timer info or config virtual timer interrupt\n");
-
-I don't understand the difference between the two cases in this error
-message.
-
-How about: "Invalid virtual timer IRQ: %d\n" ?
-
->  		return -ENODEV;
->  	}
->  
-> -	ppi = irq_of_parse_and_map(np, 2);
-> -	if (!ppi) {
-> -		kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
-> -		err = -EINVAL;
-> -		goto out;
-> -	}
-> -
-> -	err = request_percpu_irq(ppi, kvm_arch_timer_handler,
-> +	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
->  				 "kvm guest timer", kvm_get_running_vcpus());
->  	if (err) {
->  		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
-> -			ppi, err);
-> +			host_vtimer_irq, err);
->  		goto out;
->  	}
->  
-> -	host_vtimer_irq = ppi;
-> -
->  	err = __register_cpu_notifier(&kvm_timer_cpu_nb);
->  	if (err) {
->  		kvm_err("Cannot register timer CPU notifier\n");
-> @@ -426,14 +408,13 @@ int kvm_timer_hyp_init(void)
->  		goto out_free;
->  	}
->  
-> -	kvm_info("%s IRQ%d\n", np->name, ppi);
-> +	kvm_info("vtimer IRQ%d\n", host_vtimer_irq);
-
-is "vtimer" a known concept anywhere?  If not, can you use some known
-terms intead?
-
->  	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
->  
->  	goto out;
->  out_free:
-> -	free_percpu_irq(ppi, kvm_get_running_vcpus());
-> +	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
->  out:
-> -	of_node_put(np);
->  	return err;
->  }
->  
-> -- 
-> 1.9.1
-> 
-
-Thanks,
--Christoffer
+a) reintroduce ioremap_cached() (with the comment, as you say)
+b) move pxa2xx-flash from memremap to ioremap_cached()
