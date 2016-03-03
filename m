@@ -1,31 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 3 Mar 2016 18:15:28 +0000
-Subject: [PATCH] arm64: enable CONFIG_DEBUG_RODATA by default
-In-Reply-To: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160303181528.GB2074@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Mar 2016 18:17:14 +0000
+Subject: [PATCHv2 0/3] KASAN: clean stale poison upon cold re-entry to
+ kernel
+In-Reply-To: <CAG_fn=VBOqPSwhKy2OCj7cgM=XaD338L=UfPDcg9X3tCwc6B_g@mail.gmail.com>
+References: <1457024068-2236-1-git-send-email-mark.rutland@arm.com>
+ <CAG_fn=WAfu4oD1Qb1xUnX765RpUznWm1y+FKYqqiM8VO53F+Ag@mail.gmail.com>
+ <20160303174015.GG19139@leverpostej>
+ <CAG_fn=VBOqPSwhKy2OCj7cgM=XaD338L=UfPDcg9X3tCwc6B_g@mail.gmail.com>
+Message-ID: <20160303181714.GH19139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 03:10:59PM +0100, Ard Biesheuvel wrote:
-> In spite of its name, CONFIG_DEBUG_RODATA is an important hardening feature
-> for production kernels, and distros all enable it by default in their
-> kernel configs. However, since enabling it used to result in more granular,
-> and thus less efficient kernel mappings, it is not enabled by default for
-> performance reasons.
-> 
-> However, since commit 2f39b5f91eb4 ("arm64: mm: Mark .rodata as RO"), the
-> various kernel segments (.text, .rodata, .init and .data) are already
-> mapped individually, and the only effect of setting CONFIG_DEBUG_RODATA is
-> that the existing .text and .rodata mappings are updated late in the boot
-> sequence to have their read-only attributes set, which means that any
-> performance concerns related to enabling CONFIG_DEBUG_RODATA are no longer
-> valid.
-> 
-> So from now on, make CONFIG_DEBUG_RODATA default to 'y'
+On Thu, Mar 03, 2016 at 06:45:55PM +0100, Alexander Potapenko wrote:
+> On Thu, Mar 3, 2016 at 6:40 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi,
+> >
+> > On Thu, Mar 03, 2016 at 06:17:31PM +0100, Alexander Potapenko wrote:
+> >> Please replace "ASAN" with "KASAN".
+> >>
+> >> On Thu, Mar 3, 2016 at 5:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > Functions which the compiler has instrumented for ASAN place poison on
+> >> > the stack shadow upon entry and remove this poison prior to returning.
 
-Patch applied. If we later get a command line option as Kees mentioned,
-I'm happy to drop this option entirely.
+[...]
 
--- 
-Catalin
+> > For the above, and the rest of the series, ASAN consistently refers to
+> > the compiler AddressSanitizer feature, and KASAN consistently refers to
+> > the Linux-specific infrastructure. A simple s/[^K]ASAN/KASAN/ would
+> > arguably be wrong (e.g. when referring to GCC behaviour above).
+> I don't think there's been any convention about the compiler feature
+> name, we usually talked about ASan as a userspace tool and KASAN as a
+> kernel-space one, although they share the compiler part.
+
+Ah, ok.
+
+In future I'll speak in terms of "AddressSanitizer instrumentation" or
+something like that, as that's fairly unambigious.
+
+> > If there is a this needs rework, then I'm happy to s/[^K]ASAN/ASan/ to
+> > follow the usual ASan naming convention and avoid confusion. Otherwise,
+> > spinning a v3 is simply churn.
+> I don't insist on changing this, I should've chimed in before.
+> Feel free to retain the above patch description.
+
+No worries, thanks for the info.
+
+Thanks,
+Mark.
