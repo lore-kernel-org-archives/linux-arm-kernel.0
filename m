@@ -1,141 +1,34 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 3 Mar 2016 12:59:16 -0500
-Subject: [PATCH v2 2/5] arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
-In-Reply-To: <1454684330-892-3-git-send-email-james.morse@arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <1454684330-892-3-git-send-email-james.morse@arm.com>
-Message-ID: <56D87B74.1010306@codeaurora.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 3 Mar 2016 10:01:31 -0800
+Subject: [PATCH v2 0/3] fix memremap on ARM
+In-Reply-To: <CAKv+Gu8U+3r-H0Oyru0J9RoS744kzbJDjYkm=_FVSRFjzR5pxQ@mail.gmail.com>
+References: <1456508053-15015-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_8Fggh+hnVnj6pM6PbOysWFTNt=ot6nudLur9nzs2FVg@mail.gmail.com>
+ <20160303171347.GY19428@n2100.arm.linux.org.uk>
+ <CAKv+Gu_5vmxsigsCfsvcjFa-hhOP6vxnMavsQ45oKgMeYzgUSg@mail.gmail.com>
+ <CAPcyv4ijokZMTNPsxVOafMUCT_CHyScTkCGbR94mcYOhQOKNqA@mail.gmail.com>
+ <CAKv+Gu80AJ+UDGLWpr=1sYT57J+6X8-KZ5HCYSEz9JpgWaTQxA@mail.gmail.com>
+ <CAPcyv4j-Pz8uMTnz+OJZGguQqS1jOG4U+JkpsO7cBRFvs=-Ehg@mail.gmail.com>
+ <CAKv+Gu_z0B9rK4NJgrZFXLXWhgi+LVj6E9555vx60LSEoRy9tg@mail.gmail.com>
+ <CAPcyv4h8ez_nNUNVcOdHzjYB-Fh-VrB24p5aepN_GZ2g3jSxMQ@mail.gmail.com>
+ <CAKv+Gu8U+3r-H0Oyru0J9RoS744kzbJDjYkm=_FVSRFjzR5pxQ@mail.gmail.com>
+Message-ID: <CAPcyv4iDMGsksCh4cHU3xooodn1e2tfSc70xTo-B_C2Ppnwsrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Thu, Mar 3, 2016 at 9:57 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 3 March 2016 at 18:55, Dan Williams <dan.j.williams@intel.com> wrote:
+>> On Thu, Mar 3, 2016 at 9:41 AM, Ard Biesheuvel
+[..]
+>> Hmm, then what about Russell's suggestoin, if I'm not
+>> mischaracterizing, that ioremap_cache() move to its old
+>> ioremap_cached() name.  The latter has less cross-arch confusion.
+>
+> That would be appropriate as soon as we get rid of all the abuses of
+> ioremap_cache() (for some of which I am responsible myself, in the ARM
+> UEFI code). If we change it now, we're likely to break stuff.
+>
 
-This change breaks booting linux-next for me.
-
-On 02/05/2016 09:58 AM, James Morse wrote:
-> ARMv8.2 adds a new feature register id_aa64mmfr2. This patch adds the
-> cpu feature boiler plate used by the actual features in later patches.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/cpu.h    |  1 +
->  arch/arm64/include/asm/sysreg.h |  4 ++++
->  arch/arm64/kernel/cpufeature.c  | 10 ++++++++++
->  arch/arm64/kernel/cpuinfo.c     |  1 +
->  4 files changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-> index b5e9cee4b5f8..13a6103130cd 100644
-> --- a/arch/arm64/include/asm/cpu.h
-> +++ b/arch/arm64/include/asm/cpu.h
-> @@ -36,6 +36,7 @@ struct cpuinfo_arm64 {
->  	u64		reg_id_aa64isar1;
->  	u64		reg_id_aa64mmfr0;
->  	u64		reg_id_aa64mmfr1;
-> +	u64		reg_id_aa64mmfr2;
->  	u64		reg_id_aa64pfr0;
->  	u64		reg_id_aa64pfr1;
->  
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 4aeebec3d882..4ef294ec49cc 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -72,6 +72,7 @@
->  
->  #define SYS_ID_AA64MMFR0_EL1		sys_reg(3, 0, 0, 7, 0)
->  #define SYS_ID_AA64MMFR1_EL1		sys_reg(3, 0, 0, 7, 1)
-> +#define SYS_ID_AA64MMFR2_EL1		sys_reg(3, 0, 0, 7, 2)
->  
->  #define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
->  #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
-> @@ -137,6 +138,9 @@
->  #define ID_AA64MMFR1_VMIDBITS_SHIFT	4
->  #define ID_AA64MMFR1_HADBS_SHIFT	0
->  
-> +/* id_aa64mmfr2 */
-> +#define ID_AA64MMFR2_UAO_SHIFT		4
-> +
->  /* id_aa64dfr0 */
->  #define ID_AA64DFR0_CTX_CMPS_SHIFT	28
->  #define ID_AA64DFR0_WRPS_SHIFT		20
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index a84febc40db2..5b8bc98105c1 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -123,6 +123,11 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
->  	ARM64_FTR_END,
->  };
->  
-> +static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
-> +	ARM64_FTR_END,
-> +};
-> +
->  static struct arm64_ftr_bits ftr_ctr[] = {
->  	U_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 3, 0),
-> @@ -284,6 +289,7 @@ static struct arm64_ftr_reg arm64_ftr_regs[] = {
->  	/* Op1 = 0, CRn = 0, CRm = 7 */
->  	ARM64_FTR_REG(SYS_ID_AA64MMFR0_EL1, ftr_id_aa64mmfr0),
->  	ARM64_FTR_REG(SYS_ID_AA64MMFR1_EL1, ftr_id_aa64mmfr1),
-> +	ARM64_FTR_REG(SYS_ID_AA64MMFR2_EL1, ftr_id_aa64mmfr2),
->  
->  	/* Op1 = 3, CRn = 0, CRm = 0 */
->  	ARM64_FTR_REG(SYS_CTR_EL0, ftr_ctr),
-> @@ -408,6 +414,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
->  	init_cpu_ftr_reg(SYS_ID_AA64ISAR1_EL1, info->reg_id_aa64isar1);
->  	init_cpu_ftr_reg(SYS_ID_AA64MMFR0_EL1, info->reg_id_aa64mmfr0);
->  	init_cpu_ftr_reg(SYS_ID_AA64MMFR1_EL1, info->reg_id_aa64mmfr1);
-> +	init_cpu_ftr_reg(SYS_ID_AA64MMFR2_EL1, info->reg_id_aa64mmfr2);
->  	init_cpu_ftr_reg(SYS_ID_AA64PFR0_EL1, info->reg_id_aa64pfr0);
->  	init_cpu_ftr_reg(SYS_ID_AA64PFR1_EL1, info->reg_id_aa64pfr1);
->  	init_cpu_ftr_reg(SYS_ID_DFR0_EL1, info->reg_id_dfr0);
-> @@ -517,6 +524,8 @@ void update_cpu_features(int cpu,
->  				      info->reg_id_aa64mmfr0, boot->reg_id_aa64mmfr0);
->  	taint |= check_update_ftr_reg(SYS_ID_AA64MMFR1_EL1, cpu,
->  				      info->reg_id_aa64mmfr1, boot->reg_id_aa64mmfr1);
-> +	taint |= check_update_ftr_reg(SYS_ID_AA64MMFR2_EL1, cpu,
-> +				      info->reg_id_aa64mmfr2, boot->reg_id_aa64mmfr2);
->  
->  	/*
->  	 * EL3 is not our concern.
-> @@ -814,6 +823,7 @@ static u64 __raw_read_system_reg(u32 sys_id)
->  	case SYS_ID_AA64DFR1_EL1:	return read_cpuid(SYS_ID_AA64DFR0_EL1);
->  	case SYS_ID_AA64MMFR0_EL1:	return read_cpuid(SYS_ID_AA64MMFR0_EL1);
->  	case SYS_ID_AA64MMFR1_EL1:	return read_cpuid(SYS_ID_AA64MMFR1_EL1);
-> +	case SYS_ID_AA64MMFR2_EL1:	return read_cpuid(SYS_ID_AA64MMFR2_EL1);
->  	case SYS_ID_AA64ISAR0_EL1:	return read_cpuid(SYS_ID_AA64ISAR0_EL1);
->  	case SYS_ID_AA64ISAR1_EL1:	return read_cpuid(SYS_ID_AA64ISAR1_EL1);
->  
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 76df22272804..966fbd52550b 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -210,6 +210,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
->  	info->reg_id_aa64isar1 = read_cpuid(SYS_ID_AA64ISAR1_EL1);
->  	info->reg_id_aa64mmfr0 = read_cpuid(SYS_ID_AA64MMFR0_EL1);
->  	info->reg_id_aa64mmfr1 = read_cpuid(SYS_ID_AA64MMFR1_EL1);
-> +	info->reg_id_aa64mmfr2 = read_cpuid(SYS_ID_AA64MMFR2_EL1);
->  	info->reg_id_aa64pfr0 = read_cpuid(SYS_ID_AA64PFR0_EL1);
->  	info->reg_id_aa64pfr1 = read_cpuid(SYS_ID_AA64PFR1_EL1);
-
-swapper[0]: undefined instruction: pc=ffffff800808d730
-Code: d5380702 d5380721 f9017c02 f9018001 (d5380742)
-Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.5.0-rc6-next-20160303 #1
-Hardware name: (null) (DT)
-task: ffffff8008b2d980 ti: ffffff8008b20000 task.ti: ffffff8008b20000
-PC is at __cpuinfo_store_cpu+0x68/0x198
-LR is at cpuinfo_store_boot_cpu+0x28/0x50
-
-ffffff800808d730:       d5380742        mrs     x2, s3_0_c0_c7_2
-
-Thanks,
-Christopher Covington
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Ok, sounds good.  I'll take care of the x86 ioremap_cache() removal
+and leave the eventual ARM conversion to you.
