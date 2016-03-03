@@ -1,35 +1,84 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 3 Mar 2016 21:44:44 +0900
-Subject: [rtc-linux] [RFC 06/15] pinctrl: rockchip: Add missing MFD_SYSCON
- dependency on HAS_IOMEM
-In-Reply-To: <1456992221-26712-7-git-send-email-k.kozlowski@samsung.com>
-References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
- <1456992221-26712-7-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAJKOXPcbiscpC_RUe=ft9NTy1ZY1uaa_zkX6rOadnoym-UMR1g@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 3 Mar 2016 13:44:50 +0100
+Subject: [PATCH 0/3] KASAN: clean stale poison upon cold re-entry to kernel
+In-Reply-To: <20160303123809.GA19139@leverpostej>
+References: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
+ <20160303120227.GA2484@gmail.com>
+ <20160303123809.GA19139@leverpostej>
+Message-ID: <20160303124450.GB8781@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-03 17:03 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> The MFD_SYSCON depends on HAS_IOMEM so when selecting it avoid unmet
-> direct dependencies.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/pinctrl/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> index fb8200b8e8ec..dc7ab58d4d74 100644
-> --- a/drivers/pinctrl/Kconfig
-> +++ b/drivers/pinctrl/Kconfig
-> @@ -131,6 +131,7 @@ config PINCTRL_MESON
->
->  config PINCTRL_ROCKCHIP
->         bool
-> +       depends on HAS_IOMEM    # For MFD_SYSCON
->         select PINMUX
 
-False alarm, no need for the patch (non-selectable symbol)
+* Mark Rutland <mark.rutland@arm.com> wrote:
 
-Best regards,
-Krzysztof
+> On Thu, Mar 03, 2016 at 01:02:27PM +0100, Ingo Molnar wrote:
+> > 
+> > * Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> > > Functions which the compiler has instrumented for ASAN place poison on
+> > > the stack shadow upon entry and remove this poison prior to returning.
+> > > 
+> > > In some cases (e.g. hotplug and idle), CPUs may exit the kernel a number
+> > > of levels deep in C code. If there are any instrumented functions on
+> > > this critical path, these will leave portions of the idle thread stack
+> > > shadow poisoned.
+> > > 
+> > > If a CPU returns to the kernel via a different path (e.g. a cold entry),
+> > > then depending on stack frame layout subsequent calls to instrumented
+> > > functions may use regions of the stack with stale poison, resulting in
+> > > (spurious) KASAN splats to the console.
+> > > 
+> > > Contemporary GCCs always add stack shadow poisoning when ASAN is
+> > > enabled, even when asked to not instrument a function [1], so we can't
+> > > simply annotate functions on the critical path to avoid poisoning.
+> > > 
+> > > Instead, this series explicitly removes any stale poison before it can
+> > > be hit. In the common hotplug case we clear the entire stack shadow in
+> > > common code, before a CPU is brought online.
+> > > 
+> > > On architectures which perform a cold return as part of cpu idle may
+> > > retain an architecture-specific amount of stack contents. To retain the
+> > > poison for this retained context, the arch code must call the core KASAN
+> > > code, passing a "watermark" stack pointer value beyond which shadow will
+> > > be cleared. Architectures which don't perform a cold return as part of
+> > > idle do not need any additional code.
+> > > 
+> > > This is a combination of previous approaches [2,3], attempting to keep
+> > > as much as possible generic.
+> > > 
+> > > Thanks,
+> > > Mark.
+> > > 
+> > > [1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69863
+> > > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409466.html
+> > > [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/411850.html
+> > > 
+> > > Mark Rutland (3):
+> > >   kasan: add functions to clear stack poison
+> > >   sched/kasan: remove stale KASAN poison after hotplug
+> > >   arm64: kasan: clear stale stack poison
+> > > 
+> > >  arch/arm64/kernel/sleep.S |  4 ++++
+> > >  include/linux/kasan.h     |  6 +++++-
+> > >  kernel/sched/core.c       |  3 +++
+> > >  mm/kasan/kasan.c          | 20 ++++++++++++++++++++
+> > >  4 files changed, 32 insertions(+), 1 deletion(-)
+> > 
+> > Looks good to me - via which tree would you like to see this merged upstream?
+> 
+> I'd prefer the arm64 tree as arm64 is (the most) affected by the issue
+> in practice.
+> 
+> I'm happy for this to go via another tree if that's simpler; I'm not
+> aware of anything that's likely to conflict in the arm64 tree.
+> 
+> Catalin, Andrey, Andrew, any preference?
+
+Ok, for the scheduler bits:
+
+  Reviewed-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
