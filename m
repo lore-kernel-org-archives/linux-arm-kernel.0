@@ -1,51 +1,65 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 3 Mar 2016 13:31:56 -0500 (EST)
-Subject: [PATCH 1/3] usb: core: add power sequence for USB devices
-In-Reply-To: <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
-Message-ID: <Pine.LNX.4.44L0.1603031326310.1380-100000@iolanthe.rowland.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  3 Mar 2016 19:44:16 +0100
+Subject: [PATCH v2 3/3] arm64: kaslr: increase randomization granularity
+In-Reply-To: <1457030656-29584-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457030656-29584-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1457030656-29584-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Mar 2016, Peter Chen wrote:
+Currently, our KASLR implementation randomizes the placement of the core
+kernel at 2 MB granularity. This is based on the arm64 kernel boot
+protocol, which mandates that the kernel is loaded TEXT_OFFSET bytes above
+a 2 MB aligned base address. This requirement is a result of the fact that
+the block size used by the early mapping code may be 2 MB at the most (for
+a 4 KB granule kernel)
 
-> Some hard-wired USB devices need to do power sequence to let the
-> device work normally, the typical power sequence like: enable USB
-> PHY clock, toggle reset pin, etc. But current Linux USB driver
-> lacks of such code to do it, it may cause some hard-wired USB devices
-> works abnormal or can't be recognized by controller at all.
-> 
-> In this patch, it will do power on sequence at hub's probe for all
-> devices under this hub (includes root hub) if this device is described
-> at dts and there is a phandle "usb-pwrseq" for it. At hub_disconnect,
-> it will do power off sequence.
-> 
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+But we can do better than that: since a KASLR kernel needs to be relocated
+in any case, we can tolerate a physical misalignment as long as the virtual
+misalignment relative to this 2 MB block size is equal in size, and code to
+deal with this is already in place.
 
+Since we align the kernel segments to 64 KB, let's randomize the physical
+offset at 64 KB granularity as well (unless CONFIG_DEBUG_ALIGN_RODATA is
+enabled). This way, the mapping efficiency is not affected at all.
 
-> +static int hub_of_pwrseq(struct usb_device *hdev, bool on)
-> +{
-> +	struct device *parent;
-> +	struct device_node *node;
-> +	int ret = 0;
-> +
-> +	if (hdev->parent)
-> +		parent = &hdev->dev;
-> +	else
-> +		parent = bus_to_hcd(hdev->bus)->self.controller;
-> +
-> +	for_each_child_of_node(parent->of_node, node) {
-> +		ret = on ? usb_child_pwrseq_on(node)
-> +			: usb_child_pwrseq_off(node);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	return 0;
-> +}
+The higher granularity produces 5 bits of additional entropy.
 
-If you get a failure, do you want to leave the power to all the
-preceding devices turned on?  It seems to me you should either turn all 
-of them back off, or else continue trying to turn on power for the 
-remaining children.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/firmware/efi/libstub/arm64-stub.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-Alan Stern
+diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+index e0e6b74fef8f..a1dd4a1dad0b 100644
+--- a/drivers/firmware/efi/libstub/arm64-stub.c
++++ b/drivers/firmware/efi/libstub/arm64-stub.c
+@@ -61,15 +61,23 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && phys_seed != 0) {
+ 		/*
++		 * Produce a displacement in the interval [0, MIN_KIMG_ALIGN)
++		 * that is a multiple of the minimal segment alignment (SZ_64K)
++		 */
++		u32 offset = !IS_ENABLED(CONFIG_DEBUG_ALIGN_RODATA) ?
++			     (phys_seed >> 32) & (MIN_KIMG_ALIGN - 1) &
++			     ~(SZ_64K - 1) : TEXT_OFFSET;
++
++		/*
+ 		 * If KASLR is enabled, and we have some randomness available,
+ 		 * locate the kernel at a randomized offset in physical memory.
+ 		 */
+-		*reserve_size = kernel_memsize + TEXT_OFFSET;
++		*reserve_size = kernel_memsize + offset;
+ 		status = efi_random_alloc(sys_table_arg, *reserve_size,
+ 					  MIN_KIMG_ALIGN, reserve_addr,
+-					  phys_seed);
++					  (u32)phys_seed);
+ 
+-		*image_addr = *reserve_addr + TEXT_OFFSET;
++		*image_addr = *reserve_addr + offset;
+ 	} else {
+ 		/*
+ 		 * Else, try a straight allocation at the preferred offset.
+-- 
+2.5.0
