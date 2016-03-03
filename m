@@ -1,48 +1,43 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 3 Mar 2016 17:56:08 +0100
-Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
-In-Reply-To: <000201d17562$5f6f0090$1e4d01b0$@gmail.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
- <000201d17562$5f6f0090$1e4d01b0$@gmail.com>
-Message-ID: <56D86CA8.6030301@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 3 Mar 2016 17:56:33 +0100
+Subject: [PATCH] arm64: enable CONFIG_DEBUG_RODATA by default
+In-Reply-To: <CAGXu5j+HzNfiiNkZb86iEtCWK4PC_MKax53hNWS7CXrpo5FE6Q@mail.gmail.com>
+References: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAGXu5j+HzNfiiNkZb86iEtCWK4PC_MKax53hNWS7CXrpo5FE6Q@mail.gmail.com>
+Message-ID: <CAKv+Gu8hkFuSkAXWNCEC_qnxoZPcP3yo_Gue5fgUDVeUzoZnNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 04:32 PM, Ma Haijun wrote:
-> Hi Neil,
-> 
-> Glad to see the mainline efforts of this SoC family.
-> 
-> Previously, I did not really understand what this "RPS" stood for.
-> After some digging(1)., now I believe it means ARM's Reference Peripheral
-> Specification
-> though the spec itself seems not publicly available, the peripheral specs
-> are accessible.
-> The interrupt controller is an AMBA Interrupt Controller(2) and the timers
-> are
-> AMBA Timer(3). Besides, ARM Dual-Timer Module (SP804)(4) looks like an
-> extended version
-> of the AMBA timer
-> 
-> 1)
-> http://infocenter.arm.com/help/topic/com.arm.doc.dai0030a/DAI0030A_sw_int_ap
-> psnote.pdf
-> 2) http://infocenter.arm.com/help/topic/com.arm.doc.ddi0047d/DDI0047.pdf
-> 3) http://infocenter.arm.com/help/topic/com.arm.doc.ddi0049c/AMBA_Timer.pdf
-> 4) http://infocenter.arm.com/help/topic/com.arm.doc.ddi0271d/DDI0271.pdf
-> 
-> Regards,
-> Haijun
+On 3 March 2016 at 17:50, Kees Cook <keescook@chromium.org> wrote:
+> On Thu, Mar 3, 2016 at 6:10 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> In spite of its name, CONFIG_DEBUG_RODATA is an important hardening feature
+>> for production kernels, and distros all enable it by default in their
+>> kernel configs. However, since enabling it used to result in more granular,
+>> and thus less efficient kernel mappings, it is not enabled by default for
+>> performance reasons.
+>>
+>> However, since commit 2f39b5f91eb4 ("arm64: mm: Mark .rodata as RO"), the
+>> various kernel segments (.text, .rodata, .init and .data) are already
+>> mapped individually, and the only effect of setting CONFIG_DEBUG_RODATA is
+>> that the existing .text and .rodata mappings are updated late in the boot
+>> sequence to have their read-only attributes set, which means that any
+>> performance concerns related to enabling CONFIG_DEBUG_RODATA are no longer
+>> valid.
+>>
+>> So from now on, make CONFIG_DEBUG_RODATA default to 'y'
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> Acked-by: Kees Cook <keescook@chromium.org>
+>
+> If this doesn't cause any problems, perhaps we can make it always 'y' soon?
+>
 
-Hi Haijun,
+You mean remove the option altogether? I would not mind, although
+arguably, being able to map .text and .rodata writable could be
+considered a useful debug option (and then it would almost, but not
+quite, live up to its name)
 
-Thanks for the tips !
-
-Indeed the timer looks like the timer-sp804 actually upstream, I'll try this driver before posting a v2.
-
-Concerning the IRQ controller, I did not find any similar drivers.
-
-Marc, Arnd, should I create a specific "arm RPS irq controller" instead ?
-
-Neil
+-- 
+Ard.
