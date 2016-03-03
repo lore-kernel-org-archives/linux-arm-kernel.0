@@ -1,50 +1,33 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 3 Mar 2016 08:33:37 -0800
-Subject: [PATCH v13 4/6] arm64: Move unflatten_device_tree() call earlier.
-In-Reply-To: <CAL_JsqL0Mzgp_SkycmiZBbt2OoGtE7_rFgD41Jex4nDS7xXrHA@mail.gmail.com>
-References: <1456959362-2036-1-git-send-email-ddaney.cavm@gmail.com>
- <1456959362-2036-5-git-send-email-ddaney.cavm@gmail.com>
- <CAL_JsqL0Mzgp_SkycmiZBbt2OoGtE7_rFgD41Jex4nDS7xXrHA@mail.gmail.com>
-Message-ID: <56D86761.9060905@caviumnetworks.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu,  3 Mar 2016 16:35:35 +0000
+Subject: [PATCH] tty: amba-pl011: don't dereference NULL platform data
+Message-ID: <597e09d3324e7d901fb0f77ccf6ccf3c07ce1f31.1457022799.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 05:47 AM, Rob Herring wrote:
-> On Wed, Mar 2, 2016 at 4:56 PM, David Daney <ddaney.cavm@gmail.com> wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> In order to extract NUMA information from the device tree, we need to
->> have the tree in its unflattened form.
->>
->> Move the call to unflatten_device_tree() into paging_init().  This
->> puts it before the call to bootmem_init(), which is where the NUMA
->> information is extracted.
->
-> Can't you just move up unflatten_device_tree in setup_arch rather than
-> hiding in paging_init?
+When only a TX DMA channel is specified in DT, pl011_dma_probe() falls
+back to looking for the optional RX channel in platform data. What it
+doesn't do is check whether that platform data actually exists...
 
-No.
+Add the missing check to avoid crashing the kernel.
 
-It must come *after* map_mem() and *before* bootmem_init(), both of 
-which are done within paging_init().
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-One option would be to split the things in paging_init() into two 
-functions, and then do:
-
-.
-.
-.
-    paging_init_first_part();
-    if (acpi_disabled)
-        unflatten_device_tree();
-    paging_init_second_part();
-.
-.
-.
-
->
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   arch/arm64/kernel/setup.c | 7 +++----
->>   arch/arm64/mm/mmu.c       | 5 +++++
->>   2 files changed, 8 insertions(+), 4 deletions(-)
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index c0da0cc..a4dd91a 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -420,7 +420,7 @@ static void pl011_dma_probe(struct uart_amba_port *uap)
+ 	/* Optionally make use of an RX channel as well */
+ 	chan = dma_request_slave_channel(dev, "rx");
+ 
+-	if (!chan && plat->dma_rx_param) {
++	if (!chan && plat && plat->dma_rx_param) {
+ 		chan = dma_request_channel(mask, plat->dma_filter, plat->dma_rx_param);
+ 
+ 		if (!chan) {
+-- 
+2.7.2.333.g70bd996.dirty
