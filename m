@@ -1,11 +1,11 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 3 Mar 2016 21:43:09 +0900
-Subject: [rtc-linux] [RFC 12/15] soc: qcom: Add missing MFD_SYSCON
+Date: Thu, 3 Mar 2016 21:43:55 +0900
+Subject: [rtc-linux] [RFC 07/15] pinctrl: mvebu: Add missing MFD_SYSCON
  dependency on HAS_IOMEM
-In-Reply-To: <1456992221-26712-13-git-send-email-k.kozlowski@samsung.com>
+In-Reply-To: <1456992221-26712-8-git-send-email-k.kozlowski@samsung.com>
 References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
- <1456992221-26712-13-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAJKOXPesNS16Zg=QCTZXA+i8ETqWiQYhMu6LBXDzbNVc0aAQRA@mail.gmail.com>
+ <1456992221-26712-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAJKOXPeVNrzCJ0TTeBG=H0w2+qHzAcXfTck9gBBmZFvVPpPx0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,21 +15,22 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/soc/qcom/Kconfig | 1 +
+>  drivers/pinctrl/mvebu/Kconfig | 1 +
 >  1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-> index 461b387d03cc..24de48134c15 100644
-> --- a/drivers/soc/qcom/Kconfig
-> +++ b/drivers/soc/qcom/Kconfig
-> @@ -4,6 +4,7 @@
->  config QCOM_GSBI
->          tristate "QCOM General Serial Bus Interface"
->          depends on ARCH_QCOM
-> +        depends on HAS_IOMEM   # For MFD_SYSCON
->          select MFD_SYSCON
+> diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
+> index 170602407c0d..13685923729c 100644
+> --- a/drivers/pinctrl/mvebu/Kconfig
+> +++ b/drivers/pinctrl/mvebu/Kconfig
+> @@ -7,6 +7,7 @@ config PINCTRL_MVEBU
+>
+>  config PINCTRL_DOVE
+>         bool
+> +       depends on HAS_IOMEM    # For MFD_SYSCON
+>         select PINCTRL_MVEBU
+>         select MFD_SYSCON
 
-False alarm, no need for the patch (this depends on ARCH_QCOM).
+False alarm, no need for the patch (non-selectable symbol)
 
 Best regards,
 Krzysztof
