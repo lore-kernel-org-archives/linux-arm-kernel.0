@@ -1,56 +1,56 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 3 Mar 2016 11:35:22 -0600
-Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr()
- on ARM
-In-Reply-To: <m337sapw89.fsf@t19.piap.pl>
-References: <m337sapw89.fsf@t19.piap.pl>
-Message-ID: <20160303173522.GA9189@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Mar 2016 17:40:15 +0000
+Subject: [PATCHv2 0/3] KASAN: clean stale poison upon cold re-entry to
+ kernel
+In-Reply-To: <CAG_fn=WAfu4oD1Qb1xUnX765RpUznWm1y+FKYqqiM8VO53F+Ag@mail.gmail.com>
+References: <1457024068-2236-1-git-send-email-mark.rutland@arm.com>
+ <CAG_fn=WAfu4oD1Qb1xUnX765RpUznWm1y+FKYqqiM8VO53F+Ag@mail.gmail.com>
+Message-ID: <20160303174015.GG19139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi,
 
-On Tue, Mar 01, 2016 at 07:07:18AM +0100, Krzysztof Ha?asa wrote:
-> Many ARM platforms use a wrapper:
-> /*
->  * Compatibility wrapper for older platforms that do not care about
->  * passing the parent device.
->  */
-> static inline void pci_common_init(struct hw_pci *hw)
-> {
->         pci_common_init_dev(NULL, hw);
-> }
+On Thu, Mar 03, 2016 at 06:17:31PM +0100, Alexander Potapenko wrote:
+> Please replace "ASAN" with "KASAN".
 > 
-> which means that pci_bus_assign_domain_nr() can be called without
-> a parent. This patch fixes the NULL pointer dereference.
+> On Thu, Mar 3, 2016 at 5:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Functions which the compiler has instrumented for ASAN place poison on
+> > the stack shadow upon entry and remove this poison prior to returning.
+> >
+> > In some cases (e.g. hotplug and idle), CPUs may exit the kernel a number
+> > of levels deep in C code. If there are any instrumented functions on
+> > this critical path, these will leave portions of the idle thread stack
+> > shadow poisoned.
+> >
+> > If a CPU returns to the kernel via a different path (e.g. a cold entry),
+> > then depending on stack frame layout subsequent calls to instrumented
+> > functions may use regions of the stack with stale poison, resulting in
+> > (spurious) KASAN splats to the console.
+> >
+> > Contemporary GCCs always add stack shadow poisoning when ASAN is
+> > enabled, even when asked to not instrument a function [1], so we can't
+> > simply annotate functions on the critical path to avoid poisoning.
+> >
+> > Instead, this series explicitly removes any stale poison before it can
+> > be hit. In the common hotplug case we clear the entire stack shadow in
+> > common code, before a CPU is brought online.
+> >
+> > On architectures which perform a cold return as part of cpu idle may
+> > retain an architecture-specific amount of stack contents. To retain the
+> > poison for this retained context, the arch code must call the core KASAN
+> > code, passing a "watermark" stack pointer value beyond which shadow will
+> > be cleared. Architectures which don't perform a cold return as part of
+> > idle do not need any additional code.
 
-What exactly is the impact of this?  Does this fix need to be in v4.5?
-It sounds like it should be, but I need a little more detailed
-justification, e.g., "platforms X, Y, Z don't boot at all without
-this change."
+For the above, and the rest of the series, ASAN consistently refers to
+the compiler AddressSanitizer feature, and KASAN consistently refers to
+the Linux-specific infrastructure. A simple s/[^K]ASAN/KASAN/ would
+arguably be wrong (e.g. when referring to GCC behaviour above).
 
-> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-> Cc: stable at vger.kernel.org
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 602eb42..f89db3a 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4772,8 +4772,10 @@ int pci_get_new_domain_nr(void)
->  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  {
->  	static int use_dt_domains = -1;
-> -	int domain = of_get_pci_domain_nr(parent->of_node);
-> +	int domain = -1;
->  
-> +	if (parent)
-> +		domain = of_get_pci_domain_nr(parent->of_node);
->  	/*
->  	 * Check DT domain and use_dt_domains values.
->  	 *
-> 
-> -- 
-> Krzysztof Halasa
-> 
-> Industrial Research Institute for Automation and Measurements PIAP
-> Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+If there is a this needs rework, then I'm happy to s/[^K]ASAN/ASan/ to
+follow the usual ASan naming convention and avoid confusion. Otherwise,
+spinning a v3 is simply churn.
+
+Thanks,
+Mark.
