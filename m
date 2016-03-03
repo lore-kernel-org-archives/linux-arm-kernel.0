@@ -1,37 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 03 Mar 2016 09:04:54 +0900
-Subject: [GIT PULL] ARM: EXYNOS: SROM driver for v4.6, 2nd try
-In-Reply-To: <1456825042-23733-3-git-send-email-k.kozlowski@samsung.com>
-References: <1456825042-23733-1-git-send-email-k.kozlowski@samsung.com>
- <1456825042-23733-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56D77FA6.5070500@samsung.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 2 Mar 2016 16:05:15 -0800
+Subject: [PATCH v2 3/6] rockchip: power-domain: add support for sub-power
+ domains
+In-Reply-To: <1828664.WUMlfLyMuz@phil>
+References: <1455764838-12928-1-git-send-email-zhangqing@rock-chips.com>
+ <1455764838-12928-4-git-send-email-zhangqing@rock-chips.com>
+ <1828664.WUMlfLyMuz@phil>
+Message-ID: <CAOi56cX-79UvCLEY5ddvWFoW=qRVmF-wcCt_0stATK_KNWU8vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.03.2016 18:37, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> 
-> After Olof comments, second pull request with movement of SROM code
-> to separate driver - under drivers/memory/samsung (more are planned for
-> that directory).
-> 
-> This depends on (included here):
-> 1. tag samsung-dt-srom-4.6: SROM-DT changes, merged already to arm-soc,
-> 2. tag samsung-soc-4.6-2: next/soc changes, sent few days ago, not merged yet.
-> 
-> This may conflict in the future (in linux-next or Linus) around
-> drivers/memory/Kconfig with iommu tree. Just add all the changes.
-> 
-> 
-> The diff at the end contains both samsung-soc-4.6-2 and this stuff.
-> To make finding changes easier, below you will find difference between
-> this tag and samsung-soc-4.6-2:
+On Thu, Feb 18, 2016 at 4:20 PM, Heiko Stuebner <heiko@sntech.de> wrote:
 
-I see you did not pull this yet so can you wait a little bit? Rob
-Herring posted some comments on bindings so this might be revisited...
+> In general the code looks like you're going to group the domains
+> hirarchically, like
+>
+>        power: power-controller {
+>                compatible = "rockchip,rk3399-power-controller";
+>
+>                pd_cci {
+>                        reg = <RK3399_PD_CCI>;
+>                        clocks = ...;
+>
+>                         pd_cci0 {
+>                                 reg = <RK3399_PD_CCI0>;
+>                                 clocks = ...;
+>                         };
+>                };
+>        };
+>
+> This isn't documented in the dt-binding and also isn't really improving
+> reading these declarations. Instead as I said before, I think I'd like more
+> get inspiration from how Exynos is doing that already
 
-This is an unlucky patchset...
+Heiko and I had a chat offline about this, and I mentioned that the
+Exynos way is not the preferred way.  The nesting that is being done
+here (and in v4) is the better way, and is fully supported by the
+genpd code.
 
-Best regards,
-Krzysztof
+Kevin
