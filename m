@@ -1,35 +1,65 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 3 Mar 2016 15:38:28 +0000 (UTC)
-Subject: [PATCH 10/11] ARM: DRA7: hwmod: Add data for
- McASP1/2/4/5/6/7/8
-In-Reply-To: <56D81C49.6030706@ti.com>
-References: <1456411827-23962-1-git-send-email-peter.ujfalusi@ti.com>
- <1456411827-23962-11-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.02.1603010900590.14948@utopia.booyaka.com>
- <56D5C6B1.6040005@ti.com>
- <alpine.DEB.2.02.1603011657260.14948@utopia.booyaka.com>
- <56D81C49.6030706@ti.com>
-Message-ID: <alpine.DEB.2.02.1603031532130.32459@utopia.booyaka.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 3 Mar 2016 21:15:18 +0530
+Subject: [PATCH V2 3/8] dmaengine: bcm2835: use shared interrupt for
+ channel 11 to 14.
+In-Reply-To: <1181247D-8257-439A-943F-34F40604D5A5@martin.sperl.org>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-4-git-send-email-kernel@martin.sperl.org>
+ <20160113122621.GA11130@localhost>
+ <56965178.7070700@martin.sperl.org>
+ <20160113134338.GH11130@localhost>
+ <56965E3B.7060104@martin.sperl.org>
+ <20160114040749.GJ11130@localhost>
+ <1181247D-8257-439A-943F-34F40604D5A5@martin.sperl.org>
+Message-ID: <20160303154518.GQ11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi P?ter,
-
-On Thu, 3 Mar 2016, Peter Ujfalusi wrote:
-
-> On 03/01/2016 07:01 PM, Paul Walmsley wrote:
-> >>> 3. Can McASP1,2,3 bus-master onto the L3?  If so, then there should be 
-> >>> "dra7xx_mcasp1__l3_main_1"-style links to indicate this.
-> >>
-> >> I need to check this, but I don't think McASP1,2,3 can be bus-master onto L3.
-> > 
-> > OK.  When you get back, maybe doublecheck this - it looks to me from 
-> > SPRUHZ6 that McASP1-3 have built-in DMA controllers.
+On Mon, Feb 29, 2016 at 06:10:53PM +0100, Martin Sperl wrote:
 > 
-> They are only targets on L3. Not sure about the built-in DMA controller
+> > On 14.01.2016, at 05:07, Vinod Koul <vinod.koul@intel.com> wrote:
+> > 
+> > On Wed, Jan 13, 2016 at 03:24:59PM +0100, Martin Sperl wrote:
+> >>>> But that would be frowned upon, so I had to come up with the approach
+> >>>> taken, which makes the following assumptions:
+> >>> 
+> >>> DT was designed to move this info and hardcoding from kernel into
+> >>> DT, so why cant we do that?
+> >> We still need to be backwards-compatible - at least that is what
+> >> everyone tells me, so I need to hard-code fallbacks for those values.
+> > 
+> > IMO hard code for falling back is okay as that supports old cases and new
+> > platforms use geric DT info and new devices can be supported generically,
+> > please check with DT folks..
+> > 
+> >>>> * the DT maps only the interrupts that are assigned to the HW block
+> >>>> * the driver knows about the number of DMA channels in HW
+> >> that could be a DT property, yes.
+> >>>> * the driver knows about the mapping of shared interrupts
+> >>>>  (11-14 share irq).
+> >> OK - how would you define that "mapping" in a "sane" manner in the DT
+> >> that allows us to have multiple such mappings in the future?
+> > 
+> > You are hard coding the flags for each channel, we can pass this for each
+> > channel in the interrupt configi, a flag share/none..? Please run this thru
+> > DT experts and I am not one of them..
+> 
+> So here a ?simple? approach with the following device tree addition (plus defaults):
+> 	interrupts = <1 16>, /* dma 0 irq */
+> 		     <1 17>, /* dma 1 irq */
+> 	...
+> 		     <1 26>, /* dma 10 irq */
+> 		     <1 27>, /* dma 11-14 irq */
+> 		     <1 28>; /* dma all irq */
+> 	brcm,dma-channel-mask = <0x7f35>;
+> 	/* new properties below - also the defaults */
+> 	brcm,dma-channel-shared-mask = <0x7800>;
+> 	brcm,dma-shared-irq-index = <11>;
+> 
+> Is this sufficient to move forward?
 
-OK thanks.  I took a closer look at SPRUHZ6E and I think I was mistaken 
-about those blocks having DMA controllers.  So you can ignore this part
-of my comments :-)
+This looks okay to me for now, though am not a DT expert. Please send
+patches and CC DT folks as relevant and we can discuss..
 
-- Paul
+-- 
+~Vinod
