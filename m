@@ -1,32 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Mar 2016 15:10:31 -0800
-Subject: [GIT PULL] enable dm814x and dra62x clock driver for v4.6 merge window
-Message-ID: <20160303231031.GH4469@atomide.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 4 Mar 2016 00:14:01 +0100
+Subject: [PATCH V14 8/9] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <56D7323B.4040100@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
+ <56D08843.5020306@linaro.org> <56D7323B.4040100@codeaurora.org>
+Message-ID: <56D8C539.9000203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8a8b6eb7a87f12804f44128d6e4c59b19f224308:
+Hi Sinan,
+On 03/02/2016 07:34 PM, Sinan Kaya wrote:
+> On 2/26/2016 12:15 PM, Eric Auger wrote:
+>>> -module_init(reset ## _module_init);				\
+>>>> +#define module_vfio_reset_handler(compat, acpihid, reset)		\
+>>>> +MODULE_ALIAS("vfio-reset:" compat);					\
+>> Here you need to handle alias for hid case I think
+> 
+> I'm wondering what happens when Compat or ACPI string is NULL.
+> 
+> MODULE_ALIAS("vfio-reset:" NULL)
+> 
+> Would the kernel like it? 
 
-  clk: ti: Fix some errors found by static checkers (2016-03-01 16:21:25 -0800)
+> 
+> I'd rather create an alias only when the string is not NULL. Given
+> this is a macro, I believe it won't work. 
 
-are available in the git repository at:
+Indeed I think we should create an alias only for the supported case or
+2 aliases if both are supported.
+> 
+> Can you think of any other way in the code to create the alias?
+> 
+To be honest I did not find any elegant solution either. Personally I
+would move the MODULE_ALIAS for compat/acpihid outside of
+module_vfio_reset_handler macro, directly in the reset module. But maybe
+someone will propose a better solution?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/dt-ti81xx-signed
+Best Regards
 
-for you to fetch changes up to 5d7e23a79444385d03717dc19cc58dd2d5883052:
-
-  ARM: dts: Add clocks for dm814x ADPLL (2016-03-01 17:14:22 -0800)
-
-----------------------------------------------------------------
-Enable dm814x and dra62x clock driver. This branch has a dependency
-to the clk-ti branch from the Linux clk tree for the ADPLL clock driver.
-Otherwise things won't keep booting properly when we flip over to use
-the clock driver instead of fixed clocks set up by the bootloader.
-
-----------------------------------------------------------------
-Tony Lindgren (1):
-      ARM: dts: Add clocks for dm814x ADPLL
-
- arch/arm/boot/dts/dm814x-clocks.dtsi | 243 ++++++++++++++++++++++++++++++-----
- arch/arm/boot/dts/dra62x-clocks.dtsi |  26 ++++
- 2 files changed, 238 insertions(+), 31 deletions(-)
+Eric
