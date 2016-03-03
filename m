@@ -1,82 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 3 Mar 2016 15:32:21 -0700
-Subject: [PATCH 1/5] ARM: bcm2835: Define standard pinctrl groups in the
- gpio node.
-In-Reply-To: <87fuw76w14.fsf@eliezer.anholt.net>
-References: <1456510756-15337-1-git-send-email-eric@anholt.net>
- <1456510756-15337-2-git-send-email-eric@anholt.net>
- <56D8AAA2.60907@wwwdotorg.org> <87fuw76w14.fsf@eliezer.anholt.net>
-Message-ID: <56D8BB75.7040002@wwwdotorg.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 3 Mar 2016 14:33:01 -0800
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <20160303.172222.338748622348351793.davem@davemloft.net>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <20160303.172222.338748622348351793.davem@davemloft.net>
+Message-ID: <20160303223301.GA19213@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 03:23 PM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
->
->> On 02/26/2016 11:19 AM, Eric Anholt wrote:
->>> The BCM2835-ARM-Peripherals.pdf documentation specifies what the
->>> function selects do for the pins, and there are a bunch of obvious
->>> groupings to be made.  With these created, we'll be able to replace
->>> bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
->>> references to specific groups we want enabled.
->>
->>> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
->>
->>> +			spi0_gpio7: spi0_gpio7 {
->>> +				brcm,pins = <7 8 9 10 11>;
->>> +				brcm,function = <BCM2835_FSEL_ALT0>;
->>> +			};
->>
->> This is too many pins.
->>
->> - It includes both MOSI and MISO, although a particular use-case may
->> only use 1 of those.
->>
->> - It includes both chip-select signals, whereas a particular use-case
->> may use 0, 1, or 2 of those. This is especially true since IIRC the
->> mainline bcm283x SPI driver wants to only use GPIOs for chip-selects,
->> not SPI-controller-generated chip-select signals, to avoid some issues
->> with the HW generation of these signals.
->>
->>
->> I believe a similar comment applies to other SPI nodes too.
->>
->>> +			pcm_gpio18: pcm_gpio18 {
->>> +				brcm,pins = <18 19 20 21>;
->>> +				brcm,function = <BCM2835_FSEL_ALT0>;
->>> +			};
->>
->> Here too, I wonder if some people might want only one of DIN/DOUT and
->> not both?
->>
->>> +			uart1_gpio36: uart1_gpio36 {
->>> +				brcm,pins = <36 37 38 39>;
->>> +				brcm,function = <BCM2835_FSEL_ALT2>;
->>> +			};
->>
->> Similarly, I think for UARTS, TX/RX and RTS/CTS should always be in
->> different nodes so people can choose 2- or 4-wire mode. Most of the UART
->> nodes are already split like this, but this one isn't.
->>
->>> +			emmc_gpio22: emmc_gpio22 {
->>> +				brcm,pins = <22 23 24 25 26 27>;
->>> +				brcm,function = <BCM2835_FSEL_ALT3>;
->>> +			};
->>
->> 1-wire (1 data wire, plus CLK/CMD) eMMC is possible in theory, although
->> I don't know whether it makes sense to support this?
->
-> Nothing here precludes making alternative pin groups for special
-> situations like you're bringing up here.  I'm just trying to bring
-> sanity to the giant lists of pins we have currently, that happen to
-> correspond to these.
->
-> Of your suggestions, making uart1_gpio36 split out cts/rts like the rest
-> makes a lot of sense to me.  Of the others, they seem like speculation
-> more than "we should fix this because it's not what people want."  Can
-> you provide specific feedback of what you'd like changed to get an Ack?
+On Thu, Mar 03, 2016 at 05:22:22PM -0500, David Miller wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Wed,  2 Mar 2016 20:06:46 +0100
+> 
+> > The icn, act2000 and pcbit drivers are all for very old hardware,
+> > and it is highly unlikely that anyone is actually still using them
+> > on modern kernels, if at all.
+> > 
+> > All three drivers apparently are for hardware that predates PCI
+> > being the common connector, as they are ISA-only and active
+> > PCI ISDN cards were widely available in the 1990s.
+> > 
+> > Looking through the git logs, it I cannot find any indication of a
+> > patch to any of these drivers that has been tested on real hardware,
+> > only cleanups or global API changes.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Greg, can you please take these two patches?
 
-All of the points I raised should be fixed. I don't believe any of the 
-groups that affect more than minimal sets of pins are useful. Indeed, 
-using groups at all is rather tenuous; it'd be far better to list the 
-precise sets of pins only as and when they're used.
+will do
