@@ -1,27 +1,33 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 3 Mar 2016 15:23:23 +0100
-Subject: [PATCH 03/14] power: ipaq-micro-battery: use __maybe_unused to
- hide pm functions
-In-Reply-To: <1456934350-1389172-4-git-send-email-arnd@arndb.de>
+Date: Thu, 3 Mar 2016 15:23:42 +0100
+Subject: [PATCH 04/14] power: pm2301-charger: use __maybe_unused to hide
+ pm functions
+In-Reply-To: <1456934350-1389172-5-git-send-email-arnd@arndb.de>
 References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
- <1456934350-1389172-4-git-send-email-arnd@arndb.de>
-Message-ID: <20160303142323.GF29689@earth>
+ <1456934350-1389172-5-git-send-email-arnd@arndb.de>
+Message-ID: <20160303142342.GG29689@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Mar 02, 2016 at 04:58:55PM +0100, Arnd Bergmann wrote:
-> The ipaq micro battery driver has suspend/resume functions that
-> are accessed using SIMPLE_DEV_PM_OPS, which hide the reference
-> when CONFIG_PM_SLEEP is not set, resulting in a warning about
-> unused functions:
+On Wed, Mar 02, 2016 at 04:58:56PM +0100, Arnd Bergmann wrote:
+> The pm2301 charger driver uses nested #ifdefs to check for both
+> CONFIG_PM and CONFIG_PM_SLEEP in an attempt to hide its
+> suspend and runtime-pm operations when they are unused, but
+> it does not hide the clear_lpn_pin() function in the same
+> way, so we get a build warning when everything is
+> disabled:
 > 
-> drivers/power/ipaq_micro_battery.c:284:12: error: 'micro_batt_suspend' defined but not used [-Werror=unused-function]
-> drivers/power/ipaq_micro_battery.c:292:12: error: 'micro_batt_resume' defined but not used [-Werror=unused-function]
+> drivers/power/pm2301_charger.c:123:13: error: 'clear_lpn_pin' defined but not used [-Werror=unused-function]
 > 
-> This adds __maybe_unused annotations to let the compiler know
-> it can silently drop the function definition.
+> This removes all the #ifdef and instead uses __maybe_unused
+> annotations to let the compiler know it can silently drop
+> the function definition.
+> 
+> For the PM2XXX_PM_OPS, we can use an IS_ENABLED() check
+> to avoid defining the structure when CONFIG_PM is not set without
+> the #ifdef.
 
 Thanks, queued.
 
@@ -32,4 +38,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160303/8c3013dc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160303/2fc7c7a5/attachment.sig>
