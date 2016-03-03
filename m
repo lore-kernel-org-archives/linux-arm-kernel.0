@@ -1,83 +1,51 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 03 Mar 2016 14:23:19 -0800
-Subject: [PATCH 1/5] ARM: bcm2835: Define standard pinctrl groups in the
- gpio node.
-In-Reply-To: <56D8AAA2.60907@wwwdotorg.org>
-References: <1456510756-15337-1-git-send-email-eric@anholt.net>
- <1456510756-15337-2-git-send-email-eric@anholt.net>
- <56D8AAA2.60907@wwwdotorg.org>
-Message-ID: <87fuw76w14.fsf@eliezer.anholt.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 3 Mar 2016 23:27:11 +0100
+Subject: DWord alignment on ARMv7
+Message-ID: <56D8BA3F.7050508@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Hello, (now sending to linux-arm-kernel)
 
-> On 02/26/2016 11:19 AM, Eric Anholt wrote:
->> The BCM2835-ARM-Peripherals.pdf documentation specifies what the
->> function selects do for the pins, and there are a bunch of obvious
->> groupings to be made.  With these created, we'll be able to replace
->> bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
->> references to specific groups we want enabled.
->
->> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
->
->> +			spi0_gpio7: spi0_gpio7 {
->> +				brcm,pins = <7 8 9 10 11>;
->> +				brcm,function = <BCM2835_FSEL_ALT0>;
->> +			};
->
-> This is too many pins.
->
-> - It includes both MOSI and MISO, although a particular use-case may 
-> only use 1 of those.
->
-> - It includes both chip-select signals, whereas a particular use-case 
-> may use 0, 1, or 2 of those. This is especially true since IIRC the 
-> mainline bcm283x SPI driver wants to only use GPIOs for chip-selects, 
-> not SPI-controller-generated chip-select signals, to avoid some issues 
-> with the HW generation of these signals.
->
->
-> I believe a similar comment applies to other SPI nodes too.
->
->> +			pcm_gpio18: pcm_gpio18 {
->> +				brcm,pins = <18 19 20 21>;
->> +				brcm,function = <BCM2835_FSEL_ALT0>;
->> +			};
->
-> Here too, I wonder if some people might want only one of DIN/DOUT and 
-> not both?
->
->> +			uart1_gpio36: uart1_gpio36 {
->> +				brcm,pins = <36 37 38 39>;
->> +				brcm,function = <BCM2835_FSEL_ALT2>;
->> +			};
->
-> Similarly, I think for UARTS, TX/RX and RTS/CTS should always be in 
-> different nodes so people can choose 2- or 4-wire mode. Most of the UART 
-> nodes are already split like this, but this one isn't.
->
->> +			emmc_gpio22: emmc_gpio22 {
->> +				brcm,pins = <22 23 24 25 26 27>;
->> +				brcm,function = <BCM2835_FSEL_ALT3>;
->> +			};
->
-> 1-wire (1 data wire, plus CLK/CMD) eMMC is possible in theory, although 
-> I don't know whether it makes sense to support this?
+I'm using btrfs on am ARMv7 and it turns out, that the kernel has to
+fixup a lot of kernel originated alignment issues.
 
-Nothing here precludes making alternative pin groups for special
-situations like you're bringing up here.  I'm just trying to bring
-sanity to the giant lists of pins we have currently, that happen to
-correspond to these.
+See /proc/cpu/alignment (~4h of uptime):
+> System: 22304815 (btrfs_get_token_64+0x13c/0x148 [btrfs])
 
-Of your suggestions, making uart1_gpio36 split out cts/rts like the rest
-makes a lot of sense to me.  Of the others, they seem like speculation
-more than "we should fix this because it's not what people want."  Can
-you provide specific feedback of what you'd like changed to get an Ack?
+For example, when compiling the kernel on a btrfs volume the counter
+increases by 100...1000 per second.
+
+The function shown "btrfs_get_token_64()" is defined here:
+> http://lxr.free-electrons.com/source/fs/btrfs/struct-funcs.c#L53
+...it already uses get_unaligned_leXX accessors.
+
+Quoting a comment in arch/arm/mm/alignment.c:
+
+         * ARMv6 and later CPUs can perform unaligned accesses for
+         * most single load and store instructions up to word size.
+         * LDM, STM, LDRD and STRD still need to be handled.
+
+But on a 32bit ARMv7 64bits are not word-sized.
+
+Is the exception and fixup overhead neglectable? Do we have to introduce
+something like HAVE_EFFICIENT_UNALIGNED_64BIT_ACCESS?
+
+regards,
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160303/1d73cc33/attachment.sig>
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160303/78229449/attachment-0001.sig>
