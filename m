@@ -1,83 +1,37 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Thu, 3 Mar 2016 18:01:16 +0800
-Subject: [PATCH 3/3] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
-In-Reply-To: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1456999276-6315-4-git-send-email-peter.chen@nxp.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 03 Mar 2016 10:12:55 +0000
+Subject: [PATCH] ARM: dts: add "simple-bus" to "arm, amba-bus"
+ compatible nodes
+In-Reply-To: <CAK7LNAQzkg5F8wUeF+p30jf9CrpNxi7UTNfqXQgybP2XbEKJag@mail.gmail.com>
+References: <1456804620-8750-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160301114610.GB30602@leverpostej>
+ <CAK7LNAQzkg5F8wUeF+p30jf9CrpNxi7UTNfqXQgybP2XbEKJag@mail.gmail.com>
+Message-ID: <1456999975.2856.18.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Chen <peter.chen@freescale.com>
+On Thu, 2016-03-03 at 12:07 +0900, Masahiro Yamada wrote:
+[...]
+> This patch is derived from Rob Herring' comment
+> "BTW, we should also kill off "amba-bus" which is an ambiguous term"
+> in the following thread:
+> http://lkml.iu.edu/hypermail/linux/kernel/1601.0/01822.html
+> 
+> 
+> So, the plan would be like this:
+> 
+> [1] Make device trees not depend on "arm,amba-bus"   (this commit)
+> [2] New device trees should no longer use "arm,amba-bus" alone.
+> [3] Go though some releases until we do not care about the backward
+> compatibility
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller.
+Why would we stop caring about backwards compatibility? If I was a user
+of any of the platforms in question and updated my kernel, I wouldn't
+expect to have to debug why it was broken, then install a new dtb to fix
+it - which may be a tricky thing to do, depending on the firmware used
+to boot Linux.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 35 ++++++++++++++---------------------
- 1 file changed, 14 insertions(+), 21 deletions(-)
+> [4] Drop "arm,amba-bus" from of_default_bus_match_table
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index 1211da8..d8a4274 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	chosen {
- 		stdout-path = &uart2;
-@@ -17,23 +19,6 @@
- 	memory {
- 		reg = <0x10000000 0x40000000>;
- 	};
--
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--	};
- };
- 
- &fec {
-@@ -119,11 +104,19 @@
- };
- 
- &usbh1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks 201>;
- 	status = "okay";
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	hub: usb2415 at 01 {
-+		compatible = "usbxxxx,xxxx";
-+		reg = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbh>;
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usdhc3 {
 -- 
-1.9.1
+Tixy
