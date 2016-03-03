@@ -1,44 +1,48 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:40:06 +0100
-Subject: [PATCH 13/17] arm: Add build support for mach-oxnas
+Date: Thu,  3 Mar 2016 12:40:02 +0100
+Subject: [PATCH 09/17] dt-bindings: Add PLX Technology OXNAS Standard Clocks
+ bindings
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-14-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-10-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Kconfig and Makefile support for mach-oxnas.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/Kconfig  | 2 ++
- arch/arm/Makefile | 1 +
- 2 files changed, 3 insertions(+)
+ .../devicetree/bindings/clock/plxtech,stdclk.txt   | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4f799e5..2025fc9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -801,6 +801,8 @@ source "arch/arm/plat-pxa/Kconfig"
- 
- source "arch/arm/mach-mmp/Kconfig"
- 
-+source "arch/arm/mach-oxnas/Kconfig"
+diff --git a/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt b/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+new file mode 100644
+index 0000000..46465c6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+@@ -0,0 +1,24 @@
++PLX Technology OXNAS SoC Family Standard Clocks
++================================================
 +
- source "arch/arm/mach-qcom/Kconfig"
- 
- source "arch/arm/mach-realview/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index fe25410..0e96c63 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -194,6 +194,7 @@ machine-$(CONFIG_ARCH_NSPIRE)		+= nspire
- machine-$(CONFIG_ARCH_OMAP1)		+= omap1
- machine-$(CONFIG_ARCH_OMAP2PLUS)	+= omap2
- machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
-+machine-$(CONFIG_ARCH_OXNAS)		+= oxnas
- machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
- machine-$(CONFIG_ARCH_PXA)		+= pxa
- machine-$(CONFIG_ARCH_QCOM)		+= qcom
++Please also refer to clock-bindings.txt in this directory for common clock
++bindings usage.
++
++Required properties:
++- compatible: Should be "plxtech,ox810se-stdclk" or "plxtech,nas782x-stdclk"
++- #clock-cells: 1, see below
++
++Parent node should have the following properties :
++- compatible: Should be "plxtech,ox810se-sys-ctrl", "syscon", "simple-mfd"
++
++example:
++
++sys: sys-ctrl at 000000 {
++	compatible = "plxtech,ox810se-sys-ctrl", "syscon", "simple-mfd";
++	reg = <0x000000 0x100000>;
++
++	stdclk: stdclk {
++		compatible = "plxtech,ox810se-stdclk", "plxtech,nas782x-stdclk";
++		#reset-cells = <1>;
++	};
++};
 -- 
 1.9.1
