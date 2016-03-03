@@ -1,121 +1,51 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 3 Mar 2016 08:55:47 -0300
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 3 Mar 2016 21:26:26 +0900
 Subject: [RFC PATCH] watchdog: s3c2410_wdt: Add max and min timeout values
-In-Reply-To: <56D7C2A5.1050304@roeck-us.net>
+In-Reply-To: <56D82643.1090105@osg.samsung.com>
 References: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
  <56D62979.5040009@samsung.com> <56D7233B.50907@osg.samsung.com>
  <56D7838D.4060602@samsung.com> <56D79E1D.3030302@osg.samsung.com>
- <56D7C2A5.1050304@roeck-us.net>
-Message-ID: <56D82643.1090105@osg.samsung.com>
+ <56D7C2A5.1050304@roeck-us.net> <56D82643.1090105@osg.samsung.com>
+Message-ID: <CAJKOXPe2GAkMGgZJR3FCRONMgb3AcrySczuzm_BehekrMnEbrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Guenter,
-
-On 03/03/2016 01:50 AM, Guenter Roeck wrote:
-> On 03/02/2016 06:14 PM, Javier Martinez Canillas wrote:
->> Hello Krzysztof,
+2016-03-03 20:55 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+> Hello Guenter,
+>
+>
+> On 03/03/2016 01:50 AM, Guenter Roeck wrote:
+>> A watchdog driver using a non-static clock must register a clock change
+>> notifier
+>> to handle the clock rate change and update its settings accordingly.
 >>
->> On 03/02/2016 09:21 PM, Krzysztof Kozlowski wrote:
->>> On 03.03.2016 02:30, Javier Martinez Canillas wrote:
+>> I would also argue that the maximum timeout should be set to the minimum
+>> possible value (probably associated with the highest possible frequency).
+>> All other cases might end up causing trouble if a clock frequency
+>> chance results in an enforced timeout change, since there is currently
+>> no mechanism to inform user space about such a change.
 >>
->> [snip]
->>
->>>>>>
->>>>>> +    wdt->wdt_device.min_timeout = 1;
->>>>>> +    wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
->>>>>
->>>>> Can the frequency of clock change? E.g. with devfreq? No problem if it
->>>>> goes lower but if it gets higher than initial, then the problem will
->>>>> appear again.
->>>>>
->>
->> I think both cases are problematic since low scaling will meant that the
->> watchdog will support a bigger timeout than what was set as maximum (this
->> will be a regression) and going up will mean that the maximum timeout is
->> bigger than what the watchdog supports (the same issue without this patch).
->>
->>>>
->>>> That's a very good question. As Guenter said we will be in deep troubles
->>>> if that ever happens since the driver doesn't take that into account.
->>>>
->>>> The .set_timeout handler just sets the counter according to the current
->>>> frequency and that's never updated, unless a new timeout is set of course.
->>>>
->>>> So in other words, I just made the same assumptions that the driver is
->>>> currently doing.
->>>
->>> Not entirely. Change of clock frequency will affect currently set
->>> timeout. But the next timeout will be using new frequency.
->>>
->>> However you are setting the maximum timeout once. It will never change.
->>
->> Of course. I meant that the driver makes the assumption that the clock
->> frequency never changes, no that the symptoms will be the same in both
->> cases (maximum timeout vs current timeout).
->>
->>>
->>>> At least the Exynos SoCs manual don't mention frequency
->>>> scaling for the watchdog timer source clock and AFAICT none of the CLK_WDT
->>>> parents scale their frequencies but I don't know if that's true for all
->>>> the machines using this driver (i.e: out-of-tree boards).
->>>
->>> I looked at Exynos4 family because the devfreq was tested there. The WDT
->>> clock goes from ACLK100 (or ACLK66 on different socs).
->>>
->>> 1. Existing devfreq for Exynos4 does not change ACLK100 frequency.
->>> 2. New patches from Chanwoo (Cc) add scaling of ACLK100 also to 50 MHz:
->>> http://lkml.iu.edu/hypermail/linux/kernel/1512.1/04828.html
->>>
->>
->> Thanks for the pointer, I missed that patch from Chanwoo.
->>
->>> The problem will be more severe if the watchdog got configured on 50 MHz
->>> and then devfreq bumps the clock to 100 MHz...
->>>
->>
->> So, what do you propose? We could for example set a maximum timeout on probe
->> as $SUBJECT do and also update the maximum timeout again on the .set_timeout
->> callback in case the clock rate changed. I think that is kind of hacky but I
->> can't think of another way to guard about the frequency being changed.
+>> Example: maximum possible timeout changes from 1 minute to 30 seconds.
+>> The timeout was set to 1 minute, and has to be reduced to 30 seconds.
+>> Very likely result is that the watchdog will reset the system because
+>> user space still believes that the timeout is 60 seconds and doesn't
+>> ping the watchdog often enough to prevent it.
 >>
 >
-> People will likely get random watchdog timeouts if the frequency increases.
-> Typical example for shot-yourself-into-the-foot.
+> Agreed.
 >
-> A watchdog driver using a non-static clock must register a clock change notifier
-> to handle the clock rate change and update its settings accordingly.
+> In any case this discussion is not related to this patch since currently
+> in mainline the watchdog source clock is fixed and does not change.
 >
-> I would also argue that the maximum timeout should be set to the minimum
-> possible value (probably associated with the highest possible frequency).
-> All other cases might end up causing trouble if a clock frequency
-> chance results in an enforced timeout change, since there is currently
-> no mechanism to inform user space about such a change.
+> So, $SUBJECT solves the issue of not having the fixed .{min,max}_timeout
+> defined to allow the watchdog_timeout_invalid() function to check values
+> set by WDIOC_SETTIMEOUT and avoid calling the .set_timeout callback.
 >
-> Example: maximum possible timeout changes from 1 minute to 30 seconds.
-> The timeout was set to 1 minute, and has to be reduced to 30 seconds.
-> Very likely result is that the watchdog will reset the system because
-> user space still believes that the timeout is 60 seconds and doesn't
-> ping the watchdog often enough to prevent it.
->
+> If later someone tries to scale a parent clock used by many drivers, then
+> the submitter should make sure that no regressions are added by the patch.
 
-Agreed.
-
-In any case this discussion is not related to this patch since currently
-in mainline the watchdog source clock is fixed and does not change.
-
-So, $SUBJECT solves the issue of not having the fixed .{min,max}_timeout
-defined to allow the watchdog_timeout_invalid() function to check values
-set by WDIOC_SETTIMEOUT and avoid calling the .set_timeout callback.
-
-If later someone tries to scale a parent clock used by many drivers, then
-the submitter should make sure that no regressions are added by the patch.
-
-> Guenter
->
+Sounds good. For this patch then:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Krzysztof
