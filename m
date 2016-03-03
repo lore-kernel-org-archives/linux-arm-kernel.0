@@ -1,71 +1,46 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Thu,  3 Mar 2016 18:19:45 +0800
-Subject: [PATCH 2/2] mmc: mediatek: Use mmc_regulator_set_vqmmc in
- start_signal_voltage_switch
-In-Reply-To: <1457000385-2317-1-git-send-email-drinkcat@chromium.org>
-References: <1457000385-2317-1-git-send-email-drinkcat@chromium.org>
-Message-ID: <1457000385-2317-2-git-send-email-drinkcat@chromium.org>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Thu,  3 Mar 2016 11:29:39 +0100
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+Message-ID: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've introduced a new helper in the MMC core:
-mmc_regulator_set_vqmmc().  Let's use this in mtk-sd.  Using this new
-helper has some advantages:
+If the internal counter is not refreshed when the watchdog is started
+for the first time, the watchdog will trigger very rapidly. For example,
+opening /dev/watchdog without writing in it will immediately trigger a
+reboot, instead of waiting for the delay to expire.
 
-    1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
-       VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
-       compatibility.
+To avoid this problem, reload the timer on opening the watchdog device.
 
-    2. We get rid of a few more warnings when probing unsupported
-       voltages.
+Command: "while sleep 5; do echo 1; done > /dev/watchdog"
+Before: system reset
+After: the watchdog runs correctly
 
-    3. We get rid of some non-mediatek specific code in mtk-sd.
-
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
+ drivers/watchdog/sama5d4_wdt.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Similar to e0848f5d294c703917260a6228cc08b8be46c527
-mmc: dw_mmc: Use mmc_regulator_set_vqmmc in start_signal_voltage_switch ,
-where I copied the commit message from.
-
- drivers/mmc/host/mtk-sd.c | 17 +++++------------
- 1 file changed, 5 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 07809f4..b17f30d 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -1021,26 +1021,19 @@ static void msdc_set_buswidth(struct msdc_host *host, u32 width)
- static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
- {
- 	struct msdc_host *host = mmc_priv(mmc);
--	int min_uv, max_uv;
- 	int ret = 0;
+diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+index a49634cdc1cc..e162fe140ae1 100644
+--- a/drivers/watchdog/sama5d4_wdt.c
++++ b/drivers/watchdog/sama5d4_wdt.c
+@@ -15,6 +15,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/reboot.h>
+ #include <linux/watchdog.h>
++#include <linux/delay.h>
  
- 	if (!IS_ERR(mmc->supply.vqmmc)) {
--		if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
--			min_uv = 3300000;
--			max_uv = 3300000;
--		} else if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
--			min_uv = 1800000;
--			max_uv = 1800000;
--		} else {
-+		if (ios->signal_voltage != MMC_SIGNAL_VOLTAGE_330 &&
-+		    ios->signal_voltage != MMC_SIGNAL_VOLTAGE_180) {
- 			dev_err(host->dev, "Unsupported signal voltage!\n");
- 			return -EINVAL;
- 		}
+ #include "at91sam9_wdt.h"
  
--		ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
-+		ret = mmc_regulator_set_vqmmc(mmc, ios);
- 		if (ret) {
--			dev_dbg(host->dev,
--					"Regulator set error %d: %d - %d\n",
--					ret, min_uv, max_uv);
-+			dev_dbg(host->dev, "Regulator set error %d (%d)\n",
-+				ret, ios->signal_voltage);
- 		} else {
- 			/* Apply different pinctrl settings for different signal voltage */
- 			if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+@@ -58,6 +59,8 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
+ 	reg = wdt_read(wdt, AT91_WDT_MR);
+ 	reg &= ~AT91_WDT_WDDIS;
+ 	wdt_write(wdt, AT91_WDT_MR, reg);
++	udelay(125); /* > 4 cycles at 32,768 Hz */
++	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
+ 
+ 	return 0;
+ }
 -- 
-2.7.0.rc3.207.g0ac5344
+2.5.0
