@@ -1,76 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Mar 2016 14:42:16 +0000
-Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
- (kernel 4.5)
-In-Reply-To: <20160303141752.GA12255@localhost.localdomain>
-References: <20160303141752.GA12255@localhost.localdomain>
-Message-ID: <20160303144215.GC19139@leverpostej>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 3 Mar 2016 15:42:47 +0100
+Subject: [PATCH 2/3] usb: chipidea: host: let the hcd know's parent
+ device node
+In-Reply-To: <1456999276-6315-3-git-send-email-peter.chen@nxp.com>
+References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
+ <1456999276-6315-3-git-send-email-peter.chen@nxp.com>
+Message-ID: <20160303144247.GH15541@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 06:17:52AM -0800, Vadim Lomovtsev wrote:
-> Hi all,
+On Thu, Mar 03, 2016 at 06:01:15PM +0800, Peter Chen wrote:
+> From: Peter Chen <peter.chen@freescale.com>
 > 
-> While working with system which has 48 CPUs per one socket it was
-> found that it is not possible to enable (turn on) more CPUs than
-> 'maxcpus' value. The kernel booted with maxcpus=4 argument:
+> Since the hcd (chipidea core device) has no device node, so
+> if we want to describe the child node under the hcd, we had
+> to put it under its parent's node (glue layer device), and
+> in the code, we need to let the hcd knows glue layer's code,
+> then the USB core can handle this node.
 > 
->     [root at localhost ~]# cat /proc/cmdline
->     BOOT_IMAGE=/boot/Image-4.5-rc5 root=UUID=9cece803-ce48-4b84-ae29-1091591c9edc ro crashkernel=2048M at 0M console=ttyAMA0,115200n8 LANG=en_US.UTF-8 earlycon=pl011,0x87e024000000 debug maxcpus=4
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/chipidea/host.c | 18 ++++++++++++++----
+>  1 file changed, 14 insertions(+), 4 deletions(-)
 > 
-> Check the overall number of CPUs and online CPUs:
-> 
->     [root at localhost ~]# cat /sys/devices/system/cpu/possible
->     0-47
->     [root at localhost ~]# cat /sys/devices/system/cpu/online
->     0-3
-> 
-> Now trying to turn on cpu which is out of scope of initial maxcpus value:
->     [root at localhost ~]# echo 1 >  /sys/devices/system/cpu/cpu4/online
->     -bash: echo: write error: Invalid argument
-> 
-> Which happens because of cpu_present_mask is set to 0x3 and prevents running more than 'maxcpus' cpus.
->     [root at localhost ~]# cat /sys/devices/system/cpu/present
->         0-3
-> 
-> For cpu0-3 it works fine:
->     [root at localhost ~]# echo 0 >  /sys/devices/system/cpu/cpu3/online
->     [root at localhost ~]# echo 1 >  /sys/devices/system/cpu/cpu3/online
-> 
-> At the same time at the Documentation/cpu-hotplug.txt it is described that:
-> 
-> >    maxcpus=n    Restrict boot time cpus to n. Say if you have 4 cpus, using
-> >                 maxcpus=2 will only boot 2. You can choose to bring the
-> >                 other cpus later online, read FAQ's for more info.
-> 
-> and
-> 
-> >    cpu_present_mask: Bitmap of CPUs currently present in the system. Not all
-> >    of them may be online. When physical hotplug is processed by the relevant
-> >    subsystem (e.g ACPI) can change and new bit either be added or removed
-> >    from the map depending on the event is hot-add/hot-remove. There are currently
-> >    no locking rules as of now. Typical usage is to init topology during boot,
-> >    at which time hotplug is disabled.
-> 
-> So after system start, according to docs, it should be possible to run
-> more CPUs than 'maxcpus' value and cpu_present_mask should contain
-> mask for all CPUs which currently present at the system.
->
-> However for arm64 it is implemented that cpu_present_mask is
-> explicetely set accordingly to 'maxcpus' value. Is it design intent ?
+> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> index 053bac9..55120ef 100644
+> --- a/drivers/usb/chipidea/host.c
+> +++ b/drivers/usb/chipidea/host.c
+> @@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
+>  	struct ehci_hcd *ehci;
+>  	struct ehci_ci_priv *priv;
+>  	int ret;
+> +	struct device *dev = ci->dev;
+>  
+> -	if (usb_disabled())
+> +	if (usb_disabled() || !dev)
+>  		return -ENODEV;
+>  
+> -	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
+> +	/*
+> +	 * USB Core will try to get child node under roothub,
+> +	 * but chipidea core has no of_node, and the child node
+> +	 * for controller is located at glue layer's node which
+> +	 * is chipidea core's parent.
+> +	 */
+> +	if (dev->parent && dev->parent->of_node)
+> +		dev->of_node = dev->parent->of_node;
 
-To some extent, yes.
+Is this a good idea? Two devices with the same of_node?
 
-Due to the possibility of a heterogeneous system, we must bring all CPUs
-online at boot time, and cannot defer this.
+I know the networking code assumes of_node values are unique, and uses
+it to find a device. Are you 100% sure the USB code does not make this
+assumption.
 
-This is necessary to detect the common subset of supported features, and
-also to detect the full set of CPUs in the system to correctly apply
-errata workarounds which require kernel text patching. Other things like
-CPU-affine device probing (e.g. PMU) also require specific CPUs to be
-online.
-
-I don't think we can reliably support maxcpus for the above case.
-
-Thanks,
-Mark.
+	Andrew
