@@ -1,46 +1,41 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu,  3 Mar 2016 11:29:39 +0100
-Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
-Message-ID: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Mar 2016 11:33:34 +0100
+Subject: [GIT PULL] STM32 defconfig updates for v4.6 #1
+In-Reply-To: <CALszF6Cgng3Yr_vrag7LY9zYunV_Fca0oHKX45w6t29DFqC5gA@mail.gmail.com>
+References: <56D6C623.8030908@gmail.com> <2216821.q30YMIK6pX@wuerfel>
+ <CALszF6Cgng3Yr_vrag7LY9zYunV_Fca0oHKX45w6t29DFqC5gA@mail.gmail.com>
+Message-ID: <1624048.IcI7yXPN7a@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the internal counter is not refreshed when the watchdog is started
-for the first time, the watchdog will trigger very rapidly. For example,
-opening /dev/watchdog without writing in it will immediately trigger a
-reboot, instead of waiting for the delay to expire.
+On Thursday 03 March 2016 09:59:35 Maxime Coquelin wrote:
+> 2016-03-02 23:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday 02 March 2016 11:53:23 Maxime Coquelin wrote:
+> >> Highlights:
+> >> -----------
+> >>   - Enable GPIO led driver in stm32_defconfig
+> >>   - Introduce a config fragment to override RAM base address
+> >>
+> >
+> > Our first config fragment 
+> 
+> Yes! Out of curiosity, did you see the question I asked you about fragments?
+> See "Re: [PATCH v3 4/4] ARM: STM32: Enable Ethernet in stm32_defconfig".
+> (https://lkml.org/lkml/2016/3/1/474)
+> 
+> This is not urgent, it can wait for after the merge window, but I will
+> be happy to have your view on this.
+> 
 
-To avoid this problem, reload the timer on opening the watchdog device.
+No, I missed that. Generally, I'd say we should limit the use of Kconfig
+fragments to more fundamental settings, it should not replace the
+manual configuration that users apply to pick the set of drivers
+they want. In the end there is not much difference between someone
+locally turning on CONFIG_INET when they need it, or using a fragment
+that does the same.
 
-Command: "while sleep 5; do echo 1; done > /dev/watchdog"
-Before: system reset
-After: the watchdog runs correctly
+Please just pick one default here (ethernet and ipv4 both enabled or
+both disabled) that makes sense for most users, and have the others
+change it manually.
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- drivers/watchdog/sama5d4_wdt.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-index a49634cdc1cc..e162fe140ae1 100644
---- a/drivers/watchdog/sama5d4_wdt.c
-+++ b/drivers/watchdog/sama5d4_wdt.c
-@@ -15,6 +15,7 @@
- #include <linux/platform_device.h>
- #include <linux/reboot.h>
- #include <linux/watchdog.h>
-+#include <linux/delay.h>
- 
- #include "at91sam9_wdt.h"
- 
-@@ -58,6 +59,8 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
- 	reg = wdt_read(wdt, AT91_WDT_MR);
- 	reg &= ~AT91_WDT_WDDIS;
- 	wdt_write(wdt, AT91_WDT_MR, reg);
-+	udelay(125); /* > 4 cycles at 32,768 Hz */
-+	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
- 
- 	return 0;
- }
--- 
-2.5.0
+	Arnd
