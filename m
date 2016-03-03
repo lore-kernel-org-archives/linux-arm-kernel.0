@@ -1,94 +1,97 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu,  3 Mar 2016 16:09:17 +0800
-Subject: [PATCH v5 5/6] dt/bindings: rockchip: modify document of Rockchip
- power domains
-In-Reply-To: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
-References: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1456992557-25331-1-git-send-email-zhangqing@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 3 Mar 2016 08:28:18 +0000
+Subject: [PATCH v2 08/17] arm64: KVM: vgic-v2: Save maintenance
+ interrupt state only if required
+In-Reply-To: <20160302230806.GB9634@cbox>
+References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+ <1455727249-24752-9-git-send-email-marc.zyngier@arm.com>
+ <20160302230806.GB9634@cbox>
+Message-ID: <20160303082818.13c217a9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the power domains
-found on Rockchip RK3399 SoCs.
-RK3399 pd on/off not need to enable clk which in this pd.
-So remove the clocks in the rk3399 pd example.
+On Thu, 3 Mar 2016 00:08:06 +0100
+Christoffer Dall <christoffer.dall@linaro.org> wrote:
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- .../bindings/soc/rockchip/power_domain.txt         | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+> On Wed, Feb 17, 2016 at 04:40:40PM +0000, Marc Zyngier wrote:
+> > Next on our list of useless accesses is the maintenance interrupt
+> > status registers (GICH_MISR, GICH_EISR{0,1}).
+> > 
+> > It is pointless to save them if we haven't asked for a maintenance
+> > interrupt the first place, which can only happen for two reasons:
+> > - Underflow: GICH_HCR_UIE will be set,
+> > - EOI: GICH_LR_EOI will be set.
+> > 
+> > These conditions can be checked on the in-memory copies of the regs.
+> > Should any of these two condition be valid, we must read GICH_MISR.
+> > We can then check for GICH_MISR_EOI, and only when set read
+> > GICH_EISR*.
+> > 
+> > This means that in most case, we don't have to save them at all.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/kvm/hyp/vgic-v2-sr.c | 54 +++++++++++++++++++++++++++++++++++------
+> >  1 file changed, 47 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > index 5ab8d63..1bda5ce 100644
+> > --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> > @@ -23,6 +23,49 @@
+> >  
+> >  #include "hyp.h"
+> >  
+> > +static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+> > +					    void __iomem *base)
+> > +{
+> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > +	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+> > +	u32 eisr0, eisr1;
+> > +	int i;
+> > +	bool expect_mi;
+> > +
+> > +	expect_mi = !!(cpu_if->vgic_hcr & GICH_HCR_UIE);
+> > +
+> > +	for (i = 0; i < nr_lr; i++) {
+> > +		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
+> > +				continue;
+> > +
+> > +		expect_mi |= (!(cpu_if->vgic_lr[i] & GICH_LR_HW) &&
+> > +			      (cpu_if->vgic_lr[i] & GICH_LR_EOI));
+> > +	}
+> 
+> Just eye balling the code it really feels crazy that this is faster than
+> reading two registers, but I believe that may just be the case given the
+> speed of the GIC.
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-index 13dc6a3..98085c8 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-@@ -7,6 +7,7 @@ Required properties for power domain controller:
- - compatible: Should be one of the following.
- 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
- 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
-+	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
- - #power-domain-cells: Number of cells in a power-domain specifier.
- 	Should be 1 for multiple PM domains.
- - #address-cells: Should be 1.
-@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
- - reg: index of the power domain, should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
- - clocks (optional): phandles to clocks which need to be enabled while power domain
- 	switches state.
- 
-@@ -45,12 +47,41 @@ Example:
-                 };
-         };
- 
-+Example 2:
-+		power: power-controller {
-+			compatible = "rockchip,rk3399-power-controller";
-+			#power-domain-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			pd_vio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <RK3399_PD_VIO>;
-+
-+				pd_vo {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <RK3399_PD_VO>;
-+
-+					pd_vopb {
-+						reg = <RK3399_PD_VOPB>;
-+					};
-+
-+					pd_vopl {
-+						reg = <RK3399_PD_VOPL>;
-+					};
-+				};
-+			};
-+		};
-+
- Node of a device using power domains must have a power-domains property,
- containing a phandle to the power device node and an index specifying which
- power domain to use.
- The index should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
- 
- Example of the node using power domain:
- 
-@@ -65,3 +96,9 @@ Example of the node using power domain:
-                 power-domains = <&power RK3368_PD_GPU_1>;
-                 /* ... */
-         };
-+
-+	node {
-+		/* ... */
-+		power-domains = <&power RK3399_PD_VOPB>;
-+		/* ... */
-+	};
+I've measured things like 300 cycles per access on some implementation.
+Pretty scary. On the other hand, this loop is usually short (we
+usually have very few LRs, and even fewer are actually live), so it
+ends up being a couple of memory accesses at most (completely dwarfed
+by the cost of the MMIO access).
+
+> 
+> As an alternative to this loop, you could keep a counter for the number
+> of requested EOI MIs and whenever we program an LR with the EOI bit set,
+> then we increment the counter, and whenever we clear such an LR, we
+> decrement the counter, and then you can just check here if it's
+> non-zero.  What do you think?  Is it worth it?  Does it make the code
+> even worse?
+
+This indeed could be a clearer/cleaner optimization indeed.
+
+> 
+> I can also write that on top of this patch if you'd like.
+
+Yes please! :-)
+
+> In any case, for this functionality:
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks!
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny.
