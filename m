@@ -1,226 +1,154 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Thu, 3 Mar 2016 15:52:34 +0800
-Subject: [PATCH v6 05/11] drm/hisilicon: Add vblank driver for ADE
-In-Reply-To: <56D58DD9.9050207@codeaurora.org>
-References: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
- <1456476028-36880-6-git-send-email-xinliang.liu@linaro.org>
- <56D4928A.1070501@codeaurora.org>
- <CAGd==07Rkx4Kb8EVJs5X513XpOhzrpRAXWs0mN85wrMQ5oWaqw@mail.gmail.com>
- <56D58DD9.9050207@codeaurora.org>
-Message-ID: <CAGd==04ZespQkgqCbbXhOTPzD67RwqEpmYciFyrrChVgojm8XQ@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 3 Mar 2016 15:58:27 +0800
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+Message-ID: <56D7EEA3.4090705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2016 at 20:40, Archit Taneja <architt@codeaurora.org> wrote:
+On 2016/3/3 15:42, Joonsoo Kim wrote:
+> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+>> (cc -mm and Joonsoo Kim)
+>>
+>>
+>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+>>> Hi,
+>>>
+>>> I came across a suspicious error for CMA stress test:
+>>>
+>>> Before the test, I got:
+>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>> CmaTotal:         204800 kB
+>>> CmaFree:          195044 kB
+>>>
+>>>
+>>> After running the test:
+>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>> CmaTotal:         204800 kB
+>>> CmaFree:         6602584 kB
+>>>
+>>> So the freed CMA memory is more than total..
+>>>
+>>> Also the the MemFree is more than mem total:
+>>>
+>>> -bash-4.3# cat /proc/meminfo
+>>> MemTotal:       16342016 kB
+>>> MemFree:        22367268 kB
+>>> MemAvailable:   22370528 kB
+>>>
+>>> Here is the kernel module doing the stress test below (if the test case
+>>> is wrong, correct me), any help would be great appreciated.
+>>>
+>>> The test is running on ARM64 platform (hisilicon D02) with 4.4 kernel, I
+>>> think
+>>> the 4.5-rc is the same as I didn't notice the updates for it.
+>>>
+>>> int malloc_dma(void *data)
+>>> {
+>>>      void *vaddr;
+>>>      struct platform_device * pdev=(struct platform_device*)data;
+>>>      dma_addr_t dma_handle;
+>>>      int i;
+>>>
+>>>      for(i=0; i<1000; i++) {
+>>>          vaddr=dma_alloc_coherent(&pdev->dev, malloc_size, &dma_handle,
+>>> GFP_KERNEL);
+>>>          if (!vaddr)
+>>>              pr_err("alloc cma memory failed!\n");
+>>>
+>>>          mdelay(1);
+>>>
+>>>          if (vaddr)
+>>>                  dma_free_coherent(&pdev->dev,malloc_size,vaddr,
+>>> dma_handle);
+>>>      }
+>>>      pr_info("alloc free cma memory success return!\n");
+>>>      return 0;
+>>> }
+>>>
+>>> static int dma_alloc_coherent_init(struct platform_device *pdev)
+>>> {
+>>>      int i;
+>>>
+>>>      for(i=0; i<100; i++)   {
+>>>          task[i] = kthread_create(malloc_dma,pdev,"malloc_dma_%d",i);
+>>>          if(!task[i]) {
+>>>              printk("kthread_create faile %d\n",i);
+>>>              continue;
+>>>          }
+>>>          wake_up_process(task[i]);
+>>>      }
+>>>      return 0;
+>>> }
+>>>
+>>> Thanks
+>>> Hanjun
+>>>
+>>> The whole /proc/meminfo:
+>>>
+>>> -bash-4.3# cat /proc/meminfo
+>>> MemTotal:       16342016 kB
+>>> MemFree:        22367268 kB
+>>> MemAvailable:   22370528 kB
+>>> Buffers:            4292 kB
+>>> Cached:            36444 kB
+>>> SwapCached:            0 kB
+>>> Active:            23564 kB
+>>> Inactive:          25360 kB
+>>> Active(anon):       8424 kB
+>>> Inactive(anon):       64 kB
+>>> Active(file):      15140 kB
+>>> Inactive(file):    25296 kB
+>>> Unevictable:           0 kB
+>>> Mlocked:               0 kB
+>>> SwapTotal:             0 kB
+>>> SwapFree:              0 kB
+>>> Dirty:                 0 kB
+>>> Writeback:             0 kB
+>>> AnonPages:          8196 kB
+>>> Mapped:            16448 kB
+>>> Shmem:               296 kB
+>>> Slab:              26832 kB
+>>> SReclaimable:       6300 kB
+>>> SUnreclaim:        20532 kB
+>>> KernelStack:        3088 kB
+>>> PageTables:          404 kB
+>>> NFS_Unstable:          0 kB
+>>> Bounce:                0 kB
+>>> WritebackTmp:          0 kB
+>>> CommitLimit:     8171008 kB
+>>> Committed_AS:      34336 kB
+>>> VmallocTotal:   258998208 kB
+>>> VmallocUsed:           0 kB
+>>> VmallocChunk:          0 kB
+>>> AnonHugePages:         0 kB
+>>> CmaTotal:         204800 kB
+>>> CmaFree:         6602584 kB
+>>> HugePages_Total:       0
+>>> HugePages_Free:        0
+>>> HugePages_Rsvd:        0
+>>> HugePages_Surp:        0
+>>> Hugepagesize:       2048 kB
+>>>
+>>
+>> I played with this a bit and can see the same problem. The sanity
+>> check of CmaFree < CmaTotal generally triggers in
+>> __move_zone_freepage_state in unset_migratetype_isolate.
+>> This also seems to be present as far back as v4.0 which was the
+>> first version to have the updated accounting from Joonsoo.
+>> Were there known limitations with the new freepage accounting,
+>> Joonsoo?
+> I don't know. I also played with this and looks like there is
+> accounting problem, however, for my case, number of free page is slightly less
+> than total. I will take a look.
 >
->
-> On 3/1/2016 3:44 PM, Xinliang Liu wrote:
->>
->> Hi,
->>
->> On 1 March 2016 at 02:48, Archit Taneja <architt@codeaurora.org> wrote:
->>>
->>>
->>>
->>> On 2/26/2016 2:10 PM, Xinliang Liu wrote:
->>>>
->>>>
->>>> Add vblank irq handle.
->>>>
->>>> v6: None.
->>>> v5: None.
->>>> v4: None.
->>>> v3:
->>>> - Remove hisi_get_crtc_from_index func.
->>>> - A few cleanup.
->>>> v2:
->>>> - Remove abtraction layer.
->>>>
->>>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->>>> ---
->>>>    drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 62
->>>> +++++++++++++++++++++++++
->>>>    drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c | 14 +++++-
->>>>    2 files changed, 75 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->>>> b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->>>> index aa2cf75cab39..749382952ab7 100644
->>>> --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->>>> +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
->>>> @@ -292,6 +292,59 @@ static void ade_set_medianoc_qos(struct ade_crtc
->>>> *acrtc)
->>>>                             SOCKET_QOS_EN, SOCKET_QOS_EN);
->>>>    }
->>>>
->>>> +static int ade_enable_vblank(struct drm_device *dev, unsigned int pipe)
->>>> +{
->>>> +       struct kirin_drm_private *priv = dev->dev_private;
->>>> +       struct ade_crtc *acrtc = to_ade_crtc(priv->crtc[pipe]);
->>>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
->>>> +       void __iomem *base = ctx->base;
->>>> +
->>>> +       if (!ctx->power_on)
->>>> +               (void)ade_power_up(ctx);
->>>> +
->>>> +       ade_update_bits(base + LDI_INT_EN, FRAME_END_INT_EN_OFST,
->>>> +                       MASK(1), 1);
->>>> +
->>>> +       return 0;
->>>> +}
->>>> +
->>>> +static void ade_disable_vblank(struct drm_device *dev, unsigned int
->>>> pipe)
->>>> +{
->>>> +       struct kirin_drm_private *priv = dev->dev_private;
->>>> +       struct ade_crtc *acrtc = to_ade_crtc(priv->crtc[pipe]);
->>>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
->>>> +       void __iomem *base = ctx->base;
->>>> +
->>>> +       if (!ctx->power_on) {
->>>> +               DRM_ERROR("power is down! vblank disable fail\n");
->>>> +               return;
->>>> +       }
->>>> +
->>>> +       ade_update_bits(base + LDI_INT_EN, FRAME_END_INT_EN_OFST,
->>>> +                       MASK(1), 0);
->>>> +}
->>>> +
->>>> +static irqreturn_t ade_irq_handler(int irq, void *data)
->>>> +{
->>>> +       struct ade_crtc *acrtc = data;
->>>> +       struct ade_hw_ctx *ctx = acrtc->ctx;
->>>> +       struct drm_crtc *crtc = &acrtc->base;
->>>> +       void __iomem *base = ctx->base;
->>>> +       u32 status;
->>>> +
->>>> +       status = readl(base + LDI_MSK_INT);
->>>> +       DRM_DEBUG_VBL("LDI IRQ: status=0x%X\n", status);
->>>> +
->>>> +       /* vblank irq */
->>>> +       if (status & BIT(FRAME_END_INT_EN_OFST)) {
->>>> +               ade_update_bits(base + LDI_INT_CLR,
->>>> FRAME_END_INT_EN_OFST,
->>>> +                               MASK(1), 1);
->>>> +               drm_crtc_handle_vblank(crtc);
->>>> +       }
->>>> +
->>>> +       return IRQ_HANDLED;
->>>> +}
->>>> +
->>>>    static void ade_display_enable(struct ade_crtc *acrtc)
->>>>    {
->>>>          struct ade_hw_ctx *ctx = acrtc->ctx;
->>>> @@ -967,6 +1020,15 @@ int ade_drm_init(struct drm_device *dev)
->>>>          if (ret)
->>>>                  return ret;
->>>>
->>>> +       /* vblank irq init */
->>>> +       ret = devm_request_irq(dev->dev, ctx->irq, ade_irq_handler,
->>>> +                              DRIVER_IRQ_SHARED, dev->driver->name,
->>>> acrtc);
->>>
->>>
->>>
->>> This isn't the way we set up interrupts for kms drivers. We need to
->>> provide the handler in drm_driver and call drm_irq_install.
->>
->>
->> I prefer to set up interrupts here for two reasons.
->> One is that it is easy to pass any interrupt private "void * data" to
->> the interrupt handler here.
->> As I discussed with Daniel Vetter before:
->> https://lkml.org/lkml/2015/9/10/204.
->>
->> Second is setting up interrupt here in the specific SoC display
->> controller driver, make other SoC reuse the kirin_drm_drv.c code
->> easily.
->> Different Hisilicon SoC may has different display controller interrupts.
->
->
-> Sure, as long as this has been discussed before.
->
->
->>
->>>
->>>
->>>> +       if (ret)
->>>> +               return ret;
->>>> +       dev->driver->get_vblank_counter = drm_vblank_no_hw_counter;
->>>> +       dev->driver->enable_vblank = ade_enable_vblank;
->>>> +       dev->driver->disable_vblank = ade_disable_vblank;
->>>> +
->>>>          return 0;
->>>>    }
->>>>
->>>> diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
->>>> b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
->>>> index 055729c1889c..723888feb760 100644
->>>> --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
->>>> +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
->>>> @@ -32,6 +32,7 @@ static int kirin_drm_kms_cleanup(struct drm_device
->>>> *dev)
->>>>    {
->>>>          struct kirin_drm_private *priv = dev->dev_private;
->>>>
->>>> +       drm_vblank_cleanup(dev);
->>>>          dc_ops->cleanup(dev);
->>>>          drm_mode_config_cleanup(dev);
->>>>          devm_kfree(dev->dev, priv);
->>>> @@ -85,11 +86,22 @@ static int kirin_drm_kms_init(struct drm_device
->>>> *dev)
->>>>                  goto err_dc_cleanup;
->>>>          }
->>>>
->>>> +       /* vblank init */
->>>> +       ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
->>>> +       if (ret) {
->>>> +               DRM_ERROR("failed to initialize vblank.\n");
->>>> +               goto err_unbind_all;
->>>> +       }
->>>> +       /* with irq_enabled = true, we can use the vblank feature. */
->>>> +       dev->irq_enabled = true;
->>>> +
->>>>          /* reset all the states of crtc/plane/encoder/connector */
->>>>          drm_mode_config_reset(dev);
->>>>
->>>>          return 0;
->>>>
->>>> +err_unbind_all:
->>>> +       component_unbind_all(dev->dev, dev);
->>>>    err_dc_cleanup:
->>>>          dc_ops->cleanup(dev);
->>>>    err_mode_config_cleanup:
->>>> @@ -123,7 +135,7 @@ static int kirin_gem_cma_dumb_create(struct drm_file
->>>> *file,
->>>>
->>>>    static struct drm_driver kirin_drm_driver = {
->>>>          .driver_features        = DRIVER_GEM | DRIVER_MODESET |
->>>> DRIVER_PRIME |
->>>> -                                 DRIVER_ATOMIC,
->>>> +                                 DRIVER_ATOMIC | DRIVER_HAVE_IRQ,
->>>
->>>
->>>
->>> DRIVER_IRQ_SHARED should be added here if you want IRQF_SHARED flag set
->>> when requesting the handler.
->>
->>
->> If not using the drm_irq_install to set up interrupts,
->> DRIVER_IRQ_SHARED may not be required to set.
->>
->
-> Yes. In any case, you should use IRQF_SHARED and not DRIVER_IRQ_SHARED
-> in the call to devm_request_irq(). The latter is a drm flag meant to be
-> used only for driver_features.
+> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+> look like your case.
 
-agree, will fix in next version.
+ The malloc_size is 1M, and with 200M total (passed via boot commandline cma=200M),
+any more information is needed, please let me know.
 
->
-> Thanks,
-> Archit
->
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Thanks for the help!
+Hanjun
