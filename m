@@ -1,48 +1,60 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 3 Mar 2016 14:09:04 +0100
-Subject: [GIT PULL] STM32 defconfig updates for v4.6 #1
-In-Reply-To: <1624048.IcI7yXPN7a@wuerfel>
-References: <56D6C623.8030908@gmail.com> <2216821.q30YMIK6pX@wuerfel>
- <CALszF6Cgng3Yr_vrag7LY9zYunV_Fca0oHKX45w6t29DFqC5gA@mail.gmail.com>
- <1624048.IcI7yXPN7a@wuerfel>
-Message-ID: <CALszF6AD7rzV0+1knDUMw_LCxMCvkRRbWV8iOpXx2td+8-Vrpg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  3 Mar 2016 14:09:38 +0100
+Subject: [PATCH 0/3] arm64: simplify and optimize kernel mapping
+Message-ID: <1457010581-4924-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-03 11:33 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 03 March 2016 09:59:35 Maxime Coquelin wrote:
->> 2016-03-02 23:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
->> > On Wednesday 02 March 2016 11:53:23 Maxime Coquelin wrote:
->> >> Highlights:
->> >> -----------
->> >>   - Enable GPIO led driver in stm32_defconfig
->> >>   - Introduce a config fragment to override RAM base address
->> >>
->> >
->> > Our first config fragment
->>
->> Yes! Out of curiosity, did you see the question I asked you about fragments?
->> See "Re: [PATCH v3 4/4] ARM: STM32: Enable Ethernet in stm32_defconfig".
->> (https://lkml.org/lkml/2016/3/1/474)
->>
->> This is not urgent, it can wait for after the merge window, but I will
->> be happy to have your view on this.
->>
->
-> No, I missed that. Generally, I'd say we should limit the use of Kconfig
-> fragments to more fundamental settings, it should not replace the
-> manual configuration that users apply to pick the set of drivers
-> they want. In the end there is not much difference between someone
-> locally turning on CONFIG_INET when they need it, or using a fragment
-> that does the same.
->
-> Please just pick one default here (ethernet and ipv4 both enabled or
-> both disabled) that makes sense for most users, and have the others
-> change it manually.
+This series makes a couple of minor changes that should result in the
+kernel being mapped in a more efficient manner.
 
-Ok, I understand your point. In this case, I think having a fragment
-for Ethernet
-might not be a good idea because of the quantity of possible combinations.
+First of all, it merges the .head.text with the .text section (patch #2)
+after moving everything except the kernel and EFI header into the __init
+section (patch #1)
 
-Thanks,
-Maxime
+Then, it standardizes the segment alignment to 64 KB for all page sizes.
+(patch #3). In the example below (4 KB granule, with Jeremy's PTE_CONT
+patch applied), we lose 80 KB in total to padding, but the resulting
+mappings do look somewhat better.
+
+Before:
+
+0xffff000008082000-0xffff000008090000    56K  ro x  SHD AF         UXN MEM
+0xffff000008090000-0xffff000008200000  1472K  ro x  SHD AF CON     UXN MEM
+0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
+0xffff000008600000-0xffff000008660000   384K  ro x  SHD AF CON     UXN MEM
+0xffff000008660000-0xffff00000866c000    48K  ro x  SHD AF         UXN MEM
+0xffff00000866c000-0xffff000008670000    16K  ro NX SHD AF         UXN MEM
+0xffff000008670000-0xffff000008900000  2624K  ro NX SHD AF CON     UXN MEM
+0xffff000008900000-0xffff000008909000    36K  ro NX SHD AF         UXN MEM
+0xffff000008c39000-0xffff000008c40000    28K  RW NX SHD AF         UXN MEM
+0xffff000008c40000-0xffff000008d50000  1088K  RW NX SHD AF CON     UXN MEM
+0xffff000008d50000-0xffff000008d57000    28K  RW NX SHD AF         UXN MEM
+
+After:
+
+0xffff000008080000-0xffff000008200000  1536K  ro x  SHD AF CON     UXN MEM
+0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
+0xffff000008600000-0xffff000008670000   448K  ro x  SHD AF CON     UXN MEM
+0xffff000008670000-0xffff000008910000  2688K  ro NX SHD AF CON     UXN MEM
+0xffff000008c50000-0xffff000008d60000  1088K  RW NX SHD AF CON     UXN MEM
+0xffff000008d60000-0xffff000008d6b000    44K  RW NX SHD AF         UXN MEM
+
+I am aware that this clashes with Jeremy's patch to allow CONT_SIZE alignment
+when CONFIG_DEBUG_ALIGN_RODATA=y, but the net effect of patch #3 is the same
+(only the Kconfig change is not included here)
+
+Ard Biesheuvel (3):
+  arm64: move early boot code to the .init segment
+  arm64: cover the .head.text section in the .text segment mapping
+  arm64: simplify kernel segment mapping granularity
+
+ arch/arm64/kernel/efi-entry.S   |  2 +-
+ arch/arm64/kernel/head.S        | 32 +++++++++-----------
+ arch/arm64/kernel/image.h       |  4 +++
+ arch/arm64/kernel/vmlinux.lds.S | 26 +++++++++-------
+ arch/arm64/mm/mmu.c             | 10 +++---
+ 5 files changed, 40 insertions(+), 34 deletions(-)
+
+-- 
+2.5.0
