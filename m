@@ -1,24 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Mar 2016 16:52:40 -0600
-Subject: [PATCH] of: alloc anywhere from memblock if range not specified
-In-Reply-To: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
-References: <1456148744-7583-1-git-send-email-vinmenon@codeaurora.org>
-Message-ID: <20160303225240.GA17541@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Mar 2016 15:10:31 -0800
+Subject: [GIT PULL] enable dm814x and dra62x clock driver for v4.6 merge window
+Message-ID: <20160303231031.GH4469@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 22, 2016 at 07:15:44PM +0530, Vinayak Menon wrote:
-> early_init_dt_alloc_reserved_memory_arch passes end as 0 to
-> __memblock_alloc_base, when limits are not specified. But
-> __memblock_alloc_base takes end value of 0 as MEMBLOCK_ALLOC_ACCESSIBLE
-> and limits the end to memblock.current_limit. This results in regions
-> never being placed in HIGHMEM area, for e.g. CMA.
-> Let __memblock_alloc_base allocate from anywhere in memory if limits are
-> not specified.
-> 
-> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
+The following changes since commit 8a8b6eb7a87f12804f44128d6e4c59b19f224308:
 
-Applied and marked for stable.
+  clk: ti: Fix some errors found by static checkers (2016-03-01 16:21:25 -0800)
 
-Rob
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/dt-ti81xx-signed
+
+for you to fetch changes up to 5d7e23a79444385d03717dc19cc58dd2d5883052:
+
+  ARM: dts: Add clocks for dm814x ADPLL (2016-03-01 17:14:22 -0800)
+
+----------------------------------------------------------------
+Enable dm814x and dra62x clock driver. This branch has a dependency
+to the clk-ti branch from the Linux clk tree for the ADPLL clock driver.
+Otherwise things won't keep booting properly when we flip over to use
+the clock driver instead of fixed clocks set up by the bootloader.
+
+----------------------------------------------------------------
+Tony Lindgren (1):
+      ARM: dts: Add clocks for dm814x ADPLL
+
+ arch/arm/boot/dts/dm814x-clocks.dtsi | 243 ++++++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/dra62x-clocks.dtsi |  26 ++++
+ 2 files changed, 238 insertions(+), 31 deletions(-)
