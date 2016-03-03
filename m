@@ -1,86 +1,200 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:39:53 +0100
-Subject: [PATCH 00/17] Add Initial support for PLX Technology OX810SE
-Message-ID: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+Date: Thu,  3 Mar 2016 12:39:59 +0100
+Subject: [PATCH 06/17] reset: Add PLX Technology Reset Controller driver
+In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-7-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serie adds initial support (IRQ, Timer, GPIO, Reset, Serial, Clocks) for
-the PLX Technology OX810SE used in the well-known Western Digital My Book
-World Edition Network Attached Storage device.
+Add System reset controller driver for PLX Technology OXNAS SoC Family.
 
-Extended support for SATA, DMA and Ethernet will come in further patches.
-
-Upstream support for following devices like the OX820SE is welcome !
-
-Neil Armstrong (17):
-  dt-bindings: vendor-prefixes: Add PLX Technology
-  irqchip: Add PLX Technology RPS IRQ Controller
-  dt-bindings: Add PLX Technology RPS IRQ Controller bindings
-  clocksource: Add PLX Technology RPS Timer
-  dt-bindings: Add PLX Technology RPS Timer bindings
-  reset: Add PLX Technology Reset Controller driver
-  dt-bindings: Add PLX Technology Reset Controller bindings
-  clk: Add PLX Technology OXNAS Standard Clocks
-  dt-bindings: Add PLX Technology OXNAS Standard Clocks bindings
-  pinctrl: Add PLX Technology OXNAS pinctrl and gpio driver
-  dt-bindings: Add PLX Technology OXNAS pinctrl and gpio bindings
-  arm: Add new mach-oxnas
-  arm: Add build support for mach-oxnas
-  arm: boot: dts: Add PLX Technology OX810SE dtsi
-  dt-bindings: Add OXNAS bindings
-  dt-bindings: Add Western Digital to vendor prefixes
-  arm: boot: dts: Add Western Digital My Book World Edition device tree
-
- Documentation/devicetree/bindings/arm/oxnas.txt    |    9 +
- .../devicetree/bindings/clock/plxtech,stdclk.txt   |   24 +
- .../devicetree/bindings/gpio/gpio_oxnas.txt        |   27 +
- .../interrupt-controller/plxtech,rps-irq.txt       |   17 +
- .../bindings/pinctrl/plxtech,pinctrl.txt           |  100 ++
- .../devicetree/bindings/reset/plxtech,reset.txt    |   25 +
- .../bindings/timer/plxtech,rps-timer.txt           |   17 +
- .../devicetree/bindings/vendor-prefixes.txt        |    2 +
- arch/arm/Kconfig                                   |    2 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/Makefile                         |    2 +
- arch/arm/boot/dts/ox810se.dtsi                     |  279 ++++
- arch/arm/boot/dts/wd-mbwe.dts                      |  106 ++
- arch/arm/mach-oxnas/Kconfig                        |   24 +
- arch/arm/mach-oxnas/Makefile                       |    1 +
- arch/arm/mach-oxnas/oxnas.c                        |   34 +
- drivers/clk/Kconfig                                |    6 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-oxnas.c                            |  159 +++
- drivers/clocksource/Kconfig                        |    6 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/timer-rps.c                    |  249 ++++
- drivers/irqchip/Kconfig                            |    5 +
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-rps.c                          |  128 ++
- drivers/pinctrl/Kconfig                            |    9 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinctrl-oxnas.c                    | 1393 ++++++++++++++++++++
- drivers/reset/Kconfig                              |    4 +
- drivers/reset/Makefile                             |    1 +
- drivers/reset/reset-oxnas.c                        |  149 +++
- 31 files changed, 2783 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
- create mode 100644 Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/plxtech,rps-irq.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
- create mode 100644 Documentation/devicetree/bindings/reset/plxtech,reset.txt
- create mode 100644 Documentation/devicetree/bindings/timer/plxtech,rps-timer.txt
- create mode 100644 arch/arm/boot/dts/ox810se.dtsi
- create mode 100644 arch/arm/boot/dts/wd-mbwe.dts
- create mode 100644 arch/arm/mach-oxnas/Kconfig
- create mode 100644 arch/arm/mach-oxnas/Makefile
- create mode 100644 arch/arm/mach-oxnas/oxnas.c
- create mode 100644 drivers/clk/clk-oxnas.c
- create mode 100644 drivers/clocksource/timer-rps.c
- create mode 100644 drivers/irqchip/irq-rps.c
- create mode 100644 drivers/pinctrl/pinctrl-oxnas.c
+CC: Ma Haijun <mahaijuns@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/reset/Kconfig       |   4 ++
+ drivers/reset/Makefile      |   1 +
+ drivers/reset/reset-oxnas.c | 149 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 154 insertions(+)
  create mode 100644 drivers/reset/reset-oxnas.c
 
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index df37212..f0ea63b 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -12,5 +12,9 @@ menuconfig RESET_CONTROLLER
+ 
+ 	  If unsure, say no.
+ 
++config RESET_OXNAS
++	bool
++	select MFD_SYSCON
++
+ source "drivers/reset/sti/Kconfig"
+ source "drivers/reset/hisilicon/Kconfig"
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 4d7178e..97e04c5 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_STI) += sti/
+ obj-$(CONFIG_ARCH_HISI) += hisilicon/
+ obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
+ obj-$(CONFIG_ATH79) += reset-ath79.o
++obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+diff --git a/drivers/reset/reset-oxnas.c b/drivers/reset/reset-oxnas.c
+new file mode 100644
+index 0000000..d0ab670
+--- /dev/null
++++ b/drivers/reset/reset-oxnas.c
+@@ -0,0 +1,149 @@
++/*
++ * drivers/reset/reset-oxnas.c
++ *
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
++ * Copyright (C) 2014 Ma Haijun <mahaijuns@gmail.com>
++ * Copyright (C) 2009 Oxford Semiconductor Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/types.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++
++/* Regmap offsets */
++#define RST_SET_REGOFFSET	0x34
++#define RST_CLR_REGOFFSET	0x38
++
++struct oxnas_reset {
++	struct regmap *regmap;
++	struct reset_controller_dev rcdev;
++};
++
++static int oxnas_reset_reset(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct oxnas_reset *data =
++		container_of(rcdev, struct oxnas_reset, rcdev);
++
++	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
++	msleep(50);
++	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
++
++	return 0;
++}
++
++static int oxnas_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct oxnas_reset *data =
++		container_of(rcdev, struct oxnas_reset, rcdev);
++
++	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
++
++	return 0;
++}
++
++static int oxnas_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct oxnas_reset *data =
++		container_of(rcdev, struct oxnas_reset, rcdev);
++
++	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
++
++	return 0;
++}
++
++static struct reset_control_ops oxnas_reset_ops = {
++	.reset		= oxnas_reset_reset,
++	.assert		= oxnas_reset_assert,
++	.deassert	= oxnas_reset_deassert,
++};
++
++static const struct of_device_id oxnas_reset_dt_ids[] = {
++	 { .compatible = "plxtech,nas782x-reset", },
++	 { /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, oxnas_reset_dt_ids);
++
++static int oxnas_reset_probe(struct platform_device *pdev)
++{
++	struct oxnas_reset *data;
++	struct device *parent;
++
++	parent = pdev->dev.parent;
++	if (!parent) {
++		dev_err(&pdev->dev, "no parent\n");
++		return -ENODEV;
++	}
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	data->regmap = syscon_node_to_regmap(parent->of_node);
++	if (IS_ERR(data->regmap)) {
++		dev_err(&pdev->dev, "failed to get parent regmap\n");
++		return -ENODEV;
++	}
++
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = 32;
++	data->rcdev.ops = &oxnas_reset_ops;
++	data->rcdev.of_node = pdev->dev.of_node;
++	reset_controller_register(&data->rcdev);
++
++	platform_set_drvdata(pdev, data);
++
++	return 0;
++}
++
++static int oxnas_reset_remove(struct platform_device *pdev)
++{
++	struct oxnas_reset *data = platform_get_drvdata(pdev);
++
++	reset_controller_unregister(&data->rcdev);
++
++	return 0;
++}
++
++static struct platform_driver oxnas_reset_driver = {
++	.probe	= oxnas_reset_probe,
++	.remove	= oxnas_reset_remove,
++	.driver = {
++		.name		= "oxnas-reset",
++		.owner		= THIS_MODULE,
++		.of_match_table	= oxnas_reset_dt_ids,
++	},
++};
++
++static int __init oxnas_reset_init(void)
++{
++	return platform_driver_probe(&oxnas_reset_driver,
++				     oxnas_reset_probe);
++}
++
++/*
++ * Reset controller does not support probe deferral, so it has to be
++ * initialized before any user, in particular, PCIE uses subsys_initcall.
++ */
++arch_initcall(oxnas_reset_init);
 -- 
 1.9.1
