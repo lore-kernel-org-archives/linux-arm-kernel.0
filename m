@@ -1,73 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 03 Mar 2016 16:00:46 +0100
-Subject: [PATCH 06/17] reset: Add PLX Technology Reset Controller driver
-In-Reply-To: <56D84A49.4010400@baylibre.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-7-git-send-email-narmstrong@baylibre.com>
- <1457014709.3425.53.camel@pengutronix.de> <56D84A49.4010400@baylibre.com>
-Message-ID: <1457017246.3425.70.camel@pengutronix.de>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 3 Mar 2016 15:01:00 +0000
+Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
+ (kernel 4.5)
+In-Reply-To: <56D85151.9050607@arm.com>
+References: <20160303141752.GA12255@localhost.localdomain>
+ <20160303144215.GC19139@leverpostej> <56D85151.9050607@arm.com>
+Message-ID: <56D851AC.7040908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 03.03.2016, 15:29 +0100 schrieb Neil Armstrong:
-> >> +static int oxnas_reset_reset(struct reset_controller_dev *rcdev,
-> >> +			      unsigned long id)
-> >> +{
-> >> +	struct oxnas_reset *data =
-> >> +		container_of(rcdev, struct oxnas_reset, rcdev);
-> >> +
-> >> +	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
-> >> +	msleep(50);
-> > 
-> > Is this the right delay for all of the resets in this register?
-> > If not, I'd drop the .reset callback.
-> > 
-> The delay is not strictly necessary, but better to avoid any HW issues.
+On 03/03/16 14:59, Suzuki K. Poulose wrote:
+> On 03/03/16 14:42, Mark Rutland wrote:
+>
+>>> However for arm64 it is implemented that cpu_present_mask is
+>>> explicetely set accordingly to 'maxcpus' value. Is it design intent ?
+>>
+>> To some extent, yes.
+>>
+>> Due to the possibility of a heterogeneous system, we must bring all CPUs
+>> online at boot time, and cannot defer this.
+>>
+>> This is necessary to detect the common subset of supported features, and
+>> also to detect the full set of CPUs in the system to correctly apply
+>> errata workarounds which require kernel text patching.
+>
+> We don't have this limitation anymore, as we can check if the booting CPU
 
-Ok, maybe add a comment.
+s/we can/we do/
 
-> And the .reset callback is needed since reset_control_reset
-> does not assert -> deassert as fallback.
+for the hotplugged CPUs.
 
-That's because some controllers don't even have manual
-assertion/deassertion, and for some reset lines the drivers better know
-the timing or they want to do other stuff while the reset is asserted.
-
-[...]
-> >> +static struct reset_control_ops oxnas_reset_ops = {
-> > 
-> > const
-> > 
-> Something checkpatch should report...
-
-This is new in any case. rcdev->ops was not const* until recently.
-
-> >> +	.reset		= oxnas_reset_reset,
-> >> +	.assert		= oxnas_reset_assert,
-> >> +	.deassert	= oxnas_reset_deassert,
-> >> +};
-> >> +
-> >> +static const struct of_device_id oxnas_reset_dt_ids[] = {
-> >> +	 { .compatible = "plxtech,nas782x-reset", },
-> >> +	 { /* sentinel */ },
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, oxnas_reset_dt_ids);
-> >> +
-> >> +static int oxnas_reset_probe(struct platform_device *pdev)
-> >> +{
-> >> +	struct oxnas_reset *data;
-> >> +	struct device *parent;
-> >> +
-> >> +	parent = pdev->dev.parent;
-> >> +	if (!parent) {
-> >> +		dev_err(&pdev->dev, "no parent\n");
-> > 
-> > Can this even happen?
-> > 
-> It's to make sure parent->of_node is valid for syscon_node_to_regmap.
-
-Since this is a platform device probed via device tree,
-pdev->dev.parent should always be set (see of_device_alloc()).
-
-regards
-Philipp
+Cheers
+Suzuki
