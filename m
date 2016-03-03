@@ -1,58 +1,63 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:39:59 +0100
-Subject: [PATCH 06/17] reset: Add PLX Technology Reset Controller driver
+Date: Thu,  3 Mar 2016 12:39:55 +0100
+Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-7-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add System reset controller driver for PLX Technology OXNAS SoC Family.
+Add PLX Technology RPS IRQ Controller as irqchip driver.
 
 CC: Ma Haijun <mahaijuns@gmail.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/reset/Kconfig       |   4 ++
- drivers/reset/Makefile      |   1 +
- drivers/reset/reset-oxnas.c | 149 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 154 insertions(+)
- create mode 100644 drivers/reset/reset-oxnas.c
+ drivers/irqchip/Kconfig   |   5 ++
+ drivers/irqchip/Makefile  |   1 +
+ drivers/irqchip/irq-rps.c | 128 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 134 insertions(+)
+ create mode 100644 drivers/irqchip/irq-rps.c
 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index df37212..f0ea63b 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -12,5 +12,9 @@ menuconfig RESET_CONTROLLER
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index fb50911..7892c1a 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -135,6 +135,11 @@ config PIC32_EVIC
+ 	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
  
- 	  If unsure, say no.
- 
-+config RESET_OXNAS
++config PLXTECH_RPS
 +	bool
-+	select MFD_SYSCON
++	select GENERIC_IRQ_CHIP
++	select IRQ_DOMAIN
 +
- source "drivers/reset/sti/Kconfig"
- source "drivers/reset/hisilicon/Kconfig"
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 4d7178e..97e04c5 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_STI) += sti/
- obj-$(CONFIG_ARCH_HISI) += hisilicon/
- obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
- obj-$(CONFIG_ATH79) += reset-ath79.o
-+obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-diff --git a/drivers/reset/reset-oxnas.c b/drivers/reset/reset-oxnas.c
+ config RENESAS_INTC_IRQPIN
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 18caacb..3eec3a0 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -34,6 +34,7 @@ obj-$(CONFIG_I8259)			+= irq-i8259.o
+ obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
+ obj-$(CONFIG_IRQ_MIPS_CPU)		+= irq-mips-cpu.o
+ obj-$(CONFIG_SIRF_IRQ)			+= irq-sirfsoc.o
++obj-$(CONFIG_PLXTECH_RPS)		+= irq-rps.o
+ obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
+ obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
+ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+diff --git a/drivers/irqchip/irq-rps.c b/drivers/irqchip/irq-rps.c
 new file mode 100644
-index 0000000..d0ab670
+index 0000000..bcd4a31
 --- /dev/null
-+++ b/drivers/reset/reset-oxnas.c
-@@ -0,0 +1,149 @@
++++ b/drivers/irqchip/irq-rps.c
+@@ -0,0 +1,128 @@
 +/*
-+ * drivers/reset/reset-oxnas.c
++ * drivers/irqchip/irq-rps.c
 + *
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ * Copyright (C) 2014 Ma Haijun <mahaijuns@gmail.com>
 + * Copyright (C) 2009 Oxford Semiconductor Ltd
++ * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -66,135 +71,114 @@ index 0000000..d0ab670
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++
++#include <linux/irqdomain.h>
++#include <linux/irq.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
 +#include <linux/err.h>
 +#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/types.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
++#include <linux/version.h>
++#include <linux/irqchip.h>
 +
-+/* Regmap offsets */
-+#define RST_SET_REGOFFSET	0x34
-+#define RST_CLR_REGOFFSET	0x38
++#include <asm/exception.h>
 +
-+struct oxnas_reset {
-+	struct regmap *regmap;
-+	struct reset_controller_dev rcdev;
++struct rps_chip_data {
++	void __iomem *base;
++	struct irq_domain *domain;
++} rps_data;
++
++enum {
++	RPS_IRQ_COUNT = 32,
++
++	RPS_STATUS = 0,
++	RPS_RAW_STATUS = 4,
++	RPS_UNMASK = 8,
++	RPS_MASK = 0xc,
 +};
 +
-+static int oxnas_reset_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
++/* Routines to acknowledge, disable and enable interrupts */
++static void rps_mask_irq(struct irq_data *d)
 +{
-+	struct oxnas_reset *data =
-+		container_of(rcdev, struct oxnas_reset, rcdev);
++	u32 mask = BIT(d->hwirq);
 +
-+	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
-+	msleep(50);
-+	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
-+
-+	return 0;
++	iowrite32(mask, rps_data.base + RPS_MASK);
 +}
 +
-+static int oxnas_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
++static void rps_unmask_irq(struct irq_data *d)
 +{
-+	struct oxnas_reset *data =
-+		container_of(rcdev, struct oxnas_reset, rcdev);
++	u32 mask = BIT(d->hwirq);
 +
-+	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
-+
-+	return 0;
++	iowrite32(mask, rps_data.base + RPS_UNMASK);
 +}
 +
-+static int oxnas_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
++static void rps_ack_irq(struct irq_data *d)
 +{
-+	struct oxnas_reset *data =
-+		container_of(rcdev, struct oxnas_reset, rcdev);
-+
-+	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
-+
-+	return 0;
++	/* NOP */
 +}
 +
-+static struct reset_control_ops oxnas_reset_ops = {
-+	.reset		= oxnas_reset_reset,
-+	.assert		= oxnas_reset_assert,
-+	.deassert	= oxnas_reset_deassert,
-+};
-+
-+static const struct of_device_id oxnas_reset_dt_ids[] = {
-+	 { .compatible = "plxtech,nas782x-reset", },
-+	 { /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, oxnas_reset_dt_ids);
-+
-+static int oxnas_reset_probe(struct platform_device *pdev)
++static void __exception_irq_entry handle_irq(struct pt_regs *regs)
 +{
-+	struct oxnas_reset *data;
-+	struct device *parent;
++	u32 irqstat;
++	int hwirq;
 +
-+	parent = pdev->dev.parent;
-+	if (!parent) {
-+		dev_err(&pdev->dev, "no parent\n");
++	irqstat = ioread32(rps_data.base + RPS_STATUS);
++	hwirq = __ffs(irqstat);
++
++	do {
++		handle_IRQ(irq_find_mapping(rps_data.domain, hwirq), regs);
++
++		irqstat = ioread32(rps_data.base + RPS_STATUS);
++		hwirq = __ffs(irqstat);
++	} while (irqstat);
++}
++
++int __init rps_of_init(struct device_node *node, struct device_node *parent)
++{
++	int ret;
++	struct irq_chip_generic *gc;
++
++	if (WARN_ON(!node))
 +		return -ENODEV;
-+	}
 +
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
++	rps_data.base = of_iomap(node, 0);
++	WARN(!rps_data.base, "unable to map rps registers\n");
++
++	rps_data.domain = irq_domain_add_linear(node, RPS_IRQ_COUNT,
++						&irq_generic_chip_ops,
++						NULL);
++	if (!rps_data.domain) {
++		pr_err("%s: could add irq domain\n",
++		       node->full_name);
 +		return -ENOMEM;
-+
-+	data->regmap = syscon_node_to_regmap(parent->of_node);
-+	if (IS_ERR(data->regmap)) {
-+		dev_err(&pdev->dev, "failed to get parent regmap\n");
-+		return -ENODEV;
 +	}
 +
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = 32;
-+	data->rcdev.ops = &oxnas_reset_ops;
-+	data->rcdev.of_node = pdev->dev.of_node;
-+	reset_controller_register(&data->rcdev);
++	ret = irq_alloc_domain_generic_chips(rps_data.domain, RPS_IRQ_COUNT, 1,
++					     "RPS", handle_level_irq,
++					     0, 0, IRQ_GC_INIT_NESTED_LOCK);
++	if (ret) {
++		pr_err("%s: could not allocate generic chip\n",
++		       node->full_name);
++		irq_domain_remove(rps_data.domain);
++		return -EINVAL;
++	}
 +
-+	platform_set_drvdata(pdev, data);
++	gc = irq_get_domain_generic_chip(rps_data.domain, 0);
++	gc->chip_types[0].chip.irq_ack = rps_ack_irq;
++	gc->chip_types[0].chip.irq_mask = rps_mask_irq;
++	gc->chip_types[0].chip.irq_unmask = rps_unmask_irq;
++
++	/* Disable all IRQs */
++	iowrite32(~0, rps_data.base + RPS_MASK);
++
++	set_handle_irq(handle_irq);
++
++	pr_info("Registered %d rps interrupts\n", RPS_IRQ_COUNT);
 +
 +	return 0;
 +}
 +
-+static int oxnas_reset_remove(struct platform_device *pdev)
-+{
-+	struct oxnas_reset *data = platform_get_drvdata(pdev);
-+
-+	reset_controller_unregister(&data->rcdev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver oxnas_reset_driver = {
-+	.probe	= oxnas_reset_probe,
-+	.remove	= oxnas_reset_remove,
-+	.driver = {
-+		.name		= "oxnas-reset",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= oxnas_reset_dt_ids,
-+	},
-+};
-+
-+static int __init oxnas_reset_init(void)
-+{
-+	return platform_driver_probe(&oxnas_reset_driver,
-+				     oxnas_reset_probe);
-+}
-+
-+/*
-+ * Reset controller does not support probe deferral, so it has to be
-+ * initialized before any user, in particular, PCIE uses subsys_initcall.
-+ */
-+arch_initcall(oxnas_reset_init);
++IRQCHIP_DECLARE(nas782x, "plxtech,nas782x-rps", rps_of_init);
 -- 
 1.9.1
