@@ -1,60 +1,18 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 3 Mar 2016 14:54:55 -0600
-Subject: [PATCH 1/3] usb: core: add power sequence for USB devices
-In-Reply-To: <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
- <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
-Message-ID: <CAL_JsqLYHzb0ABYN_P9ZOEorT6otvn_BPNzuCFhoqwa5M4y-hw@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 03 Mar 2016 13:06:55 -0800
+Subject: [PATCH V3 2/4] net-next: mediatek: add support for MT7623 ethernet
+In-Reply-To: <1457035361-57669-3-git-send-email-blogic@openwrt.org>
+References: <1457035361-57669-1-git-send-email-blogic@openwrt.org>
+ <1457035361-57669-3-git-send-email-blogic@openwrt.org>
+Message-ID: <1457039215.4044.122.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 3, 2016 at 4:01 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> Some hard-wired USB devices need to do power sequence to let the
-> device work normally, the typical power sequence like: enable USB
-> PHY clock, toggle reset pin, etc. But current Linux USB driver
-> lacks of such code to do it, it may cause some hard-wired USB devices
-> works abnormal or can't be recognized by controller at all.
->
-> In this patch, it will do power on sequence at hub's probe for all
-> devices under this hub (includes root hub) if this device is described
-> at dts and there is a phandle "usb-pwrseq" for it. At hub_disconnect,
-> it will do power off sequence.
->
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> ---
->  .../devicetree/bindings/usb/usb-device.txt         |  41 +++++-
->  drivers/usb/core/Makefile                          |   2 +-
->  drivers/usb/core/hub.c                             |  32 +++++
->  drivers/usb/core/pwrseq.c                          | 149 +++++++++++++++++++++
->  include/linux/usb/of.h                             |  10 ++
->  5 files changed, 232 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/usb/core/pwrseq.c
->
-> diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-> index 1c35e7b..c7a298c 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-device.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-> @@ -13,8 +13,37 @@ Required properties:
->  - reg: the port number which this device is connecting to, the range
->    is 1-31.
->
-> +Optional properties:
-> +- usb-pwrseq: the power sequence handler which need to do before this USB
-> +  device can work.
-> +- clocks: the input clock for USB device.
-> +- clock-frequency: the frequency for device's clock.
-> +- reset-gpios: Should specify the GPIO for reset.
-> +- reset-duration-us: the duration in microsecond for assert reset signal.
+On Thu, 2016-03-03 at 21:02 +0100, John Crispin wrote:
+> Add ethernet support for MediaTek SoCs from the MT7623 family.
+[]
+> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.h b/drivers/net/ethernet/mediatek/mtk_eth_soc.h
+[]
+> +/* ugly macro hack to make sure hw_stats and ethtool strings are consistent */
 
-So we sorted out how to describe USB devices in DT, but now we don't
-use it? I know this is similar to what was done for MMC, but I really
-don't like it.
-
-Just put all these properties into the device nodes. The parent can
-then scan for children and handle the power sequencing with generic
-code. I think it is safe to assume that if these properties are
-present, they need to be handled for device detection. We may still
-need something device specific to handle some devices at some point,
-but that is true either way.
-
-Rob
+I agree and think the _FE macros defines and uses should be removed.
