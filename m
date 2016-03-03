@@ -1,163 +1,94 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  3 Mar 2016 14:09:39 +0100
-Subject: [PATCH 1/3] arm64: move early boot code to the .init segment
+Date: Thu,  3 Mar 2016 14:09:41 +0100
+Subject: [PATCH 3/3] arm64: simplify kernel segment mapping granularity
 In-Reply-To: <1457010581-4924-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1457010581-4924-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1457010581-4924-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1457010581-4924-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apart from the arm64/linux and EFI header data structures, there is nothing
-in the .head.text section that must reside at the beginning of the Image.
-So let's move it to the .init section where it belongs.
+The mapping of the kernel consist of four segments, each of which is mapped
+with different permission attributes and/or lifetimes. To optimize the TLB
+and translation table footprint, we define various opaque constants in the
+linker script that resolve to different aligment values depending on the
+page size and whether CONFIG_DEBUG_ALIGN_RODATA is set.
 
-Note that this involves some minor tweaking of the EFI header, primarily
-because the address of 'stext' no longer coincides with the start of the
-.text section. It also requires a couple of relocated symbol references
-to be slightly rewritten or their definition moved to the linker script.
+Considering that
+- a 4 KB granule kernel benefits from a 64 KB segment alignment (due to
+  the fact that it allows the use of the contiguous bit),
+- the minimum alignment of the .data segment is THREAD_SIZE already, not
+  PAGE_SIZE (i.e., we already have padding between _data and the start of
+  the .data payload in many cases),
+- 2 MB is a suitable alignment value on all granule sizes, either for
+  mapping directly (level 2 on 4 KB), or via the contiguous bit (level 3 on
+  16 KB and 64 KB),
+- anything beyond 2 MB exceeds the minimum alignment mandated by the boot
+  protocol, and can only be mapped efficiently if the physical alignment
+  happens to be the same,
+
+we can simplify this by standardizing on 64 KB (or 2 MB) explicitly, i.e.,
+regardless of granule size, all segments are aligned either to 64 KB, or to
+2 MB if CONFIG_DEBUG_ALIGN_RODATA=y.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi-entry.S |  2 +-
- arch/arm64/kernel/head.S      | 32 +++++++++-----------
- arch/arm64/kernel/image.h     |  4 +++
- 3 files changed, 20 insertions(+), 18 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S | 25 ++++++++++++--------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index f82036e02485..936022f0655e 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -61,7 +61,7 @@ ENTRY(entry)
- 	 */
- 	mov	x20, x0		// DTB address
- 	ldr	x0, [sp, #16]	// relocated _text address
--	movz	x21, #:abs_g0:stext_offset
-+	ldr	w21, =stext_offset
- 	add	x21, x0, x21
- 
- 	/*
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 50c2134a4aaf..af522c853b7f 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -101,8 +101,6 @@ _head:
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 7a141c098bbb..2c60d19b038c 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -63,14 +63,19 @@ PECOFF_FILE_ALIGNMENT = 0x200;
  #endif
  
- #ifdef CONFIG_EFI
--	.globl	__efistub_stext_offset
--	.set	__efistub_stext_offset, stext - _head
- 	.align 3
- pe_header:
- 	.ascii	"PE"
-@@ -122,11 +120,11 @@ optional_header:
- 	.short	0x20b				// PE32+ format
- 	.byte	0x02				// MajorLinkerVersion
- 	.byte	0x14				// MinorLinkerVersion
--	.long	_end - stext			// SizeOfCode
-+	.long	_end - efi_header_end		// SizeOfCode
- 	.long	0				// SizeOfInitializedData
- 	.long	0				// SizeOfUninitializedData
- 	.long	__efistub_entry - _head		// AddressOfEntryPoint
--	.long	__efistub_stext_offset		// BaseOfCode
-+	.long	efi_header_end - _head		// BaseOfCode
- 
- extra_header_fields:
- 	.quad	0				// ImageBase
-@@ -143,7 +141,7 @@ extra_header_fields:
- 	.long	_end - _head			// SizeOfImage
- 
- 	// Everything before the kernel image is considered part of the header
--	.long	__efistub_stext_offset		// SizeOfHeaders
-+	.long	efi_header_end - _head		// SizeOfHeaders
- 	.long	0				// CheckSum
- 	.short	0xa				// Subsystem (EFI application)
- 	.short	0				// DllCharacteristics
-@@ -187,10 +185,10 @@ section_table:
- 	.byte	0
- 	.byte	0
- 	.byte	0        		// end of 0 padding of section name
--	.long	_end - stext		// VirtualSize
--	.long	__efistub_stext_offset	// VirtualAddress
--	.long	_edata - stext		// SizeOfRawData
--	.long	__efistub_stext_offset	// PointerToRawData
-+	.long	_end - efi_header_end	// VirtualSize
-+	.long	efi_header_end - _head	// VirtualAddress
-+	.long	_edata - efi_header_end	// SizeOfRawData
-+	.long	efi_header_end - _head	// PointerToRawData
- 
- 	.long	0		// PointerToRelocations (0 for executables)
- 	.long	0		// PointerToLineNumbers (0 for executables)
-@@ -199,15 +197,18 @@ section_table:
- 	.long	0xe0500020	// Characteristics (section flags)
- 
- 	/*
--	 * EFI will load stext onwards at the 4k section alignment
-+	 * EFI will load .text onwards at the 4k section alignment
- 	 * described in the PE/COFF header. To ensure that instruction
- 	 * sequences using an adrp and a :lo12: immediate will function
--	 * correctly at this alignment, we must ensure that stext is
-+	 * correctly at this alignment, we must ensure that .text is
- 	 * placed at a 4k boundary in the Image to begin with.
- 	 */
- 	.align 12
-+efi_header_end:
+ #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
+-#elif defined(CONFIG_DEBUG_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
++/*
++ *  4 KB granule:   1 level 2 entry
++ * 16 KB granule: 128 level 3 entries, with contiguous bit
++ * 64 KB granule:  32 level 3 entries, with contiguous bit
++ */
++#define SEGMENT_ALIGN			SZ_2M
+ #else
+-#define ALIGN_DEBUG_RO
+-#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
++/*
++ *  4 KB granule:  16 level 3 entries, with contiguous bit
++ * 16 KB granule:   4 level 3 entries, without contiguous bit
++ * 64 KB granule:   1 level 3 entry
++ */
++#define SEGMENT_ALIGN			SZ_64K
  #endif
  
-+	__INIT
-+
- ENTRY(stext)
- 	bl	preserve_boot_args
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
-@@ -222,12 +223,12 @@ ENTRY(stext)
- 	 * the TCR will have been set.
- 	 */
- 	ldr	x27, 0f				// address to jump to after
--						// MMU has been enabled
-+	neg	x27, x27			// MMU has been enabled
- 	adr_l	lr, __enable_mmu		// return (PIC) address
- 	b	__cpu_setup			// initialise processor
- ENDPROC(stext)
- 	.align	3
--0:	.quad	__mmap_switched - (_head - TEXT_OFFSET) + KIMAGE_VADDR
-+0:	.quad	(_text - TEXT_OFFSET) - __mmap_switched - KIMAGE_VADDR
+ SECTIONS
+@@ -113,12 +118,12 @@ SECTIONS
+ 		*(.got)			/* Global offset table		*/
+ 	}
  
- /*
-  * Preserve the arguments passed by the bootloader in x0 .. x3
-@@ -396,7 +397,7 @@ __create_page_tables:
- 	ldr	x5, =KIMAGE_VADDR
- 	add	x5, x5, x23			// add KASLR displacement
- 	create_pgd_entry x0, x5, x3, x6
--	ldr	w6, kernel_img_size
-+	ldr	w6, =kernel_img_size
- 	add	x6, x6, x5
- 	mov	x3, x24				// phys offset
- 	create_block_map x0, x7, x3, x5, x6
-@@ -413,9 +414,6 @@ __create_page_tables:
+-	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
++	. = ALIGN(SEGMENT_ALIGN);
+ 	RO_DATA(PAGE_SIZE)		/* everything from this point to */
+ 	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
+ 	NOTES
  
- 	ret	x28
- ENDPROC(__create_page_tables)
--
--kernel_img_size:
--	.long	_end - (_head - TEXT_OFFSET)
- 	.ltorg
+-	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
++	. = ALIGN(SEGMENT_ALIGN);
+ 	_etext = .;			/* End of text and rodata section */
+ 	__init_begin = .;
  
- /*
-diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-index db1bf57948f1..5ff892f40a0a 100644
---- a/arch/arm64/kernel/image.h
-+++ b/arch/arm64/kernel/image.h
-@@ -71,8 +71,12 @@
- 	DEFINE_IMAGE_LE64(_kernel_offset_le, TEXT_OFFSET);	\
- 	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);
+@@ -166,7 +171,7 @@ SECTIONS
+ 		*(.hash)
+ 	}
  
-+kernel_img_size = _end - (_text - TEXT_OFFSET);
-+
- #ifdef CONFIG_EFI
+-	. = ALIGN(PAGE_SIZE);
++	. = ALIGN(SEGMENT_ALIGN);
+ 	__init_end = .;
  
-+__efistub_stext_offset = stext - _text;
-+
- /*
-  * Prevent the symbol aliases below from being emitted into the kallsyms
-  * table, by forcing them to be absolute symbols (which are conveniently
+ 	_data = .;
 -- 
 2.5.0
