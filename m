@@ -1,67 +1,113 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 3 Mar 2016 08:14:19 +0000
-Subject: [PATCH v2 11/17] arm64: KVM: vgic-v2: Only wipe LRs on vcpu exit
-In-Reply-To: <20160302230819.GE9634@cbox>
-References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
- <1455727249-24752-12-git-send-email-marc.zyngier@arm.com>
- <20160302230819.GE9634@cbox>
-Message-ID: <20160303081419.40a4df1a@arm.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Thu,  3 Mar 2016 16:09:51 +0800
+Subject: [PATCH v5 6/6] rockchip: power-domain: Modify power domain driver for
+ rk3399
+In-Reply-To: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
+References: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1456992591-25383-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Mar 2016 00:08:19 +0100
-Christoffer Dall <christoffer.dall@linaro.org> wrote:
+This driver is modified to support RK3399 SoC.
 
-> On Wed, Feb 17, 2016 at 04:40:43PM +0000, Marc Zyngier wrote:
-> > So far, we're always writing all possible LRs, setting the empty
-> > ones with a zero value. This is obvious doing a low of work for
-> 
-> s/low/lot/
-> 
-> > nothing, and we're better off clearing those we've actually
-> > dirtied on the exit path (it is very rare to inject more than one
-> > interrupt at a time anyway).
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/kvm/hyp/vgic-v2-sr.c | 10 +++++-----
-> >  1 file changed, 5 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> > index 3dbbc6b..e53f131 100644
-> > --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> > +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> > @@ -101,6 +101,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
-> >  		}
-> >  
-> >  		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-> > +		writel_relaxed(0, base + GICH_LR0 + (i * 4));
-> >  	}
-> >  }
-> >  
-> > @@ -158,12 +159,11 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
-> >  		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
-> >  		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
-> >  		for (i = 0; i < nr_lr; i++) {
-> > -			u32 val = 0;
-> > -
-> > -			if (live_lrs & (1UL << i))
-> > -				val = cpu_if->vgic_lr[i];
-> > +			if (!(live_lrs & (1UL << i)))
-> > +				continue;
-> 
-> how can we be sure that the LRs are clear when we launch our first VM on
-> a given physical CPU?  Don't we need to flush the LRs during VGIC init
-> time?
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ drivers/soc/rockchip/pm_domains.c | 55 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-Very good point. The registers reset to zero, but there is indeed no
-guarantee that we don't get something clobbered by EL3, or some earlier
-crash.
-
-I'll add a patch to that effect.
-
-Thanks,
-
-	M.
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index 1777e8e..8cdd877 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -19,6 +19,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/power/rk3368-power.h>
++#include <dt-bindings/power/rk3399-power.h>
+ 
+ struct rockchip_domain_info {
+ 	int pwr_mask;
+@@ -79,6 +80,9 @@ struct rockchip_pmu {
+ #define DOMAIN_RK3368(pwr, status, req)		\
+ 	DOMAIN(pwr, status, req, (req) + 16, req)
+ 
++#define DOMAIN_RK3399(pwr, status, req)                \
++	DOMAIN(pwr, status, req, req, req)
++
+ static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
+ {
+ 	struct rockchip_pmu *pmu = pd->pmu;
+@@ -535,6 +539,36 @@ static const struct rockchip_domain_info rk3368_pm_domains[] = {
+ 	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
+ };
+ 
++static const struct rockchip_domain_info rk3399_pm_domains[] = {
++	[RK3399_PD_TCPD0]	= DOMAIN_RK3399(8, 8, -1),
++	[RK3399_PD_TCPD1]	= DOMAIN_RK3399(9, 9, -1),
++	[RK3399_PD_CCI]	= DOMAIN_RK3399(10, 10, -1),
++	[RK3399_PD_CCI0]	= DOMAIN_RK3399(-1, -1, 15),
++	[RK3399_PD_CCI1]	= DOMAIN_RK3399(-1, -1, 16),
++	[RK3399_PD_PERILP]	= DOMAIN_RK3399(11, 11, 1),
++	[RK3399_PD_PERIHP]	= DOMAIN_RK3399(12, 12, 2),
++	[RK3399_PD_CENTER]	= DOMAIN_RK3399(13, 13, 14),
++	[RK3399_PD_VIO]	= DOMAIN_RK3399(14, 14, 17),
++	[RK3399_PD_GPU]	= DOMAIN_RK3399(15, 15, 0),
++	[RK3399_PD_VCODEC]	= DOMAIN_RK3399(16, 16, 3),
++	[RK3399_PD_VDU]	= DOMAIN_RK3399(17, 17, 4),
++	[RK3399_PD_RGA]	= DOMAIN_RK3399(18, 18, 5),
++	[RK3399_PD_IEP]	= DOMAIN_RK3399(19, 19, 6),
++	[RK3399_PD_VO]	= DOMAIN_RK3399(20, 20, -1),
++	[RK3399_PD_VOPB]	= DOMAIN_RK3399(-1, -1, 7),
++	[RK3399_PD_VOPL]	= DOMAIN_RK3399(-1, -1, 8),
++	[RK3399_PD_ISP0]	= DOMAIN_RK3399(22, 22, 9),
++	[RK3399_PD_ISP1]	= DOMAIN_RK3399(23, 23, 10),
++	[RK3399_PD_HDCP]	= DOMAIN_RK3399(24, 24, 11),
++	[RK3399_PD_GMAC]	= DOMAIN_RK3399(25, 25, 23),
++	[RK3399_PD_EMMC]	= DOMAIN_RK3399(26, 26, 24),
++	[RK3399_PD_USB3]	= DOMAIN_RK3399(27, 27, 12),
++	[RK3399_PD_EDP]	= DOMAIN_RK3399(28, 28, 22),
++	[RK3399_PD_GIC]	= DOMAIN_RK3399(29, 29, 27),
++	[RK3399_PD_SD]	= DOMAIN_RK3399(30, 30, 28),
++	[RK3399_PD_SDIOAUDIO]	= DOMAIN_RK3399(31, 31, 29),
++};
++
+ static const struct rockchip_pmu_info rk3288_pmu = {
+ 	.pwr_offset = 0x08,
+ 	.status_offset = 0x0c,
+@@ -569,6 +603,23 @@ static const struct rockchip_pmu_info rk3368_pmu = {
+ 	.domain_info = rk3368_pm_domains,
+ };
+ 
++static const struct rockchip_pmu_info rk3399_pmu = {
++	.pwr_offset = 0x14,
++	.status_offset = 0x18,
++	.req_offset = 0x60,
++	.idle_offset = 0x64,
++	.ack_offset = 0x68,
++
++	.core_pwrcnt_offset = 0x9c,
++	.gpu_pwrcnt_offset = 0xa4,
++
++	.core_power_transition_time = 24,
++	.gpu_power_transition_time = 24,
++
++	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
++	.domain_info = rk3399_pm_domains,
++};
++
+ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 	{
+ 		.compatible = "rockchip,rk3288-power-controller",
+@@ -578,6 +629,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 		.compatible = "rockchip,rk3368-power-controller",
+ 		.data = (void *)&rk3368_pmu,
+ 	},
++	{
++		.compatible = "rockchip,rk3399-power-controller",
++		.data = (void *)&rk3399_pmu,
++	},
+ 	{ /* sentinel */ },
+ };
+ 
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
