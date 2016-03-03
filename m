@@ -1,49 +1,146 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Mar 2016 13:36:49 +0000
-Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
-In-Reply-To: <7673826.decBlDRz96@wuerfel>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
- <56D83599.2030400@arm.com> <7673826.decBlDRz96@wuerfel>
-Message-ID: <20160303133649.GX19428@n2100.arm.linux.org.uk>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 03 Mar 2016 15:39:45 +0200
+Subject: [PATCH net] net: hns: fix the bug about loopback
+In-Reply-To: <1457006579-236479-1-git-send-email-yankejian@huawei.com>
+References: <1457006579-236479-1-git-send-email-yankejian@huawei.com>
+Message-ID: <1457012385.13244.243.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 02:08:19PM +0100, Arnd Bergmann wrote:
-> On Thursday 03 March 2016 13:01:13 Marc Zyngier wrote:
-> > > +/* Routines to acknowledge, disable and enable interrupts */
-> > > +static void rps_mask_irq(struct irq_data *d)
-> > > +{
-> > > +     u32 mask = BIT(d->hwirq);
-> > > +
-> > > +     iowrite32(mask, rps_data.base + RPS_MASK);
-> > 
-> > I do question the use of iowrite32 here (and its ioread32 pendent
-> > anywhere else), as it actually translates in a writel, which contains a
-> > memory barrier. Do you have any case that requires the use of such a
-> > barrier? if not, consider switching to relaxed accessors (which are the
-> > 
-> 
-> I really ask everyone to do the opposite: we have seen several drivers
-> blindlessly using the relaxed accessors and actually introducing bugs
-> that way, so I'd rather see the readl/writel ones used by default.
+On Thu, 2016-03-03 at 20:02 +0800, Kejian Yan wrote:
+> It will always be passed if the soc is tested the loopback cases.
+> This
+> patch will fix this bug.
 
-I actually agree with Marc - we have far too many drivers using the
-barriered IO accessors, which are really very expensive on 32-bit
-ARM.
+Few style related comments.
 
-For most ARM systems, the rules are quite simple: a write which causes
-DMA memory to be accessed by the device must be using the barriered
-IO accessor, and a read from a DMA status register must be too.
-Everything else need not be.  Barriered IO accessors are only about
-access ordering.
+> @@ -686,6 +690,10 @@ static int hns_ae_config_loopback(struct
+> hnae_handle *handle,
+> ?	default:
+> ?		ret = -EINVAL;
+> ?	}
+> +
+> +	if (!ret)
+> +		hns_dsaf_set_inner_lb(mac_cb->dsaf_dev, mac_cb-
+> >mac_id, en);
+> +
+> ?	return ret;
 
-That's independent of whether you need a read-back to ensure that the
-write has hit the hardware: that's a completely different problem, and
-one which is harder for people to understand and get right.  (Eg, for
-interrupt registers.)
+if (ret)
+?return ret;
+
+whatever();
+return 0;
+
+> ?}
+
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+> @@ -230,6 +230,30 @@ static void hns_dsaf_mix_def_qid_cfg(struct
+> dsaf_device *dsaf_dev)
+> ?	}
+> ?}
+> ?
+> +static void hns_dsaf_inner_qid_cfg(struct dsaf_device *dsaf_dev)
+> +{
+> +	u16 max_q_per_vf, max_vfn;
+> +	u32 q_id = 0, q_num_per_port;
+> +	u32 mac_id;
+> +
+> +	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
+> +		return;
+> +
+> +	hns_rcb_get_queue_mode(dsaf_dev->dsaf_mode,
+> +			???????HNS_DSAF_COMM_SERVICE_NW_IDX,
+> +			???????&max_vfn, &max_q_per_vf);
+> +	q_num_per_port = max_vfn * max_q_per_vf;
+> +
+> +	for (mac_id = 0, q_id = 0; mac_id < DSAF_SERVICE_NW_NUM; 
+
+q_id is already assigned to 0. Get rid of either.
+
+> mac_id++) {
+> +		dsaf_set_dev_field(dsaf_dev,
+> +				???DSAFV2_SERDES_LBK_0_REG + 0x4 *
+> mac_id,
+> +				???DSAFV2_SERDES_LBK_QID_M,
+> +				???DSAFV2_SERDES_LBK_QID_S,
+> +				???q_id);
+> +		q_id += q_num_per_port;
+> +	}
+> +}
+
+?
+> +void hns_dsaf_set_inner_lb(struct dsaf_device *dsaf_dev, u32 mac_id,
+> u32 en)
+> +{
+> +	if (AE_IS_VER1(dsaf_dev->dsaf_ver) ||
+> +	????dsaf_dev->mac_cb[mac_id].mac_type == HNAE_PORT_DEBUG)
+> +		return;
+> +
+> +	dsaf_set_dev_bit(dsaf_dev, DSAFV2_SERDES_LBK_0_REG + 0x4 *
+> mac_id,
+
+0x4 -> 4 (it's about register width, right?)
+
+> +			?DSAFV2_SERDES_LBK_EN_B, !!en);
+> +}
+
+> ?#define PPEV2_CFG_RSS_TBL_4N3_S	24
+> ?#define PPEV2_CFG_RSS_TBL_4N3_M	(((1UL << 5) - 1) <<
+> PPEV2_CFG_RSS_TBL_4N3_S)
+> ?
+> +#define DSAFV2_SERDES_LBK_EN_B??8
+> +#define DSAFV2_SERDES_LBK_QID_S 0
+> +#define DSAFV2_SERDES_LBK_QID_M \
+> +	(((1UL << DSAFV2_SERDES_LBK_EN_B) - 1) <<
+> DSAFV2_SERDES_LBK_QID_S)
+
+Why not like above?
+
+#define DSAFV2_SERDES_LBK_QID_M	(((1UL << 8) - 1)
+<<?DSAFV2_SERDES_LBK_QID_S)
+
+> +static void __lb_fill_txt_skb_buff(struct net_device *ndev,
+> +				???struct sk_buff *skb)
+> +{
+> +	struct hns_nic_priv *priv = netdev_priv(ndev);
+> +	struct hnae_handle *h = priv->ae_handle;
+> +	u32 frame_size;
+> +
+> +	frame_size = skb->len;
+> +	memset(skb->data, 0xFF, frame_size);
+> +
+> +	if ((!AE_IS_VER1(priv->enet_ver)) &&
+> +	????(h->port_type == HNAE_PORT_SERVICE)) {
+> +		memcpy(skb->data, ndev->dev_addr, 6);
+
+ether_addr_copy() ?
+
+> +		skb->data[5] += 0x1f;
+
+This has to be explained.
+
+> +	}
+> +
+> +	frame_size &= ~1ul;
+
+And how 1ul is different to plain 1 here?
+
+> +	memset(&skb->data[frame_size / 2], 0xAA, frame_size / 2 -
+> 1);
+> +	memset(&skb->data[frame_size / 2 + 10], 0xBE, frame_size / 2
+> - 11);
+> +	memset(&skb->data[frame_size / 2 + 12], 0xAF, frame_size / 2
+> - 13);
+
+Magic numbers have to be explained.
+Also, what is the logic to overwrite the data if frame_size is big
+enough?
+
+> +}
+> +
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
