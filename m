@@ -1,35 +1,89 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 3 Mar 2016 04:05:44 +0200
-Subject: [GIT PULL] NXP LPC32xx Platform Updates for v4.6 #1
-In-Reply-To: <11608683.muXZLfFRbg@wuerfel>
-References: <56BBE6E6.4080802@mleia.com> <20160224213633.GF10126@localhost>
- <56D76FAB.9090908@mleia.com> <11608683.muXZLfFRbg@wuerfel>
-Message-ID: <56D79BF8.1030508@mleia.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 2 Mar 2016 23:14:53 -0300
+Subject: [RFC PATCH] watchdog: s3c2410_wdt: Add max and min timeout values
+In-Reply-To: <56D7838D.4060602@samsung.com>
+References: <1456850717-3670-1-git-send-email-javier@osg.samsung.com>
+ <56D62979.5040009@samsung.com> <56D7233B.50907@osg.samsung.com>
+ <56D7838D.4060602@samsung.com>
+Message-ID: <56D79E1D.3030302@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Krzysztof,
 
-On 03.03.2016 01:27, Arnd Bergmann wrote:
-> On Thursday 03 March 2016 00:56:43 Vladimir Zapolskiy wrote:
->> I would really appreciate, if this pull request is accepted for v4.6, if it
->> happens then most probably v4.7 will contain all needed irqchip fixes --
->> this pull request removes a duplicated timer driver, which in turn strictly
->> depends on a legacy platform clock driver (removed) and on hardware irq
->> numbering provided by a legacy irqchip driver (will be removed in v4.7
->> hopefully).
-> 
-> As far as I can tell, Olof merged the series into the next/cleanup
-> branch on Feb 24, but did not make that clear enough in his reply.
-> 
-> I don't see anything holding up your patches from going into 4.6,
-> everything should be fine, let me know if there are any other
-> problems here, and please check if the arm-soc/for-next branch
-> works for you.
-> 
+On 03/02/2016 09:21 PM, Krzysztof Kozlowski wrote:
+> On 03.03.2016 02:30, Javier Martinez Canillas wrote:
 
-I've checked it and everything is fine, thank you for pointing it out.
+[snip]
 
---
-With best wishes,
-Vladimir
+>>>>
+>>>> +    wdt->wdt_device.min_timeout = 1;
+>>>> +    wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
+>>>
+>>> Can the frequency of clock change? E.g. with devfreq? No problem if it
+>>> goes lower but if it gets higher than initial, then the problem will
+>>> appear again.
+>>>
+
+I think both cases are problematic since low scaling will meant that the
+watchdog will support a bigger timeout than what was set as maximum (this
+will be a regression) and going up will mean that the maximum timeout is
+bigger than what the watchdog supports (the same issue without this patch).
+
+>>
+>> That's a very good question. As Guenter said we will be in deep troubles
+>> if that ever happens since the driver doesn't take that into account.
+>>
+>> The .set_timeout handler just sets the counter according to the current
+>> frequency and that's never updated, unless a new timeout is set of course.
+>>
+>> So in other words, I just made the same assumptions that the driver is
+>> currently doing.
+>
+> Not entirely. Change of clock frequency will affect currently set
+> timeout. But the next timeout will be using new frequency.
+>
+> However you are setting the maximum timeout once. It will never change.
+
+Of course. I meant that the driver makes the assumption that the clock
+frequency never changes, no that the symptoms will be the same in both
+cases (maximum timeout vs current timeout).
+
+>
+>> At least the Exynos SoCs manual don't mention frequency
+>> scaling for the watchdog timer source clock and AFAICT none of the CLK_WDT
+>> parents scale their frequencies but I don't know if that's true for all
+>> the machines using this driver (i.e: out-of-tree boards).
+>
+> I looked at Exynos4 family because the devfreq was tested there. The WDT
+> clock goes from ACLK100 (or ACLK66 on different socs).
+>
+> 1. Existing devfreq for Exynos4 does not change ACLK100 frequency.
+> 2. New patches from Chanwoo (Cc) add scaling of ACLK100 also to 50 MHz:
+> http://lkml.iu.edu/hypermail/linux/kernel/1512.1/04828.html
+>
+
+Thanks for the pointer, I missed that patch from Chanwoo.
+
+> The problem will be more severe if the watchdog got configured on 50 MHz
+> and then devfreq bumps the clock to 100 MHz...
+>
+
+So, what do you propose? We could for example set a maximum timeout on probe
+as $SUBJECT do and also update the maximum timeout again on the .set_timeout
+callback in case the clock rate changed. I think that is kind of hacky but I
+can't think of another way to guard about the frequency being changed.
+  
+> Best regards,
+> Krzysztof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
