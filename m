@@ -1,34 +1,34 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 3 Mar 2016 15:01:00 +0000
-Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
- (kernel 4.5)
-In-Reply-To: <56D85151.9050607@arm.com>
-References: <20160303141752.GA12255@localhost.localdomain>
- <20160303144215.GC19139@leverpostej> <56D85151.9050607@arm.com>
-Message-ID: <56D851AC.7040908@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 03 Mar 2016 16:02:15 +0100
+Subject: [PATCH 01/17] dt-bindings: vendor-prefixes: Add PLX Technology
+In-Reply-To: <1457005210-18485-2-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457017335.3425.72.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/16 14:59, Suzuki K. Poulose wrote:
-> On 03/03/16 14:42, Mark Rutland wrote:
->
->>> However for arm64 it is implemented that cpu_present_mask is
->>> explicetely set accordingly to 'maxcpus' value. Is it design intent ?
->>
->> To some extent, yes.
->>
->> Due to the possibility of a heterogeneous system, we must bring all CPUs
->> online at boot time, and cannot defer this.
->>
->> This is necessary to detect the common subset of supported features, and
->> also to detect the full set of CPUs in the system to correctly apply
->> errata workarounds which require kernel text patching.
->
-> We don't have this limitation anymore, as we can check if the booting CPU
+Am Donnerstag, den 03.03.2016, 12:39 +0100 schrieb Neil Armstrong:
+> Add PLX Technology vendor prefix.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 72e2c5a..03970fb 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -178,6 +178,7 @@ picochip	Picochip Ltd
+>  plathome	Plat'Home Co., Ltd.
+>  plda	PLDA
+>  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+> +plxtech	PLX Technology, Inc.
 
-s/we can/we do/
+The PLX Technology NASDAQ symbol used to be PLXT.
+Personally, I prefer the more verbose name, just pointing out that
+"plxt," might also be an option.
 
-for the hotplugged CPUs.
-
-Cheers
-Suzuki
+regards
+Philipp
