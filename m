@@ -1,35 +1,28 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  3 Mar 2016 10:39:58 +0900
-Subject: [PATCH] bus: simple-pm-bus: Use ARCH_RENESAS
-Message-ID: <1456969198-20365-1-git-send-email-horms+renesas@verge.net.au>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Thu, 03 Mar 2016 02:41:21 +0100
+Subject: [PATCH v3 0/2] Add PCIe driver support for imx6sx
+In-Reply-To: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <1456969281.2246.0.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of ARCH_RENESAS in place of ARCH_SHMOBILE.
+*ping*
 
-This is part of an ongoing process to migrate from ARCH_SHMOBILE to
-ARCH_RENESAS the motivation for which being that RENESAS seems to be a more
-appropriate name than SHMOBILE for the majority of Renesas ARM based SoCs.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/bus/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
- v4.5-rc1
-
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 129d47bcc5fc..c10c6def1565 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -110,7 +110,7 @@ config OMAP_OCP2SCP
- config SIMPLE_PM_BUS
- 	bool "Simple Power-Managed Bus Driver"
- 	depends on OF && PM
--	depends on ARCH_SHMOBILE || COMPILE_TEST
-+	depends on ARCH_RENESAS || COMPILE_TEST
- 	help
- 	  Driver for transparent busses that don't need a real driver, but
- 	  where the bus controller is part of a PM domain, or under the control
--- 
-2.1.4
+On Thu, 2016-02-25 at 15:47 +0100, Christoph Fritz wrote:
+> v3:
+>  * adapt devicetree bindings documentation fsl,imx6q-pcie.txt
+> v2:
+>  * leave out regulator handling from driver, will be done later
+>    in PM subsystem 
+>  * use BIT() macro for MFD
+> 
+> Christoph Fritz (2):
+>   MFD: imx6sx: Add PCIe register definitions for iomuxc gpr
+>   PCI: imx6: add initial imx6sx support
+> 
+>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+>  drivers/pci/host/pci-imx6.c                        | 130 ++++++++++++++-------
+>  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |   5 +
+>  3 files changed, 101 insertions(+), 40 deletions(-)
+> 
