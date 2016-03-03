@@ -1,66 +1,58 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 3 Mar 2016 13:02:27 +0100
-Subject: [PATCH 0/3] KASAN: clean stale poison upon cold re-entry to kernel
-In-Reply-To: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
-References: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160303120227.GA2484@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 3 Mar 2016 04:10:15 -0800
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+In-Reply-To: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+Message-ID: <56D829A7.1020201@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/03/2016 02:29 AM, Romain Izard wrote:
+> If the internal counter is not refreshed when the watchdog is started
+> for the first time, the watchdog will trigger very rapidly. For example,
+> opening /dev/watchdog without writing in it will immediately trigger a
+> reboot, instead of waiting for the delay to expire.
+>
+> To avoid this problem, reload the timer on opening the watchdog device.
+>
+> Command: "while sleep 5; do echo 1; done > /dev/watchdog"
+> Before: system reset
+> After: the watchdog runs correctly
+>
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 
-* Mark Rutland <mark.rutland@arm.com> wrote:
+Subject might better read "ping watchdog on start" or similar.
 
-> Functions which the compiler has instrumented for ASAN place poison on
-> the stack shadow upon entry and remove this poison prior to returning.
-> 
-> In some cases (e.g. hotplug and idle), CPUs may exit the kernel a number
-> of levels deep in C code. If there are any instrumented functions on
-> this critical path, these will leave portions of the idle thread stack
-> shadow poisoned.
-> 
-> If a CPU returns to the kernel via a different path (e.g. a cold entry),
-> then depending on stack frame layout subsequent calls to instrumented
-> functions may use regions of the stack with stale poison, resulting in
-> (spurious) KASAN splats to the console.
-> 
-> Contemporary GCCs always add stack shadow poisoning when ASAN is
-> enabled, even when asked to not instrument a function [1], so we can't
-> simply annotate functions on the critical path to avoid poisoning.
-> 
-> Instead, this series explicitly removes any stale poison before it can
-> be hit. In the common hotplug case we clear the entire stack shadow in
-> common code, before a CPU is brought online.
-> 
-> On architectures which perform a cold return as part of cpu idle may
-> retain an architecture-specific amount of stack contents. To retain the
-> poison for this retained context, the arch code must call the core KASAN
-> code, passing a "watermark" stack pointer value beyond which shadow will
-> be cleared. Architectures which don't perform a cold return as part of
-> idle do not need any additional code.
-> 
-> This is a combination of previous approaches [2,3], attempting to keep
-> as much as possible generic.
-> 
-> Thanks,
-> Mark.
-> 
-> [1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69863
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409466.html
-> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/411850.html
-> 
-> Mark Rutland (3):
->   kasan: add functions to clear stack poison
->   sched/kasan: remove stale KASAN poison after hotplug
->   arm64: kasan: clear stale stack poison
-> 
->  arch/arm64/kernel/sleep.S |  4 ++++
->  include/linux/kasan.h     |  6 +++++-
->  kernel/sched/core.c       |  3 +++
->  mm/kasan/kasan.c          | 20 ++++++++++++++++++++
->  4 files changed, 32 insertions(+), 1 deletion(-)
-
-Looks good to me - via which tree would you like to see this merged upstream?
+Does the watchdog have to be pinged before it is enabled ?
+I am a bit concerned that there may still be a 125 uS window
+during which the system could restart.
 
 Thanks,
+Guenter
 
-	Ingo
+> ---
+>   drivers/watchdog/sama5d4_wdt.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index a49634cdc1cc..e162fe140ae1 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -15,6 +15,7 @@
+>   #include <linux/platform_device.h>
+>   #include <linux/reboot.h>
+>   #include <linux/watchdog.h>
+> +#include <linux/delay.h>
+>
+>   #include "at91sam9_wdt.h"
+>
+> @@ -58,6 +59,8 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>   	reg = wdt_read(wdt, AT91_WDT_MR);
+>   	reg &= ~AT91_WDT_WDDIS;
+>   	wdt_write(wdt, AT91_WDT_MR, reg);
+> +	udelay(125); /* > 4 cycles at 32,768 Hz */
+> +	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
+>
+>   	return 0;
+>   }
+>
