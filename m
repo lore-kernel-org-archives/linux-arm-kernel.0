@@ -1,101 +1,147 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Mar 2016 12:40:05 +0100
-Subject: [PATCH 12/17] arm: Add new mach-oxnas
+Date: Thu,  3 Mar 2016 12:40:10 +0100
+Subject: [PATCH 17/17] arm: boot: dts: Add Western Digital My Book World
+ Edition device tree
 In-Reply-To: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457005210-18485-13-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457005210-18485-18-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mach-oxnas directory containing Kconfig and generic oxnas
-handling for future SoC specific features like system reset.
+Add Western Digital My Book World Edition device tree based on
+PLX Technology OX810SE SoC.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/mach-oxnas/Kconfig  | 24 ++++++++++++++++++++++++
- arch/arm/mach-oxnas/Makefile |  1 +
- arch/arm/mach-oxnas/oxnas.c  | 34 ++++++++++++++++++++++++++++++++++
- 3 files changed, 59 insertions(+)
- create mode 100644 arch/arm/mach-oxnas/Kconfig
- create mode 100644 arch/arm/mach-oxnas/Makefile
- create mode 100644 arch/arm/mach-oxnas/oxnas.c
+ arch/arm/boot/dts/Makefile    |   2 +
+ arch/arm/boot/dts/wd-mbwe.dts | 106 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+)
+ create mode 100644 arch/arm/boot/dts/wd-mbwe.dts
 
-diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a4a6d70..0395674 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -520,6 +520,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
+ 	orion5x-rd88f5182-nas.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += \
+ 	prima2-evb.dtb
++dtb-$(CONFIG_ARCH_OXNAS) += \
++	wd-mbwe.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8064-cm-qs600.dtb \
+ 	qcom-apq8064-ifc6410.dtb \
+diff --git a/arch/arm/boot/dts/wd-mbwe.dts b/arch/arm/boot/dts/wd-mbwe.dts
 new file mode 100644
-index 0000000..6a1f24c
+index 0000000..ad97e2f
 --- /dev/null
-+++ b/arch/arm/mach-oxnas/Kconfig
-@@ -0,0 +1,24 @@
-+menuconfig ARCH_OXNAS
-+	bool "PLX Technology OXNAS Family SoCs"
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select PINCTRL
-+	depends on ARCH_MULTI_V5
-+	help
-+	  Support for OxNas SoC family developed by PLX Technology.
-+	  (Formely Oxford Semiconductor)
-+
-+if ARCH_OXNAS
-+
-+config MACH_OX810SE
-+	bool "Support OX810SE Based Products"
-+	select CPU_ARM926T
-+	select PLXTECH_RPS
-+	select CLKSRC_RPS_TIMER
-+	select RESET_OXNAS
-+	select COMMON_CLK_OXNAS
-+	select PINCTRL_OXNAS
-+	help
-+	  Include Support for the PLX Technology OX810SE SoC Based Products.
-+
-+endif
-diff --git a/arch/arm/mach-oxnas/Makefile b/arch/arm/mach-oxnas/Makefile
-new file mode 100644
-index 0000000..c54bec7
---- /dev/null
-+++ b/arch/arm/mach-oxnas/Makefile
-@@ -0,0 +1 @@
-+obj-y			:= oxnas.o
-diff --git a/arch/arm/mach-oxnas/oxnas.c b/arch/arm/mach-oxnas/oxnas.c
-new file mode 100644
-index 0000000..ebdcd9d
---- /dev/null
-+++ b/arch/arm/mach-oxnas/oxnas.c
-@@ -0,0 +1,34 @@
++++ b/arch/arm/boot/dts/wd-mbwe.dts
+@@ -0,0 +1,106 @@
 +/*
++ * wd-mbwe.dtsi - Device tree file for Western Digital My Book World Edition
++ *
 + * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * Licensed under GPLv2 or later
 + */
 +
-+#include <asm/mach/arch.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
++/dts-v1/;
++#include "ox810se.dtsi"
 +
-+static const char * const oxnas_dt_compat[] __initconst = {
-+	"plxtech,ox810se",
-+	NULL,
++/ {
++	model = "Western Digital My Book World Edition";
++
++	compatible = "wd,mbwe", "plxtech,ox810se";
++
++	chosen {
++		bootargs = "console=ttyS1,115200n8 earlyprintk=serial";
++	};
++
++	memory {
++		/* 128Mbytes DDR */
++		reg = <0x48000000 0x8000000>;
++	};
++
++	gpio-keys-polled {
++		compatible = "gpio-keys-polled";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		poll-interval = <100>;
++
++		power {
++			label = "power";
++			gpios = <&gpio0 0 1>;
++			linux,code = <0x198>;
++		};
++
++		recovery {
++			label = "recovery";
++			gpios = <&gpio0 4 1>;
++			linux,code = <0xab>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		a0 {
++			label = "activity0";
++			gpios = <&gpio0 25 0>;
++			default-state = "keep";
++		};
++
++		a1 {
++			label = "activity1";
++			gpios = <&gpio0 26 0>;
++			default-state = "keep";
++		};
++
++		a2 {
++			label = "activity2";
++			gpios = <&gpio0 5 0>;
++			default-state = "keep";
++		};
++
++		a3 {
++			label = "activity3";
++			gpios = <&gpio0 6 0>;
++			default-state = "keep";
++		};
++
++		a4 {
++			label = "activity4";
++			gpios = <&gpio0 7 0>;
++			default-state = "keep";
++		};
++
++		a5 {
++			label = "activity5";
++			gpios = <&gpio1 2 0>;
++			default-state = "keep";
++		};
++	};
++
++	i2c-gpio {
++		compatible = "i2c-gpio";
++		gpios = <&gpio0 3 0 /* sda */
++			 &gpio0 2 0 /* scl */
++			 >;
++		i2c-gpio,delay-us = <2>;        /* ~100 kHz */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rtc0: rtc at 48 {
++			compatible = "st,m41t00";
++			reg = <0x68>;
++		};
++	};
 +};
 +
-+static void __init oxnas_init(void)
-+{
-+	pr_info("OXNAS Device Tree boot\n");
++&uart1 {
++	status = "okay";
 +
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+DT_MACHINE_START(OXNAS, "PLX Technology OXNAS Family")
-+	.dt_compat	= oxnas_dt_compat,
-+	.init_machine	= oxnas_init,
-+MACHINE_END
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++};
 -- 
 1.9.1
