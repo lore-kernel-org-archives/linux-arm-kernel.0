@@ -1,112 +1,59 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 3 Mar 2016 02:54:26 +0800
-Subject: [PATCH] arm64/dma-mapping: Add DMA_ATTR_ALLOC_SINGLE_PAGES support
-Message-ID: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 3 Mar 2016 12:07:32 +0900
+Subject: [PATCH] ARM: dts: add "simple-bus" to "arm,
+ amba-bus" compatible nodes
+In-Reply-To: <20160301114610.GB30602@leverpostej>
+References: <1456804620-8750-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160301114610.GB30602@leverpostej>
+Message-ID: <CAK7LNAQzkg5F8wUeF+p30jf9CrpNxi7UTNfqXQgybP2XbEKJag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes it is not worth for the iommu allocating big chunks.
-Here we enable DMA_ATTR_ALLOC_SINGLE_PAGES which could help avoid to
-allocate big chunks while iommu allocating buffer.
+Hi Mark,
 
-More information about this attribute, please check Doug's commit[1].
 
-[1]: https://lkml.org/lkml/2016/1/11/720
+2016-03-01 20:46 GMT+09:00 Mark Rutland <mark.rutland@arm.com>:
+> On Tue, Mar 01, 2016 at 12:57:00PM +0900, Masahiro Yamada wrote:
+>> The "arm,amba-bus" string in the of_default_bus_match_table is
+>> ambiguous.  This prepares for killing it off in a long run.
+>
+> I don't follow the purpose of this patch.
+>
+> There's no way we can remove kernel-side support for "arm,amba-bus", as
+> there are DTBs that rely on it.
+>
+> If we're going to merge "arm,amba-bus" in the kernel with "simple-bus",
+> such that there is no distinction between the two, then that doesn't
+> require any DTBs to be updated.
+>
+> The only reason I would see for changing dts files would be a subsequent
+> clean-up for consistency, but at that point "arm,amba-bus" could be
+> dropped entirely.
+>
+> So this patch makes no sense to me.
+>
+> Thanks,
+> Mark.
+>
 
-Cc: Robin Murphy <robin.murphy@arm.com>
-Suggested-by: Douglas Anderson <dianders@chromium.org>
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
----
+This patch is derived from Rob Herring' comment
+"BTW, we should also kill off "amba-bus" which is an ambiguous term"
+in the following thread:
+http://lkml.iu.edu/hypermail/linux/kernel/1601.0/01822.html
 
-Our video drivers may soon use this.
 
- arch/arm64/mm/dma-mapping.c |  4 ++--
- drivers/iommu/dma-iommu.c   | 14 ++++++++++----
- include/linux/dma-iommu.h   |  4 ++--
- 3 files changed, 14 insertions(+), 8 deletions(-)
+So, the plan would be like this:
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 331c4ca..3225e3ca 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -562,8 +562,8 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 		struct page **pages;
- 		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
- 
--		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
--					flush_page);
-+		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, attrs,
-+					handle, flush_page);
- 		if (!pages)
- 			return NULL;
- 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 72d6182..3569cb6 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -190,7 +190,8 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
- 	kvfree(pages);
- }
- 
--static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
-+static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
-+					     struct dma_attrs *attrs)
- {
- 	struct page **pages;
- 	unsigned int i = 0, array_size = count * sizeof(*pages);
-@@ -203,6 +204,10 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
- 	if (!pages)
- 		return NULL;
- 
-+	/* Go straight to 4K chunks if caller says it's OK. */
-+	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
-+		order = 0;
-+
- 	/* IOMMU can map any pages, so himem can also be used here */
- 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
- 
-@@ -268,6 +273,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
-  * @size: Size of buffer in bytes
-  * @gfp: Allocation flags
-  * @prot: IOMMU mapping flags
-+ * @attrs: DMA attributes flags
-  * @handle: Out argument for allocated DMA handle
-  * @flush_page: Arch callback which must ensure PAGE_SIZE bytes from the
-  *		given VA/PA are visible to the given non-coherent device.
-@@ -278,8 +284,8 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
-  * Return: Array of struct page pointers describing the buffer,
-  *	   or NULL on failure.
-  */
--struct page **iommu_dma_alloc(struct device *dev, size_t size,
--		gfp_t gfp, int prot, dma_addr_t *handle,
-+struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-+		int prot, struct dma_attrs *attrs, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t))
- {
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-@@ -292,7 +298,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size,
- 
- 	*handle = DMA_ERROR_CODE;
- 
--	pages = __iommu_dma_alloc_pages(count, gfp);
-+	pages = __iommu_dma_alloc_pages(count, gfp, attrs);
- 	if (!pages)
- 		return NULL;
- 
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index fc48103..08d9603 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -38,8 +38,8 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
-  * These implement the bulk of the relevant DMA mapping callbacks, but require
-  * the arch code to take care of attributes and cache maintenance
-  */
--struct page **iommu_dma_alloc(struct device *dev, size_t size,
--		gfp_t gfp, int prot, dma_addr_t *handle,
-+struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-+		int prot, struct dma_attrs *attrs, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t));
- void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
- 		dma_addr_t *handle);
+[1] Make device trees not depend on "arm,amba-bus"   (this commit)
+[2] New device trees should no longer use "arm,amba-bus" alone.
+[3] Go though some releases until we do not care about the backward
+compatibility
+[4] Drop "arm,amba-bus" from of_default_bus_match_table
+
+
+No?
+
+
 -- 
-1.8.1.1.dirty
+Best Regards
+Masahiro Yamada
