@@ -1,128 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 3 Mar 2016 15:32:47 +0000
-Subject: [PATCH v10 6/9] arm64: kprobes instruction simulation support
-In-Reply-To: <56D854EE.4000801@linaro.org>
-References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
- <1456801047-29014-7-git-send-email-dave.long@linaro.org>
- <56D5D9A0.9090205@arm.com> <56D7C573.8030401@linaro.org>
- <20160303080139.3d415d17@arm.com> <56D854EE.4000801@linaro.org>
-Message-ID: <56D8591F.7070909@arm.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 3 Mar 2016 07:35:40 -0800
+Subject: [PATCH v4 0/4] ACPI: parse the SPCR table
+In-Reply-To: <56D8272E.20705@gmail.com>
+References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
+ <56D5B5CB.7010702@hurleysoftware.com> <56D8272E.20705@gmail.com>
+Message-ID: <56D859CC.7010901@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/16 15:14, David Long wrote:
-> On 03/03/2016 03:01 AM, Marc Zyngier wrote:
->> On Thu, 3 Mar 2016 00:02:43 -0500
->> David Long <dave.long@linaro.org> wrote:
->>
->>> On 03/01/2016 01:04 PM, Marc Zyngier wrote:
->>>> On 01/03/16 02:57, David Long wrote:
->>>>> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->>>>>
->>>>> Kprobes needs simulation of instructions that cannot be stepped
->>>>> from different memory location, e.g.: those instructions
->>>>> that uses PC-relative addressing. In simulation, the behaviour
->>>>> of the instruction is implemented using a copy of pt_regs.
->>>>>
->>>>> Following instruction catagories are simulated:
->>>>>    - All branching instructions(conditional, register, and immediate)
->>>>>    - Literal access instructions(load-literal, adr/adrp)
->>>>>
->>>>> Conditional execution is limited to branching instructions in
->>>>> ARM v8. If conditions at PSTATE do not match the condition fields
->>>>> of opcode, the instruction is effectively NOP. Kprobes considers
->>>>> this case as 'miss'.
->>>>>
->>>>> This code also replaces the use of arch/arm/opcodes.c for
->>>>> arm_check_condition().
->>>>
->>>> Outdated comment?
->>>>
->>>
->>> Yeah.  I'll remove it.
->>>
->>>>>
->>>>> Thanks to Will Cohen for assorted suggested changes.
->>>>>
->>>>> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->>>>> Signed-off-by: William Cohen <wcohen@redhat.com>
->>>>> Signed-off-by: David A. Long <dave.long@linaro.org>
->>>>> ---
->>>>>    arch/arm64/include/asm/insn.h            |   1 +
->>>>>    arch/arm64/include/asm/probes.h          |   5 +-
->>>>>    arch/arm64/kernel/Makefile               |   3 +-
->>>>>    arch/arm64/kernel/insn.c                 |   1 +
->>>>>    arch/arm64/kernel/kprobes-arm64.c        |  29 +++++
->>>>>    arch/arm64/kernel/kprobes.c              |  32 +++++-
->>>>>    arch/arm64/kernel/probes-simulate-insn.c | 187 +++++++++++++++++++++++++++++++
->>>>>    arch/arm64/kernel/probes-simulate-insn.h |  28 +++++
->>>>>    8 files changed, 280 insertions(+), 6 deletions(-)
->>>>>    create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
->>>>>    create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
->>>>>
->>
->> [...]
->>
->>>>> +/*
->>>>> + * instruction simulation functions
->>>>> + */
->>>>> +void __kprobes
->>>>> +simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
->>>>> +{
->>>>> +	long imm, xn, val;
->>>>> +
->>>>> +	xn = opcode & 0x1f;
->>>>> +	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
->>>>> +	imm = sign_extend(imm, 20);
->>>>> +	if (opcode & 0x80000000)
->>>>> +		val = (imm<<12) + (addr & 0xfffffffffffff000);
->>>>> +	else
->>>>> +		val = imm + addr;
->>>>> +
->>>>> +	regs->regs[xn] = val;
->>>>
->>>> What happens when you have something like "adr xzr, blah"? I haven't
->>>> found out where you are writing that back yet, but that could be really
->>>> fun for SP...
->>>>
->>>
->>> It hadn't occurred to me that xzr could be an output register. Sigh.
->>> That could mean a bit of repeated code to handle this special case.  I
->>> wonder what the implications would be of adding xzr to the pt_regs
->>> structure to avoid that.
->>
->> xzr is not a register. It is an encoding that tells the CPU to discard
->> the result of an operation. As such, there is no need to store it.
->>
+On 03/03/2016 03:59 AM, Aleksey Makarov wrote:
 > 
-> I get that, I was just thinking about extra safety for code that gets it 
-> wrong. But on second thought maybe that's a little ugly.
 > 
->> An easy fix for this would be to have an accessor that actually checks
->> for the register number, and only allows the range 0-30. We've used
->> similar things in KVM for the same reasons (vcpu_get_reg/vcpu_set_reg).
+> On 03/01/2016 06:31 PM, Peter Hurley wrote:
+>> On 02/29/2016 04:02 AM, Aleksey Makarov wrote:
+>>> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+>>> Console Redirection Table) [2] as a mandatory ACPI table that
+>>> specifies the configuration of serial console.
+>>>
+>>> Introduce a new function acpi_console_check().  At the uart port
+>>> registration, this function checks if the ACPI SPCR table specifies
+>>> its argument of type struct uart_port to be a console
+>>> and if so calls add_preferred_console().
 >>
+>> How will a user enable an earlycon on the same console as the SPCR
+>> console if there is no DBG2 table?
 > 
-> That makes sense although for at least some of this code it looks like 
-> explicitly checking for it allows skipping unneeded calculations.  I 
-> don't think the accessor is warranted just for this.
+> ...
+> [    0.000000] earlycon: pl11 at MMIO 0x0000000009000000 (options '')
+> [    0.000000] bootconsole [pl11] enabled
+> ...
+> [    0.000000] Kernel command line:  root=/dev/vda1 rw systemd.show_status=no acpi=force earlycon=pl011,0x9000000
+> ...
+> [    0.318248] ACPI: SPCR: adding preferred console [ttyAMA0]
+> [    0.318736] ARMH0011:00: ttyAMA0 at MMIO 0x9000000 (irq = 5, base_baud = 0) is a SBSA
+> [    0.319502] console [ttyAMA0] enabled
+> [    0.319502] console [ttyAMA0] enabled
+> [    0.319933] bootconsole [pl11] disabled
+> [    0.319933] bootconsole [pl11] disabled
+> ...
+> 
+> Why?
 
-You can expect code that writes back to xzr to be pretty rare (it took
-us 3 years to spot the bug in KVM), so any form of optimization around
-the fact that xzr behaves like a RO register is a bit pointless (just
-like the code that does it is).
+That's pretty disingenuous; via command line?
 
-It is even arguable that any form of optimization here is fairly
-pointless: you just took a trap, saved your register file on the stack,
-are *emulating* an instruction - an extra arithmetic operation is never
-going to show up anywhere.
+By that measure, none of your patches are required because a user
+can already start both console and earlycon without them.
 
-On the other hand, having a safe accessor to the register file is pretty
-high on my checklist of things that I'd like to see in code that is
-aimed at mainline.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+With the console location specified in the SPCR, earlycon should
+be opt-in on the command-line simply with "earlycon" command-line
+parameter.
