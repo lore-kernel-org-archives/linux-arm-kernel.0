@@ -1,47 +1,226 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Mar 2016 13:58:33 +0100
-Subject: [RFC 08/15] rtc: at91sam9: Add missing MFD_SYSCON dependency on
- HAS_IOMEM
-In-Reply-To: <CAMuHMdXUdz0=n2+Aa74f1LtwiwfV9=gkPBiJKC_DMyr1_jBe7Q@mail.gmail.com>
-References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
- <2233190.1BxevBAvDE@wuerfel>
- <CAMuHMdXUdz0=n2+Aa74f1LtwiwfV9=gkPBiJKC_DMyr1_jBe7Q@mail.gmail.com>
-Message-ID: <4070388.ZbRf8kMntA@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 3 Mar 2016 13:01:13 +0000
+Subject: [PATCH 02/17] irqchip: Add PLX Technology RPS IRQ Controller
+In-Reply-To: <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <56D83599.2030400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2016 13:27:59 Geert Uytterhoeven wrote:
-> On Thu, Mar 3, 2016 at 11:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 03 March 2016 17:03:34 Krzysztof Kozlowski wrote:
-> >> index 0da40e2e4280..5c530b6b125d 100644
-> >> --- a/drivers/rtc/Kconfig
-> >> +++ b/drivers/rtc/Kconfig
-> >> @@ -1302,6 +1302,7 @@ config RTC_DRV_AT91RM9200
-> >>  config RTC_DRV_AT91SAM9
-> >>         tristate "AT91SAM9 RTT as RTC"
-> >>         depends on ARCH_AT91 || COMPILE_TEST
-> >> +       depends on HAS_IOMEM    # For MFD_SYSCON
-> >>         select MFD_SYSCON
-> >>         help
-> >>           Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
-> >>
-> >
-> > This is technically correct, but the entire RTC menu is hidden
-> > inside of 'depends on !UML && !S390', so we won't ever get there
-> > on any configuration that does not use HAS_IOMEM.
-> >
-> > If we did, all other RTC drivers would also fail.
+Neil,
+
+On 03/03/16 11:39, Neil Armstrong wrote:
+> Add PLX Technology RPS IRQ Controller as irqchip driver.
 > 
-> So UML has no RTC. Should/can it use RTC_DRV_GENERIC?
+> CC: Ma Haijun <mahaijuns@gmail.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/irqchip/Kconfig   |   5 ++
+>  drivers/irqchip/Makefile  |   1 +
+>  drivers/irqchip/irq-rps.c | 128 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 134 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-rps.c
+> 
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index fb50911..7892c1a 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -135,6 +135,11 @@ config PIC32_EVIC
+>  	select GENERIC_IRQ_CHIP
+>  	select IRQ_DOMAIN
+>  
+> +config PLXTECH_RPS
+> +	bool
+> +	select GENERIC_IRQ_CHIP
+> +	select IRQ_DOMAIN
+> +
+>  config RENESAS_INTC_IRQPIN
+>  	bool
+>  	select IRQ_DOMAIN
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 18caacb..3eec3a0 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -34,6 +34,7 @@ obj-$(CONFIG_I8259)			+= irq-i8259.o
+>  obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
+>  obj-$(CONFIG_IRQ_MIPS_CPU)		+= irq-mips-cpu.o
+>  obj-$(CONFIG_SIRF_IRQ)			+= irq-sirfsoc.o
+> +obj-$(CONFIG_PLXTECH_RPS)		+= irq-rps.o
+>  obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
+>  obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
+>  obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+> diff --git a/drivers/irqchip/irq-rps.c b/drivers/irqchip/irq-rps.c
+> new file mode 100644
+> index 0000000..bcd4a31
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-rps.c
+> @@ -0,0 +1,128 @@
+> +/*
+> + * drivers/irqchip/irq-rps.c
+> + *
+> + * Copyright (C) 2009 Oxford Semiconductor Ltd
+> + * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
+> + * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/irqdomain.h>
+> +#include <linux/irq.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/version.h>
+> +#include <linux/irqchip.h>
+> +
+> +#include <asm/exception.h>
+> +
+> +struct rps_chip_data {
+> +	void __iomem *base;
+> +	struct irq_domain *domain;
+> +} rps_data;
+> +
+> +enum {
+> +	RPS_IRQ_COUNT = 32,
+> +
+> +	RPS_STATUS = 0,
+> +	RPS_RAW_STATUS = 4,
+> +	RPS_UNMASK = 8,
+> +	RPS_MASK = 0xc,
+> +};
 
-I think nothing should use that, even if it could ;-)
+As much as I hate macros (despite making a living out of writing
+complicated/braindead ones), shoving random and unrelated values in an
+enum doesn't make much sense. Please convert this to a set of #defines.
 
-Funny enough, RTC_DRV_GENERIC would probably actually work if you
-run UML as root and set iopl() to allow port access, but we don't
-really want it to mess with the host RTC.
+> +
+> +/* Routines to acknowledge, disable and enable interrupts */
+> +static void rps_mask_irq(struct irq_data *d)
+> +{
+> +	u32 mask = BIT(d->hwirq);
+> +
+> +	iowrite32(mask, rps_data.base + RPS_MASK);
 
-I don't know where UML gets it real time, but it doesn't actually
-need much other than calling clock_gettime(CLOCK_REALTIME, ...)
-to get the host time. Presumably it uses some variation of that.
+I do question the use of iowrite32 here (and its ioread32 pendent
+anywhere else), as it actually translates in a writel, which contains a
+memory barrier. Do you have any case that requires the use of such a
+barrier? if not, consider switching to relaxed accessors (which are the
 
-	Arnd
+> +}
+> +
+> +static void rps_unmask_irq(struct irq_data *d)
+> +{
+> +	u32 mask = BIT(d->hwirq);
+> +
+> +	iowrite32(mask, rps_data.base + RPS_UNMASK);
+> +}
+> +
+> +static void rps_ack_irq(struct irq_data *d)
+> +{
+> +	/* NOP */
+> +}
+
+If that's a nop, you probably don't need it, see below.
+
+> +
+> +static void __exception_irq_entry handle_irq(struct pt_regs *regs)
+> +{
+> +	u32 irqstat;
+> +	int hwirq;
+> +
+> +	irqstat = ioread32(rps_data.base + RPS_STATUS);
+> +	hwirq = __ffs(irqstat);
+> +
+> +	do {
+> +		handle_IRQ(irq_find_mapping(rps_data.domain, hwirq), regs);
+
+Please use handle_domain_irq() which will do the right thing (and save
+you from RCU shouting at you).
+
+> +
+> +		irqstat = ioread32(rps_data.base + RPS_STATUS);
+> +		hwirq = __ffs(irqstat);
+> +	} while (irqstat);
+> +}
+
+Can you get more that a single bit set in one read from the status
+register? If so, you'd be better off handling all the pending interrupts
+before reading from the MMIO again, since that's a slow operation.
+
+> +
+> +int __init rps_of_init(struct device_node *node, struct device_node *parent)
+> +{
+> +	int ret;
+> +	struct irq_chip_generic *gc;
+> +
+> +	if (WARN_ON(!node))
+> +		return -ENODEV;
+> +
+> +	rps_data.base = of_iomap(node, 0);
+> +	WARN(!rps_data.base, "unable to map rps registers\n");
+> +
+> +	rps_data.domain = irq_domain_add_linear(node, RPS_IRQ_COUNT,
+> +						&irq_generic_chip_ops,
+> +						NULL);
+> +	if (!rps_data.domain) {
+> +		pr_err("%s: could add irq domain\n",
+> +		       node->full_name);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ret = irq_alloc_domain_generic_chips(rps_data.domain, RPS_IRQ_COUNT, 1,
+> +					     "RPS", handle_level_irq,
+
+Given that all your interrupts are level triggered...
+
+> +					     0, 0, IRQ_GC_INIT_NESTED_LOCK);
+> +	if (ret) {
+> +		pr_err("%s: could not allocate generic chip\n",
+> +		       node->full_name);
+> +		irq_domain_remove(rps_data.domain);
+> +		return -EINVAL;
+> +	}
+> +
+> +	gc = irq_get_domain_generic_chip(rps_data.domain, 0);
+> +	gc->chip_types[0].chip.irq_ack = rps_ack_irq;
+
+... I believe you can loose this callback, it is never used by the handler.
+
+> +	gc->chip_types[0].chip.irq_mask = rps_mask_irq;
+> +	gc->chip_types[0].chip.irq_unmask = rps_unmask_irq;
+> +
+> +	/* Disable all IRQs */
+> +	iowrite32(~0, rps_data.base + RPS_MASK);
+> +
+> +	set_handle_irq(handle_irq);
+> +
+> +	pr_info("Registered %d rps interrupts\n", RPS_IRQ_COUNT);
+
+Given that this is always the same value, I don't think this is a very
+useful message...
+
+> +
+> +	return 0;
+> +}
+> +
+> +IRQCHIP_DECLARE(nas782x, "plxtech,nas782x-rps", rps_of_init);
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
