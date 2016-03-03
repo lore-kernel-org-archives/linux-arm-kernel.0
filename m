@@ -1,59 +1,93 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 3 Mar 2016 20:21:54 +0100
-Subject: [PATCH v2 17/17] arm64: KVM: vgic-v3: Do not save ICH_AP0Rn_EL2
- for GICv2 emulation
-In-Reply-To: <1455727249-24752-18-git-send-email-marc.zyngier@arm.com>
-References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
- <1455727249-24752-18-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160303192154.GJ9634@cbox>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Thu, 3 Mar 2016 16:24:56 -0300
+Subject: mtd: pxa3xx_nand: issue with command time out
+In-Reply-To: <56D61502.1090007@alliedtelesis.co.nz>
+References: <5695CEF0.1080100@alliedtelesis.co.nz>
+ <87a8o9ex9r.fsf@belgarion.home>
+ <569827BC.10601@alliedtelesis.co.nz>
+ <874meddqu5.fsf@belgarion.home> <20160125183022.GA41251@google.com>
+ <87fuxl9yil.fsf@belgarion.home>
+ <CAAEAJfCNzh9+zRq_Yb=hFyLfP8RFoX+LUsDL4dVwUenVc_gVOA@mail.gmail.com>
+ <56D61502.1090007@alliedtelesis.co.nz>
+Message-ID: <CAAEAJfAd2qkcJby3AaKOaxL2LZC=PMNfu7dy5yMcZ1eHhOF7oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 17, 2016 at 04:40:49PM +0000, Marc Zyngier wrote:
-> The GICv3 specification mandates that ICH_AP0Rn_EL2 are set to
-> zero when running guests that use the memory mapped registers.
-> 
-> This is fine, as we initialize all ICH_AP0Rn_EL2 registers to
-> zero, and restore them on entry. But it also means that we
-> do not need to save these registers on exit. Profit!
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/vgic-v3-sr.c | 19 +++++++++++--------
->  1 file changed, 11 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> index 5f12c57..c2f173d 100644
-> --- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> @@ -202,14 +202,17 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  			__gic_v3_set_lr(0, i);
->  		}
->  
-> -		switch (nr_pri_bits) {
-> -		case 7:
-> -			cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
-> -			cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
-> -		case 6:
-> -			cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
-> -		default:
-> -			cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
-> +		/* ICH_AP0Rn is only valid for SRE==1 */
-> +		if (cpu_if->vgic_sre & ICC_SRE_EL1_SRE) {
-> +			switch (nr_pri_bits) {
-> +			case 7:
-> +				cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
-> +				cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
-> +			case 6:
-> +				cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
-> +			default:
-> +				cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
-> +			}
->  		}
->  
->  		switch (nr_pri_bits) {
-> -- 
-> 2.1.4
-> 
++Richard, Boris and Thomas
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+On 1 March 2016 at 19:17, Hamish Martin
+<Hamish.Martin@alliedtelesis.co.nz> wrote:
+> Hi Robert, Ezequiel, and Brian,
+>
+> I have been working with Michael Wang on this issue and wanted to update
+> you on our results as we think there is a wider issue to resolve here.
+>
+> I believe Ezequiel's analysis of the IRQ sequence is correct. The
+> proposed patch from Brian is not needed, not does it resolve our issue.
+>
+> Further, we have debugged in more detail with kernel tracing and see
+> that the problem occurs because nothing calls 'schedule()' in the kernel
+> within the timeout period (200ms) to actually allow the IRQ bottom-half
+> thread ((pxa3xx_nand_irq_thread()) to run.
+>
+> With the trace enabled we were able to see long delays between the IRQ
+> thread being queued for run as a result of the return with
+> IRQ_WAKE_THREAD in pxa3xx_nand_irq(), and a call to schedule() actually
+> selecting the thread for execution. This delay was tied to whatever else
+> was happening in our system during the boot up when this issue occurs.
+> For instance, if a mutex got unlocked this would ultimately lead to a
+> call to schedule() and our thread (pxa3xx_nand_irq_thread()) would run.
+> If some file system ops happened schedule() would get called. These
+> unrelated activities were required so that schedule() got called and the
+> scheduler would let the bottom-half execute.
+> In our tracing we saw the issue occur whenever the call to schedule()
+> didn't occur before the timeout expired. In short, if we got lucky and
+> something completely unrelated happened that led to a call to
+> 'schedule()', then the issue didn't occur. If we got unlucky and nothing
+> called schedule(), the issue was observed.
+>
+> We have enabled CONFIG_PREEMPT in our system to resolve this. This has
+> the effect of leading to a triggering of 'schedule()' at the end of
+> processing interrupts. This means that we now see a nice tight execution
+> of pxa3xx_nand threaded IRQ such that we see all ops completing with
+> less that 20ms delay.
+>
+> I wanted to highlight this to you because I think it shows that the
+> change to a threaded IRQ is probably only safe if we can guarantee
+> scheduling of the bottom-half thread within the time out period (200ms).
+> I think this is not safe for systems with CONFIG_PREEMPT not configured.
+> Or perhaps there is a better way to resolve this. Is this a deficiency
+> in the Armada XP code?
+>
+> What do you think?
+>
+
+Thanks a lot for updating us. Richard, Boris and I have
+discussed about this on IRC.
+
+We came to the following conclusions:
+
+1. There's no way to guarantee that the thread will be scheduled
+soon enough to always do the data transfer in time.
+
+Using CONFIG_PREEMPT could prevent a timeout in many (most?)
+cases, but it's not guaranteed to work.
+
+2. The pxa3xx-nand driver is poorly designed, and it shouldn't
+do any data transfer in the IRQ (threaded or not) handler.
+
+Instead, this should be done in {read,write}_buf, i.e. in the
+context of the calling process that asks data to be read/write.
+This is potentially a big rework.
+
+3. Richard proposed to get rid of the timeout
+(using wait_for_completion_interruptible instead?).
+
+I'm wondering if that could avoid these kind of issues (false
+timeouts), as a less invasive solution, until someone steps
+up to rework the driver.
+
+How does it sound?
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
