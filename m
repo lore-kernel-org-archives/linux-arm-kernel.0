@@ -1,51 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  3 Mar 2016 15:10:59 +0100
-Subject: [PATCH] arm64: enable CONFIG_DEBUG_RODATA by default
-Message-ID: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Mar 2016 14:14:29 +0000
+Subject: [PATCH 3/3] arm64: kasan: clear stale stack poison
+In-Reply-To: <1456928778-22491-4-git-send-email-mark.rutland@arm.com>
+References: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
+ <1456928778-22491-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160303141429.GB19139@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In spite of its name, CONFIG_DEBUG_RODATA is an important hardening feature
-for production kernels, and distros all enable it by default in their
-kernel configs. However, since enabling it used to result in more granular,
-and thus less efficient kernel mappings, it is not enabled by default for
-performance reasons.
+On Wed, Mar 02, 2016 at 02:26:18PM +0000, Mark Rutland wrote:
+> Functions which the compiler has instrumented for ASAN place poison on
+> the stack shadow upon entry and remove this poison prior to returning.
+> 
+> In the case of cpuidle, CPUs exit the kernel a number of levels deep
+> in C code. Any instrumented functions on this critical path will leave
+> portions of the stack shadow poisoned.
+> 
+> If CPUs lose context and return to the kernel via a cold path, we
+> restore a prior context saved in __cpu_suspend_enter are forgotten, and
+> we never remove the poison they placed in the stack shadow area by
+> functions calls between this and the actual exit of the kernel.
+> 
+> Thus, (depending on stackframe layout) subsequent calls to instrumented
+> functions may hit this stale poison, resulting in (spurious) KASAN
+> splats to the console.
+> 
+> To avoid this, clear any stale poison from the idle thread for a CPU
+> prior to bringing a CPU online.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Alexander Potapenko <glider@google.com>
+> Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/sleep.S | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> index e33fe33..fd10eb6 100644
+> --- a/arch/arm64/kernel/sleep.S
+> +++ b/arch/arm64/kernel/sleep.S
+> @@ -145,6 +145,10 @@ ENTRY(cpu_resume_mmu)
+>  ENDPROC(cpu_resume_mmu)
+>  	.popsection
+>  cpu_resume_after_mmu:
+> +#ifdef CONFIG_KASAN
+> +	mov	x0, sp
+> +	bl	kasan_unpoison_remaining_stack
+> +#endif
 
-However, since commit 2f39b5f91eb4 ("arm64: mm: Mark .rodata as RO"), the
-various kernel segments (.text, .rodata, .init and .data) are already
-mapped individually, and the only effect of setting CONFIG_DEBUG_RODATA is
-that the existing .text and .rodata mappings are updated late in the boot
-sequence to have their read-only attributes set, which means that any
-performance concerns related to enabling CONFIG_DEBUG_RODATA are no longer
-valid.
+Lorenzo, as this was following your suggestion [1], I hope that this
+patch looks ok to you?
 
-So from now on, make CONFIG_DEBUG_RODATA default to 'y'
+Are you happy to provide an Ack / Reviewed-by?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig.debug | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Thanks,
+Mark.
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index e13c4bf84d9e..7e76845a0434 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -50,13 +50,13 @@ config DEBUG_SET_MODULE_RONX
- 
- config DEBUG_RODATA
- 	bool "Make kernel text and rodata read-only"
-+	default y
- 	help
- 	  If this is set, kernel text and rodata will be made read-only. This
- 	  is to help catch accidental or malicious attempts to change the
--	  kernel's executable code. Additionally splits rodata from kernel
--	  text so it can be made explicitly non-executable.
-+	  kernel's executable code.
- 
--          If in doubt, say Y
-+	  If in doubt, say Y
- 
- config DEBUG_ALIGN_RODATA
- 	depends on DEBUG_RODATA && ARM64_4K_PAGES
--- 
-2.5.0
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/413061.html
