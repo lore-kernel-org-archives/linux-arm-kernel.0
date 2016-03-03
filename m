@@ -1,10 +1,10 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 03 Mar 2016 17:03:27 +0900
-Subject: [RFC 01/15] clocksource: atmel: Add missing MFD_SYSCON dependency on
+Date: Thu, 03 Mar 2016 17:03:29 +0900
+Subject: [RFC 03/15] hwspinlock: qcom: Add missing MFD_SYSCON dependency on
  HAS_IOMEM
 In-Reply-To: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
 References: <1456992221-26712-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1456992221-26712-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1456992221-26712-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,20 +13,20 @@ direct dependencies.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clocksource/Kconfig | 1 +
+ drivers/hwspinlock/Kconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index c346be650892..5927944b46e0 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -239,6 +239,7 @@ config ATMEL_PIT
- 
- config ATMEL_ST
- 	bool
+diff --git a/drivers/hwspinlock/Kconfig b/drivers/hwspinlock/Kconfig
+index 73a401662853..5ab2d51dc147 100644
+--- a/drivers/hwspinlock/Kconfig
++++ b/drivers/hwspinlock/Kconfig
+@@ -21,6 +21,7 @@ config HWSPINLOCK_OMAP
+ config HWSPINLOCK_QCOM
+ 	tristate "Qualcomm Hardware Spinlock device"
+ 	depends on ARCH_QCOM
 +	depends on HAS_IOMEM	# For MFD_SYSCON
- 	select CLKSRC_OF
+ 	select HWSPINLOCK
  	select MFD_SYSCON
- 
+ 	help
 -- 
 2.5.0
