@@ -1,54 +1,38 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu, 3 Mar 2016 13:53:47 +0100
-Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
-In-Reply-To: <56D829A7.1020201@roeck-us.net>
-References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
- <56D829A7.1020201@roeck-us.net>
-Message-ID: <CAGkQfmMFAJ7dQ-BMXNFdgW8ZvGhJ87h+gh3RHPecgFm9WjKoMQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Mar 2016 13:56:56 +0100
+Subject: [PATCH 12/17] arm: Add new mach-oxnas
+In-Reply-To: <1457005210-18485-13-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-13-git-send-email-narmstrong@baylibre.com>
+Message-ID: <3226743.49AyJYeiGh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+On Thursday 03 March 2016 12:40:05 Neil Armstrong wrote:
+> +
+> +config MACH_OX810SE
+> +	bool "Support OX810SE Based Products"
+> +	select CPU_ARM926T
+> +	select PLXTECH_RPS
+> +	select CLKSRC_RPS_TIMER
+> +	select RESET_OXNAS
+> +	select COMMON_CLK_OXNAS
+> +	select PINCTRL_OXNAS
 
-2016-03-03 13:10 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
-> On 03/03/2016 02:29 AM, Romain Izard wrote:
->>
->> If the internal counter is not refreshed when the watchdog is started
->> for the first time, the watchdog will trigger very rapidly. For
->> example, opening /dev/watchdog without writing in it will immediately
->> trigger a reboot, instead of waiting for the delay to expire.
->>
->> To avoid this problem, reload the timer on opening the watchdog
->> device.
->>
->> Command: "while sleep 5; do echo 1; done > /dev/watchdog"
->> Before: system reset
->> After: the watchdog runs correctly
->>
->> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
->
->
-> Subject might better read "ping watchdog on start" or similar.
->
-OK. I'll change it for a v2.
+Please sort these alphabetically
 
-> Does the watchdog have to be pinged before it is enabled ?  I am a bit
-> concerned that there may still be a 125 uS window during which the
-> system could restart.
->
+> +
+> +static void __init oxnas_init(void)
+> +{
+> +	pr_info("OXNAS Device Tree boot\n");
+> +
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
 
-According to the SAMA5D2 & SAMA5D4 datasheets, the timer ought to be
-reloaded when the watchdog is enabled by a write in the MR register.
-Unfortunately, it does not work as described, as I encountered the
-problem on a SAMA5D2 Xplained board.
+I think you should at least remove this function, as the pr_info is not
+needed and the rest is the default.
 
-The 4 clock delay is not in the datasheet either, but without any delay
-the timer is clearly not reloaded, as my issue stays the same. As there
-is a required delay before writing to MR after writing to CR, I applied
-the same type of delay in the reverse case.
+As Russell mentioned, the entire file is not really needed either, but
+so far we have left the trivial per-platform files in place generally.
 
-Perhaps Nicolas or Wenyou have more information on this.
-
-Best regards,
--- 
-Romain Izard
+	Arnd
