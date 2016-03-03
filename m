@@ -1,69 +1,70 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 3 Mar 2016 08:50:17 -0800
-Subject: [PATCH] arm64: enable CONFIG_DEBUG_RODATA by default
-In-Reply-To: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAGXu5j+HzNfiiNkZb86iEtCWK4PC_MKax53hNWS7CXrpo5FE6Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  3 Mar 2016 16:54:25 +0000
+Subject: [PATCHv2 0/3] KASAN: clean stale poison upon cold re-entry to kernel
+Message-ID: <1457024068-2236-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 3, 2016 at 6:10 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> In spite of its name, CONFIG_DEBUG_RODATA is an important hardening feature
-> for production kernels, and distros all enable it by default in their
-> kernel configs. However, since enabling it used to result in more granular,
-> and thus less efficient kernel mappings, it is not enabled by default for
-> performance reasons.
->
-> However, since commit 2f39b5f91eb4 ("arm64: mm: Mark .rodata as RO"), the
-> various kernel segments (.text, .rodata, .init and .data) are already
-> mapped individually, and the only effect of setting CONFIG_DEBUG_RODATA is
-> that the existing .text and .rodata mappings are updated late in the boot
-> sequence to have their read-only attributes set, which means that any
-> performance concerns related to enabling CONFIG_DEBUG_RODATA are no longer
-> valid.
->
-> So from now on, make CONFIG_DEBUG_RODATA default to 'y'
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Functions which the compiler has instrumented for ASAN place poison on
+the stack shadow upon entry and remove this poison prior to returning.
 
-Acked-by: Kees Cook <keescook@chromium.org>
+In some cases (e.g. hotplug and idle), CPUs may exit the kernel a number
+of levels deep in C code. If there are any instrumented functions on
+this critical path, these will leave portions of the idle thread stack
+shadow poisoned.
 
-If this doesn't cause any problems, perhaps we can make it always 'y' soon?
+If a CPU returns to the kernel via a different path (e.g. a cold entry),
+then depending on stack frame layout subsequent calls to instrumented
+functions may use regions of the stack with stale poison, resulting in
+(spurious) KASAN splats to the console.
 
--Kees
+Contemporary GCCs always add stack shadow poisoning when ASAN is
+enabled, even when asked to not instrument a function [1], so we can't
+simply annotate functions on the critical path to avoid poisoning.
 
-> ---
->  arch/arm64/Kconfig.debug | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index e13c4bf84d9e..7e76845a0434 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -50,13 +50,13 @@ config DEBUG_SET_MODULE_RONX
->
->  config DEBUG_RODATA
->         bool "Make kernel text and rodata read-only"
-> +       default y
->         help
->           If this is set, kernel text and rodata will be made read-only. This
->           is to help catch accidental or malicious attempts to change the
-> -         kernel's executable code. Additionally splits rodata from kernel
-> -         text so it can be made explicitly non-executable.
-> +         kernel's executable code.
->
-> -          If in doubt, say Y
-> +         If in doubt, say Y
->
->  config DEBUG_ALIGN_RODATA
->         depends on DEBUG_RODATA && ARM64_4K_PAGES
-> --
-> 2.5.0
->
+Instead, this series explicitly removes any stale poison before it can
+be hit. In the common hotplug case we clear the entire stack shadow in
+common code, before a CPU is brought online.
 
+On architectures which perform a cold return as part of cpu idle may
+retain an architecture-specific amount of stack contents. To retain the
+poison for this retained context, the arch code must call the core KASAN
+code, passing a "watermark" stack pointer value beyond which shadow will
+be cleared. Architectures which don't perform a cold return as part of
+idle do not need any additional code.
 
+This is a combination of previous approaches [2,3], attempting to keep
+as much as possible generic.
+
+Since v1 [4]:
+* Clean from task_stack_page(task)
+* Add acks from v1
+
+Andrew, the conclusion [5] from v1 was that this should go via the mm tree.
+Are you happy to pick this up? 
+
+Ingo was happy for the sched patch to go via the arm64 tree, and I assume that
+also holds for going via mm. Ingo, please shout if that's not the case!
+
+Thanks,
+Mark.
+
+[1] https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69863
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/409466.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/411850.html
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/413093.html
+[5] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/413475.html
+
+Mark Rutland (3):
+  kasan: add functions to clear stack poison
+  sched/kasan: remove stale KASAN poison after hotplug
+  arm64: kasan: clear stale stack poison
+
+ arch/arm64/kernel/sleep.S |  4 ++++
+ include/linux/kasan.h     |  6 +++++-
+ kernel/sched/core.c       |  3 +++
+ mm/kasan/kasan.c          | 20 ++++++++++++++++++++
+ 4 files changed, 32 insertions(+), 1 deletion(-)
 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+1.9.1
