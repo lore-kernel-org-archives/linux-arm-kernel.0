@@ -1,88 +1,121 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 3 Mar 2016 07:51:49 -0800
-Subject: [PATCH v3 6/7] ACPI: enable ACPI_DBG2_TABLE on ARM64
-In-Reply-To: <56D822DD.2030400@gmail.com>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
- <1456749726-30261-7-git-send-email-aleksey.makarov@linaro.org>
- <56D5ACBB.50408@hurleysoftware.com> <56D5CB42.3030806@linaro.org>
- <56D5D08E.3030902@hurleysoftware.com> <56D822DD.2030400@gmail.com>
-Message-ID: <56D85D95.5050506@hurleysoftware.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 3 Mar 2016 15:58:08 +0000
+Subject: [PATCH v2 11/17] arm64: KVM: vgic-v2: Only wipe LRs on vcpu exit
+In-Reply-To: <20160302230819.GE9634@cbox>
+References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+ <1455727249-24752-12-git-send-email-marc.zyngier@arm.com>
+ <20160302230819.GE9634@cbox>
+Message-ID: <56D85F10.1030602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 03:41 AM, Aleksey Makarov wrote:
+On 02/03/16 23:08, Christoffer Dall wrote:
+> On Wed, Feb 17, 2016 at 04:40:43PM +0000, Marc Zyngier wrote:
+>> So far, we're always writing all possible LRs, setting the empty
+>> ones with a zero value. This is obvious doing a low of work for
 > 
+> s/low/lot/
 > 
-> On 03/01/2016 08:25 PM, Peter Hurley wrote:
->> On 03/01/2016 09:02 AM, Aleksey Makarov wrote:
->>>
->>>
->>> On 03/01/2016 05:52 PM, Peter Hurley wrote:
->>>> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
->>>>> SBBR mentions DBG2 as a mandatory ACPI table.
->>>>> So enable it for ARM64
->>>>
->>>> Why does this have to be opted-in per-arch?
->>>
->>> DBG2 can specify earlycons.  They should start as soon as possible.
->>> On ARM64 it is just after boot tables become available (in arch_init()).
->>> So it has to be per-arch unless we decide not to start earlycons on 
->>> DBG2 ports.
+>> nothing, and we're better off clearing those we've actually
+>> dirtied on the exit path (it is very rare to inject more than one
+>> interrupt at a time anyway).
 >>
->> OF does all that already but the earlycon opt-in is not per-arch.
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/vgic-v2-sr.c | 10 +++++-----
+>>  1 file changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+>> index 3dbbc6b..e53f131 100644
+>> --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
+>> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+>> @@ -101,6 +101,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+>>  		}
+>>  
+>>  		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+>> +		writel_relaxed(0, base + GICH_LR0 + (i * 4));
+>>  	}
+>>  }
+>>  
+>> @@ -158,12 +159,11 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+>>  		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+>>  		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+>>  		for (i = 0; i < nr_lr; i++) {
+>> -			u32 val = 0;
+>> -
+>> -			if (live_lrs & (1UL << i))
+>> -				val = cpu_if->vgic_lr[i];
+>> +			if (!(live_lrs & (1UL << i)))
+>> +				continue;
 > 
-> In the last next-XXXX kernel support for OF earlycon depends on
-> CONFIG_OF_EARLY_FLATTREE which *is* per-arch.
-
-That's true.
-
-(of_setup_earlycon() was really always CONFIG_OF_EARLY_FLATTREE because
-its lone caller was CONFIG_OF_EARLY_FLATTREE).
-
-
-> Probably we need the same kind of configuration option here,
-> something like CONFIG_ACPI_BOOT_TABLES instead of ACPI_DBG2_TABLE.
-
-I'll let acpi maintainers sort that.
-
-
->>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->>>>> ---
->>>>>  arch/arm64/Kconfig       | 1 +
->>>>>  arch/arm64/kernel/acpi.c | 2 ++
->>>>>  2 files changed, 3 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>>> index 9dc5209..0b614d4 100644
->>>>> --- a/arch/arm64/Kconfig
->>>>> +++ b/arch/arm64/Kconfig
->>>>> @@ -3,6 +3,7 @@ config ARM64
->>>>>  	select ACPI_CCA_REQUIRED if ACPI
->>>>>  	select ACPI_GENERIC_GSI if ACPI
->>>>>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->>>>> +	select ACPI_DBG2_TABLE if ACPI
->>>>>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->>>>>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->>>>>  	select ARCH_HAS_ELF_RANDOMIZE
->>>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->>>>> index d1ce8e2..3370046 100644
->>>>> --- a/arch/arm64/kernel/acpi.c
->>>>> +++ b/arch/arm64/kernel/acpi.c
->>>>> @@ -208,6 +208,8 @@ void __init acpi_boot_table_init(void)
->>>>>  		pr_err("Failed to init ACPI tables\n");
->>>>>  		if (!param_acpi_force)
->>>>>  			disable_acpi();
->>>>> +	} else {
->>>>> +		acpi_probe_device_table(dbg2);
->>>>>  	}
->>>>>  }
->>>>>  
->>>>>
->>>>
+> how can we be sure that the LRs are clear when we launch our first VM on
+> a given physical CPU?  Don't we need to flush the LRs during VGIC init
+> time?
+> 
+>>  
+>> -			writel_relaxed(val, base + GICH_LR0 + (i * 4));
+>> +			writel_relaxed(cpu_if->vgic_lr[i],
+>> +				       base + GICH_LR0 + (i * 4));
+>>  		}
+>>  	}
+>>  
+>> -- 
+>> 2.1.4
 >>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+> 
+> otherwie LGTM.
+
+So how about this, just before this patch (I'll obviously do something similar for GICv3):
+
+>From d9a80c4c406450190a68abee302c7d9a0034c62a Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Thu, 3 Mar 2016 15:43:58 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic-v2: Reset LRs at boot time
+
+In order to let make the GICv2 code more lazy in the way it
+accesses the LRs, it is necessary to start with a clean slate.
+
+Let's reset the LRs on each CPU when the vgic is probed.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic-v2.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index ff02f08..67ec334 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -176,6 +176,15 @@ static const struct vgic_ops vgic_v2_ops = {
+ 
+ static struct vgic_params vgic_v2_params;
+ 
++static void vgic_cpu_init_lrs(void *params)
++{
++	struct vgic_params *vgic = params;
++	int i;
++
++	for (i = 0; i < vgic->nr_lr; i++)
++		writel_relaxed(0, vgic->vctrl_base + GICH_LR0 + (i * 4));
++}
++
+ /**
+  * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+  * @node:	pointer to the DT node
+@@ -257,6 +266,9 @@ int vgic_v2_probe(struct device_node *vgic_node,
+ 
+ 	vgic->type = VGIC_V2;
+ 	vgic->max_gic_vcpus = VGIC_V2_MAX_CPUS;
++
++	on_each_cpu(vgic_cpu_init_lrs, vgic, 1);
++
+ 	*ops = &vgic_v2_ops;
+ 	*params = vgic;
+ 	goto out;
+
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
