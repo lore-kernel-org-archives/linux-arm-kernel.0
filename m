@@ -1,80 +1,66 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu,  3 Mar 2016 16:20:19 -0500
-Subject: [PATCH v6 0/6] watchdog: pnx4008: add restart handler
-Message-ID: <1457040025-1108-1-git-send-email-slemieux.tyco@gmail.com>
+Date: Thu,  3 Mar 2016 16:20:22 -0500
+Subject: [PATCH v6 3/6] watchdog: pnx4008: add support for soft reset
+In-Reply-To: <1457040025-1108-1-git-send-email-slemieux.tyco@gmail.com>
+References: <1457040025-1108-1-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <1457040025-1108-4-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sylvain Lemieux <slemieux@tycoint.com>
 
-The LPC32xx provide the capability to perform a soft or hard reset;
-a soft reset will no reset the external peripheral
-(i.e. RESOUT_N output not asserted).
+Add support for explicit soft reset using the reboot mode.
 
-This changeset migrate the restart code from the "mach-lpc32xx" to
-the "pnx-4008" watchdog driver and add the soft reset capability.
+The default reboot mode behavior is unchanged;
+you can overwrite the default reboot type in the board specific file
+"DT_MACHINE_START" definition using the "reboot_mode" parameter.
 
-The default behavior (i.e. hard reset) remain unchanged.
-
-This patchset have a dependency on the following patch:
-watchdog: Add 'action' and 'data' parameters to restart handler callback
-http://permalink.gmane.org/gmane.linux.watchdog/3364/
-
-Note:
-Patch #5 was generated with the option "--unified=2" to ensure
-it can be apply before or after the changes for the new 
-LPC32xx irqchip driver:
-- http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
+Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 ---
 Changes from v5 to v6:
-* Update the patch as per the feedback received from:
-  Guenter: http://permalink.gmane.org/gmane.linux.watchdog/3420
-  - remove typecast.
+- remove typecast.
 
 Changes from v4 to v5:
-* Rebased on the following patch:
-  http://permalink.gmane.org/gmane.linux.watchdog/3364/
+- no logical change; updated to work with new revision of patch #2.
 
 Changes from v3 to v4:
-* Update the patch as per the feedback received from:
-  Arnd: http://permalink.gmane.org/gmane.linux.watchdog/3329
-  - Switch patch #5 and #6 order.
+- none.
 
 Changes from v2 to v3:
-* Update the patch as per the feedback received from:
-  Joachim: http://permalink.gmane.org/gmane.linux.watchdog/3303
-  - remove explicit clock enable from restart handler.
-  - verify "register_restart_handler" return value.
-  - add call to unregister_restart_handler".
-  - do the restart handling directly in "pnx4008_restart_handler".
-* Move the change to "phy3250.c" into a separate patch and generate
-  the new patch with the "--unified=2" option.
+- no logical change; updated to work with new revision of patch #2.
 
 Changes from v1 to v2:
-* Rename patch title;
+- Rename patch title;
   was "arm: lpc32xx: restart: add support for soft reset"
-* Update the patch as per the feedback received from:
-  Joachim: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/479791
-  - migrate restart code from "mach-lpc32xx" to "pnx-4008" driver.
-* Add soft reset support to "pnx-4008" driver instead of "mach-lpc32xx".
-* Use define available in "pnx-4008" when writting to watchdog register.
-* Remove restart handler from "mach-lpc32xx".
-* Remove restart hook from "phy3250.c".
-* Update driver logging during power-on. 
+- Add change to "pnx-4008" driver instead of "mach-lpc32xx".
+- Use define available in "pnx-4008" when writting to watchdog register.
 
-Sylvain Lemieux (6):
-  watchdog: pnx4008: update logging during power-on
-  watchdog: pnx4008: add restart handler
-  watchdog: pnx4008: add support for soft reset
-  watchdog: pnx4008: restart: support "cmd" from userspace
-  arm: lpc32xx: phy3250 remove restart hook
-  arm: lpc32xx: remove restart handler
+ drivers/watchdog/pnx4008_wdt.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
- arch/arm/mach-lpc32xx/common.c  | 15 ---------------
- arch/arm/mach-lpc32xx/common.h  |  1 -
- arch/arm/mach-lpc32xx/phy3250.c |  1 -
- drivers/watchdog/pnx4008_wdt.c  | 42 +++++++++++++++++++++++++++++++++++++++--
- 4 files changed, 40 insertions(+), 19 deletions(-)
-
+diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+index f3be522..51be66e 100644
+--- a/drivers/watchdog/pnx4008_wdt.c
++++ b/drivers/watchdog/pnx4008_wdt.c
+@@ -129,9 +129,16 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+ static int pnx4008_restart_handler(struct watchdog_device *wdd,
+ 				   unsigned long mode, void *cmd)
+ {
+-	/* Instant assert of RESETOUT_N with pulse length 1mS */
+-	writel(13000, WDTIM_PULSE(wdt_base));
+-	writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
++	if (mode == REBOOT_SOFT) {
++		/* Force match output active */
++		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
++		/* Internal reset on match output (RESOUT_N not asserted) */
++		writel(M_RES1, WDTIM_MCTRL(wdt_base));
++	} else {
++		/* Instant assert of RESETOUT_N with pulse length 1mS */
++		writel(13000, WDTIM_PULSE(wdt_base));
++		writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
++	}
+ 
+ 	/* Wait for watchdog to reset system */
+ 	mdelay(1000);
 -- 
 1.8.3.1
