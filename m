@@ -1,56 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Mar 2016 17:40:15 +0000
-Subject: [PATCHv2 0/3] KASAN: clean stale poison upon cold re-entry to
- kernel
-In-Reply-To: <CAG_fn=WAfu4oD1Qb1xUnX765RpUznWm1y+FKYqqiM8VO53F+Ag@mail.gmail.com>
-References: <1457024068-2236-1-git-send-email-mark.rutland@arm.com>
- <CAG_fn=WAfu4oD1Qb1xUnX765RpUznWm1y+FKYqqiM8VO53F+Ag@mail.gmail.com>
-Message-ID: <20160303174015.GG19139@leverpostej>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 3 Mar 2016 09:41:18 -0800
+Subject: [PATCH] arm64: enable CONFIG_DEBUG_RODATA by default
+In-Reply-To: <CAKv+Gu8hkFuSkAXWNCEC_qnxoZPcP3yo_Gue5fgUDVeUzoZnNw@mail.gmail.com>
+References: <1457014259-32015-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAGXu5j+HzNfiiNkZb86iEtCWK4PC_MKax53hNWS7CXrpo5FE6Q@mail.gmail.com>
+ <CAKv+Gu8hkFuSkAXWNCEC_qnxoZPcP3yo_Gue5fgUDVeUzoZnNw@mail.gmail.com>
+Message-ID: <CAGXu5j+uP3zbLSUJ+SUJ3U9kk5GC+ndtxmdxAkGeZahYUj8VUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 3, 2016 at 8:56 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 3 March 2016 at 17:50, Kees Cook <keescook@chromium.org> wrote:
+>> On Thu, Mar 3, 2016 at 6:10 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> In spite of its name, CONFIG_DEBUG_RODATA is an important hardening feature
+>>> for production kernels, and distros all enable it by default in their
+>>> kernel configs. However, since enabling it used to result in more granular,
+>>> and thus less efficient kernel mappings, it is not enabled by default for
+>>> performance reasons.
+>>>
+>>> However, since commit 2f39b5f91eb4 ("arm64: mm: Mark .rodata as RO"), the
+>>> various kernel segments (.text, .rodata, .init and .data) are already
+>>> mapped individually, and the only effect of setting CONFIG_DEBUG_RODATA is
+>>> that the existing .text and .rodata mappings are updated late in the boot
+>>> sequence to have their read-only attributes set, which means that any
+>>> performance concerns related to enabling CONFIG_DEBUG_RODATA are no longer
+>>> valid.
+>>>
+>>> So from now on, make CONFIG_DEBUG_RODATA default to 'y'
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> Acked-by: Kees Cook <keescook@chromium.org>
+>>
+>> If this doesn't cause any problems, perhaps we can make it always 'y' soon?
+>>
+>
+> You mean remove the option altogether? I would not mind, although
+> arguably, being able to map .text and .rodata writable could be
+> considered a useful debug option (and then it would almost, but not
+> quite, live up to its name)
 
-On Thu, Mar 03, 2016 at 06:17:31PM +0100, Alexander Potapenko wrote:
-> Please replace "ASAN" with "KASAN".
-> 
-> On Thu, Mar 3, 2016 at 5:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Functions which the compiler has instrumented for ASAN place poison on
-> > the stack shadow upon entry and remove this poison prior to returning.
-> >
-> > In some cases (e.g. hotplug and idle), CPUs may exit the kernel a number
-> > of levels deep in C code. If there are any instrumented functions on
-> > this critical path, these will leave portions of the idle thread stack
-> > shadow poisoned.
-> >
-> > If a CPU returns to the kernel via a different path (e.g. a cold entry),
-> > then depending on stack frame layout subsequent calls to instrumented
-> > functions may use regions of the stack with stale poison, resulting in
-> > (spurious) KASAN splats to the console.
-> >
-> > Contemporary GCCs always add stack shadow poisoning when ASAN is
-> > enabled, even when asked to not instrument a function [1], so we can't
-> > simply annotate functions on the critical path to avoid poisoning.
-> >
-> > Instead, this series explicitly removes any stale poison before it can
-> > be hit. In the common hotplug case we clear the entire stack shadow in
-> > common code, before a CPU is brought online.
-> >
-> > On architectures which perform a cold return as part of cpu idle may
-> > retain an architecture-specific amount of stack contents. To retain the
-> > poison for this retained context, the arch code must call the core KASAN
-> > code, passing a "watermark" stack pointer value beyond which shadow will
-> > be cleared. Architectures which don't perform a cold return as part of
-> > idle do not need any additional code.
+For x86 (and everything that implements mark_rodata_ro()) this will
+soon be controlled by rodata=off on the kernel command line (i.e. it
+skips mark_rodata_ro() during startup).
 
-For the above, and the rest of the series, ASAN consistently refers to
-the compiler AddressSanitizer feature, and KASAN consistently refers to
-the Linux-specific infrastructure. A simple s/[^K]ASAN/KASAN/ would
-arguably be wrong (e.g. when referring to GCC behaviour above).
+-Kees
 
-If there is a this needs rework, then I'm happy to s/[^K]ASAN/ASan/ to
-follow the usual ASan naming convention and avoid confusion. Otherwise,
-spinning a v3 is simply churn.
-
-Thanks,
-Mark.
+-- 
+Kees Cook
+Chrome OS & Brillo Security
