@@ -1,139 +1,48 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 2 Mar 2016 17:25:24 -0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56D6F008.1050600@huawei.com>
-References: <56D6F008.1050600@huawei.com>
-Message-ID: <56D79284.3030009@redhat.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Thu, 3 Mar 2016 09:28:31 +0800
+Subject: [PATCH v6 01/11] drm/hisilicon: Add device tree binding for
+ hi6220 display subsystem
+In-Reply-To: <20160302182952.GA1184@rob-hp-laptop>
+References: <1456476028-36880-1-git-send-email-xinliang.liu@linaro.org>
+ <1456476028-36880-2-git-send-email-xinliang.liu@linaro.org>
+ <20160302182952.GA1184@rob-hp-laptop>
+Message-ID: <CAGd==0609p0x2k3F5LEDfxs_fDFGLrvtRKmNKbp0PAQg06Sy2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc -mm and Joonsoo Kim)
+Hi,
 
-On 03/02/2016 05:52 AM, Hanjun Guo wrote:
-> Hi,
+On 3 March 2016 at 02:29, Rob Herring <robh@kernel.org> wrote:
+> On Fri, Feb 26, 2016 at 04:40:18PM +0800, Xinliang Liu wrote:
+>> Add ADE display controller binding doc.
+>> Add DesignWare DSI Host Controller v1.20a binding doc.
+>>
+>> v6:
+>> - Cleanup values part of reg and clocks properties.
+>> - Change "pclk_dsi" clock name to "pclk".
+>> v5:
+>> - Remove endpoint unit address of dsi output port.
+>> - Add "hisilicon,noc-syscon" property for ADE NOC QoS syscon.
+>> - Add "resets" property for ADE reset.
+>> v4:
+>> - Describe more specific of clocks and ports.
+>> - Fix indentation.
+>> v3:
+>> - Make ade as the drm master node.
+>> - Use assigned-clocks to set clock rate.
+>> - Use ports to connect display relavant nodes.
+>> v2:
+>> - Move dt binding docs to bindings/display/hisilicon directory.
+>>
+>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> ---
+>>  .../bindings/display/hisilicon/dw-dsi.txt          | 72 ++++++++++++++++++++++
+>>  .../bindings/display/hisilicon/hisi-ade.txt        | 64 +++++++++++++++++++
+>>  2 files changed, 136 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+>>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
 >
-> I came across a suspicious error for CMA stress test:
->
-> Before the test, I got:
-> -bash-4.3# cat /proc/meminfo | grep Cma
-> CmaTotal:         204800 kB
-> CmaFree:          195044 kB
->
->
-> After running the test:
-> -bash-4.3# cat /proc/meminfo | grep Cma
-> CmaTotal:         204800 kB
-> CmaFree:         6602584 kB
->
-> So the freed CMA memory is more than total..
->
-> Also the the MemFree is more than mem total:
->
-> -bash-4.3# cat /proc/meminfo
-> MemTotal:       16342016 kB
-> MemFree:        22367268 kB
-> MemAvailable:   22370528 kB
->
-> Here is the kernel module doing the stress test below (if the test case
-> is wrong, correct me), any help would be great appreciated.
->
-> The test is running on ARM64 platform (hisilicon D02) with 4.4 kernel, I think
-> the 4.5-rc is the same as I didn't notice the updates for it.
->
-> int malloc_dma(void *data)
-> {
->      void *vaddr;
->      struct platform_device * pdev=(struct platform_device*)data;
->      dma_addr_t dma_handle;
->      int i;
->
->      for(i=0; i<1000; i++) {
->          vaddr=dma_alloc_coherent(&pdev->dev, malloc_size, &dma_handle, GFP_KERNEL);
->          if (!vaddr)
->              pr_err("alloc cma memory failed!\n");
->
->          mdelay(1);
->
->          if (vaddr)
->                  dma_free_coherent(&pdev->dev,malloc_size,vaddr, dma_handle);
->      }
->      pr_info("alloc free cma memory success return!\n");
->      return 0;
-> }
->
-> static int dma_alloc_coherent_init(struct platform_device *pdev)
-> {
->      int i;
->
->      for(i=0; i<100; i++)   {
->          task[i] = kthread_create(malloc_dma,pdev,"malloc_dma_%d",i);
->          if(!task[i]) {
->              printk("kthread_create faile %d\n",i);
->              continue;
->          }
->          wake_up_process(task[i]);
->      }
->      return 0;
-> }
->
-> Thanks
-> Hanjun
->
-> The whole /proc/meminfo:
->
-> -bash-4.3# cat /proc/meminfo
-> MemTotal:       16342016 kB
-> MemFree:        22367268 kB
-> MemAvailable:   22370528 kB
-> Buffers:            4292 kB
-> Cached:            36444 kB
-> SwapCached:            0 kB
-> Active:            23564 kB
-> Inactive:          25360 kB
-> Active(anon):       8424 kB
-> Inactive(anon):       64 kB
-> Active(file):      15140 kB
-> Inactive(file):    25296 kB
-> Unevictable:           0 kB
-> Mlocked:               0 kB
-> SwapTotal:             0 kB
-> SwapFree:              0 kB
-> Dirty:                 0 kB
-> Writeback:             0 kB
-> AnonPages:          8196 kB
-> Mapped:            16448 kB
-> Shmem:               296 kB
-> Slab:              26832 kB
-> SReclaimable:       6300 kB
-> SUnreclaim:        20532 kB
-> KernelStack:        3088 kB
-> PageTables:          404 kB
-> NFS_Unstable:          0 kB
-> Bounce:                0 kB
-> WritebackTmp:          0 kB
-> CommitLimit:     8171008 kB
-> Committed_AS:      34336 kB
-> VmallocTotal:   258998208 kB
-> VmallocUsed:           0 kB
-> VmallocChunk:          0 kB
-> AnonHugePages:         0 kB
-> CmaTotal:         204800 kB
-> CmaFree:         6602584 kB
-> HugePages_Total:       0
-> HugePages_Free:        0
-> HugePages_Rsvd:        0
-> HugePages_Surp:        0
-> Hugepagesize:       2048 kB
->
+> Acked-by: Rob Herring <robh@kernel.org>
 
-
-I played with this a bit and can see the same problem. The sanity
-check of CmaFree < CmaTotal generally triggers in
-__move_zone_freepage_state in unset_migratetype_isolate.
-This also seems to be present as far back as v4.0 which was the
-first version to have the updated accounting from Joonsoo.
-Were there known limitations with the new freepage accounting,
-Joonsoo?
-
-Thanks,
-Laura
+Thanks :-)
+-xinliang
