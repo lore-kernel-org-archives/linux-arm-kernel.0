@@ -1,29 +1,94 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 3 Mar 2016 14:07:08 +0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56D79284.3030009@redhat.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
-Message-ID: <56D7D48C.6010505@huawei.com>
+From: B56489@freescale.com (Yunhui Cui)
+Date: Thu, 3 Mar 2016 14:54:01 +0800
+Subject: [PATCH v3 1/4] mtd:fsl-quadspi:use the property fields of SPI-NOR
+Message-ID: <1456988044-37061-1-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+We can get the read/write/erase opcode from the spi nor framework
+directly. This patch uses the information stored in the SPI-NOR to
+remove the hardcode in the fsl_qspi_init_lut().
 
-Thanks a lot for taking a look!
+Signed-off-by: Yunhui Cui <B56489@freescale.com>
+Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+---
+ drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
 
-On 2016/3/3 9:25, Laura Abbott wrote:
-> (cc -mm and Joonsoo Kim)
->
->
-[...]
->
-> I played with this a bit and can see the same problem. The sanity
-> check of CmaFree < CmaTotal generally triggers in
-> __move_zone_freepage_state in unset_migratetype_isolate.
-> This also seems to be present as far back as v4.0 which was the
-> first version to have the updated accounting from Joonsoo.
-
-Would you mind point out the specific commit ID?
-
-Thanks
-Hanjun
+diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+index 9ab2b51..517ffe2 100644
+--- a/drivers/mtd/spi-nor/fsl-quadspi.c
++++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+@@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	void __iomem *base = q->iobase;
+ 	int rxfifo = q->devtype_data->rxfifo;
+ 	u32 lut_base;
+-	u8 cmd, addrlen, dummy;
+ 	int i;
+ 
++	struct spi_nor *nor = &q->nor[0];
++	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
++	u8 read_op = nor->read_opcode;
++	u8 read_dm = nor->read_dummy;
++
+ 	fsl_qspi_unlock_lut(q);
+ 
+ 	/* Clear all the LUT table */
+@@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Quad Read */
+ 	lut_base = SEQID_QUAD_READ * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR24BIT;
+-		dummy = 8;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR32BIT;
+-		dummy = 8;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+-	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
++	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
++		    LUT1(FSL_READ, PAD4, rxfifo),
+ 			base + QUADSPI_LUT(lut_base + 1));
+ 
+ 	/* Write enable */
+@@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Page Program */
+ 	lut_base = SEQID_PP * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR24BIT;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR32BIT;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
+ 			base + QUADSPI_LUT(lut_base + 1));
+@@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Erase a sector */
+ 	lut_base = SEQID_SE * 4;
+ 
+-	cmd = q->nor[0].erase_opcode;
+-	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 
+ 	/* Erase the whole chip */
+-- 
+2.1.0.27.g96db324
