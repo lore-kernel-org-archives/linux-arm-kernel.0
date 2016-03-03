@@ -1,63 +1,30 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 3 Mar 2016 14:32:46 +0000
-Subject: [PATCH 3/3] arm64: kasan: clear stale stack poison
-In-Reply-To: <20160303141429.GB19139@leverpostej>
-References: <1456928778-22491-1-git-send-email-mark.rutland@arm.com>
- <1456928778-22491-4-git-send-email-mark.rutland@arm.com>
- <20160303141429.GB19139@leverpostej>
-Message-ID: <20160303143237.GA29015@red-moon>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 03 Mar 2016 15:31:07 +0100
+Subject: [PATCH 07/17] dt-bindings: Add PLX Technology Reset Controller
+ bindings
+In-Reply-To: <56D8492B.8060706@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-8-git-send-email-narmstrong@baylibre.com>
+ <1457014907.3425.56.camel@pengutronix.de> <56D8492B.8060706@baylibre.com>
+Message-ID: <1457015467.3425.58.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 02:14:29PM +0000, Mark Rutland wrote:
-> On Wed, Mar 02, 2016 at 02:26:18PM +0000, Mark Rutland wrote:
-> > Functions which the compiler has instrumented for ASAN place poison on
-> > the stack shadow upon entry and remove this poison prior to returning.
+Am Donnerstag, den 03.03.2016, 15:24 +0100 schrieb Neil Armstrong:
+> On 03/03/2016 03:21 PM, Philipp Zabel wrote:
+> > Am Donnerstag, den 03.03.2016, 12:40 +0100 schrieb Neil Armstrong:
+> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > > 
-> > In the case of cpuidle, CPUs exit the kernel a number of levels deep
-> > in C code. Any instrumented functions on this critical path will leave
-> > portions of the stack shadow poisoned.
+> > Is there a list of the reset bits in this register?
 > > 
-> > If CPUs lose context and return to the kernel via a cold path, we
-> > restore a prior context saved in __cpu_suspend_enter are forgotten, and
-> > we never remove the poison they placed in the stack shadow area by
-> > functions calls between this and the actual exit of the kernel.
+> > regards
+> > Philipp
 > > 
-> > Thus, (depending on stackframe layout) subsequent calls to instrumented
-> > functions may hit this stale poison, resulting in (spurious) KASAN
-> > splats to the console.
-> > 
-> > To avoid this, clear any stale poison from the idle thread for a CPU
-> > prior to bringing a CPU online.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Alexander Potapenko <glider@google.com>
-> > Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/sleep.S | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> > index e33fe33..fd10eb6 100644
-> > --- a/arch/arm64/kernel/sleep.S
-> > +++ b/arch/arm64/kernel/sleep.S
-> > @@ -145,6 +145,10 @@ ENTRY(cpu_resume_mmu)
-> >  ENDPROC(cpu_resume_mmu)
-> >  	.popsection
-> >  cpu_resume_after_mmu:
-> > +#ifdef CONFIG_KASAN
-> > +	mov	x0, sp
-> > +	bl	kasan_unpoison_remaining_stack
-> > +#endif
 > 
-> Lorenzo, as this was following your suggestion [1], I hope that this
-> patch looks ok to you?
-> 
-> Are you happy to provide an Ack / Reviewed-by?
+> Yes, should I add it to the bindings ?
 
-Yes sure, thanks for putting it together:
+Yes, please. Either that or add a header file with #defines to
+include/dt-bindings/reset and use it in the dtsi.
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+regards
+Philipp
