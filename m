@@ -1,36 +1,22 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 04 Mar 2016 10:02:24 +0900
-Subject: [PATCH v2] media: platform: Add missing MFD_SYSCON dependency on
- HAS_IOMEM
-Message-ID: <1457053344-28992-1-git-send-email-k.kozlowski@samsung.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 04 Mar 2016 09:04:57 +0800
+Subject: [PATCH] drm/rockchip: vop: fix crtc size in plane check
+In-Reply-To: <1456143779-16208-1-git-send-email-john@metanate.com>
+References: <1456143779-16208-1-git-send-email-john@metanate.com>
+Message-ID: <56D8DF39.8020104@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MFD_SYSCON depends on HAS_IOMEM so when selecting it avoid unmet
-direct dependencies.
+On 2016?02?22? 20:22, John Keeping wrote:
+> If the geometry of a crtc is changing in an atomic update then we much
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+I think "we much validate" should be "we must validate".:-)
 
----
+> validate the plane size against the new state of the crtc and not the
+> current size, otherwise if the crtc size is increasing the plane will be
+> cropped at the previous size and will not fill the screen.
+>
+> Signed-off-by: John Keeping<john@metanate.com>
 
-Changes since v1:
-1. Fix comments from Arnd: VIDEO_OMAP3 does not require it, however
-   VIDEO_S5P_FIMC still needs it.
----
- drivers/media/platform/exynos4-is/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-index 57d42c6172c5..c4317b99d257 100644
---- a/drivers/media/platform/exynos4-is/Kconfig
-+++ b/drivers/media/platform/exynos4-is/Kconfig
-@@ -17,6 +17,7 @@ config VIDEO_S5P_FIMC
- 	tristate "S5P/EXYNOS4 FIMC/CAMIF camera interface driver"
- 	depends on I2C
- 	depends on HAS_DMA
-+	depends on HAS_IOMEM	# For MFD_SYSCON
- 	select VIDEOBUF2_DMA_CONTIG
- 	select V4L2_MEM2MEM_DEV
- 	select MFD_SYSCON
 -- 
-2.5.0
+?ark Yao
