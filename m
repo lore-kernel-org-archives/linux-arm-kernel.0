@@ -1,63 +1,45 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 4 Mar 2016 13:33:03 +0100
-Subject: [PATCH] ARM: dts: imx25-pinfunc: add MX25_PAD_KPP_ROW3__UART1_RI
-In-Reply-To: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20160304133303.109baa10@ipc1.ka-ro>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 4 Mar 2016 13:33:30 +0100
+Subject: [RFC PATCH 0/8] PM / Domains: Add support for removing PM domains
+In-Reply-To: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <CAPDyKFq3hNARzjSOoP+-NmcgfSWzG6GDmh7qVX6yx6QPgN9Arw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
+> In order to safely remove PM domains there are a few changes that need to be
+> made to ensure that no one is holding an external reference to a PM domain
+> after it has been removed. One solution, implemented here, solves this by
+> eliminating external references to PM domain. Another alternative would be
+> to employ some reference counting for the PM domains, however, I did not see
+> a good reason for allowing external references in the first place (as always
+> there could be something that I have over-looked!).
+>
+> Jon Hunter (8):
+>   PM / Domains: Add new helper functions for device-tree
+>   ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
+>   staging: board: Remove calls to of_genpd_get_from_provider()
+>   PM / Domains: Don't expose generic_pm_domain structure
+>   PM / Domains: Verify the PM domain is present when adding a provider
+>   PM / Domains: Remove a provider by referencing the data pointer
+>   PM / Domains: Prepare for adding support to remove PM domains
+>   PM / Domains: Add support for removing PM domains
+>
+>  arch/arm/mach-exynos/pm_domains.c |  23 +--
+>  drivers/base/power/domain.c       | 324 +++++++++++++++++++++++++++++++++++---
+>  drivers/staging/board/board.c     |   9 +-
+>  include/linux/pm_domain.h         |  55 ++++---
+>  4 files changed, 348 insertions(+), 63 deletions(-)
+>
+> --
+> 2.1.4
+>
 
-On Fri,  4 Mar 2016 11:00:52 +0100 Uwe Kleine-K?nig wrote:
-> Funny side note: When uart1 is used in dte mode (where RI is an input)
-> the RIIN bit in uart1's USR2 register reflects the input level of
-> MX25_PAD_KPP_ROW3 even if this pad is muxed to a different function.
-> The same seems to hold for some other pads, too.
-> 
-I guess that's not a funny side note, but the expected behaviour when
-the SION bit in the MUX control register is set.
+Jon, thanks for posting this!
+My initial impressions is the I like the ideas for where you moves this.
 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> I think the appropriate action for the "funny" side note is that we must
-> introduce dt-properties like
-> 
-> 	fsl,mask-ri;
-> 
-> or something similar (maybe positive logic?) that prevents an uart1 RI irq
-> whenever uart3.CTS toggles.
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/boot/dts/imx25-pinfunc.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
-> index 848ffa785b63..3c8c5e1bea9e 100644
-> --- a/arch/arm/boot/dts/imx25-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx25-pinfunc.h
-> @@ -453,6 +453,7 @@
->  
->  #define MX25_PAD_KPP_ROW3__KPP_ROW3		0x1b4 0x3ac 0x000 0x10 0x000
->  #define MX25_PAD_KPP_ROW3__CSI_D1		0x1b4 0x3ac 0x48c 0x13 0x002
-> +#define MX25_PAD_KPP_ROW3__UART1_RI		0x1b4 0x3ac 0x000 0x14 0x000
->  #define MX25_PAD_KPP_ROW3__GPIO_3_0		0x1b4 0x3ac 0x000 0x15 0x000
-                                                                  ^^^^
-Do you still have the side effect, with SION (0x10) cleared?
+I will review it in more details as soon as I can (travelling next week).
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Kind regards
+Uffe
