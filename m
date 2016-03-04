@@ -1,88 +1,109 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 4 Mar 2016 15:35:26 +0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <20160304063807.GA13317@js1304-P5Q-DELUXE>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE> <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE>
-Message-ID: <56D93ABE.9070406@huawei.com>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Fri, 4 Mar 2016 07:41:23 +0000
+Subject: [PATCH net-next V2 03/16] net: fec: pass txq to fec_enet_tx_queue
+ instead of queue_id
+In-Reply-To: <56D71133.4000708@boundarydevices.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-4-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18555F637F86F38461B3442BFFBC0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <56D71133.4000708@boundarydevices.com>
+Message-ID: <VI1PR0401MB18557FE58F60E929DF9B6329FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/3/4 14:38, Joonsoo Kim wrote:
-> On Fri, Mar 04, 2016 at 02:05:09PM +0800, Hanjun Guo wrote:
->> On 2016/3/4 12:32, Joonsoo Kim wrote:
->>> On Fri, Mar 04, 2016 at 11:02:33AM +0900, Joonsoo Kim wrote:
->>>> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
->>>>> On 2016/3/3 15:42, Joonsoo Kim wrote:
->>>>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
->>>>>>> (cc -mm and Joonsoo Kim)
->>>>>>>
->>>>>>>
->>>>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> I came across a suspicious error for CMA stress test:
->>>>>>>>
->>>>>>>> Before the test, I got:
->>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
->>>>>>>> CmaTotal:         204800 kB
->>>>>>>> CmaFree:          195044 kB
->>>>>>>>
->>>>>>>>
->>>>>>>> After running the test:
->>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
->>>>>>>> CmaTotal:         204800 kB
->>>>>>>> CmaFree:         6602584 kB
->>>>>>>>
->>>>>>>> So the freed CMA memory is more than total..
->>>>>>>>
->>>>>>>> Also the the MemFree is more than mem total:
->>>>>>>>
->>>>>>>> -bash-4.3# cat /proc/meminfo
->>>>>>>> MemTotal:       16342016 kB
->>>>>>>> MemFree:        22367268 kB
->>>>>>>> MemAvailable:   22370528 kB
->>>>> [...]
->>>>>>> I played with this a bit and can see the same problem. The sanity
->>>>>>> check of CmaFree < CmaTotal generally triggers in
->>>>>>> __move_zone_freepage_state in unset_migratetype_isolate.
->>>>>>> This also seems to be present as far back as v4.0 which was the
->>>>>>> first version to have the updated accounting from Joonsoo.
->>>>>>> Were there known limitations with the new freepage accounting,
->>>>>>> Joonsoo?
->>>>>> I don't know. I also played with this and looks like there is
->>>>>> accounting problem, however, for my case, number of free page is slightly less
->>>>>> than total. I will take a look.
->>>>>>
->>>>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
->>>>>> look like your case.
->>>>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
->>>>> did some other test:
->>>> Thanks! Now, I can re-generate erronous situation you mentioned.
->>>>
->>>>>  - run with single thread with 100000 times, everything is fine.
->>>>>
->>>>>  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
->>>>>    the same test with 100 multi-thread, then I got:
->>>> [1] would not be sufficient to close this race.
->>>>
->>>> Try following things [A]. And, for more accurate test, I changed code a bit more
->>>> to prevent kernel page allocation from cma area [B]. This will prevent kernel
->>>> page allocation from cma area completely so we can focus cma_alloc/release race.
->>>>
->>>> Although, this is not correct fix, it could help that we can guess
->>>> where the problem is.
->>> More correct fix is something like below.
->>> Please test it.
->> Hmm, this is not working:
-> Sad to hear that.
->
-> Could you tell me your system's MAX_ORDER and pageblock_order?
->
+From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, March 03, 2016 12:14 AM
+> To: Fugang Duan <fugang.duan@nxp.com>; netdev at vger.kernel.org;
+> davem at davemloft.net; b38611 at freescale.com
+> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
+> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
+> johannes at sipsolutions.net; stillcompiling at gmail.com;
+> sergei.shtylyov at cogentembedded.com; arnd at arndb.de
+> Subject: Re: [PATCH net-next V2 03/16] net: fec: pass txq to
+> fec_enet_tx_queue instead of queue_id
+> 
+> On 3/2/2016 8:16 AM, Fugang Duan wrote:
+> > From: Troy Kisky <troy.kisky@boundarydevices.com>  Sent: Thursday,
+> > February 25, 2016 8:37 AM
+> >> To: netdev at vger.kernel.org; davem at davemloft.net;
+> b38611 at freescale.com
+> >> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de;
+> >> andrew at lunn.ch; tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+> >> kernel at lists.infradead.org; laci at boundarydevices.com;
+> >> shawnguo at kernel.org; johannes at sipsolutions.net;
+> >> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+> >> arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
+> >> Subject: [PATCH net-next V2 03/16] net: fec: pass txq to
+> >> fec_enet_tx_queue instead of queue_id
+> >>
+> >> queue_id is the qid member of struct bufdesc_prop.
+> >>
+> >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> >> ---
+> >>  drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
+> >>  1 file changed, 6 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> >> b/drivers/net/ethernet/freescale/fec_main.c
+> >> index 9619b9e..c517194 100644
+> >> --- a/drivers/net/ethernet/freescale/fec_main.c
+> >> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> >> @@ -1156,25 +1156,18 @@ fec_enet_hwtstamp(struct fec_enet_private
+> >> *fep, unsigned ts,
+> >>  	hwtstamps->hwtstamp = ns_to_ktime(ns);  }
+> >>
+> >> -static void
+> >> -fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
+> >> +static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
+> >> +		    struct fec_enet_priv_tx_q *txq)
+> >>  {
+> >> -	struct	fec_enet_private *fep;
+> >>  	struct bufdesc *bdp;
+> >>  	unsigned short status;
+> >>  	struct	sk_buff	*skb;
+> >> -	struct fec_enet_priv_tx_q *txq;
+> >>  	struct netdev_queue *nq;
+> >>  	int	index = 0;
+> >>  	int	entries_free;
+> >>
+> >> -	fep = netdev_priv(ndev);
+> >> -
+> >> -	queue_id = FEC_ENET_GET_QUQUE(queue_id);
+> >> -
+> >> -	txq = fep->tx_queue[queue_id];
+> >>  	/* get next bdp of dirty_tx */
+> >> -	nq = netdev_get_tx_queue(ndev, queue_id);
+> >> +	nq = netdev_get_tx_queue(ndev, txq->bd.qid);
+> >>  	bdp = txq->dirty_tx;
+> >>
+> >>  	/* get next bdp of dirty_tx */
+> >> @@ -1268,11 +1261,13 @@ static void
+> >>  fec_enet_tx(struct net_device *ndev)  {
+> >>  	struct fec_enet_private *fep = netdev_priv(ndev);
+> >> +	struct fec_enet_priv_tx_q *txq;
+> >>  	u16 queue_id;
+> >>  	/* First process class A queue, then Class B and Best Effort queue */
+> >>  	for_each_set_bit(queue_id, &fep->work_tx, FEC_ENET_MAX_TX_QS)
+> {
+> >>  		clear_bit(queue_id, &fep->work_tx);
+> >> -		fec_enet_tx_queue(ndev, queue_id);
+> >> +		txq = fep->tx_queue[FEC_ENET_GET_QUQUE(queue_id)];
+> >> +		fec_txq(ndev, fep, txq);
+> >>  	}
+> >>  	return;
+> >>  }
+> >> --
+> >> 2.5.0
+> >
+> > The patch should merge with patch#1.
+> >
+> 
+> 
+> Why ?  That would only hide the change in patch #1.
 
-MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
+Hi Troy Kisky,
 
-Hanjun
+Sorry, I mean patch#2 net: fec: pass rxq to fec_enet_rx_queue instead of queue_id.  It is not necessary to separate them.
+
+Regards,
+Andy
