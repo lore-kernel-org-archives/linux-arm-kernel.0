@@ -1,45 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 4 Mar 2016 20:06:25 +0000
-Subject: [GIT PULL] arm64 fix for 4.5-rc7
-Message-ID: <20160304200625.GE7886@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri,  4 Mar 2016 17:20:11 -0300
+Subject: [PATCH 0/2] [media] exynos4-is: Trivial fixes for DT port/endpoint
+ parse logic
+Message-ID: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hello,
 
-Please pull this arm64 fix for -rc7. Without it, our struct page array
-can overflow the vmemmap region on systems with a large PHYS_OFFSET.
+This series have two trivial fixes for issues that I noticed while
+reading as a reference the driver's functions that parse the graph
+port and endpoints nodes.
 
-Nothing else on the radar at the moment, so hopefully that's it for 4.5
-from us.
+It was only compile tested because I don't have access to a Exynos4
+hardware to test the DT parsing, but the patches are very simple.
 
-Cheers,
+Best regards,
+Javier
 
-Will
 
---->8
+Javier Martinez Canillas (2):
+  [media] exynos4-is: Put node before s5pcsis_parse_dt() return error
+  [media] exynos4-is: FIMC port parse should fail if there's no endpoint
 
-The following changes since commit 81f70ba233d5f660e1ea5fe23260ee323af5d53a:
+ drivers/media/platform/exynos4-is/media-dev.c | 2 +-
+ drivers/media/platform/exynos4-is/mipi-csis.c | 6 ++++--
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-  Linux 4.5-rc5 (2016-02-20 13:39:35 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to dfd55ad85e4a7fbaa82df12467515ac3c81e8a3e:
-
-  arm64: vmemmap: use virtual projection of linear region (2016-02-26 17:59:04 +0000)
-
-----------------------------------------------------------------
-arm64 fix:
-
-- Ensure struct page array fits within vmemmap area
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: vmemmap: use virtual projection of linear region
-
- arch/arm64/include/asm/pgtable.h | 7 ++++---
- arch/arm64/mm/init.c             | 4 ++--
- 2 files changed, 6 insertions(+), 5 deletions(-)
+-- 
+2.5.0
