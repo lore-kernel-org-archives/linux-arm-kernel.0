@@ -1,22 +1,71 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 04 Mar 2016 09:04:57 +0800
-Subject: [PATCH] drm/rockchip: vop: fix crtc size in plane check
-In-Reply-To: <1456143779-16208-1-git-send-email-john@metanate.com>
-References: <1456143779-16208-1-git-send-email-john@metanate.com>
-Message-ID: <56D8DF39.8020104@rock-chips.com>
+From: wenyou.yang@atmel.com (Yang, Wenyou)
+Date: Fri, 4 Mar 2016 09:35:05 +0800
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+In-Reply-To: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+Message-ID: <56D8E649.8030500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?02?22? 20:22, John Keeping wrote:
-> If the geometry of a crtc is changing in an atomic update then we much
+Hi Romain,
 
-I think "we much validate" should be "we must validate".:-)
-
-> validate the plane size against the new state of the crtc and not the
-> current size, otherwise if the crtc size is increasing the plane will be
-> cropped at the previous size and will not fill the screen.
+On 2016/3/3 18:29, Romain Izard wrote:
+> If the internal counter is not refreshed when the watchdog is started
+> for the first time, the watchdog will trigger very rapidly. For example,
+> opening /dev/watchdog without writing in it will immediately trigger a
+> reboot, instead of waiting for the delay to expire.
 >
-> Signed-off-by: John Keeping<john@metanate.com>
+> To avoid this problem, reload the timer on opening the watchdog device.
+>
+> Command: "while sleep 5; do echo 1; done > /dev/watchdog"
+> Before: system reset
+> After: the watchdog runs correctly
+I didn't reproduce your issue on my side,
 
--- 
-?ark Yao
+run the your commands as follows, it works fine,  the system reset 
+doesn't happen.
+---8<----
+#!/bin/sh
+
+while [ 1 ]
+do
+         sleep 5;
+         echo 1 > /dev/watchdog
+done
+--->8----
+
+I also check the WDT_MR register before and after enabling watchdog, the 
+WDV and WDD fields are correct.
+
+Can you check it again? thank you.
+
+>
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> ---
+>   drivers/watchdog/sama5d4_wdt.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index a49634cdc1cc..e162fe140ae1 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -15,6 +15,7 @@
+>   #include <linux/platform_device.h>
+>   #include <linux/reboot.h>
+>   #include <linux/watchdog.h>
+> +#include <linux/delay.h>
+>   
+>   #include "at91sam9_wdt.h"
+>   
+> @@ -58,6 +59,8 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>   	reg = wdt_read(wdt, AT91_WDT_MR);
+>   	reg &= ~AT91_WDT_WDDIS;
+>   	wdt_write(wdt, AT91_WDT_MR, reg);
+> +	udelay(125); /* > 4 cycles at 32,768 Hz */
+> +	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
+>   
+>   	return 0;
+>   }
+
+Best Regards,
+Wenyou Yang
