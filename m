@@ -1,62 +1,118 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 4 Mar 2016 11:23:48 +0000
-Subject: [RFC PATCH 2/8] ARM: EXYNOS: Remove calls to
- of_genpd_get_from_provider()
+Date: Fri, 4 Mar 2016 11:23:47 +0000
+Subject: [RFC PATCH 1/8] PM / Domains: Add new helper functions for device-tree
 In-Reply-To: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
 References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1457090634-14785-3-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1457090634-14785-2-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the EXYNOS PM domain code to use the of_genpd_add_subdomain()
-and remove any calls to of_genpd_get_from_provider().
+Ideally, if we are returning a reference to a PM domain via a call to
+of_genpd_get_from_provider(), then we should keep track of such
+references via a reference count. The reference count could then be used
+to determine if a PM domain can be safely removed. Alternatively, it is
+possible to avoid such external references by providing APIs to access
+the PM domain and hence, eliminate any calls to
+of_genpd_get_from_provider().
+
+Add new helper functions for adding a device and a subdomain to a PM
+domain when using device-tree, so that external calls to
+of_genpd_get_from_provider() can be removed.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- arch/arm/mach-exynos/pm_domains.c | 23 ++++++++---------------
- 1 file changed, 8 insertions(+), 15 deletions(-)
+ drivers/base/power/domain.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h   | 16 ++++++++++++++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 7c21760f590f..871f72a292ae 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -193,29 +193,22 @@ no_clk:
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 5bdb42bf40f4..b24893499454 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1706,6 +1706,50 @@ struct generic_pm_domain *of_genpd_get_from_provider(
+ EXPORT_SYMBOL_GPL(of_genpd_get_from_provider);
  
- 	/* Assign the child power domains to their parents */
- 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
--		struct generic_pm_domain *child_domain, *parent_domain;
--		struct of_phandle_args args;
-+		struct of_phandle_args child, parent;
+ /**
++ * of_genpd_add_device() - Add a device to an I/O PM domain
++ * @genpdspec: OF phandle args to use for look-up PM domain
++ * @dev: Device to be added.
++ *
++ * Looks-up an I/O PM domain based upon phandle args provided and adds
++ * the device to the PM domain. Returns a negative error code on failure.
++ */
++int of_genpd_add_device(struct of_phandle_args *genpdspec, struct device *dev)
++{
++	struct generic_pm_domain *genpd;
++
++	genpd = of_genpd_get_from_provider(genpdspec);
++	if (IS_ERR(genpd))
++		return PTR_ERR(genpd);
++
++	return pm_genpd_add_device(genpd, dev);
++}
++
++/**
++ * of_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
++ * @parent_spec: OF phandle args to use for parent PM domain look-up
++ * @subdomain_spec: OF phandle args to use for subdomain look-up
++ *
++ * Looks-up a parent PM domain and subdomain based upon phandle args
++ * provided and adds the subdomain to the parent PM domain. Returns a
++ * negative error code on failure.
++ */
++int of_genpd_add_subdomain(struct of_phandle_args *parent_spec,
++			   struct of_phandle_args *subdomain_spec)
++{
++	struct generic_pm_domain *parent, *subdomain;
++
++	parent = of_genpd_get_from_provider(parent_spec);
++	if (IS_ERR(parent))
++		return PTR_ERR(parent);
++
++	subdomain = of_genpd_get_from_provider(subdomain_spec);
++	if (IS_ERR(subdomain))
++		return PTR_ERR(subdomain);
++
++	return pm_genpd_add_subdomain(parent, subdomain);
++}
++
++/**
+  * genpd_dev_pm_detach - Detach a device from its PM domain.
+  * @dev: Device to detach.
+  * @power_off: Currently not used
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 49cd8890b873..2b6ee670b231 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -210,6 +210,10 @@ struct generic_pm_domain *__of_genpd_xlate_simple(
+ struct generic_pm_domain *__of_genpd_xlate_onecell(
+ 					struct of_phandle_args *genpdspec,
+ 					void *data);
++extern int of_genpd_add_device(struct of_phandle_args *args,
++			       struct device *dev);
++extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
++				  struct of_phandle_args *new_subdomain);
  
--		args.np = np;
--		args.args_count = 0;
--		child_domain = of_genpd_get_from_provider(&args);
--		if (IS_ERR(child_domain))
--			continue;
-+		child.np = np;
-+		child.args_count = 0;
+ int genpd_dev_pm_attach(struct device *dev);
+ #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+@@ -229,6 +233,18 @@ static inline struct generic_pm_domain *of_genpd_get_from_provider(
+ #define __of_genpd_xlate_simple		NULL
+ #define __of_genpd_xlate_onecell	NULL
  
- 		if (of_parse_phandle_with_args(np, "power-domains",
--					 "#power-domain-cells", 0, &args) != 0)
--			continue;
--
--		parent_domain = of_genpd_get_from_provider(&args);
--		if (IS_ERR(parent_domain))
-+					       "#power-domain-cells", 0,
-+					       &parent) != 0)
- 			continue;
- 
--		if (pm_genpd_add_subdomain(parent_domain, child_domain))
-+		if (of_genpd_add_subdomain(&parent, &child))
- 			pr_warn("%s failed to add subdomain: %s\n",
--				parent_domain->name, child_domain->name);
-+				parent.np->name, child.np->name);
- 		else
- 			pr_info("%s has as child subdomain: %s.\n",
--				parent_domain->name, child_domain->name);
-+				parent.np->name, child.np->name);
- 	}
- 
- 	return 0;
++static inline int of_pm_genpd_add_device(struct of_phandle_args *args,
++					 struct device *dev)
++{
++	return -ENODEV;
++}
++
++static inline int of_genpd_add_subdomain(struct of_phandle_args *parent,
++					 struct of_phandle_args *new_subdomain)
++{
++	return -ENODEV;
++}
++
+ static inline int genpd_dev_pm_attach(struct device *dev)
+ {
+ 	return -ENODEV;
 -- 
 2.1.4
