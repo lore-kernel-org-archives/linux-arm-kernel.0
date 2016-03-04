@@ -1,155 +1,75 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 4 Mar 2016 11:02:33 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56D832BD.5080305@huawei.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com>
-Message-ID: <20160304020232.GA12036@js1304-P5Q-DELUXE>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 4 Mar 2016 10:02:42 +0800
+Subject: [PATCH 1/3] usb: core: add power sequence for USB devices
+In-Reply-To: <CAL_JsqLYHzb0ABYN_P9ZOEorT6otvn_BPNzuCFhoqwa5M4y-hw@mail.gmail.com>
+References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
+ <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
+ <CAL_JsqLYHzb0ABYN_P9ZOEorT6otvn_BPNzuCFhoqwa5M4y-hw@mail.gmail.com>
+Message-ID: <20160304020242.GB30272@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
-> On 2016/3/3 15:42, Joonsoo Kim wrote:
-> > 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
-> >> (cc -mm and Joonsoo Kim)
-> >>
-> >>
-> >> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
-> >>> Hi,
-> >>>
-> >>> I came across a suspicious error for CMA stress test:
-> >>>
-> >>> Before the test, I got:
-> >>> -bash-4.3# cat /proc/meminfo | grep Cma
-> >>> CmaTotal:         204800 kB
-> >>> CmaFree:          195044 kB
-> >>>
-> >>>
-> >>> After running the test:
-> >>> -bash-4.3# cat /proc/meminfo | grep Cma
-> >>> CmaTotal:         204800 kB
-> >>> CmaFree:         6602584 kB
-> >>>
-> >>> So the freed CMA memory is more than total..
-> >>>
-> >>> Also the the MemFree is more than mem total:
-> >>>
-> >>> -bash-4.3# cat /proc/meminfo
-> >>> MemTotal:       16342016 kB
-> >>> MemFree:        22367268 kB
-> >>> MemAvailable:   22370528 kB
-> [...]
-> >>
-> >> I played with this a bit and can see the same problem. The sanity
-> >> check of CmaFree < CmaTotal generally triggers in
-> >> __move_zone_freepage_state in unset_migratetype_isolate.
-> >> This also seems to be present as far back as v4.0 which was the
-> >> first version to have the updated accounting from Joonsoo.
-> >> Were there known limitations with the new freepage accounting,
-> >> Joonsoo?
-> > I don't know. I also played with this and looks like there is
-> > accounting problem, however, for my case, number of free page is slightly less
-> > than total. I will take a look.
+On Thu, Mar 03, 2016 at 02:54:55PM -0600, Rob Herring wrote:
+> On Thu, Mar 3, 2016 at 4:01 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > Some hard-wired USB devices need to do power sequence to let the
+> > device work normally, the typical power sequence like: enable USB
+> > PHY clock, toggle reset pin, etc. But current Linux USB driver
+> > lacks of such code to do it, it may cause some hard-wired USB devices
+> > works abnormal or can't be recognized by controller at all.
 > >
-> > Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
-> > look like your case.
+> > In this patch, it will do power on sequence at hub's probe for all
+> > devices under this hub (includes root hub) if this device is described
+> > at dts and there is a phandle "usb-pwrseq" for it. At hub_disconnect,
+> > it will do power off sequence.
+> >
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > ---
+> >  .../devicetree/bindings/usb/usb-device.txt         |  41 +++++-
+> >  drivers/usb/core/Makefile                          |   2 +-
+> >  drivers/usb/core/hub.c                             |  32 +++++
+> >  drivers/usb/core/pwrseq.c                          | 149 +++++++++++++++++++++
+> >  include/linux/usb/of.h                             |  10 ++
+> >  5 files changed, 232 insertions(+), 2 deletions(-)
+> >  create mode 100644 drivers/usb/core/pwrseq.c
+> >
+> > diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
+> > index 1c35e7b..c7a298c 100644
+> > --- a/Documentation/devicetree/bindings/usb/usb-device.txt
+> > +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
+> > @@ -13,8 +13,37 @@ Required properties:
+> >  - reg: the port number which this device is connecting to, the range
+> >    is 1-31.
+> >
+> > +Optional properties:
+> > +- usb-pwrseq: the power sequence handler which need to do before this USB
+> > +  device can work.
+> > +- clocks: the input clock for USB device.
+> > +- clock-frequency: the frequency for device's clock.
+> > +- reset-gpios: Should specify the GPIO for reset.
+> > +- reset-duration-us: the duration in microsecond for assert reset signal.
 > 
-> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
-> did some other test:
+> So we sorted out how to describe USB devices in DT, but now we don't
+> use it?
 
-Thanks! Now, I can re-generate erronous situation you mentioned.
+We only know USB device after USB bus finds it, but without power
+on sequence, the USB bus can't find it.
 
+> I know this is similar to what was done for MMC, but I really
+> don't like it.
 > 
->  - run with single thread with 100000 times, everything is fine.
+> Just put all these properties into the device nodes. The parent can
+> then scan for children and handle the power sequencing with generic
+> code. I think it is safe to assume that if these properties are
+> present, they need to be handled for device detection. We may still
+> need something device specific to handle some devices at some point,
+> but that is true either way.
 > 
->  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
->    the same test with 100 multi-thread, then I got:
 
-[1] would not be sufficient to close this race.
+It is two different things, one is power sequence which needs to be done
+before the device can be detected. Another is the features for this USB
+devices, it can be handled after this device has been recognized.
 
-Try following things [A]. And, for more accurate test, I changed code a bit more
-to prevent kernel page allocation from cma area [B]. This will prevent kernel
-page allocation from cma area completely so we can focus cma_alloc/release race.
+-- 
 
-Although, this is not correct fix, it could help that we can guess
-where the problem is.
-
-Thanks.
-
-[A]
-diff --git a/mm/cma.c b/mm/cma.c
-index c003274..43ed02d 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -496,7 +496,9 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
- 
-        VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
- 
-+       mutex_lock(&cma_mutex);
-        free_contig_range(pfn, count);
-+       mutex_unlock(&cma_mutex);
-        cma_clear_bitmap(cma, pfn, count);
-        trace_cma_release(pfn, pages, count);
- 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index c6c38ed..1ce8a59 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -2192,7 +2192,8 @@ void free_hot_cold_page(struct page *page, bool cold)
-         * excessively into the page allocator
-         */
-        if (migratetype >= MIGRATE_PCPTYPES) {
--               if (unlikely(is_migrate_isolate(migratetype))) {
-+               if (is_migrate_cma(migratetype) ||
-+                       unlikely(is_migrate_isolate(migratetype))) {
-                        free_one_page(zone, page, pfn, 0, migratetype);
-                        goto out;
-                }
-
-
-[B]
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index f2dccf9..c6c38ed 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -1493,6 +1493,7 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
-                                                                int alloc_flags)
- {
-        int i;
-+       bool cma = false;
- 
-        for (i = 0; i < (1 << order); i++) {
-                struct page *p = page + i;
-@@ -1500,6 +1501,9 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
-                        return 1;
-        }
- 
-+       if (is_migrate_cma(get_pcppage_migratetype(page)))
-+               cma = true;
-+
-        set_page_private(page, 0);
-        set_page_refcounted(page);
- 
-@@ -1528,6 +1532,12 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
-        else
-                clear_page_pfmemalloc(page);
- 
-+       if (cma) {
-+               page_ref_dec(page);
-+               __free_pages_ok(page, order);
-+               return 1;
-+       }
-+
-        return 0;
- }
- 
-@@ -1582,7 +1592,7 @@ static int fallbacks[MIGRATE_TYPES][4] = {
- static struct page *__rmqueue_cma_fallback(struct zone *zone,
-                                        unsigned int order)
- {
--       return __rmqueue_smallest(zone, order, MIGRATE_CMA);
-+       return NULL;
- }
- #else
- static inline struct page *__rmqueue_cma_fallback(struct zone *zone,
+Best Regards,
+Peter Chen
