@@ -1,84 +1,46 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 4 Mar 2016 14:37:28 +0800
-Subject: [PATCH v5 10/17] arm/xen: Get event-channel irq through HVM_PARAM
- when booting with ACPI
+Date: Fri, 4 Mar 2016 14:37:27 +0800
+Subject: [PATCH v5 09/17] xen/hvm/params: Add a new delivery type for
+ event-channel in HVM_PARAM_CALLBACK_IRQ
 In-Reply-To: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1457073455-11516-11-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1457073455-11516-10-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When booting with ACPI, it could get the event-channel irq through
-HVM_PARAM_CALLBACK_IRQ.
+Add a new delivery type:
+val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
+To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
+bit 1 stands the interrupt polarity is active low(1) or high(0).
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 35 insertions(+), 1 deletion(-)
+ include/xen/interface/hvm/params.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index d94f726..807a93e 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -30,6 +30,7 @@
- #include <linux/time64.h>
- #include <linux/timekeeping.h>
- #include <linux/timekeeper_internal.h>
-+#include <linux/acpi.h>
+diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+index 70ad208..d32b02b 100644
+--- a/include/xen/interface/hvm/params.h
++++ b/include/xen/interface/hvm/params.h
+@@ -53,6 +53,16 @@
+  * if this delivery method is available.
+  */
  
- #include <linux/mm.h>
++#define HVM_PARAM_CALLBACK_TYPE_EVENT    3
++/*
++ * val[55:16] need to be zero.
++ * val[15:8] is flag of event-channel interrupt:
++ *  bit 8: interrupt is edge(1) or level(0) triggered
++ *  bit 9: interrupt is active low(1) or high(0)
++ * val[7:0] is PPI number used by event-channel.
++ * This is only used by ARM/ARM64.
++ */
++
+ #define HVM_PARAM_STORE_PFN    1
+ #define HVM_PARAM_STORE_EVTCHN 2
  
-@@ -278,6 +279,35 @@ void __init xen_early_init(void)
- 		add_preferred_console("hvc", 0, NULL);
- }
- 
-+static void __init xen_acpi_guest_init(void)
-+{
-+#ifdef CONFIG_ACPI
-+	struct xen_hvm_param a;
-+	int interrupt, trigger, polarity;
-+
-+	a.domid = DOMID_SELF;
-+	a.index = HVM_PARAM_CALLBACK_IRQ;
-+	xen_events_irq = 0;
-+
-+	if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
-+		if ((a.value >> 56) == HVM_PARAM_CALLBACK_TYPE_EVENT) {
-+			interrupt = a.value & 0xff;
-+			trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
-+							 : ACPI_LEVEL_SENSITIVE;
-+			polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
-+							  : ACPI_ACTIVE_HIGH;
-+			xen_events_irq = acpi_register_gsi(NULL, interrupt,
-+							   trigger, polarity);
-+		}
-+	}
-+#endif
-+}
-+
-+static void __init xen_dt_guest_init(void)
-+{
-+	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-+}
-+
- static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
-@@ -286,7 +316,11 @@ static int __init xen_guest_init(void)
- 	if (!xen_domain())
- 		return 0;
- 
--	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-+	if (!acpi_disabled)
-+		xen_acpi_guest_init();
-+	else
-+		xen_dt_guest_init();
-+
- 	if (!xen_events_irq) {
- 		pr_err("Xen event channel interrupt not found\n");
- 		return -ENODEV;
 -- 
 2.0.4
