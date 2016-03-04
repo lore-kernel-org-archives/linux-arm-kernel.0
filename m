@@ -1,7 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  4 Mar 2016 15:56:59 +0100
-Subject: [GIT PULL 1/3] ARM: tegra: Core SoC changes for v4.6-rc1
-Message-ID: <1457103421-26006-1-git-send-email-thierry.reding@gmail.com>
+Date: Fri,  4 Mar 2016 15:57:00 +0100
+Subject: [GIT PULL 2/3] ARM: tegra: Devicetree changes for v4.6-rc1
+In-Reply-To: <1457103421-26006-1-git-send-email-thierry.reding@gmail.com>
+References: <1457103421-26006-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1457103421-26006-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,38 +15,50 @@ The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.6-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.6-arm
 
-for you to fetch changes up to 50ca629d08c7141056cdfac573d1cf28d2abe639:
+for you to fetch changes up to 2bd451d6f5a47eb79feddfa4af827e3b63ed99e9:
 
-  dt-bindings: Update NVIDIA PMC for Tegra (2016-03-02 18:00:30 +0100)
-
-----------------------------------------------------------------
-ARM: tegra: Core SoC changes for v4.6-rc1
-
-This set of patches contains a slew of fixes and cleanups in preparation
-for moving Tegra to generic power domains.
+  ARM: tegra: Replace legacy *,wakeup property with wakeup-source (2016-02-16 11:32:40 +0100)
 
 ----------------------------------------------------------------
-Jon Hunter (14):
-      soc/tegra: pmc: Add missing structure members to kernel-doc
-      soc/tegra: pmc: Fix sparse warning for tegra_pmc_init_tsense_reset()
-      soc/tegra: pmc: Remove debugfs entry on probe failure
-      soc/tegra: pmc: Remove non-existing power partitions for Tegra210
-      soc/tegra: pmc: Remove non-existing L2 partition for Tegra124
-      soc/tegra: pmc: Restore base address on probe failure
-      soc/tegra: pmc: Protect public functions from potential race conditions
-      soc/tegra: pmc: Change powergate and rail IDs to be an unsigned type
-      soc/tegra: pmc: Fix testing of powergate state
-      soc/tegra: pmc: Fix verification of valid partitions
-      soc/tegra: pmc: Remove additional check for a valid partition
-      soc/tegra: pmc: Ensure GPU partition can be toggled on/off by PMC
-      soc/tegra: pmc: Wait for powergate state to change
-      dt-bindings: Update NVIDIA PMC for Tegra
+ARM: tegra: Devicetree changes for v4.6-rc1
 
- .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  12 +-
- arch/arm/mach-tegra/platsmp.c                      |  16 +--
- drivers/gpu/drm/tegra/drm.h                        |   2 +-
- drivers/soc/tegra/pmc.c                            | 150 +++++++++++++--------
- include/soc/tegra/pmc.h                            |  35 ++---
- 5 files changed, 124 insertions(+), 91 deletions(-)
+These patches clean up some of the 32-bit ARM device tree files and
+remove redundant Kconfig dependencies.
+
+----------------------------------------------------------------
+Maarten Lankhorst (1):
+      ARM: tegra: Enable watchdog support for Tegra114 and Tegra124
+
+Masahiro Yamada (1):
+      ARM: tegra: Remove redundant ARM_L1_CACHE_SHIFT_6 select
+
+Ralf Ramsauer (2):
+      ARM: tegra: Fix copy/paste typo in several DTS includes
+      ARM: tegra: Add high speed UARTs to Jetson TK1 device tree
+
+Sudeep Holla (1):
+      ARM: tegra: Replace legacy *,wakeup property with wakeup-source
+
+ arch/arm/boot/dts/tegra114-dalmore.dts        |  2 +-
+ arch/arm/boot/dts/tegra114-roth.dts           |  2 +-
+ arch/arm/boot/dts/tegra114-tn7.dts            |  2 +-
+ arch/arm/boot/dts/tegra114.dtsi               |  4 ++--
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts     | 28 ++++++++++++++++++++++++++-
+ arch/arm/boot/dts/tegra124-nyan.dtsi          |  4 ++--
+ arch/arm/boot/dts/tegra124-venice2.dts        |  2 +-
+ arch/arm/boot/dts/tegra124.dtsi               |  4 ++--
+ arch/arm/boot/dts/tegra20-harmony.dts         |  2 +-
+ arch/arm/boot/dts/tegra20-paz00.dts           |  2 +-
+ arch/arm/boot/dts/tegra20-seaboard.dts        |  4 ++--
+ arch/arm/boot/dts/tegra20-trimslice.dts       |  2 +-
+ arch/arm/boot/dts/tegra20-ventana.dts         |  2 +-
+ arch/arm/boot/dts/tegra20-whistler.dts        |  2 +-
+ arch/arm/boot/dts/tegra20.dtsi                |  2 +-
+ arch/arm/boot/dts/tegra30-apalis-eval.dts     |  2 +-
+ arch/arm/boot/dts/tegra30-cardhu.dtsi         |  2 +-
+ arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |  2 +-
+ arch/arm/boot/dts/tegra30.dtsi                |  2 +-
+ drivers/soc/tegra/Kconfig                     |  2 --
+ 20 files changed, 49 insertions(+), 25 deletions(-)
