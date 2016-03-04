@@ -1,463 +1,163 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 4 Mar 2016 14:37:32 +0800
-Subject: [PATCH v5 14/17] XEN: EFI: Move x86 specific codes to architecture
- directory
-In-Reply-To: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1457073455-11516-15-git-send-email-zhaoshenglong@huawei.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 4 Mar 2016 14:59:39 +0800
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <20160304020232.GA12036@js1304-P5Q-DELUXE>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
+Message-ID: <56D9325B.9060709@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On 2016/3/4 10:02, Joonsoo Kim wrote:
+> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
+>> On 2016/3/3 15:42, Joonsoo Kim wrote:
+>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+>>>> (cc -mm and Joonsoo Kim)
+>>>>
+>>>>
+>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+>>>>> Hi,
+>>>>>
+>>>>> I came across a suspicious error for CMA stress test:
+>>>>>
+>>>>> Before the test, I got:
+>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>>> CmaTotal:         204800 kB
+>>>>> CmaFree:          195044 kB
+>>>>>
+>>>>>
+>>>>> After running the test:
+>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>>> CmaTotal:         204800 kB
+>>>>> CmaFree:         6602584 kB
+>>>>>
+>>>>> So the freed CMA memory is more than total..
+>>>>>
+>>>>> Also the the MemFree is more than mem total:
+>>>>>
+>>>>> -bash-4.3# cat /proc/meminfo
+>>>>> MemTotal:       16342016 kB
+>>>>> MemFree:        22367268 kB
+>>>>> MemAvailable:   22370528 kB
+>> [...]
+>>>> I played with this a bit and can see the same problem. The sanity
+>>>> check of CmaFree < CmaTotal generally triggers in
+>>>> __move_zone_freepage_state in unset_migratetype_isolate.
+>>>> This also seems to be present as far back as v4.0 which was the
+>>>> first version to have the updated accounting from Joonsoo.
+>>>> Were there known limitations with the new freepage accounting,
+>>>> Joonsoo?
+>>> I don't know. I also played with this and looks like there is
+>>> accounting problem, however, for my case, number of free page is slightly less
+>>> than total. I will take a look.
+>>>
+>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+>>> look like your case.
+>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+>> did some other test:
+> Thanks! Now, I can re-generate erronous situation you mentioned.
+>
+>>  - run with single thread with 100000 times, everything is fine.
+>>
+>>  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+>>    the same test with 100 multi-thread, then I got:
+> [1] would not be sufficient to close this race.
+>
+> Try following things [A]. And, for more accurate test, I changed code a bit more
+> to prevent kernel page allocation from cma area [B]. This will prevent kernel
+> page allocation from cma area completely so we can focus cma_alloc/release race.
+>
+> Although, this is not correct fix, it could help that we can guess
+> where the problem is.
+>
+> Thanks.
+>
+> [A]
+> diff --git a/mm/cma.c b/mm/cma.c
+> index c003274..43ed02d 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -496,7 +496,9 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
+>  
+>         VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
+>  
+> +       mutex_lock(&cma_mutex);
+>         free_contig_range(pfn, count);
+> +       mutex_unlock(&cma_mutex);
+>         cma_clear_bitmap(cma, pfn, count);
+>         trace_cma_release(pfn, pages, count);
+>  
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index c6c38ed..1ce8a59 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -2192,7 +2192,8 @@ void free_hot_cold_page(struct page *page, bool cold)
+>          * excessively into the page allocator
+>          */
+>         if (migratetype >= MIGRATE_PCPTYPES) {
+> -               if (unlikely(is_migrate_isolate(migratetype))) {
+> +               if (is_migrate_cma(migratetype) ||
+> +                       unlikely(is_migrate_isolate(migratetype))) {
+>                         free_one_page(zone, page, pfn, 0, migratetype);
+>                         goto out;
+>                 }
 
-Move x86 specific codes to architecture directory and export those EFI
-runtime service functions. This will be useful for initializing runtime
-service on ARM later.
+As I replied in previous email, the solution will fix the problem, the Cma freed memory and
+system freed memory is in sane state after apply above patch.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/x86/xen/efi.c    | 112 ++++++++++++++++++++++++++++++++
- drivers/xen/efi.c     | 174 ++++++++++----------------------------------------
- include/xen/xen-ops.h |  30 ++++++---
- 3 files changed, 168 insertions(+), 148 deletions(-)
+I also tested this situation which only apply the code below:
 
-diff --git a/arch/x86/xen/efi.c b/arch/x86/xen/efi.c
-index be14cc3..86527f1 100644
---- a/arch/x86/xen/efi.c
-+++ b/arch/x86/xen/efi.c
-@@ -20,10 +20,122 @@
- #include <linux/init.h>
- #include <linux/string.h>
- 
-+#include <xen/xen.h>
- #include <xen/xen-ops.h>
-+#include <xen/interface/platform.h>
- 
- #include <asm/page.h>
- #include <asm/setup.h>
-+#include <asm/xen/hypercall.h>
-+
-+static efi_char16_t vendor[100] __initdata;
-+
-+static efi_system_table_t efi_systab_xen __initdata = {
-+	.hdr = {
-+		.signature	= EFI_SYSTEM_TABLE_SIGNATURE,
-+		.revision	= 0, /* Initialized later. */
-+		.headersize	= 0, /* Ignored by Linux Kernel. */
-+		.crc32		= 0, /* Ignored by Linux Kernel. */
-+		.reserved	= 0
-+	},
-+	.fw_vendor	= EFI_INVALID_TABLE_ADDR, /* Initialized later. */
-+	.fw_revision	= 0,			  /* Initialized later. */
-+	.con_in_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
-+	.con_in		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
-+	.con_out_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
-+	.con_out	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
-+	.stderr_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
-+	.stderr		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
-+	.runtime	= (efi_runtime_services_t *)EFI_INVALID_TABLE_ADDR,
-+						  /* Not used under Xen. */
-+	.boottime	= (efi_boot_services_t *)EFI_INVALID_TABLE_ADDR,
-+						  /* Not used under Xen. */
-+	.nr_tables	= 0,			  /* Initialized later. */
-+	.tables		= EFI_INVALID_TABLE_ADDR  /* Initialized later. */
-+};
-+
-+static const struct efi efi_xen __initconst = {
-+	.systab                   = NULL, /* Initialized later. */
-+	.runtime_version	  = 0,    /* Initialized later. */
-+	.mps                      = EFI_INVALID_TABLE_ADDR,
-+	.acpi                     = EFI_INVALID_TABLE_ADDR,
-+	.acpi20                   = EFI_INVALID_TABLE_ADDR,
-+	.smbios                   = EFI_INVALID_TABLE_ADDR,
-+	.smbios3                  = EFI_INVALID_TABLE_ADDR,
-+	.sal_systab               = EFI_INVALID_TABLE_ADDR,
-+	.boot_info                = EFI_INVALID_TABLE_ADDR,
-+	.hcdp                     = EFI_INVALID_TABLE_ADDR,
-+	.uga                      = EFI_INVALID_TABLE_ADDR,
-+	.uv_systab                = EFI_INVALID_TABLE_ADDR,
-+	.fw_vendor                = EFI_INVALID_TABLE_ADDR,
-+	.runtime                  = EFI_INVALID_TABLE_ADDR,
-+	.config_table             = EFI_INVALID_TABLE_ADDR,
-+	.get_time                 = xen_efi_get_time,
-+	.set_time                 = xen_efi_set_time,
-+	.get_wakeup_time          = xen_efi_get_wakeup_time,
-+	.set_wakeup_time          = xen_efi_set_wakeup_time,
-+	.get_variable             = xen_efi_get_variable,
-+	.get_next_variable        = xen_efi_get_next_variable,
-+	.set_variable             = xen_efi_set_variable,
-+	.query_variable_info      = xen_efi_query_variable_info,
-+	.update_capsule           = xen_efi_update_capsule,
-+	.query_capsule_caps       = xen_efi_query_capsule_caps,
-+	.get_next_high_mono_count = xen_efi_get_next_high_mono_count,
-+	.reset_system             = NULL, /* Functionality provided by Xen. */
-+	.set_virtual_address_map  = NULL, /* Not used under Xen. */
-+	.memmap                   = NULL, /* Not used under Xen. */
-+	.flags			  = 0     /* Initialized later. */
-+};
-+
-+static efi_system_table_t __init *xen_efi_probe(void)
-+{
-+	struct xen_platform_op op = {
-+		.cmd = XENPF_firmware_info,
-+		.u.firmware_info = {
-+			.type = XEN_FW_EFI_INFO,
-+			.index = XEN_FW_EFI_CONFIG_TABLE
-+		}
-+	};
-+	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
-+
-+	if (!xen_initial_domain() || HYPERVISOR_platform_op(&op) < 0)
-+		return NULL;
-+
-+	/* Here we know that Xen runs on EFI platform. */
-+
-+	efi = efi_xen;
-+
-+	efi_systab_xen.tables = info->cfg.addr;
-+	efi_systab_xen.nr_tables = info->cfg.nent;
-+
-+	op.cmd = XENPF_firmware_info;
-+	op.u.firmware_info.type = XEN_FW_EFI_INFO;
-+	op.u.firmware_info.index = XEN_FW_EFI_VENDOR;
-+	info->vendor.bufsz = sizeof(vendor);
-+	set_xen_guest_handle(info->vendor.name, vendor);
-+
-+	if (HYPERVISOR_platform_op(&op) == 0) {
-+		efi_systab_xen.fw_vendor = __pa_symbol(vendor);
-+		efi_systab_xen.fw_revision = info->vendor.revision;
-+	} else
-+		efi_systab_xen.fw_vendor = __pa_symbol(L"UNKNOWN");
-+
-+	op.cmd = XENPF_firmware_info;
-+	op.u.firmware_info.type = XEN_FW_EFI_INFO;
-+	op.u.firmware_info.index = XEN_FW_EFI_VERSION;
-+
-+	if (HYPERVISOR_platform_op(&op) == 0)
-+		efi_systab_xen.hdr.revision = info->version;
-+
-+	op.cmd = XENPF_firmware_info;
-+	op.u.firmware_info.type = XEN_FW_EFI_INFO;
-+	op.u.firmware_info.index = XEN_FW_EFI_RT_VERSION;
-+
-+	if (HYPERVISOR_platform_op(&op) == 0)
-+		efi.runtime_version = info->version;
-+
-+	return &efi_systab_xen;
-+}
- 
- void __init xen_efi_init(void)
- {
-diff --git a/drivers/xen/efi.c b/drivers/xen/efi.c
-index be7e56a..22f71ff 100644
---- a/drivers/xen/efi.c
-+++ b/drivers/xen/efi.c
-@@ -38,7 +38,7 @@
- 
- #define efi_data(op)	(op.u.efi_runtime_call)
- 
--static efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
-+efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(get_time);
- 
-@@ -59,8 +59,9 @@ static efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_get_time);
- 
--static efi_status_t xen_efi_set_time(efi_time_t *tm)
-+efi_status_t xen_efi_set_time(efi_time_t *tm)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(set_time);
- 
-@@ -72,10 +73,10 @@ static efi_status_t xen_efi_set_time(efi_time_t *tm)
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_set_time);
- 
--static efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled,
--					    efi_bool_t *pending,
--					    efi_time_t *tm)
-+efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled, efi_bool_t *pending,
-+				     efi_time_t *tm)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(get_wakeup_time);
- 
-@@ -95,8 +96,9 @@ static efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled,
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_get_wakeup_time);
- 
--static efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
-+efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(set_wakeup_time);
- 
-@@ -113,12 +115,11 @@ static efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_set_wakeup_time);
- 
--static efi_status_t xen_efi_get_variable(efi_char16_t *name,
--					 efi_guid_t *vendor,
--					 u32 *attr,
--					 unsigned long *data_size,
--					 void *data)
-+efi_status_t xen_efi_get_variable(efi_char16_t *name, efi_guid_t *vendor,
-+				  u32 *attr, unsigned long *data_size,
-+				  void *data)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(get_variable);
- 
-@@ -138,10 +139,11 @@ static efi_status_t xen_efi_get_variable(efi_char16_t *name,
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_get_variable);
- 
--static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
--					      efi_char16_t *name,
--					      efi_guid_t *vendor)
-+efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
-+				       efi_char16_t *name,
-+				       efi_guid_t *vendor)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(get_next_variable_name);
- 
-@@ -161,12 +163,11 @@ static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_get_next_variable);
- 
--static efi_status_t xen_efi_set_variable(efi_char16_t *name,
--					 efi_guid_t *vendor,
--					 u32 attr,
--					 unsigned long data_size,
--					 void *data)
-+efi_status_t xen_efi_set_variable(efi_char16_t *name, efi_guid_t *vendor,
-+				 u32 attr, unsigned long data_size,
-+				 void *data)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(set_variable);
- 
-@@ -183,11 +184,11 @@ static efi_status_t xen_efi_set_variable(efi_char16_t *name,
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_set_variable);
- 
--static efi_status_t xen_efi_query_variable_info(u32 attr,
--						u64 *storage_space,
--						u64 *remaining_space,
--						u64 *max_variable_size)
-+efi_status_t xen_efi_query_variable_info(u32 attr, u64 *storage_space,
-+					 u64 *remaining_space,
-+					 u64 *max_variable_size)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(query_variable_info);
- 
-@@ -205,8 +206,9 @@ static efi_status_t xen_efi_query_variable_info(u32 attr,
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_query_variable_info);
- 
--static efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
-+efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(get_next_high_monotonic_count);
- 
-@@ -217,10 +219,10 @@ static efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_get_next_high_mono_count);
- 
--static efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
--					   unsigned long count,
--					   unsigned long sg_list)
-+efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
-+				    unsigned long count, unsigned long sg_list)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(update_capsule);
- 
-@@ -237,11 +239,11 @@ static efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
- 
- 	return efi_data(op).status;
- }
-+EXPORT_SYMBOL_GPL(xen_efi_update_capsule);
- 
--static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
--					       unsigned long count,
--					       u64 *max_size,
--					       int *reset_type)
-+efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
-+					unsigned long count, u64 *max_size,
-+					int *reset_type)
- {
- 	struct xen_platform_op op = INIT_EFI_OP(query_capsule_capabilities);
- 
-@@ -260,112 +262,4 @@ static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
- 
- 	return efi_data(op).status;
- }
--
--static efi_char16_t vendor[100] __initdata;
--
--static efi_system_table_t efi_systab_xen __initdata = {
--	.hdr = {
--		.signature	= EFI_SYSTEM_TABLE_SIGNATURE,
--		.revision	= 0, /* Initialized later. */
--		.headersize	= 0, /* Ignored by Linux Kernel. */
--		.crc32		= 0, /* Ignored by Linux Kernel. */
--		.reserved	= 0
--	},
--	.fw_vendor	= EFI_INVALID_TABLE_ADDR, /* Initialized later. */
--	.fw_revision	= 0,			  /* Initialized later. */
--	.con_in_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
--	.con_in		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
--	.con_out_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
--	.con_out	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
--	.stderr_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
--	.stderr		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
--	.runtime	= (efi_runtime_services_t *)EFI_INVALID_TABLE_ADDR,
--						  /* Not used under Xen. */
--	.boottime	= (efi_boot_services_t *)EFI_INVALID_TABLE_ADDR,
--						  /* Not used under Xen. */
--	.nr_tables	= 0,			  /* Initialized later. */
--	.tables		= EFI_INVALID_TABLE_ADDR  /* Initialized later. */
--};
--
--static const struct efi efi_xen __initconst = {
--	.systab                   = NULL, /* Initialized later. */
--	.runtime_version	  = 0,    /* Initialized later. */
--	.mps                      = EFI_INVALID_TABLE_ADDR,
--	.acpi                     = EFI_INVALID_TABLE_ADDR,
--	.acpi20                   = EFI_INVALID_TABLE_ADDR,
--	.smbios                   = EFI_INVALID_TABLE_ADDR,
--	.smbios3                  = EFI_INVALID_TABLE_ADDR,
--	.sal_systab               = EFI_INVALID_TABLE_ADDR,
--	.boot_info                = EFI_INVALID_TABLE_ADDR,
--	.hcdp                     = EFI_INVALID_TABLE_ADDR,
--	.uga                      = EFI_INVALID_TABLE_ADDR,
--	.uv_systab                = EFI_INVALID_TABLE_ADDR,
--	.fw_vendor                = EFI_INVALID_TABLE_ADDR,
--	.runtime                  = EFI_INVALID_TABLE_ADDR,
--	.config_table             = EFI_INVALID_TABLE_ADDR,
--	.get_time                 = xen_efi_get_time,
--	.set_time                 = xen_efi_set_time,
--	.get_wakeup_time          = xen_efi_get_wakeup_time,
--	.set_wakeup_time          = xen_efi_set_wakeup_time,
--	.get_variable             = xen_efi_get_variable,
--	.get_next_variable        = xen_efi_get_next_variable,
--	.set_variable             = xen_efi_set_variable,
--	.query_variable_info      = xen_efi_query_variable_info,
--	.update_capsule           = xen_efi_update_capsule,
--	.query_capsule_caps       = xen_efi_query_capsule_caps,
--	.get_next_high_mono_count = xen_efi_get_next_high_mono_count,
--	.reset_system             = NULL, /* Functionality provided by Xen. */
--	.set_virtual_address_map  = NULL, /* Not used under Xen. */
--	.memmap                   = NULL, /* Not used under Xen. */
--	.flags			  = 0     /* Initialized later. */
--};
--
--efi_system_table_t __init *xen_efi_probe(void)
--{
--	struct xen_platform_op op = {
--		.cmd = XENPF_firmware_info,
--		.u.firmware_info = {
--			.type = XEN_FW_EFI_INFO,
--			.index = XEN_FW_EFI_CONFIG_TABLE
--		}
--	};
--	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
--
--	if (!xen_initial_domain() || HYPERVISOR_platform_op(&op) < 0)
--		return NULL;
--
--	/* Here we know that Xen runs on EFI platform. */
--
--	efi = efi_xen;
--
--	efi_systab_xen.tables = info->cfg.addr;
--	efi_systab_xen.nr_tables = info->cfg.nent;
--
--	op.cmd = XENPF_firmware_info;
--	op.u.firmware_info.type = XEN_FW_EFI_INFO;
--	op.u.firmware_info.index = XEN_FW_EFI_VENDOR;
--	info->vendor.bufsz = sizeof(vendor);
--	set_xen_guest_handle(info->vendor.name, vendor);
--
--	if (HYPERVISOR_platform_op(&op) == 0) {
--		efi_systab_xen.fw_vendor = __pa_symbol(vendor);
--		efi_systab_xen.fw_revision = info->vendor.revision;
--	} else
--		efi_systab_xen.fw_vendor = __pa_symbol(L"UNKNOWN");
--
--	op.cmd = XENPF_firmware_info;
--	op.u.firmware_info.type = XEN_FW_EFI_INFO;
--	op.u.firmware_info.index = XEN_FW_EFI_VERSION;
--
--	if (HYPERVISOR_platform_op(&op) == 0)
--		efi_systab_xen.hdr.revision = info->version;
--
--	op.cmd = XENPF_firmware_info;
--	op.u.firmware_info.type = XEN_FW_EFI_INFO;
--	op.u.firmware_info.index = XEN_FW_EFI_RT_VERSION;
--
--	if (HYPERVISOR_platform_op(&op) == 0)
--		efi.runtime_version = info->version;
--
--	return &efi_systab_xen;
--}
-+EXPORT_SYMBOL_GPL(xen_efi_query_capsule_caps);
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index 072be1c..3491582 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -90,14 +90,28 @@ int xen_xlate_map_ballooned_pages(xen_pfn_t **pfns, void **vaddr,
- 
- bool xen_running_on_version_or_later(unsigned int major, unsigned int minor);
- 
--#ifdef CONFIG_XEN_EFI
--extern efi_system_table_t *xen_efi_probe(void);
--#else
--static inline efi_system_table_t __init *xen_efi_probe(void)
--{
--	return NULL;
--}
--#endif
-+efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc);
-+efi_status_t xen_efi_set_time(efi_time_t *tm);
-+efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled, efi_bool_t *pending,
-+				     efi_time_t *tm);
-+efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm);
-+efi_status_t xen_efi_get_variable(efi_char16_t *name, efi_guid_t *vendor,
-+				  u32 *attr, unsigned long *data_size,
-+				  void *data);
-+efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
-+				       efi_char16_t *name, efi_guid_t *vendor);
-+efi_status_t xen_efi_set_variable(efi_char16_t *name, efi_guid_t *vendor,
-+				  u32 attr, unsigned long data_size,
-+				  void *data);
-+efi_status_t xen_efi_query_variable_info(u32 attr, u64 *storage_space,
-+					 u64 *remaining_space,
-+					 u64 *max_variable_size);
-+efi_status_t xen_efi_get_next_high_mono_count(u32 *count);
-+efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
-+				    unsigned long count, unsigned long sg_list);
-+efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
-+					unsigned long count, u64 *max_size,
-+					int *reset_type);
- 
- #ifdef CONFIG_PREEMPT
- 
--- 
-2.0.4
+        if (migratetype >= MIGRATE_PCPTYPES) {
+-               if (unlikely(is_migrate_isolate(migratetype))) {
++               if (is_migrate_cma(migratetype) ||
++                       unlikely(is_migrate_isolate(migratetype))) {
+                        free_one_page(zone, page, pfn, 0, migratetype);
+                        goto out;
+                }
+
+
+This will not fix the problem, but will reduce the errorous freed number of memory,
+hope this helps.
+
+>
+>
+> [B]
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index f2dccf9..c6c38ed 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -1493,6 +1493,7 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+>                                                                 int alloc_flags)
+>  {
+>         int i;
+> +       bool cma = false;
+>  
+>         for (i = 0; i < (1 << order); i++) {
+>                 struct page *p = page + i;
+> @@ -1500,6 +1501,9 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+>                         return 1;
+>         }
+>  
+> +       if (is_migrate_cma(get_pcppage_migratetype(page)))
+> +               cma = true;
+> +
+>         set_page_private(page, 0);
+>         set_page_refcounted(page);
+>  
+> @@ -1528,6 +1532,12 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+>         else
+>                 clear_page_pfmemalloc(page);
+>  
+> +       if (cma) {
+> +               page_ref_dec(page);
+
+mm/page_alloc.c: In function ?prep_new_page?:
+mm/page_alloc.c:1407:3: error: implicit declaration of function ?page_ref_dec? [-Werror=implicit-function-declaration]
+   page_ref_dec(page);
+   ^
+
+Typo?
+
+Thanks
+Hanjun
