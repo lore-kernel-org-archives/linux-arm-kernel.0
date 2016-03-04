@@ -1,23 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Mar 2016 18:12:57 +0000
-Subject: [PATCH] arm64: efi: add missing frame pointer assignment
-In-Reply-To: <1457022692-14043-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1457022692-14043-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160304181257.GC13403@e104818-lin.cambridge.arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 04 Mar 2016 13:15:37 -0500
+Subject: [PATCH v2 2/5] arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
+In-Reply-To: <20160304145927.GD31115@leverpostej>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+ <1454684330-892-3-git-send-email-james.morse@arm.com>
+ <56D87B74.1010306@codeaurora.org> <56D88219.6040806@arm.com>
+ <56D88A6C.8070304@codeaurora.org> <20160304145927.GD31115@leverpostej>
+Message-ID: <C8C84389-B923-45F8-8141-E69640E259E6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 05:31:32PM +0100, Ard Biesheuvel wrote:
-> The prologue of the EFI entry point pushes x29 and x30 onto the stack but
-> fails to create the stack frame correctly by omitting the assignment of x29
-> to the new value of the stack pointer. So fix that.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi-entry.S | 1 +
->  1 file changed, 1 insertion(+)
 
-Applied. Thanks.
+
+On March 4, 2016 9:59:28 AM EST, Mark Rutland <mark.rutland@arm.com> wrote:
+>On Thu, Mar 03, 2016 at 02:03:08PM -0500, Christopher Covington wrote:
+>> On 03/03/2016 01:27 PM, Robin Murphy wrote:
+>> > On 03/03/16 17:59, Christopher Covington wrote:
+>> 
+>> >>> --- a/arch/arm64/kernel/cpuinfo.c
+>> >>> +++ b/arch/arm64/kernel/cpuinfo.c
+>> >>> @@ -210,6 +210,7 @@ static void __cpuinfo_store_cpu(struct
+>> >>> cpuinfo_arm64 *info)
+>> >>>       info->reg_id_aa64isar1 = read_cpuid(SYS_ID_AA64ISAR1_EL1);
+>> >>>       info->reg_id_aa64mmfr0 = read_cpuid(SYS_ID_AA64MMFR0_EL1);
+>> >>>       info->reg_id_aa64mmfr1 = read_cpuid(SYS_ID_AA64MMFR1_EL1);
+>> >>> +    info->reg_id_aa64mmfr2 = read_cpuid(SYS_ID_AA64MMFR2_EL1);
+>> >>>       info->reg_id_aa64pfr0 = read_cpuid(SYS_ID_AA64PFR0_EL1);
+>> >>>       info->reg_id_aa64pfr1 = read_cpuid(SYS_ID_AA64PFR1_EL1);
+>> >>
+>> >> swapper[0]: undefined instruction: pc=ffffff800808d730
+>> >> Code: d5380702 d5380721 f9017c02 f9018001 (d5380742)
+>> >> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
+>> >> Modules linked in:
+>> >> CPU: 0 PID: 0 Comm: swapper Not tainted 4.5.0-rc6-next-20160303 #1
+>> >> Hardware name: (null) (DT)
+>> >> task: ffffff8008b2d980 ti: ffffff8008b20000 task.ti:
+>ffffff8008b20000
+>> >> PC is at __cpuinfo_store_cpu+0x68/0x198
+>> >> LR is at cpuinfo_store_boot_cpu+0x28/0x50
+>> >>
+>> >> ffffff800808d730:       d5380742        mrs     x2, s3_0_c0_c7_2
+>> > 
+>> > Hmm, per table C5-6 in the ARMv8 ARM (issue i), that's specifically
+>a
+>> > reserved encoding, rather than an unallocated one, so it should
+>read as
+>> > zero, not undef. What are you running on?
+>> 
+>> QDF2432. I'll investigate.
+>
+>Just to check, I take it you're running natively, and not under a
+>hypervisor?
+
+Yes this was running natively. I haven't yet been able to confirm things, but I'll let you know when I do.
+
+Cov
 
 -- 
-Catalin
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
+
+Sent from my Snapdragon powered Android device with K-9 Mail. Please excuse my brevity.
