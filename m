@@ -1,92 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Mar 2016 15:41:58 +0100
-Subject: DWord alignment on ARMv7
-In-Reply-To: <20160304134651.GB19428@n2100.arm.linux.org.uk>
-References: <56D8BA3F.7050508@pengutronix.de> <72900410.JPa1IHPXo5@wuerfel>
- <20160304134651.GB19428@n2100.arm.linux.org.uk>
-Message-ID: <2494410.DJhrOHD4yE@wuerfel>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Fri, 04 Mar 2016 09:52:15 -0500
+Subject: [PATCH v6 4/6] watchdog: pnx4008: restart: support "cmd" from
+ userspace
+In-Reply-To: <56D98FD2.7040403@roeck-us.net>
+References: <1457040025-1108-1-git-send-email-slemieux.tyco@gmail.com>
+ <1457040025-1108-5-git-send-email-slemieux.tyco@gmail.com>
+ <56D98FD2.7040403@roeck-us.net>
+Message-ID: <1457103135.4541.0.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 March 2016 13:46:51 Russell King - ARM Linux wrote:
-> On Fri, Mar 04, 2016 at 02:30:23PM +0100, Arnd Bergmann wrote:
-> > Ah, I thought it only required 32-bit alignment like ldm/stm, but it
-> > seems that it won't do that. However, an implementation like
-> > 
-> > unsigned long long get_unaligned_u64(void *p)
-> > {
-> >         unsigned long long upper, lower;
-> >         lower = *(unsigned long*)p;
-> >         upper = *(unsigned long*)(p+4);
-> > 
-> >         return lower | (upper << 32);
-> > }
-> > 
-> > does get compiled into
-> > 
-> > 00000000 <f>:
-> >    0:   e8900003        ldm     r0, {r0, r1}
-> >    4:   e12fff1e        bx      lr
+On Fri, 2016-03-04 at 05:38 -0800, Guenter Roeck wrote:
+> On 03/03/2016 01:20 PM, Sylvain Lemieux wrote:
+> > From: Sylvain Lemieux <slemieux@tycoint.com>
+> >
+> > Added support to verify if a "cmd" is passed from the userspace program rebooting the system;
+> > - if a valid "cmd" is available, handle it;
+> > - If the received "cmd" is not supported, use the default reboot mode.
+> >
+> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> > ---
+> > Changes from v5 to v6:
+> > - remove typecast.
+> >
+> > Changes from v4 to v5:
+> > - no logical change; updated to work with new revision of patch #2.
+> >
+> > Changes from v3 to v4:
+> > - none.
+> >
+> > Changes from v2 to v3:
+> > - no logical change; updated to work with new revision of patch #2.
+> >
+> > Changes from v1 to v2:
+> > - Rename patch title;
+> >    was "arm: lpc32xx: restart: support "cmd" from userspace"
+> > - Add change to "pnx-4008" driver instead of "mach-lpc32xx".
+> >
+> >   drivers/watchdog/pnx4008_wdt.c | 15 +++++++++++++++
+> >   1 file changed, 15 insertions(+)
+> >
+> > diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+> > index 51be66e..4162135 100644
+> > --- a/drivers/watchdog/pnx4008_wdt.c
+> > +++ b/drivers/watchdog/pnx4008_wdt.c
+> > @@ -129,6 +129,21 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+> >   static int pnx4008_restart_handler(struct watchdog_device *wdd,
+> >   				   unsigned long mode, void *cmd)
+> >   {
+> > +	const char *boot_cmd = (const char *)cmd;
 > 
-> I think it may be something of a bitch to work around, because the
-> compiler is going to do stuff like that behind your back.
+> This typecast is unnecessary.
 > 
-> The only way around that would be to bypass the compiler by using
-> asm(), but then you end up bypassing the instruction scheduling too.
-> That may not matter, as the resulting overhead may still be lower.
+> Guenter
 
-I think the compiler is correctly optimizing the code according to
-what we tell it about the alignment here: the ABI explicitly specifies
-that variables are naturally aligned, so whenever we dereference
-a 32-bit pointer that is not __packed, it should assume it can safely
-use any instruction that requires this alignment. This is essentially
-what get_unaligned() is designed to work around, when we have
-data that is known to be possibly misaligned.
+OK; will send a new revision later today.
 
-Simply using the generic implementation from before 0567f5facbd
-("asm-generic: allow generic unaligned access if the arch supports it")
-solves the problem, as we explicitly tell the compiler about the
-fact that data is unaligned and let it do the right thing (bytewise
-access on ARMv5 or lower, normal access except ldm and ldlr on
-later architectures).
-
-The implementation appears to be suboptimal for cross-endian loads
-though, as gcc-5.3 does not use the 'rev' instruction here but
-falls back on byte accesses. We can easily fix that by introducing
-one more generic implementation for the cross-endian accesses doing
-
-static __always_inline void put_unaligned_be64(u64 val, void *p)
-{
-       __put_unaligned_cpu64((u64 __force)cpu_to_be64(val), p);
-}
-static __always_inline void put_unaligned_be32(u32 val, void *p)
-{
-       __put_unaligned_cpu32((u32 __force)cpu_to_be32(val), p);
-}
-static __always_inline void put_unaligned_be16(u16 val, void *p)
-{
-       __put_unaligned_cpu16((u16 __force)cpu_to_be16(val), p);
-}
-
-which is better on ARM than the currently used
-
-static inline void __put_unaligned_le16(u16 val, u8 *p)
-{
-        *p++ = val;
-        *p++ = val >> 8;
-}
-static inline void __put_unaligned_le32(u32 val, u8 *p)
-{
-        __put_unaligned_le16(val >> 16, p + 2);
-        __put_unaligned_le16(val, p);
-}
-static inline void __put_unaligned_le64(u64 val, u8 *p)
-{
-        __put_unaligned_le32(val >> 32, p + 4);
-        __put_unaligned_le32(val, p);
-}
-
-because it will allow using ldr/str+rev for unaligned
-cross-endian accesses, but disallow ldm/stm+rev.
-
-	Arnd
+Sylvain
+> 
+> > +
+> > +	/*
+> > +	 * Verify if a "cmd" passed from the userspace program rebooting
+> > +	 * the system; if available, handle it.
+> > +	 * - For details, see the 'reboot' syscall in kernel/reboot.c
+> > +	 * - If the received "cmd" is not supported, use the default mode.
+> > +	 */
+> > +	if (boot_cmd) {
+> > +		if (boot_cmd[0] == 'h')
+> > +			mode = REBOOT_HARD;
+> > +		else if (boot_cmd[0] == 's')
+> > +			mode = REBOOT_SOFT;
+> > +	}
+> > +
+> >   	if (mode == REBOOT_SOFT) {
+> >   		/* Force match output active */
+> >   		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
+> >
+> 
