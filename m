@@ -1,99 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 4 Mar 2016 16:38:14 +0000
-Subject: [PATCH v10 11/12] arm64: factor work_pending state machine to C
-In-Reply-To: <1456949376-4910-12-git-send-email-cmetcalf@ezchip.com>
-References: <1456949376-4910-1-git-send-email-cmetcalf@ezchip.com>
- <1456949376-4910-12-git-send-email-cmetcalf@ezchip.com>
-Message-ID: <20160304163814.GD7886@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Mar 2016 16:38:54 +0000
+Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue
+ bits when just one is being checked
+In-Reply-To: <56D9B54B.8020309@boundarydevices.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-7-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18550FD3A944783B88BEDB64FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <56D9B54B.8020309@boundarydevices.com>
+Message-ID: <20160304163854.GD19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-On Wed, Mar 02, 2016 at 03:09:35PM -0500, Chris Metcalf wrote:
-> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
-> state machine that can be difficult to reason about due to duplicated
-> code and a large number of branch targets.
+On Fri, Mar 04, 2016 at 09:18:19AM -0700, Troy Kisky wrote:
+> On 3/4/2016 2:11 AM, Fugang Duan wrote:
+> > From: Troy Kisky <troy.kisky@boundarydevices.com>Sent: Thursday, February 25, 2016 8:37 AM
+> >> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
+> >> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
+> >> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+> >> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
+> >> johannes at sipsolutions.net; stillcompiling at gmail.com;
+> >> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
+> >> <troy.kisky@boundarydevices.com>
+> >> Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue bits when
+> >> just one is being checked
+> >>
+> >> FEC_ENET_RXF is 3 separate bits, we only check one queue at a time. So, when
+> >> the last queue is being checked, it is bad to remove the interrupt on the 1st
+> >> queue.
+> >>
+> >> Also, since this is now done in the napi routine and not the interrupt, it is not
+> >> needed.
+> >>
+> >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> >> ---
+> >>  drivers/net/ethernet/freescale/fec_main.c | 2 --
+> >>  1 file changed, 2 deletions(-)
+> >>
+> >> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> >> b/drivers/net/ethernet/freescale/fec_main.c
+> >> index 610cf6c..791f385 100644
+> >> --- a/drivers/net/ethernet/freescale/fec_main.c
+> >> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> >> @@ -1338,8 +1338,6 @@ static int fec_rxq(struct net_device *ndev, struct
+> >> fec_enet_private *fep,
+> >>  			break;
+> >>  		pkt_received++;
+> >>
+> >> -		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
+> >> -
+> > 
+> > We should clear the related rx queue ievent, not remove the code.
+> > Pls see commit: db3421c114cf that was submitted by Russell King.
+> > 
+> > No ack the patch.
 > 
-> This patch factors the common logic out into the existing
-> do_notify_resume function, converting the code to C in the process,
-> making the code more legible.
 > 
-> This patch tries to closely mirror the existing behaviour while using
-> the usual C control flow primitives. As local_irq_{disable,enable} may
-> be instrumented, we balance exception entry (where we will almost most
-> likely enable IRQs) with a call to trace_hardirqs_on just before the
-> return to userspace.
+> This is now done in patch #4 "net: fec: reduce interrupts" and you could argue
+> that it should be squashed into that patch. But I like separating changes
+> as much as possible.
+> 
+> 
+> Russell, this patch and patch #4 will likely need your ack before it will be applied.
+> Can you take a look please?
 
-[...]
+I stopped caring about the FEC ethernet driver about 18 months ago,
+after I ended up dropping a significant pile of fixes on the floor
+through the huge number of conflicts and the shere effort of
+constantly trying to move them forward.
 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 1f7f5a2b61bf..966d0d4308f2 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -674,18 +674,13 @@ ret_fast_syscall_trace:
->   * Ok, we need to do extra processing, enter the slow path.
->   */
->  work_pending:
-> -	tbnz	x1, #TIF_NEED_RESCHED, work_resched
-> -	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
->  	mov	x0, sp				// 'regs'
-> -	enable_irq				// enable interrupts for do_notify_resume()
->  	bl	do_notify_resume
-> -	b	ret_to_user
-> -work_resched:
->  #ifdef CONFIG_TRACE_IRQFLAGS
-> -	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
-> +	bl	trace_hardirqs_on		// enabled while in userspace
+My patch series tend to be large because I put concentrated effort
+into something for a month, which then gives a problem if conflicts
+come up later and the series has to be effectively rewritten from
+scratch.  It was after the second or third time of facing an almost
+total rewrite that happened that I just gave up.
 
-This doesn't look right to me. We only get here after running
-do_notify_resume, which returns with interrupts disabled.
+I've toyed with the idea of forking the driver, but I wouldn't have
+time to maintain such a thing.  So, right now I just put up with all
+the bad quirks, and reset/power cycle the boards when things go wrong.
+Right now, I just disable runtime PM support on the FEC to get
+stability here. :)
 
-Do we not instead need to inform the tracing code that interrupts are
-disabled prior to calling do_notify_resume?
+Sorry, but I can't be of more help.
 
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index e18c48cb6db1..3432e14b7d6e 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -402,15 +402,29 @@ static void do_signal(struct pt_regs *regs)
->  asmlinkage void do_notify_resume(struct pt_regs *regs,
->  				 unsigned int thread_flags)
->  {
-> -	if (thread_flags & _TIF_SIGPENDING)
-> -		do_signal(regs);
-> +	while (true) {
->  
-> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
-> -		clear_thread_flag(TIF_NOTIFY_RESUME);
-> -		tracehook_notify_resume(regs);
-> -	}
-> +		if (thread_flags & _TIF_NEED_RESCHED) {
-> +			schedule();
-> +		} else {
-> +			local_irq_enable();
-> +
-> +			if (thread_flags & _TIF_SIGPENDING)
-> +				do_signal(regs);
->  
-> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
-> -		fpsimd_restore_current_state();
-> +			if (thread_flags & _TIF_NOTIFY_RESUME) {
-> +				clear_thread_flag(TIF_NOTIFY_RESUME);
-> +				tracehook_notify_resume(regs);
-> +			}
-> +
-> +			if (thread_flags & _TIF_FOREIGN_FPSTATE)
-> +				fpsimd_restore_current_state();
-> +		}
->  
-> +		local_irq_disable();
-> +
-> +		thread_flags = READ_ONCE(current_thread_info()->flags);
-> +		if (!(thread_flags & _TIF_WORK_MASK))
-> +			break;
-> +	}
-
-This might be easier to read as a do { ... } while.
-
-Will
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
