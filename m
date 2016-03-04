@@ -1,133 +1,142 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Fri, 4 Mar 2016 06:23:45 -0600
-Subject: [PATCH v3 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <alpine.DEB.2.02.1603040553010.3980@utopia.booyaka.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-3-git-send-email-fcooper@ti.com>
- <20160301181109.GB13417@atomide.com>
- <alpine.DEB.2.02.1603011858510.14948@utopia.booyaka.com>
- <20160301205043.GA4469@atomide.com> <56D71331.5020702@ti.com>
- <56D8EDF4.9070904@ti.com>
- <alpine.DEB.2.02.1603040553010.3980@utopia.booyaka.com>
-Message-ID: <56D97E51.5050602@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 4 Mar 2016 12:24:21 +0000
+Subject: [PATCH v5 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1457073455-11516-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
+ <1457073455-11516-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1603041213400.17938@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On 03/04/2016 12:25 AM, Paul Walmsley wrote:
-> On Thu, 3 Mar 2016, Franklin S Cooper Jr. wrote:
->
->> So I looked into this more and verified that the eCAP and
->> ePWM doesn't have their own unique clock. The PWMSS receives
->> a clock L4PER2_L3_GICLK/2 which is passed through to its
->> sub-devices (ePWM, eCAP and eQEP). The PWMSS is responsible
->> for handling its clock internally while the subdevices have
->> no role in managing this clock. So this explains why we have
->> hwmod entries for PWMSS and why we are planning on removing
->> it from the various subdevices.
-> It's not whether they have their own unique clock, but whether the 
-> submodules have OCP integration registers, speak the idle/standby 
-> protocols, have direct L3/L4 ports, etc.
-
-Sorry from a hwmod perspective your right. I initially
-thought my response about the clocks were related to hwmod
-but I see why I was off after reading a bit more on hwmod.
->> Since ePWM, eCAP and eQEP are subdevices of PWMSS they
->> shouldn't have their own concept of their "own" clock. The
->> ePWM , eCAP and eQEP clocks are all shared and managed by
->> their parent PWMSS. Once the PWMSS is enabled and has its
->> clock running then ePWM, eCAP and eQEP from their main clock
->> perspective have everything they need.
->>
->> So my plan is to strip all references of clocks (including
->> hwmod entries) for ePWM, eCAP and eQEP. The devm_clk_get
->> calls made in the ePWM and eCAP will simply point to their
->> parent's dev (PWMSS). I did a couple of quick test using
->> this approach and it works. I have more testing to do but if
->> that checks out are you ok with the above approach?
-> I don't know if that should be done or not.  I haven't stared at the code 
-> yet, but based on your description, it sounds to me that it probably 
-> shouldn't be done.  In any case, it's not what I meant...
-
-Your right my response did miss your initial point. But what
-I'm proposing sounds like exactly what you were suggesting.
-I think we both agree that hwmod entries for ePWM, eCAP and
-eQEP should be removed. Not just for dra7 but also for
-am335x and am437x as separate patches.
-
-My comment about devm_clk_get was based on the fact that I
-don't believe eCAP, ePWM and eQEP should have their own
-clock defined even within DT. Instead they can just
-reference the clk provided by pwmss (its parent) which in
-hardware is the clock that is directly passed to the
-sub-devices. The only reason those drivers need a reference
-to that clk is to get its rate once during probe.
-
-I plan on doing a bit more testing and I can shoot an
-updated v4. I believe it will address all of your comments
-and you will hopefully get a better understanding of the
-minor change I plan on making.
->
->> Also I'm not sure how simple-bus fits in this picture. The
->> eCAP, eQEP and ePWM are all separate devices. The only thing
->> that they share is a single clock from their parent. So it
->> doesn't seem like the right approach. I'm basing this on the
->> info in this thread
->> https://www.mail-archive.com/linuxppc-dev at lists.ozlabs.org/msg27979.html
->> that talks about the usage of simple-bus. So if its outdated
->> or I"m misinterpreting it incorrectly please let me know.
-> What I meant is that the ECAP*, EQEP*, EHRPWM* devices don't need to be 
-> registered through the hwmod code, due to the fact that they don't have 
-> the integration mentioned above.  Instead, I think those three subdevices 
-> should be listed as child nodes of epwmss* in the DT.
->
-> Looking at the DT data from Vignesh, it looks like he's already got 
-> ehrpwm1 as a child node of the epwmss1:
->
-> +               epwmss1: epwmss at 48440000 {
-> +                       compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
-> +                       reg = <0x48440000 0x30>;
-> +                       ti,hwmods = "epwmss1";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       status = "disabled";
-> +                       ranges = <0x48440100  0x48440100  0x80   /* ECAP */
-> +                                 0x48440180  0x48440180  0x80   /* EQEP */
-> +                                 0x48440200  0x48440200  0x80>; /* EHRPWM */
+On Fri, 4 Mar 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> ACPI 6.0 introduces a new table STAO to list the devices which are used
+> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> UART is used by Xen. So here it hides UART from Dom0.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+> CC: linux-acpi at vger.kernel.org (open list:ACPI)
+> ---
+>  drivers/acpi/scan.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
+> 
+> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> index 407a376..31d794c 100644
+> --- a/drivers/acpi/scan.c
+> +++ b/drivers/acpi/scan.c
+> @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+>  DEFINE_MUTEX(acpi_device_lock);
+>  LIST_HEAD(acpi_wakeup_device_list);
+>  static DEFINE_MUTEX(acpi_hp_context_lock);
+> +static u64 spcr_uart_addr;
+>  
+>  struct acpi_dep_data {
+>  	struct list_head node;
+> @@ -1453,6 +1454,47 @@ static int acpi_add_single_object(struct acpi_device **child,
+>  	return 0;
+>  }
+>  
+> +static acpi_status acpi_get_resource_fixed_memory32(struct acpi_resource *res,
+> +						    void *context)
+> +{
+> +	struct acpi_resource_fixed_memory32 *fixed_memory32;
 > +
-> +                       ehrpwm1: ehrpwm at 48440200 {
-> +                               compatible = "ti,dra7xx-ehrpwm",
-> +                                            "ti,am33xx-ehrpwm";
-> +                               #pwm-cells = <3>;
-> +                               reg = <0x48440200 0x80>;
-> +                               ti,hwmods = "ehrpwm1";
->
-> So, drop the above line, since the subdevices don't have corresponding 
-> hwmods any more.
+> +	if (res->type != ACPI_RESOURCE_TYPE_FIXED_MEMORY32)
+> +		return AE_OK;
+> +
+> +	fixed_memory32 = &res->data.fixed_memory32;
 
-Right
->
-> +                               status = "disabled";
-> +                       };
->
-> Then, here, you'd add nodes similar to ehrpwm1 for ecap1 and eqep1.  I 
-> can't remember at the moment if adding "simple-bus" to the epwmss1 string 
-> would be sufficient to register the subdevices after the epwmss1 is 
-> probed.  If so, maybe that's all you need.
->
-> +               };
->
-> Then repeat for epwmss0, epwmss2.
+Should we call acpi_resource_to_address64 instead?
+Aside from this the rest looks good.
 
-As you mentioned pwmss is the parent node in the DT while
-ecap and epwm are child nodes. These child nodes must be
-probed only after their parent node has been probed and the
-parent clock is running. The pwm-tipwmss.c already calls
-of_platform_populate(node, NULL, NULL, &pdev->dev); as the
-very last step of its probe call. So what you want to happen
-is already happening in the driver. So I don't believe
-simple-bus is needed.
->
->
-> - Paul
+
+> +	if (!fixed_memory32)
+> +		return AE_OK;
+> +
+> +	*((u32 *)context) = fixed_memory32->address;
+> +	return AE_CTRL_TERMINATE;
+> +}
+> +
+> +static bool acpi_device_should_be_hidden(acpi_handle handle)
+> +{
+> +	acpi_status status;
+> +	u32 addr = 0;
+> +
+> +	/* Check if it should ignore the UART device */
+> +	if (spcr_uart_addr != 0) {
+> +		if (!acpi_has_method(handle, METHOD_NAME__CRS))
+> +			return false;
+> +
+> +		status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> +					     acpi_get_resource_fixed_memory32,
+> +					     &addr);
+> +		if (ACPI_FAILURE(status))
+> +			return false;
+> +
+> +		if (addr == spcr_uart_addr) {
+> +			printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
+> +			return true;
+> +		}
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>  				    unsigned long long *sta)
+>  {
+> @@ -1466,6 +1508,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>  	switch (acpi_type) {
+>  	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
+>  	case ACPI_TYPE_DEVICE:
+> +		if (acpi_device_should_be_hidden(handle))
+> +			return -ENODEV;
+> +
+>  		*type = ACPI_BUS_TYPE_DEVICE;
+>  		status = acpi_bus_get_status_handle(handle, sta);
+>  		if (ACPI_FAILURE(status))
+> @@ -1919,6 +1964,8 @@ static int acpi_bus_scan_fixed(void)
+>  int __init acpi_scan_init(void)
+>  {
+>  	int result;
+> +	acpi_status status;
+> +	struct acpi_table_stao *stao_ptr;
+>  
+>  	acpi_pci_root_init();
+>  	acpi_pci_link_init();
+> @@ -1933,6 +1980,27 @@ int __init acpi_scan_init(void)
+>  
+>  	acpi_scan_add_handler(&generic_device_handler);
+>  
+> +	/* If there is STAO table, check whether it needs to ignore the UART
+> +	 * device in SPCR table.
+> +	 */
+> +	status = acpi_get_table(ACPI_SIG_STAO, 0,
+> +				(struct acpi_table_header **)&stao_ptr);
+> +	if (ACPI_SUCCESS(status)) {
+> +		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
+> +			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
+> +
+> +		if (stao_ptr->ignore_uart) {
+> +			struct acpi_table_spcr *spcr_ptr;
+> +
+> +			status = acpi_get_table(ACPI_SIG_SPCR, 0,
+> +					(struct acpi_table_header **)&spcr_ptr);
+> +			if (ACPI_SUCCESS(status))
+> +				spcr_uart_addr = spcr_ptr->serial_port.address;
+> +			else
+> +				printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
+> +		}
+> +	}
+> +
+>  	mutex_lock(&acpi_scan_lock);
+>  	/*
+>  	 * Enumerate devices in the ACPI namespace.
+> -- 
+> 2.0.4
+> 
+> 
