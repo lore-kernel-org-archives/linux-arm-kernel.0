@@ -1,91 +1,90 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 4 Mar 2016 22:18:38 +0100
-Subject: [PATCH 0/4] pwm: omap-dmtimer: fix period/duty_cycle calculation
-In-Reply-To: <20160304112736.660e4223.drivshin.allworx@gmail.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <20160226203100.303fe192.drivshin.allworx@gmail.com>
- <20160304151948.GF26400@ulmo.nvidia.com>
- <20160304112736.660e4223.drivshin.allworx@gmail.com>
-Message-ID: <20160304211838.GA21731@ulmo>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 4 Mar 2016 13:21:59 -0800
+Subject: [PATCH v2] mtd: avoid stack overflow in MTD CFI code
+In-Reply-To: <1456748436-522413-1-git-send-email-arnd@arndb.de>
+References: <1456748436-522413-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160304212159.GA55664@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 11:27:36AM -0500, David Rivshin (Allworx) wrote:
-> On Fri, 4 Mar 2016 16:19:48 +0100
-> Thierry Reding <thierry.reding@gmail.com> wrote:
+On Mon, Feb 29, 2016 at 01:20:28PM +0100, Arnd Bergmann wrote:
+> When map_word gets too large, we use a lot of kernel stack, and for
+> MTD_MAP_BANK_WIDTH_32, this means we use more than the recommended
+> 1024 bytes in a number of functions:
 > 
-> > On Fri, Feb 26, 2016 at 08:31:00PM -0500, David Rivshin (Allworx) wrote:
-> > > On Fri, 29 Jan 2016 23:26:50 -0500
-> > > "David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
-> > >   
-> > > > From: David Rivshin <drivshin@allworx.com>
-> > > > 
-> > > > When using a short PWM period (approaching the min of 2/clk_rate),
-> > > > pwm-omap-dmtimer does not produce accurate results. In the worst case a
-> > > > requested period of 2/clk_rate would result in a real period of 4/clk_rate
-> > > > instead. This is a series includes a fix for that problem, as well as
-> > > > other related improvements, and is based on the current linux-pwm/for-next
-> > > > tip.
-> > > > 
-> > > > I have tested on a Sitara AM335x platform, using a scope to verify the
-> > > > output with a variety of periods and duty cycles. This includes a PWM
-> > > > rate up clk_rate/2 with 50% duty cycle (e.g. generating fclk/2) with
-> > > > both 32768Hz and 24MHz fclks. I do not have an OMAP4 board to test with,
-> > > > although appropriate sections in the the reference manuals appear
-> > > > substantially the same, so I believe the changes are equally correct
-> > > > there.
-> > > > 
-> > > > Note that the OMAP4 TRMs do effectively state that the maximum PWM
-> > > > rate is clk_rate/4, so at very fast PWM rates the behavior may not be
-> > > > as reliable as I observed with Sitara. Although I suspect that it's
-> > > > the same module and will also work, at least under some circumstances.
-> > > > If anyone with OMAP4 hardware and a scope is so inclined, I would be
-> > > > curious to know the results.
-> > > > 
-> > > > David Rivshin (4):
-> > > >   pwm: omap-dmtimer: fix inaccurate period/duty_cycle calculation
-> > > >   pwm: omap-dmtimer: add sanity checking for load and match values
-> > > >   pwm: omap-dmtimer: round load and match values rather than truncate
-> > > >   pwm: omap-dmtimer: add dev_dbg() message for effective period and duty
-> > > >     cycle
-> > > > 
-> > > >  drivers/pwm/pwm-omap-dmtimer.c | 71 ++++++++++++++++++++++++++++++++----------
-> > > >  1 file changed, 55 insertions(+), 16 deletions(-)
-> > > >   
-> > > 
-> > > Hi Thierry,
-> > > 
-> > > Gentle ping. It does not look like you've taken this series, and I 
-> > > wanted to make sure you're not waiting on something from me. It would 
-> > > be nice to get at least the first patch into 4.5, if possible.  
-> > 
-> > I've applied patches 1 and 3, and I'm planning on sending out a pull
-> > request for inclusion in v4.5-rc7 later on.
+> drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
+> drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1336 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+> drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_erase_varsize':
+> drivers/mtd/chips/cfi_cmdset_0020.c:972:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+> drivers/mtd/chips/cfi_cmdset_0001.c: In function 'do_write_buffer':
+> drivers/mtd/chips/cfi_cmdset_0001.c:1835:1: warning: the frame size of 1240 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 > 
-> Thanks!
+> This can be avoided if all operations on the map word are done
+> indirectly and the stack gets reused between the calls. We can
+> mostly achieve this by selecting MTD_COMPLEX_MAPPINGS whenever
+> MTD_MAP_BANK_WIDTH_32 is set, but for the case that no other
+> bank width is enabled, we also need to use a non-constant
+> map_bankwidth() to convince the compiler to use less stack.
 > 
-> > Patches 2 and 4 didn't seem ready/critical, so let's finish those up
-> > for v4.6-rc1.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: added 'if HAS_IOMEM' to avoid a Kconfig warning on user-mode-linux.
 > 
-> I know there was a lot of discussion on 4, but I'm not sure what the 
-> concern is on patch 2. Is there something specific you're thinking of?
+> Originally sent out on Jan 1, sorry for taking my time to follow
+> up with a new version.
+> 
+>  drivers/mtd/chips/Kconfig |  1 +
+>  include/linux/mtd/map.h   | 19 +++++++------------
+>  2 files changed, 8 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/mtd/chips/Kconfig b/drivers/mtd/chips/Kconfig
+> index 741ec69e0b46..cd162cbc3746 100644
+> --- a/drivers/mtd/chips/Kconfig
+> +++ b/drivers/mtd/chips/Kconfig
+> @@ -117,6 +117,7 @@ config MTD_MAP_BANK_WIDTH_16
+>  
+>  config MTD_MAP_BANK_WIDTH_32
+>  	bool "Support 256-bit buswidth" if MTD_CFI_GEOMETRY
+> +	select MTD_COMPLEX_MAPPINGS if HAS_IOMEM
+>  	default n
+>  	help
+>  	  If you wish to support CFI devices on a physical bus which is
+> diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+> index 5e0eb7ccabd4..3aa56e3104bb 100644
+> --- a/include/linux/mtd/map.h
+> +++ b/include/linux/mtd/map.h
+> @@ -122,18 +122,13 @@
+>  #endif
+>  
+>  #ifdef CONFIG_MTD_MAP_BANK_WIDTH_32
+> -# ifdef map_bankwidth
+> -#  undef map_bankwidth
+> -#  define map_bankwidth(map) ((map)->bankwidth)
+> -#  undef map_bankwidth_is_large
+> -#  define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
+> -#  undef map_words
+> -#  define map_words(map) map_calc_words(map)
+> -# else
+> -#  define map_bankwidth(map) 32
+> -#  define map_bankwidth_is_large(map) (1)
+> -#  define map_words(map) map_calc_words(map)
+> -# endif
+> +/* always use indirect access for 256-bit to preserve kernel stack */
+> +# undef map_bankwidth
+> +# define map_bankwidth(map) ((map)->bankwidth)
+> +# undef map_bankwidth_is_large
+> +# define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
+> +# undef map_words
+> +# define map_words(map) map_calc_words(map)
+>  #define map_bankwidth_is_32(map) (map_bankwidth(map) == 32)
+>  #undef MAX_MAP_BANKWIDTH
+>  #define MAX_MAP_BANKWIDTH 32
 
-Patch 2 sounded like some optional sanity checking which we didn't hit
-anyway in the current code. Hence I didn't consider it a fix.
+Looking a little closer at this... why do we need the changes to
+include/linux/mtd/map.h again? It should be fine to leave these
+definitions as-is, right? They don't contribute to the large stack
+usage, do they?
 
-> FYI, I know that Adam Ford is using this driver as the backend for
-> a pwm-backlight control. Without patch 2 this driver will not configure 
-> the HW in a legal way at 0 or 100% duty cycle. However, I forget what 
-> the practical effect of that is, and Adam seemed to indicate it was OK
-> for his purposes.
+Maybe I'm just missing something obvious, so please do enlighten :)
 
-Okay, I'll hold back a little longer to give you some time to test.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/83c0a526/attachment-0001.sig>
+Brian
