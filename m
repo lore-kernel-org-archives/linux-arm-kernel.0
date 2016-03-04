@@ -1,64 +1,93 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  4 Mar 2016 15:57:00 +0100
-Subject: [GIT PULL 2/3] ARM: tegra: Devicetree changes for v4.6-rc1
-In-Reply-To: <1457103421-26006-1-git-send-email-thierry.reding@gmail.com>
-References: <1457103421-26006-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1457103421-26006-2-git-send-email-thierry.reding@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Mar 2016 14:56:56 +0000
+Subject: DWord alignment on ARMv7
+In-Reply-To: <2494410.DJhrOHD4yE@wuerfel>
+References: <56D8BA3F.7050508@pengutronix.de> <72900410.JPa1IHPXo5@wuerfel>
+ <20160304134651.GB19428@n2100.arm.linux.org.uk>
+ <2494410.DJhrOHD4yE@wuerfel>
+Message-ID: <20160304145656.GC19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Fri, Mar 04, 2016 at 03:41:58PM +0100, Arnd Bergmann wrote:
+> On Friday 04 March 2016 13:46:51 Russell King - ARM Linux wrote:
+> > On Fri, Mar 04, 2016 at 02:30:23PM +0100, Arnd Bergmann wrote:
+> > > Ah, I thought it only required 32-bit alignment like ldm/stm, but it
+> > > seems that it won't do that. However, an implementation like
+> > > 
+> > > unsigned long long get_unaligned_u64(void *p)
+> > > {
+> > >         unsigned long long upper, lower;
+> > >         lower = *(unsigned long*)p;
+> > >         upper = *(unsigned long*)(p+4);
+> > > 
+> > >         return lower | (upper << 32);
+> > > }
+> > > 
+> > > does get compiled into
+> > > 
+> > > 00000000 <f>:
+> > >    0:   e8900003        ldm     r0, {r0, r1}
+> > >    4:   e12fff1e        bx      lr
+> > 
+> > I think it may be something of a bitch to work around, because the
+> > compiler is going to do stuff like that behind your back.
+> > 
+> > The only way around that would be to bypass the compiler by using
+> > asm(), but then you end up bypassing the instruction scheduling too.
+> > That may not matter, as the resulting overhead may still be lower.
+> 
+> I think the compiler is correctly optimizing the code according to
+> what we tell it about the alignment here:
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+It is, that's not what I was saying though - I wasn't saying whether or
+not the compiler is correctly optimising the code (it is.)  I was saying
+that we _don't_ want the compiler optimising the code in this way here -
+that's a completely _different_ point.
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> The implementation appears to be suboptimal for cross-endian loads
+> though, as gcc-5.3 does not use the 'rev' instruction here but
+> falls back on byte accesses. We can easily fix that by introducing
+> one more generic implementation for the cross-endian accesses doing
+> 
+> static __always_inline void put_unaligned_be64(u64 val, void *p)
+> {
+>        __put_unaligned_cpu64((u64 __force)cpu_to_be64(val), p);
+> }
+> static __always_inline void put_unaligned_be32(u32 val, void *p)
+> {
+>        __put_unaligned_cpu32((u32 __force)cpu_to_be32(val), p);
+> }
+> static __always_inline void put_unaligned_be16(u16 val, void *p)
+> {
+>        __put_unaligned_cpu16((u16 __force)cpu_to_be16(val), p);
+> }
+> 
+> which is better on ARM than the currently used
+> 
+> static inline void __put_unaligned_le16(u16 val, u8 *p)
+> {
+>         *p++ = val;
+>         *p++ = val >> 8;
+> }
+> static inline void __put_unaligned_le32(u32 val, u8 *p)
+> {
+>         __put_unaligned_le16(val >> 16, p + 2);
+>         __put_unaligned_le16(val, p);
+> }
+> static inline void __put_unaligned_le64(u64 val, u8 *p)
+> {
+>         __put_unaligned_le32(val >> 32, p + 4);
+>         __put_unaligned_le32(val, p);
+> }
+> 
+> because it will allow using ldr/str+rev for unaligned
+> cross-endian accesses, but disallow ldm/stm+rev.
 
-are available in the git repository at:
+Looks like it's going to make the unaligned stuff even more of a rabbit
+warren of include files.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.6-arm
-
-for you to fetch changes up to 2bd451d6f5a47eb79feddfa4af827e3b63ed99e9:
-
-  ARM: tegra: Replace legacy *,wakeup property with wakeup-source (2016-02-16 11:32:40 +0100)
-
-----------------------------------------------------------------
-ARM: tegra: Devicetree changes for v4.6-rc1
-
-These patches clean up some of the 32-bit ARM device tree files and
-remove redundant Kconfig dependencies.
-
-----------------------------------------------------------------
-Maarten Lankhorst (1):
-      ARM: tegra: Enable watchdog support for Tegra114 and Tegra124
-
-Masahiro Yamada (1):
-      ARM: tegra: Remove redundant ARM_L1_CACHE_SHIFT_6 select
-
-Ralf Ramsauer (2):
-      ARM: tegra: Fix copy/paste typo in several DTS includes
-      ARM: tegra: Add high speed UARTs to Jetson TK1 device tree
-
-Sudeep Holla (1):
-      ARM: tegra: Replace legacy *,wakeup property with wakeup-source
-
- arch/arm/boot/dts/tegra114-dalmore.dts        |  2 +-
- arch/arm/boot/dts/tegra114-roth.dts           |  2 +-
- arch/arm/boot/dts/tegra114-tn7.dts            |  2 +-
- arch/arm/boot/dts/tegra114.dtsi               |  4 ++--
- arch/arm/boot/dts/tegra124-jetson-tk1.dts     | 28 ++++++++++++++++++++++++++-
- arch/arm/boot/dts/tegra124-nyan.dtsi          |  4 ++--
- arch/arm/boot/dts/tegra124-venice2.dts        |  2 +-
- arch/arm/boot/dts/tegra124.dtsi               |  4 ++--
- arch/arm/boot/dts/tegra20-harmony.dts         |  2 +-
- arch/arm/boot/dts/tegra20-paz00.dts           |  2 +-
- arch/arm/boot/dts/tegra20-seaboard.dts        |  4 ++--
- arch/arm/boot/dts/tegra20-trimslice.dts       |  2 +-
- arch/arm/boot/dts/tegra20-ventana.dts         |  2 +-
- arch/arm/boot/dts/tegra20-whistler.dts        |  2 +-
- arch/arm/boot/dts/tegra20.dtsi                |  2 +-
- arch/arm/boot/dts/tegra30-apalis-eval.dts     |  2 +-
- arch/arm/boot/dts/tegra30-cardhu.dtsi         |  2 +-
- arch/arm/boot/dts/tegra30-colibri-eval-v3.dts |  2 +-
- arch/arm/boot/dts/tegra30.dtsi                |  2 +-
- drivers/soc/tegra/Kconfig                     |  2 --
- 20 files changed, 49 insertions(+), 25 deletions(-)
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
