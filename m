@@ -1,39 +1,30 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri,  4 Mar 2016 17:20:13 -0300
-Subject: [PATCH 2/2] [media] exynos4-is: FIMC port parse should fail if
- there's no endpoint
-In-Reply-To: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
-References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1457122813-12791-3-git-send-email-javier@osg.samsung.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri,  4 Mar 2016 12:32:05 -0800
+Subject: [PATCH 0/3] ARM: bcm2835: Include VC4 GPU in the DT
+Message-ID: <1457123528-13482-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fimc_md_parse_port_node() function return 0 if an endpoint node is
-not found but according to Documentation/devicetree/bindings/graph.txt,
-a port must always have at least one enpoint.
+This has been floating around out of tree, and the Pi Foundation is
+including a variant of it in the device tree overlay in its firmware
+update system.
 
-So return an -EINVAL errno code to the caller instead, so it knows that
-the port node parse failed due an invalid Device Tree description.
+Eric Anholt (3):
+  dt-bindings: Add binding docs for V3D.
+  drm/vc4: Recognize a more specific compatible string for V3D.
+  ARM: bcm2835: Add VC4 to the device tree.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+ .../devicetree/bindings/display/brcm,bcm-vc4.txt   | 12 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-a.dts                |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |  4 ++
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  9 +++++
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |  4 ++
+ arch/arm/boot/dts/bcm283x.dtsi                     | 47 ++++++++++++++++++++++
+ drivers/gpu/drm/vc4/vc4_v3d.c                      |  1 +
+ 10 files changed, 93 insertions(+)
 
----
-
- drivers/media/platform/exynos4-is/media-dev.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index feb521f28e14..06f3d75c9a0e 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -394,7 +394,7 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
- 	/* Assume here a port node can have only one endpoint node. */
- 	ep = of_get_next_child(port, NULL);
- 	if (!ep)
--		return 0;
-+		return -EINVAL;
- 
- 	ret = v4l2_of_parse_endpoint(ep, &endpoint);
- 	if (ret) {
 -- 
-2.5.0
+2.7.0
