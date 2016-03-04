@@ -1,138 +1,130 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 04 Mar 2016 23:51:15 +0000
-Subject: [PATCH v14 15/20] arm64: kdump: reserve memory for crash dump kernel
+Subject: [PATCH v14 14/20] arm64/kexec: Add pr_debug output
 In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
 References: <cover.1457135058.git.geoff@infradead.org>
-Message-ID: <ed0bef8ad5b0295542840f648b85135040a7bda6.1457135058.git.geoff@infradead.org>
+Message-ID: <b11ec7d6be4debe94cd91c20d218f4015980d057.1457135058.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+To aid in debugging kexec problems or when adding new functionality to kexec add
+a new routine kexec_image_info() and several inline pr_debug statements.
 
-On the startup of primary kernel, the memory region used by crash dump
-kernel must be specified by "crashkernel=" kernel parameter.
-reserve_crashkernel() will allocate and reserve the region for later use.
-
-User space tools, like kexec-tools, will be able to find that region marked
-as "Crash kernel" in /proc/iomem.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/setup.c |  7 +++++-
- arch/arm64/mm/init.c      | 60 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/machine_kexec.c | 70 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 68 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 8119479..293cee2 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -31,7 +31,6 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 6fd0f0c..747f0a6 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -11,6 +11,7 @@
+ 
+ #include <linux/highmem.h>
  #include <linux/kexec.h>
--#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -221,6 +220,12 @@ static void __init request_standard_resources(void)
- 		    kernel_data.end <= res->end)
- 			request_resource(res, &kernel_data);
- 	}
++#include <linux/libfdt_env.h>
+ #include <linux/of_fdt.h>
+ #include <linux/slab.h>
+ #include <linux/uaccess.h>
+@@ -26,6 +27,50 @@ extern const unsigned long arm64_relocate_new_kernel_size;
+ 
+ static unsigned long kimage_start;
+ 
++/**
++ * kexec_is_dtb - Helper routine to check the device tree header signature.
++ */
++static bool kexec_is_dtb(const void *dtb)
++{
++	__be32 magic;
 +
-+#ifdef CONFIG_KEXEC_CORE
-+	/* User space tools will find "Crash kernel" region in /proc/iomem. */
-+	if (crashk_res.end)
-+		insert_resource(&iomem_resource, &crashk_res);
++	if (get_user(magic, (__be32 *)dtb))
++		return false;
++
++	return fdt32_to_cpu(magic) == OF_DT_HEADER;
++}
++
++/**
++ * kexec_image_info - For debugging output.
++ */
++#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
++static void _kexec_image_info(const char *func, int line,
++	const struct kimage *kimage)
++{
++	unsigned long i;
++
++#ifndef DEBUG
++	return;
 +#endif
++	pr_debug("%s:%d:\n", func, line);
++	pr_debug("  kexec kimage info:\n");
++	pr_debug("    type:        %d\n", kimage->type);
++	pr_debug("    start:       %lx\n", kimage->start);
++	pr_debug("    head:        %lx\n", kimage->head);
++	pr_debug("    nr_segments: %lu\n", kimage->nr_segments);
++
++	for (i = 0; i < kimage->nr_segments; i++) {
++		pr_debug("      segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages%s\n",
++			i,
++			kimage->segment[i].mem,
++			kimage->segment[i].mem + kimage->segment[i].memsz,
++			kimage->segment[i].memsz,
++			kimage->segment[i].memsz /  PAGE_SIZE,
++			(kexec_is_dtb(kimage->segment[i].buf) ?
++				", dtb segment" : ""));
++	}
++}
++
+ void machine_kexec_cleanup(struct kimage *kimage)
+ {
+ 	/* Empty routine needed to avoid build errors. */
+@@ -39,6 +84,8 @@ void machine_kexec_cleanup(struct kimage *kimage)
+ int machine_kexec_prepare(struct kimage *kimage)
+ {
+ 	kimage_start = kimage->start;
++	kexec_image_info(kimage);
++
+ 	return 0;
  }
  
- #ifdef CONFIG_BLK_DEV_INITRD
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f3b061e..ff5e01a 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -34,6 +34,7 @@
- #include <linux/dma-contiguous.h>
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
-+#include <linux/kexec.h>
+@@ -81,10 +128,10 @@ static void kexec_segment_flush(const struct kimage *kimage)
+ {
+ 	unsigned long i;
  
- #include <asm/fixmap.h>
- #include <asm/memory.h>
-@@ -66,6 +67,63 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
+-	pr_devel("%s:\n", __func__);
++	pr_debug("%s:\n", __func__);
  
-+#ifdef CONFIG_KEXEC_CORE
-+/*
-+ * reserve_crashkernel() - reserves memory for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
-+{
-+	unsigned long long crash_size = 0, crash_base = 0;
-+	int ret;
-+
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-+				&crash_size, &crash_base);
-+	if (ret)
-+		return;
-+
-+	if (crash_base == 0) {
-+		crash_base = memblock_find_in_range(0,
-+				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, 1 << 21);
-+		if (crash_base == 0) {
-+			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-+				crash_size);
-+			return;
-+		}
-+		memblock_reserve(crash_base, crash_size);
-+
-+	} else {
-+		/* User specifies base address explicitly. */
-+		if (!memblock_is_region_memory(crash_base, crash_size) ||
-+			memblock_is_region_reserved(crash_base, crash_size)) {
-+			pr_warn("crashkernel has wrong address or size\n");
-+			return;
-+		}
-+
-+		if (crash_base & ((1 << 21) - 1)) {
-+			pr_warn("crashkernel base address is not 2MB aligned\n");
-+			return;
-+		}
-+
-+		memblock_reserve(crash_base, crash_size);
-+	}
-+
-+	pr_info("Reserving %lldMB of memory@%lldMB for crashkernel\n",
-+		crash_size >> 20, crash_base >> 20);
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
-+}
-+#else
-+static void __init reserve_crashkernel(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_KEXEC_CORE */
-+
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -171,6 +229,8 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
+ 	for (i = 0; i < kimage->nr_segments; i++) {
+-		pr_devel("  segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages\n",
++		pr_debug("  segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages\n",
+ 			i,
+ 			kimage->segment[i].mem,
+ 			kimage->segment[i].mem + kimage->segment[i].memsz,
+@@ -111,6 +158,25 @@ void machine_kexec(struct kimage *kimage)
+ 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+ 	reboot_code_buffer = kmap(kimage->control_code_page);
  
-+	reserve_crashkernel();
++	kexec_image_info(kimage);
 +
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
++	pr_debug("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
++		kimage->control_code_page);
++	pr_debug("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
++		&reboot_code_buffer_phys);
++	pr_debug("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
++		reboot_code_buffer);
++	pr_debug("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
++		arm64_relocate_new_kernel);
++	pr_debug("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
++		__func__, __LINE__, arm64_relocate_new_kernel_size,
++		arm64_relocate_new_kernel_size);
++
++	pr_debug("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
++		kimage->head);
++	pr_debug("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
++		kimage_start);
++
+ 	/*
+ 	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
+ 	 * after the kernel is shut down.
 -- 
 2.5.0
