@@ -1,53 +1,75 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 4 Mar 2016 12:06:58 -0700
-Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
- fec_timeout
-In-Reply-To: <1457112947.4044.133.camel@perches.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
- <VI1PR0401MB18552AB3E4128E412273B439FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
- <56D9B238.2040400@boundarydevices.com>
- <1457112947.4044.133.camel@perches.com>
-Message-ID: <56D9DCD2.2090009@boundarydevices.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 4 Mar 2016 20:16:56 +0100
+Subject: [PATCH v3 0/4] fix memremap on ARM
+In-Reply-To: <CAPcyv4gmgE1=REbvWfv8Q61pLOJp9Vjf_qxbX5GQ82o=7aVtGA@mail.gmail.com>
+References: <1457084928-21179-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAPcyv4gmgE1=REbvWfv8Q61pLOJp9Vjf_qxbX5GQ82o=7aVtGA@mail.gmail.com>
+Message-ID: <CAKv+Gu_SFO81PniDNYjfz6OqbBXdmi0Z3GWO=OBAc0p1v4_JBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/4/2016 10:35 AM, Joe Perches wrote:
-> On Fri, 2016-03-04 at 09:05 -0700, Troy Kisky wrote:
->> On 3/4/2016 3:06 AM, Fugang Duan wrote:
->>> From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2016 8:37 AM
-> []
->>>> Print the current interrupt flags and mask and the interrupt state during the last
->>>> interrupt in fec_timeout.
-> []
->>>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> []
->>>> @@ -1107,6 +1107,9 @@ fec_timeout(struct net_device *ndev)
->>>>  	int i;
->>>>  	uint events = 0;
->>>>
->>>> +	pr_err("%s: last=%x %x, mask %x\n", __func__, fep->last_ievents,
->>>> +	       readl(fep->hwp + FEC_IEVENT), readl(fep->hwp + FEC_IMASK));
->>>> +
->>> pr_err() -> netdev_err()
->> Sounds good
-> 
-> This seems like debugging information rather than
-> an error a user can do anything with and if there's
-> a timeout, how likely is it that the hardware is
-> hosed and this would  repetitively and unnecessarily
-> fill up logs?
-> 
-> So maybe netdev_dbg and net_ratelimit() too.
-> 
-> 	if (net_ratelimit()
-> 		netdev_<level>(etc...)
-> 
-> 
+On 4 March 2016 at 19:34, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Fri, Mar 4, 2016 at 1:48 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> This is something I ran into while working on support for the UEFI
+>> memory attributes and ESRT tables. In both cases, these tables are
+>> passed to the kernel in memory which is guaranteed to be below 4 GB,
+>> but may be outside of the kernel direct mapping. (UEFI typically
+>> attempts to allocate from the top down, which means such tables are
+>> highly likely to be in highmem for any system with more than 760 MB
+>> of system RAM)
+>>
+>> The recently introduced memremap() is a very useful abstraction for
+>> accessing such tables, because it is generic, and already attempts to
+>> do the right thing with respect to regions that may already have been
+>> mapped directly. However, it falls back to ioremap_cache() for mapping
+>> high memory, which is not allowed on ARM for system RAM, and also results
+>> in the region to be mapped with different attributes depending on whether
+>> it is covered by lowmem or not.
+>>
+>> So instead, create an arch specific hook 'arch_memremap_wb(), and
+>> implement it for ARM using the same memory attributes used for the
+>> linear mapping. Note that memremap will only call this hook for regions
+>> that are not already mapped permanently.
+>>
+>> Since this change results in memremap() to use attributes different from
+>> the ones used by ioremap_cache(), revert the change to pxa2xx-flash that
+>> moved it to memremap.
+>>
+>> Changes since v2:
+>> - add patch to bring back ioremap_cached() on ARM
+>> - switch pxa2xx-flash back to ioremap_cached() not ioremap_cache()
+>> - use arch_ioremap_caller not __arm_ioremap_caller() in patch #4
+>> - deal with __iomem annotation of arch_ioremap_caller (patch #4)
+>>
+>> Changes since v1/rfc:
+>> - new patch #1 that reverts the ioremap_cache->memremap conversion for the
+>>   pxa2xx-flash driver
+>> - added Dan's ack to patch #2
+>>
+>> Ard Biesheuvel (4):
+>>   ARM: reintroduce ioremap_cached() for creating cached I/O mappings
+>>   mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
+>>   memremap: add arch specific hook for MEMREMAP_WB mappings
+>>   ARM: memremap: implement arch_memremap_wb()
+>>
+>>  arch/arm/include/asm/io.h       | 12 ++++++++++++
+>>  arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
+>>  drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
+>>  kernel/memremap.c               | 11 ++++++++---
+>>  4 files changed, 37 insertions(+), 8 deletions(-)
+>>
+>
+> For the series:
+>
+> Acked-by: Dan Williams <dan.j.williams@intel.com>
 
-This patch hasn't been helpful to me in quite a while. I'll just drop it.
-I know where to get it if I need it again.
+Thanks Dan,
 
+With the added patch #1, I think it now makes the most sense for
+Russell to take the whole series via the ARM tree.
 
-Thanks
-Troy
+@Brian, David: any objections?
+
+Thanks,
+Ard.
