@@ -1,133 +1,184 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 4 Mar 2016 14:37:19 +0800
-Subject: [PATCH v5 01/17] Xen: ACPI: Hide UART used by Xen
+Date: Fri, 4 Mar 2016 14:37:24 +0800
+Subject: [PATCH v5 06/17] Xen: ARM: Add support for mapping platform device
+ mmio
 In-Reply-To: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1457073455-11516-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1457073455-11516-7-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-ACPI 6.0 introduces a new table STAO to list the devices which are used
-by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-UART is used by Xen. So here it hides UART from Dom0.
+Add a bus_notifier for platform bus device in order to map the device
+mmio regions when DOM0 booting with ACPI.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
-CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
-CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
-CC: linux-acpi at vger.kernel.org (open list:ACPI)
----
- drivers/acpi/scan.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+ drivers/xen/Makefile     |   1 +
+ drivers/xen/arm-device.c | 141 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 142 insertions(+)
+ create mode 100644 drivers/xen/arm-device.c
 
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 407a376..31d794c 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
- DEFINE_MUTEX(acpi_device_lock);
- LIST_HEAD(acpi_wakeup_device_list);
- static DEFINE_MUTEX(acpi_hp_context_lock);
-+static u64 spcr_uart_addr;
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index 9b7a35c..415f286 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -9,6 +9,7 @@ CFLAGS_features.o			:= $(nostackp)
  
- struct acpi_dep_data {
- 	struct list_head node;
-@@ -1453,6 +1454,47 @@ static int acpi_add_single_object(struct acpi_device **child,
- 	return 0;
- }
+ CFLAGS_efi.o				+= -fshort-wchar
  
-+static acpi_status acpi_get_resource_fixed_memory32(struct acpi_resource *res,
-+						    void *context)
++dom0-$(CONFIG_ARM64) += arm-device.o
+ dom0-$(CONFIG_PCI) += pci.o
+ dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+ dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+new file mode 100644
+index 0000000..76e26e5
+--- /dev/null
++++ b/drivers/xen/arm-device.c
+@@ -0,0 +1,141 @@
++/*
++ * Copyright (c) 2015, Linaro Limited, Shannon Zhao
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/acpi.h>
++#include <xen/xen.h>
++#include <xen/page.h>
++#include <xen/interface/memory.h>
++#include <asm/xen/hypervisor.h>
++#include <asm/xen/hypercall.h>
++
++static int xen_unmap_device_mmio(struct resource *resource, unsigned int count)
 +{
-+	struct acpi_resource_fixed_memory32 *fixed_memory32;
++	unsigned int i, j, nr;
++	int rc = 0;
++	struct resource *r;
++	struct xen_remove_from_physmap xrp;
 +
-+	if (res->type != ACPI_RESOURCE_TYPE_FIXED_MEMORY32)
-+		return AE_OK;
++	for (i = 0; i < count; i++) {
++		r = &resource[i];
++		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
++		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
++			continue;
 +
-+	fixed_memory32 = &res->data.fixed_memory32;
-+	if (!fixed_memory32)
-+		return AE_OK;
-+
-+	*((u32 *)context) = fixed_memory32->address;
-+	return AE_CTRL_TERMINATE;
-+}
-+
-+static bool acpi_device_should_be_hidden(acpi_handle handle)
-+{
-+	acpi_status status;
-+	u32 addr = 0;
-+
-+	/* Check if it should ignore the UART device */
-+	if (spcr_uart_addr != 0) {
-+		if (!acpi_has_method(handle, METHOD_NAME__CRS))
-+			return false;
-+
-+		status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-+					     acpi_get_resource_fixed_memory32,
-+					     &addr);
-+		if (ACPI_FAILURE(status))
-+			return false;
-+
-+		if (addr == spcr_uart_addr) {
-+			printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
-+			return true;
++		for (j = 0; j < nr; j++) {
++			xrp.domid = DOMID_SELF;
++			xrp.gpfn = XEN_PFN_DOWN(r->start) + j;
++			rc = HYPERVISOR_memory_op(XENMEM_remove_from_physmap,
++						  &xrp);
++			if (rc)
++				return rc;
 +		}
 +	}
 +
-+	return false;
++	return rc;
 +}
 +
- static int acpi_bus_type_and_status(acpi_handle handle, int *type,
- 				    unsigned long long *sta)
- {
-@@ -1466,6 +1508,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
- 	switch (acpi_type) {
- 	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
- 	case ACPI_TYPE_DEVICE:
-+		if (acpi_device_should_be_hidden(handle))
-+			return -ENODEV;
++static int xen_map_device_mmio(struct resource *resource, unsigned int count)
++{
++	unsigned int i, j, nr;
++	int rc = 0;
++	struct resource *r;
++	xen_pfn_t *gpfns;
++	xen_ulong_t *idxs;
++	int *errs;
++	struct xen_add_to_physmap_range xatp;
 +
- 		*type = ACPI_BUS_TYPE_DEVICE;
- 		status = acpi_bus_get_status_handle(handle, sta);
- 		if (ACPI_FAILURE(status))
-@@ -1919,6 +1964,8 @@ static int acpi_bus_scan_fixed(void)
- int __init acpi_scan_init(void)
- {
- 	int result;
-+	acpi_status status;
-+	struct acpi_table_stao *stao_ptr;
- 
- 	acpi_pci_root_init();
- 	acpi_pci_link_init();
-@@ -1933,6 +1980,27 @@ int __init acpi_scan_init(void)
- 
- 	acpi_scan_add_handler(&generic_device_handler);
- 
-+	/* If there is STAO table, check whether it needs to ignore the UART
-+	 * device in SPCR table.
-+	 */
-+	status = acpi_get_table(ACPI_SIG_STAO, 0,
-+				(struct acpi_table_header **)&stao_ptr);
-+	if (ACPI_SUCCESS(status)) {
-+		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
-+			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
++	for (i = 0; i < count; i++) {
++		r = &resource[i];
++		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
++		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
++			continue;
 +
-+		if (stao_ptr->ignore_uart) {
-+			struct acpi_table_spcr *spcr_ptr;
-+
-+			status = acpi_get_table(ACPI_SIG_SPCR, 0,
-+					(struct acpi_table_header **)&spcr_ptr);
-+			if (ACPI_SUCCESS(status))
-+				spcr_uart_addr = spcr_ptr->serial_port.address;
-+			else
-+				printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
++		gpfns = kzalloc(sizeof(xen_pfn_t) * nr, GFP_KERNEL);
++		idxs = kzalloc(sizeof(xen_ulong_t) * nr, GFP_KERNEL);
++		errs = kzalloc(sizeof(int) * nr, GFP_KERNEL);
++		if (!gpfns || !idxs || !errs) {
++			kfree(gpfns);
++			kfree(idxs);
++			kfree(errs);
++			return -ENOMEM;
 +		}
++
++		for (j = 0; j < nr; j++) {
++			gpfns[j] = XEN_PFN_DOWN(r->start) + j;
++			idxs[j] = XEN_PFN_DOWN(r->start) + j;
++		}
++
++		xatp.domid = DOMID_SELF;
++		xatp.size = nr;
++		xatp.space = XENMAPSPACE_dev_mmio;
++
++		set_xen_guest_handle(xatp.gpfns, gpfns);
++		set_xen_guest_handle(xatp.idxs, idxs);
++		set_xen_guest_handle(xatp.errs, errs);
++
++		rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
++		kfree(gpfns);
++		kfree(idxs);
++		kfree(errs);
++		if (rc)
++			return rc;
 +	}
 +
- 	mutex_lock(&acpi_scan_lock);
- 	/*
- 	 * Enumerate devices in the ACPI namespace.
++	return rc;
++}
++
++static int xen_platform_notifier(struct notifier_block *nb,
++				 unsigned long action, void *data)
++{
++	struct platform_device *pdev = to_platform_device(data);
++	int r = 0;
++
++	if (pdev->num_resources == 0 || pdev->resource == NULL)
++		return NOTIFY_OK;
++
++	switch (action) {
++	case BUS_NOTIFY_ADD_DEVICE:
++		r = xen_map_device_mmio(pdev->resource, pdev->num_resources);
++		break;
++	case BUS_NOTIFY_DEL_DEVICE:
++		r = xen_unmap_device_mmio(pdev->resource, pdev->num_resources);
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++	if (r)
++		dev_err(&pdev->dev, "Platform: Failed to %s device %s MMIO!\n",
++			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
++			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
++			pdev->name);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block platform_device_nb = {
++	.notifier_call = xen_platform_notifier,
++};
++
++static int __init register_xen_platform_notifier(void)
++{
++	if (!xen_initial_domain() || acpi_disabled)
++		return 0;
++
++	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
++}
++
++arch_initcall(register_xen_platform_notifier);
 -- 
 2.0.4
