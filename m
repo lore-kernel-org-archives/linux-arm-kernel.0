@@ -1,70 +1,155 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 4 Mar 2016 09:53:26 +0800
-Subject: [PATCH 2/3] usb: chipidea: host: let the hcd know's parent
- device node
-In-Reply-To: <20160303144247.GH15541@lunn.ch>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
- <1456999276-6315-3-git-send-email-peter.chen@nxp.com>
- <20160303144247.GH15541@lunn.ch>
-Message-ID: <20160304015326.GA30272@shlinux2.ap.freescale.net>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 4 Mar 2016 11:02:33 +0900
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56D832BD.5080305@huawei.com>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com>
+Message-ID: <20160304020232.GA12036@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 03:42:47PM +0100, Andrew Lunn wrote:
-> On Thu, Mar 03, 2016 at 06:01:15PM +0800, Peter Chen wrote:
-> > From: Peter Chen <peter.chen@freescale.com>
-> > 
-> > Since the hcd (chipidea core device) has no device node, so
-> > if we want to describe the child node under the hcd, we had
-> > to put it under its parent's node (glue layer device), and
-> > in the code, we need to let the hcd knows glue layer's code,
-> > then the USB core can handle this node.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/host.c | 18 ++++++++++++++----
-> >  1 file changed, 14 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> > index 053bac9..55120ef 100644
-> > --- a/drivers/usb/chipidea/host.c
-> > +++ b/drivers/usb/chipidea/host.c
-> > @@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
-> >  	struct ehci_hcd *ehci;
-> >  	struct ehci_ci_priv *priv;
-> >  	int ret;
-> > +	struct device *dev = ci->dev;
-> >  
-> > -	if (usb_disabled())
-> > +	if (usb_disabled() || !dev)
-> >  		return -ENODEV;
-> >  
-> > -	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
-> > +	/*
-> > +	 * USB Core will try to get child node under roothub,
-> > +	 * but chipidea core has no of_node, and the child node
-> > +	 * for controller is located at glue layer's node which
-> > +	 * is chipidea core's parent.
-> > +	 */
-> > +	if (dev->parent && dev->parent->of_node)
-> > +		dev->of_node = dev->parent->of_node;
+On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
+> On 2016/3/3 15:42, Joonsoo Kim wrote:
+> > 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+> >> (cc -mm and Joonsoo Kim)
+> >>
+> >>
+> >> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+> >>> Hi,
+> >>>
+> >>> I came across a suspicious error for CMA stress test:
+> >>>
+> >>> Before the test, I got:
+> >>> -bash-4.3# cat /proc/meminfo | grep Cma
+> >>> CmaTotal:         204800 kB
+> >>> CmaFree:          195044 kB
+> >>>
+> >>>
+> >>> After running the test:
+> >>> -bash-4.3# cat /proc/meminfo | grep Cma
+> >>> CmaTotal:         204800 kB
+> >>> CmaFree:         6602584 kB
+> >>>
+> >>> So the freed CMA memory is more than total..
+> >>>
+> >>> Also the the MemFree is more than mem total:
+> >>>
+> >>> -bash-4.3# cat /proc/meminfo
+> >>> MemTotal:       16342016 kB
+> >>> MemFree:        22367268 kB
+> >>> MemAvailable:   22370528 kB
+> [...]
+> >>
+> >> I played with this a bit and can see the same problem. The sanity
+> >> check of CmaFree < CmaTotal generally triggers in
+> >> __move_zone_freepage_state in unset_migratetype_isolate.
+> >> This also seems to be present as far back as v4.0 which was the
+> >> first version to have the updated accounting from Joonsoo.
+> >> Were there known limitations with the new freepage accounting,
+> >> Joonsoo?
+> > I don't know. I also played with this and looks like there is
+> > accounting problem, however, for my case, number of free page is slightly less
+> > than total. I will take a look.
+> >
+> > Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+> > look like your case.
 > 
-> Is this a good idea? Two devices with the same of_node?
+> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+> did some other test:
+
+Thanks! Now, I can re-generate erronous situation you mentioned.
+
 > 
-
-This is only for chipidea driver whose host controller device
-doesn't have entry at dts, but other host controller driver which
-supports device tree should have its entry at dts.
-
-> I know the networking code assumes of_node values are unique, and uses
-> it to find a device. Are you 100% sure the USB code does not make this
-> assumption.
+>  - run with single thread with 100000 times, everything is fine.
 > 
+>  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+>    the same test with 100 multi-thread, then I got:
 
-The controller device is the root for USB device, the common
-USB code will not touch its glue layer device (controller's parent).
+[1] would not be sufficient to close this race.
 
--- 
+Try following things [A]. And, for more accurate test, I changed code a bit more
+to prevent kernel page allocation from cma area [B]. This will prevent kernel
+page allocation from cma area completely so we can focus cma_alloc/release race.
 
-Best Regards,
-Peter Chen
+Although, this is not correct fix, it could help that we can guess
+where the problem is.
+
+Thanks.
+
+[A]
+diff --git a/mm/cma.c b/mm/cma.c
+index c003274..43ed02d 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -496,7 +496,9 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
+ 
+        VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
+ 
++       mutex_lock(&cma_mutex);
+        free_contig_range(pfn, count);
++       mutex_unlock(&cma_mutex);
+        cma_clear_bitmap(cma, pfn, count);
+        trace_cma_release(pfn, pages, count);
+ 
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index c6c38ed..1ce8a59 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -2192,7 +2192,8 @@ void free_hot_cold_page(struct page *page, bool cold)
+         * excessively into the page allocator
+         */
+        if (migratetype >= MIGRATE_PCPTYPES) {
+-               if (unlikely(is_migrate_isolate(migratetype))) {
++               if (is_migrate_cma(migratetype) ||
++                       unlikely(is_migrate_isolate(migratetype))) {
+                        free_one_page(zone, page, pfn, 0, migratetype);
+                        goto out;
+                }
+
+
+[B]
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index f2dccf9..c6c38ed 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1493,6 +1493,7 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+                                                                int alloc_flags)
+ {
+        int i;
++       bool cma = false;
+ 
+        for (i = 0; i < (1 << order); i++) {
+                struct page *p = page + i;
+@@ -1500,6 +1501,9 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+                        return 1;
+        }
+ 
++       if (is_migrate_cma(get_pcppage_migratetype(page)))
++               cma = true;
++
+        set_page_private(page, 0);
+        set_page_refcounted(page);
+ 
+@@ -1528,6 +1532,12 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+        else
+                clear_page_pfmemalloc(page);
+ 
++       if (cma) {
++               page_ref_dec(page);
++               __free_pages_ok(page, order);
++               return 1;
++       }
++
+        return 0;
+ }
+ 
+@@ -1582,7 +1592,7 @@ static int fallbacks[MIGRATE_TYPES][4] = {
+ static struct page *__rmqueue_cma_fallback(struct zone *zone,
+                                        unsigned int order)
+ {
+-       return __rmqueue_smallest(zone, order, MIGRATE_CMA);
++       return NULL;
+ }
+ #else
+ static inline struct page *__rmqueue_cma_fallback(struct zone *zone,
