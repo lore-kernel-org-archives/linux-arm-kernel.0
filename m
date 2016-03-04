@@ -1,167 +1,274 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Mar 2016 13:57:55 +0100
-Subject: [PATCH v3 3/3] clk: mvebu: new driver for Armada AP806 system
- controller
-In-Reply-To: <1457096275-7581-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1457096275-7581-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1457096275-7581-4-git-send-email-thomas.petazzoni@free-electrons.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Fri, 4 Mar 2016 16:03:56 +0300
+Subject: [PATCH v3 5/7] ACPI: serial: implement earlycon on ACPI DBG2 port
+In-Reply-To: <56D878D4.4000902@hurleysoftware.com>
+References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456749726-30261-6-git-send-email-aleksey.makarov@linaro.org>
+ <56D5BAFF.6080008@hurleysoftware.com> <56D5C9F5.5060301@linaro.org>
+ <56D878D4.4000902@hurleysoftware.com>
+Message-ID: <56D987BC.7070209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada AP806 system controller, amongst other things, provides a
-number of clocks for the platform: the CPU cluster clocks, whose
-frequencies are found by reading the Sample At Reset register, one
-fixed clock, and another clock derived from the fixed clock, which is
-the one used by most peripherals in AP806.
 
-The AP806 is one of the two core HW blocks used in the Marvell 7K/8K
-SoCs.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/clk/mvebu/Kconfig                   |   3 +
- drivers/clk/mvebu/Makefile                  |   1 +
- drivers/clk/mvebu/ap806-system-controller.c | 106 ++++++++++++++++++++++++++++
- 3 files changed, 110 insertions(+)
- create mode 100644 drivers/clk/mvebu/ap806-system-controller.c
+On 03/03/2016 08:48 PM, Peter Hurley wrote:
+> On 03/01/2016 08:57 AM, Aleksey Makarov wrote:
+>>
+>>
+>> On 03/01/2016 06:53 PM, Peter Hurley wrote:
+>>> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
+>>>> Add ACPI_DBG2_EARLYCON_DECLARE() macros that declares
+>>>> an earlycon on the serial port specified in the DBG2 ACPI table.
+>>>>
+>>>> Pass the string "earlycon=acpi_dbg2" to the kernel to activate it.
+>>>>
+>>>> Callbacks for EARLYCON_DECLARE() and OF_EARLYCON_DECLARE()
+>>>> can also be used for this macros.
+>>>>
+>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>>>> ---
+>>>>  Documentation/kernel-parameters.txt |  3 ++
+>>>>  drivers/tty/serial/earlycon.c       | 60 +++++++++++++++++++++++++++++++++++++
+>>>>  include/linux/acpi_dbg2.h           | 20 +++++++++++++
+>>>>  3 files changed, 83 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+>>>> index e0a21e4..19b947b 100644
+>>>> --- a/Documentation/kernel-parameters.txt
+>>>> +++ b/Documentation/kernel-parameters.txt
+>>>> @@ -1072,6 +1072,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>>>  			A valid base address must be provided, and the serial
+>>>>  			port must already be setup and configured.
+>>>>  
+>>>> +		acpi_dbg2
+>>>> +			Use serial port specified by the DBG2 ACPI table.
+>>>> +
+>>>>  	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
+>>>>  			earlyprintk=vga
+>>>>  			earlyprintk=efi
+>>>> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+>>>> index d217366..9ba3a04 100644
+>>>> --- a/drivers/tty/serial/earlycon.c
+>>>> +++ b/drivers/tty/serial/earlycon.c
+>>>> @@ -22,6 +22,7 @@
+>>>>  #include <linux/sizes.h>
+>>>>  #include <linux/of.h>
+>>>>  #include <linux/of_fdt.h>
+>>>> +#include <linux/acpi.h>
+>>>>  
+>>>>  #ifdef CONFIG_FIX_EARLYCON_MEM
+>>>>  #include <asm/fixmap.h>
+>>>> @@ -200,6 +201,8 @@ int __init setup_earlycon(char *buf)
+>>>>  	return -ENOENT;
+>>>>  }
+>>>>  
+>>>> +static bool setup_dbg2_earlycon;
+>>>> +
+>>>>  /* early_param wrapper for setup_earlycon() */
+>>>>  static int __init param_setup_earlycon(char *buf)
+>>>>  {
+>>>> @@ -212,6 +215,11 @@ static int __init param_setup_earlycon(char *buf)
+>>>>  	if (!buf || !buf[0])
+>>>>  		return early_init_dt_scan_chosen_serial();
+>>>>  
+>>>> +	if (!strcmp(buf, "acpi_dbg2")) {
+>>>> +		setup_dbg2_earlycon = true;
+>>>> +		return 0;
+>>>> +	}
+>>>
+>>> So this series doesn't start an ACPI earlycon at early_param time?
+>>> That doesn't seem very useful.
+>>>
+>>> When does the ACPI earlycon actually start?
+>>> And don't say "when the DBG2 table is probed"; that much is obvious.
+>>
+>> ACPI earlycon starts as soon as ACPI tables become accessible (setup_arch()).
+>> I think that is still quite early.
+> 
+> I see now; the probe is in patch 6/7.
+> 
+> setup_arch()
+>   acpi_boot_table_init()
+>     acpi_probe_device_table()
+>       ...
+>         acpi_dbg2_setup()
+>           ->setup()
+>             acpi_setup_earlycon()
+> 
+> 
+>>>> +
+>>>>  	err = setup_earlycon(buf);
+>>>>  	if (err == -ENOENT || err == -EALREADY)
+>>>>  		return 0;
+>>>> @@ -286,3 +294,55 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
+>>>>  }
+>>>>  
+>>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>>> +
+>>>> +#ifdef CONFIG_ACPI_DBG2_TABLE
+>>>> +
+>>>> +int __init acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d)
+>>>> +{
+>>>> +	int err;
+>>>> +	struct uart_port *port = &early_console_dev.port;
+>>>> +	int (*setup)(struct earlycon_device *, const char *) = d;
+>>>> +	struct acpi_generic_address *reg;
+>>>> +
+>>>> +	if (!setup_dbg2_earlycon)
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	if (device->register_count < 1)
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	if (device->base_address_offset >= device->length)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	reg = (void *)device + device->base_address_offset;
+>>>> +
+>>>> +	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY &&
+>>>> +	    reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	spin_lock_init(&port->lock);
+>>>> +	port->uartclk = BASE_BAUD * 16;
+>>>> +
+>>>> +	if (reg->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
+>>>> +		if (device->port_type == ACPI_DBG2_ARM_SBSA_32BIT)
+>>>> +			port->iotype = UPIO_MEM32;
+>>>> +		else
+>>>> +			port->iotype = UPIO_MEM;
+>>>> +		port->mapbase = reg->address;
+>>>> +		port->membase = earlycon_map(reg->address, SZ_4K);
+>>>> +	} else {
+>>>> +		port->iotype = UPIO_PORT;
+>>>> +		port->iobase = reg->address;
+>>>> +	}
+>>>> +
+>>>> +	early_console_dev.con->data = &early_console_dev;
+>>>> +	err = setup(&early_console_dev, NULL);
+>>>> +	if (err < 0)
+>>>> +		return err;
+>>>> +	if (!early_console_dev.con->write)
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	register_console(early_console_dev.con);
+>>>> +	return 0;
+>>>> +}
+>>>> +
+>>>> +#endif /* CONFIG_ACPI_DBG2_TABLE */
+>>>> diff --git a/include/linux/acpi_dbg2.h b/include/linux/acpi_dbg2.h
+>>>> index 125ae7e..b653752 100644
+>>>> --- a/include/linux/acpi_dbg2.h
+>>>> +++ b/include/linux/acpi_dbg2.h
+>>>> @@ -37,12 +37,32 @@ int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
+>>>>  	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
+>>>>  				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
+>>>>  
+>>>> +int acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d);
+>>>> +
+>>>> +/**
+>>>> + * ACPI_DBG2_EARLYCON_DECLARE() - Define handler for ACPI GDB2 serial port
+>>>> + * @name:		Identifier to compose name of table data
+>>>> + * @subtype:		Subtype of the port
+>>>> + * @console_setup:	Function to be called to setup the port
+>>>> + *
+>>>> + * Type of the console_setup() callback is
+>>>> + * int (*setup)(struct earlycon_device *, const char *)
+>>>> + * It's the type of callback of of_setup_earlycon().
+>>>> + */
+>>>> +#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
+>>>> +	ACPI_DBG2_DECLARE(name, ACPI_DBG2_SERIAL_PORT, subtype,		\
+>>>> +			  acpi_setup_earlycon, console_setup)
+>>>> +
+>>>>  #else
+>>>>  
+>>>>  #define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
+>>>>  	static const void *__acpi_dbg_data_##name[]			\
+>>>>  		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
+>>>>  
+>>>> +#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
+>>>> +	static const void *__acpi_dbg_data_serial_##name[]		\
+>>>> +		__used __initdata = { (void *)console_setup }
+> 
+> console_setup is a terrible macro argument name; console_setup() is an
+> actual kernel function (although file-scope).
+> Please change it to something short and generic.
 
-diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
-index eaee8f0..bf7ae00 100644
---- a/drivers/clk/mvebu/Kconfig
-+++ b/drivers/clk/mvebu/Kconfig
-@@ -29,6 +29,9 @@ config ARMADA_XP_CLK
- 	select MVEBU_CLK_COMMON
- 	select MVEBU_CLK_CPU
- 
-+config ARMADA_AP806_SYSCON
-+	bool
-+
- config DOVE_CLK
- 	bool
- 	select MVEBU_CLK_COMMON
-diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index 8866115..f4aa481 100644
---- a/drivers/clk/mvebu/Makefile
-+++ b/drivers/clk/mvebu/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
- obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
- obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
- obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
-+obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
- obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
- obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
- obj-$(CONFIG_ORION_CLK)		+= orion.o
-diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
-new file mode 100644
-index 0000000..c33c209
---- /dev/null
-+++ b/drivers/clk/mvebu/ap806-system-controller.c
-@@ -0,0 +1,106 @@
-+/*
-+ * Marvell Armada AP806 System Controller
-+ *
-+ * Copyright (C) 2016 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#define pr_fmt(fmt) "ap806-system-controller: " fmt
-+
-+#include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/regmap.h>
-+
-+#define AP806_SAR_REG			0x400
-+#define AP806_SAR_CLKFREQ_MODE_MASK	0x1f
-+
-+#define AP806_CLK_NUM 			4
-+
-+static struct clk *ap806_clks[AP806_CLK_NUM];
-+
-+static struct clk_onecell_data ap806_clk_data = {
-+	.clks = ap806_clks,
-+	.clk_num = AP806_CLK_NUM,
-+};
-+
-+static void __init ap806_syscon_clk_init(struct device_node *np)
-+{
-+	unsigned int freq_mode, cpuclk_freq;
-+	const char *name, *fixedclk_name;
-+	struct regmap *regmap;
-+	u32 reg;
-+
-+	regmap = syscon_node_to_regmap(np);
-+	if (IS_ERR(regmap)) {
-+		pr_err("cannot get regmap\n");
-+		return;
-+	}
-+
-+	if (regmap_read(regmap, AP806_SAR_REG, &reg)) {
-+		pr_err("cannot read from regmap\n");
-+		return;
-+	}
-+
-+	freq_mode = reg & AP806_SAR_CLKFREQ_MODE_MASK;
-+	switch(freq_mode) {
-+	case 0x0 ... 0x5:
-+		cpuclk_freq = 2000;
-+		break;
-+	case 0x6 ... 0xB:
-+		cpuclk_freq = 1800;
-+		break;
-+	case 0xC ... 0x11:
-+		cpuclk_freq = 1600;
-+		break;
-+	case 0x12 ... 0x16:
-+		cpuclk_freq = 1400;
-+		break;
-+	case 0x17 ... 0x19:
-+		cpuclk_freq = 1300;
-+		break;
-+	default:
-+		pr_err("invalid SAR value\n");
-+		return;
-+	}
-+
-+	/* Convert to hertz */
-+	cpuclk_freq *= 1000 * 1000;
-+
-+	/* CPU clocks depend on the Sample At Reset configuration */
-+	of_property_read_string_index(np, "clock-output-names",
-+				      0, &name);
-+	ap806_clks[0] = clk_register_fixed_rate(NULL, name, NULL,
-+						0, cpuclk_freq);
-+
-+	of_property_read_string_index(np, "clock-output-names",
-+				      1, &name);
-+	ap806_clks[1] = clk_register_fixed_rate(NULL, name, NULL, 0,
-+						cpuclk_freq);
-+
-+	/* Fixed clock is always 1200 Mhz */
-+	of_property_read_string_index(np, "clock-output-names",
-+				      2, &fixedclk_name);
-+	ap806_clks[2] = clk_register_fixed_rate(NULL, fixedclk_name, NULL, 0,
-+						1200 * 1000 * 1000);
-+
-+	/* MSS Clock is fixed clock divided by 6 */
-+	of_property_read_string_index(np, "clock-output-names",
-+				      3, &name);
-+	ap806_clks[3] = clk_register_fixed_factor(NULL, name, fixedclk_name,
-+						  0, 1, 6);
-+
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
-+}
-+
-+CLK_OF_DECLARE(ap806_syscon_clk, "marvell,ap806-system-controller",
-+	       ap806_syscon_clk_init);
--- 
-2.6.4
+Is 'setup_fn' ok?
+
+> Honestly, I'd just prefer you skip all this apparatus that makes
+> ACPI earlycon appear to be like OF earlycon code-wise, but without any of
+> the real underpinning or flexibility.
+
+Actually it was Mark Salter who asked to introduce such macros.
+
+https://lkml.kernel.org/g/1441730339.5459.8.camel at redhat.com
+
+I think reusing the OF functions is a good decision.
+
+Your "but without any of the real underpinning or flexibility" is unfounded.
+
+> This would be trivial to parse the ACPI table and invoke
+> setup_earlycon() with a string specifier instead.
+> 
+> For example,
+> 
+> int __init acpi_earlycon_setup(struct acpi_dbg2_device *dbg2)
+> {
+>         char opts[64];
+>         struct acpi_generic_addr *addr = (void*)dbg2 + dbg2->base_address_offset;
+> 	int mmio = addr->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY;
+> 
+>         if (dbg2->port_type != ACPI_DBG2_SERIAL_PORT)
+>                 return 0;
+> 
+>         switch (dbg2->port_subtype) {
+>         case ACPI_DBG2_ARM_PL011:
+> 	case ACPI_DBG2_ARM_SBSA_GENERIC:
+> 	case ACPI_DBG2_BCM2835:
+>                 sprintf(opts, "pl011,%s,0x%llx", mmio, addr->address);
+>                 break;
+>         case ACPI_DBG2_ARM_SBSA_32BIT:
+>                 sprintf(opts, "pl011,mmio32,0x%llx", addr->address);
+>                 break;
+>         case ACPI_DBG2_16550_COMPATIBLE:
+>         case ACPI_DBG2_16550_SUBSET:
+>                 sprintf(opts, "uart,%s,0x%llx", mmio, addr->address);
+>                 break;
+>         default:
+>                 return 0;
+>         }
+> 
+> 	return setup_earlycon(opts);
+> }
+
+- Note that this decision forces setting earlycon on GDB2 debug port.
+  DBG2 does not specify that it should be exactly earlycon.
+
+- You missed ACPI_DBG2_ARM_DCC.  And actually I think the list of 
+  debug ports is open. You will have to make up names like "uart" "pl011"
+  each time a new port is introduced into the specs.
+
+- Most important thing, this way you disclose the internals of serial ports
+  to the generic earlycon.c  Such info as access mode should stay 
+  in the respective drivers.
+
+- I would not like printing address and then parsing it back.
+
+> This supports every earlycon ACPI DBG2 declares, not just the ARM_PL011
+> subtype of your series.
+
+To support earlycon on other types of debug port just add literally one
+string of code (as in pl011).
+
+> 
+> 
+> 
+>>>> +
+>>>>  #endif
+>>>>  
+>>>>  #endif
+>>>>
+>>>
+> 
