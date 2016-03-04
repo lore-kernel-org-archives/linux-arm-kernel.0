@@ -1,39 +1,73 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 4 Mar 2016 09:47:29 +0100
-Subject: [PATCH] arm64: tegra210-smaug: Add gpio-key nodes
-In-Reply-To: <1457034865-17826-1-git-send-email-rklein@nvidia.com>
-References: <1457034865-17826-1-git-send-email-rklein@nvidia.com>
-Message-ID: <20160304084729.GB4038@ulmo>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 4 Mar 2016 08:54:11 +0000
+Subject: [PATCH v2 17/17] arm64: KVM: vgic-v3: Do not save ICH_AP0Rn_EL2
+ for GICv2 emulation
+In-Reply-To: <20160303192154.GJ9634@cbox>
+References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
+ <1455727249-24752-18-git-send-email-marc.zyngier@arm.com>
+ <20160303192154.GJ9634@cbox>
+Message-ID: <56D94D33.1020101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 02:54:25PM -0500, Rhyland Klein wrote:
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-[...]
-> +		lid {
-> +			label = "Lid";
-> +			gpios = <&gpio TEGRA_GPIO(B, 4) GPIO_ACTIVE_LOW>;
-> +			linux,input-type = <5>; /* EV_SW */
-> +			linux,code = <0>; /* SW_LID */
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		tablet_mode {
-> +			label = "Tablet Mode";
-> +			gpios = <&gpio TEGRA_GPIO(Z, 2) GPIO_ACTIVE_HIGH>;
-> +			linux,input-type = <5>; /* EV_SW */
-> +			linux,code = <1>; /* SW_TABLET_MODE */
-> +			gpio-key,wakeup;
-> +		};
+On 03/03/16 19:21, Christoffer Dall wrote:
+> On Wed, Feb 17, 2016 at 04:40:49PM +0000, Marc Zyngier wrote:
+>> The GICv3 specification mandates that ICH_AP0Rn_EL2 are set to
+>> zero when running guests that use the memory mapped registers.
+>>
+>> This is fine, as we initialize all ICH_AP0Rn_EL2 registers to
+>> zero, and restore them on entry. But it also means that we
+>> do not need to save these registers on exit. Profit!
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 19 +++++++++++--------
+>>  1 file changed, 11 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+>> index 5f12c57..c2f173d 100644
+>> --- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
+>> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+>> @@ -202,14 +202,17 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>>  			__gic_v3_set_lr(0, i);
+>>  		}
+>>  
+>> -		switch (nr_pri_bits) {
+>> -		case 7:
+>> -			cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
+>> -			cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
+>> -		case 6:
+>> -			cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
+>> -		default:
+>> -			cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
+>> +		/* ICH_AP0Rn is only valid for SRE==1 */
+>> +		if (cpu_if->vgic_sre & ICC_SRE_EL1_SRE) {
+>> +			switch (nr_pri_bits) {
+>> +			case 7:
+>> +				cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
+>> +				cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
+>> +			case 6:
+>> +				cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
+>> +			default:
+>> +				cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
+>> +			}
+>>  		}
+>>  
+>>  		switch (nr_pri_bits) {
+>> -- 
+>> 2.1.4
+>>
+> 
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
 
-Is there a way to trigger these on a DVT device? Power and volume
-controls work fine, but I haven't found a way to test these two.
+Looks like this patch, despite working fine on A57+GIC500, introduces a
+regression on an internal build of the AEMv8 model. I'm chasing the
+modelling guys in order to find out about it. In the meantime, I'll keep
+it on the back-burner, just in case.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/1b26017c/attachment.sig>
+Thanks.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
