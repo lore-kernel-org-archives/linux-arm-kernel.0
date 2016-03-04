@@ -1,141 +1,47 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Fri, 4 Mar 2016 09:33:13 +0000
-Subject: [PATCH net-next V2 08/16] net: fec: eliminate calls to
- fec_enet_get_prevdesc
-In-Reply-To: <1456360619-24390-9-git-send-email-troy.kisky@boundarydevices.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-9-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB18556C9393B8629330062B8EFFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 4 Mar 2016 10:41:46 +0100
+Subject: [PATCH 1/2] mmc: mediatek: Change signal voltage error to
+ dev_dbg()
+In-Reply-To: <1457000385-2317-1-git-send-email-drinkcat@chromium.org>
+References: <1457000385-2317-1-git-send-email-drinkcat@chromium.org>
+Message-ID: <CAPDyKFqt111susg4GtDsWkYAEPAk0NU7vv67DjG+6FBAw_N1Dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2016 8:37 AM
-> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
-> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
-> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
-> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
-> johannes at sipsolutions.net; stillcompiling at gmail.com;
-> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
-> <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net-next V2 08/16] net: fec: eliminate calls to
-> fec_enet_get_prevdesc
-> 
-> This shrinks the code a little.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+On 3 March 2016 at 11:19, Nicolas Boichat <drinkcat@chromium.org> wrote:
+> In commit ceae98f20e36 ("mmc: core: Try other signal levels
+> during power up") we can see that there are times when it's
+> valid to try several signal voltages.  Don't print an ugly
+> error in the logs when that happens.
+>
+> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+
+Thanks, applied for next!
+
+Kind regards
+Uffe
+
 > ---
->  drivers/net/ethernet/freescale/fec_main.c | 37 +++++++++----------------------
->  1 file changed, 11 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c
-> index 6ceb5f9..b5ed287 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -758,6 +758,7 @@ static void fec_enet_bd_init(struct net_device *dev)
->  	struct bufdesc *bdp;
->  	unsigned int i;
->  	unsigned int q;
-> +	unsigned status;
-
-Should be unsigned int status;
-
-> 
->  	for (q = 0; q < fep->num_rx_queues; q++) {
->  		/* Initialize the receive buffer descriptors. */ @@ -765,19
-> +766,13 @@ static void fec_enet_bd_init(struct net_device *dev)
->  		bdp = rxq->bd.base;
-> 
->  		for (i = 0; i < rxq->bd.ring_size; i++) {
-> -
->  			/* Initialize the BD for every fragment in the page. */
-> -			if (bdp->cbd_bufaddr)
-> -				bdp->cbd_sc =
-> cpu_to_fec16(BD_ENET_RX_EMPTY);
-> -			else
-> -				bdp->cbd_sc = cpu_to_fec16(0);
-> +			status = bdp->cbd_bufaddr ? BD_ENET_RX_EMPTY : 0;
-> +			if (bdp == rxq->bd.last)
-> +				status |= BD_SC_WRAP;
-> +			bdp->cbd_sc = cpu_to_fec16(status);
->  			bdp = fec_enet_get_nextdesc(bdp, &rxq->bd);
->  		}
-> -
-> -		/* Set the last buffer to wrap */
-> -		bdp = fec_enet_get_prevdesc(bdp, &rxq->bd);
-> -		bdp->cbd_sc |= cpu_to_fec16(BD_SC_WRAP);
-> -
->  		rxq->bd.cur = rxq->bd.base;
->  	}
-> 
-> @@ -789,18 +784,16 @@ static void fec_enet_bd_init(struct net_device *dev)
-> 
->  		for (i = 0; i < txq->bd.ring_size; i++) {
->  			/* Initialize the BD for every fragment in the page. */
-> -			bdp->cbd_sc = cpu_to_fec16(0);
->  			if (txq->tx_skbuff[i]) {
->  				dev_kfree_skb_any(txq->tx_skbuff[i]);
->  				txq->tx_skbuff[i] = NULL;
->  			}
->  			bdp->cbd_bufaddr = cpu_to_fec32(0);
-> +			bdp->cbd_sc = cpu_to_fec16((bdp == txq->bd.last) ?
-> +					BD_SC_WRAP : 0);
->  			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
->  		}
-> -
-> -		/* Set the last buffer to wrap */
->  		bdp = fec_enet_get_prevdesc(bdp, &txq->bd);
-> -		bdp->cbd_sc |= cpu_to_fec16(BD_SC_WRAP);
->  		txq->dirty_tx = bdp;
->  	}
->  }
-> @@ -2717,19 +2710,16 @@ fec_enet_alloc_rxq_buffers(struct net_device
-> *ndev, unsigned int queue)
->  		}
-> 
->  		rxq->rx_skbuff[i] = skb;
-> -		bdp->cbd_sc = cpu_to_fec16(BD_ENET_RX_EMPTY);
-> 
->  		if (fep->bufdesc_ex) {
->  			struct bufdesc_ex *ebdp = (struct bufdesc_ex *)bdp;
->  			ebdp->cbd_esc = cpu_to_fec32(BD_ENET_RX_INT);
->  		}
-> +		bdp->cbd_sc = cpu_to_fec16(BD_ENET_RX_EMPTY |
-> +				((bdp == rxq->bd.last) ? BD_SC_WRAP : 0));
-> 
->  		bdp = fec_enet_get_nextdesc(bdp, &rxq->bd);
->  	}
-> -
-> -	/* Set the last buffer to wrap. */
-> -	bdp = fec_enet_get_prevdesc(bdp, &rxq->bd);
-> -	bdp->cbd_sc |= cpu_to_fec16(BD_SC_WRAP);
->  	return 0;
-> 
->   err_alloc:
-> @@ -2752,21 +2742,16 @@ fec_enet_alloc_txq_buffers(struct net_device
-> *ndev, unsigned int queue)
->  		if (!txq->tx_bounce[i])
->  			goto err_alloc;
-> 
-> -		bdp->cbd_sc = cpu_to_fec16(0);
->  		bdp->cbd_bufaddr = cpu_to_fec32(0);
-> 
->  		if (fep->bufdesc_ex) {
->  			struct bufdesc_ex *ebdp = (struct bufdesc_ex *)bdp;
->  			ebdp->cbd_esc = cpu_to_fec32(BD_ENET_TX_INT);
->  		}
-> -
-> +		bdp->cbd_sc = cpu_to_fec16((bdp == txq->bd.last) ?
-> +				BD_SC_WRAP : 0);
->  		bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
->  	}
-> -
-> -	/* Set the last buffer to wrap. */
-> -	bdp = fec_enet_get_prevdesc(bdp, &txq->bd);
-> -	bdp->cbd_sc |= cpu_to_fec16(BD_SC_WRAP);
-> -
->  	return 0;
-> 
->   err_alloc:
+>
+> Similar to b19caf379c82e99737c29bc15d7b7fd7d24279f9
+> mmc: dw_mmc: Change signal voltage error to dev_dbg()
+>
+>  drivers/mmc/host/mtk-sd.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index f01972e..07809f4 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -1038,7 +1038,7 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
+>
+>                 ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
+>                 if (ret) {
+> -                       dev_err(host->dev,
+> +                       dev_dbg(host->dev,
+>                                         "Regulator set error %d: %d - %d\n",
+>                                         ret, min_uv, max_uv);
+>                 } else {
 > --
-> 2.5.0
+> 2.7.0.rc3.207.g0ac5344
+>
