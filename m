@@ -1,68 +1,63 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 4 Mar 2016 12:27:08 +0000
-Subject: [PATCH v5 16/17] FDT: Add a helper to get the subnode by given
- name
-In-Reply-To: <1457073455-11516-17-git-send-email-zhaoshenglong@huawei.com>
-References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
- <1457073455-11516-17-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1603041226520.17938@kaball.uk.xensource.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 4 Mar 2016 13:33:03 +0100
+Subject: [PATCH] ARM: dts: imx25-pinfunc: add MX25_PAD_KPP_ROW3__UART1_RI
+In-Reply-To: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20160304133303.109baa10@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Mar 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Sometimes it needs to check if there is a subnode of given node in FDT
-> by given name. Introduce this helper to get the subnode if it exists.
-> 
-> CC: Rob Herring <robh@kernel.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Hi,
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
->  drivers/of/fdt.c       | 13 +++++++++++++
->  include/linux/of_fdt.h |  2 ++
->  2 files changed, 15 insertions(+)
+On Fri,  4 Mar 2016 11:00:52 +0100 Uwe Kleine-K?nig wrote:
+> Funny side note: When uart1 is used in dte mode (where RI is an input)
+> the RIIN bit in uart1's USR2 register reflects the input level of
+> MX25_PAD_KPP_ROW3 even if this pad is muxed to a different function.
+> The same seems to hold for some other pads, too.
 > 
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 655f79d..09001db 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -645,6 +645,19 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
->  }
+I guess that's not a funny side note, but the expected behaviour when
+the SION bit in the MUX control register is set.
+
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> I think the appropriate action for the "funny" side note is that we must
+> introduce dt-properties like
+> 
+> 	fsl,mask-ri;
+> 
+> or something similar (maybe positive logic?) that prevents an uart1 RI irq
+> whenever uart3.CTS toggles.
+> 
+> Best regards
+> Uwe
+> 
+>  arch/arm/boot/dts/imx25-pinfunc.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
+> index 848ffa785b63..3c8c5e1bea9e 100644
+> --- a/arch/arm/boot/dts/imx25-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx25-pinfunc.h
+> @@ -453,6 +453,7 @@
 >  
->  /**
-> + * of_get_flat_dt_subnode_by_name - get the subnode by given name
-> + *
-> + * @node: the parent node
-> + * @uname: the name of subnode
-> + * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
-> + */
-> +
-> +int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
-> +{
-> +	return fdt_subnode_offset(initial_boot_params, node, uname);
-> +}
-> +
-> +/**
->   * of_get_flat_dt_root - find the root node in the flat blob
->   */
->  unsigned long __init of_get_flat_dt_root(void)
-> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> index df9ef38..fc28162 100644
-> --- a/include/linux/of_fdt.h
-> +++ b/include/linux/of_fdt.h
-> @@ -52,6 +52,8 @@ extern char __dtb_end[];
->  extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
->  				     int depth, void *data),
->  			   void *data);
-> +extern int of_get_flat_dt_subnode_by_name(unsigned long node,
-> +					  const char *uname);
->  extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
->  				       int *size);
->  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
-> -- 
-> 2.0.4
-> 
-> 
+>  #define MX25_PAD_KPP_ROW3__KPP_ROW3		0x1b4 0x3ac 0x000 0x10 0x000
+>  #define MX25_PAD_KPP_ROW3__CSI_D1		0x1b4 0x3ac 0x48c 0x13 0x002
+> +#define MX25_PAD_KPP_ROW3__UART1_RI		0x1b4 0x3ac 0x000 0x14 0x000
+>  #define MX25_PAD_KPP_ROW3__GPIO_3_0		0x1b4 0x3ac 0x000 0x15 0x000
+                                                                  ^^^^
+Do you still have the side effect, with SION (0x10) cleared?
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
