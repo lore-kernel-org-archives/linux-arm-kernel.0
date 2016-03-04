@@ -1,44 +1,73 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  4 Mar 2016 11:00:52 +0100
-Subject: [PATCH] ARM: dts: imx25-pinfunc: add MX25_PAD_KPP_ROW3__UART1_RI
-Message-ID: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Fri, 4 Mar 2016 10:06:18 +0000
+Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
+ fec_timeout
+In-Reply-To: <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <VI1PR0401MB18552AB3E4128E412273B439FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Funny side note: When uart1 is used in dte mode (where RI is an input)
-the RIIN bit in uart1's USR2 register reflects the input level of
-MX25_PAD_KPP_ROW3 even if this pad is muxed to a different function.
-The same seems to hold for some other pads, too.
+From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2016 8:37 AM
+> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
+> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
+> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
+> johannes at sipsolutions.net; stillcompiling at gmail.com;
+> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
+> <troy.kisky@boundarydevices.com>
+> Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
+> fec_timeout
+> 
+> Print the current interrupt flags and mask and the interrupt state during the last
+> interrupt in fec_timeout.
+> 
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  drivers/net/ethernet/freescale/fec.h      | 1 +
+>  drivers/net/ethernet/freescale/fec_main.c | 4 ++++
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec.h
+> b/drivers/net/ethernet/freescale/fec.h
+> index 001200b..615cca1 100644
+> --- a/drivers/net/ethernet/freescale/fec.h
+> +++ b/drivers/net/ethernet/freescale/fec.h
+> @@ -506,6 +506,7 @@ struct fec_enet_private {
+>  	unsigned int total_tx_ring_size;
+>  	unsigned int total_rx_ring_size;
+>  	uint	events;
+> +	uint	last_ievents;
+> 
+>  	struct	platform_device *pdev;
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> b/drivers/net/ethernet/freescale/fec_main.c
+> index afd4060..9a3136b 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -1107,6 +1107,9 @@ fec_timeout(struct net_device *ndev)
+>  	int i;
+>  	uint events = 0;
+> 
+> +	pr_err("%s: last=%x %x, mask %x\n", __func__, fep->last_ievents,
+> +	       readl(fep->hwp + FEC_IEVENT), readl(fep->hwp + FEC_IMASK));
+> +
+pr_err() -> netdev_err()
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+I don't want the debug patch enter to the driver.
 
-I think the appropriate action for the "funny" side note is that we must
-introduce dt-properties like
-
-	fsl,mask-ri;
-
-or something similar (maybe positive logic?) that prevents an uart1 RI irq
-whenever uart3.CTS toggles.
-
-Best regards
-Uwe
-
- arch/arm/boot/dts/imx25-pinfunc.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
-index 848ffa785b63..3c8c5e1bea9e 100644
---- a/arch/arm/boot/dts/imx25-pinfunc.h
-+++ b/arch/arm/boot/dts/imx25-pinfunc.h
-@@ -453,6 +453,7 @@
- 
- #define MX25_PAD_KPP_ROW3__KPP_ROW3		0x1b4 0x3ac 0x000 0x10 0x000
- #define MX25_PAD_KPP_ROW3__CSI_D1		0x1b4 0x3ac 0x48c 0x13 0x002
-+#define MX25_PAD_KPP_ROW3__UART1_RI		0x1b4 0x3ac 0x000 0x14 0x000
- #define MX25_PAD_KPP_ROW3__GPIO_3_0		0x1b4 0x3ac 0x000 0x15 0x000
- 
- #define MX25_PAD_KPP_COL0__KPP_COL0		0x1b8 0x3b0 0x000 0x10 0x000
--- 
-2.7.0
+>  	for (i = 0; i < fep->num_tx_queues; i++) {
+>  		struct fec_enet_priv_tx_q *txq = fep->tx_queue[i];
+>  		int index;
+> @@ -1514,6 +1517,7 @@ fec_enet_interrupt(int irq, void *dev_id)
+> 
+>  	if (!int_events)
+>  		return IRQ_NONE;
+> +	fep->last_ievents = int_events;
+> 
+>  	if (int_events & (FEC_ENET_RXF | FEC_ENET_TXF)) {
+>  		if (napi_schedule_prep(&fep->napi)) {
+> --
+> 2.5.0
