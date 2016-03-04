@@ -1,68 +1,38 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 3 Mar 2016 19:39:22 -0600
-Subject: [PATCH v3 5/5] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <20160302182634.GA26055@rob-hp-laptop>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-6-git-send-email-fcooper@ti.com>
- <20160302182634.GA26055@rob-hp-laptop>
-Message-ID: <56D8E74A.6090601@ti.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 04 Mar 2016 02:39:50 +0100
+Subject: [GIT PULL 1/3] 2nd part of rockchip soc-driver changes for 4.6
+Message-ID: <2165258.7vUftGQ1I7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Arnd, Olof, Kevin,
 
-On 03/02/2016 12:26 PM, Rob Herring wrote:
-> On Thu, Feb 25, 2016 at 04:36:36PM -0600, Franklin S Cooper Jr wrote:
->> From: Vignesh R <vigneshr@ti.com>
->>
->> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
->> for dt bindings.
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->> Version 3 changes:
->> None
->>
->>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  8 +++
->>  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 17 +++++-
->>  arch/arm/boot/dts/dra7.dtsi                        | 64 ++++++++++++++++++++++
->>  3 files changed, 88 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->> index 9c100b2..25d91ae 100644
->> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->> @@ -4,6 +4,7 @@ Required properties:
->>  - compatible: Must be "ti,<soc>-ehrpwm".
->>    for am33xx - compatible = "ti,am33xx-ehrpwm";
->>    for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
->> +  for dra7xx - compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
-> We're starting to push back on wildcards in compatible strings. I guess 
-> this is okay...
->
->>  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
->>    the cells format. The only third cell flag supported by this binding is
->>    PWM_POLARITY_INVERTED.
->> @@ -27,3 +28,10 @@ ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
->>  	#pwm-cells = <3>;
->>  	reg = <0x300000 0x2000>;
->>  };
->> +
->> +ehrpwm0: ehrpwm at 0 { /* EHRPWM on dra7xx */
-> Should be pwm at 48440200
+this contains a fix for the error handling of the power-domain driver.
 
-So the AM335x, AM437x  and DA850 all use ehrpwm0:
-ehrpwm@<address>. Also the address of 0 simply follows the
-pattern used in the other binding examples in that doc. I
-can replace the 0 address in this patch and make another
-patch that fixes it for the other examples in that file. But
-in terms of switching from ehrpwm0:ehrpwm@<address> to
-ehrpwm0:pwm@<address> that would also require making changes
-to the various dtsis also. So is it worth making that
-change? If so I have no problem doing it.
->
->> +	compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
->> +	#pwm-cells = <3>;
->> +	reg = <0x48440200 0x80>;
->> +	ti,hwmods = "ehrpwm0";
->> +};
+
+Thanks
+Heiko
+
+
+The following changes since commit 1d961f11a108af9f7fbe89cc950a8d16ddbdbb28:
+
+  soc: rockchip: power-domain: fix err handle while probing (2016-02-02 22:18:31 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.6-rockchip-drivers2
+
+for you to fetch changes up to 1503cfbbc7c62509c9b1188508d312ab9c90cb24:
+
+  soc: rockchip: power-domain: check the existing of regmap (2016-02-15 22:24:14 +0100)
+
+----------------------------------------------------------------
+Fix handling the case when syscon_node_to_regmap returns an error
+in the power-domain driver.
+
+----------------------------------------------------------------
+Shawn Lin (1):
+      soc: rockchip: power-domain: check the existing of regmap
+
+ drivers/soc/rockchip/pm_domains.c | 4 ++++
+ 1 file changed, 4 insertions(+)
