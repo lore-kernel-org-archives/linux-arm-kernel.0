@@ -1,320 +1,133 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 4 Mar 2016 15:19:40 +0300
-Subject: [PATCH v3 4/7] ACPI: parse DBG2 table
-In-Reply-To: <56D868F5.6030509@hurleysoftware.com>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
- <1456749726-30261-5-git-send-email-aleksey.makarov@linaro.org>
- <56D5ABE1.7010905@hurleysoftware.com> <56D5C234.70305@linaro.org>
- <56D5CFC9.2010206@hurleysoftware.com> <56D5DD48.6050204@linaro.org>
- <56D868F5.6030509@hurleysoftware.com>
-Message-ID: <56D97D5C.7040702@linaro.org>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Fri, 4 Mar 2016 06:23:45 -0600
+Subject: [PATCH v3 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+In-Reply-To: <alpine.DEB.2.02.1603040553010.3980@utopia.booyaka.com>
+References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
+ <1456439796-28546-3-git-send-email-fcooper@ti.com>
+ <20160301181109.GB13417@atomide.com>
+ <alpine.DEB.2.02.1603011858510.14948@utopia.booyaka.com>
+ <20160301205043.GA4469@atomide.com> <56D71331.5020702@ti.com>
+ <56D8EDF4.9070904@ti.com>
+ <alpine.DEB.2.02.1603040553010.3980@utopia.booyaka.com>
+Message-ID: <56D97E51.5050602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Paul,
 
+On 03/04/2016 12:25 AM, Paul Walmsley wrote:
+> On Thu, 3 Mar 2016, Franklin S Cooper Jr. wrote:
+>
+>> So I looked into this more and verified that the eCAP and
+>> ePWM doesn't have their own unique clock. The PWMSS receives
+>> a clock L4PER2_L3_GICLK/2 which is passed through to its
+>> sub-devices (ePWM, eCAP and eQEP). The PWMSS is responsible
+>> for handling its clock internally while the subdevices have
+>> no role in managing this clock. So this explains why we have
+>> hwmod entries for PWMSS and why we are planning on removing
+>> it from the various subdevices.
+> It's not whether they have their own unique clock, but whether the 
+> submodules have OCP integration registers, speak the idle/standby 
+> protocols, have direct L3/L4 ports, etc.
 
-On 03/03/2016 07:40 PM, Peter Hurley wrote:
-> On 03/01/2016 10:19 AM, Aleksey Makarov wrote:
+Sorry from a hwmod perspective your right. I initially
+thought my response about the clocks were related to hwmod
+but I see why I was off after reading a bit more on hwmod.
+>> Since ePWM, eCAP and eQEP are subdevices of PWMSS they
+>> shouldn't have their own concept of their "own" clock. The
+>> ePWM , eCAP and eQEP clocks are all shared and managed by
+>> their parent PWMSS. Once the PWMSS is enabled and has its
+>> clock running then ePWM, eCAP and eQEP from their main clock
+>> perspective have everything they need.
 >>
->>
->> On 03/01/2016 08:22 PM, Peter Hurley wrote:
->>> On 03/01/2016 08:24 AM, Aleksey Makarov wrote:
->>>>
->>>>
->>>> On 03/01/2016 05:49 PM, Peter Hurley wrote:
->>>>> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
->>>>>> 'ARM Server Base Boot Requirements' [1] mentions DBG2 (Microsoft Debug
->>>>>> Port Table 2) [2] as a mandatory ACPI table that specifies debug ports.
->>>>>>
->>>>>> - Implement macros
->>>>>>
->>>>>> 	ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)
->>>>>>
->>>>>>   that defines a handler for the port of given type and subtype.
->>>>>>
->>>>>> - For each declared port that is also described in the ACPI DBG2 table
->>>>>>   call the provided callback.
->>>>>
->>>>> On 02/22/2016 06:43 AM, Aleksey Makarov wrote:
->>>>>> On 02/19/2016 08:20 PM, Christopher Covington wrote:
->>>>>>> Can the device specified in DBG2 be used for both earlycon and KGDB? If it can only be used for one, let's make sure the choice of earlycon vs KGDB is intentional rather than accidental.
->>>>>>
->>>>>> I just sent the DBG2 series.  It enables an earlycon on DBG2 port with
->>>>>> an "earlycon=acpi_dbg2" option (we can discuss particular name).
->>>>>> If you need KGDB on that port just support it for that port in the kernel
->>>>>> (i. e. add a new instance of ACPI_DBG2_DECLARE() macros for that port, see the patches)
->>>>>> and change the command line options.
->>>>>> I hope that is OK.  We could continue this discussion in the DBG2 thread.
->>>>>
->>>>> This method will not work for kgdb, since kgdb doesn't actually
->>>>> implement the i/o but rather runs on top of a console.
->>>>
->>>> I see. Thank you for pointing this out.
->>>>
->>>> I don't have requirements to implement running kgdb over the serial port
->>>> specified with DBG2.  This feature should be supported separately.
->>>
->>> And this takes us back full-circle to my initial point regarding
->>> supporting earlycon via ACPI: which is that my view is earlycon should
->>> be opt-in for any ACPI-specified console, rather than console via
->>> SPCR and earlycon via DBG2.
->>
->> This is the main point on which we do not agree: 
->> should SPCR start a new earlycon or match existing full-featured console.
-> 
-> My point of view is not that SPCR should *only* start an earlycon
-> but rather *optionally also* start an earlycon.
+>> So my plan is to strip all references of clocks (including
+>> hwmod entries) for ePWM, eCAP and eQEP. The devm_clk_get
+>> calls made in the ePWM and eCAP will simply point to their
+>> parent's dev (PWMSS). I did a couple of quick test using
+>> this approach and it works. I have more testing to do but if
+>> that checks out are you ok with the above approach?
+> I don't know if that should be done or not.  I haven't stared at the code 
+> yet, but based on your description, it sounds to me that it probably 
+> shouldn't be done.  In any case, it's not what I meant...
 
-Again, we have DBG2 to specify earlycon.
-SPCR specifies full-featured console.  DBG2 specifies earlycon.
+Your right my response did miss your initial point. But what
+I'm proposing sounds like exactly what you were suggesting.
+I think we both agree that hwmod entries for ePWM, eCAP and
+eQEP should be removed. Not just for dra7 but also for
+am335x and am437x as separate patches.
 
-> This is the existing behavior of every other firmware-specified console.
+My comment about devm_clk_get was based on the fact that I
+don't believe eCAP, ePWM and eQEP should have their own
+clock defined even within DT. Instead they can just
+reference the clk provided by pwmss (its parent) which in
+hardware is the clock that is directly passed to the
+sub-devices. The only reason those drivers need a reference
+to that clk is to get its rate once during probe.
 
-It SPCR + DBG2 works exactly as every other firmware-specified console
-(well, after I change "earlycon=acpi_dbg2" to just "earlycon" back)
-plus it allows to specify console and earlycon separately.
+I plan on doing a bit more testing and I can shoot an
+updated v4. I believe it will address all of your comments
+and you will hopefully get a better understanding of the
+minor change I plan on making.
+>
+>> Also I'm not sure how simple-bus fits in this picture. The
+>> eCAP, eQEP and ePWM are all separate devices. The only thing
+>> that they share is a single clock from their parent. So it
+>> doesn't seem like the right approach. I'm basing this on the
+>> info in this thread
+>> https://www.mail-archive.com/linuxppc-dev at lists.ozlabs.org/msg27979.html
+>> that talks about the usage of simple-bus. So if its outdated
+>> or I"m misinterpreting it incorrectly please let me know.
+> What I meant is that the ECAP*, EQEP*, EHRPWM* devices don't need to be 
+> registered through the hwmod code, due to the fact that they don't have 
+> the integration mentioned above.  Instead, I think those three subdevices 
+> should be listed as child nodes of epwmss* in the DT.
+>
+> Looking at the DT data from Vignesh, it looks like he's already got 
+> ehrpwm1 as a child node of the epwmss1:
+>
+> +               epwmss1: epwmss at 48440000 {
+> +                       compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
+> +                       reg = <0x48440000 0x30>;
+> +                       ti,hwmods = "epwmss1";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       status = "disabled";
+> +                       ranges = <0x48440100  0x48440100  0x80   /* ECAP */
+> +                                 0x48440180  0x48440180  0x80   /* EQEP */
+> +                                 0x48440200  0x48440200  0x80>; /* EHRPWM */
+> +
+> +                       ehrpwm1: ehrpwm at 48440200 {
+> +                               compatible = "ti,dra7xx-ehrpwm",
+> +                                            "ti,am33xx-ehrpwm";
+> +                               #pwm-cells = <3>;
+> +                               reg = <0x48440200 0x80>;
+> +                               ti,hwmods = "ehrpwm1";
+>
+> So, drop the above line, since the subdevices don't have corresponding 
+> hwmods any more.
 
->> But I do not see how this kgdb/DBG2 feature makes your point of view
->> more founded.  Can you please elaborate?
-> 
-> Well, my main concern is that other configurations that you have not
-> provided for will not be supportable at all because of the design choices
-> you're making here.
-> 
-> For example, your current design does not allow for earlycon+console
-> on the SPCR port and debugger on DBG2 port. I think that's a problem.
+Right
+>
+> +                               status = "disabled";
+> +                       };
+>
+> Then, here, you'd add nodes similar to ehrpwm1 for ecap1 and eqep1.  I 
+> can't remember at the moment if adding "simple-bus" to the epwmss1 string 
+> would be sufficient to register the subdevices after the epwmss1 is 
+> probed.  If so, maybe that's all you need.
+>
+> +               };
+>
+> Then repeat for epwmss0, epwmss2.
 
-It can not run earlycon+console on the SPCR port because earlycon
-is specified separately by DBG2.  And that is not a problem, just specify it.
-
-As for debugger, it's not the object of these patchets.
-But I am sure it will not be hard to run it on DBG2, it's just not
-what these patches do.
-
-> Another concern is that, since you haven't accounted for options which
-> we'll want to implement in the near future, that a rewrite will be
-> necessary to implement those.
-
-Correct.  I can not forecast any future design decision.  Nobody can.
-
-> This framework is fairly heavyweight to already not have properly
-> considered how to start kgdb via DBG2.
-
-There is no framework.  It's just a fix for ACPI tables and one simple
-callback function.  No design decisions were made to restrict kdbg via DBG2.
-
->> On the contrary, if SPCR console is earlycon, we will not be able to
->> run kgdb on it.
-> 
-> I'm not sure what you mean by "run kgdb on it". What is "it" and why
-> would that be a problem?
-
-kgdb can not run over earlycon.  If SPCR runs earlycon we can not run kgdb over it.
-
->>>> Thank you
->>>> Aleksey Makarov
->>>>
->>>>>> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
->>>>>> [2] http://go.microsoft.com/fwlink/p/?LinkId=234837
->>>>>>
->>>>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->>>>>> ---
->>>>>>  drivers/acpi/Kconfig              |  3 ++
->>>>>>  drivers/acpi/Makefile             |  1 +
->>>>>>  drivers/acpi/dbg2.c               | 88 +++++++++++++++++++++++++++++++++++++++
->>>>>>  include/asm-generic/vmlinux.lds.h |  1 +
->>>>>>  include/linux/acpi_dbg2.h         | 48 +++++++++++++++++++++
->>>>>>  5 files changed, 141 insertions(+)
->>>>>>  create mode 100644 drivers/acpi/dbg2.c
->>>>>>  create mode 100644 include/linux/acpi_dbg2.h
->>>>>>
->>>>>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->>>>>> index 65fb483..660666e 100644
->>>>>> --- a/drivers/acpi/Kconfig
->>>>>> +++ b/drivers/acpi/Kconfig
->>>>>> @@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
->>>>>>  config ACPI_CCA_REQUIRED
->>>>>>  	bool
->>>>>>  
->>>>>> +config ACPI_DBG2_TABLE
->>>>>> +	bool
->>>>>> +
->>>>>>  config ACPI_DEBUGGER
->>>>>>  	bool "AML debugger interface"
->>>>>>  	select ACPI_DEBUG
->>>>>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->>>>>> index 7395928..3b5f1ea 100644
->>>>>> --- a/drivers/acpi/Makefile
->>>>>> +++ b/drivers/acpi/Makefile
->>>>>> @@ -83,6 +83,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
->>>>>>  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
->>>>>>  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
->>>>>>  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
->>>>>> +obj-$(CONFIG_ACPI_DBG2_TABLE)	+= dbg2.o
->>>>>>  
->>>>>>  # processor has its own "processor." module_param namespace
->>>>>>  processor-y			:= processor_driver.o
->>>>>> diff --git a/drivers/acpi/dbg2.c b/drivers/acpi/dbg2.c
->>>>>> new file mode 100644
->>>>>> index 0000000..0f0f6ca
->>>>>> --- /dev/null
->>>>>> +++ b/drivers/acpi/dbg2.c
->>>>>> @@ -0,0 +1,88 @@
->>>>>> +/*
->>>>>> + * Copyright (c) 2012, Intel Corporation
->>>>>> + * Copyright (c) 2015, 2016 Linaro Ltd.
->>>>>> + *
->>>>>> + * This program is free software; you can redistribute it and/or modify
->>>>>> + * it under the terms of the GNU General Public License version 2 as
->>>>>> + * published by the Free Software Foundation.
->>>>>> + *
->>>>>> + */
->>>>>> +
->>>>>> +#define pr_fmt(fmt) "ACPI: DBG2: " fmt
->>>>>> +
->>>>>> +#include <linux/acpi_dbg2.h>
->>>>>> +#include <linux/acpi.h>
->>>>>> +#include <linux/kernel.h>
->>>>>> +
->>>>>> +static const char * __init type2string(u16 type)
->>>>>> +{
->>>>>> +	switch (type) {
->>>>>> +	case ACPI_DBG2_SERIAL_PORT:
->>>>>> +		return "SERIAL";
->>>>>> +	case ACPI_DBG2_1394_PORT:
->>>>>> +		return "1394";
->>>>>> +	case ACPI_DBG2_USB_PORT:
->>>>>> +		return "USB";
->>>>>> +	case ACPI_DBG2_NET_PORT:
->>>>>> +		return "NET";
->>>>>> +	default:
->>>>>> +		return "?";
->>>>>> +	}
->>>>>> +}
->>>>>> +
->>>>>> +static const char * __init subtype2string(u16 subtype)
->>>>>> +{
->>>>>> +	switch (subtype) {
->>>>>> +	case ACPI_DBG2_16550_COMPATIBLE:
->>>>>> +		return "16550_COMPATIBLE";
->>>>>> +	case ACPI_DBG2_16550_SUBSET:
->>>>>> +		return "16550_SUBSET";
->>>>>> +	case ACPI_DBG2_ARM_PL011:
->>>>>> +		return "ARM_PL011";
->>>>>> +	case ACPI_DBG2_ARM_SBSA_32BIT:
->>>>>> +		return "ARM_SBSA_32BIT";
->>>>>> +	case ACPI_DBG2_ARM_SBSA_GENERIC:
->>>>>> +		return "ARM_SBSA_GENERIC";
->>>>>> +	case ACPI_DBG2_ARM_DCC:
->>>>>> +		return "ARM_DCC";
->>>>>> +	case ACPI_DBG2_BCM2835:
->>>>>> +		return "BCM2835";
->>>>>> +	default:
->>>>>> +		return "?";
->>>>>> +	}
->>>>>> +}
->>>>>> +
->>>>>> +int __init acpi_dbg2_setup(struct acpi_table_header *table, const void *data)
->>>>>> +{
->>>>>> +	struct acpi_table_dbg2 *dbg2 = (struct acpi_table_dbg2 *)table;
->>>>>> +	struct acpi_dbg2_data *dbg2_data = (struct acpi_dbg2_data *)data;
->>>>>> +	struct acpi_dbg2_device *dbg2_device, *dbg2_end;
->>>>>> +	int i;
->>>>>> +
->>>>>> +	dbg2_device = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2,
->>>>>> +				   dbg2->info_offset);
->>>>>> +	dbg2_end = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2, table->length);
->>>>>> +
->>>>>> +	for (i = 0; i < dbg2->info_count; i++) {
->>>>>> +		if (dbg2_device + 1 > dbg2_end) {
->>>>>> +			pr_err("device pointer overflows, bad table\n");
->>>>>> +			return 0;
->>>>>> +		}
->>>>>> +
->>>>>> +		if (dbg2_device->port_type == dbg2_data->port_type &&
->>>>>> +		    dbg2_device->port_subtype == dbg2_data->port_subtype) {
->>>>>> +			if (dbg2_device->port_type == ACPI_DBG2_SERIAL_PORT)
->>>>>> +				pr_info("debug port: SERIAL; subtype: %s\n",
->>>>>> +				     subtype2string(dbg2_device->port_subtype));
->>>>>> +			else
->>>>>> +				pr_info("debug port: %s\n",
->>>>>> +					type2string(dbg2_device->port_type));
->>>>>> +			dbg2_data->setup(dbg2_device, dbg2_data->data);
->>>>>> +		}
->>>>>> +
->>>>>> +		dbg2_device = ACPI_ADD_PTR(struct acpi_dbg2_device, dbg2_device,
->>>>>> +					   dbg2_device->length);
->>>>>> +	}
->>>>>> +
->>>>>> +	return 0;
->>>>>> +}
->>>>>> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
->>>>>> index 8f5a12a..8cc49ba 100644
->>>>>> --- a/include/asm-generic/vmlinux.lds.h
->>>>>> +++ b/include/asm-generic/vmlinux.lds.h
->>>>>> @@ -526,6 +526,7 @@
->>>>>>  	IRQCHIP_OF_MATCH_TABLE()					\
->>>>>>  	ACPI_PROBE_TABLE(irqchip)					\
->>>>>>  	ACPI_PROBE_TABLE(clksrc)					\
->>>>>> +	ACPI_PROBE_TABLE(dbg2)						\
->>>>>>  	EARLYCON_TABLE()
->>>>>>  
->>>>>>  #define INIT_TEXT							\
->>>>>> diff --git a/include/linux/acpi_dbg2.h b/include/linux/acpi_dbg2.h
->>>>>> new file mode 100644
->>>>>> index 0000000..125ae7e
->>>>>> --- /dev/null
->>>>>> +++ b/include/linux/acpi_dbg2.h
->>>>>> @@ -0,0 +1,48 @@
->>>>>> +#ifndef _ACPI_DBG2_H_
->>>>>> +#define _ACPI_DBG2_H_
->>>>>> +
->>>>>> +#ifdef CONFIG_ACPI_DBG2_TABLE
->>>>>> +
->>>>>> +#include <linux/kernel.h>
->>>>>> +
->>>>>> +struct acpi_dbg2_device;
->>>>>> +struct acpi_table_header;
->>>>>> +
->>>>>> +struct acpi_dbg2_data {
->>>>>> +	u16 port_type;
->>>>>> +	u16 port_subtype;
->>>>>> +	int (*setup)(struct acpi_dbg2_device *, void *);
->>>>>> +	void *data;
->>>>>> +};
->>>>>> +
->>>>>> +int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
->>>>>> +
->>>>>> +/**
->>>>>> + * ACPI_DBG2_DECLARE() - Define handler for ACPI DBG2 port
->>>>>> + * @name:	Identifier to compose name of table data
->>>>>> + * @type:	Type of the port
->>>>>> + * @subtype:	Subtype of the port
->>>>>> + * @setup_fn:	Function to be called to setup the port
->>>>>> + *		(of type int (*)(struct acpi_dbg2_device *, void *);)
->>>>>> + * @data_ptr:	Sideband data provided back to the driver
->>>>>> + */
->>>>>> +#define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
->>>>>> +	static const struct acpi_dbg2_data				\
->>>>>> +		__acpi_dbg2_data_##name __used = {			\
->>>>>> +			.port_type = type,				\
->>>>>> +			.port_subtype = subtype,			\
->>>>>> +			.setup = setup_fn,				\
->>>>>> +			.data = data_ptr,				\
->>>>>> +		   };							\
->>>>>> +	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
->>>>>> +				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
->>>>>> +
->>>>>> +#else
->>>>>> +
->>>>>> +#define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
->>>>>> +	static const void *__acpi_dbg_data_##name[]			\
->>>>>> +		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
->>>>>> +
->>>>>> +#endif
->>>>>> +
->>>>>> +#endif
->>>>>>
->>>>>
->>>
-> 
+As you mentioned pwmss is the parent node in the DT while
+ecap and epwm are child nodes. These child nodes must be
+probed only after their parent node has been probed and the
+parent clock is running. The pwm-tipwmss.c already calls
+of_platform_populate(node, NULL, NULL, &pdev->dev); as the
+very last step of its probe call. So what you want to happen
+is already happening in the driver. So I don't believe
+simple-bus is needed.
+>
+>
+> - Paul
