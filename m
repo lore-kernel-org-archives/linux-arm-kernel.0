@@ -1,93 +1,116 @@
-From: cmetcalf@mellanox.com (Chris Metcalf)
-Date: Fri, 4 Mar 2016 15:02:47 -0500
-Subject: [PATCH v10 11/12] arm64: factor work_pending state machine to C
-In-Reply-To: <20160304163814.GD7886@arm.com>
-References: <1456949376-4910-1-git-send-email-cmetcalf@ezchip.com>
- <1456949376-4910-12-git-send-email-cmetcalf@ezchip.com>
- <20160304163814.GD7886@arm.com>
-Message-ID: <56D9E9E7.9000503@mellanox.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Fri, 4 Mar 2016 14:03:36 -0600
+Subject: [PATCH 0/4] pwm: omap-dmtimer: fix period/duty_cycle calculation
+In-Reply-To: <20160304150109.2c4941ef.drivshin.allworx@gmail.com>
+References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+ <20160226203100.303fe192.drivshin.allworx@gmail.com>
+ <20160304151948.GF26400@ulmo.nvidia.com>
+ <20160304112736.660e4223.drivshin.allworx@gmail.com>
+ <CAHCN7xJYi8VCe8ue_QuYmqTEo-8GPSPiwzM2F_631mMUrwajSA@mail.gmail.com>
+ <20160304150109.2c4941ef.drivshin.allworx@gmail.com>
+Message-ID: <CAHCN7xKFgMJre0wENHU1NPLAoR3eZRd7_-iFA=_n8+2xsJ4xNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2016 11:38 AM, Will Deacon wrote:
-> Hi Chris,
+On Fri, Mar 4, 2016 at 2:01 PM, David Rivshin (Allworx)
+<drivshin.allworx@gmail.com> wrote:
+> On Fri, 4 Mar 2016 10:29:07 -0600
+> Adam Ford <aford173@gmail.com> wrote:
 >
-> On Wed, Mar 02, 2016 at 03:09:35PM -0500, Chris Metcalf wrote:
->> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
->> state machine that can be difficult to reason about due to duplicated
->> code and a large number of branch targets.
+>> I am OK with it. 0% vs 1% is not perceivable and neither is 99% vs 100%.
+>
+> IIRC, you tested with none of these patches, and with all of them. You
+> might want to double check the behavior with just patch 1 and 3, since
+> that's what Thierry applied. I'm just concerned that the behavior now
+> might be worse at one extreme or the other, compared to your previous
+> tests.
+>
+
+I will give them a try this afternoon and see how they are perceived.
+I am offsite, so I don't have an oscilloscope to actually observe the
+waveform.
+
+adam
+
 >>
->> This patch factors the common logic out into the existing
->> do_notify_resume function, converting the code to C in the process,
->> making the code more legible.
+>> Thanks!
 >>
->> This patch tries to closely mirror the existing behaviour while using
->> the usual C control flow primitives. As local_irq_{disable,enable} may
->> be instrumented, we balance exception entry (where we will almost most
->> likely enable IRQs) with a call to trace_hardirqs_on just before the
->> return to userspace.
-> [...]
+>> Adam
+>> On Mar 4, 2016 10:27 AM, "David Rivshin (Allworx)" <
+>> drivshin.allworx at gmail.com> wrote:
+>>
+>> > On Fri, 4 Mar 2016 16:19:48 +0100
+>> > Thierry Reding <thierry.reding@gmail.com> wrote:
+>> >
+>> > > On Fri, Feb 26, 2016 at 08:31:00PM -0500, David Rivshin (Allworx) wrote:
+>> > > > On Fri, 29 Jan 2016 23:26:50 -0500
+>> > > > "David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
+>> > > >
+>> > > > > From: David Rivshin <drivshin@allworx.com>
+>> > > > >
+>> > > > > When using a short PWM period (approaching the min of 2/clk_rate),
+>> > > > > pwm-omap-dmtimer does not produce accurate results. In the worst
+>> > case a
+>> > > > > requested period of 2/clk_rate would result in a real period of
+>> > 4/clk_rate
+>> > > > > instead. This is a series includes a fix for that problem, as well as
+>> > > > > other related improvements, and is based on the current
+>> > linux-pwm/for-next
+>> > > > > tip.
+>> > > > >
+>> > > > > I have tested on a Sitara AM335x platform, using a scope to verify
+>> > the
+>> > > > > output with a variety of periods and duty cycles. This includes a PWM
+>> > > > > rate up clk_rate/2 with 50% duty cycle (e.g. generating fclk/2) with
+>> > > > > both 32768Hz and 24MHz fclks. I do not have an OMAP4 board to test
+>> > with,
+>> > > > > although appropriate sections in the the reference manuals appear
+>> > > > > substantially the same, so I believe the changes are equally correct
+>> > > > > there.
+>> > > > >
+>> > > > > Note that the OMAP4 TRMs do effectively state that the maximum PWM
+>> > > > > rate is clk_rate/4, so at very fast PWM rates the behavior may not be
+>> > > > > as reliable as I observed with Sitara. Although I suspect that it's
+>> > > > > the same module and will also work, at least under some
+>> > circumstances.
+>> > > > > If anyone with OMAP4 hardware and a scope is so inclined, I would be
+>> > > > > curious to know the results.
+>> > > > >
+>> > > > > David Rivshin (4):
+>> > > > >   pwm: omap-dmtimer: fix inaccurate period/duty_cycle calculation
+>> > > > >   pwm: omap-dmtimer: add sanity checking for load and match values
+>> > > > >   pwm: omap-dmtimer: round load and match values rather than truncate
+>> > > > >   pwm: omap-dmtimer: add dev_dbg() message for effective period and
+>> > duty
+>> > > > >     cycle
+>> > > > >
+>> > > > >  drivers/pwm/pwm-omap-dmtimer.c | 71
+>> > ++++++++++++++++++++++++++++++++----------
+>> > > > >  1 file changed, 55 insertions(+), 16 deletions(-)
+>> > > > >
+>> > > >
+>> > > > Hi Thierry,
+>> > > >
+>> > > > Gentle ping. It does not look like you've taken this series, and I
+>> > > > wanted to make sure you're not waiting on something from me. It would
+>> > > > be nice to get at least the first patch into 4.5, if possible.
+>> > >
+>> > > I've applied patches 1 and 3, and I'm planning on sending out a pull
+>> > > request for inclusion in v4.5-rc7 later on.
+>> >
+>> > Thanks!
+>> >
+>> > > Patches 2 and 4 didn't seem ready/critical, so let's finish those up
+>> > > for v4.6-rc1.
+>> >
+>> > I know there was a lot of discussion on 4, but I'm not sure what the
+>> > concern is on patch 2. Is there something specific you're thinking of?
+>> >
+>> > FYI, I know that Adam Ford is using this driver as the backend for
+>> > a pwm-backlight control. Without patch 2 this driver will not configure
+>> > the HW in a legal way at 0 or 100% duty cycle. However, I forget what
+>> > the practical effect of that is, and Adam seemed to indicate it was OK
+>> > for his purposes.
+>> >
+>> >
 >
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 1f7f5a2b61bf..966d0d4308f2 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -674,18 +674,13 @@ ret_fast_syscall_trace:
->>    * Ok, we need to do extra processing, enter the slow path.
->>    */
->>   work_pending:
->> -	tbnz	x1, #TIF_NEED_RESCHED, work_resched
->> -	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
->>   	mov	x0, sp				// 'regs'
->> -	enable_irq				// enable interrupts for do_notify_resume()
->>   	bl	do_notify_resume
->> -	b	ret_to_user
->> -work_resched:
->>   #ifdef CONFIG_TRACE_IRQFLAGS
->> -	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
->> +	bl	trace_hardirqs_on		// enabled while in userspace
-> This doesn't look right to me. We only get here after running
-> do_notify_resume, which returns with interrupts disabled.
->
-> Do we not instead need to inform the tracing code that interrupts are
-> disabled prior to calling do_notify_resume?
-
-I think you are right about the trace_hardirqs_off prior to
-calling into do_notify_resume, given Catalin's recent commit to
-add it.  I dropped it since I was moving schedule() into C code,
-but I suspect we'll see the same problem that Catalin saw with
-CONFIG_TRACE_IRQFLAGS without it.  I'll copy the arch/arm approach
-and add a trace_hardirqs_off() at the top of do_notify_resume().
-
-The trace_hardirqs_on I was copying from Mark Rutland's earlier patch:
-
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/467781
-
-I don't know if it's necessary to flag that interrupts are enabled
-prior to returning to userspace; it may well not be.  Mark, can you
-comment on what led you to add that trace_hardirqs_on?
-
-For now I've left both of them in there.
-
->> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
->> index e18c48cb6db1..3432e14b7d6e 100644
->> --- a/arch/arm64/kernel/signal.c
->> +++ b/arch/arm64/kernel/signal.c
->> @@ -402,15 +402,29 @@ static void do_signal(struct pt_regs *regs)
->>   asmlinkage void do_notify_resume(struct pt_regs *regs,
->>   				 unsigned int thread_flags)
->>   {
->> -	if (thread_flags & _TIF_SIGPENDING)
->> -		do_signal(regs);
->> +	while (true) {
->> [...]
->> +	}
-> This might be easier to read as a do { ... } while.
-
-Yes, and in fact that's how I did it for arch/tile, as the maintainer.
-I picked up the arch/x86 version as more canonical to copy.  But I'm
-more than happy to do it the other way :-).  Fixed.
-
--- 
-Chris Metcalf, EZChip Semiconductor
-http://www.ezchip.com
