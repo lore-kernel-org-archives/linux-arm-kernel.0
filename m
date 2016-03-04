@@ -1,96 +1,33 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 4 Mar 2016 12:19:32 +0100
-Subject: DWord alignment on ARMv7
-In-Reply-To: <CAKv+Gu8b05BsNMPD2QNf9pLyRwSNGhc-5TVskwfudYuVqeCoAw@mail.gmail.com>
-References: <56D8BA3F.7050508@pengutronix.de> <20160303235426.GA11237@arm.com>
- <CAKv+Gu8D37DgfbopvB1On_=fNqrBzmCmOCTotX2Lvv6NoSCtvw@mail.gmail.com>
- <20160304110210.GA19428@n2100.arm.linux.org.uk>
- <CAKv+Gu8b05BsNMPD2QNf9pLyRwSNGhc-5TVskwfudYuVqeCoAw@mail.gmail.com>
-Message-ID: <56D96F44.6010905@pengutronix.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 4 Mar 2016 11:23:46 +0000
+Subject: [RFC PATCH 0/8] PM / Domains: Add support for removing PM domains
+Message-ID: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2016 12:14 PM, Ard Biesheuvel wrote:
-> I wonder if we should simply apply something like the patch below
-> (untested): it depends on how many 32-bit architectures implement
+In order to safely remove PM domains there are a few changes that need to be
+made to ensure that no one is holding an external reference to a PM domain
+after it has been removed. One solution, implemented here, solves this by
+eliminating external references to PM domain. Another alternative would be
+to employ some reference counting for the PM domains, however, I did not see
+a good reason for allowing external references in the first place (as always
+there could be something that I have over-looked!).
 
-The "Last line effect" hit here.
+Jon Hunter (8):
+  PM / Domains: Add new helper functions for device-tree
+  ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
+  staging: board: Remove calls to of_genpd_get_from_provider()
+  PM / Domains: Don't expose generic_pm_domain structure
+  PM / Domains: Verify the PM domain is present when adding a provider
+  PM / Domains: Remove a provider by referencing the data pointer
+  PM / Domains: Prepare for adding support to remove PM domains
+  PM / Domains: Add support for removing PM domains
 
-> double word load instructions, but for ones that don't, the patch
-> shouldn't change anything, nor should it change anything for 64-bit
-> architectures.
-
-> -------8<-----------
-> diff --git a/include/linux/unaligned/access_ok.h
-> b/include/linux/unaligned/access_ok.h
-> index 99c1b4d20b0f..019d0b7ea6a3 100644
-> --- a/include/linux/unaligned/access_ok.h
-> +++ b/include/linux/unaligned/access_ok.h
-> @@ -16,7 +16,11 @@ static inline u32 get_unaligned_le32(const void *p)
-> 
->  static inline u64 get_unaligned_le64(const void *p)
->  {
-> -       return le64_to_cpup((__le64 *)p);
-> +       if (BITS_PER_LONG == 64)
-> +               return le64_to_cpup((__le64 *)p);
-> +       else
-> +               return ((u64)le32_to_cpup((__le32 *)p)) |
-> +                      ((u64)le32_to_cpup((__le32 *)p + 1) << 32);
->  }
-> 
->  static inline u16 get_unaligned_be16(const void *p)
-> @@ -31,7 +35,11 @@ static inline u32 get_unaligned_be32(const void *p)
-> 
->  static inline u64 get_unaligned_be64(const void *p)
->  {
-> -       return be64_to_cpup((__be64 *)p);
-> +       if (BITS_PER_LONG == 64)
-> +               return be64_to_cpup((__be64 *)p);
-> +       else
-> +               return ((u64)be32_to_cpup((__be32 *)p) << 32) |
-> +                      ((u64)be32_to_cpup((__be32 *)p + 1));
->  }
-> 
->  static inline void put_unaligned_le16(u16 val, void *p)
-> @@ -46,7 +54,12 @@ static inline void put_unaligned_le32(u32 val, void *p)
-> 
->  static inline void put_unaligned_le64(u64 val, void *p)
->  {
-> -       *((__le64 *)p) = cpu_to_le64(val);
-> +       if (BITS_PER_LONG == 64) {
-> +               *((__le64 *)p) = cpu_to_le64(val);
-> +       } else {
-> +               *((__le32 *)p) = cpu_to_le32(val);
-> +               *((__le32 *)p + 1) = cpu_to_le32(val >> 32);
-> +       }
->  }
-> 
->  static inline void put_unaligned_be16(u16 val, void *p)
-> @@ -61,7 +74,12 @@ static inline void put_unaligned_be32(u32 val, void *p)
-> 
->  static inline void put_unaligned_be64(u64 val, void *p)
->  {
-> -       *((__be64 *)p) = cpu_to_be64(val);
-> +       if (BITS_PER_LONG == 64) {
-> +               *((__be64 *)p) = cpu_to_be64(val);
-> +       } else {
-> +               *((__be32 *)p) = cpu_to_le32(val >> 32);
-                                          be32
-> +               *((__be32 *)p + 1) = cpu_to_le32(val);
-                                              be32
-
-Marc
+ arch/arm/mach-exynos/pm_domains.c |  23 +--
+ drivers/base/power/domain.c       | 324 +++++++++++++++++++++++++++++++++++---
+ drivers/staging/board/board.c     |   9 +-
+ include/linux/pm_domain.h         |  55 ++++---
+ 4 files changed, 348 insertions(+), 63 deletions(-)
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/eab425e3/attachment-0001.sig>
+2.1.4
