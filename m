@@ -1,65 +1,60 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 4 Mar 2016 14:53:15 +0300
-Subject: [PATCH v4 0/4] ACPI: parse the SPCR table
-In-Reply-To: <56D859CC.7010901@hurleysoftware.com>
-References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
- <56D5B5CB.7010702@hurleysoftware.com> <56D8272E.20705@gmail.com>
- <56D859CC.7010901@hurleysoftware.com>
-Message-ID: <56D9772B.5000402@linaro.org>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 4 Mar 2016 11:57:53 +0000
+Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
+In-Reply-To: <20160304030349.GA11012@leoy-linaro>
+References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
+ <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
+ <20160303162942.GA2445@localhost.localdomain>
+ <20160304030349.GA11012@leoy-linaro>
+Message-ID: <20160304115752.GA13894@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/03/2016 06:35 PM, Peter Hurley wrote:
-> On 03/03/2016 03:59 AM, Aleksey Makarov wrote:
->>
->>
->> On 03/01/2016 06:31 PM, Peter Hurley wrote:
->>> On 02/29/2016 04:02 AM, Aleksey Makarov wrote:
->>>> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
->>>> Console Redirection Table) [2] as a mandatory ACPI table that
->>>> specifies the configuration of serial console.
->>>>
->>>> Introduce a new function acpi_console_check().  At the uart port
->>>> registration, this function checks if the ACPI SPCR table specifies
->>>> its argument of type struct uart_port to be a console
->>>> and if so calls add_preferred_console().
->>>
->>> How will a user enable an earlycon on the same console as the SPCR
->>> console if there is no DBG2 table?
->>
->> ...
->> [    0.000000] earlycon: pl11 at MMIO 0x0000000009000000 (options '')
->> [    0.000000] bootconsole [pl11] enabled
->> ...
->> [    0.000000] Kernel command line:  root=/dev/vda1 rw systemd.show_status=no acpi=force earlycon=pl011,0x9000000
->> ...
->> [    0.318248] ACPI: SPCR: adding preferred console [ttyAMA0]
->> [    0.318736] ARMH0011:00: ttyAMA0 at MMIO 0x9000000 (irq = 5, base_baud = 0) is a SBSA
->> [    0.319502] console [ttyAMA0] enabled
->> [    0.319502] console [ttyAMA0] enabled
->> [    0.319933] bootconsole [pl11] disabled
->> [    0.319933] bootconsole [pl11] disabled
->> ...
->>
->> Why?
+On Fri, Mar 04, 2016 at 11:03:49AM +0800, Leo Yan wrote:
+> Hi Eduardo,
 > 
-> That's pretty disingenuous; via command line?
+> On Thu, Mar 03, 2016 at 08:29:44AM -0800, Eduardo Valentin wrote:
+> > Hi Leo,
+> > 
+> > On Fri, Feb 26, 2016 at 11:43:43AM +0800, Leo Yan wrote:
+> > > The property "hysteresis" is mandatory for trip points, so if without
+> > > it the thermal zone cannot register successfully. But "hysteresis" is
+> > > ignored in the thermal subsystem and only inquired by several thermal
+> > > sensor drivers.
+> > 
+> > I am not sure this a good direction to go. Remember that Linux
+> > implementation not necessarily has to be the implication of the DT
+> > binding. Hysteresis is a property that plays a significant role on
+> > thermal control systems, which in many cases avoid overshooting cooling
+> > actions. Having the DT writer to explicitly set it to 0 means that zone
+> > does not suffer of overshooting and does not need hysteresis.
 > 
-> By that measure, none of your patches are required because a user
-> can already start both console and earlycon without them.
+> After review current code, the "hysteresis" is used to calculate
+> temperature falling threshold with a more conservative value; so that
+> finally avoid overshooting issue.
 > 
-> With the console location specified in the SPCR, earlycon should
-> be opt-in on the command-line simply with "earlycon" command-line
-> parameter.
+> Please confirm if is my understanding correct or not?
+> 
+> > If the Linux thermal subsystem has a problem with handling hysteresis, I
+> > would rather fix Linux code than relaxing the DT binding. Or if you
+> > still believe hysteresis is really optional, I would prefer to see a
+> > better justification than "Linux ignores it".
 
-Yes.  That's why we have SPCR *and* DBG2. 
-DBG2 specifies where we should run earlycon.
+I see it the other way round, Is hysteresis a property that, without
+it, the thermal code can't configure itself so it fails to create the
+trip point?  The current code goes "There is no hysteresis for this
+property, I don't know how to set up this trip point!".  I think we
+can do better than this.
 
->>> How will a user enable an earlycon on the same console as the SPCR
->>> console if there is no DBG2 table?
+> If we think about power allocator governor, PID's two parameters are
+> also used to dismiss overshooting issue: one is k_po (proportional
+> term), another is k_i (integral term). So that means after we apply
+> power allocator governor, we don't need parameter "hysteresis" due PID
+> algorithm can automatically dismiss potential errors.
 
-In no way.  You need DBG2 to run earlycon.
+I disagree.  We shouldn't base DT decisions based on only one
+governor in linux.  Having said that, AFAICS all governors currently
+ignore hysteresis.
 
-(If you don't want to specify it's address etc explicitly)
+Cheers,
+Javi
