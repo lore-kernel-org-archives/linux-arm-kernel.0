@@ -1,91 +1,98 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 4 Mar 2016 11:09:32 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56D887E1.8000602@redhat.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com> <56D887E1.8000602@redhat.com>
-Message-ID: <20160304020932.GB12036@js1304-P5Q-DELUXE>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 4 Mar 2016 10:04:38 +0800
+Subject: [PATCH 3/3] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
+ property
+In-Reply-To: <56D8BB1D.6040108@maciej.szmigiero.name>
+References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
+ <1456999276-6315-4-git-send-email-peter.chen@nxp.com>
+ <56D8BB1D.6040108@maciej.szmigiero.name>
+Message-ID: <20160304020438.GC30272@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 10:52:17AM -0800, Laura Abbott wrote:
-> On 03/03/2016 04:49 AM, Hanjun Guo wrote:
-> >On 2016/3/3 15:42, Joonsoo Kim wrote:
-> >>2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
-> >>>(cc -mm and Joonsoo Kim)
-> >>>
-> >>>
-> >>>On 03/02/2016 05:52 AM, Hanjun Guo wrote:
-> >>>>Hi,
-> >>>>
-> >>>>I came across a suspicious error for CMA stress test:
-> >>>>
-> >>>>Before the test, I got:
-> >>>>-bash-4.3# cat /proc/meminfo | grep Cma
-> >>>>CmaTotal:         204800 kB
-> >>>>CmaFree:          195044 kB
-> >>>>
-> >>>>
-> >>>>After running the test:
-> >>>>-bash-4.3# cat /proc/meminfo | grep Cma
-> >>>>CmaTotal:         204800 kB
-> >>>>CmaFree:         6602584 kB
-> >>>>
-> >>>>So the freed CMA memory is more than total..
-> >>>>
-> >>>>Also the the MemFree is more than mem total:
-> >>>>
-> >>>>-bash-4.3# cat /proc/meminfo
-> >>>>MemTotal:       16342016 kB
-> >>>>MemFree:        22367268 kB
-> >>>>MemAvailable:   22370528 kB
-> >[...]
-> >>>
-> >>>I played with this a bit and can see the same problem. The sanity
-> >>>check of CmaFree < CmaTotal generally triggers in
-> >>>__move_zone_freepage_state in unset_migratetype_isolate.
-> >>>This also seems to be present as far back as v4.0 which was the
-> >>>first version to have the updated accounting from Joonsoo.
-> >>>Were there known limitations with the new freepage accounting,
-> >>>Joonsoo?
-> >>I don't know. I also played with this and looks like there is
-> >>accounting problem, however, for my case, number of free page is slightly less
-> >>than total. I will take a look.
-> >>
-> >>Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
-> >>look like your case.
-> >
-> >I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
-> >did some other test:
-> >
-> >  - run with single thread with 100000 times, everything is fine.
-> >
-> >  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
-> >    the same test with 100 multi-thread, then I got:
-> >
-> >-bash-4.3# cat /proc/meminfo | grep Cma
-> >CmaTotal: 204800 kB
-> >CmaFree: 225112 kB
-> >
-> >It only increased about 30M for free, not 6G+ in previous test, although
-> >the problem is not solved, the problem is less serious, is it a synchronization
-> >problem?
-> >
+On Thu, Mar 03, 2016 at 11:30:53PM +0100, Maciej S. Szmigiero wrote:
+> Hi Peter,
 > 
-> 'only' 30M is still an issue although I think you are right about something related
-> to synchronization. When I put the cma_mutex around free_contig_range I don't see
+> On 03.03.2016 11:01, Peter Chen wrote:
+> > From: Peter Chen <peter.chen@freescale.com>
+> > 
+> > The current dts describes USB HUB's property at USB controller's
+> > entry, it is improper. The USB HUB should be the child node
+> > under USB controller.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> 
+> Thanks for patches!
+> 
+> VID:PID for hub on UDOO board is 0424:2514.
+> 
+> I've tested these patches on this board and was able to make USB work
+> again with following DT changes:
+> diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+> index d3e54e4..4956de7 100644
+> --- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+> @@ -9,6 +9,8 @@
+>   *
+>   */
+>  
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+>  / {
+>  	chosen {
+>  		stdout-path = &uart2;
+> @@ -18,21 +27,11 @@
+>  		reg = <0x10000000 0x40000000>;
+>  	};
+>  
+> -	regulators {
+> -		compatible = "simple-bus";
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+> -		reg_usb_h1_vbus: regulator at 0 {
+> -			compatible = "regulator-fixed";
+> -			reg = <0>;
+> -			regulator-name = "usb_h1_vbus";
+> -			regulator-min-microvolt = <5000000>;
+> -			regulator-max-microvolt = <5000000>;
+> -			enable-active-high;
+> -			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
+> -			gpio = <&gpio7 12 0>;
+> -		};
+> +	usb2415_pwrseq: usb2415_pwrseq {
+> +		compatible = "usb-pwrseq";
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+> +		reset-duration-us = <3000>;
+>  	};
+>  
+>  	sound {
+> @@ -163,9 +218,16 @@
+>  &usbh1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_usbh>;
+> -	vbus-supply = <&reg_usb_h1_vbus>;
+> -	clocks = <&clks 201>;
+>  	status = "okay";
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	hub: usb2415 at 01 {
+> +		compatible = "usb424,2514";
+> +		reg = <1>;
+> +		usb-pwrseq = <&usb2415_pwrseq>;
+> +	};
+>  };
+>  
+>  &usdhc3 {
+> 
+> 
 
-Hmm... I can see the issue even if putting the cma_mutex around
-free_contig_range().
+Thank you very much.
 
-In other reply, I attached the code to temporary close the race.
+-- 
 
-> the issue. I wonder if free of the pages is racing with the undo_isolate_page_range
-> on overlapping ranges caused by outer_start?
-
-I don't know yet.
-Anyway, it looks like that the problem that I want to fix by commit '3c60509'
-still remains.
-
-Thanks.
+Best Regards,
+Peter Chen
