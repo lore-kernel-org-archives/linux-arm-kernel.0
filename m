@@ -1,37 +1,92 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 4 Mar 2016 14:26:43 +0000
-Subject: [PATCH] ARM64: tegra: Remove unused #power-domain-cells property
-Message-ID: <1457101603-8426-1-git-send-email-jonathanh@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Mar 2016 15:41:58 +0100
+Subject: DWord alignment on ARMv7
+In-Reply-To: <20160304134651.GB19428@n2100.arm.linux.org.uk>
+References: <56D8BA3F.7050508@pengutronix.de> <72900410.JPa1IHPXo5@wuerfel>
+ <20160304134651.GB19428@n2100.arm.linux.org.uk>
+Message-ID: <2494410.DJhrOHD4yE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the "#power-domain-cells" property which was incorrectly
-included by commit e53095857166 ("arm64: tegra: Add Tegra210
-support").
+On Friday 04 March 2016 13:46:51 Russell King - ARM Linux wrote:
+> On Fri, Mar 04, 2016 at 02:30:23PM +0100, Arnd Bergmann wrote:
+> > Ah, I thought it only required 32-bit alignment like ldm/stm, but it
+> > seems that it won't do that. However, an implementation like
+> > 
+> > unsigned long long get_unaligned_u64(void *p)
+> > {
+> >         unsigned long long upper, lower;
+> >         lower = *(unsigned long*)p;
+> >         upper = *(unsigned long*)(p+4);
+> > 
+> >         return lower | (upper << 32);
+> > }
+> > 
+> > does get compiled into
+> > 
+> > 00000000 <f>:
+> >    0:   e8900003        ldm     r0, {r0, r1}
+> >    4:   e12fff1e        bx      lr
+> 
+> I think it may be something of a bitch to work around, because the
+> compiler is going to do stuff like that behind your back.
+> 
+> The only way around that would be to bypass the compiler by using
+> asm(), but then you end up bypassing the instruction scheduling too.
+> That may not matter, as the resulting overhead may still be lower.
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
----
+I think the compiler is correctly optimizing the code according to
+what we tell it about the alignment here: the ABI explicitly specifies
+that variables are naturally aligned, so whenever we dereference
+a 32-bit pointer that is not __packed, it should assume it can safely
+use any instruction that requires this alignment. This is essentially
+what get_unaligned() is designed to work around, when we have
+data that is known to be possibly misaligned.
 
-ARM-SOC maintainers, could we get this into to the v4.5-rc cycle?
-This only appeared since Tegra210 was added for v4.5 and so it
-would be good to correct this before the final v4.5.
+Simply using the generic implementation from before 0567f5facbd
+("asm-generic: allow generic unaligned access if the arch supports it")
+solves the problem, as we explicitly tell the compiler about the
+fact that data is unaligned and let it do the right thing (bytewise
+access on ARMv5 or lower, normal access except ldm and ldlr on
+later architectures).
 
- arch/arm64/boot/dts/nvidia/tegra210.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+The implementation appears to be suboptimal for cross-endian loads
+though, as gcc-5.3 does not use the 'rev' instruction here but
+falls back on byte accesses. We can easily fix that by introducing
+one more generic implementation for the cross-endian accesses doing
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-index cd4f45ccd6a7..6cd2048defe2 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-@@ -580,8 +580,6 @@
- 		reg = <0x0 0x7000e400 0x0 0x400>;
- 		clocks = <&tegra_car TEGRA210_CLK_PCLK>, <&clk32k_in>;
- 		clock-names = "pclk", "clk32k_in";
--
--		#power-domain-cells = <1>;
- 	};
- 
- 	fuse at 0,7000f800 {
--- 
-2.1.4
+static __always_inline void put_unaligned_be64(u64 val, void *p)
+{
+       __put_unaligned_cpu64((u64 __force)cpu_to_be64(val), p);
+}
+static __always_inline void put_unaligned_be32(u32 val, void *p)
+{
+       __put_unaligned_cpu32((u32 __force)cpu_to_be32(val), p);
+}
+static __always_inline void put_unaligned_be16(u16 val, void *p)
+{
+       __put_unaligned_cpu16((u16 __force)cpu_to_be16(val), p);
+}
+
+which is better on ARM than the currently used
+
+static inline void __put_unaligned_le16(u16 val, u8 *p)
+{
+        *p++ = val;
+        *p++ = val >> 8;
+}
+static inline void __put_unaligned_le32(u32 val, u8 *p)
+{
+        __put_unaligned_le16(val >> 16, p + 2);
+        __put_unaligned_le16(val, p);
+}
+static inline void __put_unaligned_le64(u64 val, u8 *p)
+{
+        __put_unaligned_le32(val >> 32, p + 4);
+        __put_unaligned_le32(val, p);
+}
+
+because it will allow using ldr/str+rev for unaligned
+cross-endian accesses, but disallow ldm/stm+rev.
+
+	Arnd
