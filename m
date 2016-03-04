@@ -1,119 +1,191 @@
 From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Fri,  4 Mar 2016 18:54:26 +0800
-Subject: [PATCH v7 00/11] Add DRM Driver for HiSilicon Kirin hi6220 SoC
-Message-ID: <1457088877-131022-1-git-send-email-xinliang.liu@linaro.org>
+Date: Fri,  4 Mar 2016 18:54:27 +0800
+Subject: [PATCH v7 01/11] drm/hisilicon: Add device tree binding for hi6220
+ display subsystem
+In-Reply-To: <1457088877-131022-1-git-send-email-xinliang.liu@linaro.org>
+References: <1457088877-131022-1-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <1457088877-131022-2-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds a new drm driver for HiSilicon Kirin hi6220 SoC.
-Current testing and support board is Hikey board which is one of Linaro
-96boards. It is an arm64 open source board. For more information about
-this board, please access https://www.96boards.org.
+Add ADE display controller binding doc.
+Add DesignWare DSI Host Controller v1.20a binding doc.
 
-Hardware Detail
----------------
-  The display subsystem of Hi6220 SoC is shown as bellow:
- +-----+       +----------+     +-----+     +-------------+
- |     |       |          |     |     |     |             |             	
- | FB  |------>|   ADE    |---->| DSI |---->|   External  |
- |     |       |          |     |     |     |  HDMI/panel |
- +-----+       +----------+     +-----+     +-------------+
-
-- ADE(Advanced Display Engine) is the display controller. It contains 7
-channels, 3 overlay compositors and a LDI.
-  - A channel looks like: DMA-->clip-->scale-->ctrans(or called csc).
-  - Overlay compositor is response to compose planes which come from 7
-  channels and pass composed image to LDI.
-  - LDI is response to generate timings and RGB data stream.
-- DSI converts the RGB data stream from ADE to DSI packets.
-- External HDMI/panel module is connected with DSI bus. Now Hikey use a
-  ADI's ADV7533 external HDMI chip.
-
-Change History
--------------
-Changes in v7:
-- Add config.mutex protection when accessing mode_config.connector_list.
-- Clean up match data getting of kirin_drm_drv.c.
-- A few Regs define clean up and typo fixs for ADE crtc and DSI encoder
-  driver.
-- Fix vblank irq flag "DRIVER_IRQF_SHARED" to "IRQF_SHARED".
-Changes in v6:
-- Cleanup values part of reg and clocks relevant properties.
+v7: Acked by Rob Herring.
+v6:
+- Cleanup values part of reg and clocks properties.
 - Change "pclk_dsi" clock name to "pclk".
-
-Changes in v5:
+v5:
 - Remove endpoint unit address of dsi output port.
-- Use syscon to access ADE media NOC QoS registers instread of directly
-  writing registers.
-- Use reset controller to reset ADE instead of directly writing registers.
-
-Changes in v4:
-- Describe more specific of clocks and ports of binding docs.
-- Fix indentation of binding docs.
-
-Changes in v3:
-- Move and rename all the files to kirin sub-directory.
-  So that we could separate different seires SoCs' driver.
+- Add "hisilicon,noc-syscon" property for ADE NOC QoS syscon.
+- Add "resets" property for ADE reset.
+v4:
+- Describe more specific of clocks and ports.
+- Fix indentation.
+v3:
 - Make ade as the drm master node.
-- Replace drm_platform_init, load, unload implementation.
 - Use assigned-clocks to set clock rate.
-- Use ports to connect display relevant nodes.
-- Rename hisi_drm_dsi.c to dw_drm_dsi.c
-- Make encoder type as DRM_MODE_ENCODER_DSI.
-- A few cleanup on regs and code.
-
-Changes in v2:
-- Remove abtraction layer of plane/crtc/encoder/connector.
-- Refactor atomic implementation according to Daniel Vetter's guides:
-http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
-http://blog.ffwll.ch/2015/09/xdc-2015-atomic-modesetting-for-drivers.html
-http://blog.ffwll.ch/2015/08/atomic-modesetting-design-overview.html
-- Use bridge instead of slave encoder to connect external HDMI.
+- Use ports to connect display relavant nodes.
+v2:
 - Move dt binding docs to bindings/display/hisilicon directory.
 
-Xinliang Liu (11):
-  drm/hisilicon: Add device tree binding for hi6220 display subsystem
-  drm/hisilicon: Add hisilicon kirin drm master driver
-  drm/hisilicon: Add crtc driver for ADE
-  drm/hisilicon: Add plane driver for ADE
-  drm/hisilicon: Add vblank driver for ADE
-  drm/hisilicon: Add cma fbdev and hotplug
-  drm/hisilicon: Add designware dsi encoder driver
-  drm/hisilicon: Add designware dsi host driver
-  drm/hisilicon: Add support for external bridge
-  MAINTAINERS: Add maintainer for hisilicon DRM driver
-  arm64: dts: hisilicon: Add display subsystem DT nodes for hi6220
-
- .../bindings/display/hisilicon/dw-dsi.txt          |   72 ++
- .../bindings/display/hisilicon/hisi-ade.txt        |   64 ++
- MAINTAINERS                                        |   10 +
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   40 +
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   55 +
- drivers/gpu/drm/Kconfig                            |    2 +
- drivers/gpu/drm/Makefile                           |    1 +
- drivers/gpu/drm/hisilicon/Kconfig                  |    5 +
- drivers/gpu/drm/hisilicon/Makefile                 |    5 +
- drivers/gpu/drm/hisilicon/kirin/Kconfig            |   10 +
- drivers/gpu/drm/hisilicon/kirin/Makefile           |    5 +
- drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c       |  857 ++++++++++++++++
- drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h       |  103 ++
- drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h    |  230 +++++
- drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c    | 1057 ++++++++++++++++++++
- drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c    |  367 +++++++
- drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h    |   31 +
- 17 files changed, 2914 insertions(+)
+Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/display/hisilicon/dw-dsi.txt          | 72 ++++++++++++++++++++++
+ .../bindings/display/hisilicon/hisi-ade.txt        | 64 +++++++++++++++++++
+ 2 files changed, 136 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
- create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
- create mode 100644 drivers/gpu/drm/hisilicon/Makefile
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/Kconfig
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/Makefile
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
- create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h
 
+diff --git a/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt b/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+new file mode 100644
+index 000000000000..d270bfe4e4e0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+@@ -0,0 +1,72 @@
++Device-Tree bindings for DesignWare DSI Host Controller v1.20a driver
++
++A DSI Host Controller resides in the middle of display controller and external
++HDMI converter or panel.
++
++Required properties:
++- compatible: value should be "hisilicon,hi6220-dsi".
++- reg: physical base address and length of dsi controller's registers.
++- clocks: contains APB clock phandle + clock-specifier pair.
++- clock-names: should be "pclk".
++- ports: contains DSI controller input and output sub port.
++  The input port connects to ADE output port with the reg value "0".
++  The output port with the reg value "1", it could connect to panel or
++  any other bridge endpoints.
++  See Documentation/devicetree/bindings/graph.txt for more device graph info.
++
++A example of HiKey board hi6220 SoC and board specific DT entry:
++Example:
++
++SoC specific:
++	dsi: dsi at f4107800 {
++		compatible = "hisilicon,hi6220-dsi";
++		reg = <0x0 0xf4107800 0x0 0x100>;
++		clocks = <&media_ctrl  HI6220_DSI_PCLK>;
++		clock-names = "pclk";
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* 0 for input port */
++			port at 0 {
++				reg = <0>;
++				dsi_in: endpoint {
++					remote-endpoint = <&ade_out>;
++				};
++			};
++		};
++	};
++
++
++Board specific:
++	&dsi {
++		status = "ok";
++
++		ports {
++			/* 1 for output port */
++			port at 1 {
++				reg = <1>;
++
++				dsi_out0: endpoint at 0 {
++					remote-endpoint = <&adv7533_in>;
++				};
++			};
++		};
++	};
++
++	&i2c2 {
++		...
++
++		adv7533: adv7533 at 39 {
++			...
++
++			port {
++				adv7533_in: endpoint {
++					remote-endpoint = <&dsi_out0>;
++				};
++			};
++		};
++	};
++
+diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+new file mode 100644
+index 000000000000..38dc9d60eef8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+@@ -0,0 +1,64 @@
++Device-Tree bindings for hisilicon ADE display controller driver
++
++ADE (Advanced Display Engine) is the display controller which grab image
++data from memory, do composition, do post image processing, generate RGB
++timing stream and transfer to DSI.
++
++Required properties:
++- compatible: value should be "hisilicon,hi6220-ade".
++- reg: physical base address and length of the ADE controller's registers.
++- hisilicon,noc-syscon: ADE NOC QoS syscon.
++- resets: The ADE reset controller node.
++- interrupt: the ldi vblank interrupt number used.
++- clocks: a list of phandle + clock-specifier pairs, one for each entry
++  in clock-names.
++- clock-names: should contain:
++  "clk_ade_core" for the ADE core clock.
++  "clk_codec_jpeg" for the media NOC QoS clock, which use the same clock with
++  jpeg codec.
++  "clk_ade_pix" for the ADE pixel clok.
++- assigned-clocks: Should contain "clk_ade_core" and "clk_codec_jpeg" clocks'
++  phandle + clock-specifier pairs.
++- assigned-clock-rates: clock rates, one for each entry in assigned-clocks.
++  The rate of "clk_ade_core" could be "360000000" or "180000000";
++  The rate of "clk_codec_jpeg" could be or less than "1440000000".
++  These rate values could be configured according to performance and power
++  consumption.
++- port: the output port. This contains one endpoint subnode, with its
++  remote-endpoint set to the phandle of the connected DSI input endpoint.
++  See Documentation/devicetree/bindings/graph.txt for more device graph info.
++
++Optional properties:
++- dma-coherent: Present if dma operations are coherent.
++
++
++A example of HiKey board hi6220 SoC specific DT entry:
++Example:
++
++	ade: ade at f4100000 {
++		compatible = "hisilicon,hi6220-ade";
++		reg = <0x0 0xf4100000 0x0 0x7800>;
++		reg-names = "ade_base";
++		hisilicon,noc-syscon = <&medianoc_ade>;
++		resets = <&media_ctrl MEDIA_ADE>;
++		interrupts = <0 115 4>; /* ldi interrupt */
++
++		clocks = <&media_ctrl HI6220_ADE_CORE>,
++			 <&media_ctrl HI6220_CODEC_JPEG>,
++			 <&media_ctrl HI6220_ADE_PIX_SRC>;
++		/*clock name*/
++		clock-names  = "clk_ade_core",
++			       "clk_codec_jpeg",
++			       "clk_ade_pix";
++
++		assigned-clocks = <&media_ctrl HI6220_ADE_CORE>,
++			<&media_ctrl HI6220_CODEC_JPEG>;
++		assigned-clock-rates = <360000000>, <288000000>;
++		dma-coherent;
++
++		port {
++			ade_out: endpoint {
++				remote-endpoint = <&dsi_in>;
++			};
++		};
++	};
 -- 
 2.7.1
