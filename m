@@ -1,55 +1,133 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 4 Mar 2016 14:37:30 +0800
-Subject: [PATCH v5 12/17] ARM64: ACPI: Check if it runs on Xen to enable or
- disable ACPI
+Date: Fri, 4 Mar 2016 14:37:19 +0800
+Subject: [PATCH v5 01/17] Xen: ACPI: Hide UART used by Xen
 In-Reply-To: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1457073455-11516-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1457073455-11516-2-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-a /hypervisor node in DT. So check if it needs to enable ACPI.
+ACPI 6.0 introduces a new table STAO to list the devices which are used
+by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+UART is used by Xen. So here it hides UART from Dom0.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/kernel/acpi.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+CC: linux-acpi at vger.kernel.org (open list:ACPI)
+---
+ drivers/acpi/scan.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2..4e92be0 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
- {
- 	/*
- 	 * Return 1 as soon as we encounter a node at depth 1 that is
--	 * not the /chosen node.
-+	 * not the /chosen node, or /hypervisor node when running on Xen.
- 	 */
--	if (depth == 1 && (strcmp(uname, "chosen") != 0))
--		return 1;
-+	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-+		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-+			return 1;
-+	}
-+
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 407a376..31d794c 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+ DEFINE_MUTEX(acpi_device_lock);
+ LIST_HEAD(acpi_wakeup_device_list);
+ static DEFINE_MUTEX(acpi_hp_context_lock);
++static u64 spcr_uart_addr;
+ 
+ struct acpi_dep_data {
+ 	struct list_head node;
+@@ -1453,6 +1454,47 @@ static int acpi_add_single_object(struct acpi_device **child,
  	return 0;
  }
  
-@@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
++static acpi_status acpi_get_resource_fixed_memory32(struct acpi_resource *res,
++						    void *context)
++{
++	struct acpi_resource_fixed_memory32 *fixed_memory32;
++
++	if (res->type != ACPI_RESOURCE_TYPE_FIXED_MEMORY32)
++		return AE_OK;
++
++	fixed_memory32 = &res->data.fixed_memory32;
++	if (!fixed_memory32)
++		return AE_OK;
++
++	*((u32 *)context) = fixed_memory32->address;
++	return AE_CTRL_TERMINATE;
++}
++
++static bool acpi_device_should_be_hidden(acpi_handle handle)
++{
++	acpi_status status;
++	u32 addr = 0;
++
++	/* Check if it should ignore the UART device */
++	if (spcr_uart_addr != 0) {
++		if (!acpi_has_method(handle, METHOD_NAME__CRS))
++			return false;
++
++		status = acpi_walk_resources(handle, METHOD_NAME__CRS,
++					     acpi_get_resource_fixed_memory32,
++					     &addr);
++		if (ACPI_FAILURE(status))
++			return false;
++
++		if (addr == spcr_uart_addr) {
++			printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
++			return true;
++		}
++	}
++
++	return false;
++}
++
+ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+ 				    unsigned long long *sta)
+ {
+@@ -1466,6 +1508,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+ 	switch (acpi_type) {
+ 	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
+ 	case ACPI_TYPE_DEVICE:
++		if (acpi_device_should_be_hidden(handle))
++			return -ENODEV;
++
+ 		*type = ACPI_BUS_TYPE_DEVICE;
+ 		status = acpi_bus_get_status_handle(handle, sta);
+ 		if (ACPI_FAILURE(status))
+@@ -1919,6 +1964,8 @@ static int acpi_bus_scan_fixed(void)
+ int __init acpi_scan_init(void)
+ {
+ 	int result;
++	acpi_status status;
++	struct acpi_table_stao *stao_ptr;
+ 
+ 	acpi_pci_root_init();
+ 	acpi_pci_link_init();
+@@ -1933,6 +1980,27 @@ int __init acpi_scan_init(void)
+ 
+ 	acpi_scan_add_handler(&generic_device_handler);
+ 
++	/* If there is STAO table, check whether it needs to ignore the UART
++	 * device in SPCR table.
++	 */
++	status = acpi_get_table(ACPI_SIG_STAO, 0,
++				(struct acpi_table_header **)&stao_ptr);
++	if (ACPI_SUCCESS(status)) {
++		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
++			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
++
++		if (stao_ptr->ignore_uart) {
++			struct acpi_table_spcr *spcr_ptr;
++
++			status = acpi_get_table(ACPI_SIG_SPCR, 0,
++					(struct acpi_table_header **)&spcr_ptr);
++			if (ACPI_SUCCESS(status))
++				spcr_uart_addr = spcr_ptr->serial_port.address;
++			else
++				printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
++		}
++	}
++
+ 	mutex_lock(&acpi_scan_lock);
  	/*
- 	 * Enable ACPI instead of device tree unless
- 	 * - ACPI has been disabled explicitly (acpi=off), or
--	 * - the device tree is not empty (it has more than just a /chosen node)
-+	 * - the device tree is not empty (it has more than just a /chosen node,
-+	 *   and a /hypervisor node when running on Xen)
- 	 *   and ACPI has not been force enabled (acpi=force)
- 	 */
- 	if (param_acpi_off ||
+ 	 * Enumerate devices in the ACPI namespace.
 -- 
 2.0.4
