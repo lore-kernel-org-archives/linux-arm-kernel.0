@@ -1,52 +1,62 @@
-From: dsterba@suse.cz (David Sterba)
-Date: Fri, 4 Mar 2016 10:16:02 +0100
-Subject: btrfs_get_token_64() alignment problem on ARM (was: Re: DWord
- alignment on ARMv7)
-In-Reply-To: <56D940E8.2030202@pengutronix.de>
-References: <56D8BA3F.7050508@pengutronix.de> <20160303235426.GA11237@arm.com>
- <56D940E8.2030202@pengutronix.de>
-Message-ID: <20160304091602.GH29310@suse.cz>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 4 Mar 2016 10:27:17 +0100
+Subject: [PATCH V5 01/15] ACPI: MCFG: Move mmcfg_list management to
+ drivers/acpi
+In-Reply-To: <20160303225152.GA10472@localhost>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-2-git-send-email-tn@semihalf.com>
+ <20160303225152.GA10472@localhost>
+Message-ID: <56D954F5.3010403@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 09:01:44AM +0100, Marc Kleine-Budde wrote:
-> Hello,
-> 
-> On 03/04/2016 12:54 AM, Will Deacon wrote:
-> > Hi Marc,
-> > 
-> > On Thu, Mar 03, 2016 at 11:27:11PM +0100, Marc Kleine-Budde wrote:
-> >> I'm using btrfs on am ARMv7 and it turns out, that the kernel has to
-> >> fixup a lot of kernel originated alignment issues.
-> >>
-> >> See /proc/cpu/alignment (~4h of uptime):
-> >>> System: 22304815 (btrfs_get_token_64+0x13c/0x148 [btrfs])
-> >>
-> >> For example, when compiling the kernel on a btrfs volume the counter
-> >> increases by 100...1000 per second.
-> >>
-> >> The function shown "btrfs_get_token_64()" is defined here:
-> >>> http://lxr.free-electrons.com/source/fs/btrfs/struct-funcs.c#L53
-> >> ...it already uses get_unaligned_leXX accessors.
-> >>
-> >> Quoting a comment in arch/arm/mm/alignment.c:
-> >>
-> >>          * ARMv6 and later CPUs can perform unaligned accesses for
-> >>          * most single load and store instructions up to word size.
-> >>          * LDM, STM, LDRD and STRD still need to be handled.
-> >>
-> >> But on a 32bit ARMv7 64bits are not word-sized.
-> >>
-> >> Is the exception and fixup overhead neglectable? Do we have to introduce
-> >> something like HAVE_EFFICIENT_UNALIGNED_64BIT_ACCESS?
-> > 
-> > Ouch, that trap/emulate is certainly going to have an effect on your
-> > performance. I doubt that HAVE_EFFICIENT_UNALIGNED_ACCESS applies to
-> > types bigger than the native word size on many architectures, so my
-> > hunch is that the btrfs code should be checking BITS_PER_LONG or similar
-> > to establish whether or not to break the access up into word accesses.
-> 
-> I've added the btrfs maintainers on Cc.
+Hi Bjorn,
 
-Can this be done transparently via the the get_unaligned_le* helpers?
-This seems to be too arch-specific to fix it in btrfs.
+On 03.03.2016 23:51, Bjorn Helgaas wrote:
+> Hi Tomasz, Jayachandran, et al,
+>
+> On Tue, Feb 16, 2016 at 02:53:31PM +0100, Tomasz Nowicki wrote:
+>> From: Jayachandran C <jchandra@broadcom.com>
+>>
+>> Move pci_mmcfg_list handling to a drivers/acpi/pci_mcfg.c. This is
+>> to share the API and code with ARM64 later. The corresponding
+>> declarations are moved from asm/pci_x86.h to linux/pci-acpi.h
+>>
+>> As a part of this we introduce three functions that can be
+>> implemented by the arch code: pci_mmconfig_map_resource() to map a
+>> mcfg entry, pci_mmconfig_unmap_resource to do the corresponding
+>> unmap and pci_mmconfig_enabled to see if the arch setup of
+>> mcfg entries was successful. We also provide weak implementations
+>> of these, which will be used from ARM64. On x86, we retain the
+>> old logic by providing platform specific implementation.
+>>
+>> This patch is purely rearranging code, it should not have any
+>> impact on the logic of MCFG parsing or list handling.
+>
+> I definitely want to figure out how to make this work well on ARM64.
+> I need to ponder this some more, so these are just some initial
+> thoughts.
+>
+> My first impression is that (a) the x86 MCFG code is an unmitigated
+> disaster, and (b) we're trying a little too hard to make that mess
+> generic.  I think we might be better served if we came up with some
+> cleaner, more generic code that we can use for ARM64 today, and
+> migrate x86 toward that over time.
+>
+> My concern is that if we elevate the current x86 code to be
+> "arch-independent", we will be perpetuating some interfaces and
+> designs that shouldn't be allowed to escape arch/x86.
+>
+> Some of the code that moved to drivers/acpi/pci_mcfg.c is not really
+> ACPI-specific, and could potentially be used for non-ACPI bridges that
+> support ECAM.  I'd like to see that sort of code moved to a new file
+> like drivers/pci/ecam.c.
+
+Actually I split it as you suggested in the previous patch set. Please 
+have a look at:
+https://lkml.org/lkml/2016/2/4/646
+
+Especially patches [0-6] which handle MMCONFIG refactoring.
+
+Thanks,
+Tomasz
