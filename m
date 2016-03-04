@@ -1,68 +1,50 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 4 Mar 2016 09:01:44 +0100
-Subject: btrfs_get_token_64() alignment problem on ARM (was: Re: DWord
- alignment on ARMv7)
-In-Reply-To: <20160303235426.GA11237@arm.com>
-References: <56D8BA3F.7050508@pengutronix.de> <20160303235426.GA11237@arm.com>
-Message-ID: <56D940E8.2030202@pengutronix.de>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 4 Mar 2016 08:00:49 +0800
+Subject: [PATCH] arm64/dma-mapping: Add DMA_ATTR_ALLOC_SINGLE_PAGES support
+In-Reply-To: <CAD=FV=VOJT_Nd67O21J2-rabXRQ2=iTJxP8yCAty2xFhcVupGw@mail.gmail.com>
+References: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
+ <CAD=FV=VOJT_Nd67O21J2-rabXRQ2=iTJxP8yCAty2xFhcVupGw@mail.gmail.com>
+Message-ID: <1457049649.26149.11.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 03/04/2016 12:54 AM, Will Deacon wrote:
-> Hi Marc,
+On Thu, 2016-03-03 at 09:44 -0800, Doug Anderson wrote:
+> Hi,
 > 
-> On Thu, Mar 03, 2016 at 11:27:11PM +0100, Marc Kleine-Budde wrote:
->> I'm using btrfs on am ARMv7 and it turns out, that the kernel has to
->> fixup a lot of kernel originated alignment issues.
->>
->> See /proc/cpu/alignment (~4h of uptime):
->>> System: 22304815 (btrfs_get_token_64+0x13c/0x148 [btrfs])
->>
->> For example, when compiling the kernel on a btrfs volume the counter
->> increases by 100...1000 per second.
->>
->> The function shown "btrfs_get_token_64()" is defined here:
->>> http://lxr.free-electrons.com/source/fs/btrfs/struct-funcs.c#L53
->> ...it already uses get_unaligned_leXX accessors.
->>
->> Quoting a comment in arch/arm/mm/alignment.c:
->>
->>          * ARMv6 and later CPUs can perform unaligned accesses for
->>          * most single load and store instructions up to word size.
->>          * LDM, STM, LDRD and STRD still need to be handled.
->>
->> But on a 32bit ARMv7 64bits are not word-sized.
->>
->> Is the exception and fixup overhead neglectable? Do we have to introduce
->> something like HAVE_EFFICIENT_UNALIGNED_64BIT_ACCESS?
+> On Wed, Mar 2, 2016 at 10:54 AM, Yong Wu <yong.wu@mediatek.com> wrote:
+> > Sometimes it is not worth for the iommu allocating big chunks.
+> > Here we enable DMA_ATTR_ALLOC_SINGLE_PAGES which could help avoid to
+> > allocate big chunks while iommu allocating buffer.
+> >
+> > More information about this attribute, please check Doug's commit[1].
+> >
+> > [1]: https://lkml.org/lkml/2016/1/11/720
+> >
+> > Cc: Robin Murphy <robin.murphy@arm.com>
+> > Suggested-by: Douglas Anderson <dianders@chromium.org>
+> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> > ---
+> >
+> > Our video drivers may soon use this.
+> >
+> >  arch/arm64/mm/dma-mapping.c |  4 ++--
+> >  drivers/iommu/dma-iommu.c   | 14 ++++++++++----
+> >  include/linux/dma-iommu.h   |  4 ++--
+> >  3 files changed, 14 insertions(+), 8 deletions(-)
 > 
-> Ouch, that trap/emulate is certainly going to have an effect on your
-> performance. I doubt that HAVE_EFFICIENT_UNALIGNED_ACCESS applies to
-> types bigger than the native word size on many architectures, so my
-> hunch is that the btrfs code should be checking BITS_PER_LONG or similar
-> to establish whether or not to break the access up into word accesses.
+> It should also be mentioned that this depends on commit df05c6f6e0bb
+> ("ARM: 8506/1: common: DMA-mapping: add DMA_ATTR_ALLOC_SINGLE_PAGES
+> attribute") which is not in mainline quite yet.
 
-I've added the btrfs maintainers on Cc.
+Thanks. I will add it in the commit message.
 
-> A cursory look at the network layer indicates that kind of trick is done
-> over there.
+> 
+> Also please CC Marek Szyprowski on any future patches in this area
+> since I saw a patch series from him that was touching this same area.
 
-I stumbled over this, too.
+Will do.
 
-Marc
+> 
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/31538889/attachment.sig>
+Thanks.
