@@ -1,53 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 4 Mar 2016 18:59:24 +0000
-Subject: [PATCH 2/2] ARM: bcm2835: Add devicetree for the Raspberry Pi 3.
-In-Reply-To: <874mcm3wfs.fsf@eliezer.anholt.net>
-References: <1457116769-8567-1-git-send-email-eric@anholt.net>
- <1457116769-8567-2-git-send-email-eric@anholt.net>
- <20160304184136.GB5033@leverpostej>
- <874mcm3wfs.fsf@eliezer.anholt.net>
-Message-ID: <20160304185923.GC5033@leverpostej>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 4 Mar 2016 12:06:58 -0700
+Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
+ fec_timeout
+In-Reply-To: <1457112947.4044.133.camel@perches.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18552AB3E4128E412273B439FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <56D9B238.2040400@boundarydevices.com>
+ <1457112947.4044.133.camel@perches.com>
+Message-ID: <56D9DCD2.2090009@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 10:55:03AM -0800, Eric Anholt wrote:
-> Mark Rutland <mark.rutland@arm.com> writes:
+On 3/4/2016 10:35 AM, Joe Perches wrote:
+> On Fri, 2016-03-04 at 09:05 -0700, Troy Kisky wrote:
+>> On 3/4/2016 3:06 AM, Fugang Duan wrote:
+>>> From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2016 8:37 AM
+> []
+>>>> Print the current interrupt flags and mask and the interrupt state during the last
+>>>> interrupt in fec_timeout.
+> []
+>>>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> []
+>>>> @@ -1107,6 +1107,9 @@ fec_timeout(struct net_device *ndev)
+>>>>  	int i;
+>>>>  	uint events = 0;
+>>>>
+>>>> +	pr_err("%s: last=%x %x, mask %x\n", __func__, fep->last_ievents,
+>>>> +	       readl(fep->hwp + FEC_IEVENT), readl(fep->hwp + FEC_IMASK));
+>>>> +
+>>> pr_err() -> netdev_err()
+>> Sounds good
 > 
-> > On Fri, Mar 04, 2016 at 10:39:29AM -0800, Eric Anholt wrote:
-> >> For now this doesn't support the new hardware present on the Pi 3 (BT,
-> >> wifi, GPIO expander).  Since the GPIO expander isn't supported, we
-> >> also don't have the LEDs like the other board files do.
-> >> 
-> >> Signed-off-by: Eric Anholt <eric@anholt.net>
-> >> ---
-> >>  arch/arm/boot/dts/Makefile            |  3 +-
-> >>  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 22 ++++++++++++
-> >>  arch/arm/boot/dts/bcm2837.dtsi        | 68 +++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 92 insertions(+), 1 deletion(-)
-> >>  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> >>  create mode 100644 arch/arm/boot/dts/bcm2837.dtsi
-> >
-> >> +	timer {
-> >> +		compatible = "arm,armv7-timer";
-> >> +		interrupt-parent = <&local_intc>;
-> >> +		interrupts = <0>, // PHYS_SECURE_PPI
-> >> +			     <1>, // PHYS_NONSECURE_PPI
-> >> +			     <3>, // VIRT_PPI
-> >> +			     <2>; // HYP_PPI
-> >> +		always-on;
-> >> +	};
-> >
-> > Are the CPUs in an always-on power domain? Or is it jsut that the kernel
-> > doesn't perform power management of CPUs?
-> >
-> > The always-on proeprty is only intended for the former.
+> This seems like debugging information rather than
+> an error a user can do anything with and if there's
+> a timeout, how likely is it that the hardware is
+> hosed and this would  repetitively and unnecessarily
+> fill up logs?
 > 
-> The kernel doesn't get to do power management of CPUs.  We only have
-> control of power domains through the firmware, and the firmware's
-> keeping the CPU domain on.
+> So maybe netdev_dbg and net_ratelimit() too.
+> 
+> 	if (net_ratelimit()
+> 		netdev_<level>(etc...)
+> 
+> 
 
-So there is no way that the CPUs could request for the firmare to place
-them in a state where the timer would lose context (but other events
-coukd wake them up), even if they don't do that today?
+This patch hasn't been helpful to me in quite a while. I'll just drop it.
+I know where to get it if I need it again.
 
-Mark
+
+Thanks
+Troy
