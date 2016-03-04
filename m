@@ -1,71 +1,63 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Fri,  4 Mar 2016 18:31:54 +0800
-Subject: [PATCH] ASoC: rockchip: add bindings for spdif controller
-Message-ID: <1457087514-1837-1-git-send-email-sugar.zhang@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 4 Mar 2016 11:48:10 +0100
+Subject: DWord alignment on ARMv7
+In-Reply-To: <20160303235426.GA11237@arm.com>
+References: <56D8BA3F.7050508@pengutronix.de> <20160303235426.GA11237@arm.com>
+Message-ID: <CAKv+Gu8D37DgfbopvB1On_=fNqrBzmCmOCTotX2Lvv6NoSCtvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch add compatible for rk3366/rk3368/rk3399 spdif,
-these three spdifs share the same type.
+(+ Russell, Arnd)
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
+On 4 March 2016 at 00:54, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Marc,
+>
+> On Thu, Mar 03, 2016 at 11:27:11PM +0100, Marc Kleine-Budde wrote:
+>> I'm using btrfs on am ARMv7 and it turns out, that the kernel has to
+>> fixup a lot of kernel originated alignment issues.
+>>
+>> See /proc/cpu/alignment (~4h of uptime):
+>> > System: 22304815 (btrfs_get_token_64+0x13c/0x148 [btrfs])
+>>
+>> For example, when compiling the kernel on a btrfs volume the counter
+>> increases by 100...1000 per second.
+>>
+>> The function shown "btrfs_get_token_64()" is defined here:
+>> > http://lxr.free-electrons.com/source/fs/btrfs/struct-funcs.c#L53
+>> ...it already uses get_unaligned_leXX accessors.
+>>
+>> Quoting a comment in arch/arm/mm/alignment.c:
+>>
+>>          * ARMv6 and later CPUs can perform unaligned accesses for
+>>          * most single load and store instructions up to word size.
+>>          * LDM, STM, LDRD and STRD still need to be handled.
+>>
+>> But on a 32bit ARMv7 64bits are not word-sized.
+>>
+>> Is the exception and fixup overhead neglectable? Do we have to introduce
+>> something like HAVE_EFFICIENT_UNALIGNED_64BIT_ACCESS?
+>
+> Ouch, that trap/emulate is certainly going to have an effect on your
+> performance. I doubt that HAVE_EFFICIENT_UNALIGNED_ACCESS applies to
+> types bigger than the native word size on many architectures, so my
+> hunch is that the btrfs code should be checking BITS_PER_LONG or similar
+> to establish whether or not to break the access up into word accesses.
+>
+> A cursory look at the network layer indicates that kind of trick is done
+> over there.
+>
 
- Documentation/devicetree/bindings/sound/rockchip-spdif.txt |  8 ++++++--
- sound/soc/rockchip/rockchip_spdif.c                        | 13 ++++++++++---
- 2 files changed, 16 insertions(+), 5 deletions(-)
+I don't think it is the job of the filesystem driver to reason about
+whether get_unaligned_le64() does the right thing under any particular
+configuration. If ARM's implementation of get_unaligned_le64() issues
+load instructions that result in a trap, it is misbehaving and should
+be fixed.
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-index e64dbde..1104642 100644
---- a/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip-spdif.txt
-@@ -7,8 +7,12 @@ a fibre cable.
- Required properties:
- 
- - compatible: should be one of the following:
--   - "rockchip,rk3288-spdif", "rockchip,rk3188-spdif" or
--     "rockchip,rk3066-spdif"
-+   - "rockchip,rk3066-spdif"
-+   - "rockchip,rk3188-spdif"
-+   - "rockchip,rk3288-spdif"
-+   - "rockchip,rk3366-spdif"
-+   - "rockchip,rk3368-spdif"
-+   - "rockchip,rk3399-spdif"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the SPDIF interrupt.
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index 5a806da..c589f6f 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -28,6 +28,7 @@ enum rk_spdif_type {
- 	RK_SPDIF_RK3066,
- 	RK_SPDIF_RK3188,
- 	RK_SPDIF_RK3288,
-+	RK_SPDIF_RK3366,
- };
- 
- #define RK3288_GRF_SOC_CON2 0x24c
-@@ -45,11 +46,17 @@ struct rk_spdif_dev {
- 
- static const struct of_device_id rk_spdif_match[] = {
- 	{ .compatible = "rockchip,rk3066-spdif",
--	  .data = (void *) RK_SPDIF_RK3066 },
-+	  .data = (void *)RK_SPDIF_RK3066 },
- 	{ .compatible = "rockchip,rk3188-spdif",
--	  .data = (void *) RK_SPDIF_RK3188 },
-+	  .data = (void *)RK_SPDIF_RK3188 },
- 	{ .compatible = "rockchip,rk3288-spdif",
--	  .data = (void *) RK_SPDIF_RK3288 },
-+	  .data = (void *)RK_SPDIF_RK3288 },
-+	{ .compatible = "rockchip,rk3366-spdif",
-+	  .data = (void *)RK_SPDIF_RK3366 },
-+	{ .compatible = "rockchip,rk3368-spdif",
-+	  .data = (void *)RK_SPDIF_RK3366 },
-+	{ .compatible = "rockchip,rk3399-spdif",
-+	  .data = (void *)RK_SPDIF_RK3366 },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, rk_spdif_match);
+I think that something like HAVE_EFFICIENT_UNALIGNED_64BIT_ACCESS
+makes sense. Or, based on Will's comment regarding other
+architectures, we could change the generic get_unaligned_le64()
+implementation for HAVE_EFFICIENT_UNALIGNED_ACCESS to split accesses
+when running on 32-bit archs.
+
 -- 
-1.9.1
+Ard.
