@@ -1,51 +1,44 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri,  4 Mar 2016 14:31:48 -0800
-Subject: [PATCH v7 3/3] pci, pci-thunder-ecam: Add driver for ThunderX-pass{1,
- 2} on-chip devices
+Date: Fri,  4 Mar 2016 14:31:47 -0800
+Subject: [PATCH v7 2/3] pci,
+ pci-thunder-pem: Add PCIe host driver for ThunderX processors.
 In-Reply-To: <1457130708-3231-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1457130708-3231-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1457130708-3231-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1457130708-3231-3-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-The cavium,pci-thunder-ecam devices are exactly ECAM based PCI root
-complexes.  These root complexes (loosely referred to as ECAM units in
-the hardware manuals) are used to access the Thunder on-chips devices.
-They are special in that all the BARs on devices behind these root
-complexes are at fixed addresses.  To handle this in a manner
-compatible with the core PCI code, we have the config access functions
-synthesize Enhanced Allocation (EA) capability entries for each BAR.
-
-Since this EA synthesis is needed for exactly two chip models, we can
-hard code some assumptions about the device topology and the
-layout of the config space of specific DEVFNs in the driver.
+The root complexes used to access off-chip PCIe devices (called PEM
+units in the hardware manuals) on some Cavium ThunderX processors
+require quirky access methods for the config space of the PCIe bridge.
+Add a driver to provide these config space accessor functions.  The
+pci-host-common code is used to configure the PCI machinery.
 
 Signed-off-by: David Daney <david.daney@cavium.com>
 Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- .../devicetree/bindings/pci/pci-thunder-ecam.txt   |  30 ++
+ .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 +++
+ MAINTAINERS                                        |   8 +
  drivers/pci/host/Kconfig                           |   7 +
  drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-thunder-ecam.c                | 407 +++++++++++++++++++++
- 4 files changed, 445 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
- create mode 100644 drivers/pci/host/pci-thunder-ecam.c
+ drivers/pci/host/pci-thunder-pem.c                 | 347 +++++++++++++++++++++
+ 5 files changed, 406 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+ create mode 100644 drivers/pci/host/pci-thunder-pem.c
 
-diff --git a/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt b/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
+diff --git a/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
 new file mode 100644
-index 0000000..0202dd1
+index 0000000..f131fae
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
-@@ -0,0 +1,30 @@
-+* ThunderX PCI host controller for pass-1.x silicon
++++ b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+@@ -0,0 +1,43 @@
++* ThunderX PEM PCIe host controller
 +
-+Firmware-initialized PCI host controller to on-chip devices found on
-+some Cavium ThunderX processors.  These devices have ECAM based config
-+access, but the BARs are all at fixed addresses.  We handle the fixed
-+addresses by synthesizing Enhanced Allocation (EA) capabilities for
-+these devices.
++Firmware-initialized PCI host controller found on some Cavium
++ThunderX processors.
 +
 +The properties and their meanings are identical to those described in
 +host-generic-pci.txt except as listed below.
@@ -53,460 +46,434 @@ index 0000000..0202dd1
 +Properties of the host controller node that differ from
 +host-generic-pci.txt:
 +
-+- compatible     : Must be "cavium,pci-host-thunder-ecam"
++- compatible     : Must be "cavium,pci-host-thunder-pem"
++
++- reg            : Two entries: First the configuration space for down
++                   stream devices base address and size, as accessed
++                   from the parent bus. Second, the register bank of
++                   the PEM device PCIe bridge.
 +
 +Example:
 +
-+	pcie at 84b000000000 {
-+		compatible = "cavium,pci-host-thunder-ecam";
-+		device_type = "pci";
-+		msi-parent = <&its>;
-+		msi-map = <0 &its 0x30000 0x10000>;
-+		bus-range = <0 31>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		#stream-id-cells = <1>;
-+		reg = <0x84b0 0x00000000 0 0x02000000>;  /* Configuration space */
-+		ranges = <0x03000000 0x8180 0x00000000 0x8180 0x00000000 0x80 0x00000000>; /* mem ranges */
-+	};
++    pci at 87e0,c2000000 {
++	compatible = "cavium,pci-host-thunder-pem";
++	device_type = "pci";
++	msi-parent = <&its>;
++	msi-map = <0 &its 0x10000 0x10000>;
++	bus-range = <0x8f 0xc7>;
++	#size-cells = <2>;
++	#address-cells = <3>;
++
++	reg = <0x8880 0x8f000000 0x0 0x39000000>,  /* Configuration space */
++	      <0x87e0 0xc2000000 0x0 0x00010000>; /* PEM space */
++	ranges = <0x01000000 0x00 0x00020000 0x88b0 0x00020000 0x00 0x00010000>, /* I/O */
++		 <0x03000000 0x00 0x10000000 0x8890 0x10000000 0x0f 0xf0000000>, /* mem64 */
++		 <0x43000000 0x10 0x00000000 0x88a0 0x00000000 0x10 0x00000000>, /* mem64-pref */
++		 <0x03000000 0x87e0 0xc2f00000 0x87e0 0xc2000000 0x00 0x00100000>; /* mem64 PEM BAR4 */
++
++	#interrupt-cells = <1>;
++	interrupt-map-mask = <0 0 0 7>;
++	interrupt-map = <0 0 0 1 &gic0 0 0 0 24 4>, /* INTA */
++			<0 0 0 2 &gic0 0 0 0 25 4>, /* INTB */
++			<0 0 0 3 &gic0 0 0 0 26 4>, /* INTC */
++			<0 0 0 4 &gic0 0 0 0 27 4>; /* INTD */
++    };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 370b3cb..cef8dda 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8407,6 +8407,14 @@ L:     linux-arm-msm at vger.kernel.org
+ S:     Maintained
+ F:     drivers/pci/host/*qcom*
+ 
++PCIE DRIVER FOR CAVIUM THUNDERX
++M:	David Daney <david.daney@cavium.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Supported
++F:	Documentation/devicetree/bindings/pci/pci-thunder-*
++F:	drivers/pci/host/pci-thunder-*
++
+ PCMCIA SUBSYSTEM
+ P:	Linux PCMCIA Team
+ L:	linux-pcmcia at lists.infradead.org
 diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index c642797..6a86ced 100644
+index cd5dfbb..c642797 100644
 --- a/drivers/pci/host/Kconfig
 +++ b/drivers/pci/host/Kconfig
-@@ -203,4 +203,11 @@ config PCI_HOST_THUNDER_PEM
- 	help
- 	  Say Y here if you want PCIe support for CN88XX Cavium Thunder SoCs.
+@@ -196,4 +196,11 @@ config PCIE_QCOM
+ 	  PCIe controller uses the Designware core plus Qualcomm-specific
+ 	  hardware wrappers.
  
-+config PCI_HOST_THUNDER_ECAM
-+	bool "Cavium Thunder ECAMe controller to on-chip devices on pass-1.x silicon"
++config PCI_HOST_THUNDER_PEM
++	bool "Cavium Thunder PCIe controller to off-chip devices"
 +	depends on OF && ARM64
 +	select PCI_HOST_COMMON
 +	help
-+	  Say Y here if you want ECAM support for CN88XX-Pass-1.x Cavium Thunder SoCs.
++	  Say Y here if you want PCIe support for CN88XX Cavium Thunder SoCs.
 +
  endmenu
 diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index 8903172..d6af3ba 100644
+index 3b24af8..8903172 100644
 --- a/drivers/pci/host/Makefile
 +++ b/drivers/pci/host/Makefile
-@@ -23,4 +23,5 @@ obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
+@@ -23,3 +23,4 @@ obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
  obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
  obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
-+obj-$(CONFIG_PCI_HOST_THUNDER_ECAM) += pci-thunder-ecam.o
- obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
-diff --git a/drivers/pci/host/pci-thunder-ecam.c b/drivers/pci/host/pci-thunder-ecam.c
++obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
+diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
 new file mode 100644
-index 0000000..723ce19
+index 0000000..4b939c7
 --- /dev/null
-+++ b/drivers/pci/host/pci-thunder-ecam.c
-@@ -0,0 +1,407 @@
++++ b/drivers/pci/host/pci-thunder-pem.c
+@@ -0,0 +1,347 @@
 +/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
-+ * Copyright (C) 2015, 2016 Cavium, Inc.
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (C) 2015 - 2016 Cavium, Inc.
 + *
 + */
 +
 +#include <linux/kernel.h>
 +#include <linux/module.h>
-+#include <linux/ioport.h>
++#include <linux/of_address.h>
 +#include <linux/of_pci.h>
-+#include <linux/of.h>
 +#include <linux/platform_device.h>
 +
 +#include "pci-host-common.h"
 +
-+/* Mapping is standard ECAM */
-+static void __iomem *thunder_ecam_map_bus(struct pci_bus *bus,
-+					  unsigned int devfn,
-+					  int where)
++#define PEM_CFG_WR 0x28
++#define PEM_CFG_RD 0x30
++
++struct thunder_pem_pci {
++	struct gen_pci	gen_pci;
++	u32		ea_entry[3];
++	void __iomem	*pem_reg_base;
++};
++
++static void __iomem *thunder_pem_map_bus(struct pci_bus *bus,
++					 unsigned int devfn, int where)
 +{
 +	struct gen_pci *pci = bus->sysdata;
 +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
 +
-+	return pci->cfg.win[idx] + ((devfn << 12) | where);
++	return pci->cfg.win[idx] + ((devfn << 16) | where);
 +}
 +
-+static void set_val(u32 v, int where, int size, u32 *val)
++static int thunder_pem_bridge_read(struct pci_bus *bus, unsigned int devfn,
++				   int where, int size, u32 *val)
 +{
-+	int shift = (where & 3) * 8;
-+
-+	pr_debug("set_val %04x: %08x\n", (unsigned)(where & ~3), v);
-+	v >>= shift;
-+	if (size == 1)
-+		v &= 0xff;
-+	else if (size == 2)
-+		v &= 0xffff;
-+	*val = v;
-+}
-+
-+static int handle_ea_bar(u32 e0, int bar, struct pci_bus *bus,
-+			 unsigned int devfn, int where, int size, u32 *val)
-+{
-+	void __iomem *addr;
-+	u32 v;
-+	/*
-+	 * Each entry is 16-byte aligned bits[2,3] select which word
-+	 * in the entry
-+	 */
-+	int where_a = where & 0xc;
-+
-+	if (where_a == 0) {
-+		set_val(e0, where, size, val);
-+		return PCIBIOS_SUCCESSFUL;
-+	}
-+	if (where_a == 0x4) {
-+		addr = bus->ops->map_bus(bus, devfn, bar); /* BAR 0 */
-+		if (!addr) {
-+			*val = ~0;
-+			return PCIBIOS_DEVICE_NOT_FOUND;
-+		}
-+		v = readl(addr);
-+		v &= ~0xf;
-+		v |= 2; /* EA entry-1. Base-L */
-+		set_val(v, where, size, val);
-+		return PCIBIOS_SUCCESSFUL;
-+	}
-+	if (where_a == 0x8) {
-+		u32 barl_orig;
-+		u32 barl_rb;
-+
-+		addr = bus->ops->map_bus(bus, devfn, bar); /* BAR 0 */
-+		if (!addr) {
-+			*val = ~0;
-+			return PCIBIOS_DEVICE_NOT_FOUND;
-+		}
-+		barl_orig = readl(addr + 0);
-+		writel(0xffffffff, addr + 0);
-+		barl_rb = readl(addr + 0);
-+		writel(barl_orig, addr + 0);
-+		/* zeros in unsettable bits. */
-+		v = ~barl_rb & ~3;
-+		v |= 0xc; /* EA entry-2. Offset-L */
-+		set_val(v, where, size, val);
-+		return PCIBIOS_SUCCESSFUL;
-+	}
-+	if (where_a == 0xc) {
-+		addr = bus->ops->map_bus(bus, devfn, bar + 4); /* BAR 1 */
-+		if (!addr) {
-+			*val = ~0;
-+			return PCIBIOS_DEVICE_NOT_FOUND;
-+		}
-+		v = readl(addr); /* EA entry-3. Base-H */
-+		set_val(v, where, size, val);
-+		return PCIBIOS_SUCCESSFUL;
-+	}
-+	return PCIBIOS_DEVICE_NOT_FOUND;
-+}
-+
-+static int thunder_ecam_p2_config_read(struct pci_bus *bus, unsigned int devfn,
-+				       int where, int size, u32 *val)
-+{
++	u64 read_val;
++	struct thunder_pem_pci *pem_pci;
 +	struct gen_pci *pci = bus->sysdata;
-+	int where_a = where & ~3;
-+	void __iomem *addr;
-+	u32 node_bits;
-+	u32 v;
 +
-+	/* EA Base[63:32] may be missing some bits ... */
-+	switch (where_a) {
-+	case 0xa8:
-+	case 0xbc:
-+	case 0xd0:
-+	case 0xe4:
-+		break;
-+	default:
-+		return pci_generic_config_read(bus, devfn, where, size, val);
-+	}
++	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
 +
-+	addr = bus->ops->map_bus(bus, devfn, where_a);
-+	if (!addr) {
++	if (devfn != 0 || where >= 2048) {
 +		*val = ~0;
 +		return PCIBIOS_DEVICE_NOT_FOUND;
 +	}
 +
-+	v = readl(addr);
++	/*
++	 * 32-bit accesses only.  Write the address to the low order
++	 * bits of PEM_CFG_RD, then trigger the read by reading back.
++	 * The config data lands in the upper 32-bits of PEM_CFG_RD.
++	 */
++	read_val = where & ~3ull;
++	writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++	read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
++	read_val >>= 32;
 +
 +	/*
-+	 * Bit 44 of the 64-bit Base must match the same bit in
-+	 * the config space access window. Since we are working with
-+	 * the high order 32 bits, shift everything down by 32 bits.
++	 * The config space contains some garbage, fix it up.  Also
++	 * synthesize an EA capability for the BAR used by MSI-X.
 +	 */
-+	node_bits = (pci->cfg.res.start >> 32) & (1 << 12);
-+
-+	v |= node_bits;
-+	set_val(v, where, size, val);
-+
++	switch (where & ~3) {
++	case 0x40:
++		read_val &= 0xffff00ff;
++		read_val |= 0x00007000; /* Skip MSI CAP */
++		break;
++	case 0x70: /* Express Cap */
++		/* PME interrupt on vector 2*/
++		read_val |= (2u << 25);
++		break;
++	case 0xb0: /* MSI-X Cap */
++		/* TableSize=4, Next Cap is EA */
++		read_val &= 0xc00000ff;
++		read_val |= 0x0003bc00;
++		break;
++	case 0xb4:
++		/* Table offset=0, BIR=0 */
++		read_val = 0x00000000;
++		break;
++	case 0xb8:
++		/* BPA offset=0xf0000, BIR=0 */
++		read_val = 0x000f0000;
++		break;
++	case 0xbc:
++		/* EA, 1 entry, no next Cap */
++		read_val = 0x00010014;
++		break;
++	case 0xc0:
++		/* DW2 for type-1 */
++		read_val = 0x00000000;
++		break;
++	case 0xc4:
++		/* Entry BEI=0, PP=0x00, SP=0xff, ES=3 */
++		read_val = 0x80ff0003;
++		break;
++	case 0xc8:
++		read_val = pem_pci->ea_entry[0];
++		break;
++	case 0xcc:
++		read_val = pem_pci->ea_entry[1];
++		break;
++	case 0xd0:
++		read_val = pem_pci->ea_entry[2];
++		break;
++	default:
++		break;
++	}
++	read_val >>= (8 * (where & 3));
++	switch (size) {
++	case 1:
++		read_val &= 0xff;
++		break;
++	case 2:
++		read_val &= 0xffff;
++		break;
++	default:
++		break;
++	}
++	*val = read_val;
 +	return PCIBIOS_SUCCESSFUL;
 +}
 +
-+static int thunder_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
-+				    int where, int size, u32 *val)
++static int thunder_pem_config_read(struct pci_bus *bus, unsigned int devfn,
++				   int where, int size, u32 *val)
 +{
-+	u32 v;
-+	u32 vendor_device;
-+	u32 class_rev;
-+	void __iomem *addr;
-+	int cfg_type;
-+	int where_a = where & ~3;
++	struct gen_pci *pci = bus->sysdata;
 +
-+	addr = bus->ops->map_bus(bus, devfn, 0xc);
-+	if (!addr) {
-+		*val = ~0;
++	if (bus->number < pci->cfg.bus_range->start ||
++	    bus->number > pci->cfg.bus_range->end)
 +		return PCIBIOS_DEVICE_NOT_FOUND;
-+	}
-+
-+	v = readl(addr);
-+
-+	/* Check for non type-00 header. */
-+	cfg_type = (v >> 16) & 0x7f;
-+
-+	addr = bus->ops->map_bus(bus, devfn, 8);
-+	if (!addr) {
-+		*val = ~0;
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+	}
-+
-+	class_rev = readl(addr);
-+	if (class_rev == 0xffffffff)
-+		goto no_emulation;
-+
-+	if ((class_rev & 0xff) >= 8) {
-+		/* Pass-2 handling */
-+		if (cfg_type)
-+			goto no_emulation;
-+		return thunder_ecam_p2_config_read(bus, devfn, where,
-+						   size, val);
-+	}
 +
 +	/*
-+	 * All BARs have fixed addresses specified by the EA
-+	 * capability, they must return zero on read.
++	 * The first device on the bus is the PEM PCIe bridge.
++	 * Special case its config access.
 +	 */
-+	if (cfg_type == 0 &&
-+	    ((where >= 0x10 && where < 0x2c) ||
-+	     (where >= 0x1a4 && where < 0x1bc))) {
-+		/* BAR or SRIOV BAR */
-+		*val = 0;
-+		return PCIBIOS_SUCCESSFUL;
-+	}
++	if (bus->number == pci->cfg.bus_range->start)
++		return thunder_pem_bridge_read(bus, devfn, where, size, val);
 +
-+	addr = bus->ops->map_bus(bus, devfn, 0);
-+	if (!addr) {
-+		*val = ~0;
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+	}
-+
-+	vendor_device = readl(addr);
-+	if (vendor_device == 0xffffffff)
-+		goto no_emulation;
-+
-+	pr_debug("%04x:%04x - Fix pass#: %08x, where: %03x, devfn: %03x\n",
-+		 vendor_device & 0xffff, vendor_device >> 16, class_rev,
-+		 (unsigned) where, devfn);
-+
-+	/* Check for non type-00 header. */
-+	if (cfg_type == 0) {
-+		bool has_msix;
-+		bool is_nic = (vendor_device == 0xa01e177d);
-+		bool is_tns = (vendor_device == 0xa01f177d);
-+
-+		addr = bus->ops->map_bus(bus, devfn, 0x70);
-+		if (!addr) {
-+			*val = ~0;
-+			return PCIBIOS_DEVICE_NOT_FOUND;
-+		}
-+		/* E_CAP */
-+		v = readl(addr);
-+		has_msix = (v & 0xff00) != 0;
-+
-+		if (!has_msix && where_a == 0x70) {
-+			v |= 0xbc00; /* next capability is EA at 0xbc */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xb0) {
-+			addr = bus->ops->map_bus(bus, devfn, where_a);
-+			if (!addr) {
-+				*val = ~0;
-+				return PCIBIOS_DEVICE_NOT_FOUND;
-+			}
-+			v = readl(addr);
-+			if (v & 0xff00)
-+				pr_err("Bad MSIX cap header: %08x\n", v);
-+			v |= 0xbc00; /* next capability is EA at 0xbc */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xbc) {
-+			if (is_nic)
-+				v = 0x40014; /* EA last in chain, 4 entries. */
-+			else if (is_tns)
-+				v = 0x30014; /* EA last in chain, 3 entries. */
-+			else if (has_msix)
-+				v = 0x20014; /* EA last in chain, 2 entries. */
-+			else
-+				v = 0x10014; /* EA last in chain, 1 entry. */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a >= 0xc0 && where_a < 0xd0)
-+			/* EA entry-0. PP=0, BAR0 Size:3 */
-+			return handle_ea_bar(0x80ff0003,
-+					     0x10, bus, devfn, where,
-+					     size, val);
-+		if (where_a >= 0xd0 && where_a < 0xe0 && has_msix)
-+			 /* EA entry-1. PP=0, BAR4 Size:3 */
-+			return handle_ea_bar(0x80ff0043,
-+					     0x20, bus, devfn, where,
-+					     size, val);
-+		if (where_a >= 0xe0 && where_a < 0xf0 && is_tns)
-+			/* EA entry-2. PP=0, BAR2, Size:3 */
-+			return handle_ea_bar(0x80ff0023,
-+					     0x18, bus, devfn, where,
-+					     size, val);
-+		if (where_a >= 0xe0 && where_a < 0xf0 && is_nic)
-+			/* EA entry-2. PP=4, VF_BAR0 (9), Size:3 */
-+			return handle_ea_bar(0x80ff0493,
-+					     0x1a4, bus, devfn, where,
-+					     size, val);
-+		if (where_a >= 0xf0 && where_a < 0x100 && is_nic)
-+			/* EA entry-3. PP=4, VF_BAR4 (d), Size:3 */
-+			return handle_ea_bar(0x80ff04d3,
-+					     0x1b4, bus, devfn, where,
-+					     size, val);
-+	} else if (cfg_type == 1) {
-+		bool is_rsl_bridge = devfn == 0x08;
-+		bool is_rad_bridge = devfn == 0xa0;
-+		bool is_zip_bridge = devfn == 0xa8;
-+		bool is_dfa_bridge = devfn == 0xb0;
-+		bool is_nic_bridge = devfn == 0x10;
-+
-+		if (where_a == 0x70) {
-+			addr = bus->ops->map_bus(bus, devfn, where_a);
-+			if (!addr) {
-+				*val = ~0;
-+				return PCIBIOS_DEVICE_NOT_FOUND;
-+			}
-+			v = readl(addr);
-+			if (v & 0xff00)
-+				pr_err("Bad PCIe cap header: %08x\n", v);
-+			v |= 0xbc00; /* next capability is EA at 0xbc */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xbc) {
-+			if (is_nic_bridge)
-+				v = 0x10014; /* EA last in chain, 1 entry */
-+			else
-+				v = 0x00014; /* EA last in chain, no entries */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xc0) {
-+			if (is_rsl_bridge || is_nic_bridge)
-+				v = 0x0101; /* subordinate:secondary = 1:1 */
-+			else if (is_rad_bridge)
-+				v = 0x0202; /* subordinate:secondary = 2:2 */
-+			else if (is_zip_bridge)
-+				v = 0x0303; /* subordinate:secondary = 3:3 */
-+			else if (is_dfa_bridge)
-+				v = 0x0404; /* subordinate:secondary = 4:4 */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xc4 && is_nic_bridge) {
-+			/* Enabled, not-Write, SP=ff, PP=05, BEI=6, ES=4 */
-+			v = 0x80ff0564;
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xc8 && is_nic_bridge) {
-+			v = 0x00000002; /* Base-L 64-bit */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xcc && is_nic_bridge) {
-+			v = 0xfffffffe; /* MaxOffset-L 64-bit */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xd0 && is_nic_bridge) {
-+			v = 0x00008430; /* NIC Base-H */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+		if (where_a == 0xd4 && is_nic_bridge) {
-+			v = 0x0000000f; /* MaxOffset-H */
-+			set_val(v, where, size, val);
-+			return PCIBIOS_SUCCESSFUL;
-+		}
-+	}
-+no_emulation:
 +	return pci_generic_config_read(bus, devfn, where, size, val);
 +}
 +
-+static int thunder_ecam_config_write(struct pci_bus *bus, unsigned int devfn,
-+				     int where, int size, u32 val)
++/*
++ * Some of the w1c_bits below also include read-only or non-writable
++ * reserved bits, this makes the code simpler and is OK as the bits
++ * are not affected by writing zeros to them.
++ */
++static u32 thunder_pem_bridge_w1c_bits(int where)
 +{
++	u32 w1c_bits = 0;
++
++	switch (where & ~3) {
++	case 0x04: /* Command/Status */
++	case 0x1c: /* Base and I/O Limit/Secondary Status */
++		w1c_bits = 0xff000000;
++		break;
++	case 0x44: /* Power Management Control and Status */
++		w1c_bits = 0xfffffe00;
++		break;
++	case 0x78: /* Device Control/Device Status */
++	case 0x80: /* Link Control/Link Status */
++	case 0x88: /* Slot Control/Slot Status */
++	case 0x90: /* Root Status */
++	case 0xa0: /* Link Control 2 Registers/Link Status 2 */
++		w1c_bits = 0xffff0000;
++		break;
++	case 0x104: /* Uncorrectable Error Status */
++	case 0x110: /* Correctable Error Status */
++	case 0x130: /* Error Status */
++	case 0x160: /* Link Control 4 */
++		w1c_bits = 0xffffffff;
++		break;
++	default:
++		break;
++	}
++	return w1c_bits;
++}
++
++static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
++				    int where, int size, u32 val)
++{
++	struct gen_pci *pci = bus->sysdata;
++	struct thunder_pem_pci *pem_pci;
++	u64 write_val, read_val;
++	u32 mask = 0;
++
++	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
++
++	if (devfn != 0 || where >= 2048)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++
 +	/*
-+	 * All BARs have fixed addresses, ignore BAR writes so they
-+	 * don't get corrupted.
++	 * 32-bit accesses only.  If the write is for a size smaller
++	 * than 32-bits, we must first read the 32-bit value and merge
++	 * in the desired bits and then write the whole 32-bits back
++	 * out.
 +	 */
-+	if ((where >= 0x10 && where < 0x2c) ||
-+	    (where >= 0x1a4 && where < 0x1bc))
-+		/* BAR or SRIOV BAR */
-+		return PCIBIOS_SUCCESSFUL;
++	switch (size) {
++	case 1:
++		read_val = where & ~3ull;
++		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
++		read_val >>= 32;
++		mask = ~(0xff << (8 * (where & 3)));
++		read_val &= mask;
++		val = (val & 0xff) << (8 * (where & 3));
++		val |= (u32)read_val;
++		break;
++	case 2:
++		read_val = where & ~3ull;
++		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
++		read_val >>= 32;
++		mask = ~(0xffff << (8 * (where & 3)));
++		read_val &= mask;
++		val = (val & 0xffff) << (8 * (where & 3));
++		val |= (u32)read_val;
++		break;
++	default:
++		break;
++	}
++
++	/*
++	 * By expanding the write width to 32 bits, we may
++	 * inadvertently hit some W1C bits that were not intended to
++	 * be written.  Calculate the mask that must be applied to the
++	 * data to be written to avoid these cases.
++	 */
++	if (mask) {
++		u32 w1c_bits = thunder_pem_bridge_w1c_bits(where);
++
++		if (w1c_bits) {
++			mask &= w1c_bits;
++			val &= ~mask;
++		}
++	}
++
++	/*
++	 * Low order bits are the config address, the high order 32
++	 * bits are the data to be written.
++	 */
++	write_val = where & ~3ull;
++	write_val |= (((u64)val) << 32);
++	writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
++				    int where, int size, u32 val)
++{
++	struct gen_pci *pci = bus->sysdata;
++
++	if (bus->number < pci->cfg.bus_range->start ||
++	    bus->number > pci->cfg.bus_range->end)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	/*
++	 * The first device on the bus is the PEM PCIe bridge.
++	 * Special case its config access.
++	 */
++	if (bus->number == pci->cfg.bus_range->start)
++		return thunder_pem_bridge_write(bus, devfn, where, size, val);
++
 +
 +	return pci_generic_config_write(bus, devfn, where, size, val);
 +}
 +
-+static struct gen_pci_cfg_bus_ops thunder_ecam_bus_ops = {
-+	.bus_shift	= 20,
++static struct gen_pci_cfg_bus_ops thunder_pem_bus_ops = {
++	.bus_shift	= 24,
 +	.ops		= {
-+		.map_bus        = thunder_ecam_map_bus,
-+		.read           = thunder_ecam_config_read,
-+		.write          = thunder_ecam_config_write,
++		.map_bus	= thunder_pem_map_bus,
++		.read		= thunder_pem_config_read,
++		.write		= thunder_pem_config_write,
 +	}
 +};
 +
-+static const struct of_device_id thunder_ecam_of_match[] = {
-+	{ .compatible = "cavium,pci-host-thunder-ecam",
-+	  .data = &thunder_ecam_bus_ops },
++static const struct of_device_id thunder_pem_of_match[] = {
++	{ .compatible = "cavium,pci-host-thunder-pem",
++	  .data = &thunder_pem_bus_ops },
 +
 +	{ },
 +};
-+MODULE_DEVICE_TABLE(of, thunder_ecam_of_match);
++MODULE_DEVICE_TABLE(of, thunder_pem_of_match);
 +
-+static int thunder_ecam_probe(struct platform_device *pdev)
++static int thunder_pem_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
 +	const struct of_device_id *of_id;
-+	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
++	resource_size_t bar4_start;
++	struct resource *res_pem;
++	struct thunder_pem_pci *pem_pci;
 +
-+	if (!pci)
++	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
++	if (!pem_pci)
 +		return -ENOMEM;
 +
-+	of_id = of_match_node(thunder_ecam_of_match, dev->of_node);
-+	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
++	of_id = of_match_node(thunder_pem_of_match, dev->of_node);
++	pem_pci->gen_pci.cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
 +
-+	return pci_host_common_probe(pdev, pci);
++	/*
++	 * The second register range is the PEM bridge to the PCIe
++	 * bus.  It has a different config access method than those
++	 * devices behind the bridge.
++	 */
++	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res_pem) {
++		dev_err(dev, "missing \"reg[1]\"property\n");
++		return -EINVAL;
++	}
++
++	pem_pci->pem_reg_base = devm_ioremap(dev, res_pem->start, 0x10000);
++	if (!pem_pci->pem_reg_base)
++		return -ENOMEM;
++
++	/*
++	 * The MSI-X BAR for the PEM and AER interrupts is located at
++	 * a fixed offset from the PEM register base.  Generate a
++	 * fragment of the synthesized Enhanced Allocation capability
++	 * structure here for the BAR.
++	 */
++	bar4_start = res_pem->start + 0xf00000;
++	pem_pci->ea_entry[0] = (u32)bar4_start | 2;
++	pem_pci->ea_entry[1] = (u32)(res_pem->end - bar4_start) & ~3u;
++	pem_pci->ea_entry[2] = (u32)(bar4_start >> 32);
++
++	return pci_host_common_probe(pdev, &pem_pci->gen_pci);
 +}
 +
-+static struct platform_driver thunder_ecam_driver = {
++static struct platform_driver thunder_pem_driver = {
 +	.driver = {
 +		.name = KBUILD_MODNAME,
-+		.of_match_table = thunder_ecam_of_match,
++		.of_match_table = thunder_pem_of_match,
 +	},
-+	.probe = thunder_ecam_probe,
++	.probe = thunder_pem_probe,
 +};
-+module_platform_driver(thunder_ecam_driver);
++module_platform_driver(thunder_pem_driver);
 +
-+MODULE_DESCRIPTION("Thunder ECAM PCI host driver");
++MODULE_DESCRIPTION("Thunder PEM PCIe host driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 1.8.3.1
