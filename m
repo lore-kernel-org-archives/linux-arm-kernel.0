@@ -1,98 +1,121 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 4 Mar 2016 10:28:29 -0700
-Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue bits
- when just one is being checked
-In-Reply-To: <20160304163854.GD19428@n2100.arm.linux.org.uk>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-7-git-send-email-troy.kisky@boundarydevices.com>
- <VI1PR0401MB18550FD3A944783B88BEDB64FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
- <56D9B54B.8020309@boundarydevices.com>
- <20160304163854.GD19428@n2100.arm.linux.org.uk>
-Message-ID: <56D9C5BD.5060802@boundarydevices.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 4 Mar 2016 17:32:50 +0000
+Subject: [PATCH 0/2] arm64, cma, gicv3-its: Use CMA for allocation of
+ large device tables
+In-Reply-To: <20160301124029.GV24726@rric.localdomain>
+References: <1456398164-16864-1-git-send-email-rrichter@caviumnetworks.com>
+ <56D42199.7040207@arm.com> <20160229122511.GS24726@rric.localdomain>
+ <56D44812.6000309@arm.com> <56D4D1A1.9060305@redhat.com>
+ <20160301124029.GV24726@rric.localdomain>
+Message-ID: <56D9C6C2.50000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/4/2016 9:38 AM, Russell King - ARM Linux wrote:
-> On Fri, Mar 04, 2016 at 09:18:19AM -0700, Troy Kisky wrote:
->> On 3/4/2016 2:11 AM, Fugang Duan wrote:
->>> From: Troy Kisky <troy.kisky@boundarydevices.com>Sent: Thursday, February 25, 2016 8:37 AM
->>>> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
->>>> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
->>>> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
->>>> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
->>>> johannes at sipsolutions.net; stillcompiling at gmail.com;
->>>> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
->>>> <troy.kisky@boundarydevices.com>
->>>> Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue bits when
->>>> just one is being checked
+On 01/03/16 12:40, Robert Richter wrote:
+> On 29.02.16 15:17:53, Laura Abbott wrote:
+>> On 02/29/2016 05:30 AM, Marc Zyngier wrote:
+>>> On 29/02/16 12:25, Robert Richter wrote:
+>>>> On 29.02.16 10:46:49, Marc Zyngier wrote:
+>>>>> On 25/02/16 11:02, Robert Richter wrote:
+>>>>>> From: Robert Richter <rrichter@cavium.com>
+>>>>>>
+>>>>>> This series implements the use of CMA for allocation of large device
+>>>>>> tables for the arm64 gicv3 interrupt controller.
+>>>>>>
+>>>>>> There are 2 patches, the first is for early activation of cma, which
+>>>>>> needs to be done before interrupt initialization to make it available
+>>>>>> to the gicv3. The second implements the use of CMA to allocate
+>>>>>> gicv3-its device tables.
+>>>>>>
+>>>>>> This solves the problem where mem allocation is limited to 4MB. A
+>>>>>> previous patch sent to the list to address this that instead increases
+>>>>>> FORCE_MAX_ZONEORDER becomes obsolete.
+>>>>>
+>>>>> I think you're looking at the problem the wrong way. Instead of going
+>>>>> through CMA directly, I'd rather go through the normal DMA API
+>>>>> (dma_alloc_coherent), which can itself try CMA (should it be enabled).
+>>>>>
+>>>>> That will give you all the benefit of the CMA allocation, and also make
+>>>>> the driver more robust. I meant to do this for a while, and never found
+>>>>> the time. Any chance you could have a look?
 >>>>
->>>> FEC_ENET_RXF is 3 separate bits, we only check one queue at a time. So, when
->>>> the last queue is being checked, it is bad to remove the interrupt on the 1st
->>>> queue.
+>>>> I was considering this first, and in fact the backend used is the
+>>>> same. The problem is that irq initialization is much more earlier than
+>>>> standard device probing. The gic even does not have its own struct
+>>>> device and is not initialized like devices are. This makes the whole
+>>>> dma_alloc_coherent() approach not feasable, at least this would
+>>>> require introducing and using a dev struct for the gic. But still this
+>>>> migth not work as it could be too early during boot. I also think
+>>>> there were reasons not implementing the gic as a device.
 >>>>
->>>> Also, since this is now done in the napi routine and not the interrupt, it is not
->>>> needed.
+>>>> I was following more the approach of iommu/mmu implementations which
+>>>> use dma_alloc_from_contiguous() directly. I think this is more close
+>>>> to the device tables for its.
 >>>>
->>>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
->>>> ---
->>>>  drivers/net/ethernet/freescale/fec_main.c | 2 --
->>>>  1 file changed, 2 deletions(-)
+>>>> Code path of dma_alloc_coherent():
 >>>>
->>>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
->>>> b/drivers/net/ethernet/freescale/fec_main.c
->>>> index 610cf6c..791f385 100644
->>>> --- a/drivers/net/ethernet/freescale/fec_main.c
->>>> +++ b/drivers/net/ethernet/freescale/fec_main.c
->>>> @@ -1338,8 +1338,6 @@ static int fec_rxq(struct net_device *ndev, struct
->>>> fec_enet_private *fep,
->>>>  			break;
->>>>  		pkt_received++;
+>>>>  dma_alloc_coherent()
+>>>>     v
+>>>>  dma_alloc_attrs()             <---- Requires get_dma_ops(dev) != NULL
+>>>>     v
+>>>>  dma_alloc_from_coherent()
+>>>>     v
+>>>>  ...
 >>>>
->>>> -		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
->>>> -
+>>>> The difference it that dma_alloc_coherent() tries cma first and then
+>>>> proceeds with ops->alloc() (which is __dma_alloc() for arm64) if
+>>>> dma_alloc_from_coherent() fails. In my implementation I am directly
+>>>> using dma_alloc_from_coherent() and only for large mem sizes.
+>>>>
+>>>> So both approaches uses finally the same allocation, but for gicv3-its
+>>>> the generic dma framework is not used since the gic is not implemented
+>>>> as a device.
 >>>
->>> We should clear the related rx queue ievent, not remove the code.
->>> Pls see commit: db3421c114cf that was submitted by Russell King.
+>>> And that's what I propose we change.
 >>>
->>> No ack the patch.
+>>> The core GIC itself indeed isn't a device, and I'm not proposing we make
+>>> it a device (yet). But the ITS is only used much later in the game, and
+>>> we could move the table allocation to a different time (when the actual
+>>> domains are allocated, for example...). Then, we'd have a set of devices
+>>> available, and the DMA API is our friend again.
+>>>
+>>> 	M.
+>>>
 >>
+>> I did the first drop of CMA in the DMA APIs for arm64. When adding that,
+>> it was decided to disallow dma_alloc calls without a valid device pointer
+>> (c666e8d5cae7 "arm64: Warn on NULL device structure for dma APIs") so
+>> if the GIC code wants to use dma_alloc it _must_ have a proper device.
 >>
->> This is now done in patch #4 "net: fec: reduce interrupts" and you could argue
->> that it should be squashed into that patch. But I like separating changes
->> as much as possible.
+>> If the device shift still isn't feasible, a better approach might be
+>> what powerpc did for kvm (arch/powerpc/kvm/book3s_hv_builtin.c). This
+>> calls the cma_alloc functions directly and skips trying to work around
+>> the DMA layer.
 >>
->>
->> Russell, this patch and patch #4 will likely need your ack before it will be applied.
->> Can you take a look please?
+>> With either option, I don't think the early initialization approach
+>> proposed is great. If we want CMA early, it's probably be just to
+>> explicitly initialize it early rather than trying to do it from
+>> two places. Something like:
 > 
-> I stopped caring about the FEC ethernet driver about 18 months ago,
-> after I ended up dropping a significant pile of fixes on the floor
-> through the huge number of conflicts and the shere effort of
-> constantly trying to move them forward.
+> I wasn't sure whether this works for all archs if called directly in
+> mm_init(). If so, ok your proposed change would be better, though a
+> stub for !CONFIG_CMA needs to be added. Any comment on the change
+> below as a replacement for patch #1?
 > 
-> My patch series tend to be large because I put concentrated effort
-> into something for a month, which then gives a problem if conflicts
-> come up later and the series has to be effectively rewritten from
-> scratch.  It was after the second or third time of facing an almost
-> total rewrite that happened that I just gave up.
-> 
-> I've toyed with the idea of forking the driver, but I wouldn't have
-> time to maintain such a thing.  So, right now I just put up with all
-> the bad quirks, and reset/power cycle the boards when things go wrong.
-> Right now, I just disable runtime PM support on the FEC to get
-> stability here. :)
-> 
-> Sorry, but I can't be of more help.
-> 
+> On the other side, if we use device enablement for its, then early cma
+> enablement is not needed anymore. Will check how that could work.
 
+I'm planning to have a look at that next week. This would solve a number
+of other issues (like the custom "needs flushing" flags we have so far),
+and Will has been pestering me about it for quite a while now.
 
-I can sympathize, I've been almost ready to post my patches numerous times
-when a huge patch set would hit, and conflict everywhere. Including once
-about 18 months ago :)
+The only worry I have is that we end-up in a dependency hell with PCI
+being probed too early. I really wish we had proper device dependencies
+sorted... But we do need to try that route before starting to hack
+things like CMA.
 
-That's why I got trigger happy, and first posted my too large set before
-net-next was opened. It didn't help though, there was already a conflict
-in net.
+Thanks,
 
-
-Troy
+	M.
+-- 
+Jazz is not dead. It just smells funny...
