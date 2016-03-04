@@ -1,30 +1,48 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Fri,  4 Mar 2016 12:32:05 -0800
-Subject: [PATCH 0/3] ARM: bcm2835: Include VC4 GPU in the DT
-Message-ID: <1457123528-13482-1-git-send-email-eric@anholt.net>
+Date: Fri,  4 Mar 2016 12:32:06 -0800
+Subject: [PATCH 1/3] dt-bindings: Add binding docs for V3D.
+In-Reply-To: <1457123528-13482-1-git-send-email-eric@anholt.net>
+References: <1457123528-13482-1-git-send-email-eric@anholt.net>
+Message-ID: <1457123528-13482-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This has been floating around out of tree, and the Pi Foundation is
-including a variant of it in the device tree overlay in its firmware
-update system.
+This was missed in the upstreaming process.
 
-Eric Anholt (3):
-  dt-bindings: Add binding docs for V3D.
-  drm/vc4: Recognize a more specific compatible string for V3D.
-  ARM: bcm2835: Add VC4 to the device tree.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
- .../devicetree/bindings/display/brcm,bcm-vc4.txt   | 12 ++++++
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |  4 ++
- arch/arm/boot/dts/bcm2835-rpi-a.dts                |  4 ++
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |  4 ++
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |  4 ++
- arch/arm/boot/dts/bcm2835-rpi-b.dts                |  4 ++
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  9 +++++
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |  4 ++
- arch/arm/boot/dts/bcm283x.dtsi                     | 47 ++++++++++++++++++++++
- drivers/gpu/drm/vc4/vc4_v3d.c                      |  1 +
- 10 files changed, 93 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+index 56a961a..9f97df4 100644
+--- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
++++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+@@ -35,6 +35,12 @@ Optional properties for HDMI:
+ 		  as an interrupt/status bit in the HDMI controller
+ 		  itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
+ 
++Required properties for V3D:
++- compatible:	Should be "brcm,bcm2835-v3d"
++- reg:		Physical base address and length of the V3D's registers
++- interrupts:	The interrupt number
++		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
++
+ Example:
+ pixelvalve at 7e807000 {
+ 	compatible = "brcm,bcm2835-pixelvalve2";
+@@ -60,6 +66,12 @@ hdmi: hdmi at 7e902000 {
+ 	clock-names = "pixel", "hdmi";
+ };
+ 
++v3d: v3d at 7ec00000 {
++	compatible = "brcm,bcm2835-v3d";
++	reg = <0x7ec00000 0x1000>;
++	interrupts = <1 10>;
++};
++
+ vc4: gpu {
+ 	compatible = "brcm,bcm2835-vc4";
+ };
 -- 
 2.7.0
