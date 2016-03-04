@@ -1,28 +1,57 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 04 Mar 2016 23:51:15 +0000
-Subject: [PATCH v14 13/20] arm64/kexec: Enable kexec in the arm64 defconfig
+Date: Fri, 04 Mar 2016 23:51:14 +0000
+Subject: [PATCH v14 11/20] Revert "arm64: remove dead code"
 In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
 References: <cover.1457135058.git.geoff@infradead.org>
-Message-ID: <b1f3b2664006ec06c3def2e19e4f666fde3f1ea5.1457135058.git.geoff@infradead.org>
+Message-ID: <6f794d4b23d333dfd70be30dfb7dbf2d0f9fd75c.1457135058.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This reverts commit b08d4640a3dca68670fc5af2fe9205b395a02388.
+
+Add back the setup_mm_for_reboot() needed for kexec.
+Rename setup_mm_for_reboot() to cpu_install_idmap() in preparation
+for the pagetable rework series.
+
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/include/asm/mmu.h |  1 +
+ arch/arm64/mm/mmu.c          | 11 +++++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 86581f7..288cbd6 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -64,6 +64,7 @@ CONFIG_KSM=y
- CONFIG_TRANSPARENT_HUGEPAGE=y
- CONFIG_CMA=y
- CONFIG_XEN=y
-+CONFIG_KEXEC=y
- CONFIG_CMDLINE="console=ttyAMA0"
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_COMPAT=y
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 990124a..ce63a20 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -29,6 +29,7 @@ typedef struct {
+ #define ASID(mm)	((mm)->context.id.counter & 0xffff)
+ 
+ extern void paging_init(void);
++extern void cpu_install_idmap(void);
+ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+ extern void init_mem_pgprot(void);
+ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 58faeaa..e43d060 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -479,6 +479,17 @@ void __init paging_init(void)
+ }
+ 
+ /*
++ * Enable the identity mapping to allow the MMU disabling.
++ */
++void cpu_install_idmap(void)
++{
++	cpu_set_reserved_ttbr0();
++	flush_tlb_all();
++	cpu_set_idmap_tcr_t0sz();
++	cpu_switch_mm(idmap_pg_dir, &init_mm);
++}
++
++/*
+  * Check whether a kernel address is valid (derived from arch/x86/).
+  */
+ int kern_addr_valid(unsigned long addr)
 -- 
 2.5.0
