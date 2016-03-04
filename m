@@ -1,93 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Mar 2016 14:56:56 +0000
-Subject: DWord alignment on ARMv7
-In-Reply-To: <2494410.DJhrOHD4yE@wuerfel>
-References: <56D8BA3F.7050508@pengutronix.de> <72900410.JPa1IHPXo5@wuerfel>
- <20160304134651.GB19428@n2100.arm.linux.org.uk>
- <2494410.DJhrOHD4yE@wuerfel>
-Message-ID: <20160304145656.GC19428@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  4 Mar 2016 15:57:01 +0100
+Subject: [GIT PULL 3/3] arm64: tegra: Devicetree changes for v4.6-rc1
+In-Reply-To: <1457103421-26006-1-git-send-email-thierry.reding@gmail.com>
+References: <1457103421-26006-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1457103421-26006-3-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 03:41:58PM +0100, Arnd Bergmann wrote:
-> On Friday 04 March 2016 13:46:51 Russell King - ARM Linux wrote:
-> > On Fri, Mar 04, 2016 at 02:30:23PM +0100, Arnd Bergmann wrote:
-> > > Ah, I thought it only required 32-bit alignment like ldm/stm, but it
-> > > seems that it won't do that. However, an implementation like
-> > > 
-> > > unsigned long long get_unaligned_u64(void *p)
-> > > {
-> > >         unsigned long long upper, lower;
-> > >         lower = *(unsigned long*)p;
-> > >         upper = *(unsigned long*)(p+4);
-> > > 
-> > >         return lower | (upper << 32);
-> > > }
-> > > 
-> > > does get compiled into
-> > > 
-> > > 00000000 <f>:
-> > >    0:   e8900003        ldm     r0, {r0, r1}
-> > >    4:   e12fff1e        bx      lr
-> > 
-> > I think it may be something of a bitch to work around, because the
-> > compiler is going to do stuff like that behind your back.
-> > 
-> > The only way around that would be to bypass the compiler by using
-> > asm(), but then you end up bypassing the instruction scheduling too.
-> > That may not matter, as the resulting overhead may still be lower.
-> 
-> I think the compiler is correctly optimizing the code according to
-> what we tell it about the alignment here:
+Hi ARM SoC maintainers,
 
-It is, that's not what I was saying though - I wasn't saying whether or
-not the compiler is correctly optimising the code (it is.)  I was saying
-that we _don't_ want the compiler optimising the code in this way here -
-that's a completely _different_ point.
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 
-> The implementation appears to be suboptimal for cross-endian loads
-> though, as gcc-5.3 does not use the 'rev' instruction here but
-> falls back on byte accesses. We can easily fix that by introducing
-> one more generic implementation for the cross-endian accesses doing
-> 
-> static __always_inline void put_unaligned_be64(u64 val, void *p)
-> {
->        __put_unaligned_cpu64((u64 __force)cpu_to_be64(val), p);
-> }
-> static __always_inline void put_unaligned_be32(u32 val, void *p)
-> {
->        __put_unaligned_cpu32((u32 __force)cpu_to_be32(val), p);
-> }
-> static __always_inline void put_unaligned_be16(u16 val, void *p)
-> {
->        __put_unaligned_cpu16((u16 __force)cpu_to_be16(val), p);
-> }
-> 
-> which is better on ARM than the currently used
-> 
-> static inline void __put_unaligned_le16(u16 val, u8 *p)
-> {
->         *p++ = val;
->         *p++ = val >> 8;
-> }
-> static inline void __put_unaligned_le32(u32 val, u8 *p)
-> {
->         __put_unaligned_le16(val >> 16, p + 2);
->         __put_unaligned_le16(val, p);
-> }
-> static inline void __put_unaligned_le64(u64 val, u8 *p)
-> {
->         __put_unaligned_le32(val >> 32, p + 4);
->         __put_unaligned_le32(val, p);
-> }
-> 
-> because it will allow using ldr/str+rev for unaligned
-> cross-endian accesses, but disallow ldm/stm+rev.
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
 
-Looks like it's going to make the unaligned stuff even more of a rabbit
-warren of include files.
+are available in the git repository at:
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.6-arm64
+
+for you to fetch changes up to e81b390f02aea3d9c2745a5ff7b3a2eaad2317e7:
+
+  arm64: tegra: Add gpio-keys nodes for Smaug (2016-03-04 08:49:09 +0100)
+
+----------------------------------------------------------------
+arm64: tegra: Devicetree changes for v4.6-rc1
+
+The most interesting bit here is the addition of initial support for the
+Google Pixel C (a.k.a. Smaug). It's far from feature complete but allows
+booting to a login prompt from a root filesystem on the eMMC.
+
+Other than that, this contains a selection of cleanups to various device
+tree source files.
+
+----------------------------------------------------------------
+Jon Hunter (1):
+      arm64: tegra: Add support for Google Pixel C
+
+Laxman Dewangan (1):
+      arm64: tegra: Enable power and volume keys on Jetson TX1
+
+Rhyland Klein (1):
+      arm64: tegra: Add gpio-keys nodes for Smaug
+
+Sudeep Holla (1):
+      arm64: tegra: Replace legacy *,wakeup property with wakeup-source
+
+Thierry Reding (1):
+      arm64: tegra: Fix copy/paste typo in several DTS includes
+
+ arch/arm64/boot/dts/nvidia/Makefile            |   1 +
+ arch/arm64/boot/dts/nvidia/tegra132-norrin.dts |   4 +-
+ arch/arm64/boot/dts/nvidia/tegra132.dtsi       |   2 +-
+ arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi |  26 +++++
+ arch/arm64/boot/dts/nvidia/tegra210-smaug.dts  | 126 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi       |   2 +-
+ 6 files changed, 157 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
