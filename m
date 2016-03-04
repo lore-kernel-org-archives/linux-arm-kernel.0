@@ -1,41 +1,35 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Fri, 04 Mar 2016 07:13:49 +0100
-Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr() on
- ARM
-In-Reply-To: <20160303173522.GA9189@localhost> (Bjorn Helgaas's message of
- "Thu, 3 Mar 2016 11:35:22 -0600")
-References: <m337sapw89.fsf@t19.piap.pl> <20160303173522.GA9189@localhost>
-Message-ID: <m38u1yojmq.fsf@t19.piap.pl>
+From: dyoung@redhat.com (Dave Young)
+Date: Fri, 4 Mar 2016 14:25:24 +0800
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <20160301233040.GA31476@codeblueprint.co.uk>
+References: <20160218104407.GC2651@codeblueprint.co.uk>
+ <CAKv+Gu_AW7PKJJOd2mbEu3LKJe+gNaPHnH=sgO=YXM_KWFyKxw@mail.gmail.com>
+ <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <20160218191624.GA1515@redhat.com>
+ <20160226144114.GA7475@codeblueprint.co.uk>
+ <20160301233040.GA31476@codeblueprint.co.uk>
+Message-ID: <20160304062524.GA19010@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+> I have a very rough draft of patches that implement this strategy on
+> the 'experiemntal/efi-memmap' branch in the EFI tree if anyone is
+> curious and wants to take a look. The series will be sent out soon.
+> 
+> I wouldn't necessarily try running them or anything as there's a few
+> things that I know are broken; ia64 build, EFI mixed mode boot,
+> probably arm64 regressions.
 
-Bjorn Helgaas <helgaas@kernel.org> writes:
+Matt, I tried :). I see a build warning about print phys_addr_t without
+%pa anotation and booting with ioremap error messages about slot not found
+, and ioremap region leak messages.
 
-> On Tue, Mar 01, 2016 at 07:07:18AM +0100, Krzysztof Ha?asa wrote:
->> Many ARM platforms use a wrapper:
->> /*
->>  * Compatibility wrapper for older platforms that do not care about
->>  * passing the parent device.
->>  */
->> static inline void pci_common_init(struct hw_pci *hw)
->> {
->>         pci_common_init_dev(NULL, hw);
->> }
->> 
->> which means that pci_bus_assign_domain_nr() can be called without
->> a parent. This patch fixes the NULL pointer dereference.
->
-> What exactly is the impact of this?  Does this fix need to be in v4.5?
-> It sounds like it should be, but I need a little more detailed
-> justification, e.g., "platforms X, Y, Z don't boot at all without
-> this change."
+Looking forward to your formal posts.
 
-At least CNS3xxx doesn't boot. I haven't verified a couple of others,
-but they may be broken as well.
--- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Thanks
+Dave
