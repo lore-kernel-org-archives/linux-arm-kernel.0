@@ -1,64 +1,84 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 04 Mar 2016 13:15:37 -0500
-Subject: [PATCH v2 2/5] arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
-In-Reply-To: <20160304145927.GD31115@leverpostej>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <1454684330-892-3-git-send-email-james.morse@arm.com>
- <56D87B74.1010306@codeaurora.org> <56D88219.6040806@arm.com>
- <56D88A6C.8070304@codeaurora.org> <20160304145927.GD31115@leverpostej>
-Message-ID: <C8C84389-B923-45F8-8141-E69640E259E6@codeaurora.org>
+From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
+Date: Fri, 4 Mar 2016 10:16:44 -0800
+Subject: [PATCH V4] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
+In-Reply-To: <56D9CF3E.7080607@caviumnetworks.com>
+References: <1457063043-10623-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <20160304160221.GC7886@arm.com> <56D9CF3E.7080607@caviumnetworks.com>
+Message-ID: <56D9D10C.8050603@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On March 4, 2016 9:59:28 AM EST, Mark Rutland <mark.rutland@arm.com> wrote:
->On Thu, Mar 03, 2016 at 02:03:08PM -0500, Christopher Covington wrote:
->> On 03/03/2016 01:27 PM, Robin Murphy wrote:
->> > On 03/03/16 17:59, Christopher Covington wrote:
->> 
->> >>> --- a/arch/arm64/kernel/cpuinfo.c
->> >>> +++ b/arch/arm64/kernel/cpuinfo.c
->> >>> @@ -210,6 +210,7 @@ static void __cpuinfo_store_cpu(struct
->> >>> cpuinfo_arm64 *info)
->> >>>       info->reg_id_aa64isar1 = read_cpuid(SYS_ID_AA64ISAR1_EL1);
->> >>>       info->reg_id_aa64mmfr0 = read_cpuid(SYS_ID_AA64MMFR0_EL1);
->> >>>       info->reg_id_aa64mmfr1 = read_cpuid(SYS_ID_AA64MMFR1_EL1);
->> >>> +    info->reg_id_aa64mmfr2 = read_cpuid(SYS_ID_AA64MMFR2_EL1);
->> >>>       info->reg_id_aa64pfr0 = read_cpuid(SYS_ID_AA64PFR0_EL1);
->> >>>       info->reg_id_aa64pfr1 = read_cpuid(SYS_ID_AA64PFR1_EL1);
->> >>
->> >> swapper[0]: undefined instruction: pc=ffffff800808d730
->> >> Code: d5380702 d5380721 f9017c02 f9018001 (d5380742)
->> >> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
->> >> Modules linked in:
->> >> CPU: 0 PID: 0 Comm: swapper Not tainted 4.5.0-rc6-next-20160303 #1
->> >> Hardware name: (null) (DT)
->> >> task: ffffff8008b2d980 ti: ffffff8008b20000 task.ti:
->ffffff8008b20000
->> >> PC is at __cpuinfo_store_cpu+0x68/0x198
->> >> LR is at cpuinfo_store_boot_cpu+0x28/0x50
->> >>
->> >> ffffff800808d730:       d5380742        mrs     x2, s3_0_c0_c7_2
->> > 
->> > Hmm, per table C5-6 in the ARMv8 ARM (issue i), that's specifically
->a
->> > reserved encoding, rather than an unallocated one, so it should
->read as
->> > zero, not undef. What are you running on?
->> 
->> QDF2432. I'll investigate.
+On 03/04/2016 10:09 AM, Tirumalesh Chalamarla wrote:
 >
->Just to check, I take it you're running natively, and not under a
->hypervisor?
-
-Yes this was running natively. I haven't yet been able to confirm things, but I'll let you know when I do.
-
-Cov
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
-
-Sent from my Snapdragon powered Android device with K-9 Mail. Please excuse my brevity.
+>
+> On 03/04/2016 08:02 AM, Will Deacon wrote:
+>> On Thu, Mar 03, 2016 at 07:44:03PM -0800, Tirumalesh Chalamarla wrote:
+>>> Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
+>>> namespaces; specifically within a given node SMMU0 and SMMU1 share,
+>>> as does SMMU2 and SMMU3.
+>>>
+>>> This patch make sures ASID and VMID space is unique across cavium
+>>> SMMUv2.
+>>>
+>>> changes from V3:
+>>>     - Removed redundent variable.
+>>
+>> [...]
+>>
+>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>> index 247a469..bfe38f3 100644
+>>> --- a/drivers/iommu/arm-smmu.c
+>>> +++ b/drivers/iommu/arm-smmu.c
+>>> @@ -326,6 +326,11 @@ struct arm_smmu_device {
+>>>
+>>>       struct list_head        list;
+>>>       struct rb_root            masters;
+>>> +    /*
+>>> +     *The following fields are specific to Cavium, Thunder
+>>> +     */
+>>> +    u32                cavium_id_base;
+>>> +
+>>>   };
+>>>
+>>>   struct arm_smmu_cfg {
+>>> @@ -335,8 +340,8 @@ struct arm_smmu_cfg {
+>>>   };
+>>>   #define INVALID_IRPTNDX            0xff
+>>>
+>>> -#define ARM_SMMU_CB_ASID(cfg)        ((cfg)->cbndx)
+>>> -#define ARM_SMMU_CB_VMID(cfg)        ((cfg)->cbndx + 1)
+>>> +#define ARM_SMMU_CB_ASID(smmu, cfg) ((u16)(smmu)->cavium_id_base +
+>>> (cfg)->cbndx)
+>>> +#define ARM_SMMU_CB_VMID(smmu, cfg) ((u16)(smmu)->cavium_id_base +
+>>> (cfg)->cbndx + 1)
+>>>
+>>>   enum arm_smmu_domain_stage {
+>>>       ARM_SMMU_DOMAIN_S1 = 0,
+>>> @@ -364,6 +369,8 @@ struct arm_smmu_option_prop {
+>>>       const char *prop;
+>>>   };
+>>>
+>>> +static u32 cavium_smmu_context_count;
+>>
+>> I thought you were going to make this an atomic_t?
+> well i moved variable handling inside atomic context.
+> with atomic_t i still needed 2 operations like read and add
+> it seems atomic_add_return is not sufficient.
+>
+ignore this, will send with atomic_t if that feels more natural.
+> in any case i thought why not use the atomic context that is already
+> there. if you feel the use of atomic_t is more natural, i will resend
+> again.
+>
+> Thanks,
+> Tirumalesh.
+>>
+>> Will
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
