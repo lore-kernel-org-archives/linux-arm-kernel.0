@@ -1,57 +1,88 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 4 Mar 2016 08:27:26 +0100
-Subject: [linux-sunxi] Re: [PATCH v4 1/2] ehci-platform: Add support for
- controllers with multiple reset lines
-In-Reply-To: <20160304043559.GA21743@kroah.com>
-References: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
- <1456592339-31767-2-git-send-email-hdegoede@redhat.com>
- <20160304043559.GA21743@kroah.com>
-Message-ID: <56D938DE.10409@redhat.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 4 Mar 2016 15:35:26 +0800
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <20160304063807.GA13317@js1304-P5Q-DELUXE>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
+ <20160304043232.GC12036@js1304-P5Q-DELUXE> <56D92595.60709@huawei.com>
+ <20160304063807.GA13317@js1304-P5Q-DELUXE>
+Message-ID: <56D93ABE.9070406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04-03-16 05:35, Greg Kroah-Hartman wrote:
-> On Sat, Feb 27, 2016 at 05:58:58PM +0100, Hans de Goede wrote:
->> From: Reinder de Haan <patchesrdh@mveas.com>
->>
->> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
->> reset lines, the controller will not initialize while the reset for
->> its companion is still asserted, which means we need to de-assert
->> 2 resets for the controller to work.
->>
->> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> Acked-by: Alan Stern <stern@rowland.harvard.edu>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->> Changes in v2:
->> -Use the new reset_control_[de]assert_shared reset-controller functions
->> Changes in v3:
->> -Adjust for changes to shared-reset reset-controller functions
->> Changes in v4:
->> -Fix Ugly continuation line
+On 2016/3/4 14:38, Joonsoo Kim wrote:
+> On Fri, Mar 04, 2016 at 02:05:09PM +0800, Hanjun Guo wrote:
+>> On 2016/3/4 12:32, Joonsoo Kim wrote:
+>>> On Fri, Mar 04, 2016 at 11:02:33AM +0900, Joonsoo Kim wrote:
+>>>> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
+>>>>> On 2016/3/3 15:42, Joonsoo Kim wrote:
+>>>>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+>>>>>>> (cc -mm and Joonsoo Kim)
+>>>>>>>
+>>>>>>>
+>>>>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> I came across a suspicious error for CMA stress test:
+>>>>>>>>
+>>>>>>>> Before the test, I got:
+>>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>>>>>> CmaTotal:         204800 kB
+>>>>>>>> CmaFree:          195044 kB
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> After running the test:
+>>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>>>>>> CmaTotal:         204800 kB
+>>>>>>>> CmaFree:         6602584 kB
+>>>>>>>>
+>>>>>>>> So the freed CMA memory is more than total..
+>>>>>>>>
+>>>>>>>> Also the the MemFree is more than mem total:
+>>>>>>>>
+>>>>>>>> -bash-4.3# cat /proc/meminfo
+>>>>>>>> MemTotal:       16342016 kB
+>>>>>>>> MemFree:        22367268 kB
+>>>>>>>> MemAvailable:   22370528 kB
+>>>>> [...]
+>>>>>>> I played with this a bit and can see the same problem. The sanity
+>>>>>>> check of CmaFree < CmaTotal generally triggers in
+>>>>>>> __move_zone_freepage_state in unset_migratetype_isolate.
+>>>>>>> This also seems to be present as far back as v4.0 which was the
+>>>>>>> first version to have the updated accounting from Joonsoo.
+>>>>>>> Were there known limitations with the new freepage accounting,
+>>>>>>> Joonsoo?
+>>>>>> I don't know. I also played with this and looks like there is
+>>>>>> accounting problem, however, for my case, number of free page is slightly less
+>>>>>> than total. I will take a look.
+>>>>>>
+>>>>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+>>>>>> look like your case.
+>>>>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+>>>>> did some other test:
+>>>> Thanks! Now, I can re-generate erronous situation you mentioned.
+>>>>
+>>>>>  - run with single thread with 100000 times, everything is fine.
+>>>>>
+>>>>>  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+>>>>>    the same test with 100 multi-thread, then I got:
+>>>> [1] would not be sufficient to close this race.
+>>>>
+>>>> Try following things [A]. And, for more accurate test, I changed code a bit more
+>>>> to prevent kernel page allocation from cma area [B]. This will prevent kernel
+>>>> page allocation from cma area completely so we can focus cma_alloc/release race.
+>>>>
+>>>> Although, this is not correct fix, it could help that we can guess
+>>>> where the problem is.
+>>> More correct fix is something like below.
+>>> Please test it.
+>> Hmm, this is not working:
+> Sad to hear that.
 >
-> This breaks the build horribly :(
+> Could you tell me your system's MAX_ORDER and pageblock_order?
 >
-> As does patch 2/2, ugh.
 
-As said in the cover letter:
+MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
 
-"These patches apply on top of the related
-reset-controller patches which have just been merged here:
-
-git://git.pengutronix.de/git/pza/linux.git reset/next"
-
-I guess I should have done s/apply on top of/depend on/
-in the above bit. These patches apply fine without those
-changes, but indeed they will not build.
-
-You may want to ask Philipp Zabel (added to the To: list)
-to create a topic branch for this which you can merge into
-your tree.
-
-Regards,
-
-Hans
+Hanjun
