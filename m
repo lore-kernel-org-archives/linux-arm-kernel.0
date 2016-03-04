@@ -1,155 +1,146 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Fri, 4 Mar 2016 11:46:46 +0800
-Subject: [PATCH net] net: hns: fix the bug about loopback
-In-Reply-To: <1457012385.13244.243.camel@linux.intel.com>
-References: <1457006579-236479-1-git-send-email-yankejian@huawei.com>
- <1457012385.13244.243.camel@linux.intel.com>
-Message-ID: <56D90526.6000003@huawei.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 4 Mar 2016 13:32:32 +0900
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <20160304020232.GA12036@js1304-P5Q-DELUXE>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com>
+ <20160304020232.GA12036@js1304-P5Q-DELUXE>
+Message-ID: <20160304043232.GC12036@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 04, 2016 at 11:02:33AM +0900, Joonsoo Kim wrote:
+> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
+> > On 2016/3/3 15:42, Joonsoo Kim wrote:
+> > > 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+> > >> (cc -mm and Joonsoo Kim)
+> > >>
+> > >>
+> > >> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+> > >>> Hi,
+> > >>>
+> > >>> I came across a suspicious error for CMA stress test:
+> > >>>
+> > >>> Before the test, I got:
+> > >>> -bash-4.3# cat /proc/meminfo | grep Cma
+> > >>> CmaTotal:         204800 kB
+> > >>> CmaFree:          195044 kB
+> > >>>
+> > >>>
+> > >>> After running the test:
+> > >>> -bash-4.3# cat /proc/meminfo | grep Cma
+> > >>> CmaTotal:         204800 kB
+> > >>> CmaFree:         6602584 kB
+> > >>>
+> > >>> So the freed CMA memory is more than total..
+> > >>>
+> > >>> Also the the MemFree is more than mem total:
+> > >>>
+> > >>> -bash-4.3# cat /proc/meminfo
+> > >>> MemTotal:       16342016 kB
+> > >>> MemFree:        22367268 kB
+> > >>> MemAvailable:   22370528 kB
+> > [...]
+> > >>
+> > >> I played with this a bit and can see the same problem. The sanity
+> > >> check of CmaFree < CmaTotal generally triggers in
+> > >> __move_zone_freepage_state in unset_migratetype_isolate.
+> > >> This also seems to be present as far back as v4.0 which was the
+> > >> first version to have the updated accounting from Joonsoo.
+> > >> Were there known limitations with the new freepage accounting,
+> > >> Joonsoo?
+> > > I don't know. I also played with this and looks like there is
+> > > accounting problem, however, for my case, number of free page is slightly less
+> > > than total. I will take a look.
+> > >
+> > > Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+> > > look like your case.
+> > 
+> > I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+> > did some other test:
+> 
+> Thanks! Now, I can re-generate erronous situation you mentioned.
+> 
+> > 
+> >  - run with single thread with 100000 times, everything is fine.
+> > 
+> >  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+> >    the same test with 100 multi-thread, then I got:
+> 
+> [1] would not be sufficient to close this race.
+> 
+> Try following things [A]. And, for more accurate test, I changed code a bit more
+> to prevent kernel page allocation from cma area [B]. This will prevent kernel
+> page allocation from cma area completely so we can focus cma_alloc/release race.
+> 
+> Although, this is not correct fix, it could help that we can guess
+> where the problem is.
 
+More correct fix is something like below.
+Please test it.
 
-On 2016/3/3 21:39, Andy Shevchenko wrote:
-> On Thu, 2016-03-03 at 20:02 +0800, Kejian Yan wrote:
->> It will always be passed if the soc is tested the loopback cases.
->> This
->> patch will fix this bug.
-> Few style related comments.
->
->> @@ -686,6 +690,10 @@ static int hns_ae_config_loopback(struct
->> hnae_handle *handle,
->>  	default:
->>  		ret = -EINVAL;
->>  	}
->> +
->> +	if (!ret)
->> +		hns_dsaf_set_inner_lb(mac_cb->dsaf_dev, mac_cb-
->>> mac_id, en);
->> +
->>  	return ret;
-> if (ret)
->  return ret;
->
-> whatever();
-> return 0;
+It checks problematic buddy merging and prevent it.
+I will try to find another way that is less intrusive for freepath performance.
 
-Hi, Andy,
-Thanks for your suggestion. I think it should be return ret. the other case will be return the value from hardware.
-it can tell callers if the operation is successful or not.
+Thanks.
 
-Best Regards
+---------------->8-----------------------
+>From 855cb11368487a0f02a5ad5b3d9de375dfbb061c Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Fri, 4 Mar 2016 13:28:17 +0900
+Subject: [PATCH] mm/cma: fix race
 
->>  }
-> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
->> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
->> @@ -230,6 +230,30 @@ static void hns_dsaf_mix_def_qid_cfg(struct
->> dsaf_device *dsaf_dev)
->>  	}
->>  }
->>  
->> +static void hns_dsaf_inner_qid_cfg(struct dsaf_device *dsaf_dev)
->> +{
->> +	u16 max_q_per_vf, max_vfn;
->> +	u32 q_id = 0, q_num_per_port;
->> +	u32 mac_id;
->> +
->> +	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
->> +		return;
->> +
->> +	hns_rcb_get_queue_mode(dsaf_dev->dsaf_mode,
->> +			       HNS_DSAF_COMM_SERVICE_NW_IDX,
->> +			       &max_vfn, &max_q_per_vf);
->> +	q_num_per_port = max_vfn * max_q_per_vf;
->> +
->> +	for (mac_id = 0, q_id = 0; mac_id < DSAF_SERVICE_NW_NUM; 
-> q_id is already assigned to 0. Get rid of either.
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+---
+ mm/page_alloc.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-Thanks. I will fix it in next submit
-
->> mac_id++) {
->> +		dsaf_set_dev_field(dsaf_dev,
->> +				   DSAFV2_SERDES_LBK_0_REG + 0x4 *
->> mac_id,
->> +				   DSAFV2_SERDES_LBK_QID_M,
->> +				   DSAFV2_SERDES_LBK_QID_S,
->> +				   q_id);
->> +		q_id += q_num_per_port;
->> +	}
->> +}
->  
->> +void hns_dsaf_set_inner_lb(struct dsaf_device *dsaf_dev, u32 mac_id,
->> u32 en)
->> +{
->> +	if (AE_IS_VER1(dsaf_dev->dsaf_ver) ||
->> +	    dsaf_dev->mac_cb[mac_id].mac_type == HNAE_PORT_DEBUG)
->> +		return;
->> +
->> +	dsaf_set_dev_bit(dsaf_dev, DSAFV2_SERDES_LBK_0_REG + 0x4 *
->> mac_id,
-> 0x4 -> 4 (it's about register width, right?)
-
-Thanks. I will fix it in next submit
-
->> +			 DSAFV2_SERDES_LBK_EN_B, !!en);
->> +}
->>  #define PPEV2_CFG_RSS_TBL_4N3_S	24
->>  #define PPEV2_CFG_RSS_TBL_4N3_M	(((1UL << 5) - 1) <<
->> PPEV2_CFG_RSS_TBL_4N3_S)
->>  
->> +#define DSAFV2_SERDES_LBK_EN_B  8
->> +#define DSAFV2_SERDES_LBK_QID_S 0
->> +#define DSAFV2_SERDES_LBK_QID_M \
->> +	(((1UL << DSAFV2_SERDES_LBK_EN_B) - 1) <<
->> DSAFV2_SERDES_LBK_QID_S)
-> Why not like above?
->
-> #define DSAFV2_SERDES_LBK_QID_M	(((1UL << 8) - 1)
-> << DSAFV2_SERDES_LBK_QID_S)
-
-to keep the unifying style, i will fix it in next submit.
-
->> +static void __lb_fill_txt_skb_buff(struct net_device *ndev,
->> +				   struct sk_buff *skb)
->> +{
->> +	struct hns_nic_priv *priv = netdev_priv(ndev);
->> +	struct hnae_handle *h = priv->ae_handle;
->> +	u32 frame_size;
->> +
->> +	frame_size = skb->len;
->> +	memset(skb->data, 0xFF, frame_size);
->> +
->> +	if ((!AE_IS_VER1(priv->enet_ver)) &&
->> +	    (h->port_type == HNAE_PORT_SERVICE)) {
->> +		memcpy(skb->data, ndev->dev_addr, 6);
-> ether_addr_copy() ?
-
-ok, thanks.i will fix it in next submit.
-
-
-
->> +		skb->data[5] += 0x1f;
-> This has to be explained.
->
->> +	}
->> +
->> +	frame_size &= ~1ul;
-> And how 1ul is different to plain 1 here?
-
-the bit width must be 32bit
-
->
->> +	memset(&skb->data[frame_size / 2], 0xAA, frame_size / 2 -
->> 1);
->> +	memset(&skb->data[frame_size / 2 + 10], 0xBE, frame_size / 2
->> - 11);
->> +	memset(&skb->data[frame_size / 2 + 12], 0xAF, frame_size / 2
->> - 13);
-> Magic numbers have to be explained.
-> Also, what is the logic to overwrite the data if frame_size is big
-> enough?
-
-the caller, who generates the frame, ensure that it will not be overwritten. it is only one caller in the system.
-
->> +}
->> +
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index c6c38ed..a01c3b5 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -620,8 +620,8 @@ static inline void rmv_page_order(struct page *page)
+  *
+  * For recording page's order, we use page_private(page).
+  */
+-static inline int page_is_buddy(struct page *page, struct page *buddy,
+-                                                       unsigned int order)
++static inline int page_is_buddy(struct zone *zone, struct page *page,
++                               struct page *buddy, unsigned int order)
+ {
+        if (!pfn_valid_within(page_to_pfn(buddy)))
+                return 0;
+@@ -644,6 +644,12 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
+                if (page_zone_id(page) != page_zone_id(buddy))
+                        return 0;
+ 
++               if (IS_ENABLED(CONFIG_CMA) &&
++                       has_isolate_pageblock(zone) &&
++                       order >= pageblock_order &&
++                       is_migrate_isolate(get_pageblock_migratetype(buddy)))
++                       return 0;
++
+                VM_BUG_ON_PAGE(page_count(buddy) != 0, buddy);
+ 
+                return 1;
+@@ -711,7 +717,7 @@ static inline void __free_one_page(struct page *page,
+        while (order < max_order - 1) {
+                buddy_idx = __find_buddy_index(page_idx, order);
+                buddy = page + (buddy_idx - page_idx);
+-               if (!page_is_buddy(page, buddy, order))
++               if (!page_is_buddy(zone, page, buddy, order))
+                        break;
+                /*
+                 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
+@@ -745,7 +751,7 @@ static inline void __free_one_page(struct page *page,
+                higher_page = page + (combined_idx - page_idx);
+                buddy_idx = __find_buddy_index(combined_idx, order + 1);
+                higher_buddy = higher_page + (buddy_idx - combined_idx);
+-               if (page_is_buddy(higher_page, higher_buddy, order + 1)) {
++               if (page_is_buddy(zone, higher_page, higher_buddy, order + 1)) {
+                        list_add_tail(&page->lru,
+                                &zone->free_area[order].free_list[migratetype]);
+                        goto out;
+-- 
+1.9.1
