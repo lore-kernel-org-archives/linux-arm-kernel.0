@@ -1,60 +1,80 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Fri, 4 Mar 2016 11:57:53 +0000
-Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
-In-Reply-To: <20160304030349.GA11012@leoy-linaro>
-References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
- <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
- <20160303162942.GA2445@localhost.localdomain>
- <20160304030349.GA11012@leoy-linaro>
-Message-ID: <20160304115752.GA13894@e104805>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 4 Mar 2016 13:01:05 +0100
+Subject: [PATCH V5 00/15] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <20160304105517.GA30693@red-moon>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <56D49611.2050202@codeaurora.org> <20160303112332.GC28359@red-moon>
+ <56D84938.6020102@codeaurora.org> <20160304105517.GA30693@red-moon>
+Message-ID: <56D97901.7080001@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 11:03:49AM +0800, Leo Yan wrote:
-> Hi Eduardo,
-> 
-> On Thu, Mar 03, 2016 at 08:29:44AM -0800, Eduardo Valentin wrote:
-> > Hi Leo,
-> > 
-> > On Fri, Feb 26, 2016 at 11:43:43AM +0800, Leo Yan wrote:
-> > > The property "hysteresis" is mandatory for trip points, so if without
-> > > it the thermal zone cannot register successfully. But "hysteresis" is
-> > > ignored in the thermal subsystem and only inquired by several thermal
-> > > sensor drivers.
-> > 
-> > I am not sure this a good direction to go. Remember that Linux
-> > implementation not necessarily has to be the implication of the DT
-> > binding. Hysteresis is a property that plays a significant role on
-> > thermal control systems, which in many cases avoid overshooting cooling
-> > actions. Having the DT writer to explicitly set it to 0 means that zone
-> > does not suffer of overshooting and does not need hysteresis.
-> 
-> After review current code, the "hysteresis" is used to calculate
-> temperature falling threshold with a more conservative value; so that
-> finally avoid overshooting issue.
-> 
-> Please confirm if is my understanding correct or not?
-> 
-> > If the Linux thermal subsystem has a problem with handling hysteresis, I
-> > would rather fix Linux code than relaxing the DT binding. Or if you
-> > still believe hysteresis is really optional, I would prefer to see a
-> > better justification than "Linux ignores it".
+On 04.03.2016 11:55, Lorenzo Pieralisi wrote:
+> On Thu, Mar 03, 2016 at 09:24:56AM -0500, Sinan Kaya wrote:
+>> >On 3/3/2016 6:23 AM, Lorenzo Pieralisi wrote:
+>>> > >x86 and IA64 claim PCI resources on boot and live with that (well, minus
+>>> > >the gazillions x86 pci= parameters that change the PCI resources assignment
+>>> > >one way or another), comments very welcome in particular on the pci=realloc
+>>> > >option and its usage.
+>> >
+>> >I have been working with Linux PCIe over 3 years. I never used
+>> >pci=realloc argument.
+>> >
+>> >The v5 series minus [PATCH V5 11/15] drivers: pci: add generic code to
+>> >claim bus resources is working just fine and is ready to go upstream
+>> >in my opinion. It passed my internal testing with different types of
+>> >endpoints.
+>> >
+>> >The inclusion of this patch is now requiring everybody to add
+>> >pci=realloc argument otherwise the resources assigned by the UEFI BIOS
+>> >are not working.
+>> >
+>> >I think there is still some work to be done in this patch and is too
+>> >early to be included into the series. It is blocking progress of the
+>> >series which is sitting on review over 1 year already.
+> First off, I think that's specious, patch 11 is not blocking anything,
+> if you and Tomasz want to drop it go ahead and take responsibility
+> of the consequences.
+>
+> I am not saying patch 11 is perfect, it is there to review, if you
+> spot bugs point them out.
+>
+> If you are interested and willing to make an effort to understand why I
+> asked Tomasz to integrate it, a bit of background here:
+>
+> http://permalink.gmane.org/gmane.linux.kernel.pci/44830
+>
+> If we want to drop patch 11, we are going to discard whatever FW
+> set-up at FW/OS hand-off and reassign everything. Want to do it ?
+> Go ahead.
+>
+> I wrote it in my previous email, probably it was not clear, so, here we
+> go again.
+>
+> If we want to at least consider the FW PCI configuration at FW/OS
+> handoff, we should read the PCI bridge apertures and claim them, when
+> that fails reassign the corresponding PCI bus hierarchy (which means
+> releasing the bridge resources and downstream devices and reassign
+> them), that's what pci=realloc does.
+>
+> I think that it is a command line option since it has to be a choice,
+> ie overriding FW set-up should be an option, not a default.
+>
+> Patch 11 does what x86 does in arch code arch/x86/pci/i386.c,
+>
+> pcibios_resource_survey()
+>
+> and that works for them (of course, minus quirks that do exist).
+>
+> I could integrate the code implementing pci=realloc in patch 11 so
+> that we realloc by default all resources claimed that failed (which
+> means that bridges are resized accordingly and you won't be forced
+> to use pci=realloc on command line).
+>
 
-I see it the other way round, Is hysteresis a property that, without
-it, the thermal code can't configure itself so it fails to create the
-trip point?  The current code goes "There is no hysteresis for this
-property, I don't know how to set up this trip point!".  I think we
-can do better than this.
+I agree with Lorenzo. Just because v3 works it does not mean we want to 
+go this way. Also, I think we should realloc all resources claimed that 
+failed, w/o need to use pci=realloc on command line.
 
-> If we think about power allocator governor, PID's two parameters are
-> also used to dismiss overshooting issue: one is k_po (proportional
-> term), another is k_i (integral term). So that means after we apply
-> power allocator governor, we don't need parameter "hysteresis" due PID
-> algorithm can automatically dismiss potential errors.
-
-I disagree.  We shouldn't base DT decisions based on only one
-governor in linux.  Having said that, AFAICS all governors currently
-ignore hysteresis.
-
-Cheers,
-Javi
+Tomasz
