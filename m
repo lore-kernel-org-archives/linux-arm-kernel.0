@@ -1,68 +1,138 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 05 Mar 2016 01:24:36 +0100
-Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
-In-Reply-To: <20160305001057.GC55664@google.com>
-References: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
- <20160305000225.GB55664@google.com> <20160305001057.GC55664@google.com>
-Message-ID: <3582240.H8v1IXn8EB@wuerfel>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 04 Mar 2016 23:51:15 +0000
+Subject: [PATCH v14 15/20] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
+References: <cover.1457135058.git.geoff@infradead.org>
+Message-ID: <ed0bef8ad5b0295542840f648b85135040a7bda6.1457135058.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 March 2016 16:10:57 Brian Norris wrote:
->   5d284e353eb1 ARM: pxa: avoid accessing interrupt registers directly
-> 
->   CC      drivers/mtd/chips/cfi_cmdset_0002.o
-> drivers/mtd/chips/cfi_cmdset_0002.c: In function ?xip_udelay?:
-> drivers/mtd/chips/cfi_cmdset_0002.c:962:35: warning: initialization makes integer from pointer without a cast [enabled by default]
-> drivers/mtd/chips/cfi_cmdset_0002.c:967:8: error: ?ICIP? undeclared (first use in this function)
-> drivers/mtd/chips/cfi_cmdset_0002.c:967:8: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/mtd/chips/cfi_cmdset_0002.c:967:15: error: ?ICMR? undeclared (first use in this function)
-> drivers/mtd/chips/cfi_cmdset_0002.c:981:123: error: invalid operands to binary / (have ?void *? and ?int?)
-> drivers/mtd/chips/cfi_cmdset_0002.c:982:14: warning: assignment makes integer from pointer without a cast [enabled by default]
-> drivers/mtd/chips/cfi_cmdset_0002.c:984:124: error: invalid operands to binary / (have ?void *? and ?int?)
-> drivers/mtd/chips/cfi_cmdset_0002.c:1034:10: warning: assignment makes integer from pointer without a cast [enabled by default]
-> drivers/mtd/chips/cfi_cmdset_0002.c:1045:118: error: invalid operands to binary / (have ?void *? and ?int?)
-> 
-> Looks like arch/arm/mach-pxa/include/mach/mtd-xip.h can't find ICIP or ICMR...
-> 
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Right, I also have a workaround for that one, but found later that it
-won't work. I think this is the patch that broke it five years ago:
+On the startup of primary kernel, the memory region used by crash dump
+kernel must be specified by "crashkernel=" kernel parameter.
+reserve_crashkernel() will allocate and reserve the region for later use.
 
-commit 5d284e353eb11ab2e8b1c5671ba06489b0bd1e0c
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Wed Apr 27 22:48:04 2011 +0800
+User space tools, like kexec-tools, will be able to find that region marked
+as "Crash kernel" in /proc/iomem.
 
-    ARM: pxa: avoid accessing interrupt registers directly
-    
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ arch/arm64/kernel/setup.c |  7 +++++-
+ arch/arm64/mm/init.c      | 60 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/regs-intc.h b/arch/arm/mach-pxa/include/mach/regs-intc.h
-deleted file mode 100644
-index 662288eb6f95..000000000000
---- a/arch/arm/mach-pxa/include/mach/regs-intc.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--#ifndef __ASM_MACH_REGS_INTC_H
--#define __ASM_MACH_REGS_INTC_H
--
--#include <mach/hardware.h>
--
--/*
-- * Interrupt Controller
-- */
--
--#define ICIP           __REG(0x40D00000)  /* Interrupt Controller IRQ Pending Register */
--#define ICMR           __REG(0x40D00004)  /* Interrupt Controller Mask Register */
--#define ICLR           __REG(0x40D00008)  /* Interrupt Controller Level Register */
--#define ICFP           __REG(0x40D0000C)  /* Interrupt Controller FIQ Pending Register */
--#define ICPR           __REG(0x40D00010)  /* Interrupt Controller Pending Register */
--#define ICCR           __REG(0x40D00014)  /* Interrupt Controller Control Register */
--#define ICHP           __REG(0x40D00018)  /* Interrupt Controller Highest Priority Register */
-
-and it's possible that nobody ever noticed...
-
-I guess we can bring back the macros for the case that MTD_XIP and XIP_KERNEL
-are both enabled.
-
-	Arnd
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..293cee2 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -31,7 +31,6 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+-#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -221,6 +220,12 @@ static void __init request_standard_resources(void)
+ 		    kernel_data.end <= res->end)
+ 			request_resource(res, &kernel_data);
+ 	}
++
++#ifdef CONFIG_KEXEC_CORE
++	/* User space tools will find "Crash kernel" region in /proc/iomem. */
++	if (crashk_res.end)
++		insert_resource(&iomem_resource, &crashk_res);
++#endif
+ }
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index f3b061e..ff5e01a 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -34,6 +34,7 @@
+ #include <linux/dma-contiguous.h>
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
++#include <linux/kexec.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
+@@ -66,6 +67,63 @@ static int __init early_initrd(char *p)
+ early_param("initrd", early_initrd);
+ #endif
+ 
++#ifdef CONFIG_KEXEC_CORE
++/*
++ * reserve_crashkernel() - reserves memory for crash kernel
++ *
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by dump capture kernel when
++ * primary kernel is crashing.
++ */
++static void __init reserve_crashkernel(void)
++{
++	unsigned long long crash_size = 0, crash_base = 0;
++	int ret;
++
++	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
++				&crash_size, &crash_base);
++	if (ret)
++		return;
++
++	if (crash_base == 0) {
++		crash_base = memblock_find_in_range(0,
++				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, 1 << 21);
++		if (crash_base == 0) {
++			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
++				crash_size);
++			return;
++		}
++		memblock_reserve(crash_base, crash_size);
++
++	} else {
++		/* User specifies base address explicitly. */
++		if (!memblock_is_region_memory(crash_base, crash_size) ||
++			memblock_is_region_reserved(crash_base, crash_size)) {
++			pr_warn("crashkernel has wrong address or size\n");
++			return;
++		}
++
++		if (crash_base & ((1 << 21) - 1)) {
++			pr_warn("crashkernel base address is not 2MB aligned\n");
++			return;
++		}
++
++		memblock_reserve(crash_base, crash_size);
++	}
++
++	pr_info("Reserving %lldMB of memory@%lldMB for crashkernel\n",
++		crash_size >> 20, crash_base >> 20);
++
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
++}
++#else
++static void __init reserve_crashkernel(void)
++{
++	;
++}
++#endif /* CONFIG_KEXEC_CORE */
++
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -171,6 +229,8 @@ void __init arm64_memblock_init(void)
+ 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
+ #endif
+ 
++	reserve_crashkernel();
++
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
+-- 
+2.5.0
