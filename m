@@ -1,80 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 4 Mar 2016 10:41:51 +0100
-Subject: [PATCH 2/2] mmc: mediatek: Use mmc_regulator_set_vqmmc in
- start_signal_voltage_switch
-In-Reply-To: <1457000385-2317-2-git-send-email-drinkcat@chromium.org>
-References: <1457000385-2317-1-git-send-email-drinkcat@chromium.org>
- <1457000385-2317-2-git-send-email-drinkcat@chromium.org>
-Message-ID: <CAPDyKFptSCN8xHqHbGv+EBzweKRuKoYATAkK1UETHiqyF7YgGg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  4 Mar 2016 10:48:44 +0100
+Subject: [PATCH v3 0/4] fix memremap on ARM
+Message-ID: <1457084928-21179-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2016 at 11:19, Nicolas Boichat <drinkcat@chromium.org> wrote:
-> We've introduced a new helper in the MMC core:
-> mmc_regulator_set_vqmmc().  Let's use this in mtk-sd.  Using this new
-> helper has some advantages:
->
->     1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
->        VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
->        compatibility.
->
->     2. We get rid of a few more warnings when probing unsupported
->        voltages.
->
->     3. We get rid of some non-mediatek specific code in mtk-sd.
->
-> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+This is something I ran into while working on support for the UEFI
+memory attributes and ESRT tables. In both cases, these tables are
+passed to the kernel in memory which is guaranteed to be below 4 GB,
+but may be outside of the kernel direct mapping. (UEFI typically
+attempts to allocate from the top down, which means such tables are
+highly likely to be in highmem for any system with more than 760 MB
+of system RAM)
 
-Thanks, applied for next!
+The recently introduced memremap() is a very useful abstraction for
+accessing such tables, because it is generic, and already attempts to
+do the right thing with respect to regions that may already have been
+mapped directly. However, it falls back to ioremap_cache() for mapping
+high memory, which is not allowed on ARM for system RAM, and also results
+in the region to be mapped with different attributes depending on whether
+it is covered by lowmem or not.
 
-Kind regards
-Uffe
+So instead, create an arch specific hook 'arch_memremap_wb(), and
+implement it for ARM using the same memory attributes used for the
+linear mapping. Note that memremap will only call this hook for regions
+that are not already mapped permanently.
 
-> ---
->
-> Similar to e0848f5d294c703917260a6228cc08b8be46c527
-> mmc: dw_mmc: Use mmc_regulator_set_vqmmc in start_signal_voltage_switch ,
-> where I copied the commit message from.
->
->  drivers/mmc/host/mtk-sd.c | 17 +++++------------
->  1 file changed, 5 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 07809f4..b17f30d 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -1021,26 +1021,19 @@ static void msdc_set_buswidth(struct msdc_host *host, u32 width)
->  static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
->  {
->         struct msdc_host *host = mmc_priv(mmc);
-> -       int min_uv, max_uv;
->         int ret = 0;
->
->         if (!IS_ERR(mmc->supply.vqmmc)) {
-> -               if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
-> -                       min_uv = 3300000;
-> -                       max_uv = 3300000;
-> -               } else if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
-> -                       min_uv = 1800000;
-> -                       max_uv = 1800000;
-> -               } else {
-> +               if (ios->signal_voltage != MMC_SIGNAL_VOLTAGE_330 &&
-> +                   ios->signal_voltage != MMC_SIGNAL_VOLTAGE_180) {
->                         dev_err(host->dev, "Unsupported signal voltage!\n");
->                         return -EINVAL;
->                 }
->
-> -               ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
-> +               ret = mmc_regulator_set_vqmmc(mmc, ios);
->                 if (ret) {
-> -                       dev_dbg(host->dev,
-> -                                       "Regulator set error %d: %d - %d\n",
-> -                                       ret, min_uv, max_uv);
-> +                       dev_dbg(host->dev, "Regulator set error %d (%d)\n",
-> +                               ret, ios->signal_voltage);
->                 } else {
->                         /* Apply different pinctrl settings for different signal voltage */
->                         if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180)
-> --
-> 2.7.0.rc3.207.g0ac5344
->
+Since this change results in memremap() to use attributes different from
+the ones used by ioremap_cache(), revert the change to pxa2xx-flash that
+moved it to memremap.
+
+Changes since v2:
+- add patch to bring back ioremap_cached() on ARM
+- switch pxa2xx-flash back to ioremap_cached() not ioremap_cache()
+- use arch_ioremap_caller not __arm_ioremap_caller() in patch #4
+- deal with __iomem annotation of arch_ioremap_caller (patch #4)
+
+Changes since v1/rfc:
+- new patch #1 that reverts the ioremap_cache->memremap conversion for the
+  pxa2xx-flash driver
+- added Dan's ack to patch #2
+
+Ard Biesheuvel (4):
+  ARM: reintroduce ioremap_cached() for creating cached I/O mappings
+  mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
+  memremap: add arch specific hook for MEMREMAP_WB mappings
+  ARM: memremap: implement arch_memremap_wb()
+
+ arch/arm/include/asm/io.h       | 12 ++++++++++++
+ arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
+ drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
+ kernel/memremap.c               | 11 ++++++++---
+ 4 files changed, 37 insertions(+), 8 deletions(-)
+
+-- 
+2.5.0
