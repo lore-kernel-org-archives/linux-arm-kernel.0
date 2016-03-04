@@ -1,142 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 4 Mar 2016 11:45:14 +0000
-Subject: [PATCH v2 11/17] arm64: KVM: vgic-v2: Only wipe LRs on vcpu exit
-In-Reply-To: <20160304113620.GA24725@cbox>
-References: <1455727249-24752-1-git-send-email-marc.zyngier@arm.com>
- <1455727249-24752-12-git-send-email-marc.zyngier@arm.com>
- <20160302230819.GE9634@cbox> <56D85F10.1030602@arm.com>
- <20160304113620.GA24725@cbox>
-Message-ID: <56D9754A.40703@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 4 Mar 2016 12:47:37 +0100
+Subject: [PATCH 6/9] spi: imx: remove unnecessary bit clearing in
+ mx51_ecspi_config
+In-Reply-To: <56D968DF.7000007@mentor.com>
+References: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
+ <1456302033-25638-7-git-send-email-s.hauer@pengutronix.de>
+ <56D968DF.7000007@mentor.com>
+Message-ID: <20160304114737.GE21869@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/16 11:36, Christoffer Dall wrote:
-> On Thu, Mar 03, 2016 at 03:58:08PM +0000, Marc Zyngier wrote:
->> On 02/03/16 23:08, Christoffer Dall wrote:
->>> On Wed, Feb 17, 2016 at 04:40:43PM +0000, Marc Zyngier wrote:
->>>> So far, we're always writing all possible LRs, setting the empty
->>>> ones with a zero value. This is obvious doing a low of work for
->>>
->>> s/low/lot/
->>>
->>>> nothing, and we're better off clearing those we've actually
->>>> dirtied on the exit path (it is very rare to inject more than one
->>>> interrupt at a time anyway).
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm64/kvm/hyp/vgic-v2-sr.c | 10 +++++-----
->>>>  1 file changed, 5 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->>>> index 3dbbc6b..e53f131 100644
->>>> --- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
->>>> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->>>> @@ -101,6 +101,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
->>>>  		}
->>>>  
->>>>  		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
->>>> +		writel_relaxed(0, base + GICH_LR0 + (i * 4));
->>>>  	}
->>>>  }
->>>>  
->>>> @@ -158,12 +159,11 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
->>>>  		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
->>>>  		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
->>>>  		for (i = 0; i < nr_lr; i++) {
->>>> -			u32 val = 0;
->>>> -
->>>> -			if (live_lrs & (1UL << i))
->>>> -				val = cpu_if->vgic_lr[i];
->>>> +			if (!(live_lrs & (1UL << i)))
->>>> +				continue;
->>>
->>> how can we be sure that the LRs are clear when we launch our first VM on
->>> a given physical CPU?  Don't we need to flush the LRs during VGIC init
->>> time?
->>>
->>>>  
->>>> -			writel_relaxed(val, base + GICH_LR0 + (i * 4));
->>>> +			writel_relaxed(cpu_if->vgic_lr[i],
->>>> +				       base + GICH_LR0 + (i * 4));
->>>>  		}
->>>>  	}
->>>>  
->>>> -- 
->>>> 2.1.4
->>>>
->>>
->>> otherwie LGTM.
->>
->> So how about this, just before this patch (I'll obviously do something similar for GICv3):
->>
->> From d9a80c4c406450190a68abee302c7d9a0034c62a Mon Sep 17 00:00:00 2001
->> From: Marc Zyngier <marc.zyngier@arm.com>
->> Date: Thu, 3 Mar 2016 15:43:58 +0000
->> Subject: [PATCH] KVM: arm/arm64: vgic-v2: Reset LRs at boot time
->>
->> In order to let make the GICv2 code more lazy in the way it
->> accesses the LRs, it is necessary to start with a clean slate.
+On Fri, Mar 04, 2016 at 12:52:15PM +0200, Vladimir Zapolskiy wrote:
+> Hi Sascha,
 > 
-> The first sentence need some love I think :)
-
-Erm... yes. -ENOPARSE! ;-)
-
+> On 24.02.2016 10:20, Sascha Hauer wrote:
+> > This reverts patch 1476253cef (spi: imx: fix ecspi mode setup)
+> > The patch tried to fix something by clearing bits in the cfg variable,
+> > but cfg is initialized to zero on function entry. There are no bits to
+> > clear.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > 
->>
->> Let's reset the LRs on each CPU when the vgic is probed.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic-v2.c | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
->> index ff02f08..67ec334 100644
->> --- a/virt/kvm/arm/vgic-v2.c
->> +++ b/virt/kvm/arm/vgic-v2.c
->> @@ -176,6 +176,15 @@ static const struct vgic_ops vgic_v2_ops = {
->>  
->>  static struct vgic_params vgic_v2_params;
->>  
->> +static void vgic_cpu_init_lrs(void *params)
->> +{
->> +	struct vgic_params *vgic = params;
->> +	int i;
->> +
->> +	for (i = 0; i < vgic->nr_lr; i++)
->> +		writel_relaxed(0, vgic->vctrl_base + GICH_LR0 + (i * 4));
->> +}
->> +
->>  /**
->>   * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
->>   * @node:	pointer to the DT node
->> @@ -257,6 +266,9 @@ int vgic_v2_probe(struct device_node *vgic_node,
->>  
->>  	vgic->type = VGIC_V2;
->>  	vgic->max_gic_vcpus = VGIC_V2_MAX_CPUS;
->> +
->> +	on_each_cpu(vgic_cpu_init_lrs, vgic, 1);
->> +
->>  	*ops = &vgic_v2_ops;
->>  	*params = vgic;
->>  	goto out;
->>
->>
->> Thanks,
->>
->> 	M.
+> I believe here the expected fix should be
 > 
-> This looks good to me.  Only concern is that we're now accessing the
-> control interface from EL1 for the first time (I think), but that should
-> work just fine though.
+> ----8<----
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 6a4ff27..9c9bae0 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -316,9 +316,10 @@ static void __maybe_unused mx51_ecspi_trigger(struct
+> spi_imx_data *spi_imx)
+>  static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  		struct spi_imx_config *config)
+>  {
+> -	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
+> +	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
+>  	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
+>  	u32 clk = config->speed_hz, delay, reg;
+> +	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
+> 
 
-We already access it for reading GICH_VTR, but that's actually fine, as
-the access is actually controlled by the page tables. Not what the
-architects had in mind, but hey... ;-)
+With this change applied we would indeed have to clear and not only set the bits,
+but why would we do this?
 
-Thanks,
+Sascha
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
