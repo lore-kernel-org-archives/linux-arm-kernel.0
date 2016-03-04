@@ -1,37 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Mar 2016 16:24:19 +0100
-Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
-In-Reply-To: <56D7F62E.6050502@linux-pingi.de>
-References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
- <1456945629-1793533-2-git-send-email-arnd@arndb.de>
- <56D7F62E.6050502@linux-pingi.de>
-Message-ID: <1659125.tHp8H942OG@wuerfel>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 4 Mar 2016 16:26:59 +0100
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+In-Reply-To: <20160304155952.2f433f3f@ipc1.ka-ro>
+References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+ <56D8E649.8030500@atmel.com> <56D91BDC.1030604@roeck-us.net>
+ <CAGkQfmN9wDkrc=frsSdBYYtMPf4VaTpcmYjX6_wARs=a78-bPQ@mail.gmail.com>
+ <56D988F0.8050803@roeck-us.net>
+ <CAGkQfmOLVwpckKP+axdi1501ghqq_UAmCygJv_tfa=bCOLvCzA@mail.gmail.com>
+ <56D99404.60305@roeck-us.net> <20160304155952.2f433f3f@ipc1.ka-ro>
+Message-ID: <CAGkQfmNpsOUE9PgnnNWYzodsfjzfw=e7UK+qMG9acKTEU8yufw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 March 2016 09:30:38 isdn at linux-pingi.de wrote:
-> Hi Arnd,
-> I fully agree and ack.
-> Thanks for the work.
-> 
+Hi Lothar,
 
-I actually did more patches that I ended up not submitting:
+2016-03-04 15:59 GMT+01:00 Lothar Wa?mann <LW@karo-electronics.de>:
+>> >>>>> I also check the WDT_MR register before and after enabling
+>> >>>>> watchdog, the WDV and WDD fields are correct.
+>> >>>>>
+>> >>>>> Can you check it again? thank you.
+>> >>>
+>> >>>
+>> >>> Working case:
+>> >>> MR on kernel startup:   0x3fffafff
+>> >>> MR after watchdog init: 0x0fffafff
+>> >>> MR after start:         0x0fff2fff
+>> >>>
+>> >>> Problem case:
+>> >>> MR on kernel startup:   0x00008000
+>> >>> MR after watchdog init: 0x0fffafff
+>> >>> MR after start:         0x0fff2fff
+>> >>>
+>> >>> So this means that the counter reload does not seem to work very well
+>> >>> if WDD/WDV have been set to 0 in the past. The other question is why
+>> >>> does U-Boot (from the Atmel branch based on 2015.1) put this stange
+>> >>> value in this register.
+>> >>>
+>> >>
+>> >> Can you check the value of AT91_WDT_SR ? Maybe it tells us something.
+>> >>
+>> > I didn't report it because it contained 0 at all times. So no information.
+>> >
+>> >> Also, in the error case, can you check if the watchdog times out at all
+>> >> after you applied your patch ?
+>> >
+>> > It times out after 16s as expected, and reboot occurs correctly.
+>> >
+>>
+>> Interesting. So it looks like AT91_WDT_WDRSTT has to be set if the timer
+>> values in MR are changed from 0 to another value, or maybe after each
+>> timer value change. Wonder if that should be done in the init function,
+>> after MR is set (with the watchdog disabled).
+>>
+>> Thoughts, anyone ?
+>>
 
-* move hisax to staging
-* remove i4l support from gigaset
-* move i4l core to staging
+> Are you aware of the Notes in the SAMA5D4 Reference Manual (Chapter
+> 19.5.2 Watchdog Timer Mode Register):
+>
+> |Note: The first write access prevents any further modification of
+> |      the value of this register. Read accesses remain possible.
+> |Note: The WDD and WDV values must not be modified within three slow
+> |      clock periods following a restart of the watchdog performed by
+> |      a write access in WDT_CR. Any modification will cause the watchdog
+> |      to trigger an end of period earlier than expected.
 
-while I initially thought that i4l as a whole is not just unmaintained
-but also more or less unused, patch 19cebbcb04c8 ("isdn: Partially
-revert debug format string usage clean up") came in that indicated that
-there are still users that even send patches for hisax, and that
-made me doubt whether we could consider it obsolete enough.
+This text is valid for older versions of the Watchdog controller, found
+in AT91SAM9 and SAMA5D3 chips. But SAMA5D4 & SAMA5D2 have a newer
+revision, which supports multiple writes to the MR register.
 
-Any thoughts on this? If you like, I can send those too.
+Are you sure about your datasheet? I have this in the latest version
+found on Atmel's site.
 
-My main motivation was to not have to fix up the ippp implementation
-when I move the compat ioctl handler from fs/compat_ioctl.c
-into drivers/net/ppp/ppp_generic.c, but I guess I can do that
-anyway as it seems that i4l never worked properly in compat mode.
+> Atmel-11238B-ATARM-SAMA5D4-Datasheet_24-Aug-15
+> Section 18.5.2
+>
+> Note: Write access to this register has no effect if the LOCKMR
+>       command is issued in WDT_CR (unlocked on hardware reset).
+> Note: The WDT_MR register values must not be modified within three slow
+>       clock periods following a restart of the watchdog performed by
+>       a write access in WDT_CR. Any modification will cause the watchdog
+>       to trigger an end of period earlier than expected.
+>
 
-	Arnd
+It matches the comments from Wenyou when he committed the sama5d4
+watchdog driver to replace the existing at91sam9 watchdog.
+
+Best regards,
+-- 
+Romain Izard
