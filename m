@@ -1,66 +1,199 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 4 Mar 2016 03:23:05 +0100
-Subject: [PATCH 1/3] usb: core: add power sequence for USB devices
-In-Reply-To: <20160304020242.GB30272@shlinux2.ap.freescale.net>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
- <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
- <CAL_JsqLYHzb0ABYN_P9ZOEorT6otvn_BPNzuCFhoqwa5M4y-hw@mail.gmail.com>
- <20160304020242.GB30272@shlinux2.ap.freescale.net>
-Message-ID: <20160304022305.GB20597@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 3 Mar 2016 18:25:32 -0800
+Subject: [PATCH 08/17] clk: Add PLX Technology OXNAS Standard Clocks
+In-Reply-To: <1457005210-18485-9-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-9-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160304022532.GE24999@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 10:02:42AM +0800, Peter Chen wrote:
-> On Thu, Mar 03, 2016 at 02:54:55PM -0600, Rob Herring wrote:
-> > On Thu, Mar 3, 2016 at 4:01 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> > > Some hard-wired USB devices need to do power sequence to let the
-> > > device work normally, the typical power sequence like: enable USB
-> > > PHY clock, toggle reset pin, etc. But current Linux USB driver
-> > > lacks of such code to do it, it may cause some hard-wired USB devices
-> > > works abnormal or can't be recognized by controller at all.
-> > >
-> > > In this patch, it will do power on sequence at hub's probe for all
-> > > devices under this hub (includes root hub) if this device is described
-> > > at dts and there is a phandle "usb-pwrseq" for it. At hub_disconnect,
-> > > it will do power off sequence.
-> > >
-> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > > ---
-> > >  .../devicetree/bindings/usb/usb-device.txt         |  41 +++++-
-> > >  drivers/usb/core/Makefile                          |   2 +-
-> > >  drivers/usb/core/hub.c                             |  32 +++++
-> > >  drivers/usb/core/pwrseq.c                          | 149 +++++++++++++++++++++
-> > >  include/linux/usb/of.h                             |  10 ++
-> > >  5 files changed, 232 insertions(+), 2 deletions(-)
-> > >  create mode 100644 drivers/usb/core/pwrseq.c
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-> > > index 1c35e7b..c7a298c 100644
-> > > --- a/Documentation/devicetree/bindings/usb/usb-device.txt
-> > > +++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-> > > @@ -13,8 +13,37 @@ Required properties:
-> > >  - reg: the port number which this device is connecting to, the range
-> > >    is 1-31.
-> > >
-> > > +Optional properties:
-> > > +- usb-pwrseq: the power sequence handler which need to do before this USB
-> > > +  device can work.
-> > > +- clocks: the input clock for USB device.
-> > > +- clock-frequency: the frequency for device's clock.
-> > > +- reset-gpios: Should specify the GPIO for reset.
-> > > +- reset-duration-us: the duration in microsecond for assert reset signal.
-> > 
-> > So we sorted out how to describe USB devices in DT, but now we don't
-> > use it?
-> 
-> We only know USB device after USB bus finds it, but without power
-> on sequence, the USB bus can't find it.
+On 03/03, Neil Armstrong wrote:
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index eca8e01..b75ef5c 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -192,6 +192,12 @@ config COMMON_CLK_PXA
+>  	---help---
+>  	  Sypport for the Marvell PXA SoC.
+>  
+> +config COMMON_CLK_OXNAS
+> +	def_bool COMMON_CLK
+> +	select MFD_SYSCON
 
-Not really true. Device tree says it exists, you just cannot see it
-yet. The fact it is in device tree means it is soldered on the board
-and really is there. So when the host controller enumerates the bus,
-it should run the power sequence of all child nodes to make them
-appear.
+So this is always built if I have the common clk framework
+enabled? Not good.
 
-	Andrew
- 
+> +	---help---
+> +	  Sypport for the OXNAS SoC Family clocks.
+> +
+>  config COMMON_CLK_CDCE706
+>  	tristate "Clock driver for TI CDCE706 clock synthesizer"
+>  	depends on I2C
+> diff --git a/drivers/clk/clk-oxnas.c b/drivers/clk/clk-oxnas.c
+> new file mode 100644
+> index 0000000..c4b903f
+> --- /dev/null
+> +++ b/drivers/clk/clk-oxnas.c
+> @@ -0,0 +1,159 @@
+> +/*
+> + * Copyright (C) 2010 Broadcom
+> + * Copyright (C) 2012 Stephen Warren
+> + * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+
+Are either of these includes used?
+
+> +#include <linux/clk-provider.h>
+> +#include <linux/of.h>
+> +#include <linux/delay.h>
+
+Is this include used?
+
+> +#include <linux/stringify.h>
+> +#include <linux/reset.h>
+
+Is this include used?
+
+> +#include <linux/io.h>
+
+Is this include used?
+
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+
+#include <linux/kernel.h> for container_of?
+
+> +
+> +/* Standard regmap gate clocks */
+> +struct clk_std {
+> +	struct clk_hw hw;
+> +	signed char bit;
+> +	struct regmap *regmap;
+> +};
+> +
+> +/* Regmap offsets */
+> +#define CLK_STAT_REGOFFSET	0x24
+> +#define CLK_SET_REGOFFSET	0x2c
+> +#define CLK_CLR_REGOFFSET	0x30
+> +
+> +#define NUM_STD_CLKS 10
+> +#define to_stdclk(_hw) container_of(_hw, struct clk_std, hw)
+> +
+> +static int std_clk_is_enabled(struct clk_hw *hw)
+> +{
+> +	struct clk_std *std = to_stdclk(hw);
+> +	int ret;
+> +	unsigned int val;
+> +
+> +	ret = regmap_read(std->regmap, CLK_STAT_REGOFFSET, &val);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	return val & BIT(std->bit);
+> +}
+> +
+> +static int std_clk_enable(struct clk_hw *hw)
+> +{
+> +	struct clk_std *std = to_stdclk(hw);
+> +
+> +	regmap_write(std->regmap, CLK_SET_REGOFFSET, BIT(std->bit));
+
+I hope the regmap is fast_io? Otherwise this is scheduling while
+atomic.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static void std_clk_disable(struct clk_hw *hw)
+> +{
+> +	struct clk_std *std = to_stdclk(hw);
+> +
+> +	regmap_write(std->regmap, CLK_CLR_REGOFFSET, BIT(std->bit));
+> +}
+> +
+> +static struct clk_ops std_clk_ops = {
+
+const?
+
+> +	.enable = std_clk_enable,
+> +	.disable = std_clk_disable,
+> +	.is_enabled = std_clk_is_enabled,
+> +};
+> +
+[..]
+> +
+> +static struct clk_hw *std_clk_hw_tbl[] = {
+
+const?
+
+> +	&clk_leon.hw,
+> +	&clk_dma_sgdma.hw,
+> +	&clk_cipher.hw,
+> +	&clk_sata.hw,
+> +	&clk_audio.hw,
+> +	&clk_usbmph.hw,
+> +	&clk_etha.hw,
+> +	&clk_pciea.hw,
+> +	&clk_nand.hw,
+> +};
+> +
+> +static struct clk *std_clk_tbl[ARRAY_SIZE(std_clk_hw_tbl)];
+> +
+> +static struct clk_onecell_data std_clk_data;
+
+These are pretty generic. Perhaps oxnas_clk_data and
+oxnas_clk_hw_tbl?
+
+> +
+> +static void __init oxnas_init_stdclk(struct device_node *np)
+> +{
+> +	int i;
+> +	struct regmap *regmap = syscon_node_to_regmap(of_get_parent(np));
+> +
+> +	if (!regmap)
+> +		panic("failed to have parent regmap\n");
+> +
+> +	for (i = 0; i < ARRAY_SIZE(std_clk_hw_tbl); i++) {
+> +		struct clk_std *std = container_of(std_clk_hw_tbl[i],
+> +						   struct clk_std, hw);
+> +
+> +		if (WARN_ON(!std))
+> +			return;
+> +		std->regmap = regmap;
+> +
+> +		std_clk_tbl[i] = clk_register(NULL, std_clk_hw_tbl[i]);
+> +		if (WARN_ON(IS_ERR(std_clk_tbl[i])))
+> +			return;
+> +	}
+> +
+> +	std_clk_data.clks = std_clk_tbl;
+> +	std_clk_data.clk_num = ARRAY_SIZE(std_clk_tbl);
+> +
+> +	of_clk_add_provider(np, of_clk_src_onecell_get, &std_clk_data);
+> +}
+> +CLK_OF_DECLARE(oxnas_pllstd, "plxtech,ox810se-stdclk", oxnas_init_stdclk);
+
+Can this be a platform driver instead?
+
+Is there a binding for this compatible?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
