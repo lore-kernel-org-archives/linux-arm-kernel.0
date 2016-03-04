@@ -1,63 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 4 Mar 2016 11:48:10 +0100
-Subject: DWord alignment on ARMv7
-In-Reply-To: <20160303235426.GA11237@arm.com>
-References: <56D8BA3F.7050508@pengutronix.de> <20160303235426.GA11237@arm.com>
-Message-ID: <CAKv+Gu8D37DgfbopvB1On_=fNqrBzmCmOCTotX2Lvv6NoSCtvw@mail.gmail.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Fri, 4 Mar 2016 12:52:15 +0200
+Subject: [PATCH 6/9] spi: imx: remove unnecessary bit clearing in
+ mx51_ecspi_config
+In-Reply-To: <1456302033-25638-7-git-send-email-s.hauer@pengutronix.de>
+References: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
+ <1456302033-25638-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <56D968DF.7000007@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Russell, Arnd)
+Hi Sascha,
 
-On 4 March 2016 at 00:54, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Marc,
->
-> On Thu, Mar 03, 2016 at 11:27:11PM +0100, Marc Kleine-Budde wrote:
->> I'm using btrfs on am ARMv7 and it turns out, that the kernel has to
->> fixup a lot of kernel originated alignment issues.
->>
->> See /proc/cpu/alignment (~4h of uptime):
->> > System: 22304815 (btrfs_get_token_64+0x13c/0x148 [btrfs])
->>
->> For example, when compiling the kernel on a btrfs volume the counter
->> increases by 100...1000 per second.
->>
->> The function shown "btrfs_get_token_64()" is defined here:
->> > http://lxr.free-electrons.com/source/fs/btrfs/struct-funcs.c#L53
->> ...it already uses get_unaligned_leXX accessors.
->>
->> Quoting a comment in arch/arm/mm/alignment.c:
->>
->>          * ARMv6 and later CPUs can perform unaligned accesses for
->>          * most single load and store instructions up to word size.
->>          * LDM, STM, LDRD and STRD still need to be handled.
->>
->> But on a 32bit ARMv7 64bits are not word-sized.
->>
->> Is the exception and fixup overhead neglectable? Do we have to introduce
->> something like HAVE_EFFICIENT_UNALIGNED_64BIT_ACCESS?
->
-> Ouch, that trap/emulate is certainly going to have an effect on your
-> performance. I doubt that HAVE_EFFICIENT_UNALIGNED_ACCESS applies to
-> types bigger than the native word size on many architectures, so my
-> hunch is that the btrfs code should be checking BITS_PER_LONG or similar
-> to establish whether or not to break the access up into word accesses.
->
-> A cursory look at the network layer indicates that kind of trick is done
-> over there.
->
+On 24.02.2016 10:20, Sascha Hauer wrote:
+> This reverts patch 1476253cef (spi: imx: fix ecspi mode setup)
+> The patch tried to fix something by clearing bits in the cfg variable,
+> but cfg is initialized to zero on function entry. There are no bits to
+> clear.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-I don't think it is the job of the filesystem driver to reason about
-whether get_unaligned_le64() does the right thing under any particular
-configuration. If ARM's implementation of get_unaligned_le64() issues
-load instructions that result in a trap, it is misbehaving and should
-be fixed.
+I believe here the expected fix should be
 
-I think that something like HAVE_EFFICIENT_UNALIGNED_64BIT_ACCESS
-makes sense. Or, based on Will's comment regarding other
-architectures, we could change the generic get_unaligned_le64()
-implementation for HAVE_EFFICIENT_UNALIGNED_ACCESS to split accesses
-when running on 32-bit archs.
+----8<----
 
--- 
-Ard.
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index 6a4ff27..9c9bae0 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -316,9 +316,10 @@ static void __maybe_unused mx51_ecspi_trigger(struct
+spi_imx_data *spi_imx)
+ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 		struct spi_imx_config *config)
+ {
+-	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
++	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
+ 	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
+ 	u32 clk = config->speed_hz, delay, reg;
++	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
+
+ 	/*
+ 	 * The hardware seems to have a race condition when changing modes. The
+
+----8<----
+
+> ---
+>  drivers/spi/spi-imx.c | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 15b23f0..287ec0c 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -366,20 +366,13 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  
+>  	if (config->mode & SPI_CPHA)
+>  		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
+> -	else
+> -		cfg &= ~MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
+>  
+>  	if (config->mode & SPI_CPOL) {
+>  		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
+>  		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
+> -	} else {
+> -		cfg &= ~MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
+> -		cfg &= ~MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
+>  	}
+>  	if (config->mode & SPI_CS_HIGH)
+>  		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+> -	else
+> -		cfg &= ~MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+>  
+>  	/* CTRL register always go first to bring out controller from reset */
+>  	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
+> 
+
+--
+With best wishes,
+Vladimir
