@@ -1,33 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Mar 2016 11:02:10 +0000
-Subject: DWord alignment on ARMv7
-In-Reply-To: <CAKv+Gu8D37DgfbopvB1On_=fNqrBzmCmOCTotX2Lvv6NoSCtvw@mail.gmail.com>
-References: <56D8BA3F.7050508@pengutronix.de> <20160303235426.GA11237@arm.com>
- <CAKv+Gu8D37DgfbopvB1On_=fNqrBzmCmOCTotX2Lvv6NoSCtvw@mail.gmail.com>
-Message-ID: <20160304110210.GA19428@n2100.arm.linux.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 04 Mar 2016 12:02:28 +0100
+Subject: [PATCH v2] media: platform: Add missing MFD_SYSCON dependency on
+ HAS_IOMEM
+In-Reply-To: <1457053344-28992-1-git-send-email-k.kozlowski@samsung.com>
+References: <1457053344-28992-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56D96B44.5090307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 11:48:10AM +0100, Ard Biesheuvel wrote:
-> I don't think it is the job of the filesystem driver to reason about
-> whether get_unaligned_le64() does the right thing under any particular
-> configuration. If ARM's implementation of get_unaligned_le64() issues
-> load instructions that result in a trap, it is misbehaving and should
-> be fixed.
+On 03/04/2016 02:02 AM, Krzysztof Kozlowski wrote:
+> The MFD_SYSCON depends on HAS_IOMEM so when selecting 
+> it avoid unmet direct dependencies.
 
-It's not ARMs implementation, we don't have our own implementation, but
-we seem to (today) use asm-generic stuff, which is sub-optimal.
+> diff --git a/drivers/media/platform/exynos4-is/Kconfig 
+> b/drivers/media/platform/exynos4-is/Kconfig
+> index 57d42c6172c5..c4317b99d257 100644
+> --- a/drivers/media/platform/exynos4-is/Kconfig
+> +++ b/drivers/media/platform/exynos4-is/Kconfig
+> @@ -17,6 +17,7 @@ config VIDEO_S5P_FIMC
+>  	tristate "S5P/EXYNOS4 FIMC/CAMIF camera interface driver"
+>  	depends on I2C
+>  	depends on HAS_DMA
+> +	depends on HAS_IOMEM	# For MFD_SYSCON
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	select V4L2_MEM2MEM_DEV
+>  	select MFD_SYSCON
 
-Looking at the state of that, I guess we need to implement our own
-asm/unaligned.h - and as the asm-generic stuff assumes that all
-access sizes fall into the same categories, I'm guessing we'll need
-to implement _all_ accessors ourselves.
-
-That really sounds very sub-optimal, but I don't see any other solution
-which wouldn't make the asm-generic stuff even more painful to follow
-through multiple include files than it already is today.
+While we are already at it, shouldn't "depends on HAS_IOMEM"
+be instead added at the top level entry in this Kconfig file,
+i.e. "config VIDEO_SAMSUNG_EXYNOS4_IS" ? For things like
+devm_ioremap_resource() depending on HAS_IOMEM and used in all
+the sub-drivers, enabled by VIDEO_SAMSUNG_EXYNOS4_IS?
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Sylwester
