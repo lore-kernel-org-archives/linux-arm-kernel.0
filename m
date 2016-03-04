@@ -1,48 +1,35 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Fri,  4 Mar 2016 12:32:06 -0800
-Subject: [PATCH 1/3] dt-bindings: Add binding docs for V3D.
+Date: Fri,  4 Mar 2016 12:32:07 -0800
+Subject: [PATCH 2/3] drm/vc4: Recognize a more specific compatible string for
+ V3D.
 In-Reply-To: <1457123528-13482-1-git-send-email-eric@anholt.net>
 References: <1457123528-13482-1-git-send-email-eric@anholt.net>
-Message-ID: <1457123528-13482-2-git-send-email-eric@anholt.net>
+Message-ID: <1457123528-13482-3-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was missed in the upstreaming process.
+The Raspberry Pi Foundation's firmware updates are shipping device
+trees using the old string, so we'll keep recognizing that as this rev
+of V3D.  Still, we should use a more specific name in the upstream DT
+to clarify which board is being supported, in case we do other revs of
+V3D in the future.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/gpu/drm/vc4/vc4_v3d.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-index 56a961a..9f97df4 100644
---- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-+++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-@@ -35,6 +35,12 @@ Optional properties for HDMI:
- 		  as an interrupt/status bit in the HDMI controller
- 		  itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
+diff --git a/drivers/gpu/drm/vc4/vc4_v3d.c b/drivers/gpu/drm/vc4/vc4_v3d.c
+index 31de5d1..e6d3c60 100644
+--- a/drivers/gpu/drm/vc4/vc4_v3d.c
++++ b/drivers/gpu/drm/vc4/vc4_v3d.c
+@@ -268,6 +268,7 @@ static int vc4_v3d_dev_remove(struct platform_device *pdev)
+ }
  
-+Required properties for V3D:
-+- compatible:	Should be "brcm,bcm2835-v3d"
-+- reg:		Physical base address and length of the V3D's registers
-+- interrupts:	The interrupt number
-+		  See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-+
- Example:
- pixelvalve at 7e807000 {
- 	compatible = "brcm,bcm2835-pixelvalve2";
-@@ -60,6 +66,12 @@ hdmi: hdmi at 7e902000 {
- 	clock-names = "pixel", "hdmi";
- };
- 
-+v3d: v3d at 7ec00000 {
-+	compatible = "brcm,bcm2835-v3d";
-+	reg = <0x7ec00000 0x1000>;
-+	interrupts = <1 10>;
-+};
-+
- vc4: gpu {
- 	compatible = "brcm,bcm2835-vc4";
+ static const struct of_device_id vc4_v3d_dt_match[] = {
++	{ .compatible = "brcm,bcm2835-v3d" },
+ 	{ .compatible = "brcm,vc4-v3d" },
+ 	{}
  };
 -- 
 2.7.0
