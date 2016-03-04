@@ -1,87 +1,66 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 4 Mar 2016 15:38:07 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56D92595.60709@huawei.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com>
- <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE>
- <56D92595.60709@huawei.com>
-Message-ID: <20160304063807.GA13317@js1304-P5Q-DELUXE>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 4 Mar 2016 14:37:26 +0800
+Subject: [PATCH v5 08/17] Xen: public/hvm: sync changes of
+ HVM_PARAM_CALLBACK_VIA ABI from Xen
+In-Reply-To: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1457073455-11516-9-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 02:05:09PM +0800, Hanjun Guo wrote:
-> On 2016/3/4 12:32, Joonsoo Kim wrote:
-> > On Fri, Mar 04, 2016 at 11:02:33AM +0900, Joonsoo Kim wrote:
-> >> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
-> >>> On 2016/3/3 15:42, Joonsoo Kim wrote:
-> >>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
-> >>>>> (cc -mm and Joonsoo Kim)
-> >>>>>
-> >>>>>
-> >>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
-> >>>>>> Hi,
-> >>>>>>
-> >>>>>> I came across a suspicious error for CMA stress test:
-> >>>>>>
-> >>>>>> Before the test, I got:
-> >>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
-> >>>>>> CmaTotal:         204800 kB
-> >>>>>> CmaFree:          195044 kB
-> >>>>>>
-> >>>>>>
-> >>>>>> After running the test:
-> >>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
-> >>>>>> CmaTotal:         204800 kB
-> >>>>>> CmaFree:         6602584 kB
-> >>>>>>
-> >>>>>> So the freed CMA memory is more than total..
-> >>>>>>
-> >>>>>> Also the the MemFree is more than mem total:
-> >>>>>>
-> >>>>>> -bash-4.3# cat /proc/meminfo
-> >>>>>> MemTotal:       16342016 kB
-> >>>>>> MemFree:        22367268 kB
-> >>>>>> MemAvailable:   22370528 kB
-> >>> [...]
-> >>>>> I played with this a bit and can see the same problem. The sanity
-> >>>>> check of CmaFree < CmaTotal generally triggers in
-> >>>>> __move_zone_freepage_state in unset_migratetype_isolate.
-> >>>>> This also seems to be present as far back as v4.0 which was the
-> >>>>> first version to have the updated accounting from Joonsoo.
-> >>>>> Were there known limitations with the new freepage accounting,
-> >>>>> Joonsoo?
-> >>>> I don't know. I also played with this and looks like there is
-> >>>> accounting problem, however, for my case, number of free page is slightly less
-> >>>> than total. I will take a look.
-> >>>>
-> >>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
-> >>>> look like your case.
-> >>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
-> >>> did some other test:
-> >> Thanks! Now, I can re-generate erronous situation you mentioned.
-> >>
-> >>>  - run with single thread with 100000 times, everything is fine.
-> >>>
-> >>>  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
-> >>>    the same test with 100 multi-thread, then I got:
-> >> [1] would not be sufficient to close this race.
-> >>
-> >> Try following things [A]. And, for more accurate test, I changed code a bit more
-> >> to prevent kernel page allocation from cma area [B]. This will prevent kernel
-> >> page allocation from cma area completely so we can focus cma_alloc/release race.
-> >>
-> >> Although, this is not correct fix, it could help that we can guess
-> >> where the problem is.
-> > More correct fix is something like below.
-> > Please test it.
-> 
-> Hmm, this is not working:
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Sad to hear that.
+Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
+Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
+ABI in the API).
 
-Could you tell me your system's MAX_ORDER and pageblock_order?
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
 
-Thanks.
+diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+index a6c7991..70ad208 100644
+--- a/include/xen/interface/hvm/params.h
++++ b/include/xen/interface/hvm/params.h
+@@ -27,16 +27,31 @@
+  * Parameter space for HVMOP_{set,get}_param.
+  */
+ 
++#define HVM_PARAM_CALLBACK_IRQ 0
+ /*
+  * How should CPU0 event-channel notifications be delivered?
+- * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
+- * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
+- *                  Domain = val[47:32], Bus  = val[31:16],
+- *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+- * val[63:56] == 2: val[7:0] is a vector number.
++ *
+  * If val == 0 then CPU0 event-channel notifications are not delivered.
++ * If val != 0, val[63:56] encodes the type, as follows:
++ */
++
++#define HVM_PARAM_CALLBACK_TYPE_GSI      0
++/*
++ * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
++ * and disables all notifications.
++ */
++
++#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
++/*
++ * val[55:0] is a delivery PCI INTx line:
++ * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
++ */
++
++#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
++/*
++ * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
++ * if this delivery method is available.
+  */
+-#define HVM_PARAM_CALLBACK_IRQ 0
+ 
+ #define HVM_PARAM_STORE_PFN    1
+ #define HVM_PARAM_STORE_EVTCHN 2
+-- 
+2.0.4
