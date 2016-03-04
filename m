@@ -1,118 +1,49 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 4 Mar 2016 11:23:47 +0000
-Subject: [RFC PATCH 1/8] PM / Domains: Add new helper functions for device-tree
+Date: Fri, 4 Mar 2016 11:23:49 +0000
+Subject: [RFC PATCH 3/8] staging: board: Remove calls to
+ of_genpd_get_from_provider()
 In-Reply-To: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
 References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1457090634-14785-2-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1457090634-14785-4-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ideally, if we are returning a reference to a PM domain via a call to
-of_genpd_get_from_provider(), then we should keep track of such
-references via a reference count. The reference count could then be used
-to determine if a PM domain can be safely removed. Alternatively, it is
-possible to avoid such external references by providing APIs to access
-the PM domain and hence, eliminate any calls to
+Update the staging/board PM domain code to use the
+of_genpd_add_subdomain() and remove any calls to
 of_genpd_get_from_provider().
-
-Add new helper functions for adding a device and a subdomain to a PM
-domain when using device-tree, so that external calls to
-of_genpd_get_from_provider() can be removed.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/base/power/domain.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pm_domain.h   | 16 ++++++++++++++++
- 2 files changed, 60 insertions(+)
+ drivers/staging/board/board.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 5bdb42bf40f4..b24893499454 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1706,6 +1706,50 @@ struct generic_pm_domain *of_genpd_get_from_provider(
- EXPORT_SYMBOL_GPL(of_genpd_get_from_provider);
- 
- /**
-+ * of_genpd_add_device() - Add a device to an I/O PM domain
-+ * @genpdspec: OF phandle args to use for look-up PM domain
-+ * @dev: Device to be added.
-+ *
-+ * Looks-up an I/O PM domain based upon phandle args provided and adds
-+ * the device to the PM domain. Returns a negative error code on failure.
-+ */
-+int of_genpd_add_device(struct of_phandle_args *genpdspec, struct device *dev)
-+{
-+	struct generic_pm_domain *genpd;
-+
-+	genpd = of_genpd_get_from_provider(genpdspec);
-+	if (IS_ERR(genpd))
-+		return PTR_ERR(genpd);
-+
-+	return pm_genpd_add_device(genpd, dev);
-+}
-+
-+/**
-+ * of_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
-+ * @parent_spec: OF phandle args to use for parent PM domain look-up
-+ * @subdomain_spec: OF phandle args to use for subdomain look-up
-+ *
-+ * Looks-up a parent PM domain and subdomain based upon phandle args
-+ * provided and adds the subdomain to the parent PM domain. Returns a
-+ * negative error code on failure.
-+ */
-+int of_genpd_add_subdomain(struct of_phandle_args *parent_spec,
-+			   struct of_phandle_args *subdomain_spec)
-+{
-+	struct generic_pm_domain *parent, *subdomain;
-+
-+	parent = of_genpd_get_from_provider(parent_spec);
-+	if (IS_ERR(parent))
-+		return PTR_ERR(parent);
-+
-+	subdomain = of_genpd_get_from_provider(subdomain_spec);
-+	if (IS_ERR(subdomain))
-+		return PTR_ERR(subdomain);
-+
-+	return pm_genpd_add_subdomain(parent, subdomain);
-+}
-+
-+/**
-  * genpd_dev_pm_detach - Detach a device from its PM domain.
-  * @dev: Device to detach.
-  * @power_off: Currently not used
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 49cd8890b873..2b6ee670b231 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -210,6 +210,10 @@ struct generic_pm_domain *__of_genpd_xlate_simple(
- struct generic_pm_domain *__of_genpd_xlate_onecell(
- 					struct of_phandle_args *genpdspec,
- 					void *data);
-+extern int of_genpd_add_device(struct of_phandle_args *args,
-+			       struct device *dev);
-+extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
-+				  struct of_phandle_args *new_subdomain);
- 
- int genpd_dev_pm_attach(struct device *dev);
- #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
-@@ -229,6 +233,18 @@ static inline struct generic_pm_domain *of_genpd_get_from_provider(
- #define __of_genpd_xlate_simple		NULL
- #define __of_genpd_xlate_onecell	NULL
- 
-+static inline int of_pm_genpd_add_device(struct of_phandle_args *args,
-+					 struct device *dev)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int of_genpd_add_subdomain(struct of_phandle_args *parent,
-+					 struct of_phandle_args *new_subdomain)
-+{
-+	return -ENODEV;
-+}
-+
- static inline int genpd_dev_pm_attach(struct device *dev)
+diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
+index 45807d8287d1..86dc41101610 100644
+--- a/drivers/staging/board/board.c
++++ b/drivers/staging/board/board.c
+@@ -140,7 +140,6 @@ static int board_staging_add_dev_domain(struct platform_device *pdev,
+ 					const char *domain)
  {
- 	return -ENODEV;
+ 	struct of_phandle_args pd_args;
+-	struct generic_pm_domain *pd;
+ 	struct device_node *np;
+ 
+ 	np = of_find_node_by_path(domain);
+@@ -151,14 +150,8 @@ static int board_staging_add_dev_domain(struct platform_device *pdev,
+ 
+ 	pd_args.np = np;
+ 	pd_args.args_count = 0;
+-	pd = of_genpd_get_from_provider(&pd_args);
+-	if (IS_ERR(pd)) {
+-		pr_err("Cannot find genpd %s (%ld)\n", domain, PTR_ERR(pd));
+-		return PTR_ERR(pd);
+-	}
+-	pr_debug("Found genpd %s for device %s\n", pd->name, pdev->name);
+ 
+-	return pm_genpd_add_device(pd, &pdev->dev);
++	return of_genpd_add_device(&pd_args, &pdev->dev);
+ }
+ #else
+ static inline int board_staging_add_dev_domain(struct platform_device *pdev,
 -- 
 2.1.4
