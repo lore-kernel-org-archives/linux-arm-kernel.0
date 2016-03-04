@@ -1,53 +1,45 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Fri,  4 Mar 2016 05:23:30 -0500
-Subject: [PATCH 1/1] arm64: dts: Enable GPIO for Broadcom NS2 SoC
-Message-ID: <1457087010-26306-1-git-send-email-yendapally.reddy@broadcom.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 4 Mar 2016 15:59:19 +0530
+Subject: [PATCH RESEND] Revert "PCI: dra7xx: Mark driver as broken"
+Message-ID: <1457087359-16816-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the GPIO support for Broadcom NS2 SoC
+From: Sekhar Nori <nsekhar@ti.com>
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+This reverts commit <5c3b99d057525fe2befe6a7db9b1309035d93eee>
+("PCI: dra7xx: Mark driver as broken").
+
+With support to de-assert PCIe reset present in kernel,
+DRA7x PCIe is not broken anymore.
+
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Bjorn,
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index a510d3a..dbe89d7 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -246,6 +246,15 @@
- 			mask = <0xfffffffd>;
- 		};
- 
-+		gpio_aon: gpio at 65024800 {
-+			compatible = "brcm,iproc-gpio";
-+			reg = <0x65024800 0x50>,
-+			      <0x65024008 0x18>;
-+			ngpios = <6>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
-+
- 		gic: interrupt-controller at 65210000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
-@@ -266,6 +275,16 @@
- 			status = "disabled";
- 		};
- 
-+		gpio_g: gpio at 660a0000 {
-+			compatible = "brcm,iproc-gpio";
-+			reg = <0x660a0000 0x50>;
-+			ngpios = <32>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			interrupt-controller;
-+			interrupts = <GIC_SPI 400 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		i2c1: i2c at 660b0000 {
- 			compatible = "brcm,iproc-i2c";
- 			reg = <0x660b0000 0x100>;
+This patch should be merged only after [1] hits linus tree.
+
+Thanks
+Kishon
+
+[1] -> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git
+	for-v4.6/omap-hwmod-b
+
+ drivers/pci/host/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 75a6054..6d181ba 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -5,7 +5,6 @@ config PCI_DRA7XX
+ 	bool "TI DRA7xx PCIe controller"
+ 	select PCIE_DW
+ 	depends on OF && HAS_IOMEM && TI_PIPE3
+-	depends on BROKEN
+ 	help
+ 	 Enables support for the PCIe controller in the DRA7xx SoC.  There
+ 	 are two instances of PCIe controller in DRA7xx.  This controller can
 -- 
-2.1.0
+1.7.9.5
