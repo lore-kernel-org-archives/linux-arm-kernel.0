@@ -1,63 +1,63 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 3 Mar 2016 18:21:01 -0600
-Subject: [PATCH v13 3/6] of, numa: Add NUMA of binding implementation.
-In-Reply-To: <56D87572.3090002@caviumnetworks.com>
-References: <1456959362-2036-1-git-send-email-ddaney.cavm@gmail.com>
- <1456959362-2036-4-git-send-email-ddaney.cavm@gmail.com>
- <CAL_JsqLRP6tmpY7cJ61Ybrrai4ctA7ezyUGmYwdbywe+-qBG5A@mail.gmail.com>
- <56D87572.3090002@caviumnetworks.com>
-Message-ID: <CAL_JsqL4FEkP-GhHf0Hyh9spKf=oV+Ft+GFfVFoZmYMyvCoDkw@mail.gmail.com>
+From: huangdaode@hisilicon.com (Daode Huang)
+Date: Fri, 4 Mar 2016 09:09:54 +0800
+Subject: [PATCH net 2/6] net: hns: fixes the hw interrupt bug in using napi
+In-Reply-To: <1457053798-93513-1-git-send-email-huangdaode@hisilicon.com>
+References: <1457053798-93513-1-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <1457053798-93513-3-git-send-email-huangdaode@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 3, 2016 at 11:33 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 03/02/2016 07:34 PM, Rob Herring wrote:
->>
->> On Wed, Mar 2, 2016 at 4:55 PM, David Daney <ddaney.cavm@gmail.com> wrote:
->>>
->>> From: David Daney <david.daney@cavium.com>
->>>
->>> Add device tree parsing for NUMA topology using device
->>> "numa-node-id" property in distance-map and cpu nodes.
->>>
->>> This is a complete rewrite of a previous patch by:
->>>     Ganapatrao Kulkarni<gkulkarni@caviumnetworks.com>
->>>
->>> Signed-off-by: David Daney <david.daney@cavium.com>
->>> ---
->>>   drivers/of/Kconfig   |   3 +
->>>   drivers/of/Makefile  |   1 +
->>>   drivers/of/of_numa.c | 200
->>> +++++++++++++++++++++++++++++++++++++++++++++++++++
->>>   include/linux/of.h   |   9 +++
->>>   4 files changed, 213 insertions(+)
->>>   create mode 100644 drivers/of/of_numa.c
+In V1 chip, common_poll should check and clean fbd pkts, because it
+can not pend irq to clean them if there is no new pkt comes in.
+But V2 chip hw fixes this bug, and will pend irq itself to do this.
+So, for V2 chip, we set ring_data->fini_process to NULL.
 
-[...]
+Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Lisheng <lisheng011@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
->>> +static int __init of_parse_distance_map(void)
->>> +{
->>> +       int ret = -EINVAL;
->>> +       struct device_node *np = of_find_node_by_name(NULL,
->>> "distance-map");
->>> +
->>> +       if (!np)
->>> +               return ret;
->>> +
->>> +       if (of_device_is_compatible(np, "numa-distance-map-v1")) {
->>
->>
->> You can use of_find_compatible_node() instead of these 2 calls.
->
->
-> Well, we need to match exactly the name "distance-map",
-> of_find_compatible_node() doesn't match on the name, so I think we need two
-> checks, one for name and one for compatible.
-
-Node names generally aren't supposed to matter and the kernel's job is
-not to validate DTs, So just finding the compatible should be enough.
-
-Not a big deal, so I've acked v14. If there's a v15, then please make
-the change.
-
-Rob
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+index 9d46d57..6250a42 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+@@ -946,8 +946,8 @@ static int hns_nic_common_poll(struct napi_struct *napi, int budget)
+ 		napi_complete(napi);
+ 		ring_data->ring->q->handle->dev->ops->toggle_ring_irq(
+ 			ring_data->ring, 0);
+-
+-		ring_data->fini_process(ring_data);
++		if (ring_data->fini_process)
++			ring_data->fini_process(ring_data);
+ 		return 0;
+ 	}
+ 
+@@ -1710,6 +1710,7 @@ static int hns_nic_init_ring_data(struct hns_nic_priv *priv)
+ {
+ 	struct hnae_handle *h = priv->ae_handle;
+ 	struct hns_nic_ring_data *rd;
++	bool is_ver1 = AE_IS_VER1(priv->enet_ver);
+ 	int i;
+ 
+ 	if (h->q_num > NIC_MAX_Q_PER_VF) {
+@@ -1727,7 +1728,7 @@ static int hns_nic_init_ring_data(struct hns_nic_priv *priv)
+ 		rd->queue_index = i;
+ 		rd->ring = &h->qs[i]->tx_ring;
+ 		rd->poll_one = hns_nic_tx_poll_one;
+-		rd->fini_process = hns_nic_tx_fini_pro;
++		rd->fini_process = is_ver1 ? hns_nic_tx_fini_pro : NULL;
+ 
+ 		netif_napi_add(priv->netdev, &rd->napi,
+ 			       hns_nic_common_poll, NIC_TX_CLEAN_MAX_NUM);
+@@ -1739,7 +1740,7 @@ static int hns_nic_init_ring_data(struct hns_nic_priv *priv)
+ 		rd->ring = &h->qs[i - h->q_num]->rx_ring;
+ 		rd->poll_one = hns_nic_rx_poll_one;
+ 		rd->ex_process = hns_nic_rx_up_pro;
+-		rd->fini_process = hns_nic_rx_fini_pro;
++		rd->fini_process = is_ver1 ? hns_nic_rx_fini_pro : NULL;
+ 
+ 		netif_napi_add(priv->netdev, &rd->napi,
+ 			       hns_nic_common_poll, NIC_RX_CLEAN_MAX_NUM);
+-- 
+1.9.1
