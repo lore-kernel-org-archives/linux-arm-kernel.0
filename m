@@ -1,28 +1,57 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 04 Mar 2016 16:05:49 +0900
-Subject: [PATCH v2] media: platform: Add missing MFD_SYSCON dependency on
- HAS_IOMEM
-In-Reply-To: <87y49yd8t6.fsf@gmail.com>
-References: <1457053344-28992-1-git-send-email-k.kozlowski@samsung.com>
- <87y49yd8t6.fsf@gmail.com>
-Message-ID: <56D933CD.4070704@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 4 Mar 2016 08:27:26 +0100
+Subject: [linux-sunxi] Re: [PATCH v4 1/2] ehci-platform: Add support for
+ controllers with multiple reset lines
+In-Reply-To: <20160304043559.GA21743@kroah.com>
+References: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
+ <1456592339-31767-2-git-send-email-hdegoede@redhat.com>
+ <20160304043559.GA21743@kroah.com>
+Message-ID: <56D938DE.10409@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.03.2016 16:03, Holger Schurig wrote:
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
-> 
->> +	depends on HAS_IOMEM	# For MFD_SYSCON
->                             ^^^^^^^^^^^^^^^^
-> 
-> I think this comment is not necessary, it's also highly unusual. On
-> other words: other patches like this don't add such comments.
-> 
-> You can always use "git blame" to find out why some line has changed the
-> way it changed ...
+Hi,
 
-No problem, I can remove it. I thought it might be useful since this
-dependency is not for the driver but for selected item.
+On 04-03-16 05:35, Greg Kroah-Hartman wrote:
+> On Sat, Feb 27, 2016 at 05:58:58PM +0100, Hans de Goede wrote:
+>> From: Reinder de Haan <patchesrdh@mveas.com>
+>>
+>> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+>> reset lines, the controller will not initialize while the reset for
+>> its companion is still asserted, which means we need to de-assert
+>> 2 resets for the controller to work.
+>>
+>> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>> Changes in v2:
+>> -Use the new reset_control_[de]assert_shared reset-controller functions
+>> Changes in v3:
+>> -Adjust for changes to shared-reset reset-controller functions
+>> Changes in v4:
+>> -Fix Ugly continuation line
+>
+> This breaks the build horribly :(
+>
+> As does patch 2/2, ugh.
 
-Best regards,
-Krzysztof
+As said in the cover letter:
+
+"These patches apply on top of the related
+reset-controller patches which have just been merged here:
+
+git://git.pengutronix.de/git/pza/linux.git reset/next"
+
+I guess I should have done s/apply on top of/depend on/
+in the above bit. These patches apply fine without those
+changes, but indeed they will not build.
+
+You may want to ask Philipp Zabel (added to the To: list)
+to create a topic branch for this which you can merge into
+your tree.
+
+Regards,
+
+Hans
