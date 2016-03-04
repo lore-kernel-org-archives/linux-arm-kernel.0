@@ -1,204 +1,86 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 4 Mar 2016 07:05:03 -0600
-Subject: [PATCH V2 2/2] mailbox: Introduce TI message manager driver
-In-Reply-To: <CABb+yY1hK4T6KAQcqNKF3D_pkLCcDVN=+T18ueV35jXbpLR+kg@mail.gmail.com>
-References: <1456525452-30638-1-git-send-email-nm@ti.com>
- <1456525452-30638-3-git-send-email-nm@ti.com>
- <CABb+yY1hK4T6KAQcqNKF3D_pkLCcDVN=+T18ueV35jXbpLR+kg@mail.gmail.com>
-Message-ID: <56D987FF.1040607@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 4 Mar 2016 05:09:04 -0800
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+In-Reply-To: <CAGkQfmN9wDkrc=frsSdBYYtMPf4VaTpcmYjX6_wARs=a78-bPQ@mail.gmail.com>
+References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+ <56D8E649.8030500@atmel.com> <56D91BDC.1030604@roeck-us.net>
+ <CAGkQfmN9wDkrc=frsSdBYYtMPf4VaTpcmYjX6_wARs=a78-bPQ@mail.gmail.com>
+Message-ID: <56D988F0.8050803@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-Thanks for reviewing the patch.
-On 03/03/2016 11:18 PM, Jassi Brar wrote:
-
-[...]
-
+On 03/04/2016 01:06 AM, Romain Izard wrote:
+> Hi Wenyou, Guenter,
+>
+> 2016-03-04 6:23 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
+>> On 03/03/2016 05:35 PM, Yang, Wenyou wrote:
+>>> On 2016/3/3 18:29, Romain Izard wrote:
+>>>>
+>>>> If the internal counter is not refreshed when the watchdog is
+>>>> started for the first time, the watchdog will trigger very rapidly.
+>>>> For example, opening /dev/watchdog without writing in it will
+>>>> immediately trigger a reboot, instead of waiting for the delay to
+>>>> expire.
+>>>>
+>>>> To avoid this problem, reload the timer on opening the watchdog
+>>>> device.
+>>>>
+>>>> Command: "while sleep 5; do echo 1; done > /dev/watchdog" Before:
+>>>> system reset After: the watchdog runs correctly
+>>>
+>>> I didn't reproduce your issue on my side,
+>>>
+>>> run the your commands as follows, it works fine,  the system reset
+>>> doesn't happen.
+>
+> I've just verified with the factory image provided on the SAMA5D2
+> Xplained board. It does not display this behaviour.
+>
+> But the difference is that in the case without the issue, I'm using the
+> AT91bootstrap SPL, U-Boot, and the kernel from the QSPI chip. When I
+> have the issue, I have a U-Boot based SPL, U-Boot itself and the kernel
+> that come from the FAT partition of an SD-Card.
+>
+> Userspace does not seem to be involved in the issue, as I can reproduce
+> it both with my buildroot environment, and the Yocto environment from
+> the factory image.
+>
+>> Different chip revision ? Different chip type ? Different chip
+>> initialization by ROMMON ?
 >>
->>  drivers/mailbox/Kconfig     |  11 +
->>  drivers/mailbox/Makefile    |   2 +
->>  drivers/mailbox/ti-msgmgr.c | 657
+>> Can we get exact chip revisions and types for both cases (working and
+>> not working), and (if it might be relevant) a dump of all associated
+>> chip registers ?
+>
+>
+>>> I also check the WDT_MR register before and after enabling watchdog,
+>>> the WDV and WDD fields are correct.
+>>>
+>>> Can you check it again? thank you.
+>
+> Working case:
+> MR on kernel startup:   0x3fffafff
+> MR after watchdog init: 0x0fffafff
+> MR after start:         0x0fff2fff
+>
+> Problem case:
+> MR on kernel startup:   0x00008000
+> MR after watchdog init: 0x0fffafff
+> MR after start:         0x0fff2fff
+>
+> So this means that the counter reload does not seem to work very well if
+> WDD/WDV have been set to 0 in the past. The other question is why does
+> U-Boot (from the Atmel branch based on 2015.1) put this stange value in
+> this register.
+>
 
-> Do you want to call it something more specific than 'msgmgr from TI'?
-> Maybe its about Keystone, like mailbox-keystone.c ?
+Can you check the value of AT91_WDT_SR ? Maybe it tells us something.
 
-Here is the rationale for choosing the name:
-There are more than 1 IPC in TI SoCs and even within Keystone SoC.
-Further, it is indeed called message manager hardware block and used
-across multiple SoC families (even though it is originated by keystone
-architecture). we do have a reuse of the omap-mailbox in a future
-keystone device (in addition to message manager), so using ti-mailbox is
-more appropriate for omap-mailbox, but anyways.. further renaming this
-as keystone-mailbox will confuse poor users when the new SoC comes in..
+Also, in the error case, can you check if the watchdog times out at all
+after you applied your patch ?
 
-We do have a lot of cross pollination of hardware blocks across TI
-architectures, and "keystone-" prefix does not really fit the usage.
-hence the usage of vendor-hardwareblock name.
+Thanks,
+Guenter
 
-> 
-> 
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <linux/of.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/ti-msgmgr.h>
->>
-> This seems a bit bold. I think  include/linux/soc/ti/ is the right place.
-
-Sure, I can. Since I followed include/linux/omap-mailbox.h, Would you
-suggest all files such as include/linux/omap* be moved to
-include/linux/soc/ti/ ? I guess that is not pertinent to this specific
-patch, but I am curious..
-
-
->> +       /* Do I actually have messages to read? */
->> +       msg_count = ti_msgmgr_queue_get_num_messages(qinst);
->> +       if (!msg_count) {
->> +               /* Shared IRQ? */
->> +               dev_dbg(dev, "Spurious event - 0 pending data!\n");
->> +               return IRQ_NONE;
->> +       }
->> +
->> +       /*
->> +        * I have no idea about the protocol being used to communicate with the
->> +        * remote producer - 0 could be valid data, so I wont make a judgement
->> +        * of how many bytes I should be reading. Let the client figure this
->> +        * out.. I just read the full message and pass it on..
->> +        */
-> Exactly. And similarly when you send data, you should not have more
-> than one message in transit. Now please see my note in
-> ti_msgmgr_send_data()
-> 
-> 
->> +static int ti_msgmgr_send_data(struct mbox_chan *chan, void *data)
->> +{
->> +       struct device *dev = chan->mbox->dev;
->> +       struct ti_msgmgr_inst *inst = dev_get_drvdata(dev);
->> +       const struct ti_msgmgr_desc *desc;
->> +       struct ti_queue_inst *qinst = chan->con_priv;
->> +       int msg_count, num_words, trail_bytes;
->> +       struct ti_msgmgr_message *message = data;
->> +       void __iomem *data_reg;
->> +       u32 *word_data;
->> +
->> +       if (WARN_ON(!inst)) {
->> +               dev_err(dev, "no platform drv data??\n");
->> +               return -EINVAL;
->> +       }
->> +       desc = inst->desc;
->> +
->> +       if (desc->max_message_size < message->len) {
->> +               dev_err(dev, "Queue %s message length %d > max %d\n",
->> +                       qinst->name, message->len, desc->max_message_size);
->> +               return -EINVAL;
->> +       }
->> +
->> +       /* Are we able to send this or not? */
->> +       msg_count = ti_msgmgr_queue_get_num_messages(qinst);
->> +       if (msg_count >= desc->max_messages) {
->> +               dev_warn(dev, "Queue %s is full (%d messages)\n", qinst->name,
->> +                        msg_count);
->> +               return -EBUSY;
->> +       }
-> This seems fishy. mailbox api always submit 1 'complete' message to be
-> sent and checks for completion by last_tx_done() before calling
-> send_data() again. Controller drivers are not supposed to queue
-> messages - mailbox core does. So you should never be unable to send a
-> message.
-
-
-OK-> to explain this, few reasons: (queue messages check and usage of
-last_tx_done are kind of intertwined answer..
-a) we need to remember that the message manager has a shared RAM.
-multiple transmitter over other queues can be sharing the same.
-unfortunately, we dont get a threshold kind of interrupt or status that
-I am able to exploit in the current incarnation of the solution. The
-best we can do in the full system is to constrain the number of messages
-that are max pending simultaneously in each of the queue from various
-transmitters in the SoC.
-b) last_tx_done() is checked if TXDONE_BY_POLL, not if TXDONE_BY_ACK
-right? which is how this'd work since txdone_poll is false -> that is
-how we want this mechanism to work once the far end is ready for next
-message, it acks. I do see your point about being tied to protocol - I
-dont like it either.. in fact, I'd prefer that client registration
-mention what kind of handshaking is necessary, but: a) that is not how
-mailbox framework is constructed at the moment(we state txdone_poll at
-mailbox registration, not at client usage) and b) I have no real need
-for multiple clients to users of message manager who actually need
-non-ACK usage - even for the foreseeable future (at least 1 next
-generation of SoC) - if such a need does arise in the future, I will
-have to rework framework and make this capability at the registration
-time of the client - allowing each client path to use different
-mechanisms on hardware such as these that need it.
-c) message manager can actually queue more than one message(depending on
-client capability). Even though, at this point, we are not really
-capable of doing it(again from what I can see for immediate future),
-mailbox framework by checking last_tx_done forces a single message
-sequencing - which is not really exploiting the capability of the
-hardware - in theory, we should be able to queue max num messages, hit
-cpuidle and snooze away while the remote entity chomp away data at it's
-own pace and finally give us a notification back - but again, we can
-argue it is indeed protocol dependent, so setting txdone_poll to false
-actually enables that to be done in user. Again - i have no immediate
-need for any queued multiple transfer needs yet.. even if i need to, in
-the future, it can easily be done by the client by maintaining code as
-is - txdone_poll is false.
-
-> 
-> 
->> +       /*
->> +        * NOTE about register access involved here:
->> +        * the hardware block is implemented with 32bit access operations and no
->> +        * support for data splitting.  We don't want the hardware to misbehave
->> +        * with sub 32bit access - For example: if the last register write is
->> +        * split into byte wise access, it can result in the queue getting
->> +        * stuck or dummy messages being transmitted or indeterminate behavior.
->> +        * The same can occur if out of order operations take place.
->> +        * Hence, we do not use memcpy_toio or ___iowrite32_copy here, instead
->> +        * we use writel which ensures the sequencing we need.
->> +        */
-> .... deja-vu ?
-
-Tell me about it.. but then, surprises like these do pop in once in a
-while.. sigh..
-
->> +
->> +/* Keystone K2G SoC integration details */
->> +static const struct ti_msgmgr_valid_queue_desc k2g_valid_queues[] = {
->> +       {.queue_id = 0, .proxy_id = 0, .is_tx = true,},
->> +       {.queue_id = 1, .proxy_id = 0, .is_tx = true,},
->> +       {.queue_id = 2, .proxy_id = 0, .is_tx = true,},
->> +       {.queue_id = 3, .proxy_id = 0, .is_tx = true,},
->> +       {.queue_id = 5, .proxy_id = 2, .is_tx = false,},
->> +       {.queue_id = 56, .proxy_id = 1, .is_tx = true,},
->> +       {.queue_id = 57, .proxy_id = 2, .is_tx = false,},
->> +       {.queue_id = 58, .proxy_id = 3, .is_tx = true,},
->> +       {.queue_id = 59, .proxy_id = 4, .is_tx = true,},
->> +       {.queue_id = 60, .proxy_id = 5, .is_tx = true,},
->> +       {.queue_id = 61, .proxy_id = 6, .is_tx = true,},
->> +};
->> +
->> +static const struct ti_msgmgr_desc k2g_desc = {
->> +       .queue_count = 64,
->> +       .max_message_size = 64,
->> +       .max_messages = 128,
->> +       .q_slices = 1,
->> +       .q_proxies = 1,
->> +       .data_first_reg = 16,
->> +       .data_last_reg = 31,
->> +       .tx_polled = false,
->> +       .valid_queues = k2g_valid_queues,
->> +       .num_valid_queues = ARRAY_SIZE(k2g_valid_queues),
->> +};
-> If these parameters are very configurable, maybe they should be in DT?
-
-These are SoC integration specific data. based on DT, we will only have
-SoC specific compatible property in DT. Since  the data is tied to SoC
-integration, there is no benefit of keeping these in DT.
-
--- 
-Regards,
-Nishanth Menon
+> Best regards,
+>
