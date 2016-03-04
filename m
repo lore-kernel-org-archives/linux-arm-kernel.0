@@ -1,91 +1,68 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 4 Mar 2016 14:26:55 +0100
-Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
-In-Reply-To: <56D988F0.8050803@roeck-us.net>
-References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
- <56D8E649.8030500@atmel.com> <56D91BDC.1030604@roeck-us.net>
- <CAGkQfmN9wDkrc=frsSdBYYtMPf4VaTpcmYjX6_wARs=a78-bPQ@mail.gmail.com>
- <56D988F0.8050803@roeck-us.net>
-Message-ID: <CAGkQfmOLVwpckKP+axdi1501ghqq_UAmCygJv_tfa=bCOLvCzA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Mar 2016 14:30:23 +0100
+Subject: DWord alignment on ARMv7
+In-Reply-To: <CAKv+Gu_HttHOutHAw-k_uwmTUGjUsTWCotVHroqRK0NQDOGkNg@mail.gmail.com>
+References: <56D8BA3F.7050508@pengutronix.de> <3093807.B56fh7Radq@wuerfel>
+ <CAKv+Gu_HttHOutHAw-k_uwmTUGjUsTWCotVHroqRK0NQDOGkNg@mail.gmail.com>
+Message-ID: <72900410.JPa1IHPXo5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-04 14:09 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
-> On 03/04/2016 01:06 AM, Romain Izard wrote:
->> 2016-03-04 6:23 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
->>> On 03/03/2016 05:35 PM, Yang, Wenyou wrote:
->>>> On 2016/3/3 18:29, Romain Izard wrote:
->>>>>
->>>>> If the internal counter is not refreshed when the watchdog is
->>>>> started for the first time, the watchdog will trigger very
->>>>> rapidly.  For example, opening /dev/watchdog without writing in it
->>>>> will immediately trigger a reboot, instead of waiting for the
->>>>> delay to expire.
->>>>>
->>>>> To avoid this problem, reload the timer on opening the watchdog
->>>>> device.
->>>>>
->>>>> Command: "while sleep 5; do echo 1; done > /dev/watchdog" Before:
->>>>> system reset After: the watchdog runs correctly
->>>>
->>>>
->>>> I didn't reproduce your issue on my side,
->>>>
->>>> run the your commands as follows, it works fine,  the system reset
->>>> doesn't happen.
->>
->>
->> I've just verified with the factory image provided on the SAMA5D2
->> Xplained board. It does not display this behaviour.
->>
->> But the difference is that in the case without the issue, I'm using
->> the AT91bootstrap SPL, U-Boot, and the kernel from the QSPI chip.
->> When I have the issue, I have a U-Boot based SPL, U-Boot itself and
->> the kernel that come from the FAT partition of an SD-Card.
->>
->> Userspace does not seem to be involved in the issue, as I can
->> reproduce it both with my buildroot environment, and the Yocto
->> environment from the factory image.
->>
->>> Different chip revision ? Different chip type ? Different chip
->>> initialization by ROMMON ?
->>>
->>> Can we get exact chip revisions and types for both cases (working
->>> and not working), and (if it might be relevant) a dump of all
->>> associated chip registers ?
->>
->>
->>
->>>> I also check the WDT_MR register before and after enabling
->>>> watchdog, the WDV and WDD fields are correct.
->>>>
->>>> Can you check it again? thank you.
->>
->>
->> Working case:
->> MR on kernel startup:   0x3fffafff
->> MR after watchdog init: 0x0fffafff
->> MR after start:         0x0fff2fff
->>
->> Problem case:
->> MR on kernel startup:   0x00008000
->> MR after watchdog init: 0x0fffafff
->> MR after start:         0x0fff2fff
->>
->> So this means that the counter reload does not seem to work very well
->> if WDD/WDV have been set to 0 in the past. The other question is why
->> does U-Boot (from the Atmel branch based on 2015.1) put this stange
->> value in this register.
->>
->
-> Can you check the value of AT91_WDT_SR ? Maybe it tells us something.
->
-I didn't report it because it contained 0 at all times. So no information.
+On Friday 04 March 2016 12:44:23 Ard Biesheuvel wrote:
+> On 4 March 2016 at 12:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 04 March 2016 12:14:24 Ard Biesheuvel wrote:
+> >> On 4 March 2016 at 12:02, Russell King - ARM Linux
+> > Here is a patch I've come up with independently. I have verified
+> > that it removes all ldrd/strd from the btrfs unaligned data
+> > handling.
+> >
+> > The open question about it is whether we'd rather play safe and
+> > let the compiler handle unaligned accesses itself, removing the
+> > theoretical risk of the compiler optimizing
+> >
+> >         void *p;
+> >         u64 v = get_unaligned((u32)p) + (get_unaligned((u32)(p + 4)) << 32);
+> >
+> > into an ldrd. I think the linux/unaligned/access_ok.h implementation
+> > would allow that.
+> >
+> 
+> I would assume that the compiler engineers are aware of the alignment
+> requirement of ldrd/strd, and don't promote adjacent accesses like
+> that if the pointer may not be 64-bit aligned.
 
-> Also, in the error case, can you check if the watchdog times out at all
-> after you applied your patch ?
+Ah, I thought it only required 32-bit alignment like ldm/stm, but it
+seems that it won't do that. However, an implementation like
 
-It times out after 16s as expected, and reboot occurs correctly.
+unsigned long long get_unaligned_u64(void *p)
+{
+        unsigned long long upper, lower;
+        lower = *(unsigned long*)p;
+        upper = *(unsigned long*)(p+4);
 
--- 
-Romain Izard
+        return lower | (upper << 32);
+}
+
+does get compiled into
+
+00000000 <f>:
+   0:   e8900003        ldm     r0, {r0, r1}
+   4:   e12fff1e        bx      lr
+
+which is still wrong, so I assume there is some danger of that remaining
+with both of our patches, as the compiler might  decide to merge
+a series of unaligned 32-bit loads into an ldm, as long as our implementation
+incorrectly tells the compiler that the data is 32-bit aligned.
+
+> > + * This is the most generic implementation of unaligned accesses
+> > + * and should work almost anywhere.
+> > + */
+> > +#include <asm/byteorder.h>
+> > +#include <linux/kernel.h>
+> > +#include <asm/byteorder.h>
+> 
+> Any particular reason to include this twice?
+
+No, just a mistake when merging the access_ok.h into this file.
+
+	Arnd
