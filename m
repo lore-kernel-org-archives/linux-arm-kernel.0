@@ -1,73 +1,94 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 4 Mar 2016 14:33:32 +0100
-Subject: DWord alignment on ARMv7
-In-Reply-To: <72900410.JPa1IHPXo5@wuerfel>
-References: <56D8BA3F.7050508@pengutronix.de> <3093807.B56fh7Radq@wuerfel>
- <CAKv+Gu_HttHOutHAw-k_uwmTUGjUsTWCotVHroqRK0NQDOGkNg@mail.gmail.com>
- <72900410.JPa1IHPXo5@wuerfel>
-Message-ID: <CAKv+Gu8_H-akYc3HF8O23mHhhHMKD86DNwUs9k1Fn1ZAykGpRA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 4 Mar 2016 05:36:49 -0800
+Subject: [PATCH v6 2/6] watchdog: pnx4008: add restart handler
+In-Reply-To: <1457040025-1108-3-git-send-email-slemieux.tyco@gmail.com>
+References: <1457040025-1108-1-git-send-email-slemieux.tyco@gmail.com>
+ <1457040025-1108-3-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <56D98F71.5000004@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2016 at 14:30, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 04 March 2016 12:44:23 Ard Biesheuvel wrote:
->> On 4 March 2016 at 12:38, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 04 March 2016 12:14:24 Ard Biesheuvel wrote:
->> >> On 4 March 2016 at 12:02, Russell King - ARM Linux
->> > Here is a patch I've come up with independently. I have verified
->> > that it removes all ldrd/strd from the btrfs unaligned data
->> > handling.
->> >
->> > The open question about it is whether we'd rather play safe and
->> > let the compiler handle unaligned accesses itself, removing the
->> > theoretical risk of the compiler optimizing
->> >
->> >         void *p;
->> >         u64 v = get_unaligned((u32)p) + (get_unaligned((u32)(p + 4)) << 32);
->> >
->> > into an ldrd. I think the linux/unaligned/access_ok.h implementation
->> > would allow that.
->> >
->>
->> I would assume that the compiler engineers are aware of the alignment
->> requirement of ldrd/strd, and don't promote adjacent accesses like
->> that if the pointer may not be 64-bit aligned.
+On 03/03/2016 01:20 PM, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
 >
-> Ah, I thought it only required 32-bit alignment like ldm/stm, but it
-> seems that it won't do that. However, an implementation like
+> Add restart handler capability to the driver;
+> the restart handler implementation was taken from
+> "mach-lpc32xx" ("lpc23xx_restart" function).
 >
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 
-It does only require 32-bit alignment, I was just confused.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-> unsigned long long get_unaligned_u64(void *p)
-> {
->         unsigned long long upper, lower;
->         lower = *(unsigned long*)p;
->         upper = *(unsigned long*)(p+4);
+> ---
+> Changes from v5 to v6:
+> - none.
 >
->         return lower | (upper << 32);
-> }
+> Changes from v4 to v5:
+> - Rebased on the following patch:
+>    http://permalink.gmane.org/gmane.linux.watchdog/3364/
 >
-> does get compiled into
+> Changes from v3 to v4:
+> - none.
 >
-> 00000000 <f>:
->    0:   e8900003        ldm     r0, {r0, r1}
->    4:   e12fff1e        bx      lr
+> Changes from v2 to v3:
+> - remove explicit clock enable from restart handler.
+> - verify "register_restart_handler" return value.
+> - add call to unregister_restart_handler".
+> - do the restart handling directly in "pnx4008_restart_handler".
 >
-> which is still wrong, so I assume there is some danger of that remaining
-> with both of our patches, as the compiler might  decide to merge
-> a series of unaligned 32-bit loads into an ldm, as long as our implementation
-> incorrectly tells the compiler that the data is 32-bit aligned.
+> Changes from v1 to v2:
+> - new patch in v2.
 >
->> > + * This is the most generic implementation of unaligned accesses
->> > + * and should work almost anywhere.
->> > + */
->> > +#include <asm/byteorder.h>
->> > +#include <linux/kernel.h>
->> > +#include <asm/byteorder.h>
->>
->> Any particular reason to include this twice?
+>   drivers/watchdog/pnx4008_wdt.c | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
 >
-> No, just a mistake when merging the access_ok.h into this file.
+> diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+> index 88264a2..f3be522 100644
+> --- a/drivers/watchdog/pnx4008_wdt.c
+> +++ b/drivers/watchdog/pnx4008_wdt.c
+> @@ -31,6 +31,8 @@
+>   #include <linux/slab.h>
+>   #include <linux/err.h>
+>   #include <linux/of.h>
+> +#include <linux/delay.h>
+> +#include <linux/reboot.h>
+>   #include <mach/hardware.h>
 >
->         Arnd
+>   /* WatchDog Timer - Chapter 23 Page 207 */
+> @@ -124,6 +126,19 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+>   	return 0;
+>   }
+>
+> +static int pnx4008_restart_handler(struct watchdog_device *wdd,
+> +				   unsigned long mode, void *cmd)
+> +{
+> +	/* Instant assert of RESETOUT_N with pulse length 1mS */
+> +	writel(13000, WDTIM_PULSE(wdt_base));
+> +	writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
+> +
+> +	/* Wait for watchdog to reset system */
+> +	mdelay(1000);
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+>   static const struct watchdog_info pnx4008_wdt_ident = {
+>   	.options = WDIOF_CARDRESET | WDIOF_MAGICCLOSE |
+>   	    WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+> @@ -135,6 +150,7 @@ static const struct watchdog_ops pnx4008_wdt_ops = {
+>   	.start = pnx4008_wdt_start,
+>   	.stop = pnx4008_wdt_stop,
+>   	.set_timeout = pnx4008_wdt_set_timeout,
+> +	.restart = pnx4008_restart_handler,
+>   };
+>
+>   static struct watchdog_device pnx4008_wdd = {
+> @@ -169,6 +185,7 @@ static int pnx4008_wdt_probe(struct platform_device *pdev)
+>   			WDIOF_CARDRESET : 0;
+>   	pnx4008_wdd.parent = &pdev->dev;
+>   	watchdog_set_nowayout(&pnx4008_wdd, nowayout);
+> +	watchdog_set_restart_priority(&pnx4008_wdd, 128);
+>
+>   	pnx4008_wdt_stop(&pnx4008_wdd);	/* disable for now */
+>
+>
