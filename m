@@ -1,94 +1,60 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 4 Mar 2016 05:36:49 -0800
-Subject: [PATCH v6 2/6] watchdog: pnx4008: add restart handler
-In-Reply-To: <1457040025-1108-3-git-send-email-slemieux.tyco@gmail.com>
-References: <1457040025-1108-1-git-send-email-slemieux.tyco@gmail.com>
- <1457040025-1108-3-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <56D98F71.5000004@roeck-us.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 4 Mar 2016 16:37:19 +0300
+Subject: [PATCH net 3/6] net: hns: fixed portid bug in sending manage pkt
+In-Reply-To: <1457053798-93513-4-git-send-email-huangdaode@hisilicon.com>
+References: <1457053798-93513-1-git-send-email-huangdaode@hisilicon.com>
+ <1457053798-93513-4-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <56D98F8F.5010700@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2016 01:20 PM, Sylvain Lemieux wrote:
-> From: Sylvain Lemieux <slemieux@tycoint.com>
->
-> Add restart handler capability to the driver;
-> the restart handler implementation was taken from
-> "mach-lpc32xx" ("lpc23xx_restart" function).
->
-> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+Hello.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+On 3/4/2016 4:09 AM, Daode Huang wrote:
 
+> In V2 chip, when sending mamagement packets, the driver should
+> config the port id to BD descs.
+>
+> Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+> Signed-off-by: Lisheng <lisheng011@huawei.com>
 > ---
-> Changes from v5 to v6:
-> - none.
+>   drivers/net/ethernet/hisilicon/hns/hnae.h         | 3 +++
+>   drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c | 1 +
+>   drivers/net/ethernet/hisilicon/hns/hns_enet.c     | 4 ++++
+>   3 files changed, 8 insertions(+)
 >
-> Changes from v4 to v5:
-> - Rebased on the following patch:
->    http://permalink.gmane.org/gmane.linux.watchdog/3364/
+> diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.h b/drivers/net/ethernet/hisilicon/hns/hnae.h
+> index 1cbcb9f..11a3f97 100644
+> --- a/drivers/net/ethernet/hisilicon/hns/hnae.h
+> +++ b/drivers/net/ethernet/hisilicon/hns/hnae.h
+[...]
+> @@ -516,6 +518,7 @@ struct hnae_handle {
+>   	int q_num;
+>   	int vf_id;
+>   	u32 eport_id;
+> +	u32 dport_id;	/*v2 tx bd should fill the dport_id*/
+
+    Please add spaces after /* and before */ (like it's done in other places 
+in this driver).
+
+[...]
+> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> index 6250a42..b45dcc2 100644
+> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+> @@ -69,6 +69,10 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
+>   	hnae_set_bit(rrcfv, HNSV2_TXD_VLD_B, 1);
+>   	hnae_set_field(bn_pid, HNSV2_TXD_BUFNUM_M, 0, buf_num - 1);
 >
-> Changes from v3 to v4:
-> - none.
->
-> Changes from v2 to v3:
-> - remove explicit clock enable from restart handler.
-> - verify "register_restart_handler" return value.
-> - add call to unregister_restart_handler".
-> - do the restart handling directly in "pnx4008_restart_handler".
->
-> Changes from v1 to v2:
-> - new patch in v2.
->
->   drivers/watchdog/pnx4008_wdt.c | 17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->
-> diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-> index 88264a2..f3be522 100644
-> --- a/drivers/watchdog/pnx4008_wdt.c
-> +++ b/drivers/watchdog/pnx4008_wdt.c
-> @@ -31,6 +31,8 @@
->   #include <linux/slab.h>
->   #include <linux/err.h>
->   #include <linux/of.h>
-> +#include <linux/delay.h>
-> +#include <linux/reboot.h>
->   #include <mach/hardware.h>
->
->   /* WatchDog Timer - Chapter 23 Page 207 */
-> @@ -124,6 +126,19 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
->   	return 0;
->   }
->
-> +static int pnx4008_restart_handler(struct watchdog_device *wdd,
-> +				   unsigned long mode, void *cmd)
-> +{
-> +	/* Instant assert of RESETOUT_N with pulse length 1mS */
-> +	writel(13000, WDTIM_PULSE(wdt_base));
-> +	writel(M_RES2 | RESFRC1 | RESFRC2, WDTIM_MCTRL(wdt_base));
+> +	/*fill port_id in the tx bd for sending management pkts*/
+
+    Likewise.
+
+> +	hnae_set_field(bn_pid, HNSV2_TXD_PORTID_M,
+> +		       HNSV2_TXD_PORTID_S, ring->q->handle->dport_id);
 > +
-> +	/* Wait for watchdog to reset system */
-> +	mdelay(1000);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
->   static const struct watchdog_info pnx4008_wdt_ident = {
->   	.options = WDIOF_CARDRESET | WDIOF_MAGICCLOSE |
->   	    WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-> @@ -135,6 +150,7 @@ static const struct watchdog_ops pnx4008_wdt_ops = {
->   	.start = pnx4008_wdt_start,
->   	.stop = pnx4008_wdt_stop,
->   	.set_timeout = pnx4008_wdt_set_timeout,
-> +	.restart = pnx4008_restart_handler,
->   };
+>   	if (type == DESC_TYPE_SKB) {
+>   		skb = (struct sk_buff *)priv;
 >
->   static struct watchdog_device pnx4008_wdd = {
-> @@ -169,6 +185,7 @@ static int pnx4008_wdt_probe(struct platform_device *pdev)
->   			WDIOF_CARDRESET : 0;
->   	pnx4008_wdd.parent = &pdev->dev;
->   	watchdog_set_nowayout(&pnx4008_wdd, nowayout);
-> +	watchdog_set_restart_priority(&pnx4008_wdd, 128);
->
->   	pnx4008_wdt_stop(&pnx4008_wdd);	/* disable for now */
->
->
+
+MBR, Sergei
