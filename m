@@ -1,69 +1,61 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 4 Mar 2016 16:28:10 +0000
-Subject: [PATCH v5 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <56D9B043.1090301@linaro.org>
-References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
- <1457073455-11516-2-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1603041213400.17938@kaball.uk.xensource.com>
- <56D9B043.1090301@linaro.org>
-Message-ID: <alpine.DEB.2.02.1603041615200.17938@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Mar 2016 17:32 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <1457108303.2651.112.camel@tiscali.nl>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1659125.tHp8H942OG@wuerfel> <1457108303.2651.112.camel@tiscali.nl>
+Message-ID: <2983219.IrgyuboXyU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Mar 2016, Shannon Zhao wrote:
-> On 2016/3/4 20:24, Stefano Stabellini wrote:
-> > On Fri, 4 Mar 2016, Shannon Zhao wrote:
-> > > >From: Shannon Zhao<shannon.zhao@linaro.org>
-> > > >
-> > > >ACPI 6.0 introduces a new table STAO to list the devices which are used
-> > > >by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-> > > >UART is used by Xen. So here it hides UART from Dom0.
-> > > >
-> > > >Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
-> > > >---
-> > > >CC: "Rafael J. Wysocki"<rjw@rjwysocki.net>  (supporter:ACPI)
-> > > >CC: Len Brown<lenb@kernel.org>  (supporter:ACPI)
-> > > >CC:linux-acpi at vger.kernel.org  (open list:ACPI)
-> > > >---
-> > > >  drivers/acpi/scan.c | 68
-> > > +++++++++++++++++++++++++++++++++++++++++++++++++++++
-> > > >  1 file changed, 68 insertions(+)
-> > > >
-> > > >diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> > > >index 407a376..31d794c 100644
-> > > >--- a/drivers/acpi/scan.c
-> > > >+++ b/drivers/acpi/scan.c
-> > > >@@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
-> > > >  DEFINE_MUTEX(acpi_device_lock);
-> > > >  LIST_HEAD(acpi_wakeup_device_list);
-> > > >  static DEFINE_MUTEX(acpi_hp_context_lock);
-> > > >+static u64 spcr_uart_addr;
-> > > >
-> > > >  struct acpi_dep_data {
-> > > >  	struct list_head node;
-> > > >@@ -1453,6 +1454,47 @@ static int acpi_add_single_object(struct
-> > > acpi_device **child,
-> > > >  	return 0;
-> > > >  }
-> > > >
-> > > >+static acpi_status acpi_get_resource_fixed_memory32(struct acpi_resource
-> > > *res,
-> > > >+						    void *context)
-> > > >+{
-> > > >+	struct acpi_resource_fixed_memory32 *fixed_memory32;
-> > > >+
-> > > >+	if (res->type != ACPI_RESOURCE_TYPE_FIXED_MEMORY32)
-> > > >+		return AE_OK;
-> > > >+
-> > > >+	fixed_memory32 = &res->data.fixed_memory32;
-> > Should we call acpi_resource_to_address64 instead?
-> > Aside from this the rest looks good.
+On Friday 04 March 2016 17:18:23 Paul Bolle wrote:
+> [Added Tilman and Christoph.]
+> 
+> On vr, 2016-03-04 at 16:24 +0100, Arnd Bergmann wrote:
+> > I actually did more patches that I ended up not submitting:
 > > 
-> You mean the resource type could be other types? like
-> ACPI_RESOURCE_TYPE_ADDRESS64 or ACPI_RESOURCE_TYPE_ADDRESS32? So it needs to
-> convert them to ACPI_RESOURCE_TYPE_ADDRESS64 firstly?
+> > * move hisax to staging
+> > * remove i4l support from gigaset
+> 
+> For the record: I have no reason to object a patch that does that. (I'm
+> not aware anyone complained when gigaset switched its default from i4l
+> to capi. By now all relevant distributions should use our capi driver.)
 
-I meant to ask whether we need to check for other types of resources, in
-addition to ACPI_RESOURCE_TYPE_FIXED_MEMORY32.  So maybe call an
-existing function that already does the check for us.
-acpi_dev_resource_memory is actually what I meant to suggest.
+Ok.
+
+> > * move i4l core to staging
+> 
+> On a local tree I have two (draft) patches that do some related
+> preliminary work:
+> - isdnhdlc: move into separate directory
+> - mISDN: NETJet: stop selecting ISDN_I4L
+> 
+> These trivial patches untangle mISDN and i4l. Perhaps you did something
+> similar in your "move i4l core to staging".
+
+Yes, I have the same thing. I didn't mention it here as it should
+be completely non-controversial.
+
+A third patch moves the capidrv source from drivers/isdn/capi/
+into the i4l directory.
+
+> > Any thoughts on this? If you like, I can send those too.
+> 
+> For my part I'm surprised that anyone is still using it. But apparently
+> the hardware that required commit 19cebbcb04c8 and 3460baa62068  (which
+> I'm unfamiliar with) is still operational. And since there never has
+> been, as far as I know, a global i4l to capi migration nor a global i4l
+> (and capi) to mISDN migration it might be that some people are stuck on
+> i4l drivers for their hardware. Perhaps that explains Cristoph's
+> commits.
+
+My understanding is that it's not about the hardware, and that all
+devices that people actually use with hisax should also with with
+mISDN.
+
+Instead, the only argument I've heard about keeping i4l and hisax
+around (indefinitely) is that existing user space tools are written
+for i4l and not ported to mISDN. They work fine with CAPI drivers
+using capidrv.ko, but there is no i4l emulation on top of mISDN.
+
+	Arnd
