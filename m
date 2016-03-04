@@ -1,48 +1,98 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Fri, 4 Mar 2016 11:51:12 -0500
-Subject: [PATCH] arm64: tegra210-smaug: Add gpio-key nodes
-In-Reply-To: <20160304084729.GB4038@ulmo>
-References: <1457034865-17826-1-git-send-email-rklein@nvidia.com>
- <20160304084729.GB4038@ulmo>
-Message-ID: <56D9BD00.3080005@nvidia.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 4 Mar 2016 10:28:29 -0700
+Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue bits
+ when just one is being checked
+In-Reply-To: <20160304163854.GD19428@n2100.arm.linux.org.uk>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-7-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18550FD3A944783B88BEDB64FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <56D9B54B.8020309@boundarydevices.com>
+ <20160304163854.GD19428@n2100.arm.linux.org.uk>
+Message-ID: <56D9C5BD.5060802@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/4/2016 3:47 AM, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+On 3/4/2016 9:38 AM, Russell King - ARM Linux wrote:
+> On Fri, Mar 04, 2016 at 09:18:19AM -0700, Troy Kisky wrote:
+>> On 3/4/2016 2:11 AM, Fugang Duan wrote:
+>>> From: Troy Kisky <troy.kisky@boundarydevices.com>Sent: Thursday, February 25, 2016 8:37 AM
+>>>> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
+>>>> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
+>>>> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+>>>> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
+>>>> johannes at sipsolutions.net; stillcompiling at gmail.com;
+>>>> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
+>>>> <troy.kisky@boundarydevices.com>
+>>>> Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue bits when
+>>>> just one is being checked
+>>>>
+>>>> FEC_ENET_RXF is 3 separate bits, we only check one queue at a time. So, when
+>>>> the last queue is being checked, it is bad to remove the interrupt on the 1st
+>>>> queue.
+>>>>
+>>>> Also, since this is now done in the napi routine and not the interrupt, it is not
+>>>> needed.
+>>>>
+>>>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>>>> ---
+>>>>  drivers/net/ethernet/freescale/fec_main.c | 2 --
+>>>>  1 file changed, 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>>>> b/drivers/net/ethernet/freescale/fec_main.c
+>>>> index 610cf6c..791f385 100644
+>>>> --- a/drivers/net/ethernet/freescale/fec_main.c
+>>>> +++ b/drivers/net/ethernet/freescale/fec_main.c
+>>>> @@ -1338,8 +1338,6 @@ static int fec_rxq(struct net_device *ndev, struct
+>>>> fec_enet_private *fep,
+>>>>  			break;
+>>>>  		pkt_received++;
+>>>>
+>>>> -		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
+>>>> -
+>>>
+>>> We should clear the related rx queue ievent, not remove the code.
+>>> Pls see commit: db3421c114cf that was submitted by Russell King.
+>>>
+>>> No ack the patch.
+>>
+>>
+>> This is now done in patch #4 "net: fec: reduce interrupts" and you could argue
+>> that it should be squashed into that patch. But I like separating changes
+>> as much as possible.
+>>
+>>
+>> Russell, this patch and patch #4 will likely need your ack before it will be applied.
+>> Can you take a look please?
 > 
-> On Thu, Mar 03, 2016 at 02:54:25PM -0500, Rhyland Klein wrote:
->> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-> [...]
->> +		lid {
->> +			label = "Lid";
->> +			gpios = <&gpio TEGRA_GPIO(B, 4) GPIO_ACTIVE_LOW>;
->> +			linux,input-type = <5>; /* EV_SW */
->> +			linux,code = <0>; /* SW_LID */
->> +			gpio-key,wakeup;
->> +		};
->> +
->> +		tablet_mode {
->> +			label = "Tablet Mode";
->> +			gpios = <&gpio TEGRA_GPIO(Z, 2) GPIO_ACTIVE_HIGH>;
->> +			linux,input-type = <5>; /* EV_SW */
->> +			linux,code = <1>; /* SW_TABLET_MODE */
->> +			gpio-key,wakeup;
->> +		};
+> I stopped caring about the FEC ethernet driver about 18 months ago,
+> after I ended up dropping a significant pile of fixes on the floor
+> through the huge number of conflicts and the shere effort of
+> constantly trying to move them forward.
 > 
-> Is there a way to trigger these on a DVT device? Power and volume
-> controls work fine, but I haven't found a way to test these two.
+> My patch series tend to be large because I put concentrated effort
+> into something for a month, which then gives a problem if conflicts
+> come up later and the series has to be effectively rewritten from
+> scratch.  It was after the second or third time of facing an almost
+> total rewrite that happened that I just gave up.
+> 
+> I've toyed with the idea of forking the driver, but I wouldn't have
+> time to maintain such a thing.  So, right now I just put up with all
+> the bad quirks, and reset/power cycle the boards when things go wrong.
+> Right now, I just disable runtime PM support on the FEC to get
+> stability here. :)
+> 
+> Sorry, but I can't be of more help.
+> 
 
-First of all, thanks for catching the deprecated property and changes in
-the input.h.
 
-As for testing, both can be triggered with magnets. The lid switch is
-near the camera on the top of the display. For me, the tablet-mode
-sensor is around 1/3 up from the bottom (assuming camera is the top) on
-the back side of the device. Not sure how that would line up for you
-though...
+I can sympathize, I've been almost ready to post my patches numerous times
+when a huge patch set would hit, and conflict everywhere. Including once
+about 18 months ago :)
 
--rhyland
+That's why I got trigger happy, and first posted my too large set before
+net-next was opened. It didn't help though, there was already a conflict
+in net.
 
--- 
-nvpublic
+
+Troy
