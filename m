@@ -1,218 +1,427 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 04 Mar 2016 23:51:14 +0000
-Subject: [PATCH v14 00/20] arm64 kexec kernel patches v14
-Message-ID: <cover.1457135058.git.geoff@infradead.org>
+Subject: [PATCH v14 05/20] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
+References: <cover.1457135058.git.geoff@infradead.org>
+Message-ID: <89b75e7bb9abd3fe62ff74b090cfc7794feb2375.1457135058.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the core support for kexec re-boot and kdump on ARM64.  This
-version of the series combines Takahiro's kdump patches with my kexec patches.
-Please consider all patches for inclusion.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-To load a second stage kernel and execute a kexec re-boot or to work with kdump
-on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
-merged upstream, are needed.  Please update to the latest if you have been using
-an older version.
+The current kvm implementation on arm64 does cpu-specific initialization
+at system boot, and has no way to gracefully shutdown a core in terms of
+kvm. This prevents kexec from rebooting the system at EL2.
 
-To examine vmcore (/proc/vmcore), you should use
-  - gdb v7.7 or later
-  - crash v7.1.1 or later
+This patch adds a cpu tear-down function and also puts an existing cpu-init
+code into a separate function, kvm_arch_hardware_disable() and
+kvm_arch_hardware_enable() respectively.
+We don't need the arm64 specific cpu hotplug hook any more.
 
-[1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
-[2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
+Since this patch modifies common code between arm and arm64, one stub
+definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+compilation errors.
 
-Changes for v14 (Mar 4, 2016, 22m):
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+[Moved __kvm_hyp_reset() to use kvm_call_hyp(), instead of having its own
+ dedicated entry point in el1_sync. Added some comments and a tlbi.]
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm/include/asm/kvm_host.h   |  10 +++-
+ arch/arm/include/asm/kvm_mmu.h    |   1 +
+ arch/arm/kvm/arm.c                | 104 ++++++++++++++++++++++++--------------
+ arch/arm/kvm/mmu.c                |   5 ++
+ arch/arm64/include/asm/kvm_asm.h  |   1 +
+ arch/arm64/include/asm/kvm_host.h |  12 ++++-
+ arch/arm64/include/asm/kvm_mmu.h  |   1 +
+ arch/arm64/kvm/hyp-init.S         |  42 +++++++++++++++
+ arch/arm64/kvm/reset.c            |  14 +++++
+ 9 files changed, 150 insertions(+), 40 deletions(-)
 
-  o Rebase to Linux-4.5-rc6.
-  o Rename setup_mm_for_reboot to cpu_install_idmap.
-  o kdump: leave non-boot cpus online at crash dump
-    As we don't have to make non-boot (crashed) cpus offline at crash dump,
-    this patch adds a variant of smp_send_stop().
-  o kdump: use a new device-tree property, "linux,elfcorehdr", instead of
-    traditional "elfcorehdr=" kernel parameter
-  o limit memory regions based on DT property, "usable-memory", instead of
-    "mem=" kernel parameter
-  o kdump: fix a build error when !CONFIG_KEXEC_CORE
-  o kvm: use generic kvm_call_hyp() interface instead of kvm_cpu_reset()
-  o kvm: initialize only a primary cpu at init_hyp_mode()
-
-Changes for v13 (Jan 15, 2016, 20m):
-
-  o Rebase to Linux-4.4.
-  o Remove align directive from cpu_reset.c.
-  o Use inline C wrapper for cpu_soft_restart.
-  o Revert the new image d-cache flush changes of v10.
-  o Add SCTLR cleanup patch.
-  o Change pr_devel to pr_debug.
-  o Call flush_icache_range() for reboot_code_buffer.
-  o Add .ltorg directive to arm64_relocate_new_kernel.
-  o Make new asm macro copy_page.
-  o Change cache maintenence from inner-shareable to non-shareable.
-  o Rename KEXEC_ARCH_ARM64 to KEXEC_ARCH_AARCH64.
-
-  o arm64: kvm: allows kvm cpu hotplug
-    - remove some garbage code from kvm_host.h
-  o arm64: kdump: reserve memory for crash dump kernel
-    - change CONFIG_KEXEC to CONFIG_KEXEC_CORE
-    - don't panic on crash kernel alloc failure
-      (thanks to Mark Salter, RH)
-  o arm64: kdump: implement machine_crash_shutdown()
-    - change "boot/non-boot cpu" to "crashing/non-crashing cpu"
-    - introduce is_in_crash_kexec() for readability
-    - re-introduce machine_kexec_mask_interrupts(), as arch/arm has,
-      to discard unexpected interrupts
-    - call crash_save_cpu() before making cpus offline to avoid a possible race
-      (thanks to Pratyush Anand/Mark Salter, RH)
-  o arm64: kdump: update a kernel doc
-    - clarify that we support "Image" format as well as vmlinux in kdump.txt
-  o arm64: kdump: relax BUG_ON() if more than one cpus are still active
-    - change a warning message at the failure of shooting down non-crahsing cpus
-
-Changes for v12 (Nov 24, 2015, 18m):
-
-  o No changes, rebase to Linux-4.4-rc2.
-
-Changes for v11 (Nov 6, 2015, 18m):
-
-  o Rebase to Linux-4.3.
-  o Move the new image d-cache flush from arm64_relocate_new_kernel to machine_kexec.
-  o Pass values to arm64_relocate_new_kernel in registers, not in global variables.
-  o Fixups to setting the sctlr_el1 and sctlr_el2 flags.
-
-Changes for v10 (Oct 18, 2015, 17m):
-
-  o Rebase to Linux-4.3-rc6.
-  o Move tcr_set_idmap_t0sz to assembler.h.
-  o Add back simplified cpu_reset routines.
-  o Combine kexec + kdump patches.
-
-Changes for v9 (Apr 7, 2015, 11m):
-
-  o Use new upstream flag IND_FLAGS.
-
-Changes for v8 (Mar 19, 2015, 10m):
-
-  o Rebase to Linux-4.0-rc4.
-  o Re-boot using purgatory only.
-
-Changes for v7 (Jan 16, 2015, 8m):
-
-  o Rebase to Linux-3.19-rc4.
-  o Change from ESR_EL2_ to ESR_ELx_.
-  o Remove work-arounds for EFI systems.
-  
-Changes for v6 (Dec 2, 2014, 7m):
-
-  o Rebase to Linux-3.18-rc2
-
-Changes for v5 (Nov 16, 2014, 6m):
-
-Changes for v4 (Oct 3, 2014, 5m):
-
-Changes for v3 (Sept 23, 2014, 4m):
-
-Changes for v2 (Sep 9, 2014, 4m):
-
-  o Rebase to Linux-3.17-rc4.
-  o Move macros from proc-macros.S to assembler.h.
-  o Convert hcalls to use ISS field.
-  o Add new hcall HVC_CALL_FUNC.
-  o Add EL2 switch to soft_restart.
-
-First submission v1 (May 13, 2014):
-
-  o Based on Linux-3.15-rc4.
-
--Geoff
-
-The following changes since commit fc77dbd34c5c99bce46d40a2491937c3bcbd10af:
-
-  Linux 4.5-rc6 (2016-02-28 08:41:20 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/linux-kexec.git kexec-v14
-
-for you to fetch changes up to b434c117ad29c98c7a3b9b36a52dc2f93f6aab99:
-
-  arm64: kdump: update a kernel doc (2016-03-04 12:25:15 -0800)
-
-----------------------------------------------------------------
-AKASHI Takahiro (7):
-      arm64: kvm: allows kvm cpu hotplug
-      arm64: kdump: reserve memory for crash dump kernel
-      arm64: limit memory regions based on DT property, usable-memory
-      arm64: kdump: implement machine_crash_shutdown()
-      arm64: kdump: add kdump support
-      arm64: kdump: enable kdump in the arm64 defconfig
-      arm64: kdump: update a kernel doc
-
-Geoff Levand (11):
-      arm64: Fold proc-macros.S into assembler.h
-      arm64: Cleanup SCTLR flags
-      arm64: Convert hcalls to use HVC immediate value
-      arm64: Add new hcall HVC_CALL_FUNC
-      arm64: Add new asm macro copy_page
-      arm64: Add back cpu_reset routines
-      Revert "arm64: mm: remove unused cpu_set_idmap_tcr_t0sz function"
-      Revert "arm64: remove dead code"
-      arm64/kexec: Add core kexec support
-      arm64/kexec: Enable kexec in the arm64 defconfig
-      arm64/kexec: Add pr_debug output
-
-James Morse (2):
-      arm64: kernel: Include _AC definition in page.h
-      arm64: Promote KERNEL_START/KERNEL_END definitions to a header file
-
- Documentation/kdump/kdump.txt        |  15 +-
- arch/arm/include/asm/kvm_host.h      |  10 +-
- arch/arm/include/asm/kvm_mmu.h       |   1 +
- arch/arm/kvm/arm.c                   | 104 ++++++++-----
- arch/arm/kvm/mmu.c                   |   5 +
- arch/arm64/Kconfig                   |  21 +++
- arch/arm64/configs/defconfig         |   2 +
- arch/arm64/include/asm/assembler.h   | 101 ++++++++++++-
- arch/arm64/include/asm/hardirq.h     |   2 +-
- arch/arm64/include/asm/kexec.h       |  82 +++++++++++
- arch/arm64/include/asm/kvm_arm.h     |  11 --
- arch/arm64/include/asm/kvm_asm.h     |   1 +
- arch/arm64/include/asm/kvm_host.h    |  12 +-
- arch/arm64/include/asm/kvm_mmu.h     |   1 +
- arch/arm64/include/asm/memory.h      |   3 +
- arch/arm64/include/asm/mmu.h         |   1 +
- arch/arm64/include/asm/mmu_context.h |  35 +++--
- arch/arm64/include/asm/page.h        |   2 +
- arch/arm64/include/asm/smp.h         |   5 +
- arch/arm64/include/asm/sysreg.h      |  19 ++-
- arch/arm64/include/asm/virt.h        |  40 +++++
- arch/arm64/kernel/Makefile           |   3 +
- arch/arm64/kernel/cpu-reset.S        |  57 ++++++++
- arch/arm64/kernel/cpu-reset.h        |  29 ++++
- arch/arm64/kernel/crash_dump.c       |  71 +++++++++
- arch/arm64/kernel/head.S             |   3 -
- arch/arm64/kernel/hyp-stub.S         |  49 +++++--
- arch/arm64/kernel/machine_kexec.c    | 273 +++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/relocate_kernel.S  | 131 +++++++++++++++++
- arch/arm64/kernel/setup.c            |   7 +-
- arch/arm64/kernel/smp.c              |  56 +++++++
- arch/arm64/kvm/hyp-init.S            |  47 +++++-
- arch/arm64/kvm/hyp.S                 |   3 +-
- arch/arm64/kvm/hyp/hyp-entry.S       |   9 +-
- arch/arm64/kvm/reset.c               |  14 ++
- arch/arm64/mm/cache.S                |   2 -
- arch/arm64/mm/init.c                 | 151 +++++++++++++++++++
- arch/arm64/mm/mmu.c                  |  11 ++
- arch/arm64/mm/proc-macros.S          |  98 -------------
- arch/arm64/mm/proc.S                 |   3 -
- include/uapi/linux/kexec.h           |   1 +
- 41 files changed, 1294 insertions(+), 197 deletions(-)
- create mode 100644 arch/arm64/include/asm/kexec.h
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
- create mode 100644 arch/arm64/kernel/crash_dump.c
- create mode 100644 arch/arm64/kernel/machine_kexec.c
- create mode 100644 arch/arm64/kernel/relocate_kernel.S
- delete mode 100644 arch/arm64/mm/proc-macros.S
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index f9f2779..8af531d 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -220,6 +220,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+ }
+ 
++static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
++					phys_addr_t phys_idmap_start)
++{
++	/*
++	 * TODO
++	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
++	 */
++}
++
+ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ {
+ 	return 0;
+@@ -232,7 +241,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+ 
+-static inline void kvm_arch_hardware_disable(void) {}
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index a520b79..4fd9ddb 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+ phys_addr_t kvm_mmu_get_httbr(void);
+ phys_addr_t kvm_mmu_get_boot_httbr(void);
+ phys_addr_t kvm_get_idmap_vector(void);
++phys_addr_t kvm_get_idmap_start(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dda1959..0aad49f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -16,7 +16,6 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
+-#include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -65,6 +64,8 @@ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
+ static bool vgic_present;
+ 
++static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
++
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ {
+ 	BUG_ON(preemptible());
+@@ -89,11 +90,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
+ 	return &kvm_arm_running_vcpu;
+ }
+ 
+-int kvm_arch_hardware_enable(void)
+-{
+-	return 0;
+-}
+-
+ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
+@@ -585,7 +581,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		/*
+ 		 * Re-check atomic conditions
+ 		 */
+-		if (signal_pending(current)) {
++		if (unlikely(!__this_cpu_read(kvm_arm_hardware_enabled))) {
++			/* cpu has been torn down */
++			ret = 0;
++			run->exit_reason = KVM_EXIT_FAIL_ENTRY;
++			run->fail_entry.hardware_entry_failure_reason
++					= (u64)-ENOEXEC;
++		} else if (signal_pending(current)) {
+ 			ret = -EINTR;
+ 			run->exit_reason = KVM_EXIT_INTR;
+ 		}
+@@ -967,7 +969,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	}
+ }
+ 
+-static void cpu_init_hyp_mode(void *dummy)
++static void cpu_init_hyp_mode(void)
+ {
+ 	phys_addr_t boot_pgd_ptr;
+ 	phys_addr_t pgd_ptr;
+@@ -989,36 +991,67 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	kvm_arm_init_debug();
+ }
+ 
+-static int hyp_init_cpu_notify(struct notifier_block *self,
+-			       unsigned long action, void *cpu)
++static void cpu_reset_hyp_mode(void)
+ {
+-	switch (action) {
+-	case CPU_STARTING:
+-	case CPU_STARTING_FROZEN:
+-		if (__hyp_get_vectors() == hyp_default_vectors)
+-			cpu_init_hyp_mode(NULL);
+-		break;
++	phys_addr_t boot_pgd_ptr;
++	phys_addr_t phys_idmap_start;
++
++	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
++	phys_idmap_start = kvm_get_idmap_start();
++
++	__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
++}
++
++int kvm_arch_hardware_enable(void)
++{
++	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
++		cpu_init_hyp_mode();
++		__this_cpu_write(kvm_arm_hardware_enabled, 1);
+ 	}
+ 
+-	return NOTIFY_OK;
++	return 0;
+ }
+ 
+-static struct notifier_block hyp_init_cpu_nb = {
+-	.notifier_call = hyp_init_cpu_notify,
+-};
++void kvm_arch_hardware_disable(void)
++{
++	if (!__this_cpu_read(kvm_arm_hardware_enabled))
++		return;
++
++	cpu_reset_hyp_mode();
++	__this_cpu_write(kvm_arm_hardware_enabled, 0);
++}
+ 
+ #ifdef CONFIG_CPU_PM
+ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
+ 				    unsigned long cmd,
+ 				    void *v)
+ {
+-	if (cmd == CPU_PM_EXIT &&
+-	    __hyp_get_vectors() == hyp_default_vectors) {
+-		cpu_init_hyp_mode(NULL);
++	/*
++	 * kvm_arm_hardware_enabled is left with its old value over
++	 * PM_ENTER->PM_EXIT. It is used to indicate PM_EXIT should
++	 * re-enable hyp.
++	 */
++	switch (cmd) {
++	case CPU_PM_ENTER:
++		if (__this_cpu_read(kvm_arm_hardware_enabled))
++			/*
++			 * don't update kvm_arm_hardware_enabled here
++			 * so that the hardware will be re-enabled
++			 * when we resume. See below.
++			 */
++			cpu_reset_hyp_mode();
++
++		return NOTIFY_OK;
++	case CPU_PM_EXIT:
++		if (__this_cpu_read(kvm_arm_hardware_enabled))
++			/* The hardware was enabled before suspend. */
++			cpu_init_hyp_mode();
++
+ 		return NOTIFY_OK;
+-	}
+ 
+-	return NOTIFY_DONE;
++	default:
++		return NOTIFY_DONE;
++	}
+ }
+ 
+ static struct notifier_block hyp_init_cpu_pm_nb = {
+@@ -1122,14 +1155,20 @@ static int init_hyp_mode(void)
+ 	}
+ 
+ 	/*
+-	 * Execute the init code on each CPU.
++	 * Init this CPU temporarily to execute kvm_hyp_call()
++	 * during kvm_vgic_hyp_init().
+ 	 */
+-	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
++	preempt_disable();
++	cpu_init_hyp_mode();
+ 
+ 	/*
+ 	 * Init HYP view of VGIC
+ 	 */
+ 	err = kvm_vgic_hyp_init();
++
++	cpu_reset_hyp_mode();
++	preempt_enable();
++
+ 	switch (err) {
+ 	case 0:
+ 		vgic_present = true;
+@@ -1213,26 +1252,15 @@ int kvm_arch_init(void *opaque)
+ 		}
+ 	}
+ 
+-	cpu_notifier_register_begin();
+-
+ 	err = init_hyp_mode();
+ 	if (err)
+ 		goto out_err;
+ 
+-	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+-	if (err) {
+-		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+-		goto out_err;
+-	}
+-
+-	cpu_notifier_register_done();
+-
+ 	hyp_cpu_pm_init();
+ 
+ 	kvm_coproc_table_init();
+ 	return 0;
+ out_err:
+-	cpu_notifier_register_done();
+ 	return err;
+ }
+ 
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index aba61fd..7a3aed6 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -1643,6 +1643,11 @@ phys_addr_t kvm_get_idmap_vector(void)
+ 	return hyp_idmap_vector;
+ }
+ 
++phys_addr_t kvm_get_idmap_start(void)
++{
++	return hyp_idmap_start;
++}
++
+ int kvm_mmu_init(void)
+ {
+ 	int err;
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 52b777b..4191d12 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -32,6 +32,7 @@ struct kvm_vcpu;
+ 
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
++extern char __kvm_hyp_reset[];
+ 
+ extern char __kvm_hyp_vector[];
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 689d4c9..b218211 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -44,6 +44,7 @@
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ int kvm_arch_dev_ioctl_check_extension(long ext);
++phys_addr_t kvm_hyp_reset_entry(void);
+ 
+ struct kvm_arch {
+ 	/* The VMID generation used for the virt. memory system */
+@@ -332,7 +333,16 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 		     hyp_stack_ptr, vector_ptr);
+ }
+ 
+-static inline void kvm_arch_hardware_disable(void) {}
++static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
++					phys_addr_t phys_idmap_start)
++{
++	/*
++	 * Call reset code, and switch back to stub hyp vectors.
++	 */
++	kvm_call_hyp((void *)kvm_hyp_reset_entry(),
++		     boot_pgd_ptr, phys_idmap_start);
++}
++
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 7364339..7ee6824 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -99,6 +99,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+ phys_addr_t kvm_mmu_get_httbr(void);
+ phys_addr_t kvm_mmu_get_boot_httbr(void);
+ phys_addr_t kvm_get_idmap_vector(void);
++phys_addr_t kvm_get_idmap_start(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 034d152c..a19a7ef 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -152,6 +152,48 @@ merged:
+ 	eret
+ ENDPROC(__kvm_hyp_init)
+ 
++	/*
++	 * x0: HYP boot pgd
++	 * x1: HYP phys_idmap_start
++	 */
++ENTRY(__kvm_hyp_reset)
++	/*
++	 * Retrieve lr from the stack (pushed by el1_sync()), so we can eret
++	 * from here.
++	 */
++	ldp	lr, xzr, [sp], #16
++
++	/* We're in trampoline code in VA, switch back to boot page tables */
++	msr	ttbr0_el2, x0
++	isb
++
++	/* Ensure the PA branch doesn't find a stale tlb entry. */
++	tlbi	alle2
++	dsb	sy
++
++	/* Branch into PA space */
++	adr	x0, 1f
++	bfi	x1, x0, #0, #PAGE_SHIFT
++	br	x1
++
++	/* We're now in idmap, disable MMU */
++1:	mrs	x0, sctlr_el2
++	ldr	x1, =SCTLR_ELx_FLAGS
++	bic	x0, x0, x1		// Clear SCTL_M and etc
++	msr	sctlr_el2, x0
++	isb
++
++	/* Invalidate the old TLBs */
++	tlbi	alle2
++	dsb	sy
++
++	/* Install stub vectors */
++	adr_l	x0, __hyp_stub_vectors
++	msr	vbar_el2, x0
++
++	eret
++ENDPROC(__kvm_hyp_reset)
++
+ 	.ltorg
+ 
+ 	.popsection
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index f34745c..d6e155a 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -29,7 +29,9 @@
+ #include <asm/cputype.h>
+ #include <asm/ptrace.h>
+ #include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
+ #include <asm/kvm_coproc.h>
++#include <asm/kvm_mmu.h>
+ 
+ /*
+  * ARMv8 Reset Values
+@@ -123,3 +125,15 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	/* Reset timer */
+ 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+ }
++
++extern char __hyp_idmap_text_start[];
++
++phys_addr_t kvm_hyp_reset_entry(void)
++{
++	unsigned long offset;
++
++	offset = (unsigned long)__kvm_hyp_reset
++		 - ((unsigned long)__hyp_idmap_text_start & PAGE_MASK);
++
++	return TRAMPOLINE_VA + offset;
++}
 -- 
 2.5.0
