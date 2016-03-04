@@ -1,53 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 4 Mar 2016 12:47:37 +0100
-Subject: [PATCH 6/9] spi: imx: remove unnecessary bit clearing in
- mx51_ecspi_config
-In-Reply-To: <56D968DF.7000007@mentor.com>
-References: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
- <1456302033-25638-7-git-send-email-s.hauer@pengutronix.de>
- <56D968DF.7000007@mentor.com>
-Message-ID: <20160304114737.GE21869@pengutronix.de>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Fri, 4 Mar 2016 14:53:15 +0300
+Subject: [PATCH v4 0/4] ACPI: parse the SPCR table
+In-Reply-To: <56D859CC.7010901@hurleysoftware.com>
+References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
+ <56D5B5CB.7010702@hurleysoftware.com> <56D8272E.20705@gmail.com>
+ <56D859CC.7010901@hurleysoftware.com>
+Message-ID: <56D9772B.5000402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 12:52:15PM +0200, Vladimir Zapolskiy wrote:
-> Hi Sascha,
-> 
-> On 24.02.2016 10:20, Sascha Hauer wrote:
-> > This reverts patch 1476253cef (spi: imx: fix ecspi mode setup)
-> > The patch tried to fix something by clearing bits in the cfg variable,
-> > but cfg is initialized to zero on function entry. There are no bits to
-> > clear.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> I believe here the expected fix should be
-> 
-> ----8<----
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 6a4ff27..9c9bae0 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -316,9 +316,10 @@ static void __maybe_unused mx51_ecspi_trigger(struct
-> spi_imx_data *spi_imx)
->  static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  		struct spi_imx_config *config)
->  {
-> -	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
-> +	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
->  	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
->  	u32 clk = config->speed_hz, delay, reg;
-> +	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
-> 
 
-With this change applied we would indeed have to clear and not only set the bits,
-but why would we do this?
 
-Sascha
+On 03/03/2016 06:35 PM, Peter Hurley wrote:
+> On 03/03/2016 03:59 AM, Aleksey Makarov wrote:
+>>
+>>
+>> On 03/01/2016 06:31 PM, Peter Hurley wrote:
+>>> On 02/29/2016 04:02 AM, Aleksey Makarov wrote:
+>>>> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+>>>> Console Redirection Table) [2] as a mandatory ACPI table that
+>>>> specifies the configuration of serial console.
+>>>>
+>>>> Introduce a new function acpi_console_check().  At the uart port
+>>>> registration, this function checks if the ACPI SPCR table specifies
+>>>> its argument of type struct uart_port to be a console
+>>>> and if so calls add_preferred_console().
+>>>
+>>> How will a user enable an earlycon on the same console as the SPCR
+>>> console if there is no DBG2 table?
+>>
+>> ...
+>> [    0.000000] earlycon: pl11 at MMIO 0x0000000009000000 (options '')
+>> [    0.000000] bootconsole [pl11] enabled
+>> ...
+>> [    0.000000] Kernel command line:  root=/dev/vda1 rw systemd.show_status=no acpi=force earlycon=pl011,0x9000000
+>> ...
+>> [    0.318248] ACPI: SPCR: adding preferred console [ttyAMA0]
+>> [    0.318736] ARMH0011:00: ttyAMA0 at MMIO 0x9000000 (irq = 5, base_baud = 0) is a SBSA
+>> [    0.319502] console [ttyAMA0] enabled
+>> [    0.319502] console [ttyAMA0] enabled
+>> [    0.319933] bootconsole [pl11] disabled
+>> [    0.319933] bootconsole [pl11] disabled
+>> ...
+>>
+>> Why?
+> 
+> That's pretty disingenuous; via command line?
+> 
+> By that measure, none of your patches are required because a user
+> can already start both console and earlycon without them.
+> 
+> With the console location specified in the SPCR, earlycon should
+> be opt-in on the command-line simply with "earlycon" command-line
+> parameter.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yes.  That's why we have SPCR *and* DBG2. 
+DBG2 specifies where we should run earlycon.
+
+>>> How will a user enable an earlycon on the same console as the SPCR
+>>> console if there is no DBG2 table?
+
+In no way.  You need DBG2 to run earlycon.
+
+(If you don't want to specify it's address etc explicitly)
