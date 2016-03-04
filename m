@@ -1,46 +1,73 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 4 Mar 2016 14:37:27 +0800
-Subject: [PATCH v5 09/17] xen/hvm/params: Add a new delivery type for
- event-channel in HVM_PARAM_CALLBACK_IRQ
+Date: Fri, 4 Mar 2016 14:37:25 +0800
+Subject: [PATCH v5 07/17] Xen: ARM: Add support for mapping AMBA device mmio
 In-Reply-To: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1457073455-11516-10-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1457073455-11516-8-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a new delivery type:
-val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
-To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
-bit 1 stands the interrupt polarity is active low(1) or high(0).
+Add a bus_notifier for AMBA bus device in order to map the device
+mmio regions when DOM0 booting with ACPI.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- include/xen/interface/hvm/params.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-index 70ad208..d32b02b 100644
---- a/include/xen/interface/hvm/params.h
-+++ b/include/xen/interface/hvm/params.h
-@@ -53,6 +53,16 @@
-  * if this delivery method is available.
-  */
+diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+index 76e26e5..3854043 100644
+--- a/drivers/xen/arm-device.c
++++ b/drivers/xen/arm-device.c
+@@ -139,3 +139,46 @@ static int __init register_xen_platform_notifier(void)
+ }
  
-+#define HVM_PARAM_CALLBACK_TYPE_EVENT    3
-+/*
-+ * val[55:16] need to be zero.
-+ * val[15:8] is flag of event-channel interrupt:
-+ *  bit 8: interrupt is edge(1) or level(0) triggered
-+ *  bit 9: interrupt is active low(1) or high(0)
-+ * val[7:0] is PPI number used by event-channel.
-+ * This is only used by ARM/ARM64.
-+ */
+ arch_initcall(register_xen_platform_notifier);
 +
- #define HVM_PARAM_STORE_PFN    1
- #define HVM_PARAM_STORE_EVTCHN 2
- 
++#ifdef CONFIG_ARM_AMBA
++#include <linux/amba/bus.h>
++
++static int xen_amba_notifier(struct notifier_block *nb,
++			     unsigned long action, void *data)
++{
++	struct amba_device *adev = to_amba_device(data);
++	int r = 0;
++
++	switch (action) {
++	case BUS_NOTIFY_ADD_DEVICE:
++		r = xen_map_device_mmio(&adev->res, 1);
++		break;
++	case BUS_NOTIFY_DEL_DEVICE:
++		r = xen_unmap_device_mmio(&adev->res, 1);
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++	if (r)
++		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
++			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
++			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
++			adev->dev.init_name);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block amba_device_nb = {
++	.notifier_call = xen_amba_notifier,
++};
++
++static int __init register_xen_amba_notifier(void)
++{
++	if (!xen_initial_domain() || acpi_disabled)
++		return 0;
++
++	return bus_register_notifier(&amba_bustype, &amba_device_nb);
++}
++
++arch_initcall(register_xen_amba_notifier);
++#endif
 -- 
 2.0.4
