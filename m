@@ -1,52 +1,52 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Fri,  4 Mar 2016 13:44:09 -0500
-Subject: [PATCH v7 5/6] arm: lpc32xx: phy3250 remove restart hook
-In-Reply-To: <1457117050-13543-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1457117050-13543-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1457117050-13543-6-git-send-email-slemieux.tyco@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 04 Mar 2016 10:55:03 -0800
+Subject: [PATCH 2/2] ARM: bcm2835: Add devicetree for the Raspberry Pi 3.
+In-Reply-To: <20160304184136.GB5033@leverpostej>
+References: <1457116769-8567-1-git-send-email-eric@anholt.net>
+ <1457116769-8567-2-git-send-email-eric@anholt.net>
+ <20160304184136.GB5033@leverpostej>
+Message-ID: <874mcm3wfs.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+Mark Rutland <mark.rutland@arm.com> writes:
 
-Remove the restart hook assignment from phy3250;
-this functionality is now managed by
-the pnx4008 watchdog driver.
+> On Fri, Mar 04, 2016 at 10:39:29AM -0800, Eric Anholt wrote:
+>> For now this doesn't support the new hardware present on the Pi 3 (BT,
+>> wifi, GPIO expander).  Since the GPIO expander isn't supported, we
+>> also don't have the LEDs like the other board files do.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  arch/arm/boot/dts/Makefile            |  3 +-
+>>  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 22 ++++++++++++
+>>  arch/arm/boot/dts/bcm2837.dtsi        | 68 +++++++++++++++++++++++++++++++++++
+>>  3 files changed, 92 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+>>  create mode 100644 arch/arm/boot/dts/bcm2837.dtsi
+>
+>> +	timer {
+>> +		compatible = "arm,armv7-timer";
+>> +		interrupt-parent = <&local_intc>;
+>> +		interrupts = <0>, // PHYS_SECURE_PPI
+>> +			     <1>, // PHYS_NONSECURE_PPI
+>> +			     <3>, // VIRT_PPI
+>> +			     <2>; // HYP_PPI
+>> +		always-on;
+>> +	};
+>
+> Are the CPUs in an always-on power domain? Or is it jsut that the kernel
+> doesn't perform power management of CPUs?
+>
+> The always-on proeprty is only intended for the former.
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
-Note:
-This patch was generated with the option "--unified=2" to ensure
-it can be apply before or after the changes for the new 
-LPC32xx irqchip driver:
-- http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
-
-Changes from v6 to v7:
-- none.
-
-Changes from v5 to v6:
-- none.
-
-Changes from v4 to v5:
-- none.
-
-Changes from v3 to v4:
-- Switch patch #5 and #6 order.
-
-Changes from v2 to v3:
-- new patch in v3.
-
- arch/arm/mach-lpc32xx/phy3250.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index a19071a..9e5c3db 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -211,4 +211,3 @@ DT_MACHINE_START(LPC32XX_DT, "LPC32XX SoC (Flattened Device Tree)")
- 	.init_machine	= lpc3250_machine_init,
- 	.dt_compat	= lpc32xx_dt_compat,
--	.restart	= lpc23xx_restart,
- MACHINE_END
--- 
-1.8.3.1
+The kernel doesn't get to do power management of CPUs.  We only have
+control of power domains through the firmware, and the firmware's
+keeping the CPU domain on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/c7198bc2/attachment.sig>
