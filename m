@@ -1,101 +1,113 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 4 Mar 2016 05:56:20 -0800
-Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
-In-Reply-To: <CAGkQfmOLVwpckKP+axdi1501ghqq_UAmCygJv_tfa=bCOLvCzA@mail.gmail.com>
-References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
- <56D8E649.8030500@atmel.com> <56D91BDC.1030604@roeck-us.net>
- <CAGkQfmN9wDkrc=frsSdBYYtMPf4VaTpcmYjX6_wARs=a78-bPQ@mail.gmail.com>
- <56D988F0.8050803@roeck-us.net>
- <CAGkQfmOLVwpckKP+axdi1501ghqq_UAmCygJv_tfa=bCOLvCzA@mail.gmail.com>
-Message-ID: <56D99404.60305@roeck-us.net>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Fri, 4 Mar 2016 15:26:04 +0100
+Subject: [PATCH 0/2] arm64, cma, gicv3-its: Use CMA for allocation of
+ large device tables
+In-Reply-To: <20160301124029.GV24726@rric.localdomain>
+References: <1456398164-16864-1-git-send-email-rrichter@caviumnetworks.com>
+ <56D42199.7040207@arm.com> <20160229122511.GS24726@rric.localdomain>
+ <56D44812.6000309@arm.com> <56D4D1A1.9060305@redhat.com>
+ <20160301124029.GV24726@rric.localdomain>
+Message-ID: <56D99AFC.5040100@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2016 05:26 AM, Romain Izard wrote:
-> 2016-03-04 14:09 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
->> On 03/04/2016 01:06 AM, Romain Izard wrote:
->>> 2016-03-04 6:23 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
->>>> On 03/03/2016 05:35 PM, Yang, Wenyou wrote:
->>>>> On 2016/3/3 18:29, Romain Izard wrote:
+On 03/01/2016 01:40 PM, Robert Richter wrote:
+> On 29.02.16 15:17:53, Laura Abbott wrote:
+>> On 02/29/2016 05:30 AM, Marc Zyngier wrote:
+>>> On 29/02/16 12:25, Robert Richter wrote:
+>>>> On 29.02.16 10:46:49, Marc Zyngier wrote:
+>>>>> On 25/02/16 11:02, Robert Richter wrote:
+>>>>>> From: Robert Richter <rrichter@cavium.com>
 >>>>>>
->>>>>> If the internal counter is not refreshed when the watchdog is
->>>>>> started for the first time, the watchdog will trigger very
->>>>>> rapidly.  For example, opening /dev/watchdog without writing in it
->>>>>> will immediately trigger a reboot, instead of waiting for the
->>>>>> delay to expire.
+>>>>>> This series implements the use of CMA for allocation of large device
+>>>>>> tables for the arm64 gicv3 interrupt controller.
 >>>>>>
->>>>>> To avoid this problem, reload the timer on opening the watchdog
->>>>>> device.
+>>>>>> There are 2 patches, the first is for early activation of cma, which
+>>>>>> needs to be done before interrupt initialization to make it available
+>>>>>> to the gicv3. The second implements the use of CMA to allocate
+>>>>>> gicv3-its device tables.
 >>>>>>
->>>>>> Command: "while sleep 5; do echo 1; done > /dev/watchdog" Before:
->>>>>> system reset After: the watchdog runs correctly
+>>>>>> This solves the problem where mem allocation is limited to 4MB. A
+>>>>>> previous patch sent to the list to address this that instead increases
+>>>>>> FORCE_MAX_ZONEORDER becomes obsolete.
 >>>>>
+>>>>> I think you're looking at the problem the wrong way. Instead of going
+>>>>> through CMA directly, I'd rather go through the normal DMA API
+>>>>> (dma_alloc_coherent), which can itself try CMA (should it be enabled).
 >>>>>
->>>>> I didn't reproduce your issue on my side,
->>>>>
->>>>> run the your commands as follows, it works fine,  the system reset
->>>>> doesn't happen.
->>>
->>>
->>> I've just verified with the factory image provided on the SAMA5D2
->>> Xplained board. It does not display this behaviour.
->>>
->>> But the difference is that in the case without the issue, I'm using
->>> the AT91bootstrap SPL, U-Boot, and the kernel from the QSPI chip.
->>> When I have the issue, I have a U-Boot based SPL, U-Boot itself and
->>> the kernel that come from the FAT partition of an SD-Card.
->>>
->>> Userspace does not seem to be involved in the issue, as I can
->>> reproduce it both with my buildroot environment, and the Yocto
->>> environment from the factory image.
->>>
->>>> Different chip revision ? Different chip type ? Different chip
->>>> initialization by ROMMON ?
+>>>>> That will give you all the benefit of the CMA allocation, and also make
+>>>>> the driver more robust. I meant to do this for a while, and never found
+>>>>> the time. Any chance you could have a look?
 >>>>
->>>> Can we get exact chip revisions and types for both cases (working
->>>> and not working), and (if it might be relevant) a dump of all
->>>> associated chip registers ?
+>>>> I was considering this first, and in fact the backend used is the
+>>>> same. The problem is that irq initialization is much more earlier than
+>>>> standard device probing. The gic even does not have its own struct
+>>>> device and is not initialized like devices are. This makes the whole
+>>>> dma_alloc_coherent() approach not feasable, at least this would
+>>>> require introducing and using a dev struct for the gic. But still this
+>>>> migth not work as it could be too early during boot. I also think
+>>>> there were reasons not implementing the gic as a device.
+>>>>
+>>>> I was following more the approach of iommu/mmu implementations which
+>>>> use dma_alloc_from_contiguous() directly. I think this is more close
+>>>> to the device tables for its.
+>>>>
+>>>> Code path of dma_alloc_coherent():
+>>>>
+>>>>  dma_alloc_coherent()
+>>>>     v
+>>>>  dma_alloc_attrs()             <---- Requires get_dma_ops(dev) != NULL
+>>>>     v
+>>>>  dma_alloc_from_coherent()
+>>>>     v
+>>>>  ...
+>>>>
+>>>> The difference it that dma_alloc_coherent() tries cma first and then
+>>>> proceeds with ops->alloc() (which is __dma_alloc() for arm64) if
+>>>> dma_alloc_from_coherent() fails. In my implementation I am directly
+>>>> using dma_alloc_from_coherent() and only for large mem sizes.
+>>>>
+>>>> So both approaches uses finally the same allocation, but for gicv3-its
+>>>> the generic dma framework is not used since the gic is not implemented
+>>>> as a device.
 >>>
+>>> And that's what I propose we change.
 >>>
+>>> The core GIC itself indeed isn't a device, and I'm not proposing we make
+>>> it a device (yet). But the ITS is only used much later in the game, and
+>>> we could move the table allocation to a different time (when the actual
+>>> domains are allocated, for example...). Then, we'd have a set of devices
+>>> available, and the DMA API is our friend again.
 >>>
->>>>> I also check the WDT_MR register before and after enabling
->>>>> watchdog, the WDV and WDD fields are correct.
->>>>>
->>>>> Can you check it again? thank you.
->>>
->>>
->>> Working case:
->>> MR on kernel startup:   0x3fffafff
->>> MR after watchdog init: 0x0fffafff
->>> MR after start:         0x0fff2fff
->>>
->>> Problem case:
->>> MR on kernel startup:   0x00008000
->>> MR after watchdog init: 0x0fffafff
->>> MR after start:         0x0fff2fff
->>>
->>> So this means that the counter reload does not seem to work very well
->>> if WDD/WDV have been set to 0 in the past. The other question is why
->>> does U-Boot (from the Atmel branch based on 2015.1) put this stange
->>> value in this register.
+>>> 	M.
 >>>
 >>
->> Can you check the value of AT91_WDT_SR ? Maybe it tells us something.
+>> I did the first drop of CMA in the DMA APIs for arm64. When adding that,
+>> it was decided to disallow dma_alloc calls without a valid device pointer
+>> (c666e8d5cae7 "arm64: Warn on NULL device structure for dma APIs") so
+>> if the GIC code wants to use dma_alloc it _must_ have a proper device.
 >>
-> I didn't report it because it contained 0 at all times. So no information.
->
->> Also, in the error case, can you check if the watchdog times out at all
->> after you applied your patch ?
->
-> It times out after 16s as expected, and reboot occurs correctly.
->
+>> If the device shift still isn't feasible, a better approach might be
+>> what powerpc did for kvm (arch/powerpc/kvm/book3s_hv_builtin.c). This
+>> calls the cma_alloc functions directly and skips trying to work around
+>> the DMA layer.
+>>
+>> With either option, I don't think the early initialization approach
+>> proposed is great. If we want CMA early, it's probably be just to
+>> explicitly initialize it early rather than trying to do it from
+>> two places. Something like:
+> 
+> I wasn't sure whether this works for all archs if called directly in
+> mm_init(). If so, ok your proposed change would be better, though a
+> stub for !CONFIG_CMA needs to be added. Any comment on the change
+> below as a replacement for patch #1?
+> 
+> On the other side, if we use device enablement for its, then early cma
+> enablement is not needed anymore. Will check how that could work.
 
-Interesting. So it looks like AT91_WDT_WDRSTT has to be set if the timer
-values in MR are changed from 0 to another value, or maybe after each
-timer value change. Wonder if that should be done in the init function,
-after MR is set (with the watchdog disabled).
-
-Thoughts, anyone ?
-
-Thanks,
-Guenter
+Hmm this reminds me of commit 080fe2068e1c7f19f5 where I've exposed
+alloc_contig_range() and related stuff for allowing gigantic page
+allocations without full CONFIG_CMA. Could this perhaps be generalized
+for this case? Would alloc_contig_range() without the CMA pageblock
+reservations be enough for you as well? Maybe then the "early CMA
+initialization" problem would go away.
