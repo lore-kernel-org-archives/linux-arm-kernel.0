@@ -1,32 +1,27 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 4 Mar 2016 16:17:48 +0100
-Subject: [PATCH 1/4] pwm: omap-dmtimer: fix inaccurate period/duty_cycle
- calculation
-In-Reply-To: <1454128014-22866-2-git-send-email-drivshin.allworx@gmail.com>
+Date: Fri, 4 Mar 2016 16:18:04 +0100
+Subject: [PATCH 3/4] pwm: omap-dmtimer: round load and match values
+ rather than truncate
+In-Reply-To: <1454128014-22866-4-git-send-email-drivshin.allworx@gmail.com>
 References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <1454128014-22866-2-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <20160304151748.GD26400@ulmo.nvidia.com>
+ <1454128014-22866-4-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <20160304151804.GE26400@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 11:26:51PM -0500, David Rivshin (Allworx) wrote:
+On Fri, Jan 29, 2016 at 11:26:53PM -0500, David Rivshin (Allworx) wrote:
 > From: David Rivshin <drivshin@allworx.com>
 > 
-> Fix the calculation of load_value and match_value. Currently they
-> are slightly too low, which produces a noticeably wrong PWM rate with
-> sufficiently short periods (i.e. when 1/period approaches clk_rate/2).
-> 
-> Example:
->  clk_rate=32768Hz, period=122070ns, duty_cycle=61035ns (8192Hz/50% PWM)
->  Correct values: load = 0xfffffffc, match = 0xfffffffd
->  Current values: load = 0xfffffffa, match = 0xfffffffc
->  effective PWM: period=183105ns, duty_cycle=91553ns (5461Hz/50% PWM)
+> When converting period and duty_cycle from nanoseconds to fclk cycles,
+> the error introduced by the integer division can be appreciable, especially
+> in the case of slow fclk or short period. Use DIV_ROUND_CLOSEST_ULL() so
+> that the error is kept to +/- 0.5 clock cycles.
 > 
 > Fixes: 6604c6556db9 ("pwm: Add PWM driver for OMAP using dual-mode timers")
 > Signed-off-by: David Rivshin <drivshin@allworx.com>
 > ---
->  drivers/pwm/pwm-omap-dmtimer.c | 27 ++++++++++++++++++++-------
->  1 file changed, 20 insertions(+), 7 deletions(-)
+>  drivers/pwm/pwm-omap-dmtimer.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
 
 Applied, thanks.
 
@@ -37,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/411a42e6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/999afb7d/attachment.sig>
