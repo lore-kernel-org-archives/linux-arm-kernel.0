@@ -1,70 +1,79 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 04 Mar 2016 23:51:14 +0000
-Subject: [PATCH v14 10/20] Revert "arm64: mm: remove unused
- cpu_set_idmap_tcr_t0sz function"
+Date: Fri, 04 Mar 2016 23:51:15 +0000
+Subject: [PATCH v14 16/20] arm64: limit memory regions based on DT property,
+ usable-memory
 In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
 References: <cover.1457135058.git.geoff@infradead.org>
-Message-ID: <7cda4b8dd98e3b56c4a565228b7ad7f00e9a4ddd.1457135058.git.geoff@infradead.org>
+Message-ID: <a9498b31faab23d9c0db1e03ab09bcc27a5c4a95.1457135058.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit c51e97d89e526368eb697f87cd4d391b9e19f369.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Add back the cpu_set_idmap_tcr_t0sz function needed by setup_mmu_for_reboot.
+Crash dump kernel will be run with a limited range of memory as System
+RAM.
+
+On arm64, we will use a device-tree property under /chosen,
+   linux,usable-memory = <BASE SIZE>
+in order for primary kernel either on uefi or non-uefi (device tree only)
+system to hand over the information about usable memory region to crash
+dump kernel. This property will supercede entries in uefi memory map table
+and "memory" nodes in a device tree.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/mmu_context.h | 35 +++++++++++++++++++++++------------
- 1 file changed, 23 insertions(+), 12 deletions(-)
+ arch/arm64/mm/init.c | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 2416578..7567030 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -70,23 +70,34 @@ static inline bool __cpu_uses_extended_idmap(void)
- 		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ff5e01a..f46e33b 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -215,8 +215,45 @@ static int __init early_mem(char *p)
  }
+ early_param("mem", early_mem);
  
-+static inline void __cpu_set_tcr_t0sz(u64 t0sz)
++static int __init early_init_dt_scan_usablemem(unsigned long node,
++		const char *uname, int depth, void *data)
 +{
-+	unsigned long tcr;
++	struct memblock_region *usablemem = (struct memblock_region *)data;
++	const __be32 *reg;
++	int len;
 +
-+	if (__cpu_uses_extended_idmap())
-+		asm volatile (
-+		"	mrs	%0, tcr_el1	;"
-+		"	bfi	%0, %1, %2, %3	;"
-+		"	msr	tcr_el1, %0	;"
-+		"	isb"
-+		: "=&r" (tcr)
-+		: "r"(t0sz), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
++	usablemem->size = 0;
++
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
++
++	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &len);
++	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
++		return 1;
++
++	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
++
++	return 1;
 +}
 +
-+/*
-+ * Set TCR.T0SZ to the value appropriate for activating the identity map.
-+ */
-+static inline void cpu_set_idmap_tcr_t0sz(void)
++static void __init fdt_enforce_memory_region(void)
 +{
-+	__cpu_set_tcr_t0sz(idmap_t0sz);
++	struct memblock_region reg;
++
++	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
++
++	if (reg.size) {
++		memblock_remove(0, PAGE_ALIGN(reg.base));
++		memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
++				ULLONG_MAX);
++	}
 +}
 +
- /*
-  * Set TCR.T0SZ to its default value (based on VA_BITS)
-  */
- static inline void cpu_set_default_tcr_t0sz(void)
+ void __init arm64_memblock_init(void)
  {
--	unsigned long tcr;
--
--	if (!__cpu_uses_extended_idmap())
--		return;
--
--	asm volatile (
--	"	mrs	%0, tcr_el1	;"
--	"	bfi	%0, %1, %2, %3	;"
--	"	msr	tcr_el1, %0	;"
--	"	isb"
--	: "=&r" (tcr)
--	: "r"(TCR_T0SZ(VA_BITS)), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
-+	__cpu_set_tcr_t0sz(TCR_T0SZ(VA_BITS));
- }
++	fdt_enforce_memory_region();
++
+ 	memblock_enforce_memory_limit(memory_limit);
  
- /*
+ 	/*
 -- 
 2.5.0
