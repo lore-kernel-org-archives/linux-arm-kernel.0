@@ -1,75 +1,69 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Fri, 4 Mar 2016 11:27:36 -0500
-Subject: [PATCH 0/4] pwm: omap-dmtimer: fix period/duty_cycle calculation
-In-Reply-To: <20160304151948.GF26400@ulmo.nvidia.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <20160226203100.303fe192.drivshin.allworx@gmail.com>
- <20160304151948.GF26400@ulmo.nvidia.com>
-Message-ID: <20160304112736.660e4223.drivshin.allworx@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 4 Mar 2016 16:28:10 +0000
+Subject: [PATCH v5 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <56D9B043.1090301@linaro.org>
+References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
+ <1457073455-11516-2-git-send-email-zhaoshenglong@huawei.com>
+ <alpine.DEB.2.02.1603041213400.17938@kaball.uk.xensource.com>
+ <56D9B043.1090301@linaro.org>
+Message-ID: <alpine.DEB.2.02.1603041615200.17938@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Mar 2016 16:19:48 +0100
-Thierry Reding <thierry.reding@gmail.com> wrote:
-
-> On Fri, Feb 26, 2016 at 08:31:00PM -0500, David Rivshin (Allworx) wrote:
-> > On Fri, 29 Jan 2016 23:26:50 -0500
-> > "David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
-> >   
-> > > From: David Rivshin <drivshin@allworx.com>
-> > > 
-> > > When using a short PWM period (approaching the min of 2/clk_rate),
-> > > pwm-omap-dmtimer does not produce accurate results. In the worst case a
-> > > requested period of 2/clk_rate would result in a real period of 4/clk_rate
-> > > instead. This is a series includes a fix for that problem, as well as
-> > > other related improvements, and is based on the current linux-pwm/for-next
-> > > tip.
-> > > 
-> > > I have tested on a Sitara AM335x platform, using a scope to verify the
-> > > output with a variety of periods and duty cycles. This includes a PWM
-> > > rate up clk_rate/2 with 50% duty cycle (e.g. generating fclk/2) with
-> > > both 32768Hz and 24MHz fclks. I do not have an OMAP4 board to test with,
-> > > although appropriate sections in the the reference manuals appear
-> > > substantially the same, so I believe the changes are equally correct
-> > > there.
-> > > 
-> > > Note that the OMAP4 TRMs do effectively state that the maximum PWM
-> > > rate is clk_rate/4, so at very fast PWM rates the behavior may not be
-> > > as reliable as I observed with Sitara. Although I suspect that it's
-> > > the same module and will also work, at least under some circumstances.
-> > > If anyone with OMAP4 hardware and a scope is so inclined, I would be
-> > > curious to know the results.
-> > > 
-> > > David Rivshin (4):
-> > >   pwm: omap-dmtimer: fix inaccurate period/duty_cycle calculation
-> > >   pwm: omap-dmtimer: add sanity checking for load and match values
-> > >   pwm: omap-dmtimer: round load and match values rather than truncate
-> > >   pwm: omap-dmtimer: add dev_dbg() message for effective period and duty
-> > >     cycle
-> > > 
-> > >  drivers/pwm/pwm-omap-dmtimer.c | 71 ++++++++++++++++++++++++++++++++----------
-> > >  1 file changed, 55 insertions(+), 16 deletions(-)
-> > >   
+On Fri, 4 Mar 2016, Shannon Zhao wrote:
+> On 2016/3/4 20:24, Stefano Stabellini wrote:
+> > On Fri, 4 Mar 2016, Shannon Zhao wrote:
+> > > >From: Shannon Zhao<shannon.zhao@linaro.org>
+> > > >
+> > > >ACPI 6.0 introduces a new table STAO to list the devices which are used
+> > > >by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> > > >UART is used by Xen. So here it hides UART from Dom0.
+> > > >
+> > > >Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
+> > > >---
+> > > >CC: "Rafael J. Wysocki"<rjw@rjwysocki.net>  (supporter:ACPI)
+> > > >CC: Len Brown<lenb@kernel.org>  (supporter:ACPI)
+> > > >CC:linux-acpi at vger.kernel.org  (open list:ACPI)
+> > > >---
+> > > >  drivers/acpi/scan.c | 68
+> > > +++++++++++++++++++++++++++++++++++++++++++++++++++++
+> > > >  1 file changed, 68 insertions(+)
+> > > >
+> > > >diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> > > >index 407a376..31d794c 100644
+> > > >--- a/drivers/acpi/scan.c
+> > > >+++ b/drivers/acpi/scan.c
+> > > >@@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+> > > >  DEFINE_MUTEX(acpi_device_lock);
+> > > >  LIST_HEAD(acpi_wakeup_device_list);
+> > > >  static DEFINE_MUTEX(acpi_hp_context_lock);
+> > > >+static u64 spcr_uart_addr;
+> > > >
+> > > >  struct acpi_dep_data {
+> > > >  	struct list_head node;
+> > > >@@ -1453,6 +1454,47 @@ static int acpi_add_single_object(struct
+> > > acpi_device **child,
+> > > >  	return 0;
+> > > >  }
+> > > >
+> > > >+static acpi_status acpi_get_resource_fixed_memory32(struct acpi_resource
+> > > *res,
+> > > >+						    void *context)
+> > > >+{
+> > > >+	struct acpi_resource_fixed_memory32 *fixed_memory32;
+> > > >+
+> > > >+	if (res->type != ACPI_RESOURCE_TYPE_FIXED_MEMORY32)
+> > > >+		return AE_OK;
+> > > >+
+> > > >+	fixed_memory32 = &res->data.fixed_memory32;
+> > Should we call acpi_resource_to_address64 instead?
+> > Aside from this the rest looks good.
 > > 
-> > Hi Thierry,
-> > 
-> > Gentle ping. It does not look like you've taken this series, and I 
-> > wanted to make sure you're not waiting on something from me. It would 
-> > be nice to get at least the first patch into 4.5, if possible.  
-> 
-> I've applied patches 1 and 3, and I'm planning on sending out a pull
-> request for inclusion in v4.5-rc7 later on.
+> You mean the resource type could be other types? like
+> ACPI_RESOURCE_TYPE_ADDRESS64 or ACPI_RESOURCE_TYPE_ADDRESS32? So it needs to
+> convert them to ACPI_RESOURCE_TYPE_ADDRESS64 firstly?
 
-Thanks!
-
-> Patches 2 and 4 didn't seem ready/critical, so let's finish those up
-> for v4.6-rc1.
-
-I know there was a lot of discussion on 4, but I'm not sure what the 
-concern is on patch 2. Is there something specific you're thinking of?
-
-FYI, I know that Adam Ford is using this driver as the backend for
-a pwm-backlight control. Without patch 2 this driver will not configure 
-the HW in a legal way at 0 or 100% duty cycle. However, I forget what 
-the practical effect of that is, and Adam seemed to indicate it was OK
-for his purposes.
+I meant to ask whether we need to check for other types of resources, in
+addition to ACPI_RESOURCE_TYPE_FIXED_MEMORY32.  So maybe call an
+existing function that already does the check for us.
+acpi_dev_resource_memory is actually what I meant to suggest.
