@@ -1,37 +1,52 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 04 Mar 2016 23:51:14 +0000
-Subject: [PATCH v14 06/20] arm64: kernel: Include _AC definition in page.h
+Subject: [PATCH v14 07/20] arm64: Promote KERNEL_START/KERNEL_END definitions
+ to a header file
 In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
 References: <cover.1457135058.git.geoff@infradead.org>
-Message-ID: <774974ccec43ebd70ddfc9d2672624568a313126.1457135058.git.geoff@infradead.org>
+Message-ID: <26b0a3f07b0b50aed9f87be48338f48bb26898bf.1457135058.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: James Morse <james.morse@arm.com>
 
-page.h uses '_AC' in the definition of PAGE_SIZE, but doesn't include
-linux/const.h where this is defined. This produces build warnings when only
-asm/page.h is included by asm code.
+KERNEL_START and KERNEL_END are useful outside head.S, move them to a
+header file.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/page.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/include/asm/memory.h | 3 +++
+ arch/arm64/kernel/head.S        | 3 ---
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index ae615b9..17b45f7 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -19,6 +19,8 @@
- #ifndef __ASM_PAGE_H
- #define __ASM_PAGE_H
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 853953c..5773a66 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -70,6 +70,9 @@
  
-+#include <linux/const.h>
+ #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+ 
++#define KERNEL_START      _text
++#define KERNEL_END        _end
 +
- /* PAGE_SHIFT determines the page size */
- /* CONT_SHIFT determines the number of pages which can be tracked together  */
- #ifdef CONFIG_ARM64_64K_PAGES
+ /*
+  * Physical vs virtual RAM address space conversion.  These are
+  * private definitions which should NOT be used outside memory.h
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 917d981..21bfb5d 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -48,9 +48,6 @@
+ #error TEXT_OFFSET must be less than 2MB
+ #endif
+ 
+-#define KERNEL_START	_text
+-#define KERNEL_END	_end
+-
+ /*
+  * Kernel startup entry point.
+  * ---------------------------
 -- 
 2.5.0
