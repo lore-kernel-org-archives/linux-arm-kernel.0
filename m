@@ -1,24 +1,65 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 4 Mar 2016 07:52:00 -0800
-Subject: [PATCH v3 5/7] ACPI: serial: implement earlycon on ACPI DBG2 port
-In-Reply-To: <56D987BC.7070209@linaro.org>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
- <1456749726-30261-6-git-send-email-aleksey.makarov@linaro.org>
- <56D5BAFF.6080008@hurleysoftware.com> <56D5C9F5.5060301@linaro.org>
- <56D878D4.4000902@hurleysoftware.com> <56D987BC.7070209@linaro.org>
-Message-ID: <56D9AF20.1060701@hurleysoftware.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Fri, 04 Mar 2016 23:56:51 +0800
+Subject: [PATCH v5 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <alpine.DEB.2.02.1603041213400.17938@kaball.uk.xensource.com>
+References: <1457073455-11516-1-git-send-email-zhaoshenglong@huawei.com>
+ <1457073455-11516-2-git-send-email-zhaoshenglong@huawei.com>
+ <alpine.DEB.2.02.1603041213400.17938@kaball.uk.xensource.com>
+Message-ID: <56D9B043.1090301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2016 05:03 AM, Aleksey Makarov wrote:
-
-> Actually it was Mark Salter who asked to introduce such macros.
-> 
-> https://lkml.kernel.org/g/1441730339.5459.8.camel at redhat.com
-
-I wasn't copied on that series, sorry.
 
 
-> I think reusing the OF functions is a good decision.
+On 2016/3/4 20:24, Stefano Stabellini wrote:
+> On Fri, 4 Mar 2016, Shannon Zhao wrote:
+>> >From: Shannon Zhao<shannon.zhao@linaro.org>
+>> >
+>> >ACPI 6.0 introduces a new table STAO to list the devices which are used
+>> >by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+>> >UART is used by Xen. So here it hides UART from Dom0.
+>> >
+>> >Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
+>> >---
+>> >CC: "Rafael J. Wysocki"<rjw@rjwysocki.net>  (supporter:ACPI)
+>> >CC: Len Brown<lenb@kernel.org>  (supporter:ACPI)
+>> >CC:linux-acpi at vger.kernel.org  (open list:ACPI)
+>> >---
+>> >  drivers/acpi/scan.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>> >  1 file changed, 68 insertions(+)
+>> >
+>> >diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>> >index 407a376..31d794c 100644
+>> >--- a/drivers/acpi/scan.c
+>> >+++ b/drivers/acpi/scan.c
+>> >@@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+>> >  DEFINE_MUTEX(acpi_device_lock);
+>> >  LIST_HEAD(acpi_wakeup_device_list);
+>> >  static DEFINE_MUTEX(acpi_hp_context_lock);
+>> >+static u64 spcr_uart_addr;
+>> >
+>> >  struct acpi_dep_data {
+>> >  	struct list_head node;
+>> >@@ -1453,6 +1454,47 @@ static int acpi_add_single_object(struct acpi_device **child,
+>> >  	return 0;
+>> >  }
+>> >
+>> >+static acpi_status acpi_get_resource_fixed_memory32(struct acpi_resource *res,
+>> >+						    void *context)
+>> >+{
+>> >+	struct acpi_resource_fixed_memory32 *fixed_memory32;
+>> >+
+>> >+	if (res->type != ACPI_RESOURCE_TYPE_FIXED_MEMORY32)
+>> >+		return AE_OK;
+>> >+
+>> >+	fixed_memory32 = &res->data.fixed_memory32;
+> Should we call acpi_resource_to_address64 instead?
+> Aside from this the rest looks good.
+>
+You mean the resource type could be other types? like 
+ACPI_RESOURCE_TYPE_ADDRESS64 or ACPI_RESOURCE_TYPE_ADDRESS32? So it 
+needs to convert them to ACPI_RESOURCE_TYPE_ADDRESS64 firstly?
 
-But you're not reusing the OF functions; you're duplicating them.
+Thanks,
+-- 
+Shannon
