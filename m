@@ -1,50 +1,40 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 4 Mar 2016 11:03:49 +0800
-Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
-In-Reply-To: <20160303162942.GA2445@localhost.localdomain>
-References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
- <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
- <20160303162942.GA2445@localhost.localdomain>
-Message-ID: <20160304030349.GA11012@leoy-linaro>
+From: zhiqiang.hou@nxp.com (Zhiqiang Hou)
+Date: Fri, 4 Mar 2016 03:38:56 +0000
+Subject: [PATCH v2 2/2] ARM64: dts: add LS1043a-QDS board support
+In-Reply-To: <CADRPPNQLifp1SsZZ+7W8FBWQ=m-nE0DqMWv+6C0uR7+ot9odEg@mail.gmail.com>
+References: <1450948298-33238-1-git-send-email-Zhiqiang.Hou@freescale.com>
+ <1450948298-33238-2-git-send-email-Zhiqiang.Hou@freescale.com>
+ <20160219032830.GG6756@tiger>
+ <HE1PR04MB0906707F686591B374AA364F84A00@HE1PR04MB0906.eurprd04.prod.outlook.com>
+ <20160228023818.GB22051@tiger>
+ <AM4PR04MB2148867ED34556A79AC0EB1584BB0@AM4PR04MB2148.eurprd04.prod.outlook.com>
+ <CADRPPNQLifp1SsZZ+7W8FBWQ=m-nE0DqMWv+6C0uR7+ot9odEg@mail.gmail.com>
+Message-ID: <AM4PR04MB2148E7CB47720D13909B442884BE0@AM4PR04MB2148.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+Hi Leo,
 
-On Thu, Mar 03, 2016 at 08:29:44AM -0800, Eduardo Valentin wrote:
-> Hi Leo,
-> 
-> On Fri, Feb 26, 2016 at 11:43:43AM +0800, Leo Yan wrote:
-> > The property "hysteresis" is mandatory for trip points, so if without
-> > it the thermal zone cannot register successfully. But "hysteresis" is
-> > ignored in the thermal subsystem and only inquired by several thermal
-> > sensor drivers.
-> 
-> I am not sure this a good direction to go. Remember that Linux
-> implementation not necessarily has to be the implication of the DT
-> binding. Hysteresis is a property that plays a significant role on
-> thermal control systems, which in many cases avoid overshooting cooling
-> actions. Having the DT writer to explicitly set it to 0 means that zone
-> does not suffer of overshooting and does not need hysteresis.
-
-After review current code, the "hysteresis" is used to calculate
-temperature falling threshold with a more conservative value; so that
-finally avoid overshooting issue.
-
-Please confirm if is my understanding correct or not?
-
-> If the Linux thermal subsystem has a problem with handling hysteresis, I
-> would rather fix Linux code than relaxing the DT binding. Or if you
-> still believe hysteresis is really optional, I would prefer to see a
-> better justification than "Linux ignores it".
-
-If we think about power allocator governor, PID's two parameters are
-also used to dismiss overshooting issue: one is k_po (proportional
-term), another is k_i (integral term). So that means after we apply
-power allocator governor, we don't need parameter "hysteresis" due PID
-algorithm can automatically dismiss potential errors.
-
-Does this make sense?
+Yes, I am busy with ls1046a emu and sdk working those days, and will submit v3 before next Tuesday.
 
 Thanks,
-Leo Yan
+Zhiqiang
+
+> -----Original Message-----
+> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com] On Behalf Of Li Yang
+> Sent: 2016?3?4? 4:28
+> To: Zhiqiang Hou <zhiqiang.hou@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Zhiqiang Hou
+> <Zhiqiang.Hou@freescale.com>; mark.rutland at arm.com;
+> devicetree at vger.kernel.org; Shaohui.Xie at freescale.com; pawel.moll at arm.com;
+> ijc+devicetree at hellion.org.uk; catalin.marinas at arm.com; will.deacon at arm.com;
+> robh+dt at kernel.org; galak at codeaurora.org; scottwood at freescale.com;
+> Mingkai.Hu at freescale.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 2/2] ARM64: dts: add LS1043a-QDS board support
+> 
+> Hi Zhiqiang,
+> 
+> Will there be a v3 coming out before the 4.6 merge windows?
+> 
+> Regards,
+> Leo
