@@ -1,57 +1,57 @@
-From: alexandre.torgue@gmail.com (Alexandre Torgue)
-Date: Fri, 4 Mar 2016 10:04:07 +0100
-Subject: [PATCH v3 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <20160302183309.GA2449@rob-hp-laptop>
-References: <1456483912-32090-1-git-send-email-alexandre.torgue@gmail.com>
- <1456483912-32090-3-git-send-email-alexandre.torgue@gmail.com>
- <20160302183309.GA2449@rob-hp-laptop>
-Message-ID: <CAJgp7zz3XEY=z6xT91tpYRo4yzaD6zcd0YrweQeuk81+arFMTg@mail.gmail.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Fri, 4 Mar 2016 10:06:45 +0100
+Subject: [PATCH] crypto/async_pq: use __free_page() instead of put_page()
+In-Reply-To: <1456738445-876239-1-git-send-email-arnd@arndb.de>
+References: <1456738445-876239-1-git-send-email-arnd@arndb.de>
+Message-ID: <56D95025.1060500@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 02/29/2016 10:33 AM, Arnd Bergmann wrote:
+> The addition of tracepoints to the page reference tracking had an
+> unfortunate side-effect in at least one driver that calls put_page
+> from its exit function, resulting in a link error:
+> 
+> `.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
+> 
+> From a cursory look at that this driver, it seems that it may be
+> doing the wrong thing here anyway, as the page gets allocated
+> using 'alloc_page()', and should be freed using '__free_page()'
+> rather than 'put_page()'.
+> 
+> With this patch, I no longer get any other build errors from the
+> page_ref patch, so hopefully we can assume that it's always wrong
+> to call any of those functions from __exit code, and that no other
+> driver does it.
 
-2016-03-02 19:33 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Fri, Feb 26, 2016 at 11:51:50AM +0100, Alexandre TORGUE wrote:
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
->>
->> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->> new file mode 100644
->> index 0000000..67fceda
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->> @@ -0,0 +1,40 @@
->> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
->> +
->> +This file documents platform glue layer for stmmac.
->> +Please see stmmac.txt for the other unchanged properties.
->> +
->> +The device node has following properties.
->> +
->> +Required properties:
->> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
->> +            "snps,dwmac-3.50a" to select IP vesrion.
->> +- clocks: Should contain the GMAC main clock, and tx clock
->> +- compatible:  Should be "st,stm32-dwmac" to select glue and
->> +            "snps,dwmac-3.50a" to select IP version.
->> +- clocks: Should contain the MAC main clock
->> +- clock-names: Should contain the clock names "stmmaceth".
->> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
->> +           encompases the glue register, and the offset of the control register.
->> +
->> +Optional properties:
->> +- clocks: Could contain:
->> +     - the tx clock,
->> +     - the rx clock
->> +- clock-names: Could contain the clock names "tx-clk", "rx-clk"
->
-> Either the IP block has 3 clocks or it has 1. If you have a case where 1
-> clock feeds all 3 inputs, then list the clock 3 times.
+Hopefully that's true. If any such driver was leaking references to
+those pages, so the put_page() didn't actually result in freeing, the
+explicit __free_page should catch this via built-in checks.
 
-I agree. I will move rx/tx clock to required properties and then send a v4.
+> Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
 
-Regards.
+Since it's in mmotm which is quilt-based, the commit hash from -next is
+not stable.
 
-Alexandre
->
-> Rob
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+
+> ---
+>  crypto/async_tx/async_pq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/crypto/async_tx/async_pq.c b/crypto/async_tx/async_pq.c
+> index c0748bbd4c08..08b3ac68952b 100644
+> --- a/crypto/async_tx/async_pq.c
+> +++ b/crypto/async_tx/async_pq.c
+> @@ -444,7 +444,7 @@ static int __init async_pq_init(void)
+>  
+>  static void __exit async_pq_exit(void)
+>  {
+> -	put_page(pq_scribble_page);
+> +	__free_page(pq_scribble_page);
+>  }
+>  
+>  module_init(async_pq_init);
+> 
