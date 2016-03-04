@@ -1,111 +1,75 @@
-From: justinpopo6@gmail.com (Justin Chen)
-Date: Fri,  4 Mar 2016 15:00:10 -0800
-Subject: [PATCH v2] bsp: add SoC driver to brcmstb
-Message-ID: <1457132410-13906-1-git-send-email-justinpopo6@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 4 Mar 2016 15:14:56 -0800
+Subject: [PATCH v7 4/6] watchdog: pnx4008: restart: support "cmd" from
+ userspace
+In-Reply-To: <1457117050-13543-5-git-send-email-slemieux.tyco@gmail.com>
+References: <1457117050-13543-1-git-send-email-slemieux.tyco@gmail.com>
+ <1457117050-13543-5-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <20160304231456.GA31027@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Justin Chen <justin.chen@broadcom.com>
+On Fri, Mar 04, 2016 at 01:44:08PM -0500, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
+> 
+> Added support to verify if a "cmd" is passed from the userspace program rebooting the system;
+> - if a valid "cmd" is available, handle it;
+> - If the received "cmd" is not supported, use the default reboot mode.
+> 
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 
-Value of soc_dev_attributes:
-family = chip family id
-soc_id = product id
-revision = product revision
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-Signed-off-by: Justin Chen <justin.chen@broadcom.com>
----
- arch/arm/mach-bcm/Kconfig    |    1 +
- drivers/soc/brcmstb/common.c |   58 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 7ef1214..b95ea11 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -179,6 +179,7 @@ config ARCH_BRCMSTB
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select SOC_BRCMSTB
-+	select SOC_BUS
- 	help
- 	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
- 	  chipset.
-diff --git a/drivers/soc/brcmstb/common.c b/drivers/soc/brcmstb/common.c
-index c262c02..dc394c0 100644
---- a/drivers/soc/brcmstb/common.c
-+++ b/drivers/soc/brcmstb/common.c
-@@ -12,10 +12,18 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/soc/brcmstb/brcmstb.h>
-+#include <linux/sys_soc.h>
- 
- #include <soc/brcmstb/common.h>
- 
-+static u32 family_id;
-+static u32 product_id;
-+
- static const struct of_device_id brcmstb_machine_match[] = {
- 	{ .compatible = "brcm,brcmstb", },
- 	{ }
-@@ -31,3 +39,53 @@ bool soc_is_brcmstb(void)
- 
- 	return of_match_node(brcmstb_machine_match, root) != NULL;
- }
-+
-+static const struct of_device_id sun_top_ctrl_match[] = {
-+	{ .compatible = "brcm,brcmstb-sun-top-ctrl", },
-+	{ }
-+};
-+
-+static int __init brcmstb_soc_device_init(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+	struct device_node *sun_top_ctrl;
-+	void __iomem *sun_top_ctrl_base;
-+
-+	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
-+	if (!sun_top_ctrl)
-+		return -ENODEV;
-+
-+	sun_top_ctrl_base = of_iomap(sun_top_ctrl, 0);
-+	if (!sun_top_ctrl_base)
-+		return -ENODEV;
-+
-+	family_id = readl(sun_top_ctrl_base);
-+	product_id = readl(sun_top_ctrl_base + 0x4);
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENOMEM;
-+
-+	soc_dev_attr->family = kasprintf(GFP_KERNEL, "%x",
-+					family_id >> 28 ?
-+					family_id >> 16 : family_id >> 8);
-+	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%x",
-+					product_id >> 28 ?
-+					product_id >> 16 : product_id >> 8);
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c%d",
-+				    (char)(((product_id & 0xff) >> 4) + 65),
-+				     product_id & 0xf);
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->family);
-+		kfree(soc_dev_attr->soc_id);
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr);
-+		return -1;
-+	}
-+
-+	return 0;
-+}
-+arch_initcall(brcmstb_soc_device_init);
--- 
-1.7.1
+> ---
+> Changes from v6 to v7:
+> - remove typecast.
+> 
+> Changes from v5 to v6:
+> - remove typecast.
+> 
+> Changes from v4 to v5:
+> - no logical change; updated to work with new revision of patch #2.
+> 
+> Changes from v3 to v4:
+> - none.
+> 
+> Changes from v2 to v3:
+> - no logical change; updated to work with new revision of patch #2.
+> 
+> Changes from v1 to v2:
+> - Rename patch title;
+>   was "arm: lpc32xx: restart: support "cmd" from userspace"
+> - Add change to "pnx-4008" driver instead of "mach-lpc32xx".
+> 
+>  drivers/watchdog/pnx4008_wdt.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+> index 51be66e..0529aed 100644
+> --- a/drivers/watchdog/pnx4008_wdt.c
+> +++ b/drivers/watchdog/pnx4008_wdt.c
+> @@ -129,6 +129,21 @@ static int pnx4008_wdt_set_timeout(struct watchdog_device *wdd,
+>  static int pnx4008_restart_handler(struct watchdog_device *wdd,
+>  				   unsigned long mode, void *cmd)
+>  {
+> +	const char *boot_cmd = cmd;
+> +
+> +	/*
+> +	 * Verify if a "cmd" passed from the userspace program rebooting
+> +	 * the system; if available, handle it.
+> +	 * - For details, see the 'reboot' syscall in kernel/reboot.c
+> +	 * - If the received "cmd" is not supported, use the default mode.
+> +	 */
+> +	if (boot_cmd) {
+> +		if (boot_cmd[0] == 'h')
+> +			mode = REBOOT_HARD;
+> +		else if (boot_cmd[0] == 's')
+> +			mode = REBOOT_SOFT;
+> +	}
+> +
+>  	if (mode == REBOOT_SOFT) {
+>  		/* Force match output active */
+>  		writel(EXT_MATCH0, WDTIM_EMR(wdt_base));
+> -- 
+> 1.8.3.1
+> 
