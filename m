@@ -1,99 +1,87 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 4 Mar 2016 06:25:50 +0000 (UTC)
-Subject: [PATCH v3 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <56D8EDF4.9070904@ti.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-3-git-send-email-fcooper@ti.com>
- <20160301181109.GB13417@atomide.com>
- <alpine.DEB.2.02.1603011858510.14948@utopia.booyaka.com>
- <20160301205043.GA4469@atomide.com>
- <56D71331.5020702@ti.com> <56D8EDF4.9070904@ti.com>
-Message-ID: <alpine.DEB.2.02.1603040553010.3980@utopia.booyaka.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 4 Mar 2016 15:38:07 +0900
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56D92595.60709@huawei.com>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com>
+ <20160304020232.GA12036@js1304-P5Q-DELUXE>
+ <20160304043232.GC12036@js1304-P5Q-DELUXE>
+ <56D92595.60709@huawei.com>
+Message-ID: <20160304063807.GA13317@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Mar 2016, Franklin S Cooper Jr. wrote:
-
-> So I looked into this more and verified that the eCAP and
-> ePWM doesn't have their own unique clock. The PWMSS receives
-> a clock L4PER2_L3_GICLK/2 which is passed through to its
-> sub-devices (ePWM, eCAP and eQEP). The PWMSS is responsible
-> for handling its clock internally while the subdevices have
-> no role in managing this clock. So this explains why we have
-> hwmod entries for PWMSS and why we are planning on removing
-> it from the various subdevices.
-
-It's not whether they have their own unique clock, but whether the 
-submodules have OCP integration registers, speak the idle/standby 
-protocols, have direct L3/L4 ports, etc.
-
-> Since ePWM, eCAP and eQEP are subdevices of PWMSS they
-> shouldn't have their own concept of their "own" clock. The
-> ePWM , eCAP and eQEP clocks are all shared and managed by
-> their parent PWMSS. Once the PWMSS is enabled and has its
-> clock running then ePWM, eCAP and eQEP from their main clock
-> perspective have everything they need.
+On Fri, Mar 04, 2016 at 02:05:09PM +0800, Hanjun Guo wrote:
+> On 2016/3/4 12:32, Joonsoo Kim wrote:
+> > On Fri, Mar 04, 2016 at 11:02:33AM +0900, Joonsoo Kim wrote:
+> >> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
+> >>> On 2016/3/3 15:42, Joonsoo Kim wrote:
+> >>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+> >>>>> (cc -mm and Joonsoo Kim)
+> >>>>>
+> >>>>>
+> >>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+> >>>>>> Hi,
+> >>>>>>
+> >>>>>> I came across a suspicious error for CMA stress test:
+> >>>>>>
+> >>>>>> Before the test, I got:
+> >>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+> >>>>>> CmaTotal:         204800 kB
+> >>>>>> CmaFree:          195044 kB
+> >>>>>>
+> >>>>>>
+> >>>>>> After running the test:
+> >>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+> >>>>>> CmaTotal:         204800 kB
+> >>>>>> CmaFree:         6602584 kB
+> >>>>>>
+> >>>>>> So the freed CMA memory is more than total..
+> >>>>>>
+> >>>>>> Also the the MemFree is more than mem total:
+> >>>>>>
+> >>>>>> -bash-4.3# cat /proc/meminfo
+> >>>>>> MemTotal:       16342016 kB
+> >>>>>> MemFree:        22367268 kB
+> >>>>>> MemAvailable:   22370528 kB
+> >>> [...]
+> >>>>> I played with this a bit and can see the same problem. The sanity
+> >>>>> check of CmaFree < CmaTotal generally triggers in
+> >>>>> __move_zone_freepage_state in unset_migratetype_isolate.
+> >>>>> This also seems to be present as far back as v4.0 which was the
+> >>>>> first version to have the updated accounting from Joonsoo.
+> >>>>> Were there known limitations with the new freepage accounting,
+> >>>>> Joonsoo?
+> >>>> I don't know. I also played with this and looks like there is
+> >>>> accounting problem, however, for my case, number of free page is slightly less
+> >>>> than total. I will take a look.
+> >>>>
+> >>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+> >>>> look like your case.
+> >>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+> >>> did some other test:
+> >> Thanks! Now, I can re-generate erronous situation you mentioned.
+> >>
+> >>>  - run with single thread with 100000 times, everything is fine.
+> >>>
+> >>>  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+> >>>    the same test with 100 multi-thread, then I got:
+> >> [1] would not be sufficient to close this race.
+> >>
+> >> Try following things [A]. And, for more accurate test, I changed code a bit more
+> >> to prevent kernel page allocation from cma area [B]. This will prevent kernel
+> >> page allocation from cma area completely so we can focus cma_alloc/release race.
+> >>
+> >> Although, this is not correct fix, it could help that we can guess
+> >> where the problem is.
+> > More correct fix is something like below.
+> > Please test it.
 > 
-> So my plan is to strip all references of clocks (including
-> hwmod entries) for ePWM, eCAP and eQEP. The devm_clk_get
-> calls made in the ePWM and eCAP will simply point to their
-> parent's dev (PWMSS). I did a couple of quick test using
-> this approach and it works. I have more testing to do but if
-> that checks out are you ok with the above approach?
+> Hmm, this is not working:
 
-I don't know if that should be done or not.  I haven't stared at the code 
-yet, but based on your description, it sounds to me that it probably 
-shouldn't be done.  In any case, it's not what I meant...
+Sad to hear that.
 
-> Also I'm not sure how simple-bus fits in this picture. The
-> eCAP, eQEP and ePWM are all separate devices. The only thing
-> that they share is a single clock from their parent. So it
-> doesn't seem like the right approach. I'm basing this on the
-> info in this thread
-> https://www.mail-archive.com/linuxppc-dev at lists.ozlabs.org/msg27979.html
-> that talks about the usage of simple-bus. So if its outdated
-> or I"m misinterpreting it incorrectly please let me know.
+Could you tell me your system's MAX_ORDER and pageblock_order?
 
-What I meant is that the ECAP*, EQEP*, EHRPWM* devices don't need to be 
-registered through the hwmod code, due to the fact that they don't have 
-the integration mentioned above.  Instead, I think those three subdevices 
-should be listed as child nodes of epwmss* in the DT.
-
-Looking at the DT data from Vignesh, it looks like he's already got 
-ehrpwm1 as a child node of the epwmss1:
-
-+               epwmss1: epwmss at 48440000 {
-+                       compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
-+                       reg = <0x48440000 0x30>;
-+                       ti,hwmods = "epwmss1";
-+                       #address-cells = <1>;
-+                       #size-cells = <1>;
-+                       status = "disabled";
-+                       ranges = <0x48440100  0x48440100  0x80   /* ECAP */
-+                                 0x48440180  0x48440180  0x80   /* EQEP */
-+                                 0x48440200  0x48440200  0x80>; /* EHRPWM */
-+
-+                       ehrpwm1: ehrpwm at 48440200 {
-+                               compatible = "ti,dra7xx-ehrpwm",
-+                                            "ti,am33xx-ehrpwm";
-+                               #pwm-cells = <3>;
-+                               reg = <0x48440200 0x80>;
-+                               ti,hwmods = "ehrpwm1";
-
-So, drop the above line, since the subdevices don't have corresponding 
-hwmods any more.
-
-+                               status = "disabled";
-+                       };
-
-Then, here, you'd add nodes similar to ehrpwm1 for ecap1 and eqep1.  I 
-can't remember at the moment if adding "simple-bus" to the epwmss1 string 
-would be sufficient to register the subdevices after the epwmss1 is 
-probed.  If so, maybe that's all you need.
-
-+               };
-
-Then repeat for epwmss0, epwmss2.
-
-
-- Paul
+Thanks.
