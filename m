@@ -1,78 +1,91 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 3 Mar 2016 20:07:48 -0600
-Subject: [PATCH v3 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <56D71331.5020702@ti.com>
-References: <1456439796-28546-1-git-send-email-fcooper@ti.com>
- <1456439796-28546-3-git-send-email-fcooper@ti.com>
- <20160301181109.GB13417@atomide.com>
- <alpine.DEB.2.02.1603011858510.14948@utopia.booyaka.com>
- <20160301205043.GA4469@atomide.com> <56D71331.5020702@ti.com>
-Message-ID: <56D8EDF4.9070904@ti.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Fri, 4 Mar 2016 11:09:32 +0900
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56D887E1.8000602@redhat.com>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com> <56D887E1.8000602@redhat.com>
+Message-ID: <20160304020932.GB12036@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Thu, Mar 03, 2016 at 10:52:17AM -0800, Laura Abbott wrote:
+> On 03/03/2016 04:49 AM, Hanjun Guo wrote:
+> >On 2016/3/3 15:42, Joonsoo Kim wrote:
+> >>2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+> >>>(cc -mm and Joonsoo Kim)
+> >>>
+> >>>
+> >>>On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+> >>>>Hi,
+> >>>>
+> >>>>I came across a suspicious error for CMA stress test:
+> >>>>
+> >>>>Before the test, I got:
+> >>>>-bash-4.3# cat /proc/meminfo | grep Cma
+> >>>>CmaTotal:         204800 kB
+> >>>>CmaFree:          195044 kB
+> >>>>
+> >>>>
+> >>>>After running the test:
+> >>>>-bash-4.3# cat /proc/meminfo | grep Cma
+> >>>>CmaTotal:         204800 kB
+> >>>>CmaFree:         6602584 kB
+> >>>>
+> >>>>So the freed CMA memory is more than total..
+> >>>>
+> >>>>Also the the MemFree is more than mem total:
+> >>>>
+> >>>>-bash-4.3# cat /proc/meminfo
+> >>>>MemTotal:       16342016 kB
+> >>>>MemFree:        22367268 kB
+> >>>>MemAvailable:   22370528 kB
+> >[...]
+> >>>
+> >>>I played with this a bit and can see the same problem. The sanity
+> >>>check of CmaFree < CmaTotal generally triggers in
+> >>>__move_zone_freepage_state in unset_migratetype_isolate.
+> >>>This also seems to be present as far back as v4.0 which was the
+> >>>first version to have the updated accounting from Joonsoo.
+> >>>Were there known limitations with the new freepage accounting,
+> >>>Joonsoo?
+> >>I don't know. I also played with this and looks like there is
+> >>accounting problem, however, for my case, number of free page is slightly less
+> >>than total. I will take a look.
+> >>
+> >>Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+> >>look like your case.
+> >
+> >I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+> >did some other test:
+> >
+> >  - run with single thread with 100000 times, everything is fine.
+> >
+> >  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+> >    the same test with 100 multi-thread, then I got:
+> >
+> >-bash-4.3# cat /proc/meminfo | grep Cma
+> >CmaTotal: 204800 kB
+> >CmaFree: 225112 kB
+> >
+> >It only increased about 30M for free, not 6G+ in previous test, although
+> >the problem is not solved, the problem is less serious, is it a synchronization
+> >problem?
+> >
+> 
+> 'only' 30M is still an issue although I think you are right about something related
+> to synchronization. When I put the cma_mutex around free_contig_range I don't see
 
-On 03/02/2016 10:22 AM, Franklin S Cooper Jr. wrote:
-> Hi Paul
->
-> On 03/01/2016 02:50 PM, Tony Lindgren wrote:
->> * Paul Walmsley <paul@pwsan.com> [160301 10:59]:
->>> On Tue, 1 Mar 2016, Tony Lindgren wrote:
->>>
->>>> * Franklin S Cooper Jr <fcooper@ti.com> [160225 14:37]:
->>>>> From: Vignesh R <vigneshr@ti.com>
->>>>>
->>>>> Add hwmod entries for the PWMSS on DRA7.
->>>>>
->>>>> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
->>>>> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
->>>>> As per AM57x TRM SPRUHZ6[1], October 2014, Section 29.1.3 Table 29-4,
->>>>> clock source to PWMSS is L4PER2_L3_GICLK. But it is actually
->>>>> L4PER2_L3_GICLK/2. The TRM does not show the division by 2.
->>>>>
->>>>> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
->>>> Looks OK to me, assuming Paul will pick this one or ack it.
->>> Well I've already sent comments on it, it doesn't look quite ready for me 
->>> yet.  I would hold off on the whole series because the hwmod comments also 
->>> impact the DT files.
->> OK will drop the dt related patches then.
-> Sorry you previously asked this question about why hwmod is
-> used for eCap, ePWM and eQEP before and it wasn't addressed.
-> I'll take a look at this and I will get back to you.
+Hmm... I can see the issue even if putting the cma_mutex around
+free_contig_range().
 
-So I looked into this more and verified that the eCAP and
-ePWM doesn't have their own unique clock. The PWMSS receives
-a clock L4PER2_L3_GICLK/2 which is passed through to its
-sub-devices (ePWM, eCAP and eQEP). The PWMSS is responsible
-for handling its clock internally while the subdevices have
-no role in managing this clock. So this explains why we have
-hwmod entries for PWMSS and why we are planning on removing
-it from the various subdevices.
+In other reply, I attached the code to temporary close the race.
 
-Since ePWM, eCAP and eQEP are subdevices of PWMSS they
-shouldn't have their own concept of their "own" clock. The
-ePWM , eCAP and eQEP clocks are all shared and managed by
-their parent PWMSS. Once the PWMSS is enabled and has its
-clock running then ePWM, eCAP and eQEP from their main clock
-perspective have everything they need.
+> the issue. I wonder if free of the pages is racing with the undo_isolate_page_range
+> on overlapping ranges caused by outer_start?
 
-So my plan is to strip all references of clocks (including
-hwmod entries) for ePWM, eCAP and eQEP. The devm_clk_get
-calls made in the ePWM and eCAP will simply point to their
-parent's dev (PWMSS). I did a couple of quick test using
-this approach and it works. I have more testing to do but if
-that checks out are you ok with the above approach?
+I don't know yet.
+Anyway, it looks like that the problem that I want to fix by commit '3c60509'
+still remains.
 
-Also I'm not sure how simple-bus fits in this picture. The
-eCAP, eQEP and ePWM are all separate devices. The only thing
-that they share is a single clock from their parent. So it
-doesn't seem like the right approach. I'm basing this on the
-info in this thread
-https://www.mail-archive.com/linuxppc-dev at lists.ozlabs.org/msg27979.html
-that talks about the usage of simple-bus. So if its outdated
-or I"m misinterpreting it incorrectly please let me know.
->
->> Regards,
->>
->> Tony
+Thanks.
