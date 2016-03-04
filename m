@@ -1,102 +1,429 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 04 Mar 2016 23:51:14 +0000
-Subject: [PATCH v14 02/20] arm64: Cleanup SCTLR flags
+Subject: [PATCH v14 12/20] arm64/kexec: Add core kexec support
 In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
 References: <cover.1457135058.git.geoff@infradead.org>
-Message-ID: <9789dfe4edeeb339230ce138793be4a8d809e341.1457135058.git.geoff@infradead.org>
+Message-ID: <cdab8a2001a9f8beb605bfcd565201c37dad78e6.1457135058.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have macros defining flags for the arm64 sctlr registers in
-both kvm_arm.h and sysreg.h.  To clean things up and simplify move the
-definitions of the SCTLR_EL2 flags from kvm_arm.h to sysreg.h, rename any
-SCTLR_EL1 or SCTLR_EL2 flags that are common to both registers to be
-SCTLR_ELx, with 'x' indicating a common flag, and fixup all files to
-include the proper header or to use the new macro names.
+Add three new files, kexec.h, machine_kexec.c and relocate_kernel.S to the
+arm64 architecture that add support for the kexec re-boot mechanism
+(CONFIG_KEXEC) on arm64 platforms.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
-[Restored pgtable-hwdef.h include]
-Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h | 11 -----------
- arch/arm64/include/asm/sysreg.h  | 19 +++++++++++++++----
- arch/arm64/kvm/hyp-init.S        |  5 +++--
- 3 files changed, 18 insertions(+), 17 deletions(-)
+ arch/arm64/Kconfig                  |  10 +++
+ arch/arm64/include/asm/kexec.h      |  48 +++++++++++
+ arch/arm64/kernel/Makefile          |   2 +
+ arch/arm64/kernel/machine_kexec.c   | 158 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/relocate_kernel.S | 131 ++++++++++++++++++++++++++++++
+ include/uapi/linux/kexec.h          |   1 +
+ 6 files changed, 350 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kexec.h
+ create mode 100644 arch/arm64/kernel/machine_kexec.c
+ create mode 100644 arch/arm64/kernel/relocate_kernel.S
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index d201d4b..fbd5dbd 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -83,17 +83,6 @@
- #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8cc6228..3001c51 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -603,6 +603,16 @@ config PARAVIRT_TIME_ACCOUNTING
  
+ 	  If in doubt, say N here.
  
--/* Hyp System Control Register (SCTLR_EL2) bits */
--#define SCTLR_EL2_EE	(1 << 25)
--#define SCTLR_EL2_WXN	(1 << 19)
--#define SCTLR_EL2_I	(1 << 12)
--#define SCTLR_EL2_SA	(1 << 3)
--#define SCTLR_EL2_C	(1 << 2)
--#define SCTLR_EL2_A	(1 << 1)
--#define SCTLR_EL2_M	1
--#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
--			 SCTLR_EL2_SA | SCTLR_EL2_I)
--
- /* TCR_EL2 Registers bits */
- #define TCR_EL2_RES1	((1 << 31) | (1 << 23))
- #define TCR_EL2_TBI	(1 << 20)
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 4aeebec..99dac2f 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -82,10 +82,21 @@
- #define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
- 				     (!!x)<<8 | 0x1f)
- 
--/* SCTLR_EL1 */
--#define SCTLR_EL1_CP15BEN	(0x1 << 5)
--#define SCTLR_EL1_SED		(0x1 << 8)
--#define SCTLR_EL1_SPAN		(0x1 << 23)
-+/* Common SCTLR_ELx flags. */
-+#define SCTLR_ELx_EE    (1 << 25)
-+#define SCTLR_ELx_I	(1 << 12)
-+#define SCTLR_ELx_SA	(1 << 3)
-+#define SCTLR_ELx_C	(1 << 2)
-+#define SCTLR_ELx_A	(1 << 1)
-+#define SCTLR_ELx_M	1
++config KEXEC
++	depends on PM_SLEEP_SMP
++	select KEXEC_CORE
++	bool "kexec system call"
++	---help---
++	  kexec is a system call that implements the ability to shutdown your
++	  current kernel, and to start another kernel.  It is like a reboot
++	  but it is independent of the system firmware.   And like a reboot
++	  you can start any kernel with it, not just Linux.
 +
-+#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
-+			 SCTLR_ELx_SA | SCTLR_ELx_I)
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+new file mode 100644
+index 0000000..04744dc
+--- /dev/null
++++ b/arch/arm64/include/asm/kexec.h
+@@ -0,0 +1,48 @@
++/*
++ * kexec for arm64
++ *
++ * Copyright (C) Linaro.
++ * Copyright (C) Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+/* SCTLR_EL1 specific flags. */
-+#define SCTLR_EL1_SPAN		(1 << 23)
-+#define SCTLR_EL1_SED		(1 << 8)
-+#define SCTLR_EL1_CP15BEN	(1 << 5)
++#ifndef _ARM64_KEXEC_H
++#define _ARM64_KEXEC_H
++
++/* Maximum physical address we can use pages from */
++
++#define KEXEC_SOURCE_MEMORY_LIMIT (-1UL)
++
++/* Maximum address we can reach in physical address mode */
++
++#define KEXEC_DESTINATION_MEMORY_LIMIT (-1UL)
++
++/* Maximum address we can use for the control code buffer */
++
++#define KEXEC_CONTROL_MEMORY_LIMIT (-1UL)
++
++#define KEXEC_CONTROL_PAGE_SIZE 4096
++
++#define KEXEC_ARCH KEXEC_ARCH_AARCH64
++
++#ifndef __ASSEMBLY__
++
++/**
++ * crash_setup_regs() - save registers for the panic kernel
++ *
++ * @newregs: registers are saved here
++ * @oldregs: registers to be saved (may be %NULL)
++ */
++
++static inline void crash_setup_regs(struct pt_regs *newregs,
++				    struct pt_regs *oldregs)
++{
++	/* Empty routine needed to avoid build errors. */
++}
++
++#endif /* __ASSEMBLY__ */
++
++#endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 83cd7e6..c0aa90d 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -42,6 +42,8 @@ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
++arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
++					   cpu-reset.o
  
- 
- /* id_aa64isar0 */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index d073b5a..034d152c 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -21,6 +21,7 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
- #include <asm/pgtable-hwdef.h>
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+new file mode 100644
+index 0000000..6fd0f0c
+--- /dev/null
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -0,0 +1,158 @@
++/*
++ * kexec for arm64
++ *
++ * Copyright (C) Linaro.
++ * Copyright (C) Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/highmem.h>
++#include <linux/kexec.h>
++#include <linux/of_fdt.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++
++#include <asm/cacheflush.h>
++#include <asm/system_misc.h>
++
++#include "cpu-reset.h"
++
++/* Global variables for the arm64_relocate_new_kernel routine. */
++extern const unsigned char arm64_relocate_new_kernel[];
++extern const unsigned long arm64_relocate_new_kernel_size;
++
++static unsigned long kimage_start;
++
++void machine_kexec_cleanup(struct kimage *kimage)
++{
++	/* Empty routine needed to avoid build errors. */
++}
++
++/**
++ * machine_kexec_prepare - Prepare for a kexec reboot.
++ *
++ * Called from the core kexec code when a kernel image is loaded.
++ */
++int machine_kexec_prepare(struct kimage *kimage)
++{
++	kimage_start = kimage->start;
++	return 0;
++}
++
++/**
++ * kexec_list_flush - Helper to flush the kimage list to PoC.
++ */
++static void kexec_list_flush(struct kimage *kimage)
++{
++	kimage_entry_t *entry;
++	unsigned int flag;
++
++	for (entry = &kimage->head, flag = 0; flag != IND_DONE; entry++) {
++		void *addr = kmap(phys_to_page(*entry & PAGE_MASK));
++
++		flag = *entry & IND_FLAGS;
++
++		switch (flag) {
++		case IND_INDIRECTION:
++			entry = (kimage_entry_t *)addr - 1;
++			__flush_dcache_area(addr, PAGE_SIZE);
++			break;
++		case IND_DESTINATION:
++			break;
++		case IND_SOURCE:
++			__flush_dcache_area(addr, PAGE_SIZE);
++			break;
++		case IND_DONE:
++			break;
++		default:
++			BUG();
++		}
++		kunmap(addr);
++	}
++}
++
++/**
++ * kexec_segment_flush - Helper to flush the kimage segments to PoC.
++ */
++static void kexec_segment_flush(const struct kimage *kimage)
++{
++	unsigned long i;
++
++	pr_devel("%s:\n", __func__);
++
++	for (i = 0; i < kimage->nr_segments; i++) {
++		pr_devel("  segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages\n",
++			i,
++			kimage->segment[i].mem,
++			kimage->segment[i].mem + kimage->segment[i].memsz,
++			kimage->segment[i].memsz,
++			kimage->segment[i].memsz /  PAGE_SIZE);
++
++		__flush_dcache_area(phys_to_virt(kimage->segment[i].mem),
++			kimage->segment[i].memsz);
++	}
++}
++
++/**
++ * machine_kexec - Do the kexec reboot.
++ *
++ * Called from the core kexec code for a sys_reboot with LINUX_REBOOT_CMD_KEXEC.
++ */
++void machine_kexec(struct kimage *kimage)
++{
++	phys_addr_t reboot_code_buffer_phys;
++	void *reboot_code_buffer;
++
++	BUG_ON(num_online_cpus() > 1);
++
++	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
++	reboot_code_buffer = kmap(kimage->control_code_page);
++
++	/*
++	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
++	 * after the kernel is shut down.
++	 */
++	memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
++		arm64_relocate_new_kernel_size);
++
++	/* Flush the reboot_code_buffer in preparation for its execution. */
++	__flush_dcache_area(reboot_code_buffer, arm64_relocate_new_kernel_size);
++	flush_icache_range((uintptr_t)reboot_code_buffer,
++		arm64_relocate_new_kernel_size);
++
++	/* Flush the kimage list. */
++	kexec_list_flush(kimage);
++
++	/* Flush the new image if already in place. */
++	if (kimage->head & IND_DONE)
++		kexec_segment_flush(kimage);
++
++	pr_info("Bye!\n");
++
++	/* Disable all DAIF exceptions. */
++	asm volatile ("msr daifset, #0xf" : : : "memory");
++
++	cpu_install_idmap();
++
++	/*
++	 * cpu_soft_restart will shutdown the MMU, disable data caches, then
++	 * transfer control to the reboot_code_buffer which contains a copy of
++	 * the arm64_relocate_new_kernel routine.  arm64_relocate_new_kernel
++	 * uses physical addressing to relocate the new image to its final
++	 * position and transfers control to the image entry point when the
++	 * relocation is complete.
++	 */
++
++	cpu_soft_restart(is_hyp_mode_available(),
++		reboot_code_buffer_phys, kimage->head, kimage_start, 0);
++
++	BUG(); /* Should never get here. */
++}
++
++void machine_crash_shutdown(struct pt_regs *regs)
++{
++	/* Empty routine needed to avoid build errors. */
++}
+diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
+new file mode 100644
+index 0000000..e380db3
+--- /dev/null
++++ b/arch/arm64/kernel/relocate_kernel.S
+@@ -0,0 +1,131 @@
++/*
++ * kexec for arm64
++ *
++ * Copyright (C) Linaro.
++ * Copyright (C) Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kexec.h>
++
++#include <asm/assembler.h>
++#include <asm/kexec.h>
++#include <asm/page.h>
 +#include <asm/sysreg.h>
++
++/*
++ * arm64_relocate_new_kernel - Put a 2nd stage image in place and boot it.
++ *
++ * The memory that the old kernel occupies may be overwritten when coping the
++ * new image to its final location.  To assure that the
++ * arm64_relocate_new_kernel routine which does that copy is not overwritten,
++ * all code and data needed by arm64_relocate_new_kernel must be between the
++ * symbols arm64_relocate_new_kernel and arm64_relocate_new_kernel_end.  The
++ * machine_kexec() routine will copy arm64_relocate_new_kernel to the kexec
++ * control_code_page, a special page which has been set up to be preserved
++ * during the copy operation.
++ */
++.globl arm64_relocate_new_kernel
++arm64_relocate_new_kernel:
++
++	/* Setup the list loop variables. */
++	mov	x18, x1				/* x18 = kimage_start */
++	mov	x17, x0				/* x17 = kimage_head */
++	dcache_line_size x16, x0		/* x16 = dcache line size */
++	mov	x15, xzr			/* x15 = segment start */
++	mov	x14, xzr			/* x14 = entry ptr */
++	mov	x13, xzr			/* x13 = copy dest */
++
++	/* Clear the sctlr_el2 flags. */
++	mrs	x0, CurrentEL
++	cmp	x0, #CurrentEL_EL2
++	b.ne	1f
++	mrs	x0, sctlr_el2
++	ldr	x1, =SCTLR_ELx_FLAGS
++	bic	x0, x0, x1
++	msr	sctlr_el2, x0
++	isb
++1:
++
++	/* Check if the new image needs relocation. */
++	cbz	x17, .Ldone
++	tbnz	x17, IND_DONE_BIT, .Ldone
++
++.Lloop:
++	and	x12, x17, PAGE_MASK		/* x12 = addr */
++
++	/* Test the entry flags. */
++.Ltest_source:
++	tbz	x17, IND_SOURCE_BIT, .Ltest_indirection
++
++	/* Invalidate dest page to PoC. */
++	mov     x0, x13
++	add     x20, x0, #PAGE_SIZE
++	sub     x1, x16, #1
++	bic     x0, x0, x1
++2:	dc      ivac, x0
++	add     x0, x0, x16
++	cmp     x0, x20
++	b.lo    2b
++	dsb     sy
++
++	mov x20, x13
++	mov x21, x12
++	copy_page x20, x21, x0, x1, x2, x3, x4, x5, x6, x7
++
++	/* dest += PAGE_SIZE */
++	add	x13, x13, PAGE_SIZE
++	b	.Lnext
++
++.Ltest_indirection:
++	tbz	x17, IND_INDIRECTION_BIT, .Ltest_destination
++
++	/* ptr = addr */
++	mov	x14, x12
++	b	.Lnext
++
++.Ltest_destination:
++	tbz	x17, IND_DESTINATION_BIT, .Lnext
++
++	mov	x15, x12
++
++	/* dest = addr */
++	mov	x13, x12
++
++.Lnext:
++	/* entry = *ptr++ */
++	ldr	x17, [x14], #8
++
++	/* while (!(entry & DONE)) */
++	tbz	x17, IND_DONE_BIT, .Lloop
++
++.Ldone:
++	dsb	nsh
++	ic	iallu
++	dsb	nsh
++	isb
++
++	/* Start new image. */
++	mov	x0, xzr
++	mov	x1, xzr
++	mov	x2, xzr
++	mov	x3, xzr
++	br	x18
++
++.ltorg
++
++.align 3	/* To keep the 64-bit values below naturally aligned. */
++
++.Lcopy_end:
++.org	KEXEC_CONTROL_PAGE_SIZE
++
++/*
++ * arm64_relocate_new_kernel_size - Number of bytes to copy to the
++ * control_code_page.
++ */
++.globl arm64_relocate_new_kernel_size
++arm64_relocate_new_kernel_size:
++	.quad	.Lcopy_end - arm64_relocate_new_kernel
+diff --git a/include/uapi/linux/kexec.h b/include/uapi/linux/kexec.h
+index 99048e5..aae5ebf 100644
+--- a/include/uapi/linux/kexec.h
++++ b/include/uapi/linux/kexec.h
+@@ -39,6 +39,7 @@
+ #define KEXEC_ARCH_SH      (42 << 16)
+ #define KEXEC_ARCH_MIPS_LE (10 << 16)
+ #define KEXEC_ARCH_MIPS    ( 8 << 16)
++#define KEXEC_ARCH_AARCH64 (183 << 16)
  
- 	.text
- 	.pushsection	.hyp.idmap.text, "ax"
-@@ -116,8 +117,8 @@ __do_hyp_init:
- 	dsb	sy
- 
- 	mrs	x4, sctlr_el2
--	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
--	ldr	x5, =SCTLR_EL2_FLAGS
-+	and	x4, x4, #SCTLR_ELx_EE	// preserve endianness of EL2
-+	ldr	x5, =SCTLR_ELx_FLAGS
- 	orr	x4, x4, x5
- 	msr	sctlr_el2, x4
- 	isb
+ /* The artificial cap on the number of segments passed to kexec_load. */
+ #define KEXEC_SEGMENT_MAX 16
 -- 
 2.5.0
