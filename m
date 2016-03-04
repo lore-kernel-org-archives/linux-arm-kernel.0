@@ -1,81 +1,99 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 4 Mar 2016 17:33:50 +0100
-Subject: [PATCH 2/6] usb: xhci-mtk: use __maybe_unused to hide pm functions
-In-Reply-To: <1456932255-71725-3-git-send-email-arnd@arndb.de>
-References: <1456932255-71725-1-git-send-email-arnd@arndb.de>
- <1456932255-71725-3-git-send-email-arnd@arndb.de>
-Message-ID: <56D9B8EE.3060107@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Mar 2016 16:38:14 +0000
+Subject: [PATCH v10 11/12] arm64: factor work_pending state machine to C
+In-Reply-To: <1456949376-4910-12-git-send-email-cmetcalf@ezchip.com>
+References: <1456949376-4910-1-git-send-email-cmetcalf@ezchip.com>
+ <1456949376-4910-12-git-send-email-cmetcalf@ezchip.com>
+Message-ID: <20160304163814.GD7886@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chris,
 
+On Wed, Mar 02, 2016 at 03:09:35PM -0500, Chris Metcalf wrote:
+> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+> state machine that can be difficult to reason about due to duplicated
+> code and a large number of branch targets.
+> 
+> This patch factors the common logic out into the existing
+> do_notify_resume function, converting the code to C in the process,
+> making the code more legible.
+> 
+> This patch tries to closely mirror the existing behaviour while using
+> the usual C control flow primitives. As local_irq_{disable,enable} may
+> be instrumented, we balance exception entry (where we will almost most
+> likely enable IRQs) with a call to trace_hardirqs_on just before the
+> return to userspace.
 
-On 02/03/16 16:24, Arnd Bergmann wrote:
-> The mediatek XHCI glue driver uses SET_SYSTEM_SLEEP_PM_OPS() to
-> conditionally set the correct suspend/resume options, and
-> also puts both the dev_pm_ops and the functions inside of
-> an #ifdef testing for CONFIG_PM_SLEEP, but those functions
-> then call other code that becomes unused:
->
-> drivers/usb/host/xhci-mtk.c:135:12: error: 'xhci_mtk_host_disable' defined but not used [-Werror=unused-function]
-> drivers/usb/host/xhci-mtk.c:313:13: error: 'usb_wakeup_enable' defined but not used [-Werror=unused-function]
-> drivers/usb/host/xhci-mtk.c:321:13: error: 'usb_wakeup_disable' defined but not used [-Werror=unused-function]
->
-> This replaces the #ifdef with __maybe_unused annotations so the
-> compiler knows it can silently drop them instead of warning.
->
-> For the DEV_PM_OPS definition, we can use an IS_ENABLED() check
-> to avoid defining the structure when CONFIG_PM is not set without
-> the #ifdef.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+[...]
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 1f7f5a2b61bf..966d0d4308f2 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -674,18 +674,13 @@ ret_fast_syscall_trace:
+>   * Ok, we need to do extra processing, enter the slow path.
+>   */
+>  work_pending:
+> -	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+> -	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+>  	mov	x0, sp				// 'regs'
+> -	enable_irq				// enable interrupts for do_notify_resume()
+>  	bl	do_notify_resume
+> -	b	ret_to_user
+> -work_resched:
+>  #ifdef CONFIG_TRACE_IRQFLAGS
+> -	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
+> +	bl	trace_hardirqs_on		// enabled while in userspace
 
->   drivers/usb/host/xhci-mtk.c | 10 +++-------
->   1 file changed, 3 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> index 9532f5aef71b..79959f17c38c 100644
-> --- a/drivers/usb/host/xhci-mtk.c
-> +++ b/drivers/usb/host/xhci-mtk.c
-> @@ -695,7 +695,6 @@ static int xhci_mtk_remove(struct platform_device *dev)
->   	return 0;
->   }
->
-> -#ifdef CONFIG_PM_SLEEP
->   /*
->    * if ip sleep fails, and all clocks are disabled, access register will hang
->    * AHB bus, so stop polling roothubs to avoid regs access on bus suspend.
-> @@ -703,7 +702,7 @@ static int xhci_mtk_remove(struct platform_device *dev)
->    * to wake up system immediately after system suspend complete if ip sleep
->    * fails, it is what we wanted.
->    */
-> -static int xhci_mtk_suspend(struct device *dev)
-> +static int __maybe_unused xhci_mtk_suspend(struct device *dev)
->   {
->   	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
->   	struct usb_hcd *hcd = mtk->hcd;
-> @@ -722,7 +721,7 @@ static int xhci_mtk_suspend(struct device *dev)
->   	return 0;
->   }
->
-> -static int xhci_mtk_resume(struct device *dev)
-> +static int __maybe_unused xhci_mtk_resume(struct device *dev)
->   {
->   	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
->   	struct usb_hcd *hcd = mtk->hcd;
-> @@ -744,10 +743,7 @@ static int xhci_mtk_resume(struct device *dev)
->   static const struct dev_pm_ops xhci_mtk_pm_ops = {
->   	SET_SYSTEM_SLEEP_PM_OPS(xhci_mtk_suspend, xhci_mtk_resume)
->   };
-> -#define DEV_PM_OPS	(&xhci_mtk_pm_ops)
-> -#else
-> -#define DEV_PM_OPS	NULL
-> -#endif /* CONFIG_PM */
-> +#define DEV_PM_OPS IS_ENABLED(CONFIG_PM) ? &xhci_mtk_pm_ops : NULL
->
->   #ifdef CONFIG_OF
->   static const struct of_device_id mtk_xhci_of_match[] = {
->
+This doesn't look right to me. We only get here after running
+do_notify_resume, which returns with interrupts disabled.
+
+Do we not instead need to inform the tracing code that interrupts are
+disabled prior to calling do_notify_resume?
+
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index e18c48cb6db1..3432e14b7d6e 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -402,15 +402,29 @@ static void do_signal(struct pt_regs *regs)
+>  asmlinkage void do_notify_resume(struct pt_regs *regs,
+>  				 unsigned int thread_flags)
+>  {
+> -	if (thread_flags & _TIF_SIGPENDING)
+> -		do_signal(regs);
+> +	while (true) {
+>  
+> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
+> -		clear_thread_flag(TIF_NOTIFY_RESUME);
+> -		tracehook_notify_resume(regs);
+> -	}
+> +		if (thread_flags & _TIF_NEED_RESCHED) {
+> +			schedule();
+> +		} else {
+> +			local_irq_enable();
+> +
+> +			if (thread_flags & _TIF_SIGPENDING)
+> +				do_signal(regs);
+>  
+> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> -		fpsimd_restore_current_state();
+> +			if (thread_flags & _TIF_NOTIFY_RESUME) {
+> +				clear_thread_flag(TIF_NOTIFY_RESUME);
+> +				tracehook_notify_resume(regs);
+> +			}
+> +
+> +			if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> +				fpsimd_restore_current_state();
+> +		}
+>  
+> +		local_irq_disable();
+> +
+> +		thread_flags = READ_ONCE(current_thread_info()->flags);
+> +		if (!(thread_flags & _TIF_WORK_MASK))
+> +			break;
+> +	}
+
+This might be easier to read as a do { ... } while.
+
+Will
