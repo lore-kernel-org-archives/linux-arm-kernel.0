@@ -1,40 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 4 Mar 2016 18:41:36 +0000
-Subject: [PATCH 2/2] ARM: bcm2835: Add devicetree for the Raspberry Pi 3.
-In-Reply-To: <1457116769-8567-2-git-send-email-eric@anholt.net>
-References: <1457116769-8567-1-git-send-email-eric@anholt.net>
- <1457116769-8567-2-git-send-email-eric@anholt.net>
-Message-ID: <20160304184136.GB5033@leverpostej>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Fri,  4 Mar 2016 13:44:04 -0500
+Subject: [PATCH v7 0/6] watchdog: pnx4008: add restart handler
+Message-ID: <1457117050-13543-1-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 04, 2016 at 10:39:29AM -0800, Eric Anholt wrote:
-> For now this doesn't support the new hardware present on the Pi 3 (BT,
-> wifi, GPIO expander).  Since the GPIO expander isn't supported, we
-> also don't have the LEDs like the other board files do.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/Makefile            |  3 +-
->  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 22 ++++++++++++
->  arch/arm/boot/dts/bcm2837.dtsi        | 68 +++++++++++++++++++++++++++++++++++
->  3 files changed, 92 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
->  create mode 100644 arch/arm/boot/dts/bcm2837.dtsi
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		interrupt-parent = <&local_intc>;
-> +		interrupts = <0>, // PHYS_SECURE_PPI
-> +			     <1>, // PHYS_NONSECURE_PPI
-> +			     <3>, // VIRT_PPI
-> +			     <2>; // HYP_PPI
-> +		always-on;
-> +	};
+The LPC32xx provide the capability to perform a soft or hard reset;
+a soft reset will no reset the external peripheral
+(i.e. RESOUT_N output not asserted).
 
-Are the CPUs in an always-on power domain? Or is it jsut that the kernel
-doesn't perform power management of CPUs?
+This changeset migrate the restart code from the "mach-lpc32xx" to
+the "pnx-4008" watchdog driver and add the soft reset capability.
 
-The always-on proeprty is only intended for the former.
+The default behavior (i.e. hard reset) remain unchanged.
 
-Mark.
+This patchset have a dependency on the following patch:
+watchdog: Add 'action' and 'data' parameters to restart handler callback
+http://permalink.gmane.org/gmane.linux.watchdog/3364/
+
+Note:
+Patch #5 was generated with the option "--unified=2" to ensure
+it can be apply before or after the changes for the new 
+LPC32xx irqchip driver:
+- http://permalink.gmane.org/gmane.linux.drivers.devicetree/144683
+---
+Changes from v6 to v7:
+* Update the patch as per the feedback received from:
+  Guenter: http://permalink.gmane.org/gmane.linux.watchdog/3488
+  - remove typecast.
+
+Changes from v5 to v6:
+* Update the patch as per the feedback received from:
+  Guenter: http://permalink.gmane.org/gmane.linux.watchdog/3420
+  - remove typecast.
+
+Changes from v4 to v5:
+* Rebased on the following patch:
+  http://permalink.gmane.org/gmane.linux.watchdog/3364/
+
+Changes from v3 to v4:
+* Update the patch as per the feedback received from:
+  Arnd: http://permalink.gmane.org/gmane.linux.watchdog/3329
+  - Switch patch #5 and #6 order.
+
+Changes from v2 to v3:
+* Update the patch as per the feedback received from:
+  Joachim: http://permalink.gmane.org/gmane.linux.watchdog/3303
+  - remove explicit clock enable from restart handler.
+  - verify "register_restart_handler" return value.
+  - add call to unregister_restart_handler".
+  - do the restart handling directly in "pnx4008_restart_handler".
+* Move the change to "phy3250.c" into a separate patch and generate
+  the new patch with the "--unified=2" option.
+
+Changes from v1 to v2:
+* Rename patch title;
+  was "arm: lpc32xx: restart: add support for soft reset"
+* Update the patch as per the feedback received from:
+  Joachim: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/479791
+  - migrate restart code from "mach-lpc32xx" to "pnx-4008" driver.
+* Add soft reset support to "pnx-4008" driver instead of "mach-lpc32xx".
+* Use define available in "pnx-4008" when writting to watchdog register.
+* Remove restart handler from "mach-lpc32xx".
+* Remove restart hook from "phy3250.c".
+* Update driver logging during power-on. 
+
+Sylvain Lemieux (6):
+  watchdog: pnx4008: update logging during power-on
+  watchdog: pnx4008: add restart handler
+  watchdog: pnx4008: add support for soft reset
+  watchdog: pnx4008: restart: support "cmd" from userspace
+  arm: lpc32xx: phy3250 remove restart hook
+  arm: lpc32xx: remove restart handler
+
+ arch/arm/mach-lpc32xx/common.c  | 15 ---------------
+ arch/arm/mach-lpc32xx/common.h  |  1 -
+ arch/arm/mach-lpc32xx/phy3250.c |  1 -
+ drivers/watchdog/pnx4008_wdt.c  | 42 +++++++++++++++++++++++++++++++++++++++--
+ 4 files changed, 40 insertions(+), 19 deletions(-)
+
+-- 
+1.8.3.1
