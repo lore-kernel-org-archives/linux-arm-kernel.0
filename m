@@ -1,101 +1,79 @@
 From: huangdaode@hisilicon.com (Daode Huang)
-Date: Fri, 4 Mar 2016 11:05:42 +0800
-Subject: [PATCH net 6/6] net: hns: bug fix of getting hilink status
+Date: Fri, 4 Mar 2016 11:05:40 +0800
+Subject: [PATCH net 4/6] net: hns: adds uc match for debug port
 In-Reply-To: <1457060742-165202-1-git-send-email-huangdaode@hisilicon.com>
 References: <1457060742-165202-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <1457060742-165202-7-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <1457060742-165202-5-git-send-email-huangdaode@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-from Lisheng <lisheng011@huawei.com>
-
-There is some difference in hilink status defination between
-v1 and v2 chips.
-for v1 chip, all ports connected to the same hilink share the same
-hilink status register bit.
-but for v2, all ports have separately hilink status register bit. And
-the register addr is also changed.
-So this patch fixes the bug.
+This patch adds uc match for debug port by:
+1)Enables uc match of debug port when initializing gmac
+2)Enables uc match of mac address register2
 
 Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
-Signed-off-by: Lisheng <lisheng011@huawei.com>
+Signed-off-by: lipeng <lipeng321@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 39 +++++++++++-----------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c | 18 +++++++++++++++++-
  drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  2 ++
- 2 files changed, 22 insertions(+), 19 deletions(-)
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index 607c3be..2fa38f1 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -240,35 +240,36 @@ void hns_ppe_com_srst(struct ppe_common_cb *ppe_common, u32 val)
- /**
-  * hns_mac_get_sds_mode - get phy ifterface form serdes mode
-  * @mac_cb: mac control block
-- * retuen phy interface
-+ * return phy interface
-  */
- phy_interface_t hns_mac_get_phy_if(struct hns_mac_cb *mac_cb)
- {
--	u32 hilink3_mode;
--	u32 hilink4_mode;
-+	u32 reg, mode, shift;
- 	void __iomem *sys_ctl_vaddr = mac_cb->sys_ctl_vaddr;
--	int dev_id = mac_cb->mac_id;
-+	int mac_id = mac_cb->mac_id;
- 	phy_interface_t phy_if = PHY_INTERFACE_MODE_NA;
-+	bool is_ver1 = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver);
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
+index b8517b0..2591a51 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
+@@ -290,6 +290,16 @@ static int hns_gmac_adjust_link(void *mac_drv, enum mac_speed speed,
+ 	return 0;
+ }
  
--	hilink3_mode = dsaf_read_reg(sys_ctl_vaddr, HNS_MAC_HILINK3_REG);
--	hilink4_mode = dsaf_read_reg(sys_ctl_vaddr, HNS_MAC_HILINK4_REG);
--	if (dev_id >= 0 && dev_id <= 3) {
--		if (hilink4_mode == 0)
--			phy_if = PHY_INTERFACE_MODE_SGMII;
--		else
-+	/*for hip05 soc, port6,7 only support ge mode*/
-+	if (is_ver1 && (mac_id >= 6 && mac_id <= 7)) {
-+		phy_if = PHY_INTERFACE_MODE_SGMII;
-+	} else	if (mac_id >= 0 && mac_id <= 3) {
-+		reg = is_ver1 ? HNS_MAC_HILINK4_REG : HNS_MAC_HILINK4V2_REG;
-+		mode = dsaf_read_reg(sys_ctl_vaddr, reg);
-+		shift = is_ver1 ? 0 : mac_id;
-+		if (dsaf_get_bit(mode, shift))
- 			phy_if = PHY_INTERFACE_MODE_XGMII;
--	} else if (dev_id >= 4 && dev_id <= 5) {
--		if (hilink3_mode == 0)
--			phy_if = PHY_INTERFACE_MODE_SGMII;
- 		else
-+			phy_if = PHY_INTERFACE_MODE_SGMII;
-+	} else if (mac_id >= 4 && mac_id <= 7) {
-+		reg = is_ver1 ? HNS_MAC_HILINK3_REG : HNS_MAC_HILINK3V2_REG;
-+		mode = dsaf_read_reg(sys_ctl_vaddr, reg);
-+		shift = is_ver1 ? 0 : mac_id - 4;
-+		if (dsaf_get_bit(mode, shift))
- 			phy_if = PHY_INTERFACE_MODE_XGMII;
--	} else {
--		phy_if = PHY_INTERFACE_MODE_SGMII;
-+		else
-+			phy_if = PHY_INTERFACE_MODE_SGMII;
++static void hns_gmac_set_uc_match(void *mac_drv, u16 en)
++{
++	struct mac_driver *drv = (struct mac_driver *)mac_drv;
++
++	dsaf_set_dev_bit(drv, GMAC_REC_FILT_CONTROL_REG,
++			 GMAC_UC_MATCH_EN_B, !en);
++	dsaf_set_dev_bit(drv, GMAC_STATION_ADDR_HIGH_2_REG,
++			 GMAC_ADDR_EN_B, !en);
++}
++
+ static void hns_gmac_init(void *mac_drv)
+ {
+ 	u32 port;
+@@ -305,6 +315,8 @@ static void hns_gmac_init(void *mac_drv)
+ 	mdelay(10);
+ 	hns_gmac_disable(mac_drv, MAC_COMM_MODE_RX_AND_TX);
+ 	hns_gmac_tx_loop_pkt_dis(mac_drv);
++	if (drv->mac_cb->mac_type == HNAE_PORT_DEBUG)
++		hns_gmac_set_uc_match(mac_drv, 0);
+ }
+ 
+ void hns_gmac_update_stats(void *mac_drv)
+@@ -407,8 +419,12 @@ static void hns_gmac_set_mac_addr(void *mac_drv, char *mac_addr)
+ 
+ 		u32 low_val = mac_addr[5] | (mac_addr[4] << 8)
+ 			| (mac_addr[3] << 16) | (mac_addr[2] << 24);
++
++		u32 val = dsaf_read_dev(drv, GMAC_STATION_ADDR_HIGH_2_REG);
++		u32 sta_addr_en = dsaf_get_bit(val, GMAC_ADDR_EN_B);
+ 		dsaf_write_dev(drv, GMAC_STATION_ADDR_LOW_2_REG, low_val);
+-		dsaf_write_dev(drv, GMAC_STATION_ADDR_HIGH_2_REG, high_val);
++		dsaf_write_dev(drv, GMAC_STATION_ADDR_HIGH_2_REG,
++			       high_val | (sta_addr_en << GMAC_ADDR_EN_B));
  	}
--
--	dev_dbg(mac_cb->dev,
--		"hilink3_mode=%d, hilink4_mode=%d dev_id=%d, phy_if=%d\n",
--		hilink3_mode, hilink4_mode, dev_id, phy_if);
- 	return phy_if;
  }
  
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-index d8c49b6..690e4ea 100644
+index f0c4f9b..d8c49b6 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-@@ -103,6 +103,8 @@
- /*serdes offset**/
- #define HNS_MAC_HILINK3_REG DSAF_SUB_SC_HILINK3_CRG_CTRL0_REG
- #define HNS_MAC_HILINK4_REG DSAF_SUB_SC_HILINK4_CRG_CTRL0_REG
-+#define HNS_MAC_HILINK3V2_REG DSAF_SUB_SC_HILINK3_CRG_CTRL1_REG
-+#define HNS_MAC_HILINK4V2_REG DSAF_SUB_SC_HILINK4_CRG_CTRL1_REG
- #define HNS_MAC_LANE0_CTLEDFE_REG 0x000BFFCCULL
- #define HNS_MAC_LANE1_CTLEDFE_REG 0x000BFFBCULL
- #define HNS_MAC_LANE2_CTLEDFE_REG 0x000BFFACULL
+@@ -917,6 +917,8 @@
+ #define GMAC_LP_REG_CF2MI_LP_EN_B	2
+ 
+ #define GMAC_MODE_CHANGE_EB_B	0
++#define GMAC_UC_MATCH_EN_B	0
++#define GMAC_ADDR_EN_B		16
+ 
+ #define GMAC_RECV_CTRL_STRIP_PAD_EN_B	3
+ #define GMAC_RECV_CTRL_RUNT_PKT_EN_B	4
 -- 
 1.9.1
