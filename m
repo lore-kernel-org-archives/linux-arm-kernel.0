@@ -1,192 +1,71 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Fri, 4 Mar 2016 13:56:09 -0800
-Subject: [PATCH V4] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-Message-ID: <1457128569-13878-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri,  4 Mar 2016 14:31:45 -0800
+Subject: [PATCH v7 0/3] Add host controller drivers for Cavium ThunderX PCI
+Message-ID: <1457130708-3231-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-namespaces; specifically within a given node SMMU0 and SMMU1 share,
-as does SMMU2 and SMMU3.
+From: David Daney <david.daney@cavium.com>
 
-This patch make sure ASID and VMID space is unique across cavium SMMUv2.
+Some Cavium ThunderX processors require quirky access methods for the
+config space of the PCIe bridge.
 
-changes from V3:
-	- Removed redundent variable.
-	- Used atomic_t for maintaining running total
+There are now three patches:
 
-changes from V2:
-	- removed *_base from DT, and replaced with compatible string
+1) Refactor code in pci-host-generic so that it can more easily be
+   used by other drivers.  This splits the driver for CAM and ECAM
+   access methods to a separate file from the common host driver code.
 
-changes from V1:
-	- rebased on top of 16 bit VMID patch
-	- removed redundent options from DT
-	- insted of transform, DT now supplies starting ASID/VMID
+2) Add the ThunderX PCIe driver to external PCIe buses, which
+   leverages the code in pci-host-generic
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
-Signed-off-by: Akula Geethasowjanya <Geethasowjanya.Akula@caviumnetworks.com>
----
- Documentation/arm64/silicon-errata.txt             |  1 +
- .../devicetree/bindings/iommu/arm,smmu.txt         |  1 +
- drivers/iommu/arm-smmu.c                           | 42 ++++++++++++++++------
- 3 files changed, 33 insertions(+), 11 deletions(-)
+3) Add ThunderX PCI driver for internel SoC buses used on early
+   ThunderX chip revisions.
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 58b71dd..3747a4b 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -56,3 +56,4 @@ stable kernels.
- |                |                 |                 |                         |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
- | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
-+| Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index 7180745..19fe6f2 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -16,6 +16,7 @@ conditions.
-                         "arm,mmu-400"
-                         "arm,mmu-401"
-                         "arm,mmu-500"
-+                        "cavium,smmu-v2"
+Changes from v6: Updated 3/3 to support Thunder pass-2.x silicon.
 
-                   depending on the particular implementation and/or the
-                   version of the architecture implemented.
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 247a469..e793b0a 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -326,6 +326,11 @@ struct arm_smmu_device {
+Changes from v5: Added Acked-by Rob Herring for the device tree
+binding in 3/3.  Fixed typo and split large functions as suggested by
+Bjorn Helgaas.
 
- 	struct list_head		list;
- 	struct rb_root			masters;
-+	/*
-+	 *The following fields are specific to Cavium, Thunder
-+	 */
-+	u32				cavium_id_base;
-+
- };
+Changes from v4: Added patch 3/3.  Stylistic changes to 2/3 suggested
+by Bjorn Helgaas.  When expanding config write width to 32-bits, mask
+out unintened writes to W1C bits, also suggested by Bjorn Helgaas.
 
- struct arm_smmu_cfg {
-@@ -335,8 +340,8 @@ struct arm_smmu_cfg {
- };
- #define INVALID_IRPTNDX			0xff
+Changes from v3: Add some Acked-by, rebased to v4.5.0-rc1
 
--#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
--#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-+#define ARM_SMMU_CB_ASID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx)
-+#define ARM_SMMU_CB_VMID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx + 1)
+Changes from v2: Improve device tree binding example as noted by Rob
+Herring.  Rename pcie-thunder-pem.* to pci-thunder-pem.* for better
+consistency.  Update MAINTAINERS to reflect the changes.
 
- enum arm_smmu_domain_stage {
- 	ARM_SMMU_DOMAIN_S1 = 0,
-@@ -364,6 +369,8 @@ struct arm_smmu_option_prop {
- 	const char *prop;
- };
+Changes from v1: Split CAM and ECAM code from common driver code as
+suggested by Arnd Bergmann.  Fix spelling errors in
+pcie-thunder-pem.txt
 
-+static atomic_t cavium_smmu_context_count = ATOMIC_INIT(0);
-+
- static struct arm_smmu_option_prop arm_smmu_options[] = {
- 	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
- 	{ 0, NULL},
-@@ -575,11 +582,11 @@ static void arm_smmu_tlb_inv_context(void *cookie)
 
- 	if (stage1) {
- 		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
--		writel_relaxed(ARM_SMMU_CB_ASID(cfg),
-+		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
- 			       base + ARM_SMMU_CB_S1_TLBIASID);
- 	} else {
- 		base = ARM_SMMU_GR0(smmu);
--		writel_relaxed(ARM_SMMU_CB_VMID(cfg),
-+		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
- 			       base + ARM_SMMU_GR0_TLBIVMID);
- 	}
+David Daney (3):
+  PCI: generic: Refactor code to enable reuse by other drivers.
+  pci, pci-thunder-pem: Add PCIe host driver for ThunderX processors.
+  pci, pci-thunder-ecam: Add driver for ThunderX-pass{1,2} on-chip
+    devices
 
-@@ -601,7 +608,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ .../devicetree/bindings/pci/pci-thunder-ecam.txt   |  30 ++
+ .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 +++
+ MAINTAINERS                                        |   9 +
+ drivers/pci/host/Kconfig                           |  18 +
+ drivers/pci/host/Makefile                          |   3 +
+ drivers/pci/host/pci-host-common.c                 | 194 ++++++++++
+ drivers/pci/host/pci-host-common.h                 |  47 +++
+ drivers/pci/host/pci-host-generic.c                | 181 +--------
+ drivers/pci/host/pci-thunder-ecam.c                | 407 +++++++++++++++++++++
+ drivers/pci/host/pci-thunder-pem.c                 | 347 ++++++++++++++++++
+ 10 files changed, 1102 insertions(+), 177 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-ecam.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+ create mode 100644 drivers/pci/host/pci-host-common.c
+ create mode 100644 drivers/pci/host/pci-host-common.h
+ create mode 100644 drivers/pci/host/pci-thunder-ecam.c
+ create mode 100644 drivers/pci/host/pci-thunder-pem.c
 
- 		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
- 			iova &= ~12UL;
--			iova |= ARM_SMMU_CB_ASID(cfg);
-+			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
- 			do {
- 				writel_relaxed(iova, reg);
- 				iova += granule;
-@@ -609,7 +616,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- #ifdef CONFIG_64BIT
- 		} else {
- 			iova >>= 12;
--			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
-+			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
- 			do {
- 				writeq_relaxed(iova, reg);
- 				iova += granule >> 12;
-@@ -629,7 +636,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- #endif
- 	} else {
- 		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
--		writel_relaxed(ARM_SMMU_CB_VMID(cfg), reg);
-+		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
- 	}
- }
-
-@@ -738,7 +745,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- #endif
- 		/* 16-bit VMIDs live in CBA2R */
- 		if (smmu->features & ARM_SMMU_FEAT_VMID16)
--			reg |= ARM_SMMU_CB_VMID(cfg) << CBA2R_VMID_SHIFT;
-+			reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
-
- 		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
- 	}
-@@ -757,7 +764,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
- 	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
- 		/* 8-bit VMIDs live in CBAR */
--		reg |= ARM_SMMU_CB_VMID(cfg) << CBAR_VMID_SHIFT;
-+		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
- 	}
- 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
-
-@@ -765,11 +772,11 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 	if (stage1) {
- 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
-
--		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
- 		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
-
- 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
--		reg64 |= ((u64)ARM_SMMU_CB_ASID(cfg)) << TTBRn_ASID_SHIFT;
-+		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
- 		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
- 	} else {
- 		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
-@@ -1717,6 +1724,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,mmu-400", .data = (void *)ARM_SMMU_V1 },
- 	{ .compatible = "arm,mmu-401", .data = (void *)ARM_SMMU_V1 },
- 	{ .compatible = "arm,mmu-500", .data = (void *)ARM_SMMU_V2 },
-+	{ .compatible = "cavium,smmu-v2", .data = (void *)ARM_SMMU_V2 },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
-@@ -1826,6 +1834,18 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 			goto out_free_irqs;
- 		}
- 	}
-+	/*
-+	 * Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-+	 * namespaces; specifically within a given node SMMU0 and SMMU1 share,
-+	 * as does SMMU2 and SMMU3. see if this is a Cavium SMMU, if so
-+	 * set asid and vmid base such that each SMMU gets unique
-+	 * asid/vmid space.
-+	 */
-+	if (of_device_is_compatible(dev->of_node, "cavium,smmu-v2")) {
-+		smmu->cavium_id_base = atomic_add_return(smmu->num_context_banks,
-+				&cavium_smmu_context_count);
-+		smmu->cavium_id_base -= smmu->num_context_banks;
-+	}
-
- 	INIT_LIST_HEAD(&smmu->list);
- 	spin_lock(&arm_smmu_devices_lock);
---
-2.1.0
+-- 
+1.8.3.1
