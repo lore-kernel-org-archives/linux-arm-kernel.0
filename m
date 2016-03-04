@@ -1,68 +1,60 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 4 Mar 2016 09:18:19 -0700
-Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue bits
- when just one is being checked
-In-Reply-To: <VI1PR0401MB18550FD3A944783B88BEDB64FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-7-git-send-email-troy.kisky@boundarydevices.com>
- <VI1PR0401MB18550FD3A944783B88BEDB64FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
-Message-ID: <56D9B54B.8020309@boundarydevices.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 04 Mar 2016 17:18:23 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <1659125.tHp8H942OG@wuerfel>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
+Message-ID: <1457108303.2651.112.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/4/2016 2:11 AM, Fugang Duan wrote:
-> From: Troy Kisky <troy.kisky@boundarydevices.com>Sent: Thursday, February 25, 2016 8:37 AM
->> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
->> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
->> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
->> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
->> johannes at sipsolutions.net; stillcompiling at gmail.com;
->> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
->> <troy.kisky@boundarydevices.com>
->> Subject: [PATCH net-next V2 06/16] net: fec: don't clear all rx queue bits when
->> just one is being checked
->>
->> FEC_ENET_RXF is 3 separate bits, we only check one queue at a time. So, when
->> the last queue is being checked, it is bad to remove the interrupt on the 1st
->> queue.
->>
->> Also, since this is now done in the napi routine and not the interrupt, it is not
->> needed.
->>
->> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
->> ---
->>  drivers/net/ethernet/freescale/fec_main.c | 2 --
->>  1 file changed, 2 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/freescale/fec_main.c
->> b/drivers/net/ethernet/freescale/fec_main.c
->> index 610cf6c..791f385 100644
->> --- a/drivers/net/ethernet/freescale/fec_main.c
->> +++ b/drivers/net/ethernet/freescale/fec_main.c
->> @@ -1338,8 +1338,6 @@ static int fec_rxq(struct net_device *ndev, struct
->> fec_enet_private *fep,
->>  			break;
->>  		pkt_received++;
->>
->> -		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
->> -
+[Added Tilman and Christoph.]
+
+On vr, 2016-03-04 at 16:24 +0100, Arnd Bergmann wrote:
+> I actually did more patches that I ended up not submitting:
 > 
-> We should clear the related rx queue ievent, not remove the code.
-> Pls see commit: db3421c114cf that was submitted by Russell King.
-> 
-> No ack the patch.
+> * move hisax to staging
+> * remove i4l support from gigaset
+
+For the record: I have no reason to object a patch that does that. (I'm
+not aware anyone complained when gigaset switched its default from i4l
+to capi. By now all relevant distributions should use our capi driver.)
+
+> * move i4l core to staging
+
+On a local tree I have two (draft) patches that do some related
+preliminary work:
+- isdnhdlc: move into separate directory
+- mISDN: NETJet: stop selecting ISDN_I4L
+
+These trivial patches untangle mISDN and i4l. Perhaps you did something
+similar in your "move i4l core to staging".
+
+> while I initially thought that i4l as a whole is not just unmaintained
+> but also more or less unused, patch 19cebbcb04c8 ("isdn: Partially
+> revert debug format string usage clean up") came in that indicated
+> that
+> there are still users that even send patches for hisax, and that
+> made me doubt whether we could consider it obsolete enough.
+
+See also commit 3460baa62068 ("PCI: Fix minimum allocation address
+overwrite").
+
+> Any thoughts on this? If you like, I can send those too.
+
+For my part I'm surprised that anyone is still using it. But apparently
+the hardware that required commit 19cebbcb04c8 and 3460baa62068  (which
+I'm unfamiliar with) is still operational. And since there never has
+been, as far as I know, a global i4l to capi migration nor a global i4l
+(and capi) to mISDN migration it might be that some people are stuck on
+i4l drivers for their hardware. Perhaps that explains Cristoph's
+commits.
+
+> My main motivation was to not have to fix up the ippp implementation
+> when I move the compat ioctl handler from fs/compat_ioctl.c
+> into drivers/net/ppp/ppp_generic.c, but I guess I can do that
+> anyway as it seems that i4l never worked properly in compat mode.
 
 
-This is now done in patch #4 "net: fec: reduce interrupts" and you could argue
-that it should be squashed into that patch. But I like separating changes
-as much as possible.
-
-
-Russell, this patch and patch #4 will likely need your ack before it will be applied.
-Can you take a look please?
-
-http://www.spinics.net/lists/netdev/msg361927.html
-
-
-Thanks
-Troy
+Paul Bolle
