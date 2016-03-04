@@ -1,25 +1,30 @@
-From: lisheng011@huawei.com (Lisheng)
-Date: Fri, 4 Mar 2016 12:40:48 +0800
-Subject: [PATCH net 0/2] net: hns: fixed the pause ctl bug
-Message-ID: <1457066450-72395-1-git-send-email-lisheng011@huawei.com>
+From: edo.rus@gmail.com (Ed Spiridonov)
+Date: Fri,  4 Mar 2016 08:11:53 +0300
+Subject: [PATCH] serial: pl011: add mark/space parity support
+Message-ID: <1457068313-16092-1-git-send-email-edo.rus@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change is for supporting pause in V2 chip:
-	service ports can close pause-rx;
-	debug ports can open pause-rx/tx.
+PL011 UART has hardware mark/space parity ability, this trivial patch adds support for it.
+Tested on Raspberry Pi v1, v2 (BCM2835 and BCM2836)
 
-Lisheng (2):
-  net: hns: fixed the pause ctl bug
-  net: hns: update pause regs to dump function
+Signed-off-by: Ed Spiridonov <edo.rus@gmail.com>
+---
+ drivers/tty/serial/amba-pl011.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  | 20 +++++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 30 +++------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 71 ++++++++++++++++++----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  4 ++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |  6 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  6 ++
- 6 files changed, 98 insertions(+), 39 deletions(-)
-
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index c0da0cc..9de674a 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1947,6 +1947,8 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		lcr_h |= UART01x_LCRH_PEN;
+ 		if (!(termios->c_cflag & PARODD))
+ 			lcr_h |= UART01x_LCRH_EPS;
++		if (termios->c_cflag & CMSPAR)
++			lcr_h |= UART011_LCRH_SPS;
+ 	}
+ 	if (uap->fifosize > 1)
+ 		lcr_h |= UART01x_LCRH_FEN;
 -- 
-1.9.1
+2.7.0
