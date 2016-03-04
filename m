@@ -1,56 +1,63 @@
-From: isdn@linux-pingi.de (isdn at linux-pingi.de)
-Date: Fri, 4 Mar 2016 19:18:49 +0100
-Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
-In-Reply-To: <1659125.tHp8H942OG@wuerfel>
-References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
- <1456945629-1793533-2-git-send-email-arnd@arndb.de>
- <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
-Message-ID: <56D9D189.8080206@linux-pingi.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 4 Mar 2016 10:34:01 -0800
+Subject: [PATCH v3 0/4] fix memremap on ARM
+In-Reply-To: <1457084928-21179-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457084928-21179-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAPcyv4gmgE1=REbvWfv8Q61pLOJp9Vjf_qxbX5GQ82o=7aVtGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 04.03.2016 um 16:24 schrieb Arnd Bergmann:
-> On Thursday 03 March 2016 09:30:38 isdn at linux-pingi.de wrote:
->> Hi Arnd,
->> I fully agree and ack.
->> Thanks for the work.
->>
-> 
-> I actually did more patches that I ended up not submitting:
-> 
-> * move hisax to staging
-> * remove i4l support from gigaset
-> * move i4l core to staging
-> 
-> while I initially thought that i4l as a whole is not just unmaintained
-> but also more or less unused, patch 19cebbcb04c8 ("isdn: Partially
-> revert debug format string usage clean up") came in that indicated that
-> there are still users that even send patches for hisax, and that
-> made me doubt whether we could consider it obsolete enough.
-> 
-> Any thoughts on this? If you like, I can send those too.
+On Fri, Mar 4, 2016 at 1:48 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> This is something I ran into while working on support for the UEFI
+> memory attributes and ESRT tables. In both cases, these tables are
+> passed to the kernel in memory which is guaranteed to be below 4 GB,
+> but may be outside of the kernel direct mapping. (UEFI typically
+> attempts to allocate from the top down, which means such tables are
+> highly likely to be in highmem for any system with more than 760 MB
+> of system RAM)
+>
+> The recently introduced memremap() is a very useful abstraction for
+> accessing such tables, because it is generic, and already attempts to
+> do the right thing with respect to regions that may already have been
+> mapped directly. However, it falls back to ioremap_cache() for mapping
+> high memory, which is not allowed on ARM for system RAM, and also results
+> in the region to be mapped with different attributes depending on whether
+> it is covered by lowmem or not.
+>
+> So instead, create an arch specific hook 'arch_memremap_wb(), and
+> implement it for ARM using the same memory attributes used for the
+> linear mapping. Note that memremap will only call this hook for regions
+> that are not already mapped permanently.
+>
+> Since this change results in memremap() to use attributes different from
+> the ones used by ioremap_cache(), revert the change to pxa2xx-flash that
+> moved it to memremap.
+>
+> Changes since v2:
+> - add patch to bring back ioremap_cached() on ARM
+> - switch pxa2xx-flash back to ioremap_cached() not ioremap_cache()
+> - use arch_ioremap_caller not __arm_ioremap_caller() in patch #4
+> - deal with __iomem annotation of arch_ioremap_caller (patch #4)
+>
+> Changes since v1/rfc:
+> - new patch #1 that reverts the ioremap_cache->memremap conversion for the
+>   pxa2xx-flash driver
+> - added Dan's ack to patch #2
+>
+> Ard Biesheuvel (4):
+>   ARM: reintroduce ioremap_cached() for creating cached I/O mappings
+>   mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
+>   memremap: add arch specific hook for MEMREMAP_WB mappings
+>   ARM: memremap: implement arch_memremap_wb()
+>
+>  arch/arm/include/asm/io.h       | 12 ++++++++++++
+>  arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
+>  drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
+>  kernel/memremap.c               | 11 ++++++++---
+>  4 files changed, 37 insertions(+), 8 deletions(-)
+>
 
-I4L is still in use on some sides and here is no 100% replacement (net
-via RAW IP mode, terminal via X.75).
+For the series:
 
-This week I got some question from a big retail chain  in Germany about
-migration. I never know that they are  using this stuff (for initial
-setup of remote shops).
-
-So I would not drop i4l yet, maybe we should propose this for 2018.
-I4L is not so usefull for NT mode, which is very popular nowadays for
-gateways into the new full IP world. Some design ins with mISDN here,
-mostly in the embedded area.
-
-> 
-> My main motivation was to not have to fix up the ippp implementation
-> when I move the compat ioctl handler from fs/compat_ioctl.c
-> into drivers/net/ppp/ppp_generic.c, but I guess I can do that
-> anyway as it seems that i4l never worked properly in compat mode.
-> 
-> 	Arnd
-> 
-> 
-> 
-> 
-> 
+Acked-by: Dan Williams <dan.j.williams@intel.com>
