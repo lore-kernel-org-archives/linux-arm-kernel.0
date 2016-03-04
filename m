@@ -1,73 +1,66 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Fri, 4 Mar 2016 10:06:18 +0000
-Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
- fec_timeout
-In-Reply-To: <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
-References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
- <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB18552AB3E4128E412273B439FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 4 Mar 2016 11:09:22 +0100
+Subject: [RFC v3 01/12] PM / Domains: Abstract genpd locking
+In-Reply-To: <1456866931-37851-3-git-send-email-lina.iyer@linaro.org>
+References: <1456866931-37851-1-git-send-email-lina.iyer@linaro.org>
+ <1456866931-37851-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFp4y_QSNPesVq6TJ_jPmmJiFJ_dqza6gzAdHypE+0j+3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2016 8:37 AM
-> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
-> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
-> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
-> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
-> johannes at sipsolutions.net; stillcompiling at gmail.com;
-> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
-> <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
-> fec_timeout
-> 
-> Print the current interrupt flags and mask and the interrupt state during the last
-> interrupt in fec_timeout.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  drivers/net/ethernet/freescale/fec.h      | 1 +
->  drivers/net/ethernet/freescale/fec_main.c | 4 ++++
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec.h
-> b/drivers/net/ethernet/freescale/fec.h
-> index 001200b..615cca1 100644
-> --- a/drivers/net/ethernet/freescale/fec.h
-> +++ b/drivers/net/ethernet/freescale/fec.h
-> @@ -506,6 +506,7 @@ struct fec_enet_private {
->  	unsigned int total_tx_ring_size;
->  	unsigned int total_rx_ring_size;
->  	uint	events;
-> +	uint	last_ievents;
-> 
->  	struct	platform_device *pdev;
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c
-> index afd4060..9a3136b 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1107,6 +1107,9 @@ fec_timeout(struct net_device *ndev)
->  	int i;
->  	uint events = 0;
-> 
-> +	pr_err("%s: last=%x %x, mask %x\n", __func__, fep->last_ievents,
-> +	       readl(fep->hwp + FEC_IEVENT), readl(fep->hwp + FEC_IMASK));
+On 1 March 2016 at 22:15, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Abstract genpd lock/unlock calls, in preparation for domain specific
+> locks added in the following patches.
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+
+[...]
+
+> +struct genpd_lock_fns;
 > +
-pr_err() -> netdev_err()
+>  struct generic_pm_domain {
+>         struct dev_pm_domain domain;    /* PM domain operations */
+>         struct list_head gpd_list_node; /* Node in the global PM domains list */
+>         struct list_head master_links;  /* Links with PM domain as a master */
+>         struct list_head slave_links;   /* Links with PM domain as a slave */
+>         struct list_head dev_list;      /* List of devices */
+> -       struct mutex lock;
+>         struct dev_power_governor *gov;
+>         struct work_struct power_off_work;
+>         const char *name;
+> @@ -74,6 +75,8 @@ struct generic_pm_domain {
+>         struct genpd_power_state *states;
+>         unsigned int state_count; /* number of states */
+>         unsigned int state_idx; /* state that genpd will go to when off */
+> +       const struct genpd_lock_fns *lock_fns;
+> +       struct mutex mlock;
 
-I don't want the debug patch enter to the driver.
+Nitpick: I wouldn't mind if you name this mtx_lock, as it would be a
+bit more consistent with the corresponding helper functions.
 
->  	for (i = 0; i < fep->num_tx_queues; i++) {
->  		struct fec_enet_priv_tx_q *txq = fep->tx_queue[i];
->  		int index;
-> @@ -1514,6 +1517,7 @@ fec_enet_interrupt(int irq, void *dev_id)
-> 
->  	if (!int_events)
->  		return IRQ_NONE;
-> +	fep->last_ievents = int_events;
-> 
->  	if (int_events & (FEC_ENET_RXF | FEC_ENET_TXF)) {
->  		if (napi_schedule_prep(&fep->napi)) {
+>
+>  };
+>
 > --
-> 2.5.0
+> 2.1.4
+>
+
+Otherwise this looks good to me!
+
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+One issue I noticed though, this patch isn't based upon Rafael's
+latest tree, thus it can't be applied as is. Could you perhaps
+re-base?
+
+I suppose that's needed for some of the other patches as well. I think
+we should split up the dependency a bit better so we can move forward
+with standalone patches.
+
+Kind regards
+Uffe
