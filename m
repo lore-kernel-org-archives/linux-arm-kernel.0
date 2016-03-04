@@ -1,70 +1,101 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 4 Mar 2016 13:54:52 +0000
-Subject: [PATCH v2 2/5] arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
-In-Reply-To: <56D98F9E.50707@arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <1454684330-892-3-git-send-email-james.morse@arm.com>
- <56D87B74.1010306@codeaurora.org> <56D88219.6040806@arm.com>
- <56D88A6C.8070304@codeaurora.org> <20160303191920.GA650@arm.com>
- <56D96188.4080203@arm.com> <56D98F9E.50707@arm.com>
-Message-ID: <56D993AC.4070402@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 4 Mar 2016 05:56:20 -0800
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+In-Reply-To: <CAGkQfmOLVwpckKP+axdi1501ghqq_UAmCygJv_tfa=bCOLvCzA@mail.gmail.com>
+References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+ <56D8E649.8030500@atmel.com> <56D91BDC.1030604@roeck-us.net>
+ <CAGkQfmN9wDkrc=frsSdBYYtMPf4VaTpcmYjX6_wARs=a78-bPQ@mail.gmail.com>
+ <56D988F0.8050803@roeck-us.net>
+ <CAGkQfmOLVwpckKP+axdi1501ghqq_UAmCygJv_tfa=bCOLvCzA@mail.gmail.com>
+Message-ID: <56D99404.60305@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/16 13:37, James Morse wrote:
-> Hi Suzuki,
->
-> On 04/03/16 10:20, Suzuki K. Poulose wrote:
->> On 03/03/16 19:19, Will Deacon wrote:
->>> On Thu, Mar 03, 2016 at 02:03:08PM -0500, Christopher Covington wrote:
->>>> On 03/03/2016 01:27 PM, Robin Murphy wrote:
->>>>> On 03/03/16 17:59, Christopher Covington wrote:
->>>>>> swapper[0]: undefined instruction: pc=ffffff800808d730
->>>>>> Code: d5380702 d5380721 f9017c02 f9018001 (d5380742)
->>>>>> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
->>>>>> Modules linked in:
->>>>>> CPU: 0 PID: 0 Comm: swapper Not tainted 4.5.0-rc6-next-20160303 #1
->>>>>> Hardware name: (null) (DT)
->>>>>> task: ffffff8008b2d980 ti: ffffff8008b20000 task.ti: ffffff8008b20000
->>>>>> PC is at __cpuinfo_store_cpu+0x68/0x198
->>>>>> LR is at cpuinfo_store_boot_cpu+0x28/0x50
+On 03/04/2016 05:26 AM, Romain Izard wrote:
+> 2016-03-04 14:09 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
+>> On 03/04/2016 01:06 AM, Romain Izard wrote:
+>>> 2016-03-04 6:23 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
+>>>> On 03/03/2016 05:35 PM, Yang, Wenyou wrote:
+>>>>> On 2016/3/3 18:29, Romain Izard wrote:
 >>>>>>
->>>>>> ffffff800808d730:       d5380742        mrs     x2, s3_0_c0_c7_2
+>>>>>> If the internal counter is not refreshed when the watchdog is
+>>>>>> started for the first time, the watchdog will trigger very
+>>>>>> rapidly.  For example, opening /dev/watchdog without writing in it
+>>>>>> will immediately trigger a reboot, instead of waiting for the
+>>>>>> delay to expire.
+>>>>>>
+>>>>>> To avoid this problem, reload the timer on opening the watchdog
+>>>>>> device.
+>>>>>>
+>>>>>> Command: "while sleep 5; do echo 1; done > /dev/watchdog" Before:
+>>>>>> system reset After: the watchdog runs correctly
 >>>>>
->>>>> Hmm, per table C5-6 in the ARMv8 ARM (issue i), that's specifically a
->>>>> reserved encoding, rather than an unallocated one, so it should read as
->>>>> zero, not undef. What are you running on?
->>>>
->>>> QDF2432. I'll investigate.
+>>>>>
+>>>>> I didn't reproduce your issue on my side,
+>>>>>
+>>>>> run the your commands as follows, it works fine,  the system reset
+>>>>> doesn't happen.
 >>>
->>> FWIW, I think the same issue was reported on qemu, so we may want to
->>> handle this in the kernel anyway. We could either use alternatives on
->>> the register read or handle the undef.
+>>>
+>>> I've just verified with the factory image provided on the SAMA5D2
+>>> Xplained board. It does not display this behaviour.
+>>>
+>>> But the difference is that in the case without the issue, I'm using
+>>> the AT91bootstrap SPL, U-Boot, and the kernel from the QSPI chip.
+>>> When I have the issue, I have a U-Boot based SPL, U-Boot itself and
+>>> the kernel that come from the FAT partition of an SD-Card.
+>>>
+>>> Userspace does not seem to be involved in the issue, as I can
+>>> reproduce it both with my buildroot environment, and the Yocto
+>>> environment from the factory image.
+>>>
+>>>> Different chip revision ? Different chip type ? Different chip
+>>>> initialization by ROMMON ?
+>>>>
+>>>> Can we get exact chip revisions and types for both cases (working
+>>>> and not working), and (if it might be relevant) a dump of all
+>>>> associated chip registers ?
+>>>
+>>>
+>>>
+>>>>> I also check the WDT_MR register before and after enabling
+>>>>> watchdog, the WDV and WDD fields are correct.
+>>>>>
+>>>>> Can you check it again? thank you.
+>>>
+>>>
+>>> Working case:
+>>> MR on kernel startup:   0x3fffafff
+>>> MR after watchdog init: 0x0fffafff
+>>> MR after start:         0x0fff2fff
+>>>
+>>> Problem case:
+>>> MR on kernel startup:   0x00008000
+>>> MR after watchdog init: 0x0fffafff
+>>> MR after start:         0x0fff2fff
+>>>
+>>> So this means that the counter reload does not seem to work very well
+>>> if WDD/WDV have been set to 0 in the past. The other question is why
+>>> does U-Boot (from the Atmel branch based on 2015.1) put this stange
+>>> value in this register.
+>>>
+>>
+>> Can you check the value of AT91_WDT_SR ? Maybe it tells us something.
+>>
+> I didn't report it because it contained 0 at all times. So no information.
 >
-> Alternatives would let us handle the QDF2432 case, but detecting the version of
-> qemu doesn't sound right. I will put together a series to handle the undef.
+>> Also, in the error case, can you check if the watchdog times out at all
+>> after you applied your patch ?
+>
+> It times out after 16s as expected, and reboot occurs correctly.
+>
 
-More generally, it would leave future potential for having to work out 
-whether to apply alternatives to read an ID register to work out whether 
-we need to apply alternatives for some feature within. I also can't even 
-begin to fathom how such a thing would interact with the heterogeneous 
-feature sanity-checking.
+Interesting. So it looks like AT91_WDT_WDRSTT has to be set if the timer
+values in MR are changed from 0 to another value, or maybe after each
+timer value change. Wonder if that should be done in the init function,
+after MR is set (with the watchdog disabled).
 
-I think trapping the undef is the only viable approach.
+Thoughts, anyone ?
 
-Robin.
-
->> We could use parts of the mrs emulation patch [1] to emulate only the above
->> for kernel mode.
->
-> Thanks, I will see what I can poach!
->
->
-> James
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thanks,
+Guenter
