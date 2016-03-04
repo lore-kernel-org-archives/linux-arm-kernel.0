@@ -1,67 +1,80 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 4 Mar 2016 09:11:31 +0100
-Subject: [PATCH v5 1/4] mmc: meson: Document Amlogic Meson MMC DT bindings
-In-Reply-To: <20160303221744.GA1828@rob-hp-laptop>
-References: <1456596108-1406-1-git-send-email-carlo@caione.org>
- <1456596108-1406-2-git-send-email-carlo@caione.org>
- <20160303221744.GA1828@rob-hp-laptop>
-Message-ID: <CAOQ7t2a85sgRj4JGV24iVbEZKWqqORmMDFwXvOFOu_y3XkHApg@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 4 Mar 2016 09:30:02 +0100
+Subject: [PATCH] arm64: tegra210-smaug: Add gpio-key nodes
+In-Reply-To: <1457034865-17826-1-git-send-email-rklein@nvidia.com>
+References: <1457034865-17826-1-git-send-email-rklein@nvidia.com>
+Message-ID: <20160304083002.GA4038@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 3, 2016 at 11:17 PM, Rob Herring <robh@kernel.org> wrote:
-> On Sat, Feb 27, 2016 at 07:01:45PM +0100, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> ---
->>  .../devicetree/bindings/mmc/meson-mmc.txt          | 30 ++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mmc/meson-mmc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/meson-mmc.txt b/Documentation/devicetree/bindings/mmc/meson-mmc.txt
->> new file mode 100644
->> index 0000000..328157e
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mmc/meson-mmc.txt
->> @@ -0,0 +1,30 @@
->> +* Amlogic Meson MMC controller
->> +
->> +The highspeed MMC host controller on Amlogic SoCs provides an interface
->> +for MMC, SD, SDIO and SDHC types of memory cards.
->> +
->> +Supported maximum speeds are the ones of the eMMC standard 4.41 as well
->> +as the speed of SD standard 2.0.
->> +
->> +Required properties:
->> + - compatible : "amlogic,meson-mmc"
->> + - reg : mmc controller base registers
->> + - interrupts : mmc controller interrupt
->> + - clocks : phandle to clock provider
->> + - pinctrl-names : should contain "sdio_a" or "sdio_b"
->> + - pinctrl-0: Should specify pin control groups used for this controller
->> +
->> +Optional properties:
->> + - meson,sd-port : 0 for port A, 1 for port B
->
-> This is different than the pinctrl-names? It needs a better description
-> including what is the default if absent.
->
+On Thu, Mar 03, 2016 at 02:54:25PM -0500, Rhyland Klein wrote:
+> Add gpio-key nodes for the volumn controls, lid switch,
+> tablet mode and power button.
+> 
+> Signed-off-by: Rhyland Klein <rklein@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 43 +++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> index 750e85c45135..9c0ec3031e98 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> +++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+> @@ -1,5 +1,7 @@
+>  /dts-v1/;
+>  
+> +#include <dt-bindings/input/input.h>
+> +
+>  #include "tegra210.dtsi"
+>  
+>  / {
+> @@ -76,6 +78,47 @@
+>  		};
+>  	};
+>  
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		gpio-keys,name = "gpio-keys";
+> +
+> +		power {
+> +			label = "Power";
+> +			gpios = <&gpio TEGRA_GPIO(X, 5) GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_POWER>;
+> +			debounce-interval = <30>;
+> +			gpio-key,wakeup;
 
-This was already discussed here
-http://www.spinics.net/lists/linux-mmc/msg34407.html.
-In the previous version (V4) I used pinctrl-names to select the
-correct port but discussing with Ulf we decided to switch back to have
-a new property in the DTS.
-About what this value is, it is a bit up to our interpretation. We use
-this value to setup the SDIO_PORT_SEL register and in the register
-description in the documentation I read only "SDIO port selection. 0:
-SDIO A; 1: SDIO B".
-So I'm assuming this is somehow related to the muxing / pin controller
-configuration but probably it's better to stay on the safe side and
-just have a new property to setup this value.
+This property was recently deprecated in favour of the standard generic
+wakeup-source property.
 
-I'll add the new default value in the next version.
+> +		};
+> +
+> +		lid {
+> +			label = "Lid";
+> +			gpios = <&gpio TEGRA_GPIO(B, 4) GPIO_ACTIVE_LOW>;
+> +			linux,input-type = <5>; /* EV_SW */
+> +			linux,code = <0>; /* SW_LID */
 
--- 
-Carlo Caione
+The dt-bindings/input/input.h header defines the symbolic names for
+these in upstream versions of the Linux kernel.
+
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		tablet_mode {
+> +			label = "Tablet Mode";
+> +			gpios = <&gpio TEGRA_GPIO(Z, 2) GPIO_ACTIVE_HIGH>;
+> +			linux,input-type = <5>; /* EV_SW */
+> +			linux,code = <1>; /* SW_TABLET_MODE */
+
+Same here.
+
+I've made all the above changes when applying, so no need to resend.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160304/4587fb98/attachment.sig>
