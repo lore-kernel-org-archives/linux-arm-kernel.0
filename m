@@ -1,57 +1,76 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Fri, 4 Mar 2016 10:06:45 +0100
-Subject: [PATCH] crypto/async_pq: use __free_page() instead of put_page()
-In-Reply-To: <1456738445-876239-1-git-send-email-arnd@arndb.de>
-References: <1456738445-876239-1-git-send-email-arnd@arndb.de>
-Message-ID: <56D95025.1060500@suse.cz>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 4 Mar 2016 10:06:34 +0100
+Subject: [PATCH v1] watchdog: sama5d4_wdt: Reset delay on start
+In-Reply-To: <56D91BDC.1030604@roeck-us.net>
+References: <1457000979-15717-1-git-send-email-romain.izard.pro@gmail.com>
+ <56D8E649.8030500@atmel.com> <56D91BDC.1030604@roeck-us.net>
+Message-ID: <CAGkQfmN9wDkrc=frsSdBYYtMPf4VaTpcmYjX6_wARs=a78-bPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2016 10:33 AM, Arnd Bergmann wrote:
-> The addition of tracepoints to the page reference tracking had an
-> unfortunate side-effect in at least one driver that calls put_page
-> from its exit function, resulting in a link error:
-> 
-> `.exit.text' referenced in section `__jump_table' of crypto/built-in.o: defined in discarded section `.exit.text' of crypto/built-in.o
-> 
-> From a cursory look at that this driver, it seems that it may be
-> doing the wrong thing here anyway, as the page gets allocated
-> using 'alloc_page()', and should be freed using '__free_page()'
-> rather than 'put_page()'.
-> 
-> With this patch, I no longer get any other build errors from the
-> page_ref patch, so hopefully we can assume that it's always wrong
-> to call any of those functions from __exit code, and that no other
-> driver does it.
+Hi Wenyou, Guenter,
 
-Hopefully that's true. If any such driver was leaking references to
-those pages, so the put_page() didn't actually result in freeing, the
-explicit __free_page should catch this via built-in checks.
+2016-03-04 6:23 GMT+01:00 Guenter Roeck <linux@roeck-us.net>:
+> On 03/03/2016 05:35 PM, Yang, Wenyou wrote:
+>> On 2016/3/3 18:29, Romain Izard wrote:
+>>>
+>>> If the internal counter is not refreshed when the watchdog is
+>>> started for the first time, the watchdog will trigger very rapidly.
+>>> For example, opening /dev/watchdog without writing in it will
+>>> immediately trigger a reboot, instead of waiting for the delay to
+>>> expire.
+>>>
+>>> To avoid this problem, reload the timer on opening the watchdog
+>>> device.
+>>>
+>>> Command: "while sleep 5; do echo 1; done > /dev/watchdog" Before:
+>>> system reset After: the watchdog runs correctly
+>>
+>> I didn't reproduce your issue on my side,
+>>
+>> run the your commands as follows, it works fine,  the system reset
+>> doesn't happen.
 
-> Fixes: 0f80830dd044 ("mm/page_ref: add tracepoint to track down page reference manipulation")
+I've just verified with the factory image provided on the SAMA5D2
+Xplained board. It does not display this behaviour.
 
-Since it's in mmotm which is quilt-based, the commit hash from -next is
-not stable.
+But the difference is that in the case without the issue, I'm using the
+AT91bootstrap SPL, U-Boot, and the kernel from the QSPI chip. When I
+have the issue, I have a U-Boot based SPL, U-Boot itself and the kernel
+that come from the FAT partition of an SD-Card.
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Userspace does not seem to be involved in the issue, as I can reproduce
+it both with my buildroot environment, and the Yocto environment from
+the factory image.
 
-Acked-by: Vlastimil Babka <vbabka@suse.cz>
+> Different chip revision ? Different chip type ? Different chip
+> initialization by ROMMON ?
+>
+> Can we get exact chip revisions and types for both cases (working and
+> not working), and (if it might be relevant) a dump of all associated
+> chip registers ?
 
-> ---
->  crypto/async_tx/async_pq.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/crypto/async_tx/async_pq.c b/crypto/async_tx/async_pq.c
-> index c0748bbd4c08..08b3ac68952b 100644
-> --- a/crypto/async_tx/async_pq.c
-> +++ b/crypto/async_tx/async_pq.c
-> @@ -444,7 +444,7 @@ static int __init async_pq_init(void)
->  
->  static void __exit async_pq_exit(void)
->  {
-> -	put_page(pq_scribble_page);
-> +	__free_page(pq_scribble_page);
->  }
->  
->  module_init(async_pq_init);
-> 
+
+>> I also check the WDT_MR register before and after enabling watchdog,
+>> the WDV and WDD fields are correct.
+>>
+>> Can you check it again? thank you.
+
+Working case:
+MR on kernel startup:   0x3fffafff
+MR after watchdog init: 0x0fffafff
+MR after start:         0x0fff2fff
+
+Problem case:
+MR on kernel startup:   0x00008000
+MR after watchdog init: 0x0fffafff
+MR after start:         0x0fff2fff
+
+So this means that the counter reload does not seem to work very well if
+WDD/WDV have been set to 0 in the past. The other question is why does
+U-Boot (from the Atmel branch based on 2015.1) put this stange value in
+this register.
+
+Best regards,
+-- 
+Romain Izard
