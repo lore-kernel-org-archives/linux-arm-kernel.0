@@ -1,57 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 4 Mar 2016 16:02:21 +0000
-Subject: [PATCH V4] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-In-Reply-To: <1457063043-10623-1-git-send-email-tchalamarla@caviumnetworks.com>
-References: <1457063043-10623-1-git-send-email-tchalamarla@caviumnetworks.com>
-Message-ID: <20160304160221.GC7886@arm.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 4 Mar 2016 09:05:12 -0700
+Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
+ fec_timeout
+In-Reply-To: <VI1PR0401MB18552AB3E4128E412273B439FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-14-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18552AB3E4128E412273B439FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+Message-ID: <56D9B238.2040400@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 07:44:03PM -0800, Tirumalesh Chalamarla wrote:
-> Due to Errata#27704 CN88xx SMMUv2,supports  only shared ASID and VMID
-> namespaces; specifically within a given node SMMU0 and SMMU1 share,
-> as does SMMU2 and SMMU3.
+On 3/4/2016 3:06 AM, Fugang Duan wrote:
+> From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, February 25, 2016 8:37 AM
+>> To: netdev at vger.kernel.org; davem at davemloft.net; b38611 at freescale.com
+>> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
+>> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+>> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
+>> johannes at sipsolutions.net; stillcompiling at gmail.com;
+>> sergei.shtylyov at cogentembedded.com; arnd at arndb.de; Troy Kisky
+>> <troy.kisky@boundarydevices.com>
+>> Subject: [PATCH net-next V2 13/16] net: fec: print more debug info in
+>> fec_timeout
+>>
+>> Print the current interrupt flags and mask and the interrupt state during the last
+>> interrupt in fec_timeout.
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> ---
+>>  drivers/net/ethernet/freescale/fec.h      | 1 +
+>>  drivers/net/ethernet/freescale/fec_main.c | 4 ++++
+>>  2 files changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/net/ethernet/freescale/fec.h
+>> b/drivers/net/ethernet/freescale/fec.h
+>> index 001200b..615cca1 100644
+>> --- a/drivers/net/ethernet/freescale/fec.h
+>> +++ b/drivers/net/ethernet/freescale/fec.h
+>> @@ -506,6 +506,7 @@ struct fec_enet_private {
+>>  	unsigned int total_tx_ring_size;
+>>  	unsigned int total_rx_ring_size;
+>>  	uint	events;
+>> +	uint	last_ievents;
+>>
+>>  	struct	platform_device *pdev;
+>>
+>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>> b/drivers/net/ethernet/freescale/fec_main.c
+>> index afd4060..9a3136b 100644
+>> --- a/drivers/net/ethernet/freescale/fec_main.c
+>> +++ b/drivers/net/ethernet/freescale/fec_main.c
+>> @@ -1107,6 +1107,9 @@ fec_timeout(struct net_device *ndev)
+>>  	int i;
+>>  	uint events = 0;
+>>
+>> +	pr_err("%s: last=%x %x, mask %x\n", __func__, fep->last_ievents,
+>> +	       readl(fep->hwp + FEC_IEVENT), readl(fep->hwp + FEC_IMASK));
+>> +
+> pr_err() -> netdev_err()
 > 
-> This patch make sures ASID and VMID space is unique across cavium SMMUv2.
-> 
-> changes from V3:
-> 	- Removed redundent variable.
 
-[...]
 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 247a469..bfe38f3 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -326,6 +326,11 @@ struct arm_smmu_device {
-> 
->  	struct list_head		list;
->  	struct rb_root			masters;
-> +	/*
-> +	 *The following fields are specific to Cavium, Thunder
-> +	 */
-> +	u32				cavium_id_base;
-> +
->  };
-> 
->  struct arm_smmu_cfg {
-> @@ -335,8 +340,8 @@ struct arm_smmu_cfg {
->  };
->  #define INVALID_IRPTNDX			0xff
-> 
-> -#define ARM_SMMU_CB_ASID(cfg)		((cfg)->cbndx)
-> -#define ARM_SMMU_CB_VMID(cfg)		((cfg)->cbndx + 1)
-> +#define ARM_SMMU_CB_ASID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx)
-> +#define ARM_SMMU_CB_VMID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx + 1)
-> 
->  enum arm_smmu_domain_stage {
->  	ARM_SMMU_DOMAIN_S1 = 0,
-> @@ -364,6 +369,8 @@ struct arm_smmu_option_prop {
->  	const char *prop;
->  };
-> 
-> +static u32 cavium_smmu_context_count;
-
-I thought you were going to make this an atomic_t?
-
-Will
+Sounds good
