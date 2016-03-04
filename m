@@ -1,274 +1,204 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 4 Mar 2016 16:03:56 +0300
-Subject: [PATCH v3 5/7] ACPI: serial: implement earlycon on ACPI DBG2 port
-In-Reply-To: <56D878D4.4000902@hurleysoftware.com>
-References: <1456749726-30261-1-git-send-email-aleksey.makarov@linaro.org>
- <1456749726-30261-6-git-send-email-aleksey.makarov@linaro.org>
- <56D5BAFF.6080008@hurleysoftware.com> <56D5C9F5.5060301@linaro.org>
- <56D878D4.4000902@hurleysoftware.com>
-Message-ID: <56D987BC.7070209@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 4 Mar 2016 07:05:03 -0600
+Subject: [PATCH V2 2/2] mailbox: Introduce TI message manager driver
+In-Reply-To: <CABb+yY1hK4T6KAQcqNKF3D_pkLCcDVN=+T18ueV35jXbpLR+kg@mail.gmail.com>
+References: <1456525452-30638-1-git-send-email-nm@ti.com>
+ <1456525452-30638-3-git-send-email-nm@ti.com>
+ <CABb+yY1hK4T6KAQcqNKF3D_pkLCcDVN=+T18ueV35jXbpLR+kg@mail.gmail.com>
+Message-ID: <56D987FF.1040607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jassi,
 
+Thanks for reviewing the patch.
+On 03/03/2016 11:18 PM, Jassi Brar wrote:
 
-On 03/03/2016 08:48 PM, Peter Hurley wrote:
-> On 03/01/2016 08:57 AM, Aleksey Makarov wrote:
+[...]
+
 >>
+>>  drivers/mailbox/Kconfig     |  11 +
+>>  drivers/mailbox/Makefile    |   2 +
+>>  drivers/mailbox/ti-msgmgr.c | 657
+
+> Do you want to call it something more specific than 'msgmgr from TI'?
+> Maybe its about Keystone, like mailbox-keystone.c ?
+
+Here is the rationale for choosing the name:
+There are more than 1 IPC in TI SoCs and even within Keystone SoC.
+Further, it is indeed called message manager hardware block and used
+across multiple SoC families (even though it is originated by keystone
+architecture). we do have a reuse of the omap-mailbox in a future
+keystone device (in addition to message manager), so using ti-mailbox is
+more appropriate for omap-mailbox, but anyways.. further renaming this
+as keystone-mailbox will confuse poor users when the new SoC comes in..
+
+We do have a lot of cross pollination of hardware blocks across TI
+architectures, and "keystone-" prefix does not really fit the usage.
+hence the usage of vendor-hardwareblock name.
+
+> 
+> 
+>> +#include <linux/module.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/ti-msgmgr.h>
 >>
->> On 03/01/2016 06:53 PM, Peter Hurley wrote:
->>> On 02/29/2016 04:42 AM, Aleksey Makarov wrote:
->>>> Add ACPI_DBG2_EARLYCON_DECLARE() macros that declares
->>>> an earlycon on the serial port specified in the DBG2 ACPI table.
->>>>
->>>> Pass the string "earlycon=acpi_dbg2" to the kernel to activate it.
->>>>
->>>> Callbacks for EARLYCON_DECLARE() and OF_EARLYCON_DECLARE()
->>>> can also be used for this macros.
->>>>
->>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->>>> ---
->>>>  Documentation/kernel-parameters.txt |  3 ++
->>>>  drivers/tty/serial/earlycon.c       | 60 +++++++++++++++++++++++++++++++++++++
->>>>  include/linux/acpi_dbg2.h           | 20 +++++++++++++
->>>>  3 files changed, 83 insertions(+)
->>>>
->>>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
->>>> index e0a21e4..19b947b 100644
->>>> --- a/Documentation/kernel-parameters.txt
->>>> +++ b/Documentation/kernel-parameters.txt
->>>> @@ -1072,6 +1072,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->>>>  			A valid base address must be provided, and the serial
->>>>  			port must already be setup and configured.
->>>>  
->>>> +		acpi_dbg2
->>>> +			Use serial port specified by the DBG2 ACPI table.
->>>> +
->>>>  	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
->>>>  			earlyprintk=vga
->>>>  			earlyprintk=efi
->>>> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
->>>> index d217366..9ba3a04 100644
->>>> --- a/drivers/tty/serial/earlycon.c
->>>> +++ b/drivers/tty/serial/earlycon.c
->>>> @@ -22,6 +22,7 @@
->>>>  #include <linux/sizes.h>
->>>>  #include <linux/of.h>
->>>>  #include <linux/of_fdt.h>
->>>> +#include <linux/acpi.h>
->>>>  
->>>>  #ifdef CONFIG_FIX_EARLYCON_MEM
->>>>  #include <asm/fixmap.h>
->>>> @@ -200,6 +201,8 @@ int __init setup_earlycon(char *buf)
->>>>  	return -ENOENT;
->>>>  }
->>>>  
->>>> +static bool setup_dbg2_earlycon;
->>>> +
->>>>  /* early_param wrapper for setup_earlycon() */
->>>>  static int __init param_setup_earlycon(char *buf)
->>>>  {
->>>> @@ -212,6 +215,11 @@ static int __init param_setup_earlycon(char *buf)
->>>>  	if (!buf || !buf[0])
->>>>  		return early_init_dt_scan_chosen_serial();
->>>>  
->>>> +	if (!strcmp(buf, "acpi_dbg2")) {
->>>> +		setup_dbg2_earlycon = true;
->>>> +		return 0;
->>>> +	}
->>>
->>> So this series doesn't start an ACPI earlycon at early_param time?
->>> That doesn't seem very useful.
->>>
->>> When does the ACPI earlycon actually start?
->>> And don't say "when the DBG2 table is probed"; that much is obvious.
->>
->> ACPI earlycon starts as soon as ACPI tables become accessible (setup_arch()).
->> I think that is still quite early.
-> 
-> I see now; the probe is in patch 6/7.
-> 
-> setup_arch()
->   acpi_boot_table_init()
->     acpi_probe_device_table()
->       ...
->         acpi_dbg2_setup()
->           ->setup()
->             acpi_setup_earlycon()
+> This seems a bit bold. I think  include/linux/soc/ti/ is the right place.
+
+Sure, I can. Since I followed include/linux/omap-mailbox.h, Would you
+suggest all files such as include/linux/omap* be moved to
+include/linux/soc/ti/ ? I guess that is not pertinent to this specific
+patch, but I am curious..
+
+
+>> +       /* Do I actually have messages to read? */
+>> +       msg_count = ti_msgmgr_queue_get_num_messages(qinst);
+>> +       if (!msg_count) {
+>> +               /* Shared IRQ? */
+>> +               dev_dbg(dev, "Spurious event - 0 pending data!\n");
+>> +               return IRQ_NONE;
+>> +       }
+>> +
+>> +       /*
+>> +        * I have no idea about the protocol being used to communicate with the
+>> +        * remote producer - 0 could be valid data, so I wont make a judgement
+>> +        * of how many bytes I should be reading. Let the client figure this
+>> +        * out.. I just read the full message and pass it on..
+>> +        */
+> Exactly. And similarly when you send data, you should not have more
+> than one message in transit. Now please see my note in
+> ti_msgmgr_send_data()
 > 
 > 
->>>> +
->>>>  	err = setup_earlycon(buf);
->>>>  	if (err == -ENOENT || err == -EALREADY)
->>>>  		return 0;
->>>> @@ -286,3 +294,55 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
->>>>  }
->>>>  
->>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
->>>> +
->>>> +#ifdef CONFIG_ACPI_DBG2_TABLE
->>>> +
->>>> +int __init acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d)
->>>> +{
->>>> +	int err;
->>>> +	struct uart_port *port = &early_console_dev.port;
->>>> +	int (*setup)(struct earlycon_device *, const char *) = d;
->>>> +	struct acpi_generic_address *reg;
->>>> +
->>>> +	if (!setup_dbg2_earlycon)
->>>> +		return -ENODEV;
->>>> +
->>>> +	if (device->register_count < 1)
->>>> +		return -ENODEV;
->>>> +
->>>> +	if (device->base_address_offset >= device->length)
->>>> +		return -EINVAL;
->>>> +
->>>> +	reg = (void *)device + device->base_address_offset;
->>>> +
->>>> +	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY &&
->>>> +	    reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO)
->>>> +		return -EINVAL;
->>>> +
->>>> +	spin_lock_init(&port->lock);
->>>> +	port->uartclk = BASE_BAUD * 16;
->>>> +
->>>> +	if (reg->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
->>>> +		if (device->port_type == ACPI_DBG2_ARM_SBSA_32BIT)
->>>> +			port->iotype = UPIO_MEM32;
->>>> +		else
->>>> +			port->iotype = UPIO_MEM;
->>>> +		port->mapbase = reg->address;
->>>> +		port->membase = earlycon_map(reg->address, SZ_4K);
->>>> +	} else {
->>>> +		port->iotype = UPIO_PORT;
->>>> +		port->iobase = reg->address;
->>>> +	}
->>>> +
->>>> +	early_console_dev.con->data = &early_console_dev;
->>>> +	err = setup(&early_console_dev, NULL);
->>>> +	if (err < 0)
->>>> +		return err;
->>>> +	if (!early_console_dev.con->write)
->>>> +		return -ENODEV;
->>>> +
->>>> +	register_console(early_console_dev.con);
->>>> +	return 0;
->>>> +}
->>>> +
->>>> +#endif /* CONFIG_ACPI_DBG2_TABLE */
->>>> diff --git a/include/linux/acpi_dbg2.h b/include/linux/acpi_dbg2.h
->>>> index 125ae7e..b653752 100644
->>>> --- a/include/linux/acpi_dbg2.h
->>>> +++ b/include/linux/acpi_dbg2.h
->>>> @@ -37,12 +37,32 @@ int acpi_dbg2_setup(struct acpi_table_header *header, const void *data);
->>>>  	ACPI_DECLARE_PROBE_ENTRY(dbg2, name, ACPI_SIG_DBG2,		\
->>>>  				 acpi_dbg2_setup, &__acpi_dbg2_data_##name)
->>>>  
->>>> +int acpi_setup_earlycon(struct acpi_dbg2_device *device, void *d);
->>>> +
->>>> +/**
->>>> + * ACPI_DBG2_EARLYCON_DECLARE() - Define handler for ACPI GDB2 serial port
->>>> + * @name:		Identifier to compose name of table data
->>>> + * @subtype:		Subtype of the port
->>>> + * @console_setup:	Function to be called to setup the port
->>>> + *
->>>> + * Type of the console_setup() callback is
->>>> + * int (*setup)(struct earlycon_device *, const char *)
->>>> + * It's the type of callback of of_setup_earlycon().
->>>> + */
->>>> +#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
->>>> +	ACPI_DBG2_DECLARE(name, ACPI_DBG2_SERIAL_PORT, subtype,		\
->>>> +			  acpi_setup_earlycon, console_setup)
->>>> +
->>>>  #else
->>>>  
->>>>  #define ACPI_DBG2_DECLARE(name, type, subtype, setup_fn, data_ptr)	\
->>>>  	static const void *__acpi_dbg_data_##name[]			\
->>>>  		__used __initdata = { (void *)setup_fn,	(void *)data_ptr }
->>>>  
->>>> +#define ACPI_DBG2_EARLYCON_DECLARE(name, subtype, console_setup)	\
->>>> +	static const void *__acpi_dbg_data_serial_##name[]		\
->>>> +		__used __initdata = { (void *)console_setup }
-> 
-> console_setup is a terrible macro argument name; console_setup() is an
-> actual kernel function (although file-scope).
-> Please change it to something short and generic.
+>> +static int ti_msgmgr_send_data(struct mbox_chan *chan, void *data)
+>> +{
+>> +       struct device *dev = chan->mbox->dev;
+>> +       struct ti_msgmgr_inst *inst = dev_get_drvdata(dev);
+>> +       const struct ti_msgmgr_desc *desc;
+>> +       struct ti_queue_inst *qinst = chan->con_priv;
+>> +       int msg_count, num_words, trail_bytes;
+>> +       struct ti_msgmgr_message *message = data;
+>> +       void __iomem *data_reg;
+>> +       u32 *word_data;
+>> +
+>> +       if (WARN_ON(!inst)) {
+>> +               dev_err(dev, "no platform drv data??\n");
+>> +               return -EINVAL;
+>> +       }
+>> +       desc = inst->desc;
+>> +
+>> +       if (desc->max_message_size < message->len) {
+>> +               dev_err(dev, "Queue %s message length %d > max %d\n",
+>> +                       qinst->name, message->len, desc->max_message_size);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       /* Are we able to send this or not? */
+>> +       msg_count = ti_msgmgr_queue_get_num_messages(qinst);
+>> +       if (msg_count >= desc->max_messages) {
+>> +               dev_warn(dev, "Queue %s is full (%d messages)\n", qinst->name,
+>> +                        msg_count);
+>> +               return -EBUSY;
+>> +       }
+> This seems fishy. mailbox api always submit 1 'complete' message to be
+> sent and checks for completion by last_tx_done() before calling
+> send_data() again. Controller drivers are not supposed to queue
+> messages - mailbox core does. So you should never be unable to send a
+> message.
 
-Is 'setup_fn' ok?
 
-> Honestly, I'd just prefer you skip all this apparatus that makes
-> ACPI earlycon appear to be like OF earlycon code-wise, but without any of
-> the real underpinning or flexibility.
-
-Actually it was Mark Salter who asked to introduce such macros.
-
-https://lkml.kernel.org/g/1441730339.5459.8.camel at redhat.com
-
-I think reusing the OF functions is a good decision.
-
-Your "but without any of the real underpinning or flexibility" is unfounded.
-
-> This would be trivial to parse the ACPI table and invoke
-> setup_earlycon() with a string specifier instead.
-> 
-> For example,
-> 
-> int __init acpi_earlycon_setup(struct acpi_dbg2_device *dbg2)
-> {
->         char opts[64];
->         struct acpi_generic_addr *addr = (void*)dbg2 + dbg2->base_address_offset;
-> 	int mmio = addr->space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY;
-> 
->         if (dbg2->port_type != ACPI_DBG2_SERIAL_PORT)
->                 return 0;
-> 
->         switch (dbg2->port_subtype) {
->         case ACPI_DBG2_ARM_PL011:
-> 	case ACPI_DBG2_ARM_SBSA_GENERIC:
-> 	case ACPI_DBG2_BCM2835:
->                 sprintf(opts, "pl011,%s,0x%llx", mmio, addr->address);
->                 break;
->         case ACPI_DBG2_ARM_SBSA_32BIT:
->                 sprintf(opts, "pl011,mmio32,0x%llx", addr->address);
->                 break;
->         case ACPI_DBG2_16550_COMPATIBLE:
->         case ACPI_DBG2_16550_SUBSET:
->                 sprintf(opts, "uart,%s,0x%llx", mmio, addr->address);
->                 break;
->         default:
->                 return 0;
->         }
-> 
-> 	return setup_earlycon(opts);
-> }
-
-- Note that this decision forces setting earlycon on GDB2 debug port.
-  DBG2 does not specify that it should be exactly earlycon.
-
-- You missed ACPI_DBG2_ARM_DCC.  And actually I think the list of 
-  debug ports is open. You will have to make up names like "uart" "pl011"
-  each time a new port is introduced into the specs.
-
-- Most important thing, this way you disclose the internals of serial ports
-  to the generic earlycon.c  Such info as access mode should stay 
-  in the respective drivers.
-
-- I would not like printing address and then parsing it back.
-
-> This supports every earlycon ACPI DBG2 declares, not just the ARM_PL011
-> subtype of your series.
-
-To support earlycon on other types of debug port just add literally one
-string of code (as in pl011).
+OK-> to explain this, few reasons: (queue messages check and usage of
+last_tx_done are kind of intertwined answer..
+a) we need to remember that the message manager has a shared RAM.
+multiple transmitter over other queues can be sharing the same.
+unfortunately, we dont get a threshold kind of interrupt or status that
+I am able to exploit in the current incarnation of the solution. The
+best we can do in the full system is to constrain the number of messages
+that are max pending simultaneously in each of the queue from various
+transmitters in the SoC.
+b) last_tx_done() is checked if TXDONE_BY_POLL, not if TXDONE_BY_ACK
+right? which is how this'd work since txdone_poll is false -> that is
+how we want this mechanism to work once the far end is ready for next
+message, it acks. I do see your point about being tied to protocol - I
+dont like it either.. in fact, I'd prefer that client registration
+mention what kind of handshaking is necessary, but: a) that is not how
+mailbox framework is constructed at the moment(we state txdone_poll at
+mailbox registration, not at client usage) and b) I have no real need
+for multiple clients to users of message manager who actually need
+non-ACK usage - even for the foreseeable future (at least 1 next
+generation of SoC) - if such a need does arise in the future, I will
+have to rework framework and make this capability at the registration
+time of the client - allowing each client path to use different
+mechanisms on hardware such as these that need it.
+c) message manager can actually queue more than one message(depending on
+client capability). Even though, at this point, we are not really
+capable of doing it(again from what I can see for immediate future),
+mailbox framework by checking last_tx_done forces a single message
+sequencing - which is not really exploiting the capability of the
+hardware - in theory, we should be able to queue max num messages, hit
+cpuidle and snooze away while the remote entity chomp away data at it's
+own pace and finally give us a notification back - but again, we can
+argue it is indeed protocol dependent, so setting txdone_poll to false
+actually enables that to be done in user. Again - i have no immediate
+need for any queued multiple transfer needs yet.. even if i need to, in
+the future, it can easily be done by the client by maintaining code as
+is - txdone_poll is false.
 
 > 
 > 
-> 
->>>> +
->>>>  #endif
->>>>  
->>>>  #endif
->>>>
->>>
-> 
+>> +       /*
+>> +        * NOTE about register access involved here:
+>> +        * the hardware block is implemented with 32bit access operations and no
+>> +        * support for data splitting.  We don't want the hardware to misbehave
+>> +        * with sub 32bit access - For example: if the last register write is
+>> +        * split into byte wise access, it can result in the queue getting
+>> +        * stuck or dummy messages being transmitted or indeterminate behavior.
+>> +        * The same can occur if out of order operations take place.
+>> +        * Hence, we do not use memcpy_toio or ___iowrite32_copy here, instead
+>> +        * we use writel which ensures the sequencing we need.
+>> +        */
+> .... deja-vu ?
+
+Tell me about it.. but then, surprises like these do pop in once in a
+while.. sigh..
+
+>> +
+>> +/* Keystone K2G SoC integration details */
+>> +static const struct ti_msgmgr_valid_queue_desc k2g_valid_queues[] = {
+>> +       {.queue_id = 0, .proxy_id = 0, .is_tx = true,},
+>> +       {.queue_id = 1, .proxy_id = 0, .is_tx = true,},
+>> +       {.queue_id = 2, .proxy_id = 0, .is_tx = true,},
+>> +       {.queue_id = 3, .proxy_id = 0, .is_tx = true,},
+>> +       {.queue_id = 5, .proxy_id = 2, .is_tx = false,},
+>> +       {.queue_id = 56, .proxy_id = 1, .is_tx = true,},
+>> +       {.queue_id = 57, .proxy_id = 2, .is_tx = false,},
+>> +       {.queue_id = 58, .proxy_id = 3, .is_tx = true,},
+>> +       {.queue_id = 59, .proxy_id = 4, .is_tx = true,},
+>> +       {.queue_id = 60, .proxy_id = 5, .is_tx = true,},
+>> +       {.queue_id = 61, .proxy_id = 6, .is_tx = true,},
+>> +};
+>> +
+>> +static const struct ti_msgmgr_desc k2g_desc = {
+>> +       .queue_count = 64,
+>> +       .max_message_size = 64,
+>> +       .max_messages = 128,
+>> +       .q_slices = 1,
+>> +       .q_proxies = 1,
+>> +       .data_first_reg = 16,
+>> +       .data_last_reg = 31,
+>> +       .tx_polled = false,
+>> +       .valid_queues = k2g_valid_queues,
+>> +       .num_valid_queues = ARRAY_SIZE(k2g_valid_queues),
+>> +};
+> If these parameters are very configurable, maybe they should be in DT?
+
+These are SoC integration specific data. based on DT, we will only have
+SoC specific compatible property in DT. Since  the data is tied to SoC
+integration, there is no benefit of keeping these in DT.
+
+-- 
+Regards,
+Nishanth Menon
