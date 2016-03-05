@@ -1,52 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 5 Mar 2016 12:35:53 +0100
-Subject: Fix preempt-rt on AT91
-In-Reply-To: <20160118174259.GC12309@linutronix.de>
-References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160118174259.GC12309@linutronix.de>
-Message-ID: <20160305113553.GB21216@piout.net>
+From: john@keeping.me.uk (John Keeping)
+Date: Sat, 5 Mar 2016 12:11:16 +0000
+Subject: [PATCH 1/2] drm/rockchip: dw_hdmi: Call drm_encoder_cleanup() in
+ error path
+In-Reply-To: <1457133723-24869-1-git-send-email-dianders@chromium.org>
+References: <1457133723-24869-1-git-send-email-dianders@chromium.org>
+Message-ID: <20160305121005.GA11966@serenity.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On 18/01/2016 at 18:42:59 +0100, Sebastian Andrzej Siewior wrote :
-> > 3/ Finally, the kernel will crash when initializing the PMC driver. This is
-> > solved by this series that will hopefully land in the mainline:
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390954.html
+On Fri, Mar 04, 2016 at 03:22:01PM -0800, Douglas Anderson wrote:
+> The drm_encoder_cleanup() was missing both from the error path of
+> dw_hdmi_rockchip_bind().  This caused a crash when slub_debug was
+> enabled and we ended up deferring probe of HDMI at boot.
 > 
-> This is new, isn't it? So the series in currently in v3 and people seem
-> happy with it. Please poke me once with the commit ids once it is merged
-> on its way upstream and I will try cherry-pick them from next or so.
+> This call isn't needed from unbind() because if dw_hdmi_bind() returns
+> no error then it takes over the job of freeing the encoder (in
+> dw_hdmi_unbind).
 > 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> ---
 
-The series landed in arm-soc and is making its way to v4.6. I guess you
-can pull the original pull request. It is based on v4.5-rc1 but should
-apply cleanly on v4.4:
+Does dw_hdmi-imx need a similar change?  I wonder if it would be cleaner
+to push this into dw_hdmi_bind() if it affects all of the platforms..
 
-The following changes since commit
-92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git
-tags/at91-ab-4.6-drivers
-
-for you to fetch changes up to 0002ca168f16e5b6ac67415a4e0198cc39af2b7f:
-
-  clk: at91: remove useless includes (2016-02-17 17:53:04 +0100)
-
-
-
-
-You may also stop at 99a81706526fb167029a940ef1f7bfbe882abd3e which
-should solve the crash but it has not been tested as thoroughly.
-
-Thanks!
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> index 3d3cf2f8891e..88776aba984e 100644
+> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> @@ -293,7 +293,16 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+>  	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
+>  			 DRM_MODE_ENCODER_TMDS, NULL);
+>  
+> -	return dw_hdmi_bind(dev, master, data, encoder, iores, irq, plat_data);
+> +	ret = dw_hdmi_bind(dev, master, data, encoder, iores, irq, plat_data);
+> +
+> +	/*
+> +	 * If dw_hdmi_bind() fails we'll never call dw_hdmi_unbind(),
+> +	 * which would have called the encoder cleanup.  Do it manually.
+> +	 */
+> +	if (ret)
+> +		drm_encoder_cleanup(encoder);
+> +
+> +	return ret;
+>  }
+>  
+>  static void dw_hdmi_rockchip_unbind(struct device *dev, struct device *master,
+> -- 
+> 2.7.0.rc3.207.g0ac5344
