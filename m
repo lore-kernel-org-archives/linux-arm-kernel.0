@@ -1,71 +1,32 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 6 Mar 2016 00:22:37 +0800
-Subject: [PATCH v3 13/13] ARM: sunxi: Add Kconfig for sunxi clocks
-In-Reply-To: <1457192586-25596-14-git-send-email-vishnupatekar0510@gmail.com>
-References: <1457192586-25596-1-git-send-email-vishnupatekar0510@gmail.com>
- <1457192586-25596-14-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <CAEzqOZvULNLoyPb__9Tr8qioNQx73i0tz=cXK8EbJYJatdb3xw@mail.gmail.com>
+From: d.mueller@elsoft.ch (=?UTF-8?Q?David_M=c3=bcller_=28ELSOFT_AG=29?=)
+Date: Sat, 5 Mar 2016 17:23:04 +0100
+Subject: Slow access to data in mmaped memory areas
+Message-ID: <56DB07E8.4040003@elsoft.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello
 
-On Sat, Mar 5, 2016 at 11:43 PM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> This patch adds Kconfig for sunxi clocks.
-> Currently, only sun8i-apb0 and sun9i-cpus clocks are added.
-> It'll help to use common clocks across different SOCs.
-> We can switch to kconfig for other clocks in future.
->
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> ---
->  drivers/clk/Kconfig        | 1 +
->  drivers/clk/sunxi/Kconfig  | 5 +++++
->  drivers/clk/sunxi/Makefile | 4 ++--
->  3 files changed, 8 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/clk/sunxi/Kconfig
->
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index eca8e01..f9f42e6 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -210,3 +210,4 @@ source "drivers/clk/mvebu/Kconfig"
->
->  source "drivers/clk/samsung/Kconfig"
->  source "drivers/clk/tegra/Kconfig"
-> +source "drivers/clk/sunxi/Kconfig"
-> diff --git a/drivers/clk/sunxi/Kconfig b/drivers/clk/sunxi/Kconfig
-> new file mode 100644
-> index 0000000..afc55c9
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/Kconfig
-> @@ -0,0 +1,5 @@
-> +config CLK_SUN8I_APB0
-> +       def_bool MACH_SUN9I || MACH_SUN8I_A83T
+I have a multi-core Cortex-A9 based system where an external busmaster 
+capable device is transmitting data into the system memory. 
+Unfortunately the device's DMA engine does not support "scatter-gather" 
+mode.
+The CPU job is to process the data received from the device.
 
-This should be MACH_SUN8I and not MACH_SUN8I_A83T.
+I have written a driver which allocates serveral continuous memory block 
+(each 2MiB in size) as buffers, and transfers the data from the external 
+device to the buffers by DMA.
 
-Self NACK for this patch.
-> +
-> +config CLK_SUN9I_CPUS
-> +       def_bool MACH_SUN9I || MACH_SUN8I_A83T
-same here
+I have also written an application which accesses the data by "mmaping" 
+the buffers into the application's address space.
+All this works ok, but processing performance of the data by the CPU is 
+pretty slow.
 
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 3fd7901..38dfca8 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -17,8 +17,8 @@ obj-y += clk-sun9i-core.o
->  obj-y += clk-sun9i-mmc.o
->  obj-y += clk-usb.o
->
-> -obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
-> -obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
-> +obj-$(CONFIG_CLK_SUN8I_APB0) += clk-sun8i-apb0.o
-> +obj-$(CONFIG_CLK_SUN9I_CPUS) += clk-sun9i-cpus.o
->
->  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
->         clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
-> --
-> 1.9.1
->
+After looking at arch/arm/mm/mmu.c and arch/arm/mm/dma-mapping.c, it 
+seems like caching is disabled for all mmaped memory areas.
+
+Is this observation correct?
+Is there a way to re-enable caching for mmaped memory areas after the 
+DMA transfer is completed and to disable caching before the next DMA starts?
+
+Dave
