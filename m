@@ -1,45 +1,58 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sat,  5 Mar 2016 18:02:53 +0000
-Subject: [PATCH 5/5] ARM: bcm2835: use defined DMA_DREQ names instead of magic
- numbers
-In-Reply-To: <1457200973-11662-1-git-send-email-kernel@martin.sperl.org>
-References: <1457200973-11662-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1457200973-11662-5-git-send-email-kernel@martin.sperl.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 6 Mar 2016 02:16:41 +0800
+Subject: [PATCH v3 net-next 7/9] net: mvneta: bm: add support for
+ hardware buffer management
+In-Reply-To: <1457198221-21752-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201603060254.FU6qyCZg%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+Hi Marcin,
 
-Change the device tree source so that instead of magic numbers
-the corresponding BCM2835_DMA_DREQ_* names are used to ease readability.
+[auto build test ERROR on v4.5-rc6]
+[also build test ERROR on next-20160304]
+[cannot apply to net-next/master robh/for-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+url:    https://github.com/0day-ci/linux/commits/Gregory-CLEMENT/API-set-for-HW-Buffer-management/20160306-012250
+config: arm-multi_v7_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `mvneta_rx_refill':
+   :(.text+0x2b4168): undefined reference to `mvneta_frag_alloc'
+   :(.text+0x2b4258): undefined reference to `mvneta_frag_free'
+   drivers/built-in.o: In function `mvneta_remove':
+>> :(.text+0x2b4aec): undefined reference to `mvneta_bm_pool_destroy'
+   :(.text+0x2b4b04): undefined reference to `mvneta_bm_pool_destroy'
+   drivers/built-in.o: In function `mvneta_cleanup_rxqs':
+   :(.text+0x2b52ec): undefined reference to `mvneta_frag_free'
+   drivers/built-in.o: In function `mvneta_poll':
+   :(.text+0x2b579c): undefined reference to `mvneta_bm_pool_refill'
+   drivers/built-in.o: In function `mvneta_bm_update_mtu':
+>> :(.text+0x2b65d0): undefined reference to `mvneta_bm_bufs_free'
+   :(.text+0x2b6614): undefined reference to `mvneta_bm_pool_destroy'
+   :(.text+0x2b662c): undefined reference to `mvneta_bm_pool_destroy'
+   :(.text+0x2b6694): undefined reference to `mvneta_bm_bufs_add'
+   drivers/built-in.o: In function `mvneta_probe':
+>> :(.text+0x2b6eac): undefined reference to `mvneta_bm_pool_use'
+   :(.text+0x2b6f5c): undefined reference to `mvneta_bm_pool_use'
+   :(.text+0x2b73cc): undefined reference to `mvneta_bm_pool_destroy'
+   :(.text+0x2b73e4): undefined reference to `mvneta_bm_pool_destroy'
+   :(.text+0x2b7ab4): undefined reference to `mvneta_bm_pool_destroy'
+
 ---
- arch/arm/boot/dts/bcm283x.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 084eda7..aec67a9 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -1,6 +1,7 @@
- #include <dt-bindings/pinctrl/bcm2835.h>
- #include <dt-bindings/clock/bcm2835.h>
- #include <dt-bindings/clock/bcm2835-aux.h>
-+#include <dt-bindings/dma/bcm2835.h>
- #include <dt-bindings/interrupt-controller/bcm2835.h>
- #include "skeleton.dtsi"
- 
-@@ -134,8 +135,8 @@
- 			reg = <0x7e203000 0x20>,
- 			      <0x7e101098 0x02>;
- 
--			dmas = <&dma 2>,
--			       <&dma 3>;
-+			dmas = <&dma BCM2835_DMA_DREQ_PCM_TX>,
-+			       <&dma BCM2835_DMA_DREQ_PCM_RX>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
--- 
-2.1.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 36571 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160306/a8596d58/attachment-0001.obj>
