@@ -1,51 +1,63 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 6 Mar 2016 02:40:16 +0800
-Subject: [PATCH v3 net-next 9/9] net: mvneta: Use the new hwbm framework
-In-Reply-To: <1457198221-21752-10-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <201603060227.TkSZowaP%fengguang.wu@intel.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 5 Mar 2016 12:02:50 -0800
+Subject: [linux-sunxi] Re: [PATCH v4 1/2] ehci-platform: Add support for
+ controllers with multiple reset lines
+In-Reply-To: <56D938DE.10409@redhat.com>
+References: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
+ <1456592339-31767-2-git-send-email-hdegoede@redhat.com>
+ <20160304043559.GA21743@kroah.com> <56D938DE.10409@redhat.com>
+Message-ID: <20160305200250.GA24790@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Fri, Mar 04, 2016 at 08:27:26AM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 04-03-16 05:35, Greg Kroah-Hartman wrote:
+> >On Sat, Feb 27, 2016 at 05:58:58PM +0100, Hans de Goede wrote:
+> >>From: Reinder de Haan <patchesrdh@mveas.com>
+> >>
+> >>At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+> >>reset lines, the controller will not initialize while the reset for
+> >>its companion is still asserted, which means we need to de-assert
+> >>2 resets for the controller to work.
+> >>
+> >>Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> >>Acked-by: Rob Herring <robh@kernel.org>
+> >>---
+> >>Changes in v2:
+> >>-Use the new reset_control_[de]assert_shared reset-controller functions
+> >>Changes in v3:
+> >>-Adjust for changes to shared-reset reset-controller functions
+> >>Changes in v4:
+> >>-Fix Ugly continuation line
+> >
+> >This breaks the build horribly :(
+> >
+> >As does patch 2/2, ugh.
+> 
+> As said in the cover letter:
+> 
+> "These patches apply on top of the related
+> reset-controller patches which have just been merged here:
+> 
+> git://git.pengutronix.de/git/pza/linux.git reset/next"
+> 
+> I guess I should have done s/apply on top of/depend on/
+> in the above bit. These patches apply fine without those
+> changes, but indeed they will not build.
 
-[auto build test ERROR on v4.5-rc6]
-[cannot apply to net-next/master robh/for-next next-20160304]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Then I can't take them, you know this :(
 
-url:    https://github.com/0day-ci/linux/commits/Gregory-CLEMENT/API-set-for-HW-Buffer-management/20160306-012250
-config: arm-multi_v7_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> You may want to ask Philipp Zabel (added to the To: list)
+> to create a topic branch for this which you can merge into
+> your tree.
 
-All errors (new ones prefixed by >>):
+If you all want me to do that, fine, otherwise just resend them after
+4.6-rc1 is out and the build will not break at that time.
 
-   drivers/built-in.o: In function `mvneta_remove':
-   :(.text+0x2b49d4): undefined reference to `mvneta_bm_pool_destroy'
-   :(.text+0x2b49ec): undefined reference to `mvneta_bm_pool_destroy'
-   drivers/built-in.o: In function `mvneta_bm_update_mtu':
-   :(.text+0x2b52e8): undefined reference to `mvneta_bm_bufs_free'
-   :(.text+0x2b532c): undefined reference to `mvneta_bm_pool_destroy'
-   :(.text+0x2b5344): undefined reference to `mvneta_bm_pool_destroy'
->> :(.text+0x2b53ac): undefined reference to `hwbm_pool_add'
-   drivers/built-in.o: In function `mvneta_probe':
-   :(.text+0x2b5a74): undefined reference to `mvneta_bm_pool_use'
-   :(.text+0x2b5b24): undefined reference to `mvneta_bm_pool_use'
-   :(.text+0x2b5fa4): undefined reference to `mvneta_bm_pool_destroy'
-   :(.text+0x2b5fbc): undefined reference to `mvneta_bm_pool_destroy'
-   :(.text+0x2b6698): undefined reference to `mvneta_bm_pool_destroy'
-   drivers/built-in.o: In function `mvneta_poll':
->> :(.text+0x2b7e98): undefined reference to `hwbm_pool_refill'
+thanks,
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36571 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160306/5abdd897/attachment-0001.obj>
+greg k-h
