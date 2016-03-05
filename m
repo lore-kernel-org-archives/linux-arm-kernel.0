@@ -1,153 +1,111 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat,  5 Mar 2016 23:38:22 +0100
-Subject: [PATCH v4 net-next 4/9] ARM: dts: armada-xp: enable buffer manager
- support on Armada XP boards
-In-Reply-To: <1457217507-10778-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1457217507-10778-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1457217507-10778-5-git-send-email-gregory.clement@free-electrons.com>
+Date: Sat,  5 Mar 2016 23:38:18 +0100
+Subject: [PATCH v4 net-next 0/9] API set for HW Buffer management
+Message-ID: <1457217507-10778-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+This forth version of the API set for HW Buffer management (that was
+initially submitted here:
+http://thread.gmane.org/gmane.linux.kernel/2125152), is actually the
+third version done right. Now it is really possible to disable the
+HWBM through the kernel configuration.
 
-Since mvneta driver supports using hardware buffer management (BM), in
-order to use it, board files have to be adjusted accordingly. This commit
-enables BM on AXP-DB and AXP-GP in same manner - because number of ports
-on those boards is the same as number of possible pools, each port is
-supposed to use single pool for all kind of packets.
+Since the second version I took into account David's remarks:
 
-Moreover appropriate entry is added to 'soc' node ranges, as well as "okay"
-status for 'bm' and 'bm-bppi' (internal SRAM) nodes.
+- I made a HWBM and a SWBM version of the mvneta_rx() function in
+  order to reduce the the conditional code. I kept a condition inside
+  the mvneta_poll because specializing this function would have means
+  duplicating 95% of the code.
+- I put back the register_netdev() call at the end of the
+  mvneta_probe() function. In order to have a uniq ID for each port I
+  just used a global variable in the driver.
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-db.dts | 19 ++++++++++++++++++-
- arch/arm/boot/dts/armada-xp-gp.dts | 19 ++++++++++++++++++-
- 2 files changed, 36 insertions(+), 2 deletions(-)
+I also added a fix from Marcin in the "net: mvneta: bm: add support
+for hardware buffer management" patch:
+- "when dropping packets, only buffer pointers passed from BM to
+  descriptors have to be returned to the pool. In submitted version
+  after closing the port and mvneta_rxq_deinit(), it was very likely
+  that a lot of fake buffers are added to the pool, because all
+  descriptors took part in iteration."
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index f774101416a5..30657302305d 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -77,7 +77,8 @@
- 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
- 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
- 			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
--			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
-+			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
- 
- 		devbus-bootcs {
- 			status = "okay";
-@@ -181,21 +182,33 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
- 			};
- 			ethernet at 74000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
- 			};
- 			ethernet at 30000 {
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
- 			};
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy3>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <3>;
-+			};
-+
-+			bm at c0000 {
-+				status = "okay";
- 			};
- 
- 			mvsdio at d4000 {
-@@ -230,5 +243,9 @@
- 				};
- 			};
- 		};
-+
-+		bm-bppi {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 4878d7353069..a1ded01d0c07 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -96,7 +96,8 @@
- 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
- 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
- 			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
--			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
-+			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
- 
- 		devbus-bootcs {
- 			status = "okay";
-@@ -196,21 +197,29 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
- 			};
- 			ethernet at 74000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
- 			};
- 			ethernet at 30000 {
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
- 			};
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy3>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <3>;
- 			};
- 
- 			/* Front-side USB slot */
-@@ -235,6 +244,10 @@
- 				};
- 			};
- 
-+			bm at c0000 {
-+				status = "okay";
-+			};
-+
- 			nand at d0000 {
- 				status = "okay";
- 				num-cs = <1>;
-@@ -243,5 +256,9 @@
- 				nand-on-flash-bbt;
- 			};
- 		};
-+
-+		bm-bppi {
-+			status = "okay";
-+		};
- 	};
- };
+Finally, I also removed the select MVNETA_BM from the Kconfig, it will
+let the user the choice to use not use it if they want.
+
+For the record in the previous version I made the following changes:
+v1 -> v2
+
+- The hardware buffer management helpers are no more built by default
+  and now depend on a hidden config symbol which has to be selected
+  by the driver if needed
+- The hwbm_pool_refill() and hwbm_pool_add() now receive a gfp_t as
+  argument allowing the caller to specify the flag it needs.
+- buf_num is now tested to ensure there is no wrapping
+- A spinlock has been added to protect the hwbm_pool_add() function in
+  SMP or irq context.
+- used pr_warn instead of pr_debug in case of errors.
+- fixed the mvneta implementation by returning the buffer to the pool
+  at various place instead of ignoring it.
+- Squashed "bus: mvenus-mbus: Fix size test for
+   mvebu_mbus_get_dram_win_info" into bus: mvebu-mbus: provide api for
+   obtaining IO and DRAM window information.
+- Added my signed-otf-by on all the patches as submitter of the series.
+- Renamed the dts patches with the pattern "ARM: dts: platform:"
+- Removed the patch "ARM: mvebu: enable SRAM support in
+  mvebu_v7_defconfig" of this series and already applied it
+- Modified the order of the patches.
+
+In order to ease the test the branch mvneta-BM-framework-v4 is
+available at git at github.com:MISL-EBU-System-SW/mainline-public.git.
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (3):
+  ARM: dts: armada-xp-openblocks-ax3-4: Add BM support
+  net: add a hardware buffer management helper API
+  net: mvneta: Use the new hwbm framework
+
+Marcin Wojtas (6):
+  ARM: dts: armada-38x: add buffer manager nodes
+  ARM: dts: armada-38x: enable buffer manager support on Armada 38x
+    boards
+  ARM: dts: armada-xp: add buffer manager nodes
+  ARM: dts: armada-xp: enable buffer manager support on Armada XP boards
+  bus: mvebu-mbus: provide api for obtaining IO and DRAM window
+    information
+  net: mvneta: bm: add support for hardware buffer management
+
+ .../bindings/net/marvell-armada-370-neta.txt       |  19 +-
+ .../devicetree/bindings/net/marvell-neta-bm.txt    |  49 ++
+ arch/arm/boot/dts/armada-385-db-ap.dts             |  20 +-
+ arch/arm/boot/dts/armada-388-clearfog.dts          |   6 +
+ arch/arm/boot/dts/armada-388-db.dts                |  17 +-
+ arch/arm/boot/dts/armada-388-gp.dts                |  17 +-
+ .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi |  15 +-
+ arch/arm/boot/dts/armada-38x.dtsi                  |  18 +
+ arch/arm/boot/dts/armada-xp-db.dts                 |  19 +-
+ arch/arm/boot/dts/armada-xp-gp.dts                 |  19 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  19 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |  18 +
+ drivers/bus/mvebu-mbus.c                           |  52 +++
+ drivers/net/ethernet/marvell/Kconfig               |  14 +
+ drivers/net/ethernet/marvell/Makefile              |   1 +
+ drivers/net/ethernet/marvell/mvneta.c              | 509 +++++++++++++++++++--
+ drivers/net/ethernet/marvell/mvneta_bm.c           | 486 ++++++++++++++++++++
+ drivers/net/ethernet/marvell/mvneta_bm.h           | 184 ++++++++
+ include/linux/mbus.h                               |   3 +
+ include/net/hwbm.h                                 |  26 ++
+ net/Kconfig                                        |   3 +
+ net/core/Makefile                                  |   1 +
+ net/core/hwbm.c                                    |  87 ++++
+ 23 files changed, 1556 insertions(+), 46 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/marvell-neta-bm.txt
+ create mode 100644 drivers/net/ethernet/marvell/mvneta_bm.c
+ create mode 100644 drivers/net/ethernet/marvell/mvneta_bm.h
+ create mode 100644 include/net/hwbm.h
+ create mode 100644 net/core/hwbm.c
+
 -- 
 2.5.0
