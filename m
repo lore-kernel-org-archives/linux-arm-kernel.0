@@ -1,190 +1,135 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sat,  5 Mar 2016 23:42:54 +0800
-Subject: [PATCH v3 01/13] pinctrl: sunxi: Add A83T R_PIO controller support
+Date: Sat,  5 Mar 2016 23:42:55 +0800
+Subject: [PATCH v3 02/13] clk: sunxi: add ahb1 clock for A83T
 In-Reply-To: <1457192586-25596-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1457192586-25596-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1457192586-25596-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1457192586-25596-3-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T has R_PIO pin controller, it's same as A23, execpt A83T
-interrupt bit is 6th and A83T has one extra pin PL12.
+AHB1 on A83T is similar to ahb1 on A31, except parents are different.
+clock index 0b1x is PLL6.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- drivers/pinctrl/sunxi/Kconfig                      |   5 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-a83t-r.c       | 119 +++++++++++++++++++++
- 4 files changed, 126 insertions(+)
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-a83t-r.c
+ Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+ drivers/clk/sunxi/clk-sunxi.c                     | 76 +++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 9213b27..f9ff10b 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -20,6 +20,7 @@ Required properties:
-   "allwinner,sun9i-a80-pinctrl"
-   "allwinner,sun9i-a80-r-pinctrl"
-   "allwinner,sun8i-a83t-pinctrl"
-+  "allwinner,sun8i-a83t-r-pinctrl"
-   "allwinner,sun8i-h3-pinctrl"
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index c09f59b..2ee7841 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -29,6 +29,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+ 	"allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
+ 	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
++	"allwinner,sun8i-a83t-ahb1-clk" - for the AHB1 clock on A83T
+ 	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+ 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 99f60ef..0ae1f09 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -344,6 +344,67 @@ static void sun6i_ahb1_recalc(struct factors_request *req)
+ 	req->rate >>= req->p;
+ }
  
- - reg: Should contain the register physical address and length for the
-diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-index f8dbc8b..eeab50b 100644
---- a/drivers/pinctrl/sunxi/Kconfig
-+++ b/drivers/pinctrl/sunxi/Kconfig
-@@ -51,6 +51,11 @@ config PINCTRL_SUN8I_A23_R
- 	depends on RESET_CONTROLLER
- 	select PINCTRL_SUNXI_COMMON
- 
-+config PINCTRL_SUN8I_A83T_R
-+	def_bool MACH_SUN8I
-+	depends on RESET_CONTROLLER
-+	select PINCTRL_SUNXI_COMMON
-+
- config PINCTRL_SUN8I_H3
- 	def_bool MACH_SUN8I
- 	select PINCTRL_SUNXI_COMMON
-diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-index ef82f22..bfd4fa0 100644
---- a/drivers/pinctrl/sunxi/Makefile
-+++ b/drivers/pinctrl/sunxi/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23)		+= pinctrl-sun8i-a23.o
- obj-$(CONFIG_PINCTRL_SUN8I_A23_R)	+= pinctrl-sun8i-a23-r.o
- obj-$(CONFIG_PINCTRL_SUN8I_A33)		+= pinctrl-sun8i-a33.o
- obj-$(CONFIG_PINCTRL_SUN8I_A83T)	+= pinctrl-sun8i-a83t.o
-+obj-$(CONFIG_PINCTRL_SUN8I_A83T_R)	+= pinctrl-sun8i-a83t-r.o
- obj-$(CONFIG_PINCTRL_SUN8I_H3)		+= pinctrl-sun8i-h3.o
- obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
- obj-$(CONFIG_PINCTRL_SUN9I_A80_R)	+= pinctrl-sun9i-a80-r.o
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t-r.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t-r.c
-new file mode 100644
-index 0000000..11787894
---- /dev/null
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t-r.c
-@@ -0,0 +1,119 @@
-+/*
-+ * Allwinner A83T SoCs special pins pinctrl driver.
++#define SUN8I_A83T_AHB1_PARENT_PLL6	2
++/**
++ * sun8i_a83t_get_ahb_factors() - calculates m, p factors for AHB
++ * AHB rate is calculated as follows
++ * rate = parent_rate >> p
 + *
-+ * Copyright (C) 2016 Vishnu Patekar
-+ * Vishnu Patekar <vishnupatekar0510@gmail.com>
-+ *
-+ * Based on pinctrl-sun8i-a23.c, which is:
-+ * Copyright (C) 2014 Chen-Yu Tsai <wens@csie.org>
-+ * Copyright (C) 2014 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * if parent is pll6, then
++ * parent_rate = pll6 rate / (m + 1)
 + */
 +
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/reset.h>
-+
-+#include "pinctrl-sunxi.h"
-+
-+static const struct sunxi_desc_pin sun8i_a83t_r_pins[] = {
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SCK */
-+		  SUNXI_FUNCTION(0x3, "s_twi"),		/* SCK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PL_EINT0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SDA */
-+		  SUNXI_FUNCTION(0x3, "s_twi"),		/* SDA */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PL_EINT1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart"),	/* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),	/* PL_EINT2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart"),	/* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),	/* PL_EINT3 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* MS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),	/* PL_EINT4 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* CK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),	/* PL_EINT5 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* DO */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PL_EINT6 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* DI */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),	/* PL_EINT7 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SCK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),	/* PL_EINT8 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SDA */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),	/* PL_EINT9 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_pwm"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),	/* PL_EINT10 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),	/* PL_EINT11 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 12),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_cir"),		/* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),	/* PL_EINT12 */
-+};
-+
-+static const struct sunxi_pinctrl_desc sun8i_a83t_r_pinctrl_data = {
-+	.pins = sun8i_a83t_r_pins,
-+	.npins = ARRAY_SIZE(sun8i_a83t_r_pins),
-+	.pin_base = PL_BASE,
-+	.irq_banks = 1,
-+};
-+
-+static int sun8i_a83t_r_pinctrl_probe(struct platform_device *pdev)
++static void sun8i_a83t_get_ahb1_factors(struct factors_request *req)
 +{
-+	return sunxi_pinctrl_init(pdev, &sun8i_a83t_r_pinctrl_data);
++	u8 div, calcp, calcm = 1;
++
++	/*
++	 * clock can only divide, so we will never be able to achieve
++	 * frequencies higher than the parent frequency
++	 */
++	if (req->parent_rate && req->rate > req->parent_rate)
++		req->rate = req->parent_rate;
++
++	div = DIV_ROUND_UP(req->parent_rate, req->rate);
++
++	/* calculate pre-divider if parent is pll6 */
++	if (req->parent_index >= SUN8I_A83T_AHB1_PARENT_PLL6) {
++		if (div < 4)
++			calcp = 0;
++		else if (div / 2 < 4)
++			calcp = 1;
++		else if (div / 4 < 4)
++			calcp = 2;
++		else
++			calcp = 3;
++
++		calcm = DIV_ROUND_UP(div, 1 << calcp);
++	} else {
++		calcp = __roundup_pow_of_two(div);
++		calcp = calcp > 3 ? 3 : calcp;
 +}
 +
-+static const struct of_device_id sun8i_a83t_r_pinctrl_match[] = {
-+	{ .compatible = "allwinner,sun8i-a83t-r-pinctrl", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, sun8i_a83t_r_pinctrl_match);
++	req->rate = (req->parent_rate / calcm) >> calcp;
++	req->p = calcp;
++	req->m = calcm - 1;
++}
 +
-+static struct platform_driver sun8i_a83t_r_pinctrl_driver = {
-+	.probe	= sun8i_a83t_r_pinctrl_probe,
-+	.driver	= {
-+		.name		= "sun8i-a83t-r-pinctrl",
-+		.of_match_table	= sun8i_a83t_r_pinctrl_match,
-+	},
++/**
++* sun8i_a83t_ahb1_recalc() - calculates AHB clock rate from m, p factors and
++*			 parent index
++*/
++static void sun8i_a83t_ahb1_recalc(struct factors_request *req)
++{
++	req->rate = req->parent_rate;
++
++/* apply pre-divider first if parent is pll6 */
++	if (req->parent_index >= SUN6I_AHB1_PARENT_PLL6)
++		req->rate /= req->m + 1;
++
++	/* clk divider */
++	req->rate >>= req->p;
++}
++
+ /**
+  * sun4i_get_apb1_factors() - calculates m, p factors for APB1
+  * APB1 rate is calculated as follows
+@@ -555,6 +616,14 @@ static const struct factors_data sun6i_ahb1_data __initconst = {
+ 	.recalc = sun6i_ahb1_recalc,
+ };
+ 
++static const struct factors_data sun8i_a83t_ahb1_data __initconst = {
++	.mux = 12,
++	.muxmask = BIT(1) | BIT(0),
++	.table = &sun6i_ahb1_config,
++	.getter = sun8i_a83t_get_ahb1_factors,
++	.recalc = sun8i_a83t_ahb1_recalc,
 +};
-+module_platform_driver(sun8i_a83t_r_pinctrl_driver);
++
+ static const struct factors_data sun4i_apb1_data __initconst = {
+ 	.mux = 24,
+ 	.muxmask = BIT(1) | BIT(0),
+@@ -627,6 +696,13 @@ static void __init sun6i_ahb1_clk_setup(struct device_node *node)
+ CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk",
+ 	       sun6i_ahb1_clk_setup);
+ 
++static void __init sun8i_a83t_ahb1_clk_setup(struct device_node *node)
++{
++	sunxi_factors_clk_setup(node, &sun8i_a83t_ahb1_data);
++}
++CLK_OF_DECLARE(sun8i_a83t_ahb1, "allwinner,sun8i-a83t-ahb1-clk",
++	       sun8i_a83t_ahb1_clk_setup);
++
+ static void __init sun4i_apb1_clk_setup(struct device_node *node)
+ {
+ 	sunxi_factors_clk_setup(node, &sun4i_apb1_data);
 -- 
 1.9.1
