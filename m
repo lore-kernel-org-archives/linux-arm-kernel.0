@@ -1,41 +1,54 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sat,  5 Mar 2016 23:43:01 +0800
-Subject: [PATCH v3 08/13] ARM: dts: sun8i-a83t: Add R_PIO controller node to
- the dtsi
+Date: Sat,  5 Mar 2016 23:43:02 +0800
+Subject: [PATCH v3 09/13] ARM: dts: sun8i-a83t: Add RSB controller device node
+ to dtsi
 In-Reply-To: <1457192586-25596-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1457192586-25596-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1457192586-25596-9-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1457192586-25596-10-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a driver for the R_PIO controller,
-add the corresponding device node to the dtsi.
+This patch adds a device node for the Reduced Serial Bus (RSB)
+controller and the defacto pinmux setting to the A83T dtsi.
+
+Since there is only one possible pinmux setting for RSB, just
+set it in the dtsi.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 691bbf1..5d240b9 100644
+index 5d240b9..7b02d85 100644
 --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -465,5 +465,17 @@
- 			compatible = "allwinner,sun6i-a31-clock-reset";
- 			#reset-cells = <1>;
- 		};
+@@ -476,6 +476,27 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
 +
-+		r_pio: pinctrl at 01f02c00 {
-+			compatible = "allwinner,sun8i-a83t-r-pinctrl";
-+			reg = <0x01f02c00 0x400>;
-+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb0_gates 0>;
-+			resets = <&apb0_reset 0>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			#gpio-cells = <3>;
++			r_rsb_pins: r_rsb {
++				allwinner,pins = "PL0", "PL1";
++				allwinner,function = "s_rsb";
++				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++			};
 +		};
++
++		r_rsb: i2c at 01f03400 {
++			compatible = "allwinner,sun8i-a23-rsb";
++			reg = <0x01f03400 0x400>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 3>;
++			clock-frequency = <3000000>;
++			resets = <&apb0_reset 3>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_rsb_pins>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
  	};
  };
 -- 
