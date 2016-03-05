@@ -1,103 +1,61 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sat,  5 Mar 2016 10:52:16 +0000
-Subject: [PATCH v3 05/11] dmaengine: bcm2835: add additional defines for
- DMA-registers
+Date: Sat,  5 Mar 2016 10:52:17 +0000
+Subject: [PATCH v3 06/11] dmaengine: bcm2835: move cyclic member from
+ bcm2835_chan into bcm2835_desc
 In-Reply-To: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
 References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1457175142-28665-6-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1457175142-28665-7-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Add additional defines describing the DMA registers
-as well as adding some more documentation to those registers.
+In preparation to consolidating code we move the cyclic member
+into the bcm_2835_desc structure.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 Reviewed-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/dma/bcm2835-dma.c | 57 ++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 49 insertions(+), 8 deletions(-)
+ drivers/dma/bcm2835-dma.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index fe7d5a6..2cdc256 100644
+index 2cdc256..23b01c5 100644
 --- a/drivers/dma/bcm2835-dma.c
 +++ b/drivers/dma/bcm2835-dma.c
-@@ -99,26 +99,67 @@ struct bcm2835_desc {
+@@ -73,7 +73,6 @@ struct bcm2835_chan {
+ 	struct list_head node;
+ 
+ 	struct dma_slave_config	cfg;
+-	bool cyclic;
+ 	unsigned int dreq;
+ 
+ 	int ch;
+@@ -95,6 +94,8 @@ struct bcm2835_desc {
+ 
+ 	unsigned int frames;
+ 	size_t size;
++
++	bool cyclic;
+ };
  
  #define BCM2835_DMA_CS		0x00
- #define BCM2835_DMA_ADDR	0x04
-+#define BCM2835_DMA_TI		0x08
- #define BCM2835_DMA_SOURCE_AD	0x0c
- #define BCM2835_DMA_DEST_AD	0x10
--#define BCM2835_DMA_NEXTCB	0x1C
-+#define BCM2835_DMA_LEN		0x14
-+#define BCM2835_DMA_STRIDE	0x18
-+#define BCM2835_DMA_NEXTCB	0x1c
-+#define BCM2835_DMA_DEBUG	0x20
+@@ -403,8 +404,6 @@ static void bcm2835_dma_issue_pending(struct dma_chan *chan)
+ 	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+ 	unsigned long flags;
  
- /* DMA CS Control and Status bits */
--#define BCM2835_DMA_ACTIVE	BIT(0)
--#define BCM2835_DMA_INT	BIT(2)
-+#define BCM2835_DMA_ACTIVE	BIT(0)  /* activate the DMA */
-+#define BCM2835_DMA_END		BIT(1)  /* current CB has ended */
-+#define BCM2835_DMA_INT		BIT(2)  /* interrupt status */
-+#define BCM2835_DMA_DREQ	BIT(3)  /* DREQ state */
- #define BCM2835_DMA_ISPAUSED	BIT(4)  /* Pause requested or not active */
- #define BCM2835_DMA_ISHELD	BIT(5)  /* Is held by DREQ flow control */
--#define BCM2835_DMA_ERR	BIT(8)
-+#define BCM2835_DMA_WAITING_FOR_WRITES BIT(6) /* waiting for last
-+					       * AXI-write to ack
-+					       */
-+#define BCM2835_DMA_ERR		BIT(8)
-+#define BCM2835_DMA_PRIORITY(x) ((x & 15) << 16) /* AXI priority */
-+#define BCM2835_DMA_PANIC_PRIORITY(x) ((x & 15) << 20) /* panic priority */
-+/* current value of TI.BCM2835_DMA_WAIT_RESP */
-+#define BCM2835_DMA_WAIT_FOR_WRITES BIT(28)
-+#define BCM2835_DMA_DIS_DEBUG	BIT(29) /* disable debug pause signal */
- #define BCM2835_DMA_ABORT	BIT(30) /* Stop current CB, go to next, WO */
- #define BCM2835_DMA_RESET	BIT(31) /* WO, self clearing */
- 
-+/* Transfer information bits - also bcm2835_cb.info field */
- #define BCM2835_DMA_INT_EN	BIT(0)
-+#define BCM2835_DMA_TDMODE	BIT(1) /* 2D-Mode */
-+#define BCM2835_DMA_WAIT_RESP	BIT(3) /* wait for AXI-write to be acked */
- #define BCM2835_DMA_D_INC	BIT(4)
--#define BCM2835_DMA_D_DREQ	BIT(6)
-+#define BCM2835_DMA_D_WIDTH	BIT(5) /* 128bit writes if set */
-+#define BCM2835_DMA_D_DREQ	BIT(6) /* enable DREQ for destination */
-+#define BCM2835_DMA_D_IGNORE	BIT(7) /* ignore destination writes */
- #define BCM2835_DMA_S_INC	BIT(8)
--#define BCM2835_DMA_S_DREQ	BIT(10)
+-	c->cyclic = true; /* Nothing else is implemented */
 -
--#define BCM2835_DMA_PER_MAP(x)	((x) << 16)
-+#define BCM2835_DMA_S_WIDTH	BIT(9) /* 128bit writes if set */
-+#define BCM2835_DMA_S_DREQ	BIT(10) /* enable SREQ for source */
-+#define BCM2835_DMA_S_IGNORE	BIT(11) /* ignore source reads - read 0 */
-+#define BCM2835_DMA_BURST_LENGTH(x) ((x & 15) << 12)
-+#define BCM2835_DMA_PER_MAP(x)	((x & 31) << 16) /* REQ source */
-+#define BCM2835_DMA_WAIT(x)	((x & 31) << 21) /* add DMA-wait cycles */
-+#define BCM2835_DMA_NO_WIDE_BURSTS BIT(26) /* no 2 beat write bursts */
-+
-+/* debug register bits */
-+#define BCM2835_DMA_DEBUG_LAST_NOT_SET_ERR	BIT(0)
-+#define BCM2835_DMA_DEBUG_FIFO_ERR		BIT(1)
-+#define BCM2835_DMA_DEBUG_READ_ERR		BIT(2)
-+#define BCM2835_DMA_DEBUG_OUTSTANDING_WRITES_SHIFT 4
-+#define BCM2835_DMA_DEBUG_OUTSTANDING_WRITES_BITS 4
-+#define BCM2835_DMA_DEBUG_ID_SHIFT		16
-+#define BCM2835_DMA_DEBUG_ID_BITS		9
-+#define BCM2835_DMA_DEBUG_STATE_SHIFT		16
-+#define BCM2835_DMA_DEBUG_STATE_BITS		9
-+#define BCM2835_DMA_DEBUG_VERSION_SHIFT		25
-+#define BCM2835_DMA_DEBUG_VERSION_BITS		3
-+#define BCM2835_DMA_DEBUG_LITE			BIT(28)
-+
-+/* shared registers for all dma channels */
-+#define BCM2835_DMA_INT_STATUS         0xfe0
-+#define BCM2835_DMA_ENABLE             0xff0
+ 	spin_lock_irqsave(&c->vc.lock, flags);
+ 	if (vchan_issue_pending(&c->vc) && !c->desc)
+ 		bcm2835_dma_start_desc(c);
+@@ -458,6 +457,7 @@ static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
+ 	d->c = c;
+ 	d->dir = direction;
+ 	d->frames = buf_len / period_len;
++	d->cyclic = true;
  
- #define BCM2835_DMA_DATA_TYPE_S8	1
- #define BCM2835_DMA_DATA_TYPE_S16	2
+ 	d->cb_list = kcalloc(d->frames, sizeof(*d->cb_list), GFP_KERNEL);
+ 	if (!d->cb_list) {
 -- 
 2.1.4
