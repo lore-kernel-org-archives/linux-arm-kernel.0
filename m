@@ -1,28 +1,51 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 4 Mar 2016 16:43:36 -0800
-Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
-In-Reply-To: <1457137718.43867.266.camel@infradead.org>
-References: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
- <20160305000225.GB55664@google.com> <5158260.vK2YuWzYIn@wuerfel>
- <20160305002203.GF55664@google.com>
- <1457137718.43867.266.camel@infradead.org>
-Message-ID: <20160305004336.GG55664@google.com>
+Date: Fri, 4 Mar 2016 18:26:21 -0800
+Subject: [PATCH v3 16/52] mtd: nand: use mtd_set_ecclayout() where
+ appropriate
+In-Reply-To: <1456448280-27788-17-git-send-email-boris.brezillon@free-electrons.com>
+References: <1456448280-27788-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1456448280-27788-17-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160305022621.GN55664@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 05, 2016 at 12:28:38AM +0000, David Woodhouse wrote:
-> On Fri, 2016-03-04 at 16:22 -0800, Brian Norris wrote:
-> > 
-> > ...but, does anyone care about XIP / MTD_XIP then, if the first two
-> > examples we have both have long-standing build issues?
+On Fri, Feb 26, 2016 at 01:57:24AM +0100, Boris Brezillon wrote:
+> Use the mtd_set_ecclayout() helper instead of directly assigning the
+> mtd->ecclayout field.
 > 
-> I think there are people trying to make it work on other platforms,
-> yes.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/mtd/nand/nand_base.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+> index 17504f2..5093a3c 100644
+> --- a/drivers/mtd/nand/nand_base.c
+> +++ b/drivers/mtd/nand/nand_base.c
+> @@ -4288,7 +4288,7 @@ int nand_scan_tail(struct mtd_info *mtd)
+>  		ecc->write_oob_raw = ecc->write_oob;
+>  
+>  	/* propagate ecc info to mtd_info */
+> -	mtd->ecclayout = ecc->layout;
+> +	mtd_set_ecclayout(mtd, ecc->layout);
 
-OK... can we kill the broken platforms though? I'm not confident that my
-and Arnd's workaround attempts will yield anything more than a pat on
-our own backs to say "yay, it compiles!" And given the number of
-practically unused things we're already maintaining in MTD, I'm always
-happy for an excuse to kill off some of it.
+I'm having trouble applying this one. For the life of me, I can't figure
+out where you got this context from. This block only appears much later
+in nand_scan_tail()...
+
+Do you think you could post a git tree with your intended changes? I may
+just try to pull something in like that instead.
+
+BTW, I'm not sure the OMAP refactorings are going to come in time, but I
+was planning to pull those directly from the TI folks (i.e., they won't
+be rebased on l2-mtd.git), since there's some intermingling of platform
+changes there. I think I can fix the conflicts fine, but FYI.
 
 Brian
+
+>  	mtd->ecc_strength = ecc->strength;
+>  	mtd->ecc_step_size = ecc->size;
+>  
+> -- 
+> 2.1.4
+> 
