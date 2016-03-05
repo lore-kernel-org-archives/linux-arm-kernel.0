@@ -1,56 +1,104 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 6 Mar 2016 06:58:59 +0800
-Subject: [PATCH v4 2/2] ohci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1456592339-31767-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <201603060606.kfJkDbP9%fengguang.wu@intel.com>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Sat, 5 Mar 2016 23:55:05 +0000
+Subject: [PATCH net-next V2 07/16] net: fec: set cbd_sc without relying on
+ previous value
+In-Reply-To: <56D9B2E7.6050000@boundarydevices.com>
+References: <1456360619-24390-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1456360619-24390-8-git-send-email-troy.kisky@boundarydevices.com>
+ <VI1PR0401MB18552747CE0E0FF2C7E0E4C5FFBE0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <56D9B2E7.6050000@boundarydevices.com>
+Message-ID: <HE1PR0401MB18493D58257B539E298B3910FFBF0@HE1PR0401MB1849.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.5-rc6 next-20160304]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-
-url:    https://github.com/0day-ci/linux/commits/Hans-de-Goede/hci-platform-Add-support-for-controllers-with-more-then-one-reset-line/20160228-010130
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: x86_64-randconfig-s5-03060621 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All errors (new ones prefixed by >>):
-
-   drivers/usb/host/ohci-platform.c: In function 'ohci_platform_probe':
->> drivers/usb/host/ohci-platform.c:201:5: error: implicit declaration of function 'devm_reset_control_get_shared_by_index' [-Werror=implicit-function-declaration]
-        devm_reset_control_get_shared_by_index(
-        ^
-   drivers/usb/host/ohci-platform.c:200:22: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-       priv->resets[rst] =
-                         ^
-   cc1: some warnings being treated as errors
-
-vim +/devm_reset_control_get_shared_by_index +201 drivers/usb/host/ohci-platform.c
-
-   195					priv->clks[clk] = NULL;
-   196					break;
-   197				}
-   198			}
-   199			for (rst = 0; rst < OHCI_MAX_RESETS; rst++) {
-   200				priv->resets[rst] =
- > 201					devm_reset_control_get_shared_by_index(
-   202							&dev->dev, rst);
-   203				if (IS_ERR(priv->resets[rst])) {
-   204					err = PTR_ERR(priv->resets[rst]);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 29486 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160306/8aec91a8/attachment-0001.obj>
+ From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Saturday, March 05, 2016 12:08 AM
+> To: Fugang Duan <fugang.duan@nxp.com>; netdev at vger.kernel.org;
+> davem at davemloft.net; b38611 at freescale.com
+> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de; andrew at lunn.ch;
+> tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+> kernel at lists.infradead.org; laci at boundarydevices.com; shawnguo at kernel.org;
+> johannes at sipsolutions.net; stillcompiling at gmail.com;
+> sergei.shtylyov at cogentembedded.com; arnd at arndb.de
+> Subject: Re: [PATCH net-next V2 07/16] net: fec: set cbd_sc without relying on
+> previous value
+> 
+> On 3/4/2016 2:29 AM, Fugang Duan wrote:
+> > From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday,
+> > February 25, 2016 8:37 AM
+> >> To: netdev at vger.kernel.org; davem at davemloft.net;
+> b38611 at freescale.com
+> >> Cc: fabio.estevam at freescale.com; l.stach at pengutronix.de;
+> >> andrew at lunn.ch; tremyfr at gmail.com; linux at arm.linux.org.uk; linux-arm-
+> >> kernel at lists.infradead.org; laci at boundarydevices.com;
+> >> shawnguo at kernel.org; johannes at sipsolutions.net;
+> >> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+> >> arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
+> >> Subject: [PATCH net-next V2 07/16] net: fec: set cbd_sc without
+> >> relying on previous value
+> >>
+> >> Relying on the wrap bit to stay valid once initialized when the
+> >> controller also writes to this byte seems undesirable since we can
+> >> easily know what the value should be.
+> >>
+> >> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> >> ---
+> >>  drivers/net/ethernet/freescale/fec_main.c | 38
+> >> +++++++++----------------------
+> >>  1 file changed, 11 insertions(+), 27 deletions(-)
+> >>
+> >> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> >> b/drivers/net/ethernet/freescale/fec_main.c
+> >> index 791f385..6ceb5f9 100644
+> >> --- a/drivers/net/ethernet/freescale/fec_main.c
+> >> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> >> @@ -340,9 +340,8 @@ fec_enet_txq_submit_frag_skb(struct
+> >> fec_enet_priv_tx_q *txq,
+> >>  		bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
+> >>  		ebdp = (struct bufdesc_ex *)bdp;
+> >>
+> >> -		status = fec16_to_cpu(bdp->cbd_sc);
+> >> -		status &= ~BD_ENET_TX_STATS;
+> >> -		status |= (BD_ENET_TX_TC | BD_ENET_TX_READY);
+> >> +		status = BD_ENET_TX_TC | BD_ENET_TX_READY |
+> >> +				((bdp == txq->bd.last) ? BD_SC_WRAP : 0);
+> >>  		frag_len = skb_shinfo(skb)->frags[frag].size;
+> >>
+> >>  		/* Handle the last BD specially */ @@ -436,8 +435,6 @@ static
+> int
+> >> fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
+> >>  	/* Fill in a Tx ring entry */
+> >>  	bdp = txq->bd.cur;
+> >>  	last_bdp = bdp;
+> >> -	status = fec16_to_cpu(bdp->cbd_sc);
+> >> -	status &= ~BD_ENET_TX_STATS;
+> >>
+> >>  	/* Set buffer length and buffer pointer */
+> >>  	bufaddr = skb->data;
+> >> @@ -462,6 +459,8 @@ static int fec_enet_txq_submit_skb(struct
+> >> fec_enet_priv_tx_q *txq,
+> >>  		return NETDEV_TX_OK;
+> >>  	}
+> >>
+> >> +	status = BD_ENET_TX_TC | BD_ENET_TX_READY |
+> >> +			((bdp == txq->bd.last) ? BD_SC_WRAP : 0);
+> >>  	if (nr_frags) {
+> >>  		last_bdp = fec_enet_txq_submit_frag_skb(txq, skb, ndev);
+> >>  		if (IS_ERR(last_bdp)) {
+> >> @@ -512,7 +511,6 @@ static int fec_enet_txq_submit_skb(struct
+> >> fec_enet_priv_tx_q *txq,
+> >>  	/* Send it on its way.  Tell FEC it's ready, interrupt when done,
+> >>  	 * it's the last BD of the frame, and to put the CRC on the end.
+> >>  	 */
+> >> -	status |= (BD_ENET_TX_READY | BD_ENET_TX_TC);
+> >
+> > This is completely error.  We have to prepare all BDs for frag skb, and then
+> enable "READY" and "TC" bit for the first BD, otherwise uDMA copy un-correct
+> data to fifo.
+> >
+> 
+> 
+> 
+> 
+> I don't follow. Please read patch again.
+> 
+Understand, sorry, I take one mistake.  The patch is fine for me.
