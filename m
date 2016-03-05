@@ -1,30 +1,153 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 5 Mar 2016 14:19:49 -0800
-Subject: [PATCH v2] serial: xuartps: Enable OF earlycon support
-In-Reply-To: <56CEFBD7.40008@monstr.eu>
-References: <09f2c419994281fca7968142e52d969542370d1c.1455782238.git.michal.simek@xilinx.com>
- <56C5F670.50005@hurleysoftware.com> <56CEFBD7.40008@monstr.eu>
-Message-ID: <20160305221949.GA19842@kroah.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat,  5 Mar 2016 23:38:22 +0100
+Subject: [PATCH v4 net-next 4/9] ARM: dts: armada-xp: enable buffer manager
+ support on Armada XP boards
+In-Reply-To: <1457217507-10778-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1457217507-10778-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1457217507-10778-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 02:04:23PM +0100, Michal Simek wrote:
-> Hi Greg,
-> 
-> On 18.2.2016 17:50, Peter Hurley wrote:
-> > On 02/17/2016 11:57 PM, Michal Simek wrote:
-> >> Support early console setup via DT for all listed compatible strings.
-> >> Remove EARLYCON_DECLARE which was done by:
-> >> "Use common framework for earlycon declarations"
-> >> (sha1: 2eaa790989e03900298ad24f77f1086dbbc1aebd)
-> >> when OF_EARLYCON_DECLARE is defined.
-> > 
-> > Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> 
-> Can you please add it your queue for 4.6?
-> Or can we merge it via arm-soc tree as was suggested by Arnd here?
-> https://lkml.org/lkml/2016/2/16/315
+From: Marcin Wojtas <mw@semihalf.com>
 
-I can take it, thanks.
+Since mvneta driver supports using hardware buffer management (BM), in
+order to use it, board files have to be adjusted accordingly. This commit
+enables BM on AXP-DB and AXP-GP in same manner - because number of ports
+on those boards is the same as number of possible pools, each port is
+supposed to use single pool for all kind of packets.
 
-greg k-h
+Moreover appropriate entry is added to 'soc' node ranges, as well as "okay"
+status for 'bm' and 'bm-bppi' (internal SRAM) nodes.
+
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-db.dts | 19 ++++++++++++++++++-
+ arch/arm/boot/dts/armada-xp-gp.dts | 19 ++++++++++++++++++-
+ 2 files changed, 36 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index f774101416a5..30657302305d 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -77,7 +77,8 @@
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+ 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
+ 			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+-			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000
++			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
+ 
+ 		devbus-bootcs {
+ 			status = "okay";
+@@ -181,21 +182,33 @@
+ 				status = "okay";
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
++				buffer-manager = <&bm>;
++				bm,pool-long = <0>;
+ 			};
+ 			ethernet at 74000 {
+ 				status = "okay";
+ 				phy = <&phy1>;
+ 				phy-mode = "rgmii-id";
++				buffer-manager = <&bm>;
++				bm,pool-long = <1>;
+ 			};
+ 			ethernet at 30000 {
+ 				status = "okay";
+ 				phy = <&phy2>;
+ 				phy-mode = "sgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <2>;
+ 			};
+ 			ethernet at 34000 {
+ 				status = "okay";
+ 				phy = <&phy3>;
+ 				phy-mode = "sgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <3>;
++			};
++
++			bm at c0000 {
++				status = "okay";
+ 			};
+ 
+ 			mvsdio at d4000 {
+@@ -230,5 +243,9 @@
+ 				};
+ 			};
+ 		};
++
++		bm-bppi {
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 4878d7353069..a1ded01d0c07 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -96,7 +96,8 @@
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+ 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
+ 			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+-			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
++			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000
++			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
+ 
+ 		devbus-bootcs {
+ 			status = "okay";
+@@ -196,21 +197,29 @@
+ 				status = "okay";
+ 				phy = <&phy0>;
+ 				phy-mode = "qsgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <0>;
+ 			};
+ 			ethernet at 74000 {
+ 				status = "okay";
+ 				phy = <&phy1>;
+ 				phy-mode = "qsgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <1>;
+ 			};
+ 			ethernet at 30000 {
+ 				status = "okay";
+ 				phy = <&phy2>;
+ 				phy-mode = "qsgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <2>;
+ 			};
+ 			ethernet at 34000 {
+ 				status = "okay";
+ 				phy = <&phy3>;
+ 				phy-mode = "qsgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <3>;
+ 			};
+ 
+ 			/* Front-side USB slot */
+@@ -235,6 +244,10 @@
+ 				};
+ 			};
+ 
++			bm at c0000 {
++				status = "okay";
++			};
++
+ 			nand at d0000 {
+ 				status = "okay";
+ 				num-cs = <1>;
+@@ -243,5 +256,9 @@
+ 				nand-on-flash-bbt;
+ 			};
+ 		};
++
++		bm-bppi {
++			status = "okay";
++		};
+ 	};
+ };
+-- 
+2.5.0
