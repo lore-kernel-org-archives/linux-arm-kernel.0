@@ -1,37 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Mar 2016 17:12:57 +0000
-Subject: [PATCH] ARM: realview: DT support for the PBA8 and PBX-A9
-In-Reply-To: <CACRpkdYBJ_4PbWoMK-wNwumuVaYPfxnxF1cw-01XyDU7rmD2jw@mail.gmail.com>
-References: <1456329276-29529-1-git-send-email-linus.walleij@linaro.org>
- <56D04CC2.9010708@arm.com>
- <CACRpkdYBJ_4PbWoMK-wNwumuVaYPfxnxF1cw-01XyDU7rmD2jw@mail.gmail.com>
-Message-ID: <20160305171257.GG19428@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat,  5 Mar 2016 18:16:55 +0100
+Subject: [PATCH v3 net-next 3/9] ARM: dts: armada-xp: add buffer manager nodes
+In-Reply-To: <1457198221-21752-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1457198221-21752-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1457198221-21752-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 06, 2016 at 12:08:27AM +0700, Linus Walleij wrote:
-> On Fri, Feb 26, 2016 at 8:01 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> 
-> > As with the Versatile AB I scored from a junk pile, trying to boot a
-> > full userspace from SD card makes slow progress through a storm of data
-> > transfer errors and eventually dies. USB is similarly flaky, with occasional
-> > device resets and command errors, but I don't see that it's this patch's
-> > fault
-> 
-> Neither SD/MMC or USB mass storage boots ever worked on these
-> shaky PL180 and ISP1760 drivers. Only NFS boot really works.
-> 
-> I think PL180 can be made to work if we implement a pure polling mode
-> (not IRQ, not DMA) to read it.
+From: Marcin Wojtas <mw@semihalf.com>
 
-Don't even try that.  The DMA is very flakey from board to board, and
-what works on one doesn't work on another.
+Armada XP network controller supports hardware buffer management (BM).
+Since it is now enabled in mvneta driver, appropriate nodes can be added
+to armada-xp.dtsi - for the actual common BM unit (bm at c0000) and its
+internal SRAM (bm-bppi), which is used for indirect access to buffer
+pointer ring residing in DRAM.
 
->From what I remember playing with that on Versatile PB926, it was a
-complete dead-end.  The only sort-of functional peripheral with DMA
-on my boards was PL011, and only for transmit.
+Pools - ports mapping, bm-bppi entry in 'soc' node's ranges and optional
+parameters are supposed to be set in board files.
 
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index be23196829bb..bd459360d7a6 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -253,6 +253,14 @@
+ 				marvell,crypto-sram-size = <0x800>;
+ 			};
+ 
++			bm: bm at c0000 {
++				compatible = "marvell,armada-380-neta-bm";
++				reg = <0xc0000 0xac>;
++				clocks = <&gateclk 13>;
++				internal-mem = <&bm_bppi>;
++				status = "disabled";
++			};
++
+ 			xor at f0900 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0xF0900 0x100
+@@ -291,6 +299,16 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 MBUS_ID(0x09, 0x05) 0 0x800>;
+ 		};
++
++		bm_bppi: bm-bppi {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			ranges = <0 MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&gateclk 13>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	clocks {
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.5.0
