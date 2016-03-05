@@ -1,64 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Mar 2016 14:54:01 +0000
-Subject: [PATCH 1/2] ASoC: cs35l32: avoid uninitialized variable access
-In-Reply-To: <1453741678-1988125-1-git-send-email-arnd@arndb.de>
-References: <1453741678-1988125-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160305145400.GF19428@n2100.arm.linux.org.uk>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 5 Mar 2016 15:02:39 +0000
+Subject: [PATCH 1/3] iio:adc:at91-sama5d2: fix typo
+In-Reply-To: <1457021355-23898-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1457021355-23898-1-git-send-email-ludovic.desroches@atmel.com>
+ <1457021355-23898-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <56DAF50F.80109@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 06:07:32PM +0100, Arnd Bergmann wrote:
-> gcc warns about the possibilty of accessing a property read from
-> devicetree in cs35l32_i2c_probe() when it has not been initialized
-> because CONFIG_OF is disabled:
+On 03/03/16 16:09, Ludovic Desroches wrote:
+> Fix typo in the name of a macro.
 > 
-> sound/soc/codecs/cs35l32.c: In function 'cs35l32_i2c_probe':
-> sound/soc/codecs/cs35l32.c:278:2: warning: 'val' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Oops ;)
+
+Applied to the togreg branch of iio.git - initially pushed out as testing
+for the autobuilders to play with it.  Not sure if I will be doing another pull
+request to Greg this cycle though...
+
+Jonathan
+> ---
+>  drivers/iio/adc/at91-sama5d2_adc.c | 26 +++++++++++++-------------
+>  1 file changed, 13 insertions(+), 13 deletions(-)
 > 
-> The code is actually correct because it checks the dev->of_node
-> variable first and we know this is NULL here, but by adding a
-> check for IS_ENABLED(CONFIG_OF), we can let the compiler know
-> as well, and also generate smaller object code.
-
-No, the code is buggy, and the compiler is very correct in warning about
-it.
-
-The code there is:
-
-        of_property_read_u32(np, "cirrus,boost-manager", &val);
-        switch (val) {
-
-of_property_read_u32() is aliased to of_property_read_u32_array() via:
-
-static inline int of_property_read_u32(const struct device_node *np,
-                                       const char *propname,
-                                       u32 *out_value)
-{
-        return of_property_read_u32_array(np, propname, out_value, 1);
-}
-
-which does this:
-
-int of_property_read_u32_array(const struct device_node *np,
-                               const char *propname, u32 *out_values,
-                               size_t sz)
-{
-        const __be32 *val = of_find_property_value_of_size(np, propname,
-                                                (sz * sizeof(*out_values)));
-
-        if (IS_ERR(val))
-                return PTR_ERR(val);
-
-        while (sz--)
-                *out_values++ = be32_to_cpup(val++);
-        return 0;
-}
-
-Note that 'out_values' is not written to if of_find_property_value_of_size()
-returns an error.  Therefore, if cirrus,boost-manager is missing, the
-resulting value of 'val' is left uninitialised.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+> index dbee13a..33bacec 100644
+> --- a/drivers/iio/adc/at91-sama5d2_adc.c
+> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
+> @@ -140,7 +140,7 @@
+>  /* Version Register */
+>  #define AT91_SAMA5D2_VERSION	0xfc
+>  
+> -#define AT91_AT91_SAMA5D2_CHAN(num, addr)				\
+> +#define AT91_SAMA5D2_CHAN(num, addr)					\
+>  	{								\
+>  		.type = IIO_VOLTAGE,					\
+>  		.channel = num,						\
+> @@ -185,18 +185,18 @@ struct at91_adc_state {
+>  };
+>  
+>  static const struct iio_chan_spec at91_adc_channels[] = {
+> -	AT91_AT91_SAMA5D2_CHAN(0, 0x50),
+> -	AT91_AT91_SAMA5D2_CHAN(1, 0x54),
+> -	AT91_AT91_SAMA5D2_CHAN(2, 0x58),
+> -	AT91_AT91_SAMA5D2_CHAN(3, 0x5c),
+> -	AT91_AT91_SAMA5D2_CHAN(4, 0x60),
+> -	AT91_AT91_SAMA5D2_CHAN(5, 0x64),
+> -	AT91_AT91_SAMA5D2_CHAN(6, 0x68),
+> -	AT91_AT91_SAMA5D2_CHAN(7, 0x6c),
+> -	AT91_AT91_SAMA5D2_CHAN(8, 0x70),
+> -	AT91_AT91_SAMA5D2_CHAN(9, 0x74),
+> -	AT91_AT91_SAMA5D2_CHAN(10, 0x78),
+> -	AT91_AT91_SAMA5D2_CHAN(11, 0x7c),
+> +	AT91_SAMA5D2_CHAN(0, 0x50),
+> +	AT91_SAMA5D2_CHAN(1, 0x54),
+> +	AT91_SAMA5D2_CHAN(2, 0x58),
+> +	AT91_SAMA5D2_CHAN(3, 0x5c),
+> +	AT91_SAMA5D2_CHAN(4, 0x60),
+> +	AT91_SAMA5D2_CHAN(5, 0x64),
+> +	AT91_SAMA5D2_CHAN(6, 0x68),
+> +	AT91_SAMA5D2_CHAN(7, 0x6c),
+> +	AT91_SAMA5D2_CHAN(8, 0x70),
+> +	AT91_SAMA5D2_CHAN(9, 0x74),
+> +	AT91_SAMA5D2_CHAN(10, 0x78),
+> +	AT91_SAMA5D2_CHAN(11, 0x7c),
+>  };
+>  
+>  static unsigned at91_adc_startup_time(unsigned startup_time_min,
+> 
