@@ -1,29 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 5 Mar 2016 15:10:11 +0100
-Subject: [PATCH 1/3] usb: core: add power sequence for USB devices
-In-Reply-To: <20160305083347.GA28858@shlinux2.ap.freescale.net>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
- <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
- <CAL_JsqLYHzb0ABYN_P9ZOEorT6otvn_BPNzuCFhoqwa5M4y-hw@mail.gmail.com>
- <20160304020242.GB30272@shlinux2.ap.freescale.net>
- <20160304022305.GB20597@lunn.ch>
- <20160304023750.GF30272@shlinux2.ap.freescale.net>
- <20160305042854.GW13525@rob-hp-laptop>
- <20160305083347.GA28858@shlinux2.ap.freescale.net>
-Message-ID: <20160305141011.GA28343@lunn.ch>
+From: phil@nwl.cc (Phil Sutter)
+Date: Sat, 5 Mar 2016 15:36:31 +0100
+Subject: Broken PCIe on Synology DS414
+Message-ID: <20160305143445.827496739A@mail.nwl.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> So, would you like to accept the generic solution like below:
-> 
-> - Create a generic power sequence driver, and it will be probed
-> according to compatible string at device tree. At its probe,
-> we can create a power sequence structure, and let this structure
-> as the private data for this power sequence device.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-I'm not sure a separate driver is required. Why not consider it more
-like pinctrl properties? They are listed in the devices node. Have the
-bus enumerate code first walk all children and run their on sequence.
-Bus shutdown would again walk the children and run the off sequence.
+Hi,
 
-    Andrew 
+Commit c466d997bb160 ("ARM: mvebu: define crypto SRAM ranges for all
+armada-xp boards") breaks PCIe on the MV78230 based Synology DS414. The
+kernel does not complain, but 'lspci' does not show a single device.
+Reverting this commit cures vanilla 4.5-rc6 again for me.
+
+Seems like the ranges declared for crypto SRAM conflict with PCIe
+controller ones in some way. Looking at the DT files, all MV78230 based
+devices should be affected, not just the DS414.
+
+Is this a known problem? Please let me know if there is anything I can
+do to further analyze the issue.
+
+Thanks, Phil
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iEYEARECAAYFAlba7uwACgkQnMPprxY1hCf8tACcDc1uAjGIw9Q06hxZ6sz3hQf9
+19EAn355YCXKamlXK3ir/Sh/fhtvZpew
+=71Sh
+-----END PGP SIGNATURE-----
