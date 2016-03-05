@@ -1,45 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat,  5 Mar 2016 16:32:38 +0100
-Subject: [PATCH] memremap: check pfn validity before passing to pfn_to_page()
-Message-ID: <1457191958-5263-1-git-send-email-ard.biesheuvel@linaro.org>
+From: linux@baker-net.org.uk (Adam Baker)
+Date: Sat,  5 Mar 2016 15:34:57 +0000
+Subject: [PATCH v4 3/3] ARM: mvebu: Add the hardware monitor to the NSA320
+ device tree
+In-Reply-To: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
+References: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
+Message-ID: <1457192097-32538-4-git-send-email-linux@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In memremap's helper function try_ram_remap(), we dereference a struct page
-pointer that was derived from a PFN that is known to be covered by a
-'System RAM' iomem region, and is thus assumed to be a 'valid' PFN, i.e., a
-PFN that has a struct page associated with it and is covered by the kernel
-direct mapping.
-However, the assumption that there is a 1:1 relation between the System RAM
-iomem region and the kernel direct mapping is not universally valid on all
-architectures, and on ARM and arm64, 'System RAM' may include regions for
-which pfn_valid() returns false.
+Add an entry for the hardware monitoring MCU
 
-Generally speaking, both __va() and pfn_to_page() should only ever be called
-on PFNs/physical addresses for which pfn_valid() returns true, so add that
-check to try_ram_remap().
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Adam Baker <linux@baker-net.org.uk>
 ---
- kernel/memremap.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This patch is unchanged from the version Gregory CLEMENT said
+he would apply once the hwmon maintainers accept 2/3
+---
+ arch/arm/boot/dts/kirkwood-nsa320.dts | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/kernel/memremap.c b/kernel/memremap.c
-index b981a7b023f0..03fa254f61f6 100644
---- a/kernel/memremap.c
-+++ b/kernel/memremap.c
-@@ -29,10 +29,10 @@ __weak void __iomem *ioremap_cache(resource_size_t offset, unsigned long size)
+diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
+index 24f686d..2a935e9 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa320.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
+@@ -193,10 +193,19 @@
+ 		};
+ 	};
  
- static void *try_ram_remap(resource_size_t offset, size_t size)
- {
--	struct page *page = pfn_to_page(offset >> PAGE_SHIFT);
-+	unsigned long pfn = PHYS_PFN(offset);
++	hwmon {
++		compatible = "zyxel,nsa320-mcu";
++		pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act>;
++		pinctrl-names = "default";
++
++		data-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
++		clk-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++		act-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
++	};
++
+ 	/* The following pins are currently not assigned to a driver,
+ 	   some of them should be configured as inputs.
+-	pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act
+-		     &pmx_htp &pmx_vid_b1
++	pinctrl-0 = <&pmx_htp &pmx_vid_b1
+ 		     &pmx_power_resume_data &pmx_power_resume_clk>; */
+ };
  
- 	/* In the simple case just return the existing linear address */
--	if (!PageHighMem(page))
-+	if (pfn_valid(pfn) && !PageHighMem(pfn_to_page(pfn)))
- 		return __va(offset);
- 	return NULL; /* fallback to ioremap_cache */
- }
 -- 
-1.9.1
+2.1.4
