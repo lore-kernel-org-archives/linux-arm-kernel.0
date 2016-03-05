@@ -1,201 +1,508 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Sat, 5 Mar 2016 23:51:44 +0800
-Subject: [PATCH v14 0/4] Watchdog: introduce ARM SBSA watchdog driver
-In-Reply-To: <20160304194747.GB7099@spo001.leaseweb.nl>
-References: <1456735610-22012-1-git-send-email-fu.wei@linaro.org>
- <20160304194747.GB7099@spo001.leaseweb.nl>
-Message-ID: <CADyBb7vx+LofgEdwffavYweS0snbCFRuoMp-LHctuvue+rszXw@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sat, 5 Mar 2016 18:54:09 +0300
+Subject: [PATCH v7 2/3] pci, pci-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <1457130708-3231-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1457130708-3231-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457130708-3231-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160305155409.GA2532@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2016 at 03:47, Wim Van Sebroeck <wim@iguana.be> wrote:
-> Hi Fu,
->
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> This patchset:
->>     (1)Introduce Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
->>     for FDT info of SBSA Generic Watchdog, and give two examples of
->>     adding SBSA Generic Watchdog device node into the dts files:
->>     foundation-v8.dts and amd-seattle-soc.dtsi.
->>
->>     (2)Introduce ARM SBSA watchdog driver:
->>         a.Use linux kernel watchdog framework;
->>         b.Work with FDT on ARM64;
->>         c.Support getting timeout from parameter and FDT at the driver
->>           init stage.
->>         d.The driver works in two modes:
->>           (1) single stage timeout (ignore WS0 interrupt)
->>           (2) two stages timeout (register WS0 interrupt, do panic in routine)
->>         e.User can config working mode by module parameter "action".
->>
->> This patchset has been tested with watchdog daemon
->> (ACPI/FDT, module/build-in) on the following platforms:
->>     (1)ARM Foundation v8 model
->>     (2)AMD Seattle platform
->>
->> This patchset has been tested with kdump successfully.
->>
->> Changelog:
->> v14:Fix a bug of registering interrupt routine: do a ping before
->>     registering interrupt routine, in case where is a pending interrupt.
->>     Reorder the initialization code to postpone registering interrupt routine.
->>     Improve some code style:
->>         (1)add some macro of string
->>         (2)use watchdog_get_drvdata instead of to_sbsa_gwdt,
->>            delete to_sbsa_gwdt.
->>
->> v13:https://lkml.org/lkml/2016/2/16/713
->>     Fix a dev_warn message typo"signle"-->"single"
->>     Add MODULE_ALIAS
->>     Add more *ed-by in commit message.
->>
->> v12:https://lkml.org/lkml/2016/2/16/154
->>     Fix a dev_warn message typo"fall"--"falling"
->>     Remove unnecessary "status" in dts
->>     Add more *ed-by in commit message.
->>
->> v11:https://lkml.org/lkml/2016/2/9/577
->>     Merge patch 4 and 5.
->>     Improve some comments.
->>     The driver works in two modes, it's configured by "action"(instead of
->>     panic_enabled).
->>     Improve the initialization of the timeout limits.
->>     Feeding dog by writing "0" to WRR.
->>
->> v10:https://lkml.org/lkml/2016/2/3/817
->>     Delete pretimeout support.
->>     Separate the driver to two parts:
->>         (1) single stage timeout driver(ignore WS0 interrupt);
->>         (2) register WS0 interrupt for the half timeout panic.
->>     timeout == (enable --> WS1).
->>
->> v9: https://lkml.org/lkml/2015/11/9/57
->>     Rebase to latest kernel version(4.3).
->>     Update the Documentation of sbsa-gwdt device node info of FDT:
->>         (1) move some introduction to pretimeout patch
->>         (2) delete WS1 value from "interrupts" of binding documentation,
->>             since WS1 won't be handled by Linux.
->>
->> v8: https://lkml.org/lkml/2015/10/27/466
->>     Rebase to latest kernel version(4.3-rc7).
->>     Separate the patches of GTDT support and arm_arch_timer. This
->>     clocksource relevant patch will upstreamed in a individual patchset.
->>     Update all the default timeout and pretimeout to 30s and 60s.
->>     Improve documentation and inline comments.
->>     Fix a bug in pretimeout support which makes timeout and pretimeout
->>     parameters initialization fail.
->>
->> v7: https://lkml.org/lkml/2015/8/24/611
->>     Rebase to latest kernel version(4.2-rc7).
->>     Improve FDT support: geting resource by order, instead of name.
->>     According to the FDT support, Update the example dts file, gtdt.c
->>     and sbsa_gwdt.c.
->>     Pass the sparse test, and fix the warning.
->>     Fix the max_pretimeout and max_timeout value overflow bug.
->>     Delete the WCV output value.
->>
->>
->> v6: https://lkml.org/lkml/2015/6/23/359
->>     Improve the dtb example files: reduce the register frame size to 4K.
->>     Improve pretimeout support:
->>         (1) improve watchdog_init_timeouts function
->>       (2) rename watchdog_check_min_max_timeouts back to the original name
->>         (1) improve watchdog_timeout_invalid/watchdog_pretimeout_invalid
->>     Add the new features in the sbsa_gwdt driver:
->>       (1) In the second stage, user can feed the dog without cleaning WS0.
->>       (2) In the second stage, user can trigger WS1 by setting pretimeout = 0.
->>       (3) expand the max value of pretimeout, in case 10 second is not enough
->>           for a kdump kernel reboot in panic.
->>
->> v5: https://lkml.org/lkml/2015/6/10/357
->>     Improve pretimeout support:
->>         (1)fix typo in documentation and comments.
->>       (2)fix the timeout limits validation bug.
->>     Simplify sbsa_gwdt driver:
->>       (1)integrate all the registers access functions into caller.
->>
->> v4: https://lkml.org/lkml/2015/6/2/4
->>     Refactor GTDT support code: remove it from arch/arm64/kernel/acpi.c,
->>     put it into drivers/acpi/gtdt.c file.
->>     Integrate the GTDT code of drivers/clocksource/arm_arch_timer.c into
->>     drivers/acpi/gtdt.c.
->>     Improve pretimeout support, fix "pretimeout == 0" problem.
->>     Simplify sbsa_gwdt driver:
->>         (1)timeout/pretimeout limits setup;
->>         (2)keepalive function;
->>         (3)delete "clk == 0" check;
->>         (4)delete WS0 status bit check in interrupt routine;
->>         (5)sbsa_gwdt_set_wcv function.
->>
->> v3: https://lkml.org/lkml/2015/5/25/111
->>     Delete "export arch_timer_get_rate" patch.
->>     Driver back to use arch_timer_get_cntfrq.
->>     Improve watchdog_init_timeouts function and update relevant documentation.
->>     Improve watchdog_timeout_invalid and watchdog_pretimeout_invalid.
->>     Improve foundation-v8.dts: delete the unnecessary tag of device node.
->>     Remove "ARM64 || COMPILE_TEST" from Kconfig.
->>     Add comments in arch/arm64/kernel/acpi.c
->>     Fix typoes and incorrect comments.
->>
->> v2: https://lkml.org/lkml/2015/5/21/172
->>     Improve watchdog-kernel-api.txt documentation for pretimeout support.
->>     Export "arch_timer_get_rate" in arm_arch_timer.c.
->>     Add watchdog_init_timeouts API for pretimeout support in framework.
->>     Improve suspend and resume foundation in driver
->>     Improve timeout/pretimeout values init code in driver.
->>     Delete unnecessary items of the sbsa_gwdt struct and #define.
->>     Delete all unnecessary debug info in driver.
->>     Fix 64bit division bug.
->>     Use the arch_timer interface to get watchdog clock rate.
->>     Add MODULE_DEVICE_TABLE for platform device id.
->>     Fix typoes.
->>
->> v1: https://lkml.org/lkml/2015/5/15/279
->>     The first version upstream patchset to linux mailing list.
->>
->> Fu Wei (4):
->>   Documentation: add sbsa-gwdt driver documentation
->>   ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts
->>   ARM64: add SBSA Generic Watchdog device node in amd-seattle-soc.dtsi
->>   Watchdog: introduce ARM SBSA watchdog driver
->>
->>  .../devicetree/bindings/watchdog/sbsa-gwdt.txt     |  31 ++
->>  Documentation/watchdog/watchdog-parameters.txt     |   7 +
->>  arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi       |   8 +
->>  arch/arm64/boot/dts/arm/foundation-v8.dts          |   7 +
->>  drivers/watchdog/Kconfig                           |  20 +
->>  drivers/watchdog/Makefile                          |   1 +
->>  drivers/watchdog/sbsa_gwdt.c                       | 408 +++++++++++++++++++++
->>  7 files changed, 482 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/watchdog/sbsa-gwdt.txt
->>  create mode 100644 drivers/watchdog/sbsa_gwdt.c
->>
->> --
->> 2.5.0
->>
->
-> Patchset added to linux-watchdog-next.
-Hi Wim,
-It is really a awesome news, Great thanks!  :-)
+Hi David,
 
-Great thanks to everyone who helps me on this patchset!
+On Fri, Mar 04, 2016 at 02:31:47PM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The root complexes used to access off-chip PCIe devices (called PEM
+> units in the hardware manuals) on some Cavium ThunderX processors
+> require quirky access methods for the config space of the PCIe bridge.
+> Add a driver to provide these config space accessor functions.  The
+> pci-host-common code is used to configure the PCI machinery.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 +++
+>  MAINTAINERS                                        |   8 +
+>  drivers/pci/host/Kconfig                           |   7 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-thunder-pem.c                 | 347 +++++++++++++++++++++
+>  5 files changed, 406 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+>  create mode 100644 drivers/pci/host/pci-thunder-pem.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+> new file mode 100644
+> index 0000000..f131fae
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+> @@ -0,0 +1,43 @@
+> +* ThunderX PEM PCIe host controller
+> +
+> +Firmware-initialized PCI host controller found on some Cavium
+> +ThunderX processors.
+> +
+> +The properties and their meanings are identical to those described in
+> +host-generic-pci.txt except as listed below.
+> +
+> +Properties of the host controller node that differ from
+> +host-generic-pci.txt:
+> +
+> +- compatible     : Must be "cavium,pci-host-thunder-pem"
+> +
+> +- reg            : Two entries: First the configuration space for down
+> +                   stream devices base address and size, as accessed
+> +                   from the parent bus. Second, the register bank of
+> +                   the PEM device PCIe bridge.
+> +
+> +Example:
+> +
+> +    pci at 87e0,c2000000 {
+> +	compatible = "cavium,pci-host-thunder-pem";
+> +	device_type = "pci";
+> +	msi-parent = <&its>;
+> +	msi-map = <0 &its 0x10000 0x10000>;
+> +	bus-range = <0x8f 0xc7>;
+> +	#size-cells = <2>;
+> +	#address-cells = <3>;
+> +
+> +	reg = <0x8880 0x8f000000 0x0 0x39000000>,  /* Configuration space */
+> +	      <0x87e0 0xc2000000 0x0 0x00010000>; /* PEM space */
+> +	ranges = <0x01000000 0x00 0x00020000 0x88b0 0x00020000 0x00 0x00010000>, /* I/O */
+> +		 <0x03000000 0x00 0x10000000 0x8890 0x10000000 0x0f 0xf0000000>, /* mem64 */
+> +		 <0x43000000 0x10 0x00000000 0x88a0 0x00000000 0x10 0x00000000>, /* mem64-pref */
+> +		 <0x03000000 0x87e0 0xc2f00000 0x87e0 0xc2000000 0x00 0x00100000>; /* mem64 PEM BAR4 */
+> +
+> +	#interrupt-cells = <1>;
+> +	interrupt-map-mask = <0 0 0 7>;
+> +	interrupt-map = <0 0 0 1 &gic0 0 0 0 24 4>, /* INTA */
+> +			<0 0 0 2 &gic0 0 0 0 25 4>, /* INTB */
+> +			<0 0 0 3 &gic0 0 0 0 26 4>, /* INTC */
+> +			<0 0 0 4 &gic0 0 0 0 27 4>; /* INTD */
+> +    };
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 370b3cb..cef8dda 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -8407,6 +8407,14 @@ L:     linux-arm-msm at vger.kernel.org
+>  S:     Maintained
+>  F:     drivers/pci/host/*qcom*
+>  
+> +PCIE DRIVER FOR CAVIUM THUNDERX
+> +M:	David Daney <david.daney@cavium.com>
+> +L:	linux-pci at vger.kernel.org
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Supported
+> +F:	Documentation/devicetree/bindings/pci/pci-thunder-*
+> +F:	drivers/pci/host/pci-thunder-*
+> +
+>  PCMCIA SUBSYSTEM
+>  P:	Linux PCMCIA Team
+>  L:	linux-pcmcia at lists.infradead.org
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index cd5dfbb..c642797 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -196,4 +196,11 @@ config PCIE_QCOM
+>  	  PCIe controller uses the Designware core plus Qualcomm-specific
+>  	  hardware wrappers.
+>  
+> +config PCI_HOST_THUNDER_PEM
+> +	bool "Cavium Thunder PCIe controller to off-chip devices"
+> +	depends on OF && ARM64
+> +	select PCI_HOST_COMMON
+> +	help
+> +	  Say Y here if you want PCIe support for CN88XX Cavium Thunder SoCs.
+> +
+>  endmenu
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index 3b24af8..8903172 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -23,3 +23,4 @@ obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
+>  obj-$(CONFIG_PCIE_ALTERA_MSI) += pcie-altera-msi.o
+>  obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
+>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+> +obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> new file mode 100644
+> index 0000000..4b939c7
+> --- /dev/null
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -0,0 +1,347 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + *
+> + * Copyright (C) 2015 - 2016 Cavium, Inc.
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include "pci-host-common.h"
+> +
+> +#define PEM_CFG_WR 0x28
+> +#define PEM_CFG_RD 0x30
+> +
+> +struct thunder_pem_pci {
+> +	struct gen_pci	gen_pci;
+> +	u32		ea_entry[3];
+> +	void __iomem	*pem_reg_base;
+> +};
+> +
+> +static void __iomem *thunder_pem_map_bus(struct pci_bus *bus,
+> +					 unsigned int devfn, int where)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
+> +
+> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
+> +}
+> +
+> +static int thunder_pem_bridge_read(struct pci_bus *bus, unsigned int devfn,
+> +				   int where, int size, u32 *val)
+> +{
+> +	u64 read_val;
+> +	struct thunder_pem_pci *pem_pci;
+> +	struct gen_pci *pci = bus->sysdata;
+> +
+> +	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+> +
+> +	if (devfn != 0 || where >= 2048) {
+> +		*val = ~0;
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	}
+> +
+> +	/*
+> +	 * 32-bit accesses only.  Write the address to the low order
+> +	 * bits of PEM_CFG_RD, then trigger the read by reading back.
+> +	 * The config data lands in the upper 32-bits of PEM_CFG_RD.
+> +	 */
+> +	read_val = where & ~3ull;
+> +	writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +	read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+> +	read_val >>= 32;
+> +
+> +	/*
+> +	 * The config space contains some garbage, fix it up.  Also
+> +	 * synthesize an EA capability for the BAR used by MSI-X.
+> +	 */
+> +	switch (where & ~3) {
+> +	case 0x40:
+> +		read_val &= 0xffff00ff;
+> +		read_val |= 0x00007000; /* Skip MSI CAP */
+> +		break;
+> +	case 0x70: /* Express Cap */
+> +		/* PME interrupt on vector 2*/
+> +		read_val |= (2u << 25);
+> +		break;
+> +	case 0xb0: /* MSI-X Cap */
+> +		/* TableSize=4, Next Cap is EA */
+> +		read_val &= 0xc00000ff;
+> +		read_val |= 0x0003bc00;
+> +		break;
+> +	case 0xb4:
+> +		/* Table offset=0, BIR=0 */
+> +		read_val = 0x00000000;
+> +		break;
+> +	case 0xb8:
+> +		/* BPA offset=0xf0000, BIR=0 */
+> +		read_val = 0x000f0000;
+> +		break;
+> +	case 0xbc:
+> +		/* EA, 1 entry, no next Cap */
+> +		read_val = 0x00010014;
+> +		break;
+> +	case 0xc0:
+> +		/* DW2 for type-1 */
+> +		read_val = 0x00000000;
+> +		break;
+> +	case 0xc4:
+> +		/* Entry BEI=0, PP=0x00, SP=0xff, ES=3 */
+> +		read_val = 0x80ff0003;
+> +		break;
+> +	case 0xc8:
+> +		read_val = pem_pci->ea_entry[0];
+> +		break;
+> +	case 0xcc:
+> +		read_val = pem_pci->ea_entry[1];
+> +		break;
+> +	case 0xd0:
+> +		read_val = pem_pci->ea_entry[2];
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +	read_val >>= (8 * (where & 3));
+> +	switch (size) {
+> +	case 1:
+> +		read_val &= 0xff;
+> +		break;
+> +	case 2:
+> +		read_val &= 0xffff;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +	*val = read_val;
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static int thunder_pem_config_read(struct pci_bus *bus, unsigned int devfn,
+> +				   int where, int size, u32 *val)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +
+> +	if (bus->number < pci->cfg.bus_range->start ||
+> +	    bus->number > pci->cfg.bus_range->end)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +	/*
+> +	 * The first device on the bus is the PEM PCIe bridge.
+> +	 * Special case its config access.
+> +	 */
+> +	if (bus->number == pci->cfg.bus_range->start)
+> +		return thunder_pem_bridge_read(bus, devfn, where, size, val);
+> +
+> +	return pci_generic_config_read(bus, devfn, where, size, val);
+> +}
+> +
+> +/*
+> + * Some of the w1c_bits below also include read-only or non-writable
+> + * reserved bits, this makes the code simpler and is OK as the bits
+> + * are not affected by writing zeros to them.
+> + */
+> +static u32 thunder_pem_bridge_w1c_bits(int where)
+> +{
+> +	u32 w1c_bits = 0;
+> +
+> +	switch (where & ~3) {
+> +	case 0x04: /* Command/Status */
+> +	case 0x1c: /* Base and I/O Limit/Secondary Status */
+> +		w1c_bits = 0xff000000;
+> +		break;
+> +	case 0x44: /* Power Management Control and Status */
+> +		w1c_bits = 0xfffffe00;
+> +		break;
+> +	case 0x78: /* Device Control/Device Status */
+> +	case 0x80: /* Link Control/Link Status */
+> +	case 0x88: /* Slot Control/Slot Status */
+> +	case 0x90: /* Root Status */
+> +	case 0xa0: /* Link Control 2 Registers/Link Status 2 */
+> +		w1c_bits = 0xffff0000;
+> +		break;
+> +	case 0x104: /* Uncorrectable Error Status */
+> +	case 0x110: /* Correctable Error Status */
+> +	case 0x130: /* Error Status */
+> +	case 0x160: /* Link Control 4 */
 
->
-> Kind regards,
-> Wim.
->
+This patchset is full of magic numbers. For better readability and
+portability, it's better to declare all that as macro:
+#define LINK_CONTROL_4 0x160
 
+If there's some specific reason to use numbers, I think, it should be
+explained.
 
+> +		w1c_bits = 0xffffffff;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +	return w1c_bits;
+> +}
+> +
+> +static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+> +				    int where, int size, u32 val)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +	struct thunder_pem_pci *pem_pci;
+> +	u64 write_val, read_val;
+> +	u32 mask = 0;
+> +
+> +	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+> +
+> +	if (devfn != 0 || where >= 2048)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +	/*
+> +	 * 32-bit accesses only.  If the write is for a size smaller
+> +	 * than 32-bits, we must first read the 32-bit value and merge
+> +	 * in the desired bits and then write the whole 32-bits back
+> +	 * out.
+> +	 */
+> +	switch (size) {
+> +	case 1:
+> +		read_val = where & ~3ull;
+> +		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		read_val >>= 32;
+> +		mask = ~(0xff << (8 * (where & 3)));
 
--- 
-Best regards,
+I'm pretty sure, there's no any rocket science, but it's hard to
+understand what happens here. What is 8? Bits in byte? Bytes in word?
+Anything PCI-specific?  Moreover, you repeat this line several times
+here (though little modified). Maybe it deserves to be wrapped by some
+explaining macro?
 
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+> +		read_val &= mask;
+> +		val = (val & 0xff) << (8 * (where & 3));
+> +		val |= (u32)read_val;
+> +		break;
+> +	case 2:
+
+Case 1 and 2 are looking very similar. Is it possible to wrap them?
+For now it looks like code duplication.
+
+> +		read_val = where & ~3ull;
+> +		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+> +		read_val >>= 32;
+> +		mask = ~(0xffff << (8 * (where & 3)));
+> +		read_val &= mask;
+> +		val = (val & 0xffff) << (8 * (where & 3));
+> +		val |= (u32)read_val;
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	/*
+> +	 * By expanding the write width to 32 bits, we may
+> +	 * inadvertently hit some W1C bits that were not intended to
+> +	 * be written.  Calculate the mask that must be applied to the
+> +	 * data to be written to avoid these cases.
+> +	 */
+> +	if (mask) {
+> +		u32 w1c_bits = thunder_pem_bridge_w1c_bits(where);
+> +
+> +		if (w1c_bits) {
+> +			mask &= w1c_bits;
+> +			val &= ~mask;
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * Low order bits are the config address, the high order 32
+> +	 * bits are the data to be written.
+> +	 */
+> +	write_val = where & ~3ull;
+> +	write_val |= (((u64)val) << 32);
+> +	writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+> +				    int where, int size, u32 val)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +
+> +	if (bus->number < pci->cfg.bus_range->start ||
+> +	    bus->number > pci->cfg.bus_range->end)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	/*
+> +	 * The first device on the bus is the PEM PCIe bridge.
+> +	 * Special case its config access.
+> +	 */
+> +	if (bus->number == pci->cfg.bus_range->start)
+> +		return thunder_pem_bridge_write(bus, devfn, where, size, val);
+> +
+> +
+> +	return pci_generic_config_write(bus, devfn, where, size, val);
+> +}
+> +
+> +static struct gen_pci_cfg_bus_ops thunder_pem_bus_ops = {
+> +	.bus_shift	= 24,
+> +	.ops		= {
+> +		.map_bus	= thunder_pem_map_bus,
+> +		.read		= thunder_pem_config_read,
+> +		.write		= thunder_pem_config_write,
+> +	}
+> +};
+> +
+> +static const struct of_device_id thunder_pem_of_match[] = {
+> +	{ .compatible = "cavium,pci-host-thunder-pem",
+> +	  .data = &thunder_pem_bus_ops },
+> +
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, thunder_pem_of_match);
+> +
+> +static int thunder_pem_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	const struct of_device_id *of_id;
+> +	resource_size_t bar4_start;
+> +	struct resource *res_pem;
+> +	struct thunder_pem_pci *pem_pci;
+> +
+> +	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
+> +	if (!pem_pci)
+> +		return -ENOMEM;
+> +
+> +	of_id = of_match_node(thunder_pem_of_match, dev->of_node);
+> +	pem_pci->gen_pci.cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
+> +
+> +	/*
+> +	 * The second register range is the PEM bridge to the PCIe
+> +	 * bus.  It has a different config access method than those
+> +	 * devices behind the bridge.
+> +	 */
+> +	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	if (!res_pem) {
+> +		dev_err(dev, "missing \"reg[1]\"property\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	pem_pci->pem_reg_base = devm_ioremap(dev, res_pem->start, 0x10000);
+> +	if (!pem_pci->pem_reg_base)
+> +		return -ENOMEM;
+> +
+> +	/*
+> +	 * The MSI-X BAR for the PEM and AER interrupts is located at
+> +	 * a fixed offset from the PEM register base.  Generate a
+> +	 * fragment of the synthesized Enhanced Allocation capability
+> +	 * structure here for the BAR.
+> +	 */
+> +	bar4_start = res_pem->start + 0xf00000;
+> +	pem_pci->ea_entry[0] = (u32)bar4_start | 2;
+> +	pem_pci->ea_entry[1] = (u32)(res_pem->end - bar4_start) & ~3u;
+> +	pem_pci->ea_entry[2] = (u32)(bar4_start >> 32);
+> +
+> +	return pci_host_common_probe(pdev, &pem_pci->gen_pci);
+> +}
+> +
+> +static struct platform_driver thunder_pem_driver = {
+> +	.driver = {
+> +		.name = KBUILD_MODNAME,
+> +		.of_match_table = thunder_pem_of_match,
+> +	},
+> +	.probe = thunder_pem_probe,
+> +};
+> +module_platform_driver(thunder_pem_driver);
+> +
+> +MODULE_DESCRIPTION("Thunder PEM PCIe host driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
