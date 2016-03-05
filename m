@@ -1,28 +1,74 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 5 Mar 2016 13:35:19 +0900
-Subject: [PATCH 0/2] [media] exynos4-is: Trivial fixes for DT
- port/endpoint parse logic
-In-Reply-To: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
-References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Sat, 05 Mar 2016 10:12:14 +0530
+Subject: [RESPIN 1/6] dt-bindings: EXYNOS: Add exynos-srom device tree
+ binding
+In-Reply-To: <20160302175319.GA11155@rob-hp-laptop>
+References: <1456389222-12738-1-git-send-email-pankaj.dubey@samsung.com>
+ <1456389222-12738-2-git-send-email-pankaj.dubey@samsung.com>
+ <20160302175319.GA11155@rob-hp-laptop>
+Message-ID: <56DA63A6.80703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-05 5:20 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
-> Hello,
->
-> This series have two trivial fixes for issues that I noticed while
-> reading as a reference the driver's functions that parse the graph
-> port and endpoints nodes.
->
-> It was only compile tested because I don't have access to a Exynos4
-> hardware to test the DT parsing, but the patches are very simple.
+Hi,
 
-Not directly related, but similar: my previous two patches for missing
-of_node_put [0] are unfortunately still waiting. Although I have
-Exynos4 boards, but I don't have infrastructure/scripts to test it.
+On Wednesday 02 March 2016 11:23 PM, Rob Herring wrote:
+> On Thu, Feb 25, 2016 at 02:03:37PM +0530, Pankaj Dubey wrote:
+>> This patch adds exynos-srom binding information for SROM Controller
+>> driver on Exynos SoCs.
+>>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Mark Rutland <mark.rutland@arm.com>
+>> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> CC: devicetree at vger.kernel.org
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Kukjin Kim <kgene@kernel.org>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>  .../devicetree/bindings/memory-controllers/exynos-srom.txt   | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt b/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+>> new file mode 100644
+>> index 0000000..33886d5
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+>> @@ -0,0 +1,12 @@
+>> +SAMSUNG Exynos SoCs SROM Controller driver.
+>> +
+>> +Required properties:
+>> +- compatible : Should contain "samsung,exynos-srom".
+> 
+> There should be SoC specific compatible strings in addition to this.
+> 
 
-Best regards,
-Krzysztof
+I do not understood need to additional need to SoC specific compatible,
+as of now all SoCs having SROM can work with exynos specific common
+compatible. Will you see any issues in this?
 
-[0] https://patchwork.linuxtv.org/patch/32707/
+>> +
+>> +- reg: offset and length of the register set
+>> +
+>> +Example:
+>> +	sromc at 12570000 {
+> 
+> This should be memory-controller at ...
+> 
+>> +		compatible = "samsung,exynos-srom";
+>> +		reg = <0x12570000 0x10>;
+> 
+> The next patch changes the size to 0x14?
+> 
+> BTW, you could just combine both patches. I guess you didn't to maintain 
+> authorship?
+
+OK. Will squash both of these patches, unless Pavel do not any objections.
+
+Thanks,
+Pankaj Dubey
+> 
+> Rob
+> 
+> 
