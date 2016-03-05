@@ -1,77 +1,80 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Sat, 05 Mar 2016 11:48:39 +0530
-Subject: [RESPIN 1/6] dt-bindings: EXYNOS: Add exynos-srom device tree
- binding
-In-Reply-To: <20160302175319.GA11155@rob-hp-laptop>
-References: <1456389222-12738-1-git-send-email-pankaj.dubey@samsung.com>
- <1456389222-12738-2-git-send-email-pankaj.dubey@samsung.com>
- <20160302175319.GA11155@rob-hp-laptop>
-Message-ID: <56DA7A3F.4060105@samsung.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Sat, 5 Mar 2016 00:36:16 -0600
+Subject: [PATCH 4/5] ARM: socfpga: Enable Arria10 L2 cache ECC on startup
+In-Reply-To: <1456850301-22066-4-git-send-email-tthayer@opensource.altera.com>
+References: <1456850301-22066-1-git-send-email-tthayer@opensource.altera.com>
+ <1456850301-22066-4-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <alpine.DEB.2.02.1603050030190.9477@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, 1 Mar 2016, tthayer at opensource.altera.com wrote:
 
-On Wednesday 02 March 2016 11:23 PM, Rob Herring wrote:
-> On Thu, Feb 25, 2016 at 02:03:37PM +0530, Pankaj Dubey wrote:
->> This patch adds exynos-srom binding information for SROM Controller
->> driver on Exynos SoCs.
->>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Mark Rutland <mark.rutland@arm.com>
->> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> CC: devicetree at vger.kernel.org
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Kukjin Kim <kgene@kernel.org>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  .../devicetree/bindings/memory-controllers/exynos-srom.txt   | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
->>
->> diff --git a/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt b/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
->> new file mode 100644
->> index 0000000..33886d5
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
->> @@ -0,0 +1,12 @@
->> +SAMSUNG Exynos SoCs SROM Controller driver.
->> +
->> +Required properties:
->> +- compatible : Should contain "samsung,exynos-srom".
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> There should be SoC specific compatible strings in addition to this.
+> Enable ECC for Arria10 L2 cache on machine startup. The ECC has to be
+> enabled before data is stored in memory otherwise the ECC will fail
+> on reads.
 > 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+>  arch/arm/mach-socfpga/l2_cache.c |   42 ++++++++++++++++++++++++++++++++++----
+>  1 file changed, 38 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-socfpga/l2_cache.c b/arch/arm/mach-socfpga/l2_cache.c
+> index e3907ab..b197218 100644
+> --- a/arch/arm/mach-socfpga/l2_cache.c
+> +++ b/arch/arm/mach-socfpga/l2_cache.c
+> @@ -17,14 +17,31 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/of_address.h>
+>  
+> +#include "core.h"
+> +
+> +/* A10 System Manager ECC interrupt mask control registers */
+> +#define A10_L2_ECC_CTRL_OFST            0x0
+> +
+> +#define A10_SYSMGR_ECC_INTMASK_CLR_OFST 0x98
+> +#define A10_L2_ECC_INT_CLR_OFST         0xA8
+> +
+> +#define A10_MPU_CTRL_L2_ECC_EN          BIT(0)
+> +#define A10_ECC_INTMASK_CLR_EN          BIT(0)
+> +#define A10_ECC_INT_CLR                 (BIT(31) | BIT(15))
+> +
+>  void socfpga_init_l2_ecc(void)
+>  {
+>  	struct device_node *np;
+>  	void __iomem *mapped_l2_edac_addr;
+> +	const char *compat = "altr,socfpga-l2-ecc";
+>  
+> -	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-l2-ecc");
+> +	if (of_machine_is_compatible("altr,socfpga-arria10"))
+> +		compat = "altr,socfpga-a10-l2-ecc";
 
-I do not understood need of additional SoC specific compatible here. As
-of now all SoCs having SROM can work with exynos specific common
-compatible. Do you see any issues if we do not have SoC specific
-compatible here.
+The ARM maintainers have made comment to me about about trying to not sprinkle
+these of_machine_is_compatible() all over the place. You should make the
+decision during the initial probe of the machine. Please look at how the
+.restart is differentiate between the 2 platforms.
 
->> +
->> +- reg: offset and length of the register set
->> +
->> +Example:
->> +	sromc at 12570000 {
-> 
-> This should be memory-controller at ...
-> 
->> +		compatible = "samsung,exynos-srom";
->> +		reg = <0x12570000 0x10>;
-> 
-> The next patch changes the size to 0x14?
-> 
-> BTW, you could just combine both patches. I guess you didn't to maintain 
-> authorship?
-> 
 
-OK. Will squash both of these patches, unless Pavel do not have any
-objections to this.
+> +
+> +	/* Find the L2 EDAC device tree node */
+> +	np = of_find_compatible_node(NULL, NULL, compat);
+>  	if (!np) {
+> -		pr_err("Unable to find socfpga-l2-ecc in dtb\n");
+> +		pr_err("Unable to find %s in dtb\n", compat);
+>  		return;
+>  	}
+>  
+> @@ -35,7 +52,24 @@ void socfpga_init_l2_ecc(void)
+>  		return;
+>  	}
+>  
+> -	/* Enable ECC */
+> -	writel(0x01, mapped_l2_edac_addr);
+> +	if (of_machine_is_compatible("altr,socfpga-arria10")) {
 
-Thanks,
-Pankaj Dubey
+Same comment as above here.
 
-> Rob
-> 
-> 
+BR,
+Dinh
