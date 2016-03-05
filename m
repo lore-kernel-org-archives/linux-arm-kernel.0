@@ -1,23 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 4 Mar 2016 22:26:13 -0600
-Subject: [PATCH 2/5] Documentation: dt: socfpga: Add Altera Arri10 L2
- cache binding
-In-Reply-To: <1456850301-22066-2-git-send-email-tthayer@opensource.altera.com>
-References: <1456850301-22066-1-git-send-email-tthayer@opensource.altera.com>
- <1456850301-22066-2-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20160305042613.GI13525@rob-hp-laptop>
+Date: Fri, 4 Mar 2016 22:26:32 -0600
+Subject: [PATCH 1/3] Documentation: dt: Add Broadcom iproc pwm controller
+ binding
+In-Reply-To: <1456854169-9788-2-git-send-email-yendapally.reddy@broadcom.com>
+References: <1456854169-9788-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1456854169-9788-2-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <20160305042632.GJ13525@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2016 at 10:38:18AM -0600, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Tue, Mar 01, 2016 at 12:42:47PM -0500, Yendapally Reddy Dhananjaya Reddy wrote:
+> Add a binding for Broadcom iproc pwm controller
 > 
-> Add the device tree binding string needed to support the Altera L2
-> cache on the Arria10 chip.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
 > ---
->  .../bindings/arm/altera/socfpga-eccmgr.txt         |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
