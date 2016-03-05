@@ -1,21 +1,30 @@
-From: martin.petersen@oracle.com (Martin K. Petersen)
-Date: Sat, 05 Mar 2016 17:08:49 -0500
-Subject: [PATCH 08/14] scsi: mvumi: use __maybe_unused to hide pm functions
-In-Reply-To: <1456934350-1389172-9-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Wed, 2 Mar 2016 16:59:00 +0100")
-References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
- <1456934350-1389172-9-git-send-email-arnd@arndb.de>
-Message-ID: <yq17fhg4lxq.fsf@sermon.lab.mkp.net>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 5 Mar 2016 14:19:49 -0800
+Subject: [PATCH v2] serial: xuartps: Enable OF earlycon support
+In-Reply-To: <56CEFBD7.40008@monstr.eu>
+References: <09f2c419994281fca7968142e52d969542370d1c.1455782238.git.michal.simek@xilinx.com>
+ <56C5F670.50005@hurleysoftware.com> <56CEFBD7.40008@monstr.eu>
+Message-ID: <20160305221949.GA19842@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Arnd" == Arnd Bergmann <arnd@arndb.de> writes:
+On Thu, Feb 25, 2016 at 02:04:23PM +0100, Michal Simek wrote:
+> Hi Greg,
+> 
+> On 18.2.2016 17:50, Peter Hurley wrote:
+> > On 02/17/2016 11:57 PM, Michal Simek wrote:
+> >> Support early console setup via DT for all listed compatible strings.
+> >> Remove EARLYCON_DECLARE which was done by:
+> >> "Use common framework for earlycon declarations"
+> >> (sha1: 2eaa790989e03900298ad24f77f1086dbbc1aebd)
+> >> when OF_EARLYCON_DECLARE is defined.
+> > 
+> > Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> 
+> Can you please add it your queue for 4.6?
+> Or can we merge it via arm-soc tree as was suggested by Arnd here?
+> https://lkml.org/lkml/2016/2/16/315
 
-Arnd> The mvumi scsi hides the references to its suspend/resume
-Arnd> functions in an #ifdef but does not hide the implementation the
-Arnd> same way:
+I can take it, thanks.
 
-Applied to 4.6/scsi-queue.
-
--- 
-Martin K. Petersen	Oracle Linux Engineering
+greg k-h
