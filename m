@@ -1,73 +1,45 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sat,  5 Mar 2016 18:02:52 +0000
-Subject: [PATCH 4/5] ARM: bcm2835: add defines for each DREQ
+Date: Sat,  5 Mar 2016 18:02:53 +0000
+Subject: [PATCH 5/5] ARM: bcm2835: use defined DMA_DREQ names instead of magic
+ numbers
 In-Reply-To: <1457200973-11662-1-git-send-email-kernel@martin.sperl.org>
 References: <1457200973-11662-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1457200973-11662-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1457200973-11662-5-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Define names for each of the DMA DREQ values.
+Change the device tree source so that instead of magic numbers
+the corresponding BCM2835_DMA_DREQ_* names are used to ease readability.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- include/dt-bindings/dma/bcm2835.h | 46 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 include/dt-bindings/dma/bcm2835.h
+ arch/arm/boot/dts/bcm283x.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/include/dt-bindings/dma/bcm2835.h b/include/dt-bindings/dma/bcm2835.h
-new file mode 100644
-index 0000000..5bade32
---- /dev/null
-+++ b/include/dt-bindings/dma/bcm2835.h
-@@ -0,0 +1,46 @@
-+/*
-+ * Copyright (C) 2016 Martin Sperl
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/* DREQ definitions */
-+#define BCM2835_DMA_DREQ_NONE		0
-+#define BCM2835_DMA_DREQ_DSI0		1
-+#define BCM2835_DMA_DREQ_PCM_TX		2
-+#define BCM2835_DMA_DREQ_PCM_RX		3
-+#define BCM2835_DMA_DREQ_SMI		4
-+#define BCM2835_DMA_DREQ_PWM		5
-+#define BCM2835_DMA_DREQ_SPI_TX		6
-+#define BCM2835_DMA_DREQ_SPI_RX		7
-+#define BCM2835_DMA_DREQ_BSC_TX		8
-+#define BCM2835_DMA_DREQ_BSC_RX		9
-+#define BCM2835_DMA_DREQ_UNUSED		10
-+#define BCM2835_DMA_DREQ_EMMC		11
-+#define BCM2835_DMA_DREQ_UART_TX	12
-+#define BCM2835_DMA_DREQ_SDHOST		13
-+#define BCM2835_DMA_DREQ_UART_RX	14
-+#define BCM2835_DMA_DREQ_DSI1		15
-+#define BCM2835_DMA_DREQ_SLIM_MC_TX	16
-+#define BCM2835_DMA_DREQ_HDMI		17
-+#define BCM2835_DMA_DREQ_SLIM_MC_RX	18
-+#define BCM2835_DMA_DREQ_SLIM_DC0	19
-+#define BCM2835_DMA_DREQ_SLIM_DC1	20
-+#define BCM2835_DMA_DREQ_SLIM_DC2	21
-+#define BCM2835_DMA_DREQ_SLIM_DC3	22
-+#define BCM2835_DMA_DREQ_SLIM_DC4	23
-+#define BCM2835_DMA_DREQ_SCALER_FIFO0	24
-+#define BCM2835_DMA_DREQ_SCALER_FIFO1	25
-+#define BCM2835_DMA_DREQ_SCALER_FIFO2	26
-+#define BCM2835_DMA_DREQ_SLIM_DC5	27
-+#define BCM2835_DMA_DREQ_SLIM_DC6	28
-+#define BCM2835_DMA_DREQ_SLIM_DC7	29
-+#define BCM2835_DMA_DREQ_SLIM_DC8	30
-+#define BCM2835_DMA_DREQ_SLIM_DC9	31
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 084eda7..aec67a9 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -1,6 +1,7 @@
+ #include <dt-bindings/pinctrl/bcm2835.h>
+ #include <dt-bindings/clock/bcm2835.h>
+ #include <dt-bindings/clock/bcm2835-aux.h>
++#include <dt-bindings/dma/bcm2835.h>
+ #include <dt-bindings/interrupt-controller/bcm2835.h>
+ #include "skeleton.dtsi"
+ 
+@@ -134,8 +135,8 @@
+ 			reg = <0x7e203000 0x20>,
+ 			      <0x7e101098 0x02>;
+ 
+-			dmas = <&dma 2>,
+-			       <&dma 3>;
++			dmas = <&dma BCM2835_DMA_DREQ_PCM_TX>,
++			       <&dma BCM2835_DMA_DREQ_PCM_RX>;
+ 			dma-names = "tx", "rx";
+ 			status = "disabled";
+ 		};
 -- 
 2.1.4
