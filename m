@@ -1,135 +1,53 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  6 Mar 2016 12:21:24 +0100
-Subject: [PATCH v4] tty: serial: meson: Implement earlycon support
-Message-ID: <1457263284-8819-1-git-send-email-afaerber@suse.de>
+From: martin@sperl.org (Martin Sperl)
+Date: Sun, 6 Mar 2016 12:31:05 +0100
+Subject: [PATCH v7] clk: bcm2835: Add support for programming the audio
+ domain clocks
+In-Reply-To: <1444354644-31997-1-git-send-email-eric@anholt.net>
+References: <1444354644-31997-1-git-send-email-eric@anholt.net>
+Message-ID: <AE3FF4E9-9435-463F-8A05-2ED0CE67BC26@sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split off the bulk of the existing meson_serial_console_write()
-implementation into meson_serial_port_write() for implementing
-meson_serial_early_console_write().
+I know it has already been merged, but while doing some 
+clock investigations of the RPI3 I came accross this code:
 
-Use "meson" as the earlycon driver name, courtesy of Nicolas.
+> On 09.10.2015, at 03:37, Eric Anholt <eric@anholt.net> wrote:
+> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+> index dd295e4..8502a4b 100644
+> --- a/drivers/clk/bcm/clk-bcm2835.c
+> +++ b/drivers/clk/bcm/clk-bcm2835.c
+> +static unsigned long bcm2835_pll_get_rate(struct clk_hw *hw,
+> +					  unsigned long parent_rate)
+> +{
+> +	struct bcm2835_pll *pll = container_of(hw, struct bcm2835_pll, hw);
+> +	struct bcm2835_cprman *cprman = pll->cprman;
+> +	const struct bcm2835_pll_data *data = pll->data;
+> +	u32 a2wctrl = cprman_read(cprman, data->a2w_ctrl_reg);
+> +	u32 ndiv, pdiv, fdiv;
+> +	bool using_prediv;
+> +
+> +	if (parent_rate == 0)
+> +		return 0;
+> +
+> +	fdiv = cprman_read(cprman, data->frac_reg) & A2W_PLL_FRAC_MASK;
+> +	ndiv = (a2wctrl & A2W_PLL_CTRL_NDIV_MASK) >> A2W_PLL_CTRL_NDIV_SHIFT;
+> +	pdiv = (a2wctrl & A2W_PLL_CTRL_PDIV_MASK) >> A2W_PLL_CTRL_PDIV_SHIFT;
+> +	using_prediv = cprman_read(cprman, data->ana_reg_base + 4) &
+> +		data->ana->fb_prediv_mask;
+> +
+> +	if (using_prediv)
+> +		ndiv *= 2;
+Is this really correct?
 
-Signed-off-by: Nicolas Saenz Julienne <nicolassaenzj@gmail.com>
-Acked-by: Carlo Caione <carlo@endlessm.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v3 -> v4:
- * Select SERIAL_EARLYCON (Arnd)
- 
- v2 -> v3:
- * Rename from "meson_serial" to just "meson" (Nicolas)
- 
- v1 -> v2:
- * Implement meson_serial_early_console_write() instead of reusing
-   meson_serial_console_write() (Peter)
- 
- Documentation/kernel-parameters.txt |  6 ++++++
- drivers/tty/serial/Kconfig          |  1 +
- drivers/tty/serial/meson_uart.c     | 42 ++++++++++++++++++++++++++++++-------
- 3 files changed, 42 insertions(+), 7 deletions(-)
+As far as I interpret the name ?fb_predic_mask" it should be either:
+  pdiv * = 2; /* there is already a divider of 2 applied */
+or
+  ndiv *= 2; /* we need to multiply bot integer and fractional by 2 */
+  fdiv *= 2;
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index e0a21e4556a6..a7c1377fd80f 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -1039,6 +1039,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			the driver will use only 32-bit accessors to read/write
- 			the device registers.
- 
-+		meson,<addr>
-+			Start an early, polled-mode console on a meson serial
-+			port at the specified address. The serial port must
-+			already be setup and configured. Options are not yet
-+			supported.
-+
- 		msm_serial,<addr>
- 			Start an early, polled-mode console on an msm serial
- 			port at the specified address. The serial port
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index bdbe1c533c6a..ad7538e8a4e8 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -213,6 +213,7 @@ config SERIAL_MESON_CONSOLE
- 	bool "Support for console on meson"
- 	depends on SERIAL_MESON=y
- 	select SERIAL_CORE_CONSOLE
-+	select SERIAL_EARLYCON
- 	help
- 	  Say Y here if you wish to use a Amlogic MesonX UART as the
- 	  system console (the system console is the device which
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 024445aa0521..6aea0f4a9165 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -481,18 +481,13 @@ static void meson_console_putchar(struct uart_port *port, int ch)
- 	writel(ch, port->membase + AML_UART_WFIFO);
- }
- 
--static void meson_serial_console_write(struct console *co, const char *s,
--				       u_int count)
-+static void meson_serial_port_write(struct uart_port *port, const char *s,
-+				    u_int count)
- {
--	struct uart_port *port;
- 	unsigned long flags;
- 	int locked;
- 	u32 val, tmp;
- 
--	port = meson_ports[co->index];
--	if (!port)
--		return;
--
- 	local_irq_save(flags);
- 	if (port->sysrq) {
- 		locked = 0;
-@@ -516,6 +511,18 @@ static void meson_serial_console_write(struct console *co, const char *s,
- 	local_irq_restore(flags);
- }
- 
-+static void meson_serial_console_write(struct console *co, const char *s,
-+				       u_int count)
-+{
-+	struct uart_port *port;
-+
-+	port = meson_ports[co->index];
-+	if (!port)
-+		return;
-+
-+	meson_serial_port_write(port, s, count);
-+}
-+
- static int meson_serial_console_setup(struct console *co, char *options)
- {
- 	struct uart_port *port;
-@@ -554,6 +561,27 @@ static int __init meson_serial_console_init(void)
- }
- console_initcall(meson_serial_console_init);
- 
-+static void meson_serial_early_console_write(struct console *co,
-+					     const char *s,
-+					     u_int count)
-+{
-+	struct earlycon_device *dev = co->data;
-+
-+	meson_serial_port_write(&dev->port, s, count);
-+}
-+
-+static int __init
-+meson_serial_early_console_setup(struct earlycon_device *device, const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = meson_serial_early_console_write;
-+	return 0;
-+}
-+OF_EARLYCON_DECLARE(meson, "amlogic,meson-uart",
-+		    meson_serial_early_console_setup);
-+
- #define MESON_SERIAL_CONSOLE	(&meson_serial_console)
- #else
- #define MESON_SERIAL_CONSOLE	NULL
--- 
-2.6.2
+As it is a pre-divider, I would assume it is the first,
+but I could be wrong - not knowing a lot about PLLs.
+
+Just want to raise this as a question.
+
+Martin
