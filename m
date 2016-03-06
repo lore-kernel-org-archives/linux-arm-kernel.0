@@ -1,349 +1,42 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  6 Mar 2016 20:53:52 +0100
-Subject: [PATCH v3 3/8] arm64: dts: rockchip: Add GeekBox config
+Date: Sun,  6 Mar 2016 20:53:56 +0100
+Subject: [PATCH v3 7/8] Documentation: devicetree: rockchip: Document
+ Landingship
 In-Reply-To: <1457294038-14243-1-git-send-email-afaerber@suse.de>
 References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
-Message-ID: <1457294038-14243-4-git-send-email-afaerber@suse.de>
+Message-ID: <1457294038-14243-8-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GeekBox contains an MXM3 module with a Rockchip RK3368 SoC.
-Some connectors are available directly on the module.
-
-This adds initial support, namely serial, USB, GMAC, eMMC, IR and TSADC.
+Use "geekbuying,geekbox-landingship" compatible string, plus those of
+the GeekBox module.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v2 -> v3:
- * Squashed GMAC, eMMC, IR, TSADC (Heiko)
- * Fixed IR pinctrl pull setting (Julien)
- * Changed TSADC polarity (rebooted immediately due to fixed otp-out pin)
+ * Changed compatible string to include geekbox- (Heiko)
+   and clarify that this is for GeekBox module
  
- v1 -> v2:
- * Dropped rk3368-geekbox.dtsi. rk3368-geekbox-landingship.dts can
-   #include "rk3368-geekbox.dts" just fine, when leaving out /dts-v1/;.
- * Revisited always-on / boot-on for PMIC regulator nodes. (Heiko)
- * Switched pmic-sleep from RK_FUNC_GPIO to RK_FUNC_2. (schematics)
+ v2: New
  
- arch/arm64/boot/dts/rockchip/Makefile           |   1 +
- arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 299 ++++++++++++++++++++++++
- 2 files changed, 300 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+ Documentation/devicetree/bindings/arm/rockchip.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index e3f0b5f4ba4e..df37865e8ced 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index f633595b196c..ae84f4e1d83b 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -91,6 +91,11 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+       - compatible = "geekbuying,geekbox", "rockchip,rk3368";
  
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-new file mode 100644
-index 000000000000..098be3700a6f
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-@@ -0,0 +1,299 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
++- GeekBuying Landingship with GeekBox module:
++    Required root node properties:
++      - compatible = "geekbuying,geekbox-landingship",
++		     "geekbuying,geekbox", "rockchip,rk3368";
 +
-+/dts-v1/;
-+#include "rk3368.dtsi"
-+
-+/ {
-+	model = "GeekBox";
-+	compatible = "geekbuying,geekbox", "rockchip,rk3368";
-+
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	ext_gmac: gmac-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "ext_gmac";
-+		#clock-cells = <0>;
-+	};
-+
-+	ir: ir-receiver {
-+		compatible = "gpio-ir-receiver";
-+		gpios = <&gpio3 30 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ir_int>;
-+	};
-+
-+	leds: gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
-+			label = "geekbox:blue:led";
-+			default-state = "on";
-+		};
-+
-+		red {
-+			gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
-+			label = "geekbox:red:led";
-+			default-state = "off";
-+		};
-+	};
-+
-+	vcc_sys: vcc-sys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&emmc {
-+	status = "okay";
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	clock-frequency = <150000000>;
-+	disable-wp;
-+	keep-power-in-suspend;
-+	non-removable;
-+	num-slots = <1>;
-+	vmmc-supply = <&vcc_io>;
-+	vqmmc-supply = <&vcc18_flash>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_bus8>;
-+};
-+
-+&gmac {
-+	status = "okay";
-+	phy-supply = <&vcc_lan>;
-+	phy-mode = "rgmii";
-+	clock_in_out = "input";
-+	assigned-clocks = <&cru SCLK_MAC>;
-+	assigned-clock-parents = <&ext_gmac>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	tx_delay = <0x30>;
-+	rx_delay = <0x10>;
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int>, <&pmic_sleep>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
-+		rockchip,system-power-controller;
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc_io>;
-+		vcc9-supply = <&vcc_sys>;
-+		vcc10-supply = <&vcc_sys>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc_io>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+		#clock-cells = <1>;
-+
-+		regulators {
-+			vdd_cpu: DCDC_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-name = "vdd_cpu";
-+			};
-+
-+			vdd_log: DCDC_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-name = "vdd_log";
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_ddr";
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_io";
-+			};
-+
-+			vcc18_flash: LDO_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_flash";
-+			};
-+
-+			vcc33_lcd: LDO_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc33_lcd";
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd_10";
-+			};
-+
-+			vcca_18: LDO_REG4 {
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcca_18";
-+			};
-+
-+			vccio_sd: LDO_REG5 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_sd";
-+			};
-+
-+			vdd10_lcd: LDO_REG6 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd10_lcd";
-+			};
-+
-+			vcc_18: LDO_REG7 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc_18";
-+			};
-+
-+			vcc18_lcd: LDO_REG8 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_lcd";
-+			};
-+
-+			vcc_sd: SWITCH_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_sd";
-+			};
-+
-+			vcc_lan: SWITCH_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_lan";
-+			};
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	ir {
-+		ir_int: ir-int {
-+			rockchip,pins = <3 30 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	pmic {
-+		pmic_sleep: pmic-sleep {
-+			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
-+		};
-+
-+		pmic_int: pmic-int {
-+			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+};
-+
-+&tsadc {
-+	status = "okay";
-+	rockchip,hw-tshut-mode = <0>; /* CRU */
-+	rockchip,hw-tshut-polarity = <1>; /* high */
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
+ - Rockchip RK3368 evb:
+     Required root node properties:
+       - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
 -- 
 2.6.2
