@@ -1,99 +1,31 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  6 Mar 2016 20:53:57 +0100
-Subject: [PATCH v3 8/8] arm64: dts: rockchip: Add Landingship config
-In-Reply-To: <1457294038-14243-1-git-send-email-afaerber@suse.de>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
-Message-ID: <1457294038-14243-9-git-send-email-afaerber@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 6 Mar 2016 20:56:01 +0100
+Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
+In-Reply-To: <8737s5wbxa.fsf@belgarion.home>
+References: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
+ <3582240.H8v1IXn8EB@wuerfel> <8737s5wbxa.fsf@belgarion.home>
+Message-ID: <201603062056.01683.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v2 -> v3:
- * Changed compatible string to include geekbox- (Heiko)
- * Rebroke compatible strings line
- * Disabled i2c1 to avoid hang (next-20160304)
- 
- v2: New - showcases inclusion of GeekBox module config
- 
- arch/arm64/boot/dts/rockchip/Makefile              |  1 +
- .../dts/rockchip/rk3368-geekbox-landingship.dts    | 57 ++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
+On Saturday 05 March 2016, Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > I guess we can bring back the macros for the case that MTD_XIP and XIP_KERNEL
+> > are both enabled.
+> >
+> > 	Arnd
+> I wouldn't have ICMR and ICIP exposed to drivers, Eric's original move looks
+> corect to me.
 
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index df37865e8ced..201bcd9863ce 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox-landingship.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
-new file mode 100644
-index 000000000000..a28ace9512bb
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "rk3368-geekbox.dts"
-+
-+/ {
-+	model = "GeekBox on Landingship";
-+	compatible = "geekbuying,geekbox-landingship",
-+		     "geekbuying,geekbox", "rockchip,rk3368";
-+};
-+
-+&i2c1 {
-+	status = "disabled";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
--- 
-2.6.2
+Yes, it's a reasonable cleanup that we have done in many places, except
+this one introduced a regression for MTD_XIP.
+
+> On the other hand, I'm wondering if xip_irqpending(), xip_currtime() and
+> xip_cpu_idle() should be declared as functions in mtd-xip.h, and be part of
+> something like arch/arm/mach-pxa/xip.c ...
+
+They have to at least be marked __xipram and must not reference anything
+in .text or .rodata, but there might be additional requirements.
+
+	Arnd
