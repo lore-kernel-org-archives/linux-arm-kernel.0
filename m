@@ -1,49 +1,38 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 6 Mar 2016 20:21:51 +0100
-Subject: [PATCH v4 net-next 8/9] net: add a hardware buffer management
- helper API
-In-Reply-To: <1457217507-10778-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1457217507-10778-1-git-send-email-gregory.clement@free-electrons.com>
- <1457217507-10778-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPv3WKeTGy+HfG=vyY04xi4Spy6eUTF_LX_X=V0=ZAGhxURdJg@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun,  6 Mar 2016 20:53:51 +0100
+Subject: [PATCH v3 2/8] Documentation: devicetree: rockchip: Document GeekBox
+In-Reply-To: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+Message-ID: <1457294038-14243-3-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Use "geekbuying,geekbox" compatible string.
 
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v2 -> v3: Unchanged
 
-> +int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp)
-> +{
-> +       int err, i;
-> +       unsigned long flags;
-> +
-> +       spin_lock_irqsave(&bm_pool->lock, flags);
-> +       if (bm_pool->buf_num == bm_pool->size) {
+ v2: New (Heiko)
+ 
+ Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-'size' field is used as a 'frag_size' but here it means pool capacity.
-I think it's better to keep 'size' for pool capacity and add
-'buf_size' field to struct hwbm_pool.
-
-> +               pr_warn("pool already filled\n");
-> +               return bm_pool->buf_num;
-> +       }
-> +
-> +       if (buf_num + bm_pool->buf_num > bm_pool->size) {
-> +               pr_warn("cannot allocate %d buffers for pool\n",
-> +                       buf_num);
-> +               return 0;
-> +       }
-> +
-> +       if ((buf_num + bm_pool->buf_num) < bm_pool->buf_num) {
-
-What is a point of this condition? How possibly after checking if
-capacity of pool is not exceeded, this one would ever be true?
-
-> +               pr_warn("Adding %d buffers to the %d current buffers will overflow\n",
-> +                       buf_num,  bm_pool->buf_num);
-> +               return 0;
-> +       }
-> +
-
-Best regards,
-Marcin
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 078c14fcdaaa..f633595b196c 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -87,6 +87,10 @@ Rockchip platforms device tree bindings
+ 		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
+ 		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
+ 
++- GeekBuying GeekBox:
++    Required root node properties:
++      - compatible = "geekbuying,geekbox", "rockchip,rk3368";
++
+ - Rockchip RK3368 evb:
+     Required root node properties:
+       - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+-- 
+2.6.2
