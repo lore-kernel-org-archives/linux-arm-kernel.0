@@ -1,30 +1,58 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  6 Mar 2016 20:53:55 +0100
-Subject: [PATCH v3 6/8] arm64: dts: rockchip: Add power key to GeekBox
+Date: Sun,  6 Mar 2016 20:53:54 +0100
+Subject: [PATCH v3 5/8] arm64: dts: rockchip: Clean up gpio-keys nodes
 In-Reply-To: <1457294038-14243-1-git-send-email-afaerber@suse.de>
 References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
-Message-ID: <1457294038-14243-7-git-send-email-afaerber@suse.de>
+Message-ID: <1457294038-14243-6-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Drop superfluous #address-cells and #size-cells.
+Use KEY_POWER define for 116.
+
+Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v2 -> v3:
- * Adopted wakeup-source instead of gpio-key,wakeup (Julien)
- * Dropped gpio-keys #address-cells and #size-cells properties (Julien)
- * Dropped power button reg property (Julien)
- * Adopted KEY_POWER (Julien)
- * Fixed power button pinctrl pull setting (Julien)
+ v3: New (Julien)
  
- v2: New
- 
- arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi | 5 ++---
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts  | 5 ++---
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-index 098be3700a6f..7036b49c9206 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
+index 06bbe421db37..b62035436d38 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
+@@ -40,6 +40,7 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
++#include <dt-bindings/input/input.h>
+ #include <dt-bindings/pwm/pwm.h>
+ #include "rk3368.dtsi"
+ 
+@@ -105,8 +106,6 @@
+ 
+ 	keys: gpio-keys {
+ 		compatible = "gpio-keys";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pwr_key>;
+ 
+@@ -114,7 +113,7 @@
+ 			wakeup-source;
+ 			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+ 			label = "GPIO Power";
+-			linux,code = <116>;
++			linux,code = <KEY_POWER>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+index a1d1aa9c16fe..efb5fa32ecac 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
 @@ -42,6 +42,7 @@
  
  /dts-v1/;
@@ -32,39 +60,24 @@ index 098be3700a6f..7036b49c9206 100644
 +#include <dt-bindings/input/input.h>
  
  / {
- 	model = "GeekBox";
-@@ -70,6 +71,19 @@
- 		pinctrl-0 = <&ir_int>;
- 	};
+ 	model = "Rockchip R88";
+@@ -65,8 +66,6 @@
  
-+	keys: gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwr_key>;
-+
-+		button at 0 {
-+			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
-+			label = "GPIO Power";
+ 	keys: gpio-keys {
+ 		compatible = "gpio-keys";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pwr_key>;
+ 
+@@ -74,7 +73,7 @@
+ 			wakeup-source;
+ 			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+ 			label = "GPIO Power";
+-			linux,code = <116>;
 +			linux,code = <KEY_POWER>;
-+			wakeup-source;
-+		};
-+	};
-+
- 	leds: gpio-leds {
- 		compatible = "gpio-leds";
- 
-@@ -265,6 +279,12 @@
  		};
  	};
  
-+	keys {
-+		pwr_key: pwr-key {
-+			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	pmic {
- 		pmic_sleep: pmic-sleep {
- 			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
 -- 
 2.6.2
