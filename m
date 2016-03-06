@@ -1,53 +1,44 @@
-From: martin@sperl.org (Martin Sperl)
-Date: Sun, 6 Mar 2016 12:31:05 +0100
-Subject: [PATCH v7] clk: bcm2835: Add support for programming the audio
- domain clocks
-In-Reply-To: <1444354644-31997-1-git-send-email-eric@anholt.net>
-References: <1444354644-31997-1-git-send-email-eric@anholt.net>
-Message-ID: <AE3FF4E9-9435-463F-8A05-2ED0CE67BC26@sperl.org>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Sun,  6 Mar 2016 10:39:20 -0300
+Subject: [PATCH 4/6] [media] st-rc: prevent a endless loop
+In-Reply-To: <076989c7736719982a1bc9557d7db072910d8efe.1457271549.git.mchehab@osg.samsung.com>
+References: <076989c7736719982a1bc9557d7db072910d8efe.1457271549.git.mchehab@osg.samsung.com>
+Message-ID: <087329695244e466f0c2d9a3a58e10ad399cd674.1457271549.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I know it has already been merged, but while doing some 
-clock investigations of the RPI3 I came accross this code:
+As warned by smatch:
+	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
 
-> On 09.10.2015, at 03:37, Eric Anholt <eric@anholt.net> wrote:
-> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-> index dd295e4..8502a4b 100644
-> --- a/drivers/clk/bcm/clk-bcm2835.c
-> +++ b/drivers/clk/bcm/clk-bcm2835.c
-> +static unsigned long bcm2835_pll_get_rate(struct clk_hw *hw,
-> +					  unsigned long parent_rate)
-> +{
-> +	struct bcm2835_pll *pll = container_of(hw, struct bcm2835_pll, hw);
-> +	struct bcm2835_cprman *cprman = pll->cprman;
-> +	const struct bcm2835_pll_data *data = pll->data;
-> +	u32 a2wctrl = cprman_read(cprman, data->a2w_ctrl_reg);
-> +	u32 ndiv, pdiv, fdiv;
-> +	bool using_prediv;
-> +
-> +	if (parent_rate == 0)
-> +		return 0;
-> +
-> +	fdiv = cprman_read(cprman, data->frac_reg) & A2W_PLL_FRAC_MASK;
-> +	ndiv = (a2wctrl & A2W_PLL_CTRL_NDIV_MASK) >> A2W_PLL_CTRL_NDIV_SHIFT;
-> +	pdiv = (a2wctrl & A2W_PLL_CTRL_PDIV_MASK) >> A2W_PLL_CTRL_PDIV_SHIFT;
-> +	using_prediv = cprman_read(cprman, data->ana_reg_base + 4) &
-> +		data->ana->fb_prediv_mask;
-> +
-> +	if (using_prediv)
-> +		ndiv *= 2;
-Is this really correct?
+as readl() might fail, with likely means some unrecovered error,
+let's loop only if it succeeds.
 
-As far as I interpret the name ?fb_predic_mask" it should be either:
-  pdiv * = 2; /* there is already a divider of 2 applied */
-or
-  ndiv *= 2; /* we need to multiply bot integer and fractional by 2 */
-  fdiv *= 2;
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ drivers/media/rc/st_rc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-As it is a pre-divider, I would assume it is the first,
-but I could be wrong - not knowing a lot about PLLs.
-
-Just want to raise this as a question.
-
-Martin
+diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
+index 1fa0c9d1c508..151bfe2aea55 100644
+--- a/drivers/media/rc/st_rc.c
++++ b/drivers/media/rc/st_rc.c
+@@ -99,7 +99,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+ 	unsigned int symbol, mark = 0;
+ 	struct st_rc_device *dev = data;
+ 	int last_symbol = 0;
+-	u32 status;
++	int status;
+ 	DEFINE_IR_RAW_EVENT(ev);
+ 
+ 	if (dev->irq_wake)
+@@ -107,7 +107,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+ 
+ 	status  = readl(dev->rx_base + IRB_RX_STATUS);
+ 
+-	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
++	while (status > 0 && (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW))) {
+ 		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
+ 		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
+ 			/* discard the entire collection in case of errors!  */
+-- 
+2.5.0
