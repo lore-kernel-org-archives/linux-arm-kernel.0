@@ -1,91 +1,87 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Mar 2016 09:33:31 +0000
-Subject: [PATCH v3 09/12] arm64: KVM: vgic-v3: Save maintenance interrupt
- state only if required
+Date: Mon,  7 Mar 2016 09:33:25 +0000
+Subject: [PATCH v3 03/12] KVM: arm/arm64: vgic-v2: Move GICH_ELRSR saving to
+ its own function
 In-Reply-To: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
 References: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1457343214-19547-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1457343214-19547-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Next on our list of useless accesses is the maintenance interrupt
-status registers (ICH_MISR_EL2, ICH_EISR_EL2).
+In order to make the saving path slightly more readable and
+prepare for some more optimizations, let's move the GICH_ELRSR
+saving to its own function.
 
-It is pointless to save them if we haven't asked for a maintenance
-interrupt the first place, which can only happen for two reasons:
-- Underflow: ICH_HCR_UIE will be set,
-- EOI: ICH_LR_EOI will be set.
-
-These conditions can be checked on the in-memory copies of the regs.
-Should any of these two condition be valid, we must read GICH_MISR.
-We can then check for ICH_MISR_EOI, and only when set read
-ICH_EISR_EL2.
-
-This means that in most case, we don't have to save them at all.
+No functional change.
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 36 +++++++++++++++++++++---------------
+ 1 file changed, 21 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index e596945..61a5e46 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -131,6 +131,35 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
- 	}
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index 0dd83d5..c576228 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -64,6 +64,25 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
+ #endif
  }
  
-+static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu, int nr_lr)
++static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
 +{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	int i;
-+	bool expect_mi;
++	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
++	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
++	u32 elrsr0, elrsr1;
 +
-+	expect_mi = !!(cpu_if->vgic_hcr & ICH_HCR_UIE);
++	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
++	if (unlikely(nr_lr > 32))
++		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
++	else
++		elrsr1 = 0;
 +
-+	for (i = 0; i < nr_lr; i++) {
-+		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
-+				continue;
-+
-+		expect_mi |= (!(cpu_if->vgic_lr[i] & ICH_LR_HW) &&
-+			      (cpu_if->vgic_lr[i] & ICH_LR_EOI));
-+	}
-+
-+	if (expect_mi) {
-+		cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
-+
-+		if (cpu_if->vgic_misr & ICH_MISR_EOI)
-+			cpu_if->vgic_eisr = read_gicreg(ICH_EISR_EL2);
-+		else
-+			cpu_if->vgic_eisr = 0;
-+	} else {
-+		cpu_if->vgic_misr = 0;
-+		cpu_if->vgic_eisr = 0;
-+	}
++#ifdef CONFIG_CPU_BIG_ENDIAN
++	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
++#else
++	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
++#endif
 +}
 +
- void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ /* vcpu is already in the HYP VA space */
+ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
  {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -148,8 +177,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 		int i;
- 		u32 max_lr_idx, nr_pri_bits;
+@@ -71,7 +90,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+ 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+-	u32 elrsr0, elrsr1;
+ 	int i, nr_lr;
  
--		cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
--		cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
- 		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
+ 	if (!base)
+@@ -81,22 +99,10 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ 	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
  
- 		write_gicreg(0, ICH_HCR_EL2);
-@@ -157,6 +184,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 		max_lr_idx = vtr_to_max_lr_idx(val);
- 		nr_pri_bits = vtr_to_nr_pri_bits(val);
+ 	if (vcpu->arch.vgic_cpu.live_lrs) {
+-		elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+-		cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
+-
+-		if (unlikely(nr_lr > 32)) {
+-			elrsr1 = readl_relaxed(base + GICH_ELRSR1);
+-		} else {
+-			elrsr1 = 0;
+-		}
+-
+-#ifdef CONFIG_CPU_BIG_ENDIAN
+-		cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
+-#else
+-		cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
+-#endif
++		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
  
-+		save_maint_int_state(vcpu, max_lr_idx + 1);
-+
- 		for (i = 0; i <= max_lr_idx; i++) {
+ 		save_maint_int_state(vcpu, base);
++		save_elrsr(vcpu, base);
+  
+ 		for (i = 0; i < nr_lr; i++)
  			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
- 				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
 -- 
 2.1.4
