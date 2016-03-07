@@ -1,62 +1,88 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 7 Mar 2016 17:17:27 +0200
-Subject: [PATCH v2 00/10] ARM: DTS/clk: DRA7 family: enable eDMA and audio
- updates
-Message-ID: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Mon, 7 Mar 2016 17:17:29 +0200
+Subject: [PATCH v2 02/10] ARM: DTS: dra7: Enable eDMA
+In-Reply-To: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1457363857-20797-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+DRA7 family has eDMA available along with the sDMA and in some cases it is
+better suited for servicing peripherals.
 
-Changes since v1:
-- hwmod patch for eDMA (tpcc/tptc0/tptc1) removed as it is already in linux-next
-- mcasp hwmod changes:
- - all module have HWMOD_OPT_CLKS_NEEDED and no HWMOD_SWSUP_SIDLE (per Paul's
-   comment)
- - mcasp1,2: add ahclkr as opt clock since those modules have fclk, ahclkx and
-   ahclkr marked as functional clocks.
-   Same change is added to the DTS patch
+Add the needed nodes for eDMA to be usable:
+edma-tpcc, edma-tptc0/1 and the edma-xbar.
 
-On dra7 family we have two DMA engine available: sDMA (omap-dma) and eDMA.
-For some peripherals the use of eDMA is better due to L3 interconnect limitation
-when using sDMA. Such peripherals are McASP1/2/3. By switching to eDMA we can
-enable the AFIFO which will help to avoid under or overruns in audio.
-
-This set will:
-- add the hwmod data for eDMA TPCC and TPTCs
-- add the needed DT nodes for eDMA and the crossbar
-- we will enable the AFIFO use for audio
-- add hwmod data and DT nodes for all McASP ports
-- Fix the beagle-x15's clkout2 parent setting for the codec
-
-The patch set has been tested on top of linux-next.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Misael Lopez Cruz (1):
-  ARM: DTS: dra7: Use eDMA and add DAT port address for McASP3
+ arch/arm/boot/dts/dra7.dtsi | 48 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-Peter Ujfalusi (9):
-  ARM: DTS: dra7: Move the sDMA crossbar node under l4_cfg/scm
-  ARM: DTS: dra7: Enable eDMA
-  ARM: DTS: dra7-evm: Enable AFIFO use for McASP3
-  ARM: DTS: dra72-evm: Enable AFIFO use for McASP3
-  ARM: DTS: am57xx-beagle-x15: Move clkout2 source selection to codec
-    node
-  ARM: DTS: am57xx-beagle-x15: Enable AFIFO use for McASP3
-  ARM: clk: dra7xx: Correct mcasp8_ahclkx_mux name
-  ARM: DRA7: hwmod: Add data for McASP1/2/4/5/6/7/8
-  ARM: DTS: dra7: Add nodes for McASP1/2/4/5/6/7/8
-
- arch/arm/boot/dts/am57xx-beagle-x15.dts   |   7 +-
- arch/arm/boot/dts/dra7-evm.dts            |   2 +
- arch/arm/boot/dts/dra7.dtsi               | 183 +++++++++++++++++++++--
- arch/arm/boot/dts/dra72-evm.dts           |   2 +
- arch/arm/boot/dts/dra7xx-clocks.dtsi      |   2 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 237 ++++++++++++++++++++++++++++++
- drivers/clk/ti/clk-7xx.c                  |   2 +-
- 7 files changed, 421 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index db7fda97a4fa..b99f51288e71 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -170,6 +170,15 @@
+ 					ti,dma-safe-map = <0>;
+ 					dma-masters = <&sdma>;
+ 				};
++
++				edma_xbar: dma-router at c78 {
++					compatible = "ti,dra7-dma-crossbar";
++					reg = <0xc78 0x7c>;
++					#dma-cells = <2>;
++					dma-requests = <204>;
++					ti,dma-safe-map = <0>;
++					dma-masters = <&edma>;
++				};
+ 			};
+ 
+ 			cm_core_aon: cm_core_aon at 5000 {
+@@ -324,6 +333,45 @@
+ 			dma-requests = <127>;
+ 		};
+ 
++		edma: edma at 43300000 {
++			compatible = "ti,edma3-tpcc";
++			ti,hwmods = "tpcc";
++			reg = <0x43300000 0x100000>;
++			reg-names = "edma3_cc";
++			interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "edma3_ccint", "emda3_mperr",
++					  "edma3_ccerrint";
++			dma-requests = <64>;
++			#dma-cells = <2>;
++
++			ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 0>;
++
++			/*
++			 * memcpy is disabled, can be enabled with:
++			 * ti,edma-memcpy-channels = <20 21>;
++			 * for example. Note that these channels need to be
++			 * masked in the xbar as well.
++			 */
++		};
++
++		edma_tptc0: tptc at 43400000 {
++			compatible = "ti,edma3-tptc";
++			ti,hwmods = "tptc0";
++			reg =	<0x43400000 0x100000>;
++			interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "edma3_tcerrint";
++		};
++
++		edma_tptc1: tptc at 43500000 {
++			compatible = "ti,edma3-tptc";
++			ti,hwmods = "tptc1";
++			reg =	<0x43500000 0x100000>;
++			interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "edma3_tcerrint";
++		};
++
+ 		gpio1: gpio at 4ae10000 {
+ 			compatible = "ti,omap4-gpio";
+ 			reg = <0x4ae10000 0x200>;
 -- 
 2.7.2
