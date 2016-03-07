@@ -1,50 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Mar 2016 17:38:35 +0000
+From: james.morse@arm.com (James Morse)
+Date: Mon, 07 Mar 2016 17:40:23 +0000
 Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
-In-Reply-To: <56DDAFA7.4090207@arm.com>
+In-Reply-To: <20160307172334.GJ19428@n2100.arm.linux.org.uk>
 References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <56DDAFA7.4090207@arm.com>
-Message-ID: <20160307173835.GB6192@e104818-lin.cambridge.arm.com>
+ <56DDAFA7.4090207@arm.com> <20160307172334.GJ19428@n2100.arm.linux.org.uk>
+Message-ID: <56DDBD07.2080200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing Kees)
-
-On Mon, Mar 07, 2016 at 04:43:19PM +0000, James Morse wrote:
-> I've just spotted UAO causes the test_user_copy module (CONFIG_TEST_USER_COPY)
-> to fail. Who to blame is up for discussion. The test is passing a user pointer
-> as the 'to' field of copy_from_user(), which it expects to fail gracefully:
+On 07/03/16 17:23, Russell King - ARM Linux wrote:
+> On Mon, Mar 07, 2016 at 04:43:19PM +0000, James Morse wrote:
+>> As far as I can see, this would only affect arm64. I can't find an equivalent
+>> memset() for x86_64.
 > 
-> lib/test_user_copy.c:75
-> >	/* Invalid usage: none of these should succeed. */
-> [ ... ]
-> > 	ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
-> >				    PAGE_SIZE),
-> >		    "illegal reversed copy_from_user passed");
-> >
-> 
-> access_ok() catches the "(char __user *)kmem", causing copy_from_user() to pass
-> bad_usermem to memset():
-> 
-> arch/arm64/include/asm/uaccess.h:279
-> >	if (access_ok(VERIFY_READ, from, n))
-> >		n = __copy_from_user(to, from, n);
-> >	else /* security hole - plug it */
-> >		memset(to, 0, n);
-> 
-> This (correctly) trips UAO's "Accessing user space memory outside uaccess.h
-> routines" message, which is a little confusing to debug, and stops the rest of
-> the module's tests from being run.
+> I don't think you've looked hard enough. :)
 
-I suggest we don't do anything on arch/arm64 (or arch/arm), I just
-consider the test to be broken. The semantics of copy_from_user() don't
-say anything about the safety checks on the destination pointer, this is
-supposed to be a valid kernel address. The test assumes that if the
-source pointer is invalid, the copy_from_user() routine should not touch
-the destination.
+Heh, Thanks! I ignored the 32bit code and instead got lost in the maze of
+underscores and alternative-strings for the 64 bit path.
 
-A better test would be to use a destination buffer filled with a poison
-value and checked after the operation.
+Having seen that path, I've now found:
+>	/* If the destination is a kernel buffer, we always clear the end */
+>	if (!__addr_ok(to))
+>		memset(to, 0, len);
 
--- 
-Catalin
+in arch/x86/lib/usercopy_64.c:copy_user_handle_tail(), which may be the x86_64
+equivalent, or I may be lost in the maze again.
+
+
+Thanks!
+
+James
