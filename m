@@ -1,28 +1,93 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon,  7 Mar 2016 20:53:42 +0100
-Subject: [PATCH 0/3] video: fbdev: imxfb: make it work again
-Message-ID: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Mon,  7 Mar 2016 20:53:45 +0100
+Subject: [PATCH 3/3] video: fbdev: imxfb: add some error handling
+In-Reply-To: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1457380425-20244-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/video/fbdev/imxfb.c | 33 ++++++++++++++++++++++++++-------
+ 1 file changed, 26 insertions(+), 7 deletions(-)
 
-it seems the imxfb driver stopped working quite some time ago. Here come
-some fixes to convince the driver to operate again. This is a cleanup of
-the RFC patch "video: fbdev: imxfb: make the driver cooperate" I sent
-last week (Message-Id:
-1456829223-1526-1-git-send-email-u.kleine-koenig at pengutronix.de).
-
-Best regards
-Uwe
-
-Uwe Kleine-K?nig (3):
-  video: fbdev: imxfb: fix semantic of .get_power and .set_power
-  video: fbdev: imxfb: enable lcd regulator in .probe
-  video: fbdev: imxfb: add some error handling
-
- drivers/video/fbdev/imxfb.c | 48 +++++++++++++++++++++++++++++++++++----------
- 1 file changed, 38 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+index 3dd2824e6773..671b3719db56 100644
+--- a/drivers/video/fbdev/imxfb.c
++++ b/drivers/video/fbdev/imxfb.c
+@@ -473,8 +473,9 @@ static int imxfb_set_par(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-static void imxfb_enable_controller(struct imxfb_info *fbi)
++static int imxfb_enable_controller(struct imxfb_info *fbi)
+ {
++	int ret;
+ 
+ 	if (fbi->enabled)
+ 		return;
+@@ -496,10 +497,27 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+ 	 */
+ 	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
+ 
+-	clk_prepare_enable(fbi->clk_ipg);
+-	clk_prepare_enable(fbi->clk_ahb);
+-	clk_prepare_enable(fbi->clk_per);
++	ret = clk_prepare_enable(fbi->clk_ipg);
++	if (ret)
++		goto err_enable_ipg;
++
++	ret = clk_prepare_enable(fbi->clk_ahb);
++	if (ret)
++		goto err_enable_ahb;
++
++	ret = clk_prepare_enable(fbi->clk_per);
++	if (ret) {
++		clk_disable_unprepare(fbi->clk_ahb);
++err_enable_ahb:
++		clk_disable_unprepare(fbi->clk_ipg);
++err_enable_ipg:
++		writel(0, fbi->regs + LCDC_RMCR);
++
++		return ret;
++	}
++
+ 	fbi->enabled = true;
++	return 0;
+ }
+ 
+ static void imxfb_disable_controller(struct imxfb_info *fbi)
+@@ -510,8 +528,8 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ 	pr_debug("Disabling LCD controller\n");
+ 
+ 	clk_disable_unprepare(fbi->clk_per);
+-	clk_disable_unprepare(fbi->clk_ipg);
+ 	clk_disable_unprepare(fbi->clk_ahb);
++	clk_disable_unprepare(fbi->clk_ipg);
+ 	fbi->enabled = false;
+ 
+ 	writel(0, fbi->regs + LCDC_RMCR);
+@@ -520,6 +538,7 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+ static int imxfb_blank(int blank, struct fb_info *info)
+ {
+ 	struct imxfb_info *fbi = info->par;
++	int ret = 0;;
+ 
+ 	pr_debug("imxfb_blank: blank=%d\n", blank);
+ 
+@@ -532,10 +551,10 @@ static int imxfb_blank(int blank, struct fb_info *info)
+ 		break;
+ 
+ 	case FB_BLANK_UNBLANK:
+-		imxfb_enable_controller(fbi);
++		ret = imxfb_enable_controller(fbi);
+ 		break;
+ 	}
+-	return 0;
++	return ret;
+ }
+ 
+ static struct fb_ops imxfb_ops = {
 -- 
 2.7.0
