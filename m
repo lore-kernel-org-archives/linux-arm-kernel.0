@@ -1,22 +1,81 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 07 Mar 2016 09:48:06 +0100
-Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
-In-Reply-To: <56DADA57.9010200@imap.cc>
-References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
- <1456945629-1793533-2-git-send-email-arnd@arndb.de>
- <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
- <1457108303.2651.112.camel@tiscali.nl> <56DADA57.9010200@imap.cc>
-Message-ID: <1457340486.2737.19.camel@tiscali.nl>
+From: blogic@openwrt.org (John Crispin)
+Date: Mon,  7 Mar 2016 09:56:36 +0100
+Subject: [PATCH V4 3/4] net-next: mediatek: add Kconfig and Makefile
+In-Reply-To: <1457340997-23116-1-git-send-email-blogic@openwrt.org>
+References: <1457340997-23116-1-git-send-email-blogic@openwrt.org>
+Message-ID: <1457340997-23116-4-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On za, 2016-03-05 at 14:08 +0100, Tilman Schmidt wrote:
-> As a consequence, owners of HiSAX type adapters are in fact stuck with
-> the old hisax driver if they want to continue using i4l userspace
-> tools.
+This patch adds the Makefile and Kconfig required to make the driver build.
 
-Do you know whether or not mISDN tools offer functionality comparable to
-i4l tools?
+Signed-off-by: John Crispin <blogic@openwrt.org>
+---
+ drivers/net/ethernet/Kconfig           |    1 +
+ drivers/net/ethernet/Makefile          |    1 +
+ drivers/net/ethernet/mediatek/Kconfig  |   17 +++++++++++++++++
+ drivers/net/ethernet/mediatek/Makefile |    5 +++++
+ 4 files changed, 24 insertions(+)
+ create mode 100644 drivers/net/ethernet/mediatek/Kconfig
+ create mode 100644 drivers/net/ethernet/mediatek/Makefile
 
-
-Paul Bolle
+diff --git a/drivers/net/ethernet/Kconfig b/drivers/net/ethernet/Kconfig
+index 0b13af8..be67a19 100644
+--- a/drivers/net/ethernet/Kconfig
++++ b/drivers/net/ethernet/Kconfig
+@@ -106,6 +106,7 @@ config LANTIQ_ETOP
+ 	  Support for the MII0 inside the Lantiq SoC
+ 
+ source "drivers/net/ethernet/marvell/Kconfig"
++source "drivers/net/ethernet/mediatek/Kconfig"
+ source "drivers/net/ethernet/mellanox/Kconfig"
+ source "drivers/net/ethernet/micrel/Kconfig"
+ source "drivers/net/ethernet/microchip/Kconfig"
+diff --git a/drivers/net/ethernet/Makefile b/drivers/net/ethernet/Makefile
+index 38dc1a7..6ffcc80 100644
+--- a/drivers/net/ethernet/Makefile
++++ b/drivers/net/ethernet/Makefile
+@@ -46,6 +46,7 @@ obj-$(CONFIG_JME) += jme.o
+ obj-$(CONFIG_KORINA) += korina.o
+ obj-$(CONFIG_LANTIQ_ETOP) += lantiq_etop.o
+ obj-$(CONFIG_NET_VENDOR_MARVELL) += marvell/
++obj-$(CONFIG_NET_VENDOR_MEDIATEK) += mediatek/
+ obj-$(CONFIG_NET_VENDOR_MELLANOX) += mellanox/
+ obj-$(CONFIG_NET_VENDOR_MICREL) += micrel/
+ obj-$(CONFIG_NET_VENDOR_MICROCHIP) += microchip/
+diff --git a/drivers/net/ethernet/mediatek/Kconfig b/drivers/net/ethernet/mediatek/Kconfig
+new file mode 100644
+index 0000000..b0229f4
+--- /dev/null
++++ b/drivers/net/ethernet/mediatek/Kconfig
+@@ -0,0 +1,17 @@
++config NET_VENDOR_MEDIATEK
++	bool "MediaTek ethernet driver"
++	depends on ARCH_MEDIATEK
++	---help---
++	  If you have a Mediatek SoC with ethernet, say Y.
++
++if NET_VENDOR_MEDIATEK
++
++config NET_MEDIATEK_SOC
++	tristate "MediaTek MT7623 Gigabit ethernet support"
++	depends on NET_VENDOR_MEDIATEK #&& (MACH_MT7623 || MACH_MT2701)
++	select PHYLIB
++	---help---
++	  This driver supports the gigabit ethernet MACs in the
++	  MediaTek MT2701/MT7623 chipset family.
++
++endif #NET_VENDOR_MEDIATEK
+diff --git a/drivers/net/ethernet/mediatek/Makefile b/drivers/net/ethernet/mediatek/Makefile
+new file mode 100644
+index 0000000..aa3f1c8
+--- /dev/null
++++ b/drivers/net/ethernet/mediatek/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for the Mediatek SoCs built-in ethernet macs
++#
++
++obj-$(CONFIG_NET_MEDIATEK_SOC)			+= mtk_eth_soc.o
+-- 
+1.7.10.4
