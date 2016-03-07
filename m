@@ -1,43 +1,49 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 7 Mar 2016 14:22:57 +0100
-Subject: [PATCH] bus: simple-pm-bus: Use ARCH_RENESAS
-In-Reply-To: <20160304052019.GD27942@verge.net.au>
-References: <1456969198-20365-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVU1RPAafTbUpw6CyW-tQ1amHeiR2DGY_QK8vTFEXpHTA@mail.gmail.com>
- <20160304052019.GD27942@verge.net.au>
-Message-ID: <CAMuHMdVjpYg1q_ZGm7tVASvrAE8oEzVZFTtua4LVDFsY7cHCVA@mail.gmail.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Mon, 7 Mar 2016 14:26:14 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <56DD7593.5060003@suse.de>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de>
+Message-ID: <56DD8176.2080603@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 4, 2016 at 6:20 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Mar 03, 2016 at 09:31:49AM +0100, Geert Uytterhoeven wrote:
->> On Thu, Mar 3, 2016 at 2:39 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
->> > Make use of ARCH_RENESAS in place of ARCH_SHMOBILE.
->> >
->> > This is part of an ongoing process to migrate from ARCH_SHMOBILE to
->> > ARCH_RENESAS the motivation for which being that RENESAS seems to be a more
->> > appropriate name than SHMOBILE for the majority of Renesas ARM based SoCs.
->> >
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hello Andreas, Heiko,
+
+On 3/7/2016 1:35 PM, Andreas F?rber wrote:
+> Hi Heiko,
 >
-> I'm a little unsure of who should take this but for now I will
-> queue it up in next with a view to sending a pull request to Linus
-> for v4.6. I'm open to other ideas.
+> Am 07.03.2016 um 13:24 schrieb Heiko St?bner:
+>> Am Montag, 7. M?rz 2016, 13:17:54 schrieb Andreas F?rber:
+>>> Am 06.03.2016 um 20:53 schrieb Andreas F?rber:
+>>>> On next-20160304 the GMAC seems to have regressed, it no longer finds the
+>>>> PHY:
+>>>>
+>>>> libphy: PHY stmmac-0:ffffffff not found
 
-All but two entries in drivers/bus/Kconfig are for ARM platforms (the other two
-are for MIPS platforms), so I think arm-soc is appropriate.
+snps,phy-addr is not correct. Can you check it?
 
-Alternatively, GregKH?
+In the stmmac_mdio if this is not passed as parameter the bus should
+be scanned and the first IDs found should select the right address.
+I suppose in your box there is a real transceiver, so maybe the patch
+from Gabriel is not actually necessary.
 
-Gr{oetje,eeting}s,
+>>>> eth0: Could not attach to PHY
+>>>> stmmac_open: Cannot attach to PHY (error: -19)
+>>>
+>>> Still with us in next-20160307. CC'ing stmmac maintainers.
 
-                        Geert
+peppe
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>>
+>> do you remember from what revision you rebased away from, when it was still
+>> working (as a known-good state)?
+>
+> Hm, next-20160111 possibly... leaving all the 5 days and 4 days ago
+> changes as candidates ("stmmac: share reset function between dwmac100
+> and dwmac1000" .. "stmmac: Fix 'eth0: No PHY found' regression").
+>
+> Regards,
+> Andreas
+>
