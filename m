@@ -1,122 +1,87 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Mon, 7 Mar 2016 13:59:12 +0100
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <20160307043442.GB24602@js1304-P5Q-DELUXE>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE> <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE> <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE>
-Message-ID: <56DD7B20.1020508@suse.cz>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 7 Mar 2016 14:03:04 +0100
+Subject: [PATCH 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
+In-Reply-To: <20160301074937.GU2613@pengutronix.de>
+References: <1456761156-27664-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1456761156-27664-3-git-send-email-s.trumtrar@pengutronix.de>
+ <CAOMZO5BN-1U6vX0HAHWX30t+23NnqEpOw6AttSgvqaZnq=cN6Q@mail.gmail.com>
+ <20160229213850.GS2613@pengutronix.de>
+ <CAOMZO5BLYumOrBuoB5-RgzLAJ=o4zp9ocv4jcZRy=p6Pky1SyQ@mail.gmail.com>
+ <20160301074937.GU2613@pengutronix.de>
+Message-ID: <20160307130304.GA791@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2016 05:34 AM, Joonsoo Kim wrote:
-> On Fri, Mar 04, 2016 at 03:35:26PM +0800, Hanjun Guo wrote:
->>> Sad to hear that.
->>>
->>> Could you tell me your system's MAX_ORDER and pageblock_order?
->>>
->>
->> MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
+Hi!
 
-I thought that CMA regions/operations (and isolation IIRC?) were 
-supposed to be MAX_ORDER aligned exactly to prevent needing these extra 
-checks for buddy merging. So what's wrong?
+On Tue, Mar 01, 2016 at 08:49:37AM +0100, Uwe Kleine-K?nig wrote:
+> Hello Fabio,
+> 
+> On Mon, Feb 29, 2016 at 08:54:19PM -0300, Fabio Estevam wrote:
+> > On Mon, Feb 29, 2016 at 6:38 PM, Uwe Kleine-K?nig
+> > <u.kleine-koenig@pengutronix.de> wrote:
+> > > On Mon, Feb 29, 2016 at 06:16:50PM -0300, Fabio Estevam wrote:
+> > >> On Mon, Feb 29, 2016 at 12:52 PM, Steffen Trumtrar
+> > >> <s.trumtrar@pengutronix.de> wrote:
+> > >>
+> > >> > +       ret = clk_prepare_enable(rngc->clk);
+> > >> > +       if (ret)
+> > >> > +               return ret;
+> > >> > +
+> > >> > +       rngc->irq = platform_get_irq(pdev, 0);
+> > >> > +       if (!rngc->irq) {
+> > >> > +               dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
+> > >> > +               clk_disable_unprepare(rngc->clk);
+> > >> > +
+> > >> > +               return ret;
+> > >>
+> > >> You are returning the wrong error code here:
+> > >>
+> > >> Better do like this:
+> > >>
+> > >>        rngc->irq = platform_get_irq(pdev, 0);
+> > >>        if (rngc->irq < 0) {
+> > >
+> > > rngc->irq is unsigned, so this is never true.
+> > >
+> > >>                dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
+> > >>                clk_disable_unprepare(rngc->clk);
+> > >>                return rngc->irq;
+> > >>        }
+> > >
+> > > So here comes my better approach:
+> > 
+> > As irq is only used inside probe it can be removed from struct mxc_rngc.
+> 
+> Good idea.
+> 
 
-> Hmm... that's same with me.
->
-> Below is similar fix that prevents buddy merging when one of buddy's
-> migrate type, but, not both, is MIGRATE_ISOLATE. In fact, I have
-> no idea why previous fix (more correct fix) doesn't work for you.
-> (It works for me.) But, maybe there is a bug on the fix
-> so I make new one which is more general form. Please test it.
->
-> Thanks.
->
-> ---------->8-------------
->  From dd41e348572948d70b935fc24f82c096ff0fb417 Mon Sep 17 00:00:00 2001
-> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> Date: Fri, 4 Mar 2016 13:28:17 +0900
-> Subject: [PATCH] mm/cma: fix race
->
-> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> ---
->   mm/page_alloc.c | 33 +++++++++++++++++++--------------
->   1 file changed, 19 insertions(+), 14 deletions(-)
->
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index c6c38ed..d80d071 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -620,8 +620,8 @@ static inline void rmv_page_order(struct page *page)
->    *
->    * For recording page's order, we use page_private(page).
->    */
-> -static inline int page_is_buddy(struct page *page, struct page *buddy,
-> -                                                       unsigned int order)
-> +static inline int page_is_buddy(struct zone *zone, struct page *page,
-> +                               struct page *buddy, unsigned int order)
->   {
->          if (!pfn_valid_within(page_to_pfn(buddy)))
->                  return 0;
-> @@ -644,6 +644,20 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
->                  if (page_zone_id(page) != page_zone_id(buddy))
->                          return 0;
->
-> +               if (IS_ENABLED(CONFIG_CMA) &&
-> +                       unlikely(has_isolate_pageblock(zone)) &&
-> +                       unlikely(order >= pageblock_order)) {
-> +                       int page_mt, buddy_mt;
-> +
-> +                       page_mt = get_pageblock_migratetype(page);
-> +                       buddy_mt = get_pageblock_migratetype(buddy);
-> +
-> +                       if (page_mt != buddy_mt &&
-> +                               (is_migrate_isolate(page_mt) ||
-> +                               is_migrate_isolate(buddy_mt)))
-> +                               return 0;
-> +               }
-> +
->                  VM_BUG_ON_PAGE(page_count(buddy) != 0, buddy);
->
->                  return 1;
-> @@ -691,17 +705,8 @@ static inline void __free_one_page(struct page *page,
->          VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
->
->          VM_BUG_ON(migratetype == -1);
-> -       if (is_migrate_isolate(migratetype)) {
-> -               /*
-> -                * We restrict max order of merging to prevent merge
-> -                * between freepages on isolate pageblock and normal
-> -                * pageblock. Without this, pageblock isolation
-> -                * could cause incorrect freepage accounting.
-> -                */
-> -               max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
-> -       } else {
-> +       if (!is_migrate_isolate(migratetype))
->                  __mod_zone_freepage_state(zone, 1 << order, migratetype);
-> -       }
->
->          page_idx = pfn & ((1 << max_order) - 1);
->
-> @@ -711,7 +716,7 @@ static inline void __free_one_page(struct page *page,
->          while (order < max_order - 1) {
->                  buddy_idx = __find_buddy_index(page_idx, order);
->                  buddy = page + (buddy_idx - page_idx);
-> -               if (!page_is_buddy(page, buddy, order))
-> +               if (!page_is_buddy(zone, page, buddy, order))
->                          break;
->                  /*
->                   * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
-> @@ -745,7 +750,7 @@ static inline void __free_one_page(struct page *page,
->                  higher_page = page + (combined_idx - page_idx);
->                  buddy_idx = __find_buddy_index(combined_idx, order + 1);
->                  higher_buddy = higher_page + (buddy_idx - combined_idx);
-> -               if (page_is_buddy(higher_page, higher_buddy, order + 1)) {
-> +               if (page_is_buddy(zone, higher_page, higher_buddy, order + 1)) {
->                          list_add_tail(&page->lru,
->                                  &zone->free_area[order].free_list[migratetype]);
->                          goto out;
->
+Actually it is currently used in the mxc_rngc_init function, but I think I can
+just move the call there into the probe function and get rid of the irq in the
+struct.
+
+> > Or maybe like this:
+> > 
+> >          ret = platform_get_irq(pdev, 0);
+> >          if (ret < 0) {
+> >                  dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
+> >                  clk_disable_unprepare(rngc->clk);
+> >                  return ret;
+> >          }
+> 
+
+This looks better, yes. I will change that, of course.
+
+> Some people think platform_get_irq returning 0 should be handled as
+> error.
+
+And who is right? drivers/of/unittest.c checks for irq < 0 for example.
+
+Thanks,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
