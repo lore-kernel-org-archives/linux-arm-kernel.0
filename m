@@ -1,42 +1,92 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 07 Mar 2016 10:55:00 +0100
-Subject: [PATCH 01/17] dt-bindings: vendor-prefixes: Add PLX Technology
-In-Reply-To: <20160305042932.GX13525@rob-hp-laptop>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-2-git-send-email-narmstrong@baylibre.com>
- <1457017335.3425.72.camel@pengutronix.de>
- <20160305042932.GX13525@rob-hp-laptop>
-Message-ID: <1457344500.3908.8.camel@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon,  7 Mar 2016 10:47:40 +0100
+Subject: [PATCH v4 50/52] staging: mt29f_spinand: switch to mtd_ooblayout_ops
+In-Reply-To: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457344062-11633-51-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 04.03.2016, 22:29 -0600 schrieb Rob Herring:
-> On Thu, Mar 03, 2016 at 04:02:15PM +0100, Philipp Zabel wrote:
-> > Am Donnerstag, den 03.03.2016, 12:39 +0100 schrieb Neil Armstrong:
-> > > Add PLX Technology vendor prefix.
-> > > 
-> > > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > > index 72e2c5a..03970fb 100644
-> > > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > > @@ -178,6 +178,7 @@ picochip	Picochip Ltd
-> > >  plathome	Plat'Home Co., Ltd.
-> > >  plda	PLDA
-> > >  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
-> > > +plxtech	PLX Technology, Inc.
-> > 
-> > The PLX Technology NASDAQ symbol used to be PLXT.
-> 
-> And is no longer listed? If not, then plxtech is fine. Otherwise, use 
-> plxt.
+Replace the nand_ecclayout definition by the equivalent mtd_ooblayout_ops
+definition.
 
-PLXT was listed until August 2014, when Avago (now Broadcom Limited)
-acquired PLX Technology.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/staging/mt29f_spinand/mt29f_spinand.c | 48 +++++++++++++++++----------
+ 1 file changed, 30 insertions(+), 18 deletions(-)
 
-regards
-Philipp
+diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+index 6728376..b9f9347 100644
+--- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
++++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+@@ -42,23 +42,33 @@ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
+ static int enable_hw_ecc;
+ static int enable_read_hw_ecc;
+ 
+-static struct nand_ecclayout spinand_oob_64 = {
+-	.eccbytes = 24,
+-	.eccpos = {
+-		1, 2, 3, 4, 5, 6,
+-		17, 18, 19, 20, 21, 22,
+-		33, 34, 35, 36, 37, 38,
+-		49, 50, 51, 52, 53, 54, },
+-	.oobfree = {
+-		{.offset = 8,
+-			.length = 8},
+-		{.offset = 24,
+-			.length = 8},
+-		{.offset = 40,
+-			.length = 8},
+-		{.offset = 56,
+-			.length = 8},
+-	}
++static int spinand_ooblayout_64_ecc(struct mtd_info *mtd, int section,
++				    struct mtd_oob_region *oobregion)
++{
++	if (section > 3)
++		return -ERANGE;
++
++	oobregion->offset = (section * 16) + 1;
++	oobregion->length = 6;
++
++	return 0;
++}
++
++static int spinand_ooblayout_64_free(struct mtd_info *mtd, int section,
++				     struct mtd_oob_region *oobregion)
++{
++	if (section > 3)
++		return -ERANGE;
++
++	oobregion->offset = (section * 16) + 8;
++	oobregion->length = 8;
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops spinand_oob_64_ops = {
++	.ecc = spinand_ooblayout_64_ecc,
++	.free = spinand_ooblayout_64_free,
+ };
+ #endif
+ 
+@@ -883,7 +893,6 @@ static int spinand_probe(struct spi_device *spi_nand)
+ 
+ 	chip->ecc.strength = 1;
+ 	chip->ecc.total	= chip->ecc.steps * chip->ecc.bytes;
+-	chip->ecc.layout = &spinand_oob_64;
+ 	chip->ecc.read_page = spinand_read_page_hwecc;
+ 	chip->ecc.write_page = spinand_write_page_hwecc;
+ #else
+@@ -908,6 +917,9 @@ static int spinand_probe(struct spi_device *spi_nand)
+ 
+ 	mtd->dev.parent = &spi_nand->dev;
+ 	mtd->oobsize = 64;
++#ifdef CONFIG_MTD_SPINAND_ONDIEECC
++	mtd_set_ooblayout(mtd, &spinand_oob_64_ops);
++#endif
+ 
+ 	if (nand_scan(mtd, 1))
+ 		return -ENXIO;
+-- 
+2.1.4
