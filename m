@@ -1,22 +1,49 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 7 Mar 2016 09:20:12 +0100
-Subject: [PATCH v2 0/6] ARM64: meson: GXBaby (S905) and Vega S95 enablement
-In-Reply-To: <1456886101-22967-1-git-send-email-afaerber@suse.de>
-References: <1456886101-22967-1-git-send-email-afaerber@suse.de>
-Message-ID: <CAOQ7t2YNrqUoyR4GW3-Ra9vbHy+JqhpDxeq-RFb0gbdotezu5A@mail.gmail.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Mon, 07 Mar 2016 09:20:19 +0100
+Subject: [PATCH v3 0/2] Add PCIe driver support for imx6sx
+In-Reply-To: <DBXPR04MB27013C807F30DABB9CB667D8CBD0@DBXPR04MB270.eurprd04.prod.outlook.com>
+References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+ <DBXPR04MB27013C807F30DABB9CB667D8CBD0@DBXPR04MB270.eurprd04.prod.outlook.com>
+Message-ID: <1457338819.1904.4.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2016 at 3:34 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Hello,
->
-> This series adds initial support for the Amlogic S905 based
-> Tronsmart Vega S95 Pro, Meta and Telos TV boxes.
+On Thu, 2016-03-03 at 01:48 +0000, Richard Zhu wrote:
+> > -----Original Message-----
+> > From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
+> > Sent: Thursday, February 25, 2016 10:48 PM
+> > To: Richard Zhu; Lucas Stach; Shawn Guo; Fabio Estevam; Bjorn Helgaas; Lee
+> > Jones
+> > Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: [PATCH v3 0/2] Add PCIe driver support for imx6sx
+> > 
+> > v3:
+> >  * adapt devicetree bindings documentation fsl,imx6q-pcie.txt
+> > v2:
+> >  * leave out regulator handling from driver, will be done later
+> >    in PM subsystem
+> >  * use BIT() macro for MFD
+> > 
+> > Christoph Fritz (2):
+> >   MFD: imx6sx: Add PCIe register definitions for iomuxc gpr
+> >   PCI: imx6: add initial imx6sx support
+> > 
+> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+> >  drivers/pci/host/pci-imx6.c                        | 130 ++++++++++++++-------
+> >  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |   5 +
+> >  3 files changed, 101 insertions(+), 40 deletions(-)
+> > 
+> > --
+> > 2.1.4
+> 
+> [Zhu hongxing]  Acked-by: Richard Zhu <Richard.Zhu@freescale.com>
+> Richard
+> Best Regards
 
-Thank you for working on this. If there will be no more comments in
-the few next days I'll pick the whole series up.
+@Bjorn: I suppose the PCI patch need to go through your tree. Would you
+pick up this patch?
 
-Cheers,
+@Lee: What about the MFD patch, does this need to go through your tree?
 
--- 
-Carlo Caione
+Thanks
+ -- Christoph
