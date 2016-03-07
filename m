@@ -1,18 +1,19 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Mon, 7 Mar 2016 15:45:03 +0900
-Subject: [PATCH 0/4] ARM64:SoC add a new platform, LG Electronics's lg1k
-In-Reply-To: <201603070529.29680.arnd@arndb.de>
-References: <1457323800-26904-1-git-send-email-chanho.min@lge.com>
- <201603070529.29680.arnd@arndb.de>
-Message-ID: <043001d1783c$e0b08250$a21186f0$@lge.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Mon, 07 Mar 2016 07:57:04 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <1659125.tHp8H942OG@wuerfel> (Arnd Bergmann's message of "Fri, 04
+ Mar 2016 16:24:19 +0100")
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
+Message-ID: <87lh5udbcv.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> The patches look ok in principle, but the timing is unfortunate: we are at -
-> rc7 now, just before the merge window, and we need to give this a little extra
-> time for review, so I think we should merge this for 4.7, not 4.6.
+I know that in Germany a good amount of land-line telephone line are
+still using ISDN. Some telco company try to move people to IP only, but
+this is currently still a process.
 
-It's ok for me.
-
-Chanho
+Especially company line are using ISDN still, and there are some Linux
+programs that act on then, e.g. Asterisk and derived PBX software has
+ISDN support which is actively used.
