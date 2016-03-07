@@ -1,128 +1,109 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Mon, 7 Mar 2016 16:30:45 -0600
-Subject: commit dfd55ad8 breaks Seattle B0
-Message-ID: <56DE0115.9040101@redhat.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 7 Mar 2016 16:33:11 -0600
+Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr()
+ on ARM
+In-Reply-To: <m337sapw89.fsf@t19.piap.pl>
+References: <m337sapw89.fsf@t19.piap.pl>
+Message-ID: <20160307223311.GB26149@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+[+cc Lorenzo]
 
-I get the following error when booting v4.5-rc7 on Seattle B0
-using the same config file that boots successfully on v4.5-rc6.
+On Tue, Mar 01, 2016 at 07:07:18AM +0100, Krzysztof Ha?asa wrote:
+> Many ARM platforms use a wrapper:
+> /*
+>  * Compatibility wrapper for older platforms that do not care about
+>  * passing the parent device.
+>  */
+> static inline void pci_common_init(struct hw_pci *hw)
+> {
+>         pci_common_init_dev(NULL, hw);
+> }
+> 
+> which means that pci_bus_assign_domain_nr() can be called without
+> a parent. This patch fixes the NULL pointer dereference.
+> 
+> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+> Cc: stable at vger.kernel.org
 
-Removing commit dfd55ad8 allows v4.5-rc7+ to boot successfully.
+I applied this to for-linus with changelog as below for v4.5, thanks!
 
---Mark Langsdorf
+Wow, this is terrible.  All ARM32 systems that use pci_common_init()
+crash at boot.  That includes cns3xxx, dove, footbridge, iopl13xx,
+ip32x, iop33x, ixp4xx, ks8695, mv78xx0, orion5x, pxa, sa1100, etc.
+Apparently they've been crashing since v4.0, when 7c674700098c and
+8c7d14746abc appeared.  I can hardly believe nobody noticed until now.
 
-[    0.000000] cma: Reserved 512 MiB at 0x00000080e0000000
-[    0.000000] Unable to handle kernel paging request at virtual address 
-fffffd0
-[    0.000000] pgd = fffffe0001320000
-[    0.000000] [fffffdff60ff0000] *pgd=00000083fffa0003, 
-*pud=00000083fffa0003,0
-[    0.000000] Internal error: Oops: 96000007 [#1] SMP
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.5.0-rc7.upstream #4
-[    0.000000] Hardware name: AMD Seattle (RevB) Development Board 
-(Overdrive) )
-[    0.000000] task: fffffe0000b72280 ti: fffffe0000b30000 task.ti: 
-fffffe0000b
-[    0.000000] PC is at memmap_init_zone+0xd4/0x11c
-[    0.000000] LR is at memmap_init_zone+0xb4/0x11c
-[    0.000000] pc : [<fffffe0000a95a60>] lr : [<fffffe0000a95a40>] 
-pstate: 8000
-[    0.000000] sp : fffffe0000b33d50
-[    0.000000] x29: fffffe0000b33d50 x28: 0000000000000001
-[    0.000000] x27: fffffe000094b8e8 x26: fffffe0000aba9c0
-[    0.000000] x25: fffffe0000b60000 x24: 0000000000840000
-[    0.000000] x23: 0000000000000000 x22: 4000000000000000
-[    0.000000] x21: 0000000000000001 x20: 00000000ffffffff
-[    0.000000] x19: 000000000083fd00 x18: 0000000000000009
-[    0.000000] x17: 0000008400000000 x16: 0000000000000008
-[    0.000000] x15: 0000000000000018 x14: 00000083ffe50000
-[    0.000000] x13: fffffe00012a0a18 x12: 0000000000180000
-[    0.000000] x11: 0000000700000008 x10: 00000083fffd8780
-[    0.000000] x9 : 0000000000000000 x8 : fffffe03fefde780
-[    0.000000] x7 : 00000000045a0000 x6 : fffffe000129fe18
-[    0.000000] x5 : 0000000000001d00 x4 : 0000000000000009
-[    0.000000] x3 : fffffdff60000000 x2 : 0000000000ff0000
-[    0.000000] x1 : 0000000000000001 x0 : 0000000000000001
-[    0.000000]
-[    0.000000] Process swapper (pid: 0, stack limit = 0xfffffe0000b30020)
-[    0.000000] Stack: (0xfffffe0000b33d50 to 0xfffffe0000b34000)
-[    0.000000] 3d40:                                   fffffe0000b33da0 
-fffffe0c
-[    0.000000] 3d60: fffffe0000c5cb80 000000000002ff40 fffffe0000c5d188 
-fffffe00
-[    0.000000] 3d80: fffffe0000b16d90 fffffe000073c808 0000000000030000 
-fffffe00
-[    0.000000] 3da0: fffffe0000b33e30 fffffe0000a54f58 fffffe0000b60000 
-fffffe00
-[    0.000000] 3dc0: 0000000000840000 0000000000800100 0000000000000018 
-fffffe00
-[    0.000000] 3de0: fffffe0000c90000 0000008002320000 fffffe0000081198 
-0000008c
-[    0.000000] 3e00: 0000000000030000 fffffe000094b9a8 fffffe000094b918 
-fffffe00
-[    0.000000] 3e20: 0000000000081198 0000000000810000 fffffe0000b33ea0 
-fffffe08
-[    0.000000] 3e40: fffffe000129fef0 0000000000000018 fffffe0000bbc000 
-fffffe00
-[    0.000000] 3e60: fffffe0000935820 fffffe0000a55200 000000000000ff00 
-00000000
-[    0.000000] 3e80: 0000000000000000 0000000000000000 0000000000000000 
-00000000
-[    0.000000] 3ea0: fffffe0000b33f00 fffffe0000a52ee0 fffffdfffa800000 
-fffffe08
-[    0.000000] 3ec0: fffffe0000080000 fffffe0000b60000 fffffe0000b60000 
-00000080
-[    0.000000] 3ee0: fffffdfffa800000 fffffe03feff0000 fffffe0000080000 
-00000080
-[    0.000000] 3f00: fffffe0000b33fa0 fffffe0000a50684 0000000000000000 
-fffffe08
-[    0.000000] 3f20: 000000801fe00000 00000083f0f15228 fffffe0000b60000 
-00000080
-[    0.000000] 3f40: 00000080022f0000 0000008002320000 fffffe0000081198 
-00000008
-[    0.000000] 3f60: 00000083f0f155a0 fffffe00007200b0 0000000000000001 
-00000080
-[    0.000000] 3f80: ffffffffffffffff 8080808000000000 0000000080808080 
-fefefeff
-[    0.000000] 3fa0: 0000000000000000 fffffe00000811b4 00000083f0f155a0 
-00000002
-[    0.000000] 3fc0: 000000801fe00000 00000083f0f15228 00000083f0f1523d 
-00000080
-[    0.000000] 3fe0: 0000000000000000 fffffe0000a98628 0000000000000000 
-00000000
-[    0.000000] Call trace:
-[    0.000000] Exception stack(0xfffffe0000b33b90 to 0xfffffe0000b33cb0)
-[    0.000000] 3b80:                                   000000000083fd00 
-0000000f
-[    0.000000] 3ba0: fffffe0000b33d50 fffffe0000a95a60 00000083fffd8780 
-00000000
-[    0.000000] 3bc0: 0000000000000018 0000000000000000 fffffe0000b33c40 
-fffffe04
-[    0.000000] 3be0: 00000083fffd8780 0000000000006000 fffffe0000a6ac78 
-00000000
-[    0.000000] 3c00: 0000000000000000 0000000000000000 0000000000010000 
-fffffe00
-[    0.000000] 3c20: fffffe000094e9c8 00000083fffd8780 0000000000000001 
-00000001
-[    0.000000] 3c40: 0000000000ff0000 fffffdff60000000 0000000000000009 
-00000000
-[    0.000000] 3c60: fffffe000129fe18 00000000045a0000 fffffe03fefde780 
-00000000
-[    0.000000] 3c80: 00000083fffd8780 0000000700000008 0000000000180000 
-fffffe08
-[    0.000000] 3ca0: 00000083ffe50000 0000000000000018
-[    0.000000] [<fffffe0000a95a60>] memmap_init_zone+0xd4/0x11c
-[    0.000000] [<fffffe0000a95d1c>] free_area_init_node+0x274/0x2bc
-[    0.000000] [<fffffe0000a54f58>] bootmem_init+0x158/0x198
-[    0.000000] [<fffffe0000a55368>] paging_init+0xec/0x1a4
-[    0.000000] [<fffffe0000a52ee0>] setup_arch+0x110/0x5a4
-[    0.000000] [<fffffe0000a50684>] start_kernel+0xac/0x3e0
-[    0.000000] [<fffffe00000811b4>] 0xfffffe00000811b4
-[    0.000000] Code: cb424262 f2dfbfe3 d37ae442 f2ffffe3 (f8636840)
-[    0.000000] ---[ end trace cb88537fdc8fa200 ]---
-[    0.000000] Kernel panic - not syncing: Fatal exception
-[    0.000000] ---[ end Kernel panic - not syncing: Fatal exception
+Actually, I did find one problem report:
+http://forum.doozan.com/read.php?2,17868,22070,quote=1 from last May,
+but apparently it got lost in a forum and never found its way
+upstream.
+
+I reworked the changelog because this problem will affect *any* arch
+that enables CONFIG_PCI_DOMAINS_GENERIC and supplies NULL "parent"
+pointers -- ia64, mips, mn10300, s390, x86, etc., would be affected if
+they enabled CONFIG_PCI_DOMAINS_GENERIC.
+
+I also added a "Fixes:" tag for 7c674700098c, since that's the commit
+that added the generic code we're fixing.  Backports of 7c674700098c
+should also backport this change.
+
+Bjorn
+
+
+
+commit 71babd2a89fe
+Author: Krzysztof =?utf-8?Q?Ha=C5=82asa?= <khalasa@piap.pl>
+Date:   Tue Mar 1 07:07:18 2016 +0100
+
+    PCI: Allow a NULL "parent" pointer in pci_bus_assign_domain_nr()
+    
+    pci_create_root_bus() passes a "parent" pointer to
+    pci_bus_assign_domain_nr().  When CONFIG_PCI_DOMAINS_GENERIC is defined,
+    pci_bus_assign_domain_nr() dereferences that pointer.  Many callers of
+    pci_create_root_bus() supply a NULL "parent" pointer, which leads to a NULL
+    pointer dereference error.
+    
+    7c674700098c ("PCI: Move domain assignment from arm64 to generic code")
+    moved the "parent" dereference from arm64 to generic code.  Only arm64 used
+    that code (because only arm64 defined CONFIG_PCI_DOMAINS_GENERIC), and it
+    always supplied a valid "parent" pointer.  Other arches supplied NULL
+    "parent" pointers but didn't defined CONFIG_PCI_DOMAINS_GENERIC, so they
+    used a no-op version of pci_bus_assign_domain_nr().
+    
+    8c7d14746abc ("ARM/PCI: Move to generic PCI domains") defined
+    CONFIG_PCI_DOMAINS_GENERIC on ARM, and many ARM platforms use
+    pci_common_init(), which supplies a NULL "parent" pointer.
+    These platforms (cns3xxx, dove, footbridge, iop13xx, etc.) crash
+    with a NULL pointer dereference like this while probing PCI:
+    
+      Unable to handle kernel NULL pointer dereference at virtual address 000000a4
+      PC is at pci_bus_assign_domain_nr+0x10/0x84
+      LR is at pci_create_root_bus+0x48/0x2e4
+      Kernel panic - not syncing: Attempted to kill init!
+    
+    [bhelgaas: changelog, add "Reported:" and "Fixes:" tags]
+    Reported: http://forum.doozan.com/read.php?2,17868,22070,quote=1
+    Fixes: 8c7d14746abc ("ARM/PCI: Move to generic PCI domains")
+    Fixes: 7c674700098c ("PCI: Move domain assignment from arm64 to generic code")
+    Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    CC: stable at vger.kernel.org	# v4.0+
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 602eb42..f89db3a 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4772,8 +4772,10 @@ int pci_get_new_domain_nr(void)
+ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ {
+ 	static int use_dt_domains = -1;
+-	int domain = of_get_pci_domain_nr(parent->of_node);
++	int domain = -1;
+ 
++	if (parent)
++		domain = of_get_pci_domain_nr(parent->of_node);
+ 	/*
+ 	 * Check DT domain and use_dt_domains values.
+ 	 *
