@@ -1,210 +1,62 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 7 Mar 2016 15:29:57 +0100
-Subject: [PATCH v2 2/2] iio:adc:at91-sama5d2: add support for signed conversion
-In-Reply-To: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1457360997-29179-3-git-send-email-ludovic.desroches@atmel.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 7 Mar 2016 11:30:30 -0300
+Subject: [PATCH 0/2] [media] exynos4-is: Trivial fixes for DT
+ port/endpoint parse logic
+In-Reply-To: <56DD48C1.8010004@samsung.com>
+References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
+ <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
+ <56DD48C1.8010004@samsung.com>
+Message-ID: <56DD9086.7070903@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at91-sama5d2 ADC controller can achieve unsigned and signed
-conversions. For each channel, a signed and an unsigned variant are
-created.
-Sign mode is a global configuration, it is not tied to a specific
-channel. For this reason, the controller has to be configured upon
-conversion request.
+Hello Sylwester,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/iio/adc/at91-sama5d2_adc.c | 125 ++++++++++++++++++++++++++++++-------
- 1 file changed, 102 insertions(+), 23 deletions(-)
+On 03/07/2016 06:24 AM, Sylwester Nawrocki wrote:
+> Hi Javier, Krzysztof,
+> 
+> On 03/05/2016 05:35 AM, Krzysztof Kozlowski wrote:
+>> 2016-03-05 5:20 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+>>>> Hello,
+>>>>
+>>>> This series have two trivial fixes for issues that I noticed while
+>>>> reading as a reference the driver's functions that parse the graph
+>>>> port and endpoints nodes.
+>>>>
+>>>> It was only compile tested because I don't have access to a Exynos4
+>>>> hardware to test the DT parsing, but the patches are very simple.
+>>
+>> Not directly related, but similar: my previous two patches for missing
+>> of_node_put [0] are unfortunately still waiting. Although I have
+>> Exynos4 boards, but I don't have infrastructure/scripts to test it.
+>>
+>> Best regards,
+>> Krzysztof
+>>
 
-diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-index 5bc038f..0370c4f 100644
---- a/drivers/iio/adc/at91-sama5d2_adc.c
-+++ b/drivers/iio/adc/at91-sama5d2_adc.c
-@@ -105,8 +105,26 @@
- #define AT91_SAMA5D2_LCCWR	0x38
- /* Overrun Status Register */
- #define AT91_SAMA5D2_OVER	0x3c
-+
- /* Extended Mode Register */
- #define AT91_SAMA5D2_EMR	0x40
-+/* Sign Mode */
-+#define AT91_SAMA5D2_EMR_SIGNMODE(v)		((v) << 25)
-+/*
-+ * Single-Ended channels: Unsigned conversions.
-+ * Differential channels: Signed conversions.
-+ */
-+#define AT91_SAMA5D2_EMR_SE_UNSG_DF_SIGN	0
-+/*
-+ * Single-Ended channels: Signed conversions.
-+ * Differential channels: Unsigned conversions.
-+ */
-+#define AT91_SAMA5D2_EMR_SE_SIGN_DF_UNSG	1
-+/* All channels: Unsigned conversions */
-+#define AT91_SAMA5D2_EMR_ALL_UNSIGNED		2
-+/* All channels: Signed conversions */
-+#define AT91_SAMA5D2_EMR_ALL_SIGNED		3
-+
- /* Compare Window Register */
- #define AT91_SAMA5D2_CWR	0x44
- /* Channel Gain Register */
-@@ -140,22 +158,28 @@
- /* Version Register */
- #define AT91_SAMA5D2_VERSION	0xfc
- 
--#define AT91_SAMA5D2_CHAN(num, addr)					\
-+#define AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, sign_mode)		\
- 	{								\
- 		.type = IIO_VOLTAGE,					\
- 		.channel = num,						\
- 		.address = addr,					\
- 		.scan_type = {						\
--			.sign = 'u',					\
-+			.sign = sign_mode,				\
- 			.realbits = 12,					\
- 		},							\
--		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-+		.info_mask_separate = (sign_mode == 's') ? BIT(IIO_CHAN_INFO_SIGNED) : BIT(IIO_CHAN_INFO_RAW),		\
- 		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
- 		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),\
- 		.datasheet_name = "CH"#num,				\
- 		.indexed = 1,						\
- 	}
- 
-+#define AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(num, addr)		\
-+	AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, 's')
-+
-+#define AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(num, addr)	\
-+	AT91_SAMA5D2_VOLTAGE_CHANNEL(num, addr, 'u')
-+
- #define at91_adc_readl(st, reg)		readl_relaxed(st->base + reg)
- #define at91_adc_writel(st, reg, val)	writel_relaxed(val, st->base + reg)
- 
-@@ -185,18 +209,30 @@ struct at91_adc_state {
- };
- 
- static const struct iio_chan_spec at91_adc_channels[] = {
--	AT91_SAMA5D2_CHAN(0, 0x50),
--	AT91_SAMA5D2_CHAN(1, 0x54),
--	AT91_SAMA5D2_CHAN(2, 0x58),
--	AT91_SAMA5D2_CHAN(3, 0x5c),
--	AT91_SAMA5D2_CHAN(4, 0x60),
--	AT91_SAMA5D2_CHAN(5, 0x64),
--	AT91_SAMA5D2_CHAN(6, 0x68),
--	AT91_SAMA5D2_CHAN(7, 0x6c),
--	AT91_SAMA5D2_CHAN(8, 0x70),
--	AT91_SAMA5D2_CHAN(9, 0x74),
--	AT91_SAMA5D2_CHAN(10, 0x78),
--	AT91_SAMA5D2_CHAN(11, 0x7c),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(0, 0x50),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(1, 0x54),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(2, 0x58),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(3, 0x5c),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(4, 0x60),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(5, 0x64),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(6, 0x68),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(7, 0x6c),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(8, 0x70),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(9, 0x74),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(10, 0x78),
-+	AT91_SAMA5D2_UNSIGNED_VOLTAGE_CHANNEL(11, 0x7c),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(0, 0x50),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(1, 0x54),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(2, 0x58),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(3, 0x5c),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(4, 0x60),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(5, 0x64),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(6, 0x68),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(7, 0x6c),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(8, 0x70),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(9, 0x74),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(10, 0x78),
-+	AT91_SAMA5D2_SIGNED_VOLTAGE_CHANNEL(11, 0x7c),
- };
- 
- static unsigned at91_adc_startup_time(unsigned startup_time_min,
-@@ -273,6 +309,38 @@ static irqreturn_t at91_adc_interrupt(int irq, void *private)
- 	return IRQ_NONE;
- }
- 
-+static int at91_adc_read_conversion_value(struct at91_adc_state *st)
-+{
-+	u32 emr;
-+	int ret;
-+
-+	/* Read EMR register and clear 'sign mode' field */
-+	emr = at91_adc_readl(st, AT91_SAMA5D2_EMR)
-+		& AT91_SAMA5D2_EMR_SIGNMODE(0);
-+	/*
-+	 * Check if the user requested a conversion on a signed or
-+	 * unsigned channel.
-+	 */
-+	if (st->chan->scan_type.sign == 's')
-+		emr |= AT91_SAMA5D2_EMR_SIGNMODE(AT91_SAMA5D2_EMR_ALL_SIGNED);
-+	else
-+		emr |= AT91_SAMA5D2_EMR_SIGNMODE(AT91_SAMA5D2_EMR_ALL_UNSIGNED);
-+
-+	at91_adc_writel(st, AT91_SAMA5D2_EMR, emr);
-+	at91_adc_writel(st, AT91_SAMA5D2_CHER, BIT(st->chan->channel));
-+	at91_adc_writel(st, AT91_SAMA5D2_IER, BIT(st->chan->channel));
-+	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_START);
-+
-+	ret = wait_event_interruptible_timeout(st->wq_data_available,
-+					       st->conversion_done,
-+					       msecs_to_jiffies(1000));
-+
-+	at91_adc_writel(st, AT91_SAMA5D2_IDR, BIT(st->chan->channel));
-+	at91_adc_writel(st, AT91_SAMA5D2_CHDR, BIT(st->chan->channel));
-+
-+	return ret;
-+}
-+
- static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 			     struct iio_chan_spec const *chan,
- 			     int *val, int *val2, long mask)
-@@ -286,13 +354,8 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 
- 		st->chan = chan;
- 
--		at91_adc_writel(st, AT91_SAMA5D2_CHER, BIT(chan->channel));
--		at91_adc_writel(st, AT91_SAMA5D2_IER, BIT(chan->channel));
--		at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_START);
-+		ret = at91_adc_read_conversion_value(st);
- 
--		ret = wait_event_interruptible_timeout(st->wq_data_available,
--						       st->conversion_done,
--						       msecs_to_jiffies(1000));
- 		if (ret == 0)
- 			ret = -ETIMEDOUT;
- 
-@@ -302,8 +365,24 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 			st->conversion_done = false;
- 		}
- 
--		at91_adc_writel(st, AT91_SAMA5D2_IDR, BIT(chan->channel));
--		at91_adc_writel(st, AT91_SAMA5D2_CHDR, BIT(chan->channel));
-+		mutex_unlock(&st->lock);
-+		return ret;
-+
-+	case IIO_CHAN_INFO_SIGNED:
-+		mutex_lock(&st->lock);
-+
-+		st->chan = chan;
-+
-+		ret = at91_adc_read_conversion_value(st);
-+
-+		if (ret == 0)
-+			ret = -ETIMEDOUT;
-+
-+		if (ret > 0) {
-+			*val = sign_extend32(st->conversion_value, 11);
-+			ret = IIO_VAL_INT;
-+			st->conversion_done = false;
-+		}
- 
- 		mutex_unlock(&st->lock);
- 		return ret;
+I've reviewed Krzysztof and looks good to me.
+
+>> [0] https://patchwork.linuxtv.org/patch/32707/
+> 
+> Thanks for the patches, I've delegated them to myself and I'm going to
+> review/apply them this week.
+>
+
+Thanks, I just noticed another similar issue in the driver now and is
+that fimc_is_parse_sensor_config() uses the same struct device_node *
+for looking up the I2C sensor, port and endpoint and thus not doing a
+of_node_put() for all the nodes on the error path.
+
+I think the right fix is to have a separate struct device_node * for
+each so their reference counter cand be incremented and decremented.
+
+> --
+> Regards,
+> Sylwester
+> 
+
+Best regards,
 -- 
-2.5.0
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
