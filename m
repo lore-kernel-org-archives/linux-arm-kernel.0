@@ -1,827 +1,365 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon,  7 Mar 2016 13:00:05 +0100
-Subject: [PATCH v3 3/3] crypto: add basic driver for the MXC SCC
-In-Reply-To: <1457352005-17457-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1457352005-17457-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1457352005-17457-3-git-send-email-s.trumtrar@pengutronix.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon,  7 Mar 2016 12:12:14 +0000
+Subject: [PATCH 1/2] arm64: dts: juno/vexpress: fix node name unit-address
+ presence warnings
+Message-ID: <1457352735-24453-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the Freescale GPL driver code, there are two different
-Security Controller (SCC) versions: SCC and SCC2.
+Commit fa38a82096a1 ("scripts/dtc: Update to upstream version
+53bf130b1cdd") added warnings on node name unit-address presence/absence
+mismatch in device trees.
 
-The SCC is found on older i.MX SoCs, e.g. the i.MX25. This is the
-version implemented and tested here.
+This patch fixes those warning on all the juno/vexpress platforms where
+unit-address is present in node name while the reg/ranges property is
+not present.
 
-As there is no publicly available documentation for this IP core,
-all information about this unit is gathered from the GPL'ed driver
-from Freescale.
-
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
-Changes in v3:
+ arch/arm64/boot/dts/arm/foundation-v8.dtsi         |  2 +-
+ arch/arm64/boot/dts/arm/juno-base.dtsi             | 14 +++++-----
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi      | 30 +++++++++++-----------
+ arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts         |  2 +-
+ arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi   | 14 +++++-----
+ .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 10 ++++----
+ 6 files changed, 36 insertions(+), 36 deletions(-)
 
-  - don't just unlock mutex in mxc_scc_ablkcipher_next, but also
-    return, too
-  - replace mutex with bool to make lockdep happy
+Hi Rob,
 
-Changes in v2:
+I am not sure if the intention of commit fa38a82096a1 is to fix even
+existing warnings or not. I saw warning with today's -next branch.
+Let me know.
 
-  - minor code cleanups
-  - mxc_scc_ablkcipher_next: complete request with error before
-    mutex_unlock
+Regards,
+Sudeep
 
- drivers/crypto/Kconfig   |   9 +
- drivers/crypto/Makefile  |   1 +
- drivers/crypto/mxc-scc.c | 748 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 758 insertions(+)
- create mode 100644 drivers/crypto/mxc-scc.c
-
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 07d494276aad..ece3e231ee4d 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -339,6 +339,15 @@ config CRYPTO_DEV_SAHARA
- 	  This option enables support for the SAHARA HW crypto accelerator
- 	  found in some Freescale i.MX chips.
+diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dtsi b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+index 9314f3943269..ba03c934a861 100644
+--- a/arch/arm64/boot/dts/arm/foundation-v8.dtsi
++++ b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+@@ -89,7 +89,7 @@
+ 			     <0 63 4>;
+ 	};
  
-+config CRYPTO_DEV_MXC_SCC
-+	tristate "Support for Freescale Security Controller (SCC)"
-+	depends on ARCH_MXC && OF
-+	select CRYPTO_BLKCIPHER
-+	select CRYPTO_DES
-+	help
-+	  This option enables support for the Security Controller (SCC)
-+	  found in Freescale i.MX25 chips.
-+
- config CRYPTO_DEV_S5P
- 	tristate "Support for Samsung S5PV210/Exynos crypto accelerator"
- 	depends on ARCH_S5PV210 || ARCH_EXYNOS
-diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
-index 713de9d11148..3c6432dd09d9 100644
---- a/drivers/crypto/Makefile
-+++ b/drivers/crypto/Makefile
-@@ -23,6 +23,7 @@ obj-$(CONFIG_CRYPTO_DEV_PICOXCELL) += picoxcell_crypto.o
- obj-$(CONFIG_CRYPTO_DEV_PPC4XX) += amcc/
- obj-$(CONFIG_CRYPTO_DEV_S5P) += s5p-sss.o
- obj-$(CONFIG_CRYPTO_DEV_SAHARA) += sahara.o
-+obj-$(CONFIG_CRYPTO_DEV_MXC_SCC) += mxc-scc.o
- obj-$(CONFIG_CRYPTO_DEV_TALITOS) += talitos.o
- obj-$(CONFIG_CRYPTO_DEV_UX500) += ux500/
- obj-$(CONFIG_CRYPTO_DEV_QAT) += qat/
-diff --git a/drivers/crypto/mxc-scc.c b/drivers/crypto/mxc-scc.c
-new file mode 100644
-index 000000000000..d37c3a820063
---- /dev/null
-+++ b/drivers/crypto/mxc-scc.c
-@@ -0,0 +1,748 @@
-+/*
-+ * Copyright (C) 2016 Pengutronix, Steffen Trumtrar <kernel@pengutronix.de>
-+ *
-+ * The driver is based on information gathered from
-+ * drivers/mxc/security/mxc_scc.c which can be found in
-+ * the Freescale linux-2.6-imx.git in the imx_2.6.35_maintain branch.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/clk.h>
-+#include <linux/crypto.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+
-+#include <crypto/algapi.h>
-+#include <crypto/des.h>
-+
-+/* Secure Memory (SCM) registers */
-+#define SCC_SCM_RED_START		0x0000
-+#define SCC_SCM_BLACK_START		0x0004
-+#define SCC_SCM_LENGTH			0x0008
-+#define SCC_SCM_CTRL			0x000C
-+#define SCC_SCM_STATUS			0x0010
-+#define SCC_SCM_ERROR_STATUS		0x0014
-+#define SCC_SCM_INTR_CTRL		0x0018
-+#define SCC_SCM_CFG			0x001C
-+#define SCC_SCM_INIT_VECTOR_0		0x0020
-+#define SCC_SCM_INIT_VECTOR_1		0x0024
-+#define SCC_SCM_RED_MEMORY		0x0400
-+#define SCC_SCM_BLACK_MEMORY		0x0800
-+
-+/* Security Monitor (SMN) Registers */
-+#define SCC_SMN_STATUS			0x1000
-+#define SCC_SMN_COMMAND		0x1004
-+#define SCC_SMN_SEQ_START		0x1008
-+#define SCC_SMN_SEQ_END		0x100C
-+#define SCC_SMN_SEQ_CHECK		0x1010
-+#define SCC_SMN_BIT_COUNT		0x1014
-+#define SCC_SMN_BITBANK_INC_SIZE	0x1018
-+#define SCC_SMN_BITBANK_DECREMENT	0x101C
-+#define SCC_SMN_COMPARE_SIZE		0x1020
-+#define SCC_SMN_PLAINTEXT_CHECK	0x1024
-+#define SCC_SMN_CIPHERTEXT_CHECK	0x1028
-+#define SCC_SMN_TIMER_IV		0x102C
-+#define SCC_SMN_TIMER_CONTROL		0x1030
-+#define SCC_SMN_DEBUG_DETECT_STAT	0x1034
-+#define SCC_SMN_TIMER			0x1038
-+
-+#define SCC_SCM_CTRL_START_CIPHER	BIT(2)
-+#define SCC_SCM_CTRL_CBC_MODE		BIT(1)
-+#define SCC_SCM_CTRL_DECRYPT_MODE	BIT(0)
-+
-+#define SCC_SCM_STATUS_LEN_ERR		BIT(12)
-+#define SCC_SCM_STATUS_SMN_UNBLOCKED	BIT(11)
-+#define SCC_SCM_STATUS_CIPHERING_DONE	BIT(10)
-+#define SCC_SCM_STATUS_ZEROIZING_DONE	BIT(9)
-+#define SCC_SCM_STATUS_INTR_STATUS	BIT(8)
-+#define SCC_SCM_STATUS_SEC_KEY		BIT(7)
-+#define SCC_SCM_STATUS_INTERNAL_ERR	BIT(6)
-+#define SCC_SCM_STATUS_BAD_SEC_KEY	BIT(5)
-+#define SCC_SCM_STATUS_ZEROIZE_FAIL	BIT(4)
-+#define SCC_SCM_STATUS_SMN_BLOCKED	BIT(3)
-+#define SCC_SCM_STATUS_CIPHERING	BIT(2)
-+#define SCC_SCM_STATUS_ZEROIZING	BIT(1)
-+#define SCC_SCM_STATUS_BUSY		BIT(0)
-+
-+#define SCC_SMN_STATUS_STATE_MASK	0x0000001F
-+#define SCC_SMN_STATE_START		0x0
-+/* The SMN is zeroizing its RAM during reset */
-+#define SCC_SMN_STATE_ZEROIZE_RAM	0x5
-+/* SMN has passed internal checks */
-+#define SCC_SMN_STATE_HEALTH_CHECK	0x6
-+/* Fatal Security Violation. SMN is locked, SCM is inoperative. */
-+#define SCC_SMN_STATE_FAIL		0x9
-+/* SCC is in secure state. SCM is using secret key. */
-+#define SCC_SMN_STATE_SECURE		0xA
-+/* SCC is not secure. SCM is using default key. */
-+#define SCC_SMN_STATE_NON_SECURE	0xC
-+
-+#define SCC_SCM_INTR_CTRL_ZEROIZE_MEM	BIT(2)
-+#define SCC_SCM_INTR_CTRL_CLR_INTR	BIT(1)
-+#define SCC_SCM_INTR_CTRL_MASK_INTR	BIT(0)
-+
-+/* Size, in blocks, of Red memory. */
-+#define SCC_SCM_CFG_BLACK_SIZE_MASK	0x07fe0000
-+#define SCC_SCM_CFG_BLACK_SIZE_SHIFT	17
-+/* Size, in blocks, of Black memory. */
-+#define SCC_SCM_CFG_RED_SIZE_MASK	0x0001ff80
-+#define SCC_SCM_CFG_RED_SIZE_SHIFT	7
-+/* Number of bytes per block. */
-+#define SCC_SCM_CFG_BLOCK_SIZE_MASK	0x0000007f
-+
-+#define SCC_SMN_COMMAND_TAMPER_LOCK	BIT(4)
-+#define SCC_SMN_COMMAND_CLR_INTR	BIT(3)
-+#define SCC_SMN_COMMAND_CLR_BIT_BANK	BIT(2)
-+#define SCC_SMN_COMMAND_EN_INTR	BIT(1)
-+#define SCC_SMN_COMMAND_SET_SOFTWARE_ALARM  BIT(0)
-+
-+#define SCC_KEY_SLOTS			20
-+#define SCC_MAX_KEY_SIZE		32
-+#define SCC_KEY_SLOT_SIZE		32
-+
-+#define SCC_CRC_CCITT_START		0xFFFF
-+
-+/*
-+ * Offset into each RAM of the base of the area which is not
-+ * used for Stored Keys.
-+ */
-+#define SCC_NON_RESERVED_OFFSET	(SCC_KEY_SLOTS * SCC_KEY_SLOT_SIZE)
-+
-+/* Fixed padding for appending to plaintext to fill out a block */
-+static char scc_block_padding[8] = { 0x80, 0, 0, 0, 0, 0, 0, 0 };
-+
-+enum mxc_scc_state {
-+	SCC_STATE_OK,
-+	SCC_STATE_UNIMPLEMENTED,
-+	SCC_STATE_FAILED
-+};
-+
-+struct mxc_scc {
-+	struct device		*dev;
-+	void __iomem		*base;
-+	struct clk		*clk;
-+	bool			hw_busy;
-+	spinlock_t		lock;
-+	struct crypto_queue	queue;
-+	struct crypto_async_request *req;
-+	int			block_size_bytes;
-+	int			black_ram_size_blocks;
-+	int			memory_size_bytes;
-+	int			bytes_remaining;
-+
-+	void __iomem		*red_memory;
-+	void __iomem		*black_memory;
-+};
-+
-+struct mxc_scc_ctx {
-+	struct mxc_scc		*scc;
-+	struct scatterlist	*sg_src;
-+	size_t			src_nents;
-+	struct scatterlist	*sg_dst;
-+	size_t			dst_nents;
-+	unsigned int		offset;
-+	unsigned int		size;
-+	unsigned int		ctrl;
-+};
-+
-+struct mxc_scc_crypto_tmpl {
-+	struct mxc_scc *scc;
-+	struct crypto_alg alg;
-+};
-+
-+static int mxc_scc_get_data(struct mxc_scc_ctx *ctx,
-+			    struct crypto_async_request *req)
-+{
-+	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
-+	struct mxc_scc *scc = ctx->scc;
-+	size_t len;
-+	void __iomem *from;
-+
-+	if (ctx->ctrl & SCC_SCM_CTRL_DECRYPT_MODE)
-+		from = scc->red_memory;
-+	else
-+		from = scc->black_memory;
-+
-+	dev_dbg(scc->dev, "pcopy: from 0x%p %d bytes\n", from,
-+		ctx->dst_nents * 8);
-+	len = sg_pcopy_from_buffer(ablkreq->dst, ctx->dst_nents,
-+				   from, ctx->size, ctx->offset);
-+	if (!len) {
-+		dev_err(scc->dev, "pcopy err from 0x%p (len=%d)\n", from, len);
-+		return -EINVAL;
-+	}
-+
-+#ifdef DEBUG
-+	print_hex_dump(KERN_ERR,
-+		       "red memory@"__stringify(__LINE__)": ",
-+		       DUMP_PREFIX_ADDRESS, 16, 4,
-+		       scc->red_memory, ctx->size, 1);
-+	print_hex_dump(KERN_ERR,
-+		       "black memory@"__stringify(__LINE__)": ",
-+		       DUMP_PREFIX_ADDRESS, 16, 4,
-+		       scc->black_memory, ctx->size, 1);
-+#endif
-+
-+	ctx->offset += len;
-+
-+	if (ctx->offset < ablkreq->nbytes)
-+		return -EINPROGRESS;
-+
-+	return 0;
-+}
-+
-+static int mxc_scc_ablkcipher_req_init(struct ablkcipher_request *req,
-+				       struct mxc_scc_ctx *ctx)
-+{
-+	struct mxc_scc *scc = ctx->scc;
-+
-+	ctx->src_nents = sg_nents_for_len(req->src, req->nbytes);
-+	if (ctx->src_nents < 0) {
-+		dev_err(scc->dev, "Invalid number of src SC");
-+		return ctx->src_nents;
-+	}
-+
-+	ctx->dst_nents = sg_nents_for_len(req->dst, req->nbytes);
-+	if (ctx->dst_nents < 0) {
-+		dev_err(scc->dev, "Invalid number of dst SC");
-+		return ctx->dst_nents;
-+	}
-+
-+	ctx->size = 0;
-+	ctx->offset = 0;
-+
-+	return 0;
-+}
-+
-+static int mxc_scc_put_data(struct mxc_scc_ctx *ctx,
-+			     struct ablkcipher_request *req)
-+{
-+	u8 padding_buffer[sizeof(u16) + sizeof(scc_block_padding)];
-+	size_t len = min_t(size_t, req->nbytes - ctx->offset,
-+			   ctx->scc->bytes_remaining);
-+	unsigned int padding_byte_count = 0;
-+	struct mxc_scc *scc = ctx->scc;
-+	void __iomem *to;
-+
-+	if (ctx->ctrl & SCC_SCM_CTRL_DECRYPT_MODE)
-+		to = scc->black_memory;
-+	else
-+		to = scc->red_memory;
-+
-+	if (ctx->ctrl & SCC_SCM_CTRL_CBC_MODE && req->info)
-+		memcpy(scc->base + SCC_SCM_INIT_VECTOR_0, req->info,
-+		       scc->block_size_bytes);
-+
-+	len = sg_pcopy_to_buffer(req->src, ctx->src_nents,
-+				 to, len, ctx->offset);
-+	if (!len) {
-+		dev_err(scc->dev, "pcopy err to 0x%p (len=%d)\n", to, len);
-+		return -EINVAL;
-+	}
-+
-+	ctx->size = len;
-+
-+#ifdef DEBUG
-+	dev_dbg(scc->dev, "copied %d bytes to 0x%p\n", len, to);
-+	print_hex_dump(KERN_ERR,
-+		       "init vector0@"__stringify(__LINE__)": ",
-+		       DUMP_PREFIX_ADDRESS, 16, 4,
-+		       scc->base + SCC_SCM_INIT_VECTOR_0, scc->block_size_bytes,
-+		       1);
-+	print_hex_dump(KERN_ERR,
-+		       "red memory@"__stringify(__LINE__)": ",
-+		       DUMP_PREFIX_ADDRESS, 16, 4,
-+		       scc->red_memory, ctx->size, 1);
-+	print_hex_dump(KERN_ERR,
-+		       "black memory@"__stringify(__LINE__)": ",
-+		       DUMP_PREFIX_ADDRESS, 16, 4,
-+		       scc->black_memory, ctx->size, 1);
-+#endif
-+
-+	scc->bytes_remaining -= len;
-+
-+	padding_byte_count = len % scc->block_size_bytes;
-+
-+	if (padding_byte_count) {
-+		memcpy(padding_buffer, scc_block_padding, padding_byte_count);
-+		memcpy(to + len, padding_buffer, padding_byte_count);
-+		ctx->size += padding_byte_count;
-+	}
-+
-+#ifdef DEBUG
-+	print_hex_dump(KERN_ERR,
-+		       "data to encrypt@"__stringify(__LINE__)": ",
-+		       DUMP_PREFIX_ADDRESS, 16, 4,
-+		       to, ctx->size, 1);
-+#endif
-+
-+	return 0;
-+}
-+
-+static void mxc_scc_ablkcipher_next(struct mxc_scc_ctx *ctx,
-+				    struct crypto_async_request *req)
-+{
-+	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
-+	struct mxc_scc *scc = ctx->scc;
-+	int err;
-+
-+	dev_dbg(scc->dev, "dispatch request (nbytes=%d, src=%p, dst=%p)\n",
-+		ablkreq->nbytes, ablkreq->src, ablkreq->dst);
-+
-+	writel(0, scc->base + SCC_SCM_ERROR_STATUS);
-+
-+	err = mxc_scc_put_data(ctx, ablkreq);
-+	if (err) {
-+		scc->req = NULL;
-+		req->complete(req, err);
-+		scc->hw_busy = false;
-+		return;
-+	}
-+
-+	dev_dbg(scc->dev, "Start encryption (0x%p/0x%p)\n",
-+		(void *)readl(scc->base + SCC_SCM_RED_START),
-+		(void *)readl(scc->base + SCC_SCM_BLACK_START));
-+
-+	/* clear interrupt control registers */
-+	writel(SCC_SCM_INTR_CTRL_CLR_INTR,
-+	       scc->base + SCC_SCM_INTR_CTRL);
-+
-+	writel((ctx->size / ctx->scc->block_size_bytes) - 1,
-+	       scc->base + SCC_SCM_LENGTH);
-+
-+	dev_dbg(scc->dev, "Process %d block(s) in 0x%p\n",
-+		ctx->size / ctx->scc->block_size_bytes,
-+		(ctx->ctrl & SCC_SCM_CTRL_DECRYPT_MODE) ? scc->black_memory :
-+		scc->red_memory);
-+
-+	writel(ctx->ctrl, scc->base + SCC_SCM_CTRL);
-+}
-+
-+static irqreturn_t mxc_scc_int(int irq, void *priv)
-+{
-+	struct crypto_async_request *req;
-+	struct mxc_scc_ctx *ctx;
-+	struct mxc_scc *scc = priv;
-+	int status;
-+	int ret;
-+
-+	status = readl(scc->base + SCC_SCM_STATUS);
-+
-+	/* clear interrupt control registers */
-+	writel(SCC_SCM_INTR_CTRL_CLR_INTR, scc->base + SCC_SCM_INTR_CTRL);
-+
-+	if (status & SCC_SCM_STATUS_BUSY)
-+		return IRQ_NONE;
-+
-+	req = scc->req;
-+	if (req) {
-+		ctx = crypto_tfm_ctx(req->tfm);
-+		ret = mxc_scc_get_data(ctx, req);
-+		if (ret != -EINPROGRESS) {
-+			scc->req = NULL;
-+			scc->bytes_remaining = scc->memory_size_bytes;
-+			req->complete(req, ret);
-+			scc->hw_busy = false;
-+		} else {
-+			mxc_scc_ablkcipher_next(ctx, req);
-+		}
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int mxc_scc_cra_init(struct crypto_tfm *tfm)
-+{
-+	struct mxc_scc_ctx *ctx = crypto_tfm_ctx(tfm);
-+	struct crypto_alg *alg = tfm->__crt_alg;
-+	struct mxc_scc_crypto_tmpl *algt;
-+
-+	algt = container_of(alg, struct mxc_scc_crypto_tmpl, alg);
-+
-+	ctx->scc = algt->scc;
-+	return 0;
-+}
-+
-+static void mxc_scc_dequeue_req_unlocked(struct mxc_scc_ctx *ctx)
-+{
-+	struct crypto_async_request *req, *backlog;
-+
-+	if (ctx->scc->hw_busy)
-+		return;
-+
-+	spin_lock_bh(&ctx->scc->lock);
-+	backlog = crypto_get_backlog(&ctx->scc->queue);
-+	req = crypto_dequeue_request(&ctx->scc->queue);
-+	ctx->scc->req = req;
-+	ctx->scc->hw_busy = true;
-+	spin_unlock_bh(&ctx->scc->lock);
-+
-+	if (!req)
-+		return;
-+
-+	if (backlog)
-+		backlog->complete(backlog, -EINPROGRESS);
-+
-+	mxc_scc_ablkcipher_next(ctx, req);
-+}
-+
-+static int mxc_scc_queue_req(struct mxc_scc_ctx *ctx,
-+			     struct crypto_async_request *req)
-+{
-+	int ret;
-+
-+	spin_lock_bh(&ctx->scc->lock);
-+	ret = crypto_enqueue_request(&ctx->scc->queue, req);
-+	spin_unlock_bh(&ctx->scc->lock);
-+
-+	if (ret != -EINPROGRESS)
-+		return ret;
-+
-+	mxc_scc_dequeue_req_unlocked(ctx);
-+
-+	return -EINPROGRESS;
-+}
-+
-+static int mxc_scc_des3_op(struct mxc_scc_ctx *ctx,
-+			   struct ablkcipher_request *req)
-+{
-+	int err;
-+
-+	err = mxc_scc_ablkcipher_req_init(req, ctx);
-+	if (err)
-+		return err;
-+
-+	return mxc_scc_queue_req(ctx, &req->base);
-+}
-+
-+static int mxc_scc_ecb_des_encrypt(struct ablkcipher_request *req)
-+{
-+	struct crypto_ablkcipher *cipher = crypto_ablkcipher_reqtfm(req);
-+	struct mxc_scc_ctx *ctx = crypto_ablkcipher_ctx(cipher);
-+
-+	ctx->ctrl = SCC_SCM_CTRL_START_CIPHER;
-+
-+	return mxc_scc_des3_op(ctx, req);
-+}
-+
-+static int mxc_scc_ecb_des_decrypt(struct ablkcipher_request *req)
-+{
-+	struct crypto_ablkcipher *cipher = crypto_ablkcipher_reqtfm(req);
-+	struct mxc_scc_ctx *ctx = crypto_ablkcipher_ctx(cipher);
-+
-+	ctx->ctrl = SCC_SCM_CTRL_START_CIPHER;
-+	ctx->ctrl |= SCC_SCM_CTRL_DECRYPT_MODE;
-+
-+	return mxc_scc_des3_op(ctx, req);
-+}
-+
-+static int mxc_scc_cbc_des_encrypt(struct ablkcipher_request *req)
-+{
-+	struct crypto_ablkcipher *cipher = crypto_ablkcipher_reqtfm(req);
-+	struct mxc_scc_ctx *ctx = crypto_ablkcipher_ctx(cipher);
-+
-+	ctx->ctrl = SCC_SCM_CTRL_START_CIPHER;
-+	ctx->ctrl |= SCC_SCM_CTRL_CBC_MODE;
-+
-+	return mxc_scc_des3_op(ctx, req);
-+}
-+
-+static int mxc_scc_cbc_des_decrypt(struct ablkcipher_request *req)
-+{
-+	struct crypto_ablkcipher *cipher = crypto_ablkcipher_reqtfm(req);
-+	struct mxc_scc_ctx *ctx = crypto_ablkcipher_ctx(cipher);
-+
-+	ctx->ctrl = SCC_SCM_CTRL_START_CIPHER;
-+	ctx->ctrl |= SCC_SCM_CTRL_CBC_MODE;
-+	ctx->ctrl |= SCC_SCM_CTRL_DECRYPT_MODE;
-+
-+	return mxc_scc_des3_op(ctx, req);
-+}
-+
-+static void mxc_scc_hw_init(struct mxc_scc *scc)
-+{
-+	int offset;
-+
-+	offset = SCC_NON_RESERVED_OFFSET / scc->block_size_bytes;
-+
-+	/* Fill the RED_START register */
-+	writel(offset, scc->base + SCC_SCM_RED_START);
-+
-+	/* Fill the BLACK_START register */
-+	writel(offset, scc->base + SCC_SCM_BLACK_START);
-+
-+	scc->red_memory = scc->base + SCC_SCM_RED_MEMORY +
-+			  SCC_NON_RESERVED_OFFSET;
-+
-+	scc->black_memory = scc->base + SCC_SCM_BLACK_MEMORY +
-+			    SCC_NON_RESERVED_OFFSET;
-+
-+	scc->bytes_remaining = scc->memory_size_bytes;
-+}
-+
-+static int mxc_scc_get_config(struct mxc_scc *scc)
-+{
-+	int config;
-+
-+	config = readl(scc->base + SCC_SCM_CFG);
-+
-+	scc->block_size_bytes = config & SCC_SCM_CFG_BLOCK_SIZE_MASK;
-+
-+	scc->black_ram_size_blocks = config & SCC_SCM_CFG_BLACK_SIZE_MASK;
-+
-+	scc->memory_size_bytes = (scc->block_size_bytes *
-+				  scc->black_ram_size_blocks) -
-+				  SCC_NON_RESERVED_OFFSET;
-+
-+	return 0;
-+}
-+
-+static enum mxc_scc_state mxc_scc_get_state(struct mxc_scc *scc)
-+{
-+	enum mxc_scc_state state;
-+	int status;
-+
-+	status = readl(scc->base + SCC_SMN_STATUS) &
-+		       SCC_SMN_STATUS_STATE_MASK;
-+
-+	/* If in Health Check, try to bringup to secure state */
-+	if (status & SCC_SMN_STATE_HEALTH_CHECK) {
-+		/*
-+		 * Write a simple algorithm to the Algorithm Sequence
-+		 * Checker (ASC)
-+		 */
-+		writel(0xaaaa, scc->base + SCC_SMN_SEQ_START);
-+		writel(0x5555, scc->base + SCC_SMN_SEQ_END);
-+		writel(0x5555, scc->base + SCC_SMN_SEQ_CHECK);
-+
-+		status = readl(scc->base + SCC_SMN_STATUS) &
-+			       SCC_SMN_STATUS_STATE_MASK;
-+	}
-+
-+	switch (status) {
-+	case SCC_SMN_STATE_NON_SECURE:
-+	case SCC_SMN_STATE_SECURE:
-+		state = SCC_STATE_OK;
-+		break;
-+	case SCC_SMN_STATE_FAIL:
-+		state = SCC_STATE_FAILED;
-+		break;
-+	default:
-+		state = SCC_STATE_UNIMPLEMENTED;
-+		break;
-+	}
-+
-+	return state;
-+}
-+
-+static struct mxc_scc_crypto_tmpl scc_ecb_des = {
-+	.alg = {
-+		.cra_name = "ecb(des3_ede)",
-+		.cra_driver_name = "ecb-des3-scc",
-+		.cra_priority = 300,
-+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
-+		.cra_blocksize = DES3_EDE_BLOCK_SIZE,
-+		.cra_ctxsize = sizeof(struct mxc_scc_ctx),
-+		.cra_alignmask = 0,
-+		.cra_type = &crypto_ablkcipher_type,
-+		.cra_module = THIS_MODULE,
-+		.cra_init = mxc_scc_cra_init,
-+		.cra_u.ablkcipher = {
-+			.min_keysize = DES3_EDE_KEY_SIZE,
-+			.max_keysize = DES3_EDE_KEY_SIZE,
-+			.encrypt = mxc_scc_ecb_des_encrypt,
-+			.decrypt = mxc_scc_ecb_des_decrypt,
-+		}
-+	}
-+};
-+
-+static struct mxc_scc_crypto_tmpl scc_cbc_des = {
-+	.alg = {
-+		.cra_name = "cbc(des3_ede)",
-+		.cra_driver_name = "cbc-des3-scc",
-+		.cra_priority = 300,
-+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER,
-+		.cra_blocksize = DES3_EDE_BLOCK_SIZE,
-+		.cra_ctxsize = sizeof(struct mxc_scc_ctx),
-+		.cra_alignmask = 0,
-+		.cra_type = &crypto_ablkcipher_type,
-+		.cra_module = THIS_MODULE,
-+		.cra_init = mxc_scc_cra_init,
-+		.cra_u.ablkcipher = {
-+			.min_keysize = DES3_EDE_KEY_SIZE,
-+			.max_keysize = DES3_EDE_KEY_SIZE,
-+			.encrypt = mxc_scc_cbc_des_encrypt,
-+			.decrypt = mxc_scc_cbc_des_decrypt,
-+		}
-+	}
-+};
-+
-+static struct mxc_scc_crypto_tmpl *scc_crypto_algs[] = {
-+	&scc_ecb_des,
-+	&scc_cbc_des,
-+};
-+
-+static int mxc_scc_crypto_register(struct mxc_scc *scc)
-+{
-+	unsigned int i;
-+	int err = 0;
-+
-+	for (i = 0; i < ARRAY_SIZE(scc_crypto_algs); i++) {
-+		scc_crypto_algs[i]->scc = scc;
-+		err = crypto_register_alg(&scc_crypto_algs[i]->alg);
-+		if (err)
-+			goto err_out;
-+	}
-+
-+	return 0;
-+
-+err_out:
-+	for (; i > 0; i--)
-+		crypto_unregister_alg(&scc_crypto_algs[i]->alg);
-+
-+	return err;
-+}
-+
-+static void mxc_scc_crypto_unregister(void)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(scc_crypto_algs); i++)
-+		crypto_unregister_alg(&scc_crypto_algs[i]->alg);
-+}
-+
-+static int mxc_scc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct mxc_scc *scc;
-+	enum mxc_scc_state state;
-+	int irq;
-+	int ret;
-+	int i;
-+
-+	scc = devm_kzalloc(dev, sizeof(*scc), GFP_KERNEL);
-+	if (!scc)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	scc->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(scc->base))
-+		return PTR_ERR(scc->base);
-+
-+	scc->clk = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(scc->clk)) {
-+		dev_err(dev, "Could not get ipg clock\n");
-+		return PTR_ERR(scc->clk);
-+	}
-+
-+	clk_prepare_enable(scc->clk);
-+
-+	/* clear error status register */
-+	writel(0x0, scc->base + SCC_SCM_ERROR_STATUS);
-+
-+	/* clear interrupt control registers */
-+	writel(SCC_SCM_INTR_CTRL_CLR_INTR |
-+	       SCC_SCM_INTR_CTRL_MASK_INTR,
-+	       scc->base + SCC_SCM_INTR_CTRL);
-+
-+	writel(SCC_SMN_COMMAND_CLR_INTR |
-+	       SCC_SMN_COMMAND_EN_INTR,
-+	       scc->base + SCC_SMN_COMMAND);
-+
-+	scc->dev = dev;
-+	platform_set_drvdata(pdev, scc);
-+
-+	ret = mxc_scc_get_config(scc);
-+	if (ret)
-+		goto err_out;
-+
-+	state = mxc_scc_get_state(scc);
-+
-+	if (state != SCC_STATE_OK) {
-+		dev_err(dev, "SCC in unusable state %d\n", state);
-+		ret = -EINVAL;
-+		goto err_out;
-+	}
-+
-+	mxc_scc_hw_init(scc);
-+
-+	spin_lock_init(&scc->lock);
-+	/* FIXME: calculate queue from RAM slots */
-+	crypto_init_queue(&scc->queue, 50);
-+
-+	for (i = 0; i < 2; i++) {
-+		irq = platform_get_irq(pdev, i);
-+		if (irq < 0) {
-+			dev_err(dev, "failed to get irq resource\n");
-+			ret = -EINVAL;
-+			goto err_out;
-+		}
-+
-+		ret = devm_request_threaded_irq(dev, irq, NULL, mxc_scc_int,
-+						IRQF_ONESHOT, dev_name(dev), scc);
-+		if (ret)
-+			goto err_out;
-+	}
-+
-+	ret = mxc_scc_crypto_register(scc);
-+	if (ret) {
-+		dev_err(dev, "could not register algorithms");
-+		goto err_out;
-+	}
-+
-+	dev_info(dev, "registered successfully.\n");
-+
-+	return 0;
-+
-+err_out:
-+	clk_disable_unprepare(scc->clk);
-+
-+	return ret;
-+}
-+
-+static int mxc_scc_remove(struct platform_device *pdev)
-+{
-+	struct mxc_scc *scc = platform_get_drvdata(pdev);
-+
-+	mxc_scc_crypto_unregister();
-+
-+	clk_disable_unprepare(scc->clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mxc_scc_dt_ids[] = {
-+	{ .compatible = "fsl,imx25-scc", .data = NULL, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxc_scc_dt_ids);
-+
-+static struct platform_driver mxc_scc_driver = {
-+	.probe	= mxc_scc_probe,
-+	.remove	= mxc_scc_remove,
-+	.driver	= {
-+		.name		= "mxc-scc",
-+		.of_match_table	= mxc_scc_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(mxc_scc_driver);
-+MODULE_AUTHOR("Steffen Trumtrar <kernel@pengutronix.de>");
-+MODULE_DESCRIPTION("Freescale i.MX25 SCC Crypto driver");
-+MODULE_LICENSE("GPL v2");
+-	smb {
++	smb at 0,08000000 {
+ 		compatible = "arm,vexpress,v2m-p1", "simple-bus";
+ 		arm,v2m-memory-map = "rs1";
+ 		#address-cells = <2>; /* SMB chipselect number and offset */
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index 4b6172b0f2cb..3841e82fa6f8 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -105,13 +105,13 @@
+ 		clocks {
+ 			compatible = "arm,scpi-clocks";
+ 
+-			scpi_dvfs: scpi_clocks at 0 {
++			scpi_dvfs: scpi-clocks-0 {
+ 				compatible = "arm,scpi-dvfs-clocks";
+ 				#clock-cells = <1>;
+ 				clock-indices = <0>, <1>, <2>;
+ 				clock-output-names = "atlclk", "aplclk","gpuclk";
+ 			};
+-			scpi_clk: scpi_clocks at 3 {
++			scpi_clk: scpi-clocks-1 {
+ 				compatible = "arm,scpi-variable-clocks";
+ 				#clock-cells = <1>;
+ 				clock-indices = <3>;
+@@ -154,7 +154,7 @@
+ 		clock-names = "pxlclk";
+ 
+ 		port {
+-			hdlcd1_output: endpoint at 0 {
++			hdlcd1_output: endpoint0 {
+ 				remote-endpoint = <&tda998x_1_input>;
+ 			};
+ 		};
+@@ -168,7 +168,7 @@
+ 		clock-names = "pxlclk";
+ 
+ 		port {
+-			hdlcd0_output: endpoint at 0 {
++			hdlcd0_output: endpoint0 {
+ 				remote-endpoint = <&tda998x_0_input>;
+ 			};
+ 		};
+@@ -196,7 +196,7 @@
+ 			compatible = "nxp,tda998x";
+ 			reg = <0x70>;
+ 			port {
+-				tda998x_0_input: endpoint at 0 {
++				tda998x_0_input: endpoint0 {
+ 					remote-endpoint = <&hdlcd0_output>;
+ 				};
+ 			};
+@@ -206,7 +206,7 @@
+ 			compatible = "nxp,tda998x";
+ 			reg = <0x71>;
+ 			port {
+-				tda998x_1_input: endpoint at 0 {
++				tda998x_1_input: endpoint0 {
+ 					remote-endpoint = <&hdlcd1_output>;
+ 				};
+ 			};
+@@ -243,7 +243,7 @@
+ 		      <0x00000008 0x80000000 0x1 0x80000000>;
+ 	};
+ 
+-	smb {
++	smb at 0,08000000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+ 		#size-cells = <1>;
+diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+index 413f1b9ebcd4..3d4af126df6e 100644
+--- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+@@ -46,7 +46,7 @@
+ 			arm,vexpress,site = <0>;
+ 			arm,v2m-memory-map = "rs1";
+ 
+-			mb_fixed_3v3: fixedregulator at 0 {
++			mb_fixed_3v3: fixedregulator0 {
+ 				compatible = "regulator-fixed";
+ 				regulator-name = "MCC_SB_3V3";
+ 				regulator-min-microvolt = <3300000>;
+@@ -59,42 +59,42 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 
+-				button at 1 {
++				button1 {
+ 					debounce_interval = <50>;
+ 					wakeup-source;
+ 					linux,code = <116>;
+ 					label = "POWER";
+ 					gpios = <&iofpga_gpio0 0 0x4>;
+ 				};
+-				button at 2 {
++				button2 {
+ 					debounce_interval = <50>;
+ 					wakeup-source;
+ 					linux,code = <102>;
+ 					label = "HOME";
+ 					gpios = <&iofpga_gpio0 1 0x4>;
+ 				};
+-				button at 3 {
++				button3 {
+ 					debounce_interval = <50>;
+ 					wakeup-source;
+ 					linux,code = <152>;
+ 					label = "RLOCK";
+ 					gpios = <&iofpga_gpio0 2 0x4>;
+ 				};
+-				button at 4 {
++				button4 {
+ 					debounce_interval = <50>;
+ 					wakeup-source;
+ 					linux,code = <115>;
+ 					label = "VOL+";
+ 					gpios = <&iofpga_gpio0 3 0x4>;
+ 				};
+-				button at 5 {
++				button5 {
+ 					debounce_interval = <50>;
+ 					wakeup-source;
+ 					linux,code = <114>;
+ 					label = "VOL-";
+ 					gpios = <&iofpga_gpio0 4 0x4>;
+ 				};
+-				button at 6 {
++				button6 {
+ 					debounce_interval = <50>;
+ 					wakeup-source;
+ 					linux,code = <99>;
+@@ -159,7 +159,7 @@
+ 					compatible = "syscon", "simple-mfd";
+ 					reg = <0x010000 0x1000>;
+ 
+-					led at 08.0 {
++					led0 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x01>;
+@@ -167,7 +167,7 @@
+ 						linux,default-trigger = "heartbeat";
+ 						default-state = "on";
+ 					};
+-					led at 08.1 {
++					led1 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x02>;
+@@ -175,7 +175,7 @@
+ 						linux,default-trigger = "mmc0";
+ 						default-state = "off";
+ 					};
+-					led at 08.2 {
++					led2 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x04>;
+@@ -183,7 +183,7 @@
+ 						linux,default-trigger = "cpu0";
+ 						default-state = "off";
+ 					};
+-					led at 08.3 {
++					led3 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x08>;
+@@ -191,7 +191,7 @@
+ 						linux,default-trigger = "cpu1";
+ 						default-state = "off";
+ 					};
+-					led at 08.4 {
++					led4 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x10>;
+@@ -199,7 +199,7 @@
+ 						linux,default-trigger = "cpu2";
+ 						default-state = "off";
+ 					};
+-					led at 08.5 {
++					led5 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x20>;
+@@ -207,14 +207,14 @@
+ 						linux,default-trigger = "cpu3";
+ 						default-state = "off";
+ 					};
+-					led at 08.6 {
++					led6 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x40>;
+ 						label = "vexpress:6";
+ 						default-state = "off";
+ 					};
+-					led at 08.7 {
++					led7 {
+ 						compatible = "register-bit-led";
+ 						offset = <0x08>;
+ 						mask = <0x80>;
+diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+index 20addabbd127..0d0df795809c 100644
+--- a/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
++++ b/arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+@@ -104,7 +104,7 @@
+ 			     <0 63 4>;
+ 	};
+ 
+-	smb {
++	smb at 0,08000000 {
+ 		compatible = "simple-bus";
+ 
+ 		#address-cells = <2>;
+diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
+index 88a7583ed7a7..09d97e1a8948 100644
+--- a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
+@@ -226,7 +226,7 @@
+ 			};
+ 		};
+ 
+-		v2m_fixed_3v3: fixedregulator at 0 {
++		v2m_fixed_3v3: fixedregulator {
+ 			compatible = "regulator-fixed";
+ 			regulator-name = "3V3";
+ 			regulator-min-microvolt = <3300000>;
+@@ -238,7 +238,7 @@
+ 			compatible = "arm,vexpress,config-bus";
+ 			arm,vexpress,config-bridge = <&v2m_sysreg>;
+ 
+-			v2m_oscclk1: osc at 1 {
++			v2m_oscclk1: osc {
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+@@ -247,27 +247,27 @@
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+ 
+-			reset at 0 {
++			reset {
+ 				compatible = "arm,vexpress-reset";
+ 				arm,vexpress-sysreg,func = <5 0>;
+ 			};
+ 
+-			muxfpga at 0 {
++			muxfpga {
+ 				compatible = "arm,vexpress-muxfpga";
+ 				arm,vexpress-sysreg,func = <7 0>;
+ 			};
+ 
+-			shutdown at 0 {
++			shutdown {
+ 				compatible = "arm,vexpress-shutdown";
+ 				arm,vexpress-sysreg,func = <8 0>;
+ 			};
+ 
+-			reboot at 0 {
++			reboot {
+ 				compatible = "arm,vexpress-reboot";
+ 				arm,vexpress-sysreg,func = <9 0>;
+ 			};
+ 
+-			dvimode at 0 {
++			dvimode {
+ 				compatible = "arm,vexpress-dvimode";
+ 				arm,vexpress-sysreg,func = <11 0>;
+ 			};
+diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+index bb3c26d1154d..00024be0c9b0 100644
+--- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
++++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+@@ -93,7 +93,7 @@
+ 		compatible = "arm,vexpress,config-bus";
+ 		arm,vexpress,config-bridge = <&v2m_sysreg>;
+ 
+-		smbclk: osc at 4 {
++		smbclk: osc4 {
+ 			/* SMC clock */
+ 			compatible = "arm,vexpress-osc";
+ 			arm,vexpress-sysreg,func = <1 4>;
+@@ -102,7 +102,7 @@
+ 			clock-output-names = "smclk";
+ 		};
+ 
+-		volt at 0 {
++		volt0 {
+ 			/* VIO to expansion board above */
+ 			compatible = "arm,vexpress-volt";
+ 			arm,vexpress-sysreg,func = <2 0>;
+@@ -112,7 +112,7 @@
+ 			regulator-always-on;
+ 		};
+ 
+-		volt at 1 {
++		volt1 {
+ 			/* 12V from power connector J6 */
+ 			compatible = "arm,vexpress-volt";
+ 			arm,vexpress-sysreg,func = <2 1>;
+@@ -120,7 +120,7 @@
+ 			regulator-always-on;
+ 		};
+ 
+-		temp at 0 {
++		temp0 {
+ 			/* FPGA temperature */
+ 			compatible = "arm,vexpress-temp";
+ 			arm,vexpress-sysreg,func = <4 0>;
+@@ -128,7 +128,7 @@
+ 		};
+ 	};
+ 
+-	smb {
++	smb at 0,08000000 {
+ 		compatible = "simple-bus";
+ 
+ 		#address-cells = <2>;
 -- 
-2.7.0
+1.9.1
