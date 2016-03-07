@@ -1,62 +1,72 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 7 Mar 2016 11:30:30 -0300
-Subject: [PATCH 0/2] [media] exynos4-is: Trivial fixes for DT
- port/endpoint parse logic
-In-Reply-To: <56DD48C1.8010004@samsung.com>
-References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
- <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
- <56DD48C1.8010004@samsung.com>
-Message-ID: <56DD9086.7070903@osg.samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 7 Mar 2016 15:31:47 +0100
+Subject: [PATCH v3 1/2] ARM: at91/dt: shdwc binding: add new shutdown
+ controller documentation
+In-Reply-To: <20151003170220.GG2694@piout.net>
+References: <1443630121-13912-1-git-send-email-nicolas.ferre@atmel.com>
+ <1443630121-13912-2-git-send-email-nicolas.ferre@atmel.com>
+ <20151003170220.GG2694@piout.net>
+Message-ID: <56DD90D3.1000102@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sylwester,
-
-On 03/07/2016 06:24 AM, Sylwester Nawrocki wrote:
-> Hi Javier, Krzysztof,
+Le 03/10/2015 19:02, Alexandre Belloni a ?crit :
+> On 30/09/2015 at 18:22:00 +0200, Nicolas Ferre wrote :
+>> +SHDWC Shutdown Controller (Alternative)
+>> +
+>> +1) shdwc node
+>> +
+>> +required properties:
+>> +- compatible: should be "atmel,sama5d2-shdwc".
+>> +- reg: should contain registers location and length
+>> +- clocks: phandle to input clock.
+>> +- #address-cells: should be one. The cell is the wake-up input index.
+>> +- #size-cells: should be zero.
+>> +
+>> +optional properties:
+>> +
+>> +- atmel,wakeup-debouncer: minimum wake-up inputs debouncer period in
 > 
-> On 03/05/2016 05:35 AM, Krzysztof Kozlowski wrote:
->> 2016-03-05 5:20 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->>>> Hello,
->>>>
->>>> This series have two trivial fixes for issues that I noticed while
->>>> reading as a reference the driver's functions that parse the graph
->>>> port and endpoints nodes.
->>>>
->>>> It was only compile tested because I don't have access to a Exynos4
->>>> hardware to test the DT parsing, but the patches are very simple.
->>
->> Not directly related, but similar: my previous two patches for missing
->> of_node_put [0] are unfortunately still waiting. Although I have
->> Exynos4 boards, but I don't have infrastructure/scripts to test it.
->>
->> Best regards,
->> Krzysztof
->>
+> Shouldn't that property be called atmel,wakeup-debouncer-ms ?
 
-I've reviewed Krzysztof and looks good to me.
+Well, as it's microseconds, it should be "-us", according to the file:
+Documentation/devicetree/bindings/property-units.txt.
 
->> [0] https://patchwork.linuxtv.org/patch/32707/
+Reworking on this I realised that a kind "generic" property exists for
+this type: "debounce-delay-ms", without a vendor prefix.
+
+So, for the DT people, what do you think if I change my private property
+to this one that seems to be used in a bunch of bindings already in its
+milliseconds variant:
+gpio-matrix-keypad.txt, tc3589x.txt, extcon-palmas.txt or with a vendor
+prefix in nvidia,tegra20-kbc.txt or lpc32xx-key.txt
+
+and if I diversify it to a "debounce-delay-us" variant and use it in
+this driver?
+
+>> +
+>> +2) input nodes
+>> +
+>> +Wake-up input nodes are usually described in the "board" part of the Device
+>> +Tree. Note also that input 0 is linked to the wake-up pin and is frequently
+>> +used.
+>> +
+>> +Required properties:
+>> +- reg: should contain the wake-up input index [0 - 15].
+>> +
+>> +Optional properties:
+>> +- atmel,wakeup-type: string, operation mode of the input described by the child
+>> +  node. Supported values are: "high" or "low".
+>> +
 > 
-> Thanks for the patches, I've delegated them to myself and I'm going to
-> review/apply them this week.
->
+> Maybe we could avoid parsing string and use an integer with a few defines
 
-Thanks, I just noticed another similar issue in the driver now and is
-that fimc_is_parse_sensor_config() uses the same struct device_node *
-for looking up the I2C sensor, port and endpoint and thus not doing a
-of_node_put() for all the nodes on the error path.
+Yes, even a boolean should do the trick. What about:
 
-I think the right fix is to have a separate struct device_node * for
-each so their reference counter cand be incremented and decremented.
+- atmel,wakeup-active-high: boolean, the corresponding wake-up
+  input described by the child, forces the wake-up of the core power
+  supply on a high level. The default is to be active low.
 
-> --
-> Regards,
-> Sylwester
-> 
-
-Best regards,
+Thanks for your insights. Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Nicolas Ferre
