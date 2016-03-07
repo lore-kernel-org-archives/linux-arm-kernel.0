@@ -1,33 +1,49 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 7 Mar 2016 17:22:12 +0000
-Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
- (kernel 4.5)
-In-Reply-To: <56D85B37.8020306@arm.com>
-References: <20160303141752.GA12255@localhost.localdomain>
- <20160303144215.GC19139@leverpostej> <56D85151.9050607@arm.com>
- <20160303151200.GE19139@leverpostej> <56D85B37.8020306@arm.com>
-Message-ID: <56DDB8C4.5010703@arm.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 7 Mar 2016 22:53:05 +0530
+Subject: [PATCH 1/2] net: thunderx: Set recevie buffer page usage count in
+ bulk
+In-Reply-To: <20160307.120410.1851177945150642006.davem@davemloft.net>
+References: <1457336157-31508-2-git-send-email-sunil.kovvuri@gmail.com>
+ <20160307.111534.235286977900488968.davem@davemloft.net>
+ <CA+sq2CewOQGSiRC5m64ioYS36-WO0C5XzykZRZd+OLE1tJ-sSQ@mail.gmail.com>
+ <20160307.120410.1851177945150642006.davem@davemloft.net>
+Message-ID: <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/16 15:41, Suzuki K. Poulose wrote:
-> On 03/03/16 15:12, Mark Rutland wrote:
->> On Thu, Mar 03, 2016 at 02:59:29PM +0000, Suzuki K. Poulose wrote:
->>> On 03/03/16 14:42, Mark Rutland wrote:
->>> We don't have this limitation anymore, as we can check if the booting CPU
->>> has any conflicting/missing features w.r.t the established set and fail the
->>> booting if it does.
->>
->> While we do this, that's more of a last-ditch effort as opposed to a
->> general solution, and I'm not sure it's complete.
->>
->> What happens when we online a CPU that we determine needs a new erratum
->> workaround applied? I didn't think we prohibited onlining in that case.
+On Mon, Mar 7, 2016 at 10:34 PM, David Miller <davem@davemloft.net> wrote:
+> From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
+> Date: Mon, 7 Mar 2016 22:28:39 +0530
 >
-> Right, the erratas can't be applied, as we would have free'd them already.
+>> Hi David,
+>>
+>>>> you create a window of time during which the consumer
+>>>> can release the page and prematurely free it.
+>> Okay, but here the consumer i.e HW is notified only after page count
+>> is incremented.
+>> For example if you check 'nicvf_refill_rbdr' fn() only after receive
+>> buffer ring is
+>> refilled with buffers, doorbell is issued to hardware to start using
+>> the new buffers.
+>>
+>> So
+>> @@ -241,6 +254,8 @@ refill:
+>>                 new_rb++;
+>>         }
+>>
+>> +       nicvf_get_page(nic);
+>> +
+>> calling 'nicvf_get_page' before issuing doorbell ensures page ref
+>> count is properly
+>> set before hw/consumer can use the buffers.
+>
+> So if you know ahead of time how the page will be split up, just
+> calculate that when you get the page and increment the page count
+> appropriately.
+>
+> That's what we do in the NIU driver.
 
-We could do what we now do for the CPU features though, i.e, fail any CPUs
-which has an ERRATA that hasn't been applied in the kernel at boot time.
+Thanks for the suggestion, will check and get back.
 
-Cheers
-Suzuki
+Regards,
+Sunil.
