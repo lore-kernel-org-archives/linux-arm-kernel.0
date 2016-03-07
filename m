@@ -1,26 +1,33 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Mon, 07 Mar 2016 10:12:55 +0100
-Subject: 4.4.3: OOPS when running "stress-ng --sock 5"
-In-Reply-To: <87twkmd6or.fsf@gmail.com> (Holger Schurig's message of "Fri, 04
- Mar 2016 08:48:52 +0100")
-References: <87twkmd6or.fsf@gmail.com>
-Message-ID: <87fuw2d52g.fsf@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 7 Mar 2016 10:19:13 +0100
+Subject: [PATCH] pwm: bcm7038: fix check of error code returned by
+ devm_ioremap_resource()
+In-Reply-To: <1457227306-3142-1-git-send-email-vz@mleia.com>
+References: <1457227306-3142-1-git-send-email-vz@mleia.com>
+Message-ID: <20160307091913.GF31189@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I compared my config with imx_v6_v7_defconfig which didn't segfault.
+On Sun, Mar 06, 2016 at 03:21:46AM +0200, Vladimir Zapolskiy wrote:
+> The change fixes potential oops while accessing iomem on invalid
+> address, if devm_ioremap_resource() fails due to some reason.
+> 
+> The devm_ioremap_resource() function returns ERR_PTR() and never
+> returns NULL, which makes useless a following check for NULL.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Fixes: 3a9f5957020f ("pwm: Add Broadcom BCM7038 PWM controller support")
+> ---
+>  drivers/pwm/pwm-brcmstb.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-After I turned on CONFIG_SWAP, my segfault vanished.
+Applied, thanks.
 
-I did turn off CONFIG_SWAP because my device only has SD-Card and eMMC.
-So I never intended to create a swap partition. And thought "why compile
-it in the kernel when I never use it?".
-
-But it seems the kernel is instable with this setting.
-
-So we have a potential denial-of-service in kernels compiled without
-CONFIG_SWAP, don't we? At least when it comes to skb handling.
-
-Other memory tests never showed anything weird, and my system is running
-X11 with some Qt applications as well as Java applications since about a
-year without trouble. During all this time without CONFIG_SWAP.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/c15a84f9/attachment.sig>
