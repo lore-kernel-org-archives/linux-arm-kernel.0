@@ -1,170 +1,47 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Mon,  7 Mar 2016 14:39:43 -0600
-Subject: [Patch v4 2/6] ARM: dts: am437x/am33xx: Remove eCAP and ePWM hwmod
- properties
+Date: Mon,  7 Mar 2016 14:39:42 -0600
+Subject: [Patch v4 1/6] pwms: pwm-ti*: Get the clock from the PWMSS (parent)
 In-Reply-To: <1457383187-17166-1-git-send-email-fcooper@ti.com>
 References: <1457383187-17166-1-git-send-email-fcooper@ti.com>
-Message-ID: <1457383187-17166-3-git-send-email-fcooper@ti.com>
+Message-ID: <1457383187-17166-2-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ECAP and ePWM do not have OCP integration registers, have L3/L4 ports, etc.
-Therefore, they shouldn't be using hwmod at all. Remove their hwmod
-properties.
-
-For ePWM add the tbclk to the node rather than depending on hwmod to do so.
+The eCAP and ePWM doesn't have their own separate clocks. They simply
+utilize the clock provided directly by the PWMSS. Therefore, they simply
+need to grab a reference to their parent's clock.
 
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 12 ++++++------
- arch/arm/boot/dts/am4372.dtsi | 21 ++++++++++++---------
- 2 files changed, 18 insertions(+), 15 deletions(-)
+ drivers/pwm/pwm-tiecap.c   | 2 +-
+ drivers/pwm/pwm-tiehrpwm.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 82c0976..1dd6c78 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -682,7 +682,6 @@
- 				reg = <0x48300100 0x80>;
- 				interrupts = <31>;
- 				interrupt-names = "ecap0";
--				ti,hwmods = "ecap0";
- 				status = "disabled";
- 			};
+diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+index 616af76..9418159 100644
+--- a/drivers/pwm/pwm-tiecap.c
++++ b/drivers/pwm/pwm-tiecap.c
+@@ -212,7 +212,7 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+ 	if (!pc)
+ 		return -ENOMEM;
  
-@@ -690,7 +689,8 @@
- 				compatible = "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48300200 0x80>;
--				ti,hwmods = "ehrpwm0";
-+				clocks = <&ehrpwm0_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-@@ -710,7 +710,6 @@
- 				reg = <0x48302100 0x80>;
- 				interrupts = <47>;
- 				interrupt-names = "ecap1";
--				ti,hwmods = "ecap1";
- 				status = "disabled";
- 			};
+-	clk = devm_clk_get(&pdev->dev, "fck");
++	clk = devm_clk_get(pdev->dev.parent, "fck");
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "failed to get clock\n");
+ 		return PTR_ERR(clk);
+diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
+index 6a41e66..09dc1bc 100644
+--- a/drivers/pwm/pwm-tiehrpwm.c
++++ b/drivers/pwm/pwm-tiehrpwm.c
+@@ -443,7 +443,7 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+ 	if (!pc)
+ 		return -ENOMEM;
  
-@@ -718,7 +717,8 @@
- 				compatible = "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48302200 0x80>;
--				ti,hwmods = "ehrpwm1";
-+				clocks = <&ehrpwm1_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-@@ -738,7 +738,6 @@
- 				reg = <0x48304100 0x80>;
- 				interrupts = <61>;
- 				interrupt-names = "ecap2";
--				ti,hwmods = "ecap2";
- 				status = "disabled";
- 			};
- 
-@@ -746,7 +745,8 @@
- 				compatible = "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48304200 0x80>;
--				ti,hwmods = "ehrpwm2";
-+				clocks = <&ehrpwm2_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 33f417c..685c8db 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -675,7 +675,6 @@
- 				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
- 				#pwm-cells = <3>;
- 				reg = <0x48300100 0x80>;
--				ti,hwmods = "ecap0";
- 				status = "disabled";
- 			};
- 
-@@ -683,7 +682,8 @@
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48300200 0x80>;
--				ti,hwmods = "ehrpwm0";
-+				clocks = <&ehrpwm0_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-@@ -701,7 +701,6 @@
- 				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
- 				#pwm-cells = <3>;
- 				reg = <0x48302100 0x80>;
--				ti,hwmods = "ecap1";
- 				status = "disabled";
- 			};
- 
-@@ -709,7 +708,8 @@
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48302200 0x80>;
--				ti,hwmods = "ehrpwm1";
-+				clocks = <&ehrpwm1_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-@@ -727,7 +727,6 @@
- 				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
- 				#pwm-cells = <3>;
- 				reg = <0x48304100 0x80>;
--				ti,hwmods = "ecap2";
- 				status = "disabled";
- 			};
- 
-@@ -735,7 +734,8 @@
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48304200 0x80>;
--				ti,hwmods = "ehrpwm2";
-+				clocks = <&ehrpwm2_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-@@ -753,7 +753,8 @@
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48306200 0x80>;
--				ti,hwmods = "ehrpwm3";
-+				clocks = <&ehrpwm3_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-@@ -771,7 +772,8 @@
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48308200 0x80>;
--				ti,hwmods = "ehrpwm4";
-+				clocks = <&ehrpwm4_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
-@@ -789,7 +791,8 @@
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x4830a200 0x80>;
--				ti,hwmods = "ehrpwm5";
-+				clocks = <&ehrpwm5_tbclk>;
-+				clock-names = "tbclk";
- 				status = "disabled";
- 			};
- 		};
+-	clk = devm_clk_get(&pdev->dev, "fck");
++	clk = devm_clk_get(pdev->dev.parent, "fck");
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "failed to get clock\n");
+ 		return PTR_ERR(clk);
 -- 
 2.7.0
