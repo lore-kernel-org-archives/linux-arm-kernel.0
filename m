@@ -1,52 +1,29 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 07 Mar 2016 15:24:57 -0800
-Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
- interrupt properties
-In-Reply-To: <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
-References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
- <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87fuw1yipi.fsf@eliezer.anholt.net>
+Date: Mon, 07 Mar 2016 15:27:47 -0800
+Subject: [PATCH] clk: bcm2835: fix check of error code returned by
+ devm_ioremap_resource()
+In-Reply-To: <1457227295-3093-1-git-send-email-vz@mleia.com>
+References: <1457227295-3093-1-git-send-email-vz@mleia.com>
+Message-ID: <87d1r5yiks.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+Vladimir Zapolskiy <vz@mleia.com> writes:
 
-> From: Martin Sperl <kernel@martin.sperl.org>
+> The change fixes potential oops while accessing iomem on invalid
+> address, if devm_ioremap_resource() fails due to some reason.
 >
-> Add binding documentation for the new shared interrupt properties:
-> * brcm,dma-channel-shared-mask
-> * brcm,dma-shared-irq-index
+> The devm_ioremap_resource() function returns ERR_PTR() and never
+> returns NULL, which makes useless a following check for NULL.
 >
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> ---
->  Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> index 1396078..f9e84ee 100644
-> --- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> @@ -17,6 +17,10 @@ Required properties:
->  - brcm,dma-channel-mask: Bit mask representing the channels
->  			 not used by the firmware in ascending order,
->  			 i.e. first channel corresponds to LSB.
-> +- brcm,dma-channel-shared-mask: Bit mask representing the channels
-> +				that use a shared interrupt
-> +- brcm,dma-shared-irq-index: index of which of the interrupts mentioned
-> +			     above is the shared interrupt
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Fixes: 5e63dcc74b30 ("clk: bcm2835: Add a driver for the auxiliary peripheral clock gates")
 
-This should be under "Optional properties" since there are appropriate
-defaults for the only compatible string listed.
-
-I still don't think exposing this in the DT is necessary (it's hardware
-block internals), but I'm not writing the code so I'm fine with it
-either way, really.  Regardless, it would be really good to get the
-slave_sg part of the series in, which is really important for the
-platform.
+Reviewed-by: Eric Anholt <eric@anholt.net>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/281da960/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/8e3b3375/attachment.sig>
