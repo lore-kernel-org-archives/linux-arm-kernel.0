@@ -1,33 +1,39 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 7 Mar 2016 10:19:13 +0100
-Subject: [PATCH] pwm: bcm7038: fix check of error code returned by
- devm_ioremap_resource()
-In-Reply-To: <1457227306-3142-1-git-send-email-vz@mleia.com>
-References: <1457227306-3142-1-git-send-email-vz@mleia.com>
-Message-ID: <20160307091913.GF31189@ulmo.nvidia.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 07 Mar 2016 10:24:17 +0100
+Subject: [PATCH 0/2] [media] exynos4-is: Trivial fixes for DT port/endpoint
+ parse logic
+In-Reply-To: <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
+References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
+ <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
+Message-ID: <56DD48C1.8010004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 06, 2016 at 03:21:46AM +0200, Vladimir Zapolskiy wrote:
-> The change fixes potential oops while accessing iomem on invalid
-> address, if devm_ioremap_resource() fails due to some reason.
-> 
-> The devm_ioremap_resource() function returns ERR_PTR() and never
-> returns NULL, which makes useless a following check for NULL.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> Fixes: 3a9f5957020f ("pwm: Add Broadcom BCM7038 PWM controller support")
-> ---
->  drivers/pwm/pwm-brcmstb.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Hi Javier, Krzysztof,
 
-Applied, thanks.
+On 03/05/2016 05:35 AM, Krzysztof Kozlowski wrote:
+> 2016-03-05 5:20 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+>> > Hello,
+>> >
+>> > This series have two trivial fixes for issues that I noticed while
+>> > reading as a reference the driver's functions that parse the graph
+>> > port and endpoints nodes.
+>> >
+>> > It was only compile tested because I don't have access to a Exynos4
+>> > hardware to test the DT parsing, but the patches are very simple.
+>
+> Not directly related, but similar: my previous two patches for missing
+> of_node_put [0] are unfortunately still waiting. Although I have
+> Exynos4 boards, but I don't have infrastructure/scripts to test it.
+> 
+> Best regards,
+> Krzysztof
+> 
+> [0] https://patchwork.linuxtv.org/patch/32707/
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/c15a84f9/attachment.sig>
+Thanks for the patches, I've delegated them to myself and I'm going to
+review/apply them this week.
+
+--
+Regards,
+Sylwester
