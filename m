@@ -1,22 +1,20 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 7 Mar 2016 17:03:53 -0300
-Subject: [PATCH 0/3] video: fbdev: imxfb: make it work again
-In-Reply-To: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAOMZO5BxrVHNq8BdOqAqkaOqC905+AOSkFtsrWFHbz4cfN=Kaw@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 7 Mar 2016 21:04:15 +0100
+Subject: [PATCH v2 2/2] iio:adc:at91-sama5d2: add support for signed
+ conversion
+In-Reply-To: <1457360997-29179-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
+ <1457360997-29179-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <56DDDEBF.30905@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On 03/07/2016 03:29 PM, Ludovic Desroches wrote:
+> The at91-sama5d2 ADC controller can achieve unsigned and signed
+> conversions. For each channel, a signed and an unsigned variant are
+> created.
+> Sign mode is a global configuration, it is not tied to a specific
+> channel. For this reason, the controller has to be configured upon
+> conversion request.
 
-On Mon, Mar 7, 2016 at 4:53 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello,
->
-> it seems the imxfb driver stopped working quite some time ago. Here come
-
-Yes, I noticed it has been broken for a long time.
-
-After this fix I managed to get it working again:
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/video/fbdev/imxfb.c?id=b82fe6ddd782f847332aeabf8cab980852f61629
+So, what's the difference between signed and unsigned mode?
