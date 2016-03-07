@@ -1,30 +1,32 @@
 From: chanho.min@lge.com (Chanho Min)
-Date: Mon, 7 Mar 2016 13:09:56 +0900
-Subject: [PATCH 0/4] ARM64:SoC add a new platform, LG Electronics's lg1k 
-Message-ID: <1457323800-26904-1-git-send-email-chanho.min@lge.com>
+Date: Mon, 7 Mar 2016 13:09:57 +0900
+Subject: [PATCH 1/4] arm64: add Kconfig entry for LG1K SoC family
+In-Reply-To: <1457323800-26904-1-git-send-email-chanho.min@lge.com>
+References: <1457323800-26904-1-git-send-email-chanho.min@lge.com>
+Message-ID: <1457323800-26904-2-git-send-email-chanho.min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an initial series for supporting LG Electronics's lg1k SoCs,
-based on ARM Cortex-A53, mainly used for digital TVs.
+This patch introduces ARCH_LG1K to enable LG Electronics's LG1K SoC
+family in Kconfig.
 
-Chanho Min (4):
-  arm64: add Kconfig entry for LG1K SoC family
-  arm64: defconfig: enable ARCH_LG1K
-  arm64: dts: Add dts files for LG Electronics's lg1312 SoC
-  MAINTAINERS: add myself as ARM/LG1K maintainer
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+ arch/arm64/Kconfig.platforms |    4 ++++
+ 1 file changed, 4 insertions(+)
 
- MAINTAINERS                           |    6 +
- arch/arm64/Kconfig.platforms          |    4 +
- arch/arm64/boot/dts/Makefile          |    1 +
- arch/arm64/boot/dts/lg/Makefile       |    5 +
- arch/arm64/boot/dts/lg/lg1312-ref.dts |   26 +++
- arch/arm64/boot/dts/lg/lg1312.dtsi    |  346 +++++++++++++++++++++++++++++++++
- arch/arm64/configs/defconfig          |    1 +
- 7 files changed, 389 insertions(+)
- create mode 100644 arch/arm64/boot/dts/lg/Makefile
- create mode 100644 arch/arm64/boot/dts/lg/lg1312-ref.dts
- create mode 100644 arch/arm64/boot/dts/lg/lg1312.dtsi
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 21074f6..b002bba 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -141,4 +141,8 @@ config ARCH_ZYNQMP
+ 	help
+ 	  This enables support for Xilinx ZynqMP Family
+ 
++config ARCH_LG1K
++	bool "LG Electronics LG1K SoC Family"
++	help
++	  This enables support for LG Electronics LG1K SoC Family
+ endmenu
 -- 
 1.7.9.5
