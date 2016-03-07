@@ -1,59 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Mar 2016 17:23:34 +0000
-Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
-In-Reply-To: <56DDAFA7.4090207@arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <56DDAFA7.4090207@arm.com>
-Message-ID: <20160307172334.GJ19428@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 7 Mar 2016 09:36:07 -0800
+Subject: [PATCH 1/2] drm/rockchip: dw_hdmi: Call drm_encoder_cleanup() in
+ error path
+In-Reply-To: <56DD3DAF.8090700@rock-chips.com>
+References: <1457133723-24869-1-git-send-email-dianders@chromium.org>
+ <20160305121005.GA11966@serenity.lan>
+ <20160305123942.GE19428@n2100.arm.linux.org.uk>
+ <56DD3DAF.8090700@rock-chips.com>
+Message-ID: <CAD=FV=XMvYYwOHH_SEovAeHV1Sv9BbiAP4fGnF3Gq3aS1hfQaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 04:43:19PM +0000, James Morse wrote:
-> Hi Catalin,
-> 
-> I've just spotted UAO causes the test_user_copy module (CONFIG_TEST_USER_COPY)
-> to fail. Who to blame is up for discussion. The test is passing a user pointer
-> as the 'to' field of copy_from_user(), which it expects to fail gracefully:
-> 
-> lib/test_user_copy.c:75
-> >	/* Invalid usage: none of these should succeed. */
-> [ ... ]
-> > 	ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
-> >				    PAGE_SIZE),
-> >		    "illegal reversed copy_from_user passed");
-> >
-> 
-> access_ok() catches the "(char __user *)kmem", causing copy_from_user() to pass
-> bad_usermem to memset():
-> 
-> arch/arm64/include/asm/uaccess.h:279
-> >	if (access_ok(VERIFY_READ, from, n))
-> >		n = __copy_from_user(to, from, n);
-> >	else /* security hole - plug it */
-> >		memset(to, 0, n);
-> 
-> This (correctly) trips UAO's "Accessing user space memory outside uaccess.h
-> routines" message, which is a little confusing to debug, and stops the rest of
-> the module's tests from being run.
-> 
-> As far as I can see, this would only affect arm64. I can't find an equivalent
-> memset() for x86_64.
+Hi,
 
-I don't think you've looked hard enough. :)
+On Mon, Mar 7, 2016 at 12:37 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2016?03?05? 20:39, Russell King - ARM Linux wrote:
+>>
+>> On Sat, Mar 05, 2016 at 12:11:16PM +0000, John Keeping wrote:
+>>>
+>>> On Fri, Mar 04, 2016 at 03:22:01PM -0800, Douglas Anderson wrote:
+>>>>
+>>>> The drm_encoder_cleanup() was missing both from the error path of
+>>>> dw_hdmi_rockchip_bind().  This caused a crash when slub_debug was
+>>>> enabled and we ended up deferring probe of HDMI at boot.
+>>>>
+>>>> This call isn't needed from unbind() because if dw_hdmi_bind() returns
+>>>> no error then it takes over the job of freeing the encoder (in
+>>>> dw_hdmi_unbind).
+>>>>
+>>>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>>>> ---
+>>>
+>>> Does dw_hdmi-imx need a similar change?  I wonder if it would be cleaner
+>>> to push this into dw_hdmi_bind() if it affects all of the platforms..
+>>
+>> I don't think moving it there would make sense - keep the initialisation
+>> and cleanup together in the same file so that it's contained together.
+>>
+>
+> I don't like this patch too, initialisation and cleanup not in the same file
+> looks bad,
+>
+> How about:
+>
+> drivers/gpu/drm/bridge/dw-hdmi.c
+> void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
+>         hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
+>
+> hdmi->connector.funcs->destroy(&hdmi->connector);
+> -       hdmi->encoder->funcs->destroy(hdmi->encoder);
+>
+> drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+>
+> -       return dw_hdmi_bind(dev, master, data, encoder, iores, irq,
+> plat_data);
+> +       ret = dw_hdmi_bind(dev, master, data, encoder, iores, irq,
+> plat_data);
+> +       if (ret)
+> +               drm_encoder_cleanup(encoder);
+> +
+> +       return ret;
+>  }
+>
+>  static void dw_hdmi_rockchip_unbind(struct device *dev, struct device
+> *master,
+>                                     void *data)
+>  {
+> +       drm_encoder_cleanup(...);
+>         return dw_hdmi_unbind(dev, master, data);
+>  }
 
-arch/x86/lib/usercopy_32.c:
+That'a a reasonable suggestion in theory.  ...but we run into the same
+problem I've run into before with the strange relationship between
+dw_hdmi and its descendants.
 
-unsigned long _copy_from_user(void *to, const void __user *from, unsigned n)
-{
-        if (access_ok(VERIFY_READ, from, n))
-                n = __copy_from_user(to, from, n);
-        else
-                memset(to, 0, n);
-        return n;
-}
-EXPORT_SYMBOL(_copy_from_user);
+Specifically:
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+* "struct dw_hdmi", which has a pointer to encoder, is private to dw-hdmi.c
+
+* We could get the encoder if we had a pointer to the "struct
+rockchip_hdmi", but there's no way to get that.  You would _think_ you
+could get it back using platform_get_drvdata() because it was stashed
+with platform_set_drvdata().  ...but you'd be wrong.  The
+platform_set_drvdata() is just there to fool you.  I believe when you
+call dw_hdmi_bind() it clobbers your drvdata when it calls
+dev_set_drvdata(dev, hdmi);
+
+
+Said another way: taking your suggestion means we need to add some way
+for dw_hdmi-rockchip.c to get a pointer to the encoder from a "struct
+device".  We could (A) move the "struct dw_hdmi" definition to a
+private header and allow dw_hdmi-rockchip.c to include it or we could
+(B) add a dw_hdmi_get_encoder() API call that dw_hdmi-rockchip.c could
+call.
+
+
+If someone would let me know whether (A) or (B) is OK I'm happy to post a patch.
+
+
+...or, of course, if I've made a mistake in all the above, feel free
+to point it out.
+
+
+-Doug
