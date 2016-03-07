@@ -1,28 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Mar 2016 09:39:26 +0000 (UTC)
-Subject: [PATCH 0/2] ARM: dra7: Enable Errata i877
-In-Reply-To: <1456994525-20573-1-git-send-email-lokeshvutla@ti.com>
-References: <1456994525-20573-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <alpine.DEB.2.02.1603070938170.3437@utopia.booyaka.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 7 Mar 2016 09:43:29 +0000
+Subject: Tegra baseline test results for v4.5-rc7
+Message-ID: <56DD4D41.6080900@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Mar 2016, Lokesh Vutla wrote:
+Here are some basic Tegra test results for Linux v4.5-rc7.
+Logs and other details at:
 
-> This series enables Errata i877 for all DRA7 platforms. The public errata
-> documentation can be found here[1].
-> 
-> [1] http://www.ti.com/lit/er/sprz429h/sprz429h.pdf
-> 
-> Lokesh Vutla (1):
->   ARM: OMAP2+: hwmod: Introduce ti,no-idle dt property
-> 
-> Mugunthan V N (1):
->   ARM: dts: dra7: do not gate cpsw clock due to errata i877
-
-I've sent these for merging immediately. 
-
-Have you sent patches for U-boot yet?
+    https://nvtb.github.io//linux/test_v4.5-rc7/20160306150102/
 
 
-- Paul
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 4): tegra114-dalmore-a04
+    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
+		   tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    FAIL: ( 1/ 4): tegra114-dalmore-a04
+    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.5-rc6 (fc77dbd34c5c99bce46d40a2491937c3bcbd10af)):
+   text     data      bss    total  kernel
+  +8586    -8192        0     +394  defconfig
+   +806        0        0     +806  multi_v7_defconfig
+  +4450        0        0    +4450  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.5-rc6 (fc77dbd34c5c99bce46d40a2491937c3bcbd10af))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .      -4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .      -4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .      -4k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .      -4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
