@@ -1,84 +1,79 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 10:47:10 +0100
-Subject: [PATCH v4 20/52] mtd: docg3: switch to mtd_ooblayout_ops
+Date: Mon,  7 Mar 2016 10:47:41 +0100
+Subject: [PATCH v4 51/52] mtd: nand: kill the ecc->layout field
 In-Reply-To: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457344062-11633-21-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457344062-11633-52-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the nand_ecclayout definition by the equivalent mtd_ooblayout_ops
-definition.
+Now that all NAND drivers have switch to mtd_ooblayout_ops, we can kill
+the ecc->layout field.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/mtd/devices/docg3.c | 46 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 35 insertions(+), 11 deletions(-)
+ drivers/mtd/nand/nand_base.c | 7 -------
+ drivers/mtd/nand/nand_bch.c  | 9 ---------
+ include/linux/mtd/nand.h     | 2 --
+ 3 files changed, 18 deletions(-)
 
-diff --git a/drivers/mtd/devices/docg3.c b/drivers/mtd/devices/docg3.c
-index 6b516e1..b833e6c 100644
---- a/drivers/mtd/devices/docg3.c
-+++ b/drivers/mtd/devices/docg3.c
-@@ -67,16 +67,40 @@ module_param(reliable_mode, uint, 0);
- MODULE_PARM_DESC(reliable_mode, "Set the docg3 mode (0=normal MLC, 1=fast, "
- 		 "2=reliable) : MLC normal operations are in normal mode");
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 779a385..e273c92 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -4162,13 +4162,6 @@ int nand_scan_tail(struct mtd_info *mtd)
+ 	chip->oob_poi = chip->buffers->databuf + mtd->writesize;
  
--/**
-- * struct docg3_oobinfo - DiskOnChip G3 OOB layout
-- * @eccbytes: 8 bytes are used (1 for Hamming ECC, 7 for BCH ECC)
-- * @eccpos: ecc positions (byte 7 is Hamming ECC, byte 8-14 are BCH ECC)
-- * @oobfree: free pageinfo bytes (byte 0 until byte 6, byte 15
-- */
--static struct nand_ecclayout docg3_oobinfo = {
--	.eccbytes = 8,
--	.eccpos = {7, 8, 9, 10, 11, 12, 13, 14},
--	.oobfree = {{0, 7}, {15, 1} },
-+static int docg3_ooblayout_ecc(struct mtd_info *mtd, int section,
-+			       struct mtd_oob_region *oobregion)
-+{
-+	if (section)
-+		return -ERANGE;
-+
-+	/* byte 7 is Hamming ECC, byte 8-14 are BCH ECC */
-+	oobregion->offset = 7;
-+	oobregion->length = 8;
-+
-+	return 0;
-+}
-+
-+static int docg3_ooblayout_free(struct mtd_info *mtd, int section,
-+				struct mtd_oob_region *oobregion)
-+{
-+	if (section > 1)
-+		return -ERANGE;
-+
-+	/* free bytes: byte 0 until byte 6, byte 15 */
-+	if (!section) {
-+		oobregion->offset = 0;
-+		oobregion->length = 7;
-+	} else {
-+		oobregion->offset = 15;
-+		oobregion->length = 1;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct mtd_ooblayout_ops nand_ooblayout_docg3_ops = {
-+	.ecc = docg3_ooblayout_ecc,
-+	.free = docg3_ooblayout_free,
- };
+ 	/*
+-	 * Set the provided ECC layout. If ecc->layout is NULL, the MTD core
+-	 * will just leave mtd->ooblayout to NULL, if it's not NULL, it will
+-	 * set ->ooblayout to the default ecclayout wrapper.
+-	 */
+-	mtd_set_ecclayout(mtd, ecc->layout);
+-
+-	/*
+ 	 * If no default placement scheme is given, select an appropriate one.
+ 	 */
+ 	if (!mtd->ooblayout && (ecc->mode != NAND_ECC_SOFT_BCH)) {
+diff --git a/drivers/mtd/nand/nand_bch.c b/drivers/mtd/nand/nand_bch.c
+index e29e75f..ca9b2a4 100644
+--- a/drivers/mtd/nand/nand_bch.c
++++ b/drivers/mtd/nand/nand_bch.c
+@@ -158,15 +158,6 @@ struct nand_bch_control *nand_bch_init(struct mtd_info *mtd)
  
- static inline u8 doc_readb(struct docg3 *docg3, u16 reg)
-@@ -1857,7 +1881,7 @@ static int __init doc_set_driver_info(int chip_id, struct mtd_info *mtd)
- 	mtd->_read_oob = doc_read_oob;
- 	mtd->_write_oob = doc_write_oob;
- 	mtd->_block_isbad = doc_block_isbad;
--	mtd_set_ecclayout(mtd, &docg3_oobinfo);
-+	mtd_set_ooblayout(mtd, &nand_ooblayout_docg3_ops);
- 	mtd->oobavail = 8;
- 	mtd->ecc_strength = DOC_ECC_BCH_T;
+ 	eccsteps = mtd->writesize/eccsize;
  
+-	/*
+-	 * Rely on the default ecclayout to ooblayout wrapper provided by MTD
+-	 * core if ecc.layout is not NULL.
+-	 * FIXME: this should be removed when all callers have moved to the
+-	 * mtd_ooblayout_ops approach.
+-	 */
+-	if (nand->ecc.layout)
+-		mtd_set_ecclayout(mtd, nand->ecc.layout);
+-
+ 	/* if no ecc placement scheme was provided, build one */
+ 	if (!mtd->ooblayout) {
+ 
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index 82a005a..fdcc2b8 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -466,7 +466,6 @@ struct nand_hw_control {
+  * @prepad:	padding information for syndrome based ECC generators
+  * @postpad:	padding information for syndrome based ECC generators
+  * @options:	ECC specific options (see NAND_ECC_XXX flags defined above)
+- * @layout:	ECC layout control struct pointer
+  * @priv:	pointer to private ECC control data
+  * @hwctl:	function to control hardware ECC generator. Must only
+  *		be provided if an hardware ECC is available
+@@ -516,7 +515,6 @@ struct nand_ecc_ctrl {
+ 	int prepad;
+ 	int postpad;
+ 	unsigned int options;
+-	struct nand_ecclayout	*layout;
+ 	void *priv;
+ 	void (*hwctl)(struct mtd_info *mtd, int mode);
+ 	int (*calculate)(struct mtd_info *mtd, const uint8_t *dat,
 -- 
 2.1.4
