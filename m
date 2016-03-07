@@ -1,39 +1,45 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 07 Mar 2016 10:24:17 +0100
-Subject: [PATCH 0/2] [media] exynos4-is: Trivial fixes for DT port/endpoint
- parse logic
-In-Reply-To: <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
-References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
- <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
-Message-ID: <56DD48C1.8010004@samsung.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 07 Mar 2016 14:55:27 +0530
+Subject: [PATCH v2] arm64: dts: Add tmu node for exynos7
+In-Reply-To: <56DD0022.20800@samsung.com>
+References: <1456477590-4530-1-git-send-email-alim.akhtar@samsung.com>
+ <56DD0022.20800@samsung.com>
+Message-ID: <56DD4907.8030100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier, Krzysztof,
+Hi Krzysztof,
 
-On 03/05/2016 05:35 AM, Krzysztof Kozlowski wrote:
-> 2016-03-05 5:20 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->> > Hello,
->> >
->> > This series have two trivial fixes for issues that I noticed while
->> > reading as a reference the driver's functions that parse the graph
->> > port and endpoints nodes.
->> >
->> > It was only compile tested because I don't have access to a Exynos4
->> > hardware to test the DT parsing, but the patches are very simple.
+On 03/07/2016 09:44 AM, Krzysztof Kozlowski wrote:
+> On 26.02.2016 18:06, Alim Akhtar wrote:
+>> This patch adds tmu node, related temprature sensor and triping
+>> point data for Atlas cpu core found on exynos7 SoC.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>> Changes since v1:
+>> * Addressed krzysztof's review comments.
+>>
+>>   .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +++++++++
+>>   .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   54 ++++++++++++++++++++
+>>   arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 ++++++++
+>>   3 files changed, 99 insertions(+)
+>>   create mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+>>   create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+>>
 >
-> Not directly related, but similar: my previous two patches for missing
-> of_node_put [0] are unfortunately still waiting. Although I have
-> Exynos4 boards, but I don't have infrastructure/scripts to test it.
-> 
+> Looks good to me.
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+Thanks!
+
+> I don't have anything in DTS queue for v4.6 and it is late so I'll apply
+> this for v4.7 after upcoming merge window.
+>
+I am ok with this patch going for v4.7.
+
 > Best regards,
 > Krzysztof
-> 
-> [0] https://patchwork.linuxtv.org/patch/32707/
-
-Thanks for the patches, I've delegated them to myself and I'm going to
-review/apply them this week.
-
---
-Regards,
-Sylwester
+>
+>
+>
