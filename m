@@ -1,43 +1,55 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 7 Mar 2016 18:15:53 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <56DDA3D5.3090209@st.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
- <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
- <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
- <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
-Message-ID: <56DDB749.1020808@suse.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Mar 2016 17:18:48 +0000
+Subject: ARM64: CPU Hotplug: can't enable more cpus than maxcpus value
+ (kernel 4.5)
+In-Reply-To: <20160303151200.GE19139@leverpostej>
+References: <20160303141752.GA12255@localhost.localdomain>
+ <20160303144215.GC19139@leverpostej> <56D85151.9050607@arm.com>
+ <20160303151200.GE19139@leverpostej>
+Message-ID: <20160307171848.GA6192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.03.2016 um 16:52 schrieb Giuseppe CAVALLARO:
-> On 3/7/2016 4:46 PM, Andreas F?rber wrote:
->> Am 07.03.2016 um 16:09 schrieb Giuseppe CAVALLARO:
->>> On 3/7/2016 3:27 PM, Andreas F?rber wrote:
->>>> Indeed, reverting Gabriel's commit fixes the observed error messages
->> [...]
->>>> However, I am unable to ping any hosts on the network now.
->>>
->>> hmm, this could be another problem. I wonder if you can
->>> check which recent patch is introducing the problem on ARM64.
->>> For example if this depends on Oct_2015 update.
->>
->> I've had success reverting drivers/net/ethernet/stmicro/ up to and
->> including "stmmac: first frame prep at the end of xmit routine", i.e.
->> top 7 commits.
+On Thu, Mar 03, 2016 at 03:12:01PM +0000, Mark Rutland wrote:
+> On Thu, Mar 03, 2016 at 02:59:29PM +0000, Suzuki K. Poulose wrote:
+> > On 03/03/16 14:42, Mark Rutland wrote:
+> > 
+> > >>However for arm64 it is implemented that cpu_present_mask is
+> > >>explicetely set accordingly to 'maxcpus' value. Is it design intent ?
+> > >
+> > >To some extent, yes.
+> > >
+> > >Due to the possibility of a heterogeneous system, we must bring all CPUs
+> > >online at boot time, and cannot defer this.
+> > >
+> > >This is necessary to detect the common subset of supported features, and
+> > >also to detect the full set of CPUs in the system to correctly apply
+> > >errata workarounds which require kernel text patching.
+> > 
+> > We don't have this limitation anymore, as we can check if the booting CPU
+> > has any conflicting/missing features w.r.t the established set and fail the
+> > booting if it does.
 > 
-> Andreas, I will check it and let you know asap.
+> While we do this, that's more of a last-ditch effort as opposed to a
+> general solution, and I'm not sure it's complete.
+> 
+> What happens when we online a CPU that we determine needs a new erratum
+> workaround applied? I didn't think we prohibited onlining in that case.
+> 
+> I guess maxcpus is effectively the same as physical CPU hotplug, and the
+> same caveats apply to both -- we can't reliably support either in the
+> general case.
 
-I verified that it's just these two commits that I need to revert:
+While I agree that there are still issues to address, I would rather
+like to have such feature in the kernel. It makes sense for some systems
+with lots of (homogeneous) CPUs and we shouldn't penalise them just
+because there are some big.LITTLE configurations out there.
 
-"stmmac: Fix 'eth0: No PHY found' regression"
-"stmmac: first frame prep at the end of xmit routine"
-
-Those in between don't cause conflicts and seem to work okay.
-
-Andreas
+My proposal is to block late hotplug of any CPU that the kernel was not
+aware of during boot (e.g. a new MIDR). We could even simplify it and
+check late CPUs against the MIDR of CPU0, I really don't care about
+heterogeneous CPU systems wanting to do late hotplug (at least until
+someone comes with a real use-case).
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Catalin
