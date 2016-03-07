@@ -1,51 +1,139 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 7 Mar 2016 18:30:18 +0900
-Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
- (2nd round)
-In-Reply-To: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNARSGsyDmSYMPOMUWS+5rYPxV2v1ieWvsAsKfQN0tZnytw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  7 Mar 2016 09:33:23 +0000
+Subject: [PATCH v3 01/12] KVM: arm/arm64: vgic-v2: Avoid accessing GICH
+ registers
+In-Reply-To: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
+References: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1457343214-19547-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof and Arnd,
+GICv2 registers are *slow*. As in "terrifyingly slow". Which is bad.
+But we're equaly bad, as we make a point in accessing them even if
+we don't have any interrupt in flight.
 
+A good solution is to first find out if we have anything useful to
+write into the GIC, and if we don't, to simply not do it. This
+involves tracking which LRs actually have something valid there.
 
-I have two series for 4.6-rc1 that have not been applied yet.
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h        |  2 ++
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 72 ++++++++++++++++++++++++++++++-------------
+ 2 files changed, 52 insertions(+), 22 deletions(-)
 
- - ARM: uniphier: UniPhier updates for Linux 4.6-rc1 (2nd round)   (this series)
- - ARM: dts: uniphier: UniPhier DT updates for Linux 4.6-rc1 (2nd round)
-
-I am getting uneasy because it is already -rc7.
-
-I hope you will find some time to check them out.
-
-
-2016-02-26 16:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Olof,
->
-> Here is a small patch series for UniPhier SoC updates.
->
->
->
-> Masahiro Yamada (2):
->   ARM: uniphier: add missing of_node_put()
->   ARM: uniphier: rework SMP code to support new System Bus binding
->
->  arch/arm/mach-uniphier/platsmp.c | 26 +++++++++++++++++---------
->  1 file changed, 17 insertions(+), 9 deletions(-)
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 13a3d53..f473fd6 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -321,6 +321,8 @@ struct vgic_cpu {
+ 
+ 	/* Protected by the distributor's irq_phys_map_lock */
+ 	struct list_head	irq_phys_map_list;
++
++	u64		live_lrs;
+ };
+ 
+ #define LR_EMPTY	0xff
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index 9514a7d..aa0fdb8 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -36,28 +36,41 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ 
+ 	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+ 	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
+-	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
+-	eisr0  = readl_relaxed(base + GICH_EISR0);
+-	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+-	if (unlikely(nr_lr > 32)) {
+-		eisr1  = readl_relaxed(base + GICH_EISR1);
+-		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
+-	} else {
+-		eisr1 = elrsr1 = 0;
+-	}
++
++	if (vcpu->arch.vgic_cpu.live_lrs) {
++		eisr0  = readl_relaxed(base + GICH_EISR0);
++		elrsr0 = readl_relaxed(base + GICH_ELRSR0);
++		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
++		cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
++
++		if (unlikely(nr_lr > 32)) {
++			eisr1  = readl_relaxed(base + GICH_EISR1);
++			elrsr1 = readl_relaxed(base + GICH_ELRSR1);
++		} else {
++			eisr1 = elrsr1 = 0;
++		}
++
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+-	cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
+-	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
++		cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
++		cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
+ #else
+-	cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
+-	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
++		cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
++		cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
+ #endif
+-	cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
+ 
+-	writel_relaxed(0, base + GICH_HCR);
++		for (i = 0; i < nr_lr; i++)
++			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
++				cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+ 
+-	for (i = 0; i < nr_lr; i++)
+-		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
++		writel_relaxed(0, base + GICH_HCR);
++
++		vcpu->arch.vgic_cpu.live_lrs = 0;
++	} else {
++		cpu_if->vgic_eisr = 0;
++		cpu_if->vgic_elrsr = ~0UL;
++		cpu_if->vgic_misr = 0;
++		cpu_if->vgic_apr = 0;
++	}
+ }
+ 
+ /* vcpu is already in the HYP VA space */
+@@ -68,15 +81,30 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+ 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+ 	int i, nr_lr;
++	u64 live_lrs = 0;
+ 
+ 	if (!base)
+ 		return;
+ 
+-	writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+-	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
+-	writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+-
+ 	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
++
+ 	for (i = 0; i < nr_lr; i++)
+-		writel_relaxed(cpu_if->vgic_lr[i], base + GICH_LR0 + (i * 4));
++		if (cpu_if->vgic_lr[i] & GICH_LR_STATE)
++			live_lrs |= 1UL << i;
++
++	if (live_lrs) {
++		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
++		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
++		for (i = 0; i < nr_lr; i++) {
++			u32 val = 0;
++
++			if (live_lrs & (1UL << i))
++				val = cpu_if->vgic_lr[i];
++
++			writel_relaxed(val, base + GICH_LR0 + (i * 4));
++		}
++	}
++
++	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
++	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
+ }
 -- 
-Best Regards
-Masahiro Yamada
+2.1.4
