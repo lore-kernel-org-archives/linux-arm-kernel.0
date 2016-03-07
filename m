@@ -1,135 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Mar 2016 16:33:38 +0000 (UTC)
-Subject: OMAP baseline test results for v4.5-rc7
-Message-ID: <alpine.DEB.2.02.1603071631370.3437@utopia.booyaka.com>
+From: dianders@google.com (Doug Anderson)
+Date: Mon, 7 Mar 2016 08:34:19 -0800
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <CAD=FV=VckTVD8b1g+f0G2kMeoTjvY0pAGhoDnWQN_dAmqSxBxg@mail.gmail.com>
+References: <20151110173416.GB21727@ulmo>
+ <CAD=FV=WL3jYEgVe-m6QcAyQwfJgdX4J5OtKisKwyoKOrTSpEQA@mail.gmail.com>
+ <20160125170855.GA10182@ulmo>
+ <CAD=FV=Xvxeqo3imUmjukC5iYk3EZkrJ04G7C1B-w4xyr-r6-2Q@mail.gmail.com>
+ <20160203145337.GD9650@ulmo>
+ <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
+ <20160222175929.GA23899@ulmo>
+ <CAD=FV=UCErW3EjYRtwt49_ztNR7cyY4U0o4R_dxdomer-Ac2Dg@mail.gmail.com>
+ <20160223143859.GA27656@ulmo>
+ <CAD=FV=UvxG3MYD4MKQJqN7W68uMjd-s+FH-e8tkrLCpS0RLmZQ@mail.gmail.com>
+ <20160223181448.GA14754@ulmo.nvidia.com>
+ <CAD=FV=VM3cOQ0HqwLANBw9MVBCyFTrSyPe_dGzgPucuMUEWRKA@mail.gmail.com>
+ <CAD=FV=VckTVD8b1g+f0G2kMeoTjvY0pAGhoDnWQN_dAmqSxBxg@mail.gmail.com>
+Message-ID: <CAD=FV=W3KPf8tyMviVNB9=HjefMdP+FBbN01Zhh7RKH+gkj2WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thierry,
 
-Here are some basic OMAP test results for Linux v4.5-rc7.
-Logs and other details at:
+On Thu, Feb 25, 2016 at 3:14 PM, Doug Anderson <dianders@google.com> wrote:
+> So just to summarize:
+>
+> * Add pwm_get_state(), pwm_apply_state(), pwm_get_args().
+> pwm_get_state() initially returns 0 for duty cycle if driver doesn't
+> support readout.
+>
+> * Re-implement pwm_get_period() (and maybe other similar functions)
+> atop pwm_get_state() as you describe earlier in the thread.
+>
+> * Document pwm_get_period() (and maybe other similar functions) as deprecated.
+>
+> * Fix drivers for all current 2 users of PWM regulator to support
+> hardware readout.
+>
+> * Update PWM regulator as you described earlier in the thread (Feb 23).
+>
+> * If PWM regulator is ever used on a new board whose PWM doesn't
+> support hardware readout, the voltage will change at probe time.
+>
+>
+> Did I get all that right?  Thanks!
 
-    http://www.pwsan.com/omap/testlogs/test_v4.5-rc7/20160306184516/
+Can you provide a "yes, you got that right" or a "no, you didn't
+understand"?  That will unblock Boris, I think.
 
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (18/18): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  omap2plus_defconfig_ti81xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    (none)
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL ( 1/18): multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/18): 2430sdp
-    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
-    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
-		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
-		  cmt3517, 5430es2uevm, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 2/18): 4430es2panda, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 8/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  3530es3beagle, 3530es31beagle, 2430sdp, 5430es2uevm
-    Pass ( 3/11): 4460pandaes, 3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
-    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
-    Pass ( 1/ 4): 3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 1/18): 4430es2panda
-
-Obsolete Kconfig symbols:
-    FAIL ( 3/21): omap1_defconfig, omap2plus_defconfig,
-		  multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc6 (fc77dbd34c5c99bce46d40a2491937c3bcbd10af)):
-   text     data      bss    total  kernel
-  +1072        0        0    +1072  omap1_defconfig
-  +1072        0        0    +1072  omap1_defconfig_1510innovator_only
-  +1096        0        0    +1096  omap1_defconfig_5912osk_only
-   +766        0        0     +766  multi_v7_defconfig
-   -158        0      +64      -94  omap2plus_defconfig
-  +4742       +8        0    +4750  omap2plus_defconfig_2430sdp_only
-    -90        0      +64      -26  omap2plus_defconfig_am33xx_only
-   -154        0      +64      -90  omap2plus_defconfig_am43xx_only
-    -94        0      +64      -30  omap2plus_defconfig_cpupm
-   -154       +8      +64      -82  omap2plus_defconfig_dra7xx_only
-   +402       +8      +32     +442  omap2plus_defconfig_n800_multi_omap2xxx
-   +516        0        0     +516  omap2plus_defconfig_n800_only_a
-    -86       +8      +64      -14  omap2plus_defconfig_no_pm
-    -94        0      +64      -30  omap2plus_defconfig_omap2_4_only
-    -90        0      +64      -26  omap2plus_defconfig_omap3_4_only
-    -90        0      +64      -26  omap2plus_defconfig_omap5_only
-    -26       +8      +64      +46  omap2plus_defconfig_ti81xx_only
-   +960        0        0     +960  rmk_omap3430_ldp_allnoconfig
-   +536        0        0     +536  rmk_omap3430_ldp_oldconfig
-   +960        0        0     +960  rmk_omap4430_sdp_allnoconfig
-   +280        0        0     +280  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc6 (fc77dbd34c5c99bce46d40a2491937c3bcbd10af))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+-Doug
