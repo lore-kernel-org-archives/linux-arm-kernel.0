@@ -1,61 +1,170 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Mon,  7 Mar 2016 14:39:41 -0600
-Subject: [Patch v4 0/6] ARM: am335x/am437x/dra7: Add PWM support for DRA7
-Message-ID: <1457383187-17166-1-git-send-email-fcooper@ti.com>
+Date: Mon,  7 Mar 2016 14:39:43 -0600
+Subject: [Patch v4 2/6] ARM: dts: am437x/am33xx: Remove eCAP and ePWM hwmod
+ properties
+In-Reply-To: <1457383187-17166-1-git-send-email-fcooper@ti.com>
+References: <1457383187-17166-1-git-send-email-fcooper@ti.com>
+Message-ID: <1457383187-17166-3-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for PWM for DRA7. The IP is same as that
-present in AM33XX and AM437XX.
+ECAP and ePWM do not have OCP integration registers, have L3/L4 ports, etc.
+Therefore, they shouldn't be using hwmod at all. Remove their hwmod
+properties.
 
-However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
-and eQEP.
+For ePWM add the tbclk to the node rather than depending on hwmod to do so.
 
-This series was tested on AM335x GP, AM437x GP and X15 + LCD screen for
-PWM based backlight.
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 12 ++++++------
+ arch/arm/boot/dts/am4372.dtsi | 21 ++++++++++++---------
+ 2 files changed, 18 insertions(+), 15 deletions(-)
 
-This series was also verified to be backwards compatible with old dtbs.
-
-This series depends on the below patch series for PWM bindings cleanup:
-https://patchwork.ozlabs.org/patch/593171/
-https://patchwork.ozlabs.org/patch/593168/
-https://patchwork.ozlabs.org/patch/593165/
-https://patchwork.ozlabs.org/patch/593166/
-https://patchwork.ozlabs.org/patch/593169/
-
-V3 series:
-https://patchwork.ozlabs.org/patch/588432/
-https://patchwork.ozlabs.org/patch/588434/
-https://patchwork.ozlabs.org/patch/588433/
-https://patchwork.ozlabs.org/patch/588429/
-https://patchwork.ozlabs.org/patch/588431/
-
-Franklin S Cooper Jr (3):
-  pwms: pwm-ti*: Get the clock from the PWMSS (parent)
-  ARM: dts: am437x/am33xx: Remove eCAP and ePWM hwmod properties
-  ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and eCAP hwmod entries
-
-Vignesh R (3):
-  ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-  ARM: dts: DRA7: Add TBCLK for PWMSS
-  ARM: dts: DRA7: Add dt nodes for PWMSS
-
- .../devicetree/bindings/pwm/pwm-tiecap.txt         |  1 -
- .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 16 ++++-
- .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
- arch/arm/boot/dts/am33xx.dtsi                      | 12 ++--
- arch/arm/boot/dts/am4372.dtsi                      | 21 +++---
- arch/arm/boot/dts/dra7.dtsi                        | 60 ++++++++++++++++
- arch/arm/boot/dts/dra7xx-clocks.dtsi               | 24 +++++++
- .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
- .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 -----------------
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 ----------------------
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 --------------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 83 +++++++++++++++++++++
- drivers/pwm/pwm-tiecap.c                           |  2 +-
- drivers/pwm/pwm-tiehrpwm.c                         |  2 +-
- 15 files changed, 214 insertions(+), 251 deletions(-)
-
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 82c0976..1dd6c78 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -682,7 +682,6 @@
+ 				reg = <0x48300100 0x80>;
+ 				interrupts = <31>;
+ 				interrupt-names = "ecap0";
+-				ti,hwmods = "ecap0";
+ 				status = "disabled";
+ 			};
+ 
+@@ -690,7 +689,8 @@
+ 				compatible = "ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48300200 0x80>;
+-				ti,hwmods = "ehrpwm0";
++				clocks = <&ehrpwm0_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -710,7 +710,6 @@
+ 				reg = <0x48302100 0x80>;
+ 				interrupts = <47>;
+ 				interrupt-names = "ecap1";
+-				ti,hwmods = "ecap1";
+ 				status = "disabled";
+ 			};
+ 
+@@ -718,7 +717,8 @@
+ 				compatible = "ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48302200 0x80>;
+-				ti,hwmods = "ehrpwm1";
++				clocks = <&ehrpwm1_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -738,7 +738,6 @@
+ 				reg = <0x48304100 0x80>;
+ 				interrupts = <61>;
+ 				interrupt-names = "ecap2";
+-				ti,hwmods = "ecap2";
+ 				status = "disabled";
+ 			};
+ 
+@@ -746,7 +745,8 @@
+ 				compatible = "ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48304200 0x80>;
+-				ti,hwmods = "ehrpwm2";
++				clocks = <&ehrpwm2_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 33f417c..685c8db 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -675,7 +675,6 @@
+ 				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48300100 0x80>;
+-				ti,hwmods = "ecap0";
+ 				status = "disabled";
+ 			};
+ 
+@@ -683,7 +682,8 @@
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48300200 0x80>;
+-				ti,hwmods = "ehrpwm0";
++				clocks = <&ehrpwm0_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -701,7 +701,6 @@
+ 				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48302100 0x80>;
+-				ti,hwmods = "ecap1";
+ 				status = "disabled";
+ 			};
+ 
+@@ -709,7 +708,8 @@
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48302200 0x80>;
+-				ti,hwmods = "ehrpwm1";
++				clocks = <&ehrpwm1_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -727,7 +727,6 @@
+ 				compatible = "ti,am4372-ecap","ti,am33xx-ecap";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48304100 0x80>;
+-				ti,hwmods = "ecap2";
+ 				status = "disabled";
+ 			};
+ 
+@@ -735,7 +734,8 @@
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48304200 0x80>;
+-				ti,hwmods = "ehrpwm2";
++				clocks = <&ehrpwm2_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -753,7 +753,8 @@
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48306200 0x80>;
+-				ti,hwmods = "ehrpwm3";
++				clocks = <&ehrpwm3_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -771,7 +772,8 @@
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48308200 0x80>;
+-				ti,hwmods = "ehrpwm4";
++				clocks = <&ehrpwm4_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -789,7 +791,8 @@
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x4830a200 0x80>;
+-				ti,hwmods = "ehrpwm5";
++				clocks = <&ehrpwm5_tbclk>;
++				clock-names = "tbclk";
+ 				status = "disabled";
+ 			};
+ 		};
 -- 
 2.7.0
