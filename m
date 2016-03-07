@@ -1,22 +1,61 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 7 Mar 2016 12:34:10 -0800
-Subject: [PATCH v4 1/7] mtd: spi-nor: fsl-quadspi: add big-endian support
-In-Reply-To: <1453793041-35868-1-git-send-email-yao.yuan@freescale.com>
-References: <1453793041-35868-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20160307203410.GX55664@google.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon,  7 Mar 2016 14:39:41 -0600
+Subject: [Patch v4 0/6] ARM: am335x/am437x/dra7: Add PWM support for DRA7
+Message-ID: <1457383187-17166-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 03:23:55PM +0800, Yuan Yao wrote:
-> Add R/W functions for big- or little-endian registers:
-> The qSPI controller's endian is independent of the CPU core's endian.
-> So far, the qSPI have two versions for big-endian and little-endian.
-> 
-> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
-> Acked-by: Han xu <han.xu@freescale.com>
+This patch series adds support for PWM for DRA7. The IP is same as that
+present in AM33XX and AM437XX.
 
-Pushed patches 1, 2, 3, 5, and 7 to l2-mtd.git. Patch 4 seems unrelated,
-and patch 6 should go through arm-soc.
+However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
+and eQEP.
 
-Regards,
-Brian
+This series was tested on AM335x GP, AM437x GP and X15 + LCD screen for
+PWM based backlight.
+
+This series was also verified to be backwards compatible with old dtbs.
+
+This series depends on the below patch series for PWM bindings cleanup:
+https://patchwork.ozlabs.org/patch/593171/
+https://patchwork.ozlabs.org/patch/593168/
+https://patchwork.ozlabs.org/patch/593165/
+https://patchwork.ozlabs.org/patch/593166/
+https://patchwork.ozlabs.org/patch/593169/
+
+V3 series:
+https://patchwork.ozlabs.org/patch/588432/
+https://patchwork.ozlabs.org/patch/588434/
+https://patchwork.ozlabs.org/patch/588433/
+https://patchwork.ozlabs.org/patch/588429/
+https://patchwork.ozlabs.org/patch/588431/
+
+Franklin S Cooper Jr (3):
+  pwms: pwm-ti*: Get the clock from the PWMSS (parent)
+  ARM: dts: am437x/am33xx: Remove eCAP and ePWM hwmod properties
+  ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and eCAP hwmod entries
+
+Vignesh R (3):
+  ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+  ARM: dts: DRA7: Add TBCLK for PWMSS
+  ARM: dts: DRA7: Add dt nodes for PWMSS
+
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         |  1 -
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 16 ++++-
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
+ arch/arm/boot/dts/am33xx.dtsi                      | 12 ++--
+ arch/arm/boot/dts/am4372.dtsi                      | 21 +++---
+ arch/arm/boot/dts/dra7.dtsi                        | 60 ++++++++++++++++
+ arch/arm/boot/dts/dra7xx-clocks.dtsi               | 24 +++++++
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 -----------------
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 ----------------------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 --------------
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 83 +++++++++++++++++++++
+ drivers/pwm/pwm-tiecap.c                           |  2 +-
+ drivers/pwm/pwm-tiehrpwm.c                         |  2 +-
+ 15 files changed, 214 insertions(+), 251 deletions(-)
+
+-- 
+2.7.0
