@@ -1,45 +1,32 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 7 Mar 2016 17:17:35 +0200
-Subject: [PATCH v2 08/10] ARM: clk: dra7xx: Correct mcasp8_ahclkx_mux name
+Date: Mon, 7 Mar 2016 17:17:32 +0200
+Subject: [PATCH v2 05/10] ARM: DTS: dra72-evm: Enable AFIFO use for McASP3
 In-Reply-To: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1457363857-20797-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1457363857-20797-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rename the mcasp8_ahclk_mux to mcasp8_ahclkx_mux.
+Since we switched to use eDMA we can now safely enable the FIFO in McASP.
+This will reduce the chance of McASP level under/overflow.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 2 +-
- drivers/clk/ti/clk-7xx.c             | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/dra72-evm.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index d0bae06b7eb7..4d614b3c7ec2 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1856,7 +1856,7 @@
- 		reg = <0x1908>;
- 	};
+diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+index 6affe2d137da..bdfc9476f036 100644
+--- a/arch/arm/boot/dts/dra72-evm.dts
++++ b/arch/arm/boot/dts/dra72-evm.dts
+@@ -834,6 +834,8 @@
+ 	serial-dir = <  /* 0: INACTIVE, 1: TX, 2: RX */
+ 		1 2 0 0
+ 	>;
++	tx-num-evt = <32>;
++	rx-num-evt = <32>;
+ };
  
--	mcasp8_ahclk_mux: mcasp8_ahclk_mux {
-+	mcasp8_ahclkx_mux: mcasp8_ahclkx_mux {
- 		#clock-cells = <0>;
- 		compatible = "ti,mux-clock";
- 		clocks = <&abe_24m_fclk>, <&abe_sys_clk_div>, <&func_24m_clk>, <&atl_clkin3_ck>, <&atl_clkin2_ck>, <&atl_clkin1_ck>, <&atl_clkin0_ck>, <&sys_clkin2>, <&ref_clkin0_ck>, <&ref_clkin1_ck>, <&ref_clkin2_ck>, <&ref_clkin3_ck>, <&mlb_clk>, <&mlbp_clk>;
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index a911d7de3377..6b5a309d9939 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -223,7 +223,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- 	DT_CLK(NULL, "mcasp6_aux_gfclk_mux", "mcasp6_aux_gfclk_mux"),
- 	DT_CLK(NULL, "mcasp7_ahclkx_mux", "mcasp7_ahclkx_mux"),
- 	DT_CLK(NULL, "mcasp7_aux_gfclk_mux", "mcasp7_aux_gfclk_mux"),
--	DT_CLK(NULL, "mcasp8_ahclk_mux", "mcasp8_ahclk_mux"),
-+	DT_CLK(NULL, "mcasp8_ahclkx_mux", "mcasp8_ahclkx_mux"),
- 	DT_CLK(NULL, "mcasp8_aux_gfclk_mux", "mcasp8_aux_gfclk_mux"),
- 	DT_CLK(NULL, "mmc1_fclk_mux", "mmc1_fclk_mux"),
- 	DT_CLK(NULL, "mmc1_fclk_div", "mmc1_fclk_div"),
+ &mailbox5 {
 -- 
 2.7.2
