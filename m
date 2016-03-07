@@ -1,38 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 7 Mar 2016 21:10:16 +0100
-Subject: [PATCH 0/3] video: fbdev: imxfb: make it work again
-In-Reply-To: <CAOMZO5BxrVHNq8BdOqAqkaOqC905+AOSkFtsrWFHbz4cfN=Kaw@mail.gmail.com>
-References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAOMZO5BxrVHNq8BdOqAqkaOqC905+AOSkFtsrWFHbz4cfN=Kaw@mail.gmail.com>
-Message-ID: <20160307201016.GB31868@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Mar 2016 21:30:24 +0100
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160307160857.577bb04d@bbrezillon>
+References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160307145429.GG11154@localhost>
+ <20160307160857.577bb04d@bbrezillon>
+Message-ID: <20160307203024.GD8418@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 05:03:53PM -0300, Fabio Estevam wrote:
-> Hi Uwe,
+On Mon, Mar 07, 2016 at 04:08:57PM +0100, Boris Brezillon wrote:
+> Hi Vinod,
 > 
-> On Mon, Mar 7, 2016 at 4:53 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > Hello,
-> >
-> > it seems the imxfb driver stopped working quite some time ago. Here come
+> On Mon, 7 Mar 2016 20:24:29 +0530
+> Vinod Koul <vinod.koul@intel.com> wrote:
 > 
-> Yes, I noticed it has been broken for a long time.
+> > On Mon, Mar 07, 2016 at 10:59:31AM +0100, Boris Brezillon wrote:
+> > > +/* Dedicated DMA parameter register layout */
+> > > +#define SUN4I_DDMA_PARA_DST_DATA_BLK_SIZE(n)	(((n) - 1) << 24)
+> > > +#define SUN4I_DDMA_PARA_DST_WAIT_CYCLES(n)	(((n) - 1) << 16)
+> > > +#define SUN4I_DDMA_PARA_SRC_DATA_BLK_SIZE(n)	(((n) - 1) << 8)
+> > > +#define SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(n)	(((n) - 1) << 0)
+> > > +
+> > > +/**
+> > > + * struct sun4i_dma_chan_config - DMA channel config
+> > > + *
+> > > + * @para: contains information about block size and time before checking
+> > > + *	  DRQ line. This is device specific and only applicable to dedicated
+> > > + *	  DMA channels
+> > 
+> > What information, can you elobrate.. And why can't you use existing
+> > dma_slave_config for this?
 > 
-> After this fix I managed to get it working again:
+> Block size is related to the device FIFO size. I guess it allows the
+> DMA channel to launch a transfer of X bytes without having to check the
+> DRQ line (the line telling the DMA engine it can transfer more data
+> to/from the device). The wait cycles information is apparently related
+> to the number of clks the engine should wait before polling/checking
+> the DRQ line status between each block transfer. I'm not sure what it
+> saves to put WAIT_CYCLES() to something != 1, but in their BSP,
+> Allwinner tweak that depending on the device.
 > 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/video/fbdev/imxfb.c?id=b82fe6ddd782f847332aeabf8cab980852f61629
+> Note that I'd be happy if the above configuration could go into the
+> generic dma_slave_config struct. This way we could avoid per-engine
+> specific APIs.
 
-I missed this one, but it works for me also without this patch (maybe
-because my bootloader is aware of the display?).
+And I'd really like to avoid that too. That will avoid to cripple the
+consumer drivers that might be using any of the two.
 
-My problem was that the handling for the optional regulator was
-wrong/nonexistent. imx25-pdk.dts doesn't use it and so doesn't suffer
-the corresponding problems.
-
-Best regards
-Uwe
+Thanks!
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/b820fc6c/attachment.sig>
