@@ -1,42 +1,28 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Mon,  7 Mar 2016 13:51:58 -0600
-Subject: [PATCH 5/5] pwm: pwm-tiehrpwm: Update dt binding document to use
- generic node name
-In-Reply-To: <1457380318-15452-1-git-send-email-fcooper@ti.com>
-References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
-Message-ID: <1457380318-15452-6-git-send-email-fcooper@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon,  7 Mar 2016 20:53:42 +0100
+Subject: [PATCH 0/3] video: fbdev: imxfb: make it work again
+Message-ID: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the node name has been changed from ehrpwm to pwm the document
-should show this proper usage. Also change the unit address in the example
-from 0 to the proper physical address value that should be used.
+Hello,
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+it seems the imxfb driver stopped working quite some time ago. Here come
+some fixes to convince the driver to operate again. This is a cleanup of
+the RFC patch "video: fbdev: imxfb: make the driver cooperate" I sent
+last week (Message-Id:
+1456829223-1526-1-git-send-email-u.kleine-koenig at pengutronix.de).
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-index 9c100b2..20211ed 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-@@ -15,14 +15,14 @@ Optional properties:
- 
- Example:
- 
--ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
-+ehrpwm0: pwm at 48300200 { /* EHRPWM on am33xx */
- 	compatible = "ti,am33xx-ehrpwm";
- 	#pwm-cells = <3>;
- 	reg = <0x48300200 0x100>;
- 	ti,hwmods = "ehrpwm0";
- };
- 
--ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
-+ehrpwm0: pwm at 01f00000 { /* EHRPWM on da850 */
- 	compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- 	#pwm-cells = <3>;
- 	reg = <0x300000 0x2000>;
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (3):
+  video: fbdev: imxfb: fix semantic of .get_power and .set_power
+  video: fbdev: imxfb: enable lcd regulator in .probe
+  video: fbdev: imxfb: add some error handling
+
+ drivers/video/fbdev/imxfb.c | 48 +++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 38 insertions(+), 10 deletions(-)
+
 -- 
 2.7.0
