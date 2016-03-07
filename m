@@ -1,44 +1,26 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 7 Mar 2016 10:01:53 +0100
-Subject: [PATCH 4/4] documentation: Fix pinctrl documentation for Meson8 /
- Meson8b
-In-Reply-To: <20160305042646.GL13525@rob-hp-laptop>
-References: <1456869876-19320-1-git-send-email-carlo@caione.org>
- <1456869876-19320-5-git-send-email-carlo@caione.org>
- <20160305042646.GL13525@rob-hp-laptop>
-Message-ID: <CAOQ7t2bd5-xeUkwjN4cqi=xa602B8JwZ4vvrUF1VL4y2=pkV_Q@mail.gmail.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Mon, 07 Mar 2016 10:12:55 +0100
+Subject: 4.4.3: OOPS when running "stress-ng --sock 5"
+In-Reply-To: <87twkmd6or.fsf@gmail.com> (Holger Schurig's message of "Fri, 04
+ Mar 2016 08:48:52 +0100")
+References: <87twkmd6or.fsf@gmail.com>
+Message-ID: <87fuw2d52g.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 5, 2016 at 5:26 AM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Mar 01, 2016 at 11:04:36PM +0100, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Fix pin controller documentation with the new compatibles.
->
-> What was wrong with it? (answer in the commit msg)
+I compared my config with imx_v6_v7_defconfig which didn't segfault.
 
-I'll extend the commit message.
+After I turned on CONFIG_SWAP, my segfault vanished.
 
-[...]
->>  Required properties for the root node:
->> - - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
->> + - compatible: "amlogic,meson8-cbus-pinctrl", "amlogic,meson8b-cbus-pinctrl",
->> +   "amlogic,meson8-aobus-pinctrl" or "amlogic,meson8b-aobus-pinctrl"
->
-> Reformat with 1 per line (assuming each are mutually exclusive).
+I did turn off CONFIG_SWAP because my device only has SD-Card and eMMC.
+So I never intended to create a swap partition. And thought "why compile
+it in the kernel when I never use it?".
 
-ok
+But it seems the kernel is instable with this setting.
 
-[...]
->> -Valid sub-node names are:
->> - - "banks" for the regular domain
->> - - "ao-bank" for the always-on domain
->> -
->
-> Why are these being removed?
+So we have a potential denial-of-service in kernels compiled without
+CONFIG_SWAP, don't we? At least when it comes to skb handling.
 
-Because we are not forced anymore to use those specific names for the sub-nodes.
-
--- 
-Carlo Caione
+Other memory tests never showed anything weird, and my system is running
+X11 with some Qt applications as well as Java applications since about a
+year without trouble. During all this time without CONFIG_SWAP.
