@@ -1,34 +1,214 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Mar 2016 11:45:20 +0700
-Subject: [PATCH 3/7 v2] video: ARM CLCD: support DT signal inversion flags
-In-Reply-To: <56D02A3A.6010701@ti.com>
-References: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
- <1456221704-5792-4-git-send-email-linus.walleij@linaro.org>
- <56D02A3A.6010701@ti.com>
-Message-ID: <CACRpkdbeY5+Rsiomf66PQ2R=62BvMAW-QjYHUx-x9NgJT35StQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 6 Mar 2016 21:41:06 -0800
+Subject: linux-next: manual merge of the watchdog tree with the arm-soc
+ tree
+In-Reply-To: <20160307150402.191ba735@canb.auug.org.au>
+References: <20160307150402.191ba735@canb.auug.org.au>
+Message-ID: <CAOesGMjD51rNqd3V8BE6xHkYZQdB8nc_Azppk1U+m8GwrtUv6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 5:34 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+Hi Wim,
 
->> +     /* Set up some inversion flags */
->> +     timnp = of_get_child_by_name(node, "panel-timing");
->> +     if (timnp && of_property_read_bool(timnp, "pixelclk-active")) {
+It's much easier for us if all DTS changes go in through the arm-soc
+trees, to avoid these kind of conflicts. Is this on a branch where you
+can easily drop it and we pick it up instead, or is it on a now-stable
+branch?
+
+
+-Olof
+
+On Sun, Mar 6, 2016 at 8:04 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi Wim,
 >
-> Hmm, why are you poking in the videomode DT properties directly?
-
-It is to provide
-backward compatibility with already deployed device trees that
-do not have this property set, so that they default to negative edge
-rather than positive edge.
-
-> If the
-> pixelclk-active was not defined in the DT, you should see it in the
-> videomode struct as neither DISPLAY_FLAGS_PIXDATA_POSEDGE nor
-> DISPLAY_FLAGS_PIXDATA_NEGEDGE being set (I think, I didn't go through
-> the code in detail).
-
-OK I'll take a look!
-
-Yours,
-Linus Walleij
+> Today's linux-next merge of the watchdog tree got a conflict in:
+>
+>   arch/arm64/boot/dts/arm/foundation-v8.dts
+>
+> between commit:
+>
+>   d11a89796678 ("arm64: dts: split Foundation model dts to put the GIC separately")
+>
+> from the arm-soc tree and commit:
+>
+>   fe3a97e8ed02 ("ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts")
+>
+> from the watchdog tree.
+>
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+>
+> --
+> Cheers,
+> Stephen Rothwell
+>
+> diff --cc arch/arm64/boot/dts/arm/foundation-v8.dts
+> index 71168077312d,66cb9aaa9135..000000000000
+> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
+> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
+> @@@ -18,4 -83,165 +18,11 @@@
+>                       <0x0 0x2c006000 0 0x2000>;
+>                 interrupts = <1 9 0xf04>;
+>         };
+>  -
+>  -      timer {
+>  -              compatible = "arm,armv8-timer";
+>  -              interrupts = <1 13 0xf08>,
+>  -                           <1 14 0xf08>,
+>  -                           <1 11 0xf08>,
+>  -                           <1 10 0xf08>;
+>  -              clock-frequency = <100000000>;
+>  -      };
+>  -
+>  -      pmu {
+>  -              compatible = "arm,armv8-pmuv3";
+>  -              interrupts = <0 60 4>,
+>  -                           <0 61 4>,
+>  -                           <0 62 4>,
+>  -                           <0 63 4>;
+>  -      };
+>  -
+>  -      smb {
+>  -              compatible = "arm,vexpress,v2m-p1", "simple-bus";
+>  -              arm,v2m-memory-map = "rs1";
+>  -              #address-cells = <2>; /* SMB chipselect number and offset */
+>  -              #size-cells = <1>;
+>  -
+>  -              ranges = <0 0 0 0x08000000 0x04000000>,
+>  -                       <1 0 0 0x14000000 0x04000000>,
+>  -                       <2 0 0 0x18000000 0x04000000>,
+>  -                       <3 0 0 0x1c000000 0x04000000>,
+>  -                       <4 0 0 0x0c000000 0x04000000>,
+>  -                       <5 0 0 0x10000000 0x04000000>;
+>  -
+>  -              #interrupt-cells = <1>;
+>  -              interrupt-map-mask = <0 0 63>;
+>  -              interrupt-map = <0 0  0 &gic 0  0 4>,
+>  -                              <0 0  1 &gic 0  1 4>,
+>  -                              <0 0  2 &gic 0  2 4>,
+>  -                              <0 0  3 &gic 0  3 4>,
+>  -                              <0 0  4 &gic 0  4 4>,
+>  -                              <0 0  5 &gic 0  5 4>,
+>  -                              <0 0  6 &gic 0  6 4>,
+>  -                              <0 0  7 &gic 0  7 4>,
+>  -                              <0 0  8 &gic 0  8 4>,
+>  -                              <0 0  9 &gic 0  9 4>,
+>  -                              <0 0 10 &gic 0 10 4>,
+>  -                              <0 0 11 &gic 0 11 4>,
+>  -                              <0 0 12 &gic 0 12 4>,
+>  -                              <0 0 13 &gic 0 13 4>,
+>  -                              <0 0 14 &gic 0 14 4>,
+>  -                              <0 0 15 &gic 0 15 4>,
+>  -                              <0 0 16 &gic 0 16 4>,
+>  -                              <0 0 17 &gic 0 17 4>,
+>  -                              <0 0 18 &gic 0 18 4>,
+>  -                              <0 0 19 &gic 0 19 4>,
+>  -                              <0 0 20 &gic 0 20 4>,
+>  -                              <0 0 21 &gic 0 21 4>,
+>  -                              <0 0 22 &gic 0 22 4>,
+>  -                              <0 0 23 &gic 0 23 4>,
+>  -                              <0 0 24 &gic 0 24 4>,
+>  -                              <0 0 25 &gic 0 25 4>,
+>  -                              <0 0 26 &gic 0 26 4>,
+>  -                              <0 0 27 &gic 0 27 4>,
+>  -                              <0 0 28 &gic 0 28 4>,
+>  -                              <0 0 29 &gic 0 29 4>,
+>  -                              <0 0 30 &gic 0 30 4>,
+>  -                              <0 0 31 &gic 0 31 4>,
+>  -                              <0 0 32 &gic 0 32 4>,
+>  -                              <0 0 33 &gic 0 33 4>,
+>  -                              <0 0 34 &gic 0 34 4>,
+>  -                              <0 0 35 &gic 0 35 4>,
+>  -                              <0 0 36 &gic 0 36 4>,
+>  -                              <0 0 37 &gic 0 37 4>,
+>  -                              <0 0 38 &gic 0 38 4>,
+>  -                              <0 0 39 &gic 0 39 4>,
+>  -                              <0 0 40 &gic 0 40 4>,
+>  -                              <0 0 41 &gic 0 41 4>,
+>  -                              <0 0 42 &gic 0 42 4>;
+>  -
+>  -              ethernet at 2,02000000 {
+>  -                      compatible = "smsc,lan91c111";
+>  -                      reg = <2 0x02000000 0x10000>;
+>  -                      interrupts = <15>;
+>  -              };
+>  -
+>  -              v2m_clk24mhz: clk24mhz {
+>  -                      compatible = "fixed-clock";
+>  -                      #clock-cells = <0>;
+>  -                      clock-frequency = <24000000>;
+>  -                      clock-output-names = "v2m:clk24mhz";
+>  -              };
+>  -
+>  -              v2m_refclk1mhz: refclk1mhz {
+>  -                      compatible = "fixed-clock";
+>  -                      #clock-cells = <0>;
+>  -                      clock-frequency = <1000000>;
+>  -                      clock-output-names = "v2m:refclk1mhz";
+>  -              };
+>  -
+>  -              v2m_refclk32khz: refclk32khz {
+>  -                      compatible = "fixed-clock";
+>  -                      #clock-cells = <0>;
+>  -                      clock-frequency = <32768>;
+>  -                      clock-output-names = "v2m:refclk32khz";
+>  -              };
+>  -
+>  -              iofpga at 3,00000000 {
+>  -                      compatible = "arm,amba-bus", "simple-bus";
+>  -                      #address-cells = <1>;
+>  -                      #size-cells = <1>;
+>  -                      ranges = <0 3 0 0x200000>;
+>  -
+>  -                      v2m_sysreg: sysreg at 010000 {
+>  -                              compatible = "arm,vexpress-sysreg";
+>  -                              reg = <0x010000 0x1000>;
+>  -                      };
+>  -
+>  -                      v2m_serial0: uart at 090000 {
+>  -                              compatible = "arm,pl011", "arm,primecell";
+>  -                              reg = <0x090000 0x1000>;
+>  -                              interrupts = <5>;
+>  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+>  -                              clock-names = "uartclk", "apb_pclk";
+>  -                      };
+>  -
+>  -                      v2m_serial1: uart at 0a0000 {
+>  -                              compatible = "arm,pl011", "arm,primecell";
+>  -                              reg = <0x0a0000 0x1000>;
+>  -                              interrupts = <6>;
+>  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+>  -                              clock-names = "uartclk", "apb_pclk";
+>  -                      };
+>  -
+>  -                      v2m_serial2: uart at 0b0000 {
+>  -                              compatible = "arm,pl011", "arm,primecell";
+>  -                              reg = <0x0b0000 0x1000>;
+>  -                              interrupts = <7>;
+>  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+>  -                              clock-names = "uartclk", "apb_pclk";
+>  -                      };
+>  -
+>  -                      v2m_serial3: uart at 0c0000 {
+>  -                              compatible = "arm,pl011", "arm,primecell";
+>  -                              reg = <0x0c0000 0x1000>;
+>  -                              interrupts = <8>;
+>  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
+>  -                              clock-names = "uartclk", "apb_pclk";
+>  -                      };
+>  -
+>  -                      virtio_block at 0130000 {
+>  -                              compatible = "virtio,mmio";
+>  -                              reg = <0x130000 0x200>;
+>  -                              interrupts = <42>;
+>  -                      };
+>  -              };
+>  -      };
+> +       watchdog at 2a440000 {
+> +               compatible = "arm,sbsa-gwdt";
+> +               reg = <0x0 0x2a440000 0 0x1000>,
+> +                       <0x0 0x2a450000 0 0x1000>;
+> +               interrupts = <0 27 4>;
+> +               timeout-sec = <30>;
+> +       };
+>   };
