@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 10:47:22 +0100
-Subject: [PATCH v4 32/52] mtd: nand: docg4: switch to mtd_ooblayout_ops
+Date: Mon,  7 Mar 2016 10:47:18 +0100
+Subject: [PATCH v4 28/52] mtd: nand: cafe: switch to mtd_ooblayout_ops
 In-Reply-To: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457344062-11633-33-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457344062-11633-29-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,66 +12,81 @@ ECC/OOB layout to MTD users.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/docg4.c | 33 ++++++++++++++++++++++++++++-----
- 1 file changed, 28 insertions(+), 5 deletions(-)
+ drivers/mtd/nand/cafe_nand.c | 44 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 32 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mtd/nand/docg4.c b/drivers/mtd/nand/docg4.c
-index fb46fd7..f5ca9a5 100644
---- a/drivers/mtd/nand/docg4.c
-+++ b/drivers/mtd/nand/docg4.c
-@@ -222,10 +222,33 @@ struct docg4_priv {
-  * Bytes 8 - 14 are hw-generated ecc covering entire page + oob bytes 0 - 14.
-  * Byte 15 (the last) is used by the driver as a "page written" flag.
-  */
--static struct nand_ecclayout docg4_oobinfo = {
--	.eccbytes = 9,
--	.eccpos = {7, 8, 9, 10, 11, 12, 13, 14, 15},
--	.oobfree = { {.offset = 2, .length = 5} }
-+static int docg4_ooblayout_ecc(struct mtd_info *mtd, int section,
+diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
+index aa1a616..3d59330 100644
+--- a/drivers/mtd/nand/cafe_nand.c
++++ b/drivers/mtd/nand/cafe_nand.c
+@@ -459,10 +459,37 @@ static int cafe_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 	return max_bitflips;
+ }
+ 
+-static struct nand_ecclayout cafe_oobinfo_2048 = {
+-	.eccbytes = 14,
+-	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
+-	.oobfree = {{14, 50}}
++static int cafe_ooblayout_ecc(struct mtd_info *mtd, int section,
++			      struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++
++	if (section)
++		return -ERANGE;
++
++	oobregion->offset = 0;
++	oobregion->length = chip->ecc.total;
++
++	return 0;
++}
++
++static int cafe_ooblayout_free(struct mtd_info *mtd, int section,
 +			       struct mtd_oob_region *oobregion)
 +{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++
 +	if (section)
 +		return -ERANGE;
 +
-+	oobregion->offset = 7;
-+	oobregion->length = 9;
++	oobregion->offset = chip->ecc.total;
++	oobregion->length = mtd->oobsize - chip->ecc.total;
 +
 +	return 0;
 +}
 +
-+static int docg4_ooblayout_free(struct mtd_info *mtd, int section,
-+				struct mtd_oob_region *oobregion)
-+{
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = 2;
-+	oobregion->length = 5;
-+
-+	return 0;
-+}
-+
-+static const struct mtd_ooblayout_ops docg4_ooblayout_ops = {
-+	.ecc = docg4_ooblayout_ecc,
-+	.free = docg4_ooblayout_free,
++static const struct mtd_ooblayout_ops cafe_ooblayout_ops = {
++	.ecc = cafe_ooblayout_ecc,
++	.free = cafe_ooblayout_free,
  };
  
- /*
-@@ -1209,6 +1232,7 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
- 	mtd->writesize = DOCG4_PAGE_SIZE;
- 	mtd->erasesize = DOCG4_BLOCK_SIZE;
- 	mtd->oobsize = DOCG4_OOB_SIZE;
-+	mtd_set_ooblayout(mtd, &docg4_ooblayout_ops);
- 	nand->chipsize = DOCG4_CHIP_SIZE;
- 	nand->chip_shift = DOCG4_CHIP_SHIFT;
- 	nand->bbt_erase_shift = nand->phys_erase_shift = DOCG4_ERASE_SHIFT;
-@@ -1217,7 +1241,6 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
- 	nand->pagemask = 0x3ffff;
- 	nand->badblockpos = NAND_LARGE_BADBLOCK_POS;
- 	nand->badblockbits = 8;
--	nand->ecc.layout = &docg4_oobinfo;
- 	nand->ecc.mode = NAND_ECC_HW_SYNDROME;
- 	nand->ecc.size = DOCG4_PAGE_SIZE;
- 	nand->ecc.prepad = 8;
+ /* Ick. The BBT code really ought to be able to work this bit out
+@@ -494,12 +521,6 @@ static struct nand_bbt_descr cafe_bbt_mirror_descr_2048 = {
+ 	.pattern = cafe_mirror_pattern_2048
+ };
+ 
+-static struct nand_ecclayout cafe_oobinfo_512 = {
+-	.eccbytes = 14,
+-	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
+-	.oobfree = {{14, 2}}
+-};
+-
+ static struct nand_bbt_descr cafe_bbt_main_descr_512 = {
+ 	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
+ 		| NAND_BBT_2BIT | NAND_BBT_VERSION,
+@@ -743,12 +764,11 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+ 		cafe->ctl2 |= 1<<29; /* 2KiB page size */
+ 
+ 	/* Set up ECC according to the type of chip we found */
++	mtd_set_ooblayout(mtd, &cafe_ooblayout_ops);
+ 	if (mtd->writesize == 2048) {
+-		cafe->nand.ecc.layout = &cafe_oobinfo_2048;
+ 		cafe->nand.bbt_td = &cafe_bbt_main_descr_2048;
+ 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_2048;
+ 	} else if (mtd->writesize == 512) {
+-		cafe->nand.ecc.layout = &cafe_oobinfo_512;
+ 		cafe->nand.bbt_td = &cafe_bbt_main_descr_512;
+ 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_512;
+ 	} else {
 -- 
 2.1.4
