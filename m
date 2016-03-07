@@ -1,47 +1,32 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 17:20:54 +0100
-Subject: [PATCH 09/16] mtd: nand: sunxi: let the NAND controller control the
- CE line
+Date: Mon,  7 Mar 2016 17:21:29 +0100
+Subject: [PATCH 10/16] mtd: nand: sunxi: fix the NFC_ECC_ERR_CNT() macro
 In-Reply-To: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457367654-26288-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457367695-26420-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need to manually toggle the CE line since the controller handles
-it for us. Moreover, keeping the CE line low when interacting with a DDR
-NAND can be problematic (data loss in some corner cases).
+NFC_ECC_ERR_CNT() is not taking into account the case when the NAND chip
+contains more than 4 ECC blocks (NANDs with 4kB+ pages).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/mtd/nand/sunxi_nand.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index db5446e..25a167f 100644
+index 25a167f..c1ab33a 100644
 --- a/drivers/mtd/nand/sunxi_nand.c
 +++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -515,21 +515,11 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
- 	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
- 	int ret;
--	u32 tmp;
+@@ -155,7 +155,7 @@
+ /* define bit use in NFC_ECC_ST */
+ #define NFC_ECC_ERR(x)		BIT(x)
+ #define NFC_ECC_PAT_FOUND(x)	BIT(x + 16)
+-#define NFC_ECC_ERR_CNT(b, x)	(((x) >> ((b) * 8)) & 0xff)
++#define NFC_ECC_ERR_CNT(b, x)	(((x) >> (((b) % 4) * 8)) & 0xff)
  
- 	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
- 	if (ret)
- 		return;
+ #define NFC_DEFAULT_TIMEOUT_MS	1000
  
--	if (ctrl & NAND_CTRL_CHANGE) {
--		tmp = readl(nfc->regs + NFC_REG_CTL);
--		if (ctrl & NAND_NCE)
--			tmp |= NFC_CE_CTL;
--		else
--			tmp &= ~NFC_CE_CTL;
--		writel(tmp, nfc->regs + NFC_REG_CTL);
--	}
--
- 	if (dat == NAND_CMD_NONE && (ctrl & NAND_NCE) &&
- 	    !(ctrl & (NAND_CLE | NAND_ALE))) {
- 		u32 cmd = 0;
 -- 
 2.1.4
