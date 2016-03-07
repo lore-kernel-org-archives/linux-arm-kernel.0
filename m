@@ -1,34 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 7 Mar 2016 10:32:15 +0700
-Subject: [GIT PULL 2/4] ARM: imx: device tree changes for 4.6
-In-Reply-To: <1580747.WVsjDBS4QB@wuerfel>
-References: <1456844403-26176-1-git-send-email-shawnguo@kernel.org>
- <1456844403-26176-2-git-send-email-shawnguo@kernel.org>
- <1580747.WVsjDBS4QB@wuerfel>
-Message-ID: <20160307033214.GB5051@x250>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Mar 2016 10:33:35 +0700
+Subject: [PATCH v3 04/10] drivers: pinctrl: add driver for Allwinner A64
+ SoC
+In-Reply-To: <1456165255-31013-5-git-send-email-andre.przywara@arm.com>
+References: <1456165255-31013-1-git-send-email-andre.przywara@arm.com>
+ <1456165255-31013-5-git-send-email-andre.przywara@arm.com>
+Message-ID: <CACRpkdYo+DhXd+7zQwnkXHPVYieE1r21Taib77SkW_sKd_Rmqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 09:26:29PM +0100, Arnd Bergmann wrote:
-> On Tuesday 01 March 2016 23:00:01 Shawn Guo wrote:
-> > Hi arm-soc maintainers,
-> > 
-> > This is the i.MX device tree updates for 4.6.  To resolve the dependency
-> > between clock drivers and DTS files on some new clock ID additions, the
-> > branch imx/clk are pulled into the branch.  The imx/clk changes have
-> > been sent to clk folks as a stable branch.
-> 
-> I'm not overly happy with this: you are pulling in a rather big
-> change to the clk driver in the middle of a huge pull request,
-> and this is the first pull request for the 4.6 cycle.
-> 
-> The changes otherwise all look reasonable, so I've put it all into
-> a next/dt2 branch. Please try to stage things out a little more
-> again next time: send the bulk of the changes a little earlier
-> if you can, and put changes that require other dependencies into
-> separate branches.
+On Tue, Feb 23, 2016 at 1:20 AM, Andre Przywara <andre.przywara@arm.com> wrote:
 
-Okay.  I will try to follow the suggestions in the future to make your
-job bit easier.
+> Based on the Allwinner A64 user manual and on the previous sunxi
+> pinctrl drivers this introduces the pin multiplex assignments for
+> the ARMv8 Allwinner A64 SoC.
+> Port A is apparently used for the fixed function DRAM controller, so
+> the ports start at B here (the manual mentions "n from 1 to 7", so
+> not starting at 0).
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Shawn
+Add Maxime's ACK.
+
+This does not apply do the pinctrl devel branch, so please rebase it.
+
+>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+>  arch/arm64/Kconfig.platforms                       |   1 +
+
+Remove this from the patch, it can go in through the ASoC or ARM64 tree,
+just a symbol dependence is fine to merge orthogonally.
+
+Yours,
+Linus Walleij
