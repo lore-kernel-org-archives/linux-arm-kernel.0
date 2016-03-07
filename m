@@ -1,109 +1,55 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 7 Mar 2016 16:33:11 -0600
-Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr()
- on ARM
-In-Reply-To: <m337sapw89.fsf@t19.piap.pl>
-References: <m337sapw89.fsf@t19.piap.pl>
-Message-ID: <20160307223311.GB26149@localhost>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Mon, 7 Mar 2016 17:22:24 -0600
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <56DDB749.1020808@suse.de>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
+ <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
+ <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
+ <56DDB749.1020808@suse.de>
+Message-ID: <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Lorenzo]
+On Mon, Mar 7, 2016 at 11:15 AM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 07.03.2016 um 16:52 schrieb Giuseppe CAVALLARO:
+>> On 3/7/2016 4:46 PM, Andreas F?rber wrote:
+>>> Am 07.03.2016 um 16:09 schrieb Giuseppe CAVALLARO:
+>>>> On 3/7/2016 3:27 PM, Andreas F?rber wrote:
+>>>>> Indeed, reverting Gabriel's commit fixes the observed error messages
+>>> [...]
+>>>>> However, I am unable to ping any hosts on the network now.
+>>>>
+>>>> hmm, this could be another problem. I wonder if you can
+>>>> check which recent patch is introducing the problem on ARM64.
+>>>> For example if this depends on Oct_2015 update.
+>>>
+>>> I've had success reverting drivers/net/ethernet/stmicro/ up to and
+>>> including "stmmac: first frame prep at the end of xmit routine", i.e.
+>>> top 7 commits.
+>>
+>> Andreas, I will check it and let you know asap.
+>
+> I verified that it's just these two commits that I need to revert:
+>
+> "stmmac: Fix 'eth0: No PHY found' regression"
+> "stmmac: first frame prep at the end of xmit routine"
+>
+> Those in between don't cause conflicts and seem to work okay.
+>
 
-On Tue, Mar 01, 2016 at 07:07:18AM +0100, Krzysztof Ha?asa wrote:
-> Many ARM platforms use a wrapper:
-> /*
->  * Compatibility wrapper for older platforms that do not care about
->  * passing the parent device.
->  */
-> static inline void pci_common_init(struct hw_pci *hw)
-> {
->         pci_common_init_dev(NULL, hw);
-> }
-> 
-> which means that pci_bus_assign_domain_nr() can be called without
-> a parent. This patch fixes the NULL pointer dereference.
-> 
-> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-> Cc: stable at vger.kernel.org
+I'm seeing the same issue on the SoCFPGA platform:
 
-I applied this to for-linus with changelog as below for v4.5, thanks!
+libphy: PHY stmmac-0:ffffffff not found
+eth0: Could not attach to PHY
+stmmac_open: Cannot attach to PHY (error: -19)
 
-Wow, this is terrible.  All ARM32 systems that use pci_common_init()
-crash at boot.  That includes cns3xxx, dove, footbridge, iopl13xx,
-ip32x, iop33x, ixp4xx, ks8695, mv78xx0, orion5x, pxa, sa1100, etc.
-Apparently they've been crashing since v4.0, when 7c674700098c and
-8c7d14746abc appeared.  I can hardly believe nobody noticed until now.
+If I just revert:
 
-Actually, I did find one problem report:
-http://forum.doozan.com/read.php?2,17868,22070,quote=1 from last May,
-but apparently it got lost in a forum and never found its way
-upstream.
+ "stmmac: Fix 'eth0: No PHY found' regression"
 
-I reworked the changelog because this problem will affect *any* arch
-that enables CONFIG_PCI_DOMAINS_GENERIC and supplies NULL "parent"
-pointers -- ia64, mips, mn10300, s390, x86, etc., would be affected if
-they enabled CONFIG_PCI_DOMAINS_GENERIC.
+then the issue goes away.
 
-I also added a "Fixes:" tag for 7c674700098c, since that's the commit
-that added the generic code we're fixing.  Backports of 7c674700098c
-should also backport this change.
-
-Bjorn
-
-
-
-commit 71babd2a89fe
-Author: Krzysztof =?utf-8?Q?Ha=C5=82asa?= <khalasa@piap.pl>
-Date:   Tue Mar 1 07:07:18 2016 +0100
-
-    PCI: Allow a NULL "parent" pointer in pci_bus_assign_domain_nr()
-    
-    pci_create_root_bus() passes a "parent" pointer to
-    pci_bus_assign_domain_nr().  When CONFIG_PCI_DOMAINS_GENERIC is defined,
-    pci_bus_assign_domain_nr() dereferences that pointer.  Many callers of
-    pci_create_root_bus() supply a NULL "parent" pointer, which leads to a NULL
-    pointer dereference error.
-    
-    7c674700098c ("PCI: Move domain assignment from arm64 to generic code")
-    moved the "parent" dereference from arm64 to generic code.  Only arm64 used
-    that code (because only arm64 defined CONFIG_PCI_DOMAINS_GENERIC), and it
-    always supplied a valid "parent" pointer.  Other arches supplied NULL
-    "parent" pointers but didn't defined CONFIG_PCI_DOMAINS_GENERIC, so they
-    used a no-op version of pci_bus_assign_domain_nr().
-    
-    8c7d14746abc ("ARM/PCI: Move to generic PCI domains") defined
-    CONFIG_PCI_DOMAINS_GENERIC on ARM, and many ARM platforms use
-    pci_common_init(), which supplies a NULL "parent" pointer.
-    These platforms (cns3xxx, dove, footbridge, iop13xx, etc.) crash
-    with a NULL pointer dereference like this while probing PCI:
-    
-      Unable to handle kernel NULL pointer dereference at virtual address 000000a4
-      PC is at pci_bus_assign_domain_nr+0x10/0x84
-      LR is at pci_create_root_bus+0x48/0x2e4
-      Kernel panic - not syncing: Attempted to kill init!
-    
-    [bhelgaas: changelog, add "Reported:" and "Fixes:" tags]
-    Reported: http://forum.doozan.com/read.php?2,17868,22070,quote=1
-    Fixes: 8c7d14746abc ("ARM/PCI: Move to generic PCI domains")
-    Fixes: 7c674700098c ("PCI: Move domain assignment from arm64 to generic code")
-    Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    CC: stable at vger.kernel.org	# v4.0+
-
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 602eb42..f89db3a 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4772,8 +4772,10 @@ int pci_get_new_domain_nr(void)
- void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- {
- 	static int use_dt_domains = -1;
--	int domain = of_get_pci_domain_nr(parent->of_node);
-+	int domain = -1;
- 
-+	if (parent)
-+		domain = of_get_pci_domain_nr(parent->of_node);
- 	/*
- 	 * Check DT domain and use_dt_domains values.
- 	 *
+Thanks,
+Dinh
