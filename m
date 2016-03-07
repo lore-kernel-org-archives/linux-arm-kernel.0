@@ -1,59 +1,81 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 17:18:17 +0100
-Subject: [PATCH 00/16] mtd: nand: sunxi: various improvements/fixes
-Message-ID: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon,  7 Mar 2016 17:18:24 +0100
+Subject: [PATCH 07/16] mtd: nand: sunxi: implement ->read_subpage()
+In-Reply-To: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457367513-26069-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Being able to read subpages can greatly improve read performances if the
+MTD user is only interested in a small section of a NAND page.
+This is particularly true with large pages (>= 8k).
 
-This patchset aims at fixing a few minor bugs, and improving performances
-of NAND accesses going through the sunxi NAND controller.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/sunxi_nand.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-Note that patch 5 exports functions provided by the core which are needed
-in patch 6 to still support raw OOB accesses. Other patches are just
-fixes or improvements only touching the sunxi driver itself.
-
-Here are the main improvements:
-- queue CLE/ALE requests instead of forcing the controller to issue each
-  cmd and address cycle separately
-- benefit from ECC correction on protected OOB bytes
-- use polling instead of interrupt-based waiting (avoid scheduling
-  overhead for short wait period)
-
-I'm preparing another series based on this one to add page operations
-and DMA support, which, according to my first tests will bring a huge
-speed improvement (at least x2 on read accesses, and even more when
-ONFI timing mode > 0 is used).
-
-Stay tuned.
-
-Best Regards,
-
-Boris
-
-Boris Brezillon (16):
-  mtd: nand: sunxi: fix call order in sunxi_nand_chip_init()
-  mtd: nand: sunxi: fix clk rate calculation
-  mtd: nand: sunxi: fix EDO mode selection
-  mtd: nand: sunxi: adapt clk_rate to tWB, tADL, tWHR and tRHW timings
-  mtd: nand: export default read/write oob functions
-  mtd: nand: sunxi: implement ->read_oob()/->write_oob()
-  mtd: nand: sunxi: implement ->read_subpage()
-  mtd: nand: sunxi: improve ->cmd_ctrl() function
-  mtd: nand: sunxi: let the NAND controller control the CE line
-  mtd: nand: sunxi: fix the NFC_ECC_ERR_CNT() macro
-  mtd: nand: sunxi: fix NFC_CTL setting
-  mtd: nand: sunxi: disable clks on device removal
-  mtd: nand: enable ECC pipelining
-  mtd: nand: sunxi: fix ->dev_ready() implementation
-  mtd: nand: sunxi: make use of readl_poll_timeout()
-  mtd: nand: sunxi: poll for events instead of using interrupts
-
- drivers/mtd/nand/nand_base.c  |  18 +--
- drivers/mtd/nand/sunxi_nand.c | 293 ++++++++++++++++++++++++++++++------------
- include/linux/mtd/nand.h      |  14 ++
- 3 files changed, 233 insertions(+), 92 deletions(-)
-
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 8977a5f..df73e55 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -974,6 +974,39 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+ 	return max_bitflips;
+ }
+ 
++static int sunxi_nfc_hw_ecc_read_subpage(struct mtd_info *mtd,
++					 struct nand_chip *chip,
++					 u32 data_offs, u32 readlen,
++					 u8 *bufpoi, int page)
++{
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++	int ret, i, cur_off = 0;
++	unsigned int max_bitflips = 0;
++
++	sunxi_nfc_hw_ecc_enable(mtd);
++
++	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
++	for (i = data_offs / ecc->size;
++	     i < DIV_ROUND_UP(data_offs + readlen, ecc->size); i++) {
++		int data_off = i * ecc->size;
++		int oob_off = i * (ecc->bytes + 4);
++		u8 *data = bufpoi + data_off;
++		u8 *oob = chip->oob_poi + oob_off;
++
++		ret = sunxi_nfc_hw_ecc_read_chunk(mtd, data, data_off,
++						  oob,
++						  oob_off + mtd->writesize,
++						  &cur_off, &max_bitflips,
++						  !i, page);
++		if (ret < 0)
++			return ret;
++	}
++
++	sunxi_nfc_hw_ecc_disable(mtd);
++
++	return max_bitflips;
++}
++
+ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+ 				       struct nand_chip *chip,
+ 				       const uint8_t *buf, int oob_required,
+@@ -1384,6 +1417,7 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
+ 	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
+ 	ecc->read_oob_raw = nand_read_oob_std;
+ 	ecc->write_oob_raw = nand_write_oob_std;
++	ecc->read_subpage = sunxi_nfc_hw_ecc_read_subpage;
+ 	layout = ecc->layout;
+ 	nsectors = mtd->writesize / ecc->size;
+ 
+@@ -1630,6 +1664,8 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 	if (nand->options & NAND_NEED_SCRAMBLING)
+ 		nand->options |= NAND_NO_SUBPAGE_WRITE;
+ 
++	nand->options |= NAND_SUBPAGE_READ;
++
+ 	ret = sunxi_nand_chip_init_timings(chip, np);
+ 	if (ret) {
+ 		dev_err(dev, "could not configure chip timings: %d\n", ret);
 -- 
 2.1.4
