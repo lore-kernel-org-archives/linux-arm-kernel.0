@@ -1,42 +1,59 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon,  7 Mar 2016 14:00:53 -0800
-Subject: [PATCH v2 4/5] drm/rockchip: dw_hdmi: Don't call
- platform_set_drvdata()
-In-Reply-To: <1457388054-23077-1-git-send-email-dianders@chromium.org>
-References: <1457388054-23077-1-git-send-email-dianders@chromium.org>
-Message-ID: <1457388054-23077-4-git-send-email-dianders@chromium.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon,  7 Mar 2016 17:21:50 -0500
+Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
+In-Reply-To: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rockchip dw_hdmi driver just called platform_set_drvdata() to get
-your hopes up that maybe, somehow, you'd be able to retrieve the 'struct
-rockchip_hdmi' from a pointer to the 'struct device'.  You can't.  When
-we call dw_hdmi_bind() the main driver calls dev_set_drvdata(), which
-clobbers our setting.
+The ACPI PCI driver is leaking out memory mappings
+when a slot is removed. Upon insertion following a
+removal, we are hitting a BUG statement. Second call
+to the remap API hits a bug statement because the area is
+already mapped. This patch releases additional virtual
+memory mapped by pci_remap_iospace function as part of
+__release_pci_root_info function if the region type is IO.
 
-Let's just remove the platform_set_drvdata() to avoid dashing people's
-hopes.
+ BUG: failure at kernel/lib/ioremap.c:31/ioremap_pte_range()!
+ Kernel panic - not syncing: BUG!
+ CPU: 1 PID: 630 Comm: kworker/u48:3 Not tainted
+ Workqueue: kacpi_hotplug acpi_hotplug_work_fn Call trace:
+ dump_backtrace+0x0/0x10c [<ffff800000086e58>]
+ show_stack+0x10/0x1c [<ffff8000004d1f50>]
+ dump_stack+0x74/0xc4
+ panic+0xe4/0x21c [<ffff8000002577cc>]
+ ioremap_page_range+0x290/0x30c [<ffff8000002861dc>]
+ pci_remap_iospace+0x88/0xa0 [<ffff8000000908f8>]
+ setup_resource+0x114/0x16c [<ffff8000002c0fc0>]
+ acpi_walk_resource_buffer+0x54/0xb0
+ acpi_walk_resources+0x90/0xbc
+ pci_acpi_scan_root+0x184/0x2d0
+ acpi_pci_root_add+0x368/0x434
+ acpi_bus_attach+0x124/0x22c [<ffff8000002a5628>]
+ acpi_bus_scan+0x58/0x74 [<ffff8000002a57c0>]
+ acpi_device_hotplug+0xc4/0x3f0 [<ffff8000002a0468>]
+ acpi_hotplug_work_fn+0x1c/0x34 [<ffff8000000b9310>]
+ process_one_work+0x1e8/0x308 [<ffff8000000b9b04>]
+ worker_thread+0x294/0x3cc  [<ffff8000000bd9
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
-Changes in v2:
-- Don't call platform_set_drvdata() new for v2.
+ drivers/acpi/pci_root.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 88776aba984e..d5cfef75fc80 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -271,8 +271,6 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 	if (!iores)
- 		return -ENXIO;
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index 71bbfae..6d4bc2d 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -946,6 +946,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
  
--	platform_set_drvdata(pdev, hdmi);
--
- 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
- 	/*
- 	 * If we failed to find the CRTC(s) which this encoder is
+ 	resource_list_for_each_entry(entry, &bridge->windows) {
+ 		res = entry->res;
++		if (res->flags & IORESOURCE_IO)
++			pci_unmap_iospace(res);
+ 		if (res->parent &&
+ 		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+ 			release_resource(res);
 -- 
-2.7.0.rc3.207.g0ac5344
+1.8.2.1
