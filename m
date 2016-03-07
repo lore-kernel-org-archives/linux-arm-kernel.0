@@ -1,200 +1,83 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 7 Mar 2016 15:04:02 +1100
-Subject: linux-next: manual merge of the watchdog tree with the arm-soc tree
-Message-ID: <20160307150402.191ba735@canb.auug.org.au>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 7 Mar 2016 05:09:04 +0100
+Subject: [PATCH V14 8/9] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <56D91B0E.1080203@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
+ <56D08843.5020306@linaro.org> <56D7323B.4040100@codeaurora.org>
+ <56D8C539.9000203@linaro.org> <56D91B0E.1080203@codeaurora.org>
+Message-ID: <56DCFEE0.6080101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim,
+Hi Sinan,
+On 03/04/2016 06:20 AM, Sinan Kaya wrote:
+> On 3/3/2016 6:14 PM, Eric Auger wrote:
+>> Hi Sinan,
+>> On 03/02/2016 07:34 PM, Sinan Kaya wrote:
+>>> On 2/26/2016 12:15 PM, Eric Auger wrote:
+>>>>> -module_init(reset ## _module_init);				\
+>>>>>> +#define module_vfio_reset_handler(compat, acpihid, reset)		\
+>>>>>> +MODULE_ALIAS("vfio-reset:" compat);					\
+>>>> Here you need to handle alias for hid case I think
+>>>
+>>> I'm wondering what happens when Compat or ACPI string is NULL.
+>>>
+>>> MODULE_ALIAS("vfio-reset:" NULL)
+>>>
+>>> Would the kernel like it? 
+>>
+>>>
+>>> I'd rather create an alias only when the string is not NULL. Given
+>>> this is a macro, I believe it won't work. 
+>>
+>> Indeed I think we should create an alias only for the supported case or
+>> 2 aliases if both are supported.
+>>>
+>>> Can you think of any other way in the code to create the alias?
+>>>
+>> To be honest I did not find any elegant solution either. Personally I
+>> would move the MODULE_ALIAS for compat/acpihid outside of
+>> module_vfio_reset_handler macro, directly in the reset module. But maybe
+>> someone will propose a better solution?
+>>
+> 
+> I briefly looked at this. 
+> 
+> #define MODULE_ALIAS(_alias) MODULE_INFO(alias, _alias)
+> #define MODULE_INFO(tag, info) __MODULE_INFO(tag, tag, info)
+> 
+> and it eventually becomes this
+> 
+> #define __MODULE_INFO(tag, name, info)                                    \
+> static const char __UNIQUE_ID(name)[]                                     \
+>    __used __attribute__((section(".modinfo"), unused, aligned(1)))         \
+>    = __stringify(tag) "=" info
+> 
+> Since the info is on the right side of the equation, I'm allowed to add some 
+> conditionals.
+> 
+> #define module_vfio_reset_handler(compat, acpihid, reset)		\
+> MODULE_ALIAS("vfio-reset:" acpihid? acpihid: compat);			\
+> 
+> This way, we'll create an alias with one of the provided strings.  
+What if you want to use vfio platform driver for HiDMA in dt mode? the
+HiDma reset module advertises both acpihid and dt compat support but an
+alias module will be created only for acpihid. Then I think we will not
+be able to load the reset module in dt mode with existing code.
 
-Today's linux-next merge of the watchdog tree got a conflict in:
+This could work however with some rework in vfio_platform_common.c. In
+vfio_platform_get_reset we should try to load the module using the
+acpihid if the module load using compat alias fails. In the look-up
+table we can find the acpihid corresponding to the dt compat.
 
-  arch/arm64/boot/dts/arm/foundation-v8.dts
+Any thought?
 
-between commit:
+Best Regards
 
-  d11a89796678 ("arm64: dts: split Foundation model dts to put the GIC separately")
+Eric
 
-from the arm-soc tree and commit:
-
-  fe3a97e8ed02 ("ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts")
-
-from the watchdog tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm64/boot/dts/arm/foundation-v8.dts
-index 71168077312d,66cb9aaa9135..000000000000
---- a/arch/arm64/boot/dts/arm/foundation-v8.dts
-+++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-@@@ -18,4 -83,165 +18,11 @@@
-  		      <0x0 0x2c006000 0 0x2000>;
-  		interrupts = <1 9 0xf04>;
-  	};
- -
- -	timer {
- -		compatible = "arm,armv8-timer";
- -		interrupts = <1 13 0xf08>,
- -			     <1 14 0xf08>,
- -			     <1 11 0xf08>,
- -			     <1 10 0xf08>;
- -		clock-frequency = <100000000>;
- -	};
- -
- -	pmu {
- -		compatible = "arm,armv8-pmuv3";
- -		interrupts = <0 60 4>,
- -			     <0 61 4>,
- -			     <0 62 4>,
- -			     <0 63 4>;
- -	};
- -
- -	smb {
- -		compatible = "arm,vexpress,v2m-p1", "simple-bus";
- -		arm,v2m-memory-map = "rs1";
- -		#address-cells = <2>; /* SMB chipselect number and offset */
- -		#size-cells = <1>;
- -
- -		ranges = <0 0 0 0x08000000 0x04000000>,
- -			 <1 0 0 0x14000000 0x04000000>,
- -			 <2 0 0 0x18000000 0x04000000>,
- -			 <3 0 0 0x1c000000 0x04000000>,
- -			 <4 0 0 0x0c000000 0x04000000>,
- -			 <5 0 0 0x10000000 0x04000000>;
- -
- -		#interrupt-cells = <1>;
- -		interrupt-map-mask = <0 0 63>;
- -		interrupt-map = <0 0  0 &gic 0  0 4>,
- -				<0 0  1 &gic 0  1 4>,
- -				<0 0  2 &gic 0  2 4>,
- -				<0 0  3 &gic 0  3 4>,
- -				<0 0  4 &gic 0  4 4>,
- -				<0 0  5 &gic 0  5 4>,
- -				<0 0  6 &gic 0  6 4>,
- -				<0 0  7 &gic 0  7 4>,
- -				<0 0  8 &gic 0  8 4>,
- -				<0 0  9 &gic 0  9 4>,
- -				<0 0 10 &gic 0 10 4>,
- -				<0 0 11 &gic 0 11 4>,
- -				<0 0 12 &gic 0 12 4>,
- -				<0 0 13 &gic 0 13 4>,
- -				<0 0 14 &gic 0 14 4>,
- -				<0 0 15 &gic 0 15 4>,
- -				<0 0 16 &gic 0 16 4>,
- -				<0 0 17 &gic 0 17 4>,
- -				<0 0 18 &gic 0 18 4>,
- -				<0 0 19 &gic 0 19 4>,
- -				<0 0 20 &gic 0 20 4>,
- -				<0 0 21 &gic 0 21 4>,
- -				<0 0 22 &gic 0 22 4>,
- -				<0 0 23 &gic 0 23 4>,
- -				<0 0 24 &gic 0 24 4>,
- -				<0 0 25 &gic 0 25 4>,
- -				<0 0 26 &gic 0 26 4>,
- -				<0 0 27 &gic 0 27 4>,
- -				<0 0 28 &gic 0 28 4>,
- -				<0 0 29 &gic 0 29 4>,
- -				<0 0 30 &gic 0 30 4>,
- -				<0 0 31 &gic 0 31 4>,
- -				<0 0 32 &gic 0 32 4>,
- -				<0 0 33 &gic 0 33 4>,
- -				<0 0 34 &gic 0 34 4>,
- -				<0 0 35 &gic 0 35 4>,
- -				<0 0 36 &gic 0 36 4>,
- -				<0 0 37 &gic 0 37 4>,
- -				<0 0 38 &gic 0 38 4>,
- -				<0 0 39 &gic 0 39 4>,
- -				<0 0 40 &gic 0 40 4>,
- -				<0 0 41 &gic 0 41 4>,
- -				<0 0 42 &gic 0 42 4>;
- -
- -		ethernet at 2,02000000 {
- -			compatible = "smsc,lan91c111";
- -			reg = <2 0x02000000 0x10000>;
- -			interrupts = <15>;
- -		};
- -
- -		v2m_clk24mhz: clk24mhz {
- -			compatible = "fixed-clock";
- -			#clock-cells = <0>;
- -			clock-frequency = <24000000>;
- -			clock-output-names = "v2m:clk24mhz";
- -		};
- -
- -		v2m_refclk1mhz: refclk1mhz {
- -			compatible = "fixed-clock";
- -			#clock-cells = <0>;
- -			clock-frequency = <1000000>;
- -			clock-output-names = "v2m:refclk1mhz";
- -		};
- -
- -		v2m_refclk32khz: refclk32khz {
- -			compatible = "fixed-clock";
- -			#clock-cells = <0>;
- -			clock-frequency = <32768>;
- -			clock-output-names = "v2m:refclk32khz";
- -		};
- -
- -		iofpga at 3,00000000 {
- -			compatible = "arm,amba-bus", "simple-bus";
- -			#address-cells = <1>;
- -			#size-cells = <1>;
- -			ranges = <0 3 0 0x200000>;
- -
- -			v2m_sysreg: sysreg at 010000 {
- -				compatible = "arm,vexpress-sysreg";
- -				reg = <0x010000 0x1000>;
- -			};
- -
- -			v2m_serial0: uart at 090000 {
- -				compatible = "arm,pl011", "arm,primecell";
- -				reg = <0x090000 0x1000>;
- -				interrupts = <5>;
- -				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
- -				clock-names = "uartclk", "apb_pclk";
- -			};
- -
- -			v2m_serial1: uart at 0a0000 {
- -				compatible = "arm,pl011", "arm,primecell";
- -				reg = <0x0a0000 0x1000>;
- -				interrupts = <6>;
- -				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
- -				clock-names = "uartclk", "apb_pclk";
- -			};
- -
- -			v2m_serial2: uart at 0b0000 {
- -				compatible = "arm,pl011", "arm,primecell";
- -				reg = <0x0b0000 0x1000>;
- -				interrupts = <7>;
- -				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
- -				clock-names = "uartclk", "apb_pclk";
- -			};
- -
- -			v2m_serial3: uart at 0c0000 {
- -				compatible = "arm,pl011", "arm,primecell";
- -				reg = <0x0c0000 0x1000>;
- -				interrupts = <8>;
- -				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
- -				clock-names = "uartclk", "apb_pclk";
- -			};
- -
- -			virtio_block at 0130000 {
- -				compatible = "virtio,mmio";
- -				reg = <0x130000 0x200>;
- -				interrupts = <42>;
- -			};
- -		};
- -	};
-+ 	watchdog at 2a440000 {
-+ 		compatible = "arm,sbsa-gwdt";
-+ 		reg = <0x0 0x2a440000 0 0x1000>,
-+ 			<0x0 0x2a450000 0 0x1000>;
-+ 		interrupts = <0 27 4>;
-+ 		timeout-sec = <30>;
-+ 	};
-  };
+> 
+> 
+> 
