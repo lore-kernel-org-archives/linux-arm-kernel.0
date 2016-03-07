@@ -1,232 +1,162 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 10:47:42 +0100
-Subject: [PATCH v4 52/52] mtd: kill the nand_ecclayout struct
-In-Reply-To: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457344062-11633-53-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon,  7 Mar 2016 10:59:31 +0100
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle configuration to
+ DMA users
+Message-ID: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all MTD drivers have moved to the mtd_ooblayout_ops model we can
-safely remove the struct nand_ecclayout definition, and all the remaining
-places where it was still used.
+Some drivers might need to tweak the block size and wait cycles values
+to get better performances.
+Create and export the sun4i_dma_set_chan_config() to do that.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/mtdchar.c      |  12 ++---
- drivers/mtd/mtdcore.c      | 117 ---------------------------------------------
- include/linux/mtd/mtd.h    |  20 --------
- include/uapi/mtd/mtd-abi.h |   2 +-
- 4 files changed, 7 insertions(+), 144 deletions(-)
+ drivers/dma/sun4i-dma.c       | 44 ++++++++++++++++++++++++++++++-------------
+ include/linux/dma/sun4i-dma.h | 38 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+), 13 deletions(-)
+ create mode 100644 include/linux/dma/sun4i-dma.h
 
-diff --git a/drivers/mtd/mtdchar.c b/drivers/mtd/mtdchar.c
-index 3fad2c7..2a47a3f 100644
---- a/drivers/mtd/mtdchar.c
-+++ b/drivers/mtd/mtdchar.c
-@@ -465,12 +465,12 @@ static int mtdchar_readoob(struct file *file, struct mtd_info *mtd,
+diff --git a/drivers/dma/sun4i-dma.c b/drivers/dma/sun4i-dma.c
+index 1661d518..e48f537 100644
+--- a/drivers/dma/sun4i-dma.c
++++ b/drivers/dma/sun4i-dma.c
+@@ -12,6 +12,7 @@
+ #include <linux/bitops.h>
+ #include <linux/clk.h>
+ #include <linux/dmaengine.h>
++#include <linux/dma/sun4i-dma.h>
+ #include <linux/dmapool.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+@@ -138,6 +139,7 @@ struct sun4i_dma_pchan {
+ struct sun4i_dma_vchan {
+ 	struct virt_dma_chan		vc;
+ 	struct dma_slave_config		cfg;
++	struct sun4i_dma_chan_config	scfg;
+ 	struct sun4i_dma_pchan		*pchan;
+ 	struct sun4i_dma_promise	*processing;
+ 	struct sun4i_dma_contract	*contract;
+@@ -779,7 +781,7 @@ sun4i_dma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	u8 ram_type, io_mode, linear_mode;
+ 	struct scatterlist *sg;
+ 	dma_addr_t srcaddr, dstaddr;
+-	u32 endpoints, para;
++	u32 endpoints;
+ 	int i;
+ 
+ 	if (!sgl)
+@@ -825,17 +827,6 @@ sun4i_dma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 			dstaddr = sg_dma_address(sg);
+ 		}
+ 
+-		/*
+-		 * These are the magic DMA engine timings that keep SPI going.
+-		 * I haven't seen any interface on DMAEngine to configure
+-		 * timings, and so far they seem to work for everything we
+-		 * support, so I've kept them here. I don't know if other
+-		 * devices need different timings because, as usual, we only
+-		 * have the "para" bitfield meanings, but no comment on what
+-		 * the values should be when doing a certain operation :|
+-		 */
+-		para = SUN4I_DDMA_MAGIC_SPI_PARAMETERS;
+-
+ 		/* And make a suitable promise */
+ 		if (vchan->is_dedicated)
+ 			promise = generate_ddma_promise(chan, srcaddr, dstaddr,
+@@ -850,7 +841,7 @@ sun4i_dma_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 			return NULL; /* TODO: should we free everything? */
+ 
+ 		promise->cfg |= endpoints;
+-		promise->para = para;
++		promise->para = vchan->scfg.para;
+ 
+ 		/* Then add it to the contract */
+ 		list_add_tail(&promise->list, &contract->demands);
+@@ -908,6 +899,21 @@ static int sun4i_dma_config(struct dma_chan *chan,
+ 	return 0;
  }
  
- /*
-- * Copies (and truncates, if necessary) data from the larger struct,
-- * nand_ecclayout, to the smaller, deprecated layout struct,
-- * nand_ecclayout_user. This is necessary only to support the deprecated
-- * API ioctl ECCGETLAYOUT while allowing all new functionality to use
-- * nand_ecclayout flexibly (i.e. the struct may change size in new
-- * releases without requiring major rewrites).
-+ * Copies (and truncates, if necessary) OOB layout information to the
-+ * deprecated layout struct, nand_ecclayout_user. This is necessary only to
-+ * support the deprecated API ioctl ECCGETLAYOUT while allowing all new
-+ * functionality to use mtd_ooblayout_ops flexibly (i.e. mtd_ooblayout_ops
-+ * can describe any kind of OOB layout with almost zero overhead from a
-+ * memory usage point of view).
-  */
- static int shrink_ecclayout(struct mtd_info *mtd,
- 			    struct nand_ecclayout_user *to)
-diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
-index bebca51..cbfa5ad 100644
---- a/drivers/mtd/mtdcore.c
-+++ b/drivers/mtd/mtdcore.c
-@@ -1357,123 +1357,6 @@ int mtd_ooblayout_count_eccbytes(struct mtd_info *mtd)
- }
- EXPORT_SYMBOL_GPL(mtd_ooblayout_count_eccbytes);
- 
--/**
-- * mtd_ecclayout_ecc - Default ooblayout_ecc iterator implementation
-- * @mtd: MTD device structure
-- * @section: ECC section. Depending on the layout you may have all the ECC
-- *	     bytes stored in a single contiguous section, or one section
-- *	     per ECC chunk (and sometime several sections for a single ECC
-- *	     ECC chunk)
-- * @oobecc: OOB region struct filled with the appropriate ECC position
-- *	    information
-- *
-- * This function is just a wrapper around the mtd->ecclayout field and is
-- * here to ease the transition to the mtd_ooblayout_ops approach.
-- * All it does is convert the layout->eccpos information into proper oob
-- * region definitions.
-- *
-- * Returns zero on success, a negative error code otherwise.
-- */
--static int mtd_ecclayout_ecc(struct mtd_info *mtd, int section,
--			     struct mtd_oob_region *oobecc)
--{
--	int eccbyte = 0, cursection = 0, length = 0, eccpos = 0;
--
--	if (!mtd->ecclayout)
--		return -ENOTSUPP;
--
--	/*
--	 * This logic allows us to reuse the ->ecclayout information and
--	 * expose them as ECC regions (as done for the OOB free regions).
--	 *
--	 * TODO: this should be dropped as soon as we get rid of the
--	 * ->ecclayout field.
--	 */
--	for (eccbyte = 0; eccbyte < mtd->ecclayout->eccbytes; eccbyte++) {
--		eccpos = mtd->ecclayout->eccpos[eccbyte];
--
--		if (eccbyte < mtd->ecclayout->eccbytes - 1) {
--			int neccpos = mtd->ecclayout->eccpos[eccbyte + 1];
--
--			if (eccpos + 1 == neccpos) {
--				length++;
--				continue;
--			}
--		}
--
--		if (section == cursection)
--			break;
--
--		length = 0;
--		cursection++;
--	}
--
--	if (cursection != section || eccbyte >= mtd->ecclayout->eccbytes)
--		return -ERANGE;
--
--	oobecc->length = length + 1;
--	oobecc->offset = eccpos - length;
--
--	return 0;
--}
--
--/**
-- * mtd_ecclayout_ecc - Default ooblayout_free iterator implementation
-- * @mtd: MTD device structure
-- * @section: Free section. Depending on the layout you may have all the free
-- *	     bytes stored in a single contiguous section, or one section
-- *	     per ECC chunk (and sometime several sections for a single ECC
-- *	     ECC chunk)
-- * @oobfree: OOB region struct filled with the appropriate free position
-- *	     information
-- *
-- * This function is just a wrapper around the mtd->ecclayout field and is
-- * here to ease the transition to the mtd_ooblayout_ops approach.
-- * All it does is convert the layout->oobfree information into proper oob
-- * region definitions.
-- *
-- * Returns zero on success, a negative error code otherwise.
-- */
--static int mtd_ecclayout_free(struct mtd_info *mtd, int section,
--			      struct mtd_oob_region *oobfree)
--{
--	struct nand_ecclayout *layout = mtd->ecclayout;
--
--	if (!layout)
--		return -ENOTSUPP;
--
--	if (section >= MTD_MAX_OOBFREE_ENTRIES_LARGE ||
--	    !layout->oobfree[section].length)
--		return -ERANGE;
--
--	oobfree->offset = layout->oobfree[section].offset;
--	oobfree->length = layout->oobfree[section].length;
--
--	return 0;
--}
--
--static const struct mtd_ooblayout_ops mtd_ecclayout_wrapper_ops = {
--	.ecc = mtd_ecclayout_ecc,
--	.free = mtd_ecclayout_free,
--};
--
--/**
-- * mtd_set_ecclayout - Attach an ecclayout to an MTD device
-- * @mtd: MTD device structure
-- * @ecclayout: The ecclayout to attach to the device
-- *
-- * Returns zero on success, a negative error code otherwise.
-- */
--void mtd_set_ecclayout(struct mtd_info *mtd, struct nand_ecclayout *ecclayout)
--{
--	if (!mtd || !ecclayout)
--		return;
--
--	mtd->ecclayout = ecclayout;
--	mtd_set_ooblayout(mtd, &mtd_ecclayout_wrapper_ops);
--}
--EXPORT_SYMBOL_GPL(mtd_set_ecclayout);
--
- /*
-  * Method to access the protection register area, present in some flash
-  * devices. The user data is one time programmable but the factory data is read
-diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-index a38fe9a..df8c116 100644
---- a/include/linux/mtd/mtd.h
-+++ b/include/linux/mtd/mtd.h
-@@ -96,21 +96,6 @@ struct mtd_oob_ops {
- 
- #define MTD_MAX_OOBFREE_ENTRIES_LARGE	32
- #define MTD_MAX_ECCPOS_ENTRIES_LARGE	640
--/*
-- * Internal ECC layout control structure. For historical reasons, there is a
-- * similar, smaller struct nand_ecclayout_user (in mtd-abi.h) that is retained
-- * for export to user-space via the ECCGETLAYOUT ioctl.
-- * nand_ecclayout should be expandable in the future simply by the above macros.
-- *
-- * This structure is now deprecated, you should use struct nand_ecclayout_ops
-- * to describe your OOB layout.
-- */
--struct nand_ecclayout {
--	__u32 eccbytes;
--	__u32 eccpos[MTD_MAX_ECCPOS_ENTRIES_LARGE];
--	struct nand_oobfree oobfree[MTD_MAX_OOBFREE_ENTRIES_LARGE];
--};
--
- /**
-  * struct mtd_oob_region - oob region definition
-  * @offset: region offset
-@@ -200,9 +185,6 @@ struct mtd_info {
- 	const char *name;
- 	int index;
- 
--	/* [Deprecated] ECC layout structure pointer - read only! */
--	struct nand_ecclayout *ecclayout;
--
- 	/* OOB layout description */
- 	const struct mtd_ooblayout_ops *ooblayout;
- 
-@@ -308,8 +290,6 @@ int mtd_ooblayout_set_databytes(struct mtd_info *mtd, const u8 *databuf,
- int mtd_ooblayout_count_freebytes(struct mtd_info *mtd);
- int mtd_ooblayout_count_eccbytes(struct mtd_info *mtd);
- 
--void mtd_set_ecclayout(struct mtd_info *mtd, struct nand_ecclayout *ecclayout);
--
- static inline void mtd_set_ooblayout(struct mtd_info *mtd,
- 				     const struct mtd_ooblayout_ops *ooblayout)
++int sun4i_dma_set_chan_config(struct dma_chan *dchan,
++			      const struct sun4i_dma_chan_config *cfg)
++{
++	struct sun4i_dma_vchan *vchan = to_sun4i_dma_vchan(dchan);
++
++	if (!vchan->is_dedicated)
++		return -ENOTSUPP;
++
++	/* TODO: control cfg value */
++	vchan->scfg = *cfg;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(sun4i_dma_set_chan_config);
++
+ static struct dma_chan *sun4i_dma_of_xlate(struct of_phandle_args *dma_spec,
+ 					   struct of_dma *ofdma)
  {
-diff --git a/include/uapi/mtd/mtd-abi.h b/include/uapi/mtd/mtd-abi.h
-index 763bb69..0ec1da2 100644
---- a/include/uapi/mtd/mtd-abi.h
-+++ b/include/uapi/mtd/mtd-abi.h
-@@ -228,7 +228,7 @@ struct nand_oobfree {
-  * complete set of ECC information. The ioctl truncates the larger internal
-  * structure to retain binary compatibility with the static declaration of the
-  * ioctl. Note that the "MTD_MAX_..._ENTRIES" macros represent the max size of
-- * the user struct, not the MAX size of the internal struct nand_ecclayout.
-+ * the user struct, not the MAX size of the internal OOB layout representation.
-  */
- struct nand_ecclayout_user {
- 	__u32 eccbytes;
+@@ -1206,6 +1212,18 @@ static int sun4i_dma_probe(struct platform_device *pdev)
+ 		spin_lock_init(&vchan->vc.lock);
+ 		vchan->vc.desc_free = sun4i_dma_free_contract;
+ 		vchan_init(&vchan->vc, &priv->slave);
++
++		/*
++		 * These are the magic DMA engine timings that keep SPI going.
++		 * I haven't seen any interface on DMAEngine to configure
++		 * timings, and so far they seem to work for everything we
++		 * support, so I've kept them here. I don't know if other
++		 * devices need different timings because, as usual, we only
++		 * have the "para" bitfield meanings, but no comment on what
++		 * the values should be when doing a certain operation :|
++		 */
++		vchan->scfg.para = SUN4I_DDMA_MAGIC_SPI_PARAMETERS;
++
+ 	}
+ 
+ 	ret = clk_prepare_enable(priv->clk);
+diff --git a/include/linux/dma/sun4i-dma.h b/include/linux/dma/sun4i-dma.h
+new file mode 100644
+index 0000000..f643539
+--- /dev/null
++++ b/include/linux/dma/sun4i-dma.h
+@@ -0,0 +1,38 @@
++/*
++ * Sun4i DMA Engine drivers support header file
++ *
++ * Copyright (C) 2016 Free Electrons. All rights reserved.
++ *
++ * This is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef _SUN4I_DMA_H
++#define _SUN4I_DMA_H
++
++#include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
++
++/* Dedicated DMA parameter register layout */
++#define SUN4I_DDMA_PARA_DST_DATA_BLK_SIZE(n)	(((n) - 1) << 24)
++#define SUN4I_DDMA_PARA_DST_WAIT_CYCLES(n)	(((n) - 1) << 16)
++#define SUN4I_DDMA_PARA_SRC_DATA_BLK_SIZE(n)	(((n) - 1) << 8)
++#define SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(n)	(((n) - 1) << 0)
++
++/**
++ * struct sun4i_dma_chan_config - DMA channel config
++ *
++ * @para: contains information about block size and time before checking
++ *	  DRQ line. This is device specific and only applicable to dedicated
++ *	  DMA channels
++ */
++struct sun4i_dma_chan_config {
++	u32 para;
++};
++
++int sun4i_dma_set_chan_config(struct dma_chan *dchan,
++			      const struct sun4i_dma_chan_config *cfg);
++
++#endif /* _SUN4I_DMA_H */
 -- 
 2.1.4
