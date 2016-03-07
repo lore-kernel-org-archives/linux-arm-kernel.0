@@ -1,26 +1,34 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 7 Mar 2016 13:17:54 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <1457294038-14243-1-git-send-email-afaerber@suse.de>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
-Message-ID: <56DD7172.4000707@suse.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 7 Mar 2016 12:19:34 +0000
+Subject: linux-next: manual merge of the watchdog tree with the arm-soc
+ tree
+In-Reply-To: <CAOesGMjD51rNqd3V8BE6xHkYZQdB8nc_Azppk1U+m8GwrtUv6w@mail.gmail.com>
+References: <20160307150402.191ba735@canb.auug.org.au>
+ <CAOesGMjD51rNqd3V8BE6xHkYZQdB8nc_Azppk1U+m8GwrtUv6w@mail.gmail.com>
+Message-ID: <56DD71D6.8040406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.03.2016 um 20:53 schrieb Andreas F?rber:
-> On next-20160304 the GMAC seems to have regressed, it no longer finds the PHY:
-> 
-> libphy: PHY stmmac-0:ffffffff not found
-> eth0: Could not attach to PHY
-> stmmac_open: Cannot attach to PHY (error: -19)
+Hi Olof,
 
-Still with us in next-20160307. CC'ing stmmac maintainers.
+On 07/03/16 05:41, Olof Johansson wrote:
+> Hi Wim,
+>
+> It's much easier for us if all DTS changes go in through the arm-soc
+> trees, to avoid these kind of conflicts. Is this on a branch where you
+> can easily drop it and we pick it up instead, or is it on a now-stable
+> branch?
+>
 
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/log/drivers/net/ethernet/stmicro
+Sorry for that. Since the patch series was still under discussion and
+v14 was posted 3 days ago, I had not checked with Fu Wei on his plans
+for DTS changes.
 
-Regards,
-Andreas
+Let me know if you want to pick up this single patch directly or want me
+to send PR for that if Wim drops it from his branch. I might have couple
+of DTS warning fixes for juno/vexpress(though I need to wait for Rob's
+acks to them), so I can bundle them together.
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Regards,
+Sudeep
