@@ -1,27 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Mar 2016 10:28:56 +0700
-Subject: [PATCH] pinctrl: lpc18xx: ensure ngroups is initialized at
- correct place
-In-Reply-To: <1456335170-20718-1-git-send-email-colin.king@canonical.com>
-References: <1456335170-20718-1-git-send-email-colin.king@canonical.com>
-Message-ID: <CACRpkdYxFm06aCUwf-stH4fmJdqS25Ek=9i0CVwR4JcSYPtLEQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 7 Mar 2016 10:29:28 +0700
+Subject: [GIT PULL 1/4] ARM: imx: soc updates for 4.6
+In-Reply-To: <2391647.boUdyk2pYU@wuerfel>
+References: <1456844403-26176-1-git-send-email-shawnguo@kernel.org>
+ <2391647.boUdyk2pYU@wuerfel>
+Message-ID: <20160307032927.GA5051@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 12:32 AM, Colin King <colin.king@canonical.com> wrote:
+On Wed, Mar 02, 2016 at 11:32:00PM +0100, Arnd Bergmann wrote:
+> On Tuesday 01 March 2016 23:00:00 Shawn Guo wrote:
+> > The i.MX SoC update for 4.6:
+> > - Enable big endian mode support for i.MX platform
+> > - Add support for i.MX6QP SoC which is the latest i.MX6 family addition
+> > - Add basic suspend/resume support for i.MX25
+> > - A couple of i.MX7D support updates
+> 
+> 
+> Merged into next/soc, thanks!
+> 
+> 
+> > - A few random code cleanups
+> 
+> I wonder if those should have been in a separate cleanup branch. I didn't
+> look at the detailed changes here, so I assume you had a good reason
+> to put them in here.
 
-> From: Colin Ian King <colin.king@canonical.com>
->
-> The initialization of ngroups is occurring at the end of the
-> first iteration of the outer loop, which means that the
-> assignment  pins[ngroups++] = i is potentially indexing into
-> a region outside of array pins because ngroups is not initialized.
-> Instead, initialize ngroups in the inner loop before the first
-> inner loop iteration.
->
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+I generally only create a cleanup branch for some significant changes,
+which usually consists of a series or quite some patches.  If you want
+to see a cleanup branch for small changes, I can do that too.
 
-Patch applied with Joachim's review tag.
-
-Yours,
-Linus Walleij
+Shawn
