@@ -1,296 +1,33 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 7 Mar 2016 17:17:36 +0200
-Subject: [PATCH v2 09/10] ARM: DRA7: hwmod: Add data for McASP1/2/4/5/6/7/8
+Date: Mon, 7 Mar 2016 17:17:34 +0200
+Subject: [PATCH v2 07/10] ARM: DTS: am57xx-beagle-x15: Enable AFIFO use for
+ McASP3
 In-Reply-To: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1457363857-20797-10-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1457363857-20797-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing data for all McASP ports for the dra7 family
+Since we switched to use eDMA we can now safely enable the FIFO in McASP.
+This will reduce the chance of McASP level under/overflow.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 237 ++++++++++++++++++++++++++++++
- 1 file changed, 237 insertions(+)
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 9442d89bd229..7610f3ef28b7 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1374,6 +1374,52 @@ static struct omap_hwmod_class dra7xx_mcasp_hwmod_class = {
- 	.sysc	= &dra7xx_mcasp_sysc,
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 2bbc8ae00ada..08fd3c37d628 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -813,6 +813,8 @@
+ 	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
+ 		1 2 0 0
+ 	>;
++	tx-num-evt = <32>;
++	rx-num-evt = <32>;
  };
  
-+/* mcasp1 */
-+static struct omap_hwmod_opt_clk mcasp1_opt_clks[] = {
-+	{ .role = "ahclkx", .clk = "mcasp1_ahclkx_mux" },
-+	{ .role = "ahclkr", .clk = "mcasp1_ahclkr_mux" },
-+};
-+
-+static struct omap_hwmod dra7xx_mcasp1_hwmod = {
-+	.name		= "mcasp1",
-+	.class		= &dra7xx_mcasp_hwmod_class,
-+	.clkdm_name	= "ipu_clkdm",
-+	.main_clk	= "mcasp1_aux_gfclk_mux",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_IPU_MCASP1_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_IPU_MCASP1_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= mcasp1_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(mcasp1_opt_clks),
-+};
-+
-+/* mcasp2 */
-+static struct omap_hwmod_opt_clk mcasp2_opt_clks[] = {
-+	{ .role = "ahclkx", .clk = "mcasp2_ahclkx_mux" },
-+	{ .role = "ahclkr", .clk = "mcasp2_ahclkr_mux" },
-+};
-+
-+static struct omap_hwmod dra7xx_mcasp2_hwmod = {
-+	.name		= "mcasp2",
-+	.class		= &dra7xx_mcasp_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "mcasp2_aux_gfclk_mux",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP2_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4PER2_MCASP2_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= mcasp2_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(mcasp2_opt_clks),
-+};
-+
- /* mcasp3 */
- static struct omap_hwmod_opt_clk mcasp3_opt_clks[] = {
- 	{ .role = "ahclkx", .clk = "mcasp3_ahclkx_mux" },
-@@ -1396,6 +1442,116 @@ static struct omap_hwmod dra7xx_mcasp3_hwmod = {
- 	.opt_clks_cnt	= ARRAY_SIZE(mcasp3_opt_clks),
- };
- 
-+/* mcasp4 */
-+static struct omap_hwmod_opt_clk mcasp4_opt_clks[] = {
-+	{ .role = "ahclkx", .clk = "mcasp4_ahclkx_mux" },
-+};
-+
-+static struct omap_hwmod dra7xx_mcasp4_hwmod = {
-+	.name		= "mcasp4",
-+	.class		= &dra7xx_mcasp_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "mcasp4_aux_gfclk_mux",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP4_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4PER2_MCASP4_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= mcasp4_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(mcasp4_opt_clks),
-+};
-+
-+/* mcasp5 */
-+static struct omap_hwmod_opt_clk mcasp5_opt_clks[] = {
-+	{ .role = "ahclkx", .clk = "mcasp5_ahclkx_mux" },
-+};
-+
-+static struct omap_hwmod dra7xx_mcasp5_hwmod = {
-+	.name		= "mcasp5",
-+	.class		= &dra7xx_mcasp_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "mcasp5_aux_gfclk_mux",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP5_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4PER2_MCASP5_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= mcasp5_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(mcasp5_opt_clks),
-+};
-+
-+/* mcasp6 */
-+static struct omap_hwmod_opt_clk mcasp6_opt_clks[] = {
-+	{ .role = "ahclkx", .clk = "mcasp6_ahclkx_mux" },
-+};
-+
-+static struct omap_hwmod dra7xx_mcasp6_hwmod = {
-+	.name		= "mcasp6",
-+	.class		= &dra7xx_mcasp_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "mcasp6_aux_gfclk_mux",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP6_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4PER2_MCASP6_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= mcasp6_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(mcasp6_opt_clks),
-+};
-+
-+/* mcasp7 */
-+static struct omap_hwmod_opt_clk mcasp7_opt_clks[] = {
-+	{ .role = "ahclkx", .clk = "mcasp7_ahclkx_mux" },
-+};
-+
-+static struct omap_hwmod dra7xx_mcasp7_hwmod = {
-+	.name		= "mcasp7",
-+	.class		= &dra7xx_mcasp_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "mcasp7_aux_gfclk_mux",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP7_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4PER2_MCASP7_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= mcasp7_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(mcasp7_opt_clks),
-+};
-+
-+/* mcasp8 */
-+static struct omap_hwmod_opt_clk mcasp8_opt_clks[] = {
-+	{ .role = "ahclkx", .clk = "mcasp8_ahclkx_mux" },
-+};
-+
-+static struct omap_hwmod dra7xx_mcasp8_hwmod = {
-+	.name		= "mcasp8",
-+	.class		= &dra7xx_mcasp_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.main_clk	= "mcasp8_aux_gfclk_mux",
-+	.flags		= HWMOD_OPT_CLKS_NEEDED,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP8_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_L4PER2_MCASP8_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= mcasp8_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(mcasp8_opt_clks),
-+};
-+
- /*
-  * 'mmc' class
-  *
-@@ -2726,6 +2882,38 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_per2 -> mcasp1 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp1 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_mcasp1_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l3_main_1 -> mcasp1 */
-+static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mcasp1 = {
-+	.master		= &dra7xx_l3_main_1_hwmod,
-+	.slave		= &dra7xx_mcasp1_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per2 -> mcasp2 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp2 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_mcasp2_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l3_main_1 -> mcasp2 */
-+static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mcasp2 = {
-+	.master		= &dra7xx_l3_main_1_hwmod,
-+	.slave		= &dra7xx_mcasp2_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_per2 -> mcasp3 */
- static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp3 = {
- 	.master		= &dra7xx_l4_per2_hwmod,
-@@ -2742,6 +2930,46 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mcasp3 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_per2 -> mcasp4 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp4 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_mcasp4_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per2 -> mcasp5 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp5 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_mcasp5_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per2 -> mcasp6 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp6 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_mcasp6_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per2 -> mcasp7 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp7 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_mcasp7_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* l4_per2 -> mcasp8 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp8 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_mcasp8_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_per1 -> elm */
- static struct omap_hwmod_ocp_if dra7xx_l4_per1__elm = {
- 	.master		= &dra7xx_l4_per1_hwmod,
-@@ -3484,8 +3712,17 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_wkup__dcan1,
- 	&dra7xx_l4_per2__dcan2,
- 	&dra7xx_l4_per2__cpgmac0,
-+	&dra7xx_l4_per2__mcasp1,
-+	&dra7xx_l3_main_1__mcasp1,
-+	&dra7xx_l4_per2__mcasp2,
-+	&dra7xx_l3_main_1__mcasp2,
- 	&dra7xx_l4_per2__mcasp3,
- 	&dra7xx_l3_main_1__mcasp3,
-+	&dra7xx_l4_per2__mcasp4,
-+	&dra7xx_l4_per2__mcasp5,
-+	&dra7xx_l4_per2__mcasp6,
-+	&dra7xx_l4_per2__mcasp7,
-+	&dra7xx_l4_per2__mcasp8,
- 	&dra7xx_gmac__mdio,
- 	&dra7xx_l4_cfg__dma_system,
- 	&dra7xx_l3_main_1__tpcc,
+ &mailbox5 {
 -- 
 2.7.2
