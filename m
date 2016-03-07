@@ -1,80 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Mar 2016 09:33:26 +0000
-Subject: [PATCH v3 04/12] KVM: arm/arm64: vgic-v2: Do not save an LR known to
- be empty
+Date: Mon,  7 Mar 2016 09:33:27 +0000
+Subject: [PATCH v3 05/12] KVM: arm/arm64: vgic-v2: Reset LRs at boot time
 In-Reply-To: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
 References: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1457343214-19547-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1457343214-19547-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On exit, any empty LR will be signaled in GICH_ELRSR*. Which
-means that we do not have to save it, and we can just clear
-its state in the in-memory copy.
+In order to let make the GICv2 code more lazy in the way it
+accesses the LRs, it is necessary to start with a clean slate.
 
-Take this opportunity to move the LR saving code into its
-own function.
+Let's reset the LRs on each CPU when the vgic is probed.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v2-sr.c | 26 ++++++++++++++++++++------
- 1 file changed, 20 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic-v2.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index c576228..6d4dd78 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -83,6 +83,25 @@ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
- #endif
- }
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index ff02f08..67ec334 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -176,6 +176,15 @@ static const struct vgic_ops vgic_v2_ops = {
  
-+static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ static struct vgic_params vgic_v2_params;
+ 
++static void vgic_cpu_init_lrs(void *params)
 +{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
++	struct vgic_params *vgic = params;
 +	int i;
 +
-+	for (i = 0; i < nr_lr; i++) {
-+		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
-+			continue;
-+
-+		if (cpu_if->vgic_elrsr & (1UL << i)) {
-+			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
-+			continue;
-+		}
-+
-+		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-+	}
++	for (i = 0; i < vgic->nr_lr; i++)
++		writel_relaxed(0, vgic->vctrl_base + GICH_LR0 + (i * 4));
 +}
 +
- /* vcpu is already in the HYP VA space */
- void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- {
-@@ -90,12 +109,10 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
--	int i, nr_lr;
+ /**
+  * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+  * @node:	pointer to the DT node
+@@ -257,6 +266,9 @@ int vgic_v2_probe(struct device_node *vgic_node,
  
- 	if (!base)
- 		return;
- 
--	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
- 	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
- 
- 	if (vcpu->arch.vgic_cpu.live_lrs) {
-@@ -103,10 +120,7 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 
- 		save_maint_int_state(vcpu, base);
- 		save_elrsr(vcpu, base);
-- 
--		for (i = 0; i < nr_lr; i++)
--			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
--				cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-+		save_lrs(vcpu, base);
- 
- 		writel_relaxed(0, base + GICH_HCR);
- 
+ 	vgic->type = VGIC_V2;
+ 	vgic->max_gic_vcpus = VGIC_V2_MAX_CPUS;
++
++	on_each_cpu(vgic_cpu_init_lrs, vgic, 1);
++
+ 	*ops = &vgic_v2_ops;
+ 	*params = vgic;
+ 	goto out;
 -- 
 2.1.4
