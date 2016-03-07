@@ -1,49 +1,33 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 7 Mar 2016 22:53:05 +0530
-Subject: [PATCH 1/2] net: thunderx: Set recevie buffer page usage count in
- bulk
-In-Reply-To: <20160307.120410.1851177945150642006.davem@davemloft.net>
-References: <1457336157-31508-2-git-send-email-sunil.kovvuri@gmail.com>
- <20160307.111534.235286977900488968.davem@davemloft.net>
- <CA+sq2CewOQGSiRC5m64ioYS36-WO0C5XzykZRZd+OLE1tJ-sSQ@mail.gmail.com>
- <20160307.120410.1851177945150642006.davem@davemloft.net>
-Message-ID: <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
+From: scott.wood@nxp.com (Scott Wood)
+Date: Mon, 7 Mar 2016 17:23:17 +0000
+Subject: [PATCH v3 1/2] Documentation: DT: Add entry for Freescale
+ LS1043a-QDS board
+References: <1457350232-12749-1-git-send-email-Zhiqiang.Hou@nxp.com>
+Message-ID: <DB5PR0401MB1928313A537226265C54764291B10@DB5PR0401MB1928.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 7, 2016 at 10:34 PM, David Miller <davem@davemloft.net> wrote:
-> From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
-> Date: Mon, 7 Mar 2016 22:28:39 +0530
->
->> Hi David,
->>
->>>> you create a window of time during which the consumer
->>>> can release the page and prematurely free it.
->> Okay, but here the consumer i.e HW is notified only after page count
->> is incremented.
->> For example if you check 'nicvf_refill_rbdr' fn() only after receive
->> buffer ring is
->> refilled with buffers, doorbell is issued to hardware to start using
->> the new buffers.
->>
->> So
->> @@ -241,6 +254,8 @@ refill:
->>                 new_rb++;
->>         }
->>
->> +       nicvf_get_page(nic);
->> +
->> calling 'nicvf_get_page' before issuing doorbell ensures page ref
->> count is properly
->> set before hw/consumer can use the buffers.
->
-> So if you know ahead of time how the page will be split up, just
-> calculate that when you get the page and increment the page count
-> appropriately.
->
-> That's what we do in the NIU driver.
+On 03/07/2016 05:39 AM, Zhiqiang Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> v3:
+>  - No change.
+> 
+>  Documentation/devicetree/bindings/arm/fsl.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index 752a685..f504fdf 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -134,6 +134,7 @@ Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
+>  LS1043A ARMv8 based RDB Board
+>  Required root node properties:
+>      - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
+> +    - compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
 
-Thanks for the suggestion, will check and get back.
+"fsl,ls1043a-qds" is required for the "LS1043A ARMv8 based RDB Board"?
 
-Regards,
-Sunil.
+-Scott
