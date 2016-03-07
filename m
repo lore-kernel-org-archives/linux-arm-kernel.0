@@ -1,88 +1,45 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 7 Mar 2016 17:17:29 +0200
-Subject: [PATCH v2 02/10] ARM: DTS: dra7: Enable eDMA
+Date: Mon, 7 Mar 2016 17:17:33 +0200
+Subject: [PATCH v2 06/10] ARM: DTS: am57xx-beagle-x15: Move clkout2 source
+ selection to codec node
 In-Reply-To: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1457363857-20797-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1457363857-20797-7-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7 family has eDMA available along with the sDMA and in some cases it is
-better suited for servicing peripherals.
-
-Add the needed nodes for eDMA to be usable:
-edma-tpcc, edma-tptc0/1 and the edma-xbar.
+The assigned-clock* needs to be in the root of the device's node. If it is
+in the sub-node the CCF will ignore it.
+Since the clkout2 is used by the codec as MCLK, move the clock parent
+selection to that node.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 48 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index db7fda97a4fa..b99f51288e71 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -170,6 +170,15 @@
- 					ti,dma-safe-map = <0>;
- 					dma-masters = <&sdma>;
- 				};
-+
-+				edma_xbar: dma-router at c78 {
-+					compatible = "ti,dra7-dma-crossbar";
-+					reg = <0xc78 0x7c>;
-+					#dma-cells = <2>;
-+					dma-requests = <204>;
-+					ti,dma-safe-map = <0>;
-+					dma-masters = <&edma>;
-+				};
- 			};
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 0a5fc5d02ce2..2bbc8ae00ada 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -173,8 +173,6 @@
  
- 			cm_core_aon: cm_core_aon at 5000 {
-@@ -324,6 +333,45 @@
- 			dma-requests = <127>;
+ 		sound0_master: simple-audio-card,codec {
+ 			sound-dai = <&tlv320aic3104>;
+-			assigned-clocks = <&clkoutmux2_clk_mux>;
+-			assigned-clock-parents = <&sys_clk2_dclk_div>;
+ 			clocks = <&clkout2_clk>;
  		};
+ 	};
+@@ -584,6 +582,9 @@
+ 		pinctrl-names = "default", "sleep";
+ 		pinctrl-0 = <&clkout2_pins_default>;
+ 		pinctrl-1 = <&clkout2_pins_sleep>;
++		assigned-clocks = <&clkoutmux2_clk_mux>;
++		assigned-clock-parents = <&sys_clk2_dclk_div>;
++
+ 		status = "okay";
+ 		adc-settle-ms = <40>;
  
-+		edma: edma at 43300000 {
-+			compatible = "ti,edma3-tpcc";
-+			ti,hwmods = "tpcc";
-+			reg = <0x43300000 0x100000>;
-+			reg-names = "edma3_cc";
-+			interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "edma3_ccint", "emda3_mperr",
-+					  "edma3_ccerrint";
-+			dma-requests = <64>;
-+			#dma-cells = <2>;
-+
-+			ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 0>;
-+
-+			/*
-+			 * memcpy is disabled, can be enabled with:
-+			 * ti,edma-memcpy-channels = <20 21>;
-+			 * for example. Note that these channels need to be
-+			 * masked in the xbar as well.
-+			 */
-+		};
-+
-+		edma_tptc0: tptc at 43400000 {
-+			compatible = "ti,edma3-tptc";
-+			ti,hwmods = "tptc0";
-+			reg =	<0x43400000 0x100000>;
-+			interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "edma3_tcerrint";
-+		};
-+
-+		edma_tptc1: tptc at 43500000 {
-+			compatible = "ti,edma3-tptc";
-+			ti,hwmods = "tptc1";
-+			reg =	<0x43500000 0x100000>;
-+			interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "edma3_tcerrint";
-+		};
-+
- 		gpio1: gpio at 4ae10000 {
- 			compatible = "ti,omap4-gpio";
- 			reg = <0x4ae10000 0x200>;
 -- 
 2.7.2
