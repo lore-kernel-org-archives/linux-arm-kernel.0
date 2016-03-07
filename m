@@ -1,127 +1,178 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 07 Mar 2016 18:57:16 +0100
-Subject: [PATCH 1/2] drm/rockchip: dw_hdmi: Call drm_encoder_cleanup() in
- error path
-In-Reply-To: <CAD=FV=XMvYYwOHH_SEovAeHV1Sv9BbiAP4fGnF3Gq3aS1hfQaw@mail.gmail.com>
-References: <1457133723-24869-1-git-send-email-dianders@chromium.org>
- <56DD3DAF.8090700@rock-chips.com>
- <CAD=FV=XMvYYwOHH_SEovAeHV1Sv9BbiAP4fGnF3Gq3aS1hfQaw@mail.gmail.com>
-Message-ID: <1693114.6CV9KAkHOO@diego>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 7 Mar 2016 10:02:08 -0800
+Subject: [PATCH v7 2/3] pci, pci-thunder-pem: Add PCIe host driver for
+ ThunderX processors.
+In-Reply-To: <20160305155409.GA2532@yury-N73SV>
+References: <1457130708-3231-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457130708-3231-3-git-send-email-ddaney.cavm@gmail.com>
+ <20160305155409.GA2532@yury-N73SV>
+Message-ID: <56DDC220.5080003@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 7. M?rz 2016, 09:36:07 schrieb Doug Anderson:
-> Hi,
-> 
-> On Mon, Mar 7, 2016 at 12:37 AM, Mark yao <mark.yao@rock-chips.com> wrote:
-> > On 2016?03?05? 20:39, Russell King - ARM Linux wrote:
-> >> On Sat, Mar 05, 2016 at 12:11:16PM +0000, John Keeping wrote:
-> >>> On Fri, Mar 04, 2016 at 03:22:01PM -0800, Douglas Anderson wrote:
-> >>>> The drm_encoder_cleanup() was missing both from the error path of
-> >>>> dw_hdmi_rockchip_bind().  This caused a crash when slub_debug was
-> >>>> enabled and we ended up deferring probe of HDMI at boot.
-> >>>> 
-> >>>> This call isn't needed from unbind() because if dw_hdmi_bind() returns
-> >>>> no error then it takes over the job of freeing the encoder (in
-> >>>> dw_hdmi_unbind).
-> >>>> 
-> >>>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> >>>> ---
-> >>> 
-> >>> Does dw_hdmi-imx need a similar change?  I wonder if it would be cleaner
-> >>> to push this into dw_hdmi_bind() if it affects all of the platforms..
-> >> 
-> >> I don't think moving it there would make sense - keep the initialisation
-> >> and cleanup together in the same file so that it's contained together.
-> > 
-> > I don't like this patch too, initialisation and cleanup not in the same
-> > file looks bad,
-> > 
-> > How about:
-> > 
-> > drivers/gpu/drm/bridge/dw-hdmi.c
-> > void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
-> > 
-> >         hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
-> > 
-> > hdmi->connector.funcs->destroy(&hdmi->connector);
-> > -       hdmi->encoder->funcs->destroy(hdmi->encoder);
-> > 
-> > drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> > static int dw_hdmi_rockchip_bind(struct device *dev, struct device
-> > *master,
-> > 
-> > -       return dw_hdmi_bind(dev, master, data, encoder, iores, irq,
-> > plat_data);
-> > +       ret = dw_hdmi_bind(dev, master, data, encoder, iores, irq,
-> > plat_data);
-> > +       if (ret)
-> > +               drm_encoder_cleanup(encoder);
-> > +
-> > +       return ret;
-> > 
-> >  }
-> >  
-> >  static void dw_hdmi_rockchip_unbind(struct device *dev, struct device
-> > 
-> > *master,
-> > 
-> >                                     void *data)
-> >  
-> >  {
-> > 
-> > +       drm_encoder_cleanup(...);
-> > 
-> >         return dw_hdmi_unbind(dev, master, data);
-> >  
-> >  }
-> 
-> That'a a reasonable suggestion in theory.  ...but we run into the same
-> problem I've run into before with the strange relationship between
-> dw_hdmi and its descendants.
+On 03/05/2016 07:54 AM, Yury Norov wrote:
+[...]
+>> +static u32 thunder_pem_bridge_w1c_bits(int where)
+>> +{
+>> +	u32 w1c_bits = 0;
+>> +
+>> +	switch (where & ~3) {
+>> +	case 0x04: /* Command/Status */
+>> +	case 0x1c: /* Base and I/O Limit/Secondary Status */
+>> +		w1c_bits = 0xff000000;
+>> +		break;
+>> +	case 0x44: /* Power Management Control and Status */
+>> +		w1c_bits = 0xfffffe00;
+>> +		break;
+>> +	case 0x78: /* Device Control/Device Status */
+>> +	case 0x80: /* Link Control/Link Status */
+>> +	case 0x88: /* Slot Control/Slot Status */
+>> +	case 0x90: /* Root Status */
+>> +	case 0xa0: /* Link Control 2 Registers/Link Status 2 */
+>> +		w1c_bits = 0xffff0000;
+>> +		break;
+>> +	case 0x104: /* Uncorrectable Error Status */
+>> +	case 0x110: /* Correctable Error Status */
+>> +	case 0x130: /* Error Status */
+>> +	case 0x160: /* Link Control 4 */
+>
+> This patchset is full of magic numbers.
 
-I don't think handing off the cleanup responsibility is really in question 
-here. I.e. I do believe it should also be fine to expect (as definition) the 
-core driver to cleanup the encoder _after_ it sucessfully claimed it in 
-dw_hdmi_bind().
-
-We do the same in the rockchip power-domains, handing off the struct clk-
-pointer to the pm_clk stuff (due to the clk-pointer being unique per-device 
-nowadays).
-
-So just making sure it is sucessfully handed off should also be ok.
+Yes.  Did you notice that there is a comment with each one describing 
+what it is, or what it is doing?
 
 
-Heiko
+> For better readability
 
-> 
-> Specifically:
-> 
-> * "struct dw_hdmi", which has a pointer to encoder, is private to dw-hdmi.c
-> 
-> * We could get the encoder if we had a pointer to the "struct
-> rockchip_hdmi", but there's no way to get that.  You would _think_ you
-> could get it back using platform_get_drvdata() because it was stashed
-> with platform_set_drvdata().  ...but you'd be wrong.  The
-> platform_set_drvdata() is just there to fool you.  I believe when you
-> call dw_hdmi_bind() it clobbers your drvdata when it calls
-> dev_set_drvdata(dev, hdmi);
-> 
-> 
-> Said another way: taking your suggestion means we need to add some way
-> for dw_hdmi-rockchip.c to get a pointer to the encoder from a "struct
-> device".  We could (A) move the "struct dw_hdmi" definition to a
-> private header and allow dw_hdmi-rockchip.c to include it or we could
-> (B) add a dw_hdmi_get_encoder() API call that dw_hdmi-rockchip.c could
-> call.
-> 
-> 
-> If someone would let me know whether (A) or (B) is OK I'm happy to post a
-> patch.
-> 
-> 
-> ...or, of course, if I've made a mistake in all the above, feel free
-> to point it out.
-> 
-> 
-> -Doug
+I disagree with that.
+
+Doing a:
+
+  #define CN8890_PASS1_LINK_CONTROL_4_CONFIG_SPACE_OFFSET 0x160
+
+and then later using the symbol adds clutter.  The current code is 
+compact, and *more* readable than scattering the information across 
+multiple sites in the file.
+
+> and portability,
+
+The whole point of this file is that we are fixing up accesses for a 
+very small and tightly constrained set of systems.  It is not a general 
+purpose PCI root complex with standard bridges that will be used by 
+multiple vendors and architectures.  Portability is not a big concern.
+
+> it's better to declare all that as macro:
+> #define LINK_CONTROL_4 0x160
+>
+> If there's some specific reason to use numbers, I think, it should be
+> explained.
+>
+
+I had hoped that the changlog for the commit combined with the comments 
+in the file would be sufficient.
+
+I try to explain in this e-mail my thoughts on some of the stylistic 
+choices I made while writing the code, but I don't plan on including 
+them into the patch itself.
+
+>> +		w1c_bits = 0xffffffff;
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +	return w1c_bits;
+>> +}
+>> +
+>> +static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+>> +				    int where, int size, u32 val)
+>> +{
+>> +	struct gen_pci *pci = bus->sysdata;
+>> +	struct thunder_pem_pci *pem_pci;
+>> +	u64 write_val, read_val;
+>> +	u32 mask = 0;
+>> +
+>> +	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+>> +
+>> +	if (devfn != 0 || where >= 2048)
+>> +		return PCIBIOS_DEVICE_NOT_FOUND;
+>> +
+>> +	/*
+>> +	 * 32-bit accesses only.  If the write is for a size smaller
+>> +	 * than 32-bits, we must first read the 32-bit value and merge
+>> +	 * in the desired bits and then write the whole 32-bits back
+>> +	 * out.
+>> +	 */
+>> +	switch (size) {
+>> +	case 1:
+>> +		read_val = where & ~3ull;
+>> +		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+>> +		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+>> +		read_val >>= 32;
+>> +		mask = ~(0xff << (8 * (where & 3)));
+>
+> I'm pretty sure, there's no any rocket science, but it's hard to
+> understand what happens here. What is 8? Bits in byte? Bytes in word?
+> Anything PCI-specific?  Moreover, you repeat this line several times
+> here (though little modified). Maybe it deserves to be wrapped by some
+> explaining macro?
+
+I tried to explain this in the comment above the switch statement.
+
+I doubt breaking the masking operations out into out-of-line functions 
+would add to the readability.
+
+>
+>> +		read_val &= mask;
+>> +		val = (val & 0xff) << (8 * (where & 3));
+>> +		val |= (u32)read_val;
+>> +		break;
+>> +	case 2:
+>
+> Case 1 and 2 are looking very similar. Is it possible to wrap them?
+> For now it looks like code duplication.
+
+They are indeed similar, differing only in mask width.
+
+If Bjorn insists, we could probably factor some of this code out into a 
+separate function.  Personally, I don't think it is worthwhile, as doing 
+so would probably increase the number of lines in the file.
+
+>
+>> +		read_val = where & ~3ull;
+>> +		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
+>> +		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+>> +		read_val >>= 32;
+>> +		mask = ~(0xffff << (8 * (where & 3)));
+>> +		read_val &= mask;
+>> +		val = (val & 0xffff) << (8 * (where & 3));
+>> +		val |= (u32)read_val;
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +
+>> +	/*
+>> +	 * By expanding the write width to 32 bits, we may
+>> +	 * inadvertently hit some W1C bits that were not intended to
+>> +	 * be written.  Calculate the mask that must be applied to the
+>> +	 * data to be written to avoid these cases.
+>> +	 */
+>> +	if (mask) {
+>> +		u32 w1c_bits = thunder_pem_bridge_w1c_bits(where);
+>> +
+>> +		if (w1c_bits) {
+>> +			mask &= w1c_bits;
+>> +			val &= ~mask;
+>> +		}
+>> +	}
+>> +
+>> +	/*
+>> +	 * Low order bits are the config address, the high order 32
+>> +	 * bits are the data to be written.
+>> +	 */
+>> +	write_val = where & ~3ull;
+>> +	write_val |= (((u64)val) << 32);
+>> +	writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
+>> +	return PCIBIOS_SUCCESSFUL;
+>> +}
+[...]
