@@ -1,28 +1,35 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 7 Mar 2016 13:21:10 +0100
-Subject: Amlogic Meson ARM64 update for 4.6
-Message-ID: <CAOQ7t2b08xSHauV_Ou=bAdr3WwzSntUmfADkZmOVngpZCtqbuw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 07 Mar 2016 13:24:25 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <56DD7172.4000707@suse.de>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de>
+Message-ID: <2714888.1DdqvJZ8cb@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
+Hi Andreas,
 
-  Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
+Am Montag, 7. M?rz 2016, 13:17:54 schrieb Andreas F?rber:
+> Am 06.03.2016 um 20:53 schrieb Andreas F?rber:
+> > On next-20160304 the GMAC seems to have regressed, it no longer finds the
+> > PHY:
+> > 
+> > libphy: PHY stmmac-0:ffffffff not found
+> > eth0: Could not attach to PHY
+> > stmmac_open: Cannot attach to PHY (error: -19)
+> 
+> Still with us in next-20160307. CC'ing stmmac maintainers.
 
-are available in the git repository at:
+do you remember from what revision you rebased away from, when it was still 
+working (as a known-good state)?
 
-  https://github.com/carlocaione/linux-meson.git tags/for-v4.6/gxbb-arm64
 
-for you to fetch changes up to 451e9e54e259f1f223763e191393c47383674256:
+Heiko
 
-  ARM64: Enable Amlogic Meson GXBaby platform (2016-03-07 10:44:31 +0100)
-
-----------------------------------------------------------------
-Provide the ARCH_MESON Kconfig symbol for the Amlogic S905 SoCs.
-
-----------------------------------------------------------------
-Andreas F?rber (1):
-      ARM64: Enable Amlogic Meson GXBaby platform
-
- arch/arm64/Kconfig.platforms | 5 +++++
- 1 file changed, 5 insertions(+)
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/log/drivers/
+> net/ethernet/stmicro
+> 
+> Regards,
+> Andreas
