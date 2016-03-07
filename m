@@ -1,49 +1,49 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Mar 2016 09:33:28 +0000
-Subject: [PATCH v3 06/12] KVM: arm/arm64: vgic-v2: Only wipe LRs on vcpu exit
+Date: Mon,  7 Mar 2016 09:33:34 +0000
+Subject: [PATCH v3 12/12] arm64: KVM: vgic-v3: Only wipe LRs on vcpu exit
 In-Reply-To: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
 References: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1457343214-19547-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1457343214-19547-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 So far, we're always writing all possible LRs, setting the empty
-ones with a zero value. This is obvious doing a lot of work for
+ones with a zero value. This is obvious doing a low of work for
 nothing, and we're better off clearing those we've actually
 dirtied on the exit path (it is very rare to inject more than one
 interrupt at a time anyway).
 
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v2-sr.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 6d4dd78..674bdf8 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -99,6 +99,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 8134947..fff7cd4 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -196,6 +196,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			}
+ 
+ 			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
++			__gic_v3_set_lr(0, i);
  		}
  
- 		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-+		writel_relaxed(0, base + GICH_LR0 + (i * 4));
- 	}
- }
+ 		switch (nr_pri_bits) {
+@@ -293,12 +294,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		}
  
-@@ -156,12 +157,11 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
- 		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
- 		for (i = 0; i < nr_lr; i++) {
--			u32 val = 0;
+ 		for (i = 0; i <= max_lr_idx; i++) {
+-			val = 0;
 -
--			if (live_lrs & (1UL << i))
+-			if (live_lrs & (1 << i))
 -				val = cpu_if->vgic_lr[i];
-+			if (!(live_lrs & (1UL << i)))
++			if (!(live_lrs & (1 << i)))
 +				continue;
  
--			writel_relaxed(val, base + GICH_LR0 + (i * 4));
-+			writel_relaxed(cpu_if->vgic_lr[i],
-+				       base + GICH_LR0 + (i * 4));
+-			__gic_v3_set_lr(val, i);
++			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
  		}
  	}
  
