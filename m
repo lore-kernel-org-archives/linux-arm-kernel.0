@@ -1,87 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Mar 2016 09:33:25 +0000
-Subject: [PATCH v3 03/12] KVM: arm/arm64: vgic-v2: Move GICH_ELRSR saving to
- its own function
+Date: Mon,  7 Mar 2016 09:33:28 +0000
+Subject: [PATCH v3 06/12] KVM: arm/arm64: vgic-v2: Only wipe LRs on vcpu exit
 In-Reply-To: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
 References: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1457343214-19547-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1457343214-19547-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make the saving path slightly more readable and
-prepare for some more optimizations, let's move the GICH_ELRSR
-saving to its own function.
+So far, we're always writing all possible LRs, setting the empty
+ones with a zero value. This is obvious doing a lot of work for
+nothing, and we're better off clearing those we've actually
+dirtied on the exit path (it is very rare to inject more than one
+interrupt at a time anyway).
 
-No functional change.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v2-sr.c | 36 +++++++++++++++++++++---------------
- 1 file changed, 21 insertions(+), 15 deletions(-)
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 0dd83d5..c576228 100644
+index 6d4dd78..674bdf8 100644
 --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
 +++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -64,6 +64,25 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- #endif
+@@ -99,6 +99,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ 		}
+ 
+ 		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
++		writel_relaxed(0, base + GICH_LR0 + (i * 4));
+ 	}
  }
  
-+static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
-+{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	int nr_lr = vcpu->arch.vgic_cpu.nr_lr;
-+	u32 elrsr0, elrsr1;
-+
-+	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-+	if (unlikely(nr_lr > 32))
-+		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
-+	else
-+		elrsr1 = 0;
-+
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
-+#else
-+	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
-+#endif
-+}
-+
- /* vcpu is already in the HYP VA space */
- void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- {
-@@ -71,7 +90,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
--	u32 elrsr0, elrsr1;
- 	int i, nr_lr;
- 
- 	if (!base)
-@@ -81,22 +99,10 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
- 
- 	if (vcpu->arch.vgic_cpu.live_lrs) {
--		elrsr0 = readl_relaxed(base + GICH_ELRSR0);
--		cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
+@@ -156,12 +157,11 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+ 		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+ 		for (i = 0; i < nr_lr; i++) {
+-			u32 val = 0;
 -
--		if (unlikely(nr_lr > 32)) {
--			elrsr1 = readl_relaxed(base + GICH_ELRSR1);
--		} else {
--			elrsr1 = 0;
--		}
--
--#ifdef CONFIG_CPU_BIG_ENDIAN
--		cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
--#else
--		cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
--#endif
-+		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
+-			if (live_lrs & (1UL << i))
+-				val = cpu_if->vgic_lr[i];
++			if (!(live_lrs & (1UL << i)))
++				continue;
  
- 		save_maint_int_state(vcpu, base);
-+		save_elrsr(vcpu, base);
-  
- 		for (i = 0; i < nr_lr; i++)
- 			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
+-			writel_relaxed(val, base + GICH_LR0 + (i * 4));
++			writel_relaxed(cpu_if->vgic_lr[i],
++				       base + GICH_LR0 + (i * 4));
+ 		}
+ 	}
+ 
 -- 
 2.1.4
