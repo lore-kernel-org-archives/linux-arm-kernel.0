@@ -1,66 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Mar 2016 09:15:53 +0100
-Subject: [PATCH v4 net-next 8/9] net: add a hardware buffer management
- helper API
-In-Reply-To: <CAPv3WKeTGy+HfG=vyY04xi4Spy6eUTF_LX_X=V0=ZAGhxURdJg@mail.gmail.com>
- (Marcin Wojtas's message of "Sun, 6 Mar 2016 20:21:51 +0100")
-References: <1457217507-10778-1-git-send-email-gregory.clement@free-electrons.com>
- <1457217507-10778-9-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKeTGy+HfG=vyY04xi4Spy6eUTF_LX_X=V0=ZAGhxURdJg@mail.gmail.com>
-Message-ID: <87pov666va.fsf@free-electrons.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 7 Mar 2016 09:16:25 +0100
+Subject: [PATCH 4/6] [media] st-rc: prevent a endless loop
+In-Reply-To: <087329695244e466f0c2d9a3a58e10ad399cd674.1457271549.git.mchehab@osg.samsung.com>
+References: <076989c7736719982a1bc9557d7db072910d8efe.1457271549.git.mchehab@osg.samsung.com>
+ <087329695244e466f0c2d9a3a58e10ad399cd674.1457271549.git.mchehab@osg.samsung.com>
+Message-ID: <56DD38D9.20002@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On dim., mars 06 2016, Marcin Wojtas <mw@semihalf.com> wrote:
+Hi Mauro
 
-> Hi Gregory,
+On 03/06/2016 02:39 PM, Mauro Carvalho Chehab wrote:
+> As warned by smatch:
+> 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
 >
+> as readl() might fail, with likely means some unrecovered error,
+> let's loop only if it succeeds.
 >
->> +int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp)
->> +{
->> +       int err, i;
->> +       unsigned long flags;
->> +
->> +       spin_lock_irqsave(&bm_pool->lock, flags);
->> +       if (bm_pool->buf_num == bm_pool->size) {
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> ---
+>   drivers/media/rc/st_rc.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> 'size' field is used as a 'frag_size' but here it means pool capacity.
-> I think it's better to keep 'size' for pool capacity and add
-> 'buf_size' field to struct hwbm_pool.
+> diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
+> index 1fa0c9d1c508..151bfe2aea55 100644
+> --- a/drivers/media/rc/st_rc.c
+> +++ b/drivers/media/rc/st_rc.c
+> @@ -99,7 +99,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+>   	unsigned int symbol, mark = 0;
+>   	struct st_rc_device *dev = data;
+>   	int last_symbol = 0;
+> -	u32 status;
+> +	int status;
+>   	DEFINE_IR_RAW_EVENT(ev);
+>   
+>   	if (dev->irq_wake)
+> @@ -107,7 +107,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+>   
+>   	status  = readl(dev->rx_base + IRB_RX_STATUS);
+>   
+> -	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
+> +	while (status > 0 && (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW))) {
+>   		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
+>   		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
+>   			/* discard the entire collection in case of errors!  */
 
-
-I thought I already added this field, but it seems that I didn't so. So
-I will add it.
-
->
->> +               pr_warn("pool already filled\n");
->> +               return bm_pool->buf_num;
->> +       }
->> +
->> +       if (buf_num + bm_pool->buf_num > bm_pool->size) {
->> +               pr_warn("cannot allocate %d buffers for pool\n",
->> +                       buf_num);
->> +               return 0;
->> +       }
->> +
->> +       if ((buf_num + bm_pool->buf_num) < bm_pool->buf_num) {
->
-> What is a point of this condition? How possibly after checking if
-> capacity of pool is not exceeded, this one would ever be true?
-
-see http://thread.gmane.org/gmane.linux.kernel/2125152/focus=2137421
-
-this test is here to ensure that (buf_num + bm_pool->buf_nu doesn't
-wrap.
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
