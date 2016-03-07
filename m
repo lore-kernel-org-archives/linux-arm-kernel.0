@@ -1,96 +1,34 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 7 Mar 2016 11:47:21 -0800
-Subject: [PATCH v14 2/6] Documentation, dt, numa: dt bindings for NUMA.
-In-Reply-To: <20160307192220.GA1535@rric.localdomain>
-References: <1457049339-23351-1-git-send-email-ddaney.cavm@gmail.com>
- <1457049339-23351-3-git-send-email-ddaney.cavm@gmail.com>
- <20160307192220.GA1535@rric.localdomain>
-Message-ID: <56DDDAC9.1010600@caviumnetworks.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon,  7 Mar 2016 13:51:53 -0600
+Subject: [PATCH 0/5] ARM: am335x/am437x: Correct pwm bindings
+Message-ID: <1457380318-15452-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2016 11:22 AM, Robert Richter wrote:
-> On 03.03.16 15:55:35, David Daney wrote:
->> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->>
->> Add DT bindings for numa mapping of memory, CPUs and IOs.
->>
->> Reviewed-by: Robert Richter <rrichter@cavium.com>
->> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++++++++++++
->>   1 file changed, 272 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/numa.txt
->>
->> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
->> new file mode 100644
->> index 0000000..ec5ed7c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/numa.txt
->
->> +==============================================================================
->> +3 - distance-map
->> +==============================================================================
->> +
->> +The device tree node distance-map describes the relative
->> +distance (memory latency) between all numa nodes.
->> +
->> +- compatible : Should at least contain "numa-distance-map-v1".
->> +
->> +- distance-matrix
->> +  This property defines a matrix to describe the relative distances
->> +  between all numa nodes.
->> +  It is represented as a list of node pairs and their relative distance.
->> +
->> +  Note:
->> +	1. Each entry represents distance from first node to second node.
->> +	The distances are equal in either direction.
->> +	2. The distance from a node to self (local distance) is represented
->> +	with value 10 and all internode distance should be represented with
->> +	a value greater than 10.
->> +	3. distance-matrix should have entries in lexicographical ascending
->> +	order of nodes.
->> +	4. There must be only one device node distance-map which must reside in the root node.
->
-> There is no note that this one is optional, but is it right? The
-> default is 10 for local and 20 for remote connections.
->
+Unlike the majority of other SOCs the PWM node uses ehrpwm instead of
+the generic pwm node name. This patch series switches to the pwm node
+name and while at it fix some other minor binding documentation issues.
 
-Do we need to explicitly state that it is optional?  Many node types are 
-optional, and their binding specifications don't really talk about their 
-being optional.
+This patch series also includes a patch to insure ABI compatibility.
 
-If the node is present then it has the meaning specified.
+This series was tested on AM335x and AM437x GP evm. I also validated that
+ABI compatibility was maintained.
 
-If the node is *not* present, then the special meaning described in the 
-bindings document does not apply.
+Franklin S Cooper Jr (5):
+  clk: ti: am335x/am4372: Add tbclk to pwm node
+  ARM: DTS: da850/am4372/am33xx: Use generic node name for ehrpwm
+  ARM: DTS: am33xx: Set pwmss ranges property to an empty value
+  pwm: pwm-tipwmss: Update documentation to use empty range property
+  pwm: pwm-tiehrpwm: Update dt binding document to use generic node name
 
-In the case of NUMA, this means that all memory is equally distant (i.e. 
-it is *Uniform*), and we are not talking about a *Non* *Uniform* Memory 
-Architecture (NUMA) system.
+ Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt |  4 ++--
+ Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt  | 12 ++++--------
+ arch/arm/boot/dts/am33xx.dtsi                          | 18 ++++++------------
+ arch/arm/boot/dts/am4372.dtsi                          | 12 ++++++------
+ arch/arm/boot/dts/da850.dtsi                           |  4 ++--
+ drivers/clk/ti/clk-33xx.c                              |  3 +++
+ drivers/clk/ti/clk-43xx.c                              |  6 ++++++
+ 7 files changed, 29 insertions(+), 30 deletions(-)
 
-
-> If so, then ...
->
-> static int __init of_numa_parse_distance_map(void)
-> {
-> 	int ret = -EINVAL;
-> 	struct device_node *np = of_find_node_by_path("/distance-map");
->
-> 	if (!np)
-> 		return ret;
->
-> must return 0 instead of -EINVAL here.
-
-No, I don't think doing that would be correct.
-
-If there is no "distance-map", then of_numa_init() returns the error 
-code.  This causes the code in arch/arm64/kernel/numa.c to fall back to 
-the non-NUMA "dummy_numa" case.
-
-By adding your Reviewed-by: Robert Richter <rrichter@cavium.com> tag to 
-patch 5/6, where we select between "real" and "dummy_numa", I had 
-assumed that you agreed with this approach.
-
-David Daney
+-- 
+2.7.0
