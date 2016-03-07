@@ -1,150 +1,165 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 10:46:52 +0100
-Subject: [PATCH v4 02/52] mtd: create an mtd_oobavail() helper and make use of
- it
-In-Reply-To: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457344062-11633-3-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon,  7 Mar 2016 10:46:50 +0100
+Subject: [PATCH v4 00/52] mtd: rework ECC layout definition
+Message-ID: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, all MTD drivers/sublayers exposing an OOB area are
-doing the same kind of test to extract the available OOB size
-based on the mtd_info and mtd_oob_ops structures.
-Move this common logic into an inline function and make use of it.
+Hello,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Suggested-by: Priit Laes <plaes@plaes.org>
----
- drivers/mtd/mtdpart.c              |  5 +----
- drivers/mtd/nand/nand_base.c       | 16 ++++------------
- drivers/mtd/onenand/onenand_base.c | 19 +++----------------
- include/linux/mtd/mtd.h            |  5 +++++
- 4 files changed, 13 insertions(+), 32 deletions(-)
+This patchset aims at getting rid of the nand_ecclayout limitations.
+struct nand_ecclayout is defining fixed eccpos and oobfree arrays which
+can only be increased by modifying the MTD_MAX_ECCPOS_ENTRIES_LARGE and
+MTD_MAX_OOBFREE_ENTRIES_LARGE macros.
+This approach forces us to modify the macro values each time we add a
+new NAND chip with a bigger OOB area, and increasing these arrays also
+penalize all platforms, even those who only support small NAND devices
+(with small OOB area).
 
-diff --git a/drivers/mtd/mtdpart.c b/drivers/mtd/mtdpart.c
-index 10bf304..08de4b2 100644
---- a/drivers/mtd/mtdpart.c
-+++ b/drivers/mtd/mtdpart.c
-@@ -126,10 +126,7 @@ static int part_read_oob(struct mtd_info *mtd, loff_t from,
- 	if (ops->oobbuf) {
- 		size_t len, pages;
- 
--		if (ops->mode == MTD_OPS_AUTO_OOB)
--			len = mtd->oobavail;
--		else
--			len = mtd->oobsize;
-+		len = mtd_oobavail(mtd, ops);
- 		pages = mtd_div_by_ws(mtd->size, mtd);
- 		pages -= mtd_div_by_ws(from, mtd);
- 		if (ops->ooboffs + ops->ooblen > pages * len)
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 9f49d3e..ee89195 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -1723,8 +1723,7 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
- 	int ret = 0;
- 	uint32_t readlen = ops->len;
- 	uint32_t oobreadlen = ops->ooblen;
--	uint32_t max_oobsize = ops->mode == MTD_OPS_AUTO_OOB ?
--		mtd->oobavail : mtd->oobsize;
-+	uint32_t max_oobsize = mtd_oobavail(mtd, ops);
- 
- 	uint8_t *bufpoi, *oob, *buf;
- 	int use_bufpoi;
-@@ -2075,10 +2074,7 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
- 
- 	stats = mtd->ecc_stats;
- 
--	if (ops->mode == MTD_OPS_AUTO_OOB)
--		len = mtd->oobavail;
--	else
--		len = mtd->oobsize;
-+	len = mtd_oobavail(mtd, ops);
- 
- 	if (unlikely(ops->ooboffs >= len)) {
- 		pr_debug("%s: attempt to start read outside oob\n",
-@@ -2575,8 +2571,7 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
- 	uint32_t writelen = ops->len;
- 
- 	uint32_t oobwritelen = ops->ooblen;
--	uint32_t oobmaxlen = ops->mode == MTD_OPS_AUTO_OOB ?
--				mtd->oobavail : mtd->oobsize;
-+	uint32_t oobmaxlen = mtd_oobavail(mtd, ops);
- 
- 	uint8_t *oob = ops->oobbuf;
- 	uint8_t *buf = ops->datbuf;
-@@ -2766,10 +2761,7 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
- 	pr_debug("%s: to = 0x%08x, len = %i\n",
- 			 __func__, (unsigned int)to, (int)ops->ooblen);
- 
--	if (ops->mode == MTD_OPS_AUTO_OOB)
--		len = mtd->oobavail;
--	else
--		len = mtd->oobsize;
-+	len = mtd_oobavail(mtd, ops);
- 
- 	/* Do not allow write past end of page */
- 	if ((ops->ooboffs + ops->ooblen) > len) {
-diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
-index df47537..af28bb3 100644
---- a/drivers/mtd/onenand/onenand_base.c
-+++ b/drivers/mtd/onenand/onenand_base.c
-@@ -1124,11 +1124,7 @@ static int onenand_mlc_read_ops_nolock(struct mtd_info *mtd, loff_t from,
- 	pr_debug("%s: from = 0x%08x, len = %i\n", __func__, (unsigned int)from,
- 			(int)len);
- 
--	if (ops->mode == MTD_OPS_AUTO_OOB)
--		oobsize = mtd->oobavail;
--	else
--		oobsize = mtd->oobsize;
--
-+	oobsize = mtd_oobavail(mtd, ops);
- 	oobcolumn = from & (mtd->oobsize - 1);
- 
- 	/* Do not allow reads past end of device */
-@@ -1229,11 +1225,7 @@ static int onenand_read_ops_nolock(struct mtd_info *mtd, loff_t from,
- 	pr_debug("%s: from = 0x%08x, len = %i\n", __func__, (unsigned int)from,
- 			(int)len);
- 
--	if (ops->mode == MTD_OPS_AUTO_OOB)
--		oobsize = mtd->oobavail;
--	else
--		oobsize = mtd->oobsize;
--
-+	oobsize = mtd_oobavail(mtd, ops);
- 	oobcolumn = from & (mtd->oobsize - 1);
- 
- 	/* Do not allow reads past end of device */
-@@ -1885,12 +1877,7 @@ static int onenand_write_ops_nolock(struct mtd_info *mtd, loff_t to,
- 	/* Check zero length */
- 	if (!len)
- 		return 0;
--
--	if (ops->mode == MTD_OPS_AUTO_OOB)
--		oobsize = mtd->oobavail;
--	else
--		oobsize = mtd->oobsize;
--
-+	oobsize = mtd_oobavail(mtd, ops);
- 	oobcolumn = to & (mtd->oobsize - 1);
- 
- 	column = to & (mtd->writesize - 1);
-diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-index 9cf13c4..7712721 100644
---- a/include/linux/mtd/mtd.h
-+++ b/include/linux/mtd/mtd.h
-@@ -264,6 +264,11 @@ static inline struct device_node *mtd_get_of_node(struct mtd_info *mtd)
- 	return mtd->dev.of_node;
- }
- 
-+static inline int mtd_oobavail(struct mtd_info *mtd, struct mtd_oob_ops *ops)
-+{
-+	return ops->mode == MTD_OPS_AUTO_OOB ? mtd->oobavail : mtd->oobsize;
-+}
-+
- int mtd_erase(struct mtd_info *mtd, struct erase_info *instr);
- int mtd_point(struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen,
- 	      void **virt, resource_size_t *phys);
+The idea to overcome this limitation, is to define the ECC/OOB layout
+by the mean of two functions: ->ecc() and ->free(), which will
+basically return the same information has those stored in the
+nand_ecclayout struct.
+
+Another advantage of this solution is that ECC layouts are usually
+following a repetitive pattern (i.e. leave X bytes free and put Y bytes
+of ECC per ECC chunk), which allows one to implement the ->ecc()
+and ->free() functions with a simple logic that can be applied
+to any size of OOB.
+
+Patches 1 to 4 are just cleanups or trivial fixes that can be taken
+independently.
+
+Also note that the last two commits are removing the nand_ecclayout
+definition, thus preventing any new driver to use this structure.
+Of course, this step can be delayed if some of the previous patches
+are not accepted.
+
+All those changes are available here [1].
+
+Best Regards,
+
+Boris
+
+[1]https://github.com/bbrezillon/linux-0day/tree/nand/ecclayout
+
+Changes since v3:
+- fixed two bugs in mtd_ooblayout core implementation
+- use ecc->total instead of (ecc->steps * ecc->bytes) in NAND drivers
+
+Changes since v2:
+- fixed a few bugs in the core and driver implementations
+
+Changes since v1:
+- unified the way of defining ECC and free bytes
+- fixed a few bugs in some ->ecc()/->free() implementations
+- added new helpers to ease ECC and free bytes manipulation
+- separated driver changes in different commits to ease review
+- dropped already applied patches
+
+Boris Brezillon (52):
+  mtd: kill the ecclayout->oobavail field
+  mtd: create an mtd_oobavail() helper and make use of it
+  mtd: mtdswap: remove useless if (!mtd->ecclayout) test
+  mtd: nand: simplify nand_bch_init() usage
+  mtd: add mtd_ooblayout_xxx() helper functions
+  mtd: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: core: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: atmel: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: fsl_ifc: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: gpmi: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: lpc32xx: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: nand: omap2: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: onenand: use mtd_ooblayout_xxx() helpers where appropriate
+  mtd: add mtd_set_ecclayout() helper function
+  mtd: use mtd_set_ecclayout() where appropriate
+  mtd: nand: use mtd_set_ecclayout() where appropriate
+  mtd: onenand: use mtd_set_ecclayout() where appropriate
+  mtd: docg3: use mtd_set_ecclayout() where appropriate
+  mtd: create an mtd_ooblayout_ops struct to ease ECC layout definition
+  mtd: docg3: switch to mtd_ooblayout_ops
+  mtd: nand: implement the default mtd_ooblayout_ops
+  mtd: nand: bch: switch to mtd_ooblayout_ops
+  mtd: nand: sharpsl: switch to mtd_ooblayout_ops
+  mtd: nand: jz4740: switch to mtd_ooblayout_ops
+  mtd: nand: atmel: switch to mtd_ooblayout_ops
+  mtd: nand: bf5xx: switch to mtd_ooblayout_ops
+  mtd: nand: brcm: switch to mtd_ooblayout_ops
+  mtd: nand: cafe: switch to mtd_ooblayout_ops
+  mtd: nand: davinci: switch to mtd_ooblayout_ops
+  mtd: nand: denali: switch to mtd_ooblayout_ops
+  mtd: nand: diskonchip: switch to mtd_ooblayout_ops
+  mtd: nand: docg4: switch to mtd_ooblayout_ops
+  mtd: nand: fsl_elbc: switch to mtd_ooblayout_ops
+  mtd: nand: fsl_ifc: switch to mtd_ooblayout_ops
+  mtd: nand: fsmc: switch to mtd_ooblayout_ops
+  mtd: nand: fsmc: get rid of the fsmc_nand_eccplace struct
+  mtd: nand: gpmi: switch to mtd_ooblayout_ops
+  mtd: nand: hisi504: switch to mtd_ooblayout_ops
+  mtd: nand: jz4780: switch to mtd_ooblayout_ops
+  mtd: nand: lpc32xx: switch to mtd_ooblayout_ops
+  mtd: nand: mxc: switch to mtd_ooblayout_ops
+  mtd: nand: omap2: switch to mtd_ooblayout_ops
+  mtd: nand: pxa3xx: switch to mtd_ooblayout_ops
+  mtd: nand: s3c2410: switch to mtd_ooblayout_ops
+  mtd: nand: sh_flctl: switch to mtd_ooblayout_ops
+  mtd: nand: sm_common: switch to mtd_ooblayout_ops
+  mtd: nand: sunxi: switch to mtd_ooblayout_ops
+  mtd: nand: vf610: switch to mtd_ooblayout_ops
+  mtd: onenand: switch to mtd_ooblayout_ops
+  staging: mt29f_spinand: switch to mtd_ooblayout_ops
+  mtd: nand: kill the ecc->layout field
+  mtd: kill the nand_ecclayout struct
+
+ arch/arm/mach-pxa/spitz.c                       |  55 +++-
+ arch/mips/include/asm/mach-jz4740/jz4740_nand.h |   2 +-
+ arch/mips/jz4740/board-qi_lb60.c                |  87 +++---
+ drivers/mtd/devices/docg3.c                     |  51 +++-
+ drivers/mtd/mtdchar.c                           | 123 ++++++--
+ drivers/mtd/mtdconcat.c                         |   2 +-
+ drivers/mtd/mtdcore.c                           | 360 +++++++++++++++++++++++
+ drivers/mtd/mtdpart.c                           |  28 +-
+ drivers/mtd/mtdswap.c                           |  24 +-
+ drivers/mtd/nand/atmel_nand.c                   | 130 ++++-----
+ drivers/mtd/nand/bf5xx_nand.c                   |  51 ++--
+ drivers/mtd/nand/brcmnand/brcmnand.c            | 262 ++++++++++-------
+ drivers/mtd/nand/cafe_nand.c                    |  44 ++-
+ drivers/mtd/nand/davinci_nand.c                 | 118 +++-----
+ drivers/mtd/nand/denali.c                       |  50 +++-
+ drivers/mtd/nand/diskonchip.c                   |  60 +++-
+ drivers/mtd/nand/docg4.c                        |  34 ++-
+ drivers/mtd/nand/fsl_elbc_nand.c                |  83 +++---
+ drivers/mtd/nand/fsl_ifc_nand.c                 | 244 +++++-----------
+ drivers/mtd/nand/fsmc_nand.c                    | 322 ++++++---------------
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c          |  61 ++--
+ drivers/mtd/nand/hisi504_nand.c                 |  27 +-
+ drivers/mtd/nand/jz4740_nand.c                  |   2 +-
+ drivers/mtd/nand/jz4780_nand.c                  |  19 +-
+ drivers/mtd/nand/lpc32xx_mlc.c                  |  50 ++--
+ drivers/mtd/nand/lpc32xx_slc.c                  |  58 +++-
+ drivers/mtd/nand/mxc_nand.c                     | 212 +++++++-------
+ drivers/mtd/nand/nand_base.c                    | 362 ++++++++++++------------
+ drivers/mtd/nand/nand_bch.c                     |  46 ++-
+ drivers/mtd/nand/omap2.c                        | 241 +++++++++-------
+ drivers/mtd/nand/pxa3xx_nand.c                  | 104 ++++---
+ drivers/mtd/nand/s3c2410.c                      |  32 ++-
+ drivers/mtd/nand/sh_flctl.c                     |  87 ++++--
+ drivers/mtd/nand/sharpsl.c                      |   2 +-
+ drivers/mtd/nand/sm_common.c                    |  93 ++++--
+ drivers/mtd/nand/sunxi_nand.c                   | 114 ++++----
+ drivers/mtd/nand/vf610_nfc.c                    |  34 +--
+ drivers/mtd/onenand/onenand_base.c              | 262 ++++++++---------
+ drivers/mtd/tests/oobtest.c                     |  49 ++--
+ drivers/staging/mt29f_spinand/mt29f_spinand.c   |  49 ++--
+ fs/jffs2/wbuf.c                                 |   6 +-
+ include/linux/mtd/fsmc.h                        |  18 --
+ include/linux/mtd/mtd.h                         |  69 ++++-
+ include/linux/mtd/nand.h                        |   5 +-
+ include/linux/mtd/nand_bch.h                    |   8 +-
+ include/linux/mtd/onenand.h                     |   2 -
+ include/linux/mtd/sharpsl.h                     |   2 +-
+ include/uapi/mtd/mtd-abi.h                      |   2 +-
+ 48 files changed, 2383 insertions(+), 1763 deletions(-)
+
 -- 
 2.1.4
