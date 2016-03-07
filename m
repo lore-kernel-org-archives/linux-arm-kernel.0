@@ -1,35 +1,60 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 7 Mar 2016 10:33:49 +0700
-Subject: [GIT PULL 3/4] arm64: nxp: device tree changes for 4.6
-In-Reply-To: <3449603.z2vlrkXDmL@wuerfel>
-References: <1456844403-26176-1-git-send-email-shawnguo@kernel.org>
- <1456844403-26176-3-git-send-email-shawnguo@kernel.org>
- <3449603.z2vlrkXDmL@wuerfel>
-Message-ID: <20160307033348.GC5051@x250>
+From: Minghuan.Lian@nxp.com (Minghuan Lian)
+Date: Mon, 7 Mar 2016 11:36:21 +0800
+Subject: [PATCH 1/2 v5] dt/bindings: Add bindings for Layerscape SCFG MSI
+Message-ID: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 11:09:59PM +0100, Arnd Bergmann wrote:
-> On Tuesday 01 March 2016 23:00:02 Shawn Guo wrote:
-> > This is the first time I help to collect NXP/Freescale arm64 dts
-> > patches.  I used to ignore such patches, because they do not belong
-> > to i.MX family.  But since people keep sending me patches, I decided
-> > to help accelerate the process for getting these patches land on
-> > mainline.
-> 
-> Much appreciated!
->  
-> > I should probably start naming my branches and tags like nxp/* from the
-> > next cycle.
-> 
-> I don't care much either way, unless you also want to start picking
-> up the patches for the lpc18xx and lpc32xx SoC families that currently
-> have other maintainers.
+Some Layerscape SoCs use a simple MSI controller implementation.
+It contains only two SCFG register to trigger and describe a
+group 32 MSI interrupts. The patch adds bindings to describe
+the controller.
 
-Okay.  I will keep the current naming schema.
+Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+---
+change log:
+v4: add interrupt-parent description
+v3-v1: no change
+ 
+ .../interrupt-controller/fsl,ls-scfg-msi.txt       | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
 
-> I've pulled the patches into next/dt64, thanks!
-
-Thanks.
-
-Shawn
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+new file mode 100644
+index 0000000..9e38949
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+@@ -0,0 +1,30 @@
++* Freescale Layerscape SCFG PCIe MSI controller
++
++Required properties:
++
++- compatible: should be "fsl,<soc-name>-msi" to identify
++	      Layerscape PCIe MSI controller block such as:
++              "fsl,1s1021a-msi"
++              "fsl,1s1043a-msi"
++- msi-controller: indicates that this is a PCIe MSI controller node
++- reg: physical base address of the controller and length of memory mapped.
++- interrupts: an interrupt to the parent interrupt controller.
++
++Optional properties:
++- interrupt-parent: the phandle to the parent interrupt controller.
++
++This interrupt controller hardware is a second level interrupt controller that
++is hooked to a parent interrupt controller: e.g: ARM GIC for ARM-based
++platforms. If interrupt-parent is not provided, the default parent interrupt
++controller will be used.
++Each PCIe node needs to have property msi-parent that points to
++MSI controller node
++
++Examples:
++
++	msi1: msi-controller at 1571000 {
++		compatible = "fsl,1s1043a-msi";
++		reg = <0x0 0x1571000 0x0 0x8>,
++		msi-controller;
++		interrupts = <0 116 0x4>;
++	};
+-- 
+1.9.1
