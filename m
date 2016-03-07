@@ -1,55 +1,91 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 7 Mar 2016 16:08:57 +0100
-Subject: [PATCH] dma: sun4i: expose block size and wait cycle
- configuration to DMA users
-In-Reply-To: <20160307145429.GG11154@localhost>
-References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160307145429.GG11154@localhost>
-Message-ID: <20160307160857.577bb04d@bbrezillon>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Mon, 7 Mar 2016 16:09:24 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <56DD8FBE.9010200@suse.de>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
+ <56DD8FBE.9010200@suse.de>
+Message-ID: <56DD99A4.5030004@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi Andreas
 
-On Mon, 7 Mar 2016 20:24:29 +0530
-Vinod Koul <vinod.koul@intel.com> wrote:
+On 3/7/2016 3:27 PM, Andreas F?rber wrote:
+> Hello Giuseppe,
+>
+> Am 07.03.2016 um 14:26 schrieb Giuseppe CAVALLARO:
+>> On 3/7/2016 1:35 PM, Andreas F?rber wrote:
+>>> Am 07.03.2016 um 13:24 schrieb Heiko St?bner:
+>>>> Am Montag, 7. M?rz 2016, 13:17:54 schrieb Andreas F?rber:
+>>>>> Am 06.03.2016 um 20:53 schrieb Andreas F?rber:
+>>>>>> On next-20160304 the GMAC seems to have regressed, it no longer
+>>>>>> finds the
+>>>>>> PHY:
+>>>>>>
+>>>>>> libphy: PHY stmmac-0:ffffffff not found
+>>
+>> snps,phy-addr is not correct. Can you check it?
+>
+> It was never set:
+>
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/rockchip/rk3368.dtsi#n436
+>
+> https://github.com/afaerber/linux/blob/96c5b5fd395fee5713755e93e677fb011cb9ddc0/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts#L114
+>
+>> In the stmmac_mdio if this is not passed as parameter the bus should
+>> be scanned and the first IDs found should select the right address.
+>> I suppose in your box there is a real transceiver, so maybe the patch
+>> from Gabriel is not actually necessary.
+>
+> On the GeekBox module there's an RTL8211E phy.
+>
+> Indeed, reverting Gabriel's commit fixes the observed error messages:
+>
+> rk_gmac-dwmac ff290000.ethernet eth0: Link is Up - 1Gbps/Full - flow
+> control rx/tx
 
-> On Mon, Mar 07, 2016 at 10:59:31AM +0100, Boris Brezillon wrote:
-> > +/* Dedicated DMA parameter register layout */
-> > +#define SUN4I_DDMA_PARA_DST_DATA_BLK_SIZE(n)	(((n) - 1) << 24)
-> > +#define SUN4I_DDMA_PARA_DST_WAIT_CYCLES(n)	(((n) - 1) << 16)
-> > +#define SUN4I_DDMA_PARA_SRC_DATA_BLK_SIZE(n)	(((n) - 1) << 8)
-> > +#define SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(n)	(((n) - 1) << 0)
-> > +
-> > +/**
-> > + * struct sun4i_dma_chan_config - DMA channel config
-> > + *
-> > + * @para: contains information about block size and time before checking
-> > + *	  DRQ line. This is device specific and only applicable to dedicated
-> > + *	  DMA channels
-> 
-> What information, can you elobrate.. And why can't you use existing
-> dma_slave_config for this?
+so this means that the phy is found and the link auto-negotiated.
 
-Block size is related to the device FIFO size. I guess it allows the
-DMA channel to launch a transfer of X bytes without having to check the
-DRQ line (the line telling the DMA engine it can transfer more data
-to/from the device). The wait cycles information is apparently related
-to the number of clks the engine should wait before polling/checking
-the DRQ line status between each block transfer. I'm not sure what it
-saves to put WAIT_CYCLES() to something != 1, but in their BSP,
-Allwinner tweak that depending on the device.
+Gabriel, it sounds that the patch solved a regression you found on
+a configuration where the MAC dialogs with a switch but it breaks the
+setup with use a std transceiver.
 
-Note that I'd be happy if the above configuration could go into the
-generic dma_slave_config struct. This way we could avoid per-engine
-specific APIs.
+> http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/net/ethernet/stmicro?id=88f8b1bb41c6208f81b6a480244533ded7b59493
+>
+> However, I am unable to ping any hosts on the network now.
 
-Best Regards,
+hmm, this could be another problem. I wonder if you can
+check which recent patch is introducing the problem on ARM64.
+For example if this depends on Oct_2015 update.
 
-Boris
+If you share some logs to me I can take a look at them.
+Then we can try to check if the problem in on rx or tx path.
+I also ask you yo check the axi settings.
 
+Let me know
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards
+peppe
+
+>
+> Regards,
+> Andreas
+>
+>>>>>> eth0: Could not attach to PHY
+>>>>>> stmmac_open: Cannot attach to PHY (error: -19)
+>>>>>
+>>>>> Still with us in next-20160307. CC'ing stmmac maintainers.
+>>
+>> peppe
+>>
+>>>>
+>>>> do you remember from what revision you rebased away from, when it was
+>>>> still
+>>>> working (as a known-good state)?
+>>>
+>>> Hm, next-20160111 possibly... leaving all the 5 days and 4 days ago
+>>> changes as candidates ("stmmac: share reset function between dwmac100
+>>> and dwmac1000" .. "stmmac: Fix 'eth0: No PHY found' regression").
+>
