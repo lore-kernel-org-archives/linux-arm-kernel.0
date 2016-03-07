@@ -1,207 +1,383 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 7 Mar 2016 10:42:14 -0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56DD38E7.3050107@huawei.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE> <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE> <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD38E7.3050107@huawei.com>
-Message-ID: <56DDCB86.4030709@redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 07 Mar 2016 19:48:23 +0100
+Subject: [PATCH v1 2/3] mailbox: rockchip: Add Rockchip mailbox driver
+In-Reply-To: <1445931106-683-3-git-send-email-wxt@rock-chips.com>
+References: <1445931106-683-1-git-send-email-wxt@rock-chips.com>
+ <1445931106-683-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <3952968.vXrbfbrlZ2@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2016 12:16 AM, Leizhen (ThunderTown) wrote:
->
->
-> On 2016/3/7 12:34, Joonsoo Kim wrote:
->> On Fri, Mar 04, 2016 at 03:35:26PM +0800, Hanjun Guo wrote:
->>> On 2016/3/4 14:38, Joonsoo Kim wrote:
->>>> On Fri, Mar 04, 2016 at 02:05:09PM +0800, Hanjun Guo wrote:
->>>>> On 2016/3/4 12:32, Joonsoo Kim wrote:
->>>>>> On Fri, Mar 04, 2016 at 11:02:33AM +0900, Joonsoo Kim wrote:
->>>>>>> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
->>>>>>>> On 2016/3/3 15:42, Joonsoo Kim wrote:
->>>>>>>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
->>>>>>>>>> (cc -mm and Joonsoo Kim)
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
->>>>>>>>>>> Hi,
->>>>>>>>>>>
->>>>>>>>>>> I came across a suspicious error for CMA stress test:
->>>>>>>>>>>
->>>>>>>>>>> Before the test, I got:
->>>>>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
->>>>>>>>>>> CmaTotal:         204800 kB
->>>>>>>>>>> CmaFree:          195044 kB
->>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> After running the test:
->>>>>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
->>>>>>>>>>> CmaTotal:         204800 kB
->>>>>>>>>>> CmaFree:         6602584 kB
->>>>>>>>>>>
->>>>>>>>>>> So the freed CMA memory is more than total..
->>>>>>>>>>>
->>>>>>>>>>> Also the the MemFree is more than mem total:
->>>>>>>>>>>
->>>>>>>>>>> -bash-4.3# cat /proc/meminfo
->>>>>>>>>>> MemTotal:       16342016 kB
->>>>>>>>>>> MemFree:        22367268 kB
->>>>>>>>>>> MemAvailable:   22370528 kB
->>>>>>>> [...]
->>>>>>>>>> I played with this a bit and can see the same problem. The sanity
->>>>>>>>>> check of CmaFree < CmaTotal generally triggers in
->>>>>>>>>> __move_zone_freepage_state in unset_migratetype_isolate.
->>>>>>>>>> This also seems to be present as far back as v4.0 which was the
->>>>>>>>>> first version to have the updated accounting from Joonsoo.
->>>>>>>>>> Were there known limitations with the new freepage accounting,
->>>>>>>>>> Joonsoo?
->>>>>>>>> I don't know. I also played with this and looks like there is
->>>>>>>>> accounting problem, however, for my case, number of free page is slightly less
->>>>>>>>> than total. I will take a look.
->>>>>>>>>
->>>>>>>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
->>>>>>>>> look like your case.
->>>>>>>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
->>>>>>>> did some other test:
->>>>>>> Thanks! Now, I can re-generate erronous situation you mentioned.
->>>>>>>
->>>>>>>>   - run with single thread with 100000 times, everything is fine.
->>>>>>>>
->>>>>>>>   - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
->>>>>>>>     the same test with 100 multi-thread, then I got:
->>>>>>> [1] would not be sufficient to close this race.
->>>>>>>
->>>>>>> Try following things [A]. And, for more accurate test, I changed code a bit more
->>>>>>> to prevent kernel page allocation from cma area [B]. This will prevent kernel
->>>>>>> page allocation from cma area completely so we can focus cma_alloc/release race.
->>>>>>>
->>>>>>> Although, this is not correct fix, it could help that we can guess
->>>>>>> where the problem is.
->>>>>> More correct fix is something like below.
->>>>>> Please test it.
->>>>> Hmm, this is not working:
->>>> Sad to hear that.
->>>>
->>>> Could you tell me your system's MAX_ORDER and pageblock_order?
->>>>
->>>
->>> MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
->>
->> Hmm... that's same with me.
->>
->> Below is similar fix that prevents buddy merging when one of buddy's
->> migrate type, but, not both, is MIGRATE_ISOLATE. In fact, I have
->> no idea why previous fix (more correct fix) doesn't work for you.
->> (It works for me.) But, maybe there is a bug on the fix
->> so I make new one which is more general form. Please test it.
->
-> Hi,
-> 	Hanjun Guo has gone to Tailand on business, so I help him to run this patch. The result
-> shows that the count of "CmaFree:" is OK now. But sometimes printed some information as below:
->
-> alloc_contig_range: [28500, 28600) PFNs busy
-> alloc_contig_range: [28300, 28380) PFNs busy
->
+Hi Jassi,
 
-Those messages aren't necessarily a problem. Those messages indicate that
-those pages weren't able to be isolated. Given the test here is a
-concurrency test, I suspect some concurrent allocation or free prevented
-isolation which is to be expected some times. I'd only be concerned if
-seeing those messages cause allocation failure or some other notable impact.
+Am Dienstag, 27. Oktober 2015, 15:31:45 schrieb Caesar Wang:
+> This driver is found on RK3368 SoCs.
+> 
+> The Mailbox module is a simple APB peripheral that allows both
+> the Cortex-A53 MCU system to communicate by writing operation to
+> generate interrupt.
+> The registers are accessible by both CPU via APB interface.
+> 
+> The Mailbox has the following main features:
+> 
+> 1) Support dual-core system: Cortex-A53 and MCU.
+> 2) Support APB interface.
+> 3) Support four mailbox elements, each element includes one data word,
+>    one command word register and one flag bit that can represent
+>    one interrupt.
+> 4) Four interrupts to Cortex-A53.
+> 5) Four interrupts to MCU.
+> 6) Provide 32 lock registers for software to use to indicate whether
+>    mailbox is occupied.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-Thanks,
-Laura
-  
->>
->> Thanks.
->>
->> ---------->8-------------
->> >From dd41e348572948d70b935fc24f82c096ff0fb417 Mon Sep 17 00:00:00 2001
->> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->> Date: Fri, 4 Mar 2016 13:28:17 +0900
->> Subject: [PATCH] mm/cma: fix race
->>
->> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->> ---
->>   mm/page_alloc.c | 33 +++++++++++++++++++--------------
->>   1 file changed, 19 insertions(+), 14 deletions(-)
->>
->> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->> index c6c38ed..d80d071 100644
->> --- a/mm/page_alloc.c
->> +++ b/mm/page_alloc.c
->> @@ -620,8 +620,8 @@ static inline void rmv_page_order(struct page *page)
->>    *
->>    * For recording page's order, we use page_private(page).
->>    */
->> -static inline int page_is_buddy(struct page *page, struct page *buddy,
->> -                                                       unsigned int order)
->> +static inline int page_is_buddy(struct zone *zone, struct page *page,
->> +                               struct page *buddy, unsigned int order)
->>   {
->>          if (!pfn_valid_within(page_to_pfn(buddy)))
->>                  return 0;
->> @@ -644,6 +644,20 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
->>                  if (page_zone_id(page) != page_zone_id(buddy))
->>                          return 0;
->>
->> +               if (IS_ENABLED(CONFIG_CMA) &&
->> +                       unlikely(has_isolate_pageblock(zone)) &&
->> +                       unlikely(order >= pageblock_order)) {
->> +                       int page_mt, buddy_mt;
->> +
->> +                       page_mt = get_pageblock_migratetype(page);
->> +                       buddy_mt = get_pageblock_migratetype(buddy);
->> +
->> +                       if (page_mt != buddy_mt &&
->> +                               (is_migrate_isolate(page_mt) ||
->> +                               is_migrate_isolate(buddy_mt)))
->> +                               return 0;
->> +               }
->> +
->>                  VM_BUG_ON_PAGE(page_count(buddy) != 0, buddy);
->>
->>                  return 1;
->> @@ -691,17 +705,8 @@ static inline void __free_one_page(struct page *page,
->>          VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
->>
->>          VM_BUG_ON(migratetype == -1);
->> -       if (is_migrate_isolate(migratetype)) {
->> -               /*
->> -                * We restrict max order of merging to prevent merge
->> -                * between freepages on isolate pageblock and normal
->> -                * pageblock. Without this, pageblock isolation
->> -                * could cause incorrect freepage accounting.
->> -                */
->> -               max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
->> -       } else {
->> +       if (!is_migrate_isolate(migratetype))
->>                  __mod_zone_freepage_state(zone, 1 << order, migratetype);
->> -       }
->>
->>          page_idx = pfn & ((1 << max_order) - 1);
->>
->> @@ -711,7 +716,7 @@ static inline void __free_one_page(struct page *page,
->>          while (order < max_order - 1) {
->>                  buddy_idx = __find_buddy_index(page_idx, order);
->>                  buddy = page + (buddy_idx - page_idx);
->> -               if (!page_is_buddy(page, buddy, order))
->> +               if (!page_is_buddy(zone, page, buddy, order))
->>                          break;
->>                  /*
->>                   * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
->> @@ -745,7 +750,7 @@ static inline void __free_one_page(struct page *page,
->>                  higher_page = page + (combined_idx - page_idx);
->>                  buddy_idx = __find_buddy_index(combined_idx, order + 1);
->>                  higher_buddy = higher_page + (buddy_idx - combined_idx);
->> -               if (page_is_buddy(higher_page, higher_buddy, order + 1)) {
->> +               if (page_is_buddy(zone, higher_page, higher_buddy, order + 1)) {
->>                          list_add_tail(&page->lru,
->>                                  &zone->free_area[order].free_list[migratetype]);
->>                          goto out;
->>
->
+it seems this patch has fallen through the cracks. Could you take a look if it 
+needs anything else?
+
+
+Thanks
+Heiko
+
+> ---
+> 
+> Changes in v1:
+> - PATCH[2/3] driver:
+> - The commit: %s/@/(num order).
+> - Add the module authors to instead of the notes.
+> - Add the COMPILE_TEST to auto compile test in Kconfig.
+> - Let the chan_to_idx() trys to instead of rockchip_mbox_chan.idx.
+> - Let's enable/disable the interrupt in startup/shutdown.
+> - Move the share memory and tx buf into the client drivers.
+> 
+>  drivers/mailbox/Kconfig            |   9 ++
+>  drivers/mailbox/Makefile           |   2 +
+>  drivers/mailbox/rockchip-mailbox.c | 286
+> +++++++++++++++++++++++++++++++++++++ 3 files changed, 297 insertions(+)
+>  create mode 100644 drivers/mailbox/rockchip-mailbox.c
+> 
+> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+> index bbec500..8b8d46e 100644
+> --- a/drivers/mailbox/Kconfig
+> +++ b/drivers/mailbox/Kconfig
+> @@ -43,6 +43,15 @@ config OMAP_MBOX_KFIFO_SIZE
+>  	  This can also be changed at runtime (via the mbox_kfifo_size
+>  	  module parameter).
+> 
+> +config ROCKCHIP_MBOX
+> +	bool "Rockchip Soc Intergrated Mailbox Support"
+> +	depends on ARCH_ROCKCHIP || COMPILE_TEST
+> +	help
+> +	  This driver provides support for inter-processor communication
+> +	  between CPU cores and MCU processor on Some Rockchip SOCs.
+> +	  Please check it that the Soc you use have Mailbox hardware.
+> +	  Say Y here if you want to use the Rockchip Mailbox support.
+> +
+>  config PCC
+>  	bool "Platform Communication Channel Driver"
+>  	depends on ACPI
+> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+> index 8e6d822..730cb5d 100644
+> --- a/drivers/mailbox/Makefile
+> +++ b/drivers/mailbox/Makefile
+> @@ -8,6 +8,8 @@ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
+> 
+>  obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+> 
+> +obj-$(CONFIG_ROCKCHIP_MBOX)	+= rockchip-mailbox.o
+> +
+>  obj-$(CONFIG_PCC)		+= pcc.o
+> 
+>  obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
+> diff --git a/drivers/mailbox/rockchip-mailbox.c
+> b/drivers/mailbox/rockchip-mailbox.c new file mode 100644
+> index 0000000..5ccdc6b
+> --- /dev/null
+> +++ b/drivers/mailbox/rockchip-mailbox.c
+> @@ -0,0 +1,286 @@
+> +/*
+> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+> for + * more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mailbox_controller.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define MAILBOX_A2B_INTEN		0x00
+> +#define MAILBOX_A2B_STATUS		0x04
+> +#define MAILBOX_A2B_CMD(x)		(0x08 + (x) * 8)
+> +#define MAILBOX_A2B_DAT(x)		(0x0c + (x) * 8)
+> +
+> +#define MAILBOX_B2A_INTEN		0x28
+> +#define MAILBOX_B2A_STATUS		0x2C
+> +#define MAILBOX_B2A_CMD(x)		(0x30 + (x) * 8)
+> +#define MAILBOX_B2A_DAT(x)		(0x34 + (x) * 8)
+> +
+> +struct rockchip_mbox_msg {
+> +	u32 cmd;
+> +	int rx_size;
+> +};
+> +
+> +struct rockchip_mbox_data {
+> +	int num_chans;
+> +};
+> +
+> +struct rockchip_mbox_chan {
+> +	int idx;
+> +	int irq;
+> +	struct rockchip_mbox_msg *msg;
+> +	struct rockchip_mbox *mb;
+> +};
+> +
+> +struct rockchip_mbox {
+> +	struct mbox_controller mbox;
+> +	struct clk *pclk;
+> +	void __iomem *mbox_base;
+> +
+> +	/* The base address of share memory to transfer data */
+> +	void __iomem *buf_base;
+> +
+> +	/* The maximum size of buf for each channel */
+> +	u32 buf_size;
+> +
+> +	struct rockchip_mbox_chan *chans;
+> +};
+> +
+> +static int rockchip_mbox_send_data(struct mbox_chan *chan, void *data)
+> +{
+> +	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
+> +	struct rockchip_mbox_msg *msg = data;
+> +	struct rockchip_mbox_chan *chans = mb->chans;
+> +
+> +	if (!msg)
+> +		return -EINVAL;
+> +
+> +	if (msg->rx_size > mb->buf_size) {
+> +		dev_err(mb->mbox.dev, "Transmit size over buf size(%d)\n",
+> +			mb->buf_size);
+> +		return -EINVAL;
+> +	}
+> +
+> +	dev_dbg(mb->mbox.dev, "Chan[%d]: A2B message, cmd 0x%08x\n",
+> +		chans->idx, msg->cmd);
+> +
+> +	mb->chans[chans->idx].msg = msg;
+> +
+> +	writel_relaxed(msg->cmd, mb->mbox_base + MAILBOX_A2B_CMD(chans->idx));
+> +	writel_relaxed(msg->rx_size, mb->mbox_base +
+> +		       MAILBOX_A2B_DAT(chans->idx));
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_mbox_startup(struct mbox_chan *chan)
+> +{
+> +	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
+> +
+> +	/* Enable all B2A interrupts */
+> +	writel_relaxed((1 << mb->mbox.num_chans) - 1,
+> +		       mb->mbox_base + MAILBOX_B2A_INTEN);
+> +
+> +	return 0;
+> +}
+> +
+> +static void rockchip_mbox_shutdown(struct mbox_chan *chan)
+> +{
+> +	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
+> +	struct rockchip_mbox_chan *chans = mb->chans;
+> +
+> +	/* Disable all B2A interrupts */
+> +	writel_relaxed(0, mb->mbox_base + MAILBOX_B2A_INTEN);
+> +
+> +	mb->chans[chans->idx].msg = NULL;
+> +}
+> +
+> +static const struct mbox_chan_ops rockchip_mbox_chan_ops = {
+> +	.send_data	= rockchip_mbox_send_data,
+> +	.startup	= rockchip_mbox_startup,
+> +	.shutdown	= rockchip_mbox_shutdown,
+> +};
+> +
+> +static irqreturn_t rockchip_mbox_irq(int irq, void *dev_id)
+> +{
+> +	int idx;
+> +	struct rockchip_mbox *mb = (struct rockchip_mbox *)dev_id;
+> +	u32 status = readl_relaxed(mb->mbox_base + MAILBOX_B2A_STATUS);
+> +
+> +	for (idx = 0; idx < mb->mbox.num_chans; idx++) {
+> +		if ((status & (1 << idx)) && (irq == mb->chans[idx].irq)) {
+> +			/* Clear mbox interrupt */
+> +			writel_relaxed(1 << idx,
+> +				       mb->mbox_base + MAILBOX_B2A_STATUS);
+> +			return IRQ_WAKE_THREAD;
+> +		}
+> +	}
+> +
+> +	return IRQ_NONE;
+> +}
+> +
+> +static irqreturn_t rockchip_mbox_isr(int irq, void *dev_id)
+> +{
+> +	int idx;
+> +	struct rockchip_mbox_msg *msg = NULL;
+> +	struct rockchip_mbox *mb = (struct rockchip_mbox *)dev_id;
+> +
+> +	for (idx = 0; idx < mb->mbox.num_chans; idx++) {
+> +		if (irq != mb->chans[idx].irq)
+> +			continue;
+> +
+> +		msg = mb->chans[idx].msg;
+> +		if (!msg) {
+> +			dev_err(mb->mbox.dev,
+> +				"Chan[%d]: B2A message is NULL\n", idx);
+> +			break; /* spurious */
+> +		}
+> +
+> +		mbox_chan_received_data(&mb->mbox.chans[idx], msg);
+> +		mb->chans[idx].msg = NULL;
+> +
+> +		dev_dbg(mb->mbox.dev, "Chan[%d]: B2A message, cmd 0x%08x\n",
+> +			idx, msg->cmd);
+> +
+> +		break;
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static const struct rockchip_mbox_data rk3368_drv_data = {
+> +	.num_chans = 4,
+> +};
+> +
+> +static const struct of_device_id rockchip_mbox_of_match[] = {
+> +	{ .compatible = "rockchip,rk3368-mailbox", .data = &rk3368_drv_data},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, rockchp_mbox_of_match);
+> +
+> +static int rockchip_mbox_probe(struct platform_device *pdev)
+> +{
+> +	struct rockchip_mbox *mb;
+> +	const struct of_device_id *match;
+> +	const struct rockchip_mbox_data *drv_data;
+> +	struct resource *res;
+> +	int ret, irq, i;
+> +
+> +	if (!pdev->dev.of_node)
+> +		return -ENODEV;
+> +
+> +	match = of_match_node(rockchip_mbox_of_match, pdev->dev.of_node);
+> +	drv_data = (const struct rockchip_mbox_data *)match->data;
+> +
+> +	mb = devm_kzalloc(&pdev->dev, sizeof(*mb), GFP_KERNEL);
+> +	if (!mb)
+> +		return -ENOMEM;
+> +
+> +	mb->chans = devm_kcalloc(&pdev->dev, drv_data->num_chans,
+> +				 sizeof(*mb->chans), GFP_KERNEL);
+> +	if (!mb->chans)
+> +		return -ENOMEM;
+> +
+> +	mb->mbox.chans = devm_kcalloc(&pdev->dev, drv_data->num_chans,
+> +				      sizeof(*mb->mbox.chans), GFP_KERNEL);
+> +	if (!mb->mbox.chans)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, mb);
+> +
+> +	mb->mbox.dev = &pdev->dev;
+> +	mb->mbox.num_chans = drv_data->num_chans;
+> +	mb->mbox.ops = &rockchip_mbox_chan_ops;
+> +	mb->mbox.txdone_irq = true;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -ENODEV;
+> +
+> +	mb->mbox_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(mb->mbox_base))
+> +		return PTR_ERR(mb->mbox_base);
+> +
+> +	/* Each channel has two buffers for A2B and B2A */
+> +	mb->buf_size = resource_size(res) / (drv_data->num_chans * 2);
+> +
+> +	mb->pclk = devm_clk_get(&pdev->dev, "pclk_mailbox");
+> +	if (IS_ERR(mb->pclk)) {
+> +		ret = PTR_ERR(mb->pclk);
+> +		dev_err(&pdev->dev, "failed to get pclk_mailbox clock: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(mb->pclk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable pclk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	for (i = 0; i < mb->mbox.num_chans; i++) {
+> +		irq = platform_get_irq(pdev, i);
+> +		if (irq < 0)
+> +			return irq;
+> +
+> +		ret = devm_request_threaded_irq(&pdev->dev, irq,
+> +						rockchip_mbox_irq,
+> +						rockchip_mbox_isr, IRQF_ONESHOT,
+> +						dev_name(&pdev->dev), mb);
+> +		if (ret < 0)
+> +			return ret;
+> +
+> +		mb->chans[i].idx = i;
+> +		mb->chans[i].irq = irq;
+> +		mb->chans[i].mb = mb;
+> +		mb->chans[i].msg = NULL;
+> +	}
+> +
+> +	ret = mbox_controller_register(&mb->mbox);
+> +	if (ret < 0)
+> +		dev_err(&pdev->dev, "Failed to register mailbox: %d\n", ret);
+> +
+> +	return ret;
+> +}
+> +
+> +static int rockchip_mbox_remove(struct platform_device *pdev)
+> +{
+> +	struct rockchip_mbox *mb = platform_get_drvdata(pdev);
+> +
+> +	if (!mb)
+> +		return -EINVAL;
+> +
+> +	mbox_controller_unregister(&mb->mbox);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver rockchip_mbox_driver = {
+> +	.probe	= rockchip_mbox_probe,
+> +	.remove	= rockchip_mbox_remove,
+> +	.driver = {
+> +		.name = "rockchip-mailbox",
+> +		.of_match_table = of_match_ptr(rockchip_mbox_of_match),
+> +	},
+> +};
+> +
+> +module_platform_driver(rockchip_mbox_driver);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("Rockchip mailbox: communicate between CPU cores and
+> MCU"); +MODULE_AUTHOR("Addy Ke <addy.ke@rock-chips.com>");
+> +MODULE_AUTHOR("Caesar Wang <wxt@rock-chips.com>");
