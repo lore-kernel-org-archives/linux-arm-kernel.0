@@ -1,54 +1,62 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 7 Mar 2016 17:17:30 +0200
-Subject: [PATCH v2 03/10] ARM: DTS: dra7: Use eDMA and add DAT port address
- for McASP3
-In-Reply-To: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1457363857-20797-4-git-send-email-peter.ujfalusi@ti.com>
+Date: Mon, 7 Mar 2016 17:17:27 +0200
+Subject: [PATCH v2 00/10] ARM: DTS/clk: DRA7 family: enable eDMA and audio
+ updates
+Message-ID: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Misael Lopez Cruz <misael.lopez@ti.com>
+Hi,
 
-McASP3 does not support constant addressing mode on the DAT
-port, so increment transfers must be used instead.  This
-restriction is also applicable for McASP1 and McASP2.
+Changes since v1:
+- hwmod patch for eDMA (tpcc/tptc0/tptc1) removed as it is already in linux-next
+- mcasp hwmod changes:
+ - all module have HWMOD_OPT_CLKS_NEEDED and no HWMOD_SWSUP_SIDLE (per Paul's
+   comment)
+ - mcasp1,2: add ahclkr as opt clock since those modules have fclk, ahclkx and
+   ahclkr marked as functional clocks.
+   Same change is added to the DTS patch
 
-This DMA addressing constraint poses a major problem for sDMA
-where constant addressing mode is used on the peripheral side.
-Unfortunately, using increment transfers in sDMA comes with
-important side effects.
+On dra7 family we have two DMA engine available: sDMA (omap-dma) and eDMA.
+For some peripherals the use of eDMA is better due to L3 interconnect limitation
+when using sDMA. Such peripherals are McASP1/2/3. By switching to eDMA we can
+enable the AFIFO which will help to avoid under or overruns in audio.
 
-The addressing mode used in eDMA is INC, so the silicon limitation
-described above has no impact and the McASP3 DAT port can be
-safely added by switching to eDMA instead of sDMA.
+This set will:
+- add the hwmod data for eDMA TPCC and TPTCs
+- add the needed DT nodes for eDMA and the crossbar
+- we will enable the AFIFO use for audio
+- add hwmod data and DT nodes for all McASP ports
+- Fix the beagle-x15's clkout2 parent setting for the codec
 
-Signed-off-by: Misael Lopez Cruz <misael.lopez@ti.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+The patch set has been tested on top of linux-next.
+
+Regards,
+Peter
 ---
- arch/arm/boot/dts/dra7.dtsi | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Misael Lopez Cruz (1):
+  ARM: DTS: dra7: Use eDMA and add DAT port address for McASP3
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index b99f51288e71..4c192ea8ae29 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1469,12 +1469,13 @@
- 		mcasp3: mcasp at 48468000 {
- 			compatible = "ti,dra7-mcasp-audio";
- 			ti,hwmods = "mcasp3";
--			reg = <0x48468000 0x2000>;
--			reg-names = "mpu";
-+			reg = <0x48468000 0x2000>,
-+			      <0x46000000 0x1000>;
-+			reg-names = "mpu","dat";
- 			interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "tx", "rx";
--			dmas = <&sdma_xbar 133>, <&sdma_xbar 132>;
-+			dmas = <&edma_xbar 133 1>, <&edma_xbar 132 1>;
- 			dma-names = "tx", "rx";
- 			clocks = <&mcasp3_aux_gfclk_mux>, <&mcasp3_ahclkx_mux>;
- 			clock-names = "fck", "ahclkx";
+Peter Ujfalusi (9):
+  ARM: DTS: dra7: Move the sDMA crossbar node under l4_cfg/scm
+  ARM: DTS: dra7: Enable eDMA
+  ARM: DTS: dra7-evm: Enable AFIFO use for McASP3
+  ARM: DTS: dra72-evm: Enable AFIFO use for McASP3
+  ARM: DTS: am57xx-beagle-x15: Move clkout2 source selection to codec
+    node
+  ARM: DTS: am57xx-beagle-x15: Enable AFIFO use for McASP3
+  ARM: clk: dra7xx: Correct mcasp8_ahclkx_mux name
+  ARM: DRA7: hwmod: Add data for McASP1/2/4/5/6/7/8
+  ARM: DTS: dra7: Add nodes for McASP1/2/4/5/6/7/8
+
+ arch/arm/boot/dts/am57xx-beagle-x15.dts   |   7 +-
+ arch/arm/boot/dts/dra7-evm.dts            |   2 +
+ arch/arm/boot/dts/dra7.dtsi               | 183 +++++++++++++++++++++--
+ arch/arm/boot/dts/dra72-evm.dts           |   2 +
+ arch/arm/boot/dts/dra7xx-clocks.dtsi      |   2 +-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 237 ++++++++++++++++++++++++++++++
+ drivers/clk/ti/clk-7xx.c                  |   2 +-
+ 7 files changed, 421 insertions(+), 14 deletions(-)
+
 -- 
 2.7.2
