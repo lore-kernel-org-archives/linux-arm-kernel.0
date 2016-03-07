@@ -1,152 +1,120 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 7 Mar 2016 17:17:37 +0200
-Subject: [PATCH v2 10/10] ARM: DTS: dra7: Add nodes for McASP1/2/4/5/6/7/8
-In-Reply-To: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1457363857-20797-11-git-send-email-peter.ujfalusi@ti.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 7 Mar 2016 10:30:06 -0500
+Subject: [PATCH V14 8/9] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <56DCFEE0.6080101@linaro.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
+ <56D08843.5020306@linaro.org> <56D7323B.4040100@codeaurora.org>
+ <56D8C539.9000203@linaro.org> <56D91B0E.1080203@codeaurora.org>
+ <56DCFEE0.6080101@linaro.org>
+Message-ID: <56DD9E7E.6000406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes to represent all McASP ports in the dra7 family.
-For system consistency use the eDMA for audio operations. sDMA would be
-fine for 4/5/6/7/8 since their DAT port is not through L3 interconnect.
+On 3/6/2016 11:09 PM, Eric Auger wrote:
+>> #define module_vfio_reset_handler(compat, acpihid, reset)		\
+>> > MODULE_ALIAS("vfio-reset:" acpihid? acpihid: compat);			\
+>> > 
+>> > This way, we'll create an alias with one of the provided strings.  
+> What if you want to use vfio platform driver for HiDMA in dt mode? the
+> HiDma reset module advertises both acpihid and dt compat support but an
+> alias module will be created only for acpihid. Then I think we will not
+> be able to load the reset module in dt mode with existing code.
+> 
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 114 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 114 insertions(+)
+Right, it won't work. Now that we know what MODULE_ALIAS does, there is no
+harm in doing this. I think we should do this.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 4c192ea8ae29..bb3c94aecdeb 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1466,6 +1466,40 @@
- 			status = "disabled";
- 		};
+#define module_vfio_reset_handler(compat, acpihid, reset)              \
+MODULE_ALIAS("vfio-reset:" compat);                                    \
+MODULE_ALIAS("vfio-reset:" acpihid);                                   \
+
+If we prefer ACPI over DT, there is no guarantee that somebody can boot DT
+kernel with ACPI kernel compilation option enabled.
+
+If one of these are null, then the module alias will be "vfio-reset:"
+
+Of course to make things prettier, we could use "NOT SUPPORTED" as a string
+instead of NULL. then, the module alias will be vfio-reset: NOT SUPPORTED".
+
+We could go one step further, and do.
+
+#define module_vfio_reset_handler(compat, acpihid, reset) \
+MODULE_ALIAS("vfio-reset: dt: " compat); \
+MODULE_ALIAS("vfio-reset: acpi: " acpihid); \
+
+and change the code below for this too.
+
+
+> This could work however with some rework in vfio_platform_common.c. In
+> vfio_platform_get_reset we should try to load the module using the
+> acpihid if the module load using compat alias fails. In the look-up
+> table we can find the acpihid corresponding to the dt compat.
+
+I was planning to submit this for the next review. Still, I don't want to 
+assume that acpihid is the only working option. Somebody can boot DT kernel.
+
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index 42d7545..ba585ad 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -58,16 +58,30 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+ 	return reset_fn;
+ }
  
-+		mcasp1: mcasp at 48460000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp1";
-+			reg = <0x48460000 0x2000>,
-+			      <0x45800000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 129 1>, <&edma_xbar 128 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp1_aux_gfclk_mux>, <&mcasp1_ahclkx_mux>,
-+				 <&mcasp1_ahclkr_mux>;
-+			clock-names = "fck", "ahclkx", "ahclkr";
-+			status = "disabled";
-+		};
+-static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
++static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
+ {
++	int rc;
 +
-+		mcasp2: mcasp at 48464000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp2";
-+			reg = <0x48464000 0x2000>,
-+			      <0x45c00000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 131 1>, <&edma_xbar 130 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp2_aux_gfclk_mux>, <&mcasp2_ahclkx_mux>,
-+				 <&mcasp2_ahclkr_mux>;
-+			clock-names = "fck", "ahclkx", "ahclkr";
-+			status = "disabled";
-+		};
+ 	vdev->reset = vfio_platform_lookup_reset(vdev->compat, vdev->acpihid,
+ 						 &vdev->reset_module);
+-	if (!vdev->reset) {
+-		request_module("vfio-reset:%s", vdev->compat);
+-		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+-							 vdev->acpihid,
+-							 &vdev->reset_module);
+-	}
++	if (vdev->reset)
++		return 0;
 +
- 		mcasp3: mcasp at 48468000 {
- 			compatible = "ti,dra7-mcasp-audio";
- 			ti,hwmods = "mcasp3";
-@@ -1482,6 +1516,86 @@
- 			status = "disabled";
- 		};
++	if (vdev->acpihid)
++		rc = request_module("vfio-reset:%s", vdev->acpihid);
++
++	if (rc && vdev->compat)
++		rc = request_module("vfio-reset:%s", vdev->compat);
++
++	if (rc)
++		return rc;
++
++	vdev->reset = vfio_platform_lookup_reset(vdev->compat, vdev->acpihid,
++						 &vdev->reset_module);
++	if (vdev->reset)
++		return 0;
++
++	return -ENODEV;
+ }
  
-+		mcasp4: mcasp at 4846c000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp4";
-+			reg = <0x4846c000 0x2000>,
-+			      <0x48436000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 135 1>, <&edma_xbar 134 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp4_aux_gfclk_mux>, <&mcasp4_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp5: mcasp at 48470000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp5";
-+			reg = <0x48470000 0x2000>,
-+			      <0x4843a000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 137 1>, <&edma_xbar 136 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp5_aux_gfclk_mux>, <&mcasp5_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp6: mcasp at 48474000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp6";
-+			reg = <0x48474000 0x2000>,
-+			      <0x4844c000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 139 1>, <&edma_xbar 138 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp6_aux_gfclk_mux>, <&mcasp6_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp7: mcasp at 48478000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp7";
-+			reg = <0x48478000 0x2000>,
-+			      <0x48450000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 141 1>, <&edma_xbar 140 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp7_aux_gfclk_mux>, <&mcasp7_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
-+		mcasp8: mcasp at 4847c000 {
-+			compatible = "ti,dra7-mcasp-audio";
-+			ti,hwmods = "mcasp8";
-+			reg = <0x4847c000 0x2000>,
-+			      <0x48454000 0x1000>;
-+			reg-names = "mpu","dat";
-+			interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tx", "rx";
-+			dmas = <&edma_xbar 143 1>, <&edma_xbar 142 1>;
-+			dma-names = "tx", "rx";
-+			clocks = <&mcasp8_aux_gfclk_mux>, <&mcasp8_ahclkx_mux>;
-+			clock-names = "fck", "ahclkx";
-+			status = "disabled";
-+		};
-+
- 		crossbar_mpu: crossbar at 4a002a48 {
- 			compatible = "ti,irq-crossbar";
- 			reg = <0x4a002a48 0x130>;
+ static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+@@ -620,7 +634,11 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 		return ret;
+ 	}
+ 
+-	vfio_platform_get_reset(vdev);
++	ret = vfio_platform_get_reset(vdev);
++	if (ret) {
++		iommu_group_put(group);
++		return ret;
++	}
+ 
+ 	mutex_init(&vdev->igate);
+  
+
+Let me know what you think.
+
+
 -- 
-2.7.2
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
