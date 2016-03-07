@@ -1,73 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Mar 2016 08:43:57 -0800
-Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
-In-Reply-To: <3185882.WT2d08mtAT@wuerfel>
-References: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
- <5158260.vK2YuWzYIn@wuerfel> <20160305002203.GF55664@google.com>
- <3185882.WT2d08mtAT@wuerfel>
-Message-ID: <20160307164356.GB9329@atomide.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 07 Mar 2016 16:43:19 +0000
+Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
+In-Reply-To: <1454684330-892-1-git-send-email-james.morse@arm.com>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+Message-ID: <56DDAFA7.4090207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160304 16:34]:
-> On Friday 04 March 2016 16:22:03 Brian Norris wrote:
-> > Hi Arnd,
-> > 
-> > On Sat, Mar 05, 2016 at 01:19:21AM +0100, Arnd Bergmann wrote:
-> > > On Friday 04 March 2016 16:02:25 Brian Norris wrote:
-> > > > On Mon, Jan 25, 2016 at 04:41:50PM +0100, Arnd Bergmann wrote:
-> > > > > When XIP_KERNEL is enabled, some functions are defined in the .data
-> > > > > ELF section because we require them to be in RAM whenever we communicate
-> > > > > with the flash chip. However this causes problems when FTRACE is
-> > > > > enabled and gcc emits calls to __gnu_mcount_nc in the function
-> > > > > prolog:
-> > > > > 
-> > > > > drivers/built-in.o: In function `cfi_chip_setup':
-> > > > > :(.data+0x272fc): relocation truncated to fit: R_ARM_CALL against symbol `__gnu_mcount_nc' defined in .text section in arch/arm/kernel/built-in.o
-> > > > > drivers/built-in.o: In function `cfi_probe_chip':
-> > > > > :(.data+0x27de8): relocation truncated to fit: R_ARM_CALL against symbol `__gnu_mcount_nc' defined in .text section in arch/arm/kernel/built-in.o
-> > > > > /tmp/ccY172rP.s: Assembler messages:
-> > > > > /tmp/ccY172rP.s:70: Warning: ignoring changed section attributes for .data
-> > > > > /tmp/ccY172rP.s: Error: 1 warning, treating warnings as errors
-> > > > > make[5]: *** [drivers/mtd/chips/cfi_probe.o] Error 1
-> > > > > /tmp/ccK4rjeO.s: Assembler messages:
-> > > > > /tmp/ccK4rjeO.s:421: Warning: ignoring changed section attributes for .data
-> > > > > /tmp/ccK4rjeO.s: Error: 1 warning, treating warnings as errors
-> > > > > make[5]: *** [drivers/mtd/chips/cfi_util.o] Error 1
-> > > > > /tmp/ccUvhCYR.s: Assembler messages:
-> > > > > /tmp/ccUvhCYR.s:1895: Warning: ignoring changed section attributes for .data
-> > > > > /tmp/ccUvhCYR.s: Error: 1 warning, treating warnings as errors
-> > > > 
-> > > > Can you provide a sample .config that DOES build correctly with
-> > > > XIP_KERNEL enabled + this patch? My first attempt yields some other
-> > > > failures I don't care to fixup right now...
-> > > > 
-> > > > Anyway, I don't doubt you have a good fix here, so I can probably take
-> > > > it. Any review from others would be welcome though.
-> > > 
-> > > I found the config in the attachment in my logs.
-> > 
-> > Thanks...
-> > 
-> > > To get this config working, I also needed this hunk from my set of
-> > > old unsubmitted patches:
-> > 
-> > ...but, does anyone care about XIP / MTD_XIP then, if the first two
-> > examples we have both have long-standing build issues?
-> > 
-> 
-> Probably not. I just checked the third user (omap1), and it seems that one
-> has been broken since 2009 with 941132606c76 ("OMAP: Remove OMAP_IO_ADDRESS,
-> use OMAP1_IO_ADDRESS and OMAP2_IO_ADDRESS instead"), when Tony replaced
-> the inline omap_readl() with an extern function, thus breaking the
-> implementation of xip_irqpending() that must be inlined.
-> 
-> The other two have apparently been broken since 2011, by other patches
-> that also broke compilation.
+Hi Catalin,
 
-For omaps, I don't recall anybody working on xip for probably close to
-10 years.
+I've just spotted UAO causes the test_user_copy module (CONFIG_TEST_USER_COPY)
+to fail. Who to blame is up for discussion. The test is passing a user pointer
+as the 'to' field of copy_from_user(), which it expects to fail gracefully:
 
-Regards,
+lib/test_user_copy.c:75
+>	/* Invalid usage: none of these should succeed. */
+[ ... ]
+> 	ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
+>				    PAGE_SIZE),
+>		    "illegal reversed copy_from_user passed");
+>
 
-Tony
+access_ok() catches the "(char __user *)kmem", causing copy_from_user() to pass
+bad_usermem to memset():
+
+arch/arm64/include/asm/uaccess.h:279
+>	if (access_ok(VERIFY_READ, from, n))
+>		n = __copy_from_user(to, from, n);
+>	else /* security hole - plug it */
+>		memset(to, 0, n);
+
+This (correctly) trips UAO's "Accessing user space memory outside uaccess.h
+routines" message, which is a little confusing to debug, and stops the rest of
+the module's tests from being run.
+
+As far as I can see, this would only affect arm64. I can't find an equivalent
+memset() for x86_64.
+
+The below ugly hack [0], handles this more gracefully. I can send this as a fix
+sooner/later if you think its the right thing to do.
+
+
+
+Thanks,
+
+James
+
+[0]
+-----------------%<-----------------
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 0685d74572af..049a82e8dd9e 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -278,8 +278,8 @@ static inline unsigned long __must_check copy_from_user(void
+*to, const void __u
+ {
+        if (access_ok(VERIFY_READ, from, n))
+                n = __copy_from_user(to, from, n);
+-       else /* security hole - plug it */
+-               memset(to, 0, n);
++       else if ((unsigned long)to > USER_DS) /* swapped from/to args? */
++               memset(to, 0, n); /* security hole - plug it */
+        return n;
+ }
+
+-----------------%<-----------------
