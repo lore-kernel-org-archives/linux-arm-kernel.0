@@ -1,58 +1,74 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 7 Mar 2016 09:36:23 +0200
-Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
- tree
-In-Reply-To: <CACRpkdaJ1xzRp4gg1wLSoo_se+LEC9sUDZ-9L2iZ1g4GPj_dZw@mail.gmail.com>
-References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
- <3695074.sKSIyOjpjD@wuerfel>
- <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
- <6859810.tb1t0IEONi@wuerfel> <56CC57FC.20707@ti.com>
- <CACRpkdYNaNtQQJ-tsBe5ksa4-z380ZQj-zN8ZnK0ED2kNPUwvg@mail.gmail.com>
- <56CC60C4.6040908@ti.com>
- <CACRpkdZd8TLdsi7_cOrqzcqWKJrfdp4Vz2sx5ozpwJXOj0fa+Q@mail.gmail.com>
- <56CF2FB1.106@ti.com>
- <CACRpkdYowXJinONTd2qREfCtEDCon+HSQtdd6t1QQA91f6PJdw@mail.gmail.com>
- <56D02D28.9080109@ti.com>
- <CACRpkdaJ1xzRp4gg1wLSoo_se+LEC9sUDZ-9L2iZ1g4GPj_dZw@mail.gmail.com>
-Message-ID: <56DD2F77.6080407@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Mar 2016 08:54:20 +0100
+Subject: [PATCH 6/9] spi: imx: remove unnecessary bit clearing in
+ mx51_ecspi_config
+In-Reply-To: <56D97A61.2070602@mentor.com>
+References: <1456302033-25638-1-git-send-email-s.hauer@pengutronix.de>
+ <1456302033-25638-7-git-send-email-s.hauer@pengutronix.de>
+ <56D968DF.7000007@mentor.com>
+ <20160304114737.GE21869@pengutronix.de>
+ <56D97A61.2070602@mentor.com>
+Message-ID: <20160307075420.GH21869@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/03/16 18:57, Linus Walleij wrote:
-> On Fri, Feb 26, 2016 at 5:47 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+On Fri, Mar 04, 2016 at 02:06:57PM +0200, Vladimir Zapolskiy wrote:
+> On 04.03.2016 13:47, Sascha Hauer wrote:
+> > On Fri, Mar 04, 2016 at 12:52:15PM +0200, Vladimir Zapolskiy wrote:
+> >> Hi Sascha,
+> >>
+> >> On 24.02.2016 10:20, Sascha Hauer wrote:
+> >>> This reverts patch 1476253cef (spi: imx: fix ecspi mode setup)
+> >>> The patch tried to fix something by clearing bits in the cfg variable,
+> >>> but cfg is initialized to zero on function entry. There are no bits to
+> >>> clear.
+> >>>
+> >>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >>
+> >> I believe here the expected fix should be
+> >>
+> >> ----8<----
+> >>
+> >> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> >> index 6a4ff27..9c9bae0 100644
+> >> --- a/drivers/spi/spi-imx.c
+> >> +++ b/drivers/spi/spi-imx.c
+> >> @@ -316,9 +316,10 @@ static void __maybe_unused mx51_ecspi_trigger(struct
+> >> spi_imx_data *spi_imx)
+> >>  static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+> >>  		struct spi_imx_config *config)
+> >>  {
+> >> -	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
+> >> +	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
+> >>  	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
+> >>  	u32 clk = config->speed_hz, delay, reg;
+> >> +	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
+> >>
+> > 
+> > With this change applied we would indeed have to clear and not only set the bits,
+> > but why would we do this?
 > 
->> Although one thing to consider is that if there is ever going to be a
->> DRM driver for CLCD, it would be good to have the device tree parts
->> correctly representing the hardware, so that the DRM driver could be
->> implemented in a cleaner, more generic way.
+> Locally we have quite a similar to 1476253cef change (well, correct version
+> of it) authored by Knut Wohlrab, here is his comment from a discussion:
 > 
-> OK so for the next kernel cycle I can work on that.
-> 
-> The non-controversial patch set is essentially just using the DT bindings
+> Please notice that iMX6 ECSPI controller support 4 channels/chip selects at
+> one SPI bus. The original iMX driver implementation(*) did not care about
+> the SPI_CPHA, SPI_CPOL and SPI_CS_HIGH configuration of the not selected
+> channels and set this to "0". Depending on the configuration of this
+> channels this could cause unwanted edges at the clock line when using this
+> channels the next time. To prevent this, we introduce the read of the
+> actual configuration/register content and set only the necessary changes.
 
-Yes, I think the non-controversial series is fine. Will you be sending a
-v2 of that series?
+If that's the reason to introduce this reason then we should commit a
+patch that really fixes this behaviour and has the above reasoning in
+the commit message. 1476253cef doesn't really change anything.
+Is it really "could cause unwanted edeges" or "We have seen unwanted
+edges"?
 
-> that are already in the kernel and in widespread use. See:
-> commit d10715be03bd8bad59ddc50236cb140c3bd73c7b
-> "video: ARM CLCD: Add DT support"
-> 
-> They follow the example set by
-> commit 478a4f81af4936c683a03488e15b087e28cb4f0d
-> "ARM: vexpress: Add CLCD Device Tree properties"
+Sascha
 
-This one not actually correct, as the panel node is inside the clcd
-node. The child parent relationship should represent a control bus. But
-that's a different topic...
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/363b6742/attachment.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
