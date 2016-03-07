@@ -1,214 +1,86 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 6 Mar 2016 21:41:06 -0800
-Subject: linux-next: manual merge of the watchdog tree with the arm-soc
- tree
-In-Reply-To: <20160307150402.191ba735@canb.auug.org.au>
-References: <20160307150402.191ba735@canb.auug.org.au>
-Message-ID: <CAOesGMjD51rNqd3V8BE6xHkYZQdB8nc_Azppk1U+m8GwrtUv6w@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 7 Mar 2016 01:40:36 +0000
+Subject: [PATCH 0/3] arm64: simplify and optimize kernel mapping
+In-Reply-To: <1457010581-4924-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457010581-4924-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160307014031.GA2158@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim,
+Hi,
 
-It's much easier for us if all DTS changes go in through the arm-soc
-trees, to avoid these kind of conflicts. Is this on a branch where you
-can easily drop it and we pick it up instead, or is it on a now-stable
-branch?
+I like this series, though I have a few minor comments below.
 
+On Thu, Mar 03, 2016 at 02:09:38PM +0100, Ard Biesheuvel wrote:
+> This series makes a couple of minor changes that should result in the
+> kernel being mapped in a more efficient manner.
+> 
+> First of all, it merges the .head.text with the .text section (patch #2)
+> after moving everything except the kernel and EFI header into the __init
+> section (patch #1)
 
--Olof
+Face-to-face, you suggested it might be possible to move .init before .text, so
+we could place the EFI header in there too (and keep .text aligned while making
+it smaller). Is there some reason we missed that means we cannot do this?
 
-On Sun, Mar 6, 2016 at 8:04 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Wim,
->
-> Today's linux-next merge of the watchdog tree got a conflict in:
->
->   arch/arm64/boot/dts/arm/foundation-v8.dts
->
-> between commit:
->
->   d11a89796678 ("arm64: dts: split Foundation model dts to put the GIC separately")
->
-> from the arm-soc tree and commit:
->
->   fe3a97e8ed02 ("ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts")
->
-> from the watchdog tree.
->
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
->
-> --
-> Cheers,
-> Stephen Rothwell
->
-> diff --cc arch/arm64/boot/dts/arm/foundation-v8.dts
-> index 71168077312d,66cb9aaa9135..000000000000
-> --- a/arch/arm64/boot/dts/arm/foundation-v8.dts
-> +++ b/arch/arm64/boot/dts/arm/foundation-v8.dts
-> @@@ -18,4 -83,165 +18,11 @@@
->                       <0x0 0x2c006000 0 0x2000>;
->                 interrupts = <1 9 0xf04>;
->         };
->  -
->  -      timer {
->  -              compatible = "arm,armv8-timer";
->  -              interrupts = <1 13 0xf08>,
->  -                           <1 14 0xf08>,
->  -                           <1 11 0xf08>,
->  -                           <1 10 0xf08>;
->  -              clock-frequency = <100000000>;
->  -      };
->  -
->  -      pmu {
->  -              compatible = "arm,armv8-pmuv3";
->  -              interrupts = <0 60 4>,
->  -                           <0 61 4>,
->  -                           <0 62 4>,
->  -                           <0 63 4>;
->  -      };
->  -
->  -      smb {
->  -              compatible = "arm,vexpress,v2m-p1", "simple-bus";
->  -              arm,v2m-memory-map = "rs1";
->  -              #address-cells = <2>; /* SMB chipselect number and offset */
->  -              #size-cells = <1>;
->  -
->  -              ranges = <0 0 0 0x08000000 0x04000000>,
->  -                       <1 0 0 0x14000000 0x04000000>,
->  -                       <2 0 0 0x18000000 0x04000000>,
->  -                       <3 0 0 0x1c000000 0x04000000>,
->  -                       <4 0 0 0x0c000000 0x04000000>,
->  -                       <5 0 0 0x10000000 0x04000000>;
->  -
->  -              #interrupt-cells = <1>;
->  -              interrupt-map-mask = <0 0 63>;
->  -              interrupt-map = <0 0  0 &gic 0  0 4>,
->  -                              <0 0  1 &gic 0  1 4>,
->  -                              <0 0  2 &gic 0  2 4>,
->  -                              <0 0  3 &gic 0  3 4>,
->  -                              <0 0  4 &gic 0  4 4>,
->  -                              <0 0  5 &gic 0  5 4>,
->  -                              <0 0  6 &gic 0  6 4>,
->  -                              <0 0  7 &gic 0  7 4>,
->  -                              <0 0  8 &gic 0  8 4>,
->  -                              <0 0  9 &gic 0  9 4>,
->  -                              <0 0 10 &gic 0 10 4>,
->  -                              <0 0 11 &gic 0 11 4>,
->  -                              <0 0 12 &gic 0 12 4>,
->  -                              <0 0 13 &gic 0 13 4>,
->  -                              <0 0 14 &gic 0 14 4>,
->  -                              <0 0 15 &gic 0 15 4>,
->  -                              <0 0 16 &gic 0 16 4>,
->  -                              <0 0 17 &gic 0 17 4>,
->  -                              <0 0 18 &gic 0 18 4>,
->  -                              <0 0 19 &gic 0 19 4>,
->  -                              <0 0 20 &gic 0 20 4>,
->  -                              <0 0 21 &gic 0 21 4>,
->  -                              <0 0 22 &gic 0 22 4>,
->  -                              <0 0 23 &gic 0 23 4>,
->  -                              <0 0 24 &gic 0 24 4>,
->  -                              <0 0 25 &gic 0 25 4>,
->  -                              <0 0 26 &gic 0 26 4>,
->  -                              <0 0 27 &gic 0 27 4>,
->  -                              <0 0 28 &gic 0 28 4>,
->  -                              <0 0 29 &gic 0 29 4>,
->  -                              <0 0 30 &gic 0 30 4>,
->  -                              <0 0 31 &gic 0 31 4>,
->  -                              <0 0 32 &gic 0 32 4>,
->  -                              <0 0 33 &gic 0 33 4>,
->  -                              <0 0 34 &gic 0 34 4>,
->  -                              <0 0 35 &gic 0 35 4>,
->  -                              <0 0 36 &gic 0 36 4>,
->  -                              <0 0 37 &gic 0 37 4>,
->  -                              <0 0 38 &gic 0 38 4>,
->  -                              <0 0 39 &gic 0 39 4>,
->  -                              <0 0 40 &gic 0 40 4>,
->  -                              <0 0 41 &gic 0 41 4>,
->  -                              <0 0 42 &gic 0 42 4>;
->  -
->  -              ethernet at 2,02000000 {
->  -                      compatible = "smsc,lan91c111";
->  -                      reg = <2 0x02000000 0x10000>;
->  -                      interrupts = <15>;
->  -              };
->  -
->  -              v2m_clk24mhz: clk24mhz {
->  -                      compatible = "fixed-clock";
->  -                      #clock-cells = <0>;
->  -                      clock-frequency = <24000000>;
->  -                      clock-output-names = "v2m:clk24mhz";
->  -              };
->  -
->  -              v2m_refclk1mhz: refclk1mhz {
->  -                      compatible = "fixed-clock";
->  -                      #clock-cells = <0>;
->  -                      clock-frequency = <1000000>;
->  -                      clock-output-names = "v2m:refclk1mhz";
->  -              };
->  -
->  -              v2m_refclk32khz: refclk32khz {
->  -                      compatible = "fixed-clock";
->  -                      #clock-cells = <0>;
->  -                      clock-frequency = <32768>;
->  -                      clock-output-names = "v2m:refclk32khz";
->  -              };
->  -
->  -              iofpga at 3,00000000 {
->  -                      compatible = "arm,amba-bus", "simple-bus";
->  -                      #address-cells = <1>;
->  -                      #size-cells = <1>;
->  -                      ranges = <0 3 0 0x200000>;
->  -
->  -                      v2m_sysreg: sysreg at 010000 {
->  -                              compatible = "arm,vexpress-sysreg";
->  -                              reg = <0x010000 0x1000>;
->  -                      };
->  -
->  -                      v2m_serial0: uart at 090000 {
->  -                              compatible = "arm,pl011", "arm,primecell";
->  -                              reg = <0x090000 0x1000>;
->  -                              interrupts = <5>;
->  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
->  -                              clock-names = "uartclk", "apb_pclk";
->  -                      };
->  -
->  -                      v2m_serial1: uart at 0a0000 {
->  -                              compatible = "arm,pl011", "arm,primecell";
->  -                              reg = <0x0a0000 0x1000>;
->  -                              interrupts = <6>;
->  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
->  -                              clock-names = "uartclk", "apb_pclk";
->  -                      };
->  -
->  -                      v2m_serial2: uart at 0b0000 {
->  -                              compatible = "arm,pl011", "arm,primecell";
->  -                              reg = <0x0b0000 0x1000>;
->  -                              interrupts = <7>;
->  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
->  -                              clock-names = "uartclk", "apb_pclk";
->  -                      };
->  -
->  -                      v2m_serial3: uart at 0c0000 {
->  -                              compatible = "arm,pl011", "arm,primecell";
->  -                              reg = <0x0c0000 0x1000>;
->  -                              interrupts = <8>;
->  -                              clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
->  -                              clock-names = "uartclk", "apb_pclk";
->  -                      };
->  -
->  -                      virtio_block at 0130000 {
->  -                              compatible = "virtio,mmio";
->  -                              reg = <0x130000 0x200>;
->  -                              interrupts = <42>;
->  -                      };
->  -              };
->  -      };
-> +       watchdog at 2a440000 {
-> +               compatible = "arm,sbsa-gwdt";
-> +               reg = <0x0 0x2a440000 0 0x1000>,
-> +                       <0x0 0x2a450000 0 0x1000>;
-> +               interrupts = <0 27 4>;
-> +               timeout-sec = <30>;
-> +       };
->   };
+> Then, it standardizes the segment alignment to 64 KB for all page sizes.
+> (patch #3). In the example below (4 KB granule, with Jeremy's PTE_CONT
+> patch applied), we lose 80 KB in total to padding, but the resulting
+> mappings do look somewhat better.
+
+I suspect some people might want a minimal alignment option for tinification
+purposes, but this sounds fine to me as a default. I also think we can wait
+until someone asks.
+
+As a general think, currently we use "chunk" instead of "segment" in the mm
+code. We only used "chunk" so as to not overload "section". For consistency it
+would be nice to either keep with "chunk" or convert existing uses to
+"segment". I much prefer the latter!
+
+> Before:
+> 
+> 0xffff000008082000-0xffff000008090000    56K  ro x  SHD AF         UXN MEM
+> 0xffff000008090000-0xffff000008200000  1472K  ro x  SHD AF CON     UXN MEM
+> 0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
+> 0xffff000008600000-0xffff000008660000   384K  ro x  SHD AF CON     UXN MEM
+> 0xffff000008660000-0xffff00000866c000    48K  ro x  SHD AF         UXN MEM
+> 0xffff00000866c000-0xffff000008670000    16K  ro NX SHD AF         UXN MEM
+> 0xffff000008670000-0xffff000008900000  2624K  ro NX SHD AF CON     UXN MEM
+> 0xffff000008900000-0xffff000008909000    36K  ro NX SHD AF         UXN MEM
+> 0xffff000008c39000-0xffff000008c40000    28K  RW NX SHD AF         UXN MEM
+> 0xffff000008c40000-0xffff000008d50000  1088K  RW NX SHD AF CON     UXN MEM
+> 0xffff000008d50000-0xffff000008d57000    28K  RW NX SHD AF         UXN MEM
+> 
+> After:
+> 
+> 0xffff000008080000-0xffff000008200000  1536K  ro x  SHD AF CON     UXN MEM
+> 0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
+> 0xffff000008600000-0xffff000008670000   448K  ro x  SHD AF CON     UXN MEM
+> 0xffff000008670000-0xffff000008910000  2688K  ro NX SHD AF CON     UXN MEM
+> 0xffff000008c50000-0xffff000008d60000  1088K  RW NX SHD AF CON     UXN MEM
+> 0xffff000008d60000-0xffff000008d6b000    44K  RW NX SHD AF         UXN MEM
+> 
+> I am aware that this clashes with Jeremy's patch to allow CONT_SIZE alignment
+> when CONFIG_DEBUG_ALIGN_RODATA=y, but the net effect of patch #3 is the same
+> (only the Kconfig change is not included here)
+
+Jeremy, do you have any thoughts on this series?
+
+Thanks,
+Mark.
+
+> Ard Biesheuvel (3):
+>   arm64: move early boot code to the .init segment
+>   arm64: cover the .head.text section in the .text segment mapping
+>   arm64: simplify kernel segment mapping granularity
+> 
+>  arch/arm64/kernel/efi-entry.S   |  2 +-
+>  arch/arm64/kernel/head.S        | 32 +++++++++-----------
+>  arch/arm64/kernel/image.h       |  4 +++
+>  arch/arm64/kernel/vmlinux.lds.S | 26 +++++++++-------
+>  arch/arm64/mm/mmu.c             | 10 +++---
+>  5 files changed, 40 insertions(+), 34 deletions(-)
+> 
+> -- 
+> 2.5.0
+> 
