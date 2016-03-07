@@ -1,113 +1,154 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Mon, 7 Mar 2016 20:22:20 +0100
-Subject: [PATCH v14 2/6] Documentation, dt, numa: dt bindings for NUMA.
-In-Reply-To: <1457049339-23351-3-git-send-email-ddaney.cavm@gmail.com>
-References: <1457049339-23351-1-git-send-email-ddaney.cavm@gmail.com>
- <1457049339-23351-3-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160307192220.GA1535@rric.localdomain>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 7 Mar 2016 11:24:27 -0800
+Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
+ for X-Gene v1
+In-Reply-To: <CAErSpo6nNKeg+v7SGLieBOi0f+5U_G03T6F7VtSw1N_VbjA2rg@mail.gmail.com>
+References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+ <CADaLNDmsW+5-EEvTMGOyCGmKWYS-trx74pQ87czkrSWqNgrHWw@mail.gmail.com>
+ <CAErSpo6nNKeg+v7SGLieBOi0f+5U_G03T6F7VtSw1N_VbjA2rg@mail.gmail.com>
+Message-ID: <CADaLNDmN+J0R7dc=9mfHSZqgi=EX-r1=es8fc38URdnGm7-gCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.03.16 15:55:35, David Daney wrote:
-> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> 
-> Add DT bindings for numa mapping of memory, CPUs and IOs.
-> 
-> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++++++++++++
->  1 file changed, 272 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/numa.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
-> new file mode 100644
-> index 0000000..ec5ed7c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/numa.txt
+On Mon, Feb 22, 2016 at 8:03 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>
+> On Sat, Feb 20, 2016 at 1:47 PM, Duc Dang <dhdang@apm.com> wrote:
+> > On Tue, Feb 9, 2016 at 5:56 PM, Duc Dang <dhdang@apm.com> wrote:
+> >> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> >> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+> >
+> > Hi Bjorn,
+> >
+> > Are you planning to take this patch into your tree?
+>
+> Sorry, I haven't had a chance to look at this yet.  I had a sick
+> daughter last week, so I'm even farther behind than usual.
+>
+Hi Bjorn,
 
-> +==============================================================================
-> +3 - distance-map
-> +==============================================================================
-> +
-> +The device tree node distance-map describes the relative
-> +distance (memory latency) between all numa nodes.
-> +
-> +- compatible : Should at least contain "numa-distance-map-v1".
-> +
-> +- distance-matrix
-> +  This property defines a matrix to describe the relative distances
-> +  between all numa nodes.
-> +  It is represented as a list of node pairs and their relative distance.
-> +
-> +  Note:
-> +	1. Each entry represents distance from first node to second node.
-> +	The distances are equal in either direction.
-> +	2. The distance from a node to self (local distance) is represented
-> +	with value 10 and all internode distance should be represented with
-> +	a value greater than 10.
-> +	3. distance-matrix should have entries in lexicographical ascending
-> +	order of nodes.
-> +	4. There must be only one device node distance-map which must reside in the root node.
+I hope your daughter is doing well.
 
-There is no note that this one is optional, but is it right? The
-default is 10 for local and 20 for remote connections.
+> When I get to it, I'll be asking questions like:
+>
+>   - Does this correspond to some analogous x86 code?
+I am not aware of any x86 code similar to this.
 
-If so, then ...
+>   - Is there something unique about arm64 or X-Gene that means it
+> needs special code?
+The MSI controller on X-Gene v1 is a separate IP block. pci-xgene-msi
+is a separate X-Gene v1 specific driver that provides MSI capability
+for X-Gene v1 PCIe controllers. We already have device-tree version of
+this driver. So the purpose of this patch is to make the driver can be
+discovered and loaded when booting with ACPI mode.
 
-static int __init of_numa_parse_distance_map(void)
-{
-	int ret = -EINVAL;
-	struct device_node *np = of_find_node_by_path("/distance-map");
+Regards,
+Duc Dang.
 
-	if (!np)
-		return ret;
-
-must return 0 instead of -EINVAL here.
-
--Robert
-
-> +
-> +Example:
-> +	4 nodes connected in mesh/ring topology as below,
-> +
-> +		0_______20______1
-> +		|               |
-> +		|               |
-> +		20             20
-> +		|               |
-> +		|               |
-> +		|_______________|
-> +		3       20      2
-> +
-> +	if relative distance for each hop is 20,
-> +	then internode distance would be,
-> +	      0 -> 1 = 20
-> +	      1 -> 2 = 20
-> +	      2 -> 3 = 20
-> +	      3 -> 0 = 20
-> +	      0 -> 2 = 40
-> +	      1 -> 3 = 40
-> +
-> +     and dt presentation for this distance matrix is,
-> +
-> +		distance-map {
-> +			 compatible = "numa-distance-map-v1";
-> +			 distance-matrix = <0 0  10>,
-> +					   <0 1  20>,
-> +					   <0 2  40>,
-> +					   <0 3  20>,
-> +					   <1 0  20>,
-> +					   <1 1  10>,
-> +					   <1 2  20>,
-> +					   <1 3  40>,
-> +					   <2 0  40>,
-> +					   <2 1  20>,
-> +					   <2 2  10>,
-> +					   <2 3  20>,
-> +					   <3 0  20>,
-> +					   <3 1  40>,
-> +					   <3 2  20>,
-> +					   <3 3  10>;
-> +		};
+>
+> I don't really understand the arm64/ACPI strategy yet, so I'll be
+> looking first for generic solutions that work across x86/ia64/arm64,
+> and justifications for the inevitable exceptions.
+>
+> >> Signed-off-by: Duc Dang <dhdang@apm.com>
+> >> ---
+> >>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
+> >>  1 file changed, 32 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+> >> index a6456b5..466aa93 100644
+> >> --- a/drivers/pci/host/pci-xgene-msi.c
+> >> +++ b/drivers/pci/host/pci-xgene-msi.c
+> >> @@ -24,6 +24,7 @@
+> >>  #include <linux/pci.h>
+> >>  #include <linux/platform_device.h>
+> >>  #include <linux/of_pci.h>
+> >> +#include <linux/acpi.h>
+> >>
+> >>  #define MSI_IR0                        0x000000
+> >>  #define MSI_INT0               0x800000
+> >> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+> >>  };
+> >>
+> >>  struct xgene_msi {
+> >> -       struct device_node      *node;
+> >> +       struct fwnode_handle    *fwnode;
+> >>         struct irq_domain       *inner_domain;
+> >>         struct irq_domain       *msi_domain;
+> >>         u64                     msi_addr;
+> >> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
+> >>         .free   = xgene_irq_domain_free,
+> >>  };
+> >>
+> >> +#ifdef CONFIG_ACPI
+> >> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+> >> +{
+> >> +       return xgene_msi_ctrl.fwnode;
+> >> +}
+> >> +#endif
+> >> +
+> >>  static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>  {
+> >>         msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+> >> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>         if (!msi->inner_domain)
+> >>                 return -ENOMEM;
+> >>
+> >> -       msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+> >> +       msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+> >>                                                     &xgene_msi_domain_info,
+> >>                                                     msi->inner_domain);
+> >>
+> >> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> >>                 return -ENOMEM;
+> >>         }
+> >>
+> >> +#ifdef CONFIG_ACPI
+> >> +       pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
+> >> +#endif
+> >>         return 0;
+> >>  }
+> >>
+> >> @@ -473,6 +484,13 @@ static const struct of_device_id xgene_msi_match_table[] = {
+> >>         {},
+> >>  };
+> >>
+> >> +#ifdef CONFIG_ACPI
+> >> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
+> >> +       {"APMC0D0E", 0},
+> >> +       { },
+> >> +};
+> >> +#endif
+> >> +
+> >>  static int xgene_msi_probe(struct platform_device *pdev)
+> >>  {
+> >>         struct resource *res;
+> >> @@ -494,7 +512,17 @@ static int xgene_msi_probe(struct platform_device *pdev)
+> >>                 goto error;
+> >>         }
+> >>         xgene_msi->msi_addr = res->start;
+> >> -       xgene_msi->node = pdev->dev.of_node;
+> >> +
+> >> +       xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
+> >> +       if (!xgene_msi->fwnode) {
+> >> +               xgene_msi->fwnode = irq_domain_alloc_fwnode(NULL);
+> >> +               if (!xgene_msi->fwnode) {
+> >> +                       dev_err(&pdev->dev, "Failed to create fwnode\n");
+> >> +                       rc = ENOMEM;
+> >> +                       goto error;
+> >> +               }
+> >> +       }
+> >> +
+> >>         xgene_msi->num_cpus = num_possible_cpus();
+> >>
+> >>         rc = xgene_msi_init_allocator(xgene_msi);
+> >> @@ -571,6 +599,7 @@ static struct platform_driver xgene_msi_driver = {
+> >>         .driver = {
+> >>                 .name = "xgene-msi",
+> >>                 .of_match_table = xgene_msi_match_table,
+> >> +               .acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
+> >>         },
+> >>         .probe = xgene_msi_probe,
+> >>         .remove = xgene_msi_remove,
+> >> --
+> >> 1.9.1
+> >>
