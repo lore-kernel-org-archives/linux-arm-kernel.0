@@ -1,104 +1,42 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Mon,  7 Mar 2016 14:00:52 -0800
-Subject: [PATCH v2 3/5] drm/rockchip: vop: Fix vop crtc cleanup
+Date: Mon,  7 Mar 2016 14:00:53 -0800
+Subject: [PATCH v2 4/5] drm/rockchip: dw_hdmi: Don't call
+ platform_set_drvdata()
 In-Reply-To: <1457388054-23077-1-git-send-email-dianders@chromium.org>
 References: <1457388054-23077-1-git-send-email-dianders@chromium.org>
-Message-ID: <1457388054-23077-3-git-send-email-dianders@chromium.org>
+Message-ID: <1457388054-23077-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a few problems in the vop crtc cleanup (handling error
-paths and cleanup upon exit):
+The Rockchip dw_hdmi driver just called platform_set_drvdata() to get
+your hopes up that maybe, somehow, you'd be able to retrieve the 'struct
+rockchip_hdmi' from a pointer to the 'struct device'.  You can't.  When
+we call dw_hdmi_bind() the main driver calls dev_set_drvdata(), which
+clobbers our setting.
 
-* The vop_create_crtc() error path had an unsafe version of the
-  iterator used for iterating over all planes (though it was
-  destroying planes in the iterator so should have used the safe
-  version)
-
-* vop_destroy_crtc() - wasn't calling vop_plane_destroy(), which made
-  slub_debug unhappy, at least if we ended up running this due to a
-  deferred probe.
-
-* In vop_create_crtc() if we were missing the "port" device tree node
-  we would fail but not return an error (found by code inspection).
-
-Fix these problems.
+Let's just remove the platform_set_drvdata() to avoid dashing people's
+hopes.
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
-Changes in v2: None
+Changes in v2:
+- Don't call platform_set_drvdata() new for v2.
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index fd370548d7d7..f86f797f10fd 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1108,7 +1108,7 @@ static int vop_create_crtc(struct vop *vop)
- 	const struct vop_data *vop_data = vop->data;
- 	struct device *dev = vop->dev;
- 	struct drm_device *drm_dev = vop->drm_dev;
--	struct drm_plane *primary = NULL, *cursor = NULL, *plane;
-+	struct drm_plane *primary = NULL, *cursor = NULL, *plane, *tmp;
- 	struct drm_crtc *crtc = &vop->crtc;
- 	struct device_node *port;
- 	int ret;
-@@ -1148,7 +1148,7 @@ static int vop_create_crtc(struct vop *vop)
- 	ret = drm_crtc_init_with_planes(drm_dev, crtc, primary, cursor,
- 					&vop_crtc_funcs, NULL);
- 	if (ret)
--		return ret;
-+		goto err_cleanup_planes;
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 88776aba984e..d5cfef75fc80 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -271,8 +271,6 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 	if (!iores)
+ 		return -ENXIO;
  
- 	drm_crtc_helper_add(crtc, &vop_crtc_helper_funcs);
- 
-@@ -1181,6 +1181,7 @@ static int vop_create_crtc(struct vop *vop)
- 	if (!port) {
- 		DRM_ERROR("no port node found in %s\n",
- 			  dev->of_node->full_name);
-+		ret = -ENOENT;
- 		goto err_cleanup_crtc;
- 	}
- 
-@@ -1194,7 +1195,8 @@ static int vop_create_crtc(struct vop *vop)
- err_cleanup_crtc:
- 	drm_crtc_cleanup(crtc);
- err_cleanup_planes:
--	list_for_each_entry(plane, &drm_dev->mode_config.plane_list, head)
-+	list_for_each_entry_safe(plane, tmp, &drm_dev->mode_config.plane_list,
-+				 head)
- 		drm_plane_cleanup(plane);
- 	return ret;
- }
-@@ -1202,9 +1204,28 @@ err_cleanup_planes:
- static void vop_destroy_crtc(struct vop *vop)
- {
- 	struct drm_crtc *crtc = &vop->crtc;
-+	struct drm_device *drm_dev = vop->drm_dev;
-+	struct drm_plane *plane, *tmp;
- 
- 	rockchip_unregister_crtc_funcs(crtc);
- 	of_node_put(crtc->port);
-+
-+	/*
-+	 * We need to cleanup the planes now.  Why?
-+	 *
-+	 * The planes are "&vop->win[i].base".  That means the memory is
-+	 * all part of the big "struct vop" chunk of memory.  That memory
-+	 * was devm allocated and associated with this component.  We need to
-+	 * free it ourselves before vop_unbind() finishes.
-+	 */
-+	list_for_each_entry_safe(plane, tmp, &drm_dev->mode_config.plane_list,
-+				 head)
-+		vop_plane_destroy(plane);
-+
-+	/*
-+	 * Destroy CRTC after vop_plane_destroy() since vop_disable_plane()
-+	 * references the CRTC.
-+	 */
- 	drm_crtc_cleanup(crtc);
- }
- 
+-	platform_set_drvdata(pdev, hdmi);
+-
+ 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
+ 	/*
+ 	 * If we failed to find the CRTC(s) which this encoder is
 -- 
 2.7.0.rc3.207.g0ac5344
