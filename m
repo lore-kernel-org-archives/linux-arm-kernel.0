@@ -1,44 +1,59 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 17:18:21 +0100
-Subject: [PATCH 04/16] mtd: nand: sunxi: adapt clk_rate to tWB, tADL,
- tWHR and tRHW timings
-In-Reply-To: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457367513-26069-5-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon,  7 Mar 2016 17:18:17 +0100
+Subject: [PATCH 00/16] mtd: nand: sunxi: various improvements/fixes
+Message-ID: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt the NAND controller clk rate to the tWB, tADL, tWHR and tRHW
-timings instead of returning an error when the maximum clk divisor is
-not big enough to provide an appropriate timing.
+Hi,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/sunxi_nand.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+This patchset aims at fixing a few minor bugs, and improving performances
+of NAND accesses going through the sunxi NAND controller.
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index a270720..2914785 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -1164,6 +1164,18 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
- 
- 	/* T16 - T19 + tCAD */
-+	if (timings->tWB_max > (min_clk_period * 20))
-+		min_clk_period = DIV_ROUND_UP(timings->tWB_max, 20);
-+
-+	if (timings->tADL_min > (min_clk_period * 32))
-+		min_clk_period = DIV_ROUND_UP(timings->tADL_min, 32);
-+
-+	if (timings->tWHR_min > (min_clk_period * 32))
-+		min_clk_period = DIV_ROUND_UP(timings->tWHR_min, 32);
-+
-+	if (timings->tRHW_min > (min_clk_period * 20))
-+		min_clk_period = DIV_ROUND_UP(timings->tRHW_min, 20);
-+
- 	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
- 					min_clk_period);
- 	if (tWB < 0) {
+Note that patch 5 exports functions provided by the core which are needed
+in patch 6 to still support raw OOB accesses. Other patches are just
+fixes or improvements only touching the sunxi driver itself.
+
+Here are the main improvements:
+- queue CLE/ALE requests instead of forcing the controller to issue each
+  cmd and address cycle separately
+- benefit from ECC correction on protected OOB bytes
+- use polling instead of interrupt-based waiting (avoid scheduling
+  overhead for short wait period)
+
+I'm preparing another series based on this one to add page operations
+and DMA support, which, according to my first tests will bring a huge
+speed improvement (at least x2 on read accesses, and even more when
+ONFI timing mode > 0 is used).
+
+Stay tuned.
+
+Best Regards,
+
+Boris
+
+Boris Brezillon (16):
+  mtd: nand: sunxi: fix call order in sunxi_nand_chip_init()
+  mtd: nand: sunxi: fix clk rate calculation
+  mtd: nand: sunxi: fix EDO mode selection
+  mtd: nand: sunxi: adapt clk_rate to tWB, tADL, tWHR and tRHW timings
+  mtd: nand: export default read/write oob functions
+  mtd: nand: sunxi: implement ->read_oob()/->write_oob()
+  mtd: nand: sunxi: implement ->read_subpage()
+  mtd: nand: sunxi: improve ->cmd_ctrl() function
+  mtd: nand: sunxi: let the NAND controller control the CE line
+  mtd: nand: sunxi: fix the NFC_ECC_ERR_CNT() macro
+  mtd: nand: sunxi: fix NFC_CTL setting
+  mtd: nand: sunxi: disable clks on device removal
+  mtd: nand: enable ECC pipelining
+  mtd: nand: sunxi: fix ->dev_ready() implementation
+  mtd: nand: sunxi: make use of readl_poll_timeout()
+  mtd: nand: sunxi: poll for events instead of using interrupts
+
+ drivers/mtd/nand/nand_base.c  |  18 +--
+ drivers/mtd/nand/sunxi_nand.c | 293 ++++++++++++++++++++++++++++++------------
+ include/linux/mtd/nand.h      |  14 ++
+ 3 files changed, 233 insertions(+), 92 deletions(-)
+
 -- 
 2.1.4
