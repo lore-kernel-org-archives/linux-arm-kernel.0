@@ -1,49 +1,227 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Mon, 07 Mar 2016 09:20:19 +0100
-Subject: [PATCH v3 0/2] Add PCIe driver support for imx6sx
-In-Reply-To: <DBXPR04MB27013C807F30DABB9CB667D8CBD0@DBXPR04MB270.eurprd04.prod.outlook.com>
-References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
- <DBXPR04MB27013C807F30DABB9CB667D8CBD0@DBXPR04MB270.eurprd04.prod.outlook.com>
-Message-ID: <1457338819.1904.4.camel@googlemail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 07 Mar 2016 09:26:31 +0100
+Subject: [PATCH 1/3] Device tree binding documentation for gpio-switch
+In-Reply-To: <CAL_JsqLX-F=-k83_-5-QL2QZpAArQqOHjE+19c1wvNKWayYfMw@mail.gmail.com>
+References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
+ <1488914.9p6SgUg6XA@adelgunde>
+ <CAL_JsqLX-F=-k83_-5-QL2QZpAArQqOHjE+19c1wvNKWayYfMw@mail.gmail.com>
+Message-ID: <6877420.aKPrAc9Qh5@adelgunde>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-03-03 at 01:48 +0000, Richard Zhu wrote:
-> > -----Original Message-----
-> > From: Christoph Fritz [mailto:chf.fritz at googlemail.com]
-> > Sent: Thursday, February 25, 2016 10:48 PM
-> > To: Richard Zhu; Lucas Stach; Shawn Guo; Fabio Estevam; Bjorn Helgaas; Lee
-> > Jones
-> > Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Subject: [PATCH v3 0/2] Add PCIe driver support for imx6sx
-> > 
-> > v3:
-> >  * adapt devicetree bindings documentation fsl,imx6q-pcie.txt
-> > v2:
-> >  * leave out regulator handling from driver, will be done later
-> >    in PM subsystem
-> >  * use BIT() macro for MFD
-> > 
-> > Christoph Fritz (2):
-> >   MFD: imx6sx: Add PCIe register definitions for iomuxc gpr
-> >   PCI: imx6: add initial imx6sx support
-> > 
-> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
-> >  drivers/pci/host/pci-imx6.c                        | 130 ++++++++++++++-------
-> >  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h        |   5 +
-> >  3 files changed, 101 insertions(+), 40 deletions(-)
-> > 
-> > --
-> > 2.1.4
+On Wednesday 02 March 2016 10:03:27 Rob Herring wrote:
+> Reviving this thread...
 > 
-> [Zhu hongxing]  Acked-by: Richard Zhu <Richard.Zhu@freescale.com>
-> Richard
-> Best Regards
+> On Tue, Dec 15, 2015 at 3:09 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> > Hi,
+> >
+> > On Monday 14 December 2015 09:45:48 Rob Herring wrote:
+> >> On Mon, Dec 14, 2015 at 8:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >> > On Fri, Dec 11, 2015 at 3:06 PM, Rob Herring <robh+dt@kernel.org> wrote:
+> >> >> On Fri, Dec 11, 2015 at 6:39 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >> >>> On Fri, Dec 4, 2015 at 6:31 PM, Martyn Welch
+> >> >>> <martyn.welch@collabora.co.uk> wrote:
+> >>
+> >> [...]
+> >>
+> >> >>> Markus Pargmann also did a series that add initial values to
+> >> >>> hogs, which is the inverse usecase of this, where you want to
+> >> >>> *output* something by default, then maybe also make it available
+> >> >>> to userspace.
+> >> >>>
+> >> >>> So what we need to see here is a patch series that does all of these
+> >> >>> things:
+> >> >>>
+> >> >>> - Name lines
+> >> >>>
+> >> >>> - Sets them to initial values
+> >> >>>
+> >> >>> - Mark them as read-only
+> >> >>>
+> >> >>> - Mark them as "not used by the operating system" so that they
+> >> >>>   can be default-exported to userspace.
+> >> >>
+> >> >> No! This should not be a DT property.
+> >> >>
+> >> >> Whether I want to control a GPIO in the kernel or userspace is not
+> >> >> known and can change over time. It could simply depend on kernel
+> >> >> config. There is also the case that a GPIO has no connection or kernel
+> >> >> driver until some time later when a DT overlay for an expansion board
+> >> >> is applied.
+> >> >
+> >> > That's correct. So from a DT point of view, what really matters is
+> >> > to give things a name, and the hogs and initvals syntax already
+> >> > has a structure for this that is in use
+> >> > (from Documentation/devicetree/bindings/gpio/gpio.txt):
+> >> >
+> >> >         qe_pio_a: gpio-controller at 1400 {
+> >> >                 compatible = "fsl,qe-pario-bank-a", "fsl,qe-pario-bank";
+> >> >                 reg = <0x1400 0x18>;
+> >> >                 gpio-controller;
+> >> >                 #gpio-cells = <2>;
+> >> >
+> >> >                 line_b {
+> >> >                         gpio-hog;
+> >> >                         gpios = <6 0>;
+> >> >                         output-low;
+> >> >                         line-name = "foo-bar-gpio";
+> >> >                 };
+> >> >         };
+> >> >
+> >> > Markus use this also for initial values. That could easily be used in
+> >> > a budget version like this:
+> >> >
+> >> >                 line_b {
+> >> >                         /* Just naming */
+> >> >                         gpios = <6 0>;
+> >> >                         line-name = "foo-bar-gpio";
+> >> >                 };
+> >> >
+> >> > That could grow kind of big though. Or maybe not? How many
+> >> > GPIO lines are actually properly named in a typical system?
+> >>
+> >> We should limit it to GPIOs with no connection to another node. For
+> >> example, I don't want to see a SD card detect in the list as that
+> >> should be in the SD host node. However, that is hard to enforce and
+> >> can change over time. Removing it would break userspace potentially.
+> >> Of course if the kernel starts own a signal that userspace used, then
+> >> that potentially breaks userspace regardless of the DT changing. OTOH,
+> >> using GPIOs in userspace is kind of use at your own risk.
+> >
+> > I see this a bit differently. I would really like to see the each GPIO having
+> > two different names:
+> 
+> I think we are saying the same thing...
+> 
+> > - GPIO label: This is the name of the GPIO line in the schematic for example
+> 
+> Yes.
+> 
+> > - GPIO use (this is the current semantic of the GPIO name): The use of a GPIO,
+> >   e.g. 'sd-card-detect', 'LED', ...
+> 
+> This should be determined from the compatible string and/or -gpios
+> prefix. This is the what the function is and "label" is which one.
+> 
+> > I think it would be good to describe all GPIO labels in gpiochip subnodes as
+> > gpio-hogging introduced it. This would offer a use-independent naming. The use
+> > of the function could be defined in the device node that is using this gpio.
+> 
+> I think I agree here. You may have a defined function without any
+> connection to another node. I also think we should encourage simple
+> GPIO bindings like gpio-leds to be child nodes. Having them at the
+> top-level is kind of arbitrary. Of course, allowing for both is
+> required.
+> 
+> > As an example perhaps something like this:
+> >
+> >         &gpiochip {
+> >                 some_interrupt {
+> >                         gpios = <4 0>;
+> >                         line-name = "some_interrupt_line";
+> >                 };
+> >
+> >                 line_b {
+> >                         gpios = <6 0>;
+> >                         line-name = "line-b";
+> >                 };
+> >         };
+> >
+> >         randomswitch {
+> >                 compatible = "gpio-switch";
+> >                 gpios = <&gpiochip 4 0>;
+> >                 use = "action-trigger";
+> >                 read-only;
+> >         };
+> >
+> > Also this does seem kind of inconsistent with gpio-hogging and the proposed
+> > gpio-initval. gpio-hogging is defined in subnodes of the gpio chip while
+> > gpio-switches are not. As "gpio-switch" is not really any kind of device it
+> > would perhaps make sense to keep this consistent with gpio-hogging as well and
+> > define it in the same subnodes?
+> > I would be happy about any consistent way.
+> 
+> Yes, as well as gpio leds, keys, etc. bindings. The key is you would
+> need to be able to start with something minimal and extend it with
+> specific compatibles.
 
-@Bjorn: I suppose the PCI patch need to go through your tree. Would you
-pick up this patch?
+So if I understand you right it would be better to handle most
+distinctions using compatibles? Something like this?
 
-@Lee: What about the MFD patch, does this need to go through your tree?
+	&gpiochip {
+		some_led {
+			compatible = "gpio-leds";
+			default-state = "on";
+			gpios = <3 0>;
+			line-name = "leda";
+		};
 
-Thanks
- -- Christoph
+		some_switch {
+			compatible = "gpio-switch", "gpio-initval";
+			gpios = <4 0>;
+			line-name = "switch1";
+
+			/* This is used by gpio-initval in case gpio-switch is not implemented */
+			output-low;
+		};
+
+		some_interrupt {
+			gpios = <5 0>;
+			line-name = "some_interrupt_line";
+		};
+
+		line_b {
+			gpios = <6 0>;
+			line-name = "line-b";
+		};
+	};
+
+	randomcomponent {
+		gpios = <&gpiochip 5 0>;
+		read-only;
+	};
+
+In this case there is a gpio-led embedded within the gpiochip node. Also
+'some_switch' is a gpio-switch and falls back to being gpio-initval.
+This way we can replace it at some point with a real driver. But if it
+doesn't exist we can at least initialize the GPIO properly.
+
+As you suggested this would open up the possibilities for all
+compatibles and drivers for single gpios.
+
+Best Regards,
+
+Markus
+
+> 
+> [...]
+> 
+> >> We also have to consider how to handle add-on boards. We probably need
+> >> a connector node which can remap connector signals to host signals in
+> >> order to have overlays independent of the host board DT. For GPIOs
+> >> this is probably a gpio-map property similar to interrupt-map. The
+> >> complicated part will be connectors that require pinmux setup of the
+> >> host.
+> >
+> > Also what about hotplugging gpio-chips? Is there any mechanism to let the
+> > 'gpio-switch' know that the GPIO is not there anymore?
+> 
+> There are certainly issues around hotplug and GPIOs. If the
+> gpio-switch device is a child of the gpio controller, then it should
+> be possible.
+> 
+> Rob
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/f8d05808/attachment.sig>
