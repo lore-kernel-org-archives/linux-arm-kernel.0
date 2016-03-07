@@ -1,31 +1,20 @@
-From: liguo.zhang@mediatek.com (liguo zhang)
-Date: Mon, 07 Mar 2016 07:26:32 -0000
-Subject: [PATCH 1/2] Document: i2c: Add a dt binding for mediatek
- MT2701 soc
-In-Reply-To: <20160104095511.GB1524@katana>
-References: <1451888138-11471-1-git-send-email-liguo.zhang@mediatek.com>
- <20160104095511.GB1524@katana>
-Message-ID: <1452215528.2088.0.camel@mhfsdcap03>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Mon,  7 Mar 2016 13:05:55 +0530
+Subject: [PATCH 0/2] net: thunderx: Performance enhancement changes
+Message-ID: <1457336157-31508-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-04 at 10:55 +0100, Wolfram Sang wrote:
-> On Mon, Jan 04, 2016 at 02:15:37PM +0800, Liguo Zhang wrote:
-> > Add a dt binding for the MT2701 soc.
-> > 
-> > Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> 
-> This should probably go with the other patch via arm-soc, or?
+From: Sunil Goutham <sgoutham@cavium.com>
 
-The patch about i2c dts info for MT2701 depends on the MT2701 clock
-patch. After the MT2701 clock patch is accepted, the i2c patch for
-MT2701 may be accepted.
+Below patches attempts to improve performance by reducing
+no of atomic operations while allocating new receive buffers
+and reducing cache misses by adjusting nicvf structure elements.
 
-The MT2701 clock patch:
-http://lists.infradead.org/pipermail/linux-mediatek/2016-January/003489.html
+Sunil Goutham (2):
+  net: thunderx: Set recevie buffer page usage count in bulk
+  net: thunderx: Adjust nicvf structure to reduce cache misses
 
-> 
-> In that case:
-> 
-> Acked-by: Wolfram Sang <wsa@the-dreams.de>
-> 
+ drivers/net/ethernet/cavium/thunder/nic.h          |   51 ++++++++++++--------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   31 +++++++++---
+ 2 files changed, 53 insertions(+), 29 deletions(-)
