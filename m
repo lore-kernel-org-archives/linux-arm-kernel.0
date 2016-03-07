@@ -1,59 +1,75 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  7 Mar 2016 17:21:50 -0500
-Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
-In-Reply-To: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
-References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
+Date: Mon,  7 Mar 2016 17:21:49 -0500
+Subject: [PATCH 1/2] pci: add pci_unmap_iospace function for PCI_IOBASE
+Message-ID: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI PCI driver is leaking out memory mappings
-when a slot is removed. Upon insertion following a
-removal, we are hitting a BUG statement. Second call
-to the remap API hits a bug statement because the area is
-already mapped. This patch releases additional virtual
-memory mapped by pci_remap_iospace function as part of
-__release_pci_root_info function if the region type is IO.
+The PCI_IOBASE needs to be released after hotplug removal so that it can be
+re-added back by the pci_remap_iospace function during insertion.
 
- BUG: failure at kernel/lib/ioremap.c:31/ioremap_pte_range()!
- Kernel panic - not syncing: BUG!
- CPU: 1 PID: 630 Comm: kworker/u48:3 Not tainted
- Workqueue: kacpi_hotplug acpi_hotplug_work_fn Call trace:
- dump_backtrace+0x0/0x10c [<ffff800000086e58>]
- show_stack+0x10/0x1c [<ffff8000004d1f50>]
- dump_stack+0x74/0xc4
- panic+0xe4/0x21c [<ffff8000002577cc>]
- ioremap_page_range+0x290/0x30c [<ffff8000002861dc>]
- pci_remap_iospace+0x88/0xa0 [<ffff8000000908f8>]
- setup_resource+0x114/0x16c [<ffff8000002c0fc0>]
- acpi_walk_resource_buffer+0x54/0xb0
- acpi_walk_resources+0x90/0xbc
- pci_acpi_scan_root+0x184/0x2d0
- acpi_pci_root_add+0x368/0x434
- acpi_bus_attach+0x124/0x22c [<ffff8000002a5628>]
- acpi_bus_scan+0x58/0x74 [<ffff8000002a57c0>]
- acpi_device_hotplug+0xc4/0x3f0 [<ffff8000002a0468>]
- acpi_hotplug_work_fn+0x1c/0x34 [<ffff8000000b9310>]
- process_one_work+0x1e8/0x308 [<ffff8000000b9b04>]
- worker_thread+0x294/0x3cc  [<ffff8000000bd9
+Adding unmap function to follow IO remap function.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/acpi/pci_root.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pci/pci.c   | 25 +++++++++++++++++++++++++
+ include/linux/pci.h |  1 +
+ 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index 71bbfae..6d4bc2d 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -946,6 +946,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 3a516c0..f5faed2 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -26,6 +26,7 @@
+ #include <linux/device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/pci_hotplug.h>
++#include <linux/vmalloc.h>
+ #include <asm-generic/pci-bridge.h>
+ #include <asm/setup.h>
+ #include <linux/aer.h>
+@@ -3169,6 +3170,30 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+ #endif
+ }
  
- 	resource_list_for_each_entry(entry, &bridge->windows) {
- 		res = entry->res;
-+		if (res->flags & IORESOURCE_IO)
-+			pci_unmap_iospace(res);
- 		if (res->parent &&
- 		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
- 			release_resource(res);
++/**
++ *	pci_unmap_iospace - Unmap the memory mapped I/O space
++ *	@virt_addr: virtual address to be unmapped
++ *	@size: size of the physical address to be unmapped
++ *
++ *	Unmap the CPU virtual address @virt_addr from virtual address space.
++ *	Only architectures that have memory mapped IO functions defined
++ *	(and the PCI_IOBASE value defined) should call this function.
++ */
++void  __weak pci_unmap_iospace(struct resource *res)
++{
++#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
++	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
++
++	unmap_kernel_range(vaddr, resource_size(res));
++#else
++	/*
++	 * This architecture does not have memory mapped I/O space,
++	 * so this function should never be called.
++	 */
++	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
++#endif
++}
++
+ static void __pci_set_master(struct pci_dev *dev, bool enable)
+ {
+ 	u16 old_cmd, cmd;
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 398ae7e..c6e3f0e 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1172,6 +1172,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+ unsigned long pci_address_to_pio(phys_addr_t addr);
+ phys_addr_t pci_pio_to_address(unsigned long pio);
+ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
++void pci_unmap_iospace(struct resource *res);
+ 
+ static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+ {
 -- 
 1.8.2.1
