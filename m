@@ -1,33 +1,34 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Mon, 7 Mar 2016 13:10:00 +0900
-Subject: [PATCH 4/4] MAINTAINERS: add myself as ARM/LG1K maintainer
-In-Reply-To: <1457323800-26904-1-git-send-email-chanho.min@lge.com>
-References: <1457323800-26904-1-git-send-email-chanho.min@lge.com>
-Message-ID: <1457323800-26904-5-git-send-email-chanho.min@lge.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 07 Mar 2016 13:14:26 +0900
+Subject: [PATCH v2] arm64: dts: Add tmu node for exynos7
+In-Reply-To: <1456477590-4530-1-git-send-email-alim.akhtar@samsung.com>
+References: <1456477590-4530-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <56DD0022.20800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- MAINTAINERS |    6 ++++++
- 1 file changed, 6 insertions(+)
+On 26.02.2016 18:06, Alim Akhtar wrote:
+> This patch adds tmu node, related temprature sensor and triping
+> point data for Atlas cpu core found on exynos7 SoC.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+> Changes since v1:
+> * Addressed krzysztof's review comments.
+> 
+>  .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +++++++++
+>  .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   54 ++++++++++++++++++++
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 ++++++++
+>  3 files changed, 99 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+>
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4f55edf..20ca61a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1245,6 +1245,12 @@ L:	linux-kernel at vger.kernel.org
- S:	Maintained
- F:	drivers/memory/*emif*
- 
-+ARM/LG1K ARCHITECTURE
-+M:	Chanho Min <chanho.min@lge.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm64/boot/dts/lg/
-+
- ARM/LOGICPD PXA270 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.7.9.5
+Looks good to me.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+I don't have anything in DTS queue for v4.6 and it is late so I'll apply
+this for v4.7 after upcoming merge window.
+
+Best regards,
+Krzysztof
