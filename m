@@ -1,126 +1,93 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 17:18:22 +0100
-Subject: [PATCH 05/16] mtd: nand: export default read/write oob functions
+Date: Mon,  7 Mar 2016 17:20:40 +0100
+Subject: [PATCH 08/16] mtd: nand: sunxi: improve ->cmd_ctrl() function
 In-Reply-To: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457367513-26069-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457367640-26243-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export the default read/write oob functions (for the standard and syndrome
-scheme), so that drivers can use them for their raw implementation and
-implement their own functions for the normal oob operation.
-
-This is required if your ECC engine is capable of fixing some of the OOB
-data. In this case you have to overload the ->read_oob() and ->write_oob(),
-but if you don't specify the ->read/write_oob_raw() functions they are
-assigned to the ->read/write_oob() implementation, which is not what you
-want.
+Try to pack address and command cycles into a single NAND controller
+command to avoid polling the status register for each single change
+on the NAND bus.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/nand_base.c | 18 ++++++++++--------
- include/linux/mtd/nand.h     | 14 ++++++++++++++
- 2 files changed, 24 insertions(+), 8 deletions(-)
+ drivers/mtd/nand/sunxi_nand.c | 52 ++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 44 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index f2c8ff3..b8cfeb7 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -1924,13 +1924,13 @@ static int nand_read(struct mtd_info *mtd, loff_t from, size_t len,
-  * @chip: nand chip info structure
-  * @page: page number to read
-  */
--static int nand_read_oob_std(struct mtd_info *mtd, struct nand_chip *chip,
--			     int page)
-+int nand_read_oob_std(struct mtd_info *mtd, struct nand_chip *chip, int page)
- {
- 	chip->cmdfunc(mtd, NAND_CMD_READOOB, 0, page);
- 	chip->read_buf(mtd, chip->oob_poi, mtd->oobsize);
- 	return 0;
- }
-+EXPORT_SYMBOL(nand_read_oob_std);
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index df73e55..db5446e 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -239,6 +239,10 @@ struct sunxi_nand_chip {
+ 	u32 timing_cfg;
+ 	u32 timing_ctl;
+ 	int selected;
++	int addr_cycles;
++	u32 addr[2];
++	int cmd_cycles;
++	u8 cmd[2];
+ 	int nsels;
+ 	struct sunxi_nand_chip_sel sels[0];
+ };
+@@ -526,17 +530,49 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
+ 		writel(tmp, nfc->regs + NFC_REG_CTL);
+ 	}
  
- /**
-  * nand_read_oob_syndrome - [REPLACEABLE] OOB data read function for HW ECC
-@@ -1939,8 +1939,8 @@ static int nand_read_oob_std(struct mtd_info *mtd, struct nand_chip *chip,
-  * @chip: nand chip info structure
-  * @page: page number to read
-  */
--static int nand_read_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
--				  int page)
-+int nand_read_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
-+			   int page)
- {
- 	int length = mtd->oobsize;
- 	int chunk = chip->ecc.bytes + chip->ecc.prepad + chip->ecc.postpad;
-@@ -1968,6 +1968,7 @@ static int nand_read_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
+-	if (dat == NAND_CMD_NONE)
+-		return;
++	if (dat == NAND_CMD_NONE && (ctrl & NAND_NCE) &&
++	    !(ctrl & (NAND_CLE | NAND_ALE))) {
++		u32 cmd = 0;
  
- 	return 0;
- }
-+EXPORT_SYMBOL(nand_read_oob_syndrome);
- 
- /**
-  * nand_write_oob_std - [REPLACEABLE] the most common OOB data write function
-@@ -1975,8 +1976,7 @@ static int nand_read_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
-  * @chip: nand chip info structure
-  * @page: page number to write
-  */
--static int nand_write_oob_std(struct mtd_info *mtd, struct nand_chip *chip,
--			      int page)
-+int nand_write_oob_std(struct mtd_info *mtd, struct nand_chip *chip, int page)
- {
- 	int status = 0;
- 	const uint8_t *buf = chip->oob_poi;
-@@ -1991,6 +1991,7 @@ static int nand_write_oob_std(struct mtd_info *mtd, struct nand_chip *chip,
- 
- 	return status & NAND_STATUS_FAIL ? -EIO : 0;
- }
-+EXPORT_SYMBOL(nand_write_oob_std);
- 
- /**
-  * nand_write_oob_syndrome - [REPLACEABLE] OOB data write function for HW ECC
-@@ -1999,8 +2000,8 @@ static int nand_write_oob_std(struct mtd_info *mtd, struct nand_chip *chip,
-  * @chip: nand chip info structure
-  * @page: page number to write
-  */
--static int nand_write_oob_syndrome(struct mtd_info *mtd,
--				   struct nand_chip *chip, int page)
-+int nand_write_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
-+			    int page)
- {
- 	int chunk = chip->ecc.bytes + chip->ecc.prepad + chip->ecc.postpad;
- 	int eccsize = chip->ecc.size, length = mtd->oobsize;
-@@ -2050,6 +2051,7 @@ static int nand_write_oob_syndrome(struct mtd_info *mtd,
- 
- 	return status & NAND_STATUS_FAIL ? -EIO : 0;
- }
-+EXPORT_SYMBOL(nand_write_oob_syndrome);
- 
- /**
-  * nand_do_read_oob - [INTERN] NAND read out-of-band
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index 7604f4b..19b2f7d 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -1070,4 +1070,18 @@ int nand_check_erased_ecc_chunk(void *data, int datalen,
- 				void *ecc, int ecclen,
- 				void *extraoob, int extraooblen,
- 				int threshold);
+-	if (ctrl & NAND_CLE) {
+-		writel(NFC_SEND_CMD1 | dat, nfc->regs + NFC_REG_CMD);
+-	} else {
+-		writel(dat, nfc->regs + NFC_REG_ADDR_LOW);
+-		writel(NFC_SEND_ADR, nfc->regs + NFC_REG_CMD);
++		if (!sunxi_nand->addr_cycles && !sunxi_nand->cmd_cycles)
++			return;
 +
-+/* Default write_oob implementation */
-+int nand_write_oob_std(struct mtd_info *mtd, struct nand_chip *chip, int page);
++		if (sunxi_nand->cmd_cycles--)
++			cmd |= NFC_SEND_CMD1 | sunxi_nand->cmd[0];
 +
-+/* Default write_oob syndrome implementation */
-+int nand_write_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
-+			    int page);
++		if (sunxi_nand->cmd_cycles--) {
++			cmd |= NFC_SEND_CMD2;
++			writel(sunxi_nand->cmd[1],
++			       nfc->regs + NFC_REG_RCMD_SET);
++		}
 +
-+/* Default read_oob implementation */
-+int nand_read_oob_std(struct mtd_info *mtd, struct nand_chip *chip, int page);
++		sunxi_nand->cmd_cycles = 0;
 +
-+/* Default read_oob syndrome implementation */
-+int nand_read_oob_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
-+			   int page);
- #endif /* __LINUX_MTD_NAND_H */
++		if (sunxi_nand->addr_cycles) {
++			cmd |= NFC_SEND_ADR |
++			       NFC_ADR_NUM(sunxi_nand->addr_cycles);
++			writel(sunxi_nand->addr[0],
++			       nfc->regs + NFC_REG_ADDR_LOW);
++		}
++
++		if (sunxi_nand->addr_cycles > 4)
++			writel(sunxi_nand->addr[1],
++			       nfc->regs + NFC_REG_ADDR_HIGH);
++
++		writel(cmd, nfc->regs + NFC_REG_CMD);
++		sunxi_nand->addr[0] = 0;
++		sunxi_nand->addr[1] = 0;
++		sunxi_nand->addr_cycles = 0;
++		sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
+ 	}
+ 
+-	sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
++	if (ctrl & NAND_CLE) {
++		sunxi_nand->cmd[sunxi_nand->cmd_cycles++] = dat;
++	} else if (ctrl & NAND_ALE) {
++		sunxi_nand->addr[sunxi_nand->addr_cycles / 4] |=
++				dat << ((sunxi_nand->addr_cycles % 4) * 8);
++		sunxi_nand->addr_cycles++;
++	}
+ }
+ 
+ /* These seed values have been extracted from Allwinner's BSP */
 -- 
 2.1.4
