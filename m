@@ -1,25 +1,64 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 7 Mar 2016 15:29:55 +0100
-Subject: [PATCH v2 0/2] iio: add support for signed conversions
-Message-ID: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Mon, 7 Mar 2016 15:29:56 +0100
+Subject: [PATCH v2 1/2] iio: core: introduce IIO_CHAN_INFO_SIGNED
+In-Reply-To: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1457360997-29179-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+The same channel can be used to perform a signed or an unsigned
+conversion. Add a new infomask element to be able to select the type of
+conversion wanted: a raw one or a signed raw one.
 
-I hope these patches are in adequacy with your comments. They are based on the
-the previous two patches you have taken. I am not sure about the 
-correctness of the documentation.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ Documentation/ABI/testing/sysfs-bus-iio | 10 ++++++++++
+ drivers/iio/industrialio-core.c         |  1 +
+ include/linux/iio/iio.h                 |  1 +
+ 3 files changed, 12 insertions(+)
 
-Ludovic Desroches (2):
-  iio: core: introduce IIO_CHAN_INFO_SIGNED
-  iio:adc:at91-sama5d2: add support for signed conversion
-
- Documentation/ABI/testing/sysfs-bus-iio |  10 +++
- drivers/iio/adc/at91-sama5d2_adc.c      | 125 ++++++++++++++++++++++++++------
- drivers/iio/industrialio-core.c         |   1 +
- include/linux/iio/iio.h                 |   1 +
- 4 files changed, 114 insertions(+), 23 deletions(-)
-
+diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
+index 3c66248..161733c 100644
+--- a/Documentation/ABI/testing/sysfs-bus-iio
++++ b/Documentation/ABI/testing/sysfs-bus-iio
+@@ -1501,3 +1501,13 @@ Contact:	linux-iio at vger.kernel.org
+ Description:
+ 		Raw (unscaled no offset etc.) pH reading of a substance as a negative
+ 		base-10 logarithm of hydrodium ions in a litre of water.
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_signed
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_supply_signed
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_i_signed
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_q_signed
++KernelVersion:	4.7
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Signed (unscaled no bias removal etc.) voltage measurement from
++		channel Y.
+diff --git a/drivers/iio/industrialio-core.c b/drivers/iio/industrialio-core.c
+index 70cb7eb..fb2ca27 100644
+--- a/drivers/iio/industrialio-core.c
++++ b/drivers/iio/industrialio-core.c
+@@ -147,6 +147,7 @@ static const char * const iio_chan_info_postfix[] = {
+ 	[IIO_CHAN_INFO_DEBOUNCE_TIME] = "debounce_time",
+ 	[IIO_CHAN_INFO_CALIBEMISSIVITY] = "calibemissivity",
+ 	[IIO_CHAN_INFO_OVERSAMPLING_RATIO] = "oversampling_ratio",
++	[IIO_CHAN_INFO_SIGNED] = "signed",
+ };
+ 
+ /**
+diff --git a/include/linux/iio/iio.h b/include/linux/iio/iio.h
+index b2b1677..6f5eb24 100644
+--- a/include/linux/iio/iio.h
++++ b/include/linux/iio/iio.h
+@@ -46,6 +46,7 @@ enum iio_chan_info_enum {
+ 	IIO_CHAN_INFO_DEBOUNCE_TIME,
+ 	IIO_CHAN_INFO_CALIBEMISSIVITY,
+ 	IIO_CHAN_INFO_OVERSAMPLING_RATIO,
++	IIO_CHAN_INFO_SIGNED,
+ };
+ 
+ enum iio_shared_by {
 -- 
 2.5.0
