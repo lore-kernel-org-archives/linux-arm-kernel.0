@@ -1,75 +1,40 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  7 Mar 2016 17:21:49 -0500
-Subject: [PATCH 1/2] pci: add pci_unmap_iospace function for PCI_IOBASE
-Message-ID: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+From: asamson@codeaurora.org (Azriel Samson)
+Date: Mon, 7 Mar 2016 15:25:08 -0700
+Subject: [PATCH v14 00/20] arm64 kexec kernel patches v14
+In-Reply-To: <cover.1457135058.git.geoff@infradead.org>
+References: <cover.1457135058.git.geoff@infradead.org>
+Message-ID: <56DDFFC4.1040206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI_IOBASE needs to be released after hotplug removal so that it can be
-re-added back by the pci_remap_iospace function during insertion.
+Hi Geoff,
 
-Adding unmap function to follow IO remap function.
+On 3/4/2016 4:51 PM, Geoff Levand wrote:
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.c   | 25 +++++++++++++++++++++++++
- include/linux/pci.h |  1 +
- 2 files changed, 26 insertions(+)
+> To load a second stage kernel and execute a kexec re-boot or to work with kdump
+> on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
+> merged upstream, are needed.  Please update to the latest if you have been using
+> an older version.
+>
+> To examine vmcore (/proc/vmcore), you should use
+>    - gdb v7.7 or later
+>    - crash v7.1.1 or later
+>
+> [1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
+> [2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
+>
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 3a516c0..f5faed2 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -26,6 +26,7 @@
- #include <linux/device.h>
- #include <linux/pm_runtime.h>
- #include <linux/pci_hotplug.h>
-+#include <linux/vmalloc.h>
- #include <asm-generic/pci-bridge.h>
- #include <asm/setup.h>
- #include <linux/aer.h>
-@@ -3169,6 +3170,30 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
- #endif
- }
- 
-+/**
-+ *	pci_unmap_iospace - Unmap the memory mapped I/O space
-+ *	@virt_addr: virtual address to be unmapped
-+ *	@size: size of the physical address to be unmapped
-+ *
-+ *	Unmap the CPU virtual address @virt_addr from virtual address space.
-+ *	Only architectures that have memory mapped IO functions defined
-+ *	(and the PCI_IOBASE value defined) should call this function.
-+ */
-+void  __weak pci_unmap_iospace(struct resource *res)
-+{
-+#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-+	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
-+
-+	unmap_kernel_range(vaddr, resource_size(res));
-+#else
-+	/*
-+	 * This architecture does not have memory mapped I/O space,
-+	 * so this function should never be called.
-+	 */
-+	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
-+#endif
-+}
-+
- static void __pci_set_master(struct pci_dev *dev, bool enable)
- {
- 	u16 old_cmd, cmd;
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 398ae7e..c6e3f0e 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1172,6 +1172,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
- unsigned long pci_address_to_pio(phys_addr_t addr);
- phys_addr_t pci_pio_to_address(unsigned long pio);
- int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-+void pci_unmap_iospace(struct resource *res);
- 
- static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
- {
+kexec-tools is still passing "mem=" parameter to the crash dump kernel 
+which causes it to crash with ACPI. You can revert commit "arm64: kdump: 
+pass "mem=" parameter to a crash dump kernel" in kexec-tools.
+
+Also, some version of the following patch from Pratyush is also still 
+needed: 
+https://github.com/pratyushanand/kexec-tools/commit/85f403cabb9ae0d7a37d1656a00fb609a9525086
+
 -- 
-1.8.2.1
+Thanks,
+Azriel Samson
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
