@@ -1,139 +1,71 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 7 Mar 2016 13:42:58 -0600
-Subject: [PATCHv2 02/11] EDAC,
- altera: Move Device structs and defines to header file
+Date: Mon, 7 Mar 2016 13:43:00 -0600
+Subject: [PATCHv2 04/11] EDAC, altera: Add register offset for ECC Error Inject
 In-Reply-To: <1457379787-8327-1-git-send-email-tthayer@opensource.altera.com>
 References: <1457379787-8327-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1457379787-8327-3-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1457379787-8327-5-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-Move the device structs and defines to altera_edac.h in preparation
-for adding the Arria10 L2 cache ECC.
+In preparation for the Arria10 peripheral ECCs, a register
+offset from the ECC base was added to the private data
+structure to index to the error injection register.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v2: Split original patch into smaller patches. Move private data
-    and defines into header file.
+v2: Split large patch into smaller patches. Add an ECC
+    error inject offset to support the different register
+    layout of Arria10 peripheral ECCs.
 ---
- drivers/edac/altera_edac.c |   43 -------------------------------------------
- drivers/edac/altera_edac.h |   43 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+), 43 deletions(-)
+ drivers/edac/altera_edac.c |    7 +++++--
+ drivers/edac/altera_edac.h |    1 +
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 63e4209..eee7a39 100644
+index 138446c..9e62a49 100644
 --- a/drivers/edac/altera_edac.c
 +++ b/drivers/edac/altera_edac.c
-@@ -78,27 +78,6 @@ static const struct altr_sdram_prv_data a10_data = {
- 	.ue_set_mask        = A10_DIAGINT_TDERRA_MASK,
+@@ -622,8 +622,9 @@ static ssize_t altr_edac_device_trig(struct file *file,
+ 		if (ACCESS_ONCE(ptemp[i]))
+ 			result = -1;
+ 		/* Toggle Error bit (it is latched), leave ECC enabled */
+-		writel(error_mask, drvdata->base);
+-		writel(priv->ecc_enable_mask, drvdata->base);
++		writel(error_mask, (drvdata->base + priv->set_err_ofst));
++		writel(priv->ecc_enable_mask, (drvdata->base +
++					       priv->set_err_ofst));
+ 		ptemp[i] = i;
+ 	}
+ 	/* Ensure it has been written out */
+@@ -881,6 +882,7 @@ const struct edac_device_prv_data ocramecc_data = {
+ 	.ecc_en_ofst = ALTR_OCR_ECC_REG_OFFSET,
+ 	.ce_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJS),
+ 	.ue_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJD),
++	.set_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
+ 	.trig_alloc_sz = ALTR_TRIG_OCRAM_BYTE_SIZE,
  };
  
--/************************** EDAC Device Defines **************************/
--
--/* OCRAM ECC Management Group Defines */
--#define ALTR_MAN_GRP_OCRAM_ECC_OFFSET   0x04
--#define ALTR_OCR_ECC_EN                 BIT(0)
--#define ALTR_OCR_ECC_INJS               BIT(1)
--#define ALTR_OCR_ECC_INJD               BIT(2)
--#define ALTR_OCR_ECC_SERR               BIT(3)
--#define ALTR_OCR_ECC_DERR               BIT(4)
--
--/* L2 ECC Management Group Defines */
--#define ALTR_MAN_GRP_L2_ECC_OFFSET      0x00
--#define ALTR_L2_ECC_EN                  BIT(0)
--#define ALTR_L2_ECC_INJS                BIT(1)
--#define ALTR_L2_ECC_INJD                BIT(2)
--
--#define ALTR_UE_TRIGGER_CHAR            'U'   /* Trigger for UE */
--#define ALTR_TRIGGER_READ_WRD_CNT       32    /* Line size x 4 */
--#define ALTR_TRIG_OCRAM_BYTE_SIZE       128   /* Line size x 4 */
--#define ALTR_TRIG_L2C_BYTE_SIZE         4096  /* Full Page */
--
- /*********************** EDAC Memory Controller Functions ****************/
+@@ -954,6 +956,7 @@ const struct edac_device_prv_data l2ecc_data = {
+ 	.ecc_en_ofst = ALTR_L2_ECC_REG_OFFSET,
+ 	.ce_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJS),
+ 	.ue_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJD),
++	.set_err_ofst = ALTR_L2_ECC_REG_OFFSET,
+ 	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
+ };
  
- /* The SDRAM controller uses the EDAC Memory Controller framework.       */
-@@ -571,28 +550,6 @@ module_platform_driver(altr_edac_driver);
- const struct edac_device_prv_data ocramecc_data;
- const struct edac_device_prv_data l2ecc_data;
- 
--struct edac_device_prv_data {
--	int (*setup)(struct platform_device *pdev, void __iomem *base);
--	int ce_clear_mask;
--	int ue_clear_mask;
--	char dbgfs_name[20];
--	void * (*alloc_mem)(size_t size, void **other);
--	void (*free_mem)(void *p, size_t size, void *other);
--	int ecc_enable_mask;
--	int ce_set_mask;
--	int ue_set_mask;
--	int trig_alloc_sz;
--};
--
--struct altr_edac_device_dev {
--	void __iomem *base;
--	int sb_irq;
--	int db_irq;
--	const struct edac_device_prv_data *data;
--	struct dentry *debugfs_dir;
--	char *edac_dev_name;
--};
--
- static irqreturn_t altr_edac_device_handler(int irq, void *dev_id)
- {
- 	irqreturn_t ret_value = IRQ_NONE;
 diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
-index 953077d..e531da4 100644
+index 54e2742..d4105b0 100644
 --- a/drivers/edac/altera_edac.h
 +++ b/drivers/edac/altera_edac.h
-@@ -195,4 +195,47 @@ struct altr_sdram_mc_data {
- 	const struct altr_sdram_prv_data *data;
+@@ -232,6 +232,7 @@ struct edac_device_prv_data {
+ 	int ecc_en_ofst;
+ 	int ce_set_mask;
+ 	int ue_set_mask;
++	int set_err_ofst;
+ 	int trig_alloc_sz;
  };
  
-+/************************** EDAC Device Defines **************************/
-+
-+#define ALTR_UE_TRIGGER_CHAR            'U'   /* Trigger for UE */
-+#define ALTR_TRIGGER_READ_WRD_CNT       32    /* Line size x 4 */
-+#define ALTR_TRIG_OCRAM_BYTE_SIZE       128   /* Line size x 4 */
-+#define ALTR_TRIG_L2C_BYTE_SIZE         4096  /* Full Page */
-+
-+/* OCRAM ECC Management Group Defines */
-+#define ALTR_MAN_GRP_OCRAM_ECC_OFFSET   0x04
-+#define ALTR_OCR_ECC_EN                 BIT(0)
-+#define ALTR_OCR_ECC_INJS               BIT(1)
-+#define ALTR_OCR_ECC_INJD               BIT(2)
-+#define ALTR_OCR_ECC_SERR               BIT(3)
-+#define ALTR_OCR_ECC_DERR               BIT(4)
-+
-+/* L2 ECC Management Group Defines */
-+#define ALTR_MAN_GRP_L2_ECC_OFFSET      0x00
-+#define ALTR_L2_ECC_EN                  BIT(0)
-+#define ALTR_L2_ECC_INJS                BIT(1)
-+#define ALTR_L2_ECC_INJD                BIT(2)
-+
-+struct edac_device_prv_data {
-+	int (*setup)(struct platform_device *pdev, void __iomem *base);
-+	int ce_clear_mask;
-+	int ue_clear_mask;
-+	char dbgfs_name[20];
-+	void * (*alloc_mem)(size_t size, void **other);
-+	void (*free_mem)(void *p, size_t size, void *other);
-+	int ecc_enable_mask;
-+	int ce_set_mask;
-+	int ue_set_mask;
-+	int trig_alloc_sz;
-+};
-+
-+struct altr_edac_device_dev {
-+	void __iomem *base;
-+	int sb_irq;
-+	int db_irq;
-+	const struct edac_device_prv_data *data;
-+	struct dentry *debugfs_dir;
-+	char *edac_dev_name;
-+};
-+
- #endif	/* #ifndef _ALTERA_EDAC_H */
 -- 
 1.7.9.5
