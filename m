@@ -1,69 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 7 Mar 2016 10:01:09 +0100
-Subject: Build regressions/improvements in v4.5-rc7
-In-Reply-To: <1457340934-23042-1-git-send-email-geert@linux-m68k.org>
-References: <1457340934-23042-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdWe9bTjp-qmTJc9=n9-iP-qH8-O0jafiRD3-y_EtT=WvA@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 7 Mar 2016 10:01:53 +0100
+Subject: [PATCH 4/4] documentation: Fix pinctrl documentation for Meson8 /
+ Meson8b
+In-Reply-To: <20160305042646.GL13525@rob-hp-laptop>
+References: <1456869876-19320-1-git-send-email-carlo@caione.org>
+ <1456869876-19320-5-git-send-email-carlo@caione.org>
+ <20160305042646.GL13525@rob-hp-laptop>
+Message-ID: <CAOQ7t2bd5-xeUkwjN4cqi=xa602B8JwZ4vvrUF1VL4y2=pkV_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 7, 2016 at 9:55 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.5-rc7[1] to v4.5-rc6[3], the summaries are:
->   - build errors: +8/-7
-  + error: debugfs.c: undefined reference to `clk_round_rate':  =>
-.text+0x11b9e0)
+On Sat, Mar 5, 2016 at 5:26 AM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Mar 01, 2016 at 11:04:36PM +0100, Carlo Caione wrote:
+>> From: Carlo Caione <carlo@endlessm.com>
+>>
+>> Fix pin controller documentation with the new compatibles.
+>
+> What was wrong with it? (answer in the commit msg)
 
-arm-randconfig
+I'll extend the commit message.
 
-While looking for more context, I noticed another regression that fell through
-the cracks of my script:
+[...]
+>>  Required properties for the root node:
+>> - - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
+>> + - compatible: "amlogic,meson8-cbus-pinctrl", "amlogic,meson8b-cbus-pinctrl",
+>> +   "amlogic,meson8-aobus-pinctrl" or "amlogic,meson8b-aobus-pinctrl"
+>
+> Reformat with 1 per line (assuming each are mutually exclusive).
 
-    arch/arm/kernel/head.o: In function `stext':
-    (.head.text+0x40): undefined reference to `CONFIG_PHYS_OFFSET'
-    drivers/built-in.o: In function `v4l2_clk_set_rate':
-    debugfs.c:(.text+0x11b9e0): undefined reference to `clk_round_rate'
+ok
 
-  + error: misc.c: undefined reference to `ftrace_likely_update':  =>
-.text+0x714), .text+0x94c), .text+0x3b8), .text+0xc10)
+[...]
+>> -Valid sub-node names are:
+>> - - "banks" for the regular domain
+>> - - "ao-bank" for the always-on domain
+>> -
+>
+> Why are these being removed?
 
-sh-randconfig
+Because we are not forced anymore to use those specific names for the sub-nodes.
 
-    arch/sh/boot/compressed/misc.o: In function `lzo1x_decompress_safe':
-    misc.c:(.text+0x3b8): undefined reference to `ftrace_likely_update'
-    misc.c:(.text+0x714): undefined reference to `ftrace_likely_update'
-    misc.c:(.text+0x94c): undefined reference to `ftrace_likely_update'
-    arch/sh/boot/compressed/misc.o: In function `unlzo.constprop.2':
-    misc.c:(.text+0xc10): undefined reference to `ftrace_likely_update'
-
-  + /tmp/cc52LvuK.s: Error: can't resolve `_start' {*UND* section} -
-`L0^A' {.text section}:  => 41, 403
-  + /tmp/ccHfoDA4.s: Error: can't resolve `_start' {*UND* section} -
-`L0^A' {.text section}:  => 43
-  + /tmp/cch1r0UQ.s: Error: can't resolve `_start' {*UND* section} -
-`L0^A' {.text section}:  => 49, 378
-  + /tmp/ccoHdFI8.s: Error: can't resolve `_start' {*UND* section} -
-`L0^A' {.text section}:  => 43
-
-mips-allnoconfig
-bigsur_defconfig
-malta_defconfig
-cavium_octeon_defconfig
-
-Not really new, but it would be great if the MIPS people could get this
-fixed for the final release.
-
-Thanks!
-
-> [1] http://kisskb.ellerman.id.au/kisskb/head/10011/ (all 262 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/9974/ (all 262 configs)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Carlo Caione
