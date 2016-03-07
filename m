@@ -1,108 +1,58 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Mon,  7 Mar 2016 13:05:57 +0530
-Subject: [PATCH 2/2] net: thunderx: Adjust nicvf structure to reduce cache
- misses
-In-Reply-To: <1457336157-31508-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1457336157-31508-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1457336157-31508-3-git-send-email-sunil.kovvuri@gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 7 Mar 2016 09:36:23 +0200
+Subject: [PATCH 11/11] ARM: versatile: move CLCD configuration to device
+ tree
+In-Reply-To: <CACRpkdaJ1xzRp4gg1wLSoo_se+LEC9sUDZ-9L2iZ1g4GPj_dZw@mail.gmail.com>
+References: <1454594660-7532-1-git-send-email-linus.walleij@linaro.org>
+ <3695074.sKSIyOjpjD@wuerfel>
+ <CACRpkdZjfjOCFUucF1U5yVZBxSwa41GKEMv-HHQE=ymF2NZ21g@mail.gmail.com>
+ <6859810.tb1t0IEONi@wuerfel> <56CC57FC.20707@ti.com>
+ <CACRpkdYNaNtQQJ-tsBe5ksa4-z380ZQj-zN8ZnK0ED2kNPUwvg@mail.gmail.com>
+ <56CC60C4.6040908@ti.com>
+ <CACRpkdZd8TLdsi7_cOrqzcqWKJrfdp4Vz2sx5ozpwJXOj0fa+Q@mail.gmail.com>
+ <56CF2FB1.106@ti.com>
+ <CACRpkdYowXJinONTd2qREfCtEDCon+HSQtdd6t1QQA91f6PJdw@mail.gmail.com>
+ <56D02D28.9080109@ti.com>
+ <CACRpkdaJ1xzRp4gg1wLSoo_se+LEC9sUDZ-9L2iZ1g4GPj_dZw@mail.gmail.com>
+Message-ID: <56DD2F77.6080407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
 
-Adjusted nicvf structure such that all elements used in hot
-path like napi, xmit e.t.c fall into same cache line. This reduced
-no of cache misses and resulted in ~2% increase in no of packets
-handled on a core.
 
-Also modified elements with :1 notation to boolean, to be
-consistent with other element definitions.
+On 05/03/16 18:57, Linus Walleij wrote:
+> On Fri, Feb 26, 2016 at 5:47 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> 
+>> Although one thing to consider is that if there is ever going to be a
+>> DRM driver for CLCD, it would be good to have the device tree parts
+>> correctly representing the hardware, so that the DRM driver could be
+>> implemented in a cleaner, more generic way.
+> 
+> OK so for the next kernel cycle I can work on that.
+> 
+> The non-controversial patch set is essentially just using the DT bindings
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h |   52 ++++++++++++++++------------
- 1 files changed, 30 insertions(+), 22 deletions(-)
+Yes, I think the non-controversial series is fine. Will you be sending a
+v2 of that series?
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 5628aea..c063d92 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -263,46 +263,54 @@ struct nicvf {
- 	struct nicvf		*pnicvf;
- 	struct net_device	*netdev;
- 	struct pci_dev		*pdev;
-+	void __iomem		*reg_base;
-+	struct queue_set	*qs;
-+	struct nicvf_cq_poll	*napi[8];
- 	u8			vf_id;
--	u8			node;
--	u8			tns_mode:1;
--	u8			sqs_mode:1;
--	u8			loopback_supported:1;
-+	u8			sqs_id;
-+	bool                    sqs_mode;
- 	bool			hw_tso;
--	u16			mtu;
--	struct queue_set	*qs;
-+
-+	/* Receive buffer alloc */
-+	u32			rb_page_offset;
-+	u16			rb_pageref;
-+	bool			rb_alloc_fail;
-+	bool			rb_work_scheduled;
-+	struct page		*rb_page;
-+	struct delayed_work	rbdr_work;
-+	struct tasklet_struct	rbdr_task;
-+
-+	/* Secondary Qset */
-+	u8			sqs_count;
- #define	MAX_SQS_PER_VF_SINGLE_NODE		5
- #define	MAX_SQS_PER_VF				11
--	u8			sqs_id;
--	u8			sqs_count; /* Secondary Qset count */
- 	struct nicvf		*snicvf[MAX_SQS_PER_VF];
-+
-+	/* Queue count */
- 	u8			rx_queues;
- 	u8			tx_queues;
- 	u8			max_queues;
--	void __iomem		*reg_base;
-+
-+	u8			node;
-+	u8			cpi_alg;
-+	u16			mtu;
- 	bool			link_up;
- 	u8			duplex;
- 	u32			speed;
--	struct page		*rb_page;
--	u32			rb_page_offset;
--	u16			rb_pageref;
--	bool			rb_alloc_fail;
--	bool			rb_work_scheduled;
--	struct delayed_work	rbdr_work;
--	struct tasklet_struct	rbdr_task;
--	struct tasklet_struct	qs_err_task;
--	struct tasklet_struct	cq_task;
--	struct nicvf_cq_poll	*napi[8];
-+	bool			tns_mode;
-+	bool			loopback_supported;
- 	struct nicvf_rss_info	rss_info;
--	u8			cpi_alg;
-+	struct tasklet_struct	qs_err_task;
-+	struct work_struct	reset_task;
-+
- 	/* Interrupt coalescing settings */
- 	u32			cq_coalesce_usecs;
--
- 	u32			msg_enable;
-+
-+	/* Stats */
- 	struct nicvf_hw_stats   hw_stats;
- 	struct nicvf_drv_stats  drv_stats;
- 	struct bgx_stats	bgx_stats;
--	struct work_struct	reset_task;
- 
- 	/* MSI-X  */
- 	bool			msix_enabled;
--- 
-1.7.1
+> that are already in the kernel and in widespread use. See:
+> commit d10715be03bd8bad59ddc50236cb140c3bd73c7b
+> "video: ARM CLCD: Add DT support"
+> 
+> They follow the example set by
+> commit 478a4f81af4936c683a03488e15b087e28cb4f0d
+> "ARM: vexpress: Add CLCD Device Tree properties"
+
+This one not actually correct, as the panel node is inside the clcd
+node. The child parent relationship should represent a control bus. But
+that's a different topic...
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160307/363b6742/attachment.sig>
