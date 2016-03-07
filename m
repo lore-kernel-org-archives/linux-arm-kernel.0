@@ -1,49 +1,96 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 7 Mar 2016 13:43:07 -0600
-Subject: [PATCHv2 11/11] ARM: dts: Add Altera Arria10 L2 Cache EDAC devicetree
- entry
-In-Reply-To: <1457379787-8327-1-git-send-email-tthayer@opensource.altera.com>
-References: <1457379787-8327-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1457379787-8327-12-git-send-email-tthayer@opensource.altera.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 7 Mar 2016 11:47:21 -0800
+Subject: [PATCH v14 2/6] Documentation, dt, numa: dt bindings for NUMA.
+In-Reply-To: <20160307192220.GA1535@rric.localdomain>
+References: <1457049339-23351-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457049339-23351-3-git-send-email-ddaney.cavm@gmail.com>
+ <20160307192220.GA1535@rric.localdomain>
+Message-ID: <56DDDAC9.1010600@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+On 03/07/2016 11:22 AM, Robert Richter wrote:
+> On 03.03.16 15:55:35, David Daney wrote:
+>> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>>
+>> Add DT bindings for numa mapping of memory, CPUs and IOs.
+>>
+>> Reviewed-by: Robert Richter <rrichter@cavium.com>
+>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++++++++++++
+>>   1 file changed, 272 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/numa.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+>> new file mode 100644
+>> index 0000000..ec5ed7c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/numa.txt
+>
+>> +==============================================================================
+>> +3 - distance-map
+>> +==============================================================================
+>> +
+>> +The device tree node distance-map describes the relative
+>> +distance (memory latency) between all numa nodes.
+>> +
+>> +- compatible : Should at least contain "numa-distance-map-v1".
+>> +
+>> +- distance-matrix
+>> +  This property defines a matrix to describe the relative distances
+>> +  between all numa nodes.
+>> +  It is represented as a list of node pairs and their relative distance.
+>> +
+>> +  Note:
+>> +	1. Each entry represents distance from first node to second node.
+>> +	The distances are equal in either direction.
+>> +	2. The distance from a node to self (local distance) is represented
+>> +	with value 10 and all internode distance should be represented with
+>> +	a value greater than 10.
+>> +	3. distance-matrix should have entries in lexicographical ascending
+>> +	order of nodes.
+>> +	4. There must be only one device node distance-map which must reside in the root node.
+>
+> There is no note that this one is optional, but is it right? The
+> default is 10 for local and 20 for remote connections.
+>
 
-Add the device tree entries needed to support the Altera L2
-cache EDAC on the Arria10 chip.
+Do we need to explicitly state that it is optional?  Many node types are 
+optional, and their binding specifications don't really talk about their 
+being optional.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v2 Match register value (l2-ecc at ffd06010)
----
- arch/arm/boot/dts/socfpga_arria10.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+If the node is present then it has the meaning specified.
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index cce9e50..44aeb3f 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -599,6 +599,20 @@
- 			reg = <0xffe00000 0x40000>;
- 		};
- 
-+		eccmgr: eccmgr at ffd06090 {
-+			compatible = "altr,socfpga-ecc-manager";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			l2-ecc at ffd06010 {
-+				compatible = "altr,socfpga-a10-l2-ecc";
-+				reg = <0xffd06010 0x4>;
-+				interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 0 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
- 		rst: rstmgr at ffd05000 {
- 			#reset-cells = <1>;
- 			compatible = "altr,rst-mgr";
--- 
-1.7.9.5
+If the node is *not* present, then the special meaning described in the 
+bindings document does not apply.
+
+In the case of NUMA, this means that all memory is equally distant (i.e. 
+it is *Uniform*), and we are not talking about a *Non* *Uniform* Memory 
+Architecture (NUMA) system.
+
+
+> If so, then ...
+>
+> static int __init of_numa_parse_distance_map(void)
+> {
+> 	int ret = -EINVAL;
+> 	struct device_node *np = of_find_node_by_path("/distance-map");
+>
+> 	if (!np)
+> 		return ret;
+>
+> must return 0 instead of -EINVAL here.
+
+No, I don't think doing that would be correct.
+
+If there is no "distance-map", then of_numa_init() returns the error 
+code.  This causes the code in arch/arm64/kernel/numa.c to fall back to 
+the non-NUMA "dummy_numa" case.
+
+By adding your Reviewed-by: Robert Richter <rrichter@cavium.com> tag to 
+patch 5/6, where we select between "real" and "dummy_numa", I had 
+assumed that you agreed with this approach.
+
+David Daney
