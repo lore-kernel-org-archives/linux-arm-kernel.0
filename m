@@ -1,383 +1,110 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 07 Mar 2016 19:48:23 +0100
-Subject: [PATCH v1 2/3] mailbox: rockchip: Add Rockchip mailbox driver
-In-Reply-To: <1445931106-683-3-git-send-email-wxt@rock-chips.com>
-References: <1445931106-683-1-git-send-email-wxt@rock-chips.com>
- <1445931106-683-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <3952968.vXrbfbrlZ2@diego>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 7 Mar 2016 10:49:53 -0800
+Subject: [PATCH 1/2] drm/rockchip: dw_hdmi: Call drm_encoder_cleanup() in
+ error path
+In-Reply-To: <1693114.6CV9KAkHOO@diego>
+References: <1457133723-24869-1-git-send-email-dianders@chromium.org>
+ <56DD3DAF.8090700@rock-chips.com>
+ <CAD=FV=XMvYYwOHH_SEovAeHV1Sv9BbiAP4fGnF3Gq3aS1hfQaw@mail.gmail.com>
+ <1693114.6CV9KAkHOO@diego>
+Message-ID: <CAD=FV=WeAp+SQFqrecPr4GwdpUVx+y=rzgAdUTGSZExd_B=Sjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+Hi,
 
-Am Dienstag, 27. Oktober 2015, 15:31:45 schrieb Caesar Wang:
-> This driver is found on RK3368 SoCs.
-> 
-> The Mailbox module is a simple APB peripheral that allows both
-> the Cortex-A53 MCU system to communicate by writing operation to
-> generate interrupt.
-> The registers are accessible by both CPU via APB interface.
-> 
-> The Mailbox has the following main features:
-> 
-> 1) Support dual-core system: Cortex-A53 and MCU.
-> 2) Support APB interface.
-> 3) Support four mailbox elements, each element includes one data word,
->    one command word register and one flag bit that can represent
->    one interrupt.
-> 4) Four interrupts to Cortex-A53.
-> 5) Four interrupts to MCU.
-> 6) Provide 32 lock registers for software to use to indicate whether
->    mailbox is occupied.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+On Mon, Mar 7, 2016 at 9:57 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Montag, 7. M?rz 2016, 09:36:07 schrieb Doug Anderson:
+>> Hi,
+>>
+>> On Mon, Mar 7, 2016 at 12:37 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+>> > On 2016?03?05? 20:39, Russell King - ARM Linux wrote:
+>> >> On Sat, Mar 05, 2016 at 12:11:16PM +0000, John Keeping wrote:
+>> >>> On Fri, Mar 04, 2016 at 03:22:01PM -0800, Douglas Anderson wrote:
+>> >>>> The drm_encoder_cleanup() was missing both from the error path of
+>> >>>> dw_hdmi_rockchip_bind().  This caused a crash when slub_debug was
+>> >>>> enabled and we ended up deferring probe of HDMI at boot.
+>> >>>>
+>> >>>> This call isn't needed from unbind() because if dw_hdmi_bind() returns
+>> >>>> no error then it takes over the job of freeing the encoder (in
+>> >>>> dw_hdmi_unbind).
+>> >>>>
+>> >>>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>> >>>> ---
+>> >>>
+>> >>> Does dw_hdmi-imx need a similar change?  I wonder if it would be cleaner
+>> >>> to push this into dw_hdmi_bind() if it affects all of the platforms..
+>> >>
+>> >> I don't think moving it there would make sense - keep the initialisation
+>> >> and cleanup together in the same file so that it's contained together.
+>> >
+>> > I don't like this patch too, initialisation and cleanup not in the same
+>> > file looks bad,
+>> >
+>> > How about:
+>> >
+>> > drivers/gpu/drm/bridge/dw-hdmi.c
+>> > void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
+>> >
+>> >         hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
+>> >
+>> > hdmi->connector.funcs->destroy(&hdmi->connector);
+>> > -       hdmi->encoder->funcs->destroy(hdmi->encoder);
+>> >
+>> > drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+>> > static int dw_hdmi_rockchip_bind(struct device *dev, struct device
+>> > *master,
+>> >
+>> > -       return dw_hdmi_bind(dev, master, data, encoder, iores, irq,
+>> > plat_data);
+>> > +       ret = dw_hdmi_bind(dev, master, data, encoder, iores, irq,
+>> > plat_data);
+>> > +       if (ret)
+>> > +               drm_encoder_cleanup(encoder);
+>> > +
+>> > +       return ret;
+>> >
+>> >  }
+>> >
+>> >  static void dw_hdmi_rockchip_unbind(struct device *dev, struct device
+>> >
+>> > *master,
+>> >
+>> >                                     void *data)
+>> >
+>> >  {
+>> >
+>> > +       drm_encoder_cleanup(...);
+>> >
+>> >         return dw_hdmi_unbind(dev, master, data);
+>> >
+>> >  }
+>>
+>> That'a a reasonable suggestion in theory.  ...but we run into the same
+>> problem I've run into before with the strange relationship between
+>> dw_hdmi and its descendants.
+>
+> I don't think handing off the cleanup responsibility is really in question
+> here. I.e. I do believe it should also be fine to expect (as definition) the
+> core driver to cleanup the encoder _after_ it sucessfully claimed it in
+> dw_hdmi_bind().
+>
+> We do the same in the rockchip power-domains, handing off the struct clk-
+> pointer to the pm_clk stuff (due to the clk-pointer being unique per-device
+> nowadays).
+>
+> So just making sure it is sucessfully handed off should also be ok.
 
-it seems this patch has fallen through the cracks. Could you take a look if it 
-needs anything else?
+If I understand correctly, that means you'd be OK with the original
+patch I posted?  In that case cleanup continues to happen in the main
+dw-hdmi.c if dw_hdmi_bind() succeeds and my patch fixes the cleanup
+when dw_hdmi_bind() fails (and thus cleanup responsibility was not
+handed off).
 
+Also: I noticed that Russell also didn't seem to say that my original
+patch was bad.  I think he just said that he didn't like John
+Keeping's suggestion.
 
-Thanks
-Heiko
+Please correct any misunderstandings.  Thanks!
 
-> ---
-> 
-> Changes in v1:
-> - PATCH[2/3] driver:
-> - The commit: %s/@/(num order).
-> - Add the module authors to instead of the notes.
-> - Add the COMPILE_TEST to auto compile test in Kconfig.
-> - Let the chan_to_idx() trys to instead of rockchip_mbox_chan.idx.
-> - Let's enable/disable the interrupt in startup/shutdown.
-> - Move the share memory and tx buf into the client drivers.
-> 
->  drivers/mailbox/Kconfig            |   9 ++
->  drivers/mailbox/Makefile           |   2 +
->  drivers/mailbox/rockchip-mailbox.c | 286
-> +++++++++++++++++++++++++++++++++++++ 3 files changed, 297 insertions(+)
->  create mode 100644 drivers/mailbox/rockchip-mailbox.c
-> 
-> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-> index bbec500..8b8d46e 100644
-> --- a/drivers/mailbox/Kconfig
-> +++ b/drivers/mailbox/Kconfig
-> @@ -43,6 +43,15 @@ config OMAP_MBOX_KFIFO_SIZE
->  	  This can also be changed at runtime (via the mbox_kfifo_size
->  	  module parameter).
-> 
-> +config ROCKCHIP_MBOX
-> +	bool "Rockchip Soc Intergrated Mailbox Support"
-> +	depends on ARCH_ROCKCHIP || COMPILE_TEST
-> +	help
-> +	  This driver provides support for inter-processor communication
-> +	  between CPU cores and MCU processor on Some Rockchip SOCs.
-> +	  Please check it that the Soc you use have Mailbox hardware.
-> +	  Say Y here if you want to use the Rockchip Mailbox support.
-> +
->  config PCC
->  	bool "Platform Communication Channel Driver"
->  	depends on ACPI
-> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-> index 8e6d822..730cb5d 100644
-> --- a/drivers/mailbox/Makefile
-> +++ b/drivers/mailbox/Makefile
-> @@ -8,6 +8,8 @@ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
-> 
->  obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
-> 
-> +obj-$(CONFIG_ROCKCHIP_MBOX)	+= rockchip-mailbox.o
-> +
->  obj-$(CONFIG_PCC)		+= pcc.o
-> 
->  obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
-> diff --git a/drivers/mailbox/rockchip-mailbox.c
-> b/drivers/mailbox/rockchip-mailbox.c new file mode 100644
-> index 0000000..5ccdc6b
-> --- /dev/null
-> +++ b/drivers/mailbox/rockchip-mailbox.c
-> @@ -0,0 +1,286 @@
-> +/*
-> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-> for + * more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mailbox_controller.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define MAILBOX_A2B_INTEN		0x00
-> +#define MAILBOX_A2B_STATUS		0x04
-> +#define MAILBOX_A2B_CMD(x)		(0x08 + (x) * 8)
-> +#define MAILBOX_A2B_DAT(x)		(0x0c + (x) * 8)
-> +
-> +#define MAILBOX_B2A_INTEN		0x28
-> +#define MAILBOX_B2A_STATUS		0x2C
-> +#define MAILBOX_B2A_CMD(x)		(0x30 + (x) * 8)
-> +#define MAILBOX_B2A_DAT(x)		(0x34 + (x) * 8)
-> +
-> +struct rockchip_mbox_msg {
-> +	u32 cmd;
-> +	int rx_size;
-> +};
-> +
-> +struct rockchip_mbox_data {
-> +	int num_chans;
-> +};
-> +
-> +struct rockchip_mbox_chan {
-> +	int idx;
-> +	int irq;
-> +	struct rockchip_mbox_msg *msg;
-> +	struct rockchip_mbox *mb;
-> +};
-> +
-> +struct rockchip_mbox {
-> +	struct mbox_controller mbox;
-> +	struct clk *pclk;
-> +	void __iomem *mbox_base;
-> +
-> +	/* The base address of share memory to transfer data */
-> +	void __iomem *buf_base;
-> +
-> +	/* The maximum size of buf for each channel */
-> +	u32 buf_size;
-> +
-> +	struct rockchip_mbox_chan *chans;
-> +};
-> +
-> +static int rockchip_mbox_send_data(struct mbox_chan *chan, void *data)
-> +{
-> +	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
-> +	struct rockchip_mbox_msg *msg = data;
-> +	struct rockchip_mbox_chan *chans = mb->chans;
-> +
-> +	if (!msg)
-> +		return -EINVAL;
-> +
-> +	if (msg->rx_size > mb->buf_size) {
-> +		dev_err(mb->mbox.dev, "Transmit size over buf size(%d)\n",
-> +			mb->buf_size);
-> +		return -EINVAL;
-> +	}
-> +
-> +	dev_dbg(mb->mbox.dev, "Chan[%d]: A2B message, cmd 0x%08x\n",
-> +		chans->idx, msg->cmd);
-> +
-> +	mb->chans[chans->idx].msg = msg;
-> +
-> +	writel_relaxed(msg->cmd, mb->mbox_base + MAILBOX_A2B_CMD(chans->idx));
-> +	writel_relaxed(msg->rx_size, mb->mbox_base +
-> +		       MAILBOX_A2B_DAT(chans->idx));
-> +
-> +	return 0;
-> +}
-> +
-> +static int rockchip_mbox_startup(struct mbox_chan *chan)
-> +{
-> +	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
-> +
-> +	/* Enable all B2A interrupts */
-> +	writel_relaxed((1 << mb->mbox.num_chans) - 1,
-> +		       mb->mbox_base + MAILBOX_B2A_INTEN);
-> +
-> +	return 0;
-> +}
-> +
-> +static void rockchip_mbox_shutdown(struct mbox_chan *chan)
-> +{
-> +	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
-> +	struct rockchip_mbox_chan *chans = mb->chans;
-> +
-> +	/* Disable all B2A interrupts */
-> +	writel_relaxed(0, mb->mbox_base + MAILBOX_B2A_INTEN);
-> +
-> +	mb->chans[chans->idx].msg = NULL;
-> +}
-> +
-> +static const struct mbox_chan_ops rockchip_mbox_chan_ops = {
-> +	.send_data	= rockchip_mbox_send_data,
-> +	.startup	= rockchip_mbox_startup,
-> +	.shutdown	= rockchip_mbox_shutdown,
-> +};
-> +
-> +static irqreturn_t rockchip_mbox_irq(int irq, void *dev_id)
-> +{
-> +	int idx;
-> +	struct rockchip_mbox *mb = (struct rockchip_mbox *)dev_id;
-> +	u32 status = readl_relaxed(mb->mbox_base + MAILBOX_B2A_STATUS);
-> +
-> +	for (idx = 0; idx < mb->mbox.num_chans; idx++) {
-> +		if ((status & (1 << idx)) && (irq == mb->chans[idx].irq)) {
-> +			/* Clear mbox interrupt */
-> +			writel_relaxed(1 << idx,
-> +				       mb->mbox_base + MAILBOX_B2A_STATUS);
-> +			return IRQ_WAKE_THREAD;
-> +		}
-> +	}
-> +
-> +	return IRQ_NONE;
-> +}
-> +
-> +static irqreturn_t rockchip_mbox_isr(int irq, void *dev_id)
-> +{
-> +	int idx;
-> +	struct rockchip_mbox_msg *msg = NULL;
-> +	struct rockchip_mbox *mb = (struct rockchip_mbox *)dev_id;
-> +
-> +	for (idx = 0; idx < mb->mbox.num_chans; idx++) {
-> +		if (irq != mb->chans[idx].irq)
-> +			continue;
-> +
-> +		msg = mb->chans[idx].msg;
-> +		if (!msg) {
-> +			dev_err(mb->mbox.dev,
-> +				"Chan[%d]: B2A message is NULL\n", idx);
-> +			break; /* spurious */
-> +		}
-> +
-> +		mbox_chan_received_data(&mb->mbox.chans[idx], msg);
-> +		mb->chans[idx].msg = NULL;
-> +
-> +		dev_dbg(mb->mbox.dev, "Chan[%d]: B2A message, cmd 0x%08x\n",
-> +			idx, msg->cmd);
-> +
-> +		break;
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static const struct rockchip_mbox_data rk3368_drv_data = {
-> +	.num_chans = 4,
-> +};
-> +
-> +static const struct of_device_id rockchip_mbox_of_match[] = {
-> +	{ .compatible = "rockchip,rk3368-mailbox", .data = &rk3368_drv_data},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, rockchp_mbox_of_match);
-> +
-> +static int rockchip_mbox_probe(struct platform_device *pdev)
-> +{
-> +	struct rockchip_mbox *mb;
-> +	const struct of_device_id *match;
-> +	const struct rockchip_mbox_data *drv_data;
-> +	struct resource *res;
-> +	int ret, irq, i;
-> +
-> +	if (!pdev->dev.of_node)
-> +		return -ENODEV;
-> +
-> +	match = of_match_node(rockchip_mbox_of_match, pdev->dev.of_node);
-> +	drv_data = (const struct rockchip_mbox_data *)match->data;
-> +
-> +	mb = devm_kzalloc(&pdev->dev, sizeof(*mb), GFP_KERNEL);
-> +	if (!mb)
-> +		return -ENOMEM;
-> +
-> +	mb->chans = devm_kcalloc(&pdev->dev, drv_data->num_chans,
-> +				 sizeof(*mb->chans), GFP_KERNEL);
-> +	if (!mb->chans)
-> +		return -ENOMEM;
-> +
-> +	mb->mbox.chans = devm_kcalloc(&pdev->dev, drv_data->num_chans,
-> +				      sizeof(*mb->mbox.chans), GFP_KERNEL);
-> +	if (!mb->mbox.chans)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, mb);
-> +
-> +	mb->mbox.dev = &pdev->dev;
-> +	mb->mbox.num_chans = drv_data->num_chans;
-> +	mb->mbox.ops = &rockchip_mbox_chan_ops;
-> +	mb->mbox.txdone_irq = true;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-> +
-> +	mb->mbox_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(mb->mbox_base))
-> +		return PTR_ERR(mb->mbox_base);
-> +
-> +	/* Each channel has two buffers for A2B and B2A */
-> +	mb->buf_size = resource_size(res) / (drv_data->num_chans * 2);
-> +
-> +	mb->pclk = devm_clk_get(&pdev->dev, "pclk_mailbox");
-> +	if (IS_ERR(mb->pclk)) {
-> +		ret = PTR_ERR(mb->pclk);
-> +		dev_err(&pdev->dev, "failed to get pclk_mailbox clock: %d\n",
-> +			ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(mb->pclk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable pclk: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	for (i = 0; i < mb->mbox.num_chans; i++) {
-> +		irq = platform_get_irq(pdev, i);
-> +		if (irq < 0)
-> +			return irq;
-> +
-> +		ret = devm_request_threaded_irq(&pdev->dev, irq,
-> +						rockchip_mbox_irq,
-> +						rockchip_mbox_isr, IRQF_ONESHOT,
-> +						dev_name(&pdev->dev), mb);
-> +		if (ret < 0)
-> +			return ret;
-> +
-> +		mb->chans[i].idx = i;
-> +		mb->chans[i].irq = irq;
-> +		mb->chans[i].mb = mb;
-> +		mb->chans[i].msg = NULL;
-> +	}
-> +
-> +	ret = mbox_controller_register(&mb->mbox);
-> +	if (ret < 0)
-> +		dev_err(&pdev->dev, "Failed to register mailbox: %d\n", ret);
-> +
-> +	return ret;
-> +}
-> +
-> +static int rockchip_mbox_remove(struct platform_device *pdev)
-> +{
-> +	struct rockchip_mbox *mb = platform_get_drvdata(pdev);
-> +
-> +	if (!mb)
-> +		return -EINVAL;
-> +
-> +	mbox_controller_unregister(&mb->mbox);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver rockchip_mbox_driver = {
-> +	.probe	= rockchip_mbox_probe,
-> +	.remove	= rockchip_mbox_remove,
-> +	.driver = {
-> +		.name = "rockchip-mailbox",
-> +		.of_match_table = of_match_ptr(rockchip_mbox_of_match),
-> +	},
-> +};
-> +
-> +module_platform_driver(rockchip_mbox_driver);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("Rockchip mailbox: communicate between CPU cores and
-> MCU"); +MODULE_AUTHOR("Addy Ke <addy.ke@rock-chips.com>");
-> +MODULE_AUTHOR("Caesar Wang <wxt@rock-chips.com>");
+-Doug
