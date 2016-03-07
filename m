@@ -1,33 +1,45 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Mar 2016 17:21:30 +0100
-Subject: [PATCH 11/16] mtd: nand: sunxi: fix NFC_CTL setting
+Date: Mon,  7 Mar 2016 17:21:33 +0100
+Subject: [PATCH 14/16] mtd: nand: sunxi: fix ->dev_ready() implementation
 In-Reply-To: <1457367695-26420-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
  <1457367695-26420-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457367695-26420-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457367695-26420-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NFC_PAGE_SHIFT() already takes the real page_shift value and subtract 10
-to it.
+->dev_ready() is not supposed to wait for busy to ready solution (this is
+the role of ->waitfunc()).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mtd/nand/sunxi_nand.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
 diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index c1ab33a..22d4d55 100644
+index 9816cda..79c90fd 100644
 --- a/drivers/mtd/nand/sunxi_nand.c
 +++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -411,7 +411,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
- 		sel = &sunxi_nand->sels[chip];
+@@ -358,7 +358,6 @@ static int sunxi_nfc_dev_ready(struct mtd_info *mtd)
+ 	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+ 	struct sunxi_nand_rb *rb;
+-	unsigned long timeo = (sunxi_nand->nand.state == FL_ERASING ? 400 : 20);
+ 	int ret;
  
- 		ctl |= NFC_CE_SEL(sel->cs) | NFC_EN |
--		       NFC_PAGE_SHIFT(nand->page_shift - 10);
-+		       NFC_PAGE_SHIFT(nand->page_shift);
- 		if (sel->rb.type == RB_NONE) {
- 			nand->dev_ready = NULL;
- 		} else {
+ 	if (sunxi_nand->selected < 0)
+@@ -370,12 +369,6 @@ static int sunxi_nfc_dev_ready(struct mtd_info *mtd)
+ 	case RB_NATIVE:
+ 		ret = !!(readl(nfc->regs + NFC_REG_ST) &
+ 			 NFC_RB_STATE(rb->info.nativeid));
+-		if (ret)
+-			break;
+-
+-		sunxi_nfc_wait_int(nfc, NFC_RB_B2R, timeo);
+-		ret = !!(readl(nfc->regs + NFC_REG_ST) &
+-			 NFC_RB_STATE(rb->info.nativeid));
+ 		break;
+ 	case RB_GPIO:
+ 		ret = gpio_get_value(rb->info.gpio);
 -- 
 2.1.4
