@@ -1,51 +1,44 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Mar 2016 09:33:27 +0000
-Subject: [PATCH v3 05/12] KVM: arm/arm64: vgic-v2: Reset LRs at boot time
+Date: Mon,  7 Mar 2016 09:33:32 +0000
+Subject: [PATCH v3 10/12] arm64: KVM: vgic-v3: Do not save an LR known to be
+ empty
 In-Reply-To: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
 References: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1457343214-19547-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1457343214-19547-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to let make the GICv2 code more lazy in the way it
-accesses the LRs, it is necessary to start with a clean slate.
+On exit, any empty LR will be signaled in ICH_ELRSR_EL2. Which
+means that we do not have to save it, and we can just clear
+its state in the in-memory copy.
 
-Let's reset the LRs on each CPU when the vgic is probed.
-
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic-v2.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index ff02f08..67ec334 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -176,6 +176,15 @@ static const struct vgic_ops vgic_v2_ops = {
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 61a5e46..0db426e 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -187,8 +187,15 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 		save_maint_int_state(vcpu, max_lr_idx + 1);
  
- static struct vgic_params vgic_v2_params;
+ 		for (i = 0; i <= max_lr_idx; i++) {
+-			if (vcpu->arch.vgic_cpu.live_lrs & (1UL << i))
+-				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
++			if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
++				continue;
++
++			if (cpu_if->vgic_elrsr & (1 << i)) {
++				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
++				continue;
++			}
++
++			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
+ 		}
  
-+static void vgic_cpu_init_lrs(void *params)
-+{
-+	struct vgic_params *vgic = params;
-+	int i;
-+
-+	for (i = 0; i < vgic->nr_lr; i++)
-+		writel_relaxed(0, vgic->vctrl_base + GICH_LR0 + (i * 4));
-+}
-+
- /**
-  * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-@@ -257,6 +266,9 @@ int vgic_v2_probe(struct device_node *vgic_node,
- 
- 	vgic->type = VGIC_V2;
- 	vgic->max_gic_vcpus = VGIC_V2_MAX_CPUS;
-+
-+	on_each_cpu(vgic_cpu_init_lrs, vgic, 1);
-+
- 	*ops = &vgic_v2_ops;
- 	*params = vgic;
- 	goto out;
+ 		switch (nr_pri_bits) {
 -- 
 2.1.4
