@@ -1,70 +1,61 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 8 Mar 2016 18:31:59 +0700
-Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <20160215152751.GT19432@atomide.com>
+Date: Tue, 8 Mar 2016 18:32:10 +0700
+Subject: [PATCH 1/3] pinctrl: single: Use a separate lockdep class
+In-Reply-To: <1454351299-27440-2-git-send-email-sudeep.holla@arm.com>
 References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
- <CACRpkdYzJ9Hy0sH6gK6RzpLE6juS4WfPjbt7nh43vR9YTuGZWA@mail.gmail.com>
- <56C1A1FE.3080403@arm.com> <20160215152751.GT19432@atomide.com>
-Message-ID: <56DEB82F.5050703@ti.com>
+ <1454351299-27440-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <56DEB83A.9070901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2016 10:27 PM, Tony Lindgren wrote:
-> * Sudeep Holla <sudeep.holla@arm.com> [160215 02:03]:
->> Hi Linus,
->>
->> On 13/02/16 14:42, Linus Walleij wrote:
->>> On Mon, Feb 1, 2016 at 7:28 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>>>    pinctrl: single: Use a separate lockdep class
->>>>    pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
->>>>    ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
->>>>
->>>>   arch/arm/mach-omap2/mux.c        |  4 ++--
->>>>   arch/arm/mach-omap2/pm34xx.c     |  9 ++++-----
->>>>   arch/arm/mach-omap2/prm_common.c |  1 +
->>>>   drivers/pinctrl/pinctrl-single.c | 15 ++++++++++++---
->>>
->>> Are these patches orthogonal so I can merge the pinctrl patch independently
->>> of the OMAP patches if Tony ACKs this?
->>>
->>
->> Thanks for the follow up.
->> IIUC they are dependent and remember Tony/Grygorii wanted them to be
->> merged together(at-least for bisectibility)
+On 02/02/2016 01:28 AM, Sudeep Holla wrote:
+> The single pinmux controller can be cascaded to the other interrupt
+> controllers. Hence when propagating wake-up settings to its parent
+> interrupt controller, there's possiblity of detecting possible recursive
+> locking and getting lockdep warning.
 > 
-> AFAIK this series needs to be kept together to keep things
-> working.
+> This patch avoids this false positive by using a separate lockdep class
+> for this single pinctrl interrupts.
 > 
->>> If not: should it be merged by me or through ARM SoC/Tony?
->>>
->>
->> I think so.
->>
->>> Anyways waiting for maintainer feedback, but the above is good to know.
->>>
->>
->> Grygorii was still not sure if this works and he couldn't give it a
->> test. He was traveling and may need more time to get back on this.
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-gpio at vger.kernel.org
+> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>   drivers/pinctrl/pinctrl-single.c | 8 ++++++++
+>   1 file changed, 8 insertions(+)
 > 
-> He said it does not work so clearly more work is needed.
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index d24e5f1d1525..fb126d56ad40 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -255,6 +255,13 @@ static enum pin_config_param pcs_bias[] = {
+>   };
+>   
+>   /*
+> + * This lock class tells lockdep that irqchip core that this single
+> + * pinctrl can be in a different category than its parents, so it won't
+> + * report false recursion.
+> + */
+> +static struct lock_class_key pcs_lock_class;
+> +
+> +/*
+>    * REVISIT: Reads and writes could eventually use regmap or something
+>    * generic. But at least on omaps, some mux registers are performance
+>    * critical as they may need to be remuxed every time before and after
+> @@ -1713,6 +1720,7 @@ static int pcs_irqdomain_map(struct irq_domain *d, unsigned int irq,
+>   	irq_set_chip_data(irq, pcs_soc);
+>   	irq_set_chip_and_handler(irq, &pcs->chip,
+>   				 handle_level_irq);
+> +	irq_set_lockdep_class(irq, &pcs_lock_class);
+>   	irq_set_noprobe(irq);
+>   
+>   	return 0;
 > 
 
-Yeah. As I mentioned before patches 2/3 will not work.
-I've tried to test suspend with diff I posted [1], but I did it only on 
-dra7 and am43 where suspend i more simple than on omap3. Also, I worry
-that with such approach some irq can be missed (especially edge ones), 
-because PRCM irqs will be re-enabled at very late resume stage 
-(right before thaw).
-
-Second option, I see, is to rework PRCM to be threaded IRQ, but in this case
-all children IRQs will need to be threaded/nested threaded
-(including PCS, legacy OMAP mux, OMAP3 _prcm_int_handle_wakeup/_prcm_int_handle_io).
-
-Are there any objection to convert PCS to threaded IRQ, for example? ;)
- 
-
-[1] https://patchwork.ozlabs.org/patch/578915/
+I have no objection to this patch and it's independent from other patches in
+this series.
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>  
 
 -- 
 regards,
