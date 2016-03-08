@@ -1,43 +1,50 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 8 Mar 2016 21:57:43 +0800
-Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
-In-Reply-To: <20160304115752.GA13894@e104805>
-References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
- <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
- <20160303162942.GA2445@localhost.localdomain>
- <20160304030349.GA11012@leoy-linaro>
- <20160304115752.GA13894@e104805>
-Message-ID: <20160308135743.GC4921@leoy-linaro>
+From: phil@nwl.cc (Phil Sutter)
+Date: Tue, 8 Mar 2016 15:04:12 +0100
+Subject: Broken PCIe on Synology DS414
+In-Reply-To: <20160308144524.5f47c217@free-electrons.com>
+References: <20160305143445.827496739A@mail.nwl.cc>
+ <20160308144524.5f47c217@free-electrons.com>
+Message-ID: <20160308140412.GD6517@orbyte.nwl.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+Hi Thomas,
 
-On Fri, Mar 04, 2016 at 11:57:53AM +0000, Javi Merino wrote:
-> On Fri, Mar 04, 2016 at 11:03:49AM +0800, Leo Yan wrote:
-> > On Thu, Mar 03, 2016 at 08:29:44AM -0800, Eduardo Valentin wrote:
-> > > On Fri, Feb 26, 2016 at 11:43:43AM +0800, Leo Yan wrote:
+On Tue, Mar 08, 2016 at 02:45:24PM +0100, Thomas Petazzoni wrote:
+> Thanks for reporting the issue. There is indeed an issue with the
+> crypto SRAM region overlapping with the PCIe aperture. However, this
+> does not prevent 'lspci' from enumerating the device.
 
-[...]
+OK, that's strange then. As said, I don't see an error message when
+crypto SRAM regions are present in DT. It's just that the kernel does
+not see any PCI devices (therefore no messages from the drivers, either)
+and lspci shows no output. I would expect to see at least the PCI
+bridge?!
 
-> > > > The property "hysteresis" is mandatory for trip points, so if without
-> > > > it the thermal zone cannot register successfully. But "hysteresis" is
-> > > > ignored in the thermal subsystem and only inquired by several thermal
-> > > > sensor drivers.
-> > > 
-> > > If the Linux thermal subsystem has a problem with handling hysteresis, I
-> > > would rather fix Linux code than relaxing the DT binding. Or if you
-> > > still believe hysteresis is really optional, I would prefer to see a
-> > > better justification than "Linux ignores it".
-> 
-> I see it the other way round, Is hysteresis a property that, without
-> it, the thermal code can't configure itself so it fails to create the
-> trip point?  The current code goes "There is no hysteresis for this
-> property, I don't know how to set up this trip point!".  I think we
-> can do better than this.
+Sadly, I can't change the PCI device configuration, as the two devices
+are built-in (didn't disassemble the box yet). Installed are a Marvell
+SATA controller and some XHCI controller (don't remember the
+manufacturer, but it's handled by generic xhci-pci driver).
 
-Do you agree with Javi's suggestion? If you think it's okay, I will
-move on to send out a new version patch based on Javi's comments.
+Indeed the situation is resolved by removing the crypto SRAM range
+definitions - of course, the kernel complains about not being able to
+register the crypto engine driver, but the PCI devices appear and the
+HDD is found (so they seem to be functional, too).
 
-Thanks,
-Leo Yan
+Maybe all this is a configuration issue? Can you possibly send me your
+kernel .config so I can compare?
+
+Could this be affected by U-Boot? I use mainline U-Boot which just
+recently accepted my board support patches. I tried to add the crypto
+SRAM ranges to U-Boot's DTS file also, but that alone did not help.
+But this reminds me to test mainline kernel again with proprietary
+U-Boot, which luckily is still present in flash. I'll get back once I
+did.
+
+> I'll cook and send a patch to fix the crypto SRAM ranges nonetheless.
+
+I'm happy to test, just let me know.
+
+Thanks for your help!
+
+Phil
