@@ -1,54 +1,73 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 8 Mar 2016 16:48:16 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56DD7B20.1020508@suse.cz>
-References: <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com>
- <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE>
- <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE>
- <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE>
- <56DD7B20.1020508@suse.cz>
-Message-ID: <20160308074816.GA31471@js1304-P5Q-DELUXE>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 8 Mar 2016 08:51:31 +0100
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160308025547.GI11154@localhost>
+References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160307145429.GG11154@localhost>
+ <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
+Message-ID: <20160308075131.GE8418@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 01:59:12PM +0100, Vlastimil Babka wrote:
-> On 03/07/2016 05:34 AM, Joonsoo Kim wrote:
-> >On Fri, Mar 04, 2016 at 03:35:26PM +0800, Hanjun Guo wrote:
-> >>>Sad to hear that.
-> >>>
-> >>>Could you tell me your system's MAX_ORDER and pageblock_order?
-> >>>
-> >>
-> >>MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
+On Tue, Mar 08, 2016 at 08:25:47AM +0530, Vinod Koul wrote:
+> On Mon, Mar 07, 2016 at 09:30:24PM +0100, Maxime Ripard wrote:
+> > On Mon, Mar 07, 2016 at 04:08:57PM +0100, Boris Brezillon wrote:
+> > > Hi Vinod,
+> > > 
+> > > On Mon, 7 Mar 2016 20:24:29 +0530
+> > > Vinod Koul <vinod.koul@intel.com> wrote:
+> > > 
+> > > > On Mon, Mar 07, 2016 at 10:59:31AM +0100, Boris Brezillon wrote:
+> > > > > +/* Dedicated DMA parameter register layout */
+> > > > > +#define SUN4I_DDMA_PARA_DST_DATA_BLK_SIZE(n)	(((n) - 1) << 24)
+> > > > > +#define SUN4I_DDMA_PARA_DST_WAIT_CYCLES(n)	(((n) - 1) << 16)
+> > > > > +#define SUN4I_DDMA_PARA_SRC_DATA_BLK_SIZE(n)	(((n) - 1) << 8)
+> > > > > +#define SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(n)	(((n) - 1) << 0)
+> > > > > +
+> > > > > +/**
+> > > > > + * struct sun4i_dma_chan_config - DMA channel config
+> > > > > + *
+> > > > > + * @para: contains information about block size and time before checking
+> > > > > + *	  DRQ line. This is device specific and only applicable to dedicated
+> > > > > + *	  DMA channels
+> > > > 
+> > > > What information, can you elobrate.. And why can't you use existing
+> > > > dma_slave_config for this?
+> > > 
+> > > Block size is related to the device FIFO size. I guess it allows the
+> > > DMA channel to launch a transfer of X bytes without having to check the
+> > > DRQ line (the line telling the DMA engine it can transfer more data
+> > > to/from the device). The wait cycles information is apparently related
+> > > to the number of clks the engine should wait before polling/checking
+> > > the DRQ line status between each block transfer. I'm not sure what it
+> > > saves to put WAIT_CYCLES() to something != 1, but in their BSP,
+> > > Allwinner tweak that depending on the device.
 > 
-> I thought that CMA regions/operations (and isolation IIRC?) were
-> supposed to be MAX_ORDER aligned exactly to prevent needing these
-> extra checks for buddy merging. So what's wrong?
+> we already have block size aka src/dst_maxburst, why not use that one.
 
-CMA isolates MAX_ORDER aligned blocks, but, during the process,
-partialy isolated block exists. If MAX_ORDER is 11 and
-pageblock_order is 9, two pageblocks make up MAX_ORDER
-aligned block and I can think following scenario because pageblock
-(un)isolation would be done one by one.
+I'm not sure it's really the same thing. The DMA controller also has a
+burst parameter, that is either 1 byte or 8 bytes, and ends up being
+different from this one.
 
-(each character means one pageblock. 'C', 'I' means MIGRATE_CMA,
-MIGRATE_ISOLATE, respectively.
+> Why does dmaengine need to wait? Can you explain that
 
-CC -> IC -> II (Isolation)
-II -> CI -> CC (Un-isolation)
+We have no idea, we thought you might have one :)
 
-If some pages are freed at this intermediate state such as IC or CI,
-that page could be merged to the other page that is resident on
-different type of pageblock and it will cause wrong freepage count.
+It doesn't really makes sense to us, but it does have a significant
+impact on the throughput.
 
-If we don't release zone lock during whole isolation process, there
-would be no problem and CMA can use that implementation. But,
-isolation is used by another feature and I guess it cannot use that
-kind of implementation.
+Maxime
 
-Thanks.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160308/9d09487f/attachment.sig>
