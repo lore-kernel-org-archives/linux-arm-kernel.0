@@ -1,130 +1,47 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  8 Mar 2016 09:26:14 -0300
-Subject: [PATCH 3/3] ARM: dts: imx6sx-sdb: Add SAI support
-In-Reply-To: <1457439974-1149-1-git-send-email-festevam@gmail.com>
-References: <1457439974-1149-1-git-send-email-festevam@gmail.com>
-Message-ID: <1457439974-1149-3-git-send-email-festevam@gmail.com>
+Date: Tue,  8 Mar 2016 09:33:39 -0300
+Subject: [PATCH] clk: imx6sx: Register SAI clocks as shared clocks
+Message-ID: <1457440419-5494-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Introduce imx6sx-sdb-sai.dts so that it is possible to use SAI
-interface. 
+SAIx and SAIx_IPG share the same bit fields in the CCM registers, so
+we should better register them via imx_clk_gate2_shared(). 
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb-sai.dts | 67 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sx-sdb.dtsi    | 16 +++++++++
- 2 files changed, 83 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6sx-sdb-sai.dts
+ drivers/clk/imx/clk-imx6sx.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb-sai.dts b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
-new file mode 100644
-index 0000000..0155450
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
-@@ -0,0 +1,67 @@
-+/*
-+ * Copyright (C) 2016 NXP Semiconductors
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "imx6sx-sdb.dts"
-+
-+/ {
-+	sound {
-+		audio-cpu = <&sai1>;
-+	};
-+};
-+
-+&audmux {
-+	/* pin conflict with sai */
-+	status = "disabled";
-+};
-+
-+&sai1 {
-+	status = "okay";
-+};
-+
-+&sdma {
-+	gpr = <&gpr>;
-+	/* SDMA event remap for SAI1 */
-+	fsl,sdma-event-remap = <0 15 1>, <0 16 1>;
-+};
-+
-+&ssi2 {
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index f1d3730..9f7a71e 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -254,6 +254,12 @@
- 	status = "okay";
- };
+diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
+index fea125e..97e742a 100644
+--- a/drivers/clk/imx/clk-imx6sx.c
++++ b/drivers/clk/imx/clk-imx6sx.c
+@@ -134,6 +134,8 @@ static u32 share_count_esai;
+ static u32 share_count_ssi1;
+ static u32 share_count_ssi2;
+ static u32 share_count_ssi3;
++static u32 share_count_sai1;
++static u32 share_count_sai2;
  
-+&sai1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai1>;
-+	status = "disabled";
-+};
-+
- &ssi2 {
- 	status = "okay";
- };
-@@ -468,6 +474,16 @@
- 			>;
- 		};
+ static struct clk ** const uart_clks[] __initconst = {
+ 	&clks[IMX6SX_CLK_UART_IPG],
+@@ -469,10 +471,10 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SX_CLK_SSI3]         = imx_clk_gate2_shared("ssi3",          "ssi3_podf",  base + 0x7c, 22, &share_count_ssi3);
+ 	clks[IMX6SX_CLK_UART_IPG]     = imx_clk_gate2("uart_ipg",      "ipg",               base + 0x7c, 24);
+ 	clks[IMX6SX_CLK_UART_SERIAL]  = imx_clk_gate2("uart_serial",   "uart_podf",         base + 0x7c, 26);
+-	clks[IMX6SX_CLK_SAI1_IPG]     = imx_clk_gate2("sai1_ipg",      "ipg",               base + 0x7c, 28);
+-	clks[IMX6SX_CLK_SAI2_IPG]     = imx_clk_gate2("sai2_ipg",      "ipg",               base + 0x7c, 30);
+-	clks[IMX6SX_CLK_SAI1]         = imx_clk_gate2("sai1",          "ssi1_podf",         base + 0x7c, 28);
+-	clks[IMX6SX_CLK_SAI2]         = imx_clk_gate2("sai2",          "ssi2_podf",         base + 0x7c, 30);
++	clks[IMX6SX_CLK_SAI1_IPG]     = imx_clk_gate2_shared("sai1_ipg", "ipg",             base + 0x7c, 28, &share_count_sai1);
++	clks[IMX6SX_CLK_SAI2_IPG]     = imx_clk_gate2_shared("sai2_ipg", "ipg",             base + 0x7c, 30, &share_count_sai2);
++	clks[IMX6SX_CLK_SAI1]         = imx_clk_gate2_shared("sai1",	"ssi1_podf",        base + 0x7c, 28, &share_count_sai1);
++	clks[IMX6SX_CLK_SAI2]         = imx_clk_gate2_shared("sai2",	"ssi2_podf",        base + 0x7c, 30, &share_count_sai2);
  
-+		pinctrl_sai1: sai1grp {
-+			fsl,pins = <
-+				MX6SX_PAD_CSI_DATA00__SAI1_TX_BCLK	0x130b0
-+				MX6SX_PAD_CSI_DATA01__SAI1_TX_SYNC	0x130b0
-+				MX6SX_PAD_CSI_HSYNC__SAI1_TX_DATA_0	0x120b0
-+				MX6SX_PAD_CSI_VSYNC__SAI1_RX_DATA_0	0x130b0
-+				MX6SX_PAD_CSI_PIXCLK__AUDMUX_MCLK	0x130b0
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
+ 	/* CCGR6 */
+ 	clks[IMX6SX_CLK_USBOH3]       = imx_clk_gate2("usboh3",        "ipg",               base + 0x80, 0);
 -- 
 1.9.1
