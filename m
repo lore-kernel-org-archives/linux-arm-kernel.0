@@ -1,54 +1,45 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 8 Mar 2016 08:50:22 -0600
-Subject: [PATCHv2 11/11] ARM: dts: Add Altera Arria10 L2 Cache EDAC
- devicetree entry
-In-Reply-To: <1457379787-8327-12-git-send-email-tthayer@opensource.altera.com>
-References: <1457379787-8327-1-git-send-email-tthayer@opensource.altera.com>
- <1457379787-8327-12-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <56DEE6AE.100@opensource.altera.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 8 Mar 2016 15:58:03 +0100
+Subject: [PATCH 02/16] mtd: nand: sunxi: fix clk rate calculation
+In-Reply-To: <1457367513-26069-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1457367513-26069-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160308155803.1b0263eb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Boris,
 
-
-On 03/07/2016 01:43 PM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Mon,  7 Mar 2016 17:18:19 +0100, Boris Brezillon wrote:
+> Unlike what is specified in the Allwinner datasheets, the NAND clock rate
+> is not equal to 2/T but 1/T. Fix the clock rate selection accordingly.
 > 
-> Add the device tree entries needed to support the Altera L2
-> cache EDAC on the Arria10 chip.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> v2 Match register value (l2-ecc at ffd06010)
-> ---
->  arch/arm/boot/dts/socfpga_arria10.dtsi |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  drivers/mtd/nand/sunxi_nand.c | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-> index cce9e50..44aeb3f 100644
-> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-> @@ -599,6 +599,20 @@
->  			reg = <0xffe00000 0x40000>;
->  		};
+> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> index 4d01e65..ab66d8d 100644
+> --- a/drivers/mtd/nand/sunxi_nand.c
+> +++ b/drivers/mtd/nand/sunxi_nand.c
+> @@ -1208,13 +1208,7 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+>  	/* Convert min_clk_period from picoseconds to nanoseconds */
+>  	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
 >  
-> +		eccmgr: eccmgr at ffd06090 {
-> +			compatible = "altr,socfpga-ecc-manager";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			l2-ecc at ffd06010 {
-> +				compatible = "altr,socfpga-a10-l2-ecc";
-> +				reg = <0xffd06010 0x4>;
-> +				interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <0 0 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +		};
-> +
+> -	/*
+> -	 * Convert min_clk_period into a clk frequency, then get the
+> -	 * appropriate rate for the NAND controller IP given this formula
+> -	 * (specified in the datasheet):
+> -	 * nand clk_rate = 2 * min_clk_rate
+> -	 */
 
-Just checking if these addresses are correct. The eccmgr is at
-0xffd06090, but the l2-ecc is at 0xffd06010? I would have thought from
-the placement the l2-ecc address would be inside the eccmgr's address?
+When some HW works in a way that is *NOT* the one specified in the
+datasheet, I think you should rather add *more* comments about this
+aspect, rather than removing existing comments.
 
-Dinh
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
