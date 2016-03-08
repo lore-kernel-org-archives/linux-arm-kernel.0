@@ -1,76 +1,81 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Tue, 8 Mar 2016 11:24:00 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <CAG374jBLD5YuBT=r3V98OqdUTXMepvQ_tLz4XMJdQMzzGYi22A@mail.gmail.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
- <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
- <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
- <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
- <56DDB749.1020808@suse.de>
- <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
- <CAG374jBLD5YuBT=r3V98OqdUTXMepvQ_tLz4XMJdQMzzGYi22A@mail.gmail.com>
-Message-ID: <56DEA840.1050305@st.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Tue,  8 Mar 2016 11:29:56 +0100
+Subject: [PATCH V5 3/4] net-next: mediatek: add Kconfig and Makefile
+In-Reply-To: <1457432997-25526-1-git-send-email-blogic@openwrt.org>
+References: <1457432997-25526-1-git-send-email-blogic@openwrt.org>
+Message-ID: <1457432997-25526-4-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/8/2016 11:03 AM, Gabriel Fernandez wrote:
-> Hi Andreas and Dinh  Thanks for your feedback i will check it.
+This patch adds the Makefile and Kconfig required to make the driver build.
 
-hmm, I was looking at the code and indeed I have some doubt on
-mdio_bus_data management that the patch changes explaining
-why the Andreas's box fails and phy_add is not detected.
+Signed-off-by: John Crispin <blogic@openwrt.org>
+---
+ drivers/net/ethernet/Kconfig           |    1 +
+ drivers/net/ethernet/Makefile          |    1 +
+ drivers/net/ethernet/mediatek/Kconfig  |   17 +++++++++++++++++
+ drivers/net/ethernet/mediatek/Makefile |    5 +++++
+ 4 files changed, 24 insertions(+)
+ create mode 100644 drivers/net/ethernet/mediatek/Kconfig
+ create mode 100644 drivers/net/ethernet/mediatek/Makefile
 
-Keep the sync
-
-peppe
-
-
-> Best regards
->
-> Gabriel
->
-> On 8 March 2016 at 00:22, Dinh Nguyen <dinh.linux@gmail.com> wrote:
->> On Mon, Mar 7, 2016 at 11:15 AM, Andreas F?rber <afaerber@suse.de> wrote:
->>> Am 07.03.2016 um 16:52 schrieb Giuseppe CAVALLARO:
->>>> On 3/7/2016 4:46 PM, Andreas F?rber wrote:
->>>>> Am 07.03.2016 um 16:09 schrieb Giuseppe CAVALLARO:
->>>>>> On 3/7/2016 3:27 PM, Andreas F?rber wrote:
->>>>>>> Indeed, reverting Gabriel's commit fixes the observed error messages
->>>>> [...]
->>>>>>> However, I am unable to ping any hosts on the network now.
->>>>>>
->>>>>> hmm, this could be another problem. I wonder if you can
->>>>>> check which recent patch is introducing the problem on ARM64.
->>>>>> For example if this depends on Oct_2015 update.
->>>>>
->>>>> I've had success reverting drivers/net/ethernet/stmicro/ up to and
->>>>> including "stmmac: first frame prep at the end of xmit routine", i.e.
->>>>> top 7 commits.
->>>>
->>>> Andreas, I will check it and let you know asap.
->>>
->>> I verified that it's just these two commits that I need to revert:
->>>
->>> "stmmac: Fix 'eth0: No PHY found' regression"
->>> "stmmac: first frame prep at the end of xmit routine"
->>>
->>> Those in between don't cause conflicts and seem to work okay.
->>>
->>
->> I'm seeing the same issue on the SoCFPGA platform:
->>
->> libphy: PHY stmmac-0:ffffffff not found
->> eth0: Could not attach to PHY
->> stmmac_open: Cannot attach to PHY (error: -19)
->>
->> If I just revert:
->>
->>   "stmmac: Fix 'eth0: No PHY found' regression"
->>
->> then the issue goes away.
->>
->> Thanks,
->> Dinh
->
->
+diff --git a/drivers/net/ethernet/Kconfig b/drivers/net/ethernet/Kconfig
+index 0b13af8..be67a19 100644
+--- a/drivers/net/ethernet/Kconfig
++++ b/drivers/net/ethernet/Kconfig
+@@ -106,6 +106,7 @@ config LANTIQ_ETOP
+ 	  Support for the MII0 inside the Lantiq SoC
+ 
+ source "drivers/net/ethernet/marvell/Kconfig"
++source "drivers/net/ethernet/mediatek/Kconfig"
+ source "drivers/net/ethernet/mellanox/Kconfig"
+ source "drivers/net/ethernet/micrel/Kconfig"
+ source "drivers/net/ethernet/microchip/Kconfig"
+diff --git a/drivers/net/ethernet/Makefile b/drivers/net/ethernet/Makefile
+index 38dc1a7..6ffcc80 100644
+--- a/drivers/net/ethernet/Makefile
++++ b/drivers/net/ethernet/Makefile
+@@ -46,6 +46,7 @@ obj-$(CONFIG_JME) += jme.o
+ obj-$(CONFIG_KORINA) += korina.o
+ obj-$(CONFIG_LANTIQ_ETOP) += lantiq_etop.o
+ obj-$(CONFIG_NET_VENDOR_MARVELL) += marvell/
++obj-$(CONFIG_NET_VENDOR_MEDIATEK) += mediatek/
+ obj-$(CONFIG_NET_VENDOR_MELLANOX) += mellanox/
+ obj-$(CONFIG_NET_VENDOR_MICREL) += micrel/
+ obj-$(CONFIG_NET_VENDOR_MICROCHIP) += microchip/
+diff --git a/drivers/net/ethernet/mediatek/Kconfig b/drivers/net/ethernet/mediatek/Kconfig
+new file mode 100644
+index 0000000..b0229f4
+--- /dev/null
++++ b/drivers/net/ethernet/mediatek/Kconfig
+@@ -0,0 +1,17 @@
++config NET_VENDOR_MEDIATEK
++	bool "MediaTek ethernet driver"
++	depends on ARCH_MEDIATEK
++	---help---
++	  If you have a Mediatek SoC with ethernet, say Y.
++
++if NET_VENDOR_MEDIATEK
++
++config NET_MEDIATEK_SOC
++	tristate "MediaTek MT7623 Gigabit ethernet support"
++	depends on NET_VENDOR_MEDIATEK && (MACH_MT7623 || MACH_MT2701)
++	select PHYLIB
++	---help---
++	  This driver supports the gigabit ethernet MACs in the
++	  MediaTek MT2701/MT7623 chipset family.
++
++endif #NET_VENDOR_MEDIATEK
+diff --git a/drivers/net/ethernet/mediatek/Makefile b/drivers/net/ethernet/mediatek/Makefile
+new file mode 100644
+index 0000000..aa3f1c8
+--- /dev/null
++++ b/drivers/net/ethernet/mediatek/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for the Mediatek SoCs built-in ethernet macs
++#
++
++obj-$(CONFIG_NET_MEDIATEK_SOC)			+= mtk_eth_soc.o
+-- 
+1.7.10.4
