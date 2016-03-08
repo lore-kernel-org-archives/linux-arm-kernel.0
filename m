@@ -1,69 +1,35 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Tue,  8 Mar 2016 03:42:54 +0100
-Subject: [PATCH v5 9/9] ARM: dts: r8a7791: add iommus to dmac0 and dmac1
+Date: Tue,  8 Mar 2016 03:42:50 +0100
+Subject: [PATCH v5 5/9] dmaengine: rcar-dmac: slave address are physical
 In-Reply-To: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1457404974-1800-10-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1457404974-1800-6-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A unconfirmed hardware bug prevents channel 0 and 15 to be used by the
-DMAC together with the IPMMU. The DMAC driver will disable the channels
-reducing the effective number of channels to 14 per DMAC.
+Slave addresses coming from a client is physical not dma. Store the
+address using the correct data type. This is in preparation for hooking
+up the dma-mapping API to the slave addresses.
 
 Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/dma/sh/rcar-dmac.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index c6bee4a..341c460 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -283,6 +283,21 @@
- 		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <15>;
-+		iommus = <&ipmmu_ds 0>,
-+			 <&ipmmu_ds 1>,
-+			 <&ipmmu_ds 2>,
-+			 <&ipmmu_ds 3>,
-+			 <&ipmmu_ds 4>,
-+			 <&ipmmu_ds 5>,
-+			 <&ipmmu_ds 6>,
-+			 <&ipmmu_ds 7>,
-+			 <&ipmmu_ds 8>,
-+			 <&ipmmu_ds 9>,
-+			 <&ipmmu_ds 10>,
-+			 <&ipmmu_ds 11>,
-+			 <&ipmmu_ds 12>,
-+			 <&ipmmu_ds 13>,
-+			 <&ipmmu_ds 14>;
- 	};
+diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
+index 7820d07..01cf82f 100644
+--- a/drivers/dma/sh/rcar-dmac.c
++++ b/drivers/dma/sh/rcar-dmac.c
+@@ -144,8 +144,8 @@ struct rcar_dmac_chan {
  
- 	dmac1: dma-controller at e6720000 {
-@@ -314,6 +329,21 @@
- 		power-domains = <&cpg_clocks>;
- 		#dma-cells = <1>;
- 		dma-channels = <15>;
-+		iommus = <&ipmmu_ds 15>,
-+			 <&ipmmu_ds 16>,
-+			 <&ipmmu_ds 17>,
-+			 <&ipmmu_ds 18>,
-+			 <&ipmmu_ds 19>,
-+			 <&ipmmu_ds 20>,
-+			 <&ipmmu_ds 21>,
-+			 <&ipmmu_ds 22>,
-+			 <&ipmmu_ds 23>,
-+			 <&ipmmu_ds 24>,
-+			 <&ipmmu_ds 25>,
-+			 <&ipmmu_ds 26>,
-+			 <&ipmmu_ds 27>,
-+			 <&ipmmu_ds 28>,
-+			 <&ipmmu_ds 29>;
- 	};
+ 	unsigned int src_xfer_size;
+ 	unsigned int dst_xfer_size;
+-	dma_addr_t src_slave_addr;
+-	dma_addr_t dst_slave_addr;
++	phys_addr_t src_slave_addr;
++	phys_addr_t dst_slave_addr;
+ 	int mid_rid;
  
- 	audma0: dma-controller at ec700000 {
+ 	spinlock_t lock;
 -- 
 2.7.2
