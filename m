@@ -1,161 +1,92 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 08 Mar 2016 10:40:11 +0000
-Subject: [PATCH] dmaengine: pl330: Fix some race conditions in residue
- calculation
-In-Reply-To: <20160308041238.GL11154@localhost>
-References: <1456319674.2867.15.camel@linaro.org>
- <20160308041238.GL11154@localhost>
-Message-ID: <1457433611.2818.83.camel@linaro.org>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Tue, 8 Mar 2016 18:41:36 +0800
+Subject: [PATCH v5 3/6] rockchip: power-domain: add support for sub-power
+ domains
+In-Reply-To: <1456992233-25164-4-git-send-email-zhangqing@rock-chips.com>
+References: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
+ <1456992233-25164-4-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <56DEAC60.9000803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-03-08 at 09:42 +0530, Vinod Koul wrote:
-> On Wed, Feb 24, 2016 at 01:14:34PM +0000, Jon Medhurst (Tixy) wrote:
-> > The residue calculation in pl330_tx_status doesn't handle transitional
-> > states that occur at the time one descriptor (A) is completed and the
-> > next (B) is started. Specifically, both A and B can simultaneously be in
-> > the BUSY state and at this time the thread's 'req_running' may (or may
-> > not) be -1.
-> 
-> you are under lock so descriptor state wont be update while we are it.
-> 
-> Also the query for residue is for "a descriptor" not whatever is the current
-> running descriptor...
-> 
-> > 
-> > To cope with this situation we change the code to ensure A is treated as
-> > complete and B as having not yet started. Prior to the change, the code
-> > would calculate a transferred byte count as if both A and B had
-> > completed.
-> 
-> You query for either A or B not both!
 
-I've probably been using wrong/ambiguous terminology...
 
-In my description I'm using 'descriptor' to refer to a 'struct
-dma_pl330_desc', I guess other people assume 'struct
-dma_async_tx_descriptor'?
+? 2016?03?03? 16:03, Elaine Zhang ??:
+> This patch adds support for making one power domain a sub-domain of
+> other domain. This is useful for modeling power dependences,
+> which needs to have more than one power domain enabled to be operational.
+>
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>   drivers/soc/rockchip/pm_domains.c | 64 +++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 64 insertions(+)
+>
+> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+> index 0465a06..1777e8e 100644
+> --- a/drivers/soc/rockchip/pm_domains.c
+> +++ b/drivers/soc/rockchip/pm_domains.c
+> @@ -370,6 +370,63 @@ static void rockchip_configure_pd_cnt(struct rockchip_pmu *pmu,
+>   	regmap_write(pmu->regmap, domain_reg_offset + 4, count);
+>   }
+>   
+> +static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
+> +				     struct device_node *parent)
+> +{
+[...]
+> +		child_domain = pmu->genpd_data.domains[idx];
+> +
+> +		if (pm_genpd_add_subdomain(parent_domain, child_domain)) {
+> +			dev_err(pmu->dev, "%s failed to add subdomain: %s\n",
+> +				parent_domain->name, child_domain->name);
+> +			goto err_out;
+> +		} else {
+> +			dev_info(pmu->dev, "%s add subdomain: %s\n",
+> +				parent_domain->name, child_domain->name);
+> +		}
 
-The situation I was debugging was audio playback, where ASoC ends up
-calling pl330_prep_dma_cyclic() with a period one quarter the length of
-the buffer it is using, so that results in four dma_pl330_desc
-'descriptors' being created to cover that buffer. These later get
-submitted to a DMA channel (struct dma_pl330_chan) which has a list of
-these that it is processing (the 'work_list').
+s/dev_info/dev_dbg
 
-The residual calculation that currently exists in pl08x_dma_tx_status()
-is iterating this work_list and summing the length of currently
-transferring 'descriptor' with those later pending ones. I believe that
-is correct behaviour because these 'descriptors' (dma_pl330_desc) are
-all internal implementation details of the driver, and the dmaengine
-API's are dealing in units of 'dma_async_tx_descriptor' ?
+CHECK: Alignment should match open parenthesis
 
-If the current code is OK in this regard, it is definitely buggy because
-it doesn't cope with the situation when two dma_pl330_desc's are in the
-state 'BUSY' a, which I have seen occur when debugging this issue, had
-worked out can happen by analysing the code, and is acknowledged by the
-in-source comments for enum desc_status...
+#416: FILE: drivers/soc/rockchip/pm_domains.c:416:
++            dev_info(pmu->dev, "%s add subdomain: %s\n",
++                parent_domain->name, child_domain->name);
 
-	/*
-	 * Sitting on the work_list and already submitted
-	 * to the PL330 core. Not more than two descriptors
-	 * of a channel can be BUSY at any time.
-	 */
-	BUSY,
+> +
+> +		error = rockchip_pm_add_subdomain(pmu, np);
+> +		if (error < 0)
+> +			goto rm_sub_domain;
+> +	}
+> +	return 0;
+> +
+> +err_out:
+> +	of_node_put(parent);
+> +	of_node_put(np);
+> +	return -EINVAL;
+> +rm_sub_domain:
+> +	pm_genpd_remove_subdomain(parent_domain, child_domain);
+> +	return error;
+> +}
+> +
+>   static int rockchip_pm_domain_probe(struct platform_device *pdev)
+>   {
+>   	struct device *dev = &pdev->dev;
+> @@ -440,6 +497,13 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
+>   			of_node_put(node);
+>   			goto err_out;
+>   		}
+> +
+> +		error = rockchip_pm_add_subdomain(pmu, node);
+> +		if (error < 0) {
+> +			dev_err(dev, "failed to handle subdomain node %s: %d\n",
+> +				node->name, error);
+> +			goto err_out;
+> +		}
+>   	}
+>   
+>   	if (error) {
 
-In my problematic usecase I have userside code calling ALSA ioctls to
-poll the current audio playback position which results in
-pl08x_dma_tx_status() being called multiple times a second. After only a
-second or two the buggy situation gets hit, resulting in a
-miscalculation that ASoC interprets as a buffer underflow and so it
-stops the stream.
 
-I spent several days debugging this, with enough ad hoc tests and
-printk's littered everywhere to be very confident as to how things are
-going wrong - what I'm not not totally confident of is how things should
-be properly fixed.
-
-This patch appears to fix the situation that I was hitting, but it
-really looks like there isn't any locking that prevent this polling use
-of pl08x_dma_tx_status() from happening concurrently with the irq
-handler reprogramming the hardware for the next dma_pl330_desc. I didn't
-attempt any fix for that for fear of introducing bugs in what looks like
-complex code, and because it's not a problem I saw happen in practice.
-
--- Tixy
-
-> 
-> > 
-> > Fixes: aee4d1fac887 ("dmaengine: pl330: improve pl330_tx_status() function")
-> > 
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > ---
-> > 
-> > I discovered this issue when trying to work out why audio stopped
-> > working on ARM's Juno platform and bisected it to commit aee4d1fac887.
-> > Whilst this patch seems to fix the problems I was seeing, I can't help
-> > but think there are more race conditions with this code. E.g. if the
-> > running descriptor changes under us, pl330_get_current_xferred_count
-> > can end up reading values from hardware that relate to a different
-> > descriptor. And if we're really unlucky, the reading of the 'val' and
-> > 'addr' values in pl330_get_current_xferred_count can come from different
-> > descriptors. I don't know if there is any locks we can use to prevent
-> > such races or if we need to try and detect when things have changed and
-> > redo/abort the residue calculation...
-> > 
-> >  drivers/dma/pl330.c | 24 ++++++++++++++++++++----
-> >  1 file changed, 20 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 17ee758..55e3c5f 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -2240,6 +2240,7 @@ pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> >  	struct dma_pl330_desc *desc, *running = NULL;
-> >  	struct dma_pl330_chan *pch = to_pchan(chan);
-> >  	unsigned int transferred, residual = 0;
-> > +	bool first_busy;
-> >  
-> >  	ret = dma_cookie_status(chan, cookie, txstate);
-> >  
-> > @@ -2253,16 +2254,31 @@ pl330_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> >  
-> >  	if (pch->thread->req_running != -1)
-> >  		running = pch->thread->req[pch->thread->req_running].desc;
-> > +	first_busy = true;
-> >  
-> >  	/* Check in pending list */
-> >  	list_for_each_entry(desc, &pch->work_list, node) {
-> >  		if (desc->status == DONE)
-> >  			transferred = desc->bytes_requested;
-> > -		else if (running && desc == running)
-> > -			transferred =
-> > -				pl330_get_current_xferred_count(pch, desc);
-> > -		else
-> > +		else if (desc->status == BUSY && first_busy) {
-> > +			first_busy = false;
-> > +			if (running && desc == running) {
-> > +				transferred =
-> > +					pl330_get_current_xferred_count(pch, desc);
-> > +			} else {
-> > +				/* BUSY but not running means it's just completed */
-> > +				transferred = desc->bytes_requested;
-> > +			}
-> > +		} else {
-> > +			/*
-> > +			 * Descriptor is either in PREP state queued for future
-> > +			 * transfer or it is the second BUSY descriptor we have
-> > +			 * seen. The latter case means it has just, or is about
-> > +			 * to be, started, so treat it as having not yet
-> > +			 * transferred any bytes, the same as PREP.
-> > +			 */
-> >  			transferred = 0;
-> > +		}
-> >  		residual += desc->bytes_requested - transferred;
-> >  		if (desc->txd.cookie == cookie) {
-> >  			switch (desc->status) {
-> > -- 
-> > 2.1.4
-> > 
-> > 
-> 
+-- 
+Thanks,
+Caesar
