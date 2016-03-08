@@ -1,215 +1,102 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 8 Mar 2016 09:42:00 +0800
-Subject: [PATCH v4 3/5] ARM: at91: pm: configure PMC fast startup signals
+Date: Tue, 8 Mar 2016 09:42:01 +0800
+Subject: [PATCH v4 4/5] Documentation: atmel-pmc: add DT bindings for fast
+ startup
 In-Reply-To: <1457401322-29120-1-git-send-email-wenyou.yang@atmel.com>
 References: <1457401322-29120-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1457401322-29120-4-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1457401322-29120-5-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fast startup signal is used as wake up sources for ULP1 mode.
-As soon as a fast startup signal is asserted, the embedded 12 MHz
-RC oscillator restarts automatically.
-
-This patch is to configure the fast startup signals, which signal
-is enabled to trigger the PMC to wake up the system from ULP1 mode
-should be configured via the DT.
+Add DT bindings to configurate the PMC_FSMR and PMC_FSPR registers
+to trigger a fast restart signal to PMC.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Acked-by: Rob Herring <robh+dt@kernel.org>
 ---
 
-Changes in v4: None
+Changes in v4:
+ - add Acked-by tag.
+
 Changes in v3:
- - use 0 and 1, not string, to define the trigger active polarity.
+ - update the property description.
 
 Changes in v2:
- - shorten the pmc-fast-startup property's name.
- - use the value property, instead of bool property for high
-   or low triggered.
+ - change the property name and property description.
 
- arch/arm/mach-at91/pm.c      |  114 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/at91_pmc.h |   32 ++++++++++++
- 2 files changed, 146 insertions(+)
+ .../devicetree/bindings/arm/atmel-pmc.txt          |   63 ++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 5c2db34..aad5041 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -24,6 +24,8 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/clk/at91_pmc.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
- 
- #include <asm/irq.h>
- #include <linux/atomic.h>
-@@ -461,6 +463,116 @@ static void __init at91_pm_init(void (*pm_idle)(void))
- 		pr_info("AT91: PM not supported, due to no SRAM allocated\n");
- }
- 
-+static int __init at91_pmc_fast_startup_init(void)
-+{
-+	struct device_node *np;
-+	struct regmap *regmap;
-+	u32 mode = 0, polarity = 0, value = 0;
+diff --git a/Documentation/devicetree/bindings/arm/atmel-pmc.txt b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
+index 795cc78..0d2481c 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-pmc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
+@@ -12,3 +12,66 @@ Examples:
+ 		compatible = "atmel,at91rm9200-pmc";
+ 		reg = <0xfffffc00 0x100>;
+ 	};
 +
-+	np = of_find_compatible_node(NULL, NULL,
-+				     "atmel,sama5d2-pmc-fast-startup");
-+	if (!np)
-+		return -ENODEV;
++PMC Fast Startup Signals
 +
-+	regmap = syscon_node_to_regmap(of_get_parent(np));
-+	if (IS_ERR(regmap)) {
-+		pr_info("AT91: failed to find PMC fast startup\n");
-+		return PTR_ERR(regmap);
-+	}
++The PMC Fast Start Signals are used as the wake up source to trigger the PMC
++to wake up the system from the ULP1 mode.
 +
-+	mode |= of_property_read_bool(np, "atmel,wkup-trigger") ?
-+		AT91_PMC_FSTT0 : 0;
-+	mode |= of_property_read_bool(np, "atmel,secumod-trigger") ?
-+		AT91_PMC_FSTT1 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu0-trigger") ?
-+		AT91_PMC_FSTT2 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu1-trigger") ?
-+		AT91_PMC_FSTT3 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu2-trigger") ?
-+		AT91_PMC_FSTT4 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu3-trigger") ?
-+		AT91_PMC_FSTT5 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu4-trigger") ?
-+		AT91_PMC_FSTT6 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu5-trigger") ?
-+		AT91_PMC_FSTT7 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu6-trigger") ?
-+		AT91_PMC_FSTT8 : 0;
-+	mode |= of_property_read_bool(np, "atmel,piobu7-trigger") ?
-+		AT91_PMC_FSTT9 : 0;
-+	mode |= of_property_read_bool(np, "atmel,gmac-wol-trigger") ?
-+		AT91_PMC_FSTT10 : 0;
-+	mode |= of_property_read_bool(np, "atmel,rtc-alarm-trigger") ?
-+		AT91_PMC_RTCAL : 0;
-+	mode |= of_property_read_bool(np, "atmel,usb-resume-trigger") ?
-+		AT91_PMC_USBAL : 0;
-+	mode |= of_property_read_bool(np, "atmel,sdmmc-cd-trigger") ?
-+		AT91_PMC_SDMMC_CD : 0;
-+	mode |= of_property_read_bool(np, "atmel,rxlp-match-trigger") ?
-+		AT91_PMC_RXLP_MCE : 0;
-+	mode |= of_property_read_bool(np, "atmel,acc-comparison-trigger") ?
-+		AT91_PMC_ACC_CE : 0;
++required properties:
++- compatible: Should be "atmel,sama5d2-pmc-fast-startup".
 +
-+	if (!of_property_read_u32(np, "atmel,wkup-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP0;
-+	}
++optional properties:
++- atmel,wkup-trigger: boolean, WKUP input can trigger a fast restart signal.
++- atmel,secumod-trigger: boolean, SECUMOD can trigger a fast restart signal.
++- atmel,piobu0-trigger: boolean, PIOBU0 input can trigger a fast restart signal.
++- atmel,piobu1-trigger: boolean, PIOBU1 input can trigger a fast restart signal.
++- atmel,piobu2-trigger: boolean, PIOBU2 input can trigger a fast restart signal.
++- atmel,piobu3-trigger: boolean, PIOBU3 input can trigger a fast restart signal.
++- atmel,piobu4-trigger: boolean, PIOBU4 input can trigger a fast restart signal.
++- atmel,piobu5-trigger: boolean, PIOBU5 input can trigger a fast restart signal.
++- atmel,piobu6-trigger: boolean, PIOBU6 input can trigger a fast restart signal.
++- atmel,piobu7-trigger: boolean, PIOBU7 input can trigger a fast restart signal.
++- atmel,gmac-wol-trigger: boolean, GMAC_WOL can trigger a fast restart signal.
++- atmel,rtc-alarm-trigger: boolean, RTC alarm can trigger a fast restart signal.
++- atmel,usb-resume-trigger: boolean, USB resume can trigger a fast restart
++  signal.
++- atmel,sdmmc-cd-trigger: boolean, SDMMC card detect can trigger a fast
++  restart signal.
++- atmel,rxlp-match-trigger: boolean, Matching condition on RXLP can trigger
++  a fast restart signal.
++- atmel,acc-comparison-trigger: boolean, ACC comparison can trigger a fast
++  restart signal.
 +
-+	if (mode & AT91_PMC_FSTT1)
-+		polarity |= AT91_PMC_FSTP1;
++- atmel,wkup-trigger-level: int, defines the active polarity of the wake-up
++  input. Supported values are: 1 or 0.
++- atmel,piobu0-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU0 input. Supported values are: 1 or 0.
++- atmel,piobu1-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU1 input. Supported values are: 1 or 0.
++- atmel,piobu2-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU2 input. Supported values are: 1 or 0".
++- atmel,piobu3-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU3 input. Supported values are: 1 or 0.
++- atmel,piobu4-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU4 input. Supported values are: 1 or 0.
++- atmel,piobu5-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU5 input. Supported values are: 1 or 0.
++- atmel,piobu6-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU6 input. Supported values are: 1 or 0.
++- atmel,piobu7-trigger-level: int, defines the active polarity of
++  the corresponding PIOBU7 input. Supported values are: 1 or 0.
 +
-+	if (!of_property_read_u32(np, "atmel,piobu0-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP2;
-+	}
++Example:
 +
-+	if (!of_property_read_u32(np, "atmel,piobu1-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP3;
-+	}
++	pmc: pmc at f0014000 {
++		compatible = "atmel,sama5d2-pmc";
++		reg = <0xf0014000 0x160>;
 +
-+	if (!of_property_read_u32(np, "atmel,piobu2-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP4;
-+	}
-+
-+	if (!of_property_read_u32(np, "atmel,piobu3-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP5;
-+	}
-+
-+	if (!of_property_read_u32(np, "atmel,piobu4-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP6;
-+	}
-+
-+	if (!of_property_read_u32(np, "atmel,piobu5-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP7;
-+	}
-+
-+	if (!of_property_read_u32(np, "atmel,piobu6-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP8;
-+	}
-+
-+	if (!of_property_read_u32(np, "atmel,piobu7-trigger-level", &value)) {
-+		if (value)
-+			polarity |= AT91_PMC_FSTP9;
-+	}
-+
-+	if (mode & AT91_PMC_FSTT10)
-+		polarity |= AT91_PMC_FSTP10;
-+
-+	regmap_write(regmap, AT91_PMC_FSMR, mode);
-+
-+	regmap_write(regmap, AT91_PMC_FSPR, polarity);
-+
-+	of_node_put(np);
-+
-+	return 0;
-+}
-+
- void __init at91rm9200_pm_init(void)
- {
- 	at91_dt_ramc();
-@@ -509,4 +621,6 @@ void __init sama5_pm_init(void)
- 
- 	if (readl(pmc + AT91_PMC_VERSION) >= SAMA5D2_PMC_VERSION)
- 		at91_pm_data.ulp_mode = ULP1_MODE;
-+
-+	at91_pmc_fast_startup_init();
- }
-diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
-index 4afd891..683580e 100644
---- a/include/linux/clk/at91_pmc.h
-+++ b/include/linux/clk/at91_pmc.h
-@@ -168,6 +168,38 @@
- #define		AT91_PMC_WPVS		(0x1  <<  0)		/* Write Protect Violation Status */
- #define		AT91_PMC_WPVSRC		(0xffff  <<  8)		/* Write Protect Violation Source */
- 
-+#define AT91_PMC_FSMR		0x70		/* Fast Startup Mode Register */
-+#define AT91_PMC_FSTT0		BIT(0)		/* WKUP Pin Enable */
-+#define AT91_PMC_FSTT1		BIT(1)		/* Security Module Enable */
-+#define AT91_PMC_FSTT2		BIT(2)		/* PIOBU0 Input Enable */
-+#define AT91_PMC_FSTT3		BIT(3)		/* PIOBU1 Input Enable */
-+#define AT91_PMC_FSTT4		BIT(4)		/* PIOBU2 Input Enable */
-+#define AT91_PMC_FSTT5		BIT(5)		/* PIOBU3 Input Enable */
-+#define AT91_PMC_FSTT6		BIT(6)		/* PIOBU4 Input Enable */
-+#define AT91_PMC_FSTT7		BIT(7)		/* PIOBU5 Input Enable */
-+#define AT91_PMC_FSTT8		BIT(8)		/* PIOBU6 Input Enable */
-+#define AT91_PMC_FSTT9		BIT(9)		/* PIOBU7 Input Enable */
-+#define AT91_PMC_FSTT10		BIT(10)		/* GMAC Wake-up On LAN Enable */
-+#define AT91_PMC_RTCAL		BIT(17)		/* RTC Alarm Enable */
-+#define AT91_PMC_USBAL		BIT(18)		/* USB Resume Enable */
-+#define AT91_PMC_SDMMC_CD	BIT(19)		/* SDMMC Card Detect Enable */
-+#define AT91_PMC_LPM		BIT(20)		/* Low-power Mode */
-+#define AT91_PMC_RXLP_MCE	BIT(24)		/* Backup UART Receive Enable */
-+#define AT91_PMC_ACC_CE		BIT(25)		/* ACC Enable */
-+
-+#define AT91_PMC_FSPR		0x74		/* Fast Startup Polarity Reg */
-+#define AT91_PMC_FSTP0		BIT(0)		/* WKUP Pin Polarity */
-+#define AT91_PMC_FSTP1		BIT(1)		/* Security Module Polarity */
-+#define AT91_PMC_FSTP2		BIT(2)		/* PIOBU0 Pin Polarity */
-+#define AT91_PMC_FSTP3		BIT(3)		/* PIOBU1 Pin Polarity */
-+#define AT91_PMC_FSTP4		BIT(4)		/* PIOBU2 Pin Polarity */
-+#define AT91_PMC_FSTP5		BIT(5)		/* PIOBU3 Pin Polarity */
-+#define AT91_PMC_FSTP6		BIT(6)		/* PIOBU4 Pin Polarity */
-+#define AT91_PMC_FSTP7		BIT(7)		/* PIOBU5 Pin Polarity */
-+#define AT91_PMC_FSTP8		BIT(8)		/* PIOBU6 Pin Polarity */
-+#define AT91_PMC_FSTP9		BIT(9)		/* PIOBU7 Pin Polarity */
-+#define AT91_PMC_FSTP10		BIT(10)		/* Wake-up On LAN Polarity */
-+
- #define AT91_PMC_VERSION	0xfc
- 
- #define AT91_PMC_PCER1		0x100			/* Peripheral Clock Enable Register 1 [SAMA5 only]*/
++		pmc_fast_restart {
++			compatible = "atmel,sama5d2-pmc-fast-startup";
++			atmel,wkup-trigger;
++			atmel,rtc-alarm-trigger;
++			atmel,wkup-trigger-level = <0>;
++		};
++	};
 -- 
 1.7.9.5
