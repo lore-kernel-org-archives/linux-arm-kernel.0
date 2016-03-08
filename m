@@ -1,32 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 8 Mar 2016 06:55:37 +0000 (UTC)
-Subject: [PATCH v5 0/6] ARM: am335x/am437x/dra7: Add PWM support for DRA7
-In-Reply-To: <1457400224-24797-1-git-send-email-fcooper@ti.com>
-References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
-Message-ID: <alpine.DEB.2.02.1603080642400.4974@utopia.booyaka.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 8 Mar 2016 12:24:35 +0530
+Subject: [PATCH] ARM: dts: AM43x-epos: Fix clk parent for synctimer
+Message-ID: <1457420075-26158-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Franklin
+commit 55ee7017ee31 ("arm: omap2: board-generic: use omap4_local_timer_init
+for AM437x") makes synctimer32k as the clocksource on AM43xx. By default
+the synctimer32k is clocked by 32K RTC OSC on AM43xx. But this 32K RTC OSC
+is not available on epos boards which makes it fail to boot.
 
-On Mon, 7 Mar 2016, Franklin S Cooper Jr wrote:
+Synctimer32k can also be clocked by a peripheral PLL, so making this as
+clock parent for synctimer3k on epos boards.
 
-> This patch series adds support for PWM for DRA7. The IP is same as that
-> present in AM33XX and AM437XX.
-> 
-> However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
-> and eQEP.
-> 
-> This series is almost identical to v4. Only difference is the addition of
-> eCAP DT nodes in the dra7.dtsi file.
-> 
-> This series was tested on AM335x GP, AM437x GP and X15 + LCD screen for
-> PWM based backlight.
-> 
-> This series was also verified to be backwards compatible with old dtbs.
+Reported-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+Tested on AM43x-epos board:
+Before this patch: http://pastebin.ubuntu.com/15326328/
+After this patch: http://pastebin.ubuntu.com/15326323/
 
-Looking at these to see what I can pick for v4.7, I'm curious about the 
-dependencies.  Can I take patches 2 and 3 before 1 is merged, or does 1 
-need to be merged first?
+ arch/arm/boot/dts/am43x-epos-evm.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-- Paul
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 948fb29..e415332 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -794,3 +794,8 @@
+ 	tx-num-evt = <32>;
+ 	rx-num-evt = <32>;
+ };
++
++&synctimer_32kclk {
++	assigned-clocks = <&mux_synctimer32k_ck>;
++	assigned-clock-parents = <&clkdiv32k_ick>;
++};
+-- 
+2.1.4
