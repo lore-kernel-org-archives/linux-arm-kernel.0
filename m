@@ -1,77 +1,33 @@
-From: js1304@gmail.com (Joonsoo Kim)
-Date: Wed, 9 Mar 2016 00:36:18 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56DEAD3D.5090706@huawei.com>
-References: <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com>
- <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE>
- <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE>
- <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE>
- <56DD7B20.1020508@suse.cz>
- <20160308074816.GA31471@js1304-P5Q-DELUXE>
- <56DEAD3D.5090706@huawei.com>
-Message-ID: <CAAmzW4MYzJwkBYqDXicA=hCrtapK+tMNZUNaEAQO=74s_mDt4g@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 8 Mar 2016 10:37:34 -0500
+Subject: [PATCH 1/2] vfio, platform: add support for ACPI while detecting
+ the reset driver
+In-Reply-To: <1457451209-21462-1-git-send-email-okaya@codeaurora.org>
+References: <1457451209-21462-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <56DEF1BE.8010701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-08 19:45 GMT+09:00 Xishi Qiu <qiuxishi@huawei.com>:
-> On 2016/3/8 15:48, Joonsoo Kim wrote:
->
->> On Mon, Mar 07, 2016 at 01:59:12PM +0100, Vlastimil Babka wrote:
->>> On 03/07/2016 05:34 AM, Joonsoo Kim wrote:
->>>> On Fri, Mar 04, 2016 at 03:35:26PM +0800, Hanjun Guo wrote:
->>>>>> Sad to hear that.
->>>>>>
->>>>>> Could you tell me your system's MAX_ORDER and pageblock_order?
->>>>>>
->>>>>
->>>>> MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
->>>
->>> I thought that CMA regions/operations (and isolation IIRC?) were
->>> supposed to be MAX_ORDER aligned exactly to prevent needing these
->>> extra checks for buddy merging. So what's wrong?
->>
->> CMA isolates MAX_ORDER aligned blocks, but, during the process,
->> partialy isolated block exists. If MAX_ORDER is 11 and
->> pageblock_order is 9, two pageblocks make up MAX_ORDER
->> aligned block and I can think following scenario because pageblock
->> (un)isolation would be done one by one.
->>
->> (each character means one pageblock. 'C', 'I' means MIGRATE_CMA,
->> MIGRATE_ISOLATE, respectively.
->>
->
-> Hi Joonsoo,
->
->> CC -> IC -> II (Isolation)
->
->> II -> CI -> CC (Un-isolation)
->>
->> If some pages are freed at this intermediate state such as IC or CI,
->> that page could be merged to the other page that is resident on
->> different type of pageblock and it will cause wrong freepage count.
->>
->
-> Isolation will appear when do cma alloc, so there are two following threads.
->
-> C(free)C(used) -> start_isolate_page_range -> I(free)C(used) -> I(free)I(someone free it) -> undo_isolate_page_range -> C(free)C(free)
-> so free cma is 2M -> 0M -> 0M -> 4M, the increased 2M was freed by someone.
+On 3/8/2016 10:33 AM, Sinan Kaya wrote:
+> +	int rc = 0;
+> +
 
-Your example is correct one but think about following one.
-C(free)C(used) -> start_isolate_page_range -> I(free)C(used) ->
-I(free)**C**(someone free it) -> undo_isolate_page_range ->
-C(free)C(free)
+I should have initialized this to -1. 
 
-it would be 2M -> 0M -> 2M -> 6M.
-When we do I(free)C(someone free it), CMA freepage is added
-because it is on CMA pageblock. But, bad merging happens and
-4M buddy is made and it is in isolate buddy list.
-Later, when we do undo_isolation, this 4M buddy is moved to
-CMA buddy list and 4M is added to CMA freepage counter so
-total is 6M.
+> +	vdev->reset = vfio_platform_lookup_reset(vdev->compat, vdev->acpihid,
+> +						 &vdev->reset_module);
+> +	if (vdev->reset)
+> +		return 0;
+> +
+> +	if (vdev->acpihid)
+> +		rc = request_module("vfio-reset:%s", vdev->acpihid);
+> +
+> +	if (rc && vdev->compat)
+> +		rc = request_module("vfio-reset:%s", vdev->compat);
+> +
 
-Thanks.
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
