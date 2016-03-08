@@ -1,31 +1,31 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 8 Mar 2016 23:03:57 +0700
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 8 Mar 2016 16:06:09 +0000
 Subject: linux-next: manual merge of the watchdog tree with the arm-soc
  tree
 In-Reply-To: <56DEF546.9090900@arm.com>
 References: <20160307150402.191ba735@canb.auug.org.au>
  <56DEF546.9090900@arm.com>
-Message-ID: <CADyBb7tUjFoV6HbJRnuvB1ZhJ8KXFsXzW66v1AaYc9+UyH4i8A@mail.gmail.com>
+Message-ID: <56DEF871.8050102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Andre,
 
-On 8 March 2016 at 22:52, Andr? Przywara <andre.przywara@arm.com> wrote:
+On 08/03/16 15:52, Andr? Przywara wrote:
 > On 07/03/16 11:04, Stephen Rothwell wrote:
 >> Hi Wim,
 >>
 >> Today's linux-next merge of the watchdog tree got a conflict in:
 >>
->>   arch/arm64/boot/dts/arm/foundation-v8.dts
+>>    arch/arm64/boot/dts/arm/foundation-v8.dts
 >>
 >> between commit:
 >>
->>   d11a89796678 ("arm64: dts: split Foundation model dts to put the GIC separately")
+>>    d11a89796678 ("arm64: dts: split Foundation model dts to put the GIC separately")
 >>
 >> from the arm-soc tree and commit:
 >>
->>   fe3a97e8ed02 ("ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts")
+>>    fe3a97e8ed02 ("ARM64: add SBSA Generic Watchdog device node in foundation-v8.dts")
 >>
 >> from the watchdog tree.
 >>
@@ -38,29 +38,13 @@ On 8 March 2016 at 22:52, Andr? Przywara <andre.przywara@arm.com> wrote:
 > So whoever now provides the watchdog patch, can it be rebased on top of
 > the foundation model .dts rework, so that the new node ends up in the
 > .dtsi file?
-
-I can rebase this patch to make a  watchdog DT patch for
-foundation-v8.dtsi ASAP.
-
-Thanks
-
 > If this is too much hassle I could also send a fix after -rc1 (as the
 > breakage is not really critical).
 >
-> Cheers,
-> Andre.
->
 
-
+I have rebased it on top of my earlier PR and sending it shortly.
+I have moved it to dtsi file.
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+Regards,
+Sudeep
