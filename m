@@ -1,73 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 8 Mar 2016 08:51:31 +0100
-Subject: [PATCH] dma: sun4i: expose block size and wait cycle
- configuration to DMA users
-In-Reply-To: <20160308025547.GI11154@localhost>
-References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160307145429.GG11154@localhost>
- <20160307160857.577bb04d@bbrezillon>
- <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
-Message-ID: <20160308075131.GE8418@lukather>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 08 Mar 2016 08:55:30 +0100
+Subject: [PATCH 1/3] video: fbdev: imxfb: fix semantic of .get_power and
+ .set_power
+In-Reply-To: <1457380425-20244-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1457380425-20244-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1457423730.4174.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 08:25:47AM +0530, Vinod Koul wrote:
-> On Mon, Mar 07, 2016 at 09:30:24PM +0100, Maxime Ripard wrote:
-> > On Mon, Mar 07, 2016 at 04:08:57PM +0100, Boris Brezillon wrote:
-> > > Hi Vinod,
-> > > 
-> > > On Mon, 7 Mar 2016 20:24:29 +0530
-> > > Vinod Koul <vinod.koul@intel.com> wrote:
-> > > 
-> > > > On Mon, Mar 07, 2016 at 10:59:31AM +0100, Boris Brezillon wrote:
-> > > > > +/* Dedicated DMA parameter register layout */
-> > > > > +#define SUN4I_DDMA_PARA_DST_DATA_BLK_SIZE(n)	(((n) - 1) << 24)
-> > > > > +#define SUN4I_DDMA_PARA_DST_WAIT_CYCLES(n)	(((n) - 1) << 16)
-> > > > > +#define SUN4I_DDMA_PARA_SRC_DATA_BLK_SIZE(n)	(((n) - 1) << 8)
-> > > > > +#define SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(n)	(((n) - 1) << 0)
-> > > > > +
-> > > > > +/**
-> > > > > + * struct sun4i_dma_chan_config - DMA channel config
-> > > > > + *
-> > > > > + * @para: contains information about block size and time before checking
-> > > > > + *	  DRQ line. This is device specific and only applicable to dedicated
-> > > > > + *	  DMA channels
-> > > > 
-> > > > What information, can you elobrate.. And why can't you use existing
-> > > > dma_slave_config for this?
-> > > 
-> > > Block size is related to the device FIFO size. I guess it allows the
-> > > DMA channel to launch a transfer of X bytes without having to check the
-> > > DRQ line (the line telling the DMA engine it can transfer more data
-> > > to/from the device). The wait cycles information is apparently related
-> > > to the number of clks the engine should wait before polling/checking
-> > > the DRQ line status between each block transfer. I'm not sure what it
-> > > saves to put WAIT_CYCLES() to something != 1, but in their BSP,
-> > > Allwinner tweak that depending on the device.
+Hi Uwe,
+
+Am Montag, den 07.03.2016, 20:53 +0100 schrieb Uwe Kleine-K?nig:
+> .set_power gets passed an FB_BLANK_XXX value, not a bool. So 0 signals
+> on; and >1 means off. The same applies for return values of .get_power.
+
+I'd try to somehow work this information into the code to avoid future
+confusion.
+
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/video/fbdev/imxfb.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> we already have block size aka src/dst_maxburst, why not use that one.
+> diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+> index cee88603efc9..c5fcedde2a60 100644
+> --- a/drivers/video/fbdev/imxfb.c
+> +++ b/drivers/video/fbdev/imxfb.c
+> @@ -759,9 +759,9 @@ static int imxfb_lcd_get_power(struct lcd_device *lcddev)
+>  	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+>  
+>  	if (!IS_ERR(fbi->lcd_pwr))
+> -		return regulator_is_enabled(fbi->lcd_pwr);
+> +		return !regulator_is_enabled(fbi->lcd_pwr);
+>  
+> -	return 1;
+> +	return 0;
 
-I'm not sure it's really the same thing. The DMA controller also has a
-burst parameter, that is either 1 byte or 8 bytes, and ends up being
-different from this one.
+How about making it explicit:
 
-> Why does dmaengine need to wait? Can you explain that
+	if (!IS_ERR(fbi->lcd_pwr) &&
+	    !regulator_is_enabled(fbi->lcd_pwr))
+		return FB_BLANK_POWERDOWN;
 
-We have no idea, we thought you might have one :)
+	return FB_BLANK_UNBLANK;
 
-It doesn't really makes sense to us, but it does have a significant
-impact on the throughput.
+>  }
+>  
+>  static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
+> @@ -769,7 +769,7 @@ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
+>  	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+>  
+>  	if (!IS_ERR(fbi->lcd_pwr)) {
+> -		if (power)
+> +		if (!power)
 
-Maxime
+Same here:
+		if (power == FB_BLANK_UNBLANK)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160308/9d09487f/attachment.sig>
+>  			return regulator_enable(fbi->lcd_pwr);
+>  		else
+>  			return regulator_disable(fbi->lcd_pwr);
+
+regards
+Philipp
