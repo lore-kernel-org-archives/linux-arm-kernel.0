@@ -1,35 +1,31 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 8 Mar 2016 08:45:26 -0600
-Subject: [PATCHv2 10/11] ARM: socfpga: Enable Arria10 L2 cache ECC on
- startup
-In-Reply-To: <1457379787-8327-11-git-send-email-tthayer@opensource.altera.com>
-References: <1457379787-8327-1-git-send-email-tthayer@opensource.altera.com>
- <1457379787-8327-11-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <56DEE586.8010102@opensource.altera.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 8 Mar 2016 15:46:20 +0100
+Subject: [PATCH 5/7] mtd: provide helper to prepare buffers for DMA
+ operations
+In-Reply-To: <20160308141853.GQ11154@localhost>
+References: <1457435715-24740-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1457435715-24740-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20160308141853.GQ11154@localhost>
+Message-ID: <20160308154620.3d64d02b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 8 Mar 2016 19:48:53 +0530
+Vinod Koul <vinod.koul@intel.com> wrote:
 
-
-On 03/07/2016 01:43 PM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+> On Tue, Mar 08, 2016 at 12:15:13PM +0100, Boris Brezillon wrote:
+> >  
+> > +#ifdef CONFIG_HAS_DMA
 > 
-> Enable ECC for Arria10 L2 cache on machine startup. The ECC has to be
-> enabled before data is stored in memory otherwise the ECC will fail
-> on reads.
-> Use DT_MACHINE to select Arria10 L2 cache function.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: Split into 2 separate functions selected with DT_MACHINE.
-> ---
->  arch/arm/mach-socfpga/core.h     |    1 +
->  arch/arm/mach-socfpga/l2_cache.c |   49 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/socfpga.c  |   10 +++++++-
->  3 files changed, 59 insertions(+), 1 deletion(-)
+> Shouldn't this be CONFIG_DMA_ENGINE as you are preparing these descriptors
+> for DMA transfer?
 > 
 
-Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+Nope, scatterlist users are not necessarily using a dmaengine, some IPs
+are directly embedding a dedicated DMA engine, which has no driver in
+drivers/dma/.
 
-Thanks,
-Dinh
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
