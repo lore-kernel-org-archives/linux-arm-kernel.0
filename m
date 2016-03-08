@@ -1,120 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 8 Mar 2016 03:01:20 +0000
-Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr()
- on ARM
-In-Reply-To: <20160307223311.GB26149@localhost>
-References: <m337sapw89.fsf@t19.piap.pl>
- <20160307223311.GB26149@localhost>
-Message-ID: <20160308030106.GA18190@red-moon>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Tue, 8 Mar 2016 09:23:03 +0530
+Subject: [PATCH 0/2] ARM: dra7: Enable Errata i877
+In-Reply-To: <alpine.DEB.2.02.1603072355030.27387@utopia.booyaka.com>
+References: <1456994525-20573-1-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1603070938170.3437@utopia.booyaka.com>
+ <56DD4C70.7070105@ti.com>
+ <alpine.DEB.2.02.1603072355030.27387@utopia.booyaka.com>
+Message-ID: <56DE4C9F.7060603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 04:33:11PM -0600, Bjorn Helgaas wrote:
-> [+cc Lorenzo]
-> 
-> On Tue, Mar 01, 2016 at 07:07:18AM +0100, Krzysztof Ha??asa wrote:
-> > Many ARM platforms use a wrapper:
-> > /*
-> >  * Compatibility wrapper for older platforms that do not care about
-> >  * passing the parent device.
-> >  */
-> > static inline void pci_common_init(struct hw_pci *hw)
-> > {
-> >         pci_common_init_dev(NULL, hw);
-> > }
-> > 
-> > which means that pci_bus_assign_domain_nr() can be called without
-> > a parent. This patch fixes the NULL pointer dereference.
-> > 
-> > Signed-off-by: Krzysztof Ha??asa <khalasa@piap.pl>
-> > Cc: stable at vger.kernel.org
-> 
-> I applied this to for-linus with changelog as below for v4.5, thanks!
-> 
-> Wow, this is terrible.  All ARM32 systems that use pci_common_init()
-> crash at boot.  That includes cns3xxx, dove, footbridge, iopl13xx,
-> ip32x, iop33x, ixp4xx, ks8695, mv78xx0, orion5x, pxa, sa1100, etc.
-> Apparently they've been crashing since v4.0, when 7c674700098c and
-> 8c7d14746abc appeared.  I can hardly believe nobody noticed until now.
-> 
-> Actually, I did find one problem report:
-> http://forum.doozan.com/read.php?2,17868,22070,quote=1 from last May,
-> but apparently it got lost in a forum and never found its way
-> upstream.
-> 
-> I reworked the changelog because this problem will affect *any* arch
-> that enables CONFIG_PCI_DOMAINS_GENERIC and supplies NULL "parent"
-> pointers -- ia64, mips, mn10300, s390, x86, etc., would be affected if
-> they enabled CONFIG_PCI_DOMAINS_GENERIC.
-> 
-> I also added a "Fixes:" tag for 7c674700098c, since that's the commit
-> that added the generic code we're fixing.  Backports of 7c674700098c
-> should also backport this change.
 
-That's really unfortunate, when I moved code from arm64 to generic I
-did not spot this issue in the original code and carried it over, you
-summarized the reasons in the commit log so without any further ado (and
-with my apologies):
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+On Tuesday 08 March 2016 05:26 AM, Paul Walmsley wrote:
+> On Mon, 7 Mar 2016, Lokesh Vutla wrote:
+> 
+>> On Monday 07 March 2016 03:09 PM, Paul Walmsley wrote:
+>>> On Thu, 3 Mar 2016, Lokesh Vutla wrote:
+>>>
+>>>> This series enables Errata i877 for all DRA7 platforms. The public errata
+>>>> documentation can be found here[1].
+>>>>
+>>>> [1] http://www.ti.com/lit/er/sprz429h/sprz429h.pdf
+>>>>
+>>>> Lokesh Vutla (1):
+>>>>   ARM: OMAP2+: hwmod: Introduce ti,no-idle dt property
+>>>>
+>>>> Mugunthan V N (1):
+>>>>   ARM: dts: dra7: do not gate cpsw clock due to errata i877
+>>>
+>>> I've sent these for merging immediately. 
+>>>
+>>> Have you sent patches for U-boot yet?
+>> Yes, It is already merged into u-boot.
+>> http://git.denx.de/?p=u-boot.git;a=commitdiff;h=f986d9720836433ded29f06c8f5aed462bd20924;hp=65e9d56fb9ce9cfd7ffff7afaa6b7de50e400e06
+> 
+> I may be misreading this patch, but all it seems to do is add clock 
+> control for GMAC.  It doesn't seem to force the clock to stay on.  What am 
+> I missing?
+So, this is an array containing clock controls which are needed very
+early. This array will be passed to clock framework to enable all the
+clocks. Just adding it to the array is sufficient.
+
+Thanks and regards,
+Lokesh
 
 > 
-> Bjorn
 > 
-> 
-> 
-> commit 71babd2a89fe
-> Author: Krzysztof =?utf-8?Q?Ha=C5=82asa?= <khalasa@piap.pl>
-> Date:   Tue Mar 1 07:07:18 2016 +0100
-> 
->     PCI: Allow a NULL "parent" pointer in pci_bus_assign_domain_nr()
->     
->     pci_create_root_bus() passes a "parent" pointer to
->     pci_bus_assign_domain_nr().  When CONFIG_PCI_DOMAINS_GENERIC is defined,
->     pci_bus_assign_domain_nr() dereferences that pointer.  Many callers of
->     pci_create_root_bus() supply a NULL "parent" pointer, which leads to a NULL
->     pointer dereference error.
->     
->     7c674700098c ("PCI: Move domain assignment from arm64 to generic code")
->     moved the "parent" dereference from arm64 to generic code.  Only arm64 used
->     that code (because only arm64 defined CONFIG_PCI_DOMAINS_GENERIC), and it
->     always supplied a valid "parent" pointer.  Other arches supplied NULL
->     "parent" pointers but didn't defined CONFIG_PCI_DOMAINS_GENERIC, so they
->     used a no-op version of pci_bus_assign_domain_nr().
->     
->     8c7d14746abc ("ARM/PCI: Move to generic PCI domains") defined
->     CONFIG_PCI_DOMAINS_GENERIC on ARM, and many ARM platforms use
->     pci_common_init(), which supplies a NULL "parent" pointer.
->     These platforms (cns3xxx, dove, footbridge, iop13xx, etc.) crash
->     with a NULL pointer dereference like this while probing PCI:
->     
->       Unable to handle kernel NULL pointer dereference at virtual address 000000a4
->       PC is at pci_bus_assign_domain_nr+0x10/0x84
->       LR is at pci_create_root_bus+0x48/0x2e4
->       Kernel panic - not syncing: Attempted to kill init!
->     
->     [bhelgaas: changelog, add "Reported:" and "Fixes:" tags]
->     Reported: http://forum.doozan.com/read.php?2,17868,22070,quote=1
->     Fixes: 8c7d14746abc ("ARM/PCI: Move to generic PCI domains")
->     Fixes: 7c674700098c ("PCI: Move domain assignment from arm64 to generic code")
->     Signed-off-by: Krzysztof Ha??asa <khalasa@piap.pl>
->     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->     CC: stable at vger.kernel.org	# v4.0+
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 602eb42..f89db3a 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4772,8 +4772,10 @@ int pci_get_new_domain_nr(void)
->  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  {
->  	static int use_dt_domains = -1;
-> -	int domain = of_get_pci_domain_nr(parent->of_node);
-> +	int domain = -1;
->  
-> +	if (parent)
-> +		domain = of_get_pci_domain_nr(parent->of_node);
->  	/*
->  	 * Check DT domain and use_dt_domains values.
->  	 *
+> - Paul
 > 
