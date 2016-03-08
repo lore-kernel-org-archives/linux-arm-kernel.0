@@ -1,53 +1,46 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 8 Mar 2016 10:44:48 -0500
-Subject: [PATCH V14 8/9] vfio, platform: add support for ACPI while
- detecting the reset driver
-In-Reply-To: <56DE5E11.3060307@codeaurora.org>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
- <56D08843.5020306@linaro.org> <56D7323B.4040100@codeaurora.org>
- <56D8C539.9000203@linaro.org> <56D91B0E.1080203@codeaurora.org>
- <56DCFEE0.6080101@linaro.org> <56DD9E7E.6000406@codeaurora.org>
- <56DE592E.6010403@linaro.org> <56DE5E11.3060307@codeaurora.org>
-Message-ID: <56DEF370.3000904@codeaurora.org>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 8 Mar 2016 09:45:04 -0600
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <56DE7E1D.5070508@st.com>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
+ <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
+ <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
+ <56DDB749.1020808@suse.de>
+ <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
+ <56DE7E1D.5070508@st.com>
+Message-ID: <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 8, 2016 at 1:24 AM, Giuseppe CAVALLARO
+<peppe.cavallaro@st.com> wrote:
+> Hi Dinh,
+>
+> On 3/8/2016 12:22 AM, Dinh Nguyen wrote:
+> [snip]
+>>
+>>
+>> I'm seeing the same issue on the SoCFPGA platform:
+>>
+>> libphy: PHY stmmac-0:ffffffff not found
+>> eth0: Could not attach to PHY
+>> stmmac_open: Cannot attach to PHY (error: -19)
+>>
+>> If I just revert:
+>>
+>>   "stmmac: Fix 'eth0: No PHY found' regression"
+>>
+>> then the issue goes away.
+>
+>
+> do you have this patch "stmmac: first frame prep at the end of xmit routine"
+> ? Or you just reverted
+>   "stmmac: Fix 'eth0: No PHY found' regression"
 
-On 3/8/2016 12:07 AM, Sinan Kaya wrote:
-> On 3/7/2016 11:46 PM, Eric Auger wrote:
->>> #define module_vfio_reset_handler(compat, acpihid, reset) \
->>>> MODULE_ALIAS("vfio-reset: dt: " compat); \
->>>> MODULE_ALIAS("vfio-reset: acpi: " acpihid); \
->> My gut feeling is we must not create a dummy alias when the mode
->> (dt/acpi) is not supported/tested. It fills the modinfo section with
->> spurious data, aliases are visible to modinfo, ...
->>
->> So I personally foresee 2 solutions,
->> 1) we create a single alias using acpihid if supported or compat if not.
->> Then even in dt mode we try to load this module through the acpihid
->> alias. Looks weird but should work.
->> 2) We simply move the module alias declaration out of this macro (to the
->> reset module itself), define 2 aliases in case both dt and acpi are
->> supported & tested.
->>
->> My personal preference is 2 I think.
->>
->> Best Regards
->>
->> Eric
->>
-> 
-> I agree with your assessment of #2. We are trying to be too smart. 
-> I'll post a patch with #2 solution.
-> 
+I only reverted "stmmac: Fix 'eth0: No PHY found' regression". I do have the
+patch "stmmac: first frame prep at the end of the xmit routine", but I did not
+need to revert that patch.
 
-I split patch 8 and 9 from the series and posted a new set here.
-
-http://www.spinics.net/lists/arm-kernel/msg489578.html
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Dinh
