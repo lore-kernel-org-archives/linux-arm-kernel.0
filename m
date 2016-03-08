@@ -1,71 +1,53 @@
-From: yao.yuan@nxp.com (Yao Yuan)
-Date: Tue, 8 Mar 2016 02:03:21 +0000
-Subject: [PATCH v4 4/7] Documentation: fsl-quadspi: Add fsl,ls2080a-dspi
- compatible string
-In-Reply-To: <20160307203200.GW55664@google.com>
-References: <1453793041-35868-1-git-send-email-yao.yuan@freescale.com>
- <1453793041-35868-4-git-send-email-yao.yuan@freescale.com>
- <20160307203200.GW55664@google.com>
-Message-ID: <AM2PR04MB0722F2CC1847AA5E9FDD96F289B20@AM2PR04MB0722.eurprd04.prod.outlook.com>
+From: zhiqiang.hou@nxp.com (Zhiqiang Hou)
+Date: Tue, 8 Mar 2016 02:10:11 +0000
+Subject: [PATCH v3 1/2] Documentation: DT: Add entry for Freescale
+ LS1043a-QDS board
+In-Reply-To: <DB5PR0401MB1928313A537226265C54764291B10@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+References: <1457350232-12749-1-git-send-email-Zhiqiang.Hou@nxp.com>
+ <DB5PR0401MB1928313A537226265C54764291B10@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+Message-ID: <AM4PR04MB214891F1E20C2D22537770EA84B20@AM4PR04MB2148.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 4:32AM, Brian Norris wrote:
-> On Tue, Jan 26, 2016 at 03:23:58PM +0800, Yuan Yao wrote:
-> > new compatible string: "fsl,ls2080a-qspi".
+Hi Scott,
+
+> -----Original Message-----
+> From: Scott Wood
+> Sent: 2016?3?8? 1:23
+> To: Zhiqiang Hou <zhiqiang.hou@nxp.com>; devicetree at vger.kernel.org;
+> robh+dt at kernel.org; mark.rutland at arm.com; pawel.moll at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; linux-arm-
+> kernel at lists.infradead.org; catalin.marinas at arm.com; will.deacon at arm.com;
+> shawnguo at kernel.org
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; Shaohui Xie <shaohui.xie@nxp.com>
+> Subject: Re: [PATCH v3 1/2] Documentation: DT: Add entry for Freescale LS1043a-
+> QDS board
 > 
-> ^^ This line doesn't match the subject or the content of the patch.
-> 
-> > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
+> On 03/07/2016 05:39 AM, Zhiqiang Hou wrote:
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> >
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > > ---
-> > Changed in v4:
-> > No changes.
+> > v3:
+> >  - No change.
 > >
-> > Changed in v3:
-> > Add the modifier for new compatible string like:
-> > "fsl,ls2080a-dspi" followed by "fsl,ls2085a-dspi"
+> >  Documentation/devicetree/bindings/arm/fsl.txt | 1 +
+> >  1 file changed, 1 insertion(+)
 > >
-> > Changed in v2:
-> > Update my email to <yao.yuan@nxp.com>
-> > ---
-> >  Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt | 5 ++++-
+> > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+> > b/Documentation/devicetree/bindings/arm/fsl.txt
+> > index 752a685..f504fdf 100644
+> > --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> > @@ -134,6 +134,7 @@ Freescale ARMv8 based Layerscape SoC family Device
+> > Tree Bindings  LS1043A ARMv8 based RDB Board  Required root node
+> > properties:
+> >      - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
+> > +    - compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
 > 
-> ^^ What is this change doing in this series anyway? You're touching MTD stuff,
-> not SPI stuff, and this string doesn't get used in any driver. Is this controller
-> somehow related, or is it a separate IP block that happens to be on some of the
-> same SoCs?
-> 
+> "fsl,ls1043a-qds" is required for the "LS1043A ARMv8 based RDB Board"?
 
-Sorry for the wrong subject, this patch is used for add the SPI(DSPI) binging document.
-It should be some mistake that I make the wrong subject and the commit message.
+Thanks for your redress, and will correct this issue in v4.
 
-> Anyway, you should send this kind of stuff to the SPI list, not the MTD one.
-
-I will resend it to SPI list, thanks for your review.
-
-> Regards,
-> Brian
-> 
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-> > b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-> > index fa77f87..1ad0fe3 100644
-> > --- a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-> > +++ b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-> > @@ -1,7 +1,10 @@
-> >  ARM Freescale DSPI controller
-> >
-> >  Required properties:
-> > -- compatible : "fsl,vf610-dspi", "fsl,ls1021a-v1.0-dspi", "fsl,ls2085a-dspi"
-> > +- compatible : "fsl,vf610-dspi", "fsl,ls1021a-v1.0-dspi",
-> > +		"fsl,ls2085a-dspi"
-> > +		or
-> > +		"fsl,ls2080a-dspi" followed by "fsl,ls2085a-dspi"
-> >  - reg : Offset and length of the register set for the device
-> >  - interrupts : Should contain SPI controller interrupt
-> >  - clocks: from common clock binding: handle to dspi clock.
-> > --
-> > 2.1.0.27.g96db324
-> >
+Thanks,
+Zhiqiang
