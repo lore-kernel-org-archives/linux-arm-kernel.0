@@ -1,81 +1,37 @@
 From: blogic@openwrt.org (John Crispin)
-Date: Tue,  8 Mar 2016 11:29:56 +0100
-Subject: [PATCH V5 3/4] net-next: mediatek: add Kconfig and Makefile
+Date: Tue,  8 Mar 2016 11:29:57 +0100
+Subject: [PATCH V5 4/4] net-next: mediatek: add an entry to MAINTAINERS
 In-Reply-To: <1457432997-25526-1-git-send-email-blogic@openwrt.org>
 References: <1457432997-25526-1-git-send-email-blogic@openwrt.org>
-Message-ID: <1457432997-25526-4-git-send-email-blogic@openwrt.org>
+Message-ID: <1457432997-25526-5-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Makefile and Kconfig required to make the driver build.
+Add myself and Felix as the Maintainers for the MediaTek ethernet driver.
 
+Signed-off-by: Felix Fietkau <nbd@openwrt.org>
 Signed-off-by: John Crispin <blogic@openwrt.org>
 ---
- drivers/net/ethernet/Kconfig           |    1 +
- drivers/net/ethernet/Makefile          |    1 +
- drivers/net/ethernet/mediatek/Kconfig  |   17 +++++++++++++++++
- drivers/net/ethernet/mediatek/Makefile |    5 +++++
- 4 files changed, 24 insertions(+)
- create mode 100644 drivers/net/ethernet/mediatek/Kconfig
- create mode 100644 drivers/net/ethernet/mediatek/Makefile
+ MAINTAINERS |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/net/ethernet/Kconfig b/drivers/net/ethernet/Kconfig
-index 0b13af8..be67a19 100644
---- a/drivers/net/ethernet/Kconfig
-+++ b/drivers/net/ethernet/Kconfig
-@@ -106,6 +106,7 @@ config LANTIQ_ETOP
- 	  Support for the MII0 inside the Lantiq SoC
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9c4d157..b5293f3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7012,6 +7012,13 @@ F:	include/uapi/linux/meye.h
+ F:	include/uapi/linux/ivtv*
+ F:	include/uapi/linux/uvcvideo.h
  
- source "drivers/net/ethernet/marvell/Kconfig"
-+source "drivers/net/ethernet/mediatek/Kconfig"
- source "drivers/net/ethernet/mellanox/Kconfig"
- source "drivers/net/ethernet/micrel/Kconfig"
- source "drivers/net/ethernet/microchip/Kconfig"
-diff --git a/drivers/net/ethernet/Makefile b/drivers/net/ethernet/Makefile
-index 38dc1a7..6ffcc80 100644
---- a/drivers/net/ethernet/Makefile
-+++ b/drivers/net/ethernet/Makefile
-@@ -46,6 +46,7 @@ obj-$(CONFIG_JME) += jme.o
- obj-$(CONFIG_KORINA) += korina.o
- obj-$(CONFIG_LANTIQ_ETOP) += lantiq_etop.o
- obj-$(CONFIG_NET_VENDOR_MARVELL) += marvell/
-+obj-$(CONFIG_NET_VENDOR_MEDIATEK) += mediatek/
- obj-$(CONFIG_NET_VENDOR_MELLANOX) += mellanox/
- obj-$(CONFIG_NET_VENDOR_MICREL) += micrel/
- obj-$(CONFIG_NET_VENDOR_MICROCHIP) += microchip/
-diff --git a/drivers/net/ethernet/mediatek/Kconfig b/drivers/net/ethernet/mediatek/Kconfig
-new file mode 100644
-index 0000000..b0229f4
---- /dev/null
-+++ b/drivers/net/ethernet/mediatek/Kconfig
-@@ -0,0 +1,17 @@
-+config NET_VENDOR_MEDIATEK
-+	bool "MediaTek ethernet driver"
-+	depends on ARCH_MEDIATEK
-+	---help---
-+	  If you have a Mediatek SoC with ethernet, say Y.
++MEDIATEK ETHERNET DRIVER
++M:	Felix Fietkau <nbd@openwrt.org>
++M:	John Crispin <blogic@openwrt.org>
++L:	netdev at vger.kernel.org
++S:	Maintained
++F:	drivers/net/ethernet/mediatek/
 +
-+if NET_VENDOR_MEDIATEK
-+
-+config NET_MEDIATEK_SOC
-+	tristate "MediaTek MT7623 Gigabit ethernet support"
-+	depends on NET_VENDOR_MEDIATEK && (MACH_MT7623 || MACH_MT2701)
-+	select PHYLIB
-+	---help---
-+	  This driver supports the gigabit ethernet MACs in the
-+	  MediaTek MT2701/MT7623 chipset family.
-+
-+endif #NET_VENDOR_MEDIATEK
-diff --git a/drivers/net/ethernet/mediatek/Makefile b/drivers/net/ethernet/mediatek/Makefile
-new file mode 100644
-index 0000000..aa3f1c8
---- /dev/null
-+++ b/drivers/net/ethernet/mediatek/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for the Mediatek SoCs built-in ethernet macs
-+#
-+
-+obj-$(CONFIG_NET_MEDIATEK_SOC)			+= mtk_eth_soc.o
+ MEDIATEK MT7601U WIRELESS LAN DRIVER
+ M:	Jakub Kicinski <kubakici@wp.pl>
+ L:	linux-wireless at vger.kernel.org
 -- 
 1.7.10.4
