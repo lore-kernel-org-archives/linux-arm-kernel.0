@@ -1,38 +1,41 @@
-From: grmoore@opensource.altera.com (Graham Moore)
-Date: Tue, 8 Mar 2016 11:02:50 -0600
-Subject: [PATCH] ARM: socfpga: dts: Add missing clock and interrupt fields for
- Arria10 DMA
-Message-ID: <1457456571-25541-1-git-send-email-grmoore@opensource.altera.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Mar 2016 09:09:09 -0800
+Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <56DEB82F.5050703@ti.com>
+References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+ <CACRpkdYzJ9Hy0sH6gK6RzpLE6juS4WfPjbt7nh43vR9YTuGZWA@mail.gmail.com>
+ <56C1A1FE.3080403@arm.com> <20160215152751.GT19432@atomide.com>
+ <56DEB82F.5050703@ti.com>
+Message-ID: <20160308170909.GC9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL330 DMA driver will not load on Arria10 without devicetree entries
-for clocks and clock_names.  This patch adds those entries.  It also adds
-the ninth interrupt, which is required for error detection.
+* Grygorii Strashko <grygorii.strashko@ti.com> [160308 03:32]:
+> 
+> Yeah. As I mentioned before patches 2/3 will not work.
+> I've tried to test suspend with diff I posted [1], but I did it only on 
+> dra7 and am43 where suspend i more simple than on omap3. Also, I worry
+> that with such approach some irq can be missed (especially edge ones), 
+> because PRCM irqs will be re-enabled at very late resume stage 
+> (right before thaw).
 
-Signed-off-by: Graham Moore <grmoore@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria10.dtsi | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Yeah any tests not done with PM on omap3 with the mainline kernel
+are clearly incomplete in this case :)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index cce9e50..45a4728 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -78,10 +78,13 @@
- 					     <0 87 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 88 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 89 IRQ_TYPE_LEVEL_HIGH>,
--					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
-+					     <0 90 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 91 IRQ_TYPE_LEVEL_HIGH>;
- 				#dma-cells = <1>;
- 				#dma-channels = <8>;
- 				#dma-requests = <32>;
-+				clocks = <&l4_main_clk>;
-+				clock-names = "apb_pclk";
- 			};
- 		};
- 
--- 
-2.5.0
+> Second option, I see, is to rework PRCM to be threaded IRQ, but in this case
+> all children IRQs will need to be threaded/nested threaded
+> (including PCS, legacy OMAP mux, OMAP3 _prcm_int_handle_wakeup/_prcm_int_handle_io).
+> 
+> Are there any objection to convert PCS to threaded IRQ, for example? ;)
+
+For PRCM interrupt, I don't think that can be threaded IRQ as
+that thing is firing all the time. The consumers for the chained
+PRCM interrupt consumers like PCS could probably use threaded IRQ.
+When the PCS interrupts fire, we're already in some sleeper
+idle state so the extra latency thre does not matter.
+
+Regards,
+
+Tony
+
+> [1] https://patchwork.ozlabs.org/patch/578915/
