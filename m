@@ -1,62 +1,24 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 8 Mar 2016 18:32:10 +0700
-Subject: [PATCH 1/3] pinctrl: single: Use a separate lockdep class
-In-Reply-To: <1454351299-27440-2-git-send-email-sudeep.holla@arm.com>
-References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
- <1454351299-27440-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <56DEB83A.9070901@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 8 Mar 2016 03:55:06 -0800
+Subject: [PATCH v4 0/3] driver for the hardware monitoring chip in the
+ Zyxel NSA320
+In-Reply-To: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
+References: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
+Message-ID: <20160308115506.GA25899@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2016 01:28 AM, Sudeep Holla wrote:
-> The single pinmux controller can be cascaded to the other interrupt
-> controllers. Hence when propagating wake-up settings to its parent
-> interrupt controller, there's possiblity of detecting possible recursive
-> locking and getting lockdep warning.
+On Sat, Mar 05, 2016 at 03:34:54PM +0000, Adam Baker wrote:
+>  Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt |  21 +++++
+>  Documentation/hwmon/nsa320                             |  53 +++++++++++
+>  arch/arm/boot/dts/kirkwood-nsa320.dts                  |  13 ++-
+>  drivers/hwmon/Kconfig                                  |  15 +++
+>  drivers/hwmon/Makefile                                 |   1 +
+>  drivers/hwmon/nsa320-hwmon.c                           | 216 ++++++++++++++++++++++++++++++++++++++++++++
+>  6 files changed, 317 insertions(+), 2 deletions(-)
 > 
-> This patch avoids this false positive by using a separate lockdep class
-> for this single pinctrl interrupts.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-gpio at vger.kernel.org
-> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->   drivers/pinctrl/pinctrl-single.c | 8 ++++++++
->   1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index d24e5f1d1525..fb126d56ad40 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -255,6 +255,13 @@ static enum pin_config_param pcs_bias[] = {
->   };
->   
->   /*
-> + * This lock class tells lockdep that irqchip core that this single
-> + * pinctrl can be in a different category than its parents, so it won't
-> + * report false recursion.
-> + */
-> +static struct lock_class_key pcs_lock_class;
-> +
-> +/*
->    * REVISIT: Reads and writes could eventually use regmap or something
->    * generic. But at least on omaps, some mux registers are performance
->    * critical as they may need to be remuxed every time before and after
-> @@ -1713,6 +1720,7 @@ static int pcs_irqdomain_map(struct irq_domain *d, unsigned int irq,
->   	irq_set_chip_data(irq, pcs_soc);
->   	irq_set_chip_and_handler(irq, &pcs->chip,
->   				 handle_level_irq);
-> +	irq_set_lockdep_class(irq, &pcs_lock_class);
->   	irq_set_noprobe(irq);
->   
->   	return 0;
-> 
+Patch 1/3 and 2/3 applied to hwmon-next.
 
-I have no objection to this patch and it's independent from other patches in
-this series.
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>  
+I assume that patch 3/3 will go through the arm tree.
 
--- 
-regards,
--grygorii
+Guenter
