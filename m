@@ -1,406 +1,127 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  8 Mar 2016 12:15:14 +0100
-Subject: [PATCH 6/7] mtd: nand: sunxi: add support for DMA assisted operations
-In-Reply-To: <1457435715-24740-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1457435715-24740-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1457435715-24740-7-git-send-email-boris.brezillon@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  8 Mar 2016 12:18:20 +0100
+Subject: [PATCH 1/2] ARM: dts: imx25-pinfunc: add all UART mux modes
+In-Reply-To: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1457435901-15886-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sunxi NAND controller is able to pipeline ECC operations only when
-operated in DMA mode, which improves a lot NAND throughput while keeping
-CPU usage low.
+Apart from a few additions this also contains two fixes where the daisy
+chain input selection register was missing. Moreover dropped _MUX from
+some pins for consistency.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/mtd/nand/sunxi_nand.c | 301 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 297 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx25-pinfunc.h | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 07c3af7..7ba285e 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -277,6 +277,7 @@ struct sunxi_nfc {
- 	unsigned long clk_rate;
- 	struct list_head chips;
- 	struct completion complete;
-+	struct dma_chan *dmac;
- };
+diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
+index 848ffa785b63..6f069bc4f933 100644
+--- a/arch/arm/boot/dts/imx25-pinfunc.h
++++ b/arch/arm/boot/dts/imx25-pinfunc.h
+@@ -237,17 +237,21 @@
+ #define MX25_PAD_LD7__GPIO_1_21			0x0e4 0x2dc 0x000 0x15 0x000
  
- static inline struct sunxi_nfc *to_sunxi_nfc(struct nand_hw_control *ctrl)
-@@ -369,6 +370,68 @@ static int sunxi_nfc_rst(struct sunxi_nfc *nfc)
- 	return ret;
- }
+ #define MX25_PAD_LD8__LD8			0x0e8 0x2e0 0x000 0x10 0x000
++#define MX25_PAD_LD8__UART4_RXD			0x0e8 0x2e0 0x570 0x12 0x000
+ #define MX25_PAD_LD8__FEC_TX_ERR		0x0e8 0x2e0 0x000 0x15 0x000
+ #define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x06 0x000
  
-+static int sunxi_nfc_dma_op_prepare(struct mtd_info *mtd, const void *buf,
-+				    int chunksize, int nchunks,
-+				    enum dma_data_direction ddir,
-+				    struct sg_table *sgt)
-+{
-+	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
-+	struct dma_async_tx_descriptor *dmad;
-+	enum dma_transfer_direction tdir;
-+	dma_cookie_t dmat;
-+	int ret;
-+
-+	if (ddir == DMA_FROM_DEVICE)
-+		tdir = DMA_DEV_TO_MEM;
-+	else
-+		tdir = DMA_MEM_TO_DEV;
-+
-+	ret = mtd_map_buf(mtd, nfc->dev, sgt, buf, nchunks * chunksize,
-+			  NULL, ddir);
-+	if (ret)
-+		return ret;
-+
-+	dmad = dmaengine_prep_slave_sg(nfc->dmac, sgt->sgl, sgt->nents,
-+				       tdir, DMA_CTRL_ACK);
-+	if (IS_ERR(dmad)) {
-+		ret = PTR_ERR(dmad);
-+		goto err_unmap_buf;
-+	}
-+
-+	writel(readl(nfc->regs + NFC_REG_CTL) | NFC_RAM_METHOD,
-+	       nfc->regs + NFC_REG_CTL);
-+	writel(nchunks, nfc->regs + NFC_REG_SECTOR_NUM);
-+	writel(chunksize, nfc->regs + NFC_REG_CNT);
-+	dmat = dmaengine_submit(dmad);
-+
-+	ret = dma_submit_error(dmat);
-+	if (ret)
-+		goto err_clr_dma_flag;
-+
-+	return 0;
-+
-+err_clr_dma_flag:
-+	writel(readl(nfc->regs + NFC_REG_CTL) & ~NFC_RAM_METHOD,
-+	       nfc->regs + NFC_REG_CTL);
-+
-+err_unmap_buf:
-+	mtd_unmap_buf(mtd, nfc->dev, sgt, ddir);
-+	return ret;
-+}
-+
-+static void sunxi_nfc_dma_op_cleanup(struct mtd_info *mtd,
-+				     enum dma_data_direction ddir,
-+				     struct sg_table *sgt)
-+{
-+	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
-+
-+	mtd_unmap_buf(mtd, nfc->dev, sgt, ddir);
-+	writel(readl(nfc->regs + NFC_REG_CTL) & ~NFC_RAM_METHOD,
-+	       nfc->regs + NFC_REG_CTL);
-+}
-+
- static int sunxi_nfc_dev_ready(struct mtd_info *mtd)
- {
- 	struct nand_chip *nand = mtd_to_nand(mtd);
-@@ -971,6 +1034,106 @@ static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
- 		*cur_off = mtd->oobsize + mtd->writesize;
- }
+ #define MX25_PAD_LD9__LD9			0x0ec 0x2e4 0x000 0x10 0x000
++#define MX25_PAD_LD9__UART4_TXD_MUX		0x0ec 0x2e4 0x000 0x12 0x000
+ #define MX25_PAD_LD9__FEC_COL			0x0ec 0x2e4 0x504 0x15 0x001
+ #define MX25_PAD_LD9__SDHC2_CLK			0x0ec 0x2e4 0x4dc 0x06 0x000
  
-+static int sunxi_nfc_hw_ecc_read_chunks_dma(struct mtd_info *mtd, uint8_t *buf,
-+					    int oob_required, int page,
-+					    int nchunks)
-+{
-+	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	unsigned int max_bitflips = 0;
-+	int ret, i, raw_mode = 0;
-+	struct sg_table sgt;
-+
-+	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-+	if (ret)
-+		return ret;
-+
-+	ret = sunxi_nfc_dma_op_prepare(mtd, buf, ecc->size, nchunks,
-+				       DMA_FROM_DEVICE, &sgt);
-+	if (ret)
-+		return ret;
-+
-+	sunxi_nfc_hw_ecc_enable(mtd);
-+	sunxi_nfc_randomizer_config(mtd, page, false);
-+	sunxi_nfc_randomizer_enable(mtd);
-+
-+	writel((NAND_CMD_RNDOUTSTART << 16) | (NAND_CMD_RNDOUT << 8) |
-+	       NAND_CMD_READSTART, nfc->regs + NFC_REG_RCMD_SET);
-+
-+	dma_async_issue_pending(nfc->dmac);
-+
-+	writel(NFC_PAGE_OP | NFC_DATA_SWAP_METHOD | NFC_DATA_TRANS,
-+	       nfc->regs + NFC_REG_CMD);
-+
-+	ret = sunxi_nfc_wait_events(nfc, NFC_CMD_INT_FLAG, true, 0);
-+	if (ret)
-+		dmaengine_terminate_all(nfc->dmac);
-+
-+	sunxi_nfc_randomizer_disable(mtd);
-+	sunxi_nfc_hw_ecc_disable(mtd);
-+
-+	sunxi_nfc_dma_op_cleanup(mtd, DMA_FROM_DEVICE, &sgt);
-+
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < nchunks; i++) {
-+		int data_off = i * ecc->size;
-+		int oob_off = i * (ecc->bytes + 4);
-+		u8 *data = buf + data_off;
-+		u8 *oob = nand->oob_poi + oob_off;
-+		bool randomized = nand->options & NAND_NEED_SCRAMBLING;
-+		bool erased;
-+
-+		ret = sunxi_nfc_hw_ecc_correct(mtd, randomized ? data : NULL,
-+				(randomized && oob_required) ? oob : NULL,
-+				i, &erased);
-+		if (ret < 0) {
-+			/*
-+			 * Re-read the data with the randomizer disabled to
-+			 * identify bitflips in erased pages.
-+			 */
-+			if (nand->options & NAND_NEED_SCRAMBLING) {
-+				/* TODO: use DMA to read page in raw mode */
-+				nand->cmdfunc(mtd, NAND_CMD_RNDOUT,
-+					      data_off, -1);
-+				nand->read_buf(mtd, data, ecc->size);
-+			}
-+
-+			/* TODO: use DMA to retrieve OOB */
-+			nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
-+			nand->read_buf(mtd, oob, ecc->bytes + 4);
-+
-+			ret = nand_check_erased_ecc_chunk(data,	ecc->size,
-+							  oob, ecc->bytes + 4,
-+							  NULL, 0,
-+							  ecc->strength);
-+			if (ret >= 0)
-+				raw_mode = 1;
-+		} else if (oob_required && !erased) {
-+			/* TODO: use DMA to retrieve OOB */
-+			nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
-+			nand->read_buf(mtd, oob, ecc->bytes + 4);
-+
-+			sunxi_nfc_hw_ecc_get_prot_oob_bytes(mtd, oob, i,
-+							    !i, page);
-+		}
-+
-+		if (erased)
-+			raw_mode = 1;
-+
-+		sunxi_nfc_hw_ecc_update_stats(mtd, &max_bitflips, ret);
-+	}
-+
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_read_extra_oob(mtd, nand->oob_poi,
-+						NULL, !raw_mode,
-+						page);
-+
-+	return max_bitflips;
-+}
-+
- static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
- 					const u8 *data, int data_off,
- 					const u8 *oob, int oob_off,
-@@ -1069,6 +1232,23 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
- 	return max_bitflips;
- }
+ #define MX25_PAD_LD10__LD10			0x0f0 0x2e8 0x000 0x10 0x000
++#define MX25_PAD_LD10__UART4_RTS		0x0f0 0x2e8 0x56c 0x12 0x000
+ #define MX25_PAD_LD10__FEC_RX_ERR		0x0f0 0x2e8 0x518 0x15 0x001
  
-+static int sunxi_nfc_hw_ecc_read_page_dma(struct mtd_info *mtd,
-+					  struct nand_chip *chip, u8 *buf,
-+					  int oob_required, int page)
-+{
-+	int ret;
-+
-+	ret = sunxi_nfc_hw_ecc_read_chunks_dma(mtd, buf, oob_required, page,
-+					       chip->ecc.steps);
-+	if (ret >= 0)
-+		return ret;
-+
-+	/* Fallback to PIO mode */
-+	chip->cmdfunc(mtd, NAND_CMD_RNDOUT, 0, -1);
-+
-+	return sunxi_nfc_hw_ecc_read_page(mtd, chip, buf, oob_required, page);
-+}
-+
- static int sunxi_nfc_hw_ecc_read_subpage(struct mtd_info *mtd,
- 					 struct nand_chip *chip,
- 					 u32 data_offs, u32 readlen,
-@@ -1102,6 +1282,25 @@ static int sunxi_nfc_hw_ecc_read_subpage(struct mtd_info *mtd,
- 	return max_bitflips;
- }
+ #define MX25_PAD_LD11__LD11			0x0f4 0x2ec 0x000 0x10 0x000
++#define MX25_PAD_LD11__UART4_CTS		0x0f4 0x2ec 0x000 0x12 0x000
+ #define MX25_PAD_LD11__FEC_RDATA2		0x0f4 0x2ec 0x50c 0x15 0x001
+ #define MX25_PAD_LD11__SDHC2_DAT1		0x0f4 0x2ec 0x4e8 0x06 0x000
  
-+static int sunxi_nfc_hw_ecc_read_subpage_dma(struct mtd_info *mtd,
-+					     struct nand_chip *chip,
-+					     u32 data_offs, u32 readlen,
-+					     u8 *buf, int page)
-+{
-+	int nchunks = DIV_ROUND_UP(data_offs + readlen, chip->ecc.size);
-+	int ret;
-+
-+	ret = sunxi_nfc_hw_ecc_read_chunks_dma(mtd, buf, false, page, nchunks);
-+	if (ret >= 0)
-+		return ret;
-+
-+	/* Fallback to PIO mode */
-+	chip->cmdfunc(mtd, NAND_CMD_RNDOUT, 0, -1);
-+
-+	return sunxi_nfc_hw_ecc_read_subpage(mtd, chip, data_offs, readlen,
-+					     buf, page);
-+}
-+
- static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 				       struct nand_chip *chip,
- 				       const uint8_t *buf, int oob_required,
-@@ -1134,6 +1333,69 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 	return 0;
- }
+@@ -360,7 +364,7 @@
+ #define MX25_PAD_I2C1_DAT__GPIO_1_13		0x154 0x34c 0x000 0x15 0x000
  
-+static int sunxi_nfc_hw_ecc_write_page_dma(struct mtd_info *mtd,
-+					   struct nand_chip *chip,
-+					   const u8 *buf,
-+					   int oob_required,
-+					   int page)
-+{
-+	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	struct sg_table sgt;
-+	int ret, i;
-+
-+	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-+	if (ret)
-+		return ret;
-+
-+	ret = sunxi_nfc_dma_op_prepare(mtd, buf, ecc->size, ecc->steps,
-+				       DMA_TO_DEVICE, &sgt);
-+	if (ret)
-+		goto pio_fallback;
-+
-+	for (i = 0; i < ecc->steps; i++) {
-+		const u8 *oob = nand->oob_poi + (i * (ecc->bytes + 4));
-+
-+		sunxi_nfc_hw_ecc_set_prot_oob_bytes(mtd, oob, i, !i, page);
-+	}
-+
-+	sunxi_nfc_hw_ecc_enable(mtd);
-+	sunxi_nfc_randomizer_config(mtd, page, false);
-+	sunxi_nfc_randomizer_enable(mtd);
-+
-+	writel((NAND_CMD_RNDIN << 8) | NAND_CMD_PAGEPROG,
-+	       nfc->regs + NFC_REG_RCMD_SET);
-+
-+	dma_async_issue_pending(nfc->dmac);
-+
-+	writel(NFC_PAGE_OP | NFC_DATA_SWAP_METHOD |
-+	       NFC_DATA_TRANS | NFC_ACCESS_DIR,
-+	       nfc->regs + NFC_REG_CMD);
-+
-+	ret = sunxi_nfc_wait_events(nfc, NFC_CMD_INT_FLAG, true, 0);
-+	if (ret)
-+		dmaengine_terminate_all(nfc->dmac);
-+
-+	sunxi_nfc_randomizer_disable(mtd);
-+	sunxi_nfc_hw_ecc_disable(mtd);
-+
-+	sunxi_nfc_dma_op_cleanup(mtd, DMA_FROM_DEVICE, &sgt);
-+
-+	if (ret)
-+		return ret;
-+
-+	if (oob_required || (chip->options & NAND_NEED_SCRAMBLING))
-+		/* TODO: use DMA to transfer extra OOB bytes ? */
-+		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi,
-+						 NULL, page);
-+
-+	return 0;
-+
-+pio_fallback:
-+	return sunxi_nfc_hw_ecc_write_page(mtd, chip, buf, oob_required, page);
-+}
-+
- static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
- 					       struct nand_chip *chip,
- 					       uint8_t *buf, int oob_required,
-@@ -1501,6 +1763,9 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
- 				       struct nand_ecc_ctrl *ecc,
- 				       struct device_node *np)
- {
-+	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
- 	struct nand_ecclayout *layout;
- 	int nsectors;
- 	int i, j;
-@@ -1510,11 +1775,19 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
- 	if (ret)
- 		return ret;
+ #define MX25_PAD_CSPI1_MOSI__CSPI1_MOSI		0x158 0x350 0x000 0x10 0x000
+-#define MX25_PAD_CSPI1_MOSI__UART3_RXD		0x158 0x350 0x000 0x12 0x000
++#define MX25_PAD_CSPI1_MOSI__UART3_RXD		0x158 0x350 0x568 0x12 0x000
+ #define MX25_PAD_CSPI1_MOSI__GPIO_1_14		0x158 0x350 0x000 0x15 0x000
  
--	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
--	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
-+	if (nfc->dmac) {
-+		ecc->read_page = sunxi_nfc_hw_ecc_read_page_dma;
-+		ecc->read_subpage = sunxi_nfc_hw_ecc_read_subpage_dma;
-+		ecc->write_page = sunxi_nfc_hw_ecc_write_page_dma;
-+	} else {
-+		ecc->read_page = sunxi_nfc_hw_ecc_read_page;
-+		ecc->read_subpage = sunxi_nfc_hw_ecc_read_subpage;
-+		ecc->write_page = sunxi_nfc_hw_ecc_write_page;
-+	}
-+
-+	/* TODO: support DMA for raw accesses */
- 	ecc->read_oob_raw = nand_read_oob_std;
- 	ecc->write_oob_raw = nand_write_oob_std;
--	ecc->read_subpage = sunxi_nfc_hw_ecc_read_subpage;
- 	layout = ecc->layout;
- 	nsectors = mtd->writesize / ecc->size;
+ #define MX25_PAD_CSPI1_MISO__CSPI1_MISO		0x15c 0x354 0x000 0x10 0x000
+@@ -392,10 +396,12 @@
+ #define MX25_PAD_UART1_RTS__UART1_RTS		0x178 0x370 0x000 0x10 0x000
+ #define MX25_PAD_UART1_RTS__CSI_D0		0x178 0x370 0x488 0x11 0x001
+ #define MX25_PAD_UART1_RTS__CC3			0x178 0x370 0x000 0x12 0x000
++#define MX25_PAD_UART1_RTS__UART2_DCD		0x178 0x370 0x000 0x13 0x000
+ #define MX25_PAD_UART1_RTS__GPIO_4_24		0x178 0x370 0x000 0x15 0x000
  
-@@ -1888,16 +2161,34 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_mod_clk_unprepare;
+ #define MX25_PAD_UART1_CTS__UART1_CTS		0x17c 0x374 0x000 0x10 0x000
+ #define MX25_PAD_UART1_CTS__CSI_D1		0x17c 0x374 0x48c 0x11 0x001
++#define MX25_PAD_UART1_CTS__UART2_RI		0x17c 0x374 0x000 0x13 0x001
+ #define MX25_PAD_UART1_CTS__GPIO_4_25		0x17c 0x374 0x000 0x15 0x000
  
-+	nfc->dmac = dma_request_slave_channel(dev, "rxtx");
-+	if (nfc->dmac) {
-+		struct dma_slave_config dmac_cfg = { };
-+
-+		dmac_cfg.src_addr = r->start + NFC_REG_IO_DATA;
-+		dmac_cfg.dst_addr = dmac_cfg.src_addr;
-+		dmac_cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+		dmac_cfg.dst_addr_width = dmac_cfg.src_addr_width;
-+		dmac_cfg.src_maxburst = 4;
-+		dmac_cfg.dst_maxburst = 4;
-+		dmaengine_slave_config(nfc->dmac, &dmac_cfg);
-+	} else {
-+		dev_warn(dev, "failed to request rxtx DMA channel\n");
-+	}
-+
- 	platform_set_drvdata(pdev, nfc);
+ #define MX25_PAD_UART2_RXD__UART2_RXD		0x180 0x378 0x000 0x10 0x000
+@@ -440,33 +446,39 @@
+ #define MX25_PAD_SD1_DATA3__GPIO_2_28		0x1a4 0x39c 0x000 0x15 0x000
  
- 	ret = sunxi_nand_chips_init(dev, nfc);
- 	if (ret) {
- 		dev_err(dev, "failed to init nand chips\n");
--		goto out_mod_clk_unprepare;
-+		goto out_release_dmac;
- 	}
+ #define MX25_PAD_KPP_ROW0__KPP_ROW0		0x1a8 0x3a0 0x000 0x10 0x000
++#define MX25_PAD_KPP_ROW0__UART3_RXD		0x1a8 0x3a0 0x568 0x11 0x001
+ #define MX25_PAD_KPP_ROW0__UART1_DTR		0x1a8 0x3a0 0x000 0x14 0x000
+ #define MX25_PAD_KPP_ROW0__GPIO_2_29		0x1a8 0x3a0 0x000 0x15 0x000
  
- 	return 0;
+ #define MX25_PAD_KPP_ROW1__KPP_ROW1		0x1ac 0x3a4 0x000 0x10 0x000
++#define MX25_PAD_KPP_ROW1__UART3_TXD		0x1ac 0x3a4 0x000 0x11 0x000
++#define MX25_PAD_KPP_ROW1__UART1_DSR		0x1ac 0x3a4 0x000 0x14 0x000
+ #define MX25_PAD_KPP_ROW1__GPIO_2_30		0x1ac 0x3a4 0x000 0x15 0x000
  
-+out_release_dmac:
-+	if (nfc->dmac)
-+		dma_release_channel(nfc->dmac);
- out_mod_clk_unprepare:
- 	clk_disable_unprepare(nfc->mod_clk);
- out_ahb_clk_unprepare:
-@@ -1911,6 +2202,8 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
- 	struct sunxi_nfc *nfc = platform_get_drvdata(pdev);
+ #define MX25_PAD_KPP_ROW2__KPP_ROW2		0x1b0 0x3a8 0x000 0x10 0x000
++#define MX25_PAD_KPP_ROW2__UART3_RTS		0x1b0 0x3a8 0x000 0x11 0x000
+ #define MX25_PAD_KPP_ROW2__CSI_D0		0x1b0 0x3a8 0x488 0x13 0x002
+ #define MX25_PAD_KPP_ROW2__UART1_DCD		0x1b0 0x3a8 0x000 0x14 0x000
+ #define MX25_PAD_KPP_ROW2__GPIO_2_31		0x1b0 0x3a8 0x000 0x15 0x000
  
- 	sunxi_nand_chips_cleanup(nfc);
-+	if (nfc->dmac)
-+		dma_release_channel(nfc->dmac);
- 	clk_disable_unprepare(nfc->mod_clk);
- 	clk_disable_unprepare(nfc->ahb_clk);
+ #define MX25_PAD_KPP_ROW3__KPP_ROW3		0x1b4 0x3ac 0x000 0x10 0x000
++#define MX25_PAD_KPP_ROW3__UART3_CTS		0x1b4 0x3ac 0x000 0x11 0x000
+ #define MX25_PAD_KPP_ROW3__CSI_D1		0x1b4 0x3ac 0x48c 0x13 0x002
++#define MX25_PAD_KPP_ROW3__UART1_RI		0x1b4 0x3ac 0x000 0x14 0x000
+ #define MX25_PAD_KPP_ROW3__GPIO_3_0		0x1b4 0x3ac 0x000 0x15 0x000
  
+ #define MX25_PAD_KPP_COL0__KPP_COL0		0x1b8 0x3b0 0x000 0x10 0x000
+-#define MX25_PAD_KPP_COL0__UART4_RXD_MUX	0x1b8 0x3b0 0x570 0x11 0x001
++#define MX25_PAD_KPP_COL0__UART4_RXD		0x1b8 0x3b0 0x570 0x11 0x001
+ #define MX25_PAD_KPP_COL0__AUD5_TXD		0x1b8 0x3b0 0x000 0x12 0x000
+ #define MX25_PAD_KPP_COL0__GPIO_3_1		0x1b8 0x3b0 0x000 0x15 0x000
+ 
+ #define MX25_PAD_KPP_COL1__KPP_COL1		0x1bc 0x3b4 0x000 0x10 0x000
+-#define MX25_PAD_KPP_COL1__UART4_TXD_MUX	0x1bc 0x3b4 0x000 0x11 0x000
++#define MX25_PAD_KPP_COL1__UART4_TXD		0x1bc 0x3b4 0x000 0x11 0x000
+ #define MX25_PAD_KPP_COL1__AUD5_RXD		0x1bc 0x3b4 0x000 0x12 0x000
+ #define MX25_PAD_KPP_COL1__GPIO_3_2		0x1bc 0x3b4 0x000 0x15 0x000
+ 
+ #define MX25_PAD_KPP_COL2__KPP_COL2		0x1c0 0x3b8 0x000 0x10 0x000
+-#define MX25_PAD_KPP_COL2__UART4_RTS		0x1c0 0x3b8 0x000 0x11 0x000
++#define MX25_PAD_KPP_COL2__UART4_RTS		0x1c0 0x3b8 0x56c 0x11 0x001
+ #define MX25_PAD_KPP_COL2__AUD5_TXC		0x1c0 0x3b8 0x000 0x12 0x000
+ #define MX25_PAD_KPP_COL2__GPIO_3_3		0x1c0 0x3b8 0x000 0x15 0x000
+ 
+@@ -560,6 +572,7 @@
+ #define MX25_PAD_VSTBY_REQ__VSTBY_REQ		0x214 0x408 0x000 0x10 0x000
+ #define MX25_PAD_VSTBY_REQ__AUD7_TXFS		0x214 0x408 0x000 0x14 0x000
+ #define MX25_PAD_VSTBY_REQ__GPIO_3_17		0x214 0x408 0x000 0x15 0x000
++#define MX25_PAD_VSTBY_REQ__UART4_RTS		0x214 0x408 0x56c 0x16 0x002
+ 
+ #define MX25_PAD_VSTBY_ACK__VSTBY_ACK		0x218 0x40c 0x000 0x10 0x000
+ #define MX25_PAD_VSTBY_ACK__GPIO_3_18		0x218 0x40c 0x000 0x15 0x000
+@@ -567,6 +580,7 @@
+ #define MX25_PAD_POWER_FAIL__POWER_FAIL		0x21c 0x410 0x000 0x10 0x000
+ #define MX25_PAD_POWER_FAIL__AUD7_RXD		0x21c 0x410 0x478 0x14 0x001
+ #define MX25_PAD_POWER_FAIL__GPIO_3_19		0x21c 0x410 0x000 0x15 0x000
++#define MX25_PAD_POWER_FAIL__UART4_CTS		0x21c 0x410 0x000 0x16 0x000
+ 
+ #define MX25_PAD_CLKO__CLKO			0x220 0x414 0x000 0x10 0x000
+ #define MX25_PAD_CLKO__GPIO_2_21		0x220 0x414 0x000 0x15 0x000
 -- 
-2.1.4
+2.7.0
