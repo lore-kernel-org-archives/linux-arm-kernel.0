@@ -1,88 +1,65 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 7 Mar 2016 17:19:50 -0800
-Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
-In-Reply-To: <3859490.BDucKaOEBr@diego>
-References: <1936935.FVZdWRYuBf@diego> <2125152.VIQO6FufKf@diego>
- <CAD=FV=Wr0f6d=tJCCfQa59pNDe1PEj44hdqCKFKricYdv7D+0w@mail.gmail.com>
- <3859490.BDucKaOEBr@diego>
-Message-ID: <CAD=FV=UrFmwEUsn_e_7JRranNkvXLEBCVfZLQduG+=MLqpBJng@mail.gmail.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon,  7 Mar 2016 19:23:38 -0600
+Subject: [PATCH v5 0/6] ARM: am335x/am437x/dra7: Add PWM support for DRA7
+Message-ID: <1457400224-24797-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+This patch series adds support for PWM for DRA7. The IP is same as that
+present in AM33XX and AM437XX.
 
-On Mon, Mar 7, 2016 at 4:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Montag, 7. M?rz 2016, 16:46:04 schrieb Doug Anderson:
->> On Fri, Dec 11, 2015 at 4:57 PM, Heiko St?bner <heiko@sntech.de> wrote:
->> > Hi Arnd,
->> >
->> > Am Samstag, 12. Dezember 2015, 01:30:17 schrieb Arnd Bergmann:
->> >> On Saturday 05 December 2015 01:53:38 Heiko St?bner wrote:
->> >> > SMP special case for the rk3036 and making sure the arch-timer
->> >> > supply is enabled, similar to the rk3288.
->> >>
->> >> That is a rather ugly hack, I'd prefer if this could be done cleaner
->> >> rather than duplicated into another place.
->> >
->> > I do agree that it is rather ugly :-) .
->> >
->> > The general opinion seems to be, that firmware is supposed to make sure
->> > this timer is enabled and at the time when it got introduced the
->> > consensus was to not hack up the arch-timer to facilitate this and "just"
->> > put it into the soc code for the affected cpu.
->> >
->> > It seems like the really new rk3228 (quad-core A7 and using psci now)
->> > actually gets this right now, in having its firmware taking care of this.
->> > So it looks like this hopefully won't be needed even for future arm32
->> > socs.
->> >
->> > I guess I should look at what the new and shiny mainline uboot support
->> > does
->> > for this, but I do think it might actually do it right as well.
->> >
->> > So this is really only a hack for flaky vendor-bootloaders.
->> >
->> >
->> > Which brings me to ...
->> >
->> >> Sorry for not seeing this earlier. Can you replace the hardcoded
->> >> RK3036_TIMER_PHYS and RK3288_TIMER6_7_PHYS constants with a DT
->> >> lookup, to make it somewhat less hacky?
->> >
->> > I'm not really sure how that is supposed to look like. Technically nothing
->> > should ever touch that timer, as it will only make the system hang if it
->> > gets disabled.
->> >
->> > We do have a binding for the timer ip block (rockchip,rk3288-timer) but of
->> > course cannot use that, to make sure the regular timer driver doesn't bind
->> > to it. So I guess we could do something like:
->> >
->> >
->> > timer at 200440a0 {
->> >
->> >         compatible = "rockchip,arch-timer-supply";
->> >         reg = <0x200440a0 0x20>;
->> >
->> > };
->> >
->> > try to find this and enable it, but duplicating the hack and spreading it
->> > into the dts as well somehow doesn't feel like an improvement ;-) .
->> >
->> > But I maybe you have a nicer idea on how to do this, than me.
->>
->> In a kernel tree drop from Rockchip I noticed that they're still
->> carrying around the patch "ARM: rockchip: make sure timer5 is enabled
->> on rk3036 platforms" as if it made it upstream, but as per this thread
->> it didn't.
->>
->> Does someone have ownership resolving this?  Perhaps everyone has
->> updated to a bootloader that avoids the need for this patch now?
->
-> running on kylin, with the provided uboot sources (mainline uboot + some
-> patches) the rk3036 runs just fine, without that timer enablement being needed.
->
-> So if nobody shouts (and does the needed work), I intend to just let it drop.
+However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
+and eQEP.
 
-Sounds like a great plan to me.  Thanks!  :)
+This series is almost identical to v4. Only difference is the addition of
+eCAP DT nodes in the dra7.dtsi file.
 
--Doug
+This series was tested on AM335x GP, AM437x GP and X15 + LCD screen for
+PWM based backlight.
+
+This series was also verified to be backwards compatible with old dtbs.
+
+This series depends on the below patch series for PWM bindings cleanup:
+https://patchwork.ozlabs.org/patch/593171/
+https://patchwork.ozlabs.org/patch/593168/
+https://patchwork.ozlabs.org/patch/593165/
+https://patchwork.ozlabs.org/patch/593166/
+https://patchwork.ozlabs.org/patch/593169/
+
+V3 series:
+https://patchwork.ozlabs.org/patch/588432/
+https://patchwork.ozlabs.org/patch/588434/
+https://patchwork.ozlabs.org/patch/588433/
+https://patchwork.ozlabs.org/patch/588429/
+https://patchwork.ozlabs.org/patch/588431/
+
+
+Franklin S Cooper Jr (3):
+  pwms: pwm-ti*: Get the clock from the PWMSS (parent)
+  ARM: dts: am437x/am33xx: Remove eCAP and ePWM hwmod properties
+  ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and eCAP hwmod entries
+
+Vignesh R (3):
+  ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+  ARM: dts: DRA7: Add TBCLK for PWMSS
+  ARM: dts: DRA7: Add dt nodes for PWMSS
+
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         | 10 ++-
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 16 ++++-
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
+ arch/arm/boot/dts/am33xx.dtsi                      | 12 ++--
+ arch/arm/boot/dts/am4372.dtsi                      | 21 +++---
+ arch/arm/boot/dts/dra7.dtsi                        | 84 ++++++++++++++++++++++
+ arch/arm/boot/dts/dra7xx-clocks.dtsi               | 24 +++++++
+ .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 -----------------
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 ----------------------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 --------------
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 83 +++++++++++++++++++++
+ drivers/pwm/pwm-tiecap.c                           |  2 +-
+ drivers/pwm/pwm-tiehrpwm.c                         |  2 +-
+ 15 files changed, 247 insertions(+), 251 deletions(-)
+
+-- 
+2.7.0
