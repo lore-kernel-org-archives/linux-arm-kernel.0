@@ -1,21 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 7 Mar 2016 23:00:32 -0700
-Subject: [PATCH 3/3] ARM: bcm2835: Add VC4 to the device tree.
-In-Reply-To: <1457123528-13482-4-git-send-email-eric@anholt.net>
-References: <1457123528-13482-1-git-send-email-eric@anholt.net>
- <1457123528-13482-4-git-send-email-eric@anholt.net>
-Message-ID: <56DE6A80.1060707@wwwdotorg.org>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Tue, 8 Mar 2016 15:25:46 +0900
+Subject: next-20160307 build: 2 failures 19 warnings (next-20160307)
+In-Reply-To: <20160308022056.GV18327@sirena.org.uk>
+References: <E1actUq-0008MZ-EF@optimist> <20160308022056.GV18327@sirena.org.uk>
+Message-ID: <002b01d17903$59b2ae00$0d180a00$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2016 01:32 PM, Eric Anholt wrote:
-> VC4 is the GPU (display and 3D) present on the 283x.
 
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
 
-> +&hdmi {
-> +	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
-> +};
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at kernel.org]
+> Sent: Tuesday, March 08, 2016 11:21 AM
+> To: Andrew Morton; Joonsoo Kim; Michal Nazarewicz; Steven Rostedt; Mel
+> Gorman; Minchan Kim; Sergey Senozhatsky; Kirill A. Shutemov; Catalin
+> Marinas; Will Deacon
+> Cc: kernel-build-reports at lists.linaro.org; linaro-kernel at lists.linaro.org;
+> linux-next at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: next-20160307 build: 2 failures 19 warnings (next-20160307)
+> 
+> On Mon, Mar 07, 2016 at 11:38:44AM +0000, Build bot for Mark Brown wrote:
+> 
+> For the past week or so an arm64 allmodconfig has failed to build.  I've
+> not been able to perform a bisect to identify where as I've been
+> travelling but the errors are below, I suspect they are triggered by
+> recent changes in the akpm tree adding tracepoints to the page reference
+> code.
 
-Isn't that the same everywhere? If so, adding it to bcm2835-rpi.dtsi 
-seems like a better idea; it'd avoid duplicating it everywhere.
+Hello,
+
+It's already reported problem and solved by following patch.
+
+http://ozlabs.org/~akpm/mmots/broken-out/mm-page_ref-add-tracepoint-to-track
+-down-page-reference-manipulation-fix-3.patch
+
+Once Andrew releases new mmotm and it is applied to linux-next,
+no error will happen.
+
+Thanks.
