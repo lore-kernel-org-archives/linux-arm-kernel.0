@@ -1,24 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Mar 2016 15:25:55 +0700
-Subject: [PATCH 5/5] ARM: bcm2835: Move most RPi default pin groups to
- their devices.
-In-Reply-To: <1456510756-15337-6-git-send-email-eric@anholt.net>
-References: <1456510756-15337-1-git-send-email-eric@anholt.net>
- <1456510756-15337-6-git-send-email-eric@anholt.net>
-Message-ID: <CACRpkdYCe_iOLEae1NP=xFLRvXXsMEUguLxj9n8Udf=ZuOFmFw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Mar 2016 09:30:52 +0100
+Subject: [PATCH 1/3] video: fbdev: imxfb: fix semantic of .get_power and
+ .set_power
+In-Reply-To: <1457423730.4174.4.camel@pengutronix.de>
+References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1457380425-20244-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1457423730.4174.4.camel@pengutronix.de>
+Message-ID: <20160308083051.GA8136@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 27, 2016 at 1:19 AM, Eric Anholt <eric@anholt.net> wrote:
+Hello,
 
-> This way we can get the duplicated pin group definitions out of each
-> RPi board file, and just leave the i2s variations in them.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+On Tue, Mar 08, 2016 at 08:55:30AM +0100, Philipp Zabel wrote:
+> Hi Uwe,
+> 
+> Am Montag, den 07.03.2016, 20:53 +0100 schrieb Uwe Kleine-K?nig:
+> > .set_power gets passed an FB_BLANK_XXX value, not a bool. So 0 signals
+> > on; and >1 means off. The same applies for return values of .get_power.
+> 
+> I'd try to somehow work this information into the code to avoid future
+> confusion.
 
-Aha I speak too soon I see. This set of patches look fine to
-me but you need to address Stephens comments and obtain his
-ACK.
+I integrated your changes into my code, you're obviously right here.
 
-Yours,
-Linus Walleij
+Jean-Christophe, Tomi: Do you agree in principle with these changes? If
+so I can resend. If you won't take the changes anyhow, I wouldn't.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
