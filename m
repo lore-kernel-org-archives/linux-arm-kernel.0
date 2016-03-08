@@ -1,55 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Mar 2016 16:41:17 +0100
-Subject: [PATCH] ARM: mvebu: Fix of_clk_get() call in a non sleeping
- context
-In-Reply-To: <1457446733-7137-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1457446733-7137-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160308164117.2a3ed3a7@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 8 Mar 2016 16:44:23 +0100
+Subject: [PATCH 8/8] drm: atmel-hlcdc: check display mode validity in
+ crtc->mode_fixup()
+In-Reply-To: <1452075569-8545-9-git-send-email-boris.brezillon@free-electrons.com>
+References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1452075569-8545-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <56DEF357.5050003@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
-
-On Tue,  8 Mar 2016 15:18:53 +0100, Gregory CLEMENT wrote:
-> of_clk_get() is called armada_xp_smp_prepare_cpus() function.
-
-Hum? Your code is changing things to have of_clk_get() called by
-armada_xp_smp_prepare_cpus(). I think you wanted to say:
-
-"of_clk_get() is currently called in get_cpu_clk(), which it turns is
-called by set_secondary_cpu_clock() during armada_xp_boot_secondary().
-However, this callback is called in a context...
-
-> This
-> callback can be called in a context where it should not sleep as pointed
-> when enabling CONFIG_DEBUG_ATOMIC_SLEEP. However of_clk_get() can sleep.
+Le 06/01/2016 11:19, Boris Brezillon a ?crit :
+> Move the adjusted display mode check into ->mode_fixup().
 > 
-> This patch solved this issue by moving the of_clk_get() during
-> initialization by gathering the list of reference on the clock, and only
-> access to this list later.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-I think this doesn't solve the problem completely, because
-set_secondary_cpu_clock() is still calling clk_prepare_enable(), and
-the prepare step of a clock is theoretically allowed to sleep. In
-practice, it doesn't sleep in our specific case, but still
-clk_prepare_enable() is not good in an atomic context.
+Seems okay:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-So I believe the whole approach of setting the CPU clock frequency in
-armada_xp_boot_secondary() is wrong, and we should basically revert my
-commit b9b1de0f4da37dac76d812a27d6065eba02dc05b, and instead find a
-different solution for the resume from suspend case.
 
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 ++++------
+>  1 file changed, 4 insertions(+), 6 deletions(-)
 > 
-> Fixes: f6cec7cd0777 ("ARM: mvebu: remove device tree parsing for cpu
-> nodes")
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> index be30bd2..d5a028f 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> @@ -142,11 +142,13 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+>  			   cfg);
+>  }
+>  
+> -static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *crtc,
+> +static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *c,
+>  					const struct drm_display_mode *mode,
+>  					struct drm_display_mode *adjusted_mode)
+>  {
+> -	return true;
+> +	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
+> +
+> +	return atmel_hlcdc_dc_mode_valid(crtc->dc, adjusted_mode) == MODE_OK;
+>  }
+>  
+>  static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
+> @@ -311,12 +313,8 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+>  static int atmel_hlcdc_crtc_atomic_check(struct drm_crtc *c,
+>  					 struct drm_crtc_state *s)
+>  {
+> -	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
+>  	int ret;
+>  
+> -	if (atmel_hlcdc_dc_mode_valid(crtc->dc, &s->adjusted_mode) != MODE_OK)
+> -		return -EINVAL;
+> -
+>  	ret = atmel_hlcdc_crtc_select_output_mode(s);
+>  	if (ret)
+>  		return ret;
+> 
 
-I don't think it fixes this commit. The one it really fixes is most
-probably b9b1de0f4da37dac76d812a27d6065eba02dc05b.
 
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Nicolas Ferre
