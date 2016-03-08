@@ -1,66 +1,105 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 08 Mar 2016 08:55:30 +0100
-Subject: [PATCH 1/3] video: fbdev: imxfb: fix semantic of .get_power and
- .set_power
-In-Reply-To: <1457380425-20244-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Tue, 08 Mar 2016 09:00:05 +0100
+Subject: [PATCH 3/3] video: fbdev: imxfb: add some error handling
+In-Reply-To: <1457380425-20244-4-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1457380425-20244-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1457423730.4174.4.camel@pengutronix.de>
+ <1457380425-20244-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1457424005.4174.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
 Am Montag, den 07.03.2016, 20:53 +0100 schrieb Uwe Kleine-K?nig:
-> .set_power gets passed an FB_BLANK_XXX value, not a bool. So 0 signals
-> on; and >1 means off. The same applies for return values of .get_power.
-
-I'd try to somehow work this information into the code to avoid future
-confusion.
-
 > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
->  drivers/video/fbdev/imxfb.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  drivers/video/fbdev/imxfb.c | 33 ++++++++++++++++++++++++++-------
+>  1 file changed, 26 insertions(+), 7 deletions(-)
 > 
 > diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
-> index cee88603efc9..c5fcedde2a60 100644
+> index 3dd2824e6773..671b3719db56 100644
 > --- a/drivers/video/fbdev/imxfb.c
 > +++ b/drivers/video/fbdev/imxfb.c
-> @@ -759,9 +759,9 @@ static int imxfb_lcd_get_power(struct lcd_device *lcddev)
->  	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
->  
->  	if (!IS_ERR(fbi->lcd_pwr))
-> -		return regulator_is_enabled(fbi->lcd_pwr);
-> +		return !regulator_is_enabled(fbi->lcd_pwr);
->  
-> -	return 1;
-> +	return 0;
-
-How about making it explicit:
-
-	if (!IS_ERR(fbi->lcd_pwr) &&
-	    !regulator_is_enabled(fbi->lcd_pwr))
-		return FB_BLANK_POWERDOWN;
-
-	return FB_BLANK_UNBLANK;
-
+> @@ -473,8 +473,9 @@ static int imxfb_set_par(struct fb_info *info)
+>  	return 0;
 >  }
 >  
->  static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
-> @@ -769,7 +769,7 @@ static int imxfb_lcd_set_power(struct lcd_device *lcddev, int power)
->  	struct imxfb_info *fbi = dev_get_drvdata(&lcddev->dev);
+> -static void imxfb_enable_controller(struct imxfb_info *fbi)
+> +static int imxfb_enable_controller(struct imxfb_info *fbi)
+>  {
+> +	int ret;
 >  
->  	if (!IS_ERR(fbi->lcd_pwr)) {
-> -		if (power)
-> +		if (!power)
+>  	if (fbi->enabled)
+>  		return;
+> @@ -496,10 +497,27 @@ static void imxfb_enable_controller(struct imxfb_info *fbi)
+>  	 */
+>  	writel(RMCR_LCDC_EN_MX1, fbi->regs + LCDC_RMCR);
+>  
+> -	clk_prepare_enable(fbi->clk_ipg);
+> -	clk_prepare_enable(fbi->clk_ahb);
+> -	clk_prepare_enable(fbi->clk_per);
+> +	ret = clk_prepare_enable(fbi->clk_ipg);
+> +	if (ret)
+> +		goto err_enable_ipg;
+> +
+> +	ret = clk_prepare_enable(fbi->clk_ahb);
+> +	if (ret)
+> +		goto err_enable_ahb;
+> +
+> +	ret = clk_prepare_enable(fbi->clk_per);
+> +	if (ret) {
+> +		clk_disable_unprepare(fbi->clk_ahb);
+> +err_enable_ahb:
+> +		clk_disable_unprepare(fbi->clk_ipg);
+> +err_enable_ipg:
+> +		writel(0, fbi->regs + LCDC_RMCR);
+> +
+> +		return ret;
+> +	}
+> +
+>  	fbi->enabled = true;
+> +	return 0;
+>  }
+>  
+>  static void imxfb_disable_controller(struct imxfb_info *fbi)
+> @@ -510,8 +528,8 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  	pr_debug("Disabling LCD controller\n");
+>  
+>  	clk_disable_unprepare(fbi->clk_per);
+> -	clk_disable_unprepare(fbi->clk_ipg);
+>  	clk_disable_unprepare(fbi->clk_ahb);
+> +	clk_disable_unprepare(fbi->clk_ipg);
+>  	fbi->enabled = false;
+>  
+>  	writel(0, fbi->regs + LCDC_RMCR);
+> @@ -520,6 +538,7 @@ static void imxfb_disable_controller(struct imxfb_info *fbi)
+>  static int imxfb_blank(int blank, struct fb_info *info)
+>  {
+>  	struct imxfb_info *fbi = info->par;
+> +	int ret = 0;;
 
-Same here:
-		if (power == FB_BLANK_UNBLANK)
+s/;;/;/
 
->  			return regulator_enable(fbi->lcd_pwr);
->  		else
->  			return regulator_disable(fbi->lcd_pwr);
+>  
+>  	pr_debug("imxfb_blank: blank=%d\n", blank);
+>  
+> @@ -532,10 +551,10 @@ static int imxfb_blank(int blank, struct fb_info *info)
+>  		break;
+>  
+>  	case FB_BLANK_UNBLANK:
+> -		imxfb_enable_controller(fbi);
+> +		ret = imxfb_enable_controller(fbi);
+>  		break;
+
+or this could be simplified to:
+		return imxfb_enable_controller(fbi);
+
+>  	}
+> -	return 0;
+> +	return ret;
+>  }
+>  
+>  static struct fb_ops imxfb_ops = {
+
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 
 regards
 Philipp
