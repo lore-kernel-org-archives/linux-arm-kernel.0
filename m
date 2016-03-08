@@ -1,63 +1,92 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 08 Mar 2016 12:08:04 -0800
-Subject: [PATCH] arm64: account for sparsemem section alignment when
- choosing vmemmap offset
-In-Reply-To: <1457446169-23099-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1457446169-23099-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <56DF3124.1080804@gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 8 Mar 2016 12:09:43 -0800
+Subject: [PATCH] Revert "arm64: vmemmap: use virtual projection of linear
+ region"
+In-Reply-To: <56DF274A.4070802@redhat.com>
+References: <1457463792-6852-1-git-send-email-ddaney.cavm@gmail.com>
+ <56DF274A.4070802@redhat.com>
+Message-ID: <56DF3187.7010901@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2016 06:09 AM, Ard Biesheuvel wrote:
-> Commit dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear
-> region") fixed an issue where the struct page array would overflow into the
-> adjacent virtual memory region if system RAM was placed so high up in
-> physical memory that its addresses were not representable in the build time
-> configured virtual address size.
+On 03/08/2016 11:26 AM, Laura Abbott wrote:
+> On 03/08/2016 11:03 AM, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> This reverts commit dfd55ad85e4a7fbaa82df12467515ac3c81e8a3e.
+>>
+>> Commit dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear
+>> region") causes this failure on Cavium Thunder systems:
+>>
+[...]
 >
-> However, the fix failed to take into account that the vmemmap region needs
-> to be relatively aligned with respect to the sparsemem section size, so that
-> a sequence of page structs corresponding with a sparsemem section in the
-> linear region appears naturally aligned in the vmemmap region.
+> See http://article.gmane.org/gmane.linux.ports.arm.kernel/484866 for a
+> proposed fix.
 >
-> So round up vmemmap to sparsemem section size. Since this essentially moves
-> the projection of the linear region up in memory, also revert the reduction
-> of the size of the vmemmap region.
->
-> Fixes: dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear region")
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
 
-For me, this fixes the failures caused by dfd55ad85e4a
+Yes, that patch fixes it for me.  I withdraw my patch to revert.
 
-Tested-by: David Daney <david.daney@cavium.com>
+Thanks,
+David Daney
 
-
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->   arch/arm64/include/asm/pgtable.h | 5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index f50608674580..819aff5d593f 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -40,7 +40,7 @@
->    * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
->    *	fixed mappings and modules
->    */
-> -#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
-> +#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
->
->   #ifndef CONFIG_KASAN
->   #define VMALLOC_START		(VA_START)
-> @@ -52,7 +52,8 @@
->   #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
->
->   #define VMEMMAP_START		(VMALLOC_END + SZ_64K)
-> -#define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
-> +#define vmemmap			((struct page *)VMEMMAP_START - \
-> +				 SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
->
->   #define FIRST_USER_ADDRESS	0UL
->
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   arch/arm64/include/asm/pgtable.h | 7 +++----
+>>   arch/arm64/mm/init.c             | 4 ++--
+>>   2 files changed, 5 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/pgtable.h
+>> b/arch/arm64/include/asm/pgtable.h
+>> index f506086..bf464de 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -34,13 +34,13 @@
+>>   /*
+>>    * VMALLOC and SPARSEMEM_VMEMMAP ranges.
+>>    *
+>> - * VMEMAP_SIZE: allows the whole linear region to be covered by a
+>> struct page array
+>> + * VMEMAP_SIZE: allows the whole VA space to be covered by a struct
+>> page array
+>>    *    (rounded up to PUD_SIZE).
+>>    * VMALLOC_START: beginning of the kernel VA space
+>>    * VMALLOC_END: extends to the available space below vmmemmap, PCI
+>> I/O space,
+>>    *    fixed mappings and modules
+>>    */
+>> -#define VMEMMAP_SIZE        ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1))
+>> * sizeof(struct page), PUD_SIZE)
+>> +#define VMEMMAP_SIZE        ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) *
+>> sizeof(struct page), PUD_SIZE)
+>>
+>>   #ifndef CONFIG_KASAN
+>>   #define VMALLOC_START        (VA_START)
+>> @@ -51,8 +51,7 @@
+>>
+>>   #define VMALLOC_END        (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE -
+>> SZ_64K)
+>>
+>> -#define VMEMMAP_START        (VMALLOC_END + SZ_64K)
+>> -#define vmemmap            ((struct page *)VMEMMAP_START -
+>> (memstart_addr >> PAGE_SHIFT))
+>> +#define vmemmap            ((struct page *)(VMALLOC_END + SZ_64K))
+>>
+>>   #define FIRST_USER_ADDRESS    0UL
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index 7802f21..f3b061e 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -319,8 +319,8 @@ void __init mem_init(void)
+>>   #endif
+>>             MLG(VMALLOC_START, VMALLOC_END),
+>>   #ifdef CONFIG_SPARSEMEM_VMEMMAP
+>> -          MLG(VMEMMAP_START,
+>> -              VMEMMAP_START + VMEMMAP_SIZE),
+>> +          MLG((unsigned long)vmemmap,
+>> +              (unsigned long)vmemmap + VMEMMAP_SIZE),
+>>             MLM((unsigned long)virt_to_page(PAGE_OFFSET),
+>>                 (unsigned long)virt_to_page(high_memory)),
+>>   #endif
+>>
 >
