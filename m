@@ -1,61 +1,42 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  8 Mar 2016 13:57:06 +0100
-Subject: [PATCH net 3/3] net: mvneta: fix error messages in mvneta_port_down
- function
-In-Reply-To: <1457441826-6100-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1457441826-6100-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1457441826-6100-4-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue, 08 Mar 2016 14:01:06 +0100
+Subject: [PATCH v4 0/3] driver for the hardware monitoring chip in the
+ Zyxel NSA320
+In-Reply-To: <20160308115506.GA25899@roeck-us.net> (Guenter Roeck's message of
+ "Tue, 8 Mar 2016 03:55:06 -0800")
+References: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
+ <20160308115506.GA25899@roeck-us.net>
+Message-ID: <87mvq93yzx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitri Epshtein <dima@marvell.com>
+Hi Adam and Guenter,
+ 
+ On mar., mars 08 2016, Guenter Roeck <linux@roeck-us.net> wrote:
 
-This commit corrects error printing when shutting down the port. Also
-magic numbers are replaced by existing macros.
+> On Sat, Mar 05, 2016 at 03:34:54PM +0000, Adam Baker wrote:
+>>  Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt |  21 +++++
+>>  Documentation/hwmon/nsa320                             |  53 +++++++++++
+>>  arch/arm/boot/dts/kirkwood-nsa320.dts                  |  13 ++-
+>>  drivers/hwmon/Kconfig                                  |  15 +++
+>>  drivers/hwmon/Makefile                                 |   1 +
+>>  drivers/hwmon/nsa320-hwmon.c                           | 216 ++++++++++++++++++++++++++++++++++++++++++++
+>>  6 files changed, 317 insertions(+), 2 deletions(-)
+>> 
+> Patch 1/3 and 2/3 applied to hwmon-next.
+>
+> I assume that patch 3/3 will go through the arm tree.
 
-Signed-off-by: Dmitri Epshtein <dima@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Yes but now that the rc7 was released is too late putting it to arm-soc
+for the 4.6 kernel.
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 2ee05cebea75..225d933259c0 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -873,14 +873,14 @@ static void mvneta_port_down(struct mvneta_port *pp)
- 	do {
- 		if (count++ >= MVNETA_RX_DISABLE_TIMEOUT_MSEC) {
- 			netdev_warn(pp->dev,
--				    "TIMEOUT for RX stopped ! rx_queue_cmd: 0x08%x\n",
-+				    "TIMEOUT for RX stopped ! rx_queue_cmd: 0x%08x\n",
- 				    val);
- 			break;
- 		}
- 		mdelay(1);
- 
- 		val = mvreg_read(pp, MVNETA_RXQ_CMD);
--	} while (val & 0xff);
-+	} while (val & MVNETA_RXQ_ENABLE_MASK);
- 
- 	/* Stop Tx port activity. Check port Tx activity. Issue stop
- 	 * command for active channels only
-@@ -905,14 +905,14 @@ static void mvneta_port_down(struct mvneta_port *pp)
- 		/* Check TX Command reg that all Txqs are stopped */
- 		val = mvreg_read(pp, MVNETA_TXQ_CMD);
- 
--	} while (val & 0xff);
-+	} while (val & MVNETA_TXQ_ENABLE_MASK);
- 
- 	/* Double check to verify that TX FIFO is empty */
- 	count = 0;
- 	do {
- 		if (count++ >= MVNETA_TX_FIFO_EMPTY_TIMEOUT) {
- 			netdev_warn(pp->dev,
--				    "TX FIFO empty timeout status=0x08%x\n",
-+				    "TX FIFO empty timeout status=0x%08x\n",
- 				    val);
- 			break;
- 		}
+Gregory
+
+>
+> Guenter
+
 -- 
-2.5.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
