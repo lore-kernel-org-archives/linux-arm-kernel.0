@@ -1,46 +1,23 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue,  8 Mar 2016 09:04:02 +0100
-Subject: [PATCHv2 6/8] ARM: dts: imx6qdl-tx6: add mdio node for ethernet phy
-In-Reply-To: <1457424244-14549-1-git-send-email-LW@KARO-electronics.de>
-References: <1457424244-14549-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1457424244-14549-7-git-send-email-LW@KARO-electronics.de>
+Date: Tue,  8 Mar 2016 09:03:56 +0100
+Subject: [PATCHv2 0/8] ARM: dts: update Ka-Ro i.MX6 module support
+Message-ID: <1457424244-14549-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add mdio node and an appropriate PHY configuration to enable use of
-the PHY interrupt for link status changes.
+This patch set updates the Ka-Ro electronics i.MX6 based module
+support and adds support for some new modules and a new baseboard.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- arch/arm/boot/dts/imx6qdl-tx6.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+changes vs. v1:
+- relicense DTS files under GPLv2/X11
+- dropped patches which have been applied already
+- added some cleanup patches
 
-diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-index dc813c2..a0d59ab 100644
---- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
-@@ -249,8 +249,22 @@
- 	clock-names = "ipg", "ahb", "ptp", "enet_out";
- 	phy-mode = "rmii";
- 	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
-+	phy-handle = <&etnphy>;
- 	phy-supply = <&reg_3v3_etn>;
- 	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		etnphy: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_enet_mdio>;
-+			interrupts-extended = <&gpio7 1 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+	};
- };
- 
- &gpmi {
--- 
-2.1.4
+[PATCHv2 1/8] ARM: dts: imx6-tx6: Relicense the Ka-Ro DT files under GPLv2/X11
+[PATCHv2 2/8] ARM: dts: imx6-tx6: cleanup; no functional change
+[PATCHv2 3/8] ARM: dts: imx6-tx6: remove regulator bus
+[PATCHv2 4/8] ARM: dts: imx6-tx6: disable the spi node by default
+[PATCHv2 5/8] ARM: dts: imx6-tx6: remove container node around pinctrl nodes
+[PATCHv2 6/8] ARM: dts: imx6qdl-tx6: add mdio node for ethernet phy
+[PATCHv2 7/8] ARM: dts: imx6: add support for more Ka-Ro electronics modules
+[PATCHv2 8/8] ARM: dts: imx6: add support for the Ka-Ro electronics 'MB7' baseboard
