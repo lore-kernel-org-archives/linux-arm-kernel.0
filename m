@@ -1,258 +1,347 @@
-From: dave.long@linaro.org (David Long)
-Date: Tue, 8 Mar 2016 00:42:51 -0500
-Subject: [PATCH v10 7/9] arm64: Add trampoline code for kretprobes
-In-Reply-To: <56D7592F.70002@redhat.com>
-References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
- <1456801047-29014-8-git-send-email-dave.long@linaro.org>
- <56D5DD27.6040404@arm.com> <56D7592F.70002@redhat.com>
-Message-ID: <56DE665B.8080209@linaro.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue,  8 Mar 2016 14:46:17 +0900
+Subject: [PATCH v2] ARM: dts: add "simple-bus" where "arm,
+ amba-bus" is used alone
+Message-ID: <1457415977-3401-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2016 04:20 PM, William Cohen wrote:
-> On 03/01/2016 01:19 PM, Marc Zyngier wrote:
->> On 01/03/16 02:57, David Long wrote:
->>> From: William Cohen <wcohen@redhat.com>
->>>
->>> The trampoline code is used by kretprobes to capture a return from a probed
->>> function.  This is done by saving the registers, calling the handler, and
->>> restoring the registers. The code then returns to the original saved caller
->>> return address. It is necessary to do this directly instead of using a
->>> software breakpoint because the code used in processing that breakpoint
->>> could itself be kprobe'd and cause a problematic reentry into the debug
->>> exception handler.
->>>
->>> Signed-off-by: William Cohen <wcohen@redhat.com>
->>> Signed-off-by: David A. Long <dave.long@linaro.org>
->>> ---
->>>   arch/arm64/include/asm/kprobes.h       |  2 +
->>>   arch/arm64/kernel/Makefile             |  1 +
->>>   arch/arm64/kernel/asm-offsets.c        | 22 +++++++++++
->>>   arch/arm64/kernel/kprobes.c            |  5 +++
->>>   arch/arm64/kernel/kprobes_trampoline.S | 67 ++++++++++++++++++++++++++++++++++
->>>   5 files changed, 97 insertions(+)
->>>   create mode 100644 arch/arm64/kernel/kprobes_trampoline.S
->>>
->>> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
->>> index 79c9511..61b4915 100644
->>> --- a/arch/arm64/include/asm/kprobes.h
->>> +++ b/arch/arm64/include/asm/kprobes.h
->>> @@ -56,5 +56,7 @@ int kprobe_exceptions_notify(struct notifier_block *self,
->>>   			     unsigned long val, void *data);
->>>   int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
->>>   int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
->>> +void kretprobe_trampoline(void);
->>> +void __kprobes *trampoline_probe_handler(struct pt_regs *regs);
->>>
->>>   #endif /* _ARM_KPROBES_H */
->>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->>> index 08325e5..f192b7d 100644
->>> --- a/arch/arm64/kernel/Makefile
->>> +++ b/arch/arm64/kernel/Makefile
->>> @@ -37,6 +37,7 @@ arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
->>>   arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
->>>   arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
->>>   arm64-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-arm64.o		\
->>> +					   kprobes_trampoline.o			\
->>>   					   probes-simulate-insn.o
->>>   arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
->>>   arm64-obj-$(CONFIG_PCI)			+= pci.o
->>> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
->>> index fffa4ac6..460b54c 100644
->>> --- a/arch/arm64/kernel/asm-offsets.c
->>> +++ b/arch/arm64/kernel/asm-offsets.c
->>> @@ -50,6 +50,28 @@ int main(void)
->>>     DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
->>>     DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
->>>     DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
->>> +  DEFINE(S_X8,			offsetof(struct pt_regs, regs[8]));
->>> +  DEFINE(S_X9,			offsetof(struct pt_regs, regs[9]));
->>> +  DEFINE(S_X10,			offsetof(struct pt_regs, regs[10]));
->>> +  DEFINE(S_X11,			offsetof(struct pt_regs, regs[11]));
->>> +  DEFINE(S_X12,			offsetof(struct pt_regs, regs[12]));
->>> +  DEFINE(S_X13,			offsetof(struct pt_regs, regs[13]));
->>> +  DEFINE(S_X14,			offsetof(struct pt_regs, regs[14]));
->>> +  DEFINE(S_X15,			offsetof(struct pt_regs, regs[15]));
->>> +  DEFINE(S_X16,			offsetof(struct pt_regs, regs[16]));
->>> +  DEFINE(S_X17,			offsetof(struct pt_regs, regs[17]));
->>> +  DEFINE(S_X18,			offsetof(struct pt_regs, regs[18]));
->>> +  DEFINE(S_X19,			offsetof(struct pt_regs, regs[19]));
->>> +  DEFINE(S_X20,			offsetof(struct pt_regs, regs[20]));
->>> +  DEFINE(S_X21,			offsetof(struct pt_regs, regs[21]));
->>> +  DEFINE(S_X22,			offsetof(struct pt_regs, regs[22]));
->>> +  DEFINE(S_X23,			offsetof(struct pt_regs, regs[23]));
->>> +  DEFINE(S_X24,			offsetof(struct pt_regs, regs[24]));
->>> +  DEFINE(S_X25,			offsetof(struct pt_regs, regs[25]));
->>> +  DEFINE(S_X26,			offsetof(struct pt_regs, regs[26]));
->>> +  DEFINE(S_X27,			offsetof(struct pt_regs, regs[27]));
->>> +  DEFINE(S_X28,			offsetof(struct pt_regs, regs[28]));
->>> +  DEFINE(S_X29,			offsetof(struct pt_regs, regs[29]));
->>
->> Do we need all of these? Specially considering that we're only using the
->> even ones? You may want to consider something like
->> arch/arm64/kvm/hyp/entry.S does.
->
-> Following what arch/arm64/kvm/hyp/entry.S does would make the patch a bit smaller.
->
+The compatible string "simple-bus" is well defined in ePAPR, while
+I see no documentation for the "arm,amba-bus" in ePAPR or under
+Documentation/devicetree/.
 
-I have cut the defines in half and duplicated the entry.S style using 
-macros.
+DT is also used by other projects than Linux kernel.  It is not a
+good idea to rely on such an unofficial binding.
 
->>
->>>     DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
->>>     DEFINE(S_SP,			offsetof(struct pt_regs, sp));
->>>   #ifdef CONFIG_COMPAT
->>> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
->>> index ffc5affd..98f4fe5 100644
->>> --- a/arch/arm64/kernel/kprobes.c
->>> +++ b/arch/arm64/kernel/kprobes.c
->>> @@ -532,6 +532,11 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->>>   	return 1;
->>>   }
->>>
->>> +void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
->>> +{
->>> +	return (void *) 0;
->>
->> Something wrong with NULL? ;-)
->
-> Nothing wrong with using NULL.
->
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Changed.
+Changes in v2:
+  - Rephrase the git-log
 
->>
->>> +}
->>> +
->>>   int __init arch_init_kprobes(void)
->>>   {
->>>   	return 0;
->>> diff --git a/arch/arm64/kernel/kprobes_trampoline.S b/arch/arm64/kernel/kprobes_trampoline.S
->>> new file mode 100644
->>> index 0000000..5a336cf
->>> --- /dev/null
->>> +++ b/arch/arm64/kernel/kprobes_trampoline.S
->>> @@ -0,0 +1,67 @@
->>> +/*
->>> + * trampoline entry and return code for kretprobes.
->>> + */
->>> +
->>> +#include <linux/linkage.h>
->>> +#include <generated/asm-offsets.h>
->>
->> #include <asm/asm-offsets.h>
->>
+ arch/arm/boot/dts/axm55xx.dtsi             | 2 +-
+ arch/arm/boot/dts/exynos3250.dtsi          | 2 +-
+ arch/arm/boot/dts/exynos4.dtsi             | 2 +-
+ arch/arm/boot/dts/exynos4415.dtsi          | 2 +-
+ arch/arm/boot/dts/exynos5250.dtsi          | 2 +-
+ arch/arm/boot/dts/exynos5420.dtsi          | 2 +-
+ arch/arm/boot/dts/exynos5440.dtsi          | 2 +-
+ arch/arm/boot/dts/hi3620.dtsi              | 2 +-
+ arch/arm/boot/dts/hip01.dtsi               | 2 +-
+ arch/arm/boot/dts/hisi-x5hd2.dtsi          | 2 +-
+ arch/arm/boot/dts/qcom-apq8064.dtsi        | 2 +-
+ arch/arm/boot/dts/qcom-msm8660.dtsi        | 2 +-
+ arch/arm/boot/dts/qcom-msm8960.dtsi        | 2 +-
+ arch/arm/boot/dts/rk3036.dtsi              | 2 +-
+ arch/arm/boot/dts/rk3228.dtsi              | 2 +-
+ arch/arm/boot/dts/rk3288.dtsi              | 2 +-
+ arch/arm/boot/dts/rk3xxx.dtsi              | 2 +-
+ arch/arm/boot/dts/s5pv210.dtsi             | 2 +-
+ arch/arm/boot/dts/socfpga.dtsi             | 2 +-
+ arch/arm/boot/dts/socfpga_arria10.dtsi     | 2 +-
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 2 +-
+ arch/arm/boot/dts/ste-u300.dts             | 2 +-
+ arch/arm/boot/dts/versatile-ab.dts         | 2 +-
+ 23 files changed, 23 insertions(+), 23 deletions(-)
 
-Fixed.
-
->>> +
->>> +	.text
->>> +
->>> +ENTRY(kretprobe_trampoline)
->>> +
->>> +	sub sp, sp, #S_FRAME_SIZE
->>> +
->>> +	stp x0, x1, [sp, #S_X0]
->>> +	stp x2, x3, [sp, #S_X2]
->>> +	stp x4, x5, [sp, #S_X4]
->>> +	stp x6, x7, [sp, #S_X6]
->>> +	stp x8, x9, [sp, #S_X8]
->>> +	stp x10, x11, [sp, #S_X10]
->>> +	stp x12, x13, [sp, #S_X12]
->>> +	stp x14, x15, [sp, #S_X14]
->>> +	stp x16, x17, [sp, #S_X16]
->>> +	stp x18, x19, [sp, #S_X18]
->>> +	stp x20, x21, [sp, #S_X20]
->>> +	stp x22, x23, [sp, #S_X22]
->>> +	stp x24, x25, [sp, #S_X24]
->>> +	stp x26, x27, [sp, #S_X26]
->>> +	stp x28, x29, [sp, #S_X28]
->>> +	str x30, [sp, #S_LR]
->>
->> Might as well call it LR?
-
-Ah, that exposed the fact there's a missing include of asm/assembler.h. 
-  All fixed.
-
->
-> Given the code is going to overwrite lr with the value returned by trampoline_probe_handler might eliminate the store to #S_LR above.
->
-
-It's not only about what's restored though, it's about what the 
-trace/user code is told the register contents are.
-
->>
->>> +	add x0, sp, #S_FRAME_SIZE
->>> +	str x0, [sp, #S_SP]
->>> +	mrs x0, nzcv
->>> +	mrs x1, daif
->>> +	orr x0, x0, x1
->>> +	/* There seems no easy way to get the mode field so make one up */
->>> +	add x0, x0, #5
->>
->> Do you mean something like CurrentEL? You could also save SPSel whilst
->> you're at it.
-
-OK, I've retrieved CurrentEL and SPSel and orr'd them into the saved PSTATE.
-
->
-> Looking at the my patch again I am wondering if the patch could skip storing daif and the mode field.  The nzcv bit are the only thing restored.
->
-
-Again, want to have realistic saved register contents.
-
->>
->>> +	str x0, [sp, #S_PSTATE]
->>> +
->>> +	mov x0, sp
->>> +	bl trampoline_probe_handler
->>> +	/* Replace trampoline address in lr with actual
->>> +	   orig_ret_addr return address. */
->>> +	str x0, [sp, #S_LR]
->>
->> Why do you need to store it on the stack? You could do a "mov lr, x0",
->> and drop the last load of the sequence below...
->
-> Ah, yes, that would save a store/load pair.
->
-
-Done.
-
->>> +
->>> +	ldr x0, [sp, #S_PSTATE]
->>> +	msr nzcv, x0
->>> +	ldp x0, x1, [sp, #S_X0]
->>> +	ldp x2, x3, [sp, #S_X2]
->>> +	ldp x4, x5, [sp, #S_X4]
->>> +	ldp x6, x7, [sp, #S_X6]
->>> +	ldp x8, x9, [sp, #S_X8]
->>> +	ldp x10, x11, [sp, #S_X10]
->>> +	ldp x12, x13, [sp, #S_X12]
->>> +	ldp x14, x15, [sp, #S_X14]
->>> +	ldp x16, x17, [sp, #S_X16]
->>> +	ldp x18, x19, [sp, #S_X18]
->>> +	ldp x20, x21, [sp, #S_X20]
->>> +	ldp x22, x23, [sp, #S_X22]
->>> +	ldp x24, x25, [sp, #S_X24]
->>> +	ldp x26, x27, [sp, #S_X26]
->>> +	ldp x28, x29, [sp, #S_X28]
->>> +	ldr x30, [sp, #S_LR]
->>> +
->>> +	add sp, sp, #S_FRAME_SIZE
->>> +	ret
->>> +
->>> +ENDPROC(kretprobe_trampoline)
->>>
->>
->> Thanks,
->>
->> 	M.
->>
->
-> Thanks,
->
-> -Will
->
-
-
--dl
+diff --git a/arch/arm/boot/dts/axm55xx.dtsi b/arch/arm/boot/dts/axm55xx.dtsi
+index ea288f0..8da4582 100644
+--- a/arch/arm/boot/dts/axm55xx.dtsi
++++ b/arch/arm/boot/dts/axm55xx.dtsi
+@@ -107,7 +107,7 @@
+ 		};
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+ 			ranges;
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 18e3def..0ad4fa7 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -381,7 +381,7 @@
+ 		};
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 045785c..d53fd78 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -661,7 +661,7 @@
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		interrupt-parent = <&gic>;
+ 		ranges;
+ 
+diff --git a/arch/arm/boot/dts/exynos4415.dtsi b/arch/arm/boot/dts/exynos4415.dtsi
+index ad76484..35d2f99 100644
+--- a/arch/arm/boot/dts/exynos4415.dtsi
++++ b/arch/arm/boot/dts/exynos4415.dtsi
+@@ -380,7 +380,7 @@
+ 		};
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			interrupt-parent = <&gic>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 33e2d5f..bcaed08 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -674,7 +674,7 @@
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		interrupt-parent = <&gic>;
+ 		ranges;
+ 
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 48a0a55..838bde3 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -327,7 +327,7 @@
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		interrupt-parent = <&gic>;
+ 		ranges;
+ 
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index f18b51f..5fe5639 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -200,7 +200,7 @@
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		interrupt-parent = <&gic>;
+ 		ranges;
+ 	};
+diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
+index 6cbb62e..7b67ffe 100644
+--- a/arch/arm/boot/dts/hi3620.dtsi
++++ b/arch/arm/boot/dts/hi3620.dtsi
+@@ -68,7 +68,7 @@
+ 
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		interrupt-parent = <&gic>;
+ 		ranges = <0 0xfc000000 0x2000000>;
+ 
+diff --git a/arch/arm/boot/dts/hip01.dtsi b/arch/arm/boot/dts/hip01.dtsi
+index 33130f8..0835627 100644
+--- a/arch/arm/boot/dts/hip01.dtsi
++++ b/arch/arm/boot/dts/hip01.dtsi
+@@ -43,7 +43,7 @@
+ 		amba {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			ranges;
+ 
+ 			uart0: uart at 10001000 {
+diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
+index c52722b..f3a79b7 100644
+--- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
++++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
+@@ -34,7 +34,7 @@
+ 		amba {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			ranges;
+ 
+ 			timer0: timer at 00002000 {
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index ed521e8..ca93486 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -721,7 +721,7 @@
+ 		};
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index e5f7f33..e05773c 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -167,7 +167,7 @@
+ 		};
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
+diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
+index 51a40d8..7e7e891 100644
+--- a/arch/arm/boot/dts/qcom-msm8960.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
+@@ -251,7 +251,7 @@
+ 		};
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index b9567c1..c15fdf4 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -94,7 +94,7 @@
+ 	};
+ 
+ 	amba {
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+diff --git a/arch/arm/boot/dts/rk3228.dtsi b/arch/arm/boot/dts/rk3228.dtsi
+index 119ff12..8b4e443 100644
+--- a/arch/arm/boot/dts/rk3228.dtsi
++++ b/arch/arm/boot/dts/rk3228.dtsi
+@@ -96,7 +96,7 @@
+ 	};
+ 
+ 	amba {
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 8ac49f3..af111fa 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -134,7 +134,7 @@
+ 	};
+ 
+ 	amba {
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index 99eeea7..c969e84 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -67,7 +67,7 @@
+ 	};
+ 
+ 	amba {
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+diff --git a/arch/arm/boot/dts/s5pv210.dtsi b/arch/arm/boot/dts/s5pv210.dtsi
+index 8344a0e..e945c343 100644
+--- a/arch/arm/boot/dts/s5pv210.dtsi
++++ b/arch/arm/boot/dts/s5pv210.dtsi
+@@ -130,7 +130,7 @@
+ 		amba {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			ranges;
+ 
+ 			pdma0: dma at e0900000 {
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 3ed4abd..cadc637 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -69,7 +69,7 @@
+ 		ranges;
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index cce9e50..06a8e86 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -63,7 +63,7 @@
+ 		ranges;
+ 
+ 		amba {
+-			compatible = "arm,amba-bus";
++			compatible = "arm,amba-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index 27a333e..74732e4 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -721,7 +721,7 @@
+ 	};
+ 
+ 	amba {
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
+index 9c73ac2..763a607 100644
+--- a/arch/arm/boot/dts/ste-u300.dts
++++ b/arch/arm/boot/dts/ste-u300.dts
+@@ -384,7 +384,7 @@
+ 	};
+ 
+ 	amba {
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+index 6fd7efb..01156cf 100644
+--- a/arch/arm/boot/dts/versatile-ab.dts
++++ b/arch/arm/boot/dts/versatile-ab.dts
+@@ -148,7 +148,7 @@
+ 	};
+ 
+ 	amba {
+-		compatible = "arm,amba-bus";
++		compatible = "arm,amba-bus", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+-- 
+1.9.1
