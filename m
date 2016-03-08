@@ -1,34 +1,62 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 08 Mar 2016 10:04:35 -0800
-Subject: [PATCH 3/3] ARM: bcm2835: Add VC4 to the device tree.
-In-Reply-To: <56DE6A80.1060707@wwwdotorg.org>
-References: <1457123528-13482-1-git-send-email-eric@anholt.net>
- <1457123528-13482-4-git-send-email-eric@anholt.net>
- <56DE6A80.1060707@wwwdotorg.org>
-Message-ID: <87bn6ozw0c.fsf@eliezer.anholt.net>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 8 Mar 2016 12:05:26 -0600
+Subject: [PATCH RESEND] Revert "PCI: dra7xx: Mark driver as broken"
+In-Reply-To: <1457087359-16816-1-git-send-email-kishon@ti.com>
+References: <1457087359-16816-1-git-send-email-kishon@ti.com>
+Message-ID: <20160308180526.GC21278@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On Fri, Mar 04, 2016 at 03:59:19PM +0530, Kishon Vijay Abraham I wrote:
+> From: Sekhar Nori <nsekhar@ti.com>
+> 
+> This reverts commit <5c3b99d057525fe2befe6a7db9b1309035d93eee>
+> ("PCI: dra7xx: Mark driver as broken").
+> 
+> With support to de-assert PCIe reset present in kernel,
+> DRA7x PCIe is not broken anymore.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> Bjorn,
+> 
+> This patch should be merged only after [1] hits linus tree.
+> 
+> Thanks
+> Kishon
+> 
+> [1] -> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git
+> 	for-v4.6/omap-hwmod-b
 
-> On 03/04/2016 01:32 PM, Eric Anholt wrote:
->> VC4 is the GPU (display and 3D) present on the 283x.
->
->> diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
->
->> +&hdmi {
->> +	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
->> +};
->
-> Isn't that the same everywhere? If so, adding it to bcm2835-rpi.dtsi 
-> seems like a better idea; it'd avoid duplicating it everywhere.
+OK.  Would you mind pinging me about this after [1] is merged to
+Linus' tree?  I don't want to put this in my "next" branch yet,
+because I don't know whether Pauls branch or mine will be merged first
+in the merge window.  But after the merge window closes, I can
+certainly include this in a "PCI fixes" pull request for inclusion in
+v4.6.
 
-It's not the same everywhere (_HIGH vs _LOW), which is why it's in the
-individual files.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160308/1566a353/attachment.sig>
+Bjorn
+
+>  drivers/pci/host/Kconfig |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 75a6054..6d181ba 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -5,7 +5,6 @@ config PCI_DRA7XX
+>  	bool "TI DRA7xx PCIe controller"
+>  	select PCIE_DW
+>  	depends on OF && HAS_IOMEM && TI_PIPE3
+> -	depends on BROKEN
+>  	help
+>  	 Enables support for the PCIe controller in the DRA7xx SoC.  There
+>  	 are two instances of PCIe controller in DRA7xx.  This controller can
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
