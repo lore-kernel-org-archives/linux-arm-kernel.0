@@ -1,191 +1,71 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue,  8 Mar 2016 11:29:30 +0000
-Subject: [PATCH v3 6/9] irqchip/gic-v3: Parse and export virtual GIC
- information
-In-Reply-To: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
-References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
-Message-ID: <1457436573-6180-7-git-send-email-julien.grall@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 8 Mar 2016 18:31:59 +0700
+Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <20160215152751.GT19432@atomide.com>
+References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+ <CACRpkdYzJ9Hy0sH6gK6RzpLE6juS4WfPjbt7nh43vR9YTuGZWA@mail.gmail.com>
+ <56C1A1FE.3080403@arm.com> <20160215152751.GT19432@atomide.com>
+Message-ID: <56DEB82F.5050703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fill up the recently introduced gic_kvm_info with the virtual GIC
-information.
+On 02/15/2016 10:27 PM, Tony Lindgren wrote:
+> * Sudeep Holla <sudeep.holla@arm.com> [160215 02:03]:
+>> Hi Linus,
+>>
+>> On 13/02/16 14:42, Linus Walleij wrote:
+>>> On Mon, Feb 1, 2016 at 7:28 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>>    pinctrl: single: Use a separate lockdep class
+>>>>    pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
+>>>>    ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+>>>>
+>>>>   arch/arm/mach-omap2/mux.c        |  4 ++--
+>>>>   arch/arm/mach-omap2/pm34xx.c     |  9 ++++-----
+>>>>   arch/arm/mach-omap2/prm_common.c |  1 +
+>>>>   drivers/pinctrl/pinctrl-single.c | 15 ++++++++++++---
+>>>
+>>> Are these patches orthogonal so I can merge the pinctrl patch independently
+>>> of the OMAP patches if Tony ACKs this?
+>>>
+>>
+>> Thanks for the follow up.
+>> IIUC they are dependent and remember Tony/Grygorii wanted them to be
+>> merged together(at-least for bisectibility)
+> 
+> AFAIK this series needs to be kept together to keep things
+> working.
+> 
+>>> If not: should it be merged by me or through ARM SoC/Tony?
+>>>
+>>
+>> I think so.
+>>
+>>> Anyways waiting for maintainer feedback, but the above is good to know.
+>>>
+>>
+>> Grygorii was still not sure if this works and he couldn't give it a
+>> test. He was traveling and may need more time to get back on this.
+> 
+> He said it does not work so clearly more work is needed.
+> 
 
-Signed-off-by: Julien Grall <julien.grall@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Yeah. As I mentioned before patches 2/3 will not work.
+I've tried to test suspend with diff I posted [1], but I did it only on 
+dra7 and am43 where suspend i more simple than on omap3. Also, I worry
+that with such approach some irq can be missed (especially edge ones), 
+because PRCM irqs will be re-enabled at very late resume stage 
+(right before thaw).
 
----
-    Changes in v3:
-        - Add ACPI support
+Second option, I see, is to rework PRCM to be threaded IRQ, but in this case
+all children IRQs will need to be threaded/nested threaded
+(including PCS, legacy OMAP mux, OMAP3 _prcm_int_handle_wakeup/_prcm_int_handle_io).
 
-    Changes in v2:
-        - Use 0 rather than a negative value to know when the maintenance IRQ
-        is not present.
-        - Use resource for vcpu and vctrl
----
- drivers/irqchip/irq-gic-v3.c           | 85 +++++++++++++++++++++++++++++++++-
- include/linux/irqchip/arm-gic-common.h |  1 +
- 2 files changed, 85 insertions(+), 1 deletion(-)
+Are there any objection to convert PCS to threaded IRQ, for example? ;)
+ 
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 50e87e6..6ae25120 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -28,6 +28,7 @@
- #include <linux/slab.h>
- 
- #include <linux/irqchip.h>
-+#include <linux/irqchip/arm-gic-common.h>
- #include <linux/irqchip/arm-gic-v3.h>
- 
- #include <asm/cputype.h>
-@@ -56,6 +57,8 @@ struct gic_chip_data {
- static struct gic_chip_data gic_data __read_mostly;
- static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
- 
-+static struct gic_kvm_info gic_v3_kvm_info;
-+
- #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
- #define gic_data_rdist_sgi_base()	(gic_data_rdist_rd_base() + SZ_64K)
-@@ -901,6 +904,37 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
- 	return 0;
- }
- 
-+static void __init gic_of_setup_kvm_info(struct device_node *node)
-+{
-+	int ret;
-+	struct resource r;
-+	u32 gicv_idx;
-+
-+	gic_v3_kvm_info.type = GIC_V3;
-+
-+	gic_v3_kvm_info.maint_irq = irq_of_parse_and_map(node, 0);
-+
-+	if (of_property_read_u32(node, "#redistributor-regions",
-+				 &gicv_idx))
-+		gicv_idx = 1;
-+
-+	gicv_idx += 3;	/* Also skip GICD, GICC, GICH */
-+	ret = of_address_to_resource(node, gicv_idx, &r);
-+	if (!ret) {
-+		if (!PAGE_ALIGNED(r.start))
-+			pr_warn("GICV physical address 0x%llx not page aligned\n",
-+				(unsigned long long)r.start);
-+		else if (!PAGE_ALIGNED(resource_size(&r)))
-+			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-+				(unsigned long long)resource_size(&r),
-+				PAGE_SIZE);
-+		else
-+			gic_v3_kvm_info.vcpu = r;
-+	}
-+
-+	gic_set_kvm_info(&gic_v3_kvm_info);
-+}
-+
- static int __init gic_of_init(struct device_node *node, struct device_node *parent)
- {
- 	void __iomem *dist_base;
-@@ -952,8 +986,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 
- 	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
- 			     redist_stride, &node->fwnode);
--	if (!err)
-+	if (!err) {
-+		gic_of_setup_kvm_info(node);
- 		return 0;
-+	}
- 
- out_unmap_rdist:
- 	for (i = 0; i < nr_redist_regions; i++)
-@@ -974,6 +1010,10 @@ static struct
- 	struct redist_region *redist_regs;
- 	u32 nr_redist_regions;
- 	bool single_redist;
-+	u32 maint_irq;
-+	int maint_irq_mode;
-+	phys_addr_t vctrl_base;
-+	phys_addr_t vcpu_base;
- } acpi_data __initdata;
- 
- static void __init
-@@ -1020,6 +1060,13 @@ gic_acpi_parse_madt_gicc(struct acpi_subtable_header *header,
- 		return -ENOMEM;
- 
- 	gic_acpi_register_redist(gicc->gicr_base_address, redist_base);
-+
-+	acpi_data.maint_irq = gicc->vgic_interrupt;
-+	acpi_data.maint_irq_mode = (gicc->flags & ACPI_MADT_VGIC_IRQ_MODE) ?
-+				    ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
-+	acpi_data.vctrl_base = gicc->gich_base_address;
-+	acpi_data.vcpu_base = gicc->gicv_base_address;
-+
- 	return 0;
- }
- 
-@@ -1111,6 +1158,40 @@ static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
- }
- 
- #define ACPI_GICV3_DIST_MEM_SIZE (SZ_64K)
-+#define ACPI_GICV2_VCTRL_MEM_SIZE	(SZ_4K)
-+#define ACPI_GICV2_VCPU_MEM_SIZE	(SZ_8K)
-+
-+static void __init gic_acpi_setup_kvm_info(void)
-+{
-+	int irq;
-+
-+	gic_v3_kvm_info.type = GIC_V3;
-+
-+	irq = acpi_register_gsi(NULL, acpi_data.maint_irq,
-+				acpi_data.maint_irq_mode,
-+				ACPI_ACTIVE_HIGH);
-+	if (irq > 0)
-+		gic_v3_kvm_info.maint_irq = irq;
-+
-+	if (acpi_data.vctrl_base) {
-+		struct resource *vctrl = &gic_v3_kvm_info.vctrl;
-+
-+		vctrl->flags = IORESOURCE_MEM;
-+		vctrl->start = acpi_data.vctrl_base;
-+		vctrl->end = vctrl->start + ACPI_GICV2_VCTRL_MEM_SIZE - 1;
-+	}
-+
-+	if (acpi_data.vcpu_base) {
-+		struct resource *vcpu = &gic_v3_kvm_info.vcpu;
-+
-+		vcpu->flags = IORESOURCE_MEM;
-+		vcpu->start = acpi_data.vcpu_base;
-+		vcpu->end = vcpu->start + ACPI_GICV2_VCPU_MEM_SIZE - 1;
-+	}
-+
-+	gic_set_kvm_info(&gic_v3_kvm_info);
-+}
-+
- 
- static int __init
- gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
-@@ -1159,6 +1240,8 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
- 		goto out_fwhandle_free;
- 
- 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
-+	gic_acpi_setup_kvm_info();
-+
- 	return 0;
- 
- out_fwhandle_free:
-diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
-index f7723b9..15d68c6 100644
---- a/include/linux/irqchip/arm-gic-common.h
-+++ b/include/linux/irqchip/arm-gic-common.h
-@@ -15,6 +15,7 @@
- 
- enum gic_type {
- 	GIC_V2,
-+	GIC_V3,
- };
- 
- struct gic_kvm_info {
+[1] https://patchwork.ozlabs.org/patch/578915/
+
 -- 
-1.9.1
+regards,
+-grygorii
