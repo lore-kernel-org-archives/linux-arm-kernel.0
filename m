@@ -1,59 +1,43 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Tue, 8 Mar 2016 07:17:42 -0600
-Subject: [PATCH v2 1/2] arm64: vmemmap: use virtual projection of linear
- region
-In-Reply-To: <CAKv+Gu9mwj0qscQJSH8wEi0zYC0anrr1hBYbdFE83iN+oQLnRQ@mail.gmail.com>
-References: <1456505834-8638-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456505834-8638-2-git-send-email-ard.biesheuvel@linaro.org>
- <56DE25DD.4010401@gmail.com>
- <E540D948-6371-4F71-A8B6-025BC39A0515@linaro.org>
- <CAKv+Gu9mwj0qscQJSH8wEi0zYC0anrr1hBYbdFE83iN+oQLnRQ@mail.gmail.com>
-Message-ID: <56DED0F6.8040602@redhat.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 8 Mar 2016 10:30:33 -0300
+Subject: [PATCH 0/3] thermal: exynos: Fixes for vtmu-supply regulator
+ handling
+In-Reply-To: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+References: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <56DED3F9.8050505@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2016 04:31 AM, Ard Biesheuvel wrote:
-> On 8 March 2016 at 09:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>
->>
->>> On 8 mrt. 2016, at 08:07, David Daney <ddaney.cavm@gmail.com> wrote:
->>>
->>>> On 02/26/2016 08:57 AM, Ard Biesheuvel wrote:
->>>> Commit dd006da21646 ("arm64: mm: increase VA range of identity map") made
->>>> some changes to the memory mapping code to allow physical memory to reside
->>>> at an offset that exceeds the size of the virtual mapping.
->>>>
->>>> However, since the size of the vmemmap area is proportional to the size of
->>>> the VA area, but it is populated relative to the physical space, we may
->>>> end up with the struct page array being mapped outside of the vmemmap
->>>> region. For instance, on my Seattle A0 box, I can see the following output
->>>> in the dmesg log.
->>>>
->>>>     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
->>>>               0xffffffbfc0000000 - 0xffffffbfd0000000   (   256 MB actual)
->>>>
->>>> We can fix this by deciding that the vmemmap region is not a projection of
->>>> the physical space, but of the virtual space above PAGE_OFFSET, i.e., the
->>>> linear region. This way, we are guaranteed that the vmemmap region is of
->>>> sufficient size, and we can even reduce the size by half.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>
->>> I see this commit now in Linus' kernel.org tree in v4.5-rc7.
->>>
->>> FYI:  I am seeing a crash that goes away when I revert this.  My kernel has some other modifications (our NUMA patches) so I haven't yet fully tracked this down on an unmodified kernel, but this is what I am getting:
->>>
->>
->
-> I managed to reproduce and diagnose this. The problem is that vmemmap
-> is no longer zone aligned, which causes trouble in the zone based
-> rounding that occurs in memory_present. The below patch fixes this by
-> rounding down the subtracted offset. Since this implies that the
-> region could stick off the other end, it also reverts the halving of
-> the region size.
+Hello Lukasz, Eduardo,
 
-This fixes the bug on my Seattle B0 system.
+On 02/18/2016 03:19 PM, Javier Martinez Canillas wrote:
+> Hello,
+> 
+> On a recent patch series to build a PMIC chip as a module [0], Krzysztof
+> asked me to check if all the consumer drivers, using the resources that
+> this PMIC provides, already support probe deferral.
+> 
+> While investigating that, I noticed that the Exynos TMU didn't do it so
+> this series fix that bug and other two minor issues that I noticed while
+> reviewing the driver and its DT binding.
+> 
+> The series are on top of Krzysztof's patches [1,2,3] not because there's
+> a dependency but to avoid merge conflicts with in-flight patches. Please
+> let me know if you prefer to use a different base instead.
+> 
+> [0]: https://lkml.org/lkml/2016/2/11/857
+> [1]: https://patchwork.kernel.org/patch/8345791/
+> [2]: https://patchwork.kernel.org/patch/8345741/
+> [3]: https://patchwork.kernel.org/patch/8345701/
+> 
+> Best regards,
+> Javier
+> 
 
-Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+Any comments about this series?
 
---Mark Langsdorf
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
