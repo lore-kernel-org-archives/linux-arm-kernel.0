@@ -1,51 +1,117 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Tue, 8 Mar 2016 09:23:03 +0530
-Subject: [PATCH 0/2] ARM: dra7: Enable Errata i877
-In-Reply-To: <alpine.DEB.2.02.1603072355030.27387@utopia.booyaka.com>
-References: <1456994525-20573-1-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1603070938170.3437@utopia.booyaka.com>
- <56DD4C70.7070105@ti.com>
- <alpine.DEB.2.02.1603072355030.27387@utopia.booyaka.com>
-Message-ID: <56DE4C9F.7060603@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 08 Mar 2016 12:03:12 +0800
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56DD38E7.3050107@huawei.com>
+References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
+ <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
+ <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
+ <20160304043232.GC12036@js1304-P5Q-DELUXE> <56D92595.60709@huawei.com>
+ <20160304063807.GA13317@js1304-P5Q-DELUXE> <56D93ABE.9070406@huawei.com>
+ <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD38E7.3050107@huawei.com>
+Message-ID: <56DE4F00.3070608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tuesday 08 March 2016 05:26 AM, Paul Walmsley wrote:
-> On Mon, 7 Mar 2016, Lokesh Vutla wrote:
-> 
->> On Monday 07 March 2016 03:09 PM, Paul Walmsley wrote:
->>> On Thu, 3 Mar 2016, Lokesh Vutla wrote:
->>>
->>>> This series enables Errata i877 for all DRA7 platforms. The public errata
->>>> documentation can be found here[1].
+On 03/07/2016 04:16 PM, Leizhen (ThunderTown) wrote:
+>
+>
+> On 2016/3/7 12:34, Joonsoo Kim wrote:
+>> On Fri, Mar 04, 2016 at 03:35:26PM +0800, Hanjun Guo wrote:
+>>> On 2016/3/4 14:38, Joonsoo Kim wrote:
+>>>> On Fri, Mar 04, 2016 at 02:05:09PM +0800, Hanjun Guo wrote:
+>>>>> On 2016/3/4 12:32, Joonsoo Kim wrote:
+>>>>>> On Fri, Mar 04, 2016 at 11:02:33AM +0900, Joonsoo Kim wrote:
+>>>>>>> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
+>>>>>>>> On 2016/3/3 15:42, Joonsoo Kim wrote:
+>>>>>>>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+>>>>>>>>>> (cc -mm and Joonsoo Kim)
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
+>>>>>>>>>>> Hi,
+>>>>>>>>>>>
+>>>>>>>>>>> I came across a suspicious error for CMA stress test:
+>>>>>>>>>>>
+>>>>>>>>>>> Before the test, I got:
+>>>>>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>>>>>>>>> CmaTotal:         204800 kB
+>>>>>>>>>>> CmaFree:          195044 kB
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> After running the test:
+>>>>>>>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
+>>>>>>>>>>> CmaTotal:         204800 kB
+>>>>>>>>>>> CmaFree:         6602584 kB
+>>>>>>>>>>>
+>>>>>>>>>>> So the freed CMA memory is more than total..
+>>>>>>>>>>>
+>>>>>>>>>>> Also the the MemFree is more than mem total:
+>>>>>>>>>>>
+>>>>>>>>>>> -bash-4.3# cat /proc/meminfo
+>>>>>>>>>>> MemTotal:       16342016 kB
+>>>>>>>>>>> MemFree:        22367268 kB
+>>>>>>>>>>> MemAvailable:   22370528 kB
+>>>>>>>> [...]
+>>>>>>>>>> I played with this a bit and can see the same problem. The sanity
+>>>>>>>>>> check of CmaFree < CmaTotal generally triggers in
+>>>>>>>>>> __move_zone_freepage_state in unset_migratetype_isolate.
+>>>>>>>>>> This also seems to be present as far back as v4.0 which was the
+>>>>>>>>>> first version to have the updated accounting from Joonsoo.
+>>>>>>>>>> Were there known limitations with the new freepage accounting,
+>>>>>>>>>> Joonsoo?
+>>>>>>>>> I don't know. I also played with this and looks like there is
+>>>>>>>>> accounting problem, however, for my case, number of free page is slightly less
+>>>>>>>>> than total. I will take a look.
+>>>>>>>>>
+>>>>>>>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
+>>>>>>>>> look like your case.
+>>>>>>>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
+>>>>>>>> did some other test:
+>>>>>>> Thanks! Now, I can re-generate erronous situation you mentioned.
+>>>>>>>
+>>>>>>>>   - run with single thread with 100000 times, everything is fine.
+>>>>>>>>
+>>>>>>>>   - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
+>>>>>>>>     the same test with 100 multi-thread, then I got:
+>>>>>>> [1] would not be sufficient to close this race.
+>>>>>>>
+>>>>>>> Try following things [A]. And, for more accurate test, I changed code a bit more
+>>>>>>> to prevent kernel page allocation from cma area [B]. This will prevent kernel
+>>>>>>> page allocation from cma area completely so we can focus cma_alloc/release race.
+>>>>>>>
+>>>>>>> Although, this is not correct fix, it could help that we can guess
+>>>>>>> where the problem is.
+>>>>>> More correct fix is something like below.
+>>>>>> Please test it.
+>>>>> Hmm, this is not working:
+>>>> Sad to hear that.
 >>>>
->>>> [1] http://www.ti.com/lit/er/sprz429h/sprz429h.pdf
+>>>> Could you tell me your system's MAX_ORDER and pageblock_order?
 >>>>
->>>> Lokesh Vutla (1):
->>>>   ARM: OMAP2+: hwmod: Introduce ti,no-idle dt property
->>>>
->>>> Mugunthan V N (1):
->>>>   ARM: dts: dra7: do not gate cpsw clock due to errata i877
 >>>
->>> I've sent these for merging immediately. 
->>>
->>> Have you sent patches for U-boot yet?
->> Yes, It is already merged into u-boot.
->> http://git.denx.de/?p=u-boot.git;a=commitdiff;h=f986d9720836433ded29f06c8f5aed462bd20924;hp=65e9d56fb9ce9cfd7ffff7afaa6b7de50e400e06
-> 
-> I may be misreading this patch, but all it seems to do is add clock 
-> control for GMAC.  It doesn't seem to force the clock to stay on.  What am 
-> I missing?
-So, this is an array containing clock controls which are needed very
-early. This array will be passed to clock framework to enable all the
-clocks. Just adding it to the array is sufficient.
+>>> MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
+>>
+>> Hmm... that's same with me.
+>>
+>> Below is similar fix that prevents buddy merging when one of buddy's
+>> migrate type, but, not both, is MIGRATE_ISOLATE. In fact, I have
+>> no idea why previous fix (more correct fix) doesn't work for you.
+>> (It works for me.) But, maybe there is a bug on the fix
+>> so I make new one which is more general form. Please test it.
+>
+> Hi,
+> 	Hanjun Guo has gone to Tailand on business, so I help him to run this patch. The result
+> shows that the count of "CmaFree:" is OK now.
 
-Thanks and regards,
-Lokesh
+Thanks Leizhen :)
 
-> 
-> 
-> - Paul
-> 
+> But sometimes printed some information as below:
+>
+> alloc_contig_range: [28500, 28600) PFNs busy
+> alloc_contig_range: [28300, 28380) PFNs busy
+
+I think it's not a problem for the stress test, as it's
+the lock not released yet.
+
+Thanks
+Hanjun
