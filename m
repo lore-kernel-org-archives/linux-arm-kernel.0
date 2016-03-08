@@ -1,42 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 08 Mar 2016 14:01:06 +0100
-Subject: [PATCH v4 0/3] driver for the hardware monitoring chip in the
- Zyxel NSA320
-In-Reply-To: <20160308115506.GA25899@roeck-us.net> (Guenter Roeck's message of
- "Tue, 8 Mar 2016 03:55:06 -0800")
-References: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
- <20160308115506.GA25899@roeck-us.net>
-Message-ID: <87mvq93yzx.fsf@free-electrons.com>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Tue, 8 Mar 2016 07:17:42 -0600
+Subject: [PATCH v2 1/2] arm64: vmemmap: use virtual projection of linear
+ region
+In-Reply-To: <CAKv+Gu9mwj0qscQJSH8wEi0zYC0anrr1hBYbdFE83iN+oQLnRQ@mail.gmail.com>
+References: <1456505834-8638-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456505834-8638-2-git-send-email-ard.biesheuvel@linaro.org>
+ <56DE25DD.4010401@gmail.com>
+ <E540D948-6371-4F71-A8B6-025BC39A0515@linaro.org>
+ <CAKv+Gu9mwj0qscQJSH8wEi0zYC0anrr1hBYbdFE83iN+oQLnRQ@mail.gmail.com>
+Message-ID: <56DED0F6.8040602@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam and Guenter,
- 
- On mar., mars 08 2016, Guenter Roeck <linux@roeck-us.net> wrote:
-
-> On Sat, Mar 05, 2016 at 03:34:54PM +0000, Adam Baker wrote:
->>  Documentation/devicetree/bindings/hwmon/nsa320-mcu.txt |  21 +++++
->>  Documentation/hwmon/nsa320                             |  53 +++++++++++
->>  arch/arm/boot/dts/kirkwood-nsa320.dts                  |  13 ++-
->>  drivers/hwmon/Kconfig                                  |  15 +++
->>  drivers/hwmon/Makefile                                 |   1 +
->>  drivers/hwmon/nsa320-hwmon.c                           | 216 ++++++++++++++++++++++++++++++++++++++++++++
->>  6 files changed, 317 insertions(+), 2 deletions(-)
->> 
-> Patch 1/3 and 2/3 applied to hwmon-next.
+On 03/08/2016 04:31 AM, Ard Biesheuvel wrote:
+> On 8 March 2016 at 09:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>
+>>
+>>> On 8 mrt. 2016, at 08:07, David Daney <ddaney.cavm@gmail.com> wrote:
+>>>
+>>>> On 02/26/2016 08:57 AM, Ard Biesheuvel wrote:
+>>>> Commit dd006da21646 ("arm64: mm: increase VA range of identity map") made
+>>>> some changes to the memory mapping code to allow physical memory to reside
+>>>> at an offset that exceeds the size of the virtual mapping.
+>>>>
+>>>> However, since the size of the vmemmap area is proportional to the size of
+>>>> the VA area, but it is populated relative to the physical space, we may
+>>>> end up with the struct page array being mapped outside of the vmemmap
+>>>> region. For instance, on my Seattle A0 box, I can see the following output
+>>>> in the dmesg log.
+>>>>
+>>>>     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+>>>>               0xffffffbfc0000000 - 0xffffffbfd0000000   (   256 MB actual)
+>>>>
+>>>> We can fix this by deciding that the vmemmap region is not a projection of
+>>>> the physical space, but of the virtual space above PAGE_OFFSET, i.e., the
+>>>> linear region. This way, we are guaranteed that the vmemmap region is of
+>>>> sufficient size, and we can even reduce the size by half.
+>>>>
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> I see this commit now in Linus' kernel.org tree in v4.5-rc7.
+>>>
+>>> FYI:  I am seeing a crash that goes away when I revert this.  My kernel has some other modifications (our NUMA patches) so I haven't yet fully tracked this down on an unmodified kernel, but this is what I am getting:
+>>>
+>>
 >
-> I assume that patch 3/3 will go through the arm tree.
+> I managed to reproduce and diagnose this. The problem is that vmemmap
+> is no longer zone aligned, which causes trouble in the zone based
+> rounding that occurs in memory_present. The below patch fixes this by
+> rounding down the subtracted offset. Since this implies that the
+> region could stick off the other end, it also reverts the halving of
+> the region size.
 
-Yes but now that the rc7 was released is too late putting it to arm-soc
-for the 4.6 kernel.
+This fixes the bug on my Seattle B0 system.
 
-Gregory
+Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
 
->
-> Guenter
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+--Mark Langsdorf
