@@ -1,58 +1,58 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 08 Mar 2016 17:38:11 +0100
-Subject: [PATCH] ARM: mvebu: Fix of_clk_get() call in a non sleeping
- context
-In-Reply-To: <20160308173134.22a3ad64@free-electrons.com> (Thomas Petazzoni's
- message of "Tue, 8 Mar 2016 17:31:34 +0100")
-References: <1457446733-7137-1-git-send-email-gregory.clement@free-electrons.com>
- <20160308164117.2a3ed3a7@free-electrons.com>
- <87a8m93pt0.fsf@free-electrons.com>
- <20160308173134.22a3ad64@free-electrons.com>
-Message-ID: <8760wx3oy4.fsf@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 8 Mar 2016 09:42:24 -0700
+Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
+ groups.
+In-Reply-To: <CACRpkdYzSt=R7j9GLSY39CsyMKLjqRYnP_31ti5jWiGngJacqA@mail.gmail.com>
+References: <1456510756-15337-1-git-send-email-eric@anholt.net>
+ <1456510756-15337-3-git-send-email-eric@anholt.net>
+ <CACRpkdYzSt=R7j9GLSY39CsyMKLjqRYnP_31ti5jWiGngJacqA@mail.gmail.com>
+Message-ID: <56DF00F0.3080801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., mars 08 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On 03/08/2016 01:24 AM, Linus Walleij wrote:
+> On Sat, Feb 27, 2016 at 1:19 AM, Eric Anholt <eric@anholt.net> wrote:
+>
+>> Since all of these pins were documented, we can use their names to
+>> explain what's going on.
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>
+>> +       pinctrl-0 = <&i2c0_gpio0
+>> +                    &i2c1_gpio2
+>> +                    &gpclk0_gpio4
+>> +                    &gpclk1_gpio5
+>> +                    &spi0_gpio7
+>> +                    &pcm_gpio18
+>> +                    &pwm0_gpio40
+>> +                    &pwm1_gpio45
+>> +                    &gpioout
+>> +                    &alt3>;
+>
+> Why are all of these done as hogs instead of being in pinctrl-0
+> "default" for the device that is using them? i2c1, gpclk0,
+> etc?
+>
+> The only reason I see would be if they are unused or something.
 
-> Hello,
->
-> On Tue, 08 Mar 2016 17:19:39 +0100, Gregory CLEMENT wrote:
->
->> OK, so let's only use clk_enable() which can't sleep. On mvebu SoCs
->> there is no prepare/unprepare operation for the clock, so trying to use
->> clk_prepare_enable() is useless. Especially for this code which is not
->> for a random IP but especially for the Armada XP SoC.
->> 
->> If in the future the same logic can be used for a new mvebu SoC which
->> need the prepare/unprepare feature, then we will see how to deal with
->> it, but I really doubt that it will happen.
->
-> I am not sure doing a clk_enable() without a clk_prepare() before it is
-> legal, and that's why the clk_prepare_enable() helper is widely used.
->
-> From the clk_prepare() comment:
->
-> ""
-> In fact clk_prepare must be called before clk_enable.
-> ""
->
+I think it makes sense to have the pinctrl driver (or even FW before the 
+kernel boots) set up everything at once where possible. That's the 
+easiest way to ensure there are never any conflicts in the pinmux table 
+(i.e. that two different pins don't end up being both muxed to SPI1's 
+MISO signal at the same time for a while before all the drivers probe). 
+Putting pinctrl entries into individual devices only makes sense to me 
+when one of:
 
-And from clk_enable comment we have:
-""
-clk_enable must not sleep, which differentiates it from clk_prepare.  In a
-simple case, clk_enable can be used instead of clk_prepare to ungate a clk
-if the operation will never sleep.
-""
+a) That device needs to dynamically change the pinmux at run-time, e.g. 
+to switch between different states, so needs definitions of those 
+different states.
 
-Moreoever for me the "must" was to insist to the order of the call no to
-the fact that both must be called.
+or:
 
-Gregory
+b) The initial pinmux is guaranteed set up to a safe non-conflicting 
+state that enables very little, and we need to defer enabling various 
+peripherals until a later time when we know the peripheral is in use, 
+e.g. when loading a DT overlay from user-space.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+On the RPi there are certain peripherals that fall into each category, 
+e.g. SD card is always used, I2S only optionally used.
