@@ -1,255 +1,215 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 8 Mar 2016 09:41:59 +0800
-Subject: [PATCH v4 2/5] ARM: at91: pm: add ULP1 mode support
+Date: Tue, 8 Mar 2016 09:42:00 +0800
+Subject: [PATCH v4 3/5] ARM: at91: pm: configure PMC fast startup signals
 In-Reply-To: <1457401322-29120-1-git-send-email-wenyou.yang@atmel.com>
 References: <1457401322-29120-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1457401322-29120-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1457401322-29120-4-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ULP1 (Ultra Low-power mode 1) is introduced by SAMA5D2.
-
-In the ULP1 mode, all the clocks are shut off, inclusive the embedded
-12MHz RC oscillator, so as to achieve the lowest power consumption
-with the system in retention mode and able to resume on the wake up
-events. As soon as the wake up event is asserted, the embedded 12MHz
+The fast startup signal is used as wake up sources for ULP1 mode.
+As soon as a fast startup signal is asserted, the embedded 12 MHz
 RC oscillator restarts automatically.
+
+This patch is to configure the fast startup signals, which signal
+is enabled to trigger the PMC to wake up the system from ULP1 mode
+should be configured via the DT.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
 
 Changes in v4: None
-Changes in v3: None
-Changes in v2:
- - fix label pm_exit to ulp_exit.
+Changes in v3:
+ - use 0 and 1, not string, to define the trigger active polarity.
 
- arch/arm/mach-at91/pm.c         |   16 ++++++-
- arch/arm/mach-at91/pm.h         |    7 +++
- arch/arm/mach-at91/pm_suspend.S |   97 +++++++++++++++++++++++++++++++++++++++
- include/linux/clk/at91_pmc.h    |    4 ++
- 4 files changed, 122 insertions(+), 2 deletions(-)
+Changes in v2:
+ - shorten the pmc-fast-startup property's name.
+ - use the value property, instead of bool property for high
+   or low triggered.
+
+ arch/arm/mach-at91/pm.c      |  114 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/at91_pmc.h |   32 ++++++++++++
+ 2 files changed, 146 insertions(+)
 
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f062701..5c2db34 100644
+index 5c2db34..aad5041 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -36,6 +36,11 @@
- #include "generic.h"
- #include "pm.h"
+@@ -24,6 +24,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk/at91_pmc.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
  
-+#define ULP0_MODE	0x00
-+#define ULP1_MODE	0x11
-+
-+#define SAMA5D2_PMC_VERSION	0x20540
-+
- static void __iomem *pmc;
- 
- /*
-@@ -52,6 +57,7 @@ extern void at91_pinctrl_gpio_resume(void);
- static struct {
- 	unsigned long uhp_udp_mask;
- 	int memctrl;
-+	u32 ulp_mode;
- } at91_pm_data;
- 
- void __iomem *at91_ramc_base[2];
-@@ -141,8 +147,11 @@ static void at91_pm_suspend(suspend_state_t state)
- {
- 	unsigned int pm_data = at91_pm_data.memctrl;
- 
--	pm_data |= (state == PM_SUSPEND_MEM) ?
--				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
-+	if (state == PM_SUSPEND_MEM) {
-+		pm_data |= AT91_PM_MODE(AT91_PM_SLOW_CLOCK);
-+		if (at91_pm_data.ulp_mode == ULP1_MODE)
-+			pm_data |= AT91_PM_ULP(AT91_PM_ULP1_MODE);
-+	}
- 
- 	flush_cache_all();
- 	outer_disable();
-@@ -497,4 +506,7 @@ void __init sama5_pm_init(void)
- 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
- 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
- 	at91_pm_init(NULL);
-+
-+	if (readl(pmc + AT91_PMC_VERSION) >= SAMA5D2_PMC_VERSION)
-+		at91_pm_data.ulp_mode = ULP1_MODE;
+ #include <asm/irq.h>
+ #include <linux/atomic.h>
+@@ -461,6 +463,116 @@ static void __init at91_pm_init(void (*pm_idle)(void))
+ 		pr_info("AT91: PM not supported, due to no SRAM allocated\n");
  }
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 3fcf881..2e76745 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -39,4 +39,11 @@ extern void __iomem *at91_ramc_base[];
  
- #define	AT91_PM_SLOW_CLOCK	0x01
++static int __init at91_pmc_fast_startup_init(void)
++{
++	struct device_node *np;
++	struct regmap *regmap;
++	u32 mode = 0, polarity = 0, value = 0;
++
++	np = of_find_compatible_node(NULL, NULL,
++				     "atmel,sama5d2-pmc-fast-startup");
++	if (!np)
++		return -ENODEV;
++
++	regmap = syscon_node_to_regmap(of_get_parent(np));
++	if (IS_ERR(regmap)) {
++		pr_info("AT91: failed to find PMC fast startup\n");
++		return PTR_ERR(regmap);
++	}
++
++	mode |= of_property_read_bool(np, "atmel,wkup-trigger") ?
++		AT91_PMC_FSTT0 : 0;
++	mode |= of_property_read_bool(np, "atmel,secumod-trigger") ?
++		AT91_PMC_FSTT1 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu0-trigger") ?
++		AT91_PMC_FSTT2 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu1-trigger") ?
++		AT91_PMC_FSTT3 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu2-trigger") ?
++		AT91_PMC_FSTT4 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu3-trigger") ?
++		AT91_PMC_FSTT5 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu4-trigger") ?
++		AT91_PMC_FSTT6 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu5-trigger") ?
++		AT91_PMC_FSTT7 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu6-trigger") ?
++		AT91_PMC_FSTT8 : 0;
++	mode |= of_property_read_bool(np, "atmel,piobu7-trigger") ?
++		AT91_PMC_FSTT9 : 0;
++	mode |= of_property_read_bool(np, "atmel,gmac-wol-trigger") ?
++		AT91_PMC_FSTT10 : 0;
++	mode |= of_property_read_bool(np, "atmel,rtc-alarm-trigger") ?
++		AT91_PMC_RTCAL : 0;
++	mode |= of_property_read_bool(np, "atmel,usb-resume-trigger") ?
++		AT91_PMC_USBAL : 0;
++	mode |= of_property_read_bool(np, "atmel,sdmmc-cd-trigger") ?
++		AT91_PMC_SDMMC_CD : 0;
++	mode |= of_property_read_bool(np, "atmel,rxlp-match-trigger") ?
++		AT91_PMC_RXLP_MCE : 0;
++	mode |= of_property_read_bool(np, "atmel,acc-comparison-trigger") ?
++		AT91_PMC_ACC_CE : 0;
++
++	if (!of_property_read_u32(np, "atmel,wkup-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP0;
++	}
++
++	if (mode & AT91_PMC_FSTT1)
++		polarity |= AT91_PMC_FSTP1;
++
++	if (!of_property_read_u32(np, "atmel,piobu0-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP2;
++	}
++
++	if (!of_property_read_u32(np, "atmel,piobu1-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP3;
++	}
++
++	if (!of_property_read_u32(np, "atmel,piobu2-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP4;
++	}
++
++	if (!of_property_read_u32(np, "atmel,piobu3-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP5;
++	}
++
++	if (!of_property_read_u32(np, "atmel,piobu4-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP6;
++	}
++
++	if (!of_property_read_u32(np, "atmel,piobu5-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP7;
++	}
++
++	if (!of_property_read_u32(np, "atmel,piobu6-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP8;
++	}
++
++	if (!of_property_read_u32(np, "atmel,piobu7-trigger-level", &value)) {
++		if (value)
++			polarity |= AT91_PMC_FSTP9;
++	}
++
++	if (mode & AT91_PMC_FSTT10)
++		polarity |= AT91_PMC_FSTP10;
++
++	regmap_write(regmap, AT91_PMC_FSMR, mode);
++
++	regmap_write(regmap, AT91_PMC_FSPR, polarity);
++
++	of_node_put(np);
++
++	return 0;
++}
++
+ void __init at91rm9200_pm_init(void)
+ {
+ 	at91_dt_ramc();
+@@ -509,4 +621,6 @@ void __init sama5_pm_init(void)
  
-+#define AT91_PM_ULP_OFFSET	5
-+#define AT91_PM_ULP_MASK	0x03
-+#define AT91_PM_ULP(x)		(((x) & AT91_PM_ULP_MASK) << AT91_PM_ULP_OFFSET)
+ 	if (readl(pmc + AT91_PMC_VERSION) >= SAMA5D2_PMC_VERSION)
+ 		at91_pm_data.ulp_mode = ULP1_MODE;
 +
-+#define AT91_PM_ULP0_MODE	0x00
-+#define AT91_PM_ULP1_MODE	0x01
-+
- #endif
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index 5fcffdc..f2a5c4b 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -41,6 +41,15 @@ tmp2	.req	r5
- 	.endm
- 
- /*
-+ * Wait for main oscillator selection is done
-+ */
-+	.macro wait_moscsels
-+1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
-+	tst	tmp1, #AT91_PMC_MOSCSELS
-+	beq	1b
-+	.endm
-+
-+/*
-  * Wait until PLLA has locked.
-  */
- 	.macro wait_pllalock
-@@ -101,6 +110,10 @@ ENTRY(at91_pm_suspend_in_sram)
- 	and	r0, r0, #AT91_PM_MODE_MASK
- 	str	r0, .pm_mode
- 
-+	lsr	r0, r3, #AT91_PM_ULP_OFFSET
-+	and	r0, r0, #AT91_PM_ULP_MASK
-+	str	r0, .ulp_mode
-+
- 	/* Active the self-refresh mode */
- 	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
- 	bl	at91_sramc_self_refresh
-@@ -131,6 +144,13 @@ ENTRY(at91_pm_suspend_in_sram)
- 	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
- 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
- 
-+	ldr	r0, .ulp_mode
-+	tst	r0, #AT91_PM_ULP1_MODE
-+	beq	ulp0_mode
-+
-+	bl	at91_pm_ulp1_mode
-+	b	ulp_exit
-+
- ulp0_mode:
- 	bl	at91_pm_ulp0_mode
- 	b	ulp_exit
-@@ -326,6 +346,81 @@ ENTRY(at91_pm_ulp0_mode)
- 	mov	pc, lr
- ENDPROC(at91_pm_ulp0_mode)
- 
-+/*
-+ * void at91_pm_ulp1_mode(void)
-+ */
-+ENTRY(at91_pm_ulp1_mode)
-+	ldr	pmc, .pmc_base
-+
-+	/* Switch the main clock source to 12-MHz RC oscillator */
-+	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-+	bic	tmp1, tmp1, #AT91_PMC_MOSCSEL
-+	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
-+	orr	tmp1, tmp1, #AT91_PMC_KEY
-+	str	tmp1, [pmc, #AT91_CKGR_MOR]
-+
-+	wait_moscsels
-+
-+	/* Disable the crystal oscillator */
-+	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-+	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
-+	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
-+	orr	tmp1, tmp1, #AT91_PMC_KEY
-+	str	tmp1, [pmc, #AT91_CKGR_MOR]
-+
-+	/* Switch the master clock source to main clock */
-+	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
-+	bic	tmp1, tmp1, #AT91_PMC_CSS
-+	orr	tmp1, tmp1, #AT91_PMC_CSS_MAIN
-+	str	tmp1, [pmc, #AT91_PMC_MCKR]
-+
-+	wait_mckrdy
-+
-+	/* Enter the ULP1 mode by set WAITMODE bit in CKGR_MOR */
-+	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-+	orr	tmp1, tmp1, #AT91_PMC_WAITMODE
-+	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
-+	orr	tmp1, tmp1, #AT91_PMC_KEY
-+	str	tmp1, [pmc, #AT91_CKGR_MOR]
-+
-+	wait_mckrdy
-+
-+	/* Enable the crystal oscillator */
-+	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-+	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-+	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
-+	orr	tmp1, tmp1, #AT91_PMC_KEY
-+	str	tmp1, [pmc, #AT91_CKGR_MOR]
-+
-+	wait_moscrdy
-+
-+	/* Switch the master clock source to slow clock */
-+	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
-+	bic	tmp1, tmp1, #AT91_PMC_CSS
-+	str	tmp1, [pmc, #AT91_PMC_MCKR]
-+
-+	wait_mckrdy
-+
-+	/* Switch main clock source to crystal oscillator */
-+	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
-+	orr	tmp1, tmp1, #AT91_PMC_MOSCSEL
-+	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
-+	orr	tmp1, tmp1, #AT91_PMC_KEY
-+	str	tmp1, [pmc, #AT91_CKGR_MOR]
-+
-+	wait_moscsels
-+
-+	/* Switch the master clock source to main clock */
-+	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
-+	bic	tmp1, tmp1, #AT91_PMC_CSS
-+	orr	tmp1, tmp1, #AT91_PMC_CSS_MAIN
-+	str	tmp1, [pmc, #AT91_PMC_MCKR]
-+
-+	wait_mckrdy
-+
-+	mov	pc, lr
-+ENDPROC(at91_pm_ulp1_mode)
-+
- .pmc_base:
- 	.word 0
- .sramc_base:
-@@ -336,6 +431,8 @@ ENDPROC(at91_pm_ulp0_mode)
- 	.word 0
- .pm_mode:
- 	.word 0
-+.ulp_mode:
-+	.word 0
- .saved_mckr:
- 	.word 0
- .saved_pllar:
++	at91_pmc_fast_startup_init();
+ }
 diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
-index 17f413b..4afd891 100644
+index 4afd891..683580e 100644
 --- a/include/linux/clk/at91_pmc.h
 +++ b/include/linux/clk/at91_pmc.h
-@@ -47,8 +47,10 @@
- #define	AT91_CKGR_MOR		0x20			/* Main Oscillator Register [not on SAM9RL] */
- #define		AT91_PMC_MOSCEN		(1    <<  0)		/* Main Oscillator Enable */
- #define		AT91_PMC_OSCBYPASS	(1    <<  1)		/* Oscillator Bypass */
-+#define		AT91_PMC_WAITMODE	(1    <<  2)		/* Wait Mode Command */
- #define		AT91_PMC_MOSCRCEN	(1    <<  3)		/* Main On-Chip RC Oscillator Enable [some SAM9] */
- #define		AT91_PMC_OSCOUNT	(0xff <<  8)		/* Main Oscillator Start-up Time */
-+#define		AT91_PMC_KEY_MASK	(0xff << 16)
- #define		AT91_PMC_KEY		(0x37 << 16)		/* MOR Writing Key */
- #define		AT91_PMC_MOSCSEL	(1    << 24)		/* Main Oscillator Selection [some SAM9] */
- #define		AT91_PMC_CFDEN		(1    << 25)		/* Clock Failure Detector Enable [some SAM9] */
-@@ -166,6 +168,8 @@
+@@ -168,6 +168,38 @@
  #define		AT91_PMC_WPVS		(0x1  <<  0)		/* Write Protect Violation Status */
  #define		AT91_PMC_WPVSRC		(0xffff  <<  8)		/* Write Protect Violation Source */
  
-+#define AT91_PMC_VERSION	0xfc
++#define AT91_PMC_FSMR		0x70		/* Fast Startup Mode Register */
++#define AT91_PMC_FSTT0		BIT(0)		/* WKUP Pin Enable */
++#define AT91_PMC_FSTT1		BIT(1)		/* Security Module Enable */
++#define AT91_PMC_FSTT2		BIT(2)		/* PIOBU0 Input Enable */
++#define AT91_PMC_FSTT3		BIT(3)		/* PIOBU1 Input Enable */
++#define AT91_PMC_FSTT4		BIT(4)		/* PIOBU2 Input Enable */
++#define AT91_PMC_FSTT5		BIT(5)		/* PIOBU3 Input Enable */
++#define AT91_PMC_FSTT6		BIT(6)		/* PIOBU4 Input Enable */
++#define AT91_PMC_FSTT7		BIT(7)		/* PIOBU5 Input Enable */
++#define AT91_PMC_FSTT8		BIT(8)		/* PIOBU6 Input Enable */
++#define AT91_PMC_FSTT9		BIT(9)		/* PIOBU7 Input Enable */
++#define AT91_PMC_FSTT10		BIT(10)		/* GMAC Wake-up On LAN Enable */
++#define AT91_PMC_RTCAL		BIT(17)		/* RTC Alarm Enable */
++#define AT91_PMC_USBAL		BIT(18)		/* USB Resume Enable */
++#define AT91_PMC_SDMMC_CD	BIT(19)		/* SDMMC Card Detect Enable */
++#define AT91_PMC_LPM		BIT(20)		/* Low-power Mode */
++#define AT91_PMC_RXLP_MCE	BIT(24)		/* Backup UART Receive Enable */
++#define AT91_PMC_ACC_CE		BIT(25)		/* ACC Enable */
 +
++#define AT91_PMC_FSPR		0x74		/* Fast Startup Polarity Reg */
++#define AT91_PMC_FSTP0		BIT(0)		/* WKUP Pin Polarity */
++#define AT91_PMC_FSTP1		BIT(1)		/* Security Module Polarity */
++#define AT91_PMC_FSTP2		BIT(2)		/* PIOBU0 Pin Polarity */
++#define AT91_PMC_FSTP3		BIT(3)		/* PIOBU1 Pin Polarity */
++#define AT91_PMC_FSTP4		BIT(4)		/* PIOBU2 Pin Polarity */
++#define AT91_PMC_FSTP5		BIT(5)		/* PIOBU3 Pin Polarity */
++#define AT91_PMC_FSTP6		BIT(6)		/* PIOBU4 Pin Polarity */
++#define AT91_PMC_FSTP7		BIT(7)		/* PIOBU5 Pin Polarity */
++#define AT91_PMC_FSTP8		BIT(8)		/* PIOBU6 Pin Polarity */
++#define AT91_PMC_FSTP9		BIT(9)		/* PIOBU7 Pin Polarity */
++#define AT91_PMC_FSTP10		BIT(10)		/* Wake-up On LAN Polarity */
++
+ #define AT91_PMC_VERSION	0xfc
+ 
  #define AT91_PMC_PCER1		0x100			/* Peripheral Clock Enable Register 1 [SAMA5 only]*/
- #define AT91_PMC_PCDR1		0x104			/* Peripheral Clock Enable Register 1 */
- #define AT91_PMC_PCSR1		0x108			/* Peripheral Clock Enable Register 1 */
 -- 
 1.7.9.5
