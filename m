@@ -1,48 +1,32 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 08 Mar 2016 09:12:35 +0100
-Subject: Reset controller changes for v4.6: shared resets
-Message-ID: <1457424755.4174.12.camel@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Mar 2016 15:18:26 +0700
+Subject: [PATCH] pinctrl-bcm2835: Fix cut-and-paste error in "pull" parsing
+In-Reply-To: <1456795808-1449-1-git-send-email-eric@anholt.net>
+References: <1456795808-1449-1-git-send-email-eric@anholt.net>
+Message-ID: <CACRpkdZT9BvDc3f4mf22jGb5PQOVVgBU+pSrzhxrqfbczHNG8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+On Tue, Mar 1, 2016 at 8:30 AM, Eric Anholt <eric@anholt.net> wrote:
 
-this tag adds reference counted shared reset support for multiple
-consumers that use the same reset line for low power states.
-Also there is a cleanup patch for lpc18xx removing global variables.
+> From: Phil Elwell <phil@raspberrypi.org>
+>
+> The DT bindings for pinctrl-bcm2835 allow both the function and pull
+> to contain either one entry or one per pin. However, an error in the
+> DT parsing can cause failures if the number of pulls differs from the
+> number of functions.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Cc: stable at vger.kernel.org
+> ---
+>
+> Yes, the s-o-b differs from the author of the commit, but this falls
+> under part b) of the process.
+>
+> Phil, any chance you could start putting Signed-off-by lines on your
+> kernel commits?
 
-regards
-Philipp
+Patch applied with the extra SoB and Stephen's review tag.
 
-The following changes since commit f673ed4d5fdc123b1552525de30741cd8dfde53f:
-
-  reset: sti: Make reset_control_ops const (2016-02-10 10:53:38 +0100)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.6-2
-
-for you to fetch changes up to bc2a505c3f325c1b4ce0610fbeee3000910fda61:
-
-  reset: Add support for shared reset controls (2016-02-24 11:37:32 +0100)
-
-----------------------------------------------------------------
-Reset controller changes for v4.6
-
-- add support for shared reset controls
-- remove global variables from the lpc18xx driver
-
-----------------------------------------------------------------
-Hans de Goede (3):
-      reset: Make [of_]reset_control_get[_foo] functions wrappers
-      reset: Share struct reset_control between reset_control_get calls
-      reset: Add support for shared reset controls
-
-Joachim Eastwood (1):
-      reset: lpc18xx: get rid of global variables for restart notifier
-
- drivers/reset/core.c             | 217 ++++++++++++++++++++++-----------------
- drivers/reset/reset-lpc18xx.c    |  22 ++--
- include/linux/reset-controller.h |   2 +
- include/linux/reset.h            | 188 +++++++++++++++++++++++++++------
- 4 files changed, 289 insertions(+), 140 deletions(-)
+Yours,
+Linus Walleij
