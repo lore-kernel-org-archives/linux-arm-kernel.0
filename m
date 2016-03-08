@@ -1,80 +1,74 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 7 Mar 2016 18:38:13 -0600
-Subject: [PATCH 0/3] arm64: simplify and optimize kernel mapping
-In-Reply-To: <20160307014031.GA2158@svinekod>
-References: <1457010581-4924-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160307014031.GA2158@svinekod>
-Message-ID: <56DE1EF5.9070503@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 7 Mar 2016 16:46:04 -0800
+Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
+In-Reply-To: <2125152.VIQO6FufKf@diego>
+References: <1936935.FVZdWRYuBf@diego> <1650675.1PTvAK3nr8@wuerfel>
+ <2125152.VIQO6FufKf@diego>
+Message-ID: <CAD=FV=Wr0f6d=tJCCfQa59pNDe1PEj44hdqCKFKricYdv7D+0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2016 07:40 PM, Mark Rutland wrote:
-> Hi,
->
-> I like this series, though I have a few minor comments below.
->
-> On Thu, Mar 03, 2016 at 02:09:38PM +0100, Ard Biesheuvel wrote:
->> This series makes a couple of minor changes that should result in the
->> kernel being mapped in a more efficient manner.
->>
->> First of all, it merges the .head.text with the .text section (patch #2)
->> after moving everything except the kernel and EFI header into the __init
->> section (patch #1)
->
-> Face-to-face, you suggested it might be possible to move .init before .text, so
-> we could place the EFI header in there too (and keep .text aligned while making
-> it smaller). Is there some reason we missed that means we cannot do this?
->
->> Then, it standardizes the segment alignment to 64 KB for all page sizes.
->> (patch #3). In the example below (4 KB granule, with Jeremy's PTE_CONT
->> patch applied), we lose 80 KB in total to padding, but the resulting
->> mappings do look somewhat better.
->
-> I suspect some people might want a minimal alignment option for tinification
-> purposes, but this sounds fine to me as a default. I also think we can wait
-> until someone asks.
->
-> As a general think, currently we use "chunk" instead of "segment" in the mm
-> code. We only used "chunk" so as to not overload "section". For consistency it
-> would be nice to either keep with "chunk" or convert existing uses to
-> "segment". I much prefer the latter!
->
->> Before:
->>
->> 0xffff000008082000-0xffff000008090000    56K  ro x  SHD AF         UXN MEM
->> 0xffff000008090000-0xffff000008200000  1472K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
->> 0xffff000008600000-0xffff000008660000   384K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008660000-0xffff00000866c000    48K  ro x  SHD AF         UXN MEM
->> 0xffff00000866c000-0xffff000008670000    16K  ro NX SHD AF         UXN MEM
->> 0xffff000008670000-0xffff000008900000  2624K  ro NX SHD AF CON     UXN MEM
->> 0xffff000008900000-0xffff000008909000    36K  ro NX SHD AF         UXN MEM
->> 0xffff000008c39000-0xffff000008c40000    28K  RW NX SHD AF         UXN MEM
->> 0xffff000008c40000-0xffff000008d50000  1088K  RW NX SHD AF CON     UXN MEM
->> 0xffff000008d50000-0xffff000008d57000    28K  RW NX SHD AF         UXN MEM
->>
->> After:
->>
->> 0xffff000008080000-0xffff000008200000  1536K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
->> 0xffff000008600000-0xffff000008670000   448K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008670000-0xffff000008910000  2688K  ro NX SHD AF CON     UXN MEM
->> 0xffff000008c50000-0xffff000008d60000  1088K  RW NX SHD AF CON     UXN MEM
->> 0xffff000008d60000-0xffff000008d6b000    44K  RW NX SHD AF         UXN MEM
->>
->> I am aware that this clashes with Jeremy's patch to allow CONT_SIZE alignment
->> when CONFIG_DEBUG_ALIGN_RODATA=y, but the net effect of patch #3 is the same
->> (only the Kconfig change is not included here)
->
-> Jeremy, do you have any thoughts on this series?
+Heiko,
 
-	I was waiting to see if anyone questioned padding the minimum kernel 
-alignment. But other than that, It looks good.
+On Fri, Dec 11, 2015 at 4:57 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Arnd,
+>
+> Am Samstag, 12. Dezember 2015, 01:30:17 schrieb Arnd Bergmann:
+>> On Saturday 05 December 2015 01:53:38 Heiko St?bner wrote:
+>> > SMP special case for the rk3036 and making sure the arch-timer
+>> > supply is enabled, similar to the rk3288.
+>>
+>> That is a rather ugly hack, I'd prefer if this could be done cleaner
+>> rather than duplicated into another place.
+>
+> I do agree that it is rather ugly :-) .
+>
+> The general opinion seems to be, that firmware is supposed to make sure this
+> timer is enabled and at the time when it got introduced the consensus was to
+> not hack up the arch-timer to facilitate this and "just" put it into the soc
+> code for the affected cpu.
+>
+> It seems like the really new rk3228 (quad-core A7 and using psci now) actually
+> gets this right now, in having its firmware taking care of this. So it looks
+> like this hopefully won't be needed even for future arm32 socs.
+>
+> I guess I should look at what the new and shiny mainline uboot support does
+> for this, but I do think it might actually do it right as well.
+>
+> So this is really only a hack for flaky vendor-bootloaders.
+>
+>
+> Which brings me to ...
+>
+>> Sorry for not seeing this earlier. Can you replace the hardcoded
+>> RK3036_TIMER_PHYS and RK3288_TIMER6_7_PHYS constants with a DT
+>> lookup, to make it somewhat less hacky?
+>
+> I'm not really sure how that is supposed to look like. Technically nothing
+> should ever touch that timer, as it will only make the system hang if it gets
+> disabled.
+>
+> We do have a binding for the timer ip block (rockchip,rk3288-timer) but of
+> course cannot use that, to make sure the regular timer driver doesn't bind to
+> it. So I guess we could do something like:
+>
+>
+> timer at 200440a0 {
+>         compatible = "rockchip,arch-timer-supply";
+>         reg = <0x200440a0 0x20>;
+> };
+>
+> try to find this and enable it, but duplicating the hack and spreading it into
+> the dts as well somehow doesn't feel like an improvement ;-) .
+>
+> But I maybe you have a nicer idea on how to do this, than me.
 
-	I've been meaning to test it at 64k pages to see how much rearranging 
-everything helps. I guess I will be rolling another CONT set to address 
-Will's reluctance to have the extra TLB flushes (and probably rework the 
-block break case as well) unless someone decides they want this now. I 
-will make sure that these two patch sets merge cleanly when I do that.
+In a kernel tree drop from Rockchip I noticed that they're still
+carrying around the patch "ARM: rockchip: make sure timer5 is enabled
+on rk3036 platforms" as if it made it upstream, but as per this thread
+it didn't.
 
-	Thanks,
+Does someone have ownership resolving this?  Perhaps everyone has
+updated to a bootloader that avoids the need for this patch now?
+
+-Doug
