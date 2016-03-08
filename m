@@ -1,95 +1,113 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue,  8 Mar 2016 15:59:42 -0800
-Subject: [PATCH v15 1/6] efi: ARM/arm64: ignore DT memory nodes instead of
- removing them
+Date: Tue,  8 Mar 2016 15:59:45 -0800
+Subject: [PATCH v15 4/6] arm64: Move unflatten_device_tree() call earlier.
 In-Reply-To: <1457481587-8976-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1457481587-8976-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1457481587-8976-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1457481587-8976-5-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: David Daney <david.daney@cavium.com>
 
-There are two problems with the UEFI stub DT memory node removal
-routine:
-- it deletes nodes as it traverses the tree, which happens to work
-  but is not supported, as deletion invalidates the node iterator;
-- deleting memory nodes entirely may discard annotations in the form
-  of additional properties on the nodes.
+In order to extract NUMA information from the device tree, we need to
+have the tree in its unflattened form.
 
-Since the discovery of DT memory nodes occurs strictly before the
-UEFI init sequence, we can simply clear the memblock memory table
-before parsing the UEFI memory map. This way, it is no longer
-necessary to remove the nodes, so we can remove that logic from the
-stub as well.
+Split paging_init() into two pieces.  The first piece maps memory so
+that unflatten_device_tree(), can allocate memory.  The second piece
+containing the bootmem_init() call that will be patched in a follow-on
+patch to add NUMA handling.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Move the unflatten_device_tree() call between the two new pieces.
+
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/firmware/efi/arm-init.c    |  8 ++++++++
- drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
- 2 files changed, 9 insertions(+), 23 deletions(-)
+ arch/arm64/include/asm/mmu.h |  3 ++-
+ arch/arm64/kernel/setup.c    | 15 ++++++++++-----
+ arch/arm64/mm/mmu.c          | 17 +++++++++++------
+ 3 files changed, 23 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 9e15d57..40c9d85 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -143,6 +143,14 @@ static __init void reserve_regions(void)
- 	if (efi_enabled(EFI_DBG))
- 		pr_info("Processing EFI memory map:\n");
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 990124a..e6e40ac 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -28,7 +28,8 @@ typedef struct {
+  */
+ #define ASID(mm)	((mm)->context.id.counter & 0xffff)
  
-+	/*
-+	 * Discard memblocks discovered so far: if there are any at this
-+	 * point, they originate from memory nodes in the DT, and UEFI
-+	 * uses its own memory map instead.
-+	 */
-+	memblock_dump_all();
-+	memblock_remove(0, ULLONG_MAX);
+-extern void paging_init(void);
++extern void paging_init_map_mem(void);
++extern void paging_init_rest(void);
+ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+ extern void init_mem_pgprot(void);
+ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..753ae90 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -319,7 +319,13 @@ void __init setup_arch(char **cmdline_p)
+ 	/* Parse the ACPI tables for possible boot-time configuration */
+ 	acpi_boot_table_init();
+ 
+-	paging_init();
++	paging_init_map_mem();
 +
- 	for_each_efi_memory_desc(&memmap, md) {
- 		paddr = md->phys_addr;
- 		npages = md->num_pages;
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index cf7b7d4..9df1560 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, prev, num_rsv;
-+	int node, num_rsv;
- 	int status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
-@@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 		goto fdt_set_fail;
++	if (acpi_disabled)
++		unflatten_device_tree();
++
++	paging_init_rest();
++
+ 	relocate_initrd();
  
- 	/*
--	 * Delete any memory nodes present. We must delete nodes which
--	 * early_init_dt_scan_memory may try to use.
--	 */
--	prev = 0;
--	for (;;) {
--		const char *type;
--		int len;
--
--		node = fdt_next_node(fdt, prev, NULL);
--		if (node < 0)
--			break;
--
--		type = fdt_getprop(fdt, node, "device_type", &len);
--		if (type && strncmp(type, "memory", len) == 0) {
--			fdt_del_node(fdt, node);
--			continue;
--		}
--
--		prev = node;
+ 	kasan_init();
+@@ -328,12 +334,11 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	early_ioremap_reset();
+ 
+-	if (acpi_disabled) {
+-		unflatten_device_tree();
++	if (acpi_disabled)
+ 		psci_dt_init();
+-	} else {
++	else
+ 		psci_acpi_init();
 -	}
++
+ 	xen_early_init();
+ 
+ 	cpu_read_bootcpu_ops();
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 58faeaa..5c6dd0a 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -449,18 +449,23 @@ void fixup_init(void)
+ }
+ 
+ /*
+- * paging_init() sets up the page tables, initialises the zone memory
+- * maps and sets up the zero page.
++ * paging_init_map_mem() sets up the page tables so that memblock
++ * memory is usable.
+  */
+-void __init paging_init(void)
++void __init paging_init_map_mem(void)
+ {
+-	void *zero_page;
 -
--	/*
- 	 * Delete all memory reserve map entries. When booting via UEFI,
- 	 * kernel will use the UEFI memory map to find reserved regions.
- 	 */
+ 	map_mem();
+ 	fixup_executable();
++}
+ 
++/*
++ * paging_init_rest() finishes setting up the page tables, initializes
++ * the zone memory maps and sets up the zero page.
++ */
++void __init paging_init_rest(void)
++{
+ 	/* allocate the zero page. */
+-	zero_page = early_alloc(PAGE_SIZE);
++	void *zero_page = early_alloc(PAGE_SIZE);
+ 
+ 	bootmem_init();
+ 
 -- 
 1.8.3.1
