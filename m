@@ -1,161 +1,69 @@
-From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Tue,  8 Mar 2016 03:42:52 +0100
-Subject: [PATCH v5 7/9] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1457404974-1800-8-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 8 Mar 2016 08:25:47 +0530
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160307203024.GD8418@lukather>
+References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160307145429.GG11154@localhost>
+ <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather>
+Message-ID: <20160308025547.GI11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable slave transfers to a device behind a IPMMU by mapping the slave
-addresses using the dma-mapping API.
+On Mon, Mar 07, 2016 at 09:30:24PM +0100, Maxime Ripard wrote:
+> On Mon, Mar 07, 2016 at 04:08:57PM +0100, Boris Brezillon wrote:
+> > Hi Vinod,
+> > 
+> > On Mon, 7 Mar 2016 20:24:29 +0530
+> > Vinod Koul <vinod.koul@intel.com> wrote:
+> > 
+> > > On Mon, Mar 07, 2016 at 10:59:31AM +0100, Boris Brezillon wrote:
+> > > > +/* Dedicated DMA parameter register layout */
+> > > > +#define SUN4I_DDMA_PARA_DST_DATA_BLK_SIZE(n)	(((n) - 1) << 24)
+> > > > +#define SUN4I_DDMA_PARA_DST_WAIT_CYCLES(n)	(((n) - 1) << 16)
+> > > > +#define SUN4I_DDMA_PARA_SRC_DATA_BLK_SIZE(n)	(((n) - 1) << 8)
+> > > > +#define SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(n)	(((n) - 1) << 0)
+> > > > +
+> > > > +/**
+> > > > + * struct sun4i_dma_chan_config - DMA channel config
+> > > > + *
+> > > > + * @para: contains information about block size and time before checking
+> > > > + *	  DRQ line. This is device specific and only applicable to dedicated
+> > > > + *	  DMA channels
+> > > 
+> > > What information, can you elobrate.. And why can't you use existing
+> > > dma_slave_config for this?
+> > 
+> > Block size is related to the device FIFO size. I guess it allows the
+> > DMA channel to launch a transfer of X bytes without having to check the
+> > DRQ line (the line telling the DMA engine it can transfer more data
+> > to/from the device). The wait cycles information is apparently related
+> > to the number of clks the engine should wait before polling/checking
+> > the DRQ line status between each block transfer. I'm not sure what it
+> > saves to put WAIT_CYCLES() to something != 1, but in their BSP,
+> > Allwinner tweak that depending on the device.
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
----
- drivers/dma/sh/rcar-dmac.c | 82 +++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 74 insertions(+), 8 deletions(-)
+we already have block size aka src/dst_maxburst, why not use that one.
 
-diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-index b3911fe..56816e3 100644
---- a/drivers/dma/sh/rcar-dmac.c
-+++ b/drivers/dma/sh/rcar-dmac.c
-@@ -128,6 +128,18 @@ struct rcar_dmac_chan_slave {
- };
- 
- /*
-+ * struct rcar_dmac_chan_map - Map of slave device phys to dma address
-+ * @addr: slave dma address
-+ * @dir: direction of mapping
-+ * @slave: slave configuration that is mapped
-+ */
-+struct rcar_dmac_chan_map {
-+	dma_addr_t addr;
-+	enum dma_data_direction dir;
-+	struct rcar_dmac_chan_slave slave;
-+};
-+
-+/*
-  * struct rcar_dmac_chan - R-Car Gen2 DMA Controller Channel
-  * @chan: base DMA channel object
-  * @iomem: channel I/O memory base
-@@ -152,6 +164,7 @@ struct rcar_dmac_chan {
- 
- 	struct rcar_dmac_chan_slave src;
- 	struct rcar_dmac_chan_slave dst;
-+	struct rcar_dmac_chan_map map;
- 	int mid_rid;
- 
- 	spinlock_t lock;
-@@ -1027,13 +1040,65 @@ rcar_dmac_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dma_dest,
- 				      DMA_MEM_TO_MEM, flags, false);
- }
- 
-+static int rcar_dmac_map_slave_addr(struct dma_chan *chan,
-+				    enum dma_transfer_direction dir)
-+{
-+	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-+	struct rcar_dmac_chan_map *map = &rchan->map;
-+	phys_addr_t dev_addr;
-+	size_t dev_size;
-+	enum dma_data_direction dev_dir;
-+
-+	if (dir == DMA_DEV_TO_MEM) {
-+		dev_addr = rchan->src.slave_addr;
-+		dev_size = rchan->src.xfer_size;
-+		dev_dir = DMA_TO_DEVICE;
-+	} else {
-+		dev_addr = rchan->dst.slave_addr;
-+		dev_size = rchan->dst.xfer_size;
-+		dev_dir = DMA_FROM_DEVICE;
-+	}
-+
-+	/* Reuse current map if possible. */
-+	if (dev_addr == map->slave.slave_addr &&
-+	    dev_size == map->slave.xfer_size &&
-+	    dev_dir == map->dir)
-+		return 0;
-+
-+	/* Remove old mapping if present. */
-+	if (map->slave.xfer_size)
-+		dma_unmap_resource(chan->device->dev, map->addr,
-+				   map->slave.xfer_size, map->dir, NULL);
-+	map->slave.xfer_size = 0;
-+
-+	/* Create new slave address map. */
-+	map->addr = dma_map_resource(chan->device->dev, dev_addr, dev_size,
-+				     dev_dir, NULL);
-+
-+	if (dma_mapping_error(chan->device->dev, map->addr)) {
-+		dev_err(chan->device->dev,
-+			"chan%u: failed to map %zx@%pap", rchan->index,
-+			dev_size, &dev_addr);
-+		return -EIO;
-+	}
-+
-+	dev_dbg(chan->device->dev, "chan%u: map %zx@%pap to %pad dir: %s\n",
-+		rchan->index, dev_size, &dev_addr, &map->addr,
-+		dev_dir == DMA_TO_DEVICE ? "DMA_TO_DEVICE" : "DMA_FROM_DEVICE");
-+
-+	map->slave.slave_addr = dev_addr;
-+	map->slave.xfer_size = dev_size;
-+	map->dir = dev_dir;
-+
-+	return 0;
-+}
-+
- static struct dma_async_tx_descriptor *
- rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			unsigned int sg_len, enum dma_transfer_direction dir,
- 			unsigned long flags, void *context)
- {
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
--	dma_addr_t dev_addr;
- 
- 	/* Someone calling slave DMA on a generic channel? */
- 	if (rchan->mid_rid < 0 || !sg_len) {
-@@ -1043,9 +1108,10 @@ rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		return NULL;
- 	}
- 
--	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
--	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
-+	if (rcar_dmac_map_slave_addr(chan, dir))
-+		return NULL;
-+
-+	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
- 				      dir, flags, false);
- }
- 
-@@ -1059,7 +1125,6 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
- 	struct dma_async_tx_descriptor *desc;
- 	struct scatterlist *sgl;
--	dma_addr_t dev_addr;
- 	unsigned int sg_len;
- 	unsigned int i;
- 
-@@ -1071,6 +1136,9 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 		return NULL;
- 	}
- 
-+	if (rcar_dmac_map_slave_addr(chan, dir))
-+		return NULL;
-+
- 	sg_len = buf_len / period_len;
- 	if (sg_len > RCAR_DMAC_MAX_SG_LEN) {
- 		dev_err(chan->device->dev,
-@@ -1098,9 +1166,7 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 		sg_dma_len(&sgl[i]) = period_len;
- 	}
- 
--	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
--	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
-+	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
- 				      dir, flags, true);
- 
- 	kfree(sgl);
+Why does dmaengine need to wait? Can you explain that
+
+> > Note that I'd be happy if the above configuration could go into the
+> > generic dma_slave_config struct. This way we could avoid per-engine
+> > specific APIs.
+> 
+> And I'd really like to avoid that too. That will avoid to cripple the
+> consumer drivers that might be using any of the two.
+
+If it is fairly genric property we should add, otherwise yes we don't want
+that
+
 -- 
-2.7.2
+~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160308/de257100/attachment-0001.sig>
