@@ -1,54 +1,37 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 7 Mar 2016 17:27:46 -0800
-Subject: mmotm broken on arm with ebc495cfcea9 (mm: cleanup *pte_alloc*
- interfaces)
-Message-ID: <56DE2A92.5010806@redhat.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 8 Mar 2016 08:38:27 +0700
+Subject: [PATCH] ARM: spear: fix check of clk_get_sys() return value
+In-Reply-To: <1457393426-14679-1-git-send-email-vz@mleia.com>
+References: <1457393426-14679-1-git-send-email-vz@mleia.com>
+Message-ID: <20160308013827.GA13153@vireshk-mac-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08-03-16, 01:30, Vladimir Zapolskiy wrote:
+> The clk_get_sys() function returns either a valid pointer to
+> struct clk or ERR_PTR() error value, this makes invalid a check for
+> NULL on error path, fix it.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+>  arch/arm/mach-spear/time.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+> index 9ccffc1..4878ba9 100644
+> --- a/arch/arm/mach-spear/time.c
+> +++ b/arch/arm/mach-spear/time.c
+> @@ -233,7 +233,7 @@ void __init spear_setup_of_timer(void)
+>  	}
+>  
+>  	gpt_clk = clk_get_sys("gpt0", NULL);
+> -	if (!gpt_clk) {
+> +	if (IS_ERR(gpt_clk)) {
+>  		pr_err("%s:couldn't get clk for gpt\n", __func__);
+>  		goto err_iomap;
+>  	}
 
-I just tried the master of mmotm and ran into compilation issues on arm:
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-   CC      arch/arm/mm/mmu.o
-arch/arm/mm/mmu.c:737:37: error: macro "pte_alloc" passed 4 arguments, but takes just 3
-      void *(*alloc)(unsigned long sz))
-                                      ^
-arch/arm/mm/mmu.c:738:1: error: expected ?=?, ?,?, ?;?, ?asm? or ?__attribute__? before ?{? token
-  {
-  ^
-arch/arm/mm/mmu.c: In function ?early_pte_alloc?:
-arch/arm/mm/mmu.c:750:47: error: macro "pte_alloc" passed 4 arguments, but takes just 3
-   return pte_alloc(pmd, addr, prot, early_alloc);
-                                                ^
-arch/arm/mm/mmu.c:750:9: error: ?pte_alloc? undeclared (first use in this function)
-   return pte_alloc(pmd, addr, prot, early_alloc);
-          ^
-arch/arm/mm/mmu.c:750:9: note: each undeclared identifier is reported only once for each function it appears in
-arch/arm/mm/mmu.c: In function ?alloc_init_pte?:
-arch/arm/mm/mmu.c:759:56: error: macro "pte_alloc" passed 4 arguments, but takes just 3
-   pte_t *pte = pte_alloc(pmd, addr, type->prot_l1, alloc);
-                                                         ^
-arch/arm/mm/mmu.c:759:15: error: ?pte_alloc? undeclared (first use in this function)
-   pte_t *pte = pte_alloc(pmd, addr, type->prot_l1, alloc);
-                ^
-arch/arm/mm/mmu.c: In function ?early_pte_alloc?:
-arch/arm/mm/mmu.c:751:1: warning: control reaches end of non-void function [-Wreturn-type]
-  }
-  ^
-
-
-It looks like this is caused by ebc495cfcea9 (mm: cleanup *pte_alloc* interfaces)
-which added
-
-#define pte_alloc(mm, pmd, address)                     \
-         (unlikely(pmd_none(*(pmd))) && __pte_alloc(mm, pmd, address))
-
-
-and conflicts with arch/arm/mm/mmu.c which is using pte_alloc as a function name.
-
-Is this a known issue? If not, Russell would you take a patch to rename the pte_alloc
-functions in arm?
-
-Thanks,
-Laura
+-- 
+viresh
