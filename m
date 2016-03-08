@@ -1,67 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Mar 2016 15:12:19 +0000
-Subject: [PATCH] arm64: account for sparsemem section alignment when
- choosing vmemmap offset
-In-Reply-To: <1457446169-23099-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1457446169-23099-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160308151219.GD6192@e104818-lin.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 8 Mar 2016 16:20:40 +0100
+Subject: [PATCH 02/16] mtd: nand: sunxi: fix clk rate calculation
+In-Reply-To: <20160308155803.1b0263eb@free-electrons.com>
+References: <1457367513-26069-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1457367513-26069-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20160308155803.1b0263eb@free-electrons.com>
+Message-ID: <20160308162040.7b659486@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 09:09:29PM +0700, Ard Biesheuvel wrote:
-> Commit dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear
-> region") fixed an issue where the struct page array would overflow into the
-> adjacent virtual memory region if system RAM was placed so high up in
-> physical memory that its addresses were not representable in the build time
-> configured virtual address size.
+On Tue, 8 Mar 2016 15:58:03 +0100
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Boris,
 > 
-> However, the fix failed to take into account that the vmemmap region needs
-> to be relatively aligned with respect to the sparsemem section size, so that
-> a sequence of page structs corresponding with a sparsemem section in the
-> linear region appears naturally aligned in the vmemmap region.
+> On Mon,  7 Mar 2016 17:18:19 +0100, Boris Brezillon wrote:
+> > Unlike what is specified in the Allwinner datasheets, the NAND clock rate
+> > is not equal to 2/T but 1/T. Fix the clock rate selection accordingly.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/sunxi_nand.c | 8 +-------
+> >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> > index 4d01e65..ab66d8d 100644
+> > --- a/drivers/mtd/nand/sunxi_nand.c
+> > +++ b/drivers/mtd/nand/sunxi_nand.c
+> > @@ -1208,13 +1208,7 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+> >  	/* Convert min_clk_period from picoseconds to nanoseconds */
+> >  	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
+> >  
+> > -	/*
+> > -	 * Convert min_clk_period into a clk frequency, then get the
+> > -	 * appropriate rate for the NAND controller IP given this formula
+> > -	 * (specified in the datasheet):
+> > -	 * nand clk_rate = 2 * min_clk_rate
+> > -	 */
 > 
-> So round up vmemmap to sparsemem section size. Since this essentially moves
-> the projection of the linear region up in memory, also revert the reduction
-> of the size of the vmemmap region.
-> 
-> Fixes: dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear region")
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/pgtable.h | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index f50608674580..819aff5d593f 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -40,7 +40,7 @@
->   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
->   *	fixed mappings and modules
->   */
-> -#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
-> +#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
+> When some HW works in a way that is *NOT* the one specified in the
+> datasheet, I think you should rather add *more* comments about this
+> aspect, rather than removing existing comments.
 
-I think we could have extended the existing halved VMEMMAP_SIZE by
-PAGES_PER_SECTION * sizeof(struct page) to cope with the alignment but I
-don't think it's worth.
+Fair enough (but you know how much I like documenting my code ;)). I'll
+add a comment explaining why it differs from the datasheet
+description :P.
 
->  
->  #ifndef CONFIG_KASAN
->  #define VMALLOC_START		(VA_START)
-> @@ -52,7 +52,8 @@
->  #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
->  
->  #define VMEMMAP_START		(VMALLOC_END + SZ_64K)
-> -#define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
-> +#define vmemmap			((struct page *)VMEMMAP_START - \
-> +				 SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
-
-It looks fine to me:
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Will would probably pick it up tomorrow (and add a cc stable as well).
 
 -- 
-Catalin
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
