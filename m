@@ -1,117 +1,179 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Tue,  8 Mar 2016 11:29:31 +0000
-Subject: [PATCH v3 7/9] KVM: arm/arm64: arch_timer: Rely on the arch timer to
- parse the firmware tables
+Date: Tue,  8 Mar 2016 11:29:29 +0000
+Subject: [PATCH v3 5/9] irqchip/gic-v3: Gather all ACPI specific data in a
+ single structure
 In-Reply-To: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
 References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
-Message-ID: <1457436573-6180-8-git-send-email-julien.grall@arm.com>
+Message-ID: <1457436573-6180-6-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The firmware table is currently parsed by the virtual timer code in
-order to retrieve the virtual timer interrupt. However, this is already
-done by the arch timer driver.
-
-To avoid code duplication, use the newly function arch_timer_get_kvm_info()
-which return all the information required by the virtual timer code.
+Even though all the variables aren't marked with __initdata, they are
+only used during initialization. So the structure is marked with
+__initdata.
 
 Signed-off-by: Julien Grall <julien.grall@arm.com>
 
 ---
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Gleb Natapov <gleb@kernel.org>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
 
     Changes in v3:
         - Patch added
 ---
- virt/kvm/arm/arch_timer.c | 40 +++++++++++-----------------------------
- 1 file changed, 11 insertions(+), 29 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 60 ++++++++++++++++++++++++--------------------
+ 1 file changed, 33 insertions(+), 27 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index a9ad4fe..c6a6f8e 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -17,7 +17,6 @@
-  */
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 5b7d3c2..50e87e6 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -968,19 +968,22 @@ out_unmap_dist:
+ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
  
- #include <linux/cpu.h>
--#include <linux/of_irq.h>
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
-@@ -409,45 +408,29 @@ static struct notifier_block kvm_timer_cpu_nb = {
- 	.notifier_call = kvm_timer_cpu_notify,
- };
+ #ifdef CONFIG_ACPI
+-static void __iomem *dist_base;
+-static struct redist_region *redist_regs __initdata;
+-static u32 nr_redist_regions __initdata;
+-static bool single_redist;
++static struct
++{
++	void __iomem *dist_base;
++	struct redist_region *redist_regs;
++	u32 nr_redist_regions;
++	bool single_redist;
++} acpi_data __initdata;
  
--static const struct of_device_id arch_timer_of_match[] = {
--	{ .compatible	= "arm,armv7-timer",	},
--	{ .compatible	= "arm,armv8-timer",	},
--	{},
--};
--
- int kvm_timer_hyp_init(void)
+ static void __init
+ gic_acpi_register_redist(phys_addr_t phys_base, void __iomem *redist_base)
  {
--	struct device_node *np;
--	unsigned int ppi;
-+	struct arch_timer_kvm_info *info;
- 	int err;
+ 	static int count = 0;
  
--	timecounter = arch_timer_get_timecounter();
--	if (!timecounter)
--		return -ENODEV;
-+	info = arch_timer_get_kvm_info();
-+	timecounter = &info->timecounter;
- 
--	np = of_find_matching_node(NULL, arch_timer_of_match);
--	if (!np) {
--		kvm_err("kvm_arch_timer: can't find DT node\n");
-+	if (info->virtual_irq <= 0) {
-+		kvm_err("kvm_arch_timer: invalid virtual timer IRQ: %d\n",
-+			info->virtual_irq);
- 		return -ENODEV;
- 	}
-+	host_vtimer_irq = info->virtual_irq;
- 
--	ppi = irq_of_parse_and_map(np, 2);
--	if (!ppi) {
--		kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
--		err = -EINVAL;
--		goto out;
--	}
--
--	err = request_percpu_irq(ppi, kvm_arch_timer_handler,
-+	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
- 				 "kvm guest timer", kvm_get_running_vcpus());
- 	if (err) {
- 		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
--			ppi, err);
-+			host_vtimer_irq, err);
- 		goto out;
- 	}
- 
--	host_vtimer_irq = ppi;
--
- 	err = __register_cpu_notifier(&kvm_timer_cpu_nb);
- 	if (err) {
- 		kvm_err("Cannot register timer CPU notifier\n");
-@@ -460,14 +443,13 @@ int kvm_timer_hyp_init(void)
- 		goto out_free;
- 	}
- 
--	kvm_info("%s IRQ%d\n", np->name, ppi);
-+	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
- 	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
- 
- 	goto out;
- out_free:
--	free_percpu_irq(ppi, kvm_get_running_vcpus());
-+	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
- out:
--	of_node_put(np);
- 	return err;
+-	redist_regs[count].phys_base = phys_base;
+-	redist_regs[count].redist_base = redist_base;
+-	redist_regs[count].single_redist = single_redist;
++	acpi_data.redist_regs[count].phys_base = phys_base;
++	acpi_data.redist_regs[count].redist_base = redist_base;
++	acpi_data.redist_regs[count].single_redist = acpi_data.single_redist;
+ 	count++;
  }
  
+@@ -1008,7 +1011,7 @@ gic_acpi_parse_madt_gicc(struct acpi_subtable_header *header,
+ {
+ 	struct acpi_madt_generic_interrupt *gicc =
+ 				(struct acpi_madt_generic_interrupt *)header;
+-	u32 reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
++	u32 reg = readl_relaxed(acpi_data.dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+ 	u32 size = reg == GIC_PIDR2_ARCH_GICv4 ? SZ_64K * 4 : SZ_64K * 2;
+ 	void __iomem *redist_base;
+ 
+@@ -1025,7 +1028,7 @@ static int __init gic_acpi_collect_gicr_base(void)
+ 	acpi_tbl_entry_handler redist_parser;
+ 	enum acpi_madt_type type;
+ 
+-	if (single_redist) {
++	if (acpi_data.single_redist) {
+ 		type = ACPI_MADT_TYPE_GENERIC_INTERRUPT;
+ 		redist_parser = gic_acpi_parse_madt_gicc;
+ 	} else {
+@@ -1076,14 +1079,14 @@ static int __init gic_acpi_count_gicr_regions(void)
+ 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+ 				      gic_acpi_match_gicr, 0);
+ 	if (count > 0) {
+-		single_redist = false;
++		acpi_data.single_redist = false;
+ 		return count;
+ 	}
+ 
+ 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+ 				      gic_acpi_match_gicc, 0);
+ 	if (count > 0)
+-		single_redist = true;
++		acpi_data.single_redist = true;
+ 
+ 	return count;
+ }
+@@ -1103,7 +1106,7 @@ static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
+ 	if (count <= 0)
+ 		return false;
+ 
+-	nr_redist_regions = count;
++	acpi_data.nr_redist_regions = count;
+ 	return true;
+ }
+ 
+@@ -1114,25 +1117,28 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+ {
+ 	struct acpi_madt_generic_distributor *dist;
+ 	struct fwnode_handle *domain_handle;
++	size_t size;
+ 	int i, err;
+ 
+ 	/* Get distributor base address */
+ 	dist = (struct acpi_madt_generic_distributor *)header;
+-	dist_base = ioremap(dist->base_address, ACPI_GICV3_DIST_MEM_SIZE);
+-	if (!dist_base) {
++	acpi_data.dist_base = ioremap(dist->base_address,
++				      ACPI_GICV3_DIST_MEM_SIZE);
++	if (!acpi_data.dist_base) {
+ 		pr_err("Unable to map GICD registers\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	err = gic_validate_dist_version(dist_base);
++	err = gic_validate_dist_version(acpi_data.dist_base);
+ 	if (err) {
+-		pr_err("No distributor detected at @%p, giving up", dist_base);
++		pr_err("No distributor detected at @%p, giving up",
++		       acpi_data.dist_base);
+ 		goto out_dist_unmap;
+ 	}
+ 
+-	redist_regs = kzalloc(sizeof(*redist_regs) * nr_redist_regions,
+-			      GFP_KERNEL);
+-	if (!redist_regs) {
++	size = sizeof(*acpi_data.redist_regs) * acpi_data.nr_redist_regions;
++	acpi_data.redist_regs = kzalloc(size, GFP_KERNEL);
++	if (!acpi_data.redist_regs) {
+ 		err = -ENOMEM;
+ 		goto out_dist_unmap;
+ 	}
+@@ -1141,14 +1147,14 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+ 	if (err)
+ 		goto out_redist_unmap;
+ 
+-	domain_handle = irq_domain_alloc_fwnode(dist_base);
++	domain_handle = irq_domain_alloc_fwnode(acpi_data.dist_base);
+ 	if (!domain_handle) {
+ 		err = -ENOMEM;
+ 		goto out_redist_unmap;
+ 	}
+ 
+-	err = gic_init_bases(dist_base, redist_regs, nr_redist_regions, 0,
+-			     domain_handle);
++	err = gic_init_bases(acpi_data.dist_base, acpi_data.redist_regs,
++			     acpi_data.nr_redist_regions, 0, domain_handle);
+ 	if (err)
+ 		goto out_fwhandle_free;
+ 
+@@ -1158,12 +1164,12 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+ out_fwhandle_free:
+ 	irq_domain_free_fwnode(domain_handle);
+ out_redist_unmap:
+-	for (i = 0; i < nr_redist_regions; i++)
+-		if (redist_regs[i].redist_base)
+-			iounmap(redist_regs[i].redist_base);
+-	kfree(redist_regs);
++	for (i = 0; i < acpi_data.nr_redist_regions; i++)
++		if (acpi_data.redist_regs[i].redist_base)
++			iounmap(acpi_data.redist_regs[i].redist_base);
++	kfree(acpi_data.redist_regs);
+ out_dist_unmap:
+-	iounmap(dist_base);
++	iounmap(acpi_data.dist_base);
+ 	return err;
+ }
+ IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
 -- 
 1.9.1
