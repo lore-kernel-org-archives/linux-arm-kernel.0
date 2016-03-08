@@ -1,106 +1,48 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 8 Mar 2016 17:09:32 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56DE2DE8.6070509@huawei.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com>
- <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <56D91E18.1020807@huawei.com> <56DE2DE8.6070509@huawei.com>
-Message-ID: <20160308080932.GB31471@js1304-P5Q-DELUXE>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 08 Mar 2016 09:12:35 +0100
+Subject: Reset controller changes for v4.6: shared resets
+Message-ID: <1457424755.4174.12.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 09:42:00AM +0800, Xishi Qiu wrote:
-> On 2016/3/4 13:33, Hanjun Guo wrote:
-> 
-> > Hi Joonsoo,
-> > 
-> > On 2016/3/4 10:02, Joonsoo Kim wrote:
-> >> On Thu, Mar 03, 2016 at 08:49:01PM +0800, Hanjun Guo wrote:
-> >>> On 2016/3/3 15:42, Joonsoo Kim wrote:
-> >>>> 2016-03-03 10:25 GMT+09:00 Laura Abbott <labbott@redhat.com>:
-> >>>>> (cc -mm and Joonsoo Kim)
-> >>>>>
-> >>>>>
-> >>>>> On 03/02/2016 05:52 AM, Hanjun Guo wrote:
-> >>>>>> Hi,
-> >>>>>>
-> >>>>>> I came across a suspicious error for CMA stress test:
-> >>>>>>
-> >>>>>> Before the test, I got:
-> >>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
-> >>>>>> CmaTotal:         204800 kB
-> >>>>>> CmaFree:          195044 kB
-> >>>>>>
-> >>>>>>
-> >>>>>> After running the test:
-> >>>>>> -bash-4.3# cat /proc/meminfo | grep Cma
-> >>>>>> CmaTotal:         204800 kB
-> >>>>>> CmaFree:         6602584 kB
-> >>>>>>
-> >>>>>> So the freed CMA memory is more than total..
-> >>>>>>
-> >>>>>> Also the the MemFree is more than mem total:
-> >>>>>>
-> >>>>>> -bash-4.3# cat /proc/meminfo
-> >>>>>> MemTotal:       16342016 kB
-> >>>>>> MemFree:        22367268 kB
-> >>>>>> MemAvailable:   22370528 kB
-> >>> [...]
-> >>>>> I played with this a bit and can see the same problem. The sanity
-> >>>>> check of CmaFree < CmaTotal generally triggers in
-> >>>>> __move_zone_freepage_state in unset_migratetype_isolate.
-> >>>>> This also seems to be present as far back as v4.0 which was the
-> >>>>> first version to have the updated accounting from Joonsoo.
-> >>>>> Were there known limitations with the new freepage accounting,
-> >>>>> Joonsoo?
-> >>>> I don't know. I also played with this and looks like there is
-> >>>> accounting problem, however, for my case, number of free page is slightly less
-> >>>> than total. I will take a look.
-> >>>>
-> >>>> Hanjun, could you tell me your malloc_size? I tested with 1 and it doesn't
-> >>>> look like your case.
-> >>> I tested with malloc_size with 2M, and it grows much bigger than 1M, also I
-> >>> did some other test:
-> >> Thanks! Now, I can re-generate erronous situation you mentioned.
-> >>
-> >>>  - run with single thread with 100000 times, everything is fine.
-> >>>
-> >>>  - I hack the cam_alloc() and free as below [1] to see if it's lock issue, with
-> >>>    the same test with 100 multi-thread, then I got:
-> >> [1] would not be sufficient to close this race.
-> >>
-> >> Try following things [A]. And, for more accurate test, I changed code a bit more
-> >> to prevent kernel page allocation from cma area [B]. This will prevent kernel
-> >> page allocation from cma area completely so we can focus cma_alloc/release race.
-> >>
-> >> Although, this is not correct fix, it could help that we can guess
-> >> where the problem is.
-> >>
-> >> Thanks.
-> >>
-> >> [A]
-> > 
-> > I tested this solution [A], it can fix the problem, as you are posting a new patch, I will
-> > test that one and leave [B] alone :)
-> > 
-> 
-> Hi Joonsoo,
-> 
-> How does this problem happen? Why the count is larger than total?
-> 
-> Patch A prevent the cma page free to pcp, right?
-> 
-> ...
-> -               if (unlikely(is_migrate_isolate(migratetype))) {
-> +               if (is_migrate_cma(migratetype) ||
-> +                       unlikely(is_migrate_isolate(migratetype))) {
-> ...
-> > .
-> > 
+Dear arm-soc maintainers,
 
-Even without free to pcp, bad merging could happen. Please see another
-thread I mentioned some example.
+this tag adds reference counted shared reset support for multiple
+consumers that use the same reset line for low power states.
+Also there is a cleanup patch for lpc18xx removing global variables.
 
-Thanks.
+regards
+Philipp
+
+The following changes since commit f673ed4d5fdc123b1552525de30741cd8dfde53f:
+
+  reset: sti: Make reset_control_ops const (2016-02-10 10:53:38 +0100)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.6-2
+
+for you to fetch changes up to bc2a505c3f325c1b4ce0610fbeee3000910fda61:
+
+  reset: Add support for shared reset controls (2016-02-24 11:37:32 +0100)
+
+----------------------------------------------------------------
+Reset controller changes for v4.6
+
+- add support for shared reset controls
+- remove global variables from the lpc18xx driver
+
+----------------------------------------------------------------
+Hans de Goede (3):
+      reset: Make [of_]reset_control_get[_foo] functions wrappers
+      reset: Share struct reset_control between reset_control_get calls
+      reset: Add support for shared reset controls
+
+Joachim Eastwood (1):
+      reset: lpc18xx: get rid of global variables for restart notifier
+
+ drivers/reset/core.c             | 217 ++++++++++++++++++++++-----------------
+ drivers/reset/reset-lpc18xx.c    |  22 ++--
+ include/linux/reset-controller.h |   2 +
+ include/linux/reset.h            | 188 +++++++++++++++++++++++++++------
+ 4 files changed, 289 insertions(+), 140 deletions(-)
