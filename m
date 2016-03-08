@@ -1,57 +1,91 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Tue, 8 Mar 2016 23:07:35 +0700
-Subject: linux-next: manual merge of the watchdog tree with the arm-soc
- tree
-In-Reply-To: <56DEF871.8050102@arm.com>
-References: <20160307150402.191ba735@canb.auug.org.au>
- <56DEF546.9090900@arm.com> <56DEF871.8050102@arm.com>
-Message-ID: <56DEF8C7.9000409@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 08 Mar 2016 17:19:39 +0100
+Subject: [PATCH] ARM: mvebu: Fix of_clk_get() call in a non sleeping
+ context
+In-Reply-To: <20160308164117.2a3ed3a7@free-electrons.com> (Thomas Petazzoni's
+ message of "Tue, 8 Mar 2016 16:41:17 +0100")
+References: <1457446733-7137-1-git-send-email-gregory.clement@free-electrons.com>
+ <20160308164117.2a3ed3a7@free-electrons.com>
+Message-ID: <87a8m93pt0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/16 23:06, Sudeep Holla wrote:
+Hi Thomas,
+ 
+ On mar., mars 08 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Hi Sudeep,
+> Greg,
+>
+> On Tue,  8 Mar 2016 15:18:53 +0100, Gregory CLEMENT wrote:
+>> of_clk_get() is called armada_xp_smp_prepare_cpus() function.
+>
+> Hum? Your code is changing things to have of_clk_get() called by
+> armada_xp_smp_prepare_cpus(). I think you wanted to say:
+>
+> "of_clk_get() is currently called in get_cpu_clk(), which it turns is
+> called by set_secondary_cpu_clock() during armada_xp_boot_secondary().
+> However, this callback is called in a context...
 
-> On 08/03/16 15:52, Andr? Przywara wrote:
->> On 07/03/16 11:04, Stephen Rothwell wrote:
->>> Hi Wim,
->>>
->>> Today's linux-next merge of the watchdog tree got a conflict in:
->>>
->>>    arch/arm64/boot/dts/arm/foundation-v8.dts
->>>
->>> between commit:
->>>
->>>    d11a89796678 ("arm64: dts: split Foundation model dts to put the
->>> GIC separately")
->>>
->>> from the arm-soc tree and commit:
->>>
->>>    fe3a97e8ed02 ("ARM64: add SBSA Generic Watchdog device node in
->>> foundation-v8.dts")
->>>
->>> from the watchdog tree.
->>>
->>> I fixed it up (see below) and can carry the fix as necessary (no action
->>> is required).
->>
->> But unfortunately this is the wrong solution. The watchdog DT node
->> belongs into the (newly created) common foundation-v8.dtsi, not into the
->> GICv2-only .dts.
->> So whoever now provides the watchdog patch, can it be rebased on top of
->> the foundation model .dts rework, so that the new node ends up in the
->> .dtsi file?
->> If this is too much hassle I could also send a fix after -rc1 (as the
->> breakage is not really critical).
->>
-> 
-> I have rebased it on top of my earlier PR and sending it shortly.
-> I have moved it to dtsi file.
+right!
 
-Thanks, that was quick!
+>
+>> This
+>> callback can be called in a context where it should not sleep as pointed
+>> when enabling CONFIG_DEBUG_ATOMIC_SLEEP. However of_clk_get() can sleep.
+>> 
+>> This patch solved this issue by moving the of_clk_get() during
+>> initialization by gathering the list of reference on the clock, and only
+>> access to this list later.
+>
+> I think this doesn't solve the problem completely, because
+> set_secondary_cpu_clock() is still calling clk_prepare_enable(), and
+> the prepare step of a clock is theoretically allowed to sleep. In
+> practice, it doesn't sleep in our specific case, but still
+> clk_prepare_enable() is not good in an atomic context.
 
-Hope that this now does not collide with Fu Wei's fix ;-)
+OK, so let's only use clk_enable() which can't sleep. On mvebu SoCs
+there is no prepare/unprepare operation for the clock, so trying to use
+clk_prepare_enable() is useless. Especially for this code which is not
+for a random IP but especially for the Armada XP SoC.
 
-Cheers,
-Andre.
+If in the future the same logic can be used for a new mvebu SoC which
+need the prepare/unprepare feature, then we will see how to deal with
+it, but I really doubt that it will happen.
+
+
+>
+> So I believe the whole approach of setting the CPU clock frequency in
+> armada_xp_boot_secondary() is wrong, and we should basically revert my
+> commit b9b1de0f4da37dac76d812a27d6065eba02dc05b, and instead find a
+> different solution for the resume from suspend case.
+>
+>> 
+>> Fixes: f6cec7cd0777 ("ARM: mvebu: remove device tree parsing for cpu
+>> nodes")
+>
+> I don't think it fixes this commit. The one it really fixes is most
+> probably b9b1de0f4da37dac76d812a27d6065eba02dc05b.
+
+Yes to be honest I pick the closer commit on which this fix could apply
+without any conflict.
+
+Thanks for your feedback, I will send a v2 taking into account your
+remarks.
+
+Ggregory
+
+
+>
+> Best regards,
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
