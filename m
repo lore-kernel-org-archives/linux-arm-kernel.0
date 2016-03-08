@@ -1,42 +1,41 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  8 Mar 2016 09:26:12 -0300
-Subject: [PATCH 1/3] ARM: dts: imx6sx: Fix SAI DMA index
-Message-ID: <1457439974-1149-1-git-send-email-festevam@gmail.com>
+Date: Tue,  8 Mar 2016 09:26:13 -0300
+Subject: [PATCH 2/3] ARM: dts: imx6sx: Remove unused property
+In-Reply-To: <1457439974-1149-1-git-send-email-festevam@gmail.com>
+References: <1457439974-1149-1-git-send-email-festevam@gmail.com>
+Message-ID: <1457439974-1149-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-According to sdma_peripheral_type in include/linux/platform_data/dma-imx.h
-IMX_DMATYPE_SAI corresponds to index 24, so fix it accordingly.
+Property 'dma-source' is not used anywhere, not it is documented, so
+let's just get rid of it.
 
-Suggested-by: Zidan Wang <zidan.wang@nxp.com>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6sx.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index a5f7602..c8269e7 100644
+index c8269e7..d02ab32 100644
 --- a/arch/arm/boot/dts/imx6sx.dtsi
 +++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -970,7 +970,7 @@
- 					 <&clks 0>, <&clks 0>;
+@@ -971,7 +971,6 @@
  				clock-names = "bus", "mclk1", "mclk2", "mclk3";
  				dma-names = "rx", "tx";
--				dmas = <&sdma 31 23 0>, <&sdma 32 23 0>;
-+				dmas = <&sdma 31 24 0>, <&sdma 32 24 0>;
- 				dma-source = <&gpr 0 15 0 16>;
+ 				dmas = <&sdma 31 24 0>, <&sdma 32 24 0>;
+-				dma-source = <&gpr 0 15 0 16>;
  				status = "disabled";
  			};
-@@ -990,7 +990,7 @@
- 					 <&clks 0>, <&clks 0>;
+ 
+@@ -991,7 +990,6 @@
  				clock-names = "bus", "mclk1", "mclk2", "mclk3";
  				dma-names = "rx", "tx";
--				dmas = <&sdma 33 23 0>, <&sdma 34 23 0>;
-+				dmas = <&sdma 33 24 0>, <&sdma 34 24 0>;
- 				dma-source = <&gpr 0 17 0 18>;
+ 				dmas = <&sdma 33 24 0>, <&sdma 34 24 0>;
+-				dma-source = <&gpr 0 17 0 18>;
  				status = "disabled";
  			};
+ 
 -- 
 1.9.1
