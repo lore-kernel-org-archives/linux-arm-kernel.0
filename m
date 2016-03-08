@@ -1,132 +1,37 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 8 Mar 2016 14:34:44 -0600
-Subject: [PATCH V4 0/5] PCIe Xilinx generic driver for Microblaze and
-In-Reply-To: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
-References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <20160308203444.GA27132@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Mar 2016 20:50:51 +0000
+Subject: [PATCH] ARM: mvebu: Fix of_clk_get() call in a non sleeping
+ context
+In-Reply-To: <8760wx3oy4.fsf@free-electrons.com>
+References: <1457446733-7137-1-git-send-email-gregory.clement@free-electrons.com>
+ <20160308164117.2a3ed3a7@free-electrons.com>
+ <87a8m93pt0.fsf@free-electrons.com>
+ <20160308173134.22a3ad64@free-electrons.com>
+ <8760wx3oy4.fsf@free-electrons.com>
+Message-ID: <20160308205050.GN19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 11, 2016 at 09:58:06PM +0530, Bharat Kumar Gogada wrote:
-> This patch series does modifications to pcie-xilinx.c, to support common
-> driver on both Zynq and Microblaze architectures.
-> Microblaze pci-common.c has been modified to support generic driver.
+On Tue, Mar 08, 2016 at 05:38:11PM +0100, Gregory CLEMENT wrote:
+> And from clk_enable comment we have:
+> ""
+> clk_enable must not sleep, which differentiates it from clk_prepare.  In a
+> simple case, clk_enable can be used instead of clk_prepare to ungate a clk
+> if the operation will never sleep.
+> ""
 > 
-> Bharat Kumar Gogada (5):
->   PCI: xilinx: Removing xilinx_pcie_parse_and_add_res function
->   PCI: xilinx: Removing struct hw_pci structure.
->   PCI: xilinx: Modifying AXI PCIe Host Bridge driver to work on both
->      Zynq and Microblaze
->   PCI: xilinx: Updating Zynq PCI binding documentation with 
->     Microblaze node.
->   Microblaze: Modifying microblaze PCI subsytem to support  generic
->     Xilinx  AXI PCIe Host Bridge IP driver
-> 
->  .../devicetree/bindings/pci/xilinx-pcie.txt        |  32 +++-
->  arch/microblaze/Kconfig                            |   3 +
->  arch/microblaze/pci/pci-common.c                   |  56 ++----
->  drivers/pci/host/Kconfig                           |   2 +-
->  drivers/pci/host/pcie-xilinx.c                     | 191 +++------------------
->  5 files changed, 66 insertions(+), 218 deletions(-)
+> Moreoever for me the "must" was to insist to the order of the call no to
+> the fact that both must be called.
 
-I applied this series to my pci/host-xilinx branch for v4.6.
+As the author of the clk API, the idea here is that clk_prepare()
+should always be called _before_ clk_enable() for any clock: in
+other words, getting a clock and then calling clk_enable() on it
+is not legal.
 
-Michal, you only explicitly acked the last patch, but that only makes
-sense if I apply the whole series, so I applied your ack to all the
-patches.
+CCF presently enforces this - clk_enable() without a preceding
+clk_prepare() will return -ESHUTDOWN.
 
-Someday somebody should rework pci_fixup_irqs() so that doesn't have
-to be arch-dependent.
-
-I reworked the changelogs as below.
-
-Bjorn
-
-
-commit 01cf9d524ff0
-Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-Date:   Thu Feb 11 21:58:11 2016 +0530
-
-    microblaze/PCI: Support generic Xilinx AXI PCIe Host Bridge IP driver
-    
-    Modify the Microblaze PCI subsystem to work with the generic
-    drivers/pci/host/pcie-xilinx.c driver on Microblaze and Zynq.
-    
-    [bhelgaas: changelog]
-    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Acked-by: Michal Simek <michal.simek@xilinx.com>
-
-commit e5d4b2006c97
-Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-Date:   Thu Feb 11 21:58:10 2016 +0530
-
-    PCI: xilinx: Update Zynq binding with Microblaze node
-    
-    Update Zynq PCI binding documentation with Microblaze node.
-    
-    [bhelgaas: fix "microbalze_0_intc" typo]
-    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Acked-by: Rob Herring <robh@kernel.org>
-    Acked-by: Michal Simek <michal.simek@xilinx.com>
-
-commit 2c51391d2559
-Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-Date:   Thu Feb 11 21:58:09 2016 +0530
-
-    PCI: xilinx: Don't call pci_fixup_irqs() on Microblaze
-    
-    The Xilinx AXI PCIe Host Bridge Soft IP driver was previously only
-    supported on ARM (in particular, on ARCH_ZYNC), and pci_fixup_irqs() is
-    available there.  But Microblaze will do IRQ fixup in pcibios_add_device(),
-    so pci_fixup_irqs() is not available on Microblaze.
-    
-    Don't call pci_fixup_irqs() on Microblaze, so the driver can work on both
-    Zynq and Microblaze Architectures.
-    
-    [bhelgaas: revise changelog to show similarity to bdb8a1844f31 ("PCI: iproc: Call pci_fixup_irqs() for ARM64 as well as ARM")]
-    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-    Acked-by: Michal Simek <michal.simek@xilinx.com>
-
-commit 4c01f3b089a0
-Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-Date:   Thu Feb 11 21:58:08 2016 +0530
-
-    PCI: xilinx: Remove dependency on ARM-specific struct hw_pci
-    
-    The Xilinx PCIe host controller driver uses pci_common_init_dev(), which
-    is ARM-specific and requires the ARM struct hw_pci.  The part of
-    pci_common_init_dev() that is needed is limited and can be done here
-    without using hw_pci.
-    
-    Create and scan the root bus directly without using the ARM
-    pci_common_init_dev() interface.
-    
-    [bhelgaas: revise changelog to show similarity to 79953dd22c1d ("PCI: rcar: Remove dependency on ARM-specific struct hw_pci")]
-    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-    Acked-by: Michal Simek <michal.simek@xilinx.com>
-
-commit 0259882e342e
-Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-Date:   Thu Feb 11 21:58:07 2016 +0530
-
-    PCI: xilinx: Use of_pci_get_host_bridge_resources() to parse DT
-    
-    Use the new of_pci_get_host_bridge_resources() API in place of the PCI OF
-    DT parser.
-    
-    [bhelgaas: revise changelog to show similarity to 0021d22b73d6 ("PCI: designware: Use of_pci_get_host_bridge_resources() to parse DT")]
-    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-    Acked-by: Michal Simek <michal.simek@xilinx.com>
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
