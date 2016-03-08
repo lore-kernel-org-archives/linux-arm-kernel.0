@@ -1,58 +1,42 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Tue, 8 Mar 2016 12:23:51 +0100
-Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
- interrupt properties
-In-Reply-To: <87fuw1yipi.fsf@eliezer.anholt.net>
-References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
- <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
- <87fuw1yipi.fsf@eliezer.anholt.net>
-Message-ID: <3503D512-7E9C-46E8-91C7-CAD828DD48D1@martin.sperl.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 8 Mar 2016 12:26:46 +0100 (CET)
+Subject: Fix preempt-rt on AT91
+In-Reply-To: <20160308110639.GC21842@linutronix.de>
+References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160118174259.GC12309@linutronix.de> <20160305113553.GB21216@piout.net>
+ <20160308110639.GC21842@linutronix.de>
+Message-ID: <alpine.DEB.2.11.1603081223470.6083@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 08.03.2016, at 00:24, Eric Anholt <eric@anholt.net> wrote:
+On Tue, 8 Mar 2016, Sebastian Andrzej Siewior wrote:
+> I sucked this in. It seems to work. What remains that free_irq() thingy:
+> |WARNING: CPU: 0 PID: 0 at kernel/irq/manage.c:1541 __free_irq+0xb4/0x2e0()
+> |Trying to free already-free IRQ 16
+> |CPU: 0 PID: 0 Comm: swapper Not tainted 4.4.4-rt10+ #219
+> |Hardware name: Atmel SAMA5
+> |[<c0015bd0>] (unwind_backtrace) from [<c0013604>] (show_stack+0x10/0x14)
+> |[<c0013604>] (show_stack) from [<c002b850>] (warn_slowpath_common+0x80/0xac)
+> |[<c002b850>] (warn_slowpath_common) from [<c002b8ac>] (warn_slowpath_fmt+0x30/0x40)
+> |[<c002b8ac>] (warn_slowpath_fmt) from [<c005adfc>] (__free_irq+0xb4/0x2e0)
+> |[<c005adfc>] (__free_irq) from [<c005b0a0>] (free_irq+0x30/0x4c)
+> |[<c005b0a0>] (free_irq) from [<c0429034>] (pit_clkevt_shutdown+0x24/0x2c)
+> |[<c0429034>] (pit_clkevt_shutdown) from [<c0076430>] (clockevents_switch_state+0x60/0x130)
+> |---[ end trace 0000000000000001 ]---
 > 
-> kernel at martin.sperl.org writes:
-> 
->> From: Martin Sperl <kernel@martin.sperl.org>
->> 
->> Add binding documentation for the new shared interrupt properties:
->> * brcm,dma-channel-shared-mask
->> * brcm,dma-shared-irq-index
->> 
->> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> ---
->> Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt | 6 ++++++
->> 1 file changed, 6 insertions(+)
->> 
->> diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
->> index 1396078..f9e84ee 100644
->> --- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
->> +++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
->> @@ -17,6 +17,10 @@ Required properties:
->> - brcm,dma-channel-mask: Bit mask representing the channels
->> 			 not used by the firmware in ascending order,
->> 			 i.e. first channel corresponds to LSB.
->> +- brcm,dma-channel-shared-mask: Bit mask representing the channels
->> +				that use a shared interrupt
->> +- brcm,dma-shared-irq-index: index of which of the interrupts mentioned
->> +			     above is the shared interrupt
-> 
-> This should be under "Optional properties" since there are appropriate
-> defaults for the only compatible string listed.
+> which is a different problem and was there. The new thing is this:
 
-Well - IMO it is actually required and the defaults are only for backwards
-compatibility with older device-trees, but that is easy to change?
-> 
-> I still don't think exposing this in the DT is necessary (it's hardware
-> block internals), but I'm not writing the code so I'm fine with it
-Actually this was a request by Vinod to make this configurable via the
-device-tree.
+I think we really need to have this irq_en/disable_action() thingy sooner than
+later.
 
-> either way, really.  Regardless, it would be really good to get the
-> slave_sg part of the series in, which is really important for the
-> platform.
-Yes, then we can bring the DMA implementations for mmc/sdhost forward.
+> Is it possible to drop this disable/enable clock on the switch from pit
+> to one shot mode?
 
-Martin
+There was an earlier discussion about the clk stuff. Actually the lock
+protecting disable/enable should be made raw, but there was some crap going on
+in some of the clk callbacks which made that impossible. We realy should
+revisit this.
+
+Thanks,
+
+	tglx
