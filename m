@@ -1,69 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 8 Mar 2016 11:53:06 +0100
-Subject: [linux-sunxi] Re: [PATCH v4 1/2] ehci-platform: Add support for
- controllers with multiple reset lines
-In-Reply-To: <20160305200250.GA24790@kroah.com>
-References: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
- <1456592339-31767-2-git-send-email-hdegoede@redhat.com>
- <20160304043559.GA21743@kroah.com> <56D938DE.10409@redhat.com>
- <20160305200250.GA24790@kroah.com>
-Message-ID: <56DEAF12.2050802@redhat.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 8 Mar 2016 17:55:51 +0700
+Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
+In-Reply-To: <20160226152714.GD3173@xsjsorenbubuntu>
+References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
+ <20160204224128.GG4215@xsjsorenbubuntu>
+ <CAAtXAHcV-9gXcZOX8dzUOBZUwj9M=O4MAsMCJNQYAP+os-D7Tg@mail.gmail.com>
+ <20160204233950.GH4215@xsjsorenbubuntu> <56D04D17.6030502@ti.com>
+ <20160226152714.GD3173@xsjsorenbubuntu>
+Message-ID: <56DEAFB7.50105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05-03-16 21:02, Greg Kroah-Hartman wrote:
-> On Fri, Mar 04, 2016 at 08:27:26AM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 04-03-16 05:35, Greg Kroah-Hartman wrote:
->>> On Sat, Feb 27, 2016 at 05:58:58PM +0100, Hans de Goede wrote:
->>>> From: Reinder de Haan <patchesrdh@mveas.com>
+On 02/26/2016 10:27 PM, S?ren Brinkmann wrote:
+> On Fri, 2016-02-26 at 15:03:19 +0200, Grygorii Strashko wrote:
+>> On 02/05/2016 01:39 AM, S?ren Brinkmann wrote:
+>>> On Thu, 2016-02-04 at 15:14:47 -0800, Moritz Fischer wrote:
+>>>> Hi Soeren,
 >>>>
->>>> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
->>>> reset lines, the controller will not initialize while the reset for
->>>> its companion is still asserted, which means we need to de-assert
->>>> 2 resets for the controller to work.
+>>>> On Thu, Feb 4, 2016 at 2:41 PM, S?ren Brinkmann
+>>>> <soren.brinkmann@xilinx.com> wrote:
 >>>>
->>>> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
->>>> Acked-by: Rob Herring <robh@kernel.org>
->>>> ---
->>>> Changes in v2:
->>>> -Use the new reset_control_[de]assert_shared reset-controller functions
->>>> Changes in v3:
->>>> -Adjust for changes to shared-reset reset-controller functions
->>>> Changes in v4:
->>>> -Fix Ugly continuation line
+>>>>> But with this change the 'if !CPU_FREQ' becomes obsolete.
+>>>> I'm confused, could you explain that statement? You don't want people
+>>>> accidentally running with GT when CPU_FREQ is on, right?
 >>>
->>> This breaks the build horribly :(
+>>> Correct. But with this Kconfig rework you can just deselect it in
+>>> Kconfig. The generic HAVE_GT could always be selected.
 >>>
->>> As does patch 2/2, ugh.
 >>
->> As said in the cover letter:
 >>
->> "These patches apply on top of the related
->> reset-controller patches which have just been merged here:
->>
->> git://git.pengutronix.de/git/pza/linux.git reset/next"
->>
->> I guess I should have done s/apply on top of/depend on/
->> in the above bit. These patches apply fine without those
->> changes, but indeed they will not build.
->
-> Then I can't take them, you know this :(
->
->> You may want to ask Philipp Zabel (added to the To: list)
->> to create a topic branch for this which you can merge into
->> your tree.
->
-> If you all want me to do that, fine, otherwise just resend them after
-> 4.6-rc1 is out and the build will not break at that time.
+>> Don't know whom should i ask - but what will be the final conclusion here?
+>> Can it be merged?
+> 
+> I think we don't break anything either way. Would just be some
+> additional clean up to get rid of that mentioned constraint (which
+> doesn't really work well anyway in the multi-arch kernel). So, no real
+> objections to merging it from my side.
+> 
 
-Ok I will resend these after 4.6-rc1
+Yeah. Thanks
 
-Regards,
+I'll re-send it after 4.6-rc.
+But What I'm not fully understand is how to get it merged taking into account that
+it touches few maches & clocksource :( 
 
-Hans
+-- 
+regards,
+-grygorii
