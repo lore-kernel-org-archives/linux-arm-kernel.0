@@ -1,18 +1,25 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 8 Mar 2016 06:37:28 +0000 (UTC)
-Subject: [PATCH v2 09/10] ARM: DRA7: hwmod: Add data for McASP1/2/4/5/6/7/8
-In-Reply-To: <1457363857-20797-10-git-send-email-peter.ujfalusi@ti.com>
-References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
- <1457363857-20797-10-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <alpine.DEB.2.02.1603080637060.4974@utopia.booyaka.com>
+Date: Tue, 8 Mar 2016 06:45:11 +0000 (UTC)
+Subject: [PATCH v5 4/6] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+In-Reply-To: <1457400224-24797-5-git-send-email-fcooper@ti.com>
+References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
+ <1457400224-24797-5-git-send-email-fcooper@ti.com>
+Message-ID: <alpine.DEB.2.02.1603080644580.4974@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Mar 2016, Peter Ujfalusi wrote:
+On Mon, 7 Mar 2016, Franklin S Cooper Jr wrote:
 
-> Add missing data for all McASP ports for the dra7 family
+> From: Vignesh R <vigneshr@ti.com>
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Add hwmod entries for the PWMSS on DRA7.
+> 
+> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
+> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> [fcooper at ti.com: Do not add eQEP, ePWM and eCAP hwmod entries]
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 
 Thanks, queued for v4.7.
 
