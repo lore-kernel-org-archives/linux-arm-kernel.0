@@ -1,42 +1,59 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 8 Mar 2016 12:26:46 +0100 (CET)
-Subject: Fix preempt-rt on AT91
-In-Reply-To: <20160308110639.GC21842@linutronix.de>
-References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160118174259.GC12309@linutronix.de> <20160305113553.GB21216@piout.net>
- <20160308110639.GC21842@linutronix.de>
-Message-ID: <alpine.DEB.2.11.1603081223470.6083@nanos>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue,  8 Mar 2016 11:29:24 +0000
+Subject: [PATCH v3 0/9] arm64: Add support of KVM with ACPI
+Message-ID: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Mar 2016, Sebastian Andrzej Siewior wrote:
-> I sucked this in. It seems to work. What remains that free_irq() thingy:
-> |WARNING: CPU: 0 PID: 0 at kernel/irq/manage.c:1541 __free_irq+0xb4/0x2e0()
-> |Trying to free already-free IRQ 16
-> |CPU: 0 PID: 0 Comm: swapper Not tainted 4.4.4-rt10+ #219
-> |Hardware name: Atmel SAMA5
-> |[<c0015bd0>] (unwind_backtrace) from [<c0013604>] (show_stack+0x10/0x14)
-> |[<c0013604>] (show_stack) from [<c002b850>] (warn_slowpath_common+0x80/0xac)
-> |[<c002b850>] (warn_slowpath_common) from [<c002b8ac>] (warn_slowpath_fmt+0x30/0x40)
-> |[<c002b8ac>] (warn_slowpath_fmt) from [<c005adfc>] (__free_irq+0xb4/0x2e0)
-> |[<c005adfc>] (__free_irq) from [<c005b0a0>] (free_irq+0x30/0x4c)
-> |[<c005b0a0>] (free_irq) from [<c0429034>] (pit_clkevt_shutdown+0x24/0x2c)
-> |[<c0429034>] (pit_clkevt_shutdown) from [<c0076430>] (clockevents_switch_state+0x60/0x130)
-> |---[ end trace 0000000000000001 ]---
-> 
-> which is a different problem and was there. The new thing is this:
+Hello,
 
-I think we really need to have this irq_en/disable_action() thingy sooner than
-later.
+This patch series allows an ARM64 ACPI based platform to use KVM.
 
-> Is it possible to drop this disable/enable clock on the switch from pit
-> to one shot mode?
+Currently the KVM code has to parse the firmware table to get the necessary
+information to setup the virtual timer and virtual GIC.
 
-There was an earlier discussion about the clk stuff. Actually the lock
-protecting disable/enable should be made raw, but there was some crap going on
-in some of the clk callbacks which made that impossible. We realy should
-revisit this.
+However the parsing of those tables are already done in the GIC and arch
+timer drivers.
 
-Thanks,
+This patch series introduces different helpers to retrieve the information
+from different drivers avoiding the duplication of the parsing code.
 
-	tglx
+Compare to v2, the serie has been reworked to allow easy merge via the
+different trees.
+
+For the other changes see the different patches.
+
+Sincerely yours,
+
+Julien Grall (9):
+  clocksource: arm_arch_timer: Gather KVM specific information in a
+    structure
+  clocksource: arm_arch_timer: Extend arch_timer_kvm_info to get the
+    virtual IRQ
+  irqchip/gic-v2: Gather ACPI specific data in a single structure
+  irqchip/gic-v2: Parse and export virtual GIC information
+  irqchip/gic-v3: Gather all ACPI specific data in a single structure
+  irqchip/gic-v3: Parse and export virtual GIC information
+  KVM: arm/arm64: arch_timer: Rely on the arch timer to parse the
+    firmware tables
+  KVM: arm/arm64: vgic: Rely on the GIC driver to parse the firmware
+    tables
+  clocksource: arm_arch_timer: Remove arch_timer_get_timecounter
+
+ drivers/clocksource/arm_arch_timer.c   |  11 ++-
+ drivers/irqchip/irq-gic-common.c       |  13 +++
+ drivers/irqchip/irq-gic-common.h       |   3 +
+ drivers/irqchip/irq-gic-v3.c           | 145 ++++++++++++++++++++++++++-------
+ drivers/irqchip/irq-gic.c              |  91 +++++++++++++++++++--
+ include/clocksource/arm_arch_timer.h   |  12 +--
+ include/kvm/arm_vgic.h                 |   7 +-
+ include/linux/irqchip/arm-gic-common.h |  34 ++++++++
+ virt/kvm/arm/arch_timer.c              |  40 +++------
+ virt/kvm/arm/vgic-v2.c                 |  67 ++++++---------
+ virt/kvm/arm/vgic-v3.c                 |  45 +++-------
+ virt/kvm/arm/vgic.c                    |  50 ++++++------
+ 12 files changed, 345 insertions(+), 173 deletions(-)
+ create mode 100644 include/linux/irqchip/arm-gic-common.h
+
+-- 
+1.9.1
