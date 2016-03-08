@@ -1,46 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 8 Mar 2016 11:27:31 +0700
-Subject: [PATCH 05/14] mfd: ipaq-micro: use __maybe_unused to hide pm
- functions
-In-Reply-To: <1456934350-1389172-6-git-send-email-arnd@arndb.de>
-References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
- <1456934350-1389172-6-git-send-email-arnd@arndb.de>
-Message-ID: <20160308042731.GG13692@x1>
+Date: Tue, 8 Mar 2016 11:32:53 +0700
+Subject: [PATCH v3 1/2] MFD: imx6sx: Add PCIe register definitions for
+ iomuxc gpr
+In-Reply-To: <1456411669-4699-2-git-send-email-chf.fritz@googlemail.com>
+References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+ <1456411669-4699-2-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <20160308043253.GH13692@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 02 Mar 2016, Arnd Bergmann wrote:
+On Thu, 25 Feb 2016, Christoph Fritz wrote:
 
-> The ipaq-micro driver uses SET_SYSTEM_SLEEP_PM_OPS() to
-> remove the reference to its resume function, but does
-> not use an #ifdef around the definition, so we get
-> a build warning:
+> This patch adds macros to define masks and bits for imx6sx
+> PCIe registers. This is based on a patch by Richard Zhu.
 > 
-> drivers/mfd/ipaq-micro.c:379:12: error: 'micro_resume' defined but not used [-Werror=unused-function]
-> 
-> This adds a __maybe_unused annotation so the compiler knows
-> it can silently drop it instead of warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
 > ---
->  drivers/mfd/ipaq-micro.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 5 +++++
+>  1 file changed, 5 insertions(+)
 
-Applied, thanks.
+I will change the non-conformant $SUBJECT line for you this time, but
+please be more vigilant in the future.
 
-> diff --git a/drivers/mfd/ipaq-micro.c b/drivers/mfd/ipaq-micro.c
-> index a41859c55bda..df16fd1df68b 100644
-> --- a/drivers/mfd/ipaq-micro.c
-> +++ b/drivers/mfd/ipaq-micro.c
-> @@ -376,7 +376,7 @@ static const struct mfd_cell micro_cells[] = {
->  	{ .name = "ipaq-micro-leds", },
->  };
+Patch applied.
+
+> diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> index 558a485..238c8db 100644
+> --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> @@ -422,6 +422,7 @@
+>  #define IMX6SX_GPR5_VADC_TO_CSI_CAPTURE_EN_MASK		(0x1 << 26)
+>  #define IMX6SX_GPR5_VADC_TO_CSI_CAPTURE_EN_ENABLE	(0x1 << 26)
+>  #define IMX6SX_GPR5_VADC_TO_CSI_CAPTURE_EN_DISABLE	(0x0 << 26)
+> +#define IMX6SX_GPR5_PCIE_BTNRST_RESET			BIT(19)
+>  #define IMX6SX_GPR5_CSI1_MUX_CTRL_MASK			(0x3 << 4)
+>  #define IMX6SX_GPR5_CSI1_MUX_CTRL_EXT_PIN		(0x0 << 4)
+>  #define IMX6SX_GPR5_CSI1_MUX_CTRL_CVD			(0x1 << 4)
+> @@ -435,6 +436,10 @@
+>  #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS			(0x1 << 1)
+>  #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK			(0x1 << 1)
 >  
-> -static int micro_resume(struct device *dev)
-> +static int __maybe_unused micro_resume(struct device *dev)
->  {
->  	struct ipaq_micro *micro = dev_get_drvdata(dev);
->  
+> +#define IMX6SX_GPR12_PCIE_TEST_POWERDOWN		BIT(30)
+> +#define IMX6SX_GPR12_PCIE_RX_EQ_MASK			(0x7 << 0)
+> +#define IMX6SX_GPR12_PCIE_RX_EQ_2			(0x2 << 0)
+> +
+>  /* For imx6ul iomux gpr register field define */
+>  #define IMX6UL_GPR1_ENET1_CLK_DIR		(0x1 << 17)
+>  #define IMX6UL_GPR1_ENET2_CLK_DIR		(0x1 << 18)
 
 -- 
 Lee Jones
