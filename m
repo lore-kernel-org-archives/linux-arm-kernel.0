@@ -1,130 +1,102 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 8 Mar 2016 09:34:36 +0100
-Subject: [PATCH v14 2/6] Documentation, dt, numa: dt bindings for NUMA.
-In-Reply-To: <CAFpQJXWHXxa2DLKHpLHqnURUJqY-+P-vLintUoCmm3Fmh6xsZQ@mail.gmail.com>
-References: <1457049339-23351-1-git-send-email-ddaney.cavm@gmail.com>
- <1457049339-23351-3-git-send-email-ddaney.cavm@gmail.com>
- <20160307192220.GA1535@rric.localdomain>
- <56DDDAC9.1010600@caviumnetworks.com>
- <CAFpQJXWHXxa2DLKHpLHqnURUJqY-+P-vLintUoCmm3Fmh6xsZQ@mail.gmail.com>
-Message-ID: <20160308083436.GC24726@rric.localdomain>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 8 Mar 2016 09:42:31 +0100
+Subject: [linux-sunxi] Re: [PATCH] dma: sun4i: expose block size and wait
+ cycle configuration to DMA users
+In-Reply-To: <20160308075131.GE8418@lukather>
+References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160307145429.GG11154@localhost> <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
+ <20160308075131.GE8418@lukather>
+Message-ID: <56DE9077.3020905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.03.16 10:31:33, Ganapatrao Kulkarni wrote:
-> On Tue, Mar 8, 2016 at 1:17 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> > On 03/07/2016 11:22 AM, Robert Richter wrote:
-> >>
-> >> On 03.03.16 15:55:35, David Daney wrote:
-> >>>
-> >>> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> >>>
-> >>> Add DT bindings for numa mapping of memory, CPUs and IOs.
-> >>>
-> >>> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> >>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> >>> Signed-off-by: David Daney <david.daney@cavium.com>
-> >>> ---
-> >>>   Documentation/devicetree/bindings/numa.txt | 272
-> >>> +++++++++++++++++++++++++++++
-> >>>   1 file changed, 272 insertions(+)
-> >>>   create mode 100644 Documentation/devicetree/bindings/numa.txt
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/numa.txt
-> >>> b/Documentation/devicetree/bindings/numa.txt
-> >>> new file mode 100644
-> >>> index 0000000..ec5ed7c
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/numa.txt
-> >>
-> >>
-> >>>
-> >>> +==============================================================================
-> >>> +3 - distance-map
-> >>>
-> >>> +==============================================================================
-> >>> +
-> >>> +The device tree node distance-map describes the relative
-> >>> +distance (memory latency) between all numa nodes.
-> >>> +
-> >>> +- compatible : Should at least contain "numa-distance-map-v1".
-> >>> +
-> >>> +- distance-matrix
-> >>> +  This property defines a matrix to describe the relative distances
-> >>> +  between all numa nodes.
-> >>> +  It is represented as a list of node pairs and their relative distance.
-> >>> +
-> >>> +  Note:
-> >>> +       1. Each entry represents distance from first node to second node.
-> >>> +       The distances are equal in either direction.
-> >>> +       2. The distance from a node to self (local distance) is
-> >>> represented
-> >>> +       with value 10 and all internode distance should be represented
-> >>> with
-> >>> +       a value greater than 10.
-> >>> +       3. distance-matrix should have entries in lexicographical
-> >>> ascending
-> >>> +       order of nodes.
-> >>> +       4. There must be only one device node distance-map which must
-> >>> reside in the root node.
-> >>
-> >>
-> >> There is no note that this one is optional, but is it right? The
-> >> default is 10 for local and 20 for remote connections.
-> >>
-> >
-> > Do we need to explicitly state that it is optional?  Many node types are
-> > optional, and their binding specifications don't really talk about their
-> > being optional.
-> >
-> > If the node is present then it has the meaning specified.
-> >
-> > If the node is *not* present, then the special meaning described in the
-> > bindings document does not apply.
-> >
-> > In the case of NUMA, this means that all memory is equally distant (i.e. it
-> > is *Uniform*), and we are not talking about a *Non* *Uniform* Memory
-> > Architecture (NUMA) system.
-> >
-> >
-> >> If so, then ...
-> >>
-> >> static int __init of_numa_parse_distance_map(void)
-> >> {
-> >>         int ret = -EINVAL;
-> >>         struct device_node *np = of_find_node_by_path("/distance-map");
-> >>
-> >>         if (!np)
-> >>                 return ret;
-> >>
-> >> must return 0 instead of -EINVAL here.
-> >
-> >
-> > No, I don't think doing that would be correct.
-> >
-> > If there is no "distance-map", then of_numa_init() returns the error code.
-> > This causes the code in arch/arm64/kernel/numa.c to fall back to the
-> > non-NUMA "dummy_numa" case.
+Hi,
 
-Which means distance-map is not optional for numa.
+On 08-03-16 08:51, Maxime Ripard wrote:
+> On Tue, Mar 08, 2016 at 08:25:47AM +0530, Vinod Koul wrote:
+>> On Mon, Mar 07, 2016 at 09:30:24PM +0100, Maxime Ripard wrote:
+>>> On Mon, Mar 07, 2016 at 04:08:57PM +0100, Boris Brezillon wrote:
+>>>> Hi Vinod,
+>>>>
+>>>> On Mon, 7 Mar 2016 20:24:29 +0530
+>>>> Vinod Koul <vinod.koul@intel.com> wrote:
+>>>>
+>>>>> On Mon, Mar 07, 2016 at 10:59:31AM +0100, Boris Brezillon wrote:
+>>>>>> +/* Dedicated DMA parameter register layout */
+>>>>>> +#define SUN4I_DDMA_PARA_DST_DATA_BLK_SIZE(n)	(((n) - 1) << 24)
+>>>>>> +#define SUN4I_DDMA_PARA_DST_WAIT_CYCLES(n)	(((n) - 1) << 16)
+>>>>>> +#define SUN4I_DDMA_PARA_SRC_DATA_BLK_SIZE(n)	(((n) - 1) << 8)
+>>>>>> +#define SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(n)	(((n) - 1) << 0)
+>>>>>> +
+>>>>>> +/**
+>>>>>> + * struct sun4i_dma_chan_config - DMA channel config
+>>>>>> + *
+>>>>>> + * @para: contains information about block size and time before checking
+>>>>>> + *	  DRQ line. This is device specific and only applicable to dedicated
+>>>>>> + *	  DMA channels
+>>>>>
+>>>>> What information, can you elobrate.. And why can't you use existing
+>>>>> dma_slave_config for this?
+>>>>
+>>>> Block size is related to the device FIFO size. I guess it allows the
+>>>> DMA channel to launch a transfer of X bytes without having to check the
+>>>> DRQ line (the line telling the DMA engine it can transfer more data
+>>>> to/from the device). The wait cycles information is apparently related
+>>>> to the number of clks the engine should wait before polling/checking
+>>>> the DRQ line status between each block transfer. I'm not sure what it
+>>>> saves to put WAIT_CYCLES() to something != 1, but in their BSP,
+>>>> Allwinner tweak that depending on the device.
+>>
+>> we already have block size aka src/dst_maxburst, why not use that one.
+>
+> I'm not sure it's really the same thing. The DMA controller also has a
+> burst parameter, that is either 1 byte or 8 bytes, and ends up being
+> different from this one.
+>
+>> Why does dmaengine need to wait? Can you explain that
+>
+> We have no idea, we thought you might have one :)
+>
+> It doesn't really makes sense to us, but it does have a significant
+> impact on the throughput.
 
-> IMO, return 0 will allow 2 node system to have distance-map optional.
-> by default node distance is set to 10 for local node and for remote node is 20
-> and this will suffice the need of 2 node system.
-> by returning EINVAL, we are forcing 2 node system (and even for
-> systems which has equal remote distances)
-> to define distance-map.
+<wild speculation>
 
-This is exaclty the problem. numa_init() fails if there is no
-distance-map node.
+I see 2 possible reasons why waiting till checking for drq can help:
 
-> > By adding your Reviewed-by: Robert Richter <rrichter@cavium.com> tag to
-> > patch 5/6, where we select between "real" and "dummy_numa", I had assumed
-> > that you agreed with this approach.
+1) A lot of devices have an internal fifo hooked up to a single mmio data
+register which gets read using the general purpose dma-engine, it allows
+this fifo to fill, and thus do burst transfers
+(We've seen similar issues with the scanout engine for the display which
+  has its own dma engine, and doing larger transfers helps a lot).
 
-This is from v6:
+2) Physical memory on the sunxi SoCs is (often) divided into banks
+with a shared data / address bus doing bank-switches is expensive, so
+this wait cycles may introduce latency which allows a user of another
+bank to complete its RAM accesses before the dma engine forces a
+bank switch, which ends up avoiding a lot of (interleaved) bank switches
+while both try to access a different banj and thus waiting makes things
+(much) faster in the end (again a known problem with the display
+scanout engine).
 
-       if (strcmp(uname, "distance-map") != 0)
-               return 0;
+</wild speculation>
 
--Robert
+Note the differences these kinda tweaks make can be quite dramatic,
+when using a 1920x1080p60 hdmi output on the A10 SoC with a 16 bit
+memory bus (real world worst case scenario), the memory bandwidth
+left for userspace processes (measured through memset) almost doubles
+from 48 MB/s to 85 MB/s, source:
+http://ssvb.github.io/2014/11/11/revisiting-fullhd-x11-desktop-performance-of-the-allwinner-a10.html
+
+TL;DR: Waiting before starting DMA allows for doing larger burst
+transfers which ends up making things more efficient.
+
+Given this, I really expect there to be other dma-engines which
+have some option to wait a bit before starting/unpausing a transfer
+instead of starting it as soon as (more) data is available, so I think
+this would make a good addition to dma_slave_config.
+
+Regards,
+
+Hans
