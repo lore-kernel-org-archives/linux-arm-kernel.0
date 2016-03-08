@@ -1,26 +1,65 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 8 Mar 2016 15:18:26 -0600
-Subject: [PATCH] ARM: socfpga: dts: Add missing clock and interrupt fields
- for Arria10 DMA
-In-Reply-To: <1457456571-25541-1-git-send-email-grmoore@opensource.altera.com>
-References: <1457456571-25541-1-git-send-email-grmoore@opensource.altera.com>
-Message-ID: <alpine.DEB.2.02.1603081517350.12664@linux-builds1>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 8 Mar 2016 18:30:17 -0300
+Subject: [PATCH 1/3] thermal: exynos: List vtmu-supply as optional
+ property in DT binding
+In-Reply-To: <20160308210744.GA8145@localhost.localdomain>
+References: <1455819551-4666-1-git-send-email-javier@osg.samsung.com>
+ <1455819551-4666-2-git-send-email-javier@osg.samsung.com>
+ <20160308210744.GA8145@localhost.localdomain>
+Message-ID: <56DF4469.7090603@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Mar 2016, Graham Moore wrote:
+Hello Eduardo,
 
-> The PL330 DMA driver will not load on Arria10 without devicetree entries
-> for clocks and clock_names.  This patch adds those entries.  It also adds
-> the ninth interrupt, which is required for error detection.
+On 03/08/2016 06:07 PM, Eduardo Valentin wrote:
+> On Thu, Feb 18, 2016 at 03:19:09PM -0300, Javier Martinez Canillas wrote:
+>> The Exynos Thermal Management Unit binding says that the vtmu-supply
+>> is optional but is listed in the required properties section. Add an
+>> optional properties section and move the regulator property there.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> ---
+>>
+>>  Documentation/devicetree/bindings/thermal/exynos-thermal.txt | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+>> index faa62059b5c5..70b4c16c7ed8 100644
+>> --- a/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+>> +++ b/Documentation/devicetree/bindings/thermal/exynos-thermal.txt
+>> @@ -41,9 +41,6 @@
+>>  		for current TMU channel
+>>  	-- "tmu_sclk" clock for functional operation of the current TMU
+>>  		channel
+>> -- vtmu-supply: This entry is optional and provides the regulator node supplying
+>> -		voltage to TMU. If needed this entry can be placed inside
+>> -		board/platform specific dts file.
+>>  
+>>  The Exynos TMU supports generating interrupts when reaching given
+>>  temperature thresholds. Number of supported thermal trip points depends
 > 
-> Signed-off-by: Graham Moore <grmoore@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/socfpga_arria10.dtsi | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
+> Where is this patch based on? I checked it on my fixes and linus
+> branches, also on linux-next 0308 branch, and none of those apply clean.
+>
 
-Applied.
+I mentioned in the cover letter [0] that this series were based on top
+of in-flight patches from Krzysztof Kozlowski to avoid merge conflicts.
 
-Thanks,
-Dinh
+Those have not landed yet either so maybe you could look at those first?
+ 
+> Can you please send this based on upstream kernel?
+>
+
+Ok, my intention was to make picking both patch series easier but if
+this is inconvenient to you, I can base on top of current mainline
+and let you handle the merge conflicts (or ask Krzysztof to resend
+on top of my patches).
+
+[0]: https://lkml.org/lkml/2016/2/18/591
+ 
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
