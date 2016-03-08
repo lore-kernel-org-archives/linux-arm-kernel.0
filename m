@@ -1,26 +1,32 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 8 Mar 2016 06:45:11 +0000 (UTC)
-Subject: [PATCH v5 4/6] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <1457400224-24797-5-git-send-email-fcooper@ti.com>
+Date: Tue, 8 Mar 2016 06:55:37 +0000 (UTC)
+Subject: [PATCH v5 0/6] ARM: am335x/am437x/dra7: Add PWM support for DRA7
+In-Reply-To: <1457400224-24797-1-git-send-email-fcooper@ti.com>
 References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
- <1457400224-24797-5-git-send-email-fcooper@ti.com>
-Message-ID: <alpine.DEB.2.02.1603080644580.4974@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1603080642400.4974@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Franklin
+
 On Mon, 7 Mar 2016, Franklin S Cooper Jr wrote:
 
-> From: Vignesh R <vigneshr@ti.com>
+> This patch series adds support for PWM for DRA7. The IP is same as that
+> present in AM33XX and AM437XX.
 > 
-> Add hwmod entries for the PWMSS on DRA7.
+> However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
+> and eQEP.
 > 
-> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
-> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
+> This series is almost identical to v4. Only difference is the addition of
+> eCAP DT nodes in the dra7.dtsi file.
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> [fcooper at ti.com: Do not add eQEP, ePWM and eCAP hwmod entries]
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> This series was tested on AM335x GP, AM437x GP and X15 + LCD screen for
+> PWM based backlight.
+> 
+> This series was also verified to be backwards compatible with old dtbs.
 
-Thanks, queued for v4.7.
+Looking at these to see what I can pick for v4.7, I'm curious about the 
+dependencies.  Can I take patches 2 and 3 before 1 is merged, or does 1 
+need to be merged first?
 
 - Paul
