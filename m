@@ -1,50 +1,55 @@
-From: phil@nwl.cc (Phil Sutter)
-Date: Tue, 8 Mar 2016 15:04:12 +0100
-Subject: Broken PCIe on Synology DS414
-In-Reply-To: <20160308144524.5f47c217@free-electrons.com>
-References: <20160305143445.827496739A@mail.nwl.cc>
- <20160308144524.5f47c217@free-electrons.com>
-Message-ID: <20160308140412.GD6517@orbyte.nwl.cc>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  8 Mar 2016 21:09:29 +0700
+Subject: [PATCH] arm64: account for sparsemem section alignment when choosing
+ vmemmap offset
+Message-ID: <1457446169-23099-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Commit dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear
+region") fixed an issue where the struct page array would overflow into the
+adjacent virtual memory region if system RAM was placed so high up in
+physical memory that its addresses were not representable in the build time
+configured virtual address size.
 
-On Tue, Mar 08, 2016 at 02:45:24PM +0100, Thomas Petazzoni wrote:
-> Thanks for reporting the issue. There is indeed an issue with the
-> crypto SRAM region overlapping with the PCIe aperture. However, this
-> does not prevent 'lspci' from enumerating the device.
+However, the fix failed to take into account that the vmemmap region needs
+to be relatively aligned with respect to the sparsemem section size, so that
+a sequence of page structs corresponding with a sparsemem section in the
+linear region appears naturally aligned in the vmemmap region.
 
-OK, that's strange then. As said, I don't see an error message when
-crypto SRAM regions are present in DT. It's just that the kernel does
-not see any PCI devices (therefore no messages from the drivers, either)
-and lspci shows no output. I would expect to see at least the PCI
-bridge?!
+So round up vmemmap to sparsemem section size. Since this essentially moves
+the projection of the linear region up in memory, also revert the reduction
+of the size of the vmemmap region.
 
-Sadly, I can't change the PCI device configuration, as the two devices
-are built-in (didn't disassemble the box yet). Installed are a Marvell
-SATA controller and some XHCI controller (don't remember the
-manufacturer, but it's handled by generic xhci-pci driver).
+Fixes: dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear region")
+Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/pgtable.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Indeed the situation is resolved by removing the crypto SRAM range
-definitions - of course, the kernel complains about not being able to
-register the crypto engine driver, but the PCI devices appear and the
-HDD is found (so they seem to be functional, too).
-
-Maybe all this is a configuration issue? Can you possibly send me your
-kernel .config so I can compare?
-
-Could this be affected by U-Boot? I use mainline U-Boot which just
-recently accepted my board support patches. I tried to add the crypto
-SRAM ranges to U-Boot's DTS file also, but that alone did not help.
-But this reminds me to test mainline kernel again with proprietary
-U-Boot, which luckily is still present in flash. I'll get back once I
-did.
-
-> I'll cook and send a patch to fix the crypto SRAM ranges nonetheless.
-
-I'm happy to test, just let me know.
-
-Thanks for your help!
-
-Phil
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index f50608674580..819aff5d593f 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -40,7 +40,7 @@
+  * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
+  *	fixed mappings and modules
+  */
+-#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
++#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
+ 
+ #ifndef CONFIG_KASAN
+ #define VMALLOC_START		(VA_START)
+@@ -52,7 +52,8 @@
+ #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+ 
+ #define VMEMMAP_START		(VMALLOC_END + SZ_64K)
+-#define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
++#define vmemmap			((struct page *)VMEMMAP_START - \
++				 SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
+ 
+ #define FIRST_USER_ADDRESS	0UL
+ 
+-- 
+1.9.1
