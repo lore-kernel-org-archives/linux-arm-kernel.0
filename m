@@ -1,128 +1,51 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Tue, 8 Mar 2016 17:23:53 -0600
-Subject: [PATCH 0/4] pwm: omap-dmtimer: fix period/duty_cycle calculation
-In-Reply-To: <20160304182013.58261fc7.drivshin.allworx@gmail.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <20160226203100.303fe192.drivshin.allworx@gmail.com>
- <20160304151948.GF26400@ulmo.nvidia.com>
- <20160304112736.660e4223.drivshin.allworx@gmail.com>
- <20160304211838.GA21731@ulmo>
- <20160304182013.58261fc7.drivshin.allworx@gmail.com>
-Message-ID: <CAHCN7xJvJ0d-xRXpFqXoGVcXWhRqXP62GbzNse0XWXnjGDf23Q@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 8 Mar 2016 15:34:44 -0800
+Subject: [RESEND PATCH v2 5/5] clk: rockchip: add clock controller for the
+ RK3399
+In-Reply-To: <1456827322-8130-1-git-send-email-zhengxing@rock-chips.com>
+References: <1456827275-8035-1-git-send-email-zhengxing@rock-chips.com>
+ <1456827322-8130-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <CAD=FV=VhMY=YO7zVYeP-+LY0gPvQ8yjaAUEGVJrMGLwbGjqVmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 4, 2016 at 5:20 PM, David Rivshin (Allworx)
-<drivshin.allworx@gmail.com> wrote:
-> On Fri, 4 Mar 2016 22:18:38 +0100
-> Thierry Reding <thierry.reding@gmail.com> wrote:
->
->> On Fri, Mar 04, 2016 at 11:27:36AM -0500, David Rivshin (Allworx) wrote:
->> > On Fri, 4 Mar 2016 16:19:48 +0100
->> > Thierry Reding <thierry.reding@gmail.com> wrote:
->> >
->> > > On Fri, Feb 26, 2016 at 08:31:00PM -0500, David Rivshin (Allworx) wrote:
->> > > > On Fri, 29 Jan 2016 23:26:50 -0500
->> > > > "David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
->> > > >
->> > > > > From: David Rivshin <drivshin@allworx.com>
->> > > > >
->> > > > > When using a short PWM period (approaching the min of 2/clk_rate),
->> > > > > pwm-omap-dmtimer does not produce accurate results. In the worst case a
->> > > > > requested period of 2/clk_rate would result in a real period of 4/clk_rate
->> > > > > instead. This is a series includes a fix for that problem, as well as
->> > > > > other related improvements, and is based on the current linux-pwm/for-next
->> > > > > tip.
->> > > > >
->> > > > > I have tested on a Sitara AM335x platform, using a scope to verify the
->> > > > > output with a variety of periods and duty cycles. This includes a PWM
->> > > > > rate up clk_rate/2 with 50% duty cycle (e.g. generating fclk/2) with
->> > > > > both 32768Hz and 24MHz fclks. I do not have an OMAP4 board to test with,
->> > > > > although appropriate sections in the the reference manuals appear
->> > > > > substantially the same, so I believe the changes are equally correct
->> > > > > there.
->> > > > >
->> > > > > Note that the OMAP4 TRMs do effectively state that the maximum PWM
->> > > > > rate is clk_rate/4, so at very fast PWM rates the behavior may not be
->> > > > > as reliable as I observed with Sitara. Although I suspect that it's
->> > > > > the same module and will also work, at least under some circumstances.
->> > > > > If anyone with OMAP4 hardware and a scope is so inclined, I would be
->> > > > > curious to know the results.
->> > > > >
->> > > > > David Rivshin (4):
->> > > > >   pwm: omap-dmtimer: fix inaccurate period/duty_cycle calculation
->> > > > >   pwm: omap-dmtimer: add sanity checking for load and match values
->> > > > >   pwm: omap-dmtimer: round load and match values rather than truncate
->> > > > >   pwm: omap-dmtimer: add dev_dbg() message for effective period and duty
->> > > > >     cycle
->> > > > >
->> > > > >  drivers/pwm/pwm-omap-dmtimer.c | 71 ++++++++++++++++++++++++++++++++----------
->> > > > >  1 file changed, 55 insertions(+), 16 deletions(-)
->> > > > >
->> > > >
->> > > > Hi Thierry,
->> > > >
->> > > > Gentle ping. It does not look like you've taken this series, and I
->> > > > wanted to make sure you're not waiting on something from me. It would
->> > > > be nice to get at least the first patch into 4.5, if possible.
->> > >
->> > > I've applied patches 1 and 3, and I'm planning on sending out a pull
->> > > request for inclusion in v4.5-rc7 later on.
->> >
->> > Thanks!
->> >
->> > > Patches 2 and 4 didn't seem ready/critical, so let's finish those up
->> > > for v4.6-rc1.
->> >
->> > I know there was a lot of discussion on 4, but I'm not sure what the
->> > concern is on patch 2. Is there something specific you're thinking of?
->>
->> Patch 2 sounded like some optional sanity checking which we didn't hit
->> anyway in the current code. Hence I didn't consider it a fix.
->
-> Hrm, perhaps there is something I should have added/changed in the
-> patch description to clarify?
->
-> For further background, patch 2 protects against things that are legal
-> in the PWM API itself, but not possible for this hardware to actually do.
-> Specifically a very short period, or duty_cycle too close to either 0 or
-> 100%. Without the checking, the natural result of the normal math results
-> in setting up the HW in non-sensical ways.
->
-> As long as noone attempts to configure the PWM in those ways, then I'd
-> agree it's not critical. What made me think it was more important was
-> when I saw that Adam (and so probably others) used it for a PWM-backlight,
-> which will naturally try to set 0 and 100% duty cycle.
->
->> > FYI, I know that Adam Ford is using this driver as the backend for
->> > a pwm-backlight control. Without patch 2 this driver will not configure
->> > the HW in a legal way at 0 or 100% duty cycle. However, I forget what
->> > the practical effect of that is, and Adam seemed to indicate it was OK
->> > for his purposes.
->>
->> Okay, I'll hold back a little longer to give you some time to test.
->
-> FYI, I just went and retested what the effect is without those checks.
-> If the duty_cycle is set too low, the result is that the output is constant
-> high. If the duty_cycle is set too high, the result is that the output is
-> constant low. IOW, the result is the reverse of what the user requested.
->
-> If the period is too low, then you also get one of those two results,
-> depending on what the duty_cycle is (essentially the duty_cycle is always
-> too close to 0/100%).
->
-> With patch 2, it will clamp the duty_cycle to the lowest/highest possible
-> value. So while imperfect, at least isn't the reverse of the requested
-> behavior.
+Xing Zheng,
 
-Sorry it took so long to test this, I had some construction at my
-house so I was without a computer for a few days, then I put it on the
-market and some showings, so I wasn't allowed to be home much over the
-weekend.
+On Tue, Mar 1, 2016 at 2:15 AM, Xing Zheng <zhengxing@rock-chips.com> wrote:
+> +       MMC(SCLK_SDMMC_DRV,     "emmc_drv",    "clk_sdmmc", RK3399_SDMMC_CON0, 1),
+> +       MMC(SCLK_SDMMC_SAMPLE,  "emmc_sample", "clk_sdmmc", RK3399_SDMMC_CON1, 1),
 
-I have finally tested this today.  Applying all 4 patches appears have
-no negative impact on what I'm doing.  The perceived brightness
-appears to work just fine, but I am not using an oscilloscope, so I
-can't see the exact duty cycle or frequency.
+Can you and Jianqun Xu please coordinate?  Though I don't have a TRM
+for rk3399 and I haven't looked through this whole patch, I know for
+sure there's a problem when I pick the latest patch series from both
+of you it doesn't compile.
 
-Tested-By: Adam Ford <aford173@gmail.com>
+I believe this is the latest from each of you in patchwork:
+
+8462411   [v3,1/3] dt-bindings: add bindings for rk3399 clock controller
+8462431   [v3,2/3] clk: rockchip: add dt-binding header for rk3399
+8462441   [v3,3/3] ARM64: dts: rockchip: add core dtsi file for rk3399
+
+8463741   [RESEND,v2,1/5] clk: rockchip: add more mux parameters for
+new pll sources
+8463801   [RESEND,v2,2/5] clk: rockchip: Add support for multiple
+clock providers
+8463771   [RESEND,v2,3/5] clk: rockchip: add new pll-type for rk3399
+and similar socs
+8463781   [RESEND,v2,4/5] clk: rockchip: add a COMPOSITE_FRACMUX_NOGATE type
+8463831   [RESEND,v2,5/5] clk: rockchip: add clock controller for the RK3399
+
+
+Specifically your patch from March 1st refers to SCLK_SDMMC_DRV and
+SCLK_SDMMC_SAMPLE.  Those defines existed in Jianqun Xu's patch back
+on Feb 19th <https://patchwork.kernel.org/patch/8355411/>, but his
+latest patch series from March 1st
+<https://patchwork.kernel.org/patch/8462431/> no longer has those
+#defines.
+
+Can you two resolve this so I can pick both patch series and see that
+they compile?  ...or let me know where I messed up, of course.
+
+Thanks!
+
+-Doug
