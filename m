@@ -1,41 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Mar 2016 09:09:09 -0800
-Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <56DEB82F.5050703@ti.com>
-References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
- <CACRpkdYzJ9Hy0sH6gK6RzpLE6juS4WfPjbt7nh43vR9YTuGZWA@mail.gmail.com>
- <56C1A1FE.3080403@arm.com> <20160215152751.GT19432@atomide.com>
- <56DEB82F.5050703@ti.com>
-Message-ID: <20160308170909.GC9329@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Mar 2016 17:19:02 +0000
+Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
+In-Reply-To: <CAGXu5jKNdisc7AOZBZj5ZbHLfdZPoF5pZ+N1SQjzdDnvQbfyzA@mail.gmail.com>
+References: <1454684330-892-1-git-send-email-james.morse@arm.com>
+ <56DDAFA7.4090207@arm.com>
+ <20160307173835.GB6192@e104818-lin.cambridge.arm.com>
+ <CAGXu5jKNdisc7AOZBZj5ZbHLfdZPoF5pZ+N1SQjzdDnvQbfyzA@mail.gmail.com>
+Message-ID: <20160308171902.GE6192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [160308 03:32]:
+On Mon, Mar 07, 2016 at 12:54:33PM -0800, Kees Cook wrote:
+> On Mon, Mar 7, 2016 at 9:38 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > (cc'ing Kees)
+> >
+> > On Mon, Mar 07, 2016 at 04:43:19PM +0000, James Morse wrote:
+> >> I've just spotted UAO causes the test_user_copy module (CONFIG_TEST_USER_COPY)
+> >> to fail. Who to blame is up for discussion. The test is passing a user pointer
+> >> as the 'to' field of copy_from_user(), which it expects to fail gracefully:
+> >>
+> >> lib/test_user_copy.c:75
+> >> >     /* Invalid usage: none of these should succeed. */
+> >> [ ... ]
+> >> >     ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
+> >> >                                 PAGE_SIZE),
+> >> >                 "illegal reversed copy_from_user passed");
+> >> >
+> >>
+> >> access_ok() catches the "(char __user *)kmem", causing copy_from_user() to pass
+> >> bad_usermem to memset():
+> >>
+> >> arch/arm64/include/asm/uaccess.h:279
+> >> >     if (access_ok(VERIFY_READ, from, n))
+> >> >             n = __copy_from_user(to, from, n);
+> >> >     else /* security hole - plug it */
+> >> >             memset(to, 0, n);
+> >>
+> >> This (correctly) trips UAO's "Accessing user space memory outside uaccess.h
+> >> routines" message, which is a little confusing to debug, and stops the rest of
+> >> the module's tests from being run.
+> >
+> > I suggest we don't do anything on arch/arm64 (or arch/arm), I just
+> > consider the test to be broken. The semantics of copy_from_user() don't
+> > say anything about the safety checks on the destination pointer, this is
+> > supposed to be a valid kernel address. The test assumes that if the
+> > source pointer is invalid, the copy_from_user() routine should not touch
+> > the destination.
 > 
-> Yeah. As I mentioned before patches 2/3 will not work.
-> I've tried to test suspend with diff I posted [1], but I did it only on 
-> dra7 and am43 where suspend i more simple than on omap3. Also, I worry
-> that with such approach some irq can be missed (especially edge ones), 
-> because PRCM irqs will be re-enabled at very late resume stage 
-> (right before thaw).
+> Hmmm, I'd prefer that copy_*_user was checking both src and
+> destination. That's what these tests are checking for.
 
-Yeah any tests not done with PM on omap3 with the mainline kernel
-are clearly incomplete in this case :)
+If the kernel pointer (source or destination, depending on the function)
+is not valid, I would rather panic the kernel (maybe as a result of a
+data abort) than silently returning a non-zero value from
+copy_from_user() which doesn't even tell whether the source or
+destination pointer is wrong.
 
-> Second option, I see, is to rework PRCM to be threaded IRQ, but in this case
-> all children IRQs will need to be threaded/nested threaded
-> (including PCS, legacy OMAP mux, OMAP3 _prcm_int_handle_wakeup/_prcm_int_handle_io).
-> 
-> Are there any objection to convert PCS to threaded IRQ, for example? ;)
+The copy_*_user functions are indeed meant to check the validity of user
+pointer arguments and safely handle aborts (extable annotations) since
+these values are usually provided by user space. But the kernel pointer
+arguments are under the control of the kernel, so IMO passing a corrupt
+value is a serious kernel/driver bug.
 
-For PRCM interrupt, I don't think that can be threaded IRQ as
-that thing is firing all the time. The consumers for the chained
-PRCM interrupt consumers like PCS could probably use threaded IRQ.
-When the PCS interrupts fire, we're already in some sleeper
-idle state so the extra latency thre does not matter.
-
-Regards,
-
-Tony
-
-> [1] https://patchwork.ozlabs.org/patch/578915/
+-- 
+Catalin
