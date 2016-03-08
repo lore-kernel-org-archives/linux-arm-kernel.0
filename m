@@ -1,96 +1,76 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 8 Mar 2016 16:03:50 +0100
-Subject: [PATCH 1/8] drm: atmel-hlcdc: add a ->cleanup_fb() operation
-In-Reply-To: <1452075569-8545-2-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue, 8 Mar 2016 16:04:16 +0100
+Subject: [PATCH 4/8] drm: atmel-hlcdc: remove leftovers from atomic mode
+ setting migration
+In-Reply-To: <1452075569-8545-5-git-send-email-boris.brezillon@free-electrons.com>
 References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
- <1452075569-8545-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <56DEE9D6.4000708@atmel.com>
+ <1452075569-8545-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <56DEE9F0.7060406@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 06/01/2016 11:19, Boris Brezillon a ?crit :
-> Add a ->cleanup_fb() operation to avoid memory leaks when the atomic
-> operation is interrupted after the ->prepare_fb() call.
+> The ->dpms field is no longer used and can be removed.
+> The same goes for the dummy ->mode_fixup() implementation which always
+> returns true.
 > 
 > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes 2389fc1 ("drm: atmel-hlcdc: Atomic mode-setting conversion")
 
-Seems okay:
-Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  2 ++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 22 +++++++++++++++++++---
->  2 files changed, 21 insertions(+), 3 deletions(-)
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 12 ------------
+>  1 file changed, 12 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> index cf6b375..e88e349 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> @@ -81,11 +81,13 @@ struct atmel_hlcdc_plane_properties {
->   * @layer: HLCDC layer structure
->   * @properties: pointer to the property definitions structure
->   * @rotation: current rotation status
-> + * @prepared: flagging the plane has prepared for an atomic update
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> index 49494e9..2255dc9 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> @@ -44,13 +44,11 @@ enum atmel_hlcdc_connector_rgb_mode {
+>   * @connector: DRM connector
+>   * @encoder: DRM encoder
+>   * @dc: pointer to the atmel_hlcdc_dc structure
+> - * @dpms: current DPMS mode
 >   */
->  struct atmel_hlcdc_plane {
->  	struct drm_plane base;
->  	struct atmel_hlcdc_layer layer;
->  	struct atmel_hlcdc_plane_properties *properties;
-> +	bool prepared;
+>  struct atmel_hlcdc_rgb_output {
+>  	struct drm_connector connector;
+>  	struct drm_encoder encoder;
+>  	struct atmel_hlcdc_dc *dc;
+> -	int dpms;
 >  };
 >  
->  static inline struct atmel_hlcdc_plane *
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> index 1ffe9c3..35027d0 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> @@ -715,11 +715,25 @@ static int atmel_hlcdc_plane_prepare_fb(struct drm_plane *p,
->  					const struct drm_plane_state *new_state)
->  {
->  	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
-> +	int ret;
->  
-> -	if (!new_state->fb)
-> -		return 0;
-> +	ret = atmel_hlcdc_layer_update_start(&plane->layer);
-> +	if (!ret)
-> +		plane->prepared = true;
-> +
-> +	return ret;
-> +}
-> +
-> +static void atmel_hlcdc_plane_cleanup_fb(struct drm_plane *p,
-> +				const struct drm_plane_state *old_state)
-> +{
-> +	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
-> +
-> +	if (!plane->prepared)
-> +		return;
->  
-> -	return atmel_hlcdc_layer_update_start(&plane->layer);
-> +	atmel_hlcdc_layer_update_rollback(&plane->layer);
-> +	plane->prepared = false;
+>  static inline struct atmel_hlcdc_rgb_output *
+> @@ -104,14 +102,6 @@ static void atmel_hlcdc_panel_encoder_disable(struct drm_encoder *encoder)
+>  	drm_panel_disable(panel->panel);
 >  }
 >  
->  static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
-> @@ -739,6 +753,7 @@ static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
->  	atmel_hlcdc_plane_update_disc_area(plane, state);
->  
->  	atmel_hlcdc_layer_update_commit(&plane->layer);
-> +	plane->prepared = false;
+> -static bool
+> -atmel_hlcdc_panel_encoder_mode_fixup(struct drm_encoder *encoder,
+> -				     const struct drm_display_mode *mode,
+> -				     struct drm_display_mode *adjusted)
+> -{
+> -	return true;
+> -}
+> -
+>  static void
+>  atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
+>  				 struct drm_display_mode *mode,
+> @@ -147,7 +137,6 @@ atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
 >  }
 >  
->  static void atmel_hlcdc_plane_atomic_disable(struct drm_plane *p,
-> @@ -844,6 +859,7 @@ static void atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane,
+>  static const struct drm_encoder_helper_funcs atmel_hlcdc_panel_encoder_helper_funcs = {
+> -	.mode_fixup = atmel_hlcdc_panel_encoder_mode_fixup,
+>  	.mode_set = atmel_hlcdc_rgb_encoder_mode_set,
+>  	.disable = atmel_hlcdc_panel_encoder_disable,
+>  	.enable = atmel_hlcdc_panel_encoder_enable,
+> @@ -248,7 +237,6 @@ static int atmel_hlcdc_create_panel_output(struct drm_device *dev,
+>  	if (!panel)
+>  		return -EINVAL;
 >  
->  static struct drm_plane_helper_funcs atmel_hlcdc_layer_plane_helper_funcs = {
->  	.prepare_fb = atmel_hlcdc_plane_prepare_fb,
-> +	.cleanup_fb = atmel_hlcdc_plane_cleanup_fb,
->  	.atomic_check = atmel_hlcdc_plane_atomic_check,
->  	.atomic_update = atmel_hlcdc_plane_atomic_update,
->  	.atomic_disable = atmel_hlcdc_plane_atomic_disable,
+> -	panel->base.dpms = DRM_MODE_DPMS_OFF;
+>  
+>  	panel->base.dc = dc;
+>  
 > 
 
 
