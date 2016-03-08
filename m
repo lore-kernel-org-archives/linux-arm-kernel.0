@@ -1,42 +1,41 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Tue, 8 Mar 2016 06:45:20 -0600
-Subject: commit dfd55ad8 breaks Seattle B0
-In-Reply-To: <CAKv+Gu_83N9CzYfbLPQY2BEuhA=h1sYPXN+nkCURtbA32gw3OA@mail.gmail.com>
-References: <56DE0115.9040101@redhat.com>
- <CAKv+Gu_83N9CzYfbLPQY2BEuhA=h1sYPXN+nkCURtbA32gw3OA@mail.gmail.com>
-Message-ID: <56DEC960.8020100@redhat.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue,  8 Mar 2016 13:57:05 +0100
+Subject: [PATCH net 2/3] net: mvneta: enable change MAC address when interface
+ is up
+In-Reply-To: <1457441826-6100-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1457441826-6100-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1457441826-6100-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2016 06:49 PM, Ard Biesheuvel wrote:
-> (+ Will)
->
-> On 8 March 2016 at 05:30, Mark Langsdorf <mlangsdo@redhat.com> wrote:
->
-> Thanks for the report. Although next time, perhaps put my name in the
-> cc box? :-)
+From: Dmitri Epshtein <dima@marvell.com>
 
-Sorry, I realized I should have done that a couple of hours too late.
+Function eth_prepare_mac_addr_change() is called as part of MAC
+address change. This function check if interface is running.
+To enable change MAC address when interface is running:
+IFF_LIVE_ADDR_CHANGE flag must be set to dev->priv_flags field
 
->> I get the following error when booting v4.5-rc7 on Seattle B0
->> using the same config file that boots successfully on v4.5-rc6.
->>
->> Removing commit dfd55ad8 allows v4.5-rc7+ to boot successfully.
->>
->
-> I will investigate today. So other than 64k pages, is there anything
-> special about your config?
+Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP
+network unit")
+Cc: stable at vger.kernel.org
+Signed-off-by: Dmitri Epshtein <dima@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thank you.
-
-My config differs substantially from defconfig but I'm not sure
-what else is special. gzip'd config attached.
-
---Mark Langsdorf
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: rh.config.gz
-Type: application/gzip
-Size: 28406 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160308/56bc7c0c/attachment-0001.gz>
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 8dc7df2edff6..2ee05cebea75 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -3721,7 +3721,7 @@ static int mvneta_probe(struct platform_device *pdev)
+ 	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
+ 	dev->hw_features |= dev->features;
+ 	dev->vlan_features |= dev->features;
+-	dev->priv_flags |= IFF_UNICAST_FLT;
++	dev->priv_flags |= IFF_UNICAST_FLT | IFF_LIVE_ADDR_CHANGE;
+ 	dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
+ 
+ 	err = register_netdev(dev);
+-- 
+2.5.0
