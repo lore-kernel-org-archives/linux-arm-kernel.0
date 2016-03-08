@@ -1,92 +1,132 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 8 Mar 2016 12:09:43 -0800
-Subject: [PATCH] Revert "arm64: vmemmap: use virtual projection of linear
- region"
-In-Reply-To: <56DF274A.4070802@redhat.com>
-References: <1457463792-6852-1-git-send-email-ddaney.cavm@gmail.com>
- <56DF274A.4070802@redhat.com>
-Message-ID: <56DF3187.7010901@caviumnetworks.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 8 Mar 2016 14:34:44 -0600
+Subject: [PATCH V4 0/5] PCIe Xilinx generic driver for Microblaze and
+In-Reply-To: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
+References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <20160308203444.GA27132@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2016 11:26 AM, Laura Abbott wrote:
-> On 03/08/2016 11:03 AM, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> This reverts commit dfd55ad85e4a7fbaa82df12467515ac3c81e8a3e.
->>
->> Commit dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear
->> region") causes this failure on Cavium Thunder systems:
->>
-[...]
->
-> See http://article.gmane.org/gmane.linux.ports.arm.kernel/484866 for a
-> proposed fix.
->
+On Thu, Feb 11, 2016 at 09:58:06PM +0530, Bharat Kumar Gogada wrote:
+> This patch series does modifications to pcie-xilinx.c, to support common
+> driver on both Zynq and Microblaze architectures.
+> Microblaze pci-common.c has been modified to support generic driver.
+> 
+> Bharat Kumar Gogada (5):
+>   PCI: xilinx: Removing xilinx_pcie_parse_and_add_res function
+>   PCI: xilinx: Removing struct hw_pci structure.
+>   PCI: xilinx: Modifying AXI PCIe Host Bridge driver to work on both
+>      Zynq and Microblaze
+>   PCI: xilinx: Updating Zynq PCI binding documentation with 
+>     Microblaze node.
+>   Microblaze: Modifying microblaze PCI subsytem to support  generic
+>     Xilinx  AXI PCIe Host Bridge IP driver
+> 
+>  .../devicetree/bindings/pci/xilinx-pcie.txt        |  32 +++-
+>  arch/microblaze/Kconfig                            |   3 +
+>  arch/microblaze/pci/pci-common.c                   |  56 ++----
+>  drivers/pci/host/Kconfig                           |   2 +-
+>  drivers/pci/host/pcie-xilinx.c                     | 191 +++------------------
+>  5 files changed, 66 insertions(+), 218 deletions(-)
 
-Yes, that patch fixes it for me.  I withdraw my patch to revert.
+I applied this series to my pci/host-xilinx branch for v4.6.
 
-Thanks,
-David Daney
+Michal, you only explicitly acked the last patch, but that only makes
+sense if I apply the whole series, so I applied your ack to all the
+patches.
 
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   arch/arm64/include/asm/pgtable.h | 7 +++----
->>   arch/arm64/mm/init.c             | 4 ++--
->>   2 files changed, 5 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/pgtable.h
->> b/arch/arm64/include/asm/pgtable.h
->> index f506086..bf464de 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -34,13 +34,13 @@
->>   /*
->>    * VMALLOC and SPARSEMEM_VMEMMAP ranges.
->>    *
->> - * VMEMAP_SIZE: allows the whole linear region to be covered by a
->> struct page array
->> + * VMEMAP_SIZE: allows the whole VA space to be covered by a struct
->> page array
->>    *    (rounded up to PUD_SIZE).
->>    * VMALLOC_START: beginning of the kernel VA space
->>    * VMALLOC_END: extends to the available space below vmmemmap, PCI
->> I/O space,
->>    *    fixed mappings and modules
->>    */
->> -#define VMEMMAP_SIZE        ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1))
->> * sizeof(struct page), PUD_SIZE)
->> +#define VMEMMAP_SIZE        ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) *
->> sizeof(struct page), PUD_SIZE)
->>
->>   #ifndef CONFIG_KASAN
->>   #define VMALLOC_START        (VA_START)
->> @@ -51,8 +51,7 @@
->>
->>   #define VMALLOC_END        (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE -
->> SZ_64K)
->>
->> -#define VMEMMAP_START        (VMALLOC_END + SZ_64K)
->> -#define vmemmap            ((struct page *)VMEMMAP_START -
->> (memstart_addr >> PAGE_SHIFT))
->> +#define vmemmap            ((struct page *)(VMALLOC_END + SZ_64K))
->>
->>   #define FIRST_USER_ADDRESS    0UL
->>
->> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> index 7802f21..f3b061e 100644
->> --- a/arch/arm64/mm/init.c
->> +++ b/arch/arm64/mm/init.c
->> @@ -319,8 +319,8 @@ void __init mem_init(void)
->>   #endif
->>             MLG(VMALLOC_START, VMALLOC_END),
->>   #ifdef CONFIG_SPARSEMEM_VMEMMAP
->> -          MLG(VMEMMAP_START,
->> -              VMEMMAP_START + VMEMMAP_SIZE),
->> +          MLG((unsigned long)vmemmap,
->> +              (unsigned long)vmemmap + VMEMMAP_SIZE),
->>             MLM((unsigned long)virt_to_page(PAGE_OFFSET),
->>                 (unsigned long)virt_to_page(high_memory)),
->>   #endif
->>
->
+Someday somebody should rework pci_fixup_irqs() so that doesn't have
+to be arch-dependent.
+
+I reworked the changelogs as below.
+
+Bjorn
+
+
+commit 01cf9d524ff0
+Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Date:   Thu Feb 11 21:58:11 2016 +0530
+
+    microblaze/PCI: Support generic Xilinx AXI PCIe Host Bridge IP driver
+    
+    Modify the Microblaze PCI subsystem to work with the generic
+    drivers/pci/host/pcie-xilinx.c driver on Microblaze and Zynq.
+    
+    [bhelgaas: changelog]
+    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+commit e5d4b2006c97
+Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Date:   Thu Feb 11 21:58:10 2016 +0530
+
+    PCI: xilinx: Update Zynq binding with Microblaze node
+    
+    Update Zynq PCI binding documentation with Microblaze node.
+    
+    [bhelgaas: fix "microbalze_0_intc" typo]
+    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Acked-by: Rob Herring <robh@kernel.org>
+    Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+commit 2c51391d2559
+Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Date:   Thu Feb 11 21:58:09 2016 +0530
+
+    PCI: xilinx: Don't call pci_fixup_irqs() on Microblaze
+    
+    The Xilinx AXI PCIe Host Bridge Soft IP driver was previously only
+    supported on ARM (in particular, on ARCH_ZYNC), and pci_fixup_irqs() is
+    available there.  But Microblaze will do IRQ fixup in pcibios_add_device(),
+    so pci_fixup_irqs() is not available on Microblaze.
+    
+    Don't call pci_fixup_irqs() on Microblaze, so the driver can work on both
+    Zynq and Microblaze Architectures.
+    
+    [bhelgaas: revise changelog to show similarity to bdb8a1844f31 ("PCI: iproc: Call pci_fixup_irqs() for ARM64 as well as ARM")]
+    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+    Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+commit 4c01f3b089a0
+Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Date:   Thu Feb 11 21:58:08 2016 +0530
+
+    PCI: xilinx: Remove dependency on ARM-specific struct hw_pci
+    
+    The Xilinx PCIe host controller driver uses pci_common_init_dev(), which
+    is ARM-specific and requires the ARM struct hw_pci.  The part of
+    pci_common_init_dev() that is needed is limited and can be done here
+    without using hw_pci.
+    
+    Create and scan the root bus directly without using the ARM
+    pci_common_init_dev() interface.
+    
+    [bhelgaas: revise changelog to show similarity to 79953dd22c1d ("PCI: rcar: Remove dependency on ARM-specific struct hw_pci")]
+    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+    Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+commit 0259882e342e
+Author: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Date:   Thu Feb 11 21:58:07 2016 +0530
+
+    PCI: xilinx: Use of_pci_get_host_bridge_resources() to parse DT
+    
+    Use the new of_pci_get_host_bridge_resources() API in place of the PCI OF
+    DT parser.
+    
+    [bhelgaas: revise changelog to show similarity to 0021d22b73d6 ("PCI: designware: Use of_pci_get_host_bridge_resources() to parse DT")]
+    Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+    Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+    Acked-by: Michal Simek <michal.simek@xilinx.com>
