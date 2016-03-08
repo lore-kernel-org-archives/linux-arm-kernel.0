@@ -1,30 +1,42 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Tue,  8 Mar 2016 13:14:33 +0100
-Subject: [PATCH] bus: arm-ccn: Fix cpu notifier priority
-Message-ID: <1457439273-5998-1-git-send-email-jglauber@cavium.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  8 Mar 2016 09:26:12 -0300
+Subject: [PATCH 1/3] ARM: dts: imx6sx: Fix SAI DMA index
+Message-ID: <1457439974-1149-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix cpu priority of notifier block that was erroneously set to
-return value of next statement.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
+According to sdma_peripheral_type in include/linux/platform_data/dma-imx.h
+IMX_DMATYPE_SAI corresponds to index 24, so fix it accordingly.
+
+Suggested-by: Zidan Wang <zidan.wang@nxp.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/bus/arm-ccn.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6sx.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 7082c72..d4a939e 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1271,7 +1271,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
- 	 * picked to have a chance to migrate events before perf is notified.
- 	 */
- 	ccn->dt.cpu_nb.notifier_call = arm_ccn_pmu_cpu_notifier;
--	ccn->dt.cpu_nb.priority = CPU_PRI_PERF + 1,
-+	ccn->dt.cpu_nb.priority = CPU_PRI_PERF + 1;
- 	err = register_cpu_notifier(&ccn->dt.cpu_nb);
- 	if (err)
- 		goto error_cpu_notifier;
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index a5f7602..c8269e7 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -970,7 +970,7 @@
+ 					 <&clks 0>, <&clks 0>;
+ 				clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 				dma-names = "rx", "tx";
+-				dmas = <&sdma 31 23 0>, <&sdma 32 23 0>;
++				dmas = <&sdma 31 24 0>, <&sdma 32 24 0>;
+ 				dma-source = <&gpr 0 15 0 16>;
+ 				status = "disabled";
+ 			};
+@@ -990,7 +990,7 @@
+ 					 <&clks 0>, <&clks 0>;
+ 				clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 				dma-names = "rx", "tx";
+-				dmas = <&sdma 33 23 0>, <&sdma 34 23 0>;
++				dmas = <&sdma 33 24 0>, <&sdma 34 24 0>;
+ 				dma-source = <&gpr 0 17 0 18>;
+ 				status = "disabled";
+ 			};
 -- 
 1.9.1
