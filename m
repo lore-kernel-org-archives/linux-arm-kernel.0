@@ -1,56 +1,63 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 8 Mar 2016 15:35:38 +0530
-Subject: [linux-sunxi] Re: [PATCH] dma: sun4i: expose block size and wait
- cycle configuration to DMA users
-In-Reply-To: <56DE9077.3020905@redhat.com>
-References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160307145429.GG11154@localhost>
- <20160307160857.577bb04d@bbrezillon>
- <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
- <20160308075131.GE8418@lukather> <56DE9077.3020905@redhat.com>
-Message-ID: <20160308100538.GO11154@localhost>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Tue, 8 Mar 2016 11:03:27 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de>
+ <56DD8176.2080603@st.com> <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
+ <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
+ <56DDB749.1020808@suse.de>
+ <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
+Message-ID: <CAG374jBLD5YuBT=r3V98OqdUTXMepvQ_tLz4XMJdQMzzGYi22A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 09:42:31AM +0100, Hans de Goede wrote:
-> <wild speculation>
-> 
-> I see 2 possible reasons why waiting till checking for drq can help:
-> 
-> 1) A lot of devices have an internal fifo hooked up to a single mmio data
-> register which gets read using the general purpose dma-engine, it allows
-> this fifo to fill, and thus do burst transfers
-> (We've seen similar issues with the scanout engine for the display which
->  has its own dma engine, and doing larger transfers helps a lot).
-> 
-> 2) Physical memory on the sunxi SoCs is (often) divided into banks
-> with a shared data / address bus doing bank-switches is expensive, so
-> this wait cycles may introduce latency which allows a user of another
-> bank to complete its RAM accesses before the dma engine forces a
-> bank switch, which ends up avoiding a lot of (interleaved) bank switches
-> while both try to access a different banj and thus waiting makes things
-> (much) faster in the end (again a known problem with the display
-> scanout engine).
-> 
-> </wild speculation>
-> 
-> Note the differences these kinda tweaks make can be quite dramatic,
-> when using a 1920x1080p60 hdmi output on the A10 SoC with a 16 bit
-> memory bus (real world worst case scenario), the memory bandwidth
-> left for userspace processes (measured through memset) almost doubles
-> from 48 MB/s to 85 MB/s, source:
-> http://ssvb.github.io/2014/11/11/revisiting-fullhd-x11-desktop-performance-of-the-allwinner-a10.html
-> 
-> TL;DR: Waiting before starting DMA allows for doing larger burst
-> transfers which ends up making things more efficient.
-> 
-> Given this, I really expect there to be other dma-engines which
-> have some option to wait a bit before starting/unpausing a transfer
-> instead of starting it as soon as (more) data is available, so I think
-> this would make a good addition to dma_slave_config.
+Hi Andreas and Dinh  Thanks for your feedback i will check it.
 
-I tend to agree but before we do that I would like this hypothesis to be
-confirmed :)
+Best regards
 
--- 
-~Vinod
+Gabriel
+
+On 8 March 2016 at 00:22, Dinh Nguyen <dinh.linux@gmail.com> wrote:
+> On Mon, Mar 7, 2016 at 11:15 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Am 07.03.2016 um 16:52 schrieb Giuseppe CAVALLARO:
+>>> On 3/7/2016 4:46 PM, Andreas F?rber wrote:
+>>>> Am 07.03.2016 um 16:09 schrieb Giuseppe CAVALLARO:
+>>>>> On 3/7/2016 3:27 PM, Andreas F?rber wrote:
+>>>>>> Indeed, reverting Gabriel's commit fixes the observed error messages
+>>>> [...]
+>>>>>> However, I am unable to ping any hosts on the network now.
+>>>>>
+>>>>> hmm, this could be another problem. I wonder if you can
+>>>>> check which recent patch is introducing the problem on ARM64.
+>>>>> For example if this depends on Oct_2015 update.
+>>>>
+>>>> I've had success reverting drivers/net/ethernet/stmicro/ up to and
+>>>> including "stmmac: first frame prep at the end of xmit routine", i.e.
+>>>> top 7 commits.
+>>>
+>>> Andreas, I will check it and let you know asap.
+>>
+>> I verified that it's just these two commits that I need to revert:
+>>
+>> "stmmac: Fix 'eth0: No PHY found' regression"
+>> "stmmac: first frame prep at the end of xmit routine"
+>>
+>> Those in between don't cause conflicts and seem to work okay.
+>>
+>
+> I'm seeing the same issue on the SoCFPGA platform:
+>
+> libphy: PHY stmmac-0:ffffffff not found
+> eth0: Could not attach to PHY
+> stmmac_open: Cannot attach to PHY (error: -19)
+>
+> If I just revert:
+>
+>  "stmmac: Fix 'eth0: No PHY found' regression"
+>
+> then the issue goes away.
+>
+> Thanks,
+> Dinh
