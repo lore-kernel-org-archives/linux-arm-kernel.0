@@ -1,172 +1,73 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 8 Mar 2016 15:54:01 +0000
-Subject: [PATCH V4 5/5] Microblaze: Modifying microblaze PCI subsytem to
- support generic Xilinx AXI PCIe Host Bridge IP driver
-In-Reply-To: <56CC3DB2.3080900@xilinx.com>
-References: <1455208091-15556-1-git-send-email-bharatku@xilinx.com>
- <1455208091-15556-6-git-send-email-bharatku@xilinx.com>
- <56CC3DB2.3080900@xilinx.com>
-Message-ID: <8520D5D51A55D047800579B09414719825887D2E@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Tue, 8 Mar 2016 09:59:51 -0600
+Subject: [PATCHv2 11/11] ARM: dts: Add Altera Arria10 L2 Cache EDAC
+ devicetree entry
+In-Reply-To: <56DEE6AE.100@opensource.altera.com>
+References: <1457379787-8327-1-git-send-email-tthayer@opensource.altera.com>
+ <1457379787-8327-12-git-send-email-tthayer@opensource.altera.com>
+ <56DEE6AE.100@opensource.altera.com>
+Message-ID: <56DEF6F7.1030100@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Dinh,
 
-Can you please take this in to your tree.
+On 03/08/2016 08:50 AM, Dinh Nguyen wrote:
+>
+>
+> On 03/07/2016 01:43 PM, tthayer at opensource.altera.com wrote:
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> Add the device tree entries needed to support the Altera L2
+>> cache EDAC on the Arria10 chip.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>> v2 Match register value (l2-ecc at ffd06010)
+>> ---
+>>   arch/arm/boot/dts/socfpga_arria10.dtsi |   14 ++++++++++++++
+>>   1 file changed, 14 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> index cce9e50..44aeb3f 100644
+>> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> @@ -599,6 +599,20 @@
+>>   			reg = <0xffe00000 0x40000>;
+>>   		};
+>>
+>> +		eccmgr: eccmgr at ffd06090 {
+>> +			compatible = "altr,socfpga-ecc-manager";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +
+>> +			l2-ecc at ffd06010 {
+>> +				compatible = "altr,socfpga-a10-l2-ecc";
+>> +				reg = <0xffd06010 0x4>;
+>> +				interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>,
+>> +					     <0 0 IRQ_TYPE_LEVEL_HIGH>;
+>> +			};
+>> +		};
+>> +
+>
+> Just checking if these addresses are correct. The eccmgr is at
+> 0xffd06090, but the l2-ecc is at 0xffd06010? I would have thought from
+> the placement the l2-ecc address would be inside the eccmgr's address?
+>
+> Dinh
+>
 
-Thanks,
-Bharat
+Yes, this is confusing and I'll clarify/reorganize in the next series. 
+The eccmgr is pointing to the ECC IRQ mask bits. These registers and the 
+L2 ECC registers are organized in different areas within the system manager.
 
-> On 11.2.2016 17:28, Bharat Kumar Gogada wrote:
-> > This patch does required modifications to microblaze PCI subsystem, to
-> > work with generic driver (drivers/pci/host/pcie-xilinx.c) on
-> > Microblaze and Zynq.
-> >
-> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > ---
-> > Changes:
-> > Removed pcibios_get_phb_of_node in pci-common.c, using generic
-> version
-> > instead.
-> > Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
-> > Modified pcibios_align_resource in pci-common.c, as per generic
-> > architecuture, removed temporary variable.
-> > Removed pci_domain_nr in pci-common.c, instead using generic code.
-> > Added pcibios_add_device in pci-common.c, as per generic architecuture.
-> > Adding Kernel configuration in arch/microblaze as required for generic
-> > PCI domains.
-> > Added kernel configuration for driver to support Microblaze.
-> > ---
-> >  arch/microblaze/Kconfig          |  3 +++
-> >  arch/microblaze/pci/pci-common.c | 56 +++++++-------------------------------
-> --
-> >  drivers/pci/host/Kconfig         |  2 +-
-> >  3 files changed, 14 insertions(+), 47 deletions(-)
-> >
-> > diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig index
-> > 0bce820..c3702b9 100644
-> > --- a/arch/microblaze/Kconfig
-> > +++ b/arch/microblaze/Kconfig
-> > @@ -271,6 +271,9 @@ config PCI
-> >  config PCI_DOMAINS
-> >  	def_bool PCI
-> >
-> > +config PCI_DOMAINS_GENERIC
-> > +	def_bool PCI_DOMAINS
-> > +
-> >  config PCI_SYSCALL
-> >  	def_bool PCI
-> >
-> > diff --git a/arch/microblaze/pci/pci-common.c
-> > b/arch/microblaze/pci/pci-common.c
-> > index ae838ed..35654be 100644
-> > --- a/arch/microblaze/pci/pci-common.c
-> > +++ b/arch/microblaze/pci/pci-common.c
-> > @@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t
-> > address)  }  EXPORT_SYMBOL_GPL(pci_address_to_pio);
-> >
-> > -/*
-> > - * Return the domain number for this bus.
-> > - */
-> > -int pci_domain_nr(struct pci_bus *bus) -{
-> > -	struct pci_controller *hose = pci_bus_to_host(bus);
-> > -
-> > -	return hose->global_number;
-> > -}
-> > -EXPORT_SYMBOL(pci_domain_nr);
-> > -
-> >  /* This routine is meant to be used early during boot, when the
-> >   * PCI bus numbers have not yet been assigned, and you need to
-> >   * issue PCI config cycles to an OF device.
-> > @@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus
-> > *bus)
-> >
-> >  void pcibios_fixup_bus(struct pci_bus *bus)  {
-> > -	/* When called from the generic PCI probe, read PCI<->PCI bridge
-> > -	 * bases. This is -not- called when generating the PCI tree from
-> > -	 * the OF device-tree.
-> > -	 */
-> > -	if (bus->self != NULL)
-> > -		pci_read_bridge_bases(bus);
-> > -
-> > -	/* Now fixup the bus bus */
-> > -	pcibios_setup_bus_self(bus);
-> > -
-> > -	/* Now fixup devices on that bus */
-> > -	pcibios_setup_bus_devices(bus);
-> > +	/* nothing to do */
-> >  }
-> >  EXPORT_SYMBOL(pcibios_fixup_bus);
-> >
-> > -static int skip_isa_ioresource_align(struct pci_dev *dev) -{
-> > -	return 0;
-> > -}
-> > -
-> >  /*
-> >   * We need to avoid collisions with `mirrored' VGA ports
-> >   * and other strange ISA hardware, so we always want the @@ -899,20
-> > +872,18 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
-> > resource_size_t pcibios_align_resource(void *data, const struct resource
-> *res,
-> >  				resource_size_t size, resource_size_t align)  {
-> > -	struct pci_dev *dev = data;
-> > -	resource_size_t start = res->start;
-> > -
-> > -	if (res->flags & IORESOURCE_IO) {
-> > -		if (skip_isa_ioresource_align(dev))
-> > -			return start;
-> > -		if (start & 0x300)
-> > -			start = (start + 0x3ff) & ~0x3ff;
-> > -	}
-> > -
-> > -	return start;
-> > +	return res->start;
-> >  }
-> >  EXPORT_SYMBOL(pcibios_align_resource);
-> >
-> > +int pcibios_add_device(struct pci_dev *dev) {
-> > +	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > +
-> > +	return 0;
-> > +}
-> > +EXPORT_SYMBOL(pcibios_add_device);
-> > +
-> >  /*
-> >   * Reparent resource children of pr that conflict with res
-> >   * under res, and make res replace those children.
-> > @@ -1333,13 +1304,6 @@ static void pcibios_setup_phb_resources(struct
-> pci_controller *hose,
-> >  		 (unsigned long)hose->io_base_virt - _IO_BASE);  }
-> >
-> > -struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus) -{
-> > -	struct pci_controller *hose = bus->sysdata;
-> > -
-> > -	return of_node_get(hose->dn);
-> > -}
-> > -
-> >  static void pcibios_scan_phb(struct pci_controller *hose)  {
-> >  	LIST_HEAD(resources);
-> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig index
-> > d5e58ba..7c56c2e 100644
-> > --- a/drivers/pci/host/Kconfig
-> > +++ b/drivers/pci/host/Kconfig
-> > @@ -79,7 +79,7 @@ config PCI_KEYSTONE
-> >
-> >  config PCIE_XILINX
-> >  	bool "Xilinx AXI PCIe host bridge support"
-> > -	depends on ARCH_ZYNQ
-> > +	depends on ARCH_ZYNQ || MICROBLAZE
-> >  	help
-> >  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
-> >  	  Host Bridge driver.
-> >
-> 
-> Less code in arch is better.
-> 
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> Bjorn: Please take this via your tree.
-> 
-> Thanks,
-> Michal
+I'm actually redoing the series since the Arria10 IRQ handling is 
+significantly different.
+
+Since this change will affect the bindings and dti (the eccmgr will have 
+the IRQs), please disregard this series.
+
+Sorry for the noise.
+
+Thor
