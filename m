@@ -1,67 +1,60 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Tue, 8 Mar 2016 19:09:21 +0800
-Subject: [PATCH v5 5/6] dt/bindings: rockchip: modify document of Rockchip
- power domains
-In-Reply-To: <1456992557-25331-1-git-send-email-zhangqing@rock-chips.com>
-References: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
- <1456992557-25331-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <56DEB2E1.6060808@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue,  8 Mar 2016 12:15:11 +0100
+Subject: [PATCH 3/7] mtd: nand: sunxi: make cur_off parameter optional in
+ extra oob helpers
+In-Reply-To: <1457435715-24740-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1457435715-24740-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1457435715-24740-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Allow for NULL cur_offs values when the caller does not know where the
+NAND page register pointer point to.
 
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/sunxi_nand.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-? 2016?03?03? 16:09, Elaine Zhang ??:
-> Add binding documentation for the power domains
-> found on Rockchip RK3399 SoCs.
-> RK3399 pd on/off not need to enable clk which in this pd.
-> So remove the clocks in the rk3399 pd example.
->
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->   .../bindings/soc/rockchip/power_domain.txt         | 37 ++++++++++++++++++++++
->   1 file changed, 37 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-> index 13dc6a3..98085c8 100644
-> --- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-> @@ -7,6 +7,7 @@ Required properties for power domain controller:
->   - compatible: Should be one of the following.
-[....]
->   
->   Example of the node using power domain:
->   
-> @@ -65,3 +96,9 @@ Example of the node using power domain:
->                   power-domains = <&power RK3368_PD_GPU_1>;
->                   /* ... */
->           };
-> +
-> +	node {
-> +		/* ... */
-> +		power-domains = <&power RK3399_PD_VOPB>;
-> +		/* ... */
-> +	};
-
-Trivial: typo
-                 power: power-controller {
-@@ -92,10 +92,10 @@ Example of the node using power domain:
-         };
-
-         node {
--                /* ... */
--                power-domains = <&power RK3368_PD_GPU_1>;
--                /* ... */
--        };
-+               /* ... */
-+               power-domains = <&power RK3368_PD_GPU_1>;
-+               /* ... */
-+       };
-
-
-
-
-
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 7b3ae72..07c3af7 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -957,7 +957,7 @@ static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
+ 	if (len <= 0)
+ 		return;
+ 
+-	if (*cur_off != offset)
++	if (!cur_off || *cur_off != offset)
+ 		nand->cmdfunc(mtd, NAND_CMD_RNDOUT,
+ 			      offset + mtd->writesize, -1);
+ 
+@@ -967,7 +967,8 @@ static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
+ 		sunxi_nfc_randomizer_read_buf(mtd, oob + offset, len,
+ 					      false, page);
+ 
+-	*cur_off = mtd->oobsize + mtd->writesize;
++	if (cur_off)
++		*cur_off = mtd->oobsize + mtd->writesize;
+ }
+ 
+ static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
+@@ -1022,13 +1023,14 @@ static void sunxi_nfc_hw_ecc_write_extra_oob(struct mtd_info *mtd,
+ 	if (len <= 0)
+ 		return;
+ 
+-	if (*cur_off != offset)
++	if (!cur_off || *cur_off != offset)
+ 		nand->cmdfunc(mtd, NAND_CMD_RNDIN,
+ 			      offset + mtd->writesize, -1);
+ 
+ 	sunxi_nfc_randomizer_write_buf(mtd, oob + offset, len, false, page);
+ 
+-	*cur_off = mtd->oobsize + mtd->writesize;
++	if (cur_off)
++		*cur_off = mtd->oobsize + mtd->writesize;
+ }
+ 
+ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
 -- 
-Thanks,
-Caesar
+2.1.4
