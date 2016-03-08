@@ -1,99 +1,83 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 8 Mar 2016 10:27:38 -0800
-Subject: [PATCH v2 0/5] arm64: kernel: Add support for User Access Override
-In-Reply-To: <20160308182212.GI6192@e104818-lin.cambridge.arm.com>
-References: <1454684330-892-1-git-send-email-james.morse@arm.com>
- <56DDAFA7.4090207@arm.com>
- <20160307173835.GB6192@e104818-lin.cambridge.arm.com>
- <CAGXu5jKNdisc7AOZBZj5ZbHLfdZPoF5pZ+N1SQjzdDnvQbfyzA@mail.gmail.com>
- <20160308171902.GE6192@e104818-lin.cambridge.arm.com>
- <CAGXu5jJgL6yO2dFScePtwUvo_QPcfhhdROb35JhZ8_svT8u5mw@mail.gmail.com>
- <20160308182212.GI6192@e104818-lin.cambridge.arm.com>
-Message-ID: <CAGXu5j+XQj505hS_+ZS1kKkX5Wm4c9FBtiU=qxzdP5ts1guu5A@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 8 Mar 2016 19:39:10 +0100
+Subject: Fix preempt-rt on AT91
+In-Reply-To: <20160308110639.GC21842@linutronix.de>
+References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160118174259.GC12309@linutronix.de>
+ <20160305113553.GB21216@piout.net>
+ <20160308110639.GC21842@linutronix.de>
+Message-ID: <20160308183910.GD5845@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 8, 2016 at 10:22 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Mar 08, 2016 at 09:39:27AM -0800, Kees Cook wrote:
->> On Tue, Mar 8, 2016 at 9:19 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Mon, Mar 07, 2016 at 12:54:33PM -0800, Kees Cook wrote:
->> >> On Mon, Mar 7, 2016 at 9:38 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> > (cc'ing Kees)
->> >> >
->> >> > On Mon, Mar 07, 2016 at 04:43:19PM +0000, James Morse wrote:
->> >> >> I've just spotted UAO causes the test_user_copy module (CONFIG_TEST_USER_COPY)
->> >> >> to fail. Who to blame is up for discussion. The test is passing a user pointer
->> >> >> as the 'to' field of copy_from_user(), which it expects to fail gracefully:
->> >> >>
->> >> >> lib/test_user_copy.c:75
->> >> >> >     /* Invalid usage: none of these should succeed. */
->> >> >> [ ... ]
->> >> >> >     ret |= test(!copy_from_user(bad_usermem, (char __user *)kmem,
->> >> >> >                                 PAGE_SIZE),
->> >> >> >                 "illegal reversed copy_from_user passed");
->> >> >> >
->> >> >>
->> >> >> access_ok() catches the "(char __user *)kmem", causing copy_from_user() to pass
->> >> >> bad_usermem to memset():
->> >> >>
->> >> >> arch/arm64/include/asm/uaccess.h:279
->> >> >> >     if (access_ok(VERIFY_READ, from, n))
->> >> >> >             n = __copy_from_user(to, from, n);
->> >> >> >     else /* security hole - plug it */
->> >> >> >             memset(to, 0, n);
->> >> >>
->> >> >> This (correctly) trips UAO's "Accessing user space memory outside uaccess.h
->> >> >> routines" message, which is a little confusing to debug, and stops the rest of
->> >> >> the module's tests from being run.
->> >> >
->> >> > I suggest we don't do anything on arch/arm64 (or arch/arm), I just
->> >> > consider the test to be broken. The semantics of copy_from_user() don't
->> >> > say anything about the safety checks on the destination pointer, this is
->> >> > supposed to be a valid kernel address. The test assumes that if the
->> >> > source pointer is invalid, the copy_from_user() routine should not touch
->> >> > the destination.
->> >>
->> >> Hmmm, I'd prefer that copy_*_user was checking both src and
->> >> destination. That's what these tests are checking for.
->> >
->> > If the kernel pointer (source or destination, depending on the function)
->> > is not valid, I would rather panic the kernel (maybe as a result of a
->> > data abort) than silently returning a non-zero value from
->> > copy_from_user() which doesn't even tell whether the source or
->> > destination pointer is wrong.
->> >
->> > The copy_*_user functions are indeed meant to check the validity of user
->> > pointer arguments and safely handle aborts (extable annotations) since
->> > these values are usually provided by user space. But the kernel pointer
->> > arguments are under the control of the kernel, so IMO passing a corrupt
->> > value is a serious kernel/driver bug.
->>
->> I'm totally fine with that, though I suspect Linus would not like this
->> (perhaps just Oops instead of panic).
->
-> That's what we get on arm64 with PAN enabled (oops).
->
->> Regardless, if that was changed, we could move this entire test into
->> lkdtm (where system panics are considered a "success").
->
-> The only downside is that not all architectures behave in the same way
-> w.r.t. the copy_*_user() routines, so the test may have some surprises
-> with the oops not being triggered.
+Hi,
 
-Right. I think if the tests were moved to lkdtm, we could do the
-checks in a few stages, where lkdtm would generate the Oops if
-copy_*_user correctly errored/ignored the bad combo without Oopsing on
-its own.
+On 08/03/2016 at 12:06:39 +0100, Sebastian Andrzej Siewior wrote :
+> I sucked this in. It seems to work. What remains that free_irq() thingy:
+> |WARNING: CPU: 0 PID: 0 at kernel/irq/manage.c:1541 __free_irq+0xb4/0x2e0()
+> |Trying to free already-free IRQ 16
+> |CPU: 0 PID: 0 Comm: swapper Not tainted 4.4.4-rt10+ #219
+> |Hardware name: Atmel SAMA5
+> |[<c0015bd0>] (unwind_backtrace) from [<c0013604>] (show_stack+0x10/0x14)
+> |[<c0013604>] (show_stack) from [<c002b850>] (warn_slowpath_common+0x80/0xac)
+> |[<c002b850>] (warn_slowpath_common) from [<c002b8ac>] (warn_slowpath_fmt+0x30/0x40)
+> |[<c002b8ac>] (warn_slowpath_fmt) from [<c005adfc>] (__free_irq+0xb4/0x2e0)
+> |[<c005adfc>] (__free_irq) from [<c005b0a0>] (free_irq+0x30/0x4c)
+> |[<c005b0a0>] (free_irq) from [<c0429034>] (pit_clkevt_shutdown+0x24/0x2c)
+> |[<c0429034>] (pit_clkevt_shutdown) from [<c0076430>] (clockevents_switch_state+0x60/0x130)
+> |---[ end trace 0000000000000001 ]---
+> 
+> which is a different problem and was there. The new thing is this:
+> 
+> |WARNING: CPU: 0 PID: 1 at kernel/locking/rtmutex.c:2062 rt_mutex_trylock+0x30/0x108)
+> |Modules linked in:
+> |CPU: 0 PID: 1 Comm: swapper Tainted: G        W       4.4.4-rt10+ #219
+> |Hardware name: Atmel SAMA5
+> |[<c0015bd0>] (unwind_backtrace) from [<c0013604>] (show_stack+0x10/0x14)
+> |[<c0013604>] (show_stack) from [<c002b850>] (warn_slowpath_common+0x80/0xac)
+> |[<c002b850>] (warn_slowpath_common) from [<c002b918>] (warn_slowpath_null+0x1c/0x24)
+> |[<c002b918>] (warn_slowpath_null) from [<c054a54c>] (rt_mutex_trylock+0x30/0x108)
+> |[<c054a54c>] (rt_mutex_trylock) from [<c054bd0c>] (rt_spin_trylock_irqsave+0x10/0x1c)
+> |[<c054bd0c>] (rt_spin_trylock_irqsave) from [<c043e030>] (clk_enable_lock+0x18/0x114)
+> |[<c043e030>] (clk_enable_lock) from [<c043f600>] (clk_disable+0x1c/0x34)
+> |[<c043f600>] (clk_disable) from [<c0429188>] (tc_shutdown+0x34/0x3c)
+> |[<c0429188>] (tc_shutdown) from [<c04291b0>] (tc_set_oneshot+0x20/0x50)
+> |[<c04291b0>] (tc_set_oneshot) from [<c00764a4>] (clockevents_switch_state+0xd4/0x130)
+> |[<c00764a4>] (clockevents_switch_state) from [<c00773e8>] (tick_switch_to_oneshot+0x48/0xb8)
+> |[<c00773e8>] (tick_switch_to_oneshot) from [<c006a480>] (hrtimer_run_queues+0x48/0x108)
+> |[<c006a480>] (hrtimer_run_queues) from [<c0068dd8>] (update_process_times+0x2c/0x64)
+> |[<c0068dd8>] (update_process_times) from [<c0076ad0>] (tick_handle_periodic+0x1c/0x90)
+> |[<c0076ad0>] (tick_handle_periodic) from [<c0429274>] (ch2_irq+0x20/0x28)
+> |[<c0429274>] (ch2_irq) from [<c005a39c>] (handle_irq_event_percpu+0x74/0x16c)
+> 
+> Is it possible to drop this disable/enable clock on the switch from pit
+> to one shot mode?
+> 
 
-> Anyway, I think the test should also check the invalid
-> source/destination independently (possibly in combination with
-> set_fs(KERNEL_DS)).
+Both are things to work on. In the mean time, I'm using the following
+patch:
+https://github.com/alexandrebelloni/linux/commit/3a2eae463fce18ae815b887a5c9ca1a657b180ac
 
-I'm open to whatever you like. :)
+I understood from
+http://lkml.iu.edu/hypermail/linux/kernel/1601.2/00941.html that this
+was not your preferred course of action.
 
--Kees
+Even if that is something that is only seen when using preempt-rt, that
+is probably something I should push mainline.
+
+> >You may also stop at 99a81706526fb167029a940ef1f7bfbe882abd3e which
+> >should solve the crash but it has not been tested as thoroughly.
+> 
+> Did you confuse the sha1 with something? This patch is called ("clk:
+> at91: remove IRQ handling and use polling") and is part of the series
+> you gave (patch #3).
+> 
+
+Yeah, what I meant is that you could stop merging after that patch as
+this is the one solving the crash.
+
 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
