@@ -1,40 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 8 Mar 2016 09:58:24 +0100
-Subject: [PATCH v2] ARM: dts: add "simple-bus" where "arm,amba-bus" is
- used alone
-In-Reply-To: <CAL_JsqJvT+4efH-+_EhehzwhHZsrYTX8pa1NLsg_Wn4YReN4Ag@mail.gmail.com>
-References: <1457415977-3401-1-git-send-email-yamada.masahiro@socionext.com>
- <CAL_JsqJvT+4efH-+_EhehzwhHZsrYTX8pa1NLsg_Wn4YReN4Ag@mail.gmail.com>
-Message-ID: <CAMuHMdWwCdFSN7tAMa7ffjhSFD2DppV4SrzFB0pmshYvA2RYmw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Mar 2016 16:01:45 +0700
+Subject: [PATCH 1/2] pinctrl: sunxi: Remove non existing irq's
+In-Reply-To: <bd43820c6708d57ff2997dccd588faa28da11990.1456698862.git.henry@nitronetworks.nl>
+References: <cover.1456698862.git.henry@nitronetworks.nl>
+ <bd43820c6708d57ff2997dccd588faa28da11990.1456698862.git.henry@nitronetworks.nl>
+Message-ID: <CACRpkdYBSdriGZgJT9S1Dhmw-wpDOycEtRM-wWby2HmGekUj1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 8, 2016 at 9:49 AM, Rob Herring <robh+dt@kernel.org> wrote:
->> diff --git a/arch/arm/boot/dts/axm55xx.dtsi b/arch/arm/boot/dts/axm55xx.dtsi
->> index ea288f0..8da4582 100644
->> --- a/arch/arm/boot/dts/axm55xx.dtsi
->> +++ b/arch/arm/boot/dts/axm55xx.dtsi
->> @@ -107,7 +107,7 @@
->>                 };
->>
->>                 amba {
->> -                       compatible = "arm,amba-bus";
->> +                       compatible = "arm,amba-bus", "simple-bus";
+On Mon, Feb 29, 2016 at 6:13 AM, Henry Paulissen <henry@nitronetworks.nl> wrote:
+
+> While I was testing irq's on the cubietruck I found a couple of
+> not working irq pins. Further diving into the problem it opened
+> up a mess called "manual".
 >
-> As I mentioned in the last version, I think you should remove
-> arm,amba-bus and just have simple-bus. I don't believe anything relies
-> on having arm,amba-bus.
+> This so called manual (A20 user manual v1.3 dated 2014-10-10) says:
+>
+> Pin overview:
+>     Page 233:       EINT12 is on pin PC19 mux6.
+>     Page 236:       EINT12 is on pin PH12 mux6.
+>
+> Now, it is a bit strange to have the same IRQ on 2 different pins,
+> but I guess this could still be possible hardware wise. But then:
+>
+> Pin registers:
+>     Page 253:       EINT12 is *not* on pin PC19.
+>     Page 281:       EINT12 is on pin PH12.
+>
+> The manual is so contradicting that further tests had to be made
+> to see which of the 2 statements where correct.
+>
+> This patch is based on actual outcome of these tests and not what
+> the manual says.
+>
+> Test procedure used:
+>
+> Connect a 1 pulse per second (GPS) line to the pin.
+>
+> echo pin### > /sys/class/gpio/export
+> echo in > /sys/class/gpio/gpio###/direction
+> echo rising > /sys/class/gpio/gpio###/edge
+>
+> Check /proc/interrupts if a irq was attached and if irq's where
+> received.
+>
+> Signed-off-by: Henry Paulissen <henry@nitronetworks.nl>
 
-It may have a side-effect: currently "arm.amba-bus" is only treated equivalent
-to  "simple-bus" if CONFIG_ARM_AMBA is enabled.
+Patch applied with Maxime's ACK.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
