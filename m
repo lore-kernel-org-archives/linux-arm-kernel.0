@@ -1,59 +1,69 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 8 Mar 2016 10:49:37 +0000
-Subject: [PATCH] Fix NULL ptr dereference in pci_bus_assign_domain_nr()
- on ARM
-In-Reply-To: <20160308042427.GA20580@localhost>
-References: <m337sapw89.fsf@t19.piap.pl> <20160307223311.GB26149@localhost>
- <20160308030106.GA18190@red-moon>
- <20160308042427.GA20580@localhost>
-Message-ID: <20160308104937.GA18919@red-moon>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 8 Mar 2016 11:53:06 +0100
+Subject: [linux-sunxi] Re: [PATCH v4 1/2] ehci-platform: Add support for
+ controllers with multiple reset lines
+In-Reply-To: <20160305200250.GA24790@kroah.com>
+References: <1456592339-31767-1-git-send-email-hdegoede@redhat.com>
+ <1456592339-31767-2-git-send-email-hdegoede@redhat.com>
+ <20160304043559.GA21743@kroah.com> <56D938DE.10409@redhat.com>
+ <20160305200250.GA24790@kroah.com>
+Message-ID: <56DEAF12.2050802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 10:24:27PM -0600, Bjorn Helgaas wrote:
+Hi,
 
-[...]
+On 05-03-16 21:02, Greg Kroah-Hartman wrote:
+> On Fri, Mar 04, 2016 at 08:27:26AM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 04-03-16 05:35, Greg Kroah-Hartman wrote:
+>>> On Sat, Feb 27, 2016 at 05:58:58PM +0100, Hans de Goede wrote:
+>>>> From: Reinder de Haan <patchesrdh@mveas.com>
+>>>>
+>>>> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+>>>> reset lines, the controller will not initialize while the reset for
+>>>> its companion is still asserted, which means we need to de-assert
+>>>> 2 resets for the controller to work.
+>>>>
+>>>> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>>>> Acked-by: Rob Herring <robh@kernel.org>
+>>>> ---
+>>>> Changes in v2:
+>>>> -Use the new reset_control_[de]assert_shared reset-controller functions
+>>>> Changes in v3:
+>>>> -Adjust for changes to shared-reset reset-controller functions
+>>>> Changes in v4:
+>>>> -Fix Ugly continuation line
+>>>
+>>> This breaks the build horribly :(
+>>>
+>>> As does patch 2/2, ugh.
+>>
+>> As said in the cover letter:
+>>
+>> "These patches apply on top of the related
+>> reset-controller patches which have just been merged here:
+>>
+>> git://git.pengutronix.de/git/pza/linux.git reset/next"
+>>
+>> I guess I should have done s/apply on top of/depend on/
+>> in the above bit. These patches apply fine without those
+>> changes, but indeed they will not build.
+>
+> Then I can't take them, you know this :(
+>
+>> You may want to ask Philipp Zabel (added to the To: list)
+>> to create a topic branch for this which you can merge into
+>> your tree.
+>
+> If you all want me to do that, fine, otherwise just resend them after
+> 4.6-rc1 is out and the build will not break at that time.
 
-> > > Actually, I did find one problem report:
-> > > http://forum.doozan.com/read.php?2,17868,22070,quote=1 from last May,
-> > > but apparently it got lost in a forum and never found its way
-> > > upstream.
-> > > 
-> > > I reworked the changelog because this problem will affect *any* arch
-> > > that enables CONFIG_PCI_DOMAINS_GENERIC and supplies NULL "parent"
-> > > pointers -- ia64, mips, mn10300, s390, x86, etc., would be affected if
-> > > they enabled CONFIG_PCI_DOMAINS_GENERIC.
-> > > 
-> > > I also added a "Fixes:" tag for 7c674700098c, since that's the commit
-> > > that added the generic code we're fixing.  Backports of 7c674700098c
-> > > should also backport this change.
-> > 
-> > That's really unfortunate, when I moved code from arm64 to generic I
-> > did not spot this issue in the original code and carried it over, you
-> > summarized the reasons in the commit log so without any further ado (and
-> > with my apologies):
-> > 
-> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> No worries, it just goes with the territory.  What surprises me is
-> that it took us so long to notice.  v4.0 was released almost a year
-> ago (April 12, 2015), so I can't figure out how nobody noticed until
-> now.
-> 
-> And I don't know what happened with the problem report in the forum.
-> That's a case where somebody *did* notice, but I guess they just gave
-> up on v4.0 and went back to v3.18.  What a shame :)  I don't know if
-> people just have low expectations of Linux, or they feel like it's too
-> hard to report bugs, or we don't make it easy enough, or we're not
-> approachable enough, or what.  I notice that many times somebody finds
-> a workaround, and people seem satisfied with that, and we don't get a
-> chance to fix the real problem.
+Ok I will resend these after 4.6-rc1
 
-I agree it is a pity the problem was not reported upstream which would
-have solved the issue (that I should have spotted anyway while moving
-the code) a long time ago, unfortunately I think it has to do with
-how often developers/distros upgrade their kernels on these boards/socs
-and how they interact with upstream, which is a discussion worth having.
+Regards,
 
-Thank you !
-Lorenzo
+Hans
