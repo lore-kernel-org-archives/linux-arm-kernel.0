@@ -1,43 +1,51 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 8 Mar 2016 02:49:27 -0600
-Subject: [PATCH v2] ARM: dts: add "simple-bus" where "arm,amba-bus" is
- used alone
-In-Reply-To: <1457415977-3401-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1457415977-3401-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAL_JsqJvT+4efH-+_EhehzwhHZsrYTX8pa1NLsg_Wn4YReN4Ag@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 8 Mar 2016 09:54:50 +0100
+Subject: [PATCH RESEND] Documentation: devicetree: Clean up gpio-keys
+ example
+In-Reply-To: <1457375055-5544-1-git-send-email-afaerber@suse.de>
+References: <1457375055-5544-1-git-send-email-afaerber@suse.de>
+Message-ID: <CAMuHMdVMVYaygvKd3qgTz2fF9SuLA_zEYRoZZrJO+2zmP=jxag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 7, 2016 at 11:46 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> The compatible string "simple-bus" is well defined in ePAPR, while
-> I see no documentation for the "arm,amba-bus" in ePAPR or under
-> Documentation/devicetree/.
+On Mon, Mar 7, 2016 at 7:24 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Drop #address-cells and #size-cells, which are not required by the
+> gpio-keys binding documentation, as button sub-nodes are not devices.
 >
-> DT is also used by other projects than Linux kernel.  It is not a
-> good idea to rely on such an unofficial binding.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
+>  Documentation/devicetree/bindings/input/gpio-keys.txt | 2 --
+>  1 file changed, 2 deletions(-)
 >
-> Changes in v2:
->   - Rephrase the git-log
-
-[...]
-
-> diff --git a/arch/arm/boot/dts/axm55xx.dtsi b/arch/arm/boot/dts/axm55xx.dtsi
-> index ea288f0..8da4582 100644
-> --- a/arch/arm/boot/dts/axm55xx.dtsi
-> +++ b/arch/arm/boot/dts/axm55xx.dtsi
-> @@ -107,7 +107,7 @@
->                 };
+> diff --git a/Documentation/devicetree/bindings/input/gpio-keys.txt b/Documentation/devicetree/bindings/input/gpio-keys.txt
+> index 21641236c095..1552a11f6786 100644
+> --- a/Documentation/devicetree/bindings/input/gpio-keys.txt
+> +++ b/Documentation/devicetree/bindings/input/gpio-keys.txt
+> @@ -34,8 +34,6 @@ Example nodes:
 >
->                 amba {
-> -                       compatible = "arm,amba-bus";
-> +                       compatible = "arm,amba-bus", "simple-bus";
+>         gpio_keys {
+>                         compatible = "gpio-keys";
+> -                       #address-cells = <1>;
+> -                       #size-cells = <0>;
+>                         autorepeat;
+>                         button at 21 {
 
-As I mentioned in the last version, I think you should remove
-arm,amba-bus and just have simple-bus. I don't believe anything relies
-on having arm,amba-bus.
+FYI, with "[PATCH] scripts/dtc: Update to upstream version 53bf130b1cdd":
+(http://www.spinics.net/lists/devicetree/msg117206.html) applied:
 
-Rob
+Warning (unit_address_vs_reg): Node /keyboard/button at 21 has a unit
+name, but no reg property
+
+>                                 label = "GPIO Key UP";
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
