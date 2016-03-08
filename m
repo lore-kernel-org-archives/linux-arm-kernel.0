@@ -1,49 +1,38 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 8 Mar 2016 16:49:02 +0000
-Subject: [GIT PULL] ARM: dts: vexpress: fixes for v4.6
-Message-ID: <56DF027E.3070807@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 8 Mar 2016 17:51:47 +0100
+Subject: [PATCH] ARM: mvebu: Fix of_clk_get() call in a non sleeping
+ context
+In-Reply-To: <8760wx3oy4.fsf@free-electrons.com>
+References: <1457446733-7137-1-git-send-email-gregory.clement@free-electrons.com>
+ <20160308164117.2a3ed3a7@free-electrons.com>
+ <87a8m93pt0.fsf@free-electrons.com>
+ <20160308173134.22a3ad64@free-electrons.com>
+ <8760wx3oy4.fsf@free-electrons.com>
+Message-ID: <20160308175147.7203734e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
+Hello,
 
-Sorry for the late pull request, but these DTC checks were introduced in
--next last Friday. Please consider pulling this for v4.6
+On Tue, 08 Mar 2016 17:38:11 +0100, Gregory CLEMENT wrote:
 
-Regards,
-Sudeep
+> And from clk_enable comment we have:
+> ""
+> clk_enable must not sleep, which differentiates it from clk_prepare.  In a
+> simple case, clk_enable can be used instead of clk_prepare to ungate a clk
+> if the operation will never sleep.
+> ""
+> 
+> Moreoever for me the "must" was to insist to the order of the call no to
+> the fact that both must be called.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+Right make sense, thanks for correcting me on this. If that's OK from a
+clock maintainer point of view, I'm fine.
 
-   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+Thanks!
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
-tags/vexpress-for-v4.6/armv7-dt-updates
-
-for you to fetch changes up to 929d755dbda796003a2eac981958def545efedf0:
-
-   ARM: dts: vexpress: fix node name unit-address presence warnings 
-(2016-03-08 14:52:34 +0000)
-
-----------------------------------------------------------------
-Update for ARM VExpress platforms
-
-Just one update to fix node name unit-address presence/absence mismatch
-warnings in all the Vexpress device trees.
-
-----------------------------------------------------------------
-Sudeep Holla (1):
-       ARM: dts: vexpress: fix node name unit-address presence warnings
-
-  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi     | 44 
-++++++++++++++---------------
-  arch/arm/boot/dts/vexpress-v2m.dtsi         | 44 
-++++++++++++++---------------
-  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts | 34 +++++++++++-----------
-  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  | 44 
-++++++++++++++---------------
-  arch/arm/boot/dts/vexpress-v2p-ca5s.dts     | 24 ++++++++--------
-  arch/arm/boot/dts/vexpress-v2p-ca9.dts      | 28 +++++++++---------
-  6 files changed, 109 insertions(+), 109 deletions(-)
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
