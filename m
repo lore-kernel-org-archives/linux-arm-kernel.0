@@ -1,58 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 8 Mar 2016 09:42:24 -0700
-Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
- groups.
-In-Reply-To: <CACRpkdYzSt=R7j9GLSY39CsyMKLjqRYnP_31ti5jWiGngJacqA@mail.gmail.com>
-References: <1456510756-15337-1-git-send-email-eric@anholt.net>
- <1456510756-15337-3-git-send-email-eric@anholt.net>
- <CACRpkdYzSt=R7j9GLSY39CsyMKLjqRYnP_31ti5jWiGngJacqA@mail.gmail.com>
-Message-ID: <56DF00F0.3080801@wwwdotorg.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 8 Mar 2016 16:48:52 +0000
+Subject: [GIT PULL] arm64: dts: vexpress/juno: Updates for v4.6(part 2)
+Message-ID: <56DF0274.1060007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2016 01:24 AM, Linus Walleij wrote:
-> On Sat, Feb 27, 2016 at 1:19 AM, Eric Anholt <eric@anholt.net> wrote:
->
->> Since all of these pins were documented, we can use their names to
->> explain what's going on.
->>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->
->> +       pinctrl-0 = <&i2c0_gpio0
->> +                    &i2c1_gpio2
->> +                    &gpclk0_gpio4
->> +                    &gpclk1_gpio5
->> +                    &spi0_gpio7
->> +                    &pcm_gpio18
->> +                    &pwm0_gpio40
->> +                    &pwm1_gpio45
->> +                    &gpioout
->> +                    &alt3>;
->
-> Why are all of these done as hogs instead of being in pinctrl-0
-> "default" for the device that is using them? i2c1, gpclk0,
-> etc?
->
-> The only reason I see would be if they are unused or something.
+Hi ARM-SoC team,
 
-I think it makes sense to have the pinctrl driver (or even FW before the 
-kernel boots) set up everything at once where possible. That's the 
-easiest way to ensure there are never any conflicts in the pinmux table 
-(i.e. that two different pins don't end up being both muxed to SPI1's 
-MISO signal at the same time for a while before all the drivers probe). 
-Putting pinctrl entries into individual devices only makes sense to me 
-when one of:
+Sorry for the late pull request.
 
-a) That device needs to dynamically change the pinmux at run-time, e.g. 
-to switch between different states, so needs definitions of those 
-different states.
+There's one update for adding support for SBSA Watchdog to foundation
+model that caused conflict as it was merged via watchdog tree. I am
+pulling that now to avoid conflicts and I also have a patch to fix DT
+warnings that new checks in DTS introduced since last Friday. Please
+consider pulling this for v4.6
 
-or:
+Regards,
+Sudeep
 
-b) The initial pinmux is guaranteed set up to a safe non-conflicting 
-state that enables very little, and we need to defer enabling various 
-peripherals until a later time when we know the peripheral is in use, 
-e.g. when loading a DT overlay from user-space.
 
-On the RPi there are certain peripherals that fall into each category, 
-e.g. SD card is always used, I2S only optionally used.
+The following changes since commit 9fd9288ed0899f9e318a97d73e777d6d3357265e:
+
+   arm64: dts: Add HDLCD support on Juno platforms (2016-02-10 10:58:33 
++0000)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
+tags/vexpress-for-v4.6/dt-updates-2
+
+for you to fetch changes up to 6d6acd140ab3d46348ec3a9dbfd386d9ca42b825:
+
+   arm64: dts: juno/vexpress: fix node name unit-address presence 
+warnings (2016-03-08 13:54:27 +0000)
+
+----------------------------------------------------------------
+Additional updates for ARM VExpress/Juno platforms
+
+1. Add support for SBSA Generic Watchdog on foundation models
+
+2. Fix node name unit-address presence/absence mismatch warnings in
+    all the device trees
+
+----------------------------------------------------------------
+Fu Wei (1):
+       arm64: dts: foundation-v8: add SBSA Generic Watchdog device node
+
+Sudeep Holla (1):
+       arm64: dts: juno/vexpress: fix node name unit-address presence 
+warnings
+
+  arch/arm64/boot/dts/arm/foundation-v8.dtsi         | 10 +++++++-
+  arch/arm64/boot/dts/arm/juno-base.dtsi             | 14 +++++-----
+  arch/arm64/boot/dts/arm/juno-motherboard.dtsi      | 30 
++++++++++++-----------
+  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts         |  2 +-
+  arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi   | 14 +++++-----
+  .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 10 ++++----
+  6 files changed, 44 insertions(+), 36 deletions(-)
