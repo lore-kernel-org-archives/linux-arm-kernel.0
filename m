@@ -1,123 +1,70 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Tue, 8 Mar 2016 18:59:26 +0800
-Subject: [PATCH v5 6/6] rockchip: power-domain: Modify power domain driver
- for rk3399
-In-Reply-To: <1456992591-25383-1-git-send-email-zhangqing@rock-chips.com>
-References: <1456992233-25164-1-git-send-email-zhangqing@rock-chips.com>
- <1456992591-25383-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <56DEB08E.5060805@gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 8 Mar 2016 12:06:39 +0100
+Subject: Fix preempt-rt on AT91
+In-Reply-To: <20160305113553.GB21216@piout.net>
+References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160118174259.GC12309@linutronix.de>
+ <20160305113553.GB21216@piout.net>
+Message-ID: <20160308110639.GC21842@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Alexandre Belloni | 2016-03-05 12:35:53 [+0100]:
 
+>Hi Sebastian,
+Hi Alexandre,
 
-? 2016?03?03? 16:09, Elaine Zhang ??:
-> This driver is modified to support RK3399 SoC.
->
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+>The series landed in arm-soc and is making its way to v4.6. I guess you
+>can pull the original pull request. It is based on v4.5-rc1 but should
+>apply cleanly on v4.4:
 
-Reviewed-by: Caesar Wang  <wxt@rock-chips.com>
+I sucked this in. It seems to work. What remains that free_irq() thingy:
+|WARNING: CPU: 0 PID: 0 at kernel/irq/manage.c:1541 __free_irq+0xb4/0x2e0()
+|Trying to free already-free IRQ 16
+|CPU: 0 PID: 0 Comm: swapper Not tainted 4.4.4-rt10+ #219
+|Hardware name: Atmel SAMA5
+|[<c0015bd0>] (unwind_backtrace) from [<c0013604>] (show_stack+0x10/0x14)
+|[<c0013604>] (show_stack) from [<c002b850>] (warn_slowpath_common+0x80/0xac)
+|[<c002b850>] (warn_slowpath_common) from [<c002b8ac>] (warn_slowpath_fmt+0x30/0x40)
+|[<c002b8ac>] (warn_slowpath_fmt) from [<c005adfc>] (__free_irq+0xb4/0x2e0)
+|[<c005adfc>] (__free_irq) from [<c005b0a0>] (free_irq+0x30/0x4c)
+|[<c005b0a0>] (free_irq) from [<c0429034>] (pit_clkevt_shutdown+0x24/0x2c)
+|[<c0429034>] (pit_clkevt_shutdown) from [<c0076430>] (clockevents_switch_state+0x60/0x130)
+|---[ end trace 0000000000000001 ]---
 
-> ---
->   drivers/soc/rockchip/pm_domains.c | 55 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 55 insertions(+)
->
-> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-> index 1777e8e..8cdd877 100644
-> --- a/drivers/soc/rockchip/pm_domains.c
-> +++ b/drivers/soc/rockchip/pm_domains.c
-> @@ -19,6 +19,7 @@
->   #include <linux/mfd/syscon.h>
->   #include <dt-bindings/power/rk3288-power.h>
->   #include <dt-bindings/power/rk3368-power.h>
-> +#include <dt-bindings/power/rk3399-power.h>
->   
->   struct rockchip_domain_info {
->   	int pwr_mask;
-> @@ -79,6 +80,9 @@ struct rockchip_pmu {
->   #define DOMAIN_RK3368(pwr, status, req)		\
->   	DOMAIN(pwr, status, req, (req) + 16, req)
->   
-> +#define DOMAIN_RK3399(pwr, status, req)                \
-> +	DOMAIN(pwr, status, req, req, req)
-> +
->   static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
->   {
->   	struct rockchip_pmu *pmu = pd->pmu;
-> @@ -535,6 +539,36 @@ static const struct rockchip_domain_info rk3368_pm_domains[] = {
->   	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
->   };
->   
-> +static const struct rockchip_domain_info rk3399_pm_domains[] = {
-> +	[RK3399_PD_TCPD0]	= DOMAIN_RK3399(8, 8, -1),
-> +	[RK3399_PD_TCPD1]	= DOMAIN_RK3399(9, 9, -1),
-> +	[RK3399_PD_CCI]	= DOMAIN_RK3399(10, 10, -1),
-> +	[RK3399_PD_CCI0]	= DOMAIN_RK3399(-1, -1, 15),
-> +	[RK3399_PD_CCI1]	= DOMAIN_RK3399(-1, -1, 16),
-> +	[RK3399_PD_PERILP]	= DOMAIN_RK3399(11, 11, 1),
-> +	[RK3399_PD_PERIHP]	= DOMAIN_RK3399(12, 12, 2),
-> +	[RK3399_PD_CENTER]	= DOMAIN_RK3399(13, 13, 14),
-> +	[RK3399_PD_VIO]	= DOMAIN_RK3399(14, 14, 17),
-> +	[RK3399_PD_GPU]	= DOMAIN_RK3399(15, 15, 0),
-> +	[RK3399_PD_VCODEC]	= DOMAIN_RK3399(16, 16, 3),
-> +	[RK3399_PD_VDU]	= DOMAIN_RK3399(17, 17, 4),
-> +	[RK3399_PD_RGA]	= DOMAIN_RK3399(18, 18, 5),
-> +	[RK3399_PD_IEP]	= DOMAIN_RK3399(19, 19, 6),
-> +	[RK3399_PD_VO]	= DOMAIN_RK3399(20, 20, -1),
-> +	[RK3399_PD_VOPB]	= DOMAIN_RK3399(-1, -1, 7),
-> +	[RK3399_PD_VOPL]	= DOMAIN_RK3399(-1, -1, 8),
-> +	[RK3399_PD_ISP0]	= DOMAIN_RK3399(22, 22, 9),
-> +	[RK3399_PD_ISP1]	= DOMAIN_RK3399(23, 23, 10),
-> +	[RK3399_PD_HDCP]	= DOMAIN_RK3399(24, 24, 11),
-> +	[RK3399_PD_GMAC]	= DOMAIN_RK3399(25, 25, 23),
-> +	[RK3399_PD_EMMC]	= DOMAIN_RK3399(26, 26, 24),
-> +	[RK3399_PD_USB3]	= DOMAIN_RK3399(27, 27, 12),
-> +	[RK3399_PD_EDP]	= DOMAIN_RK3399(28, 28, 22),
-> +	[RK3399_PD_GIC]	= DOMAIN_RK3399(29, 29, 27),
-> +	[RK3399_PD_SD]	= DOMAIN_RK3399(30, 30, 28),
-> +	[RK3399_PD_SDIOAUDIO]	= DOMAIN_RK3399(31, 31, 29),
-> +};
-> +
->   static const struct rockchip_pmu_info rk3288_pmu = {
->   	.pwr_offset = 0x08,
->   	.status_offset = 0x0c,
-> @@ -569,6 +603,23 @@ static const struct rockchip_pmu_info rk3368_pmu = {
->   	.domain_info = rk3368_pm_domains,
->   };
->   
-> +static const struct rockchip_pmu_info rk3399_pmu = {
-> +	.pwr_offset = 0x14,
-> +	.status_offset = 0x18,
-> +	.req_offset = 0x60,
-> +	.idle_offset = 0x64,
-> +	.ack_offset = 0x68,
-> +
-> +	.core_pwrcnt_offset = 0x9c,
-> +	.gpu_pwrcnt_offset = 0xa4,
-> +
-> +	.core_power_transition_time = 24,
-> +	.gpu_power_transition_time = 24,
-> +
-> +	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
-> +	.domain_info = rk3399_pm_domains,
-> +};
-> +
->   static const struct of_device_id rockchip_pm_domain_dt_match[] = {
->   	{
->   		.compatible = "rockchip,rk3288-power-controller",
-> @@ -578,6 +629,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
->   		.compatible = "rockchip,rk3368-power-controller",
->   		.data = (void *)&rk3368_pmu,
->   	},
-> +	{
-> +		.compatible = "rockchip,rk3399-power-controller",
-> +		.data = (void *)&rk3399_pmu,
-> +	},
->   	{ /* sentinel */ },
->   };
->   
+which is a different problem and was there. The new thing is this:
 
+|WARNING: CPU: 0 PID: 1 at kernel/locking/rtmutex.c:2062 rt_mutex_trylock+0x30/0x108)
+|Modules linked in:
+|CPU: 0 PID: 1 Comm: swapper Tainted: G        W       4.4.4-rt10+ #219
+|Hardware name: Atmel SAMA5
+|[<c0015bd0>] (unwind_backtrace) from [<c0013604>] (show_stack+0x10/0x14)
+|[<c0013604>] (show_stack) from [<c002b850>] (warn_slowpath_common+0x80/0xac)
+|[<c002b850>] (warn_slowpath_common) from [<c002b918>] (warn_slowpath_null+0x1c/0x24)
+|[<c002b918>] (warn_slowpath_null) from [<c054a54c>] (rt_mutex_trylock+0x30/0x108)
+|[<c054a54c>] (rt_mutex_trylock) from [<c054bd0c>] (rt_spin_trylock_irqsave+0x10/0x1c)
+|[<c054bd0c>] (rt_spin_trylock_irqsave) from [<c043e030>] (clk_enable_lock+0x18/0x114)
+|[<c043e030>] (clk_enable_lock) from [<c043f600>] (clk_disable+0x1c/0x34)
+|[<c043f600>] (clk_disable) from [<c0429188>] (tc_shutdown+0x34/0x3c)
+|[<c0429188>] (tc_shutdown) from [<c04291b0>] (tc_set_oneshot+0x20/0x50)
+|[<c04291b0>] (tc_set_oneshot) from [<c00764a4>] (clockevents_switch_state+0xd4/0x130)
+|[<c00764a4>] (clockevents_switch_state) from [<c00773e8>] (tick_switch_to_oneshot+0x48/0xb8)
+|[<c00773e8>] (tick_switch_to_oneshot) from [<c006a480>] (hrtimer_run_queues+0x48/0x108)
+|[<c006a480>] (hrtimer_run_queues) from [<c0068dd8>] (update_process_times+0x2c/0x64)
+|[<c0068dd8>] (update_process_times) from [<c0076ad0>] (tick_handle_periodic+0x1c/0x90)
+|[<c0076ad0>] (tick_handle_periodic) from [<c0429274>] (ch2_irq+0x20/0x28)
+|[<c0429274>] (ch2_irq) from [<c005a39c>] (handle_irq_event_percpu+0x74/0x16c)
 
--- 
-Thanks,
-Caesar
+Is it possible to drop this disable/enable clock on the switch from pit
+to one shot mode?
+
+>You may also stop at 99a81706526fb167029a940ef1f7bfbe882abd3e which
+>should solve the crash but it has not been tested as thoroughly.
+
+Did you confuse the sha1 with something? This patch is called ("clk:
+at91: remove IRQ handling and use polling") and is part of the series
+you gave (patch #3).
+
+>Thanks!
+
+Sebastian
