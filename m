@@ -1,62 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 8 Mar 2016 16:44:23 +0100
-Subject: [PATCH 8/8] drm: atmel-hlcdc: check display mode validity in
- crtc->mode_fixup()
-In-Reply-To: <1452075569-8545-9-git-send-email-boris.brezillon@free-electrons.com>
-References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
- <1452075569-8545-9-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <56DEF357.5050003@atmel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 8 Mar 2016 10:44:48 -0500
+Subject: [PATCH V14 8/9] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <56DE5E11.3060307@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-9-git-send-email-okaya@codeaurora.org>
+ <56D08843.5020306@linaro.org> <56D7323B.4040100@codeaurora.org>
+ <56D8C539.9000203@linaro.org> <56D91B0E.1080203@codeaurora.org>
+ <56DCFEE0.6080101@linaro.org> <56DD9E7E.6000406@codeaurora.org>
+ <56DE592E.6010403@linaro.org> <56DE5E11.3060307@codeaurora.org>
+Message-ID: <56DEF370.3000904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/01/2016 11:19, Boris Brezillon a ?crit :
-> Move the adjusted display mode check into ->mode_fixup().
+Hi,
+
+On 3/8/2016 12:07 AM, Sinan Kaya wrote:
+> On 3/7/2016 11:46 PM, Eric Auger wrote:
+>>> #define module_vfio_reset_handler(compat, acpihid, reset) \
+>>>> MODULE_ALIAS("vfio-reset: dt: " compat); \
+>>>> MODULE_ALIAS("vfio-reset: acpi: " acpihid); \
+>> My gut feeling is we must not create a dummy alias when the mode
+>> (dt/acpi) is not supported/tested. It fills the modinfo section with
+>> spurious data, aliases are visible to modinfo, ...
+>>
+>> So I personally foresee 2 solutions,
+>> 1) we create a single alias using acpihid if supported or compat if not.
+>> Then even in dt mode we try to load this module through the acpihid
+>> alias. Looks weird but should work.
+>> 2) We simply move the module alias declaration out of this macro (to the
+>> reset module itself), define 2 aliases in case both dt and acpi are
+>> supported & tested.
+>>
+>> My personal preference is 2 I think.
+>>
+>> Best Regards
+>>
+>> Eric
+>>
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-Seems okay:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
-> ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 ++++------
->  1 file changed, 4 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> index be30bd2..d5a028f 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> @@ -142,11 +142,13 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
->  			   cfg);
->  }
->  
-> -static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *crtc,
-> +static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *c,
->  					const struct drm_display_mode *mode,
->  					struct drm_display_mode *adjusted_mode)
->  {
-> -	return true;
-> +	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
-> +
-> +	return atmel_hlcdc_dc_mode_valid(crtc->dc, adjusted_mode) == MODE_OK;
->  }
->  
->  static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
-> @@ -311,12 +313,8 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
->  static int atmel_hlcdc_crtc_atomic_check(struct drm_crtc *c,
->  					 struct drm_crtc_state *s)
->  {
-> -	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
->  	int ret;
->  
-> -	if (atmel_hlcdc_dc_mode_valid(crtc->dc, &s->adjusted_mode) != MODE_OK)
-> -		return -EINVAL;
-> -
->  	ret = atmel_hlcdc_crtc_select_output_mode(s);
->  	if (ret)
->  		return ret;
+> I agree with your assessment of #2. We are trying to be too smart. 
+> I'll post a patch with #2 solution.
 > 
 
+I split patch 8 and 9 from the series and posted a new set here.
+
+http://www.spinics.net/lists/arm-kernel/msg489578.html
 
 -- 
-Nicolas Ferre
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
