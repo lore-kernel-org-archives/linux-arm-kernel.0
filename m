@@ -1,32 +1,37 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Mar 2016 15:18:26 +0700
-Subject: [PATCH] pinctrl-bcm2835: Fix cut-and-paste error in "pull" parsing
-In-Reply-To: <1456795808-1449-1-git-send-email-eric@anholt.net>
-References: <1456795808-1449-1-git-send-email-eric@anholt.net>
-Message-ID: <CACRpkdZT9BvDc3f4mf22jGb5PQOVVgBU+pSrzhxrqfbczHNG8Q@mail.gmail.com>
+Date: Tue, 8 Mar 2016 15:24:34 +0700
+Subject: [PATCH 2/5] ARM: bcm2835: Replace alt0/i2s_alt[02] with standard
+ groups.
+In-Reply-To: <1456510756-15337-3-git-send-email-eric@anholt.net>
+References: <1456510756-15337-1-git-send-email-eric@anholt.net>
+ <1456510756-15337-3-git-send-email-eric@anholt.net>
+Message-ID: <CACRpkdYzSt=R7j9GLSY39CsyMKLjqRYnP_31ti5jWiGngJacqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 1, 2016 at 8:30 AM, Eric Anholt <eric@anholt.net> wrote:
+On Sat, Feb 27, 2016 at 1:19 AM, Eric Anholt <eric@anholt.net> wrote:
 
-> From: Phil Elwell <phil@raspberrypi.org>
->
-> The DT bindings for pinctrl-bcm2835 allow both the function and pull
-> to contain either one entry or one per pin. However, an error in the
-> DT parsing can cause failures if the number of pulls differs from the
-> number of functions.
+> Since all of these pins were documented, we can use their names to
+> explain what's going on.
 >
 > Signed-off-by: Eric Anholt <eric@anholt.net>
-> Cc: stable at vger.kernel.org
-> ---
->
-> Yes, the s-o-b differs from the author of the commit, but this falls
-> under part b) of the process.
->
-> Phil, any chance you could start putting Signed-off-by lines on your
-> kernel commits?
 
-Patch applied with the extra SoB and Stephen's review tag.
+> +       pinctrl-0 = <&i2c0_gpio0
+> +                    &i2c1_gpio2
+> +                    &gpclk0_gpio4
+> +                    &gpclk1_gpio5
+> +                    &spi0_gpio7
+> +                    &pcm_gpio18
+> +                    &pwm0_gpio40
+> +                    &pwm1_gpio45
+> +                    &gpioout
+> +                    &alt3>;
+
+Why are all of these done as hogs instead of being in pinctrl-0
+"default" for the device that is using them? i2c1, gpclk0,
+etc?
+
+The only reason I see would be if they are unused or something.
 
 Yours,
 Linus Walleij
