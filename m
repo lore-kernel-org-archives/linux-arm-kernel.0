@@ -1,62 +1,65 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Tue,  8 Mar 2016 11:29:26 +0000
-Subject: [PATCH v3 2/9] clocksource: arm_arch_timer: Extend
- arch_timer_kvm_info to get the virtual IRQ
+Date: Tue,  8 Mar 2016 11:29:27 +0000
+Subject: [PATCH v3 3/9] irqchip/gic-v2: Gather ACPI specific data in a single
+ structure
 In-Reply-To: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
 References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
-Message-ID: <1457436573-6180-3-git-send-email-julien.grall@arm.com>
+Message-ID: <1457436573-6180-4-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the firmware table is parsed by the virtual timer code in
-order to retrieve the virtual timer interrupt. However, this is already
-done by the arch timer driver.
-
-To avoid code duplication, extend arch_timer_kvm_info to get the virtual
-IRQ.
-
-Note that the KVM code will be modified in a subsequent patch.
+For now, there is only one member. More member will be added later.
 
 Signed-off-by: Julien Grall <julien.grall@arm.com>
 
 ---
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-    Changes in v3:
-        - Move the KVM changes in a separate patch and rename the patch
-        - Move the initialization of the virtual_irq to
-        arch_timer_common_init
+    Changes in v2:
+        - Patch added
 ---
- drivers/clocksource/arm_arch_timer.c | 2 ++
- include/clocksource/arm_arch_timer.h | 1 +
- 2 files changed, 3 insertions(+)
+ drivers/irqchip/irq-gic.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index b7ab588..d8887f3 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -701,6 +701,8 @@ static void __init arch_timer_common_init(void)
- 	arch_timer_banner(arch_timers_present);
- 	arch_counter_register(arch_timers_present);
- 	arch_timer_arch_init();
-+
-+	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 8f9ebf7..fbde202 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1245,7 +1245,10 @@ IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
+ #endif
+ 
+ #ifdef CONFIG_ACPI
+-static phys_addr_t cpu_phy_base __initdata;
++static struct
++{
++	phys_addr_t cpu_phy_base;
++} acpi_data __initdata;
+ 
+ static int __init
+ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+@@ -1265,10 +1268,10 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+ 	 * All CPU interface addresses have to be the same.
+ 	 */
+ 	gic_cpu_base = processor->base_address;
+-	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
++	if (cpu_base_assigned && gic_cpu_base != acpi_data.cpu_phy_base)
+ 		return -EINVAL;
+ 
+-	cpu_phy_base = gic_cpu_base;
++	acpi_data.cpu_phy_base = gic_cpu_base;
+ 	cpu_base_assigned = 1;
+ 	return 0;
  }
+@@ -1316,7 +1319,7 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
+ 		return -EINVAL;
+ 	}
  
- static void __init arch_timer_init(void)
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 9101ed6b..9dd996a 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -51,6 +51,7 @@ enum arch_timer_reg {
- 
- struct arch_timer_kvm_info {
- 	struct timecounter timecounter;
-+	int virtual_irq;
- };
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
+-	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
++	cpu_base = ioremap(acpi_data.cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
+ 	if (!cpu_base) {
+ 		pr_err("Unable to map GICC registers\n");
+ 		return -ENOMEM;
 -- 
 1.9.1
