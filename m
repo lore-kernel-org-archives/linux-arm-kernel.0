@@ -1,83 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Mar 2016 14:45:24 +0100
-Subject: Broken PCIe on Synology DS414
-In-Reply-To: <20160305143445.827496739A@mail.nwl.cc>
-References: <20160305143445.827496739A@mail.nwl.cc>
-Message-ID: <20160308144524.5f47c217@free-electrons.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 8 Mar 2016 21:57:43 +0800
+Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
+In-Reply-To: <20160304115752.GA13894@e104805>
+References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
+ <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
+ <20160303162942.GA2445@localhost.localdomain>
+ <20160304030349.GA11012@leoy-linaro>
+ <20160304115752.GA13894@e104805>
+Message-ID: <20160308135743.GC4921@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Phil,
+Hi Eduardo,
 
-On Sat, 5 Mar 2016 15:36:31 +0100, Phil Sutter wrote:
+On Fri, Mar 04, 2016 at 11:57:53AM +0000, Javi Merino wrote:
+> On Fri, Mar 04, 2016 at 11:03:49AM +0800, Leo Yan wrote:
+> > On Thu, Mar 03, 2016 at 08:29:44AM -0800, Eduardo Valentin wrote:
+> > > On Fri, Feb 26, 2016 at 11:43:43AM +0800, Leo Yan wrote:
 
-> Commit c466d997bb160 ("ARM: mvebu: define crypto SRAM ranges for all
-> armada-xp boards") breaks PCIe on the MV78230 based Synology DS414. The
-> kernel does not complain, but 'lspci' does not show a single device.
-> Reverting this commit cures vanilla 4.5-rc6 again for me.
+[...]
+
+> > > > The property "hysteresis" is mandatory for trip points, so if without
+> > > > it the thermal zone cannot register successfully. But "hysteresis" is
+> > > > ignored in the thermal subsystem and only inquired by several thermal
+> > > > sensor drivers.
+> > > 
+> > > If the Linux thermal subsystem has a problem with handling hysteresis, I
+> > > would rather fix Linux code than relaxing the DT binding. Or if you
+> > > still believe hysteresis is really optional, I would prefer to see a
+> > > better justification than "Linux ignores it".
 > 
-> Seems like the ranges declared for crypto SRAM conflict with PCIe
-> controller ones in some way. Looking at the DT files, all MV78230 based
-> devices should be affected, not just the DS414.
-> 
-> Is this a known problem? Please let me know if there is anything I can
-> do to further analyze the issue.
+> I see it the other way round, Is hysteresis a property that, without
+> it, the thermal code can't configure itself so it fails to create the
+> trip point?  The current code goes "There is no hysteresis for this
+> property, I don't know how to set up this trip point!".  I think we
+> can do better than this.
 
-Thanks for reporting the issue. There is indeed an issue with the
-crypto SRAM region overlapping with the PCIe aperture. However, this
-does not prevent 'lspci' from enumerating the device.
+Do you agree with Javi's suggestion? If you think it's okay, I will
+move on to send out a new version patch based on Javi's comments.
 
-I've tested with 3 different PCIe devices, and got two different
-behavior:
-
- * With 2 PCIe cards (Intel e1000e NIC and some Marvell AHCI SATA
-   controller), the PCIe memory region has a size smaller than 1 MB.
-   Since the PCIe aperture starts at 0xf8000000 and the crypto SRAM
-   mapping at 0xf8100000, this leaves 1 MB of space, which is enough to
-   map the resources of those PCIe cards. Both cards are properly
-   enumerated (visible in lspci) and usable.
-
- * With another PCIe card (Intel IGB NIC), the PCIe memory region has a
-   size of 8 MB, so it cannot be created at 0xf8000000 as it would
-   overlap with the crypto SRAM region. And indeed at boot time, I get:
-
-[    3.302213] igb: Copyright (c) 2007-2014 Intel Corporation.
-[    3.307841] pci 0000:00:09.0: enabling device (0140 -> 0143)
-[    3.313539] mvebu_mbus: cannot add window '4:f8', conflicts with another window
-[    3.320870] mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0xf8000000-0xf87fffff]: -22
-[    3.330811] Unhandled fault: external abort on non-linefetch (0x1008) at 0xf08c0018
-
-   And the kernel crashes, because the IGB driver tries to access its
-   PCIe device memory region, which isn't mapped in the physical
-   address space because the MBus window has not been created.
-
-   However, this *only* happens because I have the IGB driver enabled
-   in my kernel. If I disable it in my kernel configuration, I can boot
-   my system just fine, and the IGB PCIe NIC appears in lspci:
-
-# /usr/sbin/lspci 
-00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (rev 02)
-00:09.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (rev 02)
-00:0a.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (rev 02)
-02:00.0 Ethernet controller: Intel Corporation 82575EB Gigabit Network Connection (rev 02)
-02:00.1 Ethernet controller: Intel Corporation 82575EB Gigabit Network Connection (rev 02)
-
-In other words, while the crypto SRAM range overlapping issue prevents
-from *using* certain PCIe devices, it certainly cannot prevent them
-from being enumerated in lspci. So if your issue is that a PCI device
-doesn't appear in lspci, then the problem is elsewhere.
-
-You can try to simply remove the crypto SRAM ranges in your .dts file,
-and see if it improves the situation. But I would be very surprised if
-it did, since the MBus windows are not related to enumerating PCI
-devices.
-
-I'll cook and send a patch to fix the crypto SRAM ranges nonetheless.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Leo Yan
