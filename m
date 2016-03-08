@@ -1,23 +1,209 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue,  8 Mar 2016 09:03:56 +0100
-Subject: [PATCHv2 0/8] ARM: dts: update Ka-Ro i.MX6 module support
-Message-ID: <1457424244-14549-1-git-send-email-LW@KARO-electronics.de>
+Date: Tue,  8 Mar 2016 09:03:59 +0100
+Subject: [PATCHv2 3/8] ARM: dts: imx6-tx6: remove regulator bus
+In-Reply-To: <1457424244-14549-1-git-send-email-LW@KARO-electronics.de>
+References: <1457424244-14549-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1457424244-14549-4-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set updates the Ka-Ro electronics i.MX6 based module
-support and adds support for some new modules and a new baseboard.
+DT maintainers don't like the 'simple-bus' container around the
+regulator nodes. So remove it.
 
-changes vs. v1:
-- relicense DTS files under GPLv2/X11
-- dropped patches which have been applied already
-- added some cleanup patches
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi | 178 +++++++++++++++++--------------------
+ 1 file changed, 81 insertions(+), 97 deletions(-)
 
-[PATCHv2 1/8] ARM: dts: imx6-tx6: Relicense the Ka-Ro DT files under GPLv2/X11
-[PATCHv2 2/8] ARM: dts: imx6-tx6: cleanup; no functional change
-[PATCHv2 3/8] ARM: dts: imx6-tx6: remove regulator bus
-[PATCHv2 4/8] ARM: dts: imx6-tx6: disable the spi node by default
-[PATCHv2 5/8] ARM: dts: imx6-tx6: remove container node around pinctrl nodes
-[PATCHv2 6/8] ARM: dts: imx6qdl-tx6: add mdio node for ethernet phy
-[PATCHv2 7/8] ARM: dts: imx6: add support for more Ka-Ro electronics modules
-[PATCHv2 8/8] ARM: dts: imx6: add support for the Ka-Ro electronics 'MB7' baseboard
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index 912f284..ec374f5 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -97,104 +97,88 @@
+ 		};
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
++	reg_3v3_etn: reg-3v3-etn {
++		compatible = "regulator-fixed";
++		regulator-name = "3V3_ETN";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_etnphy_power>;
++		gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ 
+-		reg_3v3_etn: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "3V3_ETN";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_etnphy_power>;
+-			gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
+-
+-		reg_2v5: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "2V5";
+-			regulator-min-microvolt = <2500000>;
+-			regulator-max-microvolt = <2500000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_3v3: regulator at 2 {
+-			compatible = "regulator-fixed";
+-			reg = <2>;
+-			regulator-name = "3V3";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_can_xcvr: regulator at 3 {
+-			compatible = "regulator-fixed";
+-			reg = <3>;
+-			regulator-name = "CAN XCVR";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_flexcan_xcvr>;
+-			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+-			enable-active-low;
+-		};
+-
+-		reg_lcd0_pwr: regulator at 4 {
+-			compatible = "regulator-fixed";
+-			reg = <4>;
+-			regulator-name = "LCD0 POWER";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_lcd0_pwr>;
+-			gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-			regulator-boot-on;
+-			regulator-always-on;
+-		};
+-
+-		reg_lcd1_pwr: regulator at 5 {
+-			compatible = "regulator-fixed";
+-			reg = <5>;
+-			regulator-name = "LCD1 POWER";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_lcd1_pwr>;
+-			gpio = <&gpio2 31 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-			regulator-boot-on;
+-			regulator-always-on;
+-		};
+-
+-		reg_usbh1_vbus: regulator at 6 {
+-			compatible = "regulator-fixed";
+-			reg = <6>;
+-			regulator-name = "usbh1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_usbh1_vbus>;
+-			gpio = <&gpio3 31 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
+-
+-		reg_usbotg_vbus: regulator at 7 {
+-			compatible = "regulator-fixed";
+-			reg = <7>;
+-			regulator-name = "usbotg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_usbotg_vbus>;
+-			gpio = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+-			enable-active-high;
+-		};
++	reg_2v5: reg-2v5 {
++		compatible = "regulator-fixed";
++		regulator-name = "2V5";
++		regulator-min-microvolt = <2500000>;
++		regulator-max-microvolt = <2500000>;
++		regulator-always-on;
++	};
++
++	reg_3v3: reg-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_can_xcvr: reg-can-xcvr {
++		compatible = "regulator-fixed";
++		regulator-name = "CAN XCVR";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_flexcan_xcvr>;
++		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
++		enable-active-low;
++	};
++
++	reg_lcd0_pwr: reg-lcd0-pwr {
++		compatible = "regulator-fixed";
++		regulator-name = "LCD0 POWER";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lcd0_pwr>;
++		gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++	};
++
++	reg_lcd1_pwr: reg-lcd1-pwr {
++		compatible = "regulator-fixed";
++		regulator-name = "LCD1 POWER";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lcd1_pwr>;
++		gpio = <&gpio2 31 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++	};
++
++	reg_usbh1_vbus: reg-usbh1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usbh1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbh1_vbus>;
++		gpio = <&gpio3 31 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usbotg_vbus: reg-usbotg-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usbotg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbotg_vbus>;
++		gpio = <&gpio1 7 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
+ 	};
+ 
+ 	sound {
+-- 
+2.1.4
