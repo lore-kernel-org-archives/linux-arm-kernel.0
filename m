@@ -1,37 +1,38 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Tue, 8 Mar 2016 11:04:19 -0600
-Subject: [PATCH v5 0/6] ARM: am335x/am437x/dra7: Add PWM support for DRA7
-In-Reply-To: <alpine.DEB.2.02.1603080642400.4974@utopia.booyaka.com>
-References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
- <alpine.DEB.2.02.1603080642400.4974@utopia.booyaka.com>
-Message-ID: <56DF0613.90203@ti.com>
+From: grmoore@opensource.altera.com (Graham Moore)
+Date: Tue, 8 Mar 2016 11:02:50 -0600
+Subject: [PATCH] ARM: socfpga: dts: Add missing clock and interrupt fields for
+ Arria10 DMA
+Message-ID: <1457456571-25541-1-git-send-email-grmoore@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The PL330 DMA driver will not load on Arria10 without devicetree entries
+for clocks and clock_names.  This patch adds those entries.  It also adds
+the ninth interrupt, which is required for error detection.
 
+Signed-off-by: Graham Moore <grmoore@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-On 03/08/2016 12:55 AM, Paul Walmsley wrote:
-> Hi Franklin
->
-> On Mon, 7 Mar 2016, Franklin S Cooper Jr wrote:
->
->> This patch series adds support for PWM for DRA7. The IP is same as that
->> present in AM33XX and AM437XX.
->>
->> However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
->> and eQEP.
->>
->> This series is almost identical to v4. Only difference is the addition of
->> eCAP DT nodes in the dra7.dtsi file.
->>
->> This series was tested on AM335x GP, AM437x GP and X15 + LCD screen for
->> PWM based backlight.
->>
->> This series was also verified to be backwards compatible with old dtbs.
-> Looking at these to see what I can pick for v4.7, I'm curious about the 
-> dependencies.  Can I take patches 2 and 3 before 1 is merged, or does 1 
-> need to be merged first?
->
-> - Paul
-
-1 needs to be merged first.
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index cce9e50..45a4728 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -78,10 +78,13 @@
+ 					     <0 87 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 88 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 89 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
++					     <0 90 IRQ_TYPE_LEVEL_HIGH>,
++					     <0 91 IRQ_TYPE_LEVEL_HIGH>;
+ 				#dma-cells = <1>;
+ 				#dma-channels = <8>;
+ 				#dma-requests = <32>;
++				clocks = <&l4_main_clk>;
++				clock-names = "apb_pclk";
+ 			};
+ 		};
+ 
+-- 
+2.5.0
