@@ -1,487 +1,188 @@
 From: dave.long@linaro.org (David Long)
-Date: Wed,  9 Mar 2016 00:32:20 -0500
-Subject: [PATCH v11 6/9] arm64: kprobes instruction simulation support
+Date: Wed,  9 Mar 2016 00:32:21 -0500
+Subject: [PATCH v11 7/9] arm64: Add trampoline code for kretprobes
 In-Reply-To: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
 References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1457501543-24197-7-git-send-email-dave.long@linaro.org>
+Message-ID: <1457501543-24197-8-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+From: William Cohen <wcohen@redhat.com>
 
-Kprobes needs simulation of instructions that cannot be stepped
-from a different memory location, e.g.: those instructions
-that uses PC-relative addressing. In simulation, the behaviour
-of the instruction is implemented using a copy of pt_regs.
+The trampoline code is used by kretprobes to capture a return from a probed
+function.  This is done by saving the registers, calling the handler, and
+restoring the registers. The code then returns to the original saved caller
+return address. It is necessary to do this directly instead of using a
+software breakpoint because the code used in processing that breakpoint
+could itself be kprobe'd and cause a problematic reentry into the debug
+exception handler.
 
-The following instruction categories are simulated:
- - All branching instructions(conditional, register, and immediate)
- - Literal access instructions(load-literal, adr/adrp)
-
-Conditional execution is limited to branching instructions in
-ARM v8. If conditions at PSTATE do not match the condition fields
-of opcode, the instruction is effectively NOP.
-
-Thanks to Will Cohen for assorted suggested changes.
-
-Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Signed-off-by: William Cohen <wcohen@redhat.com>
 Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- arch/arm64/include/asm/insn.h            |   1 +
- arch/arm64/include/asm/probes.h          |   5 +-
- arch/arm64/kernel/Makefile               |   3 +-
- arch/arm64/kernel/insn.c                 |   1 +
- arch/arm64/kernel/kprobes-arm64.c        |  29 ++++
- arch/arm64/kernel/kprobes.c              |  32 ++++-
- arch/arm64/kernel/probes-simulate-insn.c | 218 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/probes-simulate-insn.h |  28 ++++
- 8 files changed, 311 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
- create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
+ arch/arm64/include/asm/kprobes.h       |  2 +
+ arch/arm64/kernel/Makefile             |  1 +
+ arch/arm64/kernel/asm-offsets.c        | 11 +++++
+ arch/arm64/kernel/kprobes.c            |  5 ++
+ arch/arm64/kernel/kprobes_trampoline.S | 88 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 107 insertions(+)
+ create mode 100644 arch/arm64/kernel/kprobes_trampoline.S
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index b9567a1..26cee10 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -410,6 +410,7 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn);
+diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+index 79c9511..61b4915 100644
+--- a/arch/arm64/include/asm/kprobes.h
++++ b/arch/arm64/include/asm/kprobes.h
+@@ -56,5 +56,7 @@ int kprobe_exceptions_notify(struct notifier_block *self,
+ 			     unsigned long val, void *data);
+ int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
+ int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
++void kretprobe_trampoline(void);
++void __kprobes *trampoline_probe_handler(struct pt_regs *regs);
  
- typedef bool (pstate_check_t)(unsigned long);
- extern pstate_check_t * const opcode_condition_checks[16];
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif	/* __ASM_INSN_H */
-diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
-index c5fcbe6..d524f7d 100644
---- a/arch/arm64/include/asm/probes.h
-+++ b/arch/arm64/include/asm/probes.h
-@@ -15,11 +15,12 @@
- #ifndef _ARM_PROBES_H
- #define _ARM_PROBES_H
- 
-+#include <asm/opcodes.h>
-+
- struct kprobe;
- struct arch_specific_insn;
- 
- typedef u32 kprobe_opcode_t;
--typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
- typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
- 
- enum pc_restore_type {
-@@ -35,7 +36,7 @@ struct kprobe_pc_restore {
- /* architecture specific copy of original instruction */
- struct arch_specific_insn {
- 	kprobe_opcode_t *insn;
--	kprobes_pstate_check_t *pstate_cc;
-+	pstate_check_t *pstate_cc;
- 	kprobes_handler_t *handler;
- 	/* restore address after step xol */
- 	struct kprobe_pc_restore restore;
+ #endif /* _ARM_KPROBES_H */
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 4efb791..08325e5 100644
+index 08325e5..f192b7d 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -36,7 +36,8 @@ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
- arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+@@ -37,6 +37,7 @@ arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
  arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
  arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
--arm64-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-arm64.o
-+arm64-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-arm64.o		\
-+					   probes-simulate-insn.o
+ arm64-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-arm64.o		\
++					   kprobes_trampoline.o			\
+ 					   probes-simulate-insn.o
  arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
  arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 9f15ceb..f9a3432 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -30,6 +30,7 @@
- #include <asm/cacheflush.h>
- #include <asm/debug-monitors.h>
- #include <asm/fixmap.h>
-+#include <asm/opcodes.h>
- #include <asm/insn.h>
- 
- #define AARCH64_INSN_SF_BIT	BIT(31)
-diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
-index e07727a..487238a 100644
---- a/arch/arm64/kernel/kprobes-arm64.c
-+++ b/arch/arm64/kernel/kprobes-arm64.c
-@@ -21,6 +21,7 @@
- #include <asm/sections.h>
- 
- #include "kprobes-arm64.h"
-+#include "probes-simulate-insn.h"
- 
- static bool __kprobes aarch64_insn_is_steppable(u32 insn)
- {
-@@ -62,8 +63,36 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- 	 */
- 	if (aarch64_insn_is_steppable(insn))
- 		return INSN_GOOD;
-+
-+	if (aarch64_insn_is_bcond(insn)) {
-+		asi->handler = simulate_b_cond;
-+	} else if (aarch64_insn_is_cbz(insn) ||
-+	    aarch64_insn_is_cbnz(insn)) {
-+		asi->handler = simulate_cbz_cbnz;
-+	} else if (aarch64_insn_is_tbz(insn) ||
-+	    aarch64_insn_is_tbnz(insn)) {
-+		asi->handler = simulate_tbz_tbnz;
-+	} else if (aarch64_insn_is_adr_adrp(insn))
-+		asi->handler = simulate_adr_adrp;
-+	else if (aarch64_insn_is_b(insn) ||
-+	    aarch64_insn_is_bl(insn))
-+		asi->handler = simulate_b_bl;
-+	else if (aarch64_insn_is_br(insn) ||
-+	    aarch64_insn_is_blr(insn) ||
-+	    aarch64_insn_is_ret(insn))
-+		asi->handler = simulate_br_blr_ret;
-+	else if (aarch64_insn_is_ldr_lit(insn))
-+		asi->handler = simulate_ldr_literal;
-+	else if (aarch64_insn_is_ldrsw_lit(insn))
-+		asi->handler = simulate_ldrsw_literal;
- 	else
-+		/*
-+		 * Instruction cannot be stepped out-of-line and we don't
-+		 * (yet) simulate it.
-+		 */
- 		return INSN_REJECTED;
-+
-+	return INSN_GOOD_NO_SLOT;
- }
- 
- static bool __kprobes
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index fffa4ac6..f7cc8ce 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -50,6 +50,17 @@ int main(void)
+   DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
+   DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
+   DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
++  DEFINE(S_X8,			offsetof(struct pt_regs, regs[8]));
++  DEFINE(S_X10,			offsetof(struct pt_regs, regs[10]));
++  DEFINE(S_X12,			offsetof(struct pt_regs, regs[12]));
++  DEFINE(S_X14,			offsetof(struct pt_regs, regs[14]));
++  DEFINE(S_X16,			offsetof(struct pt_regs, regs[16]));
++  DEFINE(S_X18,			offsetof(struct pt_regs, regs[18]));
++  DEFINE(S_X20,			offsetof(struct pt_regs, regs[20]));
++  DEFINE(S_X22,			offsetof(struct pt_regs, regs[22]));
++  DEFINE(S_X24,			offsetof(struct pt_regs, regs[24]));
++  DEFINE(S_X26,			offsetof(struct pt_regs, regs[26]));
++  DEFINE(S_X28,			offsetof(struct pt_regs, regs[28]));
+   DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
+   DEFINE(S_SP,			offsetof(struct pt_regs, sp));
+ #ifdef CONFIG_COMPAT
 diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-index e72dbce..ffc5affd 100644
+index ffc5affd..bd3f233 100644
 --- a/arch/arm64/kernel/kprobes.c
 +++ b/arch/arm64/kernel/kprobes.c
-@@ -40,6 +40,9 @@ void jprobe_return_break(void);
- DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
- DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
- 
-+static void __kprobes
-+post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
-+
- static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
- {
- 	/* prepare insn slot */
-@@ -57,6 +60,24 @@ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
- 	p->ainsn.restore.type = RESTORE_PC;
+@@ -532,6 +532,11 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	return 1;
  }
  
-+static void __kprobes arch_prepare_simulate(struct kprobe *p)
++void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
 +{
-+	/* This instructions is not executed xol. No need to adjust the PC */
-+	p->ainsn.restore.addr = 0;
-+	p->ainsn.restore.type = NO_RESTORE;
++	return NULL;
 +}
 +
-+static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
-+{
-+	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-+
-+	if (p->ainsn.handler)
-+		p->ainsn.handler((u32)p->opcode, (long)p->addr, regs);
-+
-+	/* single step simulated, now go for post processing */
-+	post_kprobe_handler(kcb, regs);
-+}
-+
- int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ int __init arch_init_kprobes(void)
  {
- 	unsigned long probe_addr = (unsigned long)p->addr;
-@@ -73,7 +94,8 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 		return -EINVAL;
- 
- 	case INSN_GOOD_NO_SLOT:	/* insn need simulation */
--		return -EINVAL;
-+		p->ainsn.insn = NULL;
-+		break;
- 
- 	case INSN_GOOD:	/* instruction uses slot */
- 		p->ainsn.insn = get_insn_slot();
-@@ -83,7 +105,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	};
- 
- 	/* prepare the instruction */
--	arch_prepare_ss_slot(p);
-+	if (p->ainsn.insn)
-+		arch_prepare_ss_slot(p);
-+	else
-+		arch_prepare_simulate(p);
- 
  	return 0;
- }
-@@ -225,7 +250,8 @@ static void __kprobes setup_singlestep(struct kprobe *p,
- 		kernel_enable_single_step(regs);
- 		instruction_pointer(regs) = slot;
- 	} else	{
--		BUG();
-+		/* insn simulation */
-+		arch_simulate_insn(p, regs);
- 	}
- }
- 
-diff --git a/arch/arm64/kernel/probes-simulate-insn.c b/arch/arm64/kernel/probes-simulate-insn.c
+diff --git a/arch/arm64/kernel/kprobes_trampoline.S b/arch/arm64/kernel/kprobes_trampoline.S
 new file mode 100644
-index 0000000..94333a6
+index 0000000..072b4e5
 --- /dev/null
-+++ b/arch/arm64/kernel/probes-simulate-insn.c
-@@ -0,0 +1,218 @@
++++ b/arch/arm64/kernel/kprobes_trampoline.S
+@@ -0,0 +1,88 @@
 +/*
-+ * arch/arm64/kernel/probes-simulate-insn.c
-+ *
-+ * Copyright (C) 2013 Linaro Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
++ * trampoline entry and return code for kretprobes.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/kprobes.h>
-+#include <linux/module.h>
++#include <linux/linkage.h>
++#include <asm/asm-offsets.h>
++#include <asm/assembler.h>
 +
-+#include "probes-simulate-insn.h"
++	.text
 +
-+#define sign_extend(x, signbit)		\
-+	((x) | (0 - ((x) & (1 << (signbit)))))
-+
-+#define bbl_displacement(insn)		\
-+	sign_extend(((insn) & 0x3ffffff) << 2, 27)
-+
-+#define bcond_displacement(insn)	\
-+	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
-+
-+#define cbz_displacement(insn)	\
-+	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
-+
-+#define tbz_displacement(insn)	\
-+	sign_extend(((insn >> 5) & 0x3fff) << 2, 15)
-+
-+#define ldr_displacement(insn)	\
-+	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
-+
-+static inline void set_x_reg(struct pt_regs *regs, int reg, u64 val)
-+{
-+	if (reg < 31)
-+		regs->regs[reg] = val;
-+}
-+
-+static inline void set_w_reg(struct pt_regs *regs, int reg, u64 val)
-+{
-+	if (reg < 31)
-+		*(u32 *) (&regs->regs[reg]) = val;
-+}
-+
-+static inline u64 get_x_reg(struct pt_regs *regs, int reg)
-+{
-+	if (reg < 31)
-+		return regs->regs[reg];
-+	else
-+		return 0;
-+}
-+
-+static inline u32 get_w_reg(struct pt_regs *regs, int reg)
-+{
-+	if (reg < 31)
-+		return regs->regs[reg] & 0xffffffff;
-+	else
-+		return 0;
-+}
-+
-+static bool __kprobes check_cbz(u32 opcode, struct pt_regs *regs)
-+{
-+	int xn = opcode & 0x1f;
-+
-+	return (opcode & (1 << 31)) ?
-+	    (get_x_reg(regs, xn) == 0) : (get_w_reg(regs, xn) == 0);
-+}
-+
-+static bool __kprobes check_cbnz(u32 opcode, struct pt_regs *regs)
-+{
-+	int xn = opcode & 0x1f;
-+
-+	return (opcode & (1 << 31)) ?
-+	    (get_x_reg(regs, xn) != 0) : (get_w_reg(regs, xn) != 0);
-+}
-+
-+static bool __kprobes check_tbz(u32 opcode, struct pt_regs *regs)
-+{
-+	int xn = opcode & 0x1f;
-+	int bit_pos = ((opcode & (1 << 31)) >> 26) | ((opcode >> 19) & 0x1f);
-+
-+	return ((get_x_reg(regs, xn) >> bit_pos) & 0x1) == 0;
-+}
-+
-+static bool __kprobes check_tbnz(u32 opcode, struct pt_regs *regs)
-+{
-+	int xn = opcode & 0x1f;
-+	int bit_pos = ((opcode & (1 << 31)) >> 26) | ((opcode >> 19) & 0x1f);
-+
-+	return ((get_x_reg(regs, xn) >> bit_pos) & 0x1) != 0;
-+}
-+
++.macro save_all_base_regs ctxt
++	stp x0, x1, [\ctxt, #S_X0]
++	stp x2, x3, [\ctxt, #S_X2]
++	stp x4, x5, [\ctxt, #S_X4]
++	stp x6, x7, [\ctxt, #S_X6]
++	stp x8, x9, [\ctxt, #S_X8]
++	stp x10, x11, [\ctxt, #S_X10]
++	stp x12, x13, [\ctxt, #S_X12]
++	stp x14, x15, [\ctxt, #S_X14]
++	stp x16, x17, [\ctxt, #S_X16]
++	stp x18, x19, [\ctxt, #S_X18]
++	stp x20, x21, [\ctxt, #S_X20]
++	stp x22, x23, [\ctxt, #S_X22]
++	stp x24, x25, [\ctxt, #S_X24]
++	stp x26, x27, [\ctxt, #S_X26]
++	stp x28, x29, [\ctxt, #S_X28]
++	str lr, [\ctxt, #S_LR]
++	add x0, \ctxt, #S_FRAME_SIZE
++	str x0, [\ctxt, #S_SP]
 +/*
-+ * instruction simulation functions
++ * Construct a useful saved PSTATE
 + */
-+void __kprobes
-+simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	long imm, xn, val;
++	mrs x0, nzcv
++	and x0, x0, #0xf0000000
++	mrs x1, daif
++	and x1, x1, #0x3c0
++	orr x0, x0, x1
++	mrs x1, CurrentEL
++	and x1, x1, #12
++	lsl x1, x1, #21
++	orr x0, x1, x0
++	mrs x1, SPSel
++	and x1, x1, #1
++	lsl x1, x1, #21
++	orr x0, x1, x0
++	str x0, [\ctxt, #S_PSTATE]
++.endm
 +
-+	xn = opcode & 0x1f;
-+	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
-+	imm = sign_extend(imm, 20);
-+	if (opcode & 0x80000000)
-+		val = (imm<<12) + (addr & 0xfffffffffffff000);
-+	else
-+		val = imm + addr;
++.macro restore_all_base_regs ctxt
++	ldr x0, [\ctxt, #S_PSTATE]
++	and x0, x0, #0xf0000000
++	msr nzcv, x0
++	ldp x0, x1, [\ctxt, #S_X0]
++	ldp x2, x3, [\ctxt, #S_X2]
++	ldp x4, x5, [\ctxt, #S_X4]
++	ldp x6, x7, [\ctxt, #S_X6]
++	ldp x8, x9, [\ctxt, #S_X8]
++	ldp x10, x11, [\ctxt, #S_X10]
++	ldp x12, x13, [\ctxt, #S_X12]
++	ldp x14, x15, [\ctxt, #S_X14]
++	ldp x16, x17, [\ctxt, #S_X16]
++	ldp x18, x19, [\ctxt, #S_X18]
++	ldp x20, x21, [\ctxt, #S_X20]
++	ldp x22, x23, [\ctxt, #S_X22]
++	ldp x24, x25, [\ctxt, #S_X24]
++	ldp x26, x27, [\ctxt, #S_X26]
++	ldp x28, x29, [\ctxt, #S_X28]
++.endm
 +
-+	set_x_reg(regs, xn, val);
++ENTRY(kretprobe_trampoline)
 +
-+	instruction_pointer(regs) += 4;
-+}
++	sub sp, sp, #S_FRAME_SIZE
 +
-+void __kprobes
-+simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	int disp = bbl_displacement(opcode);
++	save_all_base_regs sp
 +
-+	/* Link register is x30 */
-+	if (opcode & (1 << 31))
-+		set_x_reg(regs, 30, addr + 4);
++	mov x0, sp
++	bl trampoline_probe_handler
++	/* Replace trampoline address in lr with actual
++	   orig_ret_addr return address. */
++	mov lr, x0
 +
-+	instruction_pointer(regs) = addr + disp;
-+}
++	restore_all_base_regs sp
 +
-+void __kprobes
-+simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	int disp = 4;
++	add sp, sp, #S_FRAME_SIZE
 +
-+	if (opcode_condition_checks[opcode & 0xf](regs->pstate & 0xffffffff))
-+		disp = bcond_displacement(opcode);
++	ret
 +
-+	instruction_pointer(regs) = addr + disp;
-+}
-+
-+void __kprobes
-+simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	int xn = (opcode >> 5) & 0x1f;
-+
-+	/* update pc first in case we're doing a "blr lr" */
-+	instruction_pointer(regs) = get_x_reg(regs, xn);
-+
-+	/* Link register is x30 */
-+	if (((opcode >> 21) & 0x3) == 1)
-+		set_x_reg(regs, 30, addr + 4);
-+}
-+
-+void __kprobes
-+simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	int disp = 4;
-+
-+	if (opcode & (1 << 24)) {
-+		if (check_cbnz(opcode, regs))
-+			disp = cbz_displacement(opcode);
-+	} else {
-+		if (check_cbz(opcode, regs))
-+			disp = cbz_displacement(opcode);
-+	}
-+	instruction_pointer(regs) = addr + disp;
-+}
-+
-+void __kprobes
-+simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	int disp = 4;
-+
-+	if (opcode & (1 << 24)) {
-+		if (check_tbnz(opcode, regs))
-+			disp = tbz_displacement(opcode);
-+	} else {
-+		if (check_tbz(opcode, regs))
-+			disp = tbz_displacement(opcode);
-+	}
-+	instruction_pointer(regs) = addr + disp;
-+}
-+
-+void __kprobes
-+simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	u64 *load_addr;
-+	int xn = opcode & 0x1f;
-+	int disp;
-+
-+	disp = ldr_displacement(opcode);
-+	load_addr = (u64 *) (addr + disp);
-+
-+	if (opcode & (1 << 30))	/* x0-x30 */
-+		set_x_reg(regs, xn, *load_addr);
-+	else			/* w0-w30 */
-+		set_w_reg(regs, xn, (*(u32 *) (load_addr)));
-+
-+	instruction_pointer(regs) += 4;
-+}
-+
-+void __kprobes
-+simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs)
-+{
-+	s32 *load_addr;
-+	int xn = opcode & 0x1f;
-+	int disp;
-+
-+	disp = ldr_displacement(opcode);
-+	load_addr = (s32 *) (addr + disp);
-+
-+	set_x_reg(regs, xn, *load_addr);
-+
-+	instruction_pointer(regs) += 4;
-+}
-diff --git a/arch/arm64/kernel/probes-simulate-insn.h b/arch/arm64/kernel/probes-simulate-insn.h
-new file mode 100644
-index 0000000..d6bb9a5
---- /dev/null
-+++ b/arch/arm64/kernel/probes-simulate-insn.h
-@@ -0,0 +1,28 @@
-+/*
-+ * arch/arm64/kernel/probes-simulate-insn.h
-+ *
-+ * Copyright (C) 2013 Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#ifndef _ARM_KERNEL_PROBES_SIMULATE_INSN_H
-+#define _ARM_KERNEL_PROBES_SIMULATE_INSN_H
-+
-+void simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs);
-+void simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs);
-+void simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs);
-+void simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs);
-+void simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs);
-+void simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs);
-+void simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs);
-+void simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs);
-+
-+#endif /* _ARM_KERNEL_PROBES_SIMULATE_INSN_H */
++ENDPROC(kretprobe_trampoline)
 -- 
 2.5.0
