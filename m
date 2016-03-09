@@ -1,46 +1,35 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed,  9 Mar 2016 00:32:23 -0500
-Subject: [PATCH v11 9/9] kprobes: Add arm64 case in kprobe example module
-In-Reply-To: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1457501543-24197-10-git-send-email-dave.long@linaro.org>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 9 Mar 2016 12:35:23 +0700
+Subject: [PATCH v3 1/9] clocksource: arm_arch_timer: Gather KVM specific
+ information in a structure
+In-Reply-To: <20160309032343.GE26583@lvm>
+References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
+ <1457436573-6180-2-git-send-email-julien.grall@arm.com>
+ <20160309032343.GE26583@lvm>
+Message-ID: <56DFB61B.4040707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+Hi Christoffer,
 
-Add info prints in sample kprobe handlers for ARM64
+On 09/03/2016 10:23, Christoffer Dall wrote:
+> On Tue, Mar 08, 2016 at 11:29:25AM +0000, Julien Grall wrote:
+>> -static struct timecounter timecounter;
+>> +static struct arch_timer_kvm_info arch_timer_kvm_info;
+>> +
+>> +struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
+>
+> borderline bikeshedding question:
+>
+> does it make sense that the info the arch timer code exports is labeled
+> to be kvm-specific?  In other words, could we imagine another subsystem
+> using this timer info some time and is there a more generic term that
+> would be more appropriate?
 
-Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
----
- samples/kprobes/kprobe_example.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I can't see any other usage. I would keep the function name KVM specific 
+until someone really need similar information.
 
-diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
-index 727eb21..0c72b8a 100644
---- a/samples/kprobes/kprobe_example.c
-+++ b/samples/kprobes/kprobe_example.c
-@@ -42,6 +42,10 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
- 			" ex1 = 0x%lx\n",
- 		p->addr, regs->pc, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
-+		p->addr, (long)regs->pc);
-+#endif
- 
- 	/* A dump_stack() here will give a stack backtrace */
- 	return 0;
-@@ -67,6 +71,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
- 	printk(KERN_INFO "post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
- 		p->addr, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("post_handler: p->addr = 0x%p, pc = 0x%lx\n",
-+		p->addr, (long)regs->pc);
-+#endif
- }
- 
- /*
+Cheers,
+
 -- 
-2.5.0
+Julien Grall
