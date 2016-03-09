@@ -1,82 +1,128 @@
-From: yankejian@huawei.com (Kejian Yan)
-Date: Wed, 9 Mar 2016 18:10:01 +0800
-Subject: [patch RESEND net] net: hns: fix the bug about mtu setting
-Message-ID: <1457518201-199863-1-git-send-email-yankejian@huawei.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Wed, 9 Mar 2016 10:52:19 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
+ <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
+ <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
+ <56DDB749.1020808@suse.de>
+ <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
+ <56DE7E1D.5070508@st.com>
+ <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
+ <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
+ <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
+ <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
+Message-ID: <56DFF253.9050208@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In chip V1, the maximum mtu value is 9600 for service ports and 1514 for
-debug ports. And in chip V2, it is 9728 for service ports and 1514 for
-debug ports. But it is always configurates as 9600 before this patch. This
-patch will configurate the right mtu value.
+On 3/9/2016 10:42 AM, Tomeu Vizoso wrote:
+> On 9 March 2016 at 10:00, Giuseppe CAVALLARO <peppe.cavallaro@st.com> wrote:
+>> On 3/9/2016 9:56 AM, Giuseppe CAVALLARO wrote:
+>>>
+>>> Hello
+>>>
+>>> On 3/9/2016 9:35 AM, Tomeu Vizoso wrote:
+>>>>
+>>>>
+>>>> in order to get the onboard network on the Radxa Rock2 to work at all
+>>>> on today's linux-next, I had to revert both commits:
+>>>>
+>>>> * "stmmac: Fix 'eth0: No PHY found' regression" for the drivers to
+>>>> probe and the link to come up, and
+>>>
+>>>
+>>> I've just sent two patches (on top of net.git) to fix this problem
+>>> pls let me know if these help on your side too.
+>>>
+>>>>
+>>>> * "stmmac: first frame prep at the end of the xmit routine" for the
+>>>> network interface to work at all.
+>>>
+>>>
+>>> I cannot reproduce it right now but I am looking at this again and let
+>>> you know.
+>>> I will check your output file too
+>>
+>>
+>> hmm, I think that the problem is around the "normal descriptor"
+>> management that is configured on the boxes where the driver is
+>> failing now. Using enhanced descriptors the network is ok.
+>> I will keep you up-to-date.
+>
+> Hi,
+>
+> I have done some tests and these are the results:
+>
+> * net.git (133800d1f028): probe failed
 
-Signed-off-by: Kejian Yan <yankejian@huawei.com>
----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c | 7 ++++++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h | 2 ++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c | 3 +++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h | 2 ++
- 4 files changed, 13 insertions(+), 1 deletion(-)
+ok, failure due to the "stmmac: Fix 'eth0: No PHY found' regression"
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-index 5ef0e96..65b8d91 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-@@ -467,8 +467,13 @@ int hns_mac_set_mtu(struct hns_mac_cb *mac_cb, u32 new_mtu)
- 	struct mac_driver *drv = hns_mac_get_drv(mac_cb);
- 	u32 buf_size = mac_cb->dsaf_dev->buf_size;
- 	u32 new_frm = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
-+	u32 max_frm = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver) ?
-+			MAC_MAX_MTU : MAC_MAX_MTU_V2;
- 
--	if ((new_mtu < MAC_MIN_MTU) || (new_frm > MAC_MAX_MTU) ||
-+	if (mac_cb->mac_type == HNAE_PORT_DEBUG)
-+		max_frm = MAC_MAX_MTU_DBG;
-+
-+	if ((new_mtu < MAC_MIN_MTU) || (new_frm > max_frm) ||
- 	    (new_frm > HNS_RCB_RING_MAX_BD_PER_PKT * buf_size))
- 		return -EINVAL;
- 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-index 0b05219..fc51e3d 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
-@@ -26,7 +26,9 @@ struct dsaf_device;
- 
- #define MAC_DEFAULT_MTU	(ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN + ETH_DATA_LEN)
- #define MAC_MAX_MTU		9600
-+#define MAC_MAX_MTU_V2		9728
- #define MAC_MIN_MTU		68
-+#define MAC_MAX_MTU_DBG         MAC_DEFAULT_MTU
- 
- #define MAC_DEFAULT_PAUSE_TIME 0xff
- 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-index f302ef9..7a61c57 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-@@ -343,6 +343,9 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
- 	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
- 		hns_ppe_set_vlan_strip(ppe_cb, 0);
- 
-+		dsaf_write_dev(ppe_cb, PPE_CFG_MAX_FRAME_LEN_REG,
-+			       HNS_PPEV2_MAX_FRAME_LEN);
-+
- 		/* set default RSS key in h/w */
- 		hns_ppe_set_rss_key(ppe_cb, ppe_cb->rss_key);
- 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
-index 0f5cb69..e9c0ec2 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
-@@ -30,6 +30,8 @@
- #define HNS_PPEV2_RSS_KEY_SIZE 40 /* in bytes or 320 bits */
- #define HNS_PPEV2_RSS_KEY_NUM (HNS_PPEV2_RSS_KEY_SIZE / sizeof(u32))
- 
-+#define HNS_PPEV2_MAX_FRAME_LEN 0X980
-+
- enum ppe_qid_mode {
- 	PPE_QID_MODE0 = 0, /* fixed queue id mode */
- 	PPE_QID_MODE1,	   /* switch:128VM non switch:6Port/4VM/4TC */
--- 
-1.9.1
+>
+> * net.git (133800d1f028) + revert: everything fine
+
+ok that is expected but the fixed-link will be NOK
+
+>
+> * net.git (133800d1f028) + revert + "stmmac: fix MDIO settings": everything fine
+
+thx for having tested it. So it works on real transceiver (tested by
+you) and with the fixed-link (tested by me).
+
+>
+> * today's linux-next: probe failed
+>
+> * today's linux-next + revert of 88f8b1bb41c6 stmmac: Fix 'eth0: No
+> PHY found' regression: probe succeeded but no network at all
+>
+> * today's linux-next + revert of 88f8b1bb41c6 (stmmac: Fix 'eth0: No
+> PHY found' regression) + revert of 0e80bdc9a72d (stmmac: first frame
+> prep at the end of xmit routine): probe succeeded, dhcp succeeds and
+> nfsroot works for a few seconds before timing out
+
+ok, I was looking at this problem now that seems to related
+the "stmmac: first frame prep at the end of xmit routine"
+that, at first glance, is breaking the gmac 3.50 with normal descriptor.
+
+> Btw, could you CC LKML on future patches that need testing?
+
+sure
+
+peppe
+
+>
+> Thanks,
+>
+> Tomeu
+>
+>> peppe
+>>
+>>
+>>>
+>>> Regards
+>>> peppe
+>>>
+>>>
+>>>> But a few seconds into the nfsroot boot I start getting:
+>>>>
+>>>> [    9.136701] systemd[1]: Started Load Kernel Modules.
+>>>> [   18.116321] nfs: server 10.42.0.1 not responding, still trying
+>>>> [   18.516224] ------------[ cut here ]------------
+>>>> [   18.521024] WARNING: CPU: 1 PID: 0 at net/sched/sch_generic.c:303
+>>>> dev_watchdog+0x284/0x288
+>>>> [   18.529456] NETDEV WATCHDOG: eth0 (rk_gmac-dwmac): transmit queue 0
+>>>> timed out
+>>>>
+>>>> I'm attaching the full boot log.
+>>>>
+>>>> Regards,
+>>>>
+>>>> Tomeu
+>>>>
+>>>
+>>>
+>>
+>
+>
