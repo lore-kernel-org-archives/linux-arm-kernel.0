@@ -1,40 +1,35 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  9 Mar 2016 11:50:14 +0100
-Subject: [PATCH 4/4] ARM: sun5i: chip: Add status LED
+Date: Wed,  9 Mar 2016 11:50:13 +0100
+Subject: [PATCH 3/4] ARM: dt: axp209: Add AXP209 GPIO driver
 In-Reply-To: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1457520614-32239-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1457520614-32239-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CHIP has a status LED connected to one of the AXP GPIOs. Add the
-gpio-leds node to be able to use the proper LED framework to control it.
+Add the AXP209 GPIO node to our AXP209 DTSI so that boards can use it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-r8-chip.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/axp209.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-index f6898c6b84d4..9a54df81ece7 100644
---- a/arch/arm/boot/dts/sun5i-r8-chip.dts
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -64,6 +64,16 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		status {
-+			label = "chip:white:status";
-+			gpios = <&axp_gpio 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
- };
+diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+index 051ab3ba9a65..5430054f7c60 100644
+--- a/arch/arm/boot/dts/axp209.dtsi
++++ b/arch/arm/boot/dts/axp209.dtsi
+@@ -53,6 +53,12 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
  
- &codec {
++	axp_gpio: gpio {
++		compatible = "x-powers,axp209-gpio";
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <1500>;
 -- 
 2.7.2
