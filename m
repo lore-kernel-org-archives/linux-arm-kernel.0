@@ -1,39 +1,65 @@
-From: a.lombardinilo@sintau.it (a.lombardinilo)
-Date: Wed,  9 Mar 2016 14:12:07 +0100
-Subject: Kirkwood dts spi-gpio
-In-Reply-To: <O3RO1V$CF721D4D7AC56BB19237E5BFE0260DB6@sintau.it>
-References: <O3RO1V$CF721D4D7AC56BB19237E5BFE0260DB6@sintau.it>
-Message-ID: <O3RWO7$37CF1BBB1164539CA7B18E9E6A340454@sintau.it>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Wed, 09 Mar 2016 14:20:16 +0100
+Subject: [linux-sunxi] [PATCH 1/4] gpio: Add AXP209 GPIO driver
+In-Reply-To: <1457520614-32239-2-git-send-email-maxime.ripard@free-electrons.com>
+ (Maxime Ripard's message of "Wed, 9 Mar 2016 11:50:11 +0100")
+References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1457520614-32239-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <87io0v23fz.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I added dts files in the following section:
+>>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-??????? spi_gpio {
-??????????????? #address-cells = <1>;
-??????????????? #size-cells = <1>;
+ > The AXP209 PMIC has a bunch of GPIOs accessible, that are usually used to
+ > control LEDs or backlight.
 
-??????????????? compatible = "spi-gpio";
+Do you find 3 'a bunch'? ;)
 
-??????????????? status = "okay";
-??????????????? gpio-sck = <&gpio1 40 GPIO_ACTIVE_LOW>;
-??????????????? gpio-miso = <&gpio1 41 GPIO_ACTIVE_LOW>;
-??????????????? gpio-mosi = <&gpio1 42 GPIO_ACTIVE_LOW>;
-??????????????? cs-gpios = <&gpio1 39 GPIO_ACTIVE_LOW>;
-??????????????? num-chipselects = <1>;
+ > +static int axp20x_gpio_probe(struct platform_device *pdev)
+ > +{
+ > +	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+ > +	struct axp20x_gpio *gpio;
+ > +	int ret;
+ > +
+ > +	if (!of_device_is_available(pdev->dev.of_node))
+ > +		return -ENODEV;
+ > +
+ > +	if (!axp20x) {
+ > +		dev_err(&pdev->dev, "Parent drvdata not set\n");
+ > +		return -EINVAL;
+ > +	}
+ > +
+ > +	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
+ > +	if (!gpio)
+ > +		return -ENOMEM;
+ > +
+ > +	gpio->chip.base			= -1;
+ > +	gpio->chip.can_sleep		= true;
+ > +	gpio->chip.dev			= &pdev->dev;
+ > +	gpio->chip.label		= dev_name(&pdev->dev);
+ > +	gpio->chip.owner		= THIS_MODULE;
+ > +	gpio->chip.get			= axp20x_gpio_get;
+ > +	gpio->chip.set			= axp20x_gpio_set;
+ > +	gpio->chip.direction_input	= axp20x_gpio_input;
+ > +	gpio->chip.direction_output	= axp20x_gpio_output;
+ > +	gpio->chip.ngpio		= 3;
+ > +
+ > +	gpio->regmap = axp20x->regmap;
 
-??????????????? can0: can at 0 {
-??????????????????????? compatible = "microchip,mcp2515";
-??????????????????????? reg = <0>;
-??????????????????????? interrupts = <&gpio1 43 GPIO_ACTIVE_LOW>;
-??????????????????????? spi-max-frequency = <10000000>;
-??????????????? };
-??????? };
+This could just use dev_get_regmap(pdev.dev->parent, NULL) instead of
+fiddling in the parent driver data.
 
- and I see the kernel message:
+ > +
+ > +	ret = gpiochip_add(&gpio->chip);
+ > +	if (ret) {
+ > +		dev_err(&pdev->dev, "Failed to register GPIO chip\n");
+ > +		return ret;
+ > +	}
+ > +
+ > +	dev_info(&pdev->dev, "AXP209 GPIO driver loaded\n");
 
-# dmesg | grep spi
-[??? 1.068019] spi_gpio spi_gpio: gpio-sck property not found
-[??? 1.073537] spi_gpio: probe of spi_gpio failed with error -22
+Any reason to be so noisy?
 
- thank you
+-- 
+Bye, Peter Korsgaard
