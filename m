@@ -1,10 +1,10 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed,  9 Mar 2016 13:35:27 -0800
-Subject: [PATCH 05/13] input: convert sun4i-ts to use
+Date: Wed,  9 Mar 2016 13:35:29 -0800
+Subject: [PATCH 07/13] thermal: convert mtk_thermal to use
  devm_thermal_zone_of_sensor_register
 In-Reply-To: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
 References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
-Message-ID: <1457559336-17652-6-git-send-email-edubezval@gmail.com>
+Message-ID: <1457559336-17652-8-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,63 +12,56 @@ This changes the driver to use the devm_ version
 of thermal_zone_of_sensor_register and cleans
 up the  local points and unregister calls.
 
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Hans de Goede <hdegoede@redhat.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Lukasz Majewski <l.majewski@samsung.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Jens Thiele <karme@karme.de>
-Cc: linux-input at vger.kernel.org
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: linux-pm at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mediatek at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
 ---
- drivers/input/touchscreen/sun4i-ts.c | 9 +--------
- 1 file changed, 1 insertion(+), 8 deletions(-)
+ drivers/thermal/mtk_thermal.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-index 4857943..d07dd29 100644
---- a/drivers/input/touchscreen/sun4i-ts.c
-+++ b/drivers/input/touchscreen/sun4i-ts.c
-@@ -115,7 +115,6 @@
- struct sun4i_ts_data {
- 	struct device *dev;
- 	struct input_dev *input;
--	struct thermal_zone_device *tz;
- 	void __iomem *base;
- 	unsigned int irq;
- 	bool ignore_fifo_data;
-@@ -366,10 +365,7 @@ static int sun4i_ts_probe(struct platform_device *pdev)
- 	if (IS_ERR(hwmon))
- 		return PTR_ERR(hwmon);
+diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
+index 3d93b1c..2c40b0f 100644
+--- a/drivers/thermal/mtk_thermal.c
++++ b/drivers/thermal/mtk_thermal.c
+@@ -145,7 +145,6 @@ struct mtk_thermal {
+ 	s32 o_slope;
+ 	s32 vts[MT8173_NUM_SENSORS];
  
--	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
--						 &sun4i_ts_tz_ops);
--	if (IS_ERR(ts->tz))
--		ts->tz = NULL;
-+	devm_thermal_zone_of_sensor_register(ts->dev, 0, ts, &sun4i_ts_tz_ops);
+-	struct thermal_zone_device *tzd;
+ };
  
- 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+ struct mtk_thermal_bank_cfg {
+@@ -573,16 +572,11 @@ static int mtk_thermal_probe(struct platform_device *pdev)
  
-@@ -377,7 +373,6 @@ static int sun4i_ts_probe(struct platform_device *pdev)
- 		error = input_register_device(ts->input);
- 		if (error) {
- 			writel(0, ts->base + TP_INT_FIFOC);
--			thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
- 			return error;
- 		}
- 	}
-@@ -394,8 +389,6 @@ static int sun4i_ts_remove(struct platform_device *pdev)
- 	if (ts->input)
- 		input_unregister_device(ts->input);
+ 	platform_set_drvdata(pdev, mt);
  
--	thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
+-	mt->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, mt,
+-				&mtk_thermal_ops);
+-	if (IS_ERR(mt->tzd))
+-		goto err_register;
++	devm_thermal_zone_of_sensor_register(&pdev->dev, 0, mt,
++					     &mtk_thermal_ops);
+ 
+ 	return 0;
+ 
+-err_register:
+-	clk_disable_unprepare(mt->clk_peri_therm);
 -
- 	/* Deactivate all IRQs */
- 	writel(0, ts->base + TP_INT_FIFOC);
+ err_disable_clk_auxadc:
+ 	clk_disable_unprepare(mt->clk_auxadc);
+ 
+@@ -593,8 +587,6 @@ static int mtk_thermal_remove(struct platform_device *pdev)
+ {
+ 	struct mtk_thermal *mt = platform_get_drvdata(pdev);
+ 
+-	thermal_zone_of_sensor_unregister(&pdev->dev, mt->tzd);
+-
+ 	clk_disable_unprepare(mt->clk_peri_therm);
+ 	clk_disable_unprepare(mt->clk_auxadc);
  
 -- 
 2.1.4
