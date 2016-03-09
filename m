@@ -1,78 +1,89 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed,  9 Mar 2016 13:35:33 -0800
-Subject: [PATCH 11/13] thermal: convert exynos to use
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 9 Mar 2016 13:45:14 -0800
+Subject: [PATCH 05/13] input: convert sun4i-ts to use
  devm_thermal_zone_of_sensor_register
-In-Reply-To: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
+In-Reply-To: <1457559336-17652-6-git-send-email-edubezval@gmail.com>
 References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
-Message-ID: <1457559336-17652-12-git-send-email-edubezval@gmail.com>
+ <1457559336-17652-6-git-send-email-edubezval@gmail.com>
+Message-ID: <20160309214514.GA18066@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This changes the driver to use the devm_ version
-of thermal_zone_of_sensor_register and cleans
-up the  local points and unregister calls.
+On Wed, Mar 09, 2016 at 01:35:27PM -0800, Eduardo Valentin wrote:
+> This changes the driver to use the devm_ version
+> of thermal_zone_of_sensor_register and cleans
+> up the  local points and unregister calls.
+> 
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jens Thiele <karme@karme.de>
+> Cc: linux-input at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
 
-Cc: Lukasz Majewski <l.majewski@samsung.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: linux-pm at vger.kernel.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
----
- drivers/thermal/samsung/exynos_tmu.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index fa61eff..256039e 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -1363,8 +1363,8 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 	 * data->tzd must be registered before calling exynos_tmu_initialize(),
- 	 * requesting irq and calling exynos_tmu_control().
- 	 */
--	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
--						    &exynos_sensor_ops);
-+	data->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, data,
-+							 &exynos_sensor_ops);
- 	if (IS_ERR(data->tzd)) {
- 		ret = PTR_ERR(data->tzd);
- 		dev_err(&pdev->dev, "Failed to register sensor: %d\n", ret);
-@@ -1374,21 +1374,19 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 	ret = exynos_tmu_initialize(pdev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to initialize TMU\n");
--		goto err_thermal;
-+		goto err_sclk;
- 	}
- 
- 	ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
- 		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
--		goto err_thermal;
-+		goto err_sclk;
- 	}
- 
- 	exynos_tmu_control(pdev, true);
- 	return 0;
- 
--err_thermal:
--	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
- err_sclk:
- 	clk_disable_unprepare(data->sclk);
- err_clk:
-@@ -1406,9 +1404,7 @@ err_sensor:
- static int exynos_tmu_remove(struct platform_device *pdev)
- {
- 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
--	struct thermal_zone_device *tzd = data->tzd;
- 
--	thermal_zone_of_sensor_unregister(&pdev->dev, tzd);
- 	exynos_tmu_control(pdev, false);
- 
- 	clk_disable_unprepare(data->sclk);
+I guess it will make sense to merge through your tree unless you want to
+hold off until after I merge winth mainline (around -rc3) assuming that
+it even makes into 4.6.
+
+Thanks.
+
+> ---
+>  drivers/input/touchscreen/sun4i-ts.c | 9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+> index 4857943..d07dd29 100644
+> --- a/drivers/input/touchscreen/sun4i-ts.c
+> +++ b/drivers/input/touchscreen/sun4i-ts.c
+> @@ -115,7 +115,6 @@
+>  struct sun4i_ts_data {
+>  	struct device *dev;
+>  	struct input_dev *input;
+> -	struct thermal_zone_device *tz;
+>  	void __iomem *base;
+>  	unsigned int irq;
+>  	bool ignore_fifo_data;
+> @@ -366,10 +365,7 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>  	if (IS_ERR(hwmon))
+>  		return PTR_ERR(hwmon);
+>  
+> -	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
+> -						 &sun4i_ts_tz_ops);
+> -	if (IS_ERR(ts->tz))
+> -		ts->tz = NULL;
+> +	devm_thermal_zone_of_sensor_register(ts->dev, 0, ts, &sun4i_ts_tz_ops);
+>  
+>  	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+>  
+> @@ -377,7 +373,6 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+>  		error = input_register_device(ts->input);
+>  		if (error) {
+>  			writel(0, ts->base + TP_INT_FIFOC);
+> -			thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
+>  			return error;
+>  		}
+>  	}
+> @@ -394,8 +389,6 @@ static int sun4i_ts_remove(struct platform_device *pdev)
+>  	if (ts->input)
+>  		input_unregister_device(ts->input);
+>  
+> -	thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
+> -
+>  	/* Deactivate all IRQs */
+>  	writel(0, ts->base + TP_INT_FIFOC);
+>  
+> -- 
+> 2.1.4
+> 
+
 -- 
-2.1.4
+Dmitry
