@@ -1,45 +1,297 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  9 Mar 2016 11:24:16 +0100
-Subject: [PATCH v2 14/18] arm: Add build support for mach-oxnas
+Date: Wed,  9 Mar 2016 11:24:17 +0100
+Subject: [PATCH v2 15/18] arm: boot: dts: Add PLX Technology OX810SE dtsi
 In-Reply-To: <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
  <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457519060-6038-15-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457519060-6038-16-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Kconfig and Makefile support for mach-oxnas.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/Kconfig  | 2 ++
- arch/arm/Makefile | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm/boot/dts/ox810se.dtsi | 273 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 273 insertions(+)
+ create mode 100644 arch/arm/boot/dts/ox810se.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4f799e5..2025fc9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -801,6 +801,8 @@ source "arch/arm/plat-pxa/Kconfig"
- 
- source "arch/arm/mach-mmp/Kconfig"
- 
-+source "arch/arm/mach-oxnas/Kconfig"
+diff --git a/arch/arm/boot/dts/ox810se.dtsi b/arch/arm/boot/dts/ox810se.dtsi
+new file mode 100644
+index 0000000..5852a57
+--- /dev/null
++++ b/arch/arm/boot/dts/ox810se.dtsi
+@@ -0,0 +1,273 @@
++/*
++ * ox810se.dtsi - Device tree file for Oxford Semiconductor OX810SE SoC
++ *
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * Licensed under GPLv2 or later
++ */
 +
- source "arch/arm/mach-qcom/Kconfig"
- 
- source "arch/arm/mach-realview/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index fe25410..0e96c63 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -194,6 +194,7 @@ machine-$(CONFIG_ARCH_NSPIRE)		+= nspire
- machine-$(CONFIG_ARCH_OMAP1)		+= omap1
- machine-$(CONFIG_ARCH_OMAP2PLUS)	+= omap2
- machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
-+machine-$(CONFIG_ARCH_OXNAS)		+= oxnas
- machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
- machine-$(CONFIG_ARCH_PXA)		+= pxa
- machine-$(CONFIG_ARCH_QCOM)		+= qcom
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "oxsemi,ox810se";
++
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			device_type = "cpu";
++			compatible = "arm,arm926ej-s";
++			clocks = <&armclk>;
++		};
++	};
++
++	memory {
++		/* Max 256MB @ 0x48000000 */
++		reg = <0x48000000 0x10000000>;
++	};
++
++	clocks {
++		osc: oscillator {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
++
++		gmacclk: gmacclk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <125000000>;
++		};
++
++		rpsclk: rpsclk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <1>;
++			clocks = <&osc>;
++		};
++
++		pll400: pll400 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <733333333>;
++		};
++
++		sysclk: sysclk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <4>;
++			clock-mult = <1>;
++			clocks = <&pll400>;
++		};
++
++		armclk: armclk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++			clocks = <&pll400>;
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		ranges;
++		interrupt-parent = <&intc>;
++
++		apb-bridge at 44000000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			ranges = <0 0x44000000 0x1000000>;
++
++			pinctrl: pinctrl {
++				compatible = "oxsemi,ox810se-pinctrl", "simple-bus";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
++
++				/* Regmap for sys registers */
++				plxtech,sys-ctrl = <&sys>;
++
++				/* Default, all-open mux-map */
++				plxtech,mux-mask = <
++					0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
++					0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
++					>;
++
++				gpio0: gpio at 000000 {
++					compatible = "oxsemi,ox810se-gpio";
++					reg = <0x000000 0x100000>;
++					interrupts = <21>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					#gpio-lines = <32>;
++				};
++
++				gpio1: gpio at 100000 {
++					compatible = "oxsemi,ox810se-gpio";
++					reg = <0x100000 0x100000>;
++					interrupts = <22>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					#gpio-lines = <3>;
++				};
++
++				uart0 {
++					pinctrl_uart0: uart0 {
++						plxtech,pins = <0 31 3 0
++								0 32 3 0>;
++					};
++					pinctrl_uart0_modem: uart0_modem {
++						plxtech,pins = <0 27 3 0
++								0 28 3 0
++								0 29 3 0
++								0 30 3 0
++								0 33 3 0
++								0 34 3 0>;
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1 {
++						plxtech,pins = <0 20 3 0
++								0 22 3 0>;
++					};
++					pinctrl_uart1_modem: uart1_modem {
++						plxtech,pins = <0 8 3 0
++								0 9 3 0
++								0 23 3 0
++								0 24 3 0
++								0 25 3 0
++								0 26 3 0>;
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2 {
++						plxtech,pins = <0 6 3 0
++								0 7 3 0>;
++					};
++					pinctrl_uart2_modem: uart2_modem {
++						plxtech,pins = <0 0 3 0
++								0 1 3 0
++								0 2 3 0
++								0 3 3 0
++								0 4 3 0
++								0 5 3 0>;
++					};
++				};
++			};
++
++			uart0: serial at 200000 {
++			       compatible = "ns16550a";
++			       reg = <0x200000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <23>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 17>;
++			};
++
++			uart1: serial at 300000 {
++			       compatible = "ns16550a";
++			       reg = <0x300000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <24>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 18>;
++			};
++
++			uart2: serial at 900000 {
++			       compatible = "ns16550a";
++			       reg = <0x900000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <29>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 22>;
++			};
++
++			uart3: serial at a00000 {
++			       compatible = "ns16550a";
++			       reg = <0xa00000 0x100000>;
++			       clocks = <&sysclk>;
++			       interrupts = <30>;
++			       reg-shift = <0>;
++			       fifo-size = <16>;
++			       reg-io-width = <1>;
++			       current-speed = <115200>;
++			       no-loopback-test;
++			       status = "disabled";
++			       resets = <&reset 23>;
++			};
++		};
++
++		apb-bridge at 45000000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			ranges = <0 0x45000000 0x1000000>;
++
++			sys: sys-ctrl at 000000 {
++				compatible = "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd";
++				reg = <0x000000 0x100000>;
++
++				reset: reset-controller {
++					compatible = "oxsemi,ox810se-reset";
++					#reset-cells = <1>;
++				};
++
++				stdclk: stdclk {
++					compatible = "oxsemi,ox810se-stdclk";
++					#clock-cells = <1>;
++				};
++			};
++
++			rps at 300000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "simple-bus";
++				ranges = <0 0x300000 0x100000>;
++
++				intc: interrupt-controller at 0 {
++					compatible = "arm,rps-irq";
++					interrupt-controller;
++					reg = <0 0x200>;
++					#interrupt-cells = <1>;
++					valid-mask = <0xFFFFFFFF>;
++					clear-mask = <0>;
++				};
++
++				timer0: timer at 200 {
++					compatible = "arm,sp804";
++					reg = <0x200 0x40>;
++					clocks = <&rpsclk>;
++					interrupts = <4 5>;
++					arm,timer-width = <24>;
++				};
++			};
++		};
++	};
++};
 -- 
 1.9.1
