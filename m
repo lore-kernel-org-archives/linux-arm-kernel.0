@@ -1,46 +1,37 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 10 Mar 2016 05:22:53 +0800
-Subject: [PATCH v6 1/6] rockchip: power-domain: make idle handling optional
-In-Reply-To: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
-References: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1457558578-22049-2-git-send-email-zhangqing@rock-chips.com>
+Date: Thu, 10 Mar 2016 05:22:52 +0800
+Subject: [RESEND PATCH v6 0/6] rockchip: power-domain: fix pm domain for
+ support RK3399 SoC
+Message-ID: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all new socs need to handle idle states on domain state changes,
-so add the possibility to make them optional.
+fix some idle handling
+support sub-power domain
+add rk3399-power.h
+modify document for RK3399 Soc
+modify power domain for RK3399 SoC
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/soc/rockchip/pm_domains.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Changes in v6:
+[PATCH v6 3/6]:
+        fix up some coding style
+[PATCH v6 4/6]:
+        fix up the volatge domain follow the TRM table
+        fix up the power domian follow the TRM reg bits
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 18aee6b..c46312d 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -68,9 +68,9 @@ struct rockchip_pmu {
- {						\
- 	.pwr_mask = BIT(pwr),			\
- 	.status_mask = BIT(status),		\
--	.req_mask = BIT(req),			\
--	.idle_mask = BIT(idle),			\
--	.ack_mask = BIT(ack),			\
-+	.req_mask = (req >= 0) ? BIT(req) : 0,		\
-+	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
-+	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
- }
- 
- #define DOMAIN_RK3288(pwr, status, req)		\
-@@ -96,6 +96,9 @@ static int rockchip_pmu_set_idle_request(struct rockchip_pm_domain *pd,
- 	struct rockchip_pmu *pmu = pd->pmu;
- 	unsigned int val;
- 
-+	if (pd_info->req_mask == 0)
-+		return 0;
-+
- 	regmap_update_bits(pmu->regmap, pmu->info->req_offset,
- 			   pd_info->req_mask, idle ? -1U : 0);
- 
+Elaine Zhang (6):
+  rockchip: power-domain: make idle handling optional
+  power-domain: allow domains only handling idle requests
+  rockchip: power-domain: add support for sub-power domains
+  dt/bindings: power: add RK3399 SoCs header for power-domain
+  dt/bindings: rockchip: modify document of Rockchip power domains
+  rockchip: power-domain: Modify power domain driver for rk3399
+
+ .../bindings/soc/rockchip/power_domain.txt         |  37 ++++++
+ drivers/soc/rockchip/pm_domains.c                  | 139 ++++++++++++++++++++-
+ include/dt-bindings/power/rk3399-power.h           |  53 ++++++++
+ 3 files changed, 224 insertions(+), 5 deletions(-)
+ create mode 100644 include/dt-bindings/power/rk3399-power.h
+
 -- 
 1.9.1
