@@ -1,120 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 9 Mar 2016 02:31:16 +0000
-Subject: [PATCH v2] irqchip/gicv3-its: Don't allow devices whose ID is
- outside range
-In-Reply-To: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
-References: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20160309023116.7172f095@arm.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed,  9 Mar 2016 10:37:00 +0800
+Subject: [PATCH v3 0/7] Add more clock compatible features and support the
+ RK3399 clock
+Message-ID: <1457491027-30936-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Feb 2016 13:22:03 -0600
-Shanker Donthineni <shankerd@codeaurora.org> wrote:
 
-Hi Shanker,
+Hi,
+  The patch series add support more mux parameters and multiple
+clock providers for the rockchip features of the clock framework,
+and support the clock controller for the RK3399.
 
-> We are not checking whether the requested device identifier fits into
-> the device table memory or not. The function its_create_device()
-> assumes that enough memory has been allocated for whole DevID sparse
-> (reported by ITS_TYPER.Devbits) during the ITS probe() and continues
-> to initialize ITS hardware.
-> 
-> This assumption is not perfect, sometimes we reduce memory size either
-> because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
-> MAPD command fails if 'Device ID' is outside of device table range.
-> 
-> Add a simple validation check to avoid MAPD failures since we are
-> not handling ITS command errors. This change also helps to return an
-> error -ENOMEM instead of success to caller.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
-> [v1]->[v2]
->   Rebase to v4.5-rc6, edit commit text and simplify code changes
-> 
->  drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
->  1 file changed, 20 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 43dfd15..6d986ac 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -55,6 +55,16 @@ struct its_collection {
->  };
->  
->  /*
-> + * The ITS_BASER structure - contains memeory information and table
-> + * entry size in bytes.
-> + */
-> +struct its_baser {
-> +	void		*base;
-> +	u32		order;
-> +	u32		entry_size;
-> +};
-> +
-> +/*
->   * The ITS structure - contains most of the infrastructure, with the
->   * top-level MSI domain, the command queue, the collections, and the
->   * list of devices writing to it.
-> @@ -66,14 +76,12 @@ struct its_node {
->  	unsigned long		phys_base;
->  	struct its_cmd_block	*cmd_base;
->  	struct its_cmd_block	*cmd_write;
-> -	struct {
-> -		void		*base;
-> -		u32		order;
-> -	} tables[GITS_BASER_NR_REGS];
-> +	struct its_baser	tables[GITS_BASER_NR_REGS];
->  	struct its_collection	*collections;
->  	struct list_head	its_device_list;
->  	u64			flags;
->  	u32			ite_size;
-> +	struct its_baser	*device_table;
 
-nit: grouping this field with the tables array would make it slightly
-nicer.
+Changes in v3:
+- rename pclkin_cif to pclkin_cifmux, add diagram and comment for
+  pclkin_cifmux
+- add the clk_test node
+- modify the cif_testout path
+- include two new patches that dt-bindings and header file from
+  Jianqun's patch series
 
->  };
->  
->  #define ITS_ITT_ALIGN		SZ_256
-> @@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->  		 * For other tables, only allocate a single page.
->  		 */
->  		if (type == GITS_BASER_TYPE_DEVICE) {
-> +			its->device_table = &its->tables[i];
->  			/*
->  			 * 'order' was initialized earlier to the default page
->  			 * granule of the the ITS.  We can't have an allocation
-> @@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
->  					node_name, order);
->  			}
->  		}
-> +		its->tables[i].entry_size = entry_size;
->  
->  retry_alloc_baser:
->  		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
-> @@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  	int nr_ites;
->  	int sz;
->  
-> +	/* Don't allow 'dev_id' that exceeds single, flat table limit */
-> +	if (its->device_table &&
-> +	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
-> +	    its->device_table->entry_size)))
+Changes in v2:
+- rename the aplll/apllb to lpll/bpll
+- add drv/sample clock nodes for sdmmc/sdio
 
-Assume for a minute we do not have a device table (which would be
-perfectly possible - just think of an ITS with its own private memory,
-like we have with KVM). Shouldn't we also check devid with the number of
-bits that this ITS implements for Device IDs?
+Xing Zheng (7):
+  dt-bindings: add bindings for rk3399 clock controller
+  clk: rockchip: add dt-binding header for rk3399
+  clk: rockchip: add more mux parameters for new pll sources
+  clk: rockchip: Add support for multiple clock providers
+  clk: rockchip: add new pll-type for rk3399 and similar socs
+  clk: rockchip: add a COMPOSITE_FRACMUX_NOGATE type
+  clk: rockchip: add clock controller for the RK3399
 
-> +		return NULL;
-> +
->  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->  	/*
->  	 * At least one bit of EventID is being used, hence a minimum
+ .../bindings/clock/rockchip,rk3399-cru.txt         |   82 +
+ drivers/clk/rockchip/Makefile                      |    1 +
+ drivers/clk/rockchip/clk-cpu.c                     |   14 +-
+ drivers/clk/rockchip/clk-pll.c                     |  309 +++-
+ drivers/clk/rockchip/clk-rk3036.c                  |   20 +-
+ drivers/clk/rockchip/clk-rk3188.c                  |   54 +-
+ drivers/clk/rockchip/clk-rk3228.c                  |   20 +-
+ drivers/clk/rockchip/clk-rk3288.c                  |   22 +-
+ drivers/clk/rockchip/clk-rk3368.c                  |   27 +-
+ drivers/clk/rockchip/clk-rk3399.c                  | 1567 ++++++++++++++++++++
+ drivers/clk/rockchip/clk.c                         |  148 +-
+ drivers/clk/rockchip/clk.h                         |   98 +-
+ include/dt-bindings/clock/rk3399-cru.h             |  720 +++++++++
+ 13 files changed, 2957 insertions(+), 125 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-rk3399.c
+ create mode 100644 include/dt-bindings/clock/rk3399-cru.h
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+1.7.9.5
