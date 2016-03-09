@@ -1,22 +1,75 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 09 Mar 2016 02:12:31 +0100
-Subject: [RESEND PATCH v2 1/5] clk: rockchip: add more mux parameters for
- new pll sources
-In-Reply-To: <1456827275-8035-2-git-send-email-zhengxing@rock-chips.com>
-References: <1456827275-8035-1-git-send-email-zhengxing@rock-chips.com>
- <1456827275-8035-2-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <2242962.kh0Ty0L2C4@phil>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 9 Mar 2016 08:19:55 +0700
+Subject: [PATCH] arm64: account for sparsemem section alignment when
+ choosing vmemmap offset
+In-Reply-To: <20160308151219.GD6192@e104818-lin.cambridge.arm.com>
+References: <1457446169-23099-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160308151219.GD6192@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu8nzi2pSyHdNVP9=kjSMNhGTEjuHYvvmOdomXKnuJ2n-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 1. M?rz 2016, 18:14:31 schrieb Xing Zheng:
-> Thers are only two parent PLLs that APLL and GPLL for core on the
-> previous SoCs (RK3066/RK3188/RK3288/RK3368). Hence, we set fixed
-> GPLL as alternate parent when core is switching freq.
-> 
-> Since RK3399 big.LITTLE architecture, we need to select and adapt
-> more PLLs (ALPLL/ABPLL/DPLL/GPLL) sources.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+On 8 March 2016 at 22:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Mar 08, 2016 at 09:09:29PM +0700, Ard Biesheuvel wrote:
+>> Commit dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear
+>> region") fixed an issue where the struct page array would overflow into the
+>> adjacent virtual memory region if system RAM was placed so high up in
+>> physical memory that its addresses were not representable in the build time
+>> configured virtual address size.
+>>
+>> However, the fix failed to take into account that the vmemmap region needs
+>> to be relatively aligned with respect to the sparsemem section size, so that
+>> a sequence of page structs corresponding with a sparsemem section in the
+>> linear region appears naturally aligned in the vmemmap region.
+>>
+>> So round up vmemmap to sparsemem section size. Since this essentially moves
+>> the projection of the linear region up in memory, also revert the reduction
+>> of the size of the vmemmap region.
+>>
+>> Fixes: dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear region")
+>> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/pgtable.h | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index f50608674580..819aff5d593f 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -40,7 +40,7 @@
+>>   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
+>>   *   fixed mappings and modules
+>>   */
+>> -#define VMEMMAP_SIZE         ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
+>> +#define VMEMMAP_SIZE         ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
+>
+> I think we could have extended the existing halved VMEMMAP_SIZE by
+> PAGES_PER_SECTION * sizeof(struct page) to cope with the alignment but I
+> don't think it's worth.
+>
 
-note to self: looks good to go
+Indeed. But it is only temporary anyway, since the problem this patch
+solves does not exist anymore in for-next/core, considering that
+memstart_addr itself should be sufficiently aligned by construction.
+So I intend to propose a revert of this change, after -rc1 perhaps?
+
+>>
+>>  #ifndef CONFIG_KASAN
+>>  #define VMALLOC_START                (VA_START)
+>> @@ -52,7 +52,8 @@
+>>  #define VMALLOC_END          (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+>>
+>>  #define VMEMMAP_START                (VMALLOC_END + SZ_64K)
+>> -#define vmemmap                      ((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
+>> +#define vmemmap                      ((struct page *)VMEMMAP_START - \
+>> +                              SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
+>
+> It looks fine to me:
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> Will would probably pick it up tomorrow (and add a cc stable as well).
+>
+
+Thanks
