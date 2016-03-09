@@ -1,90 +1,91 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 9 Mar 2016 13:27:44 +0100
-Subject: [PATCH v3 08/12] arm64, numa: rework numa_add_memblk()
-In-Reply-To: <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
-Message-ID: <20160309122744.GD1535@rric.localdomain>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 09 Mar 2016 13:29:09 +0100
+Subject: [PATCH v3 5/7] clk: rockchip: add new pll-type for rk3399 and
+ similar socs
+In-Reply-To: <1457491378-31077-1-git-send-email-zhengxing@rock-chips.com>
+References: <1457491027-30936-1-git-send-email-zhengxing@rock-chips.com>
+ <1457491378-31077-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <2688473.EyteJL2oqe@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.01.16 17:39:23, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
+Hi Xing,
+
+Am Mittwoch, 9. M?rz 2016, 10:42:58 schrieb Xing Zheng:
+> The rk3399's pll and clock are similar with rk3036's, it different
+> with base on the rk3066(rk3188, rk3288, rk3368 use it), there are
+> different adjust foctors and control registers, so these should be
+> independent and separate from the series of rk3066s.
 > 
-> Rework numa_add_memblk() to update the parameter "u64 size"
-> to "u64 end", this will make it consistent with x86 and
-> can simplify the code later.
-> 
-> Updates for arch/arm64/mm/numa.c should squash to core NUMA
-> patches from Ganapat.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 > ---
->  arch/arm64/kernel/acpi_numa.c |  2 +-
->  arch/arm64/kernel/of_numa.c   |  2 +-
->  arch/arm64/mm/numa.c          | 12 ++++++------
->  3 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/clk/rockchip/clk-pll.c |  279
+> +++++++++++++++++++++++++++++++++++++++- drivers/clk/rockchip/clk.h     |  
+>  3 +-
+>  2 files changed, 280 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
+> index 27be66a..62d2f0e 100644
+> --- a/drivers/clk/rockchip/clk-pll.c
+> +++ b/drivers/clk/rockchip/clk-pll.c
+> @@ -593,6 +593,275 @@ static const struct clk_ops
+> rockchip_rk3066_pll_clk_ops = { .init = rockchip_rk3066_pll_init,
+>  };
+> 
+> +/**
+> + * PLL used in RK3399
+> + */
+> +
+> +#define RK3399_PLLCON(i)			(i * 0x4)
+> +#define RK3399_PLLCON0_FBDIV_MASK		0xfff
+> +#define RK3399_PLLCON0_FBDIV_SHIFT		0
+> +#define RK3399_PLLCON1_REFDIV_MASK		0x3f
+> +#define RK3399_PLLCON1_REFDIV_SHIFT		0
+> +#define RK3399_PLLCON1_POSTDIV1_MASK		0x7
+> +#define RK3399_PLLCON1_POSTDIV1_SHIFT		8
+> +#define RK3399_PLLCON1_POSTDIV2_MASK		0x7
+> +#define RK3399_PLLCON1_POSTDIV2_SHIFT		12
+> +#define RK3399_PLLCON2_FRAC_MASK		0xffffff
+> +#define RK3399_PLLCON2_FRAC_SHIFT		0
+please move RK3399_PLLCON2_LOCK_STATUS here
 
-> diff --git a/arch/arm64/kernel/of_numa.c b/arch/arm64/kernel/of_numa.c
-> index 2f9e34b..aa6f3a3 100644
-> --- a/arch/arm64/kernel/of_numa.c
-> +++ b/arch/arm64/kernel/of_numa.c
-> @@ -168,7 +168,7 @@ static int __init early_init_parse_memory_node(unsigned long node)
->  		pr_debug("NUMA-DT:  base = %llx , node = %u\n",
->  				base, nid);
->  
-> -		if (numa_add_memblk(nid, base, size) < 0)
-> +		if (numa_add_memblk(nid, base, base + size) < 0)
->  			return -EINVAL;
->  	}
->  
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index e974995..2b04b8a 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -137,25 +137,25 @@ void numa_store_cpu_info(unsigned int cpu)
->   * numa_add_memblk - Set node id to memblk
->   * @nid: NUMA node ID of the new memblk
->   * @start: Start address of the new memblk
-> - * @size:  Size of the new memblk
-> + * @end:  End address of the new memblk
+> +#define RK3399_PLLCON3_DSMPD_MASK		0x1
+> +#define RK3399_PLLCON3_DSMPD_SHIFT		12
 
-Apart from my earlier comment, this is not exactly correct and may
-cause confussion. The implementation here defines:
+DSMPD_SHIFT should be 3, right?
 
- size == end - start
+> +
+> +#define RK3399_PLLCON2_LOCK_STATUS		(31 << 0)
 
-which is different to struct resource, where:
+that is wrong, you want (1 << 31), or even better BIT(31) here
 
- resource_size(res) == res->end - res->start + 1
 
-Thus, @end here is the first address outside of memblk.
+> +#define RK3399_PLLCON3_PWRDOWN			(1 << 0)
 
-This is one more argument for keeping @size here.
+dito, BIT(0) please
 
--Robert
+[...]
 
->   *
->   * RETURNS:
->   * 0 on success, -errno on failure.
->   */
-> -int __init numa_add_memblk(int nid, u64 start, u64 size)
-> +int __init numa_add_memblk(int nid, u64 start, u64 end)
->  {
->  	int ret;
->  
-> -	ret = memblock_set_node(start, size, &memblock.memory, nid);
-> +	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
->  	if (ret < 0) {
->  		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
-> -			start, (start + size - 1), nid);
-> +			start, (end - 1), nid);
->  		return ret;
->  	}
->  
->  	node_set(nid, numa_nodes_parsed);
->  	pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
-> -			start, (start + size - 1), nid);
-> +			start, (end - 1), nid);
->  	return ret;
->  }
+> +static int rockchip_rk3399_pll_set_rate(struct clk_hw *hw, unsigned long
+> drate, +					unsigned long prate)
+> +{
+> +	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
+> +	const struct rockchip_pll_rate_table *rate;
+> +	unsigned long old_rate = rockchip_rk3399_pll_recalc_rate(hw, prate);
+> +	struct regmap *grf = rockchip_clk_get_grf(pll->ctx);
+> +
+> +	if (IS_ERR(grf)) {
+> +		pr_debug("%s: grf regmap not available, aborting rate change\n",
+> +			 __func__);
+> +		return PTR_ERR(grf);
+> +	}
+
+the pll lock-status moved to the pll registers it seems, so you don't need to 
+get the GRF here at all, as we don't need it for the lock status.
+
+
+Heiko
