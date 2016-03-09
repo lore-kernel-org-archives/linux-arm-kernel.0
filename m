@@ -1,10 +1,10 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed,  9 Mar 2016 13:35:32 -0800
-Subject: [PATCH 10/13] thermal: convert rockchip_thermal to use
+Date: Wed,  9 Mar 2016 13:35:33 -0800
+Subject: [PATCH 11/13] thermal: convert exynos to use
  devm_thermal_zone_of_sensor_register
 In-Reply-To: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
 References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
-Message-ID: <1457559336-17652-11-git-send-email-edubezval@gmail.com>
+Message-ID: <1457559336-17652-12-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,79 +12,67 @@ This changes the driver to use the devm_ version
 of thermal_zone_of_sensor_register and cleans
 up the  local points and unregister calls.
 
+Cc: Lukasz Majewski <l.majewski@samsung.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Cc: linux-pm at vger.kernel.org
+Cc: linux-samsung-soc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
 ---
- drivers/thermal/rockchip_thermal.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index b58e3fb..792c5d0 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -753,8 +753,8 @@ rockchip_thermal_register_sensor(struct platform_device *pdev,
- 
- 	sensor->thermal = thermal;
- 	sensor->id = id;
--	sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev, id, sensor,
--						      &rockchip_of_thermal_ops);
-+	sensor->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, id,
-+					sensor, &rockchip_of_thermal_ops);
- 	if (IS_ERR(sensor->tzd)) {
- 		error = PTR_ERR(sensor->tzd);
- 		dev_err(&pdev->dev, "failed to register sensor %d: %d\n",
-@@ -782,7 +782,7 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 	struct resource *res;
- 	int irq;
--	int i, j;
-+	int i;
- 	int error;
- 
- 	match = of_match_node(of_rockchip_thermal_match, np);
-@@ -865,9 +865,6 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev,
- 				"failed to register sensor[%d] : error = %d\n",
- 				i, error);
--			for (j = 0; j < i; j++)
--				thermal_zone_of_sensor_unregister(&pdev->dev,
--						thermal->sensors[j].tzd);
- 			goto err_disable_pclk;
- 		}
- 	}
-@@ -879,7 +876,7 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
- 	if (error) {
- 		dev_err(&pdev->dev,
- 			"failed to request tsadc irq: %d\n", error);
--		goto err_unregister_sensor;
-+		goto err_disable_pclk;
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index fa61eff..256039e 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -1363,8 +1363,8 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 	 * data->tzd must be registered before calling exynos_tmu_initialize(),
+ 	 * requesting irq and calling exynos_tmu_control().
+ 	 */
+-	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+-						    &exynos_sensor_ops);
++	data->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, data,
++							 &exynos_sensor_ops);
+ 	if (IS_ERR(data->tzd)) {
+ 		ret = PTR_ERR(data->tzd);
+ 		dev_err(&pdev->dev, "Failed to register sensor: %d\n", ret);
+@@ -1374,21 +1374,19 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+ 	ret = exynos_tmu_initialize(pdev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to initialize TMU\n");
+-		goto err_thermal;
++		goto err_sclk;
  	}
  
- 	thermal->chip->control(thermal->regs, true);
-@@ -891,11 +888,6 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
+ 	ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
+ 		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
+-		goto err_thermal;
++		goto err_sclk;
+ 	}
  
+ 	exynos_tmu_control(pdev, true);
  	return 0;
  
--err_unregister_sensor:
--	while (i--)
--		thermal_zone_of_sensor_unregister(&pdev->dev,
--						  thermal->sensors[i].tzd);
--
- err_disable_pclk:
- 	clk_disable_unprepare(thermal->pclk);
- err_disable_clk:
-@@ -913,7 +905,6 @@ static int rockchip_thermal_remove(struct platform_device *pdev)
- 		struct rockchip_thermal_sensor *sensor = &thermal->sensors[i];
+-err_thermal:
+-	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+ err_sclk:
+ 	clk_disable_unprepare(data->sclk);
+ err_clk:
+@@ -1406,9 +1404,7 @@ err_sensor:
+ static int exynos_tmu_remove(struct platform_device *pdev)
+ {
+ 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+-	struct thermal_zone_device *tzd = data->tzd;
  
- 		rockchip_thermal_toggle_sensor(sensor, false);
--		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
- 	}
+-	thermal_zone_of_sensor_unregister(&pdev->dev, tzd);
+ 	exynos_tmu_control(pdev, false);
  
- 	thermal->chip->control(thermal->regs, false);
+ 	clk_disable_unprepare(data->sclk);
 -- 
 2.1.4
