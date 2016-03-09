@@ -1,92 +1,113 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 10 Mar 2016 05:02:37 +0800
-Subject: [PATCH v6 5/6] dt/bindings: rockchip: modify document of Rockchip
- power domains
+Date: Thu, 10 Mar 2016 05:03:01 +0800
+Subject: [PATCH v6 6/6] rockchip: power-domain: Modify power domain driver for
+ rk3399
 In-Reply-To: <1457557241-21297-1-git-send-email-zhangqing@rock-chips.com>
 References: <1457557241-21297-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1457557357-21423-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1457557381-21470-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the power domains
-found on Rockchip RK3399 SoCs
+This driver is modified to support RK3399 SoC.
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- .../bindings/soc/rockchip/power_domain.txt         | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/soc/rockchip/pm_domains.c | 55 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-index 13dc6a3..98085c8 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-@@ -7,6 +7,7 @@ Required properties for power domain controller:
- - compatible: Should be one of the following.
- 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
- 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
-+	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
- - #power-domain-cells: Number of cells in a power-domain specifier.
- 	Should be 1 for multiple PM domains.
- - #address-cells: Should be 1.
-@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
- - reg: index of the power domain, should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
- - clocks (optional): phandles to clocks which need to be enabled while power domain
- 	switches state.
+diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
+index e4ae94f..e0cfe5f 100644
+--- a/drivers/soc/rockchip/pm_domains.c
++++ b/drivers/soc/rockchip/pm_domains.c
+@@ -19,6 +19,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/power/rk3368-power.h>
++#include <dt-bindings/power/rk3399-power.h>
  
-@@ -45,12 +47,41 @@ Example:
-                 };
-         };
+ struct rockchip_domain_info {
+ 	int pwr_mask;
+@@ -79,6 +80,9 @@ struct rockchip_pmu {
+ #define DOMAIN_RK3368(pwr, status, req)		\
+ 	DOMAIN(pwr, status, req, (req) + 16, req)
  
-+Example 2:
-+		power: power-controller {
-+			compatible = "rockchip,rk3399-power-controller";
-+			#power-domain-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++#define DOMAIN_RK3399(pwr, status, req)                \
++	DOMAIN(pwr, status, req, req, req)
 +
-+			pd_vio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <RK3399_PD_VIO>;
-+
-+				pd_vo {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <RK3399_PD_VO>;
-+
-+					pd_vopb {
-+						reg = <RK3399_PD_VOPB>;
-+					};
-+
-+					pd_vopl {
-+						reg = <RK3399_PD_VOPL>;
-+					};
-+				};
-+			};
-+		};
-+
- Node of a device using power domains must have a power-domains property,
- containing a phandle to the power device node and an index specifying which
- power domain to use.
- The index should use macros in:
- 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
- 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
-+	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
+ static bool rockchip_pmu_domain_is_idle(struct rockchip_pm_domain *pd)
+ {
+ 	struct rockchip_pmu *pmu = pd->pmu;
+@@ -535,6 +539,36 @@ static const struct rockchip_domain_info rk3368_pm_domains[] = {
+ 	[RK3368_PD_GPU_1]	= DOMAIN_RK3368(17, 16, 2),
+ };
  
- Example of the node using power domain:
- 
-@@ -65,3 +96,9 @@ Example of the node using power domain:
-                 power-domains = <&power RK3368_PD_GPU_1>;
-                 /* ... */
-         };
++static const struct rockchip_domain_info rk3399_pm_domains[] = {
++	[RK3399_PD_TCPD0]	= DOMAIN_RK3399(8, 8, -1),
++	[RK3399_PD_TCPD1]	= DOMAIN_RK3399(9, 9, -1),
++	[RK3399_PD_CCI]	= DOMAIN_RK3399(10, 10, -1),
++	[RK3399_PD_CCI0]	= DOMAIN_RK3399(-1, -1, 15),
++	[RK3399_PD_CCI1]	= DOMAIN_RK3399(-1, -1, 16),
++	[RK3399_PD_PERILP]	= DOMAIN_RK3399(11, 11, 1),
++	[RK3399_PD_PERIHP]	= DOMAIN_RK3399(12, 12, 2),
++	[RK3399_PD_CENTER]	= DOMAIN_RK3399(13, 13, 14),
++	[RK3399_PD_VIO]	= DOMAIN_RK3399(14, 14, 17),
++	[RK3399_PD_GPU]	= DOMAIN_RK3399(15, 15, 0),
++	[RK3399_PD_VCODEC]	= DOMAIN_RK3399(16, 16, 3),
++	[RK3399_PD_VDU]	= DOMAIN_RK3399(17, 17, 4),
++	[RK3399_PD_RGA]	= DOMAIN_RK3399(18, 18, 5),
++	[RK3399_PD_IEP]	= DOMAIN_RK3399(19, 19, 6),
++	[RK3399_PD_VO]	= DOMAIN_RK3399(20, 20, -1),
++	[RK3399_PD_VOPB]	= DOMAIN_RK3399(-1, -1, 7),
++	[RK3399_PD_VOPL]	= DOMAIN_RK3399(-1, -1, 8),
++	[RK3399_PD_ISP0]	= DOMAIN_RK3399(22, 22, 9),
++	[RK3399_PD_ISP1]	= DOMAIN_RK3399(23, 23, 10),
++	[RK3399_PD_HDCP]	= DOMAIN_RK3399(24, 24, 11),
++	[RK3399_PD_GMAC]	= DOMAIN_RK3399(25, 25, 23),
++	[RK3399_PD_EMMC]	= DOMAIN_RK3399(26, 26, 24),
++	[RK3399_PD_USB3]	= DOMAIN_RK3399(27, 27, 12),
++	[RK3399_PD_EDP]	= DOMAIN_RK3399(28, 28, 22),
++	[RK3399_PD_GIC]	= DOMAIN_RK3399(29, 29, 27),
++	[RK3399_PD_SD]	= DOMAIN_RK3399(30, 30, 28),
++	[RK3399_PD_SDIOAUDIO]	= DOMAIN_RK3399(31, 31, 29),
++};
 +
-+	node {
-+		/* ... */
-+		power-domains = <&power RK3399_PD_VOPB>;
-+		/* ... */
-+	};
+ static const struct rockchip_pmu_info rk3288_pmu = {
+ 	.pwr_offset = 0x08,
+ 	.status_offset = 0x0c,
+@@ -569,6 +603,23 @@ static const struct rockchip_pmu_info rk3368_pmu = {
+ 	.domain_info = rk3368_pm_domains,
+ };
+ 
++static const struct rockchip_pmu_info rk3399_pmu = {
++	.pwr_offset = 0x14,
++	.status_offset = 0x18,
++	.req_offset = 0x60,
++	.idle_offset = 0x64,
++	.ack_offset = 0x68,
++
++	.core_pwrcnt_offset = 0x9c,
++	.gpu_pwrcnt_offset = 0xa4,
++
++	.core_power_transition_time = 24,
++	.gpu_power_transition_time = 24,
++
++	.num_domains = ARRAY_SIZE(rk3399_pm_domains),
++	.domain_info = rk3399_pm_domains,
++};
++
+ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 	{
+ 		.compatible = "rockchip,rk3288-power-controller",
+@@ -578,6 +629,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
+ 		.compatible = "rockchip,rk3368-power-controller",
+ 		.data = (void *)&rk3368_pmu,
+ 	},
++	{
++		.compatible = "rockchip,rk3399-power-controller",
++		.data = (void *)&rk3399_pmu,
++	},
+ 	{ /* sentinel */ },
+ };
+ 
 -- 
 1.9.1
