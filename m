@@ -1,97 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 9 Mar 2016 12:03:10 +0700
-Subject: [PATCH 0/3] arm64: simplify and optimize kernel mapping
-In-Reply-To: <20160307014031.GA2158@svinekod>
-References: <1457010581-4924-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160307014031.GA2158@svinekod>
-Message-ID: <CAKv+Gu_RRtARFsgc516GjhceiT=i4iS6P4muG++ciB6eO-cH+A@mail.gmail.com>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Wed, 9 Mar 2016 10:32:48 +0530
+Subject: [PATCH] arm64: Fix the ptep_set_wrprotect() to set PTE_DIRTY if
+ (PTE_DBM && !PTE_RDONLY)
+Message-ID: <1457499768-31176-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 March 2016 at 08:40, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> I like this series, though I have a few minor comments below.
->
-> On Thu, Mar 03, 2016 at 02:09:38PM +0100, Ard Biesheuvel wrote:
->> This series makes a couple of minor changes that should result in the
->> kernel being mapped in a more efficient manner.
->>
->> First of all, it merges the .head.text with the .text section (patch #2)
->> after moving everything except the kernel and EFI header into the __init
->> section (patch #1)
->
-> Face-to-face, you suggested it might be possible to move .init before .text, so
-> we could place the EFI header in there too (and keep .text aligned while making
-> it smaller). Is there some reason we missed that means we cannot do this?
->
+Commit 2f4b829c625e ("arm64: Add support for hardware updates of the
+access and dirty pte bits") introduced support for handling hardware
+updates of the access flag and dirty status.
 
-Well, I tried implementing this, and it breaks the PIE linking. That
-itself is probably a binutils problem, and I will try to follow up on
-that with the toolchain group. But in the meantime, it means we cannot
-reorder .text and .init.
+ptep_set_wrprotect is setting PTR_DIRTY if !PTE_RDONLY,
+however by design it suppose to set PTE_DIRTY
+only if (PTE_DBM && !PTE_RDONLY). This patch addes code to
+test and set accordingly.
 
->> Then, it standardizes the segment alignment to 64 KB for all page sizes.
->> (patch #3). In the example below (4 KB granule, with Jeremy's PTE_CONT
->> patch applied), we lose 80 KB in total to padding, but the resulting
->> mappings do look somewhat better.
->
-> I suspect some people might want a minimal alignment option for tinification
-> purposes, but this sounds fine to me as a default. I also think we can wait
-> until someone asks.
->
-> As a general think, currently we use "chunk" instead of "segment" in the mm
-> code. We only used "chunk" so as to not overload "section". For consistency it
-> would be nice to either keep with "chunk" or convert existing uses to
-> "segment". I much prefer the latter!
->
+This patch fixes BUG,
+kernel BUG at /build/linux-StrpB2/linux-4.4.0/fs/ext4/inode.c:2394!
+Internal error: Oops - BUG: 0 [#1] SMP
 
-OK
+on thunderx numa board, when ARM64_HW_AFDBM and NUMA_BALANCING are enabled.
 
->> Before:
->>
->> 0xffff000008082000-0xffff000008090000    56K  ro x  SHD AF         UXN MEM
->> 0xffff000008090000-0xffff000008200000  1472K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
->> 0xffff000008600000-0xffff000008660000   384K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008660000-0xffff00000866c000    48K  ro x  SHD AF         UXN MEM
->> 0xffff00000866c000-0xffff000008670000    16K  ro NX SHD AF         UXN MEM
->> 0xffff000008670000-0xffff000008900000  2624K  ro NX SHD AF CON     UXN MEM
->> 0xffff000008900000-0xffff000008909000    36K  ro NX SHD AF         UXN MEM
->> 0xffff000008c39000-0xffff000008c40000    28K  RW NX SHD AF         UXN MEM
->> 0xffff000008c40000-0xffff000008d50000  1088K  RW NX SHD AF CON     UXN MEM
->> 0xffff000008d50000-0xffff000008d57000    28K  RW NX SHD AF         UXN MEM
->>
->> After:
->>
->> 0xffff000008080000-0xffff000008200000  1536K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008200000-0xffff000008600000     4M  ro x  SHD AF     BLK UXN MEM
->> 0xffff000008600000-0xffff000008670000   448K  ro x  SHD AF CON     UXN MEM
->> 0xffff000008670000-0xffff000008910000  2688K  ro NX SHD AF CON     UXN MEM
->> 0xffff000008c50000-0xffff000008d60000  1088K  RW NX SHD AF CON     UXN MEM
->> 0xffff000008d60000-0xffff000008d6b000    44K  RW NX SHD AF         UXN MEM
->>
->> I am aware that this clashes with Jeremy's patch to allow CONT_SIZE alignment
->> when CONFIG_DEBUG_ALIGN_RODATA=y, but the net effect of patch #3 is the same
->> (only the Kconfig change is not included here)
->
-> Jeremy, do you have any thoughts on this series?
->
-> Thanks,
-> Mark.
->
->> Ard Biesheuvel (3):
->>   arm64: move early boot code to the .init segment
->>   arm64: cover the .head.text section in the .text segment mapping
->>   arm64: simplify kernel segment mapping granularity
->>
->>  arch/arm64/kernel/efi-entry.S   |  2 +-
->>  arch/arm64/kernel/head.S        | 32 +++++++++-----------
->>  arch/arm64/kernel/image.h       |  4 +++
->>  arch/arm64/kernel/vmlinux.lds.S | 26 +++++++++-------
->>  arch/arm64/mm/mmu.c             | 10 +++---
->>  5 files changed, 40 insertions(+), 34 deletions(-)
->>
->> --
->> 2.5.0
->>
+note: this patch is not tested on platform which supports AFDBM.
+
+Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+---
+ arch/arm64/include/asm/pgtable.h | 24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index f506086..d396892 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -613,20 +613,24 @@ static inline pmd_t pmdp_get_and_clear(struct mm_struct *mm,
+ #define __HAVE_ARCH_PTEP_SET_WRPROTECT
+ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long address, pte_t *ptep)
+ {
+-	pteval_t pteval;
++	pteval_t pteval, pteval2;
+ 	unsigned long tmp;
+ 
+ 	asm volatile("//	ptep_set_wrprotect\n"
+-	"	prfm	pstl1strm, %2\n"
+-	"1:	ldxr	%0, %2\n"
+-	"	tst	%0, %4			// check for hw dirty (!PTE_RDONLY)\n"
+-	"	csel	%1, %3, xzr, eq		// set PTE_DIRTY|PTE_RDONLY if dirty\n"
+-	"	orr	%0, %0, %1		// if !dirty, PTE_RDONLY is already set\n"
+-	"	and	%0, %0, %5		// clear PTE_WRITE/PTE_DBM\n"
+-	"	stxr	%w1, %0, %2\n"
++	"	prfm	pstl1strm, %3\n"
++	"1:	ldxr	%0, %3\n"
++	"	and	%2, %0, %4		//extract bits PTE_WRITE and PTE_RDONLY\n"
++	"	cmp	%2, %5			// compare wth PTE_WRITE\n"
++	"	b.ne	2f\n"
++	"	orr	%0, %0, %8		// Set PTE_DIRTY if (PTE_DBM && !PTE_RDONLY)\n"
++	"2:	tst	%0, %6			// check for !PTE_RDONLY\n"
++	"	csel	%1, %6, xzr, eq		// select PTE_RDONLY if !PTE_RDONLY\n"
++	"	orr	%0, %0, %1		// set PTE_RDONLY if !PTE_RDONLY\n"
++	"	and	%0, %0, %7		// clear PTE_WRITE/PTE_DBM\n"
++	"	stxr	%w1, %0, %3\n"
+ 	"	cbnz	%w1, 1b\n"
+-	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
+-	: "r" (PTE_DIRTY|PTE_RDONLY), "L" (PTE_RDONLY), "L" (~PTE_WRITE)
++	: "=&r" (pteval), "=&r" (tmp), "=&r" (pteval2), "+Q" (pte_val(*ptep))
++	: "r" (PTE_WRITE|PTE_RDONLY), "r" (PTE_WRITE), "r" (PTE_RDONLY), "L" (~PTE_WRITE), "L" (PTE_DIRTY)
+ 	: "cc");
+ }
+ 
+-- 
+1.8.1.4
