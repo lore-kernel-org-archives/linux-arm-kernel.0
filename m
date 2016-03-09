@@ -1,44 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 7 Mar 2016 19:07:06 +0000
-Subject: [PATCH 1/2] drivers: net: xgene: fix: Derive prefetch number
- from irq
-In-Reply-To: <1457502577-2606-2-git-send-email-isubramanian@apm.com>
-References: <1457502577-2606-1-git-send-email-isubramanian@apm.com>
- <1457502577-2606-2-git-send-email-isubramanian@apm.com>
-Message-ID: <20160307190705.GA27101@svinekod>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 9 Mar 2016 09:31:21 +0100
+Subject: [PATCH] pinctrl: pxa2xx: export symbols
+In-Reply-To: <1457489509-5680-1-git-send-email-linus.walleij@linaro.org>
+References: <1457489509-5680-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160309083121.GS8136@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 09:49:36PM -0800, Iyappan Subramanian wrote:
-> Prefetch buffer numbers are mapped to hardware irqs. Currently
-> they are statically assigned to match with firmware irqs.
+On Wed, Mar 09, 2016 at 09:11:49AM +0700, Linus Walleij wrote:
+> The pxa2xxx fails some automated builds because of unexported
+> symbols.
 > 
-> If the irq on firmware changes, prefetch buffer number on the driver
-> also needs to be updated to match with the firmware.
-> 
-> This patch removes this static association between firmware and the
-> driver by deriving the prefetch buffer number from the Linux irq.
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-This driver should neither care about the Linux IRQ number nor the interrupt
-controller's physical IRQ number. Neither of the two are properties of the
-device.
+There is 3a5242e648a8d009f0e0fd47867592e5265374b6 in linus/master which
+does a part of this patch already.
 
-What you actually care about is the index of the interrupt pin _out_ of the
-device, not _into_ the interrupt controller. As with other drivers, that should
-described explicitly in the device binding. Either the interrupts should be
-listed in a fixed order, or they should be given names.
+Apart from that I don't understand the patch. The only user of
+pxa2xx_pinctrl_init is drivers/pinctrl/pxa/pinctrl-pxa27x.c[1] and this
+is built into the same module as pinctrl-pxa2xx.o. So without testing I
+wonder in which configuration this fails to build.
 
-> +static u8 xgene_start_cpu_bufnum(struct xgene_enet_pdata *pdata)
-> +{
-> +	struct irq_desc *desc;
-> +	int hwirq;
-> +
-> +	desc = irq_to_desc(pdata->irqs[0]);
-> +	hwirq = desc->irq_data.hwirq;
-> +
-> +	return hwirq - XGENE2_RM0_START_IRQ;
-> +}
+Best regards
+Uwe
 
-No device driver should be doing this.
+[1] git grep -E pxa2xx_pinctrl_\(in\|ex\)it next/master
+    git grep -E pxa2xx_pinctrl_\(in\|ex\)it linus/master
 
-Mark.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
