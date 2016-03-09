@@ -1,118 +1,75 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Wed, 9 Mar 2016 19:21:50 +0900
-Subject: [PATCH 3/4] arm64: dts: Add dts files for LG Electronics's lg1312
- SoC
-In-Reply-To: <20160307015955.GA2410@svinekod>
-References: <1457323800-26904-1-git-send-email-chanho.min@lge.com>
- <1457323800-26904-4-git-send-email-chanho.min@lge.com>
- <20160307015955.GA2410@svinekod>
-Message-ID: <06be01d179ed$7e7c9940$7b75cbc0$@lge.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Wed, 9 Mar 2016 18:22:06 +0800
+Subject: [PATCH v6 2/2] dts/ls2080a: update the DTS for QSPI and DSPI support
+In-Reply-To: <1457518926-18518-1-git-send-email-yao.yuan@freescale.com>
+References: <1457518926-18518-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1457518926-18518-3-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
-> 
-> On Mon, Mar 07, 2016 at 01:09:59PM +0900, Chanho Min wrote:
-> > Add initial dtsi file to support lg1312 SoC which based on Cortex-A53.
-> > Also add dts file to support lg1312 reference board which based on
-> > lg1312 SoC.
-> >
-> > Signed-off-by: Chanho Min <chanho.min@lge.com>
-> 
-> I have a few comments on this patch below.
-> 
-> > +/ {
-> > +	#address-cells = <2>;
-> > +	#size-cells = <1>;
-> 
-> Is there definitely no reason to require a 64-bit size? e.g. ranges?
-> 
-> Generally I'd expect both address and size to be described as 64 bit
-> quantities in the root node, to make it less painful to extend in future.
-> 
-> > +
-> > +	model = "LG Electronics, DTV SoC LG1312 Reference Board";
-> > +	compatible = "lge,lg1312-ref", "lge,lg1312";
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x00000000 0x20000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "root=/dev/nfs ip=dhcp";
-> > +	};
-> > +};
-> 
-> Drop these bootargs. This is specific to a particular developer's
-> configuration, and they make no sense alone given the lack of an nfsroot, so
-> they're evidently being overwritten anyway.
-> 
-> > +	psci {
-> > +		compatible  = "arm,psci";
-> > +		method = "smc";
-> > +		cpu_suspend = <0x84000001>;
-> > +		cpu_off = <0x84000002>;
-> > +		cpu_on = <0x84000003>;
-> > +	};
-> 
-> What are you using as your PSCI implementation?
-> 
-> Is it not PSCI 0.2+ compliant?
-No, Our TZ firmware support for psci 0.1 only.
+Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+Acked-by: Han xu <han.xu@nxp.com>
+---
+Changed in v6:
+No changes.
 
-> 
-> Which exception level are you booting at?
-EL3.
+Changed in v5:
+Resend base on arm-soc.
 
-> 
-> > +	gic: interrupt-controller at c0001000 {
-> > +		#interrupt-cells = <3>;
-> > +
-> > +		compatible = "arm,gic-400";
-> > +		interrupt-controller;
-> > +		reg = <0x0 0xc0001000 0x1000>,
-> > +		      <0x0 0xc0002000 0x1000>;
-> > +	};
-> 
-> I believe the CPU interface is too short (as GICC_DIR lives at 0x1000).
-> 
-> What about GICH and GICV?
-> 
-> > +	pmu {
-> > +		compatible = "arm,armv8-pmuv3";
-> 
-> Use "arm,cortex-a53-pmu".
-> 
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupts = <GIC_PPI 13 ARMV8_TIMER_IRQ_TYPE>,
-> > +			     <GIC_PPI 14 ARMV8_TIMER_IRQ_TYPE>;
-> > +		clock-frequency = <24000000>;
-> > +	};
-> 
-> Please fix your firmware to program CNTFRQ.
-> 
-> The clock-frequency property is at best a workaround for a broken system, and
-> is not sufficient in general.
-> 
-> > +	clocks {
-> > +		clk_bus: clk_bus {
-> > +			#clock-cells = <0>;
-> > +
-> > +			compatible = "fixed-clock";
-> > +			clock-frequency = <198000000>;
-> > +			clock-output-names = "BUSCLK";
-> > +		};
-> > +	};
-> 
-> Just put this fixed-clock under the root node. There is nothing special about
-> /clocks; it is not required to be probed and serves no purpose.
-> 
-> Thanks,
-> Mark.
+Changed in v4:
+No changes.
 
-I'll resend this patch with fixes that you and Arnd mentioned.
+Changed in v3:
+No changes.
 
-Thanks
-Chanho
+Changed in v2:
+Update my email to <yao.yuan@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts | 9 ++++++++-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi    | 4 ++--
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+index 4cb996d..e8801fa 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+@@ -178,7 +178,14 @@
+ 
+ &qspi {
+ 	status = "okay";
+-	qflash0: s25fl008k {
++	flash0: s25fl256s1 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "st,m25p80";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
++	flash2: s25fl256s1 at 2 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "st,m25p80";
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 2b23d03..65e612a 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -318,7 +318,7 @@
+ 
+ 		dspi: dspi at 2100000 {
+ 			status = "disabled";
+-			compatible = "fsl,vf610-dspi";
++			compatible = "fsl,ls2080a-dspi", "fsl,ls2085a-dspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0x0 0x2100000 0x0 0x10000>;
+@@ -444,7 +444,7 @@
+ 
+ 		qspi: quadspi at 20c0000 {
+ 			status = "disabled";
+-			compatible = "fsl,vf610-qspi";
++			compatible = "fsl,ls2080a-qspi", "fsl,ls1021a-qspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0x0 0x20c0000 0x0 0x10000>,
+-- 
+2.1.0.27.g96db324
