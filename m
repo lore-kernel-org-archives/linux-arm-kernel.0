@@ -1,42 +1,90 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 9 Mar 2016 13:17:50 +0100
-Subject: [PATCH 0/4] Add AXP209 GPIO driver
-In-Reply-To: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <56E0146E.6050102@redhat.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Wed, 9 Mar 2016 13:27:44 +0100
+Subject: [PATCH v3 08/12] arm64, numa: rework numa_add_memblk()
+In-Reply-To: <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
+Message-ID: <20160309122744.GD1535@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 23.01.16 17:39:23, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> Rework numa_add_memblk() to update the parameter "u64 size"
+> to "u64 end", this will make it consistent with x86 and
+> can simplify the code later.
+> 
+> Updates for arch/arm64/mm/numa.c should squash to core NUMA
+> patches from Ganapat.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi_numa.c |  2 +-
+>  arch/arm64/kernel/of_numa.c   |  2 +-
+>  arch/arm64/mm/numa.c          | 12 ++++++------
+>  3 files changed, 8 insertions(+), 8 deletions(-)
 
-On 09-03-16 11:50, Maxime Ripard wrote:
-> Hi,
->
-> The axp209 PMIC used in combination to some Allwinner SoCs has a bunch
-> of GPIOs accessible. Some boards use these to control their backlight
-> or a few LEDs.
+> diff --git a/arch/arm64/kernel/of_numa.c b/arch/arm64/kernel/of_numa.c
+> index 2f9e34b..aa6f3a3 100644
+> --- a/arch/arm64/kernel/of_numa.c
+> +++ b/arch/arm64/kernel/of_numa.c
+> @@ -168,7 +168,7 @@ static int __init early_init_parse_memory_node(unsigned long node)
+>  		pr_debug("NUMA-DT:  base = %llx , node = %u\n",
+>  				base, nid);
+>  
+> -		if (numa_add_memblk(nid, base, size) < 0)
+> +		if (numa_add_memblk(nid, base, base + size) < 0)
+>  			return -EINVAL;
+>  	}
+>  
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index e974995..2b04b8a 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -137,25 +137,25 @@ void numa_store_cpu_info(unsigned int cpu)
+>   * numa_add_memblk - Set node id to memblk
+>   * @nid: NUMA node ID of the new memblk
+>   * @start: Start address of the new memblk
+> - * @size:  Size of the new memblk
+> + * @end:  End address of the new memblk
 
-Thanks for working on this, but IMHO this cannot go upstream like this,
-the gpio pins on the axp pmics need a pinctrl driver, not a gpio
-driver. I.E. on the axp209 gpio0 and gpio1 can also be used to output
-an additional low-noise ldo (so as a regulator), or as an adc input.
+Apart from my earlier comment, this is not exactly correct and may
+cause confussion. The implementation here defines:
 
-I've been working on gsl1680 touchscreen support lately and on at least
-a few a23 tablets, the low-noise ldo is used as AVCC for the touchscreen
-controller. Now these use an axp223 pmic, but nothing is stopping
-someone from doing something similar with an axp209 and I think it
-would be best to support this from day one, rather then hope we can
-retro-fit this later without breaking dts.
+ size == end - start
 
-> There's supposed to be 4 of them, but the fourth one has a different
-> configuration register scheme, and I couldn't find any board that was
-> using this GPIO. It will be probably be supported eventually, but
-> until then, we support only the first 3 GPIOs.
+which is different to struct resource, where:
 
-He he, this matches what I've done in u-boot, the 4th gpio indeed
-is somewhat funky (and the docs are not quite clear on how it works
-exactly IIRC), leaving it out for now indeed seems for the best.
+ resource_size(res) == res->end - res->start + 1
 
-Regards,
+Thus, @end here is the first address outside of memblk.
 
-Hans
+This is one more argument for keeping @size here.
+
+-Robert
+
+>   *
+>   * RETURNS:
+>   * 0 on success, -errno on failure.
+>   */
+> -int __init numa_add_memblk(int nid, u64 start, u64 size)
+> +int __init numa_add_memblk(int nid, u64 start, u64 end)
+>  {
+>  	int ret;
+>  
+> -	ret = memblock_set_node(start, size, &memblock.memory, nid);
+> +	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
+>  	if (ret < 0) {
+>  		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
+> -			start, (start + size - 1), nid);
+> +			start, (end - 1), nid);
+>  		return ret;
+>  	}
+>  
+>  	node_set(nid, numa_nodes_parsed);
+>  	pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
+> -			start, (start + size - 1), nid);
+> +			start, (end - 1), nid);
+>  	return ret;
+>  }
