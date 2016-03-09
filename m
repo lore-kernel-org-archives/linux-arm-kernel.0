@@ -1,67 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  9 Mar 2016 09:45:20 +0000
-Subject: [PULL #2] GIC updates for 4.6
-Message-ID: <1457516720-25639-1-git-send-email-marc.zyngier@arm.com>
+From: yankejian@huawei.com (Kejian Yan)
+Date: Wed, 9 Mar 2016 18:10:01 +0800
+Subject: [patch RESEND net] net: hns: fix the bug about mtu setting
+Message-ID: <1457518201-199863-1-git-send-email-yankejian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Fixed subject and a few patch titles, sorry for the noise...]
+In chip V1, the maximum mtu value is 9600 for service ports and 1514 for
+debug ports. And in chip V2, it is 9728 for service ports and 1514 for
+debug ports. But it is always configurates as 9600 before this patch. This
+patch will configurate the right mtu value.
 
-Hi Thomas,
+Signed-off-by: Kejian Yan <yankejian@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c | 7 ++++++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h | 2 ++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c | 3 +++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h | 2 ++
+ 4 files changed, 13 insertions(+), 1 deletion(-)
 
-Please find below the GIC updates for 4.6. This time around, the first
-round of ACPI support for GICv3, the Alpine MSI widget and a RealView
-support update (blast from the past!).
-
-Thanks,
-
-	M.
-
-The following changes since commit fe2f95468e4bdf4a526be4f86efaefe48ca63b83:
-
-  x86/apic: Deinline _flat_send_IPI_mask, save ~150 bytes (2016-03-08 12:26:41 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git tags/gic-4.6
-
-for you to fetch changes up to 82b0a434b436f5da69ddd24bd6a6fa5dc4484310:
-
-  irqchip/gic/realview: Support more RealView DCC variants (2016-03-09 09:38:05 +0000)
-
-----------------------------------------------------------------
-GIC updates for 4.6
-
-- Basic GICv3 ACPI support
-- Alpine MSI widget on top of GICv3
-- More RealView GIC support
-
-----------------------------------------------------------------
-Antoine Tenart (3):
-      irqchip/gic-v3: Always return IRQ_SET_MASK_OK_DONE in gic_set_affinity
-      irqchip: Add the Alpine MSIX interrupt controller
-      Documentation/bindings: Document the Alpine MSIX driver
-
-Hanjun Guo (1):
-      irqchip/gic-v3: Remove gic_root_node variable from the ITS code
-
-Linus Walleij (1):
-      irqchip/gic/realview: Support more RealView DCC variants
-
-Tomasz Nowicki (4):
-      irqchip/gic-v3: Refactor gic_of_init() for GICv3 driver
-      irqchip/gic-v3: Add ACPI support for GICv3/4 initialization
-      irqchip/gic-v3: ACPI: Add redistributor support via GICC structures
-      irqchip/gic-v3-its: Mark its_init() and its children as __init
-
- .../interrupt-controller/al,alpine-msix.txt        |  26 ++
- .../bindings/interrupt-controller/arm,gic.txt      |   1 +
- drivers/irqchip/Kconfig                            |   6 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-alpine-msi.c                   | 293 +++++++++++++++++
- drivers/irqchip/irq-gic-realview.c                 |  44 ++-
- drivers/irqchip/irq-gic-v3-its.c                   |  10 +-
- drivers/irqchip/irq-gic-v3.c                       | 349 ++++++++++++++++++---
- 8 files changed, 669 insertions(+), 61 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/al,alpine-msix.txt
- create mode 100644 drivers/irqchip/irq-alpine-msi.c
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+index 5ef0e96..65b8d91 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+@@ -467,8 +467,13 @@ int hns_mac_set_mtu(struct hns_mac_cb *mac_cb, u32 new_mtu)
+ 	struct mac_driver *drv = hns_mac_get_drv(mac_cb);
+ 	u32 buf_size = mac_cb->dsaf_dev->buf_size;
+ 	u32 new_frm = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
++	u32 max_frm = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver) ?
++			MAC_MAX_MTU : MAC_MAX_MTU_V2;
+ 
+-	if ((new_mtu < MAC_MIN_MTU) || (new_frm > MAC_MAX_MTU) ||
++	if (mac_cb->mac_type == HNAE_PORT_DEBUG)
++		max_frm = MAC_MAX_MTU_DBG;
++
++	if ((new_mtu < MAC_MIN_MTU) || (new_frm > max_frm) ||
+ 	    (new_frm > HNS_RCB_RING_MAX_BD_PER_PKT * buf_size))
+ 		return -EINVAL;
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
+index 0b05219..fc51e3d 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h
+@@ -26,7 +26,9 @@ struct dsaf_device;
+ 
+ #define MAC_DEFAULT_MTU	(ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN + ETH_DATA_LEN)
+ #define MAC_MAX_MTU		9600
++#define MAC_MAX_MTU_V2		9728
+ #define MAC_MIN_MTU		68
++#define MAC_MAX_MTU_DBG         MAC_DEFAULT_MTU
+ 
+ #define MAC_DEFAULT_PAUSE_TIME 0xff
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+index f302ef9..7a61c57 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+@@ -343,6 +343,9 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
+ 	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+ 		hns_ppe_set_vlan_strip(ppe_cb, 0);
+ 
++		dsaf_write_dev(ppe_cb, PPE_CFG_MAX_FRAME_LEN_REG,
++			       HNS_PPEV2_MAX_FRAME_LEN);
++
+ 		/* set default RSS key in h/w */
+ 		hns_ppe_set_rss_key(ppe_cb, ppe_cb->rss_key);
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
+index 0f5cb69..e9c0ec2 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h
+@@ -30,6 +30,8 @@
+ #define HNS_PPEV2_RSS_KEY_SIZE 40 /* in bytes or 320 bits */
+ #define HNS_PPEV2_RSS_KEY_NUM (HNS_PPEV2_RSS_KEY_SIZE / sizeof(u32))
+ 
++#define HNS_PPEV2_MAX_FRAME_LEN 0X980
++
+ enum ppe_qid_mode {
+ 	PPE_QID_MODE0 = 0, /* fixed queue id mode */
+ 	PPE_QID_MODE1,	   /* switch:128VM non switch:6Port/4VM/4TC */
+-- 
+1.9.1
