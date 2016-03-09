@@ -1,52 +1,133 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 9 Mar 2016 19:53:06 +0530
-Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
- pinctrl_{register, unregister}
-In-Reply-To: <56D307CC.2050202@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
- <56D307CC.2050202@nvidia.com>
-Message-ID: <56E031CA.9010204@nvidia.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Wed, 9 Mar 2016 15:53:02 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <56E033C8.40506@st.com>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
+ <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
+ <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
+ <56DDB749.1020808@suse.de>
+ <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
+ <56DE7E1D.5070508@st.com>
+ <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
+ <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
+ <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
+ <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
+ <56DFF253.9050208@st.com> <56DFFA9E.7060602@st.com>
+ <CAAObsKBUzBXcamEyup44N1bYUzGr_ZZTsYcD5x3PXb-2E00cGA@mail.gmail.com>
+ <56E033C8.40506@st.com>
+Message-ID: <56E038CE.606@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Tomeu, Dinh, Andreas
 
-On Sunday 28 February 2016 08:14 PM, Laxman Dewangan wrote:
+I need a sum and help from you to go ahead on the
+tx timeout.
+
+The "stmmac: MDIO fixes" seems to be the candidate to
+fix the phy connection and I will send the V2 asap (Andreas' comment).
+
+So, supposing the probe is ok and phy is connected,
+I need your input ...
+
+  Tomeu: after revering the 0e80bdc9a72d (stmmac: first frame
+         prep at the end of xmit routine) the network is
+         not stable and there is a timeout after a while.
+         The box has 3.50 with normal desc settings.
+
+  Dinh: the network is ok, I wonder if you can share a boot
+        log just to understand if the normal or enhanced
+        descriptors are used.
+
+  Andreas: you are also using 3.50 with normal desc but I have not
+           clear if just reverting 0e80bdc9a72d  commit the
+           network is ok or you see timeout issues.
+
+In the meantime I am trying to find a box where try normal setup
+and I can confirm that enhanced descriptors are ok on my side
+
+Regards
+Peppe
+
+
+
+
+On 3/9/2016 3:31 PM, Giuseppe CAVALLARO wrote:
+> Hi Tomeu
 >
-> On Thursday 25 February 2016 07:43 PM, Linus Walleij wrote:
->> On Wed, Feb 24, 2016 at 2:15 PM, Laxman Dewangan 
->> <ldewangan@nvidia.com> wrote:
+> On 3/9/2016 11:53 AM, Tomeu Vizoso wrote:
+>> On 9 March 2016 at 11:27, Giuseppe CAVALLARO <peppe.cavallaro@st.com>
+>> wrote:
+>>> Hello Tomeu, Andreas,
+>>>
+>>> On 3/9/2016 10:52 AM, Giuseppe CAVALLARO wrote:
+>>>>>
+>>>>> * today's linux-next: probe failed
+>>>>>
+>>>>> * today's linux-next + revert of 88f8b1bb41c6 stmmac: Fix 'eth0: No
+>>>>> PHY found' regression: probe succeeded but no network at all
+>>>>>
+>>>>> * today's linux-next + revert of 88f8b1bb41c6 (stmmac: Fix 'eth0: No
+>>>>> PHY found' regression) + revert of 0e80bdc9a72d (stmmac: first frame
+>>>>> prep at the end of xmit routine): probe succeeded, dhcp succeeds and
+>>>>> nfsroot works for a few seconds before timing out
+>>>>
+>>>>
+>>>> ok, I was looking at this problem now that seems to related
+>>>> the "stmmac: first frame prep at the end of xmit routine"
+>>>> that, at first glance, is breaking the gmac 3.50 with normal
+>>>> descriptor.
+>>>
+>>>
+>>> I have no Hw where to test this use case. So, I wonder if may I ask
+>>> you to
+>>> test some patch.
+>>>
+>>> This first patch adds a missing barrier to the normal routine that
+>>> inits the
+>>> descriptor. Barrier was needed to well manage the OWN
+>>> descriptor and it was not added in case of normal desc case after
+>>> the xmit rework.
+>>>
+>>> Then I will check the algo behind the new xmit and in case of problems,
+>>> if you agree, we will decide to revert it because it aimed to add an
+>>> optimization.
+>>>
+>>> Let me know if you agree.
 >>
->>> Add resource manageemnt APIs fro pinctrl_register() and 
->>> pinctrl_unregister()
->>> and use these new APIs on hw driver to reduce the error path code and
->>> remove callback for driver.
->> As you can probably guess I like this too, so wait a while, collect ACKs
->> and send me a branch to pull for this too.
+>> I'm not sure what you would like to be tested, but just in case, I
+>> have just tried your patch on top of these commits and the result is
+>> the "transmit queue 0 timed out" error during boot:
 >>
-> Got lots of ack/reviewed by and captured all. Also did code changes 
-> per review:
-> - Optimizing in devm_ apis.
-> - Correcting the description of devm_ apis.
-> - Simplifying probe in digicolor.
-> - Removing unwanted pfc->pinctrl in ish.
+>> 6542b30d0a67 Revert "stmmac: first frame prep at the end of xmit routine"
+>> eb5274cbc0f7 Revert "stmmac: do not poll phy handler when attach a
+>> switch"
+>> e88e625a68d9 Revert "stmmac: fix phy init when attached to a phy"
+>> ef5dd3777876 stmmac: fix MDIO settings
+>> 77634ba1f25c Revert "stmmac: Fix 'eth0: No PHY found' regression"
+>> 7811b4ffc312 Add linux-next specific files for 20160309
 >
-> Pushed the change at:
-> Branch "devm_pinctrl_register" of 
-> https://github.com/ldewangan/linux-upstream.git.
+> I missed that the issue is not only related the
+>    "stmmac: first frame prep at the end of xmit routine"
+> I have to try to test on 3.50 with normal descriptor.
+> When using enhanced descriptors all works fine on my
+> side.
 >
-> Base repo is
-> for-next of 
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
+> I keep you informed.
+>
+> peppe
 >
 >
-> If required, I can send the V2 version of list with acks.
+>> Regards,
+>>
+>> Tomeu
+>>
+>>> Regards
+>>> Peppe
+>>
+>>
 >
-
-Let me know if I need to send full series (V2 with collected ack) again 
-or fine to pull it from above location.
-
-
-Thanks,
-Laxman
+>
+>
