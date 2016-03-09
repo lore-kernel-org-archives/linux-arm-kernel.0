@@ -1,52 +1,36 @@
-From: vishalm@ti.com (Vishal Mahaveer)
-Date: Wed, 9 Mar 2016 14:56:31 -0600
-Subject: [PATCH] ARM: DRA722: Add ID detect for Silicon Rev 2.0
-Message-ID: <1457556991-10729-1-git-send-email-vishalm@ti.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 9 Mar 2016 21:04:21 +0000
+Subject: [PATCH v2 1/2] iio: core: introduce IIO_CHAN_INFO_SIGNED
+In-Reply-To: <56DDDFFC.5010100@metafoo.de>
+References: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
+ <1457360997-29179-2-git-send-email-ludovic.desroches@atmel.com>
+ <56DDDFFC.5010100@metafoo.de>
+Message-ID: <56E08FD5.4060701@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vishal Mahaveer <vishalm@ti.com>
+On 07/03/16 20:09, Lars-Peter Clausen wrote:
+> On 03/07/2016 03:29 PM, Ludovic Desroches wrote:
+>> The same channel can be used to perform a signed or an unsigned
+>> conversion. Add a new infomask element to be able to select the type of
+>> conversion wanted: a raw one or a signed raw one.
+> 
+> If this is the difference between offset binary and two's complement then it
+> makes no sense to expose this at this level. Both are the same number just
+> in a different representation and converting between them is cheap. A few
+> magnitudes cheaper than reading the result over sysfs. So, if your device
+> supports both, just pick one.
+> 
+> For the buffered interface it may make sense to expose this, since the per
+> sample overhead is a lot lower. But still doing the conversion should be
+> cheap enough that it does not really matter. Before this is implemented I'd
+> like to see hard performance numbers that this actually makes a difference.
+> 
+> - Lars
+> 
+Definitely looking for more detail on this.  I'd missed we were talking simply
+about representation (which is also how I read 62.6.6 Conversion Results Format
+in the datasheet). Not entirely sure what I imagined the difference between
+signed and unsigned output would be!
 
-Silicon Rev 2.0 is a minor variant of Rev 1.0. Rev 2.0 is an incremental revision
-with various fixes including the following:
-    - Reset logic fixes
-    - Few asymetric aging logic fixes
-    - Ethernet speed fixes
-    - EDMA fixes for McASP
-
-Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
----
- arch/arm/mach-omap2/id.c  |    4 ++--
- arch/arm/mach-omap2/soc.h |    1 +
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 8a2ae82..84ee602 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -667,9 +667,9 @@ void __init dra7xxx_check_revision(void)
- 		case 0:
- 			omap_revision = DRA722_REV_ES1_0;
- 			break;
-+		case 1:
- 		default:
--			/* If we have no new revisions */
--			omap_revision = DRA722_REV_ES1_0;
-+			omap_revision = DRA722_REV_ES2_0;
- 			break;
- 		}
- 		break;
-diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-index 83d3547..464e73f 100644
---- a/arch/arm/mach-omap2/soc.h
-+++ b/arch/arm/mach-omap2/soc.h
-@@ -471,6 +471,7 @@ IS_OMAP_TYPE(3430, 0x3430)
- #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
- #define DRA752_REV_ES2_0	(DRA7XX_CLASS | (0x52 << 16) | (0x20 << 8))
- #define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
-+#define DRA722_REV_ES2_0	(DRA7XX_CLASS | (0x22 << 16) | (0x20 << 8))
- 
- void omap2xxx_check_revision(void);
- void omap3xxx_check_revision(void);
--- 
-1.7.4.1
+Jonathan
