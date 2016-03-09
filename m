@@ -1,281 +1,115 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 9 Mar 2016 07:41:01 +0000
-Subject: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
- HiSilicon SoCs Host Controllers
-In-Reply-To: <20160302155117.GB24024@localhost>
-References: <20160210111234.GC2632@leverpostej>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECB1D30@lhreml503-mbs>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECC5F00@lhreml503-mbs>
- <20160224011418.GB13026@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECCAD6A@lhreml503-mbs>
- <20160224152538.GA19700@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ECCD209@lhreml503-mbs>
- <20160225120750.GA32016@red-moon> <20160225195912.GA4818@localhost>
- <20160301192247.GA21324@red-moon> <20160302155117.GB24024@localhost>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED09A7B@lhreml503-mbs>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 09 Mar 2016 08:49:40 +0100
+Subject: [PATCH net 1/3] net: mvneta: Fix spinlock usage
+In-Reply-To: <20160309144254.3fbf177f@xhacker> (Jisheng Zhang's message of
+ "Wed, 9 Mar 2016 14:42:54 +0800")
+References: <1457441826-6100-1-git-send-email-gregory.clement@free-electrons.com>
+ <1457441826-6100-2-git-send-email-gregory.clement@free-electrons.com>
+ <20160309144254.3fbf177f@xhacker>
+Message-ID: <87wppc2iqz.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn, Lorenzo
-
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: 02 March 2016 15:51
-> To: Lorenzo Pieralisi
-> Cc: Gabriele Paoloni; 'Mark Rutland'; Guohanjun (Hanjun Guo); Wangzhou
-> (B); liudongdong (C); Linuxarm; qiujiang; 'bhelgaas at google.com';
-> 'arnd at arndb.de'; 'tn at semihalf.com'; 'linux-pci at vger.kernel.org';
-> 'linux-kernel at vger.kernel.org'; xuwei (O); 'linux-
-> acpi at vger.kernel.org'; 'jcm at redhat.com'; zhangjukuo; Liguozhu
-> (Kenneth); 'linux-arm-kernel at lists.infradead.org'
-> Subject: Re: [RFC PATCH v3 3/3] PCI/ACPI: hisi: Add ACPI support for
-> HiSilicon SoCs Host Controllers
-> 
-> On Tue, Mar 01, 2016 at 07:22:47PM +0000, Lorenzo Pieralisi wrote:
-> > Hi Bjorn,
-> >
-> > On Thu, Feb 25, 2016 at 01:59:12PM -0600, Bjorn Helgaas wrote:
-> > > On Thu, Feb 25, 2016 at 12:07:50PM +0000, Lorenzo Pieralisi wrote:
-> > > > On Thu, Feb 25, 2016 at 03:01:19AM +0000, Gabriele Paoloni wrote:
-> >
-> > [...]
-> >
-> > > > I do not understand how PNP0c02 works, currently, by the way.
-> > > >
-> > > > If I read x86 code correctly, the unassigned PCI bus resources
-> are
-> > > > assigned in arch/x86/pci/i386.c (?)
-> fs_initcall(pcibios_assign_resources),
-> > > > with a comment:
-> > > >
-> > > > /**
-> > > >  * called in fs_initcall (one below subsys_initcall),
-> > > >  * give a chance for motherboard reserve resources
-> > > >  */
-> > > >
-> > > > Problem is, motherboard resources are requested through (?):
-> > > >
-> > > > drivers/pnp/system.c
-> > > >
-> > > > which is also initialized at fs_initcall, so it might be called
-> after
-> > > > core x86 code reassign resources, defeating the purpose PNP0c02
-> was
-> > > > designed for, namely, request motherboard regions before
-> resources
-> > > > are assigned, am I wrong ?
-> > >
-> > > I think you're right.  This is a long-standing screwup in Linux.
-> > > IMHO, ACPI resources should be parsed and reserved by the ACPI
-> core,
-> > > before any PCI resource management (since PCI host bridges are
-> > > represented in ACPI).  But historically PCI devices have enumerated
-> > > before ACPI got involved.  And the ACPI core doesn't really pay
-> > > attention to _CRS for most devices (with the exception of PNP0C02).
-> > >
-> > > IMO the PNP0C02 code in drivers/pnp/system.c should really be done
-> in
-> > > the ACPI core for all ACPI devices, similar to the way the PCI core
-> > > reserves BAR space for all PCI devices, even if we don't have
-> drivers
-> > > for them.  I've tried to fix this in the past, but it is really a
-> > > nightmare to unravel everything.
-> > >
-> > > Because the ACPI core doesn't reserve resources for the _CRS of all
-> > > ACPI devices, we're already vulnerable to the problem of placing a
-> > > device on top of another ACPI device.  We don't see problems
-> because
-> > > on x86, at least, most ACPI devices are already configured by the
-> BIOS
-> > > to be enabled and non-overlapping.  But x86 has the advantage of
-> > > having extensive test coverage courtesy of Windows, and as long as
-> > > _CRS has the right stuff in it, we at least have the potential of
-> > > fixing problems in Linux.
-> >
-> > ...
-> > By "fixing problems in Linux" above, you mean that, given that we
-> > do have a validated _CRS space, we can request/reserve the region the
-> _CRS
-> > reports to prevent assigning those resources to other devices,
-> correct ?
-> 
-> Yes.
-> 
-> I think part of what makes this difficult in Linux is that the
-> resource tree is too strict about overlapping resources.  We get
-> address space information from E820 (on x86), static ACPI tables like
-> MCFG, and dynamic things like ACPI _CRS.  There's no real requirement
-> that the BIOS should make all these consistent, but yet we try to jam
-> it all into the same resource tree.
-> 
-> For example, E820 might tell us that range A is reserved and
-> unavailable to Linux.  We stick it in the resource tree.  Then we
-> might have a _CRS that tells us about range B.  We *want* to put range
-> B in the resource tree, but if B overlaps part of A, the insert will
-> fail.
-> 
-> All we really need from E820 is the information that "you can't put
-> devices in A".  We don't need to enforce any relationship between A
-> and B, but the current resource tree imposes unnecessary hierarchical
-> requirements.
-> 
-> I think issues like this are the biggest reason why the ACPI core
-> doesn't reserve all _CRS space early on (Rafael may correct me here).
-> 
-> > > If the platform doesn't report resource usage correctly on ARM, we
-> may
-> > > not find problems (because we don't have the Windows test suite)
-> and
-> > > if we have resource assignment problems because _CRS is lacking,
-> we'll
-> > > have no way to fix them.
-> >
-> > And I think here you mean we can't prevent assigning resource space
-> to
-> > devices that do not necessarily own it because since some devices
-> _CRS
-> > are borked/missing we have no way to detect the address space
-> allocated
-> > to them and we may end up with resources conflicts.
-> 
-> The ACPI core currently doesn't reserve the space consumed by ACPI
-> devices.  Some drivers, e.g., for PNP0C02 (motherboard) and PNP0A03
-> (PCI host bridge), do reserve their space, but the core itself does
-> not.
-> 
-> If we have drivers for all the ACPI devices, those drivers will
-> probably use _CRS and reserve the space, and we'll probably notice any
-> _CRS errors.  But if we don't have drivers, e.g., for performance
-> monitors or other non-essential things, nothing will use _CRS, and
-> nothing will reserve the space used by the device, and it's hard to
-> find errors.
-> 
-> If we ever assign top-level resources, there's nothing to prevent us
-> from creating a conflict.  The only reason we don't trip over this is
-> that we usually don't assign top-level resources because firmware does
-> it for us.
-
-It seems that in this thread we have touched quite few issues.
-
-First is how to describe a PCI host controller config space resource:
-as you highlighted before mentioning the specs, these resources should
-be marked as "PNP0C02"; therefore I guess the current Nowicki patchset
-must be reworked to check the resources to be motherboard reserved when
-parsing the MCFG table.
-
-Also with respect to the ACPI table for my specific PCIe controller I
-would use the following approach:
-
-	// PCIe Root bus
-	Device (PCI1)
-	{
-		Name (_HID, "HISI0080") // PCI Express Root Bridge
-		Name (_CID, "PNP0A03") // Compatible PCI Root Bridge
-		Name(_SEG, 1) // Segment of this Root complex
-		Name(_BBN, 0) // Base Bus Number
-		Name(_CCA, 1)
-		Method (_CRS, 0, Serialized) { // Root complex resources
-			Name (RBUF, ResourceTemplate () {
-				WordBusNumber ( // Bus numbers assigned to this root
-					ResourceProducer, MinFixed, MaxFixed, PosDecode,
-					0, // AddressGranularity
-					0, // AddressMinimum - Minimum Bus Number
-					63, // AddressMaximum - Maximum Bus Number
-					0, // AddressTranslation - Set to 0
-					64 // RangeLength - Number of Busses
-				)
-				QWordMemory ( // 64-bit BAR Windows
-					ResourceProducer,
-					PosDecode,
-					MinFixed,
-					MaxFixed,
-					Cacheable,
-					ReadWrite,
-					0x0000000000000000, // Granularity
-					0x00000000b0000000, // Min Base Address pci address
-					0x00000000bbfeffff, // Max Base Address
-					0x0000021f54000000, // Translate
-					0x000000000bff0000 // Length
-				)
-				QWordIO (
-					ResourceProducer,
-					MinFixed,
-					MaxFixed,
-					PosDecode,
-					EntireRange,
-					0x0000000000000000, // Granularity
-					0x0000000000000000, // Min Base Address
-					0x000000000000ffff, // Max Base Address
-					0x000002200fff0000, // Translate
-					0x0000000000010000 // Length
-				)
-			}) // Name(RBUF)
-			Return (RBUF)
-		} // Method(_CRS)
-		Device (RES0)
-		{
-			Name (_HID, "HISI0081") // HiSi PCIe RC config base address
-			Name (_CID, "PNP0C02")  // Motherboard reserved resource
-			Name (_CRS, ResourceTemplate (){
-                         Memory32Fixed (ReadWrite, 0xb0080000 , 0x10000)
-			})
-			
-		}
-   
-So in the table above I have a sub-device under the RC to pass the address
-for the RC config space (the rest of the config space addresses for bus 1
-to 63 are passed in the MCFG). As you can see the device _CID is PNP0C02
-As per ACPI specs.
-Do you see anything wrong with this approach?
+Hi Jisheng,
  
-The second issue is when and how to reserve HW resources. As per
-conversation above this seems quite a tricky issue and probably needs to
-consider different aspects...
+ On mer., mars 09 2016, Jisheng Zhang <jszhang@marvell.com> wrote:
 
-I was wondering if we can take a gradual approach; maybe for the time being
-we can just rework Nowicki patchset to check the MCFG resources to be
-motherboard reserved and later on we can make an effort to fix the resource
-insertion mechanism making sure that it works right on both x86 and ARM.
+> Dear Gregory,
+>
+> On Tue, 8 Mar 2016 13:57:04 +0100 Gregory CLEMENT wrote:
+>
+>> In the previous patch, the spinlock was not initialized. While it didn't
+>> cause any trouble yet it could be a problem to use it uninitialized.
+>> 
+>> The most annoying part was the critical section protected by the spinlock
+>> in mvneta_stop(). Some of the functions could sleep as pointed when
+>> activated CONFIG_DEBUG_ATOMIC_SLEEP. Actually, in mvneta_stop() we only
+>> need to protect the is_stopped flagged, indeed the code of the notifier
+>> for CPU online is protected by the same spinlock, so when we get the
+>> lock, the notifer work is done.
+>> 
+>> Reported-by: Patrick Uiterwijk <patrick@puiterwijk.org>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/net/ethernet/marvell/mvneta.c | 11 ++++++-----
+>>  1 file changed, 6 insertions(+), 5 deletions(-)
+>> 
+>> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+>> index b0ae69f84493..8dc7df2edff6 100644
+>> --- a/drivers/net/ethernet/marvell/mvneta.c
+>> +++ b/drivers/net/ethernet/marvell/mvneta.c
+>> @@ -3070,17 +3070,17 @@ static int mvneta_stop(struct net_device *dev)
+>>  	struct mvneta_port *pp = netdev_priv(dev);
+>>  
+>>  	/* Inform that we are stopping so we don't want to setup the
+>> -	 * driver for new CPUs in the notifiers
+>> +	 * driver for new CPUs in the notifiers. The code of the
+>> +	 * notifier for CPU online is protected by the same spinlock,
+>> +	 * so when we get the lock, the notifer work is done.
+>>  	 */
+>>  	spin_lock(&pp->lock);
+>>  	pp->is_stopped = true;
+>> +	spin_unlock(&pp->lock);
+>
+> This fix sleep in atomic issue. But
+> I see race here. Let's assume is_stopped is false.
 
-What do you think about?
+You forgot that the lock was hold in the mvneta_percpu_notifier so your
+scenario can't happen.
 
-Many Thanks
+>
+> cpu0:                           	cpu1:
+> mvneta_percpu_notifier():		mvneta_stop():
+>
 
-Gab
+spin_lock(&pp->lock);
 
-> 
-> > > > As per last Tomasz's patchset, we claim and assign unassigned PCI
-> > > > resources upon ACPI PCI host bridge probing (which happens at
-> > > > subsys_initcall time, courtesy of ACPI current code); at that
-> time the
-> > > > kernel did not even register the PNP0c02 driver
-> (drivers/pnp/system.c)
-> > > > (it does that at fs_initcall). On the other hand, we insert MCFG
-> > > > regions into the resource tree upon MCFG parsing, so I do not
-> > > > see why we need to rely on PNP0c02 to do that for us (granted,
-> the
-> > > > mechanism is part of the PCI fw specs, which are x86 centric
-> anyway
-> > > > ie we can't certainly rely on Int15 e820 to detect reserved
-> memory
-> > > > on ARM :D)
-> > > >
-> > > > There is lots of legacy x86 here and Bjorn definitely has more
-> > > > visibility into that than I have, the ARM world must understand
-> > > > how this works to make sure we have an agreement.
-> > >
-> > > As you say, there is lots of unpleasant x86 legacy here.  Possibly
-> ARM
-> > > has a chance to clean this up and do it more sanely; I'm not sure
-> > > whether it's feasible to reverse the ACPI/PCI init order there or
-> not.
-> > >
-> > > Rafael, any thoughts on this whole thing?
-> > >
-> > > Bjorn
-> > >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-acpi"
-> in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> if (pp->is_stopped) {
+> 	spin_unlock(&pp->lock);
+> 	break;
+> }
+>
+
+                                      the lock is hold in
+                                      mvneta_percpu_notifier(), so as
+                                      said in the comment this cpu is
+                                      waiting for on the following
+                                      line:
+                                      spin_lock(&pp->lock);
+
+                                      This code will be executed only
+                                      when the lock will be released
+> 					pp->is_stopped = true;
+> 					spin_unlock(&pp->lock);
+>
+>
+> netif_tx_stop_all_queues(pp->dev);
+> for_each_online_cpu(other_cpu) {
+> ....
+>
+So what will happen is:
+cpu0:                           	cpu1:
+mvneta_percpu_notifier():		mvneta_stop():
+
+spin_lock(&pp->lock);
+if (pp->is_stopped) {
+	spin_unlock(&pp->lock);
+	break;
+}
+                                        spin_lock(&pp->lock);
+
+netif_tx_stop_all_queues(pp->dev);
+for_each_online_cpu(other_cpu) {
+....
+spin_unlock(&pp->lock);
+					pp->is_stopped = true;
+					spin_unlock(&pp->lock);
+
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
