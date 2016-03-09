@@ -1,83 +1,72 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Wed, 9 Mar 2016 10:18:14 +0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <CAAmzW4MYzJwkBYqDXicA=hCrtapK+tMNZUNaEAQO=74s_mDt4g@mail.gmail.com>
-References: <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE> <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE> <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD7B20.1020508@suse.cz>
- <20160308074816.GA31471@js1304-P5Q-DELUXE> <56DEAD3D.5090706@huawei.com>
- <CAAmzW4MYzJwkBYqDXicA=hCrtapK+tMNZUNaEAQO=74s_mDt4g@mail.gmail.com>
-Message-ID: <56DF87E6.10703@huawei.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed, 9 Mar 2016 10:20:24 +0800
+Subject: [RESEND PATCH v2 3/5] clk: rockchip: add new pll-type for rk3399
+ and similar socs
+In-Reply-To: <3286748.Col0jAfKKX@phil>
+References: <1456827275-8035-1-git-send-email-zhengxing@rock-chips.com>
+ <1456827275-8035-4-git-send-email-zhengxing@rock-chips.com>
+ <3286748.Col0jAfKKX@phil>
+Message-ID: <56DF8868.6070706@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/3/8 23:36, Joonsoo Kim wrote:
+Hi Heiko,
 
-> 2016-03-08 19:45 GMT+09:00 Xishi Qiu <qiuxishi@huawei.com>:
->> On 2016/3/8 15:48, Joonsoo Kim wrote:
->>
->>> On Mon, Mar 07, 2016 at 01:59:12PM +0100, Vlastimil Babka wrote:
->>>> On 03/07/2016 05:34 AM, Joonsoo Kim wrote:
->>>>> On Fri, Mar 04, 2016 at 03:35:26PM +0800, Hanjun Guo wrote:
->>>>>>> Sad to hear that.
->>>>>>>
->>>>>>> Could you tell me your system's MAX_ORDER and pageblock_order?
->>>>>>>
->>>>>>
->>>>>> MAX_ORDER is 11, pageblock_order is 9, thanks for your help!
->>>>
->>>> I thought that CMA regions/operations (and isolation IIRC?) were
->>>> supposed to be MAX_ORDER aligned exactly to prevent needing these
->>>> extra checks for buddy merging. So what's wrong?
->>>
->>> CMA isolates MAX_ORDER aligned blocks, but, during the process,
->>> partialy isolated block exists. If MAX_ORDER is 11 and
->>> pageblock_order is 9, two pageblocks make up MAX_ORDER
->>> aligned block and I can think following scenario because pageblock
->>> (un)isolation would be done one by one.
->>>
->>> (each character means one pageblock. 'C', 'I' means MIGRATE_CMA,
->>> MIGRATE_ISOLATE, respectively.
->>>
->>
->> Hi Joonsoo,
->>
->>> CC -> IC -> II (Isolation)
->>
->>> II -> CI -> CC (Un-isolation)
->>>
->>> If some pages are freed at this intermediate state such as IC or CI,
->>> that page could be merged to the other page that is resident on
->>> different type of pageblock and it will cause wrong freepage count.
->>>
->>
->> Isolation will appear when do cma alloc, so there are two following threads.
->>
->> C(free)C(used) -> start_isolate_page_range -> I(free)C(used) -> I(free)I(someone free it) -> undo_isolate_page_range -> C(free)C(free)
->> so free cma is 2M -> 0M -> 0M -> 4M, the increased 2M was freed by someone.
-> 
-> Your example is correct one but think about following one.
-> C(free)C(used) -> start_isolate_page_range -> I(free)C(used) ->
-> I(free)**C**(someone free it) -> undo_isolate_page_range ->
-> C(free)C(free)
-> 
-> it would be 2M -> 0M -> 2M -> 6M.
-> When we do I(free)C(someone free it), CMA freepage is added
-> because it is on CMA pageblock. But, bad merging happens and
-> 4M buddy is made and it is in isolate buddy list.
-> Later, when we do undo_isolation, this 4M buddy is moved to
-> CMA buddy list and 4M is added to CMA freepage counter so
-> total is 6M.
-> 
+On 2016?03?09? 09:22, Heiko Stuebner wrote:
+> Am Dienstag, 1. M?rz 2016, 18:14:33 schrieb Xing Zheng:
+>
+>> +static int rockchip_rk3399_pll_set_params(struct rockchip_clk_pll *pll,
+>> +				const struct rockchip_pll_rate_table *rate)
+>> +{
+>> +	const struct clk_ops *pll_mux_ops = pll->pll_mux_ops;
+>> +	struct clk_mux *pll_mux = &pll->pll_mux;
+>> +	struct rockchip_pll_rate_table cur;
+>> +	u32 pllcon;
+>> +	int rate_change_remuxed = 0;
+>> +	int cur_parent;
+>> +	int ret;
+>> +
+>> +	pr_debug("%s: rate settings for %lu fbdiv: %d, postdiv1: %d, refdiv: %d,
+>> postdiv2: %d, dsmpd: %d, frac: %d\n", +		__func__, rate->rate,
+>> rate->fbdiv, rate->postdiv1, rate->refdiv, +		rate->postdiv2,
+>> rate->dsmpd, rate->frac);
+>> +
+>> +	rockchip_rk3399_pll_get_params(pll, &cur);
+>> +	cur.rate = 0;
+>> +
+>> +	cur_parent = pll_mux_ops->get_parent(&pll_mux->hw);
+>> +	if (cur_parent == PLL_MODE_NORM) {
+>> +		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_SLOW);
+>> +		rate_change_remuxed = 1;
+>> +	}
+>> +
+>> +	/* update pll values */
+>> +	writel_relaxed(HIWORD_UPDATE(rate->fbdiv, RK3399_PLLCON0_FBDIV_MASK,
+>> +					  RK3399_PLLCON0_FBDIV_SHIFT),
+> indentation is strange ... I guess the plan was to move
+> RK3399_PLLCON0_FBDIV_SHIFT under RK3399_PLLCON0_FBDIV_MASK, currently it's
+> having tabs + spaces but has no alignment whatsoever
+Yes, I think that it due to copy them from the RK3036 style ...
+>
+>> +		       pll->reg_base + RK3399_PLLCON(0));
+>> +
+>> +	writel_relaxed(HIWORD_UPDATE(rate->refdiv, RK3399_PLLCON1_REFDIV_MASK,
+>> +						   RK3399_PLLCON1_REFDIV_SHIFT) |
+>> +		       HIWORD_UPDATE(rate->postdiv1, RK3399_PLLCON1_POSTDIV1_MASK,
+>> +					     RK3399_PLLCON1_POSTDIV1_SHIFT) |
+> same for postdiv1
+Done.
+>
+>> +		       HIWORD_UPDATE(rate->postdiv2, RK3399_PLLCON1_POSTDIV2_MASK,
+>> +						     RK3399_PLLCON1_POSTDIV2_SHIFT),
+>> +		       pll->reg_base + RK3399_PLLCON(1));
+>
+> rest looks nice
+>
+>
+> Heiko
+>
+Thanks.
 
-Hi Joonsoo,
-
-I know the cause of the problem now, thank you very much.
-
-> Thanks.
-> 
-> .
-> 
+-- 
+- Xing Zheng
