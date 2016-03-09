@@ -1,259 +1,160 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  9 Mar 2016 11:24:11 +0100
-Subject: [PATCH v2 09/18] clk: Add PLX Technology OXNAS Standard Clocks
+Date: Wed,  9 Mar 2016 11:24:14 +0100
+Subject: [PATCH v2 12/18] dt-bindings: Add PLX Technology OXNAS pinctrl and
+ gpio bindings
 In-Reply-To: <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
 References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
  <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457519060-6038-10-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1457519060-6038-13-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PLX Technology OXNAS SoC Family Standard Clocks support.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/clk/Kconfig     |   6 ++
- drivers/clk/Makefile    |   1 +
- drivers/clk/clk-oxnas.c | 202 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 209 insertions(+)
- create mode 100644 drivers/clk/clk-oxnas.c
+ .../devicetree/bindings/gpio/gpio_oxnas.txt        |  27 ++++++
+ .../bindings/pinctrl/plxtech,pinctrl.txt           | 100 +++++++++++++++++++++
+ 2 files changed, 127 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index eca8e01..16fa822 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -192,6 +192,12 @@ config COMMON_CLK_PXA
- 	---help---
- 	  Sypport for the Marvell PXA SoC.
- 
-+config COMMON_CLK_OXNAS
-+	bool
-+	select MFD_SYSCON
-+	---help---
-+	  Sypport for the OXNAS SoC Family clocks.
-+
- config COMMON_CLK_CDCE706
- 	tristate "Clock driver for TI CDCE706 clock synthesizer"
- 	depends on I2C
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index bae4be6..a5d45d8 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -33,6 +33,7 @@ obj-$(CONFIG_ARCH_MB86S7X)		+= clk-mb86s7x.o
- obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
- obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
- obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
-+obj-$(CONFIG_COMMON_CLK_OXNAS)		+= clk-oxnas.o
- obj-$(CONFIG_COMMON_CLK_PALMAS)		+= clk-palmas.o
- obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
- obj-$(CONFIG_COMMON_CLK_RK808)		+= clk-rk808.o
-diff --git a/drivers/clk/clk-oxnas.c b/drivers/clk/clk-oxnas.c
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
 new file mode 100644
-index 0000000..58b984b
+index 0000000..cbb03c4
 --- /dev/null
-+++ b/drivers/clk/clk-oxnas.c
-@@ -0,0 +1,202 @@
-+/*
-+ * Copyright (C) 2010 Broadcom
-+ * Copyright (C) 2012 Stephen Warren
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++++ b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+@@ -0,0 +1,27 @@
++PLX Technology OXNAS SoC GPIO Controller
++==========================================
 +
-+#include <linux/clk-provider.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/stringify.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
++Required properties:
++- compatible: "oxsemi,ox810se-gpio".
++- reg: Should contain GPIO controller registers location and length
++- interrupts: Should be the port interrupt shared by all the pins.
++- #gpio-cells: Should be two.  The first cell is the pin number and
++  the second cell is used to specify optional parameters (currently
++  unused).
++- gpio-controller: Marks the device node as a GPIO controller.
 +
-+/* Standard regmap gate clocks */
-+struct clk_oxnas {
-+	struct clk_hw hw;
-+	signed char bit;
-+	struct regmap *regmap;
++optional properties:
++- #gpio-lines: Number of gpio if absent 32.
++
++
++Example:
++	gpio0: gpio at 000000 {
++		compatible = "oxsemi,ox810se-gpio";
++		reg = <0x000000 0x100000>;
++		interrupts = <21>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		#gpio-lines = <32>;
++	};
+diff --git a/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
+new file mode 100644
+index 0000000..0c5051a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
+@@ -0,0 +1,100 @@
++PLX Technology OXNAS SoC Pinmux Controller
++==========================================
++
++The OXNAS Pinmux Controller, enables the IC to share one PAD to several
++functional blocks. The sharing is done by multiplexing the PAD input/output
++signals. For each PAD there are up to 8 muxing options (called periph modes).
++Since different modules require different PAD settings
++(like pull up, keeper, etc) the contoller controls also the PAD settings
++parameters.
++
++Please refer to pinctrl-bindings.txt in this directory for details of the
++common pinctrl bindings used by client devices, including the meaning of the
++phrase "pin configuration node".
++
++OXNAS pin configuration node is a node of a group of pins which can be
++used for a specific device or function. This node represents both mux and config
++of the pins in that group. The 'pins' selects the function mode(also named pin
++mode) this pin can work on and the 'config' configures various pad settings
++such as pull-up, multi drive, etc.
++
++Required properties for iomux controller:
++- compatible: "oxsemi,ox810se-pinctrl"
++- plxtech,mux-mask: array of mask (periph per bank) to describe if a pin can be
++  configured in this periph mode. All the periph and bank need to be describe.
++- plxtech,sys-ctrl: a phandle to the system controller syscon node
++
++How to create such array:
++
++Each column will represent the possible peripheral of the pinctrl
++Each line will represent a pio bank
++
++For example :
++Peripheral: 2 ( A and B)
++Bank: 2 (A, B and C)
++=>
++
++  /*    A         B     */
++  0xffffffff 0xffc00c3b  /* pioA */
++  0xffffffff 0x7fff3ccf  /* pioB */
++
++For each peripheral/bank we will descibe in a u32 if a pin can be
++configured in it by putting 1 to the pin bit (1 << pin)
++
++Required properties for pin configuration node:
++- plxtech,pins: 4 integers array, represents a group of pins mux and config
++  setting. The format is plxtech,pins = <PIN_BANK PIN_BANK_NUM PERIPH CONFIG>.
++  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
++  PIN_BANK 0 is pioA, PIN_BANK 1 is pioB...
++
++Bits used for CONFIG:
++ - None Yet
++
++Examples:
++
++pinctrl: pinctrl {
++	compatible = "oxsemi,ox810se-pinctrl", "simple-bus";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	/* Regmap for sys registers */
++	plxtech,sys-ctrl = <&sys>;
++
++	/* Default, all-open mux-map */
++	plxtech,mux-mask = <
++		 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
++		 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
++		 >;
++
++	uart0 {
++		pinctrl_uart0: uart0 {
++			plxtech,pins = <0 31 3 0
++					0 32 3 0>;
++		};
++		pinctrl_uart0_modem: uart0_modem {
++			plxtech,pins = <0 27 3 0
++					0 28 3 0
++					0 29 3 0
++					0 30 3 0
++					0 33 3 0
++					0 34 3 0>;
++		};
++	};
 +};
 +
-+/* Regmap offsets */
-+#define CLK_STAT_REGOFFSET	0x24
-+#define CLK_SET_REGOFFSET	0x2c
-+#define CLK_CLR_REGOFFSET	0x30
-+
-+static inline struct clk_oxnas *to_clk_oxnas(struct clk_hw *hw)
-+{
-+	return container_of(hw, struct clk_oxnas, hw);
-+}
-+
-+static int oxnas_clk_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_oxnas *std = to_clk_oxnas(hw);
-+	int ret;
-+	unsigned int val;
-+
-+	ret = regmap_read(std->regmap, CLK_STAT_REGOFFSET, &val);
-+	if (ret < 0)
-+		return ret;
-+
-+	return val & BIT(std->bit);
-+}
-+
-+static int oxnas_clk_enable(struct clk_hw *hw)
-+{
-+	struct clk_oxnas *std = to_clk_oxnas(hw);
-+
-+	regmap_write(std->regmap, CLK_SET_REGOFFSET, BIT(std->bit));
-+
-+	return 0;
-+}
-+
-+static void oxnas_clk_disable(struct clk_hw *hw)
-+{
-+	struct clk_oxnas *std = to_clk_oxnas(hw);
-+
-+	regmap_write(std->regmap, CLK_CLR_REGOFFSET, BIT(std->bit));
-+}
-+
-+static const struct clk_ops oxnas_clk_ops = {
-+	.enable = oxnas_clk_enable,
-+	.disable = oxnas_clk_disable,
-+	.is_enabled = oxnas_clk_is_enabled,
++uart0: uart at 200000 {
++	compatible = "ns16550a";
++	reg = <0x200000 0x100000>;
++	clocks = <&sysclk>;
++	interrupts = <23>;
++	reg-shift = <0>;
++	fifo-size = <16>;
++	reg-io-width = <1>;
++	current-speed = <115200>;
++	no-loopback-test;
++	status = "disabled";
++	resets = <&reset 17>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart0>;
 +};
-+
-+static const char *const oxnas_clk_parents[] = {
-+	"oscillator",
-+};
-+
-+static const char *const eth_parents[] = {
-+	"gmacclk",
-+};
-+
-+#define DECLARE_STD_CLKP(__clk, __parent)			\
-+static const struct clk_init_data clk_##__clk##_init = {	\
-+	.name = __stringify(__clk),				\
-+	.ops = &oxnas_clk_ops,					\
-+	.parent_names = __parent,				\
-+	.num_parents = ARRAY_SIZE(__parent),			\
-+}
-+
-+#define DECLARE_STD_CLK(__clk) DECLARE_STD_CLKP(__clk, oxnas_clk_parents)
-+
-+/* Clk init data declaration */
-+DECLARE_STD_CLK(leon);
-+DECLARE_STD_CLK(dma_sgdma);
-+DECLARE_STD_CLK(cipher);
-+DECLARE_STD_CLK(sata);
-+DECLARE_STD_CLK(audio);
-+DECLARE_STD_CLK(usbmph);
-+DECLARE_STD_CLKP(etha, eth_parents);
-+DECLARE_STD_CLK(pciea);
-+DECLARE_STD_CLK(nand);
-+
-+/* Bit - Name association */
-+static const struct clk_init_data *clk_oxnas_init[] = {
-+	[0] = &clk_leon_init,
-+	[1] = &clk_dma_sgdma_init,
-+	[2] = &clk_cipher_init,
-+	[3] = NULL,		/* Do not touch to DDR clock */
-+	[4] = &clk_sata_init,
-+	[5] = &clk_audio_init,
-+	[6] = &clk_usbmph_init,
-+	[7] = &clk_etha_init,
-+	[8] = &clk_pciea_init,
-+	[9] = &clk_nand_init,
-+};
-+
-+static int oxnas_stdclk_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct regmap *regmap;
-+	struct clk_oxnas *clk_oxnas;
-+	struct clk_onecell_data *onecell_data;
-+	struct clk **clks;
-+	unsigned int clks_count = 0;
-+	int i;
-+
-+	clk_oxnas = devm_kzalloc(&pdev->dev,
-+				 sizeof(*clk_oxnas)*ARRAY_SIZE(clk_oxnas_init),
-+				 GFP_KERNEL);
-+	if (!clk_oxnas)
-+		return -ENOMEM;
-+
-+	clks = devm_kzalloc(&pdev->dev,
-+			    sizeof(*clks)*ARRAY_SIZE(clk_oxnas_init),
-+			    GFP_KERNEL);
-+	if (!clks)
-+		return -ENOMEM;
-+
-+	onecell_data = devm_kzalloc(&pdev->dev, sizeof(*onecell_data),
-+				     GFP_KERNEL);
-+	if (!onecell_data)
-+		return -ENOMEM;
-+
-+	regmap = syscon_node_to_regmap(of_get_parent(np));
-+	if (!regmap) {
-+		dev_err(&pdev->dev, "failed to have parent regmap\n");
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < ARRAY_SIZE(clk_oxnas_init); i++) {
-+		struct clk_oxnas *_clk;
-+
-+		if (!clk_oxnas_init[i])
-+			continue;
-+
-+		_clk = &clk_oxnas[i];
-+		_clk->bit = i;
-+		_clk->hw.init = clk_oxnas_init[i];
-+		_clk->regmap = regmap;
-+
-+		clks[clks_count] = devm_clk_register(&pdev->dev, &_clk->hw);
-+		if (WARN_ON(IS_ERR(clks[clks_count])))
-+			return PTR_ERR(clks[clks_count]);
-+
-+		++clks_count;
-+	}
-+
-+	onecell_data->clks = clks;
-+	onecell_data->clk_num = clks_count;
-+
-+	return of_clk_add_provider(np, of_clk_src_onecell_get, onecell_data);
-+}
-+
-+static int oxnas_stdclk_remove(struct platform_device *pdev)
-+{
-+	of_clk_del_provider(pdev->dev.of_node);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id oxnas_stdclk_dt_ids[] = {
-+	{ .compatible = "oxsemi,ox810se-stdclk" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, oxnas_stdclk_dt_ids);
-+
-+static struct platform_driver oxnas_stdclk_driver = {
-+	.probe = oxnas_stdclk_probe,
-+	.remove = oxnas_stdclk_remove,
-+	.driver	= {
-+		.name = "oxnas-stdclk",
-+		.of_match_table = of_match_ptr(oxnas_stdclk_dt_ids),
-+	},
-+};
-+
-+module_platform_driver(oxnas_stdclk_driver);
 -- 
 1.9.1
