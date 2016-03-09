@@ -1,10 +1,10 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed,  9 Mar 2016 13:35:29 -0800
-Subject: [PATCH 07/13] thermal: convert mtk_thermal to use
+Date: Wed,  9 Mar 2016 13:35:32 -0800
+Subject: [PATCH 10/13] thermal: convert rockchip_thermal to use
  devm_thermal_zone_of_sensor_register
 In-Reply-To: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
 References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
-Message-ID: <1457559336-17652-8-git-send-email-edubezval@gmail.com>
+Message-ID: <1457559336-17652-11-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,55 +13,78 @@ of thermal_zone_of_sensor_register and cleans
 up the  local points and unregister calls.
 
 Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
 Cc: linux-pm at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
 ---
- drivers/thermal/mtk_thermal.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ drivers/thermal/rockchip_thermal.c | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-index 3d93b1c..2c40b0f 100644
---- a/drivers/thermal/mtk_thermal.c
-+++ b/drivers/thermal/mtk_thermal.c
-@@ -145,7 +145,6 @@ struct mtk_thermal {
- 	s32 o_slope;
- 	s32 vts[MT8173_NUM_SENSORS];
+diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+index b58e3fb..792c5d0 100644
+--- a/drivers/thermal/rockchip_thermal.c
++++ b/drivers/thermal/rockchip_thermal.c
+@@ -753,8 +753,8 @@ rockchip_thermal_register_sensor(struct platform_device *pdev,
  
--	struct thermal_zone_device *tzd;
- };
+ 	sensor->thermal = thermal;
+ 	sensor->id = id;
+-	sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev, id, sensor,
+-						      &rockchip_of_thermal_ops);
++	sensor->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, id,
++					sensor, &rockchip_of_thermal_ops);
+ 	if (IS_ERR(sensor->tzd)) {
+ 		error = PTR_ERR(sensor->tzd);
+ 		dev_err(&pdev->dev, "failed to register sensor %d: %d\n",
+@@ -782,7 +782,7 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
+ 	const struct of_device_id *match;
+ 	struct resource *res;
+ 	int irq;
+-	int i, j;
++	int i;
+ 	int error;
  
- struct mtk_thermal_bank_cfg {
-@@ -573,16 +572,11 @@ static int mtk_thermal_probe(struct platform_device *pdev)
+ 	match = of_match_node(of_rockchip_thermal_match, np);
+@@ -865,9 +865,6 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
+ 			dev_err(&pdev->dev,
+ 				"failed to register sensor[%d] : error = %d\n",
+ 				i, error);
+-			for (j = 0; j < i; j++)
+-				thermal_zone_of_sensor_unregister(&pdev->dev,
+-						thermal->sensors[j].tzd);
+ 			goto err_disable_pclk;
+ 		}
+ 	}
+@@ -879,7 +876,7 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
+ 	if (error) {
+ 		dev_err(&pdev->dev,
+ 			"failed to request tsadc irq: %d\n", error);
+-		goto err_unregister_sensor;
++		goto err_disable_pclk;
+ 	}
  
- 	platform_set_drvdata(pdev, mt);
- 
--	mt->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, mt,
--				&mtk_thermal_ops);
--	if (IS_ERR(mt->tzd))
--		goto err_register;
-+	devm_thermal_zone_of_sensor_register(&pdev->dev, 0, mt,
-+					     &mtk_thermal_ops);
+ 	thermal->chip->control(thermal->regs, true);
+@@ -891,11 +888,6 @@ static int rockchip_thermal_probe(struct platform_device *pdev)
  
  	return 0;
  
--err_register:
--	clk_disable_unprepare(mt->clk_peri_therm);
+-err_unregister_sensor:
+-	while (i--)
+-		thermal_zone_of_sensor_unregister(&pdev->dev,
+-						  thermal->sensors[i].tzd);
 -
- err_disable_clk_auxadc:
- 	clk_disable_unprepare(mt->clk_auxadc);
+ err_disable_pclk:
+ 	clk_disable_unprepare(thermal->pclk);
+ err_disable_clk:
+@@ -913,7 +905,6 @@ static int rockchip_thermal_remove(struct platform_device *pdev)
+ 		struct rockchip_thermal_sensor *sensor = &thermal->sensors[i];
  
-@@ -593,8 +587,6 @@ static int mtk_thermal_remove(struct platform_device *pdev)
- {
- 	struct mtk_thermal *mt = platform_get_drvdata(pdev);
+ 		rockchip_thermal_toggle_sensor(sensor, false);
+-		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
+ 	}
  
--	thermal_zone_of_sensor_unregister(&pdev->dev, mt->tzd);
--
- 	clk_disable_unprepare(mt->clk_peri_therm);
- 	clk_disable_unprepare(mt->clk_auxadc);
- 
+ 	thermal->chip->control(thermal->regs, false);
 -- 
 2.1.4
