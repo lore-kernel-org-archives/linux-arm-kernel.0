@@ -1,79 +1,92 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 10 Mar 2016 05:22:56 +0800
-Subject: [PATCH v6 4/6] dt/bindings: power: add RK3399 SoCs header for
- power-domain
+Date: Thu, 10 Mar 2016 05:24:21 +0800
+Subject: [PATCH v6 5/6] dt/bindings: rockchip: modify document of Rockchip
+ power domains
 In-Reply-To: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
 References: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1457558578-22049-5-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1457558661-22125-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to a description from TRM, add all the power domains
+Add binding documentation for the power domains
+found on Rockchip RK3399 SoCs
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- include/dt-bindings/power/rk3399-power.h | 53 ++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
- create mode 100644 include/dt-bindings/power/rk3399-power.h
+ .../bindings/soc/rockchip/power_domain.txt         | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/include/dt-bindings/power/rk3399-power.h b/include/dt-bindings/power/rk3399-power.h
-new file mode 100644
-index 0000000..168b3bf
---- /dev/null
-+++ b/include/dt-bindings/power/rk3399-power.h
-@@ -0,0 +1,53 @@
-+#ifndef __DT_BINDINGS_POWER_RK3399_POWER_H__
-+#define __DT_BINDINGS_POWER_RK3399_POWER_H__
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 13dc6a3..98085c8 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -7,6 +7,7 @@ Required properties for power domain controller:
+ - compatible: Should be one of the following.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
++	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
+ - #power-domain-cells: Number of cells in a power-domain specifier.
+ 	Should be 1 for multiple PM domains.
+ - #address-cells: Should be 1.
+@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
+ - clocks (optional): phandles to clocks which need to be enabled while power domain
+ 	switches state.
+ 
+@@ -45,12 +47,41 @@ Example:
+                 };
+         };
+ 
++Example 2:
++		power: power-controller {
++			compatible = "rockchip,rk3399-power-controller";
++			#power-domain-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+/* VD_CORE_L */
-+#define RK3399_PD_A53_L0	0
-+#define RK3399_PD_A53_L1	1
-+#define RK3399_PD_A53_L2	2
-+#define RK3399_PD_A53_L3	3
-+#define RK3399_PD_SCU_L		4
++			pd_vio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <RK3399_PD_VIO>;
 +
-+/* VD_CORE_B */
-+#define RK3399_PD_A72_B0	5
-+#define RK3399_PD_A72_B1	6
-+#define RK3399_PD_SCU_B		7
++				pd_vo {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <RK3399_PD_VO>;
 +
-+/* VD_LOGIC */
-+#define RK3399_PD_TCPD0		8
-+#define RK3399_PD_TCPD1		9
-+#define RK3399_PD_CCI		10
-+#define RK3399_PD_CCI0		11
-+#define RK3399_PD_CCI1		12
-+#define RK3399_PD_PERILP	13
-+#define RK3399_PD_PERIHP	14
-+#define RK3399_PD_VIO		15
-+#define RK3399_PD_VO		16
-+#define RK3399_PD_VOPB		17
-+#define RK3399_PD_VOPL		18
-+#define RK3399_PD_ISP0		19
-+#define RK3399_PD_ISP1		20
-+#define RK3399_PD_HDCP		21
-+#define RK3399_PD_GMAC		22
-+#define RK3399_PD_EMMC		23
-+#define RK3399_PD_USB3		24
-+#define RK3399_PD_EDP		25
-+#define RK3399_PD_GIC		26
-+#define RK3399_PD_SD		27
-+#define RK3399_PD_SDIOAUDIO	28
-+#define RK3399_PD_ALIVE		29
++					pd_vopb {
++						reg = <RK3399_PD_VOPB>;
++					};
 +
-+/* VD_CENTER */
-+#define RK3399_PD_CENTER	30
-+#define RK3399_PD_VCODEC	31
-+#define RK3399_PD_VDU		32
-+#define RK3399_PD_RGA		33
-+#define RK3399_PD_IEP		34
++					pd_vopl {
++						reg = <RK3399_PD_VOPL>;
++					};
++				};
++			};
++		};
 +
-+/* VD_GPU */
-+#define RK3399_PD_GPU		35
+ Node of a device using power domains must have a power-domains property,
+ containing a phandle to the power device node and an index specifying which
+ power domain to use.
+ The index should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
+ 
+ Example of the node using power domain:
+ 
+@@ -65,3 +96,9 @@ Example of the node using power domain:
+                 power-domains = <&power RK3368_PD_GPU_1>;
+                 /* ... */
+         };
 +
-+/* VD_PMU */
-+#define RK3399_PD_PMU		36
-+
-+#endif
++	node {
++		/* ... */
++		power-domains = <&power RK3399_PD_VOPB>;
++		/* ... */
++	};
 -- 
 1.9.1
