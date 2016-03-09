@@ -1,461 +1,469 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Wed,  9 Mar 2016 17:21:03 +0100
-Subject: [PATCH v2 1/5] arm64/perf: Basic uncore counter support for Cavium
- ThunderX
+Date: Wed,  9 Mar 2016 17:21:07 +0100
+Subject: [PATCH v2 5/5] arm64/perf: Cavium ThunderX OCX TLK uncore support
 In-Reply-To: <cover.1457539621.git.jglauber@cavium.com>
 References: <cover.1457539621.git.jglauber@cavium.com>
-Message-ID: <2588abcb011df6e60cd8212a8583454999180748.1457539622.git.jglauber@cavium.com>
+Message-ID: <876bae8e4fc594a646651c02ae8ab9a8c423a49e.1457539622.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide "uncore" facilities for different non-CPU performance
-counter units. Based on Intel/AMD uncore pmu support.
-
-The uncore drivers cover quite different functionality including
-L2 Cache, memory controllers and interconnects.
-
-The uncore PMUs can be found under /sys/bus/event_source/devices.
-All counters are exported via sysfs in the corresponding events
-files under the PMU directory so the perf tool can list the event names.
-
-There are some points that are special in this implementation:
-
-1) The PMU detection relies on PCI device detection. If a
-   matching PCI device is found the PMU is created. The code can deal
-   with multiple units of the same type, e.g. more than one memory
-   controller.
-   Note: There is also a CPUID check to determine the CPU variant,
-   this is needed to support different hardware versions that use
-   the same PCI IDs.
-
-2) Counters are summarized across different units of the same type
-   on one NUMA node.
-   For instance L2C TAD 0..7 are presented as a single counter
-   (adding the values from TAD 0 to 7). Although losing the ability
-   to read a single value the merged values are easier to use.
-
-3) NUMA support. The device node id is used to group devices by node
-   so counters on one node can be merged. The NUMA node can be selected
-   via a new sysfs node attribute.
-   Without NUMA support all devices will be on node 0.
-
-4) All counters are 64 bit wide without overflow interrupts.
+Support for the OCX transmit link counters.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- drivers/perf/Makefile               |   1 +
- drivers/perf/uncore/Makefile        |   1 +
- drivers/perf/uncore/uncore_cavium.c | 301 ++++++++++++++++++++++++++++++++++++
- drivers/perf/uncore/uncore_cavium.h |  78 ++++++++++
- 4 files changed, 381 insertions(+)
- create mode 100644 drivers/perf/uncore/Makefile
- create mode 100644 drivers/perf/uncore/uncore_cavium.c
- create mode 100644 drivers/perf/uncore/uncore_cavium.h
+ drivers/perf/uncore/Makefile                |   3 +-
+ drivers/perf/uncore/uncore_cavium.c         |   3 +
+ drivers/perf/uncore/uncore_cavium.h         |   4 +
+ drivers/perf/uncore/uncore_cavium_ocx_tlk.c | 380 ++++++++++++++++++++++++++++
+ 4 files changed, 389 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/perf/uncore/uncore_cavium_ocx_tlk.c
 
-diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-index acd2397..61b6084 100644
---- a/drivers/perf/Makefile
-+++ b/drivers/perf/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARM_PMU) += arm_pmu.o
-+obj-$(CONFIG_ARCH_THUNDER) += uncore/
 diff --git a/drivers/perf/uncore/Makefile b/drivers/perf/uncore/Makefile
-new file mode 100644
-index 0000000..b9c72c2
---- /dev/null
+index 81479e8..88d1f57 100644
+--- a/drivers/perf/uncore/Makefile
 +++ b/drivers/perf/uncore/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_THUNDER) += uncore_cavium.o
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_ARCH_THUNDER) += uncore_cavium.o		\
+ 			      uncore_cavium_l2c_tad.o	\
+ 			      uncore_cavium_l2c_cbc.o	\
+-			      uncore_cavium_lmc.o
++			      uncore_cavium_lmc.o	\
++			      uncore_cavium_ocx_tlk.o
 diff --git a/drivers/perf/uncore/uncore_cavium.c b/drivers/perf/uncore/uncore_cavium.c
-new file mode 100644
-index 0000000..4fd5e45
---- /dev/null
+index 45c81d0..e210457 100644
+--- a/drivers/perf/uncore/uncore_cavium.c
 +++ b/drivers/perf/uncore/uncore_cavium.c
-@@ -0,0 +1,301 @@
+@@ -21,6 +21,8 @@ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
+ 		return thunder_uncore_l2c_cbc;
+ 	else if (event->pmu->type == thunder_lmc_pmu.type)
+ 		return thunder_uncore_lmc;
++	else if (event->pmu->type == thunder_ocx_tlk_pmu.type)
++		return thunder_uncore_ocx_tlk;
+ 	else
+ 		return NULL;
+ }
+@@ -306,6 +308,7 @@ static int __init thunder_uncore_init(void)
+ 	thunder_uncore_l2c_tad_setup();
+ 	thunder_uncore_l2c_cbc_setup();
+ 	thunder_uncore_lmc_setup();
++	thunder_uncore_ocx_tlk_setup();
+ 	return 0;
+ }
+ late_initcall(thunder_uncore_init);
+diff --git a/drivers/perf/uncore/uncore_cavium.h b/drivers/perf/uncore/uncore_cavium.h
+index f14f6be..78e95c7 100644
+--- a/drivers/perf/uncore/uncore_cavium.h
++++ b/drivers/perf/uncore/uncore_cavium.h
+@@ -10,6 +10,7 @@ enum uncore_type {
+ 	L2C_TAD_TYPE,
+ 	L2C_CBC_TYPE,
+ 	LMC_TYPE,
++	OCX_TLK_TYPE,
+ };
+ 
+ extern int thunder_uncore_version;
+@@ -70,9 +71,11 @@ extern struct device_attribute format_attr_node;
+ extern struct thunder_uncore *thunder_uncore_l2c_tad;
+ extern struct thunder_uncore *thunder_uncore_l2c_cbc;
+ extern struct thunder_uncore *thunder_uncore_lmc;
++extern struct thunder_uncore *thunder_uncore_ocx_tlk;
+ extern struct pmu thunder_l2c_tad_pmu;
+ extern struct pmu thunder_l2c_cbc_pmu;
+ extern struct pmu thunder_lmc_pmu;
++extern struct pmu thunder_ocx_tlk_pmu;
+ 
+ /* Prototypes */
+ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
+@@ -89,3 +92,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
+ int thunder_uncore_l2c_tad_setup(void);
+ int thunder_uncore_l2c_cbc_setup(void);
+ int thunder_uncore_lmc_setup(void);
++int thunder_uncore_ocx_tlk_setup(void);
+diff --git a/drivers/perf/uncore/uncore_cavium_ocx_tlk.c b/drivers/perf/uncore/uncore_cavium_ocx_tlk.c
+new file mode 100644
+index 0000000..02f1bc1
+--- /dev/null
++++ b/drivers/perf/uncore/uncore_cavium_ocx_tlk.c
+@@ -0,0 +1,380 @@
 +/*
-+ * Cavium Thunder uncore PMU support. Derived from Intel and AMD uncore code.
++ * Cavium Thunder uncore PMU support, OCX TLK counters.
 + *
-+ * Copyright (C) 2015,2016 Cavium Inc.
++ * Copyright 2016 Cavium Inc.
 + * Author: Jan Glauber <jan.glauber@cavium.com>
 + */
 +
 +#include <linux/slab.h>
-+#include <linux/numa.h>
-+#include <linux/cpufeature.h>
++#include <linux/perf_event.h>
 +
 +#include "uncore_cavium.h"
 +
-+int thunder_uncore_version;
++#ifndef PCI_DEVICE_ID_THUNDER_OCX
++#define PCI_DEVICE_ID_THUNDER_OCX		0xa013
++#endif
 +
-+struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
++#define OCX_TLK_NR_UNITS			3
++#define OCX_TLK_UNIT_OFFSET			0x2000
++#define OCX_TLK_CONTROL_OFFSET			0x10040
++#define OCX_TLK_COUNTER_OFFSET			0x10400
++
++#define OCX_TLK_STAT_DISABLE			0
++#define OCX_TLK_STAT_ENABLE			1
++
++/* OCX TLK event list */
++#define OCX_TLK_EVENT_STAT_IDLE_CNT		0x00
++#define OCX_TLK_EVENT_STAT_DATA_CNT		0x01
++#define OCX_TLK_EVENT_STAT_SYNC_CNT		0x02
++#define OCX_TLK_EVENT_STAT_RETRY_CNT		0x03
++#define OCX_TLK_EVENT_STAT_ERR_CNT		0x04
++
++#define OCX_TLK_EVENT_STAT_MAT0_CNT		0x08
++#define OCX_TLK_EVENT_STAT_MAT1_CNT		0x09
++#define OCX_TLK_EVENT_STAT_MAT2_CNT		0x0a
++#define OCX_TLK_EVENT_STAT_MAT3_CNT		0x0b
++
++#define OCX_TLK_EVENT_STAT_VC0_CMD		0x10
++#define OCX_TLK_EVENT_STAT_VC1_CMD		0x11
++#define OCX_TLK_EVENT_STAT_VC2_CMD		0x12
++#define OCX_TLK_EVENT_STAT_VC3_CMD		0x13
++#define OCX_TLK_EVENT_STAT_VC4_CMD		0x14
++#define OCX_TLK_EVENT_STAT_VC5_CMD		0x15
++
++#define OCX_TLK_EVENT_STAT_VC0_PKT		0x20
++#define OCX_TLK_EVENT_STAT_VC1_PKT		0x21
++#define OCX_TLK_EVENT_STAT_VC2_PKT		0x22
++#define OCX_TLK_EVENT_STAT_VC3_PKT		0x23
++#define OCX_TLK_EVENT_STAT_VC4_PKT		0x24
++#define OCX_TLK_EVENT_STAT_VC5_PKT		0x25
++#define OCX_TLK_EVENT_STAT_VC6_PKT		0x26
++#define OCX_TLK_EVENT_STAT_VC7_PKT		0x27
++#define OCX_TLK_EVENT_STAT_VC8_PKT		0x28
++#define OCX_TLK_EVENT_STAT_VC9_PKT		0x29
++#define OCX_TLK_EVENT_STAT_VC10_PKT		0x2a
++#define OCX_TLK_EVENT_STAT_VC11_PKT		0x2b
++#define OCX_TLK_EVENT_STAT_VC12_PKT		0x2c
++#define OCX_TLK_EVENT_STAT_VC13_PKT		0x2d
++
++#define OCX_TLK_EVENT_STAT_VC0_CON		0x30
++#define OCX_TLK_EVENT_STAT_VC1_CON		0x31
++#define OCX_TLK_EVENT_STAT_VC2_CON		0x32
++#define OCX_TLK_EVENT_STAT_VC3_CON		0x33
++#define OCX_TLK_EVENT_STAT_VC4_CON		0x34
++#define OCX_TLK_EVENT_STAT_VC5_CON		0x35
++#define OCX_TLK_EVENT_STAT_VC6_CON		0x36
++#define OCX_TLK_EVENT_STAT_VC7_CON		0x37
++#define OCX_TLK_EVENT_STAT_VC8_CON		0x38
++#define OCX_TLK_EVENT_STAT_VC9_CON		0x39
++#define OCX_TLK_EVENT_STAT_VC10_CON		0x3a
++#define OCX_TLK_EVENT_STAT_VC11_CON		0x3b
++#define OCX_TLK_EVENT_STAT_VC12_CON		0x3c
++#define OCX_TLK_EVENT_STAT_VC13_CON		0x3d
++
++#define OCX_TLK_MAX_COUNTER			OCX_TLK_EVENT_STAT_VC13_CON
++#define OCX_TLK_NR_COUNTERS			OCX_TLK_MAX_COUNTER
++
++struct thunder_uncore *thunder_uncore_ocx_tlk;
++
++/*
++ * The OCX devices have a single device per node, therefore picking the
++ * first device from the list is correct.
++ */
++static inline void __iomem *map_offset(struct thunder_uncore_node *node,
++				       unsigned long addr, int offset, int nr)
 +{
-+	return NULL;
++	struct thunder_uncore_unit *unit;
++
++	unit = list_first_entry(&node->unit_list, struct thunder_uncore_unit,
++				entry);
++	return (void __iomem *) (addr + unit->map + nr * offset);
 +}
 +
-+void thunder_uncore_read(struct perf_event *event)
++static void __iomem *map_offset_ocx_tlk(struct thunder_uncore_node *node,
++					unsigned long addr, int nr)
++{
++	return (void __iomem *) map_offset(node, addr, nr,
++					   OCX_TLK_UNIT_OFFSET);
++}
++
++/*
++ * Summarize counters across all TLK's. Different from the other uncore
++ * PMUs because all TLK's are on one PCI device.
++ */
++static void thunder_uncore_read_ocx_tlk(struct perf_event *event)
 +{
 +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
 +	struct hw_perf_event *hwc = &event->hw;
 +	struct thunder_uncore_node *node;
-+	struct thunder_uncore_unit *unit;
 +	u64 prev, new = 0;
 +	s64 delta;
-+
-+	node = get_node(hwc->config, uncore);
++	int i;
 +
 +	/*
 +	 * No counter overflow interrupts so we do not
 +	 * have to worry about prev_count changing on us.
 +	 */
++
 +	prev = local64_read(&hwc->prev_count);
 +
-+	/* read counter values from all units on the node */
-+	list_for_each_entry(unit, &node->unit_list, entry)
-+		new += readq(hwc->event_base + unit->map);
++	/* read counter values from all units */
++	node = get_node(hwc->config, uncore);
++	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
++		new += readq(map_offset_ocx_tlk(node, hwc->event_base, i));
 +
 +	local64_set(&hwc->prev_count, new);
 +	delta = new - prev;
 +	local64_add(delta, &event->count);
 +}
 +
-+void thunder_uncore_del(struct perf_event *event, int flags)
++static void thunder_uncore_start(struct perf_event *event, int flags)
 +{
 +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
 +	struct hw_perf_event *hwc = &event->hw;
 +	struct thunder_uncore_node *node;
 +	int i;
 +
-+	event->pmu->stop(event, PERF_EF_UPDATE);
++	hwc->state = 0;
 +
-+	/*
-+	 * For programmable counters we need to check where we installed it.
-+	 * To keep this function generic always test the more complicated
-+	 * case (free running counters won't need the loop).
-+	 */
++	/* enable counters on all units */
 +	node = get_node(hwc->config, uncore);
-+	for (i = 0; i < node->num_counters; i++) {
-+		if (cmpxchg(&node->events[i], event, NULL) == event)
-+			break;
-+	}
-+	hwc->idx = -1;
++	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
++		writeb(OCX_TLK_STAT_ENABLE,
++		       map_offset_ocx_tlk(node, hwc->config_base, i));
++
++	perf_event_update_userpage(event);
 +}
 +
-+int thunder_uncore_event_init(struct perf_event *event)
++static void thunder_uncore_stop(struct perf_event *event, int flags)
 +{
++	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
 +	struct hw_perf_event *hwc = &event->hw;
 +	struct thunder_uncore_node *node;
-+	struct thunder_uncore *uncore;
++	int i;
 +
-+	if (event->attr.type != event->pmu->type)
-+		return -ENOENT;
++	/* disable counters on all units */
++	node = get_node(hwc->config, uncore);
++	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
++		writeb(OCX_TLK_STAT_DISABLE,
++		       map_offset_ocx_tlk(node, hwc->config_base, i));
++	hwc->state |= PERF_HES_STOPPED;
 +
-+	/* we do not support sampling */
-+	if (is_sampling_event(event))
-+		return -EINVAL;
++	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
++		thunder_uncore_read_ocx_tlk(event);
++		hwc->state |= PERF_HES_UPTODATE;
++	}
++}
 +
-+	/* counters do not have these bits */
-+	if (event->attr.exclude_user	||
-+	    event->attr.exclude_kernel	||
-+	    event->attr.exclude_host	||
-+	    event->attr.exclude_guest	||
-+	    event->attr.exclude_hv	||
-+	    event->attr.exclude_idle)
-+		return -EINVAL;
++static int thunder_uncore_add(struct perf_event *event, int flags)
++{
++	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
++	struct hw_perf_event *hwc = &event->hw;
++	struct thunder_uncore_node *node;
++	int id, i;
 +
-+	/* counters are 64 bit wide and without overflow interrupts */
++	WARN_ON_ONCE(!uncore);
++	node = get_node(hwc->config, uncore);
++	id = get_id(hwc->config);
 +
-+	uncore = event_to_thunder_uncore(event);
-+	if (!uncore)
-+		return -ENODEV;
-+	if (!uncore->event_valid(event->attr.config & UNCORE_EVENT_ID_MASK))
-+		return -EINVAL;
++	/* are we already assigned? */
++	if (hwc->idx != -1 && node->events[hwc->idx] == event)
++		goto out;
 +
-+	/* check NUMA node */
-+	node = get_node(event->attr.config, uncore);
-+	if (!node) {
-+		pr_debug("Invalid numa node selected\n");
-+		return -EINVAL;
++	for (i = 0; i < node->num_counters; i++) {
++		if (node->events[i] == event) {
++			hwc->idx = i;
++			goto out;
++		}
 +	}
 +
-+	hwc->config = event->attr.config;
++	/* counters are 1:1 */
 +	hwc->idx = -1;
++	if (cmpxchg(&node->events[id], NULL, event) == NULL)
++		hwc->idx = id;
++
++out:
++	if (hwc->idx == -1)
++		return -EBUSY;
++
++	hwc->config_base = 0;
++	hwc->event_base = OCX_TLK_COUNTER_OFFSET - OCX_TLK_CONTROL_OFFSET +
++			hwc->idx * sizeof(unsigned long long);
++	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
++
++	if (flags & PERF_EF_START)
++		thunder_uncore_start(event, PERF_EF_RELOAD);
 +	return 0;
 +}
 +
-+/*
-+ * Thunder uncore events are independent from CPUs. Provide a cpumask
-+ * nevertheless to prevent perf from adding the event per-cpu and just
-+ * set the mask to one online CPU. Use the same cpumask for all uncore
-+ * devices.
-+ */
-+static cpumask_t thunder_active_mask;
++PMU_FORMAT_ATTR(event, "config:0-5");
 +
-+static ssize_t thunder_uncore_attr_show_cpumask(struct device *dev,
-+						struct device_attribute *attr,
-+						char *buf)
-+{
-+	return cpumap_print_to_pagebuf(true, buf, &thunder_active_mask);
-+}
-+static DEVICE_ATTR(cpumask, S_IRUGO, thunder_uncore_attr_show_cpumask, NULL);
-+
-+static struct attribute *thunder_uncore_attrs[] = {
-+	&dev_attr_cpumask.attr,
++static struct attribute *thunder_ocx_tlk_format_attr[] = {
++	&format_attr_event.attr,
++	&format_attr_node.attr,
 +	NULL,
 +};
 +
-+struct attribute_group thunder_uncore_attr_group = {
-+	.attrs = thunder_uncore_attrs,
++static struct attribute_group thunder_ocx_tlk_format_group = {
++	.name = "format",
++	.attrs = thunder_ocx_tlk_format_attr,
 +};
 +
-+ssize_t thunder_events_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr,
-+				  char *page)
++EVENT_ATTR(idle_cnt,	OCX_TLK_EVENT_STAT_IDLE_CNT);
++EVENT_ATTR(data_cnt,	OCX_TLK_EVENT_STAT_DATA_CNT);
++EVENT_ATTR(sync_cnt,	OCX_TLK_EVENT_STAT_SYNC_CNT);
++EVENT_ATTR(retry_cnt,	OCX_TLK_EVENT_STAT_RETRY_CNT);
++EVENT_ATTR(err_cnt,	OCX_TLK_EVENT_STAT_ERR_CNT);
++EVENT_ATTR(mat0_cnt,	OCX_TLK_EVENT_STAT_MAT0_CNT);
++EVENT_ATTR(mat1_cnt,	OCX_TLK_EVENT_STAT_MAT1_CNT);
++EVENT_ATTR(mat2_cnt,	OCX_TLK_EVENT_STAT_MAT2_CNT);
++EVENT_ATTR(mat3_cnt,	OCX_TLK_EVENT_STAT_MAT3_CNT);
++EVENT_ATTR(vc0_cmd,	OCX_TLK_EVENT_STAT_VC0_CMD);
++EVENT_ATTR(vc1_cmd,	OCX_TLK_EVENT_STAT_VC1_CMD);
++EVENT_ATTR(vc2_cmd,	OCX_TLK_EVENT_STAT_VC2_CMD);
++EVENT_ATTR(vc3_cmd,	OCX_TLK_EVENT_STAT_VC3_CMD);
++EVENT_ATTR(vc4_cmd,	OCX_TLK_EVENT_STAT_VC4_CMD);
++EVENT_ATTR(vc5_cmd,	OCX_TLK_EVENT_STAT_VC5_CMD);
++EVENT_ATTR(vc0_pkt,	OCX_TLK_EVENT_STAT_VC0_PKT);
++EVENT_ATTR(vc1_pkt,	OCX_TLK_EVENT_STAT_VC1_PKT);
++EVENT_ATTR(vc2_pkt,	OCX_TLK_EVENT_STAT_VC2_PKT);
++EVENT_ATTR(vc3_pkt,	OCX_TLK_EVENT_STAT_VC3_PKT);
++EVENT_ATTR(vc4_pkt,	OCX_TLK_EVENT_STAT_VC4_PKT);
++EVENT_ATTR(vc5_pkt,	OCX_TLK_EVENT_STAT_VC5_PKT);
++EVENT_ATTR(vc6_pkt,	OCX_TLK_EVENT_STAT_VC6_PKT);
++EVENT_ATTR(vc7_pkt,	OCX_TLK_EVENT_STAT_VC7_PKT);
++EVENT_ATTR(vc8_pkt,	OCX_TLK_EVENT_STAT_VC8_PKT);
++EVENT_ATTR(vc9_pkt,	OCX_TLK_EVENT_STAT_VC9_PKT);
++EVENT_ATTR(vc10_pkt,	OCX_TLK_EVENT_STAT_VC10_PKT);
++EVENT_ATTR(vc11_pkt,	OCX_TLK_EVENT_STAT_VC11_PKT);
++EVENT_ATTR(vc12_pkt,	OCX_TLK_EVENT_STAT_VC12_PKT);
++EVENT_ATTR(vc13_pkt,	OCX_TLK_EVENT_STAT_VC13_PKT);
++EVENT_ATTR(vc0_con,	OCX_TLK_EVENT_STAT_VC0_CON);
++EVENT_ATTR(vc1_con,	OCX_TLK_EVENT_STAT_VC1_CON);
++EVENT_ATTR(vc2_con,	OCX_TLK_EVENT_STAT_VC2_CON);
++EVENT_ATTR(vc3_con,	OCX_TLK_EVENT_STAT_VC3_CON);
++EVENT_ATTR(vc4_con,	OCX_TLK_EVENT_STAT_VC4_CON);
++EVENT_ATTR(vc5_con,	OCX_TLK_EVENT_STAT_VC5_CON);
++EVENT_ATTR(vc6_con,	OCX_TLK_EVENT_STAT_VC6_CON);
++EVENT_ATTR(vc7_con,	OCX_TLK_EVENT_STAT_VC7_CON);
++EVENT_ATTR(vc8_con,	OCX_TLK_EVENT_STAT_VC8_CON);
++EVENT_ATTR(vc9_con,	OCX_TLK_EVENT_STAT_VC9_CON);
++EVENT_ATTR(vc10_con,	OCX_TLK_EVENT_STAT_VC10_CON);
++EVENT_ATTR(vc11_con,	OCX_TLK_EVENT_STAT_VC11_CON);
++EVENT_ATTR(vc12_con,	OCX_TLK_EVENT_STAT_VC12_CON);
++EVENT_ATTR(vc13_con,	OCX_TLK_EVENT_STAT_VC13_CON);
++
++static struct attribute *thunder_ocx_tlk_events_attr[] = {
++	EVENT_PTR(idle_cnt),
++	EVENT_PTR(data_cnt),
++	EVENT_PTR(sync_cnt),
++	EVENT_PTR(retry_cnt),
++	EVENT_PTR(err_cnt),
++	EVENT_PTR(mat0_cnt),
++	EVENT_PTR(mat1_cnt),
++	EVENT_PTR(mat2_cnt),
++	EVENT_PTR(mat3_cnt),
++	EVENT_PTR(vc0_cmd),
++	EVENT_PTR(vc1_cmd),
++	EVENT_PTR(vc2_cmd),
++	EVENT_PTR(vc3_cmd),
++	EVENT_PTR(vc4_cmd),
++	EVENT_PTR(vc5_cmd),
++	EVENT_PTR(vc0_pkt),
++	EVENT_PTR(vc1_pkt),
++	EVENT_PTR(vc2_pkt),
++	EVENT_PTR(vc3_pkt),
++	EVENT_PTR(vc4_pkt),
++	EVENT_PTR(vc5_pkt),
++	EVENT_PTR(vc6_pkt),
++	EVENT_PTR(vc7_pkt),
++	EVENT_PTR(vc8_pkt),
++	EVENT_PTR(vc9_pkt),
++	EVENT_PTR(vc10_pkt),
++	EVENT_PTR(vc11_pkt),
++	EVENT_PTR(vc12_pkt),
++	EVENT_PTR(vc13_pkt),
++	EVENT_PTR(vc0_con),
++	EVENT_PTR(vc1_con),
++	EVENT_PTR(vc2_con),
++	EVENT_PTR(vc3_con),
++	EVENT_PTR(vc4_con),
++	EVENT_PTR(vc5_con),
++	EVENT_PTR(vc6_con),
++	EVENT_PTR(vc7_con),
++	EVENT_PTR(vc8_con),
++	EVENT_PTR(vc9_con),
++	EVENT_PTR(vc10_con),
++	EVENT_PTR(vc11_con),
++	EVENT_PTR(vc12_con),
++	EVENT_PTR(vc13_con),
++	NULL,
++};
++
++static struct attribute_group thunder_ocx_tlk_events_group = {
++	.name = "events",
++	.attrs = thunder_ocx_tlk_events_attr,
++};
++
++static const struct attribute_group *thunder_ocx_tlk_attr_groups[] = {
++	&thunder_uncore_attr_group,
++	&thunder_ocx_tlk_format_group,
++	&thunder_ocx_tlk_events_group,
++	NULL,
++};
++
++struct pmu thunder_ocx_tlk_pmu = {
++	.attr_groups	= thunder_ocx_tlk_attr_groups,
++	.name		= "thunder_ocx_tlk",
++	.event_init	= thunder_uncore_event_init,
++	.add		= thunder_uncore_add,
++	.del		= thunder_uncore_del,
++	.start		= thunder_uncore_start,
++	.stop		= thunder_uncore_stop,
++	.read		= thunder_uncore_read_ocx_tlk,
++};
++
++static int event_valid(u64 config)
 +{
-+	struct perf_pmu_events_attr *pmu_attr =
-+		container_of(attr, struct perf_pmu_events_attr, attr);
-+
-+	if (pmu_attr->event_str)
-+		return sprintf(page, "%s", pmu_attr->event_str);
-+
-+	return 0;
-+}
-+
-+/* node attribute depending on number of numa nodes */
-+static ssize_t node_show(struct device *dev, struct device_attribute *attr, char *page)
-+{
-+	if (NODES_SHIFT)
-+		return sprintf(page, "config:16-%d\n", 16 + NODES_SHIFT - 1);
++	if (config <= OCX_TLK_EVENT_STAT_ERR_CNT ||
++	    (config >= OCX_TLK_EVENT_STAT_MAT0_CNT &&
++	     config <= OCX_TLK_EVENT_STAT_MAT3_CNT) ||
++	    (config >= OCX_TLK_EVENT_STAT_VC0_CMD &&
++	     config <= OCX_TLK_EVENT_STAT_VC5_CMD) ||
++	    (config >= OCX_TLK_EVENT_STAT_VC0_PKT &&
++	     config <= OCX_TLK_EVENT_STAT_VC13_PKT) ||
++	    (config >= OCX_TLK_EVENT_STAT_VC0_CON &&
++	     config <= OCX_TLK_EVENT_STAT_VC13_CON))
++		return 1;
 +	else
-+		return sprintf(page, "config:16\n");
++		return 0;
 +}
 +
-+struct device_attribute format_attr_node = __ATTR_RO(node);
-+
-+static int thunder_uncore_pmu_cpu_notifier(struct notifier_block *nb,
-+					   unsigned long action, void *data)
++int __init thunder_uncore_ocx_tlk_setup(void)
 +{
-+	struct thunder_uncore *uncore = container_of(nb, struct thunder_uncore, cpu_nb);
-+	int new_cpu, old_cpu = (long) data;
++	int ret;
 +
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	case CPU_DOWN_PREPARE:
-+		if (!cpumask_test_and_clear_cpu(old_cpu, &thunder_active_mask))
-+			break;
-+		new_cpu = cpumask_any_but(cpu_online_mask, old_cpu);
-+		if (new_cpu >= nr_cpu_ids)
-+			break;
-+		perf_pmu_migrate_context(uncore->pmu, old_cpu, new_cpu);
-+		cpumask_set_cpu(new_cpu, &thunder_active_mask);
-+		break;
-+	default:
-+		break;
++	thunder_uncore_ocx_tlk = kzalloc(sizeof(struct thunder_uncore),
++					 GFP_KERNEL);
++	if (!thunder_uncore_ocx_tlk) {
++		ret = -ENOMEM;
++		goto fail_nomem;
 +	}
-+	return NOTIFY_OK;
-+}
 +
-+static struct thunder_uncore_node *alloc_node(struct thunder_uncore *uncore, int node_id, int counters)
-+{
-+	struct thunder_uncore_node *node;
-+
-+	node = kzalloc(sizeof(struct thunder_uncore_node), GFP_KERNEL);
-+	if (!node)
-+		return NULL;
-+	node->num_counters = counters;
-+	INIT_LIST_HEAD(&node->unit_list);
-+	return node;
-+}
-+
-+int __init thunder_uncore_setup(struct thunder_uncore *uncore, int device_id,
-+			 unsigned long offset, unsigned long size,
-+			 struct pmu *pmu, int counters)
-+{
-+	struct thunder_uncore_unit  *unit, *tmp;
-+	struct thunder_uncore_node *node;
-+	struct pci_dev *pdev = NULL;
-+	int ret, node_id, found = 0;
-+
-+	/* detect PCI devices */
-+	do {
-+		pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, device_id, pdev);
-+		if (!pdev)
-+			break;
-+
-+		node_id = dev_to_node(&pdev->dev);
-+		/*
-+		 * -1 without NUMA, set to 0 because we always have at
-+		 *  least node 0.
-+		 */
-+		if (node_id < 0)
-+			node_id = 0;
-+
-+		/* allocate node if necessary */
-+		if (!uncore->nodes[node_id])
-+			uncore->nodes[node_id] = alloc_node(uncore, node_id, counters);
-+
-+		node = uncore->nodes[node_id];
-+		if (!node) {
-+			ret = -ENOMEM;
-+			goto fail;
-+		}
-+
-+		unit = kzalloc(sizeof(struct thunder_uncore_unit), GFP_KERNEL);
-+		if (!unit) {
-+			ret = -ENOMEM;
-+			goto fail;
-+		}
-+
-+		unit->pdev = pdev;
-+		unit->map = ioremap(pci_resource_start(pdev, 0) + offset, size);
-+		list_add(&unit->entry, &node->unit_list);
-+		node->nr_units++;
-+		found++;
-+	} while (1);
-+
-+	if (!found)
-+		return -ENODEV;
-+
-+	/*
-+	 * perf PMU is CPU dependent in difference to our uncore devices.
-+	 * Just pick a CPU and migrate away if it goes offline.
-+	 */
-+	cpumask_set_cpu(smp_processor_id(), &thunder_active_mask);
-+
-+	uncore->cpu_nb.notifier_call = thunder_uncore_pmu_cpu_notifier;
-+	uncore->cpu_nb.priority = CPU_PRI_PERF + 1;
-+	ret = register_cpu_notifier(&uncore->cpu_nb);
++	ret = thunder_uncore_setup(thunder_uncore_ocx_tlk,
++				   PCI_DEVICE_ID_THUNDER_OCX,
++				   OCX_TLK_CONTROL_OFFSET,
++				   OCX_TLK_UNIT_OFFSET * OCX_TLK_NR_UNITS,
++				   &thunder_ocx_tlk_pmu,
++				   OCX_TLK_NR_COUNTERS);
 +	if (ret)
 +		goto fail;
 +
-+	ret = perf_pmu_register(pmu, pmu->name, -1);
-+	if (ret)
-+		goto fail_pmu;
-+
-+	uncore->pmu = pmu;
++	thunder_uncore_ocx_tlk->type = OCX_TLK_TYPE;
++	thunder_uncore_ocx_tlk->event_valid = event_valid;
 +	return 0;
 +
-+fail_pmu:
-+	unregister_cpu_notifier(&uncore->cpu_nb);
 +fail:
-+	node_id = 0;
-+	while (uncore->nodes[node_id]) {
-+		node = uncore->nodes[node_id];
-+
-+		list_for_each_entry_safe(unit, tmp, &node->unit_list, entry) {
-+			if (unit->pdev) {
-+				if (unit->map)
-+					iounmap(unit->map);
-+				pci_dev_put(unit->pdev);
-+			}
-+			kfree(unit);
-+		}
-+		kfree(uncore->nodes[node_id]);
-+		node_id++;
-+	}
++	kfree(thunder_uncore_ocx_tlk);
++fail_nomem:
 +	return ret;
 +}
-+
-+static int __init thunder_uncore_init(void)
-+{
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number();
-+	u32 variant;
-+
-+	if (implementor != ARM_CPU_IMP_CAVIUM ||
-+	    part_number != CAVIUM_CPU_PART_THUNDERX)
-+		return -ENODEV;
-+
-+	/* detect pass2 which contains different counters */
-+	variant = MIDR_VARIANT(read_cpuid_id());
-+	if (variant == 1)
-+		thunder_uncore_version = 1;
-+	pr_info("PMU version: %d\n", thunder_uncore_version);
-+
-+	return 0;
-+}
-+late_initcall(thunder_uncore_init);
-diff --git a/drivers/perf/uncore/uncore_cavium.h b/drivers/perf/uncore/uncore_cavium.h
-new file mode 100644
-index 0000000..c799709
---- /dev/null
-+++ b/drivers/perf/uncore/uncore_cavium.h
-@@ -0,0 +1,78 @@
-+#include <linux/perf_event.h>
-+#include <linux/pci.h>
-+#include <linux/list.h>
-+#include <linux/io.h>
-+
-+#undef pr_fmt
-+#define pr_fmt(fmt)     "thunderx_uncore: " fmt
-+
-+enum uncore_type {
-+	NOP_TYPE,
-+};
-+
-+extern int thunder_uncore_version;
-+
-+#define UNCORE_EVENT_ID_MASK		0xffff
-+#define UNCORE_EVENT_ID_SHIFT		16
-+
-+/* maximum number of parallel hardware counters for all uncore parts */
-+#define MAX_COUNTERS			64
-+
-+struct thunder_uncore_unit {
-+	struct list_head entry;
-+	void __iomem *map;
-+	struct pci_dev *pdev;
-+};
-+
-+struct thunder_uncore_node {
-+	int nr_units;
-+	int num_counters;
-+	struct list_head unit_list;
-+	struct perf_event *events[MAX_COUNTERS];
-+};
-+
-+/* generic uncore struct for different pmu types */
-+struct thunder_uncore {
-+	int type;
-+	struct pmu *pmu;
-+	int (*event_valid)(u64);
-+	struct notifier_block cpu_nb;
-+	struct thunder_uncore_node *nodes[MAX_NUMNODES];
-+};
-+
-+#define EVENT_PTR(_id) (&event_attr_##_id.attr.attr)
-+
-+#define EVENT_ATTR(_name, _val)						   \
-+static struct perf_pmu_events_attr event_attr_##_name = {		   \
-+	.attr	   = __ATTR(_name, 0444, thunder_events_sysfs_show, NULL), \
-+	.event_str = "event=" __stringify(_val),			   \
-+}
-+
-+#define EVENT_ATTR_STR(_name, _str)					   \
-+static struct perf_pmu_events_attr event_attr_##_name = {		   \
-+	.attr	   = __ATTR(_name, 0444, thunder_events_sysfs_show, NULL), \
-+	.event_str = _str,						   \
-+}
-+
-+static inline struct thunder_uncore_node *get_node(u64 config,
-+					struct thunder_uncore *uncore)
-+{
-+	return uncore->nodes[config >> UNCORE_EVENT_ID_SHIFT];
-+}
-+
-+#define get_id(config) (config & UNCORE_EVENT_ID_MASK)
-+
-+extern struct attribute_group thunder_uncore_attr_group;
-+extern struct device_attribute format_attr_node;
-+
-+/* Prototypes */
-+struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
-+void thunder_uncore_del(struct perf_event *event, int flags);
-+int thunder_uncore_event_init(struct perf_event *event);
-+void thunder_uncore_read(struct perf_event *event);
-+int thunder_uncore_setup(struct thunder_uncore *uncore, int id,
-+			 unsigned long offset, unsigned long size,
-+			 struct pmu *pmu, int counters);
-+ssize_t thunder_events_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr,
-+				  char *page);
 -- 
 1.9.1
