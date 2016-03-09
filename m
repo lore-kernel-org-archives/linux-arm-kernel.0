@@ -1,22 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 8 Mar 2016 21:55:26 -0800
-Subject: [PATCH v3 7/9] KVM: arm/arm64: arch_timer: Rely on the arch
- timer to parse the firmware tables
-In-Reply-To: <1457436573-6180-8-git-send-email-julien.grall@arm.com>
-References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
- <1457436573-6180-8-git-send-email-julien.grall@arm.com>
-Message-ID: <20160309055526.GK26583@lvm>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Mar 2016 12:55:43 +0700
+Subject: [GIT PULL v2] Immutable branch between MFD, Input and IIO [with fix]
+In-Reply-To: <20160211155633.GB20693@x1>
+References: <1450101234-2191-1-git-send-email-mpa@pengutronix.de>
+ <20160211155633.GB20693@x1>
+Message-ID: <20160309055543.GQ13692@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 11:29:31AM +0000, Julien Grall wrote:
-> The firmware table is currently parsed by the virtual timer code in
-> order to retrieve the virtual timer interrupt. However, this is already
-> done by the arch timer driver.
-> 
-> To avoid code duplication, use the newly function arch_timer_get_kvm_info()
-> which return all the information required by the virtual timer code.
-> 
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Please pull this new tag.  It contains a fix.
+
+The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
+
+  Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-input-iio-v4.6-v2
+
+for you to fetch changes up to 0708677558dd7d03e70292549433f0f6b04a5e00:
+
+  iio: adc/imx25-gcq: Move incorrect do_div (2016-03-09 12:50:51 +0700)
+
+----------------------------------------------------------------
+Immutable branch between MFD, Input and IIO [with fix] due for v4.6
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      iio: adc/imx25-gcq: Move incorrect do_div
+
+Markus Pargmann (6):
+      mfd: Add DT binding documentation for imx25 ADC/TSC
+      iio: Add binding documentation for imx25 GCQ
+      Input: add binding documentation for imx25 touchscreen controller
+      mfd: fsl-imx25-tsadc: Register touchscreen ADC driver
+      iio: adc: Add imx25-gcq ADC driver
+      Input: touchscreen: Add imx25 TCQ driver
+
+ .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  58 ++
+ .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  35 ++
+ .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  47 ++
+ drivers/iio/adc/Kconfig                            |   7 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/fsl-imx25-gcq.c                    | 417 ++++++++++++++
+ drivers/input/touchscreen/Kconfig                  |   9 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/fsl-imx25-tcq.c          | 596 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |   9 +
+ drivers/mfd/Makefile                               |   2 +
+ drivers/mfd/fsl-imx25-tsadc.c                      | 203 +++++++
+ include/dt-bindings/iio/adc/fsl-imx25-gcq.h        |  18 +
+ include/linux/mfd/imx25-tsadc.h                    | 140 +++++
+ 14 files changed, 1543 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+ create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
+ create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
+ create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+ create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
+ create mode 100644 include/linux/mfd/imx25-tsadc.h
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
