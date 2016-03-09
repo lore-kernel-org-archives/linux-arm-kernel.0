@@ -1,171 +1,226 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  8 Mar 2016 20:48:34 -0700
-Subject: [PATCH 1/3] coresight: moving coresight_simple_func() to header file
+Date: Tue,  8 Mar 2016 20:48:35 -0700
+Subject: [PATCH 2/3] coresight: etb10: splitting sysFS "status" entry
 In-Reply-To: <1457495316-5281-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1457495316-5281-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1457495316-5281-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1457495316-5281-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Macro "coresight_simple_func()" can be used by several drivers.
-As such making the structure type generic and moving to a
-globally available header file.  That way individual drivers
-can use the functionality by simply specifying the structure
-they need to work with.
+The sysFS "status" entry conveys a wealth of information about
+the status of the HW but goes agains the sysFS rule of one topic
+per file.
+
+This patch rectifies the situation by adding read-only entries for
+each of the field formaly displayed by "status".  The ABI
+documentation is kept up to date.
+
+An error message with questionnable relevance is also removed to
+keep checkpatch.pl happy.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 33 +++++-------
- .../hwtracing/coresight/coresight-etm4x-sysfs.c    | 63 ++++++++++------------
- drivers/hwtracing/coresight/coresight-priv.h       | 10 ++++
- 3 files changed, 51 insertions(+), 55 deletions(-)
+ .../ABI/testing/sysfs-bus-coresight-devices-etb10  | 69 +++++++++++++++--
+ drivers/hwtracing/coresight/coresight-etb10.c      | 86 ++++++++++------------
+ 2 files changed, 101 insertions(+), 54 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index cbb4046c1070..02d4b629891f 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -1221,26 +1221,19 @@ static struct attribute *coresight_etm_attrs[] = {
- 	NULL,
- };
+diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10 b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10
+index 4b8d6ec92e2b..b5f526081711 100644
+--- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10
++++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etb10
+@@ -6,13 +6,6 @@ Description:	(RW) Add/remove a sink from a trace path.  There can be multiple
+ 		source for a single sink.
+ 		ex: echo 1 > /sys/bus/coresight/devices/20010000.etb/enable_sink
  
--#define coresight_simple_func(name, offset)                             \
--static ssize_t name##_show(struct device *_dev,                         \
--			   struct device_attribute *attr, char *buf)    \
--{                                                                       \
--	struct etm_drvdata *drvdata = dev_get_drvdata(_dev->parent);    \
--	return scnprintf(buf, PAGE_SIZE, "0x%x\n",                      \
--			 readl_relaxed(drvdata->base + offset));        \
--}                                                                       \
--DEVICE_ATTR_RO(name)
+-What:		/sys/bus/coresight/devices/<memory_map>.etb/status
+-Date:		November 2014
+-KernelVersion:	3.19
+-Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+-Description:	(R) List various control and status registers.  The specific
+-		layout and content is driver specific.
 -
--coresight_simple_func(etmccr, ETMCCR);
--coresight_simple_func(etmccer, ETMCCER);
--coresight_simple_func(etmscr, ETMSCR);
--coresight_simple_func(etmidr, ETMIDR);
--coresight_simple_func(etmcr, ETMCR);
--coresight_simple_func(etmtraceidr, ETMTRACEIDR);
--coresight_simple_func(etmteevr, ETMTEEVR);
--coresight_simple_func(etmtssvr, ETMTSSCR);
--coresight_simple_func(etmtecr1, ETMTECR1);
--coresight_simple_func(etmtecr2, ETMTECR2);
-+#define coresight_etm3x_simple_func(name, offset)			\
-+	coresight_simple_func(struct etm_drvdata, name, offset)
+ What:		/sys/bus/coresight/devices/<memory_map>.etb/trigger_cntr
+ Date:		November 2014
+ KernelVersion:	3.19
+@@ -22,3 +15,65 @@ Description:	(RW) Disables write access to the Trace RAM by stopping the
+ 		following the trigger event. The number of 32-bit words written
+ 		into the Trace RAM following the trigger event is equal to the
+ 		value stored in this register+1 (from ARM ETB-TRM).
 +
-+coresight_etm3x_simple_func(etmccr, ETMCCR);
-+coresight_etm3x_simple_func(etmccer, ETMCCER);
-+coresight_etm3x_simple_func(etmscr, ETMSCR);
-+coresight_etm3x_simple_func(etmidr, ETMIDR);
-+coresight_etm3x_simple_func(etmcr, ETMCR);
-+coresight_etm3x_simple_func(etmtraceidr, ETMTRACEIDR);
-+coresight_etm3x_simple_func(etmteevr, ETMTEEVR);
-+coresight_etm3x_simple_func(etmtssvr, ETMTSSCR);
-+coresight_etm3x_simple_func(etmtecr1, ETMTECR1);
-+coresight_etm3x_simple_func(etmtecr2, ETMTECR2);
- 
- static struct attribute *coresight_etm_mgmt_attrs[] = {
- 	&dev_attr_etmccr.attr,
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-index 0e80ec668402..7c84308c5564 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-@@ -2039,29 +2039,22 @@ static struct attribute *coresight_etmv4_attrs[] = {
- 	NULL,
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/rdp
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Defines the depth, in words, of the trace RAM in powers of
++		2.  The value is read directly from HW register RDP, 0x004.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/sts
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Shows the value held by the ETB status register.  The value
++		is read directly from HW register STS, 0x00C.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/rrp
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Shows the value held by the ETB RAM Read Pointer register
++		that is used to read entries from the Trace RAM over the APB
++		interface.  The value is read directly from HW register RRP,
++		0x014.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/rwp
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Shows the value held by the ETB RAM Write Pointer register
++		that is used to sets the write pointer to write entries from
++		the CoreSight bus into the Trace RAM. The value is read directly
++		from HW register RWP, 0x018.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/trg
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Similar to "trigger_cntr" above except that this value is
++		read directly from HW register TRG, 0x01C.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/ctl
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Shows the value held by the ETB Control register. The value
++		is read directly from HW register CTL, 0x020.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/ffsr
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Shows the value held by the ETB Formatter and Flush Status
++		register.  The value is read directly from HW register FFSR,
++		0x300.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etb/mgmt/ffcr
++Date:		March 2016
++KernelVersion:	4.7
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Shows the value held by the ETB Formatter and Flush Control
++		register.  The value is read directly from HW register FFCR,
++		0x304.
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index a2eb6bdeaafa..bf7686fa1f1f 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -578,47 +578,29 @@ static const struct file_operations etb_fops = {
+ 	.llseek		= no_llseek,
  };
  
--#define coresight_simple_func(name, offset)				\
--static ssize_t name##_show(struct device *_dev,				\
--			   struct device_attribute *attr, char *buf)	\
--{									\
--	struct etmv4_drvdata *drvdata = dev_get_drvdata(_dev->parent);	\
--	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
--			 readl_relaxed(drvdata->base + offset));	\
--}									\
--DEVICE_ATTR_RO(name)
+-static ssize_t status_show(struct device *dev,
+-			   struct device_attribute *attr, char *buf)
+-{
+-	unsigned long flags;
+-	u32 etb_rdr, etb_sr, etb_rrp, etb_rwp;
+-	u32 etb_trg, etb_cr, etb_ffsr, etb_ffcr;
+-	struct etb_drvdata *drvdata = dev_get_drvdata(dev->parent);
 -
--coresight_simple_func(trcoslsr, TRCOSLSR);
--coresight_simple_func(trcpdcr, TRCPDCR);
--coresight_simple_func(trcpdsr, TRCPDSR);
--coresight_simple_func(trclsr, TRCLSR);
--coresight_simple_func(trcconfig, TRCCONFIGR);
--coresight_simple_func(trctraceid, TRCTRACEIDR);
--coresight_simple_func(trcauthstatus, TRCAUTHSTATUS);
--coresight_simple_func(trcdevid, TRCDEVID);
--coresight_simple_func(trcdevtype, TRCDEVTYPE);
--coresight_simple_func(trcpidr0, TRCPIDR0);
--coresight_simple_func(trcpidr1, TRCPIDR1);
--coresight_simple_func(trcpidr2, TRCPIDR2);
--coresight_simple_func(trcpidr3, TRCPIDR3);
-+#define coresight_etm4x_simple_func(name, offset)			\
-+	coresight_simple_func(struct etmv4_drvdata, name, offset)
+-	pm_runtime_get_sync(drvdata->dev);
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	CS_UNLOCK(drvdata->base);
+-
+-	etb_rdr = readl_relaxed(drvdata->base + ETB_RAM_DEPTH_REG);
+-	etb_sr = readl_relaxed(drvdata->base + ETB_STATUS_REG);
+-	etb_rrp = readl_relaxed(drvdata->base + ETB_RAM_READ_POINTER);
+-	etb_rwp = readl_relaxed(drvdata->base + ETB_RAM_WRITE_POINTER);
+-	etb_trg = readl_relaxed(drvdata->base + ETB_TRG);
+-	etb_cr = readl_relaxed(drvdata->base + ETB_CTL_REG);
+-	etb_ffsr = readl_relaxed(drvdata->base + ETB_FFSR);
+-	etb_ffcr = readl_relaxed(drvdata->base + ETB_FFCR);
+-
+-	CS_LOCK(drvdata->base);
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+-	pm_runtime_put(drvdata->dev);
+-
+-	return sprintf(buf,
+-		       "Depth:\t\t0x%x\n"
+-		       "Status:\t\t0x%x\n"
+-		       "RAM read ptr:\t0x%x\n"
+-		       "RAM wrt ptr:\t0x%x\n"
+-		       "Trigger cnt:\t0x%x\n"
+-		       "Control:\t0x%x\n"
+-		       "Flush status:\t0x%x\n"
+-		       "Flush ctrl:\t0x%x\n",
+-		       etb_rdr, etb_sr, etb_rrp, etb_rwp,
+-		       etb_trg, etb_cr, etb_ffsr, etb_ffcr);
+-
+-	return -EINVAL;
+-}
+-static DEVICE_ATTR_RO(status);
++#define coresight_etb10_simple_func(name, offset)                       \
++	coresight_simple_func(struct etb_drvdata, name, offset)
 +
-+coresight_etm4x_simple_func(trcoslsr, TRCOSLSR);
-+coresight_etm4x_simple_func(trcpdcr, TRCPDCR);
-+coresight_etm4x_simple_func(trcpdsr, TRCPDSR);
-+coresight_etm4x_simple_func(trclsr, TRCLSR);
-+coresight_etm4x_simple_func(trcconfig, TRCCONFIGR);
-+coresight_etm4x_simple_func(trctraceid, TRCTRACEIDR);
-+coresight_etm4x_simple_func(trcauthstatus, TRCAUTHSTATUS);
-+coresight_etm4x_simple_func(trcdevid, TRCDEVID);
-+coresight_etm4x_simple_func(trcdevtype, TRCDEVTYPE);
-+coresight_etm4x_simple_func(trcpidr0, TRCPIDR0);
-+coresight_etm4x_simple_func(trcpidr1, TRCPIDR1);
-+coresight_etm4x_simple_func(trcpidr2, TRCPIDR2);
-+coresight_etm4x_simple_func(trcpidr3, TRCPIDR3);
++coresight_etb10_simple_func(rdp, ETB_RAM_DEPTH_REG);
++coresight_etb10_simple_func(sts, ETB_STATUS_REG);
++coresight_etb10_simple_func(rrp, ETB_RAM_READ_POINTER);
++coresight_etb10_simple_func(rwp, ETB_RAM_WRITE_POINTER);
++coresight_etb10_simple_func(trg, ETB_TRG);
++coresight_etb10_simple_func(ctl, ETB_CTL_REG);
++coresight_etb10_simple_func(ffsr, ETB_FFSR);
++coresight_etb10_simple_func(ffcr, ETB_FFCR);
++
++static struct attribute *coresight_etb_mgmt_attrs[] = {
++	&dev_attr_rdp.attr,
++	&dev_attr_sts.attr,
++	&dev_attr_rrp.attr,
++	&dev_attr_rwp.attr,
++	&dev_attr_trg.attr,
++	&dev_attr_ctl.attr,
++	&dev_attr_ffsr.attr,
++	&dev_attr_ffcr.attr,
++	NULL,
++};
  
- static struct attribute *coresight_etmv4_mgmt_attrs[] = {
- 	&dev_attr_trcoslsr.attr,
-@@ -2080,19 +2073,19 @@ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
+ static ssize_t trigger_cntr_show(struct device *dev,
+ 			    struct device_attribute *attr, char *buf)
+@@ -648,10 +630,23 @@ static DEVICE_ATTR_RW(trigger_cntr);
+ 
+ static struct attribute *coresight_etb_attrs[] = {
+ 	&dev_attr_trigger_cntr.attr,
+-	&dev_attr_status.attr,
  	NULL,
  };
- 
--coresight_simple_func(trcidr0, TRCIDR0);
--coresight_simple_func(trcidr1, TRCIDR1);
--coresight_simple_func(trcidr2, TRCIDR2);
--coresight_simple_func(trcidr3, TRCIDR3);
--coresight_simple_func(trcidr4, TRCIDR4);
--coresight_simple_func(trcidr5, TRCIDR5);
-+coresight_etm4x_simple_func(trcidr0, TRCIDR0);
-+coresight_etm4x_simple_func(trcidr1, TRCIDR1);
-+coresight_etm4x_simple_func(trcidr2, TRCIDR2);
-+coresight_etm4x_simple_func(trcidr3, TRCIDR3);
-+coresight_etm4x_simple_func(trcidr4, TRCIDR4);
-+coresight_etm4x_simple_func(trcidr5, TRCIDR5);
- /* trcidr[6,7] are reserved */
--coresight_simple_func(trcidr8, TRCIDR8);
--coresight_simple_func(trcidr9, TRCIDR9);
--coresight_simple_func(trcidr10, TRCIDR10);
--coresight_simple_func(trcidr11, TRCIDR11);
--coresight_simple_func(trcidr12, TRCIDR12);
--coresight_simple_func(trcidr13, TRCIDR13);
-+coresight_etm4x_simple_func(trcidr8, TRCIDR8);
-+coresight_etm4x_simple_func(trcidr9, TRCIDR9);
-+coresight_etm4x_simple_func(trcidr10, TRCIDR10);
-+coresight_etm4x_simple_func(trcidr11, TRCIDR11);
-+coresight_etm4x_simple_func(trcidr12, TRCIDR12);
-+coresight_etm4x_simple_func(trcidr13, TRCIDR13);
- 
- static struct attribute *coresight_etmv4_trcidr_attrs[] = {
- 	&dev_attr_trcidr0.attr,
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 333eddaed339..3b5dd95a3588 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -37,6 +37,16 @@
- #define ETM_MODE_EXCL_KERN	BIT(30)
- #define ETM_MODE_EXCL_USER	BIT(31)
- 
-+#define coresight_simple_func(type, name, offset)			\
-+static ssize_t name##_show(struct device *_dev,				\
-+			   struct device_attribute *attr, char *buf)	\
-+{									\
-+	type *drvdata = dev_get_drvdata(_dev->parent);			\
-+	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
-+			 readl_relaxed(drvdata->base + offset));	\
-+}									\
-+static DEVICE_ATTR_RO(name)
+-ATTRIBUTE_GROUPS(coresight_etb);
 +
- enum cs_mode {
- 	CS_MODE_DISABLED,
- 	CS_MODE_SYSFS,
++static const struct attribute_group coresight_etb_group = {
++	.attrs = coresight_etb_attrs,
++};
++
++static const struct attribute_group coresight_etb_mgmt_group = {
++	.attrs = coresight_etb_mgmt_attrs,
++	.name = "mgmt",
++};
++
++const struct attribute_group *coresight_etb_groups[] = {
++	&coresight_etb_group,
++	&coresight_etb_mgmt_group,
++	NULL,
++};
+ 
+ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+@@ -701,11 +696,8 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	drvdata->buf = devm_kzalloc(dev,
+ 				    drvdata->buffer_depth * 4, GFP_KERNEL);
+-	if (!drvdata->buf) {
+-		dev_err(dev, "Failed to allocate %u bytes for buffer data\n",
+-			drvdata->buffer_depth * 4);
++	if (!drvdata->buf)
+ 		return -ENOMEM;
+-	}
+ 
+ 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+ 	if (!desc)
 -- 
 2.1.4
