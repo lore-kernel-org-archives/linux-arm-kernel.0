@@ -1,36 +1,74 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 9 Mar 2016 21:04:21 +0000
-Subject: [PATCH v2 1/2] iio: core: introduce IIO_CHAN_INFO_SIGNED
-In-Reply-To: <56DDDFFC.5010100@metafoo.de>
-References: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
- <1457360997-29179-2-git-send-email-ludovic.desroches@atmel.com>
- <56DDDFFC.5010100@metafoo.de>
-Message-ID: <56E08FD5.4060701@kernel.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed,  9 Mar 2016 13:35:27 -0800
+Subject: [PATCH 05/13] input: convert sun4i-ts to use
+ devm_thermal_zone_of_sensor_register
+In-Reply-To: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
+References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
+Message-ID: <1457559336-17652-6-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/16 20:09, Lars-Peter Clausen wrote:
-> On 03/07/2016 03:29 PM, Ludovic Desroches wrote:
->> The same channel can be used to perform a signed or an unsigned
->> conversion. Add a new infomask element to be able to select the type of
->> conversion wanted: a raw one or a signed raw one.
-> 
-> If this is the difference between offset binary and two's complement then it
-> makes no sense to expose this at this level. Both are the same number just
-> in a different representation and converting between them is cheap. A few
-> magnitudes cheaper than reading the result over sysfs. So, if your device
-> supports both, just pick one.
-> 
-> For the buffered interface it may make sense to expose this, since the per
-> sample overhead is a lot lower. But still doing the conversion should be
-> cheap enough that it does not really matter. Before this is implemented I'd
-> like to see hard performance numbers that this actually makes a difference.
-> 
-> - Lars
-> 
-Definitely looking for more detail on this.  I'd missed we were talking simply
-about representation (which is also how I read 62.6.6 Conversion Results Format
-in the datasheet). Not entirely sure what I imagined the difference between
-signed and unsigned output would be!
+This changes the driver to use the devm_ version
+of thermal_zone_of_sensor_register and cleans
+up the  local points and unregister calls.
 
-Jonathan
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Lukasz Majewski <l.majewski@samsung.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Jens Thiele <karme@karme.de>
+Cc: linux-input at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+---
+ drivers/input/touchscreen/sun4i-ts.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
+
+diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+index 4857943..d07dd29 100644
+--- a/drivers/input/touchscreen/sun4i-ts.c
++++ b/drivers/input/touchscreen/sun4i-ts.c
+@@ -115,7 +115,6 @@
+ struct sun4i_ts_data {
+ 	struct device *dev;
+ 	struct input_dev *input;
+-	struct thermal_zone_device *tz;
+ 	void __iomem *base;
+ 	unsigned int irq;
+ 	bool ignore_fifo_data;
+@@ -366,10 +365,7 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+ 	if (IS_ERR(hwmon))
+ 		return PTR_ERR(hwmon);
+ 
+-	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
+-						 &sun4i_ts_tz_ops);
+-	if (IS_ERR(ts->tz))
+-		ts->tz = NULL;
++	devm_thermal_zone_of_sensor_register(ts->dev, 0, ts, &sun4i_ts_tz_ops);
+ 
+ 	writel(TEMP_IRQ_EN(1), ts->base + TP_INT_FIFOC);
+ 
+@@ -377,7 +373,6 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+ 		error = input_register_device(ts->input);
+ 		if (error) {
+ 			writel(0, ts->base + TP_INT_FIFOC);
+-			thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
+ 			return error;
+ 		}
+ 	}
+@@ -394,8 +389,6 @@ static int sun4i_ts_remove(struct platform_device *pdev)
+ 	if (ts->input)
+ 		input_unregister_device(ts->input);
+ 
+-	thermal_zone_of_sensor_unregister(ts->dev, ts->tz);
+-
+ 	/* Deactivate all IRQs */
+ 	writel(0, ts->base + TP_INT_FIFOC);
+ 
+-- 
+2.1.4
