@@ -1,51 +1,37 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  9 Mar 2016 18:16:58 -0800
-Subject: [PATCH 17/18] Documentation: dt: add Vybrid DDR memory controller
- bindings
-In-Reply-To: <1457576219-7971-1-git-send-email-stefan@agner.ch>
-References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
-Message-ID: <1457576219-7971-18-git-send-email-stefan@agner.ch>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Thu, 10 Mar 2016 05:00:35 +0800
+Subject: [PATCH v6 0/6] rockchip: power-domain: fix pm domain for support
+ RK3399 SoC
+Message-ID: <1457557241-21297-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device-tree bindings of Vybrids LPDDR2/DDR3 SDRAM Memory
-Controller. Access to the device is required to put the memory
-into self-refresh mode.
+fix some idle handling
+support sub-power domain
+add rk3399-power.h
+modify document for RK3399 Soc
+modify power domain for RK3399 SoC
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- .../bindings/arm/freescale/fsl,vf610-ddrmc.txt     | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
+Changes in v6:
+[PATCH v6 3/6]:
+	fix up some coding style
+[PATCH v6 4/6]:
+	fix up the volatge domain follow the TRM table
+	fix up the power domian follow the TRM reg bits
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
-new file mode 100644
-index 0000000..56a71d6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
-@@ -0,0 +1,23 @@
-+Freescale Vybrid LPDDR2/DDR3 SDRAM Memory Controller
-+
-+The memory controller supports high performance applications for 16-bit or
-+8-bit DDR2, or LPDDR SDRAM memories.
-+
-+Required properties:
-+- compatible:	"fsl,vf610-ddrmc"
-+- reg:		the register range of the DDRMC registers
-+- clocks:	DDRMC main clock to clock memory and access registers.
-+- clock-names:	Must contain "ddrc", matching entry in the clocks property.
-+- fsl,has-cke-reset-pulls:
-+		States whether pull-down/up are populated on DDR CKE/RESET
-+		signals to allow using DDR self-refresh modes (see Vybrid
-+		Hardware Development Guide for details).
-+
-+Example:
-+	ddrmc: ddrmc at 400ae000 {
-+		compatible = "fsl,vf610-ddrmc";
-+		reg = <0x400ae000 0x1000>;
-+		clocks = <&clks VF610_CLK_DDRMC>;
-+		clock-names = "ddrc";
-+		fsl,has-cke-reset-pulls;
-+	}
+Elaine Zhang (6):
+  rockchip: power-domain: make idle handling optional
+  power-domain: allow domains only handling idle requests
+  rockchip: power-domain: add support for sub-power domains
+  dt/bindings: power: add RK3399 SoCs header for power-domain
+  dt/bindings: rockchip: modify document of Rockchip power domains
+  rockchip: power-domain: Modify power domain driver for rk3399
+
+ .../bindings/soc/rockchip/power_domain.txt         |  37 ++++++
+ drivers/soc/rockchip/pm_domains.c                  | 139 ++++++++++++++++++++-
+ include/dt-bindings/power/rk3399-power.h           |  53 ++++++++
+ 3 files changed, 224 insertions(+), 5 deletions(-)
+ create mode 100644 include/dt-bindings/power/rk3399-power.h
+
 -- 
-2.7.2
+1.9.1
