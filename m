@@ -1,92 +1,88 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Wed,  9 Mar 2016 17:21:06 +0100
-Subject: [PATCH v2 4/5] arm64/perf: Cavium ThunderX LMC uncore support
+Date: Wed,  9 Mar 2016 17:21:05 +0100
+Subject: [PATCH v2 3/5] arm64/perf: Cavium ThunderX L2C CBC uncore support
 In-Reply-To: <cover.1457539621.git.jglauber@cavium.com>
 References: <cover.1457539621.git.jglauber@cavium.com>
-Message-ID: <0409c7b35218b788bc33b974ab89f610e0db2c9a.1457539622.git.jglauber@cavium.com>
+Message-ID: <256cecaca63266beedb57c344f10260915cc0a01.1457539622.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support counters on the DRAM controllers.
-
-Also support pass2 added counters by checking MIDR.
+Support counters of the L2 cache crossbar connect.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- drivers/perf/uncore/Makefile            |   3 +-
- drivers/perf/uncore/uncore_cavium.c     |   3 +
- drivers/perf/uncore/uncore_cavium.h     |   4 +
- drivers/perf/uncore/uncore_cavium_lmc.c | 196 ++++++++++++++++++++++++++++++++
- 4 files changed, 205 insertions(+), 1 deletion(-)
- create mode 100644 drivers/perf/uncore/uncore_cavium_lmc.c
+ drivers/perf/uncore/Makefile                |   3 +-
+ drivers/perf/uncore/uncore_cavium.c         |   3 +
+ drivers/perf/uncore/uncore_cavium.h         |   4 +
+ drivers/perf/uncore/uncore_cavium_l2c_cbc.c | 237 ++++++++++++++++++++++++++++
+ 4 files changed, 246 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_cbc.c
 
 diff --git a/drivers/perf/uncore/Makefile b/drivers/perf/uncore/Makefile
-index d52ecc9..81479e8 100644
+index 6a16caf..d52ecc9 100644
 --- a/drivers/perf/uncore/Makefile
 +++ b/drivers/perf/uncore/Makefile
-@@ -1,3 +1,4 @@
+@@ -1,2 +1,3 @@
  obj-$(CONFIG_ARCH_THUNDER) += uncore_cavium.o		\
- 			      uncore_cavium_l2c_tad.o	\
--			      uncore_cavium_l2c_cbc.o
-+			      uncore_cavium_l2c_cbc.o	\
-+			      uncore_cavium_lmc.o
+-			      uncore_cavium_l2c_tad.o
++			      uncore_cavium_l2c_tad.o	\
++			      uncore_cavium_l2c_cbc.o
 diff --git a/drivers/perf/uncore/uncore_cavium.c b/drivers/perf/uncore/uncore_cavium.c
-index a230450..45c81d0 100644
+index b92b2ae..a230450 100644
 --- a/drivers/perf/uncore/uncore_cavium.c
 +++ b/drivers/perf/uncore/uncore_cavium.c
-@@ -19,6 +19,8 @@ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
+@@ -17,6 +17,8 @@ struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event)
+ {
+ 	if (event->pmu->type == thunder_l2c_tad_pmu.type)
  		return thunder_uncore_l2c_tad;
- 	else if (event->pmu->type == thunder_l2c_cbc_pmu.type)
- 		return thunder_uncore_l2c_cbc;
-+	else if (event->pmu->type == thunder_lmc_pmu.type)
-+		return thunder_uncore_lmc;
++	else if (event->pmu->type == thunder_l2c_cbc_pmu.type)
++		return thunder_uncore_l2c_cbc;
  	else
  		return NULL;
  }
-@@ -303,6 +305,7 @@ static int __init thunder_uncore_init(void)
+@@ -300,6 +302,7 @@ static int __init thunder_uncore_init(void)
+ 	pr_info("PMU version: %d\n", thunder_uncore_version);
  
  	thunder_uncore_l2c_tad_setup();
- 	thunder_uncore_l2c_cbc_setup();
-+	thunder_uncore_lmc_setup();
++	thunder_uncore_l2c_cbc_setup();
  	return 0;
  }
  late_initcall(thunder_uncore_init);
 diff --git a/drivers/perf/uncore/uncore_cavium.h b/drivers/perf/uncore/uncore_cavium.h
-index 94bd02c..f14f6be 100644
+index 7a9c367..94bd02c 100644
 --- a/drivers/perf/uncore/uncore_cavium.h
 +++ b/drivers/perf/uncore/uncore_cavium.h
-@@ -9,6 +9,7 @@
+@@ -8,6 +8,7 @@
+ 
  enum uncore_type {
  	L2C_TAD_TYPE,
- 	L2C_CBC_TYPE,
-+	LMC_TYPE,
++	L2C_CBC_TYPE,
  };
  
  extern int thunder_uncore_version;
-@@ -68,8 +69,10 @@ extern struct device_attribute format_attr_node;
+@@ -66,7 +67,9 @@ extern struct attribute_group thunder_uncore_attr_group;
+ extern struct device_attribute format_attr_node;
  
  extern struct thunder_uncore *thunder_uncore_l2c_tad;
- extern struct thunder_uncore *thunder_uncore_l2c_cbc;
-+extern struct thunder_uncore *thunder_uncore_lmc;
++extern struct thunder_uncore *thunder_uncore_l2c_cbc;
  extern struct pmu thunder_l2c_tad_pmu;
- extern struct pmu thunder_l2c_cbc_pmu;
-+extern struct pmu thunder_lmc_pmu;
++extern struct pmu thunder_l2c_cbc_pmu;
  
  /* Prototypes */
  struct thunder_uncore *event_to_thunder_uncore(struct perf_event *event);
-@@ -85,3 +88,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
+@@ -81,3 +84,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
+ 				  char *page);
  
  int thunder_uncore_l2c_tad_setup(void);
- int thunder_uncore_l2c_cbc_setup(void);
-+int thunder_uncore_lmc_setup(void);
-diff --git a/drivers/perf/uncore/uncore_cavium_lmc.c b/drivers/perf/uncore/uncore_cavium_lmc.c
++int thunder_uncore_l2c_cbc_setup(void);
+diff --git a/drivers/perf/uncore/uncore_cavium_l2c_cbc.c b/drivers/perf/uncore/uncore_cavium_l2c_cbc.c
 new file mode 100644
-index 0000000..b8d21b4
+index 0000000..bde7a51
 --- /dev/null
-+++ b/drivers/perf/uncore/uncore_cavium_lmc.c
-@@ -0,0 +1,196 @@
++++ b/drivers/perf/uncore/uncore_cavium_l2c_cbc.c
+@@ -0,0 +1,237 @@
 +/*
-+ * Cavium Thunder uncore PMU support, LMC counters.
++ * Cavium Thunder uncore PMU support, L2C CBC counters.
 + *
 + * Copyright 2016 Cavium Inc.
 + * Author: Jan Glauber <jan.glauber@cavium.com>
@@ -97,33 +93,58 @@ index 0000000..b8d21b4
 +
 +#include "uncore_cavium.h"
 +
-+#ifndef PCI_DEVICE_ID_THUNDER_LMC
-+#define PCI_DEVICE_ID_THUNDER_LMC	0xa022
++#ifndef PCI_DEVICE_ID_THUNDER_L2C_CBC
++#define PCI_DEVICE_ID_THUNDER_L2C_CBC	0xa02f
 +#endif
 +
-+#define LMC_NR_COUNTERS			3
-+#define LMC_PASS2_NR_COUNTERS		5
-+#define LMC_MAX_NR_COUNTERS		LMC_PASS2_NR_COUNTERS
++#define L2C_CBC_NR_COUNTERS             16
 +
-+/* LMC event list */
-+#define LMC_EVENT_IFB_CNT		0
-+#define LMC_EVENT_OPS_CNT		1
-+#define LMC_EVENT_DCLK_CNT		2
++/* L2C CBC event list */
++#define L2C_CBC_EVENT_XMC0		0x00
++#define L2C_CBC_EVENT_XMD0		0x01
++#define L2C_CBC_EVENT_RSC0		0x02
++#define L2C_CBC_EVENT_RSD0		0x03
++#define L2C_CBC_EVENT_INV0		0x04
++#define L2C_CBC_EVENT_IOC0		0x05
++#define L2C_CBC_EVENT_IOR0		0x06
 +
-+/* pass 2 added counters */
-+#define LMC_EVENT_BANK_CONFLICT1	3
-+#define LMC_EVENT_BANK_CONFLICT2	4
++#define L2C_CBC_EVENT_XMC1		0x08	/* 0x40 */
++#define L2C_CBC_EVENT_XMD1		0x09
++#define L2C_CBC_EVENT_RSC1		0x0a
++#define L2C_CBC_EVENT_RSD1		0x0b
++#define L2C_CBC_EVENT_INV1		0x0c
 +
-+#define LMC_COUNTER_START		LMC_EVENT_IFB_CNT
-+#define LMC_COUNTER_END			(LMC_EVENT_BANK_CONFLICT2 + 8)
++#define L2C_CBC_EVENT_XMC2		0x10	/* 0x80 */
++#define L2C_CBC_EVENT_XMD2		0x11
++#define L2C_CBC_EVENT_RSC2		0x12
++#define L2C_CBC_EVENT_RSD2		0x13
 +
-+struct thunder_uncore *thunder_uncore_lmc;
++struct thunder_uncore *thunder_uncore_l2c_cbc;
 +
-+int lmc_events[LMC_MAX_NR_COUNTERS] = { 0x1d0, 0x1d8, 0x1e0, 0x360, 0x368 };
++int l2c_cbc_events[L2C_CBC_NR_COUNTERS] = {
++	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
++	0x08, 0x09, 0x0a, 0x0b, 0x0c,
++	0x10, 0x11, 0x12, 0x13
++};
 +
 +static void thunder_uncore_start(struct perf_event *event, int flags)
 +{
++	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
 +	struct hw_perf_event *hwc = &event->hw;
++	struct thunder_uncore_node *node;
++	struct thunder_uncore_unit *unit;
++	u64 prev;
++
++	node = get_node(hwc->config, uncore);
++
++	/* restore counter value divided by units into all counters */
++	if (flags & PERF_EF_RELOAD) {
++		prev = local64_read(&hwc->prev_count);
++		prev = prev / node->nr_units;
++
++		list_for_each_entry(unit, &node->unit_list, entry)
++			writeq(prev, hwc->event_base + unit->map);
++	}
 +
 +	hwc->state = 0;
 +	perf_event_update_userpage(event);
@@ -163,73 +184,95 @@ index 0000000..b8d21b4
 +
 +	/* these counters are self-sustained so idx must match the counter! */
 +	hwc->idx = -1;
-+	if (cmpxchg(&node->events[id], NULL, event) == NULL)
-+		hwc->idx = i;
++	for (i = 0; i < node->num_counters; i++) {
++		if (l2c_cbc_events[i] == id) {
++			if (cmpxchg(&node->events[i], NULL, event) == NULL) {
++				hwc->idx = i;
++				break;
++			}
++		}
++	}
 +
 +out:
 +	if (hwc->idx == -1)
 +		return -EBUSY;
 +
-+	hwc->event_base = lmc_events[id];
++	hwc->event_base = id * sizeof(unsigned long long);
++
++	/* counter is not stoppable so avoiding PERF_HES_STOPPED */
 +	hwc->state = PERF_HES_UPTODATE;
 +
-+	/* counters are read-only, so avoid PERF_EF_RELOAD */
 +	if (flags & PERF_EF_START)
 +		thunder_uncore_start(event, 0);
 +
 +	return 0;
 +}
 +
-+PMU_FORMAT_ATTR(event, "config:0-2");
++PMU_FORMAT_ATTR(event, "config:0-4");
 +
-+static struct attribute *thunder_lmc_format_attr[] = {
++static struct attribute *thunder_l2c_cbc_format_attr[] = {
 +	&format_attr_event.attr,
 +	&format_attr_node.attr,
 +	NULL,
 +};
 +
-+static struct attribute_group thunder_lmc_format_group = {
++static struct attribute_group thunder_l2c_cbc_format_group = {
 +	.name = "format",
-+	.attrs = thunder_lmc_format_attr,
++	.attrs = thunder_l2c_cbc_format_attr,
 +};
 +
-+EVENT_ATTR(ifb_cnt,		LMC_EVENT_IFB_CNT);
-+EVENT_ATTR(ops_cnt,		LMC_EVENT_OPS_CNT);
-+EVENT_ATTR(dclk_cnt,		LMC_EVENT_DCLK_CNT);
-+EVENT_ATTR(bank_conflict1,	LMC_EVENT_BANK_CONFLICT1);
-+EVENT_ATTR(bank_conflict2,	LMC_EVENT_BANK_CONFLICT2);
++EVENT_ATTR(xmc0,	L2C_CBC_EVENT_XMC0);
++EVENT_ATTR(xmd0,	L2C_CBC_EVENT_XMD0);
++EVENT_ATTR(rsc0,	L2C_CBC_EVENT_RSC0);
++EVENT_ATTR(rsd0,	L2C_CBC_EVENT_RSD0);
++EVENT_ATTR(inv0,	L2C_CBC_EVENT_INV0);
++EVENT_ATTR(ioc0,	L2C_CBC_EVENT_IOC0);
++EVENT_ATTR(ior0,	L2C_CBC_EVENT_IOR0);
++EVENT_ATTR(xmc1,	L2C_CBC_EVENT_XMC1);
++EVENT_ATTR(xmd1,	L2C_CBC_EVENT_XMD1);
++EVENT_ATTR(rsc1,	L2C_CBC_EVENT_RSC1);
++EVENT_ATTR(rsd1,	L2C_CBC_EVENT_RSD1);
++EVENT_ATTR(inv1,	L2C_CBC_EVENT_INV1);
++EVENT_ATTR(xmc2,	L2C_CBC_EVENT_XMC2);
++EVENT_ATTR(xmd2,	L2C_CBC_EVENT_XMD2);
++EVENT_ATTR(rsc2,	L2C_CBC_EVENT_RSC2);
++EVENT_ATTR(rsd2,	L2C_CBC_EVENT_RSD2);
 +
-+static struct attribute *thunder_lmc_events_attr[] = {
-+	EVENT_PTR(ifb_cnt),
-+	EVENT_PTR(ops_cnt),
-+	EVENT_PTR(dclk_cnt),
++static struct attribute *thunder_l2c_cbc_events_attr[] = {
++	EVENT_PTR(xmc0),
++	EVENT_PTR(xmd0),
++	EVENT_PTR(rsc0),
++	EVENT_PTR(rsd0),
++	EVENT_PTR(inv0),
++	EVENT_PTR(ioc0),
++	EVENT_PTR(ior0),
++	EVENT_PTR(xmc1),
++	EVENT_PTR(xmd1),
++	EVENT_PTR(rsc1),
++	EVENT_PTR(rsd1),
++	EVENT_PTR(inv1),
++	EVENT_PTR(xmc2),
++	EVENT_PTR(xmd2),
++	EVENT_PTR(rsc2),
++	EVENT_PTR(rsd2),
 +	NULL,
 +};
 +
-+static struct attribute *thunder_lmc_pass2_events_attr[] = {
-+	EVENT_PTR(ifb_cnt),
-+	EVENT_PTR(ops_cnt),
-+	EVENT_PTR(dclk_cnt),
-+	EVENT_PTR(bank_conflict1),
-+	EVENT_PTR(bank_conflict2),
-+	NULL,
-+};
-+
-+static struct attribute_group thunder_lmc_events_group = {
++static struct attribute_group thunder_l2c_cbc_events_group = {
 +	.name = "events",
-+	.attrs = NULL,
++	.attrs = thunder_l2c_cbc_events_attr,
 +};
 +
-+static const struct attribute_group *thunder_lmc_attr_groups[] = {
++static const struct attribute_group *thunder_l2c_cbc_attr_groups[] = {
 +	&thunder_uncore_attr_group,
-+	&thunder_lmc_format_group,
-+	&thunder_lmc_events_group,
++	&thunder_l2c_cbc_format_group,
++	&thunder_l2c_cbc_events_group,
 +	NULL,
 +};
 +
-+struct pmu thunder_lmc_pmu = {
-+	.attr_groups	= thunder_lmc_attr_groups,
-+	.name		= "thunder_lmc",
++struct pmu thunder_l2c_cbc_pmu = {
++	.attr_groups	= thunder_l2c_cbc_attr_groups,
++	.name		= "thunder_l2c_cbc",
 +	.event_init	= thunder_uncore_event_init,
 +	.add		= thunder_uncore_add,
 +	.del		= thunder_uncore_del,
@@ -240,44 +283,38 @@ index 0000000..b8d21b4
 +
 +static int event_valid(u64 config)
 +{
-+	if (config <= LMC_EVENT_DCLK_CNT)
++	if (config <= L2C_CBC_EVENT_IOR0 ||
++	    (config >= L2C_CBC_EVENT_XMC1 && config <= L2C_CBC_EVENT_INV1) ||
++	    (config >= L2C_CBC_EVENT_XMC2 && config <= L2C_CBC_EVENT_RSD2))
 +		return 1;
-+
-+	if (thunder_uncore_version == 1)
-+		if (config == LMC_EVENT_BANK_CONFLICT1 ||
-+		    config == LMC_EVENT_BANK_CONFLICT2)
-+			return 1;
-+	return 0;
++	else
++		return 0;
 +}
 +
-+int __init thunder_uncore_lmc_setup(void)
++int __init thunder_uncore_l2c_cbc_setup(void)
 +{
 +	int ret = -ENOMEM;
 +
-+	thunder_uncore_lmc = kzalloc(sizeof(struct thunder_uncore), GFP_KERNEL);
-+	if (!thunder_uncore_lmc)
++	thunder_uncore_l2c_cbc = kzalloc(sizeof(struct thunder_uncore),
++					 GFP_KERNEL);
++	if (!thunder_uncore_l2c_cbc)
 +		goto fail_nomem;
 +
-+	/* pass2 is default */
-+	thunder_lmc_events_group.attrs = (thunder_uncore_version == 0) ?
-+		thunder_lmc_events_attr : thunder_lmc_pass2_events_attr;
-+
-+	ret = thunder_uncore_setup(thunder_uncore_lmc,
-+				   PCI_DEVICE_ID_THUNDER_LMC,
-+				   LMC_COUNTER_START,
-+				   LMC_COUNTER_END - LMC_COUNTER_START,
-+				   &thunder_lmc_pmu,
-+				   (thunder_uncore_version == 1) ?
-+					LMC_PASS2_NR_COUNTERS : LMC_NR_COUNTERS);
++	ret = thunder_uncore_setup(thunder_uncore_l2c_cbc,
++				   PCI_DEVICE_ID_THUNDER_L2C_CBC,
++				   0,
++				   0x100,
++				   &thunder_l2c_cbc_pmu,
++				   L2C_CBC_NR_COUNTERS);
 +	if (ret)
 +		goto fail;
 +
-+	thunder_uncore_lmc->type = LMC_TYPE;
-+	thunder_uncore_lmc->event_valid = event_valid;
++	thunder_uncore_l2c_cbc->type = L2C_CBC_TYPE;
++	thunder_uncore_l2c_cbc->event_valid = event_valid;
 +	return 0;
 +
 +fail:
-+	kfree(thunder_uncore_lmc);
++	kfree(thunder_uncore_l2c_cbc);
 +fail_nomem:
 +	return ret;
 +}
