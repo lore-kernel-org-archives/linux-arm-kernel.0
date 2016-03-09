@@ -1,72 +1,120 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 9 Mar 2016 10:20:24 +0800
-Subject: [RESEND PATCH v2 3/5] clk: rockchip: add new pll-type for rk3399
- and similar socs
-In-Reply-To: <3286748.Col0jAfKKX@phil>
-References: <1456827275-8035-1-git-send-email-zhengxing@rock-chips.com>
- <1456827275-8035-4-git-send-email-zhengxing@rock-chips.com>
- <3286748.Col0jAfKKX@phil>
-Message-ID: <56DF8868.6070706@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 9 Mar 2016 02:31:16 +0000
+Subject: [PATCH v2] irqchip/gicv3-its: Don't allow devices whose ID is
+ outside range
+In-Reply-To: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
+References: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20160309023116.7172f095@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Sun, 28 Feb 2016 13:22:03 -0600
+Shanker Donthineni <shankerd@codeaurora.org> wrote:
 
-On 2016?03?09? 09:22, Heiko Stuebner wrote:
-> Am Dienstag, 1. M?rz 2016, 18:14:33 schrieb Xing Zheng:
->
->> +static int rockchip_rk3399_pll_set_params(struct rockchip_clk_pll *pll,
->> +				const struct rockchip_pll_rate_table *rate)
->> +{
->> +	const struct clk_ops *pll_mux_ops = pll->pll_mux_ops;
->> +	struct clk_mux *pll_mux = &pll->pll_mux;
->> +	struct rockchip_pll_rate_table cur;
->> +	u32 pllcon;
->> +	int rate_change_remuxed = 0;
->> +	int cur_parent;
->> +	int ret;
->> +
->> +	pr_debug("%s: rate settings for %lu fbdiv: %d, postdiv1: %d, refdiv: %d,
->> postdiv2: %d, dsmpd: %d, frac: %d\n", +		__func__, rate->rate,
->> rate->fbdiv, rate->postdiv1, rate->refdiv, +		rate->postdiv2,
->> rate->dsmpd, rate->frac);
->> +
->> +	rockchip_rk3399_pll_get_params(pll, &cur);
->> +	cur.rate = 0;
->> +
->> +	cur_parent = pll_mux_ops->get_parent(&pll_mux->hw);
->> +	if (cur_parent == PLL_MODE_NORM) {
->> +		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_SLOW);
->> +		rate_change_remuxed = 1;
->> +	}
->> +
->> +	/* update pll values */
->> +	writel_relaxed(HIWORD_UPDATE(rate->fbdiv, RK3399_PLLCON0_FBDIV_MASK,
->> +					  RK3399_PLLCON0_FBDIV_SHIFT),
-> indentation is strange ... I guess the plan was to move
-> RK3399_PLLCON0_FBDIV_SHIFT under RK3399_PLLCON0_FBDIV_MASK, currently it's
-> having tabs + spaces but has no alignment whatsoever
-Yes, I think that it due to copy them from the RK3036 style ...
->
->> +		       pll->reg_base + RK3399_PLLCON(0));
->> +
->> +	writel_relaxed(HIWORD_UPDATE(rate->refdiv, RK3399_PLLCON1_REFDIV_MASK,
->> +						   RK3399_PLLCON1_REFDIV_SHIFT) |
->> +		       HIWORD_UPDATE(rate->postdiv1, RK3399_PLLCON1_POSTDIV1_MASK,
->> +					     RK3399_PLLCON1_POSTDIV1_SHIFT) |
-> same for postdiv1
-Done.
->
->> +		       HIWORD_UPDATE(rate->postdiv2, RK3399_PLLCON1_POSTDIV2_MASK,
->> +						     RK3399_PLLCON1_POSTDIV2_SHIFT),
->> +		       pll->reg_base + RK3399_PLLCON(1));
->
-> rest looks nice
->
->
-> Heiko
->
-Thanks.
+Hi Shanker,
 
+> We are not checking whether the requested device identifier fits into
+> the device table memory or not. The function its_create_device()
+> assumes that enough memory has been allocated for whole DevID sparse
+> (reported by ITS_TYPER.Devbits) during the ITS probe() and continues
+> to initialize ITS hardware.
+> 
+> This assumption is not perfect, sometimes we reduce memory size either
+> because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
+> MAPD command fails if 'Device ID' is outside of device table range.
+> 
+> Add a simple validation check to avoid MAPD failures since we are
+> not handling ITS command errors. This change also helps to return an
+> error -ENOMEM instead of success to caller.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+> [v1]->[v2]
+>   Rebase to v4.5-rc6, edit commit text and simplify code changes
+> 
+>  drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
+>  1 file changed, 20 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 43dfd15..6d986ac 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -55,6 +55,16 @@ struct its_collection {
+>  };
+>  
+>  /*
+> + * The ITS_BASER structure - contains memeory information and table
+> + * entry size in bytes.
+> + */
+> +struct its_baser {
+> +	void		*base;
+> +	u32		order;
+> +	u32		entry_size;
+> +};
+> +
+> +/*
+>   * The ITS structure - contains most of the infrastructure, with the
+>   * top-level MSI domain, the command queue, the collections, and the
+>   * list of devices writing to it.
+> @@ -66,14 +76,12 @@ struct its_node {
+>  	unsigned long		phys_base;
+>  	struct its_cmd_block	*cmd_base;
+>  	struct its_cmd_block	*cmd_write;
+> -	struct {
+> -		void		*base;
+> -		u32		order;
+> -	} tables[GITS_BASER_NR_REGS];
+> +	struct its_baser	tables[GITS_BASER_NR_REGS];
+>  	struct its_collection	*collections;
+>  	struct list_head	its_device_list;
+>  	u64			flags;
+>  	u32			ite_size;
+> +	struct its_baser	*device_table;
+
+nit: grouping this field with the tables array would make it slightly
+nicer.
+
+>  };
+>  
+>  #define ITS_ITT_ALIGN		SZ_256
+> @@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>  		 * For other tables, only allocate a single page.
+>  		 */
+>  		if (type == GITS_BASER_TYPE_DEVICE) {
+> +			its->device_table = &its->tables[i];
+>  			/*
+>  			 * 'order' was initialized earlier to the default page
+>  			 * granule of the the ITS.  We can't have an allocation
+> @@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>  					node_name, order);
+>  			}
+>  		}
+> +		its->tables[i].entry_size = entry_size;
+>  
+>  retry_alloc_baser:
+>  		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+> @@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>  	int nr_ites;
+>  	int sz;
+>  
+> +	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+> +	if (its->device_table &&
+> +	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
+> +	    its->device_table->entry_size)))
+
+Assume for a minute we do not have a device table (which would be
+perfectly possible - just think of an ITS with its own private memory,
+like we have with KVM). Shouldn't we also check devid with the number of
+bits that this ITS implements for Device IDs?
+
+> +		return NULL;
+> +
+>  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>  	/*
+>  	 * At least one bit of EventID is being used, hence a minimum
+
+Thanks,
+
+	M.
 -- 
-- Xing Zheng
+Jazz is not dead. It just smells funny.
