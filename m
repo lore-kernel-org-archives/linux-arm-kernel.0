@@ -1,58 +1,72 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 9 Mar 2016 13:32:12 +0900
-Subject: [PATCH v2] ARM: dts: add "simple-bus" where "arm,amba-bus" is
- used alone
-In-Reply-To: <CAL_JsqJvT+4efH-+_EhehzwhHZsrYTX8pa1NLsg_Wn4YReN4Ag@mail.gmail.com>
-References: <1457415977-3401-1-git-send-email-yamada.masahiro@socionext.com>
- <CAL_JsqJvT+4efH-+_EhehzwhHZsrYTX8pa1NLsg_Wn4YReN4Ag@mail.gmail.com>
-Message-ID: <CAK7LNARcnsgqzsRFStUiWsFQZG8GiJRbxARDbtd51+RaVs97pQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 9 Mar 2016 10:31:58 +0530
+Subject: [PATCH RESEND] Revert "PCI: dra7xx: Mark driver as broken"
+In-Reply-To: <20160308180526.GC21278@localhost>
+References: <1457087359-16816-1-git-send-email-kishon@ti.com>
+ <20160308180526.GC21278@localhost>
+Message-ID: <56DFAE46.4090509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
 
-2016-03-08 17:49 GMT+09:00 Rob Herring <robh+dt@kernel.org>:
-> On Mon, Mar 7, 2016 at 11:46 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> The compatible string "simple-bus" is well defined in ePAPR, while
->> I see no documentation for the "arm,amba-bus" in ePAPR or under
->> Documentation/devicetree/.
+On Tuesday 08 March 2016 11:35 PM, Bjorn Helgaas wrote:
+> On Fri, Mar 04, 2016 at 03:59:19PM +0530, Kishon Vijay Abraham I wrote:
+>> From: Sekhar Nori <nsekhar@ti.com>
 >>
->> DT is also used by other projects than Linux kernel.  It is not a
->> good idea to rely on such an unofficial binding.
+>> This reverts commit <5c3b99d057525fe2befe6a7db9b1309035d93eee>
+>> ("PCI: dra7xx: Mark driver as broken").
 >>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> With support to de-assert PCIe reset present in kernel,
+>> DRA7x PCIe is not broken anymore.
+>>
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 >> ---
+>> Bjorn,
 >>
->> Changes in v2:
->>   - Rephrase the git-log
->
-> [...]
->
->> diff --git a/arch/arm/boot/dts/axm55xx.dtsi b/arch/arm/boot/dts/axm55xx.dtsi
->> index ea288f0..8da4582 100644
->> --- a/arch/arm/boot/dts/axm55xx.dtsi
->> +++ b/arch/arm/boot/dts/axm55xx.dtsi
->> @@ -107,7 +107,7 @@
->>                 };
+>> This patch should be merged only after [1] hits linus tree.
 >>
->>                 amba {
->> -                       compatible = "arm,amba-bus";
->> +                       compatible = "arm,amba-bus", "simple-bus";
->
-> As I mentioned in the last version, I think you should remove
-> arm,amba-bus and just have simple-bus. I don't believe anything relies
-> on having arm,amba-bus.
+>> Thanks
+>> Kishon
+>>
+>> [1] -> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git
+>> 	for-v4.6/omap-hwmod-b
+> 
+> OK.  Would you mind pinging me about this after [1] is merged to
+> Linus' tree?  I don't want to put this in my "next" branch yet,
+> because I don't know whether Pauls branch or mine will be merged first
+> in the merge window.  But after the merge window closes, I can
+> certainly include this in a "PCI fixes" pull request for inclusion in
+> v4.6.
 
-Sorry about this.
+yes sure. I can do that.
 
-V3 is here now:
-https://patchwork.kernel.org/patch/8542031/
+Thanks
+Kishon
 
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> Bjorn
+> 
+>>  drivers/pci/host/Kconfig |    1 -
+>>  1 file changed, 1 deletion(-)
+>>
+>> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+>> index 75a6054..6d181ba 100644
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
+>> @@ -5,7 +5,6 @@ config PCI_DRA7XX
+>>  	bool "TI DRA7xx PCIe controller"
+>>  	select PCIE_DW
+>>  	depends on OF && HAS_IOMEM && TI_PIPE3
+>> -	depends on BROKEN
+>>  	help
+>>  	 Enables support for the PCIe controller in the DRA7xx SoC.  There
+>>  	 are two instances of PCIe controller in DRA7xx.  This controller can
+>> -- 
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
