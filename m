@@ -1,211 +1,157 @@
 From: dave.long@linaro.org (David Long)
-Date: Wed,  9 Mar 2016 00:32:15 -0500
-Subject: [PATCH v11 1/9] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+Date: Wed,  9 Mar 2016 00:32:16 -0500
+Subject: [PATCH v11 2/9] arm64: Add more test functions to insn.c
 In-Reply-To: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
 References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1457501543-24197-2-git-send-email-dave.long@linaro.org>
+Message-ID: <1457501543-24197-3-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
+Certain instructions are hard to execute correctly out-of-line (as in
+kprobes).  Test functions are added to insn.[hc] to identify these.  The
+instructions include any that use PC-relative addressing, change the PC,
+or change interrupt masking. For efficiency and simplicity test
+functions are also added for small collections of related instructions.
 
 Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- arch/arm64/Kconfig              |   1 +
- arch/arm64/include/asm/ptrace.h |  31 +++++++++++
- arch/arm64/kernel/ptrace.c      | 117 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 149 insertions(+)
+ arch/arm64/include/asm/insn.h | 35 +++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/insn.c      | 34 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc6228..4211b0d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -78,6 +78,7 @@ config ARM64
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
- 	select HAVE_PERF_USER_STACK_DUMP
-+	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_RCU_TABLE_FREE
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select IOMMU_DMA if IOMMU_SUPPORT
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index e9e5467..7bd6445 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -118,6 +118,8 @@ struct pt_regs {
- 	u64 syscallno;
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 30e50eb..662b42a 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -120,6 +120,29 @@ enum aarch64_insn_register {
+ 	AARCH64_INSN_REG_SP = 31  /* Stack pointer: as load/store base reg */
  };
  
-+#define MAX_REG_OFFSET offsetof(struct user_pt_regs, pstate)
-+
- #define arch_has_single_step()	(1)
- 
- #ifdef CONFIG_COMPAT
-@@ -146,6 +148,35 @@ struct pt_regs {
- #define user_stack_pointer(regs) \
- 	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
- 
-+extern int regs_query_register_offset(const char *name);
-+extern const char *regs_query_register_name(unsigned int offset);
-+extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
-+extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
-+					       unsigned int n);
-+
-+/**
-+ * regs_get_register() - get register value from its offset
-+ * @regs:	   pt_regs from which register value is gotten
-+ * @offset:    offset number of the register.
-+ *
-+ * regs_get_register returns the value of a register whose offset from @regs.
-+ * The @offset is the offset of the register in struct pt_regs.
-+ * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
-+ */
-+static inline u64 regs_get_register(struct pt_regs *regs,
-+					      unsigned int offset)
-+{
-+	if (unlikely(offset > MAX_REG_OFFSET))
-+		return 0;
-+	return *(u64 *)((u64)regs + offset);
-+}
-+
-+/* Valid only for Kernel mode traps. */
-+static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
-+{
-+	return regs->sp;
-+}
-+
- static inline unsigned long regs_return_value(struct pt_regs *regs)
- {
- 	return regs->regs[0];
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index ff7f132..efebf0f 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -48,6 +48,123 @@
- #define CREATE_TRACE_POINTS
- #include <trace/events/syscalls.h>
- 
-+struct pt_regs_offset {
-+	const char *name;
-+	int offset;
++enum aarch64_insn_special_register {
++	AARCH64_INSN_SPCLREG_SPSR_EL1	= 0xC200,
++	AARCH64_INSN_SPCLREG_ELR_EL1	= 0xC201,
++	AARCH64_INSN_SPCLREG_SP_EL0	= 0xC208,
++	AARCH64_INSN_SPCLREG_SPSEL	= 0xC210,
++	AARCH64_INSN_SPCLREG_CURRENTEL	= 0xC212,
++	AARCH64_INSN_SPCLREG_DAIF	= 0xDA11,
++	AARCH64_INSN_SPCLREG_NZCV	= 0xDA10,
++	AARCH64_INSN_SPCLREG_FPCR	= 0xDA20,
++	AARCH64_INSN_SPCLREG_DSPSR_EL0	= 0xDA28,
++	AARCH64_INSN_SPCLREG_DLR_EL0	= 0xDA29,
++	AARCH64_INSN_SPCLREG_SPSR_EL2	= 0xE200,
++	AARCH64_INSN_SPCLREG_ELR_EL2	= 0xE201,
++	AARCH64_INSN_SPCLREG_SP_EL1	= 0xE208,
++	AARCH64_INSN_SPCLREG_SPSR_INQ	= 0xE218,
++	AARCH64_INSN_SPCLREG_SPSR_ABT	= 0xE219,
++	AARCH64_INSN_SPCLREG_SPSR_UND	= 0xE21A,
++	AARCH64_INSN_SPCLREG_SPSR_FIQ	= 0xE21B,
++	AARCH64_INSN_SPCLREG_SPSR_EL3	= 0xF200,
++	AARCH64_INSN_SPCLREG_ELR_EL3	= 0xF201,
++	AARCH64_INSN_SPCLREG_SP_EL2	= 0xF210
 +};
 +
-+#define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
-+#define REG_OFFSET_END {.name = NULL, .offset = 0}
-+#define	GPR_OFFSET_NAME(r)	\
-+	{.name = "x" #r, .offset = offsetof(struct pt_regs, regs[r])}
-+
-+static const struct pt_regs_offset regoffset_table[] = {
-+	GPR_OFFSET_NAME(0),
-+	GPR_OFFSET_NAME(1),
-+	GPR_OFFSET_NAME(2),
-+	GPR_OFFSET_NAME(3),
-+	GPR_OFFSET_NAME(4),
-+	GPR_OFFSET_NAME(5),
-+	GPR_OFFSET_NAME(6),
-+	GPR_OFFSET_NAME(7),
-+	GPR_OFFSET_NAME(8),
-+	GPR_OFFSET_NAME(9),
-+	GPR_OFFSET_NAME(10),
-+	GPR_OFFSET_NAME(11),
-+	GPR_OFFSET_NAME(12),
-+	GPR_OFFSET_NAME(13),
-+	GPR_OFFSET_NAME(14),
-+	GPR_OFFSET_NAME(15),
-+	GPR_OFFSET_NAME(16),
-+	GPR_OFFSET_NAME(17),
-+	GPR_OFFSET_NAME(18),
-+	GPR_OFFSET_NAME(19),
-+	GPR_OFFSET_NAME(20),
-+	GPR_OFFSET_NAME(21),
-+	GPR_OFFSET_NAME(22),
-+	GPR_OFFSET_NAME(23),
-+	GPR_OFFSET_NAME(24),
-+	GPR_OFFSET_NAME(25),
-+	GPR_OFFSET_NAME(26),
-+	GPR_OFFSET_NAME(27),
-+	GPR_OFFSET_NAME(28),
-+	GPR_OFFSET_NAME(29),
-+	GPR_OFFSET_NAME(30),
-+	{.name = "lr", .offset = offsetof(struct pt_regs, regs[30])},
-+	REG_OFFSET_NAME(sp),
-+	REG_OFFSET_NAME(pc),
-+	REG_OFFSET_NAME(pstate),
-+	REG_OFFSET_END,
-+};
-+
-+/**
-+ * regs_query_register_offset() - query register offset from its name
-+ * @name:	the name of a register
-+ *
-+ * regs_query_register_offset() returns the offset of a register in struct
-+ * pt_regs from its name. If the name is invalid, this returns -EINVAL;
-+ */
-+int regs_query_register_offset(const char *name)
+ enum aarch64_insn_variant {
+ 	AARCH64_INSN_VARIANT_32BIT,
+ 	AARCH64_INSN_VARIANT_64BIT
+@@ -223,8 +246,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+ { return (val); }
+ 
++__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
++__AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
+ __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+ __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
++__AARCH64_INSN_FUNCS(ldr_lit,	0xBF000000, 0x18000000)
++__AARCH64_INSN_FUNCS(ldrsw_lit,	0xFF000000, 0x98000000)
++__AARCH64_INSN_FUNCS(exclusive,	0x3F800000, 0x08000000)
+ __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
+ __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
+ __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
+@@ -273,10 +301,14 @@ __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
+ __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
+ __AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
+ __AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
++__AARCH64_INSN_FUNCS(exception,	0xFF000000, 0xD4000000)
+ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
+ __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
+ __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
+ __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
++__AARCH64_INSN_FUNCS(mrs,	0xFFF00000, 0xD5300000)
++__AARCH64_INSN_FUNCS(msr_imm,	0xFFF8F01F, 0xD500401F)
++__AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
+ 
+ #undef	__AARCH64_INSN_FUNCS
+ 
+@@ -286,6 +318,8 @@ bool aarch64_insn_is_branch_imm(u32 insn);
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
+ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
++bool aarch64_insn_uses_literal(u32 insn);
++bool aarch64_insn_is_branch(u32 insn);
+ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
+@@ -367,6 +401,7 @@ bool aarch32_insn_is_wide(u32 insn);
+ #define A32_RT_OFFSET	12
+ #define A32_RT2_OFFSET	 0
+ 
++u32 aarch64_extract_system_register(u32 insn);
+ u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+ u32 aarch32_insn_mcr_extract_opc2(u32 insn);
+ u32 aarch32_insn_mcr_extract_crm(u32 insn);
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 7371455..60c1c71 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -162,6 +162,32 @@ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+ 		aarch64_insn_is_nop(insn);
+ }
+ 
++bool __kprobes aarch64_insn_uses_literal(u32 insn)
 +{
-+	const struct pt_regs_offset *roff;
++	/* ldr/ldrsw (literal), prfm */
 +
-+	for (roff = regoffset_table; roff->name != NULL; roff++)
-+		if (!strcmp(roff->name, name))
-+			return roff->offset;
-+	return -EINVAL;
++	return aarch64_insn_is_ldr_lit(insn) ||
++		aarch64_insn_is_ldrsw_lit(insn) ||
++		aarch64_insn_is_adr_adrp(insn) ||
++		aarch64_insn_is_prfm_lit(insn);
 +}
 +
-+/**
-+ * regs_query_register_name() - query register name from its offset
-+ * @offset:	the offset of a register in struct pt_regs.
-+ *
-+ * regs_query_register_name() returns the name of a register from its
-+ * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
-+ */
-+const char *regs_query_register_name(unsigned int offset)
++bool __kprobes aarch64_insn_is_branch(u32 insn)
 +{
-+	const struct pt_regs_offset *roff;
++	/* b, bl, cb*, tb*, b.cond, br, blr */
 +
-+	for (roff = regoffset_table; roff->name != NULL; roff++)
-+		if (roff->offset == offset)
-+			return roff->name;
-+	return NULL;
-+}
-+
-+/**
-+ * regs_within_kernel_stack() - check the address in the stack
-+ * @regs:      pt_regs which contains kernel stack pointer.
-+ * @addr:      address which is checked.
-+ *
-+ * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
-+ * If @addr is within the kernel stack, it returns true. If not, returns false.
-+ */
-+bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
-+{
-+	return ((addr & ~(THREAD_SIZE - 1))  ==
-+		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
-+}
-+
-+/**
-+ * regs_get_kernel_stack_nth() - get Nth entry of the stack
-+ * @regs:	pt_regs which contains kernel stack pointer.
-+ * @n:		stack entry number.
-+ *
-+ * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-+ * is specified by @regs. If the @n th entry is NOT in the kernel stack,
-+ * this returns 0.
-+ */
-+unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
-+{
-+	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
-+
-+	addr += n;
-+	if (regs_within_kernel_stack(regs, (unsigned long)addr))
-+		return *addr;
-+	else
-+		return 0;
++	return aarch64_insn_is_b(insn) ||
++		aarch64_insn_is_bl(insn) ||
++		aarch64_insn_is_cbz(insn) ||
++		aarch64_insn_is_cbnz(insn) ||
++		aarch64_insn_is_tbz(insn) ||
++		aarch64_insn_is_tbnz(insn) ||
++		aarch64_insn_is_ret(insn) ||
++		aarch64_insn_is_br(insn) ||
++		aarch64_insn_is_blr(insn) ||
++		aarch64_insn_is_bcond(insn);
 +}
 +
  /*
-  * TODO: does not yet catch signals sent when the child dies.
-  * in exit.c or in signal.c.
+  * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
+  * Section B2.6.5 "Concurrent modification and execution of instructions":
+@@ -1175,6 +1201,14 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
+ 	BUG();
+ }
+ 
++/*
++ * Extract the Op/CR data from a msr/mrs instruction.
++ */
++u32 aarch64_insn_extract_system_reg(u32 insn)
++{
++	return (insn & 0x1FFFE0) >> 5;
++}
++
+ bool aarch32_insn_is_wide(u32 insn)
+ {
+ 	return insn >= 0xe800;
 -- 
 2.5.0
