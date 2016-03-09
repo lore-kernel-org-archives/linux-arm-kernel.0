@@ -1,120 +1,106 @@
-From: dwoods@mellanox.com (David Woods)
-Date: Wed, 9 Mar 2016 11:01:42 -0500
-Subject: BUG in HugeTLBFS with Contiguous hint
-In-Reply-To: <20160309153131.GF28496@arm.com>
-References: <20160309021252.GA4573@linaro.org> <20160309153131.GF28496@arm.com>
-Message-ID: <56E048E6.9030508@mellanox.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 Mar 2016 16:03:53 +0000
+Subject: [PATCH] arm64: Fix the ptep_set_wrprotect() to set PTE_DIRTY if
+ (PTE_DBM && !PTE_RDONLY)
+In-Reply-To: <CAFpQJXUaXYkVNCc1OjLxCmpKu6b26LOaMv0V9XYRn7pLAGk2SQ@mail.gmail.com>
+References: <1457499768-31176-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <20160309100605.GJ6192@e104818-lin.cambridge.arm.com>
+ <CAFpQJXUaXYkVNCc1OjLxCmpKu6b26LOaMv0V9XYRn7pLAGk2SQ@mail.gmail.com>
+Message-ID: <20160309160352.GM6192@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2016 10:31 AM, Will Deacon wrote:
-> On Wed, Mar 09, 2016 at 02:12:56AM +0000, Steve Capper wrote:
->> Hi,
-> Hi Steve,
->
->> I am very sorry for the very late bug report. I have just come across
->> this error.
->>
->> Whilst testing something else, I found that 2MB HugeTLB pages formed
->> from contiguous pte's cause BUGs to appear when running through the
->> libhugetlbfs test suite.
-> Ouch. Any idea why this wasn't spotted earlier? Did something else
-> change?
+On Wed, Mar 09, 2016 at 05:17:39PM +0530, Ganapatrao Kulkarni wrote:
+> On Wed, Mar 9, 2016 at 3:36 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Mar 09, 2016 at 10:32:48AM +0530, Ganapatrao Kulkarni wrote:
+> >> Commit 2f4b829c625e ("arm64: Add support for hardware updates of the
+> >> access and dirty pte bits") introduced support for handling hardware
+> >> updates of the access flag and dirty status.
+> >>
+> >> ptep_set_wrprotect is setting PTR_DIRTY if !PTE_RDONLY,
+> >> however by design it suppose to set PTE_DIRTY
+> >> only if (PTE_DBM && !PTE_RDONLY). This patch addes code to
+> >> test and set accordingly.
+> >
+> > The reasoning behind the original code is that if !PTE_RDONLY, you have
+> > no way to tell whether the page was written or not since it is already
+> > writable, independent of the DBM. So by clearing the DBM bit (making the
+> > page read-only), we need to ensure that a potential dirty state is
+> > transferred to the software PTE_DIRTY bit.
+> >
+> > By checking PTE_DBM && !PTE_RDONLY, you kind of imply that you can have
+> > a page with !PTE_DBM && !PTE_RDONLY. Given that PTE_DBM is actually
+> > PTE_WRITE, PTE_RDONLY must always be set when !PTE_DBM. The bug may be
+> > elsewhere not setting these bits correctly.
+> 
+> but i do see this macro,
+> #define pte_hw_dirty(pte)       (pte_write(pte) && !(pte_val(pte) & PTE_RDONLY))
 
-I'm reasonably sure that I ran that same test before pushing this 
-patch.  That was with the arm64-next tree which was at 4.4-rc3 at the 
-time.  It's possible there's been some regression since then.  I can 
-check on that.
->> I have been digging into this and I think the problem is due to the
->> huge pages not being unmapped properly (the nature of the bugs is that
->> compound pages have a non-negative compound mapped count, thus appear
->> as mapped in the hugetlbfs inode destruction logic); but I have not
->> yet been able to convincingly isolate the problem.
->>
->> I ran with 64KB PAGE_SIZE and CONFIG_DEBUG_VM. Failure mode at the
->> bottom of this email for a 4.5-rc7 kernel.
+This was added in commit b847415ce96e ("arm64: Fix the pte_hw_dirty()
+check when AF/DBM is enabled") for the pte_modify() case which is not
+called on the actual PTE but a local variable. A pte passed to this
+function as !PTE_DBM && !PTE_RDONLY should not be assumed dirty since
+PTE_RDONLY will be set later by set_pte_at() when the actual page table
+write occurs.
 
-I did run into this same BUG during my testing.  The cause that time was 
-a bug in huge_ptep_get_and_clear().  It was clearing PTEs beyond the 
-ncontig that it was supposed to.  The logic in remove_inode_hugepages 
-got confused when it found those victim PTEs already zeroed out.  That 
-bug was fixed of course, but maybe something similar is happening now.
+ptep_set_wrprotect() is run directly on the actual PTE, so here a
+!PTE_RDONLY only means potentially dirty, independent of the PTE_DBM
+bit. I consider the additional PTE_DBM check superfluous in this case
+but we need to understand when we would actually get a pte with both
+PTE_DBM and PTE_RDONLY cleared.
 
-> A revert is certainly the easiest option, but it also seems unfortunate.
->
-> Maybe something like the patch below instead? It can be reverted as soon
-> as this is worked out. Can you confirm that this avoids the BUG?
+The only way I see this happening is if the pte doesn't have PTE_VALID
+set, IOW it probably has PTE_PROT_NONE set which is used by the NUMA
+balancing. So calling set_pte_at() on a !PTE_VALID && !PTE_DBM pte does
+not currently set PTE_RDONLY and ptep_set_wrprotect() wrongly assumes it
+is dirty.
 
-I haven't tested it, but your patch looks reasonable to me.
+> i dont see this issue, if i comment out arm64 implementation of
+> ptep_set_wrprotect()
 
--Dave
+Because the default implementation discards any existing hw dirty
+information by clearing the PTE_DBM bit and setting PTE_RDONLY via the
+set_pte_at (of course, apart from the atomicity issues).
 
->
-> Will
->
-> --->8
->
->  From ff7925848b50050732ac0401e0acf27e8b241d7b Mon Sep 17 00:00:00 2001
-> From: Will Deacon <will.deacon@arm.com>
-> Date: Wed, 9 Mar 2016 15:22:55 +0000
-> Subject: [PATCH] arm64: hugetlb: partial revert of 66b3923a1a0f
->
-> Commit 66b3923a1a0f ("arm64: hugetlb: add support for PTE contiguous bit")
-> introduced support for huge pages using the contiguous bit in the PTE
-> as opposed to block mappings, which may be slightly unwieldy (512M) in
-> 64k page configurations.
->
-> Unfortunately, this support has resulted in some late regressions when
-> running the libhugetlbfs test suite with 64k pages and CONFIG_DEBUG_VM
-> as a result of a BUG:
->
->   | readback (2M: 64):	------------[ cut here ]------------
->   | kernel BUG at fs/hugetlbfs/inode.c:446!
->   | Internal error: Oops - BUG: 0 [#1] SMP
->   | Modules linked in:
->   | CPU: 7 PID: 1448 Comm: readback Not tainted 4.5.0-rc7 #148
->   | Hardware name: linux,dummy-virt (DT)
->   | task: fffffe0040964b00 ti: fffffe00c2668000 task.ti: fffffe00c2668000
->   | PC is at remove_inode_hugepages+0x44c/0x480
->   | LR is at remove_inode_hugepages+0x264/0x480
->
-> Rather than revert the entire patch, simply avoid advertising the
-> contiguous huge page sizes for now while people are actively working on
-> a fix. This patch can then be reverted once things have been sorted out.
->
-> Cc: David Woods <dwoods@ezchip.com>
-> Reported-by: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/mm/hugetlbpage.c | 14 --------------
->   1 file changed, 14 deletions(-)
->
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 82d607c3614e..da30529bb1f6 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -306,10 +306,6 @@ static __init int setup_hugepagesz(char *opt)
->   		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
->   	} else if (ps == PUD_SIZE) {
->   		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
-> -	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
-> -		hugetlb_add_hstate(CONT_PTE_SHIFT);
-> -	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
-> -		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
->   	} else {
->   		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
->   		return 0;
-> @@ -317,13 +313,3 @@ static __init int setup_hugepagesz(char *opt)
->   	return 1;
->   }
->   __setup("hugepagesz=", setup_hugepagesz);
-> -
-> -#ifdef CONFIG_ARM64_64K_PAGES
-> -static __init int add_default_hugepagesz(void)
-> -{
-> -	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
-> -		hugetlb_add_hstate(CONT_PMD_SHIFT);
-> -	return 0;
-> -}
-> -arch_initcall(add_default_hugepagesz);
-> -#endif
+> >> This patch fixes BUG,
+> >> kernel BUG at /build/linux-StrpB2/linux-4.4.0/fs/ext4/inode.c:2394!
+> >> Internal error: Oops - BUG: 0 [#1] SMP
+> >
+> > Which bug is this? It's a PageWriteback() check in the for-next/core
+> > branch. What kernel version are you using?
+> 
+> i am using 4.4.0
+
+I guess with additional NUMA patches since it only fails when you enable
+the NUMA_BALANCING configuration.
+
+> > BTW, in 4.5-rc2 we pushed commit ac15bd63bbb2 ("arm64: Honour !PTE_WRITE
+> > in set_pte_at() for kernel mappings"), though not sure that's what you
+> > are hitting.
+> 
+> i have tried this patch, but issue still exist. crash log below
+> 
+> root at ubuntu:/home/ganapat/test# [  733.853009] kernel BUG at
+> fs/ext4/inode.c:2394!
+
+Is this the BUG_ON in page_buffers(!PagePrivate(page))? I can see in the
+code above this that wrongly marking a page as dirty could have some
+side effects.
+
+Can you give this patch a try, on top of commit ac15bd63bbb2?
+
+-------------8<----------------------
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 7c73b365fcfa..b409a983f870 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -201,7 +201,7 @@ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
+ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 			      pte_t *ptep, pte_t pte)
+ {
+-	if (pte_valid(pte)) {
++	if (pte_present(pte)) {
+ 		if (pte_sw_dirty(pte) && pte_write(pte))
+ 			pte_val(pte) &= ~PTE_RDONLY;
+ 		else
