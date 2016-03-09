@@ -1,58 +1,87 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Wed, 9 Mar 2016 09:56:59 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
- <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
- <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
- <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
- <56DDB749.1020808@suse.de>
- <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
- <56DE7E1D.5070508@st.com>
- <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
- <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
-Message-ID: <56DFE55B.2090806@st.com>
+From: minghuan.lian@nxp.com (Minghuan Lian)
+Date: Wed, 9 Mar 2016 08:57:34 +0000
+Subject: [PATCH 1/2 v5] dt/bindings: Add bindings for Layerscape SCFG MSI
+In-Reply-To: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
+References: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <VI1PR04MB161551B58DBC718C91D4DA28E8B30@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Hi Rob Herring,
 
-On 3/9/2016 9:35 AM, Tomeu Vizoso wrote:
->
-> in order to get the onboard network on the Radxa Rock2 to work at all
-> on today's linux-next, I had to revert both commits:
->
-> * "stmmac: Fix 'eth0: No PHY found' regression" for the drivers to
-> probe and the link to come up, and
+Could you help to review this patch?
+Thanks a lot.
 
-I've just sent two patches (on top of net.git) to fix this problem
-pls let me know if these help on your side too.
-
->
-> * "stmmac: first frame prep at the end of the xmit routine" for the
-> network interface to work at all.
-
-I cannot reproduce it right now but I am looking at this again and let
-you know.
-I will check your output file too
-
-Regards
-peppe
+Regards,
+Minghuan
 
 
-> But a few seconds into the nfsroot boot I start getting:
->
-> [    9.136701] systemd[1]: Started Load Kernel Modules.
-> [   18.116321] nfs: server 10.42.0.1 not responding, still trying
-> [   18.516224] ------------[ cut here ]------------
-> [   18.521024] WARNING: CPU: 1 PID: 0 at net/sched/sch_generic.c:303
-> dev_watchdog+0x284/0x288
-> [   18.529456] NETDEV WATCHDOG: eth0 (rk_gmac-dwmac): transmit queue 0 timed out
->
-> I'm attaching the full boot log.
->
-> Regards,
->
-> Tomeu
->
+> -----Original Message-----
+> From: Minghuan Lian [mailto:Minghuan.Lian at nxp.com]
+> Sent: Monday, March 07, 2016 11:36 AM
+> To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Cc: Marc Zyngier <marc.zyngier@arm.com>; Thomas Gleixner
+> <tglx@linutronix.de>; Jason Cooper <jason@lakedaemon.net>; Roy Zang
+> <roy.zang@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Stuart Yoder
+> <stuart.yoder@nxp.com>; Yang-Leo Li <leoyang.li@nxp.com>; Minghuan Lian
+> <minghuan.lian@nxp.com>
+> Subject: [PATCH 1/2 v5] dt/bindings: Add bindings for Layerscape SCFG MSI
+> 
+> Some Layerscape SoCs use a simple MSI controller implementation.
+> It contains only two SCFG register to trigger and describe a
+> group 32 MSI interrupts. The patch adds bindings to describe
+> the controller.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> ---
+> change log:
+> v4: add interrupt-parent description
+> v3-v1: no change
+> 
+>  .../interrupt-controller/fsl,ls-scfg-msi.txt       | 30
+> ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+> b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+> new file mode 100644
+> index 0000000..9e38949
+> --- /dev/null
+> +++
+> b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+> @@ -0,0 +1,30 @@
+> +* Freescale Layerscape SCFG PCIe MSI controller
+> +
+> +Required properties:
+> +
+> +- compatible: should be "fsl,<soc-name>-msi" to identify
+> +	      Layerscape PCIe MSI controller block such as:
+> +              "fsl,1s1021a-msi"
+> +              "fsl,1s1043a-msi"
+> +- msi-controller: indicates that this is a PCIe MSI controller node
+> +- reg: physical base address of the controller and length of memory mapped.
+> +- interrupts: an interrupt to the parent interrupt controller.
+> +
+> +Optional properties:
+> +- interrupt-parent: the phandle to the parent interrupt controller.
+> +
+> +This interrupt controller hardware is a second level interrupt controller that
+> +is hooked to a parent interrupt controller: e.g: ARM GIC for ARM-based
+> +platforms. If interrupt-parent is not provided, the default parent interrupt
+> +controller will be used.
+> +Each PCIe node needs to have property msi-parent that points to
+> +MSI controller node
+> +
+> +Examples:
+> +
+> +	msi1: msi-controller at 1571000 {
+> +		compatible = "fsl,1s1043a-msi";
+> +		reg = <0x0 0x1571000 0x0 0x8>,
+> +		msi-controller;
+> +		interrupts = <0 116 0x4>;
+> +	};
+> --
+> 1.9.1
