@@ -1,75 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 9 Mar 2016 08:19:55 +0700
-Subject: [PATCH] arm64: account for sparsemem section alignment when
- choosing vmemmap offset
-In-Reply-To: <20160308151219.GD6192@e104818-lin.cambridge.arm.com>
-References: <1457446169-23099-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160308151219.GD6192@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu8nzi2pSyHdNVP9=kjSMNhGTEjuHYvvmOdomXKnuJ2n-w@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed,  9 Mar 2016 03:21:29 +0200
+Subject: [PATCH] irqchip/sunxi-nmi: fix error check of of_io_request_and_map()
+Message-ID: <1457486489-10189-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 March 2016 at 22:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Mar 08, 2016 at 09:09:29PM +0700, Ard Biesheuvel wrote:
->> Commit dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear
->> region") fixed an issue where the struct page array would overflow into the
->> adjacent virtual memory region if system RAM was placed so high up in
->> physical memory that its addresses were not representable in the build time
->> configured virtual address size.
->>
->> However, the fix failed to take into account that the vmemmap region needs
->> to be relatively aligned with respect to the sparsemem section size, so that
->> a sequence of page structs corresponding with a sparsemem section in the
->> linear region appears naturally aligned in the vmemmap region.
->>
->> So round up vmemmap to sparsemem section size. Since this essentially moves
->> the projection of the linear region up in memory, also revert the reduction
->> of the size of the vmemmap region.
->>
->> Fixes: dfd55ad85e4a ("arm64: vmemmap: use virtual projection of linear region")
->> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/pgtable.h | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index f50608674580..819aff5d593f 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -40,7 +40,7 @@
->>   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
->>   *   fixed mappings and modules
->>   */
->> -#define VMEMMAP_SIZE         ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
->> +#define VMEMMAP_SIZE         ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
->
-> I think we could have extended the existing halved VMEMMAP_SIZE by
-> PAGES_PER_SECTION * sizeof(struct page) to cope with the alignment but I
-> don't think it's worth.
->
+The of_io_request_and_map() returns a valid pointer in iomem region or
+ERR_PTR(), check for NULL always fails and may cause a NULL pointer
+dereference on error path.
 
-Indeed. But it is only temporary anyway, since the problem this patch
-solves does not exist anymore in for-next/core, considering that
-memstart_addr itself should be sufficiently aligned by construction.
-So I intend to propose a revert of this change, after -rc1 perhaps?
+Fixes: 0e841b04c829 ("irqchip/sunxi-nmi: Switch to of_io_request_and_map() from of_iomap()")
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+ drivers/irqchip/irq-sunxi-nmi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
->>
->>  #ifndef CONFIG_KASAN
->>  #define VMALLOC_START                (VA_START)
->> @@ -52,7 +52,8 @@
->>  #define VMALLOC_END          (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
->>
->>  #define VMEMMAP_START                (VMALLOC_END + SZ_64K)
->> -#define vmemmap                      ((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
->> +#define vmemmap                      ((struct page *)VMEMMAP_START - \
->> +                              SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
->
-> It looks fine to me:
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->
-> Will would probably pick it up tomorrow (and add a cc stable as well).
->
-
-Thanks
+diff --git a/drivers/irqchip/irq-sunxi-nmi.c b/drivers/irqchip/irq-sunxi-nmi.c
+index 0820f67..668730c 100644
+--- a/drivers/irqchip/irq-sunxi-nmi.c
++++ b/drivers/irqchip/irq-sunxi-nmi.c
+@@ -160,9 +160,9 @@ static int __init sunxi_sc_nmi_irq_init(struct device_node *node,
+ 
+ 	gc = irq_get_domain_generic_chip(domain, 0);
+ 	gc->reg_base = of_io_request_and_map(node, 0, of_node_full_name(node));
+-	if (!gc->reg_base) {
++	if (IS_ERR(gc->reg_base)) {
+ 		pr_err("unable to map resource\n");
+-		ret = -ENOMEM;
++		ret = PTR_ERR(gc->reg_base);
+ 		goto fail_irqd_remove;
+ 	}
+ 
+-- 
+2.1.4
