@@ -1,72 +1,88 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 09 Mar 2016 02:22:50 +0100
-Subject: [RESEND PATCH v2 3/5] clk: rockchip: add new pll-type for rk3399
- and similar socs
-In-Reply-To: <1456827275-8035-4-git-send-email-zhengxing@rock-chips.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed, 9 Mar 2016 09:26:34 +0800
+Subject: [RESEND PATCH v2 5/5] clk: rockchip: add clock controller for the
+ RK3399
+In-Reply-To: <56DF7393.4020600@rock-chips.com>
 References: <1456827275-8035-1-git-send-email-zhengxing@rock-chips.com>
- <1456827275-8035-4-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <3286748.Col0jAfKKX@phil>
+ <1456827322-8130-1-git-send-email-zhengxing@rock-chips.com>
+ <CAD=FV=VhMY=YO7zVYeP-+LY0gPvQ8yjaAUEGVJrMGLwbGjqVmg@mail.gmail.com>
+ <56DF7393.4020600@rock-chips.com>
+Message-ID: <56DF7BCA.3000900@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 1. M?rz 2016, 18:14:33 schrieb Xing Zheng:
-> The rk3399's pll and clock are similar with rk3036's, it different
-> with base on the rk3066(rk3188, rk3288, rk3368 use it), there are
-> different adjust foctors and control registers, so these should be
-> independent and separate from the series of rk3066s.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Hi Doug,
+     Yes, I will resend my patch series include the previous patches 
+(header file and dt-bindings) of the Jianqun, and update the header file 
+for the MMC defines.
 
-[...]
+Thanks.
 
-> +static int rockchip_rk3399_pll_set_params(struct rockchip_clk_pll *pll,
-> +				const struct rockchip_pll_rate_table *rate)
-> +{
-> +	const struct clk_ops *pll_mux_ops = pll->pll_mux_ops;
-> +	struct clk_mux *pll_mux = &pll->pll_mux;
-> +	struct rockchip_pll_rate_table cur;
-> +	u32 pllcon;
-> +	int rate_change_remuxed = 0;
-> +	int cur_parent;
-> +	int ret;
-> +
-> +	pr_debug("%s: rate settings for %lu fbdiv: %d, postdiv1: %d, refdiv: %d,
-> postdiv2: %d, dsmpd: %d, frac: %d\n", +		__func__, rate->rate,
-> rate->fbdiv, rate->postdiv1, rate->refdiv, +		rate->postdiv2,
-> rate->dsmpd, rate->frac);
-> +
-> +	rockchip_rk3399_pll_get_params(pll, &cur);
-> +	cur.rate = 0;
-> +
-> +	cur_parent = pll_mux_ops->get_parent(&pll_mux->hw);
-> +	if (cur_parent == PLL_MODE_NORM) {
-> +		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_SLOW);
-> +		rate_change_remuxed = 1;
-> +	}
-> +
-> +	/* update pll values */
-> +	writel_relaxed(HIWORD_UPDATE(rate->fbdiv, RK3399_PLLCON0_FBDIV_MASK,
-> +					  RK3399_PLLCON0_FBDIV_SHIFT),
+On 2016?03?09? 08:51, Jianqun Xu wrote:
+> Hi Doug:
+>
+> ? 09/03/2016 07:34, Doug Anderson ??:
+>> Xing Zheng,
+>>
+>> On Tue, Mar 1, 2016 at 2:15 AM, Xing Zheng <zhengxing@rock-chips.com> 
+>> wrote:
+>>> +       MMC(SCLK_SDMMC_DRV, "emmc_drv",    "clk_sdmmc", 
+>>> RK3399_SDMMC_CON0, 1),
+>>> +       MMC(SCLK_SDMMC_SAMPLE,  "emmc_sample", "clk_sdmmc", 
+>>> RK3399_SDMMC_CON1, 1),
+>>
+>> Can you and Jianqun Xu please coordinate?  Though I don't have a TRM
+>> for rk3399 and I haven't looked through this whole patch, I know for
+>> sure there's a problem when I pick the latest patch series from both
+>> of you it doesn't compile.
+>>
+>> I believe this is the latest from each of you in patchwork:
+>>
+>> 8462411   [v3,1/3] dt-bindings: add bindings for rk3399 clock controller
+>> 8462431   [v3,2/3] clk: rockchip: add dt-binding header for rk3399
+>> 8462441   [v3,3/3] ARM64: dts: rockchip: add core dtsi file for rk3399
+>>
+>> 8463741   [RESEND,v2,1/5] clk: rockchip: add more mux parameters for
+>> new pll sources
+>> 8463801   [RESEND,v2,2/5] clk: rockchip: Add support for multiple
+>> clock providers
+>> 8463771   [RESEND,v2,3/5] clk: rockchip: add new pll-type for rk3399
+>> and similar socs
+>> 8463781   [RESEND,v2,4/5] clk: rockchip: add a 
+>> COMPOSITE_FRACMUX_NOGATE type
+>> 8463831   [RESEND,v2,5/5] clk: rockchip: add clock controller for the 
+>> RK3399
+>>
+>>
+>> Specifically your patch from March 1st refers to SCLK_SDMMC_DRV and
+>> SCLK_SDMMC_SAMPLE.  Those defines existed in Jianqun Xu's patch back
+>> on Feb 19th <https://patchwork.kernel.org/patch/8355411/>, but his
+>> latest patch series from March 1st
+>> <https://patchwork.kernel.org/patch/8462431/> no longer has those
+>> #defines.
+>>
+>> Can you two resolve this so I can pick both patch series and see that
+>> they compile?  ...or let me know where I messed up, of course.
+>>
+> ok, we will upload dtsi later after the clk-rk3399 driver been applied.
+> xing will send the patches for rk3399 together.
+>
+> We hope the dtsi could be applied first but depends on clk driver, but 
+> it seems
+> not a good idea, we will resend dtsi patch after more drivers are 
+> applied.
+>
+> Thanks Doug.
+>
+>> Thanks!
+>>
+>> -Doug
+>>
+>>
+>>
+>
+>
+>
 
-indentation is strange ... I guess the plan was to move 
-RK3399_PLLCON0_FBDIV_SHIFT under RK3399_PLLCON0_FBDIV_MASK, currently it's 
-having tabs + spaces but has no alignment whatsoever
-
-> +		       pll->reg_base + RK3399_PLLCON(0));
-> +
-> +	writel_relaxed(HIWORD_UPDATE(rate->refdiv, RK3399_PLLCON1_REFDIV_MASK,
-> +						   RK3399_PLLCON1_REFDIV_SHIFT) |
-> +		       HIWORD_UPDATE(rate->postdiv1, RK3399_PLLCON1_POSTDIV1_MASK,
-> +					     RK3399_PLLCON1_POSTDIV1_SHIFT) |
-
-same for postdiv1
-
-> +		       HIWORD_UPDATE(rate->postdiv2, RK3399_PLLCON1_POSTDIV2_MASK,
-> +						     RK3399_PLLCON1_POSTDIV2_SHIFT),
-> +		       pll->reg_base + RK3399_PLLCON(1));
-
-
-rest looks nice
-
-
-Heiko
+-- 
+- Xing Zheng
