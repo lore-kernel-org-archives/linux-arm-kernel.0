@@ -1,61 +1,52 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Wed, 9 Mar 2016 11:27:42 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <56DFF253.9050208@st.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
- <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
- <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
- <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
- <56DDB749.1020808@suse.de>
- <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
- <56DE7E1D.5070508@st.com>
- <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
- <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
- <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
- <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
- <56DFF253.9050208@st.com>
-Message-ID: <56DFFA9E.7060602@st.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Wed, 9 Mar 2016 18:22:05 +0800
+Subject: [PATCH v6 1/2] Documentation: fsl: dspi: Add fsl,
+ ls2080a-dspi compatible string
+In-Reply-To: <1457518926-18518-1-git-send-email-yao.yuan@freescale.com>
+References: <1457518926-18518-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1457518926-18518-2-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomeu, Andreas,
+new compatible string: "fsl,ls2080a-dspi".
 
-On 3/9/2016 10:52 AM, Giuseppe CAVALLARO wrote:
->> * today's linux-next: probe failed
->>
->> * today's linux-next + revert of 88f8b1bb41c6 stmmac: Fix 'eth0: No
->> PHY found' regression: probe succeeded but no network at all
->>
->> * today's linux-next + revert of 88f8b1bb41c6 (stmmac: Fix 'eth0: No
->> PHY found' regression) + revert of 0e80bdc9a72d (stmmac: first frame
->> prep at the end of xmit routine): probe succeeded, dhcp succeeds and
->> nfsroot works for a few seconds before timing out
->
-> ok, I was looking at this problem now that seems to related
-> the "stmmac: first frame prep at the end of xmit routine"
-> that, at first glance, is breaking the gmac 3.50 with normal descriptor.
+Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changed in v6:
+No changes.
 
-I have no Hw where to test this use case. So, I wonder if may I ask you 
-to test some patch.
+Changed in v5:
+Fix the subject and commit message.
 
-This first patch adds a missing barrier to the normal routine that inits 
-the descriptor. Barrier was needed to well manage the OWN
-descriptor and it was not added in case of normal desc case after
-the xmit rework.
+Changed in v4:
+No changes.
 
-Then I will check the algo behind the new xmit and in case of problems,
-if you agree, we will decide to revert it because it aimed to add an
-optimization.
+Changed in v3:
+Add the modifier for new compatible string like:
+"fsl,ls2080a-dspi" followed by "fsl,ls2085a-dspi"
 
-Let me know if you agree.
+Changed in v2:
+Update my email to <yao.yuan@nxp.com>
+---
+ Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Regards
-Peppe
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: normal_tmp.patch
-Type: text/x-patch
-Size: 950 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160309/807d1599/attachment-0001.bin>
+diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+index fa77f87..1ad0fe3 100644
+--- a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
++++ b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+@@ -1,7 +1,10 @@
+ ARM Freescale DSPI controller
+ 
+ Required properties:
+-- compatible : "fsl,vf610-dspi", "fsl,ls1021a-v1.0-dspi", "fsl,ls2085a-dspi"
++- compatible : "fsl,vf610-dspi", "fsl,ls1021a-v1.0-dspi",
++		"fsl,ls2085a-dspi"
++		or
++		"fsl,ls2080a-dspi" followed by "fsl,ls2085a-dspi"
+ - reg : Offset and length of the register set for the device
+ - interrupts : Should contain SPI controller interrupt
+ - clocks: from common clock binding: handle to dspi clock.
+-- 
+2.1.0.27.g96db324
