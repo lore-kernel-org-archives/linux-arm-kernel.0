@@ -1,297 +1,61 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  9 Mar 2016 11:24:17 +0100
-Subject: [PATCH v2 15/18] arm: boot: dts: Add PLX Technology OX810SE dtsi
-In-Reply-To: <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1457519060-6038-16-git-send-email-narmstrong@baylibre.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Wed, 9 Mar 2016 11:27:42 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <56DFF253.9050208@st.com>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
+ <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
+ <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
+ <56DDB749.1020808@suse.de>
+ <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
+ <56DE7E1D.5070508@st.com>
+ <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
+ <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
+ <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
+ <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
+ <56DFF253.9050208@st.com>
+Message-ID: <56DFFA9E.7060602@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/ox810se.dtsi | 273 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 273 insertions(+)
- create mode 100644 arch/arm/boot/dts/ox810se.dtsi
+Hello Tomeu, Andreas,
 
-diff --git a/arch/arm/boot/dts/ox810se.dtsi b/arch/arm/boot/dts/ox810se.dtsi
-new file mode 100644
-index 0000000..5852a57
---- /dev/null
-+++ b/arch/arm/boot/dts/ox810se.dtsi
-@@ -0,0 +1,273 @@
-+/*
-+ * ox810se.dtsi - Device tree file for Oxford Semiconductor OX810SE SoC
-+ *
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "oxsemi,ox810se";
-+
-+	cpus {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			device_type = "cpu";
-+			compatible = "arm,arm926ej-s";
-+			clocks = <&armclk>;
-+		};
-+	};
-+
-+	memory {
-+		/* Max 256MB @ 0x48000000 */
-+		reg = <0x48000000 0x10000000>;
-+	};
-+
-+	clocks {
-+		osc: oscillator {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+
-+		gmacclk: gmacclk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <125000000>;
-+		};
-+
-+		rpsclk: rpsclk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
-+			clock-mult = <1>;
-+			clocks = <&osc>;
-+		};
-+
-+		pll400: pll400 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <733333333>;
-+		};
-+
-+		sysclk: sysclk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <4>;
-+			clock-mult = <1>;
-+			clocks = <&pll400>;
-+		};
-+
-+		armclk: armclk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&pll400>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		apb-bridge at 44000000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			ranges = <0 0x44000000 0x1000000>;
-+
-+			pinctrl: pinctrl {
-+				compatible = "oxsemi,ox810se-pinctrl", "simple-bus";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				/* Regmap for sys registers */
-+				plxtech,sys-ctrl = <&sys>;
-+
-+				/* Default, all-open mux-map */
-+				plxtech,mux-mask = <
-+					0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
-+					0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF 0xFFFFFFFF
-+					>;
-+
-+				gpio0: gpio at 000000 {
-+					compatible = "oxsemi,ox810se-gpio";
-+					reg = <0x000000 0x100000>;
-+					interrupts = <21>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					#gpio-lines = <32>;
-+				};
-+
-+				gpio1: gpio at 100000 {
-+					compatible = "oxsemi,ox810se-gpio";
-+					reg = <0x100000 0x100000>;
-+					interrupts = <22>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					#gpio-lines = <3>;
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0 {
-+						plxtech,pins = <0 31 3 0
-+								0 32 3 0>;
-+					};
-+					pinctrl_uart0_modem: uart0_modem {
-+						plxtech,pins = <0 27 3 0
-+								0 28 3 0
-+								0 29 3 0
-+								0 30 3 0
-+								0 33 3 0
-+								0 34 3 0>;
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1 {
-+						plxtech,pins = <0 20 3 0
-+								0 22 3 0>;
-+					};
-+					pinctrl_uart1_modem: uart1_modem {
-+						plxtech,pins = <0 8 3 0
-+								0 9 3 0
-+								0 23 3 0
-+								0 24 3 0
-+								0 25 3 0
-+								0 26 3 0>;
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2 {
-+						plxtech,pins = <0 6 3 0
-+								0 7 3 0>;
-+					};
-+					pinctrl_uart2_modem: uart2_modem {
-+						plxtech,pins = <0 0 3 0
-+								0 1 3 0
-+								0 2 3 0
-+								0 3 3 0
-+								0 4 3 0
-+								0 5 3 0>;
-+					};
-+				};
-+			};
-+
-+			uart0: serial at 200000 {
-+			       compatible = "ns16550a";
-+			       reg = <0x200000 0x100000>;
-+			       clocks = <&sysclk>;
-+			       interrupts = <23>;
-+			       reg-shift = <0>;
-+			       fifo-size = <16>;
-+			       reg-io-width = <1>;
-+			       current-speed = <115200>;
-+			       no-loopback-test;
-+			       status = "disabled";
-+			       resets = <&reset 17>;
-+			};
-+
-+			uart1: serial at 300000 {
-+			       compatible = "ns16550a";
-+			       reg = <0x300000 0x100000>;
-+			       clocks = <&sysclk>;
-+			       interrupts = <24>;
-+			       reg-shift = <0>;
-+			       fifo-size = <16>;
-+			       reg-io-width = <1>;
-+			       current-speed = <115200>;
-+			       no-loopback-test;
-+			       status = "disabled";
-+			       resets = <&reset 18>;
-+			};
-+
-+			uart2: serial at 900000 {
-+			       compatible = "ns16550a";
-+			       reg = <0x900000 0x100000>;
-+			       clocks = <&sysclk>;
-+			       interrupts = <29>;
-+			       reg-shift = <0>;
-+			       fifo-size = <16>;
-+			       reg-io-width = <1>;
-+			       current-speed = <115200>;
-+			       no-loopback-test;
-+			       status = "disabled";
-+			       resets = <&reset 22>;
-+			};
-+
-+			uart3: serial at a00000 {
-+			       compatible = "ns16550a";
-+			       reg = <0xa00000 0x100000>;
-+			       clocks = <&sysclk>;
-+			       interrupts = <30>;
-+			       reg-shift = <0>;
-+			       fifo-size = <16>;
-+			       reg-io-width = <1>;
-+			       current-speed = <115200>;
-+			       no-loopback-test;
-+			       status = "disabled";
-+			       resets = <&reset 23>;
-+			};
-+		};
-+
-+		apb-bridge at 45000000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			ranges = <0 0x45000000 0x1000000>;
-+
-+			sys: sys-ctrl at 000000 {
-+				compatible = "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd";
-+				reg = <0x000000 0x100000>;
-+
-+				reset: reset-controller {
-+					compatible = "oxsemi,ox810se-reset";
-+					#reset-cells = <1>;
-+				};
-+
-+				stdclk: stdclk {
-+					compatible = "oxsemi,ox810se-stdclk";
-+					#clock-cells = <1>;
-+				};
-+			};
-+
-+			rps at 300000 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "simple-bus";
-+				ranges = <0 0x300000 0x100000>;
-+
-+				intc: interrupt-controller at 0 {
-+					compatible = "arm,rps-irq";
-+					interrupt-controller;
-+					reg = <0 0x200>;
-+					#interrupt-cells = <1>;
-+					valid-mask = <0xFFFFFFFF>;
-+					clear-mask = <0>;
-+				};
-+
-+				timer0: timer at 200 {
-+					compatible = "arm,sp804";
-+					reg = <0x200 0x40>;
-+					clocks = <&rpsclk>;
-+					interrupts = <4 5>;
-+					arm,timer-width = <24>;
-+				};
-+			};
-+		};
-+	};
-+};
--- 
-1.9.1
+On 3/9/2016 10:52 AM, Giuseppe CAVALLARO wrote:
+>> * today's linux-next: probe failed
+>>
+>> * today's linux-next + revert of 88f8b1bb41c6 stmmac: Fix 'eth0: No
+>> PHY found' regression: probe succeeded but no network at all
+>>
+>> * today's linux-next + revert of 88f8b1bb41c6 (stmmac: Fix 'eth0: No
+>> PHY found' regression) + revert of 0e80bdc9a72d (stmmac: first frame
+>> prep at the end of xmit routine): probe succeeded, dhcp succeeds and
+>> nfsroot works for a few seconds before timing out
+>
+> ok, I was looking at this problem now that seems to related
+> the "stmmac: first frame prep at the end of xmit routine"
+> that, at first glance, is breaking the gmac 3.50 with normal descriptor.
+
+I have no Hw where to test this use case. So, I wonder if may I ask you 
+to test some patch.
+
+This first patch adds a missing barrier to the normal routine that inits 
+the descriptor. Barrier was needed to well manage the OWN
+descriptor and it was not added in case of normal desc case after
+the xmit rework.
+
+Then I will check the algo behind the new xmit and in case of problems,
+if you agree, we will decide to revert it because it aimed to add an
+optimization.
+
+Let me know if you agree.
+
+Regards
+Peppe
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: normal_tmp.patch
+Type: text/x-patch
+Size: 950 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160309/807d1599/attachment-0001.bin>
