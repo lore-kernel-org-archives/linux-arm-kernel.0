@@ -1,70 +1,92 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 10 Mar 2016 05:00:37 +0800
-Subject: [PATCH v6 2/6] power-domain: allow domains only handling idle requests
+Date: Thu, 10 Mar 2016 05:02:37 +0800
+Subject: [PATCH v6 5/6] dt/bindings: rockchip: modify document of Rockchip
+ power domains
 In-Reply-To: <1457557241-21297-1-git-send-email-zhangqing@rock-chips.com>
 References: <1457557241-21297-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1457557241-21297-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1457557357-21423-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Rockchip SoC there exist child-domains only handling their
-idle state with the actual power-state handled by a parent-domain.
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-
-So allow such types of domains. For them, we can determine their
-state (on/of) by checking the inverse idle-state instead.
-
-There exist one special case if both idle as well power handling
-were set as not present, but as the domain-data is defined in the
-code itself, we can expect the reasonable developer to define them
-in a correct, without adding more checks.
+Add binding documentation for the power domains
+found on Rockchip RK3399 SoCs
 
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/soc/rockchip/pm_domains.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ .../bindings/soc/rockchip/power_domain.txt         | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index c46312d..0465a06 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -66,8 +66,8 @@ struct rockchip_pmu {
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 13dc6a3..98085c8 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -7,6 +7,7 @@ Required properties for power domain controller:
+ - compatible: Should be one of the following.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
++	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
+ - #power-domain-cells: Number of cells in a power-domain specifier.
+ 	Should be 1 for multiple PM domains.
+ - #address-cells: Should be 1.
+@@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power domain.
+ - clocks (optional): phandles to clocks which need to be enabled while power domain
+ 	switches state.
  
- #define DOMAIN(pwr, status, req, idle, ack)	\
- {						\
--	.pwr_mask = BIT(pwr),			\
--	.status_mask = BIT(status),		\
-+	.pwr_mask = (pwr >= 0) ? BIT(pwr) : 0,		\
-+	.status_mask = (status >= 0) ? BIT(status) : 0,	\
- 	.req_mask = (req >= 0) ? BIT(req) : 0,		\
- 	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
- 	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
-@@ -119,6 +119,10 @@ static bool rockchip_pmu_domain_is_on(struct rockchip_pm_domain *pd)
- 	struct rockchip_pmu *pmu = pd->pmu;
- 	unsigned int val;
+@@ -45,12 +47,41 @@ Example:
+                 };
+         };
  
-+	/* check idle status for idle-only domains */
-+	if (pd->info->status_mask == 0)
-+		return !rockchip_pmu_domain_is_idle(pd);
++Example 2:
++		power: power-controller {
++			compatible = "rockchip,rk3399-power-controller";
++			#power-domain-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
- 	regmap_read(pmu->regmap, pmu->info->status_offset, &val);
- 
- 	/* 1'b0: power on, 1'b1: power off */
-@@ -130,6 +134,9 @@ static void rockchip_do_pmu_set_power_domain(struct rockchip_pm_domain *pd,
- {
- 	struct rockchip_pmu *pmu = pd->pmu;
- 
-+	if (pd->info->pwr_mask == 0)
-+		return;
++			pd_vio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <RK3399_PD_VIO>;
 +
- 	regmap_update_bits(pmu->regmap, pmu->info->pwr_offset,
- 			   pd->info->pwr_mask, on ? 0 : -1U);
++				pd_vo {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <RK3399_PD_VO>;
++
++					pd_vopb {
++						reg = <RK3399_PD_VOPB>;
++					};
++
++					pd_vopl {
++						reg = <RK3399_PD_VOPL>;
++					};
++				};
++			};
++		};
++
+ Node of a device using power domains must have a power-domains property,
+ containing a phandle to the power device node and an index specifying which
+ power domain to use.
+ The index should use macros in:
+ 	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+ 	"include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
++	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power domain.
  
+ Example of the node using power domain:
+ 
+@@ -65,3 +96,9 @@ Example of the node using power domain:
+                 power-domains = <&power RK3368_PD_GPU_1>;
+                 /* ... */
+         };
++
++	node {
++		/* ... */
++		power-domains = <&power RK3399_PD_VOPB>;
++		/* ... */
++	};
 -- 
 1.9.1
