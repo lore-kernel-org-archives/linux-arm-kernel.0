@@ -1,52 +1,30 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Wed, 9 Mar 2016 08:24:14 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>	<56DD7172.4000707@suse.de>	<2714888.1DdqvJZ8cb@diego>	<56DD7593.5060003@suse.de>	<56DD8176.2080603@st.com>	<56DD8FBE.9010200@suse.de>	<56DD99A4.5030004@st.com>	<56DDA26C.3050301@suse.de>	<56DDA3D5.3090209@st.com>	<56DDB749.1020808@suse.de>	<CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>	<56DE7E1D.5070508@st.com>
- <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
-Message-ID: <56DFCF9E.5040206@st.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 9 Mar 2016 15:24:20 +0800
+Subject: [Query]set clk rate must operate its coordinated clock
+Message-ID: <20160309152420.20de187a@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh
+Dear Stephen, Michael, Sebastian and all, 
 
-On 3/8/2016 4:45 PM, Dinh Nguyen wrote:
-> On Tue, Mar 8, 2016 at 1:24 AM, Giuseppe CAVALLARO
-> <peppe.cavallaro@st.com> wrote:
->> Hi Dinh,
->>
->> On 3/8/2016 12:22 AM, Dinh Nguyen wrote:
->> [snip]
->>>
->>>
->>> I'm seeing the same issue on the SoCFPGA platform:
->>>
->>> libphy: PHY stmmac-0:ffffffff not found
->>> eth0: Could not attach to PHY
->>> stmmac_open: Cannot attach to PHY (error: -19)
->>>
->>> If I just revert:
->>>
->>>    "stmmac: Fix 'eth0: No PHY found' regression"
->>>
->>> then the issue goes away.
->>
->>
->> do you have this patch "stmmac: first frame prep at the end of xmit routine"
->> ? Or you just reverted
->>    "stmmac: Fix 'eth0: No PHY found' regression"
->
-> I only reverted "stmmac: Fix 'eth0: No PHY found' regression". I do have the
-> patch "stmmac: first frame prep at the end of the xmit routine", but I did not
-> need to revert that patch.
+I have the following clk case which I dunno the elegant solution:
 
-thx for this input.
 
-FYI, I am reworking the code to manage the mdio inside the driver so a
-patch will come soon.
+cpuclk have two parents: cpupll and refclk. When set the cpuclk freq, we
+have to set its parent's freq, I.E cpupll freq. But before changing the
+cpupll's freq, we should set its refclk as its parent firstly.
 
-peppe
+AFAIK, this is a common case, I have seen such requirement in rockchip, samsung
+clk driver. They solve this by notifier, but as pointed out by Michael
+in http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351565.html
 
->
-> Dinh
->
+"This is also a hack and it points towards some missing infrastructure in the
+clock framework."
+
+I also don't like the notifier solution, I believe the elegant solution could
+be using the coordinated clock infrastructure. So what's the status of
+this infrastructure? I can test, and I can even add some code to make it be
+ready to be merged if you guide me ;)
+
+Thanks in advance,
+Jisheng
