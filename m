@@ -1,41 +1,38 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Tue,  8 Mar 2016 21:49:37 -0800
-Subject: [PATCH 2/2] drivers: net: xgene: fix: Remove IRQF_SHARED flag
-In-Reply-To: <1457502577-2606-1-git-send-email-isubramanian@apm.com>
-References: <1457502577-2606-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1457502577-2606-3-git-send-email-isubramanian@apm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 9 Mar 2016 12:52:08 +0700
+Subject: [PATCH v3 2/9] clocksource: arm_arch_timer: Extend
+ arch_timer_kvm_info to get the virtual IRQ
+In-Reply-To: <20160309032713.GF26583@lvm>
+References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
+ <1457436573-6180-3-git-send-email-julien.grall@arm.com>
+ <20160309032713.GF26583@lvm>
+Message-ID: <56DFBA08.7060000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not allowing sharing of IRQs.
+Hi Christoffer,
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Tested-by: Toan Le <toanle@apm.com>
----
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 09/03/2016 10:27, Christoffer Dall wrote:
+> On Tue, Mar 08, 2016 at 11:29:26AM +0000, Julien Grall wrote:
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index b7ab588..d8887f3 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -701,6 +701,8 @@ static void __init arch_timer_common_init(void)
+>>   	arch_timer_banner(arch_timers_present);
+>>   	arch_counter_register(arch_timers_present);
+>>   	arch_timer_arch_init();
+>> +
+>> +	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
+>
+> why is this in common_init and not just in init?
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 0878aec..f68c187 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -630,7 +630,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
- 		ring = pdata->rx_ring[i];
- 		irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
- 		ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
--				       IRQF_SHARED, ring->irq_name, ring);
-+				       0, ring->irq_name, ring);
- 		if (ret) {
- 			netdev_err(ndev, "Failed to request irq %s\n",
- 				   ring->irq_name);
-@@ -641,7 +641,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
- 		ring = pdata->tx_ring[i]->cp_ring;
- 		irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
- 		ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
--				       IRQF_SHARED, ring->irq_name, ring);
-+				       0, ring->irq_name, ring);
- 		if (ret) {
- 			netdev_err(ndev, "Failed to request irq %s\n",
- 				   ring->irq_name);
+I thought we wanted to initialize virtual_irq for both the system 
+registers timer and the memory timer. Although, as talked IRL, KVM 
+mandates system registers timer. So I will initialize the virtual_irq in 
+arch_timer_init.
+
+Cheers,
+
 -- 
-1.9.1
+Julien Grall
