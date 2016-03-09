@@ -1,32 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  9 Mar 2016 11:50:12 +0100
-Subject: [PATCH 2/4] mfd: axp20x: Add AXP209 GPIO driver to the mfd
+Date: Wed,  9 Mar 2016 11:50:14 +0100
+Subject: [PATCH 4/4] ARM: sun5i: chip: Add status LED
 In-Reply-To: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1457520614-32239-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1457520614-32239-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a GPIO driver for the AXP209, we can add it to our MFD.
+The CHIP has a status LED connected to one of the AXP GPIOs. Add the
+gpio-leds node to be able to use the proper LED framework to control it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mfd/axp20x.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun5i-r8-chip.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index a57d6e940610..89518ee3be33 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -430,6 +430,9 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
+diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+index f6898c6b84d4..9a54df81ece7 100644
+--- a/arch/arm/boot/dts/sun5i-r8-chip.dts
++++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+@@ -64,6 +64,16 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		status {
++			label = "chip:white:status";
++			gpios = <&axp_gpio 2 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
+ };
  
- static struct mfd_cell axp20x_cells[] = {
- 	{
-+		.name		= "axp20x-gpio",
-+		.of_compatible	= "x-powers,axp209-gpio",
-+	}, {
- 		.name		= "axp20x-pek",
- 		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
- 		.resources	= axp20x_pek_resources,
+ &codec {
 -- 
 2.7.2
