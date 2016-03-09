@@ -1,57 +1,90 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 9 Mar 2016 15:30:36 +0100
-Subject: Kirkwood dts spi-gpio
-In-Reply-To: <O3RWO7$37CF1BBB1164539CA7B18E9E6A340454@sintau.it>
-References: <O3RO1V$CF721D4D7AC56BB19237E5BFE0260DB6@sintau.it>
- <O3RWO7$37CF1BBB1164539CA7B18E9E6A340454@sintau.it>
-Message-ID: <20160309143036.GC31963@lunn.ch>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Wed, 9 Mar 2016 15:31:36 +0100
+Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
+In-Reply-To: <CAAObsKBUzBXcamEyup44N1bYUzGr_ZZTsYcD5x3PXb-2E00cGA@mail.gmail.com>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
+ <56DD7593.5060003@suse.de> <56DD8176.2080603@st.com>
+ <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
+ <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
+ <56DDB749.1020808@suse.de>
+ <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
+ <56DE7E1D.5070508@st.com>
+ <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
+ <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
+ <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
+ <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
+ <56DFF253.9050208@st.com> <56DFFA9E.7060602@st.com>
+ <CAAObsKBUzBXcamEyup44N1bYUzGr_ZZTsYcD5x3PXb-2E00cGA@mail.gmail.com>
+Message-ID: <56E033C8.40506@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 02:12:07PM +0100, a.lombardinilo wrote:
-> I added dts files in the following section:
-> 
-> ??????? spi_gpio {
-> ??????????????? #address-cells = <1>;
-> ??????????????? #size-cells = <1>;
-> 
-> ??????????????? compatible = "spi-gpio";
-> 
-> ??????????????? status = "okay";
-> ??????????????? gpio-sck = <&gpio1 40 GPIO_ACTIVE_LOW>;
+Hi Tomeu
 
-40 is invalid. It should be in the range 0-31.
+On 3/9/2016 11:53 AM, Tomeu Vizoso wrote:
+> On 9 March 2016 at 11:27, Giuseppe CAVALLARO <peppe.cavallaro@st.com> wrote:
+>> Hello Tomeu, Andreas,
+>>
+>> On 3/9/2016 10:52 AM, Giuseppe CAVALLARO wrote:
+>>>>
+>>>> * today's linux-next: probe failed
+>>>>
+>>>> * today's linux-next + revert of 88f8b1bb41c6 stmmac: Fix 'eth0: No
+>>>> PHY found' regression: probe succeeded but no network at all
+>>>>
+>>>> * today's linux-next + revert of 88f8b1bb41c6 (stmmac: Fix 'eth0: No
+>>>> PHY found' regression) + revert of 0e80bdc9a72d (stmmac: first frame
+>>>> prep at the end of xmit routine): probe succeeded, dhcp succeeds and
+>>>> nfsroot works for a few seconds before timing out
+>>>
+>>>
+>>> ok, I was looking at this problem now that seems to related
+>>> the "stmmac: first frame prep at the end of xmit routine"
+>>> that, at first glance, is breaking the gmac 3.50 with normal descriptor.
+>>
+>>
+>> I have no Hw where to test this use case. So, I wonder if may I ask you to
+>> test some patch.
+>>
+>> This first patch adds a missing barrier to the normal routine that inits the
+>> descriptor. Barrier was needed to well manage the OWN
+>> descriptor and it was not added in case of normal desc case after
+>> the xmit rework.
+>>
+>> Then I will check the algo behind the new xmit and in case of problems,
+>> if you agree, we will decide to revert it because it aimed to add an
+>> optimization.
+>>
+>> Let me know if you agree.
+>
+> I'm not sure what you would like to be tested, but just in case, I
+> have just tried your patch on top of these commits and the result is
+> the "transmit queue 0 timed out" error during boot:
+>
+> 6542b30d0a67 Revert "stmmac: first frame prep at the end of xmit routine"
+> eb5274cbc0f7 Revert "stmmac: do not poll phy handler when attach a switch"
+> e88e625a68d9 Revert "stmmac: fix phy init when attached to a phy"
+> ef5dd3777876 stmmac: fix MDIO settings
+> 77634ba1f25c Revert "stmmac: Fix 'eth0: No PHY found' regression"
+> 7811b4ffc312 Add linux-next specific files for 20160309
 
-Try gpio-sck = <&gpio1 8 GPIO_ACTIVE_LOW>;
+I missed that the issue is not only related the
+   "stmmac: first frame prep at the end of xmit routine"
+I have to try to test on 3.50 with normal descriptor.
+When using enhanced descriptors all works fine on my
+side.
 
-Also, why are you doing spi-gpio?
+I keep you informed.
 
-Looking at the pinctrl driver, these pins can be used by a real SPI
-core:
+peppe
 
-        MPP_MODE(39,
-                MPP_VAR_FUNCTION(0x0, "gpio", NULL,      V(0, 0, 0, 1, 1, 1)),
-                MPP_VAR_FUNCTION(0x1, "ts", "mp3",       V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x2, "tdm", "spi-cs0",  V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x4, "audio", "bclk",   V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0xb, "lcd", "d19",      V(0, 0, 0, 0, 1, 0))),
-        MPP_MODE(40,
-                MPP_VAR_FUNCTION(0x0, "gpio", NULL,      V(0, 0, 0, 1, 1, 1)),
-                MPP_VAR_FUNCTION(0x1, "ts", "mp4",       V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x2, "tdm", "spi-sck",  V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x4, "audio", "sdo",    V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0xb, "lcd", "d20",      V(0, 0, 0, 0, 1, 0))),
-        MPP_MODE(41,
-                MPP_VAR_FUNCTION(0x0, "gpio", NULL,      V(0, 0, 0, 1, 1, 1)),
-                MPP_VAR_FUNCTION(0x1, "ts", "mp5",       V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x2, "tdm", "spi-miso", V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x4, "audio", "lrclk",  V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0xb, "lcd", "d21",      V(0, 0, 0, 0, 1, 0))),
-        MPP_MODE(42,
-                MPP_VAR_FUNCTION(0x0, "gpio", NULL,      V(0, 0, 0, 1, 1, 1)),
-                MPP_VAR_FUNCTION(0x1, "ts", "mp6",       V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x2, "tdm", "spi-mosi", V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0x4, "audio", "mclk",   V(0, 0, 0, 1, 1, 0)),
-                MPP_VAR_FUNCTION(0xb, "lcd", "d22",      V(0, 0, 0, 0, 1, 0))),
 
-Andrew
+> Regards,
+>
+> Tomeu
+>
+>> Regards
+>> Peppe
+>
+>
