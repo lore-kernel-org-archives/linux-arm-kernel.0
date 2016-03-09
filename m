@@ -1,29 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Mar 2016 09:59:48 +0700
-Subject: [PATCH 1/8] drivers/pinctrl: sunxi/pinctrl-sunxi.c does not need
- module.h
-In-Reply-To: <1456778924-20730-2-git-send-email-paul.gortmaker@windriver.com>
-References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
- <1456778924-20730-2-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CACRpkdZ0_qmkyfBOBwXFL-HV+PvQxz-Emv0qiMv7EaEJaR1BkQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 8 Mar 2016 19:07:51 -0800
+Subject: [PATCH v3 05/12] KVM: arm/arm64: vgic-v2: Reset LRs at boot time
+In-Reply-To: <1457343214-19547-6-git-send-email-marc.zyngier@arm.com>
+References: <1457343214-19547-1-git-send-email-marc.zyngier@arm.com>
+ <1457343214-19547-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160309030751.GA26583@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 1, 2016 at 3:48 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
+On Mon, Mar 07, 2016 at 09:33:27AM +0000, Marc Zyngier wrote:
+> In order to let make the GICv2 code more lazy in the way it
+> accesses the LRs, it is necessary to start with a clean slate.
+> 
+> Let's reset the LRs on each CPU when the vgic is probed.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> This file is not modular, nor is it using modular functions. The
-> only thing close is the global THIS_MODULE which comes from export.h
-> so lets replace it appropriately and cut back on the amount of
-> header stuff we draw in by several thousand lines.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Patch applied with Maxime's ACK.
-
-Yours,
-Linus Walleij
+> ---
+>  virt/kvm/arm/vgic-v2.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+> index ff02f08..67ec334 100644
+> --- a/virt/kvm/arm/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic-v2.c
+> @@ -176,6 +176,15 @@ static const struct vgic_ops vgic_v2_ops = {
+>  
+>  static struct vgic_params vgic_v2_params;
+>  
+> +static void vgic_cpu_init_lrs(void *params)
+> +{
+> +	struct vgic_params *vgic = params;
+> +	int i;
+> +
+> +	for (i = 0; i < vgic->nr_lr; i++)
+> +		writel_relaxed(0, vgic->vctrl_base + GICH_LR0 + (i * 4));
+> +}
+> +
+>  /**
+>   * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+>   * @node:	pointer to the DT node
+> @@ -257,6 +266,9 @@ int vgic_v2_probe(struct device_node *vgic_node,
+>  
+>  	vgic->type = VGIC_V2;
+>  	vgic->max_gic_vcpus = VGIC_V2_MAX_CPUS;
+> +
+> +	on_each_cpu(vgic_cpu_init_lrs, vgic, 1);
+> +
+>  	*ops = &vgic_v2_ops;
+>  	*params = vgic;
+>  	goto out;
+> -- 
+> 2.1.4
+> 
