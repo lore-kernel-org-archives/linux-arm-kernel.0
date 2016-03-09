@@ -1,105 +1,112 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Wed, 9 Mar 2016 10:42:28 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <56DFE64B.8060606@st.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
- <56DD7593.5060003@suse.de>
- <56DD8176.2080603@st.com> <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
- <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
- <56DDB749.1020808@suse.de>
- <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
- <56DE7E1D.5070508@st.com>
- <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
- <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
- <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
-Message-ID: <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed,  9 Mar 2016 10:41:59 +0100
+Subject: [PATCH v2 4/4] documentation: Fix pinctrl documentation for Meson8 /
+ Meson8b
+In-Reply-To: <20160305042646.GL13525@rob-hp-laptop>
+References: <20160305042646.GL13525@rob-hp-laptop>
+Message-ID: <1457516519-15319-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 March 2016 at 10:00, Giuseppe CAVALLARO <peppe.cavallaro@st.com> wrote:
-> On 3/9/2016 9:56 AM, Giuseppe CAVALLARO wrote:
->>
->> Hello
->>
->> On 3/9/2016 9:35 AM, Tomeu Vizoso wrote:
->>>
->>>
->>> in order to get the onboard network on the Radxa Rock2 to work at all
->>> on today's linux-next, I had to revert both commits:
->>>
->>> * "stmmac: Fix 'eth0: No PHY found' regression" for the drivers to
->>> probe and the link to come up, and
->>
->>
->> I've just sent two patches (on top of net.git) to fix this problem
->> pls let me know if these help on your side too.
->>
->>>
->>> * "stmmac: first frame prep at the end of the xmit routine" for the
->>> network interface to work at all.
->>
->>
->> I cannot reproduce it right now but I am looking at this again and let
->> you know.
->> I will check your output file too
->
->
-> hmm, I think that the problem is around the "normal descriptor"
-> management that is configured on the boxes where the driver is
-> failing now. Using enhanced descriptors the network is ok.
-> I will keep you up-to-date.
+From: Carlo Caione <carlo@endlessm.com>
 
-Hi,
+Fix pin controller documentation introducing the new compatibles for
+the pinctrl drivers specific for aobus / cbus.
 
-I have done some tests and these are the results:
+This is needed because we have changed the pin controller driver: we
+have now a single specialized pinctrl driver / compatible for each bus
+the controller is attached to, instead of one single driver dealing with
+all the controllers we have on different buses.
 
-* net.git (133800d1f028): probe failed
-
-* net.git (133800d1f028) + revert: everything fine
-
-* net.git (133800d1f028) + revert + "stmmac: fix MDIO settings": everything fine
-
-* today's linux-next: probe failed
-
-* today's linux-next + revert of 88f8b1bb41c6 stmmac: Fix 'eth0: No
-PHY found' regression: probe succeeded but no network at all
-
-* today's linux-next + revert of 88f8b1bb41c6 (stmmac: Fix 'eth0: No
-PHY found' regression) + revert of 0e80bdc9a72d (stmmac: first frame
-prep at the end of xmit routine): probe succeeded, dhcp succeeds and
-nfsroot works for a few seconds before timing out
-
-Btw, could you CC LKML on future patches that need testing?
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+Hey Rob,
+I'm resubmitting a V2 only for this patch since the driver changes have
+been already taken by Linus.
 
 Thanks,
+---
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  | 38 ++++------------------
+ 1 file changed, 7 insertions(+), 31 deletions(-)
 
-Tomeu
-
-> peppe
->
->
->>
->> Regards
->> peppe
->>
->>
->>> But a few seconds into the nfsroot boot I start getting:
->>>
->>> [    9.136701] systemd[1]: Started Load Kernel Modules.
->>> [   18.116321] nfs: server 10.42.0.1 not responding, still trying
->>> [   18.516224] ------------[ cut here ]------------
->>> [   18.521024] WARNING: CPU: 1 PID: 0 at net/sched/sch_generic.c:303
->>> dev_watchdog+0x284/0x288
->>> [   18.529456] NETDEV WATCHDOG: eth0 (rk_gmac-dwmac): transmit queue 0
->>> timed out
->>>
->>> I'm attaching the full boot log.
->>>
->>> Regards,
->>>
->>> Tomeu
->>>
->>
->>
->
+diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+index 3f6a524..ca6d283 100644
+--- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+@@ -1,13 +1,16 @@
+ == Amlogic Meson pinmux controller ==
+ 
+ Required properties for the root node:
+- - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
++ - compatible: one of "amlogic,meson8-cbus-pinctrl"
++		      "amlogic,meson8b-cbus-pinctrl"
++		      "amlogic,meson8-aobus-pinctrl"
++		      "amlogic,meson8b-aobus-pinctrl"
+  - reg: address and size of registers controlling irq functionality
+ 
+ === GPIO sub-nodes ===
+ 
+-The 2 power domains of the controller (regular and always-on) are
+-represented as sub-nodes and each of them acts as a GPIO controller.
++Each power domain of the controller (regular and always-on) is
++represented as a sub-node and it acts as a GPIO controller.
+ 
+ Required properties for sub-nodes are:
+  - reg: should contain address and size for mux, pull-enable, pull and
+@@ -18,10 +21,6 @@ Required properties for sub-nodes are:
+  - gpio-controller: identifies the node as a gpio controller
+  - #gpio-cells: must be 2
+ 
+-Valid sub-node names are:
+- - "banks" for the regular domain
+- - "ao-bank" for the always-on domain
+-
+ === Other sub-nodes ===
+ 
+ Child nodes without the "gpio-controller" represent some desired
+@@ -45,7 +44,7 @@ pinctrl-bindings.txt
+ === Example ===
+ 
+ 	pinctrl: pinctrl at c1109880 {
+-		compatible = "amlogic,meson8-pinctrl";
++		compatible = "amlogic,meson8-cbus-pinctrl";
+ 		reg = <0xc1109880 0x10>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -61,15 +60,6 @@ pinctrl-bindings.txt
+ 			#gpio-cells = <2>;
+                };
+ 
+-		gpio_ao: ao-bank at c1108030 {
+-			reg = <0xc8100014 0x4>,
+-			      <0xc810002c 0x4>,
+-			      <0xc8100024 0x8>;
+-			reg-names = "mux", "pull", "gpio";
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-		};
+-
+ 		nand {
+ 			mux {
+ 				groups = "nand_io", "nand_io_ce0", "nand_io_ce1",
+@@ -79,18 +69,4 @@ pinctrl-bindings.txt
+ 				function = "nand";
+ 			};
+ 		};
+-
+-		uart_ao_a {
+-			mux {
+-				groups = "uart_tx_ao_a", "uart_rx_ao_a",
+-					 "uart_cts_ao_a", "uart_rts_ao_a";
+-				function = "uart_ao";
+-			};
+-
+-			conf {
+-				pins = "GPIOAO_0", "GPIOAO_1",
+-				       "GPIOAO_2", "GPIOAO_3";
+-				bias-disable;
+-			};
+-		};
+ 	};
+-- 
+2.5.0
