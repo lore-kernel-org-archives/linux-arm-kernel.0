@@ -1,51 +1,78 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 10 Mar 2016 11:40:00 +0200
-Subject: ARMv4 (not v4t) marked obsolete in gcc-6
-In-Reply-To: <201603101013.04618.arnd@arndb.de>
-References: <201603101013.04618.arnd@arndb.de>
-Message-ID: <20160310094000.GA2057@tarshish>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 10 Mar 2016 11:40:58 +0200
+Subject: [PATCH v3 05/11] soc: renesas: rcar-sysc: Enable Clock Domain for
+ r8a7795 I/O devices
+In-Reply-To: <1457551127-21934-6-git-send-email-geert+renesas@glider.be>
+References: <1457551127-21934-1-git-send-email-geert+renesas@glider.be>
+ <1457551127-21934-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <2523920.fzA0Elmkzz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Geert,
 
-On Thu, Mar 10, 2016 at 10:13:04AM +0100, Arnd Bergmann wrote:
-> I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
-> so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
-> we currenly support in the Linux kernel.
-> 
-> The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
-> and it will be removed in the following release (gcc-7) one year later, unless someone
-> raises concerns over it.
-> 
-> We will of course be able to compile kernels for a long time using older compilers, but
-> this tends to get harder over the years as people upgrade to newer distros.
-> 
-> Here is an overview of which ARMv4 platforms we still have as of Linux-4.6:
-> 
-> * Moxart: this is the only one that was recently (2013) added, and is apparently
->   hardware that remains commercially available.
-> 
-> * Gemini: officially supported in OpenWRT today, with the latest compiler. This one
->   will likely cause the most issues for actual users. It would be helpful to get
->   some numbers about users or downloads here, to see whether it can be dropped
->   in a future OpenWRT release or if it might be possible to leave this on
->   gcc-6.x when the other platforms move on to gcc-7+
-> 
-> * sa1100: A lot of people have these, but I'm guessing this is mostly interesting
->   for hobbyists that are able to keep using older gcc versions.
-> 
-> * RiscPC, Footbridge, EBSA110: Classic systems that used to be popular in
->   the past but only remain in small quantities as far as I know. Russell still
->   uses them. He also uses older compilers, so probably isn't affected
->   immediately.
+Thank you for the patch.
 
-There are also quite a few ARM920T (ARMv4) based SoCs: EP93xx, Atmel 
-AT91RM9200, Samsung S3C24xx, Freescale i.MX1.
+On Wednesday 09 March 2016 20:18:41 Geert Uytterhoeven wrote:
+> On R-Car H3, some power areas (e.g. A3VP) contain I/O devices, which are
+> also part of the CPG/MSSR Clock Domain.  Hook up the CPG/MSSR Clock
+> Domain attach/detach callbacks to enable power management using module
+> clocks.
+> 
+> This also allows to support the Clock Domain for devices in the
+> "always-on" power area.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> v3:
+>   - Hook up the CPG/MSSR Clock Domain attach/detach callbacks instead of
+>     using our own copies,
+> 
+> v2:
+>   - New.
+> ---
+>  drivers/soc/renesas/rcar-sysc.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/soc/renesas/rcar-sysc.c
+> b/drivers/soc/renesas/rcar-sysc.c index 28af0b704fc008d2..2d6fbeb481883be7
+> 100644
+> --- a/drivers/soc/renesas/rcar-sysc.c
+> +++ b/drivers/soc/renesas/rcar-sysc.c
+> @@ -9,6 +9,7 @@
+>   * for more details.
+>   */
+> 
+> +#include <linux/clk/renesas.h>
+>  #include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/mm.h>
+> @@ -251,6 +252,15 @@ static void __init rcar_sysc_pd_setup(struct
+> device_node *np, gov = &pm_domain_always_on_gov;
+>  	}
+> 
+> +#ifdef CONFIG_ARCH_R8A7795
 
-baruch
+This is fine for now as the R8A7795 is the only ARM64 model in the R-Car 
+family, but how do you plan to move forward on this ? Will it be enabled for 
+ARM64 SoCs straight away, and for ARM32 SoCs when switching from the cpg to 
+the always-on power domain ?
+
+> +	if (!(pd->flags & (PD_CPU | PD_SCU))) {
+> +		/* Enable Clock Domain for I/O devices */
+> +		genpd->flags = GENPD_FLAG_PM_CLK;
+> +		genpd->attach_dev = cpg_mssr_attach_dev;
+> +		genpd->detach_dev = cpg_mssr_detach_dev;
+> +	}
+> +#endif
+> +
+>  	pm_genpd_init(genpd, gov, false);
+>  	genpd->dev_ops.active_wakeup = rcar_sysc_active_wakeup;
+>  	genpd->power_off = rcar_sysc_pd_power_off;
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Regards,
+
+Laurent Pinchart
