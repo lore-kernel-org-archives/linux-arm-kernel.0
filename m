@@ -1,78 +1,69 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 10 Mar 2016 11:40:58 +0200
-Subject: [PATCH v3 05/11] soc: renesas: rcar-sysc: Enable Clock Domain for
- r8a7795 I/O devices
-In-Reply-To: <1457551127-21934-6-git-send-email-geert+renesas@glider.be>
-References: <1457551127-21934-1-git-send-email-geert+renesas@glider.be>
- <1457551127-21934-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <2523920.fzA0Elmkzz@avalon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 10 Mar 2016 17:50:58 +0800
+Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <56D6F3EA.4050904@gmail.com>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
+ <56D6F3EA.4050904@gmail.com>
+Message-ID: <56E14382.1070003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Matthias,
 
-Thank you for the patch.
+Sorry for the late reply, on a travelling now.
 
-On Wednesday 09 March 2016 20:18:41 Geert Uytterhoeven wrote:
-> On R-Car H3, some power areas (e.g. A3VP) contain I/O devices, which are
-> also part of the CPG/MSSR Clock Domain.  Hook up the CPG/MSSR Clock
-> Domain attach/detach callbacks to enable power management using module
-> clocks.
-> 
-> This also allows to support the Clock Domain for devices in the
-> "always-on" power area.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> v3:
->   - Hook up the CPG/MSSR Clock Domain attach/detach callbacks instead of
->     using our own copies,
-> 
-> v2:
->   - New.
-> ---
->  drivers/soc/renesas/rcar-sysc.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/soc/renesas/rcar-sysc.c
-> b/drivers/soc/renesas/rcar-sysc.c index 28af0b704fc008d2..2d6fbeb481883be7
-> 100644
-> --- a/drivers/soc/renesas/rcar-sysc.c
-> +++ b/drivers/soc/renesas/rcar-sysc.c
-> @@ -9,6 +9,7 @@
->   * for more details.
->   */
-> 
-> +#include <linux/clk/renesas.h>
->  #include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/mm.h>
-> @@ -251,6 +252,15 @@ static void __init rcar_sysc_pd_setup(struct
-> device_node *np, gov = &pm_domain_always_on_gov;
->  	}
-> 
-> +#ifdef CONFIG_ARCH_R8A7795
+On 03/02/2016 10:08 PM, Matthias Brugger wrote:
+>
+>
+> On 23/01/16 10:39, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> Introduce a new file to hold ACPI based NUMA information
+>> parsing from SRAT and SLIT.
+>>
+>> SRAT includes the CPU ACPI ID to Proximity Domain mappings
+>> and memory ranges to Proximity Domain mapping.
+>> SLIT has the information of inter node
+>> distances(relative number for access latency).
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+[..]
+>>
+>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+>> index 9e8704b..e974995 100644
+>> --- a/arch/arm64/mm/numa.c
+>> +++ b/arch/arm64/mm/numa.c
+>> @@ -17,6 +17,7 @@
+>>    * along with this program.  If not, see
+>> <http://www.gnu.org/licenses/>.
+>>    */
+>>
+>> +#include <linux/acpi.h>
+>>   #include <linux/bootmem.h>
+>>   #include <linux/ctype.h>
+>>   #include <linux/init.h>
+>> @@ -385,10 +386,8 @@ void __init arm64_numa_init(void)
+>>   {
+>>       int ret = -ENODEV;
+>>
+>> -#ifdef CONFIG_OF_NUMA
+>>       if (!numa_off)
+>> -        ret = numa_init(arm64_of_numa_init);
+>> -#endif
+>> +        ret = numa_init(acpi_disabled ? arm64_of_numa_init :
+>> arm64_acpi_numa_init);
+>
+> Header asm/acpi.h is included in linux/acpi.h but only if CONFIG_ACPI=y
+> arm64_acpi_numa_init is declared in asm/acpi.h, so if we don't use the
+> ifdef CONFIG_* approach from Robert, we will need to include as/acpi.h
+> implicitly here. Otherwise we get a compilation error if CONFIG_ACPI is
+> not set.
 
-This is fine for now as the R8A7795 is the only ARM64 model in the R-Car 
-family, but how do you plan to move forward on this ? Will it be enabled for 
-ARM64 SoCs straight away, and for ARM32 SoCs when switching from the cpg to 
-the always-on power domain ?
+Yes, I noticed the same issue as you spotted out, and I agree with
+you and Robert that I should use the ifdef CONFIG_* approach.
 
-> +	if (!(pd->flags & (PD_CPU | PD_SCU))) {
-> +		/* Enable Clock Domain for I/O devices */
-> +		genpd->flags = GENPD_FLAG_PM_CLK;
-> +		genpd->attach_dev = cpg_mssr_attach_dev;
-> +		genpd->detach_dev = cpg_mssr_detach_dev;
-> +	}
-> +#endif
-> +
->  	pm_genpd_init(genpd, gov, false);
->  	genpd->dev_ops.active_wakeup = rcar_sysc_active_wakeup;
->  	genpd->power_off = rcar_sysc_pd_power_off;
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks
+Hanjun
