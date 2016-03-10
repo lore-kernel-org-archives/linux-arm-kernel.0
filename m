@@ -1,23 +1,22 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 10 Mar 2016 14:48:12 -0500 (EST)
-Subject: [PATCH 1/2] net: thunderx: Set recevie buffer page usage count
- in bulk
-In-Reply-To: <CA+sq2CeMQMnmGPUWoLrtPzGiJpvNTsR_WmQzQr5wFVC9b3LU-w@mail.gmail.com>
-References: <CA+sq2Cc44v_ggy=QLOX_FGt6uTv3Qo1KmqCeZ8=3G1COuWxAHw@mail.gmail.com>
- <20160310.124450.278421705870462421.davem@davemloft.net>
- <CA+sq2CeMQMnmGPUWoLrtPzGiJpvNTsR_WmQzQr5wFVC9b3LU-w@mail.gmail.com>
-Message-ID: <20160310.144812.2252397711464239518.davem@davemloft.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 10 Mar 2016 22:52:50 +0300
+Subject: [PATCH 3/5] dmaengine: sun6i: Add 4 as a possible bust value
+In-Reply-To: <63a8e05126c45e3064dbe83947fc34459a2d4a02.1457606136.git.moinejf@free.fr>
+References: <cover.1457606136.git.moinejf@free.fr>
+ <63a8e05126c45e3064dbe83947fc34459a2d4a02.1457606136.git.moinejf@free.fr>
+Message-ID: <56E1D092.2080205@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
-Date: Thu, 10 Mar 2016 23:57:48 +0530
+Hello.
 
-> Difference between NIU driver and this patch is there it's
-> calculate split count, increment page count and then divide page into
-> buffers. Here it's divide page into buffers, have a counter which increments
-> at every split and then at the end do a atomic increment of page->_count.
-> 
-> Any issue with this approach ?
+On 03/10/2016 12:56 PM, Jean-Francois Moine wrote:
 
-I guess not.
+> Some DMA transfers, as for H3 audio, ask for 4 as a bust value.
+
+    Burst? :-)
+
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+[...]
+
+MBR, Sergei
