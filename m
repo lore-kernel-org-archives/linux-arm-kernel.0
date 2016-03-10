@@ -1,40 +1,34 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Mar 2016 18:39:51 +0000
-Subject: [PATCH] arm64: Fix the ptep_set_wrprotect() to set PTE_DIRTY if
- (PTE_DBM && !PTE_RDONLY)
-In-Reply-To: <CAFpQJXVy-FafeU+Uq40_27ZauDN6ziYtGugUBiWJ8eHGOwkCfQ@mail.gmail.com>
-References: <1457499768-31176-1-git-send-email-gkulkarni@caviumnetworks.com>
- <20160309100605.GJ6192@e104818-lin.cambridge.arm.com>
- <CAFpQJXUaXYkVNCc1OjLxCmpKu6b26LOaMv0V9XYRn7pLAGk2SQ@mail.gmail.com>
- <20160309160352.GM6192@e104818-lin.cambridge.arm.com>
- <CAFpQJXVkjgpTaftiA7uK-GknoZXP+fP0pTX1ajZk6wfjovDwCw@mail.gmail.com>
- <CAFpQJXVy-FafeU+Uq40_27ZauDN6ziYtGugUBiWJ8eHGOwkCfQ@mail.gmail.com>
-Message-ID: <20160310183951.GA2804@e104818-lin.cambridge.arm.com>
+Date: Thu, 10 Mar 2016 18:57:23 +0000
+Subject: [PATCH] arm64: kasan: Use actual memory node when populating the
+ kernel image shadow
+Message-ID: <1457636243-17382-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 08:34:46AM +0530, Ganapatrao Kulkarni wrote:
-> > On Wed, Mar 9, 2016 at 9:33 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> >> index 7c73b365fcfa..b409a983f870 100644
-> >> --- a/arch/arm64/include/asm/pgtable.h
-> >> +++ b/arch/arm64/include/asm/pgtable.h
-> >> @@ -201,7 +201,7 @@ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
-> >>  static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
-> >>                               pte_t *ptep, pte_t pte)
-> >>  {
-> >> -       if (pte_valid(pte)) {
-> >> +       if (pte_present(pte)) {
-> >>                 if (pte_sw_dirty(pte) && pte_write(pte))
-> >>                         pte_val(pte) &= ~PTE_RDONLY;
-> >>                 else
->
-> this diff works for me.
-> 
-> Tested-by: Ganapatrao Kulkarni <gkulkarni@cavium.com>
+With the 16KB or 64KB page configurations, the generic
+vmemmap_populate() implementation warns on potential offnode
+page_structs via vmemmap_verify() because the arm64 kasan_init() passes
+NUMA_NO_NODE instead of the actual node for the kernel image memory.
 
-Thanks. I'll push it out during the merging window and cc stable (though
-it needs a slightly different workaround for 4.4 anyway).
+Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/mm/kasan_init.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
--- 
-Catalin
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 56e19d150c21..a164183f3481 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -152,7 +152,8 @@ void __init kasan_init(void)
+ 
+ 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
+ 
+-	vmemmap_populate(kimg_shadow_start, kimg_shadow_end, NUMA_NO_NODE);
++	vmemmap_populate(kimg_shadow_start, kimg_shadow_end,
++			 pfn_to_nid(virt_to_pfn(_text)));
+ 
+ 	/*
+ 	 * vmemmap_populate() has populated the shadow region that covers the
