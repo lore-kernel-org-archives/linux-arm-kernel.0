@@ -1,91 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 10 Mar 2016 16:44:32 +0100
-Subject: [PATCH] net: macb: fix default configuration for GMAC on AT91
-Message-ID: <1457624672-30666-1-git-send-email-nicolas.ferre@atmel.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 10 Mar 2016 15:40:44 +0000
+Subject: ARMv4 (not v4t) marked obsolete in gcc-6
+In-Reply-To: <201603101013.04618.arnd@arndb.de>
+References: <201603101013.04618.arnd@arndb.de>
+Message-ID: <20160310154024.GA23883@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On AT91 SoCs, the User Register (USRIO) exposes a switch to configure the
-"Reduced" or "Traditional" version of the Media Independent Interface
-(RMII vs. MII or RGMII vs. GMII).
-As on the older EMAC version, on GMAC, this switch is set by default to the
-non-reduced type of interface, so use the existing capability and extend it to
-GMII as well. We then keep the current logic in the macb_init() function.
+On Thu, Mar 10, 2016 at 10:13:04AM +0100, Arnd Bergmann wrote:
+> I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
+> so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
+> we currenly support in the Linux kernel.
+> 
+> The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
+> and it will be removed in the following release (gcc-7) one year later, unless someone
+> raises concerns over it.
+> 
+> We will of course be able to compile kernels for a long time using older compilers, but
+> this tends to get harder over the years as people upgrade to newer distros.
+> 
+> Here is an overview of which ARMv4 platforms we still have as of Linux-4.6:
+> 
+> * Moxart: this is the only one that was recently (2013) added, and is apparently
+>   hardware that remains commercially available.
+> 
+> * Gemini: officially supported in OpenWRT today, with the latest compiler. This one
+>   will likely cause the most issues for actual users. It would be helpful to get
+>   some numbers about users or downloads here, to see whether it can be dropped
+>   in a future OpenWRT release or if it might be possible to leave this on
+>   gcc-6.x when the other platforms move on to gcc-7+
+> 
+> * sa1100: A lot of people have these, but I'm guessing this is mostly interesting
+>   for hobbyists that are able to keep using older gcc versions.
+> 
+> * RiscPC, Footbridge, EBSA110: Classic systems that used to be popular in
+>   the past but only remain in small quantities as far as I know. Russell still
+>   uses them. He also uses older compilers, so probably isn't affected
+>   immediately.
+> 
+> 	Arnd
 
-The capabilities of sama5d2, sama5d4 and sama5d3 GEM interface are updated in
-the macb_config structure to be able to properly enable them with a traditional
-interface (GMII or MII).
+_If_ gcc -march=armv4t -marm will still be generating R_ARM_V4BX relocs
+and --fix-v4bx is being retained in the linker, then I think compiling
+for v4 plain should still be possible, even if ARM/Thumb interworking
+is mandatory, IIUC.
 
-Reported-by: Romain HENRIET <romain.henriet@l-acoustics.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 13 +++++++------
- drivers/net/ethernet/cadence/macb.h |  2 +-
- 2 files changed, 8 insertions(+), 7 deletions(-)
+I don't know what gcc's plans are relating to that, though.
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 7ccf2298a5fa..3ce6095ced3d 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -2440,9 +2440,9 @@ static int macb_init(struct platform_device *pdev)
- 		if (bp->phy_interface == PHY_INTERFACE_MODE_RGMII)
- 			val = GEM_BIT(RGMII);
- 		else if (bp->phy_interface == PHY_INTERFACE_MODE_RMII &&
--			 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
-+			 (bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII))
- 			val = MACB_BIT(RMII);
--		else if (!(bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII))
-+		else if (!(bp->caps & MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII))
- 			val = MACB_BIT(MII);
- 
- 		if (bp->caps & MACB_CAPS_USRIO_HAS_CLKEN)
-@@ -2774,7 +2774,7 @@ static int at91ether_init(struct platform_device *pdev)
- }
- 
- static const struct macb_config at91sam9260_config = {
--	.caps = MACB_CAPS_USRIO_HAS_CLKEN | MACB_CAPS_USRIO_DEFAULT_IS_MII,
-+	.caps = MACB_CAPS_USRIO_HAS_CLKEN | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
- 	.clk_init = macb_clk_init,
- 	.init = macb_init,
- };
-@@ -2787,21 +2787,22 @@ static const struct macb_config pc302gem_config = {
- };
- 
- static const struct macb_config sama5d2_config = {
--	.caps = 0,
-+	.caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
- 	.dma_burst_length = 16,
- 	.clk_init = macb_clk_init,
- 	.init = macb_init,
- };
- 
- static const struct macb_config sama5d3_config = {
--	.caps = MACB_CAPS_SG_DISABLED | MACB_CAPS_GIGABIT_MODE_AVAILABLE,
-+	.caps = MACB_CAPS_SG_DISABLED | MACB_CAPS_GIGABIT_MODE_AVAILABLE
-+	      | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
- 	.dma_burst_length = 16,
- 	.clk_init = macb_clk_init,
- 	.init = macb_init,
- };
- 
- static const struct macb_config sama5d4_config = {
--	.caps = 0,
-+	.caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
- 	.dma_burst_length = 4,
- 	.clk_init = macb_clk_init,
- 	.init = macb_init,
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 9ba416d5afff..8a13824ef802 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -400,7 +400,7 @@
- /* Capability mask bits */
- #define MACB_CAPS_ISR_CLEAR_ON_WRITE		0x00000001
- #define MACB_CAPS_USRIO_HAS_CLKEN		0x00000002
--#define MACB_CAPS_USRIO_DEFAULT_IS_MII		0x00000004
-+#define MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII	0x00000004
- #define MACB_CAPS_NO_GIGABIT_HALF		0x00000008
- #define MACB_CAPS_USRIO_DISABLED		0x00000010
- #define MACB_CAPS_FIFO_MODE			0x10000000
--- 
-2.1.3
+---Dave
