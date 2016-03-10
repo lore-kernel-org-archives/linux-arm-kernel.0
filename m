@@ -1,139 +1,92 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed,  9 Mar 2016 17:50:03 -0600
-Subject: [PATCH 2/4] mmc: davinci: fix unwinding in probe
-In-Reply-To: <1457567405-30475-1-git-send-email-david@lechnology.com>
-References: <1457567405-30475-1-git-send-email-david@lechnology.com>
-Message-ID: <1457567405-30475-3-git-send-email-david@lechnology.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 10 Mar 2016 09:16:36 +0900
+Subject: [PATCH 11/13] thermal: convert exynos to use
+ devm_thermal_zone_of_sensor_register
+In-Reply-To: <1457559336-17652-12-git-send-email-edubezval@gmail.com>
+References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
+ <1457559336-17652-12-git-send-email-edubezval@gmail.com>
+Message-ID: <56E0BCE4.6020309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unwiding from an error in davinci_mmcsd_probe was a mess. Some errors were
-not handled and not all paths unwound correctly.
+On 10.03.2016 06:35, Eduardo Valentin wrote:
+> This changes the driver to use the devm_ version
+> of thermal_zone_of_sensor_register and cleans
+> up the  local points and unregister calls.
+> 
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+> ---
+>  drivers/thermal/samsung/exynos_tmu.c | 12 ++++--------
+>  1 file changed, 4 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index fa61eff..256039e 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -1363,8 +1363,8 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+>  	 * data->tzd must be registered before calling exynos_tmu_initialize(),
+>  	 * requesting irq and calling exynos_tmu_control().
+>  	 */
+> -	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+> -						    &exynos_sensor_ops);
+> +	data->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+> +							 &exynos_sensor_ops);
+>  	if (IS_ERR(data->tzd)) {
+>  		ret = PTR_ERR(data->tzd);
+>  		dev_err(&pdev->dev, "Failed to register sensor: %d\n", ret);
+> @@ -1374,21 +1374,19 @@ static int exynos_tmu_probe(struct platform_device *pdev)
+>  	ret = exynos_tmu_initialize(pdev);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "Failed to initialize TMU\n");
+> -		goto err_thermal;
+> +		goto err_sclk;
+>  	}
+>  
+>  	ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
+>  		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
+> -		goto err_thermal;
+> +		goto err_sclk;
+>  	}
+>  
+>  	exynos_tmu_control(pdev, true);
+>  	return 0;
+>  
+> -err_thermal:
+> -	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+>  err_sclk:
+>  	clk_disable_unprepare(data->sclk);
+>  err_clk:
+> @@ -1406,9 +1404,7 @@ err_sensor:
+>  static int exynos_tmu_remove(struct platform_device *pdev)
+>  {
+>  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+> -	struct thermal_zone_device *tzd = data->tzd;
+>  
+> -	thermal_zone_of_sensor_unregister(&pdev->dev, tzd);
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- drivers/mmc/host/davinci_mmc.c | 62 +++++++++++++++++++-----------------------
- 1 file changed, 28 insertions(+), 34 deletions(-)
+Before, the sensor was removed from zone (ops like get_temp NULL-ified
+etc), then we stopped TMU, disabled clocks, disabled regulator and
+finally freed IRQ (through devm-like interface).
 
-diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-index 469aa8c..f571549 100644
---- a/drivers/mmc/host/davinci_mmc.c
-+++ b/drivers/mmc/host/davinci_mmc.c
-@@ -1232,7 +1232,7 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 	struct mmc_davinci_host *host = NULL;
- 	struct mmc_host *mmc = NULL;
- 	struct resource *r, *mem = NULL;
--	int ret = 0, irq = 0;
-+	int ret, irq;
- 	size_t mem_size;
- 	const struct platform_device_id *id_entry;
- 
-@@ -1242,22 +1242,21 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
- 
--	ret = -ENODEV;
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_irq(pdev, 0);
- 	if (!r || irq == NO_IRQ)
--		goto out;
-+		return -ENODEV;
- 
--	ret = -EBUSY;
- 	mem_size = resource_size(r);
- 	mem = request_mem_region(r->start, mem_size, pdev->name);
- 	if (!mem)
--		goto out;
-+		return -EBUSY;
- 
--	ret = -ENOMEM;
- 	mmc = mmc_alloc_host(sizeof(struct mmc_davinci_host), &pdev->dev);
--	if (!mmc)
--		goto out;
-+	if (!mmc) {
-+		ret = -ENOMEM;
-+		goto mmc_alloc_host_fail;
-+	}
- 
- 	host = mmc_priv(mmc);
- 	host->mmc = mmc;	/* Important */
-@@ -1277,15 +1276,17 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 	host->mem_res = mem;
- 	host->base = ioremap(mem->start, mem_size);
- 	if (!host->base)
--		goto out;
-+		goto ioremap_fail;
- 
--	ret = -ENXIO;
- 	host->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(host->clk)) {
- 		ret = PTR_ERR(host->clk);
--		goto out;
-+		goto clk_get_fail;
- 	}
--	clk_enable(host->clk);
-+	ret = clk_enable(host->clk);
-+	if (ret)
-+		goto clk_enable_fail;
-+
- 	host->mmc_input_clk = clk_get_rate(host->clk);
- 
- 	init_mmcsd_host(host);
-@@ -1355,11 +1356,11 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 
- 	ret = mmc_add_host(mmc);
- 	if (ret < 0)
--		goto out;
-+		goto mmc_add_host_fail;
- 
- 	ret = request_irq(irq, mmc_davinci_irq, 0, mmc_hostname(mmc), host);
- 	if (ret)
--		goto out;
-+		goto request_irq_fail;
- 
- 	if (host->sdio_irq >= 0) {
- 		ret = request_irq(host->sdio_irq, mmc_davinci_sdio_irq, 0,
-@@ -1376,28 +1377,21 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--out:
-+request_irq_fail:
-+	mmc_remove_host(mmc);
-+mmc_add_host_fail:
- 	mmc_davinci_cpufreq_deregister(host);
- cpu_freq_fail:
--	if (host) {
--		davinci_release_dma_channels(host);
--
--		if (host->clk) {
--			clk_disable(host->clk);
--			clk_put(host->clk);
--		}
--
--		if (host->base)
--			iounmap(host->base);
--	}
--
--	if (mmc)
--		mmc_free_host(mmc);
--
--	if (mem)
--		release_resource(mem);
--
--	dev_dbg(&pdev->dev, "probe err %d\n", ret);
-+	davinci_release_dma_channels(host);
-+	clk_disable(host->clk);
-+clk_enable_fail:
-+	clk_put(host->clk);
-+clk_get_fail:
-+	iounmap(host->base);
-+ioremap_fail:
-+	mmc_free_host(mmc);
-+mmc_alloc_host_fail:
-+	release_resource(mem);
- 
- 	return ret;
- }
--- 
-1.9.1
+Now this will be different - first stop of TMU, disable clocks, disable,
+regulator, remove sensor from zone (through devm) and finally free IRQ.
+
+Are you sure that changing order is okay?
+
+Best regards,
+Krzysztof
+
+>  	exynos_tmu_control(pdev, false);
+>  
+>  	clk_disable_unprepare(data->sclk);
+> 
