@@ -1,59 +1,37 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Thu, 10 Mar 2016 15:34:55 +0100
-Subject: [PATCH] bus: arm-ccn: Fix cpu notifier priority
-In-Reply-To: <1457512845.22102.113.camel@arm.com>
-References: <1457439273-5998-1-git-send-email-jglauber@cavium.com>
- <1457512845.22102.113.camel@arm.com>
-Message-ID: <20160310143455.GA9998@hardcore>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 10 Mar 2016 22:43:33 +0800
+Subject: [PATCH v2 11/18] pinctrl: Add PLX Technology OXNAS pinctrl and
+ gpio driver
+In-Reply-To: <1457519060-6038-12-git-send-email-narmstrong@baylibre.com>
+Message-ID: <201603102242.MEPUl2xs%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 08:40:45AM +0000, Pawel Moll wrote:
-> On Tue, 2016-03-08 at 13:14 +0100, Jan Glauber wrote:
-> > Fix cpu priority of notifier block that was erroneously set to
-> > return value of next statement.
-> > 
-> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> > ---
-> >  drivers/bus/arm-ccn.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-> > index 7082c72..d4a939e 100644
-> > --- a/drivers/bus/arm-ccn.c
-> > +++ b/drivers/bus/arm-ccn.c
-> > @@ -1271,7 +1271,7 @@ static int arm_ccn_pmu_init(struct arm_ccn
-> > *ccn)
-> >  	 * picked to have a chance to migrate events before perf is
-> > notified.
-> >  	 */
-> >  	ccn->dt.cpu_nb.notifier_call = arm_ccn_pmu_cpu_notifier;
-> > -	ccn->dt.cpu_nb.priority = CPU_PRI_PERF + 1,
-> > +	ccn->dt.cpu_nb.priority = CPU_PRI_PERF + 1;
-> >  	err = register_cpu_notifier(&ccn->dt.cpu_nb);
-> >  	if (err)
-> >  		goto error_cpu_notifier;
-> 
-> Damn, of course! I have never made (or heard about) such a typo before 
-> - I wish the compiler warned about it :-(
+Hi Neil,
 
-Hi Pawel,
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.5-rc7]
+[cannot apply to next-20160310]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-actually my patch description is wrong. The compiler evaluates both
-statements but does _not_ overwrite the value of the first statement
-(would require parenthesis to do so). So it is just a cosmetical
-change, feel free to drop it.
+url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/Add-Initial-support-for-PLX-Technology-OX810SE/20160309-183154
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: um-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=um 
 
-Sorry for the noise,
-Jan
+All warnings (new ones prefixed by >>):
 
-> By all means:
-> 
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
-> Cc: <stable@vger.kernel.org> # 4.2+
-> 
-> Arnd, would you be still able to pick it up in this cycle?
-> 
-> Thanks Both!
-> 
-> Pawe?
+warning: (ST_IRQCHIP && HIP04_ETH && STMMAC_PLATFORM && DWMAC_IPQ806X && DWMAC_LPC18XX && DWMAC_ROCKCHIP && DWMAC_SOCFPGA && DWMAC_STI && TI_CPSW && PINCTRL_OXNAS && PINCTRL_ROCKCHIP && PINCTRL_DOVE && POWER_RESET_KEYSTONE && POWER_RESET_SYSCON && POWER_RESET_SYSCON_POWEROFF && S3C2410_WATCHDOG && VIDEO_OMAP3 && VIDEO_S5P_FIMC && USB_XHCI_MTK && RTC_DRV_AT91SAM9 && LPC18XX_DMAMUX && VIDEO_OMAP4 && COMMON_CLK_OXNAS && HWSPINLOCK_QCOM && ATMEL_ST && QCOM_GSBI && PHY_HI6220_USB) selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 17787 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160310/26c3135c/attachment.obj>
