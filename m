@@ -1,50 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 10 Mar 2016 12:44:50 -0500 (EST)
-Subject: [PATCH 1/2] net: thunderx: Set recevie buffer page usage count
- in bulk
-In-Reply-To: <CA+sq2Cc44v_ggy=QLOX_FGt6uTv3Qo1KmqCeZ8=3G1COuWxAHw@mail.gmail.com>
-References: <20160307.120410.1851177945150642006.davem@davemloft.net>
- <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
- <CA+sq2Cc44v_ggy=QLOX_FGt6uTv3Qo1KmqCeZ8=3G1COuWxAHw@mail.gmail.com>
-Message-ID: <20160310.124450.278421705870462421.davem@davemloft.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 10 Mar 2016 18:54:38 +0100
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <CAD=FV=W3KPf8tyMviVNB9=HjefMdP+FBbN01Zhh7RKH+gkj2WQ@mail.gmail.com>
+References: <20160203145337.GD9650@ulmo>
+ <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
+ <20160222175929.GA23899@ulmo>
+ <CAD=FV=UCErW3EjYRtwt49_ztNR7cyY4U0o4R_dxdomer-Ac2Dg@mail.gmail.com>
+ <20160223143859.GA27656@ulmo>
+ <CAD=FV=UvxG3MYD4MKQJqN7W68uMjd-s+FH-e8tkrLCpS0RLmZQ@mail.gmail.com>
+ <20160223181448.GA14754@ulmo.nvidia.com>
+ <CAD=FV=VM3cOQ0HqwLANBw9MVBCyFTrSyPe_dGzgPucuMUEWRKA@mail.gmail.com>
+ <CAD=FV=VckTVD8b1g+f0G2kMeoTjvY0pAGhoDnWQN_dAmqSxBxg@mail.gmail.com>
+ <CAD=FV=W3KPf8tyMviVNB9=HjefMdP+FBbN01Zhh7RKH+gkj2WQ@mail.gmail.com>
+Message-ID: <20160310175438.GA5648@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
-Date: Thu, 10 Mar 2016 16:13:28 +0530
+On Mon, Mar 07, 2016 at 08:34:19AM -0800, Doug Anderson wrote:
+> Thierry,
+> 
+> On Thu, Feb 25, 2016 at 3:14 PM, Doug Anderson <dianders@google.com> wrote:
+> > So just to summarize:
+> >
+> > * Add pwm_get_state(), pwm_apply_state(), pwm_get_args().
+> > pwm_get_state() initially returns 0 for duty cycle if driver doesn't
+> > support readout.
+> >
+> > * Re-implement pwm_get_period() (and maybe other similar functions)
+> > atop pwm_get_state() as you describe earlier in the thread.
+> >
+> > * Document pwm_get_period() (and maybe other similar functions) as deprecated.
+> >
+> > * Fix drivers for all current 2 users of PWM regulator to support
+> > hardware readout.
+> >
+> > * Update PWM regulator as you described earlier in the thread (Feb 23).
+> >
+> > * If PWM regulator is ever used on a new board whose PWM doesn't
+> > support hardware readout, the voltage will change at probe time.
+> >
+> >
+> > Did I get all that right?  Thanks!
+> 
+> Can you provide a "yes, you got that right" or a "no, you didn't
+> understand"?  That will unblock Boris, I think.
 
-> Hi David,
-> 
-> 
->>> So if you know ahead of time how the page will be split up, just
->>> calculate that when you get the page and increment the page count
->>> appropriately.
->>>
->>> That's what we do in the NIU driver.
->>
->> Thanks for the suggestion, will check and get back.
->>
-> 
-> I looked at the NIU driver and in fn() niu_rbr_refill()
-> static void niu_rbr_refill(struct niu *np, struct rx_ring_info *rp, gfp_t mask)
-> {
->         int index = rp->rbr_index;
-> 
->         rp->rbr_pending++;
->         if ((rp->rbr_pending % rp->rbr_blocks_per_page) == 0) {
-> 
-> Here it's been checked whether rbr_pending is a exact multiple of page
-> split count.
-> And hence updating page count based on fixed calculation is right.
-> 
-> On my platform driver receives a interrupt when free buffer count
-> falls below a threshold
-> and by the time SW reads count of buffers to be refilled it can be any
-> number i.e
-> may or may not be a exact multiple of page split count.
+Sounds about right. Hopefully this will eliminate any objections that
+others had about the series.
 
-So calculate the modulus on the page split count and optimize the
-increment ahead of time when possible, and for the sub page split
-pieces do it one at a time.
-
-I don't understand what the problem is.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160310/bd595f8a/attachment.sig>
