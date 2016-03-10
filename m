@@ -1,30 +1,40 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Thu, 10 Mar 2016 23:57:48 +0530
-Subject: [PATCH 1/2] net: thunderx: Set recevie buffer page usage count in
- bulk
-In-Reply-To: <20160310.124450.278421705870462421.davem@davemloft.net>
-References: <20160307.120410.1851177945150642006.davem@davemloft.net>
- <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
- <CA+sq2Cc44v_ggy=QLOX_FGt6uTv3Qo1KmqCeZ8=3G1COuWxAHw@mail.gmail.com>
- <20160310.124450.278421705870462421.davem@davemloft.net>
-Message-ID: <CA+sq2CeMQMnmGPUWoLrtPzGiJpvNTsR_WmQzQr5wFVC9b3LU-w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Mar 2016 18:39:51 +0000
+Subject: [PATCH] arm64: Fix the ptep_set_wrprotect() to set PTE_DIRTY if
+ (PTE_DBM && !PTE_RDONLY)
+In-Reply-To: <CAFpQJXVy-FafeU+Uq40_27ZauDN6ziYtGugUBiWJ8eHGOwkCfQ@mail.gmail.com>
+References: <1457499768-31176-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <20160309100605.GJ6192@e104818-lin.cambridge.arm.com>
+ <CAFpQJXUaXYkVNCc1OjLxCmpKu6b26LOaMv0V9XYRn7pLAGk2SQ@mail.gmail.com>
+ <20160309160352.GM6192@e104818-lin.cambridge.arm.com>
+ <CAFpQJXVkjgpTaftiA7uK-GknoZXP+fP0pTX1ajZk6wfjovDwCw@mail.gmail.com>
+ <CAFpQJXVy-FafeU+Uq40_27ZauDN6ziYtGugUBiWJ8eHGOwkCfQ@mail.gmail.com>
+Message-ID: <20160310183951.GA2804@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 10, 2016 at 08:34:46AM +0530, Ganapatrao Kulkarni wrote:
+> > On Wed, Mar 9, 2016 at 9:33 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> >> index 7c73b365fcfa..b409a983f870 100644
+> >> --- a/arch/arm64/include/asm/pgtable.h
+> >> +++ b/arch/arm64/include/asm/pgtable.h
+> >> @@ -201,7 +201,7 @@ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
+> >>  static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+> >>                               pte_t *ptep, pte_t pte)
+> >>  {
+> >> -       if (pte_valid(pte)) {
+> >> +       if (pte_present(pte)) {
+> >>                 if (pte_sw_dirty(pte) && pte_write(pte))
+> >>                         pte_val(pte) &= ~PTE_RDONLY;
+> >>                 else
 >
-> So calculate the modulus on the page split count and optimize the
-> increment ahead of time when possible, and for the sub page split
-> pieces do it one at a time.
->
-Patch does almost the same with a negligible overhead of a counter
-for page->_count increment at a later time but still before HW starts
-using buffers.
-Difference between NIU driver and this patch is there it's
-calculate split count, increment page count and then divide page into
-buffers. Here it's divide page into buffers, have a counter which increments
-at every split and then at the end do a atomic increment of page->_count.
+> this diff works for me.
+> 
+> Tested-by: Ganapatrao Kulkarni <gkulkarni@cavium.com>
 
-Any issue with this approach ?
+Thanks. I'll push it out during the merging window and cc stable (though
+it needs a slightly different workaround for 4.4 anyway).
 
-Thanks,
-Sunil.
+-- 
+Catalin
