@@ -1,69 +1,87 @@
 From: chauveau.julien@gmail.com (Julien Chauveau)
-Date: Fri, 11 Mar 2016 00:08:56 +0100
-Subject: [PATCH RESEND] Documentation: devicetree: Clean up gpio-keys
- example
-In-Reply-To: <56DEA4D6.10008@suse.de>
-References: <1457375055-5544-1-git-send-email-afaerber@suse.de>
- <CAMuHMdVMVYaygvKd3qgTz2fF9SuLA_zEYRoZZrJO+2zmP=jxag@mail.gmail.com>
- <56DEA4D6.10008@suse.de>
-Message-ID: <A62AD22E-ECB3-4DC7-8156-22BC84795412@gmail.com>
+Date: Fri, 11 Mar 2016 00:09:04 +0100
+Subject: [PATCH v3 6/8] arm64: dts: rockchip: Add power key to GeekBox
+In-Reply-To: <1457294038-14243-7-git-send-email-afaerber@suse.de>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <1457294038-14243-7-git-send-email-afaerber@suse.de>
+Message-ID: <BE473E87-8B7E-4F30-B715-680D869C4D0C@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> Le 8 mars 2016 ? 11:09, Andreas F?rber <afaerber@suse.de> a ?crit :
+> Le 6 mars 2016 ? 20:53, Andreas F?rber <afaerber@suse.de> a ?crit :
 > 
-> Am 08.03.2016 um 09:54 schrieb Geert Uytterhoeven:
->> On Mon, Mar 7, 2016 at 7:24 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>> Drop #address-cells and #size-cells, which are not required by the
->>> gpio-keys binding documentation, as button sub-nodes are not devices.
->>> 
->>> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>> Documentation/devicetree/bindings/input/gpio-keys.txt | 2 --
->>> 1 file changed, 2 deletions(-)
->>> 
->>> diff --git a/Documentation/devicetree/bindings/input/gpio-keys.txt b/Documentation/devicetree/bindings/input/gpio-keys.txt
->>> index 21641236c095..1552a11f6786 100644
->>> --- a/Documentation/devicetree/bindings/input/gpio-keys.txt
->>> +++ b/Documentation/devicetree/bindings/input/gpio-keys.txt
->>> @@ -34,8 +34,6 @@ Example nodes:
->>> 
->>>        gpio_keys {
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+> v2 -> v3:
+> * Adopted wakeup-source instead of gpio-key,wakeup (Julien)
+> * Dropped gpio-keys #address-cells and #size-cells properties (Julien)
+> * Dropped power button reg property (Julien)
+> * Adopted KEY_POWER (Julien)
+> * Fixed power button pinctrl pull setting (Julien)
 > 
-> While at it, I was told the preferred node naming would be dashes, not
-> underscores. The deeper we dig, the more we find.
-
-I agree, here we should use dashes, not underscores. So "gpio-keys" instead of "gpio_keys".
-
+> v2: New
 > 
->>>                        compatible = "gpio-keys";
->>> -                       #address-cells = <1>;
->>> -                       #size-cells = <0>;
->>>                        autorepeat;
+> arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 20 ++++++++++++++++++++
+> 1 file changed, 20 insertions(+)
 > 
-> Also a white line here may be optically more pleasant.
-
-I agree.
-
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> index 098be3700a6f..7036b49c9206 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> @@ -42,6 +42,7 @@
 > 
->>>                        button at 21 {
->> 
->> FYI, with "[PATCH] scripts/dtc: Update to upstream version 53bf130b1cdd":
->> (http://www.spinics.net/lists/devicetree/msg117206.html) applied:
->> 
->> Warning (unit_address_vs_reg): Node /keyboard/button at 21 has a unit
->> name, but no reg property
+> /dts-v1/;
+> #include "rk3368.dtsi"
+> +#include <dt-bindings/input/input.h>
 > 
-> My v2 GeekBox patch did have *-cells and a reg property, but Julien
-> asked I drop that: https://patchwork.kernel.org/patch/8246481/
+> / {
+> 	model = "GeekBox";
+> @@ -70,6 +71,19 @@
+> 		pinctrl-0 = <&ir_int>;
+> 	};
 > 
-> Are you suggesting we should add a reg property here and drop this patch
-> or go with this patch but follow up to not use @21?
+> +	keys: gpio-keys {
 
-I may be wrong but I think that if the unit-address has no meaning and is not used, then it should be removed.
+I think you don't need the "keys" label, because there?s no phandle that refers to this.
 
-By the way, I think the warning message is wrong. It should be _address_ instead of name: "Node has a unit address, but no reg property".
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pwr_key>;
+> +
+> +		button at 0 {
 
-Julien
+Here you should use "power" instead of "button at 0".
+
+> +			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+> +			label = "GPIO Power";
+> +			linux,code = <KEY_POWER>;
+
+According to Documentation/input/event-codes.txt, there?s a special event type for the power button.
+Should we use it here for that purpose?
+
+			linux,input-type = <EV_PWR>
+
+> +			wakeup-source;
+> +		};
+> +	};
+> +
+> 	leds: gpio-leds {
+> 		compatible = "gpio-leds";
+> 
+> @@ -265,6 +279,12 @@
+> 		};
+> 	};
+> 
+> +	keys {
+> +		pwr_key: pwr-key {
+> +			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +
+> 	pmic {
+> 		pmic_sleep: pmic-sleep {
+> 			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
+> -- 
+> 2.6.2
+> 
