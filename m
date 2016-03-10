@@ -1,62 +1,72 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 10 Mar 2016 14:43:25 +0100
-Subject: [PATCH 00/30] ARM: dts: r8a779[0-4]: Reference both DMA
- controllers
-In-Reply-To: <CAMuHMdXF4FMLg=Y_cZ2chjzGWAV90N=vLsCkPKGmmYx5mFY64Q@mail.gmail.com>
-References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <CAMuHMdXF4FMLg=Y_cZ2chjzGWAV90N=vLsCkPKGmmYx5mFY64Q@mail.gmail.com>
-Message-ID: <20160310134325.GA1111@bigcity.dyn.berto.se>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 10 Mar 2016 22:18:28 +0800
+Subject: [PATCH 1/2] iommu/io-pgtable: Add MTK 4GB mode in Short-descriptor
+In-Reply-To: <56D6DD2E.4030207@arm.com>
+References: <1456268552-16635-1-git-send-email-yong.wu@mediatek.com>
+ <1456268552-16635-2-git-send-email-yong.wu@mediatek.com>
+ <56D6DD2E.4030207@arm.com>
+Message-ID: <1457619508.14539.40.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On 2016-03-10 13:20:56 +0100, Geert Uytterhoeven wrote:
-> Hi Niklas,
+On Wed, 2016-03-02 at 12:31 +0000, Robin Murphy wrote:
+> Hi Yong,
 > 
-> On Thu, Mar 10, 2016 at 12:35 PM, Niklas S?derlund
-> <niklas.soderlund+renesas@ragnatech.se> wrote:
-> > R-Car Gen2 have two DMA controllers, which are equivalent. However DMA
-> > slaves were tied only to a single DMA controller in .dtsi. This series
-> > add references to to both DMA controllers for all nodes that previously
-> > only referenced one of them. It also adds dma references to the SDHI
-> > nodes for r8a7794 which according to the datasheet should work but I
-> > have not access to HW to verify.
+> On 23/02/16 23:02, Yong Wu wrote:
+> > Mediatek extend bit9 in the lvl1 and lvl2 pgtable descriptor of the
+> > Short-descriptor as the 4GB mode in which the dram size will be
+> > over 4GB.
 > >
-> > Tested on Koelsch (r8a7791) by altering the compatible value of either
-> > dmac0 or dmac1 and verifying that the DMA slaves pick the DMA controller
-> > that is instantiated.
+> > We add a special quirk for this MTK-4GB mode, And in the standard
+> > spec, Bit9 in the lvl1 is "IMPLEMENTATION DEFINED", while it's AP[2]
+> > in the lvl2, therefore if this quirk is enabled, NO_PERMS is also
+> > expected.
 > 
-> Thanks for your series!
+> Would you be able to explain exactly what this "4GB mode" actually is? 
+> I've been trying to make sense of it from the original M4U patches and 
+> the patch for the I2C driver, but it has me completely baffled.
 > 
-> If you fix the subject of patch 30:
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Is it simply used as an extra physical address bit (although surely that 
+> would make it "8GB mode"?), or does it do something crazier like 
+> toggling an interconnect remap that shifts the output addresses up by 
+> 1GB to be relative to the base of DRAM, like a dma_pfn_offset?
 
-Thanks for your review and that you found my error in the subject.
+Unfortunately, it is somewhat more crazier than that. Let me have a
+short brief on what we got.
 
-> 
-> I guess this is against v4.5-rc7? It doesn't apply against
-> renesas-devel-20160308-v4.5-rc7.
-> Unfortunately you'll have to rebase against Simon's tree, and add scif2
-> on r8a7790, and i2c[6-8] on r8a7793.
+Normally, mt8173 memory map looks like this:
 
-I will rebase and update the relevant patches to include the additions 
-to r8a7790 and r8a7793.
+Physical addr
+---------
+| 1st GB |    ->  HW SRAM and Regs
+|--------
+| 2nd GB |    ->  DRAM 1st GB
+|--------
+| 3rd GB |    ->  DRAM 2nd GB
+|--------
+| 4th GB |    ->  DRAM 3rd GB
+|--------
 
-> 
-> Hint for the other reviewers: use the --color-words option of git diff/show.
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+On mt8173, we have a "DRAM 4GB mode" toggle bit. If it is enabled, from
+CPU's point of view, the dram will be shifted to start from PA
+0x1_00000000. The PA 0x40000000~0xffffffff will become an alias to
+0x1_40000000~0x1_ffffffff.
 
--- 
-Regards,
-Niklas S?derlund
+Many HW only support 32bits physical address, the 33bit will be added to
+PA when 4GB mode is enabled. This looks like dma_pfn_offset you
+mentioned.
+
+Some others, like i2c or audio, support 33bits physical address, mostly
+because they support DMA to/from SRAM with the same SW interface. When
+4GB mode is enabled, these HW can still access DRAM with aliased dram
+address (0x40000000 ~ 0xffffffff)
+
+The MTK M4U(iommu) is another case. It did add 33 bits to page table
+entries and registers. Unfortunately, when 4GB mode is enabled, 33bit
+must be 1. It treats all PA < 0x1_0000_0000 as invalid address. That's
+why we always set the 33bit when 4GB mode is enabled in this patch.
+
+And there are other HWs with even crazier remap rule, but that's another
+story...
+
+Joe.C
