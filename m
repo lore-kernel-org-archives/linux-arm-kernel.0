@@ -1,122 +1,93 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 10 Mar 2016 08:34:46 +0530
-Subject: [PATCH] arm64: Fix the ptep_set_wrprotect() to set PTE_DIRTY if
- (PTE_DBM && !PTE_RDONLY)
-In-Reply-To: <CAFpQJXVkjgpTaftiA7uK-GknoZXP+fP0pTX1ajZk6wfjovDwCw@mail.gmail.com>
-References: <1457499768-31176-1-git-send-email-gkulkarni@caviumnetworks.com>
- <20160309100605.GJ6192@e104818-lin.cambridge.arm.com>
- <CAFpQJXUaXYkVNCc1OjLxCmpKu6b26LOaMv0V9XYRn7pLAGk2SQ@mail.gmail.com>
- <20160309160352.GM6192@e104818-lin.cambridge.arm.com>
- <CAFpQJXVkjgpTaftiA7uK-GknoZXP+fP0pTX1ajZk6wfjovDwCw@mail.gmail.com>
-Message-ID: <CAFpQJXVy-FafeU+Uq40_27ZauDN6ziYtGugUBiWJ8eHGOwkCfQ@mail.gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Thu, 10 Mar 2016 11:25:34 +0800
+Subject: [PATCH v3 5/7] clk: rockchip: add new pll-type for rk3399 and
+ similar socs
+In-Reply-To: <2688473.EyteJL2oqe@diego>
+References: <1457491027-30936-1-git-send-email-zhengxing@rock-chips.com>
+ <1457491378-31077-1-git-send-email-zhengxing@rock-chips.com>
+ <2688473.EyteJL2oqe@diego>
+Message-ID: <56E0E92E.7000206@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 9, 2016 at 11:13 PM, Ganapatrao Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> On Wed, Mar 9, 2016 at 9:33 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Wed, Mar 09, 2016 at 05:17:39PM +0530, Ganapatrao Kulkarni wrote:
->>> On Wed, Mar 9, 2016 at 3:36 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>> > On Wed, Mar 09, 2016 at 10:32:48AM +0530, Ganapatrao Kulkarni wrote:
->>> >> Commit 2f4b829c625e ("arm64: Add support for hardware updates of the
->>> >> access and dirty pte bits") introduced support for handling hardware
->>> >> updates of the access flag and dirty status.
->>> >>
->>> >> ptep_set_wrprotect is setting PTR_DIRTY if !PTE_RDONLY,
->>> >> however by design it suppose to set PTE_DIRTY
->>> >> only if (PTE_DBM && !PTE_RDONLY). This patch addes code to
->>> >> test and set accordingly.
->>> >
->>> > The reasoning behind the original code is that if !PTE_RDONLY, you have
->>> > no way to tell whether the page was written or not since it is already
->>> > writable, independent of the DBM. So by clearing the DBM bit (making the
->>> > page read-only), we need to ensure that a potential dirty state is
->>> > transferred to the software PTE_DIRTY bit.
->>> >
->>> > By checking PTE_DBM && !PTE_RDONLY, you kind of imply that you can have
->>> > a page with !PTE_DBM && !PTE_RDONLY. Given that PTE_DBM is actually
->>> > PTE_WRITE, PTE_RDONLY must always be set when !PTE_DBM. The bug may be
->>> > elsewhere not setting these bits correctly.
->>>
->>> but i do see this macro,
->>> #define pte_hw_dirty(pte)       (pte_write(pte) && !(pte_val(pte) & PTE_RDONLY))
->>
->> This was added in commit b847415ce96e ("arm64: Fix the pte_hw_dirty()
->> check when AF/DBM is enabled") for the pte_modify() case which is not
->> called on the actual PTE but a local variable. A pte passed to this
->> function as !PTE_DBM && !PTE_RDONLY should not be assumed dirty since
->> PTE_RDONLY will be set later by set_pte_at() when the actual page table
->> write occurs.
->>
->> ptep_set_wrprotect() is run directly on the actual PTE, so here a
->> !PTE_RDONLY only means potentially dirty, independent of the PTE_DBM
->> bit. I consider the additional PTE_DBM check superfluous in this case
->> but we need to understand when we would actually get a pte with both
->> PTE_DBM and PTE_RDONLY cleared.
->>
->> The only way I see this happening is if the pte doesn't have PTE_VALID
->> set, IOW it probably has PTE_PROT_NONE set which is used by the NUMA
->> balancing. So calling set_pte_at() on a !PTE_VALID && !PTE_DBM pte does
->> not currently set PTE_RDONLY and ptep_set_wrprotect() wrongly assumes it
->> is dirty.
->>
->>> i dont see this issue, if i comment out arm64 implementation of
->>> ptep_set_wrprotect()
->>
->> Because the default implementation discards any existing hw dirty
->> information by clearing the PTE_DBM bit and setting PTE_RDONLY via the
->> set_pte_at (of course, apart from the atomicity issues).
->>
->>> >> This patch fixes BUG,
->>> >> kernel BUG at /build/linux-StrpB2/linux-4.4.0/fs/ext4/inode.c:2394!
->>> >> Internal error: Oops - BUG: 0 [#1] SMP
->>> >
->>> > Which bug is this? It's a PageWriteback() check in the for-next/core
->>> > branch. What kernel version are you using?
->>>
->>> i am using 4.4.0
->>
->> I guess with additional NUMA patches since it only fails when you enable
->> the NUMA_BALANCING configuration.
->>
->>> > BTW, in 4.5-rc2 we pushed commit ac15bd63bbb2 ("arm64: Honour !PTE_WRITE
->>> > in set_pte_at() for kernel mappings"), though not sure that's what you
->>> > are hitting.
->>>
->>> i have tried this patch, but issue still exist. crash log below
->>>
->>> root at ubuntu:/home/ganapat/test# [  733.853009] kernel BUG at
->>> fs/ext4/inode.c:2394!
->>
->> Is this the BUG_ON in page_buffers(!PagePrivate(page))? I can see in the
->> code above this that wrongly marking a page as dirty could have some
->> side effects.
->>
->> Can you give this patch a try, on top of commit ac15bd63bbb2?
->
-> thanks, this fixes the issue, i have tried making pte_valid same as pte_present
-> however, i have overlooked that set_pte_at is using pte_valid_user(in 4.4)
->
->
->>
->> -------------8<----------------------
->>
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index 7c73b365fcfa..b409a983f870 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -201,7 +201,7 @@ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
->>  static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
->>                               pte_t *ptep, pte_t pte)
->>  {
->> -       if (pte_valid(pte)) {
->> +       if (pte_present(pte)) {
->>                 if (pte_sw_dirty(pte) && pte_write(pte))
->>                         pte_val(pte) &= ~PTE_RDONLY;
->>                 else
->
-this diff works for me.
+Hi Heiko,
 
-Tested-by: Ganapatrao Kulkarni <gkulkarni@cavium.com>
+On 2016?03?09? 20:29, Heiko St?bner wrote:
+> Hi Xing,
+>
+> Am Mittwoch, 9. M?rz 2016, 10:42:58 schrieb Xing Zheng:
+>> The rk3399's pll and clock are similar with rk3036's, it different
+>> with base on the rk3066(rk3188, rk3288, rk3368 use it), there are
+>> different adjust foctors and control registers, so these should be
+>> independent and separate from the series of rk3066s.
+>>
+>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>> ---
+>>
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>   drivers/clk/rockchip/clk-pll.c |  279
+>> +++++++++++++++++++++++++++++++++++++++- drivers/clk/rockchip/clk.h     |
+>>   3 +-
+>>   2 files changed, 280 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
+>> index 27be66a..62d2f0e 100644
+>> --- a/drivers/clk/rockchip/clk-pll.c
+>> +++ b/drivers/clk/rockchip/clk-pll.c
+>> @@ -593,6 +593,275 @@ static const struct clk_ops
+>> rockchip_rk3066_pll_clk_ops = { .init = rockchip_rk3066_pll_init,
+>>   };
+>>
+>> +/**
+>> + * PLL used in RK3399
+>> + */
+>> +
+>> +#define RK3399_PLLCON(i)			(i * 0x4)
+>> +#define RK3399_PLLCON0_FBDIV_MASK		0xfff
+>> +#define RK3399_PLLCON0_FBDIV_SHIFT		0
+>> +#define RK3399_PLLCON1_REFDIV_MASK		0x3f
+>> +#define RK3399_PLLCON1_REFDIV_SHIFT		0
+>> +#define RK3399_PLLCON1_POSTDIV1_MASK		0x7
+>> +#define RK3399_PLLCON1_POSTDIV1_SHIFT		8
+>> +#define RK3399_PLLCON1_POSTDIV2_MASK		0x7
+>> +#define RK3399_PLLCON1_POSTDIV2_SHIFT		12
+>> +#define RK3399_PLLCON2_FRAC_MASK		0xffffff
+>> +#define RK3399_PLLCON2_FRAC_SHIFT		0
+> please move RK3399_PLLCON2_LOCK_STATUS here
+Done.
+>> +#define RK3399_PLLCON3_DSMPD_MASK		0x1
+>> +#define RK3399_PLLCON3_DSMPD_SHIFT		12
+> DSMPD_SHIFT should be 3, right?
+Yes, I'm sorry to careless.
+>
+>> +
+>> +#define RK3399_PLLCON2_LOCK_STATUS		(31 << 0)
+> that is wrong, you want (1 << 31), or even better BIT(31) here
+Yes, done.
+>
+>> +#define RK3399_PLLCON3_PWRDOWN			(1 << 0)
+> dito, BIT(0) please
+Done.
+>> +static int rockchip_rk3399_pll_set_rate(struct clk_hw *hw, unsigned long
+>> drate, +					unsigned long prate)
+>> +{
+>> +	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
+>> +	const struct rockchip_pll_rate_table *rate;
+>> +	unsigned long old_rate = rockchip_rk3399_pll_recalc_rate(hw, prate);
+>> +	struct regmap *grf = rockchip_clk_get_grf(pll->ctx);
+>> +
+>> +	if (IS_ERR(grf)) {
+>> +		pr_debug("%s: grf regmap not available, aborting rate change\n",
+>> +			 __func__);
+>> +		return PTR_ERR(grf);
+>> +	}
+> the pll lock-status moved to the pll registers it seems, so you don't need to
+> get the GRF here at all, as we don't need it for the lock status.
+Yes, done.
 
-> Ganapat
+Thanks.
+
+-- 
+- Xing Zheng
