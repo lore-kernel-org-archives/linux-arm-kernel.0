@@ -1,110 +1,75 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 10 Mar 2016 16:47:14 +0900
-Subject: [PATCH 2/3] iommu/dma: Use correct offset in map_sg
-In-Reply-To: <56E03A83.9050909@arm.com>
-References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
- <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
- <CANqRtoSHa1fzQge4ntK9Jt_XFiL0AKWtUti93-cwS-aOkJQcjg@mail.gmail.com>
- <56E03A83.9050909@arm.com>
-Message-ID: <CANqRtoQJcYaUXDrA8aDzaEEfVr6dh=guvUWQqjPcuuC8VKxxXg@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 10 Mar 2016 14:57:02 +0700
+Subject: BUG in HugeTLBFS with Contiguous hint
+In-Reply-To: <56E048E6.9030508@mellanox.com>
+References: <20160309021252.GA4573@linaro.org> <20160309153131.GF28496@arm.com>
+ <56E048E6.9030508@mellanox.com>
+Message-ID: <CAPvkgC1Oe=AiDDwSO_38bz_7FPwg3XoHK_Tts_UPorexkgFnhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi,
+Replying to both inline below:
 
-On Thu, Mar 10, 2016 at 12:00 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Magnus,
->
-> Thanks for bringing this up...
+On 9 March 2016 at 23:01, David Woods <dwoods@mellanox.com> wrote:
+> On 03/09/2016 10:31 AM, Will Deacon wrote:
+>>
+>> On Wed, Mar 09, 2016 at 02:12:56AM +0000, Steve Capper wrote:
+>>>
+>>> Hi,
+>>
+>> Hi Steve,
+>>
+>>> I am very sorry for the very late bug report. I have just come across
+>>> this error.
+>>>
+>>> Whilst testing something else, I found that 2MB HugeTLB pages formed
+>>> from contiguous pte's cause BUGs to appear when running through the
+>>> libhugetlbfs test suite.
+>>
+>> Ouch. Any idea why this wasn't spotted earlier? Did something else
+>> change?
 
-No worries!
+Sorry, no. A lot of stuff has changed (and I need to double check my
+.config too). I will be able to dig into this in more detail when I
+get back in the office next week (I have a painfully slow internet
+connection to my devboard at the moment).
 
-> On 09/03/16 07:50, Magnus Damm wrote:
->>
->> On Sat, Dec 19, 2015 at 2:01 AM, Robin Murphy <robin.murphy@arm.com>
->> wrote:
->>>
->>> When mapping a non-page-aligned scatterlist entry, we copy the original
->>> offset to the output DMA address before aligning it to hand off to
->>> iommu_map_sg(), then later adding the IOVA page address portion to get
->>> the final mapped address. However, when the IOVA page size is smaller
->>> than the CPU page size, it is the offset within the IOVA page we want,
->>> not that within the CPU page, which can easily be larger than an IOVA
->>> page and thus result in an incorrect final address.
->>>
->>> Fix the bug by taking only the IOVA-aligned part of the offset as the
->>> basis of the DMA address, not the whole thing.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>   drivers/iommu/dma-iommu.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->>> index 982e716..03811e3 100644
->>> --- a/drivers/iommu/dma-iommu.c
->>> +++ b/drivers/iommu/dma-iommu.c
->>> @@ -458,7 +458,7 @@ int iommu_dma_map_sg(struct device *dev, struct
->>> scatterlist *sg,
->>>                  size_t s_length = s->length;
->>>                  size_t pad_len = (mask - iova_len + 1) & mask;
->>>
->>> -               sg_dma_address(s) = s->offset;
->>> +               sg_dma_address(s) = s_offset;
->>>                  sg_dma_len(s) = s_length;
->>>                  s->offset -= s_offset;
->>>                  s_length = iova_align(iovad, s_length + s_offset);
->>> --
->>> 1.9.1
->>
->>
->> Hi Robin,
->>
->> Thanks a lot for your fix! While I don't have any doubt that your
->> patch fixes a real issue I wonder if another update is needed.
->> Depending on what is expected perhaps just the comment above the code
->> wants an update or maybe the "un-swizzling" needs more work. With this
->> patch applied the code looks semi-complete to me at this point.
->>
->> Currently the comment just above the hunk says:
->>
->>      /*
->>       * Work out how much IOVA space we need, and align the segments to
->>       * IOVA granules for the IOMMU driver to handle. With some clever
->>       * trickery we can modify the list in-place, but reversibly, by
->>       * hiding the original data in the as-yet-unused DMA fields.
->>       */
->>
->> With your fix the "original data" is no longer stored in the unused
->> DMA fields.
 >
 >
-> OK, so we're now  moving some of the data rather than taking a literal copy,
-> but the point remains that we're not throwing any information away - we can
-> move the remainder back again if necessary. As far as I'm concerned the
-> comment is still valid, but if it's open to misinterpretation I can try
-> rephrasing it.
-
-Thanks, I agree with you about the comment! As long as the fields can
-be restored everything is fine.
-
->> Instead the s_offset value is stored as modified in
->> sg_dma_address() which in turn will make the iommu_dma_map_sg()
->> function return with modified sg->s_offset both on success and
->> failure.
+> I'm reasonably sure that I ran that same test before pushing this patch.
+> That was with the arm64-next tree which was at 4.4-rc3 at the time.  It's
+> possible there's been some regression since then.  I can check on that.
+>>>
+>>> I have been digging into this and I think the problem is due to the
+>>> huge pages not being unmapped properly (the nature of the bugs is that
+>>> compound pages have a non-negative compound mapped count, thus appear
+>>> as mapped in the hugetlbfs inode destruction logic); but I have not
+>>> yet been able to convincingly isolate the problem.
+>>>
+>>> I ran with 64KB PAGE_SIZE and CONFIG_DEBUG_VM. Failure mode at the
+>>> bottom of this email for a 4.5-rc7 kernel.
+>
+>
+> I did run into this same BUG during my testing.  The cause that time was a
+> bug in huge_ptep_get_and_clear().  It was clearing PTEs beyond the ncontig
+> that it was supposed to.  The logic in remove_inode_hugepages got confused
+> when it found those victim PTEs already zeroed out.  That bug was fixed of
+> course, but maybe something similar is happening now.
+>
+>> A revert is certainly the easiest option, but it also seems unfortunate.
 >>
->> Perhaps this is intentional design, or maybe __invalidate_sg() and
->> __finalize_sg() both need to support roll back? Any ideas?
+>> Maybe something like the patch below instead? It can be reverted as soon
+>> as this is worked out. Can you confirm that this avoids the BUG?
 >
 >
-> What's missing is that some idiot forgot about the hard-to-exercise failure
-> path and didn't update __invalidate_sg() to match. I'll get right on that...
+> I haven't tested it, but your patch looks reasonable to me.
 
-Oh well. Fixing the error case sounds good. I don't have any special
-test case to trigger anything, so testing is a bit difficult for me.
-Apart from that I'm happy to help - let me know if you can think of
-something.
+The fix looks reasonable to me too. I've given it a test on both 64KB
+granule (only 512MB huge pages appeared as expected) and 4KB granule
+(libhugetlbfs passed all tests for 2MB huge pages which were the only
+ones to appear - as expected).
 
 Cheers,
-
-/ magnus
+--
+Steve
