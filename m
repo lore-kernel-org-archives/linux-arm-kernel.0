@@ -1,39 +1,49 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Thu, 10 Mar 2016 13:42:37 +0200
-Subject: [PATCH 2/6] usb: xhci-mtk: use __maybe_unused to hide pm functions
-In-Reply-To: <56D9B8EE.3060107@gmail.com>
-References: <1456932255-71725-1-git-send-email-arnd@arndb.de>
- <1456932255-71725-3-git-send-email-arnd@arndb.de>
- <56D9B8EE.3060107@gmail.com>
-Message-ID: <56E15DAD.3000104@linux.intel.com>
+From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
+Date: Thu, 10 Mar 2016 12:35:56 +0100
+Subject: [PATCH 04/30] ARM: dts: r8a7790: Reference both DMA controllers in
+ SCIF nodes
+In-Reply-To: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1457609782-24108-5-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.03.2016 18:33, Matthias Brugger wrote:
->
->
-> On 02/03/16 16:24, Arnd Bergmann wrote:
->> The mediatek XHCI glue driver uses SET_SYSTEM_SLEEP_PM_OPS() to
->> conditionally set the correct suspend/resume options, and
->> also puts both the dev_pm_ops and the functions inside of
->> an #ifdef testing for CONFIG_PM_SLEEP, but those functions
->> then call other code that becomes unused:
->>
->> drivers/usb/host/xhci-mtk.c:135:12: error: 'xhci_mtk_host_disable' defined but not used [-Werror=unused-function]
->> drivers/usb/host/xhci-mtk.c:313:13: error: 'usb_wakeup_enable' defined but not used [-Werror=unused-function]
->> drivers/usb/host/xhci-mtk.c:321:13: error: 'usb_wakeup_disable' defined but not used [-Werror=unused-function]
->>
->> This replaces the #ifdef with __maybe_unused annotations so the
->> compiler knows it can silently drop them instead of warning.
->>
->> For the DEV_PM_OPS definition, we can use an IS_ENABLED() check
->> to avoid defining the structure when CONFIG_PM is not set without
->> the #ifdef.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->
-> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
->
+R-Car Gen2 have two DMA controllers, which are equivalent. Add
+references to both dmac0 and dmac1 so the driver can fallback to the
+later if the first one is unavailable.
 
-Acked-by: Mathias Nyman <mathias.nyman@linux.intel.com>
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index c8a2f68..164bad25 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -668,8 +668,9 @@
+ 		interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_SCIF0>;
+ 		clock-names = "sci_ick";
+-		dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x29>, <&dmac0 0x2a>,
++		       <&dmac1 0x29>, <&dmac1 0x2a>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -680,8 +681,9 @@
+ 		interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_SCIF1>;
+ 		clock-names = "sci_ick";
+-		dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x2d>, <&dmac0 0x2e>,
++		       <&dmac1 0x2d>, <&dmac1 0x2e>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+-- 
+2.7.2
