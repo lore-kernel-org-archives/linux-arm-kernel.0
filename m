@@ -1,47 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Mar 2016 13:20:56 +0100
-Subject: [PATCH 00/30] ARM: dts: r8a779[0-4]: Reference both DMA
- controllers
-In-Reply-To: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <CAMuHMdXF4FMLg=Y_cZ2chjzGWAV90N=vLsCkPKGmmYx5mFY64Q@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 10 Mar 2016 13:44:26 +0100
+Subject: [PATCH] ARM: mvebu: Fix of_clk_get() call in a non sleeping
+ context
+In-Reply-To: <20160308205050.GN19428@n2100.arm.linux.org.uk> (Russell King's
+ message of "Tue, 8 Mar 2016 20:50:51 +0000")
+References: <1457446733-7137-1-git-send-email-gregory.clement@free-electrons.com>
+ <20160308164117.2a3ed3a7@free-electrons.com>
+ <87a8m93pt0.fsf@free-electrons.com>
+ <20160308173134.22a3ad64@free-electrons.com>
+ <8760wx3oy4.fsf@free-electrons.com>
+ <20160308205050.GN19428@n2100.arm.linux.org.uk>
+Message-ID: <87fuvy33kl.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+Hi Russell King,
+ 
+ On mar., mars 08 2016, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-On Thu, Mar 10, 2016 at 12:35 PM, Niklas S?derlund
-<niklas.soderlund+renesas@ragnatech.se> wrote:
-> R-Car Gen2 have two DMA controllers, which are equivalent. However DMA
-> slaves were tied only to a single DMA controller in .dtsi. This series
-> add references to to both DMA controllers for all nodes that previously
-> only referenced one of them. It also adds dma references to the SDHI
-> nodes for r8a7794 which according to the datasheet should work but I
-> have not access to HW to verify.
+> On Tue, Mar 08, 2016 at 05:38:11PM +0100, Gregory CLEMENT wrote:
+>> And from clk_enable comment we have:
+>> ""
+>> clk_enable must not sleep, which differentiates it from clk_prepare.  In a
+>> simple case, clk_enable can be used instead of clk_prepare to ungate a clk
+>> if the operation will never sleep.
+>> ""
+>> 
+>> Moreoever for me the "must" was to insist to the order of the call no to
+>> the fact that both must be called.
 >
-> Tested on Koelsch (r8a7791) by altering the compatible value of either
-> dmac0 or dmac1 and verifying that the DMA slaves pick the DMA controller
-> that is instantiated.
+> As the author of the clk API, the idea here is that clk_prepare()
+> should always be called _before_ clk_enable() for any clock: in
+> other words, getting a clock and then calling clk_enable() on it
+> is not legal.
+>
+> CCF presently enforces this - clk_enable() without a preceding
+> clk_prepare() will return -ESHUTDOWN.
 
-Thanks for your series!
+Thanks for the clarification, I will work on a alternative solutioin.
 
-If you fix the subject of patch 30:
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Gregory
 
-I guess this is against v4.5-rc7? It doesn't apply against
-renesas-devel-20160308-v4.5-rc7.
-Unfortunately you'll have to rebase against Simon's tree, and add scif2
-on r8a7790, and i2c[6-8] on r8a7793.
+>
+> -- 
+> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
-Hint for the other reviewers: use the --color-words option of git diff/show.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
