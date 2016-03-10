@@ -1,52 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Mar 2016 17:38:54 +0100
-Subject: ARMv4 (not v4t) marked obsolete in gcc-6
-In-Reply-To: <CALT56yPDXkOvwQHngFsLkjgkyGx5HRNj8oddhFjTRdMbv5zvbw@mail.gmail.com>
-References: <201603101013.04618.arnd@arndb.de>
- <CALT56yPDXkOvwQHngFsLkjgkyGx5HRNj8oddhFjTRdMbv5zvbw@mail.gmail.com>
-Message-ID: <201603101738.55060.arnd@arndb.de>
+From: isdn@linux-pingi.de (isdn at linux-pingi.de)
+Date: Thu, 10 Mar 2016 17:41:03 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <1457614704.2478.11.camel@tiscali.nl>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
+ <1457108303.2651.112.camel@tiscali.nl> <56DADA57.9010200@imap.cc>
+ <1457340486.2737.19.camel@tiscali.nl> <56E09F4A.8010202@imap.cc>
+ <56E15211.7080206@linux-pingi.de> <1457614704.2478.11.camel@tiscali.nl>
+Message-ID: <56E1A39F.1010005@linux-pingi.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 March 2016, Dmitry Eremin-Solenikov wrote:
-> 2016-03-10 12:13 GMT+03:00 Arnd Bergmann <arnd@arndb.de>:
-> > I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
-> > so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
-> > we currenly support in the Linux kernel.
-> >
-> > The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
-> > and it will be removed in the following release (gcc-7) one year later, unless someone
-> > raises concerns over it.
+Am 10.03.2016 um 13:58 schrieb Paul Bolle:
+> Hi Karsten,
 > 
-> In which form should we raise concerns? Is it about stepping up as a
-> maintainers, or just
-> about telling them that platforms are used? 
+> On do, 2016-03-10 at 11:53 +0100, isdn at linux-pingi.de wrote:
+>> mISDN with CAPI support works just fine with pppd and pppdcapiplugin
+>> and the CAPI works for all mISDN HW.
+> 
+> In the mainline tree the mISDN and CAPI stacks are effectively separate.
+> Do you perhaps refer to a mISDN + Asterisk + chan-capi setup? (That's
+> the closest to mISDN with CAPI support that I could find. Did I miss
+> something?)
 
+http://listserv.isdn4linux.de/pipermail/isdn4linux/2012-January/005580.html
 
-As I understand it, having someone step up as an active maintainer would leave the
-architecture supported indefinitely, while saying you still need the support
-can at least delay the process a bit. Ramana can probably clarify further
-what the gcc folks are looking for exactly.
+Since 2012 mISDN has a cAPI20 interface, pure in userspace.
+Everything is in the capi20 subdirectory of mISDNuser.
+The capi20 support need to be enabled with ./configure.
 
-> My main concern with
-> limiting ARMv4 platforms
-> to older compilers would be that sooner or later we won't be able to
-> use newer kernels,
-> as the mainline will stop supporting older compilers.
+Has nothing to do with Asterisk, but for FAX it is useing the same DSP
+library, spandsp.
 
-I think we've been doing ok with keeping old compilers working, gcc-4.2 
-from 2007 seems to work fine for the older targets (it misses support for
-some of the armv7 platforms in turn) and in theory we should be able to
-get older ones working with a few patches: according to the README
-file in the kernel, we support gcc-3.2 (from 2002) in theory, but I'm
-running into some trickier problems with some of the older compilers.
-
-It's definitely clear that at some point we will stop supporting gcc-6
-for building the kernel, but I don't know if that's already 2022 or
-only 2038 (when all sort of software breaks).
-
-How long do you think you need for your systems?
-Do you still ship new products, or are these all legacy devices that
-will have a failing battery or flash at some point in the future?
-
-	Arnd
+Best
+Karsten Keil
