@@ -1,15 +1,13 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Mar 2016 13:08:56 +0100
-Subject: [PATCH 30/30] ARM: dts: r8a7794: Reference both DMA controllers
- in QSPI node
-In-Reply-To: <1457609782-24108-31-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Date: Thu, 10 Mar 2016 13:09:41 +0100
+Subject: [PATCH 29/30] ARM: dts: r8a7794: Reference both DMA controllers
+ in SDHI nodes
+In-Reply-To: <1457609782-24108-30-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1457609782-24108-31-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <CAMuHMdW_nMfWF-sQPFgtxmtA_1vxw_hFPsb1DkRp7TJtKrB2ig@mail.gmail.com>
+ <1457609782-24108-30-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <CAMuHMdVEQZXc=nqn7w5YbNOWGX8XevSLm0pRbQ5HF5a+dPqYRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Niklas,
 
 On Thu, Mar 10, 2016 at 12:36 PM, Niklas S?derlund
 <niklas.soderlund+renesas@ragnatech.se> wrote:
@@ -18,20 +16,8 @@ On Thu, Mar 10, 2016 at 12:36 PM, Niklas S?derlund
 > later if the first one is unavailable.
 >
 > Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 76709ff..e098eab 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -605,8 +605,9 @@
->                 reg = <0 0xee200000 0 0x80>;
->                 interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
->                 clocks = <&mstp3_clks R8A7794_CLK_MMCIF0>;
 
-This one has the wrong subject: QSPI vs. MMCIF.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
 
