@@ -1,109 +1,99 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Thu, 10 Mar 2016 09:24:17 +0000
-Subject: [PATCH v3 1/4] mtd:fsl-quadspi:use the property fields of SPI-NOR
-In-Reply-To: <1456988044-37061-1-git-send-email-B56489@freescale.com>
-References: <1456988044-37061-1-git-send-email-B56489@freescale.com>
-Message-ID: <DB5PR0401MB1912C4A7B6FC649CBF4F9E4194B40@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 10 Mar 2016 10:25:53 +0100
+Subject: [PATCH 6/8] efi/arm*: libstub: wire up GOP handling into the ARM
+ UEFI stub
+In-Reply-To: <CAKv+Gu_rtQjWJ-=Nf-dEYEHVB5dwKMA_Mv2rVujBz9t=3qnUrA@mail.gmail.com>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160310082522.GB8618@gmail.com>
+ <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
+ <20160310090345.GA19834@gmail.com>
+ <CAKv+Gu_rtQjWJ-=Nf-dEYEHVB5dwKMA_Mv2rVujBz9t=3qnUrA@mail.gmail.com>
+Message-ID: <20160310092552.GA19588@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
 
-Thanks for your suggestions before.
-Could you help me to review this patch set if you are free?
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Thanks
-Yunhui
+> On 10 March 2016 at 16:03, Ingo Molnar <mingo@kernel.org> wrote:
+> >
+> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >
+> >> > So screen_info_guid should probably not be a 'const': you have to cast it away
+> >> > anyway, adding artificial linebreaks and uglifying the code. It's also a bad
+> >> > practice to cast away const-ness, it hinders move-consts-to-readonly-sections
+> >> > efforts.
+> >>
+> >> The problem here is that the UEFI spec never uses const qualifiers in
+> >> its APIs for by-ref parameters that are obviously never modified by
+> >> the caller, such as these GUIDs. [...]
+> >
+> > Ah, ok. Two related thoughts came up:
+> >
+> > 1)
+> >
+> > While I was looking at this code and was asking myself why the EFI runtime is
+> > generally invoked via a relatively fragile, non-type-checking vararg construct.
+> >
+> > Wouldn't you be better off by explicitly defining all the API variants, and then
+> > internally calling the EFI runtime?
+> >
+> > That would neatly solve such const artifacts as well.
+> >
+> > So instead of:
+> >
+> >
+> > +       status = efi_call_early(allocate_pool, EFI_RUNTIME_SERVICES_DATA,
+> > +                               sizeof(*si), (void **)&si);
+> >
+> > we could have something like:
+> >
+> >         status = efi_early__allocate_pool(EFI_RUNTIME_SERVICES_DATA, sizeof(*si), &si);
+> >
+> >         ...
+> >
+> >         efi_early__free_pool(si);
+> >
+> >
+> > i.e. it would look a lot more like a properly distributed, typed, structured
+> > family of C function APIs, instead of this single central bastard of an ioctl()
+> > interface.
+> >
+> > There's over 100 invocations of the EFI runtime in the Linux kernel, I think it
+> > would be worth the effort. The wrapper inlines should be mostly trivial.
+> >
+> > That would also add an opportunity to actually document most of these calls.
+> >
+> 
+> If only. The ARM and arm64 wrappers actually simply resolve to
+> correctly typed calls. While I am not an expert on the x86 side of
+> things, I think the vararg stuff is needed to be able to perform the
+> thunking required to do function calls using the MS ABI for x86_64.
 
------Original Message-----
-From: Yunhui Cui [mailto:B56489 at freescale.com] 
-Sent: Thursday, March 03, 2016 2:54 PM
-To: dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com
-Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
-Subject: [PATCH v3 1/4] mtd:fsl-quadspi:use the property fields of SPI-NOR
+So at least the efi_early calls seem to just be using a function pointer:
 
-We can get the read/write/erase opcode from the spi nor framework directly. This patch uses the information stored in the SPI-NOR to remove the hardcode in the fsl_qspi_init_lut().
+  arch/x86/include/asm/efi.h:     __efi_early()->call(__efi_early()->f, __VA_ARGS__);
 
-Signed-off-by: Yunhui Cui <B56489@freescale.com>
-Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
----
- drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
- 1 file changed, 12 insertions(+), 28 deletions(-)
+Furthermore, my suggestion would work with arbitrarily structured thunking: my 
+suggestion was to put a typed C layer in there - and the layer itself could then 
+call the vararg construct internally. It's a C type demuxing, only a syntactic 
+effort, it does not change any real call signature.
 
-diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 9ab2b51..517ffe2 100644
---- a/drivers/mtd/spi-nor/fsl-quadspi.c
-+++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	void __iomem *base = q->iobase;
- 	int rxfifo = q->devtype_data->rxfifo;
- 	u32 lut_base;
--	u8 cmd, addrlen, dummy;
- 	int i;
- 
-+	struct spi_nor *nor = &q->nor[0];
-+	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
-+	u8 read_op = nor->read_opcode;
-+	u8 read_dm = nor->read_dummy;
-+
- 	fsl_qspi_unlock_lut(q);
- 
- 	/* Clear all the LUT table */
-@@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Quad Read */
- 	lut_base = SEQID_QUAD_READ * 4;
- 
--	if (q->nor_size <= SZ_16M) {
--		cmd = SPINOR_OP_READ_1_1_4;
--		addrlen = ADDR24BIT;
--		dummy = 8;
--	} else {
--		/* use the 4-byte address */
--		cmd = SPINOR_OP_READ_1_1_4;
--		addrlen = ADDR32BIT;
--		dummy = 8;
--	}
--
--	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-+	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
- 			base + QUADSPI_LUT(lut_base));
--	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
-+	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-+		    LUT1(FSL_READ, PAD4, rxfifo),
- 			base + QUADSPI_LUT(lut_base + 1));
- 
- 	/* Write enable */
-@@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Page Program */
- 	lut_base = SEQID_PP * 4;
- 
--	if (q->nor_size <= SZ_16M) {
--		cmd = SPINOR_OP_PP;
--		addrlen = ADDR24BIT;
--	} else {
--		/* use the 4-byte address */
--		cmd = SPINOR_OP_PP;
--		addrlen = ADDR32BIT;
--	}
--
--	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-+	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
-+		    LUT1(ADDR, PAD1, addrlen),
- 			base + QUADSPI_LUT(lut_base));
- 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
- 			base + QUADSPI_LUT(lut_base + 1));
-@@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Erase a sector */
- 	lut_base = SEQID_SE * 4;
- 
--	cmd = q->nor[0].erase_opcode;
--	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
--
--	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-+	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
-+		    LUT1(ADDR, PAD1, addrlen),
- 			base + QUADSPI_LUT(lut_base));
- 
- 	/* Erase the whole chip */
---
-2.1.0.27.g96db324
+> As far as documentation is concerned, all of these functions and
+> protocol methods are documented in the UEFI spec, which is freely
+> accessible. It may be somewhat redundant to have our own documentation
+> for them.
+
+I mean a properly split up typed C interface 'documents itself' to a large degree 
+- while with opaque varargs bugs can slip in more easily.
+
+This is really an obvious argument ... it's the well known 'why ioctl()s are bad' 
+API argument.
+
+It has no bearing on this series obviously, it's a cleanup suggestion that could 
+be done separately.
+
+Thanks,
+
+	Ingo
