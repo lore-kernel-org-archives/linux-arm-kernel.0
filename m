@@ -1,92 +1,150 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 10 Mar 2016 09:16:36 +0900
-Subject: [PATCH 11/13] thermal: convert exynos to use
- devm_thermal_zone_of_sensor_register
-In-Reply-To: <1457559336-17652-12-git-send-email-edubezval@gmail.com>
-References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
- <1457559336-17652-12-git-send-email-edubezval@gmail.com>
-Message-ID: <56E0BCE4.6020309@samsung.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Wed, 9 Mar 2016 18:49:31 -0600
+Subject: [PATCH v2] irqchip/gicv3-its: Don't allow devices whose ID is
+ outside range
+In-Reply-To: <20160309023116.7172f095@arm.com>
+References: <1456687323-8446-1-git-send-email-shankerd@codeaurora.org>
+ <20160309023116.7172f095@arm.com>
+Message-ID: <56E0C49B.8010300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.03.2016 06:35, Eduardo Valentin wrote:
-> This changes the driver to use the devm_ version
-> of thermal_zone_of_sensor_register and cleans
-> up the  local points and unregister calls.
-> 
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 12 ++++--------
->  1 file changed, 4 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index fa61eff..256039e 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -1363,8 +1363,8 @@ static int exynos_tmu_probe(struct platform_device *pdev)
->  	 * data->tzd must be registered before calling exynos_tmu_initialize(),
->  	 * requesting irq and calling exynos_tmu_control().
->  	 */
-> -	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
-> -						    &exynos_sensor_ops);
-> +	data->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, data,
-> +							 &exynos_sensor_ops);
->  	if (IS_ERR(data->tzd)) {
->  		ret = PTR_ERR(data->tzd);
->  		dev_err(&pdev->dev, "Failed to register sensor: %d\n", ret);
-> @@ -1374,21 +1374,19 @@ static int exynos_tmu_probe(struct platform_device *pdev)
->  	ret = exynos_tmu_initialize(pdev);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Failed to initialize TMU\n");
-> -		goto err_thermal;
-> +		goto err_sclk;
->  	}
->  
->  	ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
->  		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
-> -		goto err_thermal;
-> +		goto err_sclk;
->  	}
->  
->  	exynos_tmu_control(pdev, true);
->  	return 0;
->  
-> -err_thermal:
-> -	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
->  err_sclk:
->  	clk_disable_unprepare(data->sclk);
->  err_clk:
-> @@ -1406,9 +1404,7 @@ err_sensor:
->  static int exynos_tmu_remove(struct platform_device *pdev)
->  {
->  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-> -	struct thermal_zone_device *tzd = data->tzd;
->  
-> -	thermal_zone_of_sensor_unregister(&pdev->dev, tzd);
+Hi Marc,
 
-Before, the sensor was removed from zone (ops like get_temp NULL-ified
-etc), then we stopped TMU, disabled clocks, disabled regulator and
-finally freed IRQ (through devm-like interface).
+On 03/08/2016 08:31 PM, Marc Zyngier wrote:
+> On Sun, 28 Feb 2016 13:22:03 -0600
+> Shanker Donthineni <shankerd@codeaurora.org> wrote:
+>
+> Hi Shanker,
+>
+>> We are not checking whether the requested device identifier fits into
+>> the device table memory or not. The function its_create_device()
+>> assumes that enough memory has been allocated for whole DevID sparse
+>> (reported by ITS_TYPER.Devbits) during the ITS probe() and continues
+>> to initialize ITS hardware.
+>>
+>> This assumption is not perfect, sometimes we reduce memory size either
+>> because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
+>> MAPD command fails if 'Device ID' is outside of device table range.
+>>
+>> Add a simple validation check to avoid MAPD failures since we are
+>> not handling ITS command errors. This change also helps to return an
+>> error -ENOMEM instead of success to caller.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>> [v1]->[v2]
+>>   Rebase to v4.5-rc6, edit commit text and simplify code changes
+>>
+>>  drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++----
+>>  1 file changed, 20 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 43dfd15..6d986ac 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -55,6 +55,16 @@ struct its_collection {
+>>  };
+>>  
+>>  /*
+>> + * The ITS_BASER structure - contains memeory information and table
+>> + * entry size in bytes.
+>> + */
+>> +struct its_baser {
+>> +	void		*base;
+>> +	u32		order;
+>> +	u32		entry_size;
+>> +};
+>> +
+>> +/*
+>>   * The ITS structure - contains most of the infrastructure, with the
+>>   * top-level MSI domain, the command queue, the collections, and the
+>>   * list of devices writing to it.
+>> @@ -66,14 +76,12 @@ struct its_node {
+>>  	unsigned long		phys_base;
+>>  	struct its_cmd_block	*cmd_base;
+>>  	struct its_cmd_block	*cmd_write;
+>> -	struct {
+>> -		void		*base;
+>> -		u32		order;
+>> -	} tables[GITS_BASER_NR_REGS];
+>> +	struct its_baser	tables[GITS_BASER_NR_REGS];
+>>  	struct its_collection	*collections;
+>>  	struct list_head	its_device_list;
+>>  	u64			flags;
+>>  	u32			ite_size;
+>> +	struct its_baser	*device_table;
+> nit: grouping this field with the tables array would make it slightly
+> nicer.
 
-Now this will be different - first stop of TMU, disable clocks, disable,
-regulator, remove sensor from zone (through devm) and finally free IRQ.
+Sure, I will get rid of this variable and add a simple accessory
+function to retrieve device table pointer.
 
-Are you sure that changing order is okay?
+static struct its_baser *its_get_baser(struct its_node *its, u8 type)
+{
+        int i;
 
-Best regards,
-Krzysztof
+        for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+                if (its->tables[i].type == type)
+                        return &its->tables[i];
+        }
 
->  	exynos_tmu_control(pdev, false);
->  
->  	clk_disable_unprepare(data->sclk);
-> 
+        return NULL;
+}
+
+>>  };
+>>  
+>>  #define ITS_ITT_ALIGN		SZ_256
+>> @@ -860,6 +868,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>  		 * For other tables, only allocate a single page.
+>>  		 */
+>>  		if (type == GITS_BASER_TYPE_DEVICE) {
+>> +			its->device_table = &its->tables[i];
+>>  			/*
+>>  			 * 'order' was initialized earlier to the default page
+>>  			 * granule of the the ITS.  We can't have an allocation
+>> @@ -874,6 +883,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>  					node_name, order);
+>>  			}
+>>  		}
+>> +		its->tables[i].entry_size = entry_size;
+>>  
+>>  retry_alloc_baser:
+>>  		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+>> @@ -1152,6 +1162,12 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>  	int nr_ites;
+>>  	int sz;
+>>  
+>> +	/* Don't allow 'dev_id' that exceeds single, flat table limit */
+>> +	if (its->device_table &&
+>> +	    (dev_id >= (PAGE_ORDER_TO_SIZE(its->device_table->order) /
+>> +	    its->device_table->entry_size)))
+> Assume for a minute we do not have a device table (which would be
+> perfectly possible - just think of an ITS with its own private memory,
+> like we have with KVM). Shouldn't we also check devid with the number of
+> bits that this ITS implements for Device IDs?
+
+Thanks, I thought of same thing. I am planning to handle second
+validation check with code changes something like shown below.
+
+        /* Don't allow 'dev_id' that exceeds single, flat table limit */
+        if (baser) {
+            if (dev_id >= (PAGE_ORDER_TO_SIZE(baser->order) /
+                baser->entry_size))
+                return NULL;
+        } else if (ilog2(dev_id) >= its->device_ids)
+                return NULL;
+ 
+>> +		return NULL;
+>> +
+>>  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>>  	/*
+>>  	 * At least one bit of EventID is being used, hence a minimum
+> Thanks,
+>
+> 	M.
+
+-- 
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
