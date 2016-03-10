@@ -1,53 +1,75 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Thu, 10 Mar 2016 10:24:13 +0200
-Subject: [patch net 2/2] net: hns: fixes a bug of RSS
-In-Reply-To: <1457576189-22924-3-git-send-email-yankejian@huawei.com>
-References: <1457576189-22924-1-git-send-email-yankejian@huawei.com>
- <1457576189-22924-3-git-send-email-yankejian@huawei.com>
-Message-ID: <1457598253.1347.52.camel@linux.intel.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 10 Mar 2016 09:25:22 +0100
+Subject: [PATCH 6/8] efi/arm*: libstub: wire up GOP handling into the ARM
+ UEFI stub
+In-Reply-To: <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160310082522.GB8618@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-03-10 at 10:16 +0800, Kejian Yan wrote:
-> If trying to get receive flow hash indirection table by ethtool, it
-> needs
-> to call .get_rxnfc to get ring number first. So this patch implements
-> the
-> .get_rxnfc of ethtool. And the data type of rss_indir_table is u32,
-> it has
-> to be multiply by the width of data type when using memcpy.
 
-+static int hns_get_rxnfc(struct net_device *netdev,
-> +			?struct ethtool_rxnfc *cmd,
-> +			?u32 *rule_locs)
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+
+> diff --git a/drivers/firmware/efi/libstub/arm32-stub.c b/drivers/firmware/efi/libstub/arm32-stub.c
+> index 495ebd657e38..0fbe00f13186 100644
+> --- a/drivers/firmware/efi/libstub/arm32-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm32-stub.c
+> @@ -9,6 +9,44 @@
+>  #include <linux/efi.h>
+>  #include <asm/efi.h>
+>  
+> +static const efi_guid_t screen_info_guid = LINUX_ARM32_SCREEN_INFO_TABLE_GUID;
+> +
+> +struct screen_info *alloc_screen_info(efi_system_table_t *sys_table_arg)
 > +{
-> +	struct hns_nic_priv *priv = netdev_priv(netdev);
-> +	int ret = 0;
+> +	struct screen_info *si;
+> +	efi_status_t status;
 > +
-> +	switch (cmd->cmd) {
-> +	case ETHTOOL_GRXRINGS:
-> +		cmd->data = priv->ae_handle->q_num;
-> +		break;
-> +	default:
-> +		ret = -EOPNOTSUPP;
-> +		break;
-> +	}
+> +	/*
+> +	 * Unlike on arm64, where we can directly fill out the screen_info
+> +	 * structure from the stub, we need to allocate a buffer to hold
+> +	 * its contents while we hand over to the kernel proper from the
+> +	 * decompressor.
+> +	 */
+> +	status = efi_call_early(allocate_pool, EFI_RUNTIME_SERVICES_DATA,
+> +				sizeof(*si), (void **)&si);
 > +
-> +	return ret;
-
-Redundant ret variable.
-
-switch (value) {
-case X:
-?break;
-default:
-?return -ERRNO;
-}
-
-return 0;
-
+> +	if (status != EFI_SUCCESS)
+> +		return NULL;
+> +
+> +	status = efi_call_early(install_configuration_table,
+> +				(efi_guid_t *)&screen_info_guid, si);
+> +	if (status == EFI_SUCCESS)
+> +		return si;
+> +
+> +	efi_call_early(free_pool, si);
+> +	return NULL;
 > +}
+> +
+> +void free_screen_info(efi_system_table_t *sys_table_arg, struct screen_info *si)
+> +{
+> +	if (!si)
+> +		return;
+> +
+> +	efi_call_early(install_configuration_table,
+> +		       (efi_guid_t *)&screen_info_guid, NULL);
+> +	efi_call_early(free_pool, si);
+> +}
+> +
+>  efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+>  				 unsigned long *image_addr,
+>  				 unsigned long *image_size,
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+So screen_info_guid should probably not be a 'const': you have to cast it away 
+anyway, adding artificial linebreaks and uglifying the code. It's also a bad 
+practice to cast away const-ness, it hinders move-consts-to-readonly-sections 
+efforts.
+
+Otherwise the series looks mostly good to me. Time for new v4.6 merges is short, 
+but if Matt acks it I can still take it into tip:efi/core.
+
+Thanks,
+
+	Ingo
