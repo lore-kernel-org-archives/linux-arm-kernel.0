@@ -1,58 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 10 Mar 2016 18:54:38 +0100
-Subject: [PATCH v3 00/12] pwm: add support for atomic update
-In-Reply-To: <CAD=FV=W3KPf8tyMviVNB9=HjefMdP+FBbN01Zhh7RKH+gkj2WQ@mail.gmail.com>
-References: <20160203145337.GD9650@ulmo>
- <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
- <20160222175929.GA23899@ulmo>
- <CAD=FV=UCErW3EjYRtwt49_ztNR7cyY4U0o4R_dxdomer-Ac2Dg@mail.gmail.com>
- <20160223143859.GA27656@ulmo>
- <CAD=FV=UvxG3MYD4MKQJqN7W68uMjd-s+FH-e8tkrLCpS0RLmZQ@mail.gmail.com>
- <20160223181448.GA14754@ulmo.nvidia.com>
- <CAD=FV=VM3cOQ0HqwLANBw9MVBCyFTrSyPe_dGzgPucuMUEWRKA@mail.gmail.com>
- <CAD=FV=VckTVD8b1g+f0G2kMeoTjvY0pAGhoDnWQN_dAmqSxBxg@mail.gmail.com>
- <CAD=FV=W3KPf8tyMviVNB9=HjefMdP+FBbN01Zhh7RKH+gkj2WQ@mail.gmail.com>
-Message-ID: <20160310175438.GA5648@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Mar 2016 18:59:15 +0100
+Subject: ARMv4 (not v4t) marked obsolete in gcc-6
+In-Reply-To: <20160310170859.GR19428@n2100.arm.linux.org.uk>
+References: <201603101013.04618.arnd@arndb.de>
+ <201603101759.37183.arnd@arndb.de>
+ <20160310170859.GR19428@n2100.arm.linux.org.uk>
+Message-ID: <201603101859.16090.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 08:34:19AM -0800, Doug Anderson wrote:
-> Thierry,
+On Thursday 10 March 2016, Russell King - ARM Linux wrote:
+> On Thu, Mar 10, 2016 at 05:59:37PM +0100, Arnd Bergmann wrote:
+> > On Thursday 10 March 2016, Russell King - ARM Linux wrote:
+> > > On Thu, Mar 10, 2016 at 10:13:04AM +0100, Arnd Bergmann wrote:
+> > > > * RiscPC, Footbridge, EBSA110: Classic systems that used to be popular in
+> > > >   the past but only remain in small quantities as far as I know. Russell still
+> > > >   uses them. He also uses older compilers, so probably isn't affected
+> > > >   immediately.
+> > > 
+> > > And I'm unlikely to ever move off them, unless there's some miraculous
+> > > change which means I end up with server type systems to replace them.
+> > > That's been very unlikely for some time, as there's little interest in
+> > > hardware people producing such platforms and I'm no longer in a position
+> > > where, even if someone did, I'd end up with such hardware.
+> > > 
+> > > So I'm pretty much stuck with what I have unless I replace it with x86
+> > > systems.
+> > 
+> > Which compiler version do you have at the moment on those? Are you also
+> > stuck on OABI for the same reasons?
 > 
-> On Thu, Feb 25, 2016 at 3:14 PM, Doug Anderson <dianders@google.com> wrote:
-> > So just to summarize:
-> >
-> > * Add pwm_get_state(), pwm_apply_state(), pwm_get_args().
-> > pwm_get_state() initially returns 0 for duty cycle if driver doesn't
-> > support readout.
-> >
-> > * Re-implement pwm_get_period() (and maybe other similar functions)
-> > atop pwm_get_state() as you describe earlier in the thread.
-> >
-> > * Document pwm_get_period() (and maybe other similar functions) as deprecated.
-> >
-> > * Fix drivers for all current 2 users of PWM regulator to support
-> > hardware readout.
-> >
-> > * Update PWM regulator as you described earlier in the thread (Feb 23).
-> >
-> > * If PWM regulator is ever used on a new board whose PWM doesn't
-> > support hardware readout, the voltage will change at probe time.
-> >
-> >
-> > Did I get all that right?  Thanks!
+> Well, the compiler version on the platforms is irrelevant as they're
+> cross-built kernels, for which I'm currently using gcc 4.7.4 for all
+> kernel builds.
 > 
-> Can you provide a "yes, you got that right" or a "no, you didn't
-> understand"?  That will unblock Boris, I think.
+> The platforms themselves are pretty much stuck on OABI for ever
+> because there's no way to progressively convert them to EABI in a
+> sane manner.
 
-Sounds about right. Hopefully this will eliminate any objections that
-others had about the series.
+Ok, got it, for some reason I thought you were building the kernel
+natively for these machines. So at least you can use gcc-6.0 to build
+an EABI kernel with OABI compat (if that's not what you are doing already).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160310/bd595f8a/attachment.sig>
+I had wondered about the R_ARM_V4BX trick already, and if that keeps working
+until binutils get changed (Ramana mentioned that it will be a while after
+the gcc removal before that happens), you can keep using gcc-7 and higher
+for at least a while longer.
+
+I think for the RiscPC platform, the fact that we need to pass -march=armv3
+means that as soon as armv3 and armv4 support get removed in gcc, you are
+stuck with the last supported compiler version. My understanding is that
+gcc-4.9 already has serious bugs (internal compiler error) when building
+certain files in the kernel, but the bug I opened when I found this has
+recently been fixed, so it might again work with gcc-6, see
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=62254
+
+	Arnd
