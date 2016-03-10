@@ -1,139 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 10 Mar 2016 11:26:06 +0100
-Subject: [PATCH 1/4] serial: imx: reorder functions to simplify next patch
-In-Reply-To: <1457605569-7828-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1457605569-7828-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1457605569-7828-2-git-send-email-u.kleine-koenig@pengutronix.de>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Thu, 10 Mar 2016 16:13:28 +0530
+Subject: [PATCH 1/2] net: thunderx: Set recevie buffer page usage count in
+ bulk
+In-Reply-To: <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
+References: <1457336157-31508-2-git-send-email-sunil.kovvuri@gmail.com>
+ <20160307.111534.235286977900488968.davem@davemloft.net>
+ <CA+sq2CewOQGSiRC5m64ioYS36-WO0C5XzykZRZd+OLE1tJ-sSQ@mail.gmail.com>
+ <20160307.120410.1851177945150642006.davem@davemloft.net>
+ <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
+Message-ID: <CA+sq2Cc44v_ggy=QLOX_FGt6uTv3Qo1KmqCeZ8=3G1COuWxAHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/tty/serial/imx.c | 98 ++++++++++++++++++++++++------------------------
- 1 file changed, 49 insertions(+), 49 deletions(-)
+Hi David,
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 231e7d5caf6c..ffa81e629a79 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -729,6 +729,55 @@ static void imx_dma_rxint(struct imx_port *sport)
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- }
- 
-+/*
-+ * We have a modem side uart, so the meanings of RTS and CTS are inverted.
-+ */
-+static unsigned int imx_get_hwmctrl(struct imx_port *sport)
-+{
-+	unsigned int tmp = TIOCM_DSR;
-+	unsigned usr1 = readl(sport->port.membase + USR1);
-+
-+	if (usr1 & USR1_RTSS)
-+		tmp |= TIOCM_CTS;
-+
-+	/* in DCE mode DCDIN is always 0 */
-+	if (!(usr1 & USR2_DCDIN))
-+		tmp |= TIOCM_CAR;
-+
-+	/* in DCE mode RIIN is always 0 */
-+	if (readl(sport->port.membase + USR2) & USR2_RIIN)
-+		tmp |= TIOCM_RI;
-+
-+	return tmp;
-+}
-+
-+/*
-+ * Handle any change of modem status signal since we were last called.
-+ */
-+static void imx_mctrl_check(struct imx_port *sport)
-+{
-+	unsigned int status, changed;
-+
-+	status = imx_get_hwmctrl(sport);
-+	changed = status ^ sport->old_status;
-+
-+	if (changed == 0)
-+		return;
-+
-+	sport->old_status = status;
-+
-+	if (changed & TIOCM_RI)
-+		sport->port.icount.rng++;
-+	if (changed & TIOCM_DSR)
-+		sport->port.icount.dsr++;
-+	if (changed & TIOCM_CAR)
-+		uart_handle_dcd_change(&sport->port, status & TIOCM_CAR);
-+	if (changed & TIOCM_CTS)
-+		uart_handle_cts_change(&sport->port, status & TIOCM_CTS);
-+
-+	wake_up_interruptible(&sport->port.state->port.delta_msr_wait);
-+}
-+
- static irqreturn_t imx_int(int irq, void *dev_id)
- {
- 	struct imx_port *sport = dev_id;
-@@ -782,28 +831,6 @@ static unsigned int imx_tx_empty(struct uart_port *port)
- 	return ret;
- }
- 
--/*
-- * We have a modem side uart, so the meanings of RTS and CTS are inverted.
-- */
--static unsigned int imx_get_hwmctrl(struct imx_port *sport)
--{
--	unsigned int tmp = TIOCM_DSR;
--	unsigned usr1 = readl(sport->port.membase + USR1);
--
--	if (usr1 & USR1_RTSS)
--		tmp |= TIOCM_CTS;
--
--	/* in DCE mode DCDIN is always 0 */
--	if (!(usr1 & USR2_DCDIN))
--		tmp |= TIOCM_CAR;
--
--	/* in DCE mode RIIN is always 0 */
--	if (readl(sport->port.membase + USR2) & USR2_RIIN)
--		tmp |= TIOCM_RI;
--
--	return tmp;
--}
--
- static unsigned int imx_get_mctrl(struct uart_port *port)
- {
- 	struct imx_port *sport = (struct imx_port *)port;
-@@ -861,33 +888,6 @@ static void imx_break_ctl(struct uart_port *port, int break_state)
- }
- 
- /*
-- * Handle any change of modem status signal since we were last called.
-- */
--static void imx_mctrl_check(struct imx_port *sport)
--{
--	unsigned int status, changed;
--
--	status = imx_get_hwmctrl(sport);
--	changed = status ^ sport->old_status;
--
--	if (changed == 0)
--		return;
--
--	sport->old_status = status;
--
--	if (changed & TIOCM_RI)
--		sport->port.icount.rng++;
--	if (changed & TIOCM_DSR)
--		sport->port.icount.dsr++;
--	if (changed & TIOCM_CAR)
--		uart_handle_dcd_change(&sport->port, status & TIOCM_CAR);
--	if (changed & TIOCM_CTS)
--		uart_handle_cts_change(&sport->port, status & TIOCM_CTS);
--
--	wake_up_interruptible(&sport->port.state->port.delta_msr_wait);
--}
--
--/*
-  * This is our per-port timeout handler, for checking the
-  * modem status signals.
-  */
--- 
-2.7.0
+
+>> So if you know ahead of time how the page will be split up, just
+>> calculate that when you get the page and increment the page count
+>> appropriately.
+>>
+>> That's what we do in the NIU driver.
+>
+> Thanks for the suggestion, will check and get back.
+>
+
+I looked at the NIU driver and in fn() niu_rbr_refill()
+static void niu_rbr_refill(struct niu *np, struct rx_ring_info *rp, gfp_t mask)
+{
+        int index = rp->rbr_index;
+
+        rp->rbr_pending++;
+        if ((rp->rbr_pending % rp->rbr_blocks_per_page) == 0) {
+
+Here it's been checked whether rbr_pending is a exact multiple of page
+split count.
+And hence updating page count based on fixed calculation is right.
+
+On my platform driver receives a interrupt when free buffer count
+falls below a threshold
+and by the time SW reads count of buffers to be refilled it can be any
+number i.e
+may or may not be a exact multiple of page split count.
+
+When interface is being brought down and while freeing unused receive
+buffers one
+page's count will go wrong and hence will disappear completely. In the
+patch i am
+updating page->count before issuing doorbell to HW irrespective of
+full page utilised
+or not. So there is no mismatch while doing put_page(unused buffer).
+
+Thanks,
+Sunil.
