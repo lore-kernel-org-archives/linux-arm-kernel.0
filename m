@@ -1,21 +1,36 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 10 Mar 2016 16:37:19 +0530
-Subject: [RESEND PATCH] dmaengine: at_xdmac: fix residue computation
-In-Reply-To: <1457601481-17405-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1457601481-17405-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20160310110718.GE11154@localhost>
+From: chanho.min@lge.com (Chanho Min)
+Date: Thu, 10 Mar 2016 20:22:38 +0900
+Subject: [PATCH v2 4/4] MAINTAINERS: add myself as ARM/LG1K maintainer
+In-Reply-To: <1457608958-23564-1-git-send-email-chanho.min@lge.com>
+References: <1457608958-23564-1-git-send-email-chanho.min@lge.com>
+Message-ID: <1457608958-23564-5-git-send-email-chanho.min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 10:17:55AM +0100, Ludovic Desroches wrote:
-> When computing the residue we need two pieces of information: the current
-> descriptor and the remaining data of the current descriptor. To get
-> that information, we need to read consecutively two registers but we
-> can't do it in an atomic way. For that reason, we have to check manually
-> that current descriptor has not changed.
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+Changes for v2:
+	- None
+---
+ MAINTAINERS |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Applied, thanks
-
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4f55edf..20ca61a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1245,6 +1245,12 @@ L:	linux-kernel at vger.kernel.org
+ S:	Maintained
+ F:	drivers/memory/*emif*
+ 
++ARM/LG1K ARCHITECTURE
++M:	Chanho Min <chanho.min@lge.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm64/boot/dts/lg/
++
+ ARM/LOGICPD PXA270 MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
-~Vinod
+1.7.9.5
