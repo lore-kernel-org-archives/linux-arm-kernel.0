@@ -1,58 +1,66 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 10 Mar 2016 11:09:09 +0100
-Subject: [PATCH v5 net-next 01/10] misc: sram: add optional ioremap without
- write combining
+Date: Thu, 10 Mar 2016 11:09:12 +0100
+Subject: [PATCH v5 net-next 04/10] ARM: dts: armada-xp: add buffer manager
+ nodes
 In-Reply-To: <1457604558-1121-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1457604558-1121-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1457604558-1121-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1457604558-1121-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcin Wojtas <mw@semihalf.com>
 
-Some SRAM users may require non-bufferable access to the memory, which is
-impossible, because devm_ioremap_wc() is used for setting sram->virt_base.
+Armada XP network controller supports hardware buffer management (BM).
+Since it is now enabled in mvneta driver, appropriate nodes can be added
+to armada-xp.dtsi - for the actual common BM unit (bm at c0000) and its
+internal SRAM (bm-bppi), which is used for indirect access to buffer
+pointer ring residing in DRAM.
 
-This commit adds optional flag 'no-memory-wc', which allow to choose remap
-method, using DT property. Documentation is updated accordingly.
+Pools - ports mapping, bm-bppi entry in 'soc' node's ranges and optional
+parameters are supposed to be set in board files.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/sram/sram.txt | 5 +++++
- drivers/misc/sram.c                             | 5 ++++-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-xp.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sram/sram.txt b/Documentation/devicetree/bindings/sram/sram.txt
-index 42ee9438b771..227e3a341af1 100644
---- a/Documentation/devicetree/bindings/sram/sram.txt
-+++ b/Documentation/devicetree/bindings/sram/sram.txt
-@@ -25,6 +25,11 @@ Required properties in the sram node:
- - ranges : standard definition, should translate from local addresses
-            within the sram to bus addresses
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index be23196829bb..553349c07f28 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -253,6 +253,14 @@
+ 				marvell,crypto-sram-size = <0x800>;
+ 			};
  
-+Optional properties in the sram node:
++			bm: bm at c0000 {
++				compatible = "marvell,armada-380-neta-bm";
++				reg = <0xc0000 0xac>;
++				clocks = <&gateclk 13>;
++				internal-mem = <&bm_bppi>;
++				status = "disabled";
++			};
 +
-+- no-memory-wc : the flag indicating, that SRAM memory region has not to
-+                 be remapped as write combining. WC is used by default.
+ 			xor at f0900 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0xF0900 0x100
+@@ -291,6 +299,17 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 MBUS_ID(0x09, 0x05) 0 0x800>;
+ 		};
 +
- Required properties in the area nodes:
++		bm_bppi: bm-bppi {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			ranges = <0 MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&gateclk 13>;
++			no-memory-wc;
++			status = "disabled";
++		};
+ 	};
  
- - reg : iomem address range, relative to the SRAM range
-diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-index 736dae715dbf..69cdabea9c03 100644
---- a/drivers/misc/sram.c
-+++ b/drivers/misc/sram.c
-@@ -360,7 +360,10 @@ static int sram_probe(struct platform_device *pdev)
- 		return -EBUSY;
- 	}
- 
--	sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
-+	if (of_property_read_bool(pdev->dev.of_node, "no-memory-wc"))
-+		sram->virt_base = devm_ioremap(sram->dev, res->start, size);
-+	else
-+		sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
- 	if (IS_ERR(sram->virt_base))
- 		return PTR_ERR(sram->virt_base);
- 
+ 	clocks {
 -- 
 2.5.0
