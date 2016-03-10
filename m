@@ -1,47 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 10 Mar 2016 23:23:22 +0700
-Subject: [PATCH 0/8] EFI framebuffer support for ARM and arm64
-In-Reply-To: <56E19CD1.6080409@redhat.com>
-References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
- <56E19CD1.6080409@redhat.com>
-Message-ID: <CAKv+Gu8imCVQ+8QM+txqXNgs54p2Uv3FMkQEMNoCkB8JJcaZUw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Mar 2016 17:38:54 +0100
+Subject: ARMv4 (not v4t) marked obsolete in gcc-6
+In-Reply-To: <CALT56yPDXkOvwQHngFsLkjgkyGx5HRNj8oddhFjTRdMbv5zvbw@mail.gmail.com>
+References: <201603101013.04618.arnd@arndb.de>
+ <CALT56yPDXkOvwQHngFsLkjgkyGx5HRNj8oddhFjTRdMbv5zvbw@mail.gmail.com>
+Message-ID: <201603101738.55060.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Laszlo)
+On Thursday 10 March 2016, Dmitry Eremin-Solenikov wrote:
+> 2016-03-10 12:13 GMT+03:00 Arnd Bergmann <arnd@arndb.de>:
+> > I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
+> > so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
+> > we currenly support in the Linux kernel.
+> >
+> > The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
+> > and it will be removed in the following release (gcc-7) one year later, unless someone
+> > raises concerns over it.
+> 
+> In which form should we raise concerns? Is it about stepping up as a
+> maintainers, or just
+> about telling them that platforms are used? 
 
-On 10 March 2016 at 23:12, Mark Langsdorf <mlangsdo@redhat.com> wrote:
-> On 03/09/2016 11:40 PM, Ard Biesheuvel wrote:
->>
->> This series adds support to ARM and arm64 for using the kernel's EFI
->> framebuffer driver to drive EFI Graphics Output Protocol (GOP) based
->> framebuffers.
->>
->> This involves refactoring some of the existing x86 code so it can be
->> reused
->> by ARM and arm64, and wiring it up both in the UEFI stub and in the core
->> kernel into the existing UEFI infrastructure for ARM and arm64.
->
->
-> Given that I have access to a variety of different ARM64 UEFI
-> implementations, how would I go about testing this code? Do I
-> need a specific UEFI implementation and are there any special
-> command line arguments I should pass to the kernel?
->
 
-I have tested this myself on QEMU and FVP Base, which are both
-software models. On bare metal, it would involve a system with a
-graphics card that the firmware knows how to drive, and I am honestly
-not sure if any such combinations currently exist, other than the ARM
-development platforms such as Juno which have an embedded-style (i.e.,
-non-PCI) graphics controller that the firmware knows how to drive out
-of the box.
+As I understand it, having someone step up as an active maintainer would leave the
+architecture supported indefinitely, while saying you still need the support
+can at least delay the process a bit. Ramana can probably clarify further
+what the gcc folks are looking for exactly.
 
-The code itself is smart enough to figure which (if any) of the
-available handles carrying the GOP protocol is the one that is
-attached to ConOut, and so there is nothing required to enable this
-other than building it into the kernel and running it on a system with
-a firmware supported screen attached.
+> My main concern with
+> limiting ARMv4 platforms
+> to older compilers would be that sooner or later we won't be able to
+> use newer kernels,
+> as the mainline will stop supporting older compilers.
 
--- 
-Ard.
+I think we've been doing ok with keeping old compilers working, gcc-4.2 
+from 2007 seems to work fine for the older targets (it misses support for
+some of the armv7 platforms in turn) and in theory we should be able to
+get older ones working with a few patches: according to the README
+file in the kernel, we support gcc-3.2 (from 2002) in theory, but I'm
+running into some trickier problems with some of the older compilers.
+
+It's definitely clear that at some point we will stop supporting gcc-6
+for building the kernel, but I don't know if that's already 2022 or
+only 2038 (when all sort of software breaks).
+
+How long do you think you need for your systems?
+Do you still ship new products, or are these all legacy devices that
+will have a failing battery or flash at some point in the future?
+
+	Arnd
