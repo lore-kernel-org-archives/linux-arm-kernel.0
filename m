@@ -1,42 +1,50 @@
 From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 10 Mar 2016 14:42:43 +0100
-Subject: [PATCH 30/30] ARM: dts: r8a7794: Reference both DMA controllers
- in QSPI node
-In-Reply-To: <CAMuHMdW_nMfWF-sQPFgtxmtA_1vxw_hFPsb1DkRp7TJtKrB2ig@mail.gmail.com>
+Date: Thu, 10 Mar 2016 14:43:25 +0100
+Subject: [PATCH 00/30] ARM: dts: r8a779[0-4]: Reference both DMA
+ controllers
+In-Reply-To: <CAMuHMdXF4FMLg=Y_cZ2chjzGWAV90N=vLsCkPKGmmYx5mFY64Q@mail.gmail.com>
 References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1457609782-24108-31-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <CAMuHMdW_nMfWF-sQPFgtxmtA_1vxw_hFPsb1DkRp7TJtKrB2ig@mail.gmail.com>
-Message-ID: <20160310134243.GA24099@bigcity.dyn.berto.se>
+ <CAMuHMdXF4FMLg=Y_cZ2chjzGWAV90N=vLsCkPKGmmYx5mFY64Q@mail.gmail.com>
+Message-ID: <20160310134325.GA1111@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-10 13:08:56 +0100, Geert Uytterhoeven wrote:
+Hi Geert,
+
+On 2016-03-10 13:20:56 +0100, Geert Uytterhoeven wrote:
 > Hi Niklas,
 > 
-> On Thu, Mar 10, 2016 at 12:36 PM, Niklas S?derlund
+> On Thu, Mar 10, 2016 at 12:35 PM, Niklas S?derlund
 > <niklas.soderlund+renesas@ragnatech.se> wrote:
-> > R-Car Gen2 have two DMA controllers, which are equivalent. Add
-> > references to both dmac0 and dmac1 so the driver can fallback to the
-> > later if the first one is unavailable.
+> > R-Car Gen2 have two DMA controllers, which are equivalent. However DMA
+> > slaves were tied only to a single DMA controller in .dtsi. This series
+> > add references to to both DMA controllers for all nodes that previously
+> > only referenced one of them. It also adds dma references to the SDHI
+> > nodes for r8a7794 which according to the datasheet should work but I
+> > have not access to HW to verify.
 > >
-> > Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-> > ---
-> >  arch/arm/boot/dts/r8a7794.dtsi | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> > index 76709ff..e098eab 100644
-> > --- a/arch/arm/boot/dts/r8a7794.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> > @@ -605,8 +605,9 @@
-> >                 reg = <0 0xee200000 0 0x80>;
-> >                 interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
-> >                 clocks = <&mstp3_clks R8A7794_CLK_MMCIF0>;
+> > Tested on Koelsch (r8a7791) by altering the compatible value of either
+> > dmac0 or dmac1 and verifying that the DMA slaves pick the DMA controller
+> > that is instantiated.
 > 
-> This one has the wrong subject: QSPI vs. MMCIF.
+> Thanks for your series!
+> 
+> If you fix the subject of patch 30:
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks for noticing, would have been embarrassing for me.
+Thanks for your review and that you found my error in the subject.
 
+> 
+> I guess this is against v4.5-rc7? It doesn't apply against
+> renesas-devel-20160308-v4.5-rc7.
+> Unfortunately you'll have to rebase against Simon's tree, and add scif2
+> on r8a7790, and i2c[6-8] on r8a7793.
+
+I will rebase and update the relevant patches to include the additions 
+to r8a7790 and r8a7793.
+
+> 
+> Hint for the other reviewers: use the --color-words option of git diff/show.
 > 
 > Gr{oetje,eeting}s,
 > 
