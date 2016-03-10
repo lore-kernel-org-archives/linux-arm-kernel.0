@@ -1,94 +1,101 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Thu, 10 Mar 2016 10:16:13 +0100
-Subject: [PATCH 11/13] thermal: convert exynos to use
- devm_thermal_zone_of_sensor_register
-In-Reply-To: <1457559336-17652-12-git-send-email-edubezval@gmail.com>
-References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
- <1457559336-17652-12-git-send-email-edubezval@gmail.com>
-Message-ID: <20160310101613.2d00b5e2@amdc2363>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 10 Mar 2016 10:17:55 +0100
+Subject: [RESEND PATCH] dmaengine: at_xdmac: fix residue computation
+Message-ID: <1457601481-17405-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+When computing the residue we need two pieces of information: the current
+descriptor and the remaining data of the current descriptor. To get
+that information, we need to read consecutively two registers but we
+can't do it in an atomic way. For that reason, we have to check manually
+that current descriptor has not changed.
 
-> This changes the driver to use the devm_ version
-> of thermal_zone_of_sensor_register and cleans
-> up the  local points and unregister calls.
-> 
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 12 ++++--------
->  1 file changed, 4 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> b/drivers/thermal/samsung/exynos_tmu.c index fa61eff..256039e 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -1363,8 +1363,8 @@ static int exynos_tmu_probe(struct
-> platform_device *pdev)
->  	 * data->tzd must be registered before calling
-> exynos_tmu_initialize(),
->  	 * requesting irq and calling exynos_tmu_control().
->  	 */
-> -	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0,
-> data,
-> -
-> &exynos_sensor_ops);
-> +	data->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev,
-> 0, data,
-> +
-> &exynos_sensor_ops); if (IS_ERR(data->tzd)) {
->  		ret = PTR_ERR(data->tzd);
->  		dev_err(&pdev->dev, "Failed to register sensor:
-> %d\n", ret); @@ -1374,21 +1374,19 @@ static int
-> exynos_tmu_probe(struct platform_device *pdev) ret =
-> exynos_tmu_initialize(pdev); if (ret) {
->  		dev_err(&pdev->dev, "Failed to initialize TMU\n");
-> -		goto err_thermal;
-> +		goto err_sclk;
->  	}
->  
->  	ret = devm_request_irq(&pdev->dev, data->irq, exynos_tmu_irq,
->  		IRQF_TRIGGER_RISING | IRQF_SHARED,
-> dev_name(&pdev->dev), data); if (ret) {
->  		dev_err(&pdev->dev, "Failed to request irq: %d\n",
-> data->irq);
-> -		goto err_thermal;
-> +		goto err_sclk;
->  	}
->  
->  	exynos_tmu_control(pdev, true);
->  	return 0;
->  
-> -err_thermal:
-> -	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
->  err_sclk:
->  	clk_disable_unprepare(data->sclk);
->  err_clk:
-> @@ -1406,9 +1404,7 @@ err_sensor:
->  static int exynos_tmu_remove(struct platform_device *pdev)
->  {
->  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-> -	struct thermal_zone_device *tzd = data->tzd;
->  
-> -	thermal_zone_of_sensor_unregister(&pdev->dev, tzd);
->  	exynos_tmu_control(pdev, false);
->  
->  	clk_disable_unprepare(data->sclk);
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Suggested-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Reported-by: David Engraf <david.engraf@sysgo.com>
+Tested-by: David Engraf <david.engraf@sysgo.com>
+Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
+eXtended DMA Controller driver")
+Cc: stable at vger.kernel.org #4.1 and later
+---
+ drivers/dma/at_xdmac.c | 42 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 39 insertions(+), 3 deletions(-)
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 64f5d1b..8e304b1 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -176,6 +176,7 @@
+ #define AT_XDMAC_MAX_CHAN	0x20
+ #define AT_XDMAC_MAX_CSIZE	16	/* 16 data */
+ #define AT_XDMAC_MAX_DWIDTH	8	/* 64 bits */
++#define AT_XDMAC_RESIDUE_MAX_RETRIES	5
+ 
+ #define AT_XDMAC_DMA_BUSWIDTHS\
+ 	(BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED) |\
+@@ -1395,8 +1396,8 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 	struct at_xdmac_desc	*desc, *_desc;
+ 	struct list_head	*descs_list;
+ 	enum dma_status		ret;
+-	int			residue;
+-	u32			cur_nda, mask, value;
++	int			residue, retry;
++	u32			cur_nda, check_nda, cur_ubc, mask, value;
+ 	u8			dwidth = 0;
+ 	unsigned long		flags;
+ 
+@@ -1433,7 +1434,42 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 			cpu_relax();
+ 	}
+ 
++	/*
++	 * When processing the residue, we need to read two registers but we
++	 * can't do it in an atomic way. AT_XDMAC_CNDA is used to find where
++	 * we stand in the descriptor list and AT_XDMAC_CUBC is used
++	 * to know how many data are remaining for the current descriptor.
++	 * Since the dma channel is not paused to not loose data, between the
++	 * AT_XDMAC_CNDA and AT_XDMAC_CUBC read, we may have change of
++	 * descriptor.
++	 * For that reason, after reading AT_XDMAC_CUBC, we check if we are
++	 * still using the same descriptor by reading a second time
++	 * AT_XDMAC_CNDA. If AT_XDMAC_CNDA has changed, it means we have to
++	 * read again AT_XDMAC_CUBC.
++	 * Memory barriers are used to ensure the read order of the registers.
++	 * A max number of retries is set because unlikely it can never ends if
++	 * we are transferring a lot of data with small buffers.
++	 */
+ 	cur_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
++	rmb();
++	cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
++	for (retry = 0; retry < AT_XDMAC_RESIDUE_MAX_RETRIES; retry++) {
++		rmb();
++		check_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
++
++		if (likely(cur_nda == check_nda))
++			break;
++
++		cur_nda = check_nda;
++		rmb();
++		cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
++	}
++
++	if (unlikely(retry >= AT_XDMAC_RESIDUE_MAX_RETRIES)) {
++		ret = DMA_ERROR;
++		goto spin_unlock;
++	}
++
+ 	/*
+ 	 * Remove size of all microblocks already transferred and the current
+ 	 * one. Then add the remaining size to transfer of the current
+@@ -1446,7 +1482,7 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 		if ((desc->lld.mbr_nda & 0xfffffffc) == cur_nda)
+ 			break;
+ 	}
+-	residue += at_xdmac_chan_read(atchan, AT_XDMAC_CUBC) << dwidth;
++	residue += cur_ubc << dwidth;
+ 
+ 	dma_set_residue(txstate, residue);
+ 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+2.5.0
