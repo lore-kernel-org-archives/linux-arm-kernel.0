@@ -1,33 +1,58 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 11 Mar 2016 08:20:09 +0100
-Subject: [PATCH 2/5] dmaengine: sun6i: Fix impossible settings of burst
- and bus width
-In-Reply-To: <20160311064227.GR11154@localhost>
-References: <cover.1457606136.git.moinejf@free.fr>
- <caa86759ff67df73c10fc3738eac5de58d582cc1.1457606136.git.moinejf@free.fr>
- <20160311064227.GR11154@localhost>
-Message-ID: <20160311082009.c8b5575ca07739b30088f8d2@free.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Mar 2016 08:57:18 +0000
+Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
+ interrupt properties
+In-Reply-To: <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
+References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
+ <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
+Message-ID: <20160310085714.GA31313@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Mar 2016 12:12:27 +0530
-Vinod Koul <vinod.koul@intel.com> wrote:
+Hi,
 
-> On Thu, Mar 10, 2016 at 10:27:37AM +0100, Jean-Francois Moine wrote:
-> > In the commit 1f9cd915b64bb95f "dmaengine: sun6i: Fix memcpy operation",
-> > the signed values returned by convert_burst() and convert_buswidth()
-> > were stored in an unsigned value.
-> > Then, these values were considered as errors when non null.
-> > As a result, setting burst or buswidth to values different from 1 was
-> > making the DMA transfers to be rejected.
+As a general note, please put DT bindings patches before any patches
+implementing them, as per
+Documentation/devicetree/bindings/submitting-patches.txt.
+
+That makes it possible to review a series in-order.
+
+On Sat, Mar 05, 2016 at 10:52:15AM +0000, kernel at martin.sperl.org wrote:
+> From: Martin Sperl <kernel@martin.sperl.org>
 > 
-> A value of 0 for burst does not make sense. Frr buswidth this in undefined.
-> So what are we gaining from 0 value and how is it fixing something which is
-> passed as wrong argument?
+> Add binding documentation for the new shared interrupt properties:
+> * brcm,dma-channel-shared-mask
+> * brcm,dma-shared-irq-index
+> 
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> ---
+>  Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+> index 1396078..f9e84ee 100644
+> --- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+> @@ -17,6 +17,10 @@ Required properties:
+>  - brcm,dma-channel-mask: Bit mask representing the channels
+>  			 not used by the firmware in ascending order,
+>  			 i.e. first channel corresponds to LSB.
+> +- brcm,dma-channel-shared-mask: Bit mask representing the channels
+> +				that use a shared interrupt
 
-The problem is not the null value, but a value different from 1:
-8 as the burst or 4 as the bus width were rejected.
+Generally we don't like masks in DT (though I see this is in keeping with
+another property above). I won't push strongly here.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+I take it that this is a fixed HW property rather than a software configuration
+option?
+
+> +- brcm,dma-shared-irq-index: index of which of the interrupts mentioned
+> +			     above is the shared interrupt
+
+What is the usual order of the interrupts? How are they expected to be parsed
+if this is in the middle of the list, for example?
+
+I think this needs a more thorough description.
+
+Thanks,
+Mark.
