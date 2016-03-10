@@ -1,54 +1,23 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Thu, 10 Mar 2016 16:13:28 +0530
-Subject: [PATCH 1/2] net: thunderx: Set recevie buffer page usage count in
- bulk
-In-Reply-To: <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
-References: <1457336157-31508-2-git-send-email-sunil.kovvuri@gmail.com>
- <20160307.111534.235286977900488968.davem@davemloft.net>
- <CA+sq2CewOQGSiRC5m64ioYS36-WO0C5XzykZRZd+OLE1tJ-sSQ@mail.gmail.com>
- <20160307.120410.1851177945150642006.davem@davemloft.net>
- <CA+sq2CcyOV3FbpUvSkX4ZhjC+fJuHk9cUpjdiJtkFNaEXOWu6Q@mail.gmail.com>
-Message-ID: <CA+sq2Cc44v_ggy=QLOX_FGt6uTv3Qo1KmqCeZ8=3G1COuWxAHw@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 10 Mar 2016 11:35:36 +0100
+Subject: [PATCH 0/5] dmaengine: sun6i: Fixes and upgrade for audio transfers
+Message-ID: <cover.1457606136.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+This patch series contains the required fixes and changes to the sun6i
+DMA driver for audio streaming.
+These ones have been tested in a Allwinner H3 (Orange PI 2).
 
+Jean-Francois Moine (5):
+  dmaengine: sun6i: Fix the access of the IRQ register
+  dmaengine: sun6i: Fix impossible settings of burst and bus width
+  dmaengine: sun6i: Add 4 as a possible bust value
+  dmaengine: sun6i: Set default values to burst and bus width
+  dmaengine: sun6i: Add cyclic capability
 
->> So if you know ahead of time how the page will be split up, just
->> calculate that when you get the page and increment the page count
->> appropriately.
->>
->> That's what we do in the NIU driver.
->
-> Thanks for the suggestion, will check and get back.
->
+ drivers/dma/sun6i-dma.c | 180 +++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 161 insertions(+), 19 deletions(-)
 
-I looked at the NIU driver and in fn() niu_rbr_refill()
-static void niu_rbr_refill(struct niu *np, struct rx_ring_info *rp, gfp_t mask)
-{
-        int index = rp->rbr_index;
-
-        rp->rbr_pending++;
-        if ((rp->rbr_pending % rp->rbr_blocks_per_page) == 0) {
-
-Here it's been checked whether rbr_pending is a exact multiple of page
-split count.
-And hence updating page count based on fixed calculation is right.
-
-On my platform driver receives a interrupt when free buffer count
-falls below a threshold
-and by the time SW reads count of buffers to be refilled it can be any
-number i.e
-may or may not be a exact multiple of page split count.
-
-When interface is being brought down and while freeing unused receive
-buffers one
-page's count will go wrong and hence will disappear completely. In the
-patch i am
-updating page->count before issuing doorbell to HW irrespective of
-full page utilised
-or not. So there is no mismatch while doing put_page(unused buffer).
-
-Thanks,
-Sunil.
+-- 
+2.7.2
