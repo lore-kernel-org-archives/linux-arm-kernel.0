@@ -1,53 +1,45 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 10 Mar 2016 11:06:01 -0800
-Subject: [PATCH v4 00/52] mtd: rework ECC layout definition
-In-Reply-To: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1457344062-11633-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160310190601.GC2545@google.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 10 Mar 2016 19:28:12 +0000
+Subject: [PATCH 1/2] iommu/dma: Restore scatterlist offsets correctly
+Message-ID: <c14a93373a34633f6db89214ca2ddf69b0eaa1c3.1457637385.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 10:46:50AM +0100, Boris Brezillon wrote:
-> Hello,
-> 
-> This patchset aims at getting rid of the nand_ecclayout limitations.
-> struct nand_ecclayout is defining fixed eccpos and oobfree arrays which
-> can only be increased by modifying the MTD_MAX_ECCPOS_ENTRIES_LARGE and
-> MTD_MAX_OOBFREE_ENTRIES_LARGE macros.
-> This approach forces us to modify the macro values each time we add a
-> new NAND chip with a bigger OOB area, and increasing these arrays also
-> penalize all platforms, even those who only support small NAND devices
-> (with small OOB area).
-> 
-> The idea to overcome this limitation, is to define the ECC/OOB layout
-> by the mean of two functions: ->ecc() and ->free(), which will
-> basically return the same information has those stored in the
-> nand_ecclayout struct.
-> 
-> Another advantage of this solution is that ECC layouts are usually
-> following a repetitive pattern (i.e. leave X bytes free and put Y bytes
-> of ECC per ECC chunk), which allows one to implement the ->ecc()
-> and ->free() functions with a simple logic that can be applied
-> to any size of OOB.
-> 
-> Patches 1 to 4 are just cleanups or trivial fixes that can be taken
-> independently.
-> 
-> Also note that the last two commits are removing the nand_ecclayout
-> definition, thus preventing any new driver to use this structure.
-> Of course, this step can be delayed if some of the previous patches
-> are not accepted.
-> 
-> All those changes are available here [1].
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> [1]https://github.com/bbrezillon/linux-0day/tree/nand/ecclayout
+With the change to stashing just the IOVA-page-aligned remainder of the
+CPU-page offset rather than the whole thing, the failure path in
+__invalidate_sg() also needs tweaking to account for that in the case of
+differing page sizes where the two offsets may not be equivalent.
+Similarly in __finalise_sg(), lest the architecture-specific wrappers
+later get the wrong address for cache maintenance on sync or unmap.
 
-FYI, I've pushed patches 1-4 to l2-mtd.git. I'll take another look at
-them this week I hope (or your new fellow, Richard, can!), then you can
-queue them up for the next cycle.
+Fixes: 164afb1d85b8 ("iommu/dma: Use correct offset in map_sg")
+Reported-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/dma-iommu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Brian
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 72d6182..58f2fe6 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -403,7 +403,7 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 		unsigned int s_length = sg_dma_len(s);
+ 		unsigned int s_dma_len = s->length;
+ 
+-		s->offset = s_offset;
++		s->offset += s_offset;
+ 		s->length = s_length;
+ 		sg_dma_address(s) = dma_addr + s_offset;
+ 		dma_addr += s_dma_len;
+@@ -422,7 +422,7 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
+ 
+ 	for_each_sg(sg, s, nents, i) {
+ 		if (sg_dma_address(s) != DMA_ERROR_CODE)
+-			s->offset = sg_dma_address(s);
++			s->offset += sg_dma_address(s);
+ 		if (sg_dma_len(s))
+ 			s->length = sg_dma_len(s);
+ 		sg_dma_address(s) = DMA_ERROR_CODE;
+-- 
+2.7.2.333.g70bd996.dirty
