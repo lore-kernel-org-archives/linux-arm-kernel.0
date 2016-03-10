@@ -1,18 +1,16 @@
 From: yankejian@huawei.com (Kejian Yan)
-Date: Thu, 10 Mar 2016 21:21:50 +0800
-Subject: [PATCH v2 net-next 2/2] net: hns: fixes a bug of RSS
-In-Reply-To: <1457616110-225844-1-git-send-email-yankejian@huawei.com>
-References: <1457616110-225844-1-git-send-email-yankejian@huawei.com>
-Message-ID: <1457616110-225844-3-git-send-email-yankejian@huawei.com>
+Date: Thu, 10 Mar 2016 21:21:48 +0800
+Subject: [PATCH v2 net-next 0/2] net: hns: get and set RSS indirection table
+ by using ethtool
+Message-ID: <1457616110-225844-1-git-send-email-yankejian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If trying to get receive flow hash indirection table by ethtool, it needs
-to call .get_rxnfc to get ring number first. So this patch implements the
-.get_rxnfc of ethtool. And the data type of rss_indir_table is u32, it has
-to be multiply by the width of data type when using memcpy.
+When we use ethtool to retrieves or configure the receive flow hash 
+indirection table, ethtool needs to call .get_rxnfc to get the ring number
+so this patchset implements the .get_rxnfc and fixes the bug that we can
+not get the tatal table each time.
 
-Signed-off-by: Kejian Yan <yankejian@huawei.com>
 ---
 change log:
 PATCH v2:
@@ -21,71 +19,14 @@ PATCH v2:
 PATCH v1:
  - first submit
 
- Link: https://lkml.org/lkml/2016/3/9/981
----
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c |  6 ++++--
- drivers/net/ethernet/hisilicon/hns/hns_ethtool.c  | 18 ++++++++++++++++++
- 2 files changed, 22 insertions(+), 2 deletions(-)
+Kejian Yan (2):
+  net: hns: fix return value of the function about rss
+  net: hns: fixes a bug of RSS
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-index d07db1f..7b06e9b 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-@@ -787,7 +787,8 @@ static int hns_ae_get_rss(struct hnae_handle *handle, u32 *indir, u8 *key,
- 		memcpy(key, ppe_cb->rss_key, HNS_PPEV2_RSS_KEY_SIZE);
- 
- 	/* update the current hash->queue mappings from the shadow RSS table */
--	memcpy(indir, ppe_cb->rss_indir_table, HNS_PPEV2_RSS_IND_TBL_SIZE);
-+	memcpy(indir, ppe_cb->rss_indir_table,
-+	       HNS_PPEV2_RSS_IND_TBL_SIZE * sizeof(*indir));
- 
- 	return 0;
- }
-@@ -802,7 +803,8 @@ static int hns_ae_set_rss(struct hnae_handle *handle, const u32 *indir,
- 		hns_ppe_set_rss_key(ppe_cb, (u32 *)key);
- 
- 	/* update the shadow RSS table with user specified qids */
--	memcpy(ppe_cb->rss_indir_table, indir, HNS_PPEV2_RSS_IND_TBL_SIZE);
-+	memcpy(ppe_cb->rss_indir_table, indir,
-+	       HNS_PPEV2_RSS_IND_TBL_SIZE * sizeof(*indir));
- 
- 	/* now update the hardware */
- 	hns_ppe_set_indir_table(ppe_cb, ppe_cb->rss_indir_table);
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c b/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
-index 3b914ac..24b2b5f 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
-@@ -1253,6 +1253,23 @@ hns_set_rss(struct net_device *netdev, const u32 *indir, const u8 *key,
- 	return ops->set_rss(priv->ae_handle, indir, key, hfunc);
- }
- 
-+static int hns_get_rxnfc(struct net_device *netdev,
-+			 struct ethtool_rxnfc *cmd,
-+			 u32 *rule_locs)
-+{
-+	struct hns_nic_priv *priv = netdev_priv(netdev);
-+
-+	switch (cmd->cmd) {
-+	case ETHTOOL_GRXRINGS:
-+		cmd->data = priv->ae_handle->q_num;
-+		break;
-+	default:
-+		return -ERRNO;
-+	}
-+
-+	return 0;
-+}
-+
- static struct ethtool_ops hns_ethtool_ops = {
- 	.get_drvinfo = hns_nic_get_drvinfo,
- 	.get_link  = hns_nic_get_link,
-@@ -1276,6 +1293,7 @@ static struct ethtool_ops hns_ethtool_ops = {
- 	.get_rxfh_indir_size = hns_get_rss_indir_size,
- 	.get_rxfh = hns_get_rss,
- 	.set_rxfh = hns_set_rss,
-+	.get_rxnfc = hns_get_rxnfc,
- };
- 
- void hns_ethtool_set_ops(struct net_device *ndev)
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c |  8 ++++---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |  2 +-
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c  | 26 +++++++++++++++++------
+ 3 files changed, 26 insertions(+), 10 deletions(-)
+
 -- 
 1.9.1
