@@ -1,94 +1,110 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Mar 2016 12:58:16 +0700
-Subject: [GIT PULL] More RealView DT and misc cleanups
-Message-ID: <CACRpkdbm0qQS1mq1xFYrQDt-Q4SfTyx7+2pT+FEJRJGQb1Mmuw@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 10 Mar 2016 16:47:14 +0900
+Subject: [PATCH 2/3] iommu/dma: Use correct offset in map_sg
+In-Reply-To: <56E03A83.9050909@arm.com>
+References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
+ <4812a34857b081e45c36d7e887840f3675da74dc.1450457730.git.robin.murphy@arm.com>
+ <CANqRtoSHa1fzQge4ntK9Jt_XFiL0AKWtUti93-cwS-aOkJQcjg@mail.gmail.com>
+ <56E03A83.9050909@arm.com>
+Message-ID: <CANqRtoQJcYaUXDrA8aDzaEEfVr6dh=guvUWQqjPcuuC8VKxxXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Hi Robin,
 
-there is nothing controversial or dangerous about these RealView patches,
-there is mainly upsides like being able to test and run QEMU on RealView
-DT for v4.6.
+On Thu, Mar 10, 2016 at 12:00 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hi Magnus,
+>
+> Thanks for bringing this up...
 
-I'm sorry this was sitting in my tree, I happened to spend my time with
-trying to finalize the CLCD changes and delete the board files but that
-failed.
+No worries!
 
-This would be nice to have merged and away from my patch stack, but
-if it's too late, it's too late, and I'll queue it for v4.7.
+> On 09/03/16 07:50, Magnus Damm wrote:
+>>
+>> On Sat, Dec 19, 2015 at 2:01 AM, Robin Murphy <robin.murphy@arm.com>
+>> wrote:
+>>>
+>>> When mapping a non-page-aligned scatterlist entry, we copy the original
+>>> offset to the output DMA address before aligning it to hand off to
+>>> iommu_map_sg(), then later adding the IOVA page address portion to get
+>>> the final mapped address. However, when the IOVA page size is smaller
+>>> than the CPU page size, it is the offset within the IOVA page we want,
+>>> not that within the CPU page, which can easily be larger than an IOVA
+>>> page and thus result in an incorrect final address.
+>>>
+>>> Fix the bug by taking only the IOVA-aligned part of the offset as the
+>>> basis of the DMA address, not the whole thing.
+>>>
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>> ---
+>>>   drivers/iommu/dma-iommu.c | 2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>>> index 982e716..03811e3 100644
+>>> --- a/drivers/iommu/dma-iommu.c
+>>> +++ b/drivers/iommu/dma-iommu.c
+>>> @@ -458,7 +458,7 @@ int iommu_dma_map_sg(struct device *dev, struct
+>>> scatterlist *sg,
+>>>                  size_t s_length = s->length;
+>>>                  size_t pad_len = (mask - iova_len + 1) & mask;
+>>>
+>>> -               sg_dma_address(s) = s->offset;
+>>> +               sg_dma_address(s) = s_offset;
+>>>                  sg_dma_len(s) = s_length;
+>>>                  s->offset -= s_offset;
+>>>                  s_length = iova_align(iovad, s_length + s_offset);
+>>> --
+>>> 1.9.1
+>>
+>>
+>> Hi Robin,
+>>
+>> Thanks a lot for your fix! While I don't have any doubt that your
+>> patch fixes a real issue I wonder if another update is needed.
+>> Depending on what is expected perhaps just the comment above the code
+>> wants an update or maybe the "un-swizzling" needs more work. With this
+>> patch applied the code looks semi-complete to me at this point.
+>>
+>> Currently the comment just above the hunk says:
+>>
+>>      /*
+>>       * Work out how much IOVA space we need, and align the segments to
+>>       * IOVA granules for the IOMMU driver to handle. With some clever
+>>       * trickery we can modify the list in-place, but reversibly, by
+>>       * hiding the original data in the as-yet-unused DMA fields.
+>>       */
+>>
+>> With your fix the "original data" is no longer stored in the unused
+>> DMA fields.
+>
+>
+> OK, so we're now  moving some of the data rather than taking a literal copy,
+> but the point remains that we're not throwing any information away - we can
+> move the remainder back again if necessary. As far as I'm concerned the
+> comment is still valid, but if it's open to misinterpretation I can try
+> rephrasing it.
 
-Anyways: please pull it in.
+Thanks, I agree with you about the comment! As long as the fields can
+be restored everything is fine.
 
-Yours,
-Linus Walleij
+>> Instead the s_offset value is stored as modified in
+>> sg_dma_address() which in turn will make the iommu_dma_map_sg()
+>> function return with modified sg->s_offset both on success and
+>> failure.
+>>
+>> Perhaps this is intentional design, or maybe __invalidate_sg() and
+>> __finalize_sg() both need to support roll back? Any ideas?
+>
+>
+> What's missing is that some idiot forgot about the hard-to-exercise failure
+> path and didn't update __invalidate_sg() to match. I'll get right on that...
 
+Oh well. Fixing the error case sounds good. I don't have any special
+test case to trigger anything, so testing is a bit difficult for me.
+Apart from that I'm happy to help - let me know if you can think of
+something.
 
-The following changes since commit 1c6e288da6cc3c72579ff0062b5a5684fb9ef90e:
+Cheers,
 
-  ARM: versatile: move restart to the device tree (2016-02-15 09:58:08 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/realview-dt-cleanup-2
-
-for you to fetch changes up to b918c87a96254b80c800e3c3b2a502aa06b84b36:
-
-  ARM: realview: hide unused 'pmu_device' object (2016-03-10 12:44:46 +0700)
-
-----------------------------------------------------------------
-This is a second set of RealView Device Tree cleanup+additions
-that is sitting in my tree for no reason:
-
-- Device Tree defintions for RealView EB, PBA8 and PBX
-
-- CLCD bindings for the standard VGA on RealView PB11MPCore and
-  PB1176 using just the existing bindings in the same way as
-  Versatile Express is doing it.
-
-- A L2x0 compile cleanup from Arnd that will not be needed once
-  we remove the board files (but removal is postponed to v4.7)
-
-- A patch to the SoC driver for Versatile making it print the
-  HBI number dynamically.
-
-- A binding blurb for the IB2 syscon on the Versatile.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: realview: hide unused 'pmu_device' object
-
-Linus Walleij (6):
-      Documentation/DT: add blurb for IB2 syscon to Versatile
-      ARM: PB11MPCore: define a standard VGA panel
-      ARM: PB1176: define a standard VGA panel
-      soc: versatile: dynamically detect RealView HBI numbers
-      ARM: realview: support all the RealView EB board variants
-      ARM: realview: DT support for the PBA8 and PBX-A9
-
- Documentation/devicetree/bindings/arm/arm-boards |   8 +
- arch/arm/boot/dts/Makefile                       |   8 +-
- arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts  |  93 ++++
- arch/arm/boot/dts/arm-realview-eb-11mp.dts       |  74 ++++
- arch/arm/boot/dts/arm-realview-eb-a9mp.dts       |  70 +++
- arch/arm/boot/dts/arm-realview-eb-mp.dtsi        | 225 ++++++++++
- arch/arm/boot/dts/arm-realview-eb.dts            | 166 +++++++
- arch/arm/boot/dts/arm-realview-eb.dtsi           | 453 +++++++++++++++++++
- arch/arm/boot/dts/arm-realview-pb1176.dts        |  40 ++
- arch/arm/boot/dts/arm-realview-pb11mp.dts        |  19 +-
- arch/arm/boot/dts/arm-realview-pba8.dts          | 178 ++++++++
- arch/arm/boot/dts/arm-realview-pbx-a9.dts        | 229 ++++++++++
- arch/arm/boot/dts/arm-realview-pbx.dtsi          | 542 +++++++++++++++++++++++
- arch/arm/mach-realview/realview_pbx.c            |   2 +
- drivers/soc/versatile/soc-realview.c             |  19 +-
- 15 files changed, 2101 insertions(+), 25 deletions(-)
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-a9mp.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-mp.dtsi
- create mode 100644 arch/arm/boot/dts/arm-realview-eb.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb.dtsi
- create mode 100644 arch/arm/boot/dts/arm-realview-pba8.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-pbx-a9.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-pbx.dtsi
+/ magnus
