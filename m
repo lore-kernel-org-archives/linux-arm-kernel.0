@@ -1,103 +1,61 @@
-From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 10 Mar 2016 11:52:54 +0000
-Subject: [RFC v5 06/17] dma-reserved-iommu: iommu_get/put_single_reserved
-In-Reply-To: <1456856877-4817-7-git-send-email-eric.auger@linaro.org>
-References: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
- <1456856877-4817-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <20160310115253.GA14609@e106794-lin.cambridge.arm.com>
+From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
+Date: Thu, 10 Mar 2016 12:36:04 +0100
+Subject: [PATCH 12/30] ARM: dts: r8a7791: Reference both DMA controllers in
+ HSCIF nodes
+In-Reply-To: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1457609782-24108-13-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+R-Car Gen2 have two DMA controllers, which are equivalent. Add
+references to both dmac0 and dmac1 so the driver can fallback to the
+later if the first one is unavailable.
 
-On Tue, Mar 01, 2016 at 06:27:46PM +0000, Eric Auger wrote:
->[...]
-> +
-> +int iommu_get_single_reserved(struct iommu_domain *domain,
-> +			      phys_addr_t addr, int prot,
-> +			      dma_addr_t *iova)
-> +{
-> +	unsigned long order = __ffs(domain->ops->pgsize_bitmap);
-> +	size_t page_size = 1 << order;
-> +	phys_addr_t mask = page_size - 1;
-> +	phys_addr_t aligned_addr = addr & ~mask;
-> +	phys_addr_t offset  = addr - aligned_addr;
-> +	struct iommu_reserved_binding *b;
-> +	struct iova *p_iova;
-> +	struct iova_domain *iovad =
-> +		(struct iova_domain *)domain->reserved_iova_cookie;
-> +	int ret;
-> +
-> +	if (!iovad)
-> +		return -EINVAL;
-> +
-> +	mutex_lock(&domain->reserved_mutex);
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+---
+ arch/arm/boot/dts/r8a7791.dtsi | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-I believe this function could get called from the chunk of __setup_irq
-that is executed atomically:
-
-    * request_threaded_irq
-    * __setup_irq
-    * irq_startup
-    * irq_domain_activate_irq
-    * msi_domain_activate
-    * msi_compose
-    * iommu_get_single_reserved
-
-If this is the case, we should probably use a spinlock to protect the
-iova_domain...
-
-> +
-> +	b = find_reserved_binding(domain, aligned_addr, page_size);
-> +	if (b) {
-> +		*iova = b->iova + offset;
-> +		kref_get(&b->kref);
-> +		ret = 0;
-> +		goto unlock;
-> +	}
-> +
-> +	/* there is no existing reserved iova for this pa */
-> +	p_iova = alloc_iova(iovad, 1, iovad->dma_32bit_pfn, true);
-> +	if (!p_iova) {
-> +		ret = -ENOMEM;
-> +		goto unlock;
-> +	}
-> +	*iova = p_iova->pfn_lo << order;
-> +
-> +	b = kzalloc(sizeof(*b), GFP_KERNEL);
-
-... and GFP_ATOMIC here.
-
-Thanks,
-Jean-Philippe
-
-> +	if (!b) {
-> +		ret = -ENOMEM;
-> +		goto free_iova_unlock;
-> +	}
-> +
-> +	ret = iommu_map(domain, *iova, aligned_addr, page_size, prot);
-> +	if (ret)
-> +		goto free_binding_iova_unlock;
-> +
-> +	kref_init(&b->kref);
-> +	kref_get(&b->kref);
-> +	b->domain = domain;
-> +	b->addr = aligned_addr;
-> +	b->iova = *iova;
-> +	b->size = page_size;
-> +
-> +	link_reserved_binding(domain, b);
-> +
-> +	*iova += offset;
-> +	goto unlock;
-> +
-> +free_binding_iova_unlock:
-> +	kfree(b);
-> +free_iova_unlock:
-> +	free_iova(iovad, *iova >> order);
-> +unlock:
-> +	mutex_unlock(&domain->reserved_mutex);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_get_single_reserved);
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 3538bd5..004c5b7 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -758,8 +758,9 @@
+ 		interrupts = <0 154 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7791_CLK_HSCIF0>;
+ 		clock-names = "sci_ick";
+-		dmas = <&dmac0 0x39>, <&dmac0 0x3a>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x39>, <&dmac0 0x3a>,
++		       <&dmac1 0x39>, <&dmac1 0x3a>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -770,8 +771,9 @@
+ 		interrupts = <0 155 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7791_CLK_HSCIF1>;
+ 		clock-names = "sci_ick";
+-		dmas = <&dmac0 0x4d>, <&dmac0 0x4e>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x4d>, <&dmac0 0x4e>,
++		       <&dmac1 0x4d>, <&dmac1 0x4e>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -782,8 +784,9 @@
+ 		interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7791_CLK_HSCIF2>;
+ 		clock-names = "sci_ick";
+-		dmas = <&dmac0 0x3b>, <&dmac0 0x3c>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x3b>, <&dmac0 0x3c>,
++		       <&dmac1 0x3b>, <&dmac1 0x3c>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+-- 
+2.7.2
