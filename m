@@ -1,77 +1,69 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 10 Mar 2016 10:03:45 +0100
-Subject: [PATCH 6/8] efi/arm*: libstub: wire up GOP handling into the ARM
- UEFI stub
-In-Reply-To: <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
-References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
- <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160310082522.GB8618@gmail.com>
- <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
-Message-ID: <20160310090345.GA19834@gmail.com>
+From: Gang.Liu@nxp.com (Liu Gang)
+Date: Thu, 10 Mar 2016 16:57:19 +0800
+Subject: [PATCH] gpio/ls1021a: Add gpio support for ls1021a platform
+Message-ID: <1457600240-47141-1-git-send-email-Gang.Liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add gpio nodes for ls1021a platform dts file. The gpio
+IP block of the ls1021a can be supported by the code
+drivers/gpio/gpio-mpc8xxx.c.
 
-* Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-> > So screen_info_guid should probably not be a 'const': you have to cast it away
-> > anyway, adding artificial linebreaks and uglifying the code. It's also a bad
-> > practice to cast away const-ness, it hinders move-consts-to-readonly-sections
-> > efforts.
-> 
-> The problem here is that the UEFI spec never uses const qualifiers in
-> its APIs for by-ref parameters that are obviously never modified by
-> the caller, such as these GUIDs. [...]
-
-Ah, ok. Two related thoughts came up:
-
-1)
-
-While I was looking at this code and was asking myself why the EFI runtime is 
-generally invoked via a relatively fragile, non-type-checking vararg construct.
-
-Wouldn't you be better off by explicitly defining all the API variants, and then 
-internally calling the EFI runtime?
-
-That would neatly solve such const artifacts as well.
-
-So instead of:
-
-
-+       status = efi_call_early(allocate_pool, EFI_RUNTIME_SERVICES_DATA,
-+                               sizeof(*si), (void **)&si);
-
-we could have something like:
-
-	status = efi_early__allocate_pool(EFI_RUNTIME_SERVICES_DATA, sizeof(*si), &si);
-
-	...
-
-	efi_early__free_pool(si);
-
-
-i.e. it would look a lot more like a properly distributed, typed, structured 
-family of C function APIs, instead of this single central bastard of an ioctl() 
-interface.
-
-There's over 100 invocations of the EFI runtime in the Linux kernel, I think it 
-would be worth the effort. The wrapper inlines should be mostly trivial.
-
-That would also add an opportunity to actually document most of these calls.
-
-2)
-
-Another suggestion: would it make sense to unify the 'EFI' and 'EFI early' calls - 
-is there any deep reason why they are invoked via separate names? Why not use a 
-single namespace:
-
-	efi__allocate_pool()
-	efi__free_pool()
-
-and have a 'current EFI configuration' pointer internaly that can be switched from 
-the early to the later variant during bootup. The various typed API wrappers would 
-use this pointer.
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 2c84ca2..57915c2 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -332,6 +332,46 @@
+ 			status = "disabled";
+ 		};
+ 
++		gpio0: gpio at 2300000 {
++			compatible = "fsl,qoriq-gpio";
++			reg = <0x0 0x2300000 0x0 0x10000>;
++			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio at 2310000 {
++			compatible = "fsl,qoriq-gpio";
++			reg = <0x0 0x2310000 0x0 0x10000>;
++			interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio2: gpio at 2320000 {
++			compatible = "fsl,qoriq-gpio";
++			reg = <0x0 0x2320000 0x0 0x10000>;
++			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio3: gpio at 2330000 {
++			compatible = "fsl,qoriq-gpio";
++			reg = <0x0 0x2330000 0x0 0x10000>;
++			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
+ 		lpuart0: serial at 2950000 {
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2950000 0x0 0x1000>;
+-- 
+2.1.0.27.g96db324
