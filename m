@@ -1,42 +1,64 @@
-From: dwoods@mellanox.com (David Woods)
-Date: Thu, 10 Mar 2016 17:23:18 -0500
-Subject: BUG in HugeTLBFS with Contiguous hint
-In-Reply-To: <CAPvkgC1Oe=AiDDwSO_38bz_7FPwg3XoHK_Tts_UPorexkgFnhA@mail.gmail.com>
-References: <20160309021252.GA4573@linaro.org>
- <20160309153131.GF28496@arm.com> <56E048E6.9030508@mellanox.com>
- <CAPvkgC1Oe=AiDDwSO_38bz_7FPwg3XoHK_Tts_UPorexkgFnhA@mail.gmail.com>
-Message-ID: <56E1F3D6.9020906@mellanox.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 10 Mar 2016 16:44:22 -0600
+Subject: [PATCH] ARM: DRA722: Add ID detect for Silicon Rev 2.0
+In-Reply-To: <1457556991-10729-1-git-send-email-vishalm@ti.com>
+References: <1457556991-10729-1-git-send-email-vishalm@ti.com>
+Message-ID: <56E1F8C6.4020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2016 02:57 AM, Steve Capper wrote:
-> Hi,
-> Replying to both inline below:
->
-> On 9 March 2016 at 23:01, David Woods <dwoods@mellanox.com> wrote:
->> On 03/09/2016 10:31 AM, Will Deacon wrote:
->>> On Wed, Mar 09, 2016 at 02:12:56AM +0000, Steve Capper wrote:
->>>> Hi,
->>> Hi Steve,
->>>
->>>> I am very sorry for the very late bug report. I have just come across
->>>> this error.
->>>>
->>>> Whilst testing something else, I found that 2MB HugeTLB pages formed
->>>> from contiguous pte's cause BUGs to appear when running through the
->>>> libhugetlbfs test suite.
->>> Ouch. Any idea why this wasn't spotted earlier? Did something else
->>> change?
-> Sorry, no. A lot of stuff has changed (and I need to double check my
-> .config too). I will be able to dig into this in more detail when I
-> get back in the office next week (I have a painfully slow internet
-> connection to my devboard at the moment).
+On 03/09/2016 02:56 PM, Vishal Mahaveer wrote:
+> From: Vishal Mahaveer <vishalm@ti.com>
+> 
+> Silicon Rev 2.0 is a minor variant of Rev 1.0. Rev 2.0 is an incremental revision
+> with various fixes including the following:
+>     - Reset logic fixes
+>     - Few asymetric aging logic fixes
+minor:
+s/asymetric/asymmetric/
 
-I was able to verify that this is a regression.  I did a git bisect to 
-track it down and it looks like the commit which caused this failure was 
-61f5d698 mm: re-enable THP.  The BUG does go away if 
-TRANSPARENT_HUGEPAGE is disabled.  I believe that means the problem came 
-with any one of the 25 commits between 61f5d698 and 56a17b88 mm: 
-temporarily mark THP broken.  I'll continue to try to debug it.
+>     - Ethernet speed fixes
+>     - EDMA fixes for McASP
+> 
+> Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
+> ---
+>  arch/arm/mach-omap2/id.c  |    4 ++--
+>  arch/arm/mach-omap2/soc.h |    1 +
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 8a2ae82..84ee602 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -667,9 +667,9 @@ void __init dra7xxx_check_revision(void)
+>  		case 0:
+>  			omap_revision = DRA722_REV_ES1_0;
+>  			break;
+> +		case 1:
+>  		default:
+> -			/* If we have no new revisions */
+> -			omap_revision = DRA722_REV_ES1_0;
+> +			omap_revision = DRA722_REV_ES2_0;
+>  			break;
+>  		}
+>  		break;
+> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+> index 83d3547..464e73f 100644
+> --- a/arch/arm/mach-omap2/soc.h
+> +++ b/arch/arm/mach-omap2/soc.h
+> @@ -471,6 +471,7 @@ IS_OMAP_TYPE(3430, 0x3430)
+>  #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
+>  #define DRA752_REV_ES2_0	(DRA7XX_CLASS | (0x52 << 16) | (0x20 << 8))
+>  #define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+> +#define DRA722_REV_ES2_0	(DRA7XX_CLASS | (0x22 << 16) | (0x20 << 8))
+>  
+>  void omap2xxx_check_revision(void);
+>  void omap3xxx_check_revision(void);
+> 
+otherwise,
+for me:
+Acked-by: Nishanth Menon <nm@ti.com>
 
--Dave
+-- 
+Regards,
+Nishanth Menon
