@@ -1,79 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Mar 2016 10:51:22 +0100
-Subject: [PATCH v3 05/11] soc: renesas: rcar-sysc: Enable Clock Domain for
- r8a7795 I/O devices
-In-Reply-To: <2523920.fzA0Elmkzz@avalon>
-References: <1457551127-21934-1-git-send-email-geert+renesas@glider.be>
- <1457551127-21934-6-git-send-email-geert+renesas@glider.be>
- <2523920.fzA0Elmkzz@avalon>
-Message-ID: <CAMuHMdUBVBRHrWT9hLH1V23LbBGrM=a5hGGVrv_F5cjPT4+TVw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 10 Mar 2016 11:09:09 +0100
+Subject: [PATCH v5 net-next 01/10] misc: sram: add optional ioremap without
+ write combining
+In-Reply-To: <1457604558-1121-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1457604558-1121-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1457604558-1121-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+From: Marcin Wojtas <mw@semihalf.com>
 
-On Thu, Mar 10, 2016 at 10:40 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Wednesday 09 March 2016 20:18:41 Geert Uytterhoeven wrote:
->> On R-Car H3, some power areas (e.g. A3VP) contain I/O devices, which are
->> also part of the CPG/MSSR Clock Domain.  Hook up the CPG/MSSR Clock
->> Domain attach/detach callbacks to enable power management using module
->> clocks.
->>
->> This also allows to support the Clock Domain for devices in the
->> "always-on" power area.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Some SRAM users may require non-bufferable access to the memory, which is
+impossible, because devm_ioremap_wc() is used for setting sram->virt_base.
 
->> --- a/drivers/soc/renesas/rcar-sysc.c
->> +++ b/drivers/soc/renesas/rcar-sysc.c
+This commit adds optional flag 'no-memory-wc', which allow to choose remap
+method, using DT property. Documentation is updated accordingly.
 
->> @@ -251,6 +252,15 @@ static void __init rcar_sysc_pd_setup(struct
->> device_node *np, gov = &pm_domain_always_on_gov;
->>       }
->>
->> +#ifdef CONFIG_ARCH_R8A7795
->
-> This is fine for now as the R8A7795 is the only ARM64 model in the R-Car
-> family, but how do you plan to move forward on this ? Will it be enabled for
-> ARM64 SoCs straight away, and for ARM32 SoCs when switching from the cpg to
-> the always-on power domain ?
->
->> +     if (!(pd->flags & (PD_CPU | PD_SCU))) {
->> +             /* Enable Clock Domain for I/O devices */
->> +             genpd->flags = GENPD_FLAG_PM_CLK;
->> +             genpd->attach_dev = cpg_mssr_attach_dev;
->> +             genpd->detach_dev = cpg_mssr_detach_dev;
->> +     }
->> +#endif
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+---
+ Documentation/devicetree/bindings/sram/sram.txt | 5 +++++
+ drivers/misc/sram.c                             | 5 ++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-When enabling the always-on power domain for R-Car H1 and Gen2, this
-should become:
-
-        if (!(pd->flags & (PD_CPU | PD_SCU))) {
-                /* Enable Clock Domain for I/O devices */
-                genpd->flags = GENPD_FLAG_PM_CLK;
-#ifdef CONFIG_ARCH_R8A7795 /* or CONFIG_ARM64 */
-                genpd->attach_dev = cpg_mssr_attach_dev;
-                genpd->detach_dev = cpg_mssr_detach_dev;
-#else
-                genpd->attach_dev = cpg_mstp_attach_dev;
-                genpd->detach_dev = cpg_mstp_detach_dev;
-#endif
-
-It becomes more gory when migrating R-Car H1 and Gen2 to CPG/MSSR, and
-maintaining backwards compatibility, as which callbacks to choose will depend
-on the presence of "renesas,cpg-mstp-clocks" device nodes in DT, and a new
-CONFIG_CLK_RENESAS_LEGACY option.
-Needless to say, it'll be more complex if not all SoCs migrate at once...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/sram/sram.txt b/Documentation/devicetree/bindings/sram/sram.txt
+index 42ee9438b771..227e3a341af1 100644
+--- a/Documentation/devicetree/bindings/sram/sram.txt
++++ b/Documentation/devicetree/bindings/sram/sram.txt
+@@ -25,6 +25,11 @@ Required properties in the sram node:
+ - ranges : standard definition, should translate from local addresses
+            within the sram to bus addresses
+ 
++Optional properties in the sram node:
++
++- no-memory-wc : the flag indicating, that SRAM memory region has not to
++                 be remapped as write combining. WC is used by default.
++
+ Required properties in the area nodes:
+ 
+ - reg : iomem address range, relative to the SRAM range
+diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+index 736dae715dbf..69cdabea9c03 100644
+--- a/drivers/misc/sram.c
++++ b/drivers/misc/sram.c
+@@ -360,7 +360,10 @@ static int sram_probe(struct platform_device *pdev)
+ 		return -EBUSY;
+ 	}
+ 
+-	sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
++	if (of_property_read_bool(pdev->dev.of_node, "no-memory-wc"))
++		sram->virt_base = devm_ioremap(sram->dev, res->start, size);
++	else
++		sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
+ 	if (IS_ERR(sram->virt_base))
+ 		return PTR_ERR(sram->virt_base);
+ 
+-- 
+2.5.0
