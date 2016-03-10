@@ -1,38 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Mar 2016 10:13:04 +0100
-Subject: ARMv4 (not v4t) marked obsolete in gcc-6
-Message-ID: <201603101013.04618.arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 10 Mar 2016 16:14:18 +0700
+Subject: [PATCH 6/8] efi/arm*: libstub: wire up GOP handling into the ARM
+ UEFI stub
+In-Reply-To: <20160310090345.GA19834@gmail.com>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160310082522.GB8618@gmail.com>
+ <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
+ <20160310090345.GA19834@gmail.com>
+Message-ID: <CAKv+Gu_rtQjWJ-=Nf-dEYEHVB5dwKMA_Mv2rVujBz9t=3qnUrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
-so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
-we currenly support in the Linux kernel.
+On 10 March 2016 at 16:03, Ingo Molnar <mingo@kernel.org> wrote:
+>
+> * Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> > So screen_info_guid should probably not be a 'const': you have to cast it away
+>> > anyway, adding artificial linebreaks and uglifying the code. It's also a bad
+>> > practice to cast away const-ness, it hinders move-consts-to-readonly-sections
+>> > efforts.
+>>
+>> The problem here is that the UEFI spec never uses const qualifiers in
+>> its APIs for by-ref parameters that are obviously never modified by
+>> the caller, such as these GUIDs. [...]
+>
+> Ah, ok. Two related thoughts came up:
+>
+> 1)
+>
+> While I was looking at this code and was asking myself why the EFI runtime is
+> generally invoked via a relatively fragile, non-type-checking vararg construct.
+>
+> Wouldn't you be better off by explicitly defining all the API variants, and then
+> internally calling the EFI runtime?
+>
+> That would neatly solve such const artifacts as well.
+>
+> So instead of:
+>
+>
+> +       status = efi_call_early(allocate_pool, EFI_RUNTIME_SERVICES_DATA,
+> +                               sizeof(*si), (void **)&si);
+>
+> we could have something like:
+>
+>         status = efi_early__allocate_pool(EFI_RUNTIME_SERVICES_DATA, sizeof(*si), &si);
+>
+>         ...
+>
+>         efi_early__free_pool(si);
+>
+>
+> i.e. it would look a lot more like a properly distributed, typed, structured
+> family of C function APIs, instead of this single central bastard of an ioctl()
+> interface.
+>
+> There's over 100 invocations of the EFI runtime in the Linux kernel, I think it
+> would be worth the effort. The wrapper inlines should be mostly trivial.
+>
+> That would also add an opportunity to actually document most of these calls.
+>
 
-The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
-and it will be removed in the following release (gcc-7) one year later, unless someone
-raises concerns over it.
+If only. The ARM and arm64 wrappers actually simply resolve to
+correctly typed calls. While I am not an expert on the x86 side of
+things, I think the vararg stuff is needed to be able to perform the
+thunking required to do function calls using the MS ABI for x86_64.
 
-We will of course be able to compile kernels for a long time using older compilers, but
-this tends to get harder over the years as people upgrade to newer distros.
+As far as documentation is concerned, all of these functions and
+protocol methods are documented in the UEFI spec, which is freely
+accessible. It may be somewhat redundant to have our own documentation
+for them.
 
-Here is an overview of which ARMv4 platforms we still have as of Linux-4.6:
+> 2)
+>
+> Another suggestion: would it make sense to unify the 'EFI' and 'EFI early' calls -
+> is there any deep reason why they are invoked via separate names? Why not use a
+> single namespace:
+>
+>         efi__allocate_pool()
+>         efi__free_pool()
+>
+> and have a 'current EFI configuration' pointer internaly that can be switched from
+> the early to the later variant during bootup. The various typed API wrappers would
+> use this pointer.
+>
 
-* Moxart: this is the only one that was recently (2013) added, and is apparently
-  hardware that remains commercially available.
+Actually, having statically initialized pointer variables is more of a
+concern. The nice thing about plain function calls is that they can
+usually be resolved at link time to relative branches on most
+architectures, rather than require GOT fixups or other magic to be
+able to execute in the UEFI environment.
 
-* Gemini: officially supported in OpenWRT today, with the latest compiler. This one
-  will likely cause the most issues for actual users. It would be helpful to get
-  some numbers about users or downloads here, to see whether it can be dropped
-  in a future OpenWRT release or if it might be possible to leave this on
-  gcc-6.x when the other platforms move on to gcc-7+
-
-* sa1100: A lot of people have these, but I'm guessing this is mostly interesting
-  for hobbyists that are able to keep using older gcc versions.
-
-* RiscPC, Footbridge, EBSA110: Classic systems that used to be popular in
-  the past but only remain in small quantities as far as I know. Russell still
-  uses them. He also uses older compilers, so probably isn't affected
-  immediately.
-
-	Arnd
+Thanks,
+Ard.
