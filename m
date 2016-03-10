@@ -1,45 +1,77 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Thu, 10 Mar 2016 10:01:04 +0100
-Subject: [PATCH 1/2] spi: sun4i: add DMA support
-In-Reply-To: <20160306214206.GW8418@lukather>
-References: <1456466217-6793-1-git-send-email-plaes@plaes.org>
- <1456466217-6793-2-git-send-email-plaes@plaes.org>
- <20160226122504.GR18327@sirena.org.uk>
- <CAOMqctTz=szSkpk95D_dUJjjpziCKoPv=xRczjfq2Roct-K-OA@mail.gmail.com>
- <20160306214206.GW8418@lukather>
-Message-ID: <CAOMqctQ5aq0A95ErVVF13f_8JBy0xRw9_FZ3avbYmZUGXp=Svg@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 10 Mar 2016 10:03:45 +0100
+Subject: [PATCH 6/8] efi/arm*: libstub: wire up GOP handling into the ARM
+ UEFI stub
+In-Reply-To: <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160310082522.GB8618@gmail.com>
+ <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
+Message-ID: <20160310090345.GA19834@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On 6 March 2016 at 22:42, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Feb 26, 2016 at 01:51:51PM +0100, Michal Suchanek wrote:
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
->> Besides this non-technical objection there were multiple technical
->> objections.
->>
->> IIRC one was that the driver does not handle the case when the DMA
->> channels are not available. As I understand it the channels are
->> exclusively reserved for a particular peripherial on sunxi platform so
->> this ShoulNotHappen(tm). So it's probably fine for the driver to fail
->> probe  when you have broken DT or no DMA engine support for sunxi
->> platform.
->
-> There's a quite trivial scenario that would trigger this: if the dma
-> driver or dmaengine is not enabled / loaded.
+> > So screen_info_guid should probably not be a 'const': you have to cast it away
+> > anyway, adding artificial linebreaks and uglifying the code. It's also a bad
+> > practice to cast away const-ness, it hinders move-consts-to-readonly-sections
+> > efforts.
+> 
+> The problem here is that the UEFI spec never uses const qualifiers in
+> its APIs for by-ref parameters that are obviously never modified by
+> the caller, such as these GUIDs. [...]
 
-There are other trivial scenarios under which the driver will fail
-like loading wrong DT, not compiling or loading the sunxi pinmux
-driver, and whatnot.
+Ah, ok. Two related thoughts came up:
 
-When you misconfigure your kernel it does not work. So long as the
-driver just fails and does not crash and burn it's normal. Since the
-driver is pretty much useless without DMA as it is now (63 byte
-transfer limit) losing the non-DMA functionality when DMA engine is
-not compiled-in does not seem that terrible.
+1)
 
-Thanks
+While I was looking at this code and was asking myself why the EFI runtime is 
+generally invoked via a relatively fragile, non-type-checking vararg construct.
 
-Michal
+Wouldn't you be better off by explicitly defining all the API variants, and then 
+internally calling the EFI runtime?
+
+That would neatly solve such const artifacts as well.
+
+So instead of:
+
+
++       status = efi_call_early(allocate_pool, EFI_RUNTIME_SERVICES_DATA,
++                               sizeof(*si), (void **)&si);
+
+we could have something like:
+
+	status = efi_early__allocate_pool(EFI_RUNTIME_SERVICES_DATA, sizeof(*si), &si);
+
+	...
+
+	efi_early__free_pool(si);
+
+
+i.e. it would look a lot more like a properly distributed, typed, structured 
+family of C function APIs, instead of this single central bastard of an ioctl() 
+interface.
+
+There's over 100 invocations of the EFI runtime in the Linux kernel, I think it 
+would be worth the effort. The wrapper inlines should be mostly trivial.
+
+That would also add an opportunity to actually document most of these calls.
+
+2)
+
+Another suggestion: would it make sense to unify the 'EFI' and 'EFI early' calls - 
+is there any deep reason why they are invoked via separate names? Why not use a 
+single namespace:
+
+	efi__allocate_pool()
+	efi__free_pool()
+
+and have a 'current EFI configuration' pointer internaly that can be switched from 
+the early to the later variant during bootup. The various typed API wrappers would 
+use this pointer.
+
+Thanks,
+
+	Ingo
