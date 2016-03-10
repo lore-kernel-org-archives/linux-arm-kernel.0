@@ -1,75 +1,43 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 10 Mar 2016 14:19:49 +0100
-Subject: [PATCH 05/13] input: convert sun4i-ts to use
- devm_thermal_zone_of_sensor_register
-In-Reply-To: <20160310093438.GL30994@pengutronix.de>
-References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
- <1457559336-17652-6-git-send-email-edubezval@gmail.com>
- <20160310093438.GL30994@pengutronix.de>
-Message-ID: <56E17475.8010506@redhat.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 10 Mar 2016 14:23:51 +0100
+Subject: [PATCH v2 1/2] iio: core: introduce IIO_CHAN_INFO_SIGNED
+In-Reply-To: <56E08FD5.4060701@kernel.org>
+References: <1457360997-29179-1-git-send-email-ludovic.desroches@atmel.com>
+ <1457360997-29179-2-git-send-email-ludovic.desroches@atmel.com>
+ <56DDDFFC.5010100@metafoo.de> <56E08FD5.4060701@kernel.org>
+Message-ID: <20160310132351.GO2690@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 09, 2016 at 09:04:21PM +0000, Jonathan Cameron wrote:
+> On 07/03/16 20:09, Lars-Peter Clausen wrote:
+> > On 03/07/2016 03:29 PM, Ludovic Desroches wrote:
+> >> The same channel can be used to perform a signed or an unsigned
+> >> conversion. Add a new infomask element to be able to select the type of
+> >> conversion wanted: a raw one or a signed raw one.
+> > 
+> > If this is the difference between offset binary and two's complement then it
+> > makes no sense to expose this at this level. Both are the same number just
+> > in a different representation and converting between them is cheap. A few
+> > magnitudes cheaper than reading the result over sysfs. So, if your device
+> > supports both, just pick one.
+> > 
+> > For the buffered interface it may make sense to expose this, since the per
+> > sample overhead is a lot lower. But still doing the conversion should be
+> > cheap enough that it does not really matter. Before this is implemented I'd
+> > like to see hard performance numbers that this actually makes a difference.
+> > 
+> > - Lars
+> > 
+> Definitely looking for more detail on this.  I'd missed we were talking simply
+> about representation (which is also how I read 62.6.6 Conversion Results Format
+> in the datasheet). Not entirely sure what I imagined the difference between
+> signed and unsigned output would be!
 
-On 10-03-16 10:34, Sascha Hauer wrote:
-> On Wed, Mar 09, 2016 at 01:35:27PM -0800, Eduardo Valentin wrote:
->> This changes the driver to use the devm_ version
->> of thermal_zone_of_sensor_register and cleans
->> up the  local points and unregister calls.
->>
->> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: Hans de Goede <hdegoede@redhat.com>
->> Cc: Zhang Rui <rui.zhang@intel.com>
->> Cc: Lukasz Majewski <l.majewski@samsung.com>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Jens Thiele <karme@karme.de>
->> Cc: linux-input at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
->> ---
->>   drivers/input/touchscreen/sun4i-ts.c | 9 +--------
->>   1 file changed, 1 insertion(+), 8 deletions(-)
->>
->> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
->> index 4857943..d07dd29 100644
->> --- a/drivers/input/touchscreen/sun4i-ts.c
->> +++ b/drivers/input/touchscreen/sun4i-ts.c
->> @@ -115,7 +115,6 @@
->>   struct sun4i_ts_data {
->>   	struct device *dev;
->>   	struct input_dev *input;
->> -	struct thermal_zone_device *tz;
->>   	void __iomem *base;
->>   	unsigned int irq;
->>   	bool ignore_fifo_data;
->> @@ -366,10 +365,7 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->>   	if (IS_ERR(hwmon))
->>   		return PTR_ERR(hwmon);
->>
->> -	ts->tz = thermal_zone_of_sensor_register(ts->dev, 0, ts,
->> -						 &sun4i_ts_tz_ops);
->> -	if (IS_ERR(ts->tz))
->> -		ts->tz = NULL;
->> +	devm_thermal_zone_of_sensor_register(ts->dev, 0, ts, &sun4i_ts_tz_ops);
->
-> Shouldn't we check the return value? There are a few possibilities for
-> thermal_zone_of_sensor_register to fail.
+You are both right, it is only about representation. I have asked hardware guys
+why they add this feature. They told me it is for convenience and because some
+librairies need signed results.
 
-Note thee old code also was not checking this, it was simply continuing
-without having registered a tz-sensor.
+Regards
 
-I guess we could log an error in that case, but that should be done in a
-seperate follow-up patch.
-
-The current patch looks good to me:
-
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-
-Regards,
-
-Hans
+Ludovic
