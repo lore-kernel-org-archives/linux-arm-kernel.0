@@ -1,64 +1,109 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 10 Mar 2016 11:19:56 +0200
-Subject: [PATCH v3 04/11] soc: renesas: rcar-sysc: Make
- rcar_sysc_power_is_off() static
-In-Reply-To: <1457551127-21934-5-git-send-email-geert+renesas@glider.be>
-References: <1457551127-21934-1-git-send-email-geert+renesas@glider.be>
- <1457551127-21934-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <2190706.M4LvRWA5A8@avalon>
+From: yunhui.cui@nxp.com (Yunhui Cui)
+Date: Thu, 10 Mar 2016 09:24:17 +0000
+Subject: [PATCH v3 1/4] mtd:fsl-quadspi:use the property fields of SPI-NOR
+In-Reply-To: <1456988044-37061-1-git-send-email-B56489@freescale.com>
+References: <1456988044-37061-1-git-send-email-B56489@freescale.com>
+Message-ID: <DB5PR0401MB1912C4A7B6FC649CBF4F9E4194B40@DB5PR0401MB1912.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi All,
 
-Thank you for the patch.
+Thanks for your suggestions before.
+Could you help me to review this patch set if you are free?
 
-On Wednesday 09 March 2016 20:18:40 Geert Uytterhoeven wrote:
-> As of commit b12ff41658171f53 ("ARM: shmobile: r8a7779: Remove legacy PM
-> Domain remainings"), rcar_sysc_power_is_off() is no longer used from
-> SoC-specific code.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Thanks
+Yunhui
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+-----Original Message-----
+From: Yunhui Cui [mailto:B56489 at freescale.com] 
+Sent: Thursday, March 03, 2016 2:54 PM
+To: dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com
+Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
+Subject: [PATCH v3 1/4] mtd:fsl-quadspi:use the property fields of SPI-NOR
 
-> ---
-> v3:
->   - New.
-> ---
->  drivers/soc/renesas/rcar-sysc.c       | 2 +-
->  include/linux/soc/renesas/rcar-sysc.h | 1 -
->  2 files changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/soc/renesas/rcar-sysc.c
-> b/drivers/soc/renesas/rcar-sysc.c index 6b21ea2a65bf59b9..28af0b704fc008d2
-> 100644
-> --- a/drivers/soc/renesas/rcar-sysc.c
-> +++ b/drivers/soc/renesas/rcar-sysc.c
-> @@ -149,7 +149,7 @@ int rcar_sysc_power_up(const struct rcar_sysc_ch
-> *sysc_ch) return rcar_sysc_power(sysc_ch, true);
->  }
-> 
-> -bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
-> +static bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
->  {
->  	unsigned int st;
-> 
-> diff --git a/include/linux/soc/renesas/rcar-sysc.h
-> b/include/linux/soc/renesas/rcar-sysc.h index
-> 96f30c2883881d97..92fc613ab23db091 100644
-> --- a/include/linux/soc/renesas/rcar-sysc.h
-> +++ b/include/linux/soc/renesas/rcar-sysc.h
-> @@ -11,7 +11,6 @@ struct rcar_sysc_ch {
-> 
->  int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
->  int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
-> -bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch);
->  void __iomem *rcar_sysc_init(phys_addr_t base);
-> 
->  #endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
+We can get the read/write/erase opcode from the spi nor framework directly. This patch uses the information stored in the SPI-NOR to remove the hardcode in the fsl_qspi_init_lut().
 
--- 
-Regards,
+Signed-off-by: Yunhui Cui <B56489@freescale.com>
+Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+---
+ drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
 
-Laurent Pinchart
+diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+index 9ab2b51..517ffe2 100644
+--- a/drivers/mtd/spi-nor/fsl-quadspi.c
++++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+@@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	void __iomem *base = q->iobase;
+ 	int rxfifo = q->devtype_data->rxfifo;
+ 	u32 lut_base;
+-	u8 cmd, addrlen, dummy;
+ 	int i;
+ 
++	struct spi_nor *nor = &q->nor[0];
++	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
++	u8 read_op = nor->read_opcode;
++	u8 read_dm = nor->read_dummy;
++
+ 	fsl_qspi_unlock_lut(q);
+ 
+ 	/* Clear all the LUT table */
+@@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Quad Read */
+ 	lut_base = SEQID_QUAD_READ * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR24BIT;
+-		dummy = 8;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR32BIT;
+-		dummy = 8;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+-	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
++	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
++		    LUT1(FSL_READ, PAD4, rxfifo),
+ 			base + QUADSPI_LUT(lut_base + 1));
+ 
+ 	/* Write enable */
+@@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Page Program */
+ 	lut_base = SEQID_PP * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR24BIT;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR32BIT;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
+ 			base + QUADSPI_LUT(lut_base + 1));
+@@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Erase a sector */
+ 	lut_base = SEQID_SE * 4;
+ 
+-	cmd = q->nor[0].erase_opcode;
+-	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 
+ 	/* Erase the whole chip */
+--
+2.1.0.27.g96db324
