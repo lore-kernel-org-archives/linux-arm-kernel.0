@@ -1,148 +1,29 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 10 Mar 2016 13:56:38 +0100
-Subject: [PATCH] ARM: mvebu: fix overlap of Crypto SRAM with PCIe memory
- window
-In-Reply-To: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 8 Mar 2016 16:59:57 +0100")
-References: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87bn6m3309.fsf@free-electrons.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 10 Mar 2016 13:58:24 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <56E15211.7080206@linux-pingi.de>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
+ <1457108303.2651.112.camel@tiscali.nl> <56DADA57.9010200@imap.cc>
+ <1457340486.2737.19.camel@tiscali.nl> <56E09F4A.8010202@imap.cc>
+ <56E15211.7080206@linux-pingi.de>
+Message-ID: <1457614704.2478.11.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., mars 08 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+Hi Karsten,
 
-> When the Crypto SRAM mappings were added to the Device Tree files
-> describing the Armada XP boards in commit c466d997bb16 ("ARM: mvebu:
-> define crypto SRAM ranges for all armada-xp boards"), the fact that
-> those mappings were overlaping with the PCIe memory aperture was
-> overlooked. Due to this, we currently have for all Armada XP platforms
-> a situation that looks like this:
->
-> Memory mapping on Armada XP boards with internal registers at
-> 0xf1000000:
->
->  - 0x00000000 -> 0xf0000000	3.75G 	RAM
->  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
->  - 0xf1000000 -> 0xf1100000	1M	internal registers
->  - 0xf8000000 -> 0xffe0000	126M	PCIe memory aperture
->  - 0xf8100000 -> 0xf8110000	64KB	Crypto SRAM #0	=> OVERLAPS WITH PCIE !
->  - 0xf8110000 -> 0xf8120000	64KB	Crypto SRAM #1	=> OVERLAPS WITH PCIE !
->  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O aperture
->  - 0xfff0000  -> 0xffffffff	1M	BootROM
->
-> The overlap means that when PCIe devices are added, depending on their
-> memory window needs, they might or might not be mapped into the
-> physical address space. Indeed, they will not be mapped if the area
-> allocated in the PCIe memory aperture by the PCI core overlaps with
-> one of the Crypto SRAM. Typically, a Intel IGB PCIe NIC that needs 8MB
-> of PCIe memory will see its PCIe memory window allocated from
-> 0xf80000000 for 8MB, which overlaps with the Crypto SRAM windows. Due
-> to this, the PCIe window is not created, and any attempt to access the
-> PCIe window makes the kernel explode:
->
-> [    3.302213] igb: Copyright (c) 2007-2014 Intel Corporation.
-> [    3.307841] pci 0000:00:09.0: enabling device (0140 -> 0143)
-> [    3.313539] mvebu_mbus: cannot add window '4:f8', conflicts with another window
-> [    3.320870] mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0xf8000000-0xf87fffff]: -22
-> [    3.330811] Unhandled fault: external abort on non-linefetch (0x1008) at 0xf08c0018
->
-> This problem does not occur on Armada 370 boards, because we use the
-> following memory mapping (for boards that have internal registers at
-> 0xf1000000):
->
->  - 0x00000000 -> 0xf0000000	3.75G 	RAM
->  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
->  - 0xf1000000 -> 0xf1100000	1M	internal registers
->  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0 => OK !
->  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
->  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
->  - 0xfff0000  -> 0xffffffff	1M	BootROM
->
-> Obviously, the solution is to align the location of the Crypto SRAM
-> mappings of Armada XP to be similar with the ones on Armada 370, i.e
-> have them between the "internal registers" area and the beginning of
-> the PCIe aperture.
->
-> However, we have a special case with the OpenBlocks AX3-4 platform,
-> which has a 128 MB NOR flash. Currently, this NOR flash is mapped from
-> 0xf0000000 to 0xf8000000. This is possible because on OpenBlocks
-> AX3-4, the internal registers are not at 0xf1000000. And this explains
-> why the Crypto SRAM mappings were not configured at the same place on
-> Armada XP.
->
-> Hence, the solution is two-fold:
->
->  (1) Move the NOR flash mapping on Armada XP OpenBlocks AX3-4 from
->      0xe8000000 to 0xf0000000. This frees the 0xf0000000 ->
->      0xf80000000 space.
->
->  (2) Move the Crypto SRAM mappings on Armada XP to be similar to
->      Armada 370 (except of course that Armada XP has two Crypto SRAM
->      and not one).
->
-> After this patch, the memory mapping on Armada XP boards with
-> registers at 0xf1 is:
->
->  - 0x00000000 -> 0xf0000000	3.75G 	RAM
->  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
->  - 0xf1000000 -> 0xf1100000	1M	internal registers
->  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
->  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
->  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
->  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
->  - 0xfff0000  -> 0xffffffff	1M	BootROM
->
-> And the memory mapping for the special case of the OpenBlocks AX3-4
-> (internal registers at 0xd0000000, NOR of 128 MB):
->
->  - 0x00000000 -> 0xc0000000	3G 	RAM
->  - 0xd0000000 -> 0xd1000000	1M	internal registers
->  - 0xe800000  -> 0xf0000000	128M	NOR flash
->  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
->  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
->  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
->  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
->  - 0xfff0000  -> 0xffffffff	1M	BootROM
->
-> Fixes: c466d997bb16 ("ARM: mvebu: define crypto SRAM ranges for all armada-xp boards")
-> Reported-by: Phil Sutter <phil@nwl.cc>
-> Cc: Phil Sutter <phil@nwl.cc>
-> Cc: <stable@kernel.org>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On do, 2016-03-10 at 11:53 +0100, isdn at linux-pingi.de wrote:
+> mISDN with CAPI support works just fine with pppd and pppdcapiplugin
+> and the CAPI works for all mISDN HW.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Arnd, Olof,
-
-it would be nice having this fix applied on v4.5-rc. Could you applied
-this patch directly, or do you want pull request for it?
+In the mainline tree the mISDN and CAPI stacks are effectively separate.
+Do you perhaps refer to a mISDN + Asterisk + chan-capi setup? (That's
+the closest to mISDN with CAPI support that I could find. Did I miss
+something?)
 
 Thanks,
 
-Gregory
 
-
-
-> ---
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 4 ++--
->  arch/arm/boot/dts/armada-xp-db.dts               | 4 ++--
->  arch/arm/boot/dts/armada-xp-gp.dts               | 4 ++--
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 4 ++--
->  arch/arm/boot/dts/armada-xp-linksys-mamba.dts    | 4 ++--
->  arch/arm/boot/dts/armada-xp-matrix.dts           | 4 ++--
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 4 ++--
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 6 +++---
->  arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 4 ++--
->  9 files changed, 19 insertions(+), 19 deletions(-)
->
-
-[...]
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Paul Bolle
