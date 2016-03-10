@@ -1,37 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 10 Mar 2016 22:43:33 +0800
-Subject: [PATCH v2 11/18] pinctrl: Add PLX Technology OXNAS pinctrl and
- gpio driver
-In-Reply-To: <1457519060-6038-12-git-send-email-narmstrong@baylibre.com>
-Message-ID: <201603102242.MEPUl2xs%fengguang.wu@intel.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 10 Mar 2016 14:49:08 +0000
+Subject: [PATCH 6/8] efi/arm*: libstub: wire up GOP handling into the ARM
+ UEFI stub
+In-Reply-To: <CAKv+Gu9ephpDq_KE_xxV+dXSit+VgBxqgXyAeKt4eXpb5KRJnw@mail.gmail.com>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160310082522.GB8618@gmail.com>
+ <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
+ <20160310090345.GA19834@gmail.com>
+ <CAKv+Gu_rtQjWJ-=Nf-dEYEHVB5dwKMA_Mv2rVujBz9t=3qnUrA@mail.gmail.com>
+ <20160310092552.GA19588@gmail.com>
+ <CAKv+Gu9ephpDq_KE_xxV+dXSit+VgBxqgXyAeKt4eXpb5KRJnw@mail.gmail.com>
+Message-ID: <20160310144908.GG15775@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Thu, 10 Mar, at 05:25:08PM, Ard Biesheuvel wrote:
+> 
+> Indeed. I think the efi_early struct is a separate structure that is
+> set up by the early boot code, and has a number of function pointers
+> of EFI boot services copied into it. Matt should know the details.
+ 
+If you look at where the efi_early stuff came from originally, you'll
+see it was merged as part of the mixed mode code for running 64-bit
+kernels on 32-bit EFI,
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.5-rc7]
-[cannot apply to next-20160310]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+commit 54b52d872680
+Author: Matt Fleming <matt.fleming@intel.com>
+Date:   Fri Jan 10 15:27:14 2014 +0000
 
-url:    https://github.com/0day-ci/linux/commits/Neil-Armstrong/Add-Initial-support-for-PLX-Technology-OX810SE/20160309-183154
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: um-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=um 
+    x86/efi: Build our own EFI services pointer table
+    
+    It's not possible to dereference the EFI System table directly when
+    booting a 64-bit kernel on a 32-bit EFI firmware because the size of
+    pointers don't match.
+    
+    In preparation for supporting the above use case, build a list of
+    function pointers on boot so that callers don't have to worry about
+    converting pointer sizes through multiple levels of indirection.
+    
+    Signed-off-by: Matt Fleming <matt.fleming@intel.com>
 
-All warnings (new ones prefixed by >>):
 
-warning: (ST_IRQCHIP && HIP04_ETH && STMMAC_PLATFORM && DWMAC_IPQ806X && DWMAC_LPC18XX && DWMAC_ROCKCHIP && DWMAC_SOCFPGA && DWMAC_STI && TI_CPSW && PINCTRL_OXNAS && PINCTRL_ROCKCHIP && PINCTRL_DOVE && POWER_RESET_KEYSTONE && POWER_RESET_SYSCON && POWER_RESET_SYSCON_POWEROFF && S3C2410_WATCHDOG && VIDEO_OMAP3 && VIDEO_S5P_FIMC && USB_XHCI_MTK && RTC_DRV_AT91SAM9 && LPC18XX_DMAMUX && VIDEO_OMAP4 && COMMON_CLK_OXNAS && HWSPINLOCK_QCOM && ATMEL_ST && QCOM_GSBI && PHY_HI6220_USB) selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
+You basically cannot ever dereference a pointer in that mode, it's
+crazy.
+ 
+The subsequent efi_early() wrapper came when some of the EFI boot stub
+code was migrated out of arch/x86 into drivers/firmware/efi/libstub.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 17787 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160310/26c3135c/attachment.obj>
+I'm not suggesting it's the most beautiful code in the world, far from
+it. It is a massive eyesore that has resulted in type bugs in the past
+because of all the casting.
+
+I've just never come up with a cleanup patch series that I was happy
+with.
+
+> > Furthermore, my suggestion would work with arbitrarily structured thunking: my
+> > suggestion was to put a typed C layer in there - and the layer itself could then
+> > call the vararg construct internally. It's a C type demuxing, only a syntactic
+> > effort, it does not change any real call signature.
+> >
+> 
+> I would welcome any improvement in this regard. Happy to contribute as well.
+ 
+The only way I think a typed C layer would be maintainable is if it
+was automatically generated. We're already suffering from the
+multitude of different bitness functions, i.e. __setup_efi_pci32() vs
+__setup_efi_pci64().
