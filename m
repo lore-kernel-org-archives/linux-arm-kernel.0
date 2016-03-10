@@ -1,89 +1,113 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 10 Mar 2016 18:16:47 +0800
-Subject: [GIT PULL]Hisilicon Hi6220 SoC and Hikey board DT updates for 4.6
-Message-ID: <56E1498F.2030107@hisilicon.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 10 Mar 2016 17:25:08 +0700
+Subject: [PATCH 6/8] efi/arm*: libstub: wire up GOP handling into the ARM
+ UEFI stub
+In-Reply-To: <20160310092552.GA19588@gmail.com>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160310082522.GB8618@gmail.com>
+ <CAKv+Gu8hTSbZVgGj6epquwf6kkSJV+imAFvNobowFVtB5AUe2Q@mail.gmail.com>
+ <20160310090345.GA19834@gmail.com>
+ <CAKv+Gu_rtQjWJ-=Nf-dEYEHVB5dwKMA_Mv2rVujBz9t=3qnUrA@mail.gmail.com>
+ <20160310092552.GA19588@gmail.com>
+Message-ID: <CAKv+Gu9ephpDq_KE_xxV+dXSit+VgBxqgXyAeKt4eXpb5KRJnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+On 10 March 2016 at 16:25, Ingo Molnar <mingo@kernel.org> wrote:
+>
+> * Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> On 10 March 2016 at 16:03, Ingo Molnar <mingo@kernel.org> wrote:
+>> >
+>> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> >
+>> >> > So screen_info_guid should probably not be a 'const': you have to cast it away
+>> >> > anyway, adding artificial linebreaks and uglifying the code. It's also a bad
+>> >> > practice to cast away const-ness, it hinders move-consts-to-readonly-sections
+>> >> > efforts.
+>> >>
+>> >> The problem here is that the UEFI spec never uses const qualifiers in
+>> >> its APIs for by-ref parameters that are obviously never modified by
+>> >> the caller, such as these GUIDs. [...]
+>> >
+>> > Ah, ok. Two related thoughts came up:
+>> >
+>> > 1)
+>> >
+>> > While I was looking at this code and was asking myself why the EFI runtime is
+>> > generally invoked via a relatively fragile, non-type-checking vararg construct.
+>> >
+>> > Wouldn't you be better off by explicitly defining all the API variants, and then
+>> > internally calling the EFI runtime?
+>> >
+>> > That would neatly solve such const artifacts as well.
+>> >
+>> > So instead of:
+>> >
+>> >
+>> > +       status = efi_call_early(allocate_pool, EFI_RUNTIME_SERVICES_DATA,
+>> > +                               sizeof(*si), (void **)&si);
+>> >
+>> > we could have something like:
+>> >
+>> >         status = efi_early__allocate_pool(EFI_RUNTIME_SERVICES_DATA, sizeof(*si), &si);
+>> >
+>> >         ...
+>> >
+>> >         efi_early__free_pool(si);
+>> >
+>> >
+>> > i.e. it would look a lot more like a properly distributed, typed, structured
+>> > family of C function APIs, instead of this single central bastard of an ioctl()
+>> > interface.
+>> >
+>> > There's over 100 invocations of the EFI runtime in the Linux kernel, I think it
+>> > would be worth the effort. The wrapper inlines should be mostly trivial.
+>> >
+>> > That would also add an opportunity to actually document most of these calls.
+>> >
+>>
+>> If only. The ARM and arm64 wrappers actually simply resolve to
+>> correctly typed calls. While I am not an expert on the x86 side of
+>> things, I think the vararg stuff is needed to be able to perform the
+>> thunking required to do function calls using the MS ABI for x86_64.
+>
+> So at least the efi_early calls seem to just be using a function pointer:
+>
+>   arch/x86/include/asm/efi.h:     __efi_early()->call(__efi_early()->f, __VA_ARGS__);
+>
 
-Please help to pull the following changes.
-Thanks!
+Indeed. I think the efi_early struct is a separate structure that is
+set up by the early boot code, and has a number of function pointers
+of EFI boot services copied into it. Matt should know the details.
 
-Best Regards,
-Wei
+> Furthermore, my suggestion would work with arbitrarily structured thunking: my
+> suggestion was to put a typed C layer in there - and the layer itself could then
+> call the vararg construct internally. It's a C type demuxing, only a syntactic
+> effort, it does not change any real call signature.
+>
 
----
+I would welcome any improvement in this regard. Happy to contribute as well.
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+>> As far as documentation is concerned, all of these functions and
+>> protocol methods are documented in the UEFI spec, which is freely
+>> accessible. It may be somewhat redundant to have our own documentation
+>> for them.
+>
+> I mean a properly split up typed C interface 'documents itself' to a large degree
+> - while with opaque varargs bugs can slip in more easily.
+>
+> This is really an obvious argument ... it's the well known 'why ioctl()s are bad'
+> API argument.
+>
+> It has no bearing on this series obviously, it's a cleanup suggestion that could
+> be done separately.
+>
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+I will take this up with Matt. There is lots of room for improvement
+and consolidation between x86 on the one hand and ARM/arm64 on the
+other hand in other ways as well.
 
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hi6220-dt-for-4.6
-
-for you to fetch changes up to 1dd86c2b042f24e194ff9fff4d0f58d5824edda7:
-
-  arm64: dts: add wifi nodes support for hi6220-hikey (2016-02-25 19:47:44 +0800)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon Hi6220 soc and hikey board updates for 4.6
-
-- Reserve memory regions for Hi6220
-- Add sp804 timer node for Hi6220
-- Add cpu and cluster level's low power state for Hi6220
-- Add gpio configuration nodes for Hi6220
-- Add pinctrl configuration nodes for Hi6220
-- Add spi related nodes for Hi6220
-- Add i2c nodes for Hi6220
-- Enable i2c nodes to work with mezzanine boards
-- Add usb nodes for Hi6220
-- Add mailobx node for Hi6220
-- Enable SRAM node and stub clock node for Hi6220
-- Add pinctrl nodes for uarts and enable them
-- Add LED nodes for hi6220-hikey board
-- Add hi655x pmic node for Hi6220
-- Add dwmmc nodes for Hi6220
-- Add resets property into dwmmc nodes
-- Add wifi nodes support for Hi6220-Hikey board
-
-----------------------------------------------------------------
-Chen Feng (1):
-      arm64: dts: hikey: Add hi655x pmic dts node
-
-Guodong Xu (5):
-      arm64: dts: hikey: enable i2c0 and i2c1 for working with mezzanine boards
-      arm64: dts: hi6220: add pinctrl for uarts and enable them
-      arm64: dts: add LED nodes for hi6220-hikey
-      arm64: dts: hi6220: add resets property into dwmmc nodes
-      arm64: dts: add wifi nodes support for hi6220-hikey
-
-Leo Yan (5):
-      arm64: dts: Reserve memory regions for hi6220
-      arm64: dts: add sp804 timer node for Hi6220
-      arm64: dts: enable idle states for Hi6220
-      arm64: dts: add mailbox node for Hi6220
-      arm64: dts: add Hi6220's stub clock node
-
-Xinwei Kong (2):
-      arm64: dts: add all hi6220 i2c nodes
-      arm64: dts: add dwmmc nodes for hi6220
-
-Zhangfei Gao (1):
-      arm64: dts: add hi6220 usb node
-
-Zhong Kaihua (3):
-      arm64: dts: Add Hi6220 gpio configuration nodes
-      arm64: dts: add Hi6220 pinctrl configuration nodes
-      arm64: dts: add Hi6220 spi configuration nodes
-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   | 196 ++++++-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 586 +++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi    | 607 +++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 705 +++++++++++++++++++++++
- include/dt-bindings/pinctrl/hisi.h               |  59 ++
- 5 files changed, 2149 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
- create mode 100644 include/dt-bindings/pinctrl/hisi.h
+Thanks,
+Ard.
