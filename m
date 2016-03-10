@@ -1,44 +1,45 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Thu, 10 Mar 2016 20:04:18 +0800
-Subject: [patch net 1/2] net: hns: fix return value of the function about
- rss
-In-Reply-To: <1457597509.1347.49.camel@linux.intel.com>
-References: <1457576189-22924-1-git-send-email-yankejian@huawei.com>
- <1457576189-22924-2-git-send-email-yankejian@huawei.com>
- <1457597509.1347.49.camel@linux.intel.com>
-Message-ID: <56E162C2.6070709@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 10 Mar 2016 13:08:56 +0100
+Subject: [PATCH 30/30] ARM: dts: r8a7794: Reference both DMA controllers
+ in QSPI node
+In-Reply-To: <1457609782-24108-31-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1457609782-24108-31-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <CAMuHMdW_nMfWF-sQPFgtxmtA_1vxw_hFPsb1DkRp7TJtKrB2ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Niklas,
 
-
-On 2016/3/10 16:11, Andy Shevchenko wrote:
-> On Thu, 2016-03-10 at 10:16 +0800, Kejian Yan wrote:
->> Both .get_rxfh and .get_rxfh are always return 0, it should return
->> result
->> from hardware when getting or setting rss. And the rss function
->> should
->> return the correct data type.
->>
-> @@ -1213,7 +1213,7 @@ hns_get_rss(struct net_device *netdev, u32
->> *indir, u8 *key, u8 *hfunc)
->>  
->>
->>  	ret = ops->get_rss(priv->ae_handle, indir, key, hfunc);
->>  
->> -	return 0;
->> +	return ret;
-> All three can be one line.
-
-ok, thanks!
-
->> @@ -1241,7 +1241,7 @@ hns_set_rss(struct net_device *netdev, const
->> u32 *indir, const u8 *key,
->>  
->>  	ret = ops->set_rss(priv->ae_handle, indir, key, hfunc);
->>  
->> -	return 0;
->> +	return ret;
-> Ditto.
+On Thu, Mar 10, 2016 at 12:36 PM, Niklas S?derlund
+<niklas.soderlund+renesas@ragnatech.se> wrote:
+> R-Car Gen2 have two DMA controllers, which are equivalent. Add
+> references to both dmac0 and dmac1 so the driver can fallback to the
+> later if the first one is unavailable.
 >
-ok, thanks!
+> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> ---
+>  arch/arm/boot/dts/r8a7794.dtsi | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> index 76709ff..e098eab 100644
+> --- a/arch/arm/boot/dts/r8a7794.dtsi
+> +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -605,8 +605,9 @@
+>                 reg = <0 0xee200000 0 0x80>;
+>                 interrupts = <0 169 IRQ_TYPE_LEVEL_HIGH>;
+>                 clocks = <&mstp3_clks R8A7794_CLK_MMCIF0>;
+
+This one has the wrong subject: QSPI vs. MMCIF.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
