@@ -1,77 +1,49 @@
-From: huangdaode@hisilicon.com (Daode Huang)
-Date: Fri, 11 Mar 2016 17:10:43 +0800
-Subject: [PATCH V2 net 3/6] net: hns: fixed portid bug in sending manage pkt
-In-Reply-To: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
-References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <1457687446-109867-4-git-send-email-huangdaode@hisilicon.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 11 Mar 2016 11:01:58 +0200
+Subject: [PATCH v3 net-next 0/2] net: hns: get and set RSS indirection
+ table by using ethtool
+In-Reply-To: <1457666747-244953-1-git-send-email-yankejian@huawei.com>
+References: <1457666747-244953-1-git-send-email-yankejian@huawei.com>
+Message-ID: <1457686918.1347.56.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In V2 chip, when sending mamagement packets, the driver should
-config the port id to BD descs.
+On Fri, 2016-03-11 at 11:25 +0800, Kejian Yan wrote:
+> When we use ethtool to retrieves or configure the receive flow hash?
+> indirection table, ethtool needs to call .get_rxnfc to get the ring
+> number
+> so this patchset implements the .get_rxnfc and fixes the bug that we
+> can
+> not get the tatal table each time.
+> 
 
-Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
-Signed-off-by: Sheng Li <lisheng011@huawei.com>
----
- v2: add space after /* and before */.
----
-drivers/net/ethernet/hisilicon/hns/hnae.h         | 3 +++
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c | 1 +
- drivers/net/ethernet/hisilicon/hns/hns_enet.c     | 6 +++++-
- 3 files changed, 9 insertions(+), 1 deletion(-)
+FWIW:
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.h b/drivers/net/ethernet/hisilicon/hns/hnae.h
-index 1cbcb9f..37d0cce 100644
---- a/drivers/net/ethernet/hisilicon/hns/hnae.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hnae.h
-@@ -147,6 +147,8 @@ enum hnae_led_state {
- 
- #define HNSV2_TXD_BUFNUM_S 0
- #define HNSV2_TXD_BUFNUM_M (0x7 << HNSV2_TXD_BUFNUM_S)
-+#define HNSV2_TXD_PORTID_S	4
-+#define HNSV2_TXD_PORTID_M	(0X7 << HNSV2_TXD_PORTID_S)
- #define HNSV2_TXD_RI_B   1
- #define HNSV2_TXD_L4CS_B   2
- #define HNSV2_TXD_L3CS_B   3
-@@ -516,6 +518,7 @@ struct hnae_handle {
- 	int q_num;
- 	int vf_id;
- 	u32 eport_id;
-+	u32 dport_id;	/* v2 tx bd should fill the dport_id */
- 	enum hnae_port_type port_type;
- 	struct list_head node;    /* list to hnae_ae_dev->handle_list */
- 	struct hnae_buf_ops *bops; /* operation for the buffer */
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-index d4f92ed..90352d6 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-@@ -175,6 +175,7 @@ struct hnae_handle *hns_ae_get_handle(struct hnae_ae_dev *dev,
- 	ae_handle->phy_node = vf_cb->mac_cb->phy_node;
- 	ae_handle->if_support = vf_cb->mac_cb->if_support;
- 	ae_handle->port_type = vf_cb->mac_cb->mac_type;
-+	ae_handle->dport_id = port_idx;
- 
- 	return ae_handle;
- vf_id_err:
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-index 6250a42..cb16b50 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-@@ -65,10 +65,14 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
- 	desc->addr = cpu_to_le64(dma);
- 	desc->tx.send_size = cpu_to_le16((u16)size);
- 
--	/*config bd buffer end */
-+	/* config bd buffer end */
- 	hnae_set_bit(rrcfv, HNSV2_TXD_VLD_B, 1);
- 	hnae_set_field(bn_pid, HNSV2_TXD_BUFNUM_M, 0, buf_num - 1);
- 
-+	/* fill port_id in the tx bd for sending management pkts */
-+	hnae_set_field(bn_pid, HNSV2_TXD_PORTID_M,
-+		       HNSV2_TXD_PORTID_S, ring->q->handle->dport_id);
-+
- 	if (type == DESC_TYPE_SKB) {
- 		skb = (struct sk_buff *)priv;
- 
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+
+> ---
+> change log:
+> PATCH v3:
+> ?- This patchset fixes the building warning and error
+> 
+> PATCH v2:
+> ?- This patchset fixes the comments provided by Andy Shevchenko <Andy
+> Shevchenko>
+> 
+> PATCH v1:
+> ?- first submit
+> 
+> Kejian Yan (2):
+> ? net: hns: fix return value of the function about rss
+> ? net: hns: fixes a bug of RSS
+> 
+> ?drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c |??8 ++++---
+> ?drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |??2 +-
+> ?drivers/net/ethernet/hisilicon/hns/hns_ethtool.c??| 28
+> ++++++++++++++++-------
+> ?3 files changed, 26 insertions(+), 12 deletions(-)
+> 
+
 -- 
-1.9.1
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
