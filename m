@@ -1,48 +1,37 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 10 Mar 2016 22:47:10 -0800
-Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <20160310160522.GB1111@bigcity.dyn.berto.se>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1457404974-1800-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160308073847.GA15520@infradead.org>
- <20160310160522.GB1111@bigcity.dyn.berto.se>
-Message-ID: <CAPcyv4gO4EZnBuVKXT8+gsMhbHJzuK7sfr0uRcjVdJP-nUUz4A@mail.gmail.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Fri, 11 Mar 2016 07:48:39 +0100
+Subject: [OpenWrt-Devel] ARMv4 (not v4t) marked obsolete in gcc-6
+In-Reply-To: <alpine.LNX.2.00.1603110638190.12310@T520.work>
+References: <201603101013.04618.arnd@arndb.de>
+ <alpine.LNX.2.00.1603110638190.12310@T520.work>
+Message-ID: <56E26A47.9040608@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 8:05 AM, Niklas S??derlund
-<niklas.soderlund@ragnatech.se> wrote:
-> Hi Christoph,
->
-> On 2016-03-07 23:38:47 -0800, Christoph Hellwig wrote:
->> Please add some documentation on where/how this should be used.  It's
->> not a very obvious interface.
->
-> Good idea, I have added the following to Documentation/DMA-API.txt and
-> folded it in to this patch. Do you feel it's adequate and do you know
-> anywhere else I should add documentation?
->
-> diff --git a/Documentation/DMA-API.txt b/Documentation/DMA-API.txt
-> index 45ef3f2..248556a 100644
-> --- a/Documentation/DMA-API.txt
-> +++ b/Documentation/DMA-API.txt
-> @@ -277,14 +277,29 @@ and <size> parameters are provided to do partial page mapping, it is
->  recommended that you never use these unless you really know what the
->  cache width is.
->
-> +dma_addr_t
-> +dma_map_resource(struct device *dev, phys_addr_t phys_addr, size_t size,
-> +                enum dma_data_direction dir, struct dma_attrs *attrs)
-> +
-> +Maps a MMIO region so it can be accessed by the device and returns the
-> +DMA address of the memory. API should only be used to map device MMIO,
-> +mapping of RAM is not permitted.
-> +
 
-I think it is confusing to use the dma_ prefix for this peer-to-peer
-mmio functionality.  dma_addr_t is a device's view of host memory.
-Something like bus_addr_t bus_map_resource().  Doesn't this routine
-also need the source device in addition to the target device?  The
-resource address is from the perspective of the host cpu, it may be a
-different address space in the view of two devices relative to each
-other.
+
+On 11/03/2016 06:44, Hans Ulli Kroll wrote:
+> Hi
+>>
+>> * Gemini: officially supported in OpenWRT today, with the latest compiler. This one
+>>   will likely cause the most issues for actual users. It would be helpful to get
+>>   some numbers about users or downloads here, to see whether it can be dropped
+>>   in a future OpenWRT release or if it might be possible to leave this on
+>>   gcc-6.x when the other platforms move on to gcc-7+
+> 
+> I don't have any numbers from the OPenWRT people.
+> For the NAS BOXes itself, I get one/two support questions a month on the 
+> german based forum.
+> I think most people know about the SATA bug, which makes the platform 
+> unreliable for some SATA drives.
+> y
+> Hans Ulli
+
+Hi,
+
+We have several active users. Roman has done a great job to constantly
+maintain and update the target. We have been including gemini in our
+releases for years thanks to Romans effort. It would be a shame to to
+see support being dropped, even if there are few yet active users.
+
+	John
