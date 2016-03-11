@@ -1,45 +1,64 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 11 Mar 2016 10:45:52 +0100
-Subject: [PATCH] dma: sun4i: expose block size and wait cycle
- configuration to DMA users
-In-Reply-To: <20160311062607.GP11154@localhost>
-References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160307145429.GG11154@localhost>
- <20160307160857.577bb04d@bbrezillon>
- <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
- <20160309120627.67612b1d@bbrezillon>
- <20160311062607.GP11154@localhost>
-Message-ID: <20160311104552.23e06a16@bbrezillon>
+Date: Fri, 11 Mar 2016 10:51:46 +0100
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <20160310175438.GA5648@ulmo.nvidia.com>
+References: <20160203145337.GD9650@ulmo>
+ <CAD=FV=U_x1cxx6RrHuVgVV8GbOwm9DXXJcyiArbbQySUOaxrvQ@mail.gmail.com>
+ <20160222175929.GA23899@ulmo>
+ <CAD=FV=UCErW3EjYRtwt49_ztNR7cyY4U0o4R_dxdomer-Ac2Dg@mail.gmail.com>
+ <20160223143859.GA27656@ulmo>
+ <CAD=FV=UvxG3MYD4MKQJqN7W68uMjd-s+FH-e8tkrLCpS0RLmZQ@mail.gmail.com>
+ <20160223181448.GA14754@ulmo.nvidia.com>
+ <CAD=FV=VM3cOQ0HqwLANBw9MVBCyFTrSyPe_dGzgPucuMUEWRKA@mail.gmail.com>
+ <CAD=FV=VckTVD8b1g+f0G2kMeoTjvY0pAGhoDnWQN_dAmqSxBxg@mail.gmail.com>
+ <CAD=FV=W3KPf8tyMviVNB9=HjefMdP+FBbN01Zhh7RKH+gkj2WQ@mail.gmail.com>
+ <20160310175438.GA5648@ulmo.nvidia.com>
+Message-ID: <20160311105146.510468ef@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Mar 2016 11:56:07 +0530
-Vinod Koul <vinod.koul@intel.com> wrote:
+Hi Thierry,
 
-> On Wed, Mar 09, 2016 at 12:06:27PM +0100, Boris Brezillon wrote:
-> > On Tue, 8 Mar 2016 08:25:47 +0530
-> > Vinod Koul <vinod.koul@intel.com> wrote:
-> > > 
-> > > Why does dmaengine need to wait? Can you explain that
+On Thu, 10 Mar 2016 18:54:38 +0100
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Mon, Mar 07, 2016 at 08:34:19AM -0800, Doug Anderson wrote:
+> > Thierry,
 > > 
-> > I don't have an answer for that one, but when I set WAIT_CYCLES to 1
-> > for the NAND use case it does not work. So I guess it is somehow
-> > related to how the DRQ line is controlled on the device side...
+> > On Thu, Feb 25, 2016 at 3:14 PM, Doug Anderson <dianders@google.com> wrote:
+> > > So just to summarize:
+> > >
+> > > * Add pwm_get_state(), pwm_apply_state(), pwm_get_args().
+> > > pwm_get_state() initially returns 0 for duty cycle if driver doesn't
+> > > support readout.
+> > >
+> > > * Re-implement pwm_get_period() (and maybe other similar functions)
+> > > atop pwm_get_state() as you describe earlier in the thread.
+> > >
+> > > * Document pwm_get_period() (and maybe other similar functions) as deprecated.
+> > >
+> > > * Fix drivers for all current 2 users of PWM regulator to support
+> > > hardware readout.
+> > >
+> > > * Update PWM regulator as you described earlier in the thread (Feb 23).
+> > >
+> > > * If PWM regulator is ever used on a new board whose PWM doesn't
+> > > support hardware readout, the voltage will change at probe time.
+> > >
+> > >
+> > > Did I get all that right?  Thanks!
+> > 
+> > Can you provide a "yes, you got that right" or a "no, you didn't
+> > understand"?  That will unblock Boris, I think.
 > 
-> Is the WAIT cycle different for different usages or same for all
-> usages/channels?
-> 
+> Sounds about right. Hopefully this will eliminate any objections that
+> others had about the series.
 
-In Allwinner BSP they adapt it on a per slave device basis, but since
-DMA channels are dynamically allocated, you can't know in advance which
-physical channel will be attached to a specific device.
+Okay, I'll rework the series accordingly and send a new version soon.
 
-Another option I considered was adding a new cell to the sun4i DT
-binding to encode these WAIT_CYCLES and BLOCK_SIZE information. But I'm
-not sure adding that to the DT is a good idea (not to mention that it
-would break DT ABI again, and given the last discussions on this topic,
-I'm not sure it's a good idea :-/).
+Thanks,
 
+Boris
 
 -- 
 Boris Brezillon, Free Electrons
