@@ -1,27 +1,45 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 11 Mar 2016 11:09:20 -0500
-Subject: [PATCH 1/2] vfio, platform: add support for ACPI while detecting
- the reset driver
-In-Reply-To: <56E24012.90002@linaro.org>
-References: <1457451209-21462-1-git-send-email-okaya@codeaurora.org>
- <56E14858.9050401@linaro.org> <56E1AB38.8020702@codeaurora.org>
- <56E24012.90002@linaro.org>
-Message-ID: <56E2EDB0.6030706@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 11 Mar 2016 10:12:28 -0600
+Subject: [PATCH] ARM: OMAP2: Fix up interconnect barrier initialization for
+ DRA7
+Message-ID: <1457712748-1408-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/10/2016 10:48 PM, Eric Auger wrote:
->> Well, I haven't seen that warning during testing. I was trying to be more 
->> > proactive.
-> Thank you for that. Personally I agree to proceed with the proposed
-> change, ie. forbid vfio platform driver to be used if there is no reset
-> function found but this should be in a separate patch with explicit
-> commit mesg and you should remove dev_warn & related dead code.
+The following commits:
+commit 3fa609755c11 ("ARM: omap2: restore OMAP4 barrier behaviour")
+commit f746929ffdc8 ("Revert "ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688"")
+and
+commit ea827ad5ffbb ("ARM: DRA7: Provide proper IO map table")
+came in around the same time, unfortunately this seem to have missed
+initializing the barrier for DRA7 platforms - omap5_map_io was reused
+for dra7 till it was split out by the last patch. barrier_init
+needs to be hence carried forward as it is valid for DRA7 family of
+processors as they are for OMAP5.
 
-OK. I'm getting read to post another series and this will be an independent
-change.
+Fixes: ea827ad5ffbb7 ("ARM: DRA7: Provide proper IO map table")
+Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
+Original thread of report: http://www.spinics.net/lists/dri-devel/msg101246.html
+
+ arch/arm/mach-omap2/io.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 3c87e40650cf..9821be6dfd5e 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -368,6 +368,7 @@ void __init omap5_map_io(void)
+ void __init dra7xx_map_io(void)
+ {
+ 	iotable_init(dra7xx_io_desc, ARRAY_SIZE(dra7xx_io_desc));
++	omap_barriers_init();
+ }
+ #endif
+ /*
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.7.0
