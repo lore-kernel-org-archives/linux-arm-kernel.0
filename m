@@ -1,59 +1,109 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Mar 2016 10:44:41 +0000
-Subject: [PATCH] arm64: kasan: Use actual memory node when populating the
- kernel image shadow
-In-Reply-To: <CAKv+Gu_sJ5N9DinfVWC5k1dbuX_=3w97u8FGnK2w_JtRrF4JDA@mail.gmail.com>
-References: <1457636243-17382-1-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu_sJ5N9DinfVWC5k1dbuX_=3w97u8FGnK2w_JtRrF4JDA@mail.gmail.com>
-Message-ID: <20160311104441.GA27733@e104818-lin.cambridge.arm.com>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Fri, 11 Mar 2016 11:54:24 +0100
+Subject: [RFC PATCH 1/7] arm64/perf: Basic uncore counter support for
+ Cavium ThunderX
+In-Reply-To: <20160212173658.GD20262@leverpostej>
+References: <cover.1455295032.git.jglauber@cavium.com>
+ <8bd93a25e069ed6428bc6c21fc53270962ccafcc.1455295032.git.jglauber@cavium.com>
+ <20160212173658.GD20262@leverpostej>
+Message-ID: <20160311105423.GA4442@wintermute>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 09:31:02AM +0700, Ard Biesheuvel wrote:
-> On 11 March 2016 at 01:57, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > With the 16KB or 64KB page configurations, the generic
-> > vmemmap_populate() implementation warns on potential offnode
-> > page_structs via vmemmap_verify() because the arm64 kasan_init() passes
-> > NUMA_NO_NODE instead of the actual node for the kernel image memory.
-> >
-> > Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Reported-by: James Morse <james.morse@arm.com>
+On Fri, Feb 12, 2016 at 05:36:59PM +0000, Mark Rutland wrote:
+> On Fri, Feb 12, 2016 at 05:55:06PM +0100, Jan Glauber wrote:
+
+[...]
+
+> > +int thunder_uncore_event_init(struct perf_event *event)
+> > +{
+> > +	struct hw_perf_event *hwc = &event->hw;
+> > +	struct thunder_uncore *uncore;
+> > +
+> > +	if (event->attr.type != event->pmu->type)
+> > +		return -ENOENT;
+> > +
+> > +	/* we do not support sampling */
+> > +	if (is_sampling_event(event))
+> > +		return -EINVAL;
+> > +
+> > +	/* counters do not have these bits */
+> > +	if (event->attr.exclude_user	||
+> > +	    event->attr.exclude_kernel	||
+> > +	    event->attr.exclude_host	||
+> > +	    event->attr.exclude_guest	||
+> > +	    event->attr.exclude_hv	||
+> > +	    event->attr.exclude_idle)
+> > +		return -EINVAL;
 > 
-> I still think using vmemmap_populate() is somewhat of a hack here, and
-> the fact that we have different versions for 4k pages and !4k pages,
-> while perhaps justified for the actual real purpose of allocating
-> struct page arrays, makes this code more fragile than it needs to be.
+> We should _really_ make these features opt-in at the core level. It's
+> crazy that each and every PMU drivers has to explicitly test and reject
+> things it doesn't support.
+> 
 
-I agree, kasan is hijacking API meant for something else.
+Looking at the exclude_* feature handling in pmu->event_init under
+arch/ shows lots of differences. Just as an example, exclude_idle
+returns sometimes -EINVAL, sometimes -EPERM while other archs
+ignore it and one silently deletes the flag.
 
-> How difficult would it be to simply have a kasan specific
-> vmalloc_shadow() function that performs a
-> memblock_alloc/create_mapping, and does the right thing wrt aligning
-> the edges, rather than putting knowledge about how vmemmap_populate
-> happens to align its allocations into the kasan code?
+So it looks hard to me to move the exclude handling into
+perf core while keeping the per-arch differences. And if we
+don't and return an error on the perf_event_open syscall in a newer
+kernel for an exclude bit that was previously ignored it will be a
+user-space regression, right?
 
-With a long flight from Bangkok, who knows, I may see some patches on
-Monday ;)
+Looking only at the uncore drivers (plus drivers/bus/arm-cc*)
+it looks like they all don't support any exclude bits but the
+handling here differs also. The table shows the current behaviour,
+X means the requested exclude flag is refused.
 
-Anyway, I think we also need to change the 4K pages vmemmap_populate to
-do a vmemmap_verify in all cases, something like below (untested):
+                          user  kernel  host    guest    hv     idle
+---------------------------------------------------------------------
+x86 uncore intel        |  X      X                      X       X
+x86 uncore intel snb    |  X      X      X       X       X       X
+x86 uncore intel cqm    |  X      X      X       X       X       X
+x86 uncore intel cstate |  X      X      X       X       X       X
+x86 uncore intel rapl   |  X      X      X       X       X       X
+x86 uncore amd          |  X      X      X       X
+x86 uncore amd iommu    |  X      X      X       X
+x86 uncore amd ibs      |  X      X      X       X       X       X
+arm bus cci             |  X      X      X       X       X       X
+arm bus ccn             |  X      X                      X       X
+----------------------------------------------------------------------
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index d2d8b8c2e17f..c0f61235a6ec 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -642,8 +642,8 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
- 				return -ENOMEM;
+How about simply adding a helper function to include/linux/perf_event.h
+that checks if _any_ of the exclude bits is set? We could then
+simplify the check-for-any exclude flag to:
+
+if (any_exclude_set(event))
+	return -EINVAL;
+
+What's your opinion?
+
+Jan
+
+---
+
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index f5c5a3f..0eacdba0 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -849,6 +849,18 @@ static inline bool is_sampling_event(struct perf_event *event)
+ 	return event->attr.sample_period != 0;
+ }
  
- 			set_pmd(pmd, __pmd(__pa(p) | PROT_SECT_NORMAL));
--		} else
--			vmemmap_verify((pte_t *)pmd, node, addr, next);
-+		}
-+		vmemmap_verify((pte_t *)pmd, node, addr, next);
- 	} while (addr = next, addr != end);
- 
- 	return 0;
-
--- 
-Catalin
++static inline int any_exclude_set(struct perf_event *event)
++{
++	if (event->attr.exclude_user	||
++	    event->attr.exclude_kernel	||
++	    event->attr.exclude_host	||
++	    event->attr.exclude_guest	||
++	    event->attr.exclude_hv	||
++	    event->attr.exclude_idle)
++		return 1;
++	return 0;
++}
++
+ /*
+  * Return 1 for a software event, 0 for a hardware event
+  */
