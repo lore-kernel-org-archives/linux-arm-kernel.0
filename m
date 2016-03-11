@@ -1,39 +1,59 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 11 Mar 2016 16:49:19 +0900
-Subject: [PATCH 2/5] hwrng: exynos - Runtime suspend device after init
+Date: Fri, 11 Mar 2016 16:49:20 +0900
+Subject: [PATCH 3/5] hwrng: exynos - Fix unbalanced PM runtime put on timeout
+ error path
 In-Reply-To: <1457682562-21219-1-git-send-email-k.kozlowski@samsung.com>
 References: <1457682562-21219-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1457682562-21219-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1457682562-21219-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver uses pm_runtime_put_noidle() after initialization so the
-device might remain in active state if the core does not read from it
-(the read callback contains regular runtime put). The put_noidle() was
-chosen probably to avoid unneeded suspend and resume cycle after the
-initialization.
+In case of timeout during read operation, the exit path lacked PM
+runtime put. This could lead to unbalanced runtime PM usage counter thus
+leaving the device in an active state.
 
-However for this purpose autosuspend is enabled so it is safe to runtime
-put just after the initialization.
-
+Fixes: d7fd6075a205 ("hwrng: exynos - Add timeout for waiting on init done")
+Cc: <stable@vger.kernel.org> # v4.4+
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/char/hw_random/exynos-rng.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/char/hw_random/exynos-rng.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
-index ada081232528..d1fd21e99368 100644
+index d1fd21e99368..38b80f82ddd2 100644
 --- a/drivers/char/hw_random/exynos-rng.c
 +++ b/drivers/char/hw_random/exynos-rng.c
-@@ -77,7 +77,8 @@ static int exynos_init(struct hwrng *rng)
+@@ -90,6 +90,7 @@ static int exynos_read(struct hwrng *rng, void *buf,
+ 						struct exynos_rng, rng);
+ 	u32 *data = buf;
+ 	int retry = 100;
++	int ret = 4;
  
  	pm_runtime_get_sync(exynos_rng->dev);
- 	ret = exynos_rng_configure(exynos_rng);
--	pm_runtime_put_noidle(exynos_rng->dev);
-+	pm_runtime_mark_last_busy(exynos_rng->dev);
-+	pm_runtime_put_autosuspend(exynos_rng->dev);
  
- 	return ret;
+@@ -98,17 +99,20 @@ static int exynos_read(struct hwrng *rng, void *buf,
+ 	while (!(exynos_rng_readl(exynos_rng,
+ 			EXYNOS_PRNG_STATUS_OFFSET) & PRNG_DONE) && --retry)
+ 		cpu_relax();
+-	if (!retry)
+-		return -ETIMEDOUT;
++	if (!retry) {
++		ret = -ETIMEDOUT;
++		goto out;
++	}
+ 
+ 	exynos_rng_writel(exynos_rng, PRNG_DONE, EXYNOS_PRNG_STATUS_OFFSET);
+ 
+ 	*data = exynos_rng_readl(exynos_rng, EXYNOS_PRNG_OUT1_OFFSET);
+ 
++out:
+ 	pm_runtime_mark_last_busy(exynos_rng->dev);
+ 	pm_runtime_put_sync_autosuspend(exynos_rng->dev);
+ 
+-	return 4;
++	return ret;
  }
+ 
+ static int exynos_rng_probe(struct platform_device *pdev)
 -- 
 2.5.0
