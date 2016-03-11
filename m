@@ -1,73 +1,39 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 11 Mar 2016 10:55:05 -0800
-Subject: [PATCH v2] bsp: add SoC driver to brcmstb
-In-Reply-To: <1457721579-9646-1-git-send-email-justinpopo6@gmail.com>
-References: <1457721579-9646-1-git-send-email-justinpopo6@gmail.com>
-Message-ID: <1457722505.4654.8.camel@perches.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 11 Mar 2016 20:06:27 +0100
+Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
+In-Reply-To: <56E30DDF.5040506@caviumnetworks.com>
+References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160311173125.GI3153@lunn.ch>
+ <56E30332.7060003@caviumnetworks.com>
+ <20160311180030.GB19277@lunn.ch>
+ <56E30DDF.5040506@caviumnetworks.com>
+Message-ID: <20160311190627.GC19277@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-03-11 at 10:39 -0800, Justin Chen wrote:
-> From: Justin Chen <justin.chen@broadcom.com>
+> >I don't see why it should wait around forever. I have boards with
+> >Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
+> >driver still loads, because the generic PHY driver is used instead.
+> >Why does this not work here?
 > 
-> Value of soc_dev_attributes:
-> family = chip family id
-> soc_id = product id
-> revision = product revision
-[]
-> diff --git a/drivers/soc/brcmstb/common.c b/drivers/soc/brcmstb/common.c
-[]
-> +static int __init brcmstb_soc_device_init(void)
-> +{
-> +	struct soc_device_attribute *soc_dev_attr;
-> +	struct soc_device *soc_dev;
-> +	struct device_node *sun_top_ctrl;
-> +	void __iomem *sun_top_ctrl_base;
-> +
-> +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
-> +	if (!sun_top_ctrl)
-> +		return -ENODEV;
-> +
-> +	sun_top_ctrl_base = of_iomap(sun_top_ctrl, 0);
-> +	if (!sun_top_ctrl_base)
-> +		return -ENODEV;
-> +
-> +	family_id = readl(sun_top_ctrl_base);
-> +	product_id = readl(sun_top_ctrl_base + 0x4);
-> +
-> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +	if (!soc_dev_attr)
-> +		return -ENOMEM;
-> +
-> +	soc_dev_attr->family = kasprintf(GFP_KERNEL, "%x",
-> +					family_id >> 28 ?
-> +					family_id >> 16 : family_id >> 8);
-> +	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%x",
-> +					product_id >> 28 ?
-> +					product_id >> 16 : product_id >> 8);
-> +	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c%d",
-> +				????(char)(((product_id & 0xff) >> 4) + 65),
-> +				?????product_id & 0xf);
+> As I said before, there is no driver for the device, so
+> of_phy_find_device() will always return NULL.
 
-This might be easier to read as:
+I'm not yet convinced this is true. I really do expect that the
+generic PHY driver will bind to it. It might then go horribly wrong,
+because it is not standard compliant, but that is a different issue.
 
-	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c%d"
-					   ((product_id & 0xf0) >> 4) + 'A',
-					   product_id & 0xf);
-> +
-> +	soc_dev = soc_device_register(soc_dev_attr);
-> +	if (IS_ERR(soc_dev)) {
-> +		kfree(soc_dev_attr->family);
-> +		kfree(soc_dev_attr->soc_id);
-> +		kfree(soc_dev_attr->revision);
-> +		kfree(soc_dev_attr);
-> +		return -1;
+The generic driver should probably have a black list for such devices.
+This is a PHY issue, not an MDIO issue, and the problem should be
+solved in the PHY layer, not in one MDIO driver.
 
-Mixing GENERIC_ERRNO types and fixed values seems odd.
-Is -EPERM the correct return here?  Maybe -ENODEV?
+We should also consider what happens when somebody actually writes a
+driver for this PHY. Are you not going to use it?
 
-> +	}
-> +
-> +	return 0;
-> +}
-> +arch_initcall(brcmstb_soc_device_init);
+Before this patchset, you did not special case this compatible
+string. So at the very least, you need to split this into a separate
+patch, so the maintainers can ACK/NACK it, independent of the other
+change it is embedded in.
+
+       Andrew
