@@ -1,49 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 11 Mar 2016 08:38:56 +0900
-Subject: [PATCH 00/30] ARM: dts: r8a779[0-4]: Reference both DMA
- controllers
-In-Reply-To: <20160310134325.GA1111@bigcity.dyn.berto.se>
-References: <1457609782-24108-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <CAMuHMdXF4FMLg=Y_cZ2chjzGWAV90N=vLsCkPKGmmYx5mFY64Q@mail.gmail.com>
- <20160310134325.GA1111@bigcity.dyn.berto.se>
-Message-ID: <20160310233855.GD7423@verge.net.au>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Fri, 11 Mar 2016 07:09:08 +0700
+Subject: [PATCH v2 0/3] Enable configs for 96boards HiKey and general arm64
+Message-ID: <1457654951-29944-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 02:43:25PM +0100, Niklas S?derlund wrote:
-> Hi Geert,
-> 
-> On 2016-03-10 13:20:56 +0100, Geert Uytterhoeven wrote:
-> > Hi Niklas,
-> > 
-> > On Thu, Mar 10, 2016 at 12:35 PM, Niklas S?derlund
-> > <niklas.soderlund+renesas@ragnatech.se> wrote:
-> > > R-Car Gen2 have two DMA controllers, which are equivalent. However DMA
-> > > slaves were tied only to a single DMA controller in .dtsi. This series
-> > > add references to to both DMA controllers for all nodes that previously
-> > > only referenced one of them. It also adds dma references to the SDHI
-> > > nodes for r8a7794 which according to the datasheet should work but I
-> > > have not access to HW to verify.
-> > >
-> > > Tested on Koelsch (r8a7791) by altering the compatible value of either
-> > > dmac0 or dmac1 and verifying that the DMA slaves pick the DMA controller
-> > > that is instantiated.
-> > 
-> > Thanks for your series!
-> > 
-> > If you fix the subject of patch 30:
-> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Thanks for your review and that you found my error in the subject.
-> 
-> > 
-> > I guess this is against v4.5-rc7? It doesn't apply against
-> > renesas-devel-20160308-v4.5-rc7.
-> > Unfortunately you'll have to rebase against Simon's tree, and add scif2
-> > on r8a7790, and i2c[6-8] on r8a7793.
-> 
-> I will rebase and update the relevant patches to include the additions 
-> to r8a7790 and r8a7793.
+This patch enables a number of devices currently supported by the Hi6220
+and 96boards HiKey. These include
+a) Hi655x PMIC and regulator
+b) Hi6220 I2C, USB, MMC, mailbox, and reset
+c) CONFIG_PINCTRL_SINGLE, and CONFIG_LEDS_GPIO
 
-If its not too much bother could you provide a git branch as well as
-patches posted to the mailing list.  For larger series that is helpful to me.
+Also added general features required in arm64:
+ - SPIDEV
+ - USB network adapters
+
+v2:
+ - rebase to next-20160310, CONFIG_MMC_BLOCK_MINORS=16 is already in.
+ - set CONFIG_I2C_DESIGNWARE_PLATFORM to be build as module
+ - Add general features for arm64
+
+Akira Tsukamoto (1):
+  ARM64: defconfig: enable several common USB network adapters
+
+Guodong Xu (2):
+  arm64: defconfig: Enable devices for Hi6220 and 96boards HiKey
+  arm64: defconfig: add CONFIG_SPI_SPIDEV as module
+
+ arch/arm64/configs/defconfig | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+-- 
+1.9.1
