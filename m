@@ -1,39 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 11 Mar 2016 20:06:27 +0100
-Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
-In-Reply-To: <56E30DDF.5040506@caviumnetworks.com>
-References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
- <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
- <20160311173125.GI3153@lunn.ch>
- <56E30332.7060003@caviumnetworks.com>
- <20160311180030.GB19277@lunn.ch>
- <56E30DDF.5040506@caviumnetworks.com>
-Message-ID: <20160311190627.GC19277@lunn.ch>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 11 Mar 2016 14:20:22 -0500 (EST)
+Subject: [PATCH net 3/3] net: mvneta: fix error messages in
+ mvneta_port_down function
+In-Reply-To: <1457441826-6100-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1457441826-6100-1-git-send-email-gregory.clement@free-electrons.com>
+ <1457441826-6100-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160311.142022.1421480365252928267.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >I don't see why it should wait around forever. I have boards with
-> >Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
-> >driver still loads, because the generic PHY driver is used instead.
-> >Why does this not work here?
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Tue,  8 Mar 2016 13:57:06 +0100
+
+> From: Dmitri Epshtein <dima@marvell.com>
 > 
-> As I said before, there is no driver for the device, so
-> of_phy_find_device() will always return NULL.
+> This commit corrects error printing when shutting down the port. Also
+> magic numbers are replaced by existing macros.
+> 
+> Signed-off-by: Dmitri Epshtein <dima@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I'm not yet convinced this is true. I really do expect that the
-generic PHY driver will bind to it. It might then go horribly wrong,
-because it is not standard compliant, but that is a different issue.
+Individual patches should do one thing, rather than several at once.
 
-The generic driver should probably have a black list for such devices.
-This is a PHY issue, not an MDIO issue, and the problem should be
-solved in the PHY layer, not in one MDIO driver.
-
-We should also consider what happens when somebody actually writes a
-driver for this PHY. Are you not going to use it?
-
-Before this patchset, you did not special case this compatible
-string. So at the very least, you need to split this into a separate
-patch, so the maintainers can ACK/NACK it, independent of the other
-change it is embedded in.
-
-       Andrew
+Please split this up into two changes, thanks.
