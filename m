@@ -1,67 +1,35 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Mar 2016 21:12:31 +0100
-Subject: [PATCH 2/2] regulator: axp20x: Fix axp22x ldo_io registration error
- on cold boot
-In-Reply-To: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
-References: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1457727151-16392-2-git-send-email-hdegoede@redhat.com>
+Date: Fri, 11 Mar 2016 21:12:30 +0100
+Subject: [PATCH 1/2] regulator: axp20x: Fix axp22x ldo_io voltage ranges
+Message-ID: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The maximum supported voltage for ldo_io# is 3.3V, but on cold
-boot the selector comes up at 0x1f, which maps to 3.8V.
-
-This causes _regulator_get_voltage() to fail with -EINVAL which
-causes regulator registration to fail when constrains are used:
-
-[    1.467788] vcc-touchscreen: failed to get the current voltage(-22)
-[    1.474209] axp20x-regulator axp20x-regulator: Failed to register ldo_io1
-[    1.483363] axp20x-regulator: probe of axp20x-regulator failed with error -22
-
-This commits makes axp20x_probe fix-up the selector values in
-the chip before registering regulators avoiding the above errors.
+The minium voltage of 1800mV is a copy and paste error from the axp20x
+regulator info. The correct minimum voltage for the ldo_io regulators
+on the axp22x is 700mV.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/regulator/axp20x-regulator.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/regulator/axp20x-regulator.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 0c0e7a3..679018c 100644
+index 40cd894..0c0e7a3 100644
 --- a/drivers/regulator/axp20x-regulator.c
 +++ b/drivers/regulator/axp20x-regulator.c
-@@ -345,6 +345,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 		.driver_data = axp20x,
- 	};
- 	int ret, i, nregulators;
-+	unsigned int reg, sel;
- 	u32 workmode;
- 	const char *axp22x_dc1_name = axp22x_regulators[AXP22X_DCDC1].name;
- 	const char *axp22x_dc5_name = axp22x_regulators[AXP22X_DCDC5].name;
-@@ -359,6 +360,24 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 	case AXP223_ID:
- 		regulators = axp22x_regulators;
- 		nregulators = AXP22X_REG_ID_MAX;
-+		/*
-+		 * On cold boot ldo_io# sel is 0x1f which is out of spec,
-+		 * fix this up here to avoid _regulator_get_voltage returning
-+		 * -EINVAL when applying constraints.
-+		 */
-+		for (reg = AXP22X_LDO_IO0_V_OUT;
-+		     reg <= AXP22X_LDO_IO1_V_OUT; reg += 2) {
-+			ret = regmap_read(axp20x->regmap, reg, &sel);
-+			if (ret)
-+				return ret;
-+			sel &= 0x1f;
-+			if (sel > 0x1a) {
-+				ret = regmap_update_bits(axp20x->regmap, reg,
-+							 0x1f, 0x1a);
-+				if (ret)
-+					return ret;
-+			}
-+		}
- 		break;
- 	default:
- 		dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
+@@ -215,10 +215,10 @@ static const struct regulator_desc axp22x_regulators[] = {
+ 		 AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
+ 	AXP_DESC(AXP22X, ELDO3, "eldo3", "eldoin", 700, 3300, 100,
+ 		 AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
+-	AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 1800, 3300, 100,
++	AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
+ 		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
+ 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+-	AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 1800, 3300, 100,
++	AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
+ 		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
+ 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+ 	AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtc_ldo", "ips", 3000),
 -- 
 2.7.2
