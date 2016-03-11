@@ -1,66 +1,40 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Fri, 11 Mar 2016 16:57:30 +0300
-Subject: [PATCH] arm64: kasan: Fix zero shadow mapping overriding kernel
- image shadow
-In-Reply-To: <1457636255-17427-1-git-send-email-catalin.marinas@arm.com>
-References: <1457636255-17427-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <56E2CECA.7050308@virtuozzo.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri, 11 Mar 2016 15:06:39 +0100
+Subject: [PATCH v2 2/3] ARM: i.MX25: add RNGC node to dtsi
+In-Reply-To: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1457705200-16951-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a devicetree entry for the Random Number Generator Version C (RNGC).
 
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+Changes in v2:
+  - remove interrupt-names from dtsi
 
-On 03/10/2016 09:57 PM, Catalin Marinas wrote:
-> With the 16KB and 64KB page size configurations, SWAPPER_BLOCK_SIZE is
-> PAGE_SIZE and ARM64_SWAPPER_USES_SECTION_MAPS is 0. Since
-> kimg_shadow_end is not page aligned (_end shifted by
-> KASAN_SHADOW_SCALE_SHIFT), the edges of previously mapped kernel image
-> shadow via vmemmap_populate() may be overridden by the subsequent call
-> to kasan_populate_zero_shadow(), leading to kernel panics like below:
-> 
-> ------------------------------------------------------------------------------
-> Unable to handle kernel paging request at virtual address fffffc100135068c
-> pgd = fffffc8009ac0000
-> [fffffc100135068c] *pgd=00000009ffee0003, *pud=00000009ffee0003, *pmd=00000009ffee0003, *pte=00e0000081a00793
-> Internal error: Oops: 9600004f [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc4+ #1984
-> Hardware name: Juno (DT)
-> task: fffffe09001a0000 ti: fffffe0900200000 task.ti: fffffe0900200000
-> PC is at __memset+0x4c/0x200
-> LR is at kasan_unpoison_shadow+0x34/0x50
-> pc : [<fffffc800846f1cc>] lr : [<fffffc800821ff54>] pstate: 00000245
-> sp : fffffe0900203db0
-> x29: fffffe0900203db0 x28: 0000000000000000
-> x27: 0000000000000000 x26: 0000000000000000
-> x25: fffffc80099b69d0 x24: 0000000000000001
-> x23: 0000000000000000 x22: 0000000000002000
-> x21: dffffc8000000000 x20: 1fffff9001350a8c
-> x19: 0000000000002000 x18: 0000000000000008
-> x17: 0000000000000147 x16: ffffffffffffffff
-> x15: 79746972100e041d x14: ffffff0000000000
-> x13: ffff000000000000 x12: 0000000000000000
-> x11: 0101010101010101 x10: 1fffffc11c000000
-> x9 : 0000000000000000 x8 : fffffc100135068c
-> x7 : 0000000000000000 x6 : 000000000000003f
-> x5 : 0000000000000040 x4 : 0000000000000004
-> x3 : fffffc100134f651 x2 : 0000000000000400
-> x1 : 0000000000000000 x0 : fffffc100135068c
-> 
-> Process swapper/0 (pid: 1, stack limit = 0xfffffe0900200020)
-> Call trace:
-> [<fffffc800846f1cc>] __memset+0x4c/0x200
-> [<fffffc8008220044>] __asan_register_globals+0x5c/0xb0
-> [<fffffc8008a09d34>] _GLOBAL__sub_I_65535_1_sunrpc_cache_lookup+0x1c/0x28
-> [<fffffc8008f20d28>] kernel_init_freeable+0x104/0x274
-> [<fffffc80089e1948>] kernel_init+0x10/0xf8
-> [<fffffc8008093a00>] ret_from_fork+0x10/0x50
-> ------------------------------------------------------------------------------
-> 
-> This patch aligns kimg_shadow_start and kimg_shadow_end to
-> SWAPPER_BLOCK_SIZE in all configurations.
-> 
-> Fixes: f9040773b7bb ("arm64: move kernel image to base of vmalloc area")
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+ arch/arm/boot/dts/imx25.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index cde329e9b9e3..ebf11d9f123e 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -397,6 +397,14 @@
+ 				interrupts = <41>;
+ 			};
+ 
++			rng: rng at 53fb0000 {
++				compatible = "fsl,imx25-rng";
++				reg = <0x53fb0000 0x4000>;
++				clocks = <&clks 109>;
++				clock-names = "ipg";
++				interrupts = <22>;
++			};
++
+ 			esdhc1: esdhc at 53fb4000 {
+ 				compatible = "fsl,imx25-esdhc";
+ 				reg = <0x53fb4000 0x4000>;
+-- 
+2.7.0
