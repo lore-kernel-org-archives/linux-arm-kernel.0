@@ -1,77 +1,61 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 11 Mar 2016 12:16:15 -0800
-Subject: [PATCH] arm64: dts: vulcan: Update PCI ranges
-In-Reply-To: <1456645037-12978-1-git-send-email-jchandra@broadcom.com>
-References: <56D200F5.7010505@broadcom.com>
- <1456645037-12978-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <56E3278F.5090200@gmail.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri, 11 Mar 2016 12:56:04 -0800
+Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
+In-Reply-To: <56E31E7A.6080905@gmail.com>
+References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160311173125.GI3153@lunn.ch> <56E30332.7060003@caviumnetworks.com>
+ <20160311180030.GB19277@lunn.ch> <56E30DDF.5040506@caviumnetworks.com>
+ <20160311190627.GC19277@lunn.ch> <56E31E7A.6080905@gmail.com>
+Message-ID: <56E330E4.9090800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/16 23:37, Jayachandran C wrote:
-> The PCI memory windows available in vulcan.dtsi are limited to 128MB
-> for 32-bit BARs, and 4GB for 64-bit BARs. Given the memory mapped IO
-> space available in arm64, these windows can be increased substantially
-> to support more use cases.
-> 
-> The change increases the 32-bit window to 256MB and the 64-bit window
-> to 128 GB. The firmware on vulcan boards will use these ranges as well.
-> 
-> PCI IO windows are not supported on Vulcan, so remove them instead of
-> keeping an unused value.
-> 
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
-> 
-> This is an update to the patch with subject
-> "arm64: Broadcom Vulcan support"
-> I had sent earlier, please fold it into that patch if possible
+On 03/11/2016 11:37 AM, Florian Fainelli wrote:
+> On 11/03/16 11:06, Andrew Lunn wrote:
+>>>> I don't see why it should wait around forever. I have boards with
+>>>> Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
+>>>> driver still loads, because the generic PHY driver is used instead.
+>>>> Why does this not work here?
+>>>
+>>> As I said before, there is no driver for the device, so
+>>> of_phy_find_device() will always return NULL.
+>>
+>> I'm not yet convinced this is true. I really do expect that the
+>> generic PHY driver will bind to it. It might then go horribly wrong,
+>> because it is not standard compliant, but that is a different issue.
+>
+> I concur with Andrew here, unless the PHY is guaranteed to return
+> garbage when get_phy_id() is called, there is a good chance that the
+> Generic PHY driver will be bound to this PHY device, or this is not
+> happening for you for some reason?
+>
 
-Arnd, I do not have any other Broadcom ARM64 DT changes for 4.6 to be
-sent at the moment, do you mind taking this patch directly?
+get_phy_id() is working a designed.
 
-Feel free to add my:
+For this phy, we have:
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+   compatible = "cortina,cs4223-slice";
 
-Thanks!
+Therefore get_phy_id() is being called with a is_c45 value of false.
 
-> 
-> Thanks,
-> JC.
-> 
-> 
->  arch/arm64/boot/dts/broadcom/vulcan.dtsi | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/broadcom/vulcan.dtsi b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-> index c49b5a8..85820e2 100644
-> --- a/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-> +++ b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-> @@ -108,12 +108,15 @@
->  		reg = <0x0 0x30000000  0x0 0x10000000>;
->  		reg-names = "PCI ECAM";
->  
-> -			  /* IO 0x4000_0000 - 0x4001_0000 */
-> -		ranges = <0x01000000 0 0x40000000 0 0x40000000 0 0x00010000
-> -			  /* MEM 0x4800_0000 - 0x5000_0000 */
-> -			  0x02000000 0 0x48000000 0 0x48000000 0 0x08000000
-> -			  /* MEM64 pref 0x6_0000_0000 - 0x7_0000_0000 */
-> -			  0x43000000 6 0x00000000 6 0x00000000 1 0x00000000>;
-> +		/*
-> +		 * PCI ranges:
-> +		 *   IO		no supported
-> +		 *   MEM        0x4000_0000 - 0x6000_0000
-> +		 *   MEM64 pref 0x40_0000_0000 - 0x60_0000_0000
-> +		 */
-> +		ranges =
-> +		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
-> +		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
->  		interrupt-map-mask = <0 0 0 7>;
->  		interrupt-map =
->  		      /* addr  pin  ic   icaddr  icintr */
-> 
+get_phy_id() is returning a value of 0, which means that it succeeds, 
+but the returned phy_id is 0xffffffff, which causes get_phy_device() to 
+not create a phy_device, and no driver can be bound.
 
+I know you are all skeptical, but I really think the best thing to do is 
+not try to attach a phy driver when this compatible value is encountered.
 
--- 
-Florian
+It is a defective device tree, and I am attempting to handle it in the 
+specific site where it can cause problems.
+
+We are trying to distinguish between these two cases:
+
+  - of_phy_find_device() returns NULL because driver is not yet bound
+
+  - of_phy_find_device() returns NULL because "cortina,cs4223-slice"
+
+I don't think we need to build some sort of frame work to handle things 
+like this in a general way.
+
+David Daney
