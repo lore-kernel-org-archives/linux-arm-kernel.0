@@ -1,75 +1,45 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 11 Mar 2016 14:29:27 +0530
-Subject: [PATCH v1 0/4] Implement SoC bus driver for Vybrid
-Message-ID: <cover.1457684688.git.maitysanchayan@gmail.com>
+Date: Fri, 11 Mar 2016 14:29:29 +0530
+Subject: [PATCH v1 2/4] ARM: dts: vfxxx: Add device tree node for OCOTP
+In-Reply-To: <cover.1457684688.git.maitysanchayan@gmail.com>
+References: <cover.1457684688.git.maitysanchayan@gmail.com>
+Message-ID: <6fc72e6919ad21aeca5c4c52ea0a4eb08de888c4.1457684688.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add device tree node for the OCOTP peripheral on Vybrid.
 
-This patchset implements SoC bus support for Freescale Vybrid platform,
-implementing the following
-https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-This a reworked version of an older patchset series posted in June 2015
-which was at v5 then [1]. Since the NVMEM framework was then getting
-introduced, we decided that first a NVMEM driver for OCOTP peripheral
-being in place would be better.
-
-Compared to the older revisions, this driver now relies on NVMEM
-consumer API using the NVMEM based vf610_ocotp driver which has
-already been in mainline for a while now. Also now a new syscon
-abstraction "syscon_regmap_read_from_offset" is implemented and
-exported from syscon allowing accessing a register from a syscon
-reference like this
-
-ocotp-cfg1 = <&ocotp 0x20>;
-
-avoiding code repetition in the driver.
-
-One point on which we were not sure here is whether we really should
-introduce a new Kconfig symbol as being introduced here. While we
-could just enable it when SOC_VF610 is selected, this however would
-introduce circular dependencies.
-
-This patch series is based on top of shawn's for-next branch and
-tested on Colibri Vybrid VF50 and VF61 modules.
-
-Feedback is most welcome.
-
-[1] Older v5:
-http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
-Even earlier versions:
-Version 4 of the patchset can be found here
-https://lkml.org/lkml/2015/5/26/199
-Version 3 of the patchset can be found here
-http://www.spinics.net/lists/arm-kernel/msg420847.html
-Version 2 of the patchset can be found here
-http://www.spinics.net/lists/devicetree/msg80654.html
-Version 1 of the patchset can be found here
-http://www.spinics.net/lists/devicetree/msg80257.html
-The RFC version can be found here
-https://lkml.org/lkml/2015/5/11/13
-
-Regards,
-Sanchayan.
-
-Sanchayan Maity (4):
-  mfd: syscon: Introduce syscon_regmap_read_from_offset
-  ARM: dts: vfxxx: Add device tree node for OCOTP
-  ARM: dts: vfxxx: Add OCROM and phandle entries for Vybrid SoC bus driver
-  soc: Add SoC bus driver for Freescale Vybrid Platform
-
- arch/arm/boot/dts/vfxxx.dtsi |  28 +++++++-
- drivers/mfd/syscon.c         |  30 ++++++++
- drivers/soc/Kconfig          |   1 +
- drivers/soc/fsl/Kconfig      |  10 +++
- drivers/soc/fsl/Makefile     |   1 +
- drivers/soc/fsl/soc-vf610.c  | 160 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/syscon.h   |  10 +++
- 7 files changed, 239 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/fsl/Kconfig
- create mode 100644 drivers/soc/fsl/soc-vf610.c
-
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 5e49fbd..db9157e 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -499,6 +499,22 @@
+ 				status = "disabled";
+ 			};
+ 
++			ocotp at 400a5000 {
++				compatible = "fsl,vf610-ocotp";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x400a5000 0xCF0>;
++				clocks = <&clks VF610_CLK_OCOTP>;
++
++				ocotp_cfg0: cfg0 at 410 {
++					reg = <0x410 0x4>;
++				};
++
++				ocotp_cfg1: cfg1 at 420 {
++					reg = <0x420 0x4>;
++				};
++			};
++
+ 			snvs0: snvs at 400a7000 {
+ 			    compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+ 				reg = <0x400a7000 0x2000>;
 -- 
 2.7.2
