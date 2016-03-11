@@ -1,33 +1,270 @@
-From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Fri, 11 Mar 2016 10:19:55 +0100
-Subject: [PATCH] arm/bL_switcher: Use global define for masking hotplug
- transition switch action argument
-Message-ID: <1457687995-40417-1-git-send-email-anna-maria@linutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 11 Mar 2016 10:36:33 +0100
+Subject: [PATCH] ARM: mvebu: fix overlap of Crypto SRAM with PCIe memory
+ window
+In-Reply-To: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160311103633.0807c6ef@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The action argument of the hotplug transition switch case is masked
-with '0xf' to map CPU_XXX_FROZEN hotplug transition on corresponding
-non frozen hotplug transitions. There is a global define
-CPU_TASKS_FROZEN used as mask for frozen hotplug transitions.
+On Tue,  8 Mar 2016 16:59:57 +0100
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Use '~CPU_TASKS_FROZEN' instead of '0xf'.
+> When the Crypto SRAM mappings were added to the Device Tree files
+> describing the Armada XP boards in commit c466d997bb16 ("ARM: mvebu:
+> define crypto SRAM ranges for all armada-xp boards"), the fact that
+> those mappings were overlaping with the PCIe memory aperture was
+> overlooked. Due to this, we currently have for all Armada XP platforms
+> a situation that looks like this:
+> 
+> Memory mapping on Armada XP boards with internal registers at
+> 0xf1000000:
+> 
+>  - 0x00000000 -> 0xf0000000	3.75G 	RAM
+>  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
+>  - 0xf1000000 -> 0xf1100000	1M	internal registers
+>  - 0xf8000000 -> 0xffe0000	126M	PCIe memory aperture
+>  - 0xf8100000 -> 0xf8110000	64KB	Crypto SRAM #0	=> OVERLAPS WITH PCIE !
+>  - 0xf8110000 -> 0xf8120000	64KB	Crypto SRAM #1	=> OVERLAPS WITH PCIE !
+>  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O aperture
+>  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> 
+> The overlap means that when PCIe devices are added, depending on their
+> memory window needs, they might or might not be mapped into the
+> physical address space. Indeed, they will not be mapped if the area
+> allocated in the PCIe memory aperture by the PCI core overlaps with
+> one of the Crypto SRAM. Typically, a Intel IGB PCIe NIC that needs 8MB
+> of PCIe memory will see its PCIe memory window allocated from
+> 0xf80000000 for 8MB, which overlaps with the Crypto SRAM windows. Due
+> to this, the PCIe window is not created, and any attempt to access the
+> PCIe window makes the kernel explode:
+> 
+> [    3.302213] igb: Copyright (c) 2007-2014 Intel Corporation.
+> [    3.307841] pci 0000:00:09.0: enabling device (0140 -> 0143)
+> [    3.313539] mvebu_mbus: cannot add window '4:f8', conflicts with another window
+> [    3.320870] mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0xf8000000-0xf87fffff]: -22
+> [    3.330811] Unhandled fault: external abort on non-linefetch (0x1008) at 0xf08c0018
+> 
+> This problem does not occur on Armada 370 boards, because we use the
+> following memory mapping (for boards that have internal registers at
+> 0xf1000000):
+> 
+>  - 0x00000000 -> 0xf0000000	3.75G 	RAM
+>  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
+>  - 0xf1000000 -> 0xf1100000	1M	internal registers
+>  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0 => OK !
+>  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
+>  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
+>  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> 
+> Obviously, the solution is to align the location of the Crypto SRAM
+> mappings of Armada XP to be similar with the ones on Armada 370, i.e
+> have them between the "internal registers" area and the beginning of
+> the PCIe aperture.
+> 
+> However, we have a special case with the OpenBlocks AX3-4 platform,
+> which has a 128 MB NOR flash. Currently, this NOR flash is mapped from
+> 0xf0000000 to 0xf8000000. This is possible because on OpenBlocks
+> AX3-4, the internal registers are not at 0xf1000000. And this explains
+> why the Crypto SRAM mappings were not configured at the same place on
+> Armada XP.
+> 
+> Hence, the solution is two-fold:
+> 
+>  (1) Move the NOR flash mapping on Armada XP OpenBlocks AX3-4 from
+>      0xe8000000 to 0xf0000000. This frees the 0xf0000000 ->
+>      0xf80000000 space.
+> 
+>  (2) Move the Crypto SRAM mappings on Armada XP to be similar to
+>      Armada 370 (except of course that Armada XP has two Crypto SRAM
+>      and not one).
+> 
+> After this patch, the memory mapping on Armada XP boards with
+> registers at 0xf1 is:
+> 
+>  - 0x00000000 -> 0xf0000000	3.75G 	RAM
+>  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
+>  - 0xf1000000 -> 0xf1100000	1M	internal registers
+>  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
+>  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
+>  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
+>  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
+>  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> 
+> And the memory mapping for the special case of the OpenBlocks AX3-4
+> (internal registers at 0xd0000000, NOR of 128 MB):
+> 
+>  - 0x00000000 -> 0xc0000000	3G 	RAM
+>  - 0xd0000000 -> 0xd1000000	1M	internal registers
+>  - 0xe800000  -> 0xf0000000	128M	NOR flash
+>  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
+>  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
+>  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
+>  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
+>  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> 
+> Fixes: c466d997bb16 ("ARM: mvebu: define crypto SRAM ranges for all armada-xp boards")
+> Reported-by: Phil Sutter <phil@nwl.cc>
+> Cc: Phil Sutter <phil@nwl.cc>
+> Cc: <stable@kernel.org>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
----
- arch/arm/common/bL_switcher.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
---- a/arch/arm/common/bL_switcher.c
-+++ b/arch/arm/common/bL_switcher.c
-@@ -762,7 +762,7 @@ static int bL_switcher_hotplug_callback(
- {
- 	if (bL_switcher_active) {
- 		int pairing = bL_switcher_cpu_pairing[(unsigned long)hcpu];
--		switch (action & 0xf) {
-+		switch (action & ~CPU_TASKS_FROZEN) {
- 		case CPU_UP_PREPARE:
- 		case CPU_DOWN_PREPARE:
- 			if (pairing == -1)
+> ---
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 4 ++--
+>  arch/arm/boot/dts/armada-xp-db.dts               | 4 ++--
+>  arch/arm/boot/dts/armada-xp-gp.dts               | 4 ++--
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  | 4 ++--
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts    | 4 ++--
+>  arch/arm/boot/dts/armada-xp-matrix.dts           | 4 ++--
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 4 ++--
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 6 +++---
+>  arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 4 ++--
+>  9 files changed, 19 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> index 23fc670..5c21b23 100644
+> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -70,8 +70,8 @@
+>  	soc {
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		pcie-controller {
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+> index f774101..ebe1d26 100644
+> --- a/arch/arm/boot/dts/armada-xp-db.dts
+> +++ b/arch/arm/boot/dts/armada-xp-db.dts
+> @@ -76,8 +76,8 @@
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+>  			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		devbus-bootcs {
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> index 4878d73..5730b87 100644
+> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -95,8 +95,8 @@
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+>  			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		devbus-bootcs {
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> index fb9e1bb..8af463f 100644
+> --- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+> @@ -65,8 +65,8 @@
+>  	soc {
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+>  			MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> -			MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		pcie-controller {
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> index 6e9820e..b89e6cf 100644
+> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> @@ -70,8 +70,8 @@
+>  	soc {
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		pcie-controller {
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
+> index 6ab3383..6522b04 100644
+> --- a/arch/arm/boot/dts/armada-xp-matrix.dts
+> +++ b/arch/arm/boot/dts/armada-xp-matrix.dts
+> @@ -68,8 +68,8 @@
+>  	soc {
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		internal-regs {
+>  			serial at 12000 {
+> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> index 62175a8..d19f44c 100644
+> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> @@ -64,8 +64,8 @@
+>  	soc {
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		pcie-controller {
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> index a5db177..853bd39 100644
+> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> @@ -65,9 +65,9 @@
+>  	soc {
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xd0000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> -			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x01, 0x2f) 0 0 0xe8000000 0x8000000
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		devbus-bootcs {
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> index 2391b11..d17dab0 100644
+> --- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> +++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> @@ -78,8 +78,8 @@
+>  	soc {
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> -			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+>  
+>  		pcie-controller {
+>  			status = "okay";
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
