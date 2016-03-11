@@ -1,48 +1,29 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Mar 2016 11:54:52 +0530
+Date: Fri, 11 Mar 2016 11:56:07 +0530
 Subject: [PATCH] dma: sun4i: expose block size and wait cycle
  configuration to DMA users
-In-Reply-To: <20160309111434.521c5ec2@bbrezillon>
+In-Reply-To: <20160309120627.67612b1d@bbrezillon>
 References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
  <20160307145429.GG11154@localhost>
  <20160307160857.577bb04d@bbrezillon>
  <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
- <20160309111434.521c5ec2@bbrezillon>
-Message-ID: <20160311062452.GO11154@localhost>
+ <20160309120627.67612b1d@bbrezillon>
+Message-ID: <20160311062607.GP11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 11:14:34AM +0100, Boris Brezillon wrote:
-> > > > > > + * struct sun4i_dma_chan_config - DMA channel config
-> > > > > > + *
-> > > > > > + * @para: contains information about block size and time before checking
-> > > > > > + *	  DRQ line. This is device specific and only applicable to dedicated
-> > > > > > + *	  DMA channels
-> > > > > 
-> > > > > What information, can you elobrate.. And why can't you use existing
-> > > > > dma_slave_config for this?
-> > > > 
-> > > > Block size is related to the device FIFO size. I guess it allows the
-> > > > DMA channel to launch a transfer of X bytes without having to check the
-> > > > DRQ line (the line telling the DMA engine it can transfer more data
-> > > > to/from the device). The wait cycles information is apparently related
-> > > > to the number of clks the engine should wait before polling/checking
-> > > > the DRQ line status between each block transfer. I'm not sure what it
-> > > > saves to put WAIT_CYCLES() to something != 1, but in their BSP,
-> > > > Allwinner tweak that depending on the device.
+On Wed, Mar 09, 2016 at 12:06:27PM +0100, Boris Brezillon wrote:
+> On Tue, 8 Mar 2016 08:25:47 +0530
+> Vinod Koul <vinod.koul@intel.com> wrote:
 > > 
-> > we already have block size aka src/dst_maxburst, why not use that one.
+> > Why does dmaengine need to wait? Can you explain that
 > 
-> Okay, but then remains the question "how should we choose the real burst
-> size?". The block size described in Allwinner datasheet is not the
-> number of words you will transmit without being preempted by other
-> master -> slave requests, it's the number of bytes that can be
-> transmitted without checking the DRQ line.
-> IOW, block_size = burst_size * X
+> I don't have an answer for that one, but when I set WAIT_CYCLES to 1
+> for the NAND use case it does not work. So I guess it is somehow
+> related to how the DRQ line is controlled on the device side...
 
-Thats fine, API expects words for this and also a width value. Client shoudl
-pass both and for programming you should use bytes converted from words and
-width.
+Is the WAIT cycle different for different usages or same for all
+usages/channels?
 
 -- 
 ~Vinod
