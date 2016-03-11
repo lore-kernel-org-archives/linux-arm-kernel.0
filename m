@@ -1,52 +1,86 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 11 Mar 2016 09:53:08 -0800
-Subject: [PATCH v2 0/3] net/phy: Improvements to Cavium Thunder MDIO code.
-Message-ID: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
+Date: Fri, 11 Mar 2016 09:53:09 -0800
+Subject: [PATCH v2 1/3] net: thunderx: Cleanup PHY probing code.
+In-Reply-To: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1457718791-6505-2-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-Changes from v1:
+Remove the call to force the octeon-mdio driver to be loaded.  Allow
+the standard driver loading mechanisms to load the PHY drivers, and
+use -EPROBE_DEFER to cause the BGX driver to be probed only after the
+PHY drivers are available.
 
- - In 1/3 Add back check for non-OF objects in bgx_init_of_phy().  It
-   is probably not necessary, but better safe than sorry...
+Reorder the setting of MAC addresses and PHY probing to allow BGX
+LMACs with no attached PHY to still be assigned a MAC address.
 
-The firmware on many Cavium Thunder systems configures the MDIO bus
-hardware to be probed as a PCI device.  In order to use the MDIO bus
-drivers in this configuration, we must add PCI probing to the driver.
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 29 ++++++++++++++---------
+ 1 file changed, 18 insertions(+), 11 deletions(-)
 
-There are two parts to this set of three patches:
-
- 1) Cleanup the PHY probing code in thunder_bgx.c to handle the case
-    where there is no PHY attached to a port, as well as being more
-    robust in the face of driver loading order by use of
-    -EPROBE_DEFER.
-
- 2) Split mdio-octeon.c into two drivers, one with platform probing,
- and the other with PCI probing.  Common code is shared between the
- two.
-
-Tested on several different Thunder and OCTEON systems, also compile
-tested on x86_64.
-
-David Daney (3):
-  net: thunderx: Cleanup PHY probing code.
-  phy: mdio-octeon: Refactor into two files/modules
-  phy: mdio-thunder:  Add driver for Cavium Thunder SoC MDIO buses.
-
- .../devicetree/bindings/net/cavium-mdio.txt        |  61 ++++-
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  29 ++-
- drivers/net/phy/Kconfig                            |  22 +-
- drivers/net/phy/Makefile                           |   2 +
- drivers/net/phy/mdio-cavium.c                      | 149 +++++++++++
- drivers/net/phy/mdio-cavium.h                      | 119 +++++++++
- drivers/net/phy/mdio-octeon.c                      | 280 ++-------------------
- drivers/net/phy/mdio-thunder.c                     | 154 ++++++++++++
- 8 files changed, 535 insertions(+), 281 deletions(-)
- create mode 100644 drivers/net/phy/mdio-cavium.c
- create mode 100644 drivers/net/phy/mdio-cavium.h
- create mode 100644 drivers/net/phy/mdio-thunder.c
-
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index f8abdff..feed231 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -978,27 +978,37 @@ static int bgx_init_of_phy(struct bgx *bgx)
+ 	const char *mac;
+ 
+ 	device_for_each_child_node(&bgx->pdev->dev, fwn) {
++		struct phy_device *pd;
+ 		struct device_node *phy_np;
+ 		struct device_node *node = to_of_node(fwn);
+ 
+-		/* If it is not an OF node we cannot handle it yet, so
+-		 * exit the loop.
++		/* Should always be an OF node.  But if it is not, we
++		 * cannot handle it, so exit the loop.
+ 		 */
+ 		if (!node)
+ 			break;
+ 
+-		phy_np = of_parse_phandle(node, "phy-handle", 0);
+-		if (!phy_np)
+-			continue;
+-
+-		bgx->lmac[lmac].phydev = of_phy_find_device(phy_np);
+-
+ 		mac = of_get_mac_address(node);
+ 		if (mac)
+ 			ether_addr_copy(bgx->lmac[lmac].mac, mac);
+ 
+ 		SET_NETDEV_DEV(&bgx->lmac[lmac].netdev, &bgx->pdev->dev);
+ 		bgx->lmac[lmac].lmacid = lmac;
++
++		phy_np = of_parse_phandle(node, "phy-handle", 0);
++		/* If there is no phy or defective firmware presents
++		 * this cortina phy, for which there is no driver
++		 * support, ignore it.
++		 */
++		if (phy_np &&
++		    !of_device_is_compatible(phy_np, "cortina,cs4223-slice")) {
++			/* Wait until the phy drivers are available */
++			pd = of_phy_find_device(phy_np);
++			if (!pd)
++				return -EPROBE_DEFER;
++			bgx->lmac[lmac].phydev = pd;
++		}
++
+ 		lmac++;
+ 		if (lmac == MAX_LMAC_PER_BGX) {
+ 			of_node_put(node);
+@@ -1032,9 +1042,6 @@ static int bgx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	struct bgx *bgx = NULL;
+ 	u8 lmac;
+ 
+-	/* Load octeon mdio driver */
+-	octeon_mdiobus_force_mod_depencency();
+-
+ 	bgx = devm_kzalloc(dev, sizeof(*bgx), GFP_KERNEL);
+ 	if (!bgx)
+ 		return -ENOMEM;
 -- 
 1.7.11.7
