@@ -1,166 +1,77 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 11 Mar 2016 11:54:35 -0500
-Subject: [PATCH V2 3/3] vfio, platform: add QTI HIDMA reset driver
-In-Reply-To: <1457715275-11925-1-git-send-email-okaya@codeaurora.org>
-References: <1457715275-11925-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1457715275-11925-4-git-send-email-okaya@codeaurora.org>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Fri, 11 Mar 2016 17:56:12 +0100 (CET)
+Subject: [OpenWrt-Devel] ARMv4 (not v4t) marked obsolete in gcc-6
+In-Reply-To: <3cbff06f821f529e67cf75580ee89732@advem.lv>
+References: <201603101013.04618.arnd@arndb.de>
+ <alpine.LNX.2.00.1603110638190.12310@T520.work>
+ <56E26A47.9040608@openwrt.org> <3cbff06f821f529e67cf75580ee89732@advem.lv>
+Message-ID: <alpine.LNX.2.00.1603111721340.13469@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In situations where the userspace driver is stopped abnormally and the
-VFIO platform device is released, the assigned HW device currently is
-left running. As a consequence the HW device might continue issuing IRQs
-and performing DMA accesses.
+HI
 
-This patch is implementing a reset driver for HIDMA platform driver.
-This gets called by the VFIO platform reset interface.
+On Fri, 11 Mar 2016, Roman Yeryomin wrote:
 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/vfio/platform/reset/Kconfig                |   9 ++
- drivers/vfio/platform/reset/Makefile               |   2 +
- .../vfio/platform/reset/vfio_platform_qcomhidma.c  | 101 +++++++++++++++++++++
- 3 files changed, 112 insertions(+)
- create mode 100644 drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
+> On 2016-03-11 08:48, John Crispin wrote:
+> > On 11/03/2016 06:44, Hans Ulli Kroll wrote:
+> > > Hi
+> > > > 
+> > > > * Gemini: officially supported in OpenWRT today, with the latest
+> > > > compiler. This one
+> > > >   will likely cause the most issues for actual users. It would be
+> > > > helpful to get
+> > > >   some numbers about users or downloads here, to see whether it can be
+> > > > dropped
+> > > >   in a future OpenWRT release or if it might be possible to leave this
+> > > > on
+> > > >   gcc-6.x when the other platforms move on to gcc-7+
+> > > 
+> > > I don't have any numbers from the OPenWRT people.
+> > > For the NAS BOXes itself, I get one/two support questions a month on the
+> > > german based forum.
+> > > I think most people know about the SATA bug, which makes the platform
+> > > unreliable for some SATA drives.
+> > > y
+> > > Hans Ulli
+> > 
+> > Hi,
+> > 
+> > We have several active users. Roman has done a great job to constantly
+> > maintain and update the target. We have been including gemini in our
+> > releases for years thanks to Romans effort. It would be a shame to to
+> > see support being dropped, even if there are few yet active users.
+> >
+> 
+> Thanks, John.
+> I'm actively using it as a backup box and know at least several other people.
+> Although it's quite old I can't stop using it, it serves well for me and I
+> don't see any reason to throw it out.
+> I've heard of SATA problems but never seen them myself.
 
-diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-index 70cccc5..d02b3b5 100644
---- a/drivers/vfio/platform/reset/Kconfig
-+++ b/drivers/vfio/platform/reset/Kconfig
-@@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
- 	  Enables the VFIO platform driver to handle reset for AMD XGBE
- 
- 	  If you don't know what to do here, say N.
-+
-+config VFIO_PLATFORM_QCOMHIDMA_RESET
-+	tristate "VFIO support for Qualcomm Technologies HIDMA reset"
-+	depends on VFIO_PLATFORM
-+	help
-+	  Enables the VFIO platform driver to handle reset for Qualcomm Technologies
-+	  HIDMA Channel.
-+
-+	  If you don't know what to do here, say N.
-diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-index 93f4e23..ec7748a 100644
---- a/drivers/vfio/platform/reset/Makefile
-+++ b/drivers/vfio/platform/reset/Makefile
-@@ -1,7 +1,9 @@
- vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
- vfio-platform-amdxgbe-y := vfio_platform_amdxgbe.o
-+vfio-platform-qcomhidma-y := vfio_platform_qcomhidma.o
- 
- ccflags-y += -Idrivers/vfio/platform
- 
- obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
-+obj-$(CONFIG_VFIO_PLATFORM_QCOMHIDMA_RESET) += vfio-platform-qcomhidma.o
- obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
-diff --git a/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c b/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
-new file mode 100644
-index 0000000..103d481
---- /dev/null
-+++ b/drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
-@@ -0,0 +1,101 @@
-+/*
-+ * Qualcomm Technologies HIDMA VFIO Reset Driver
-+ *
-+ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/device.h>
-+#include <linux/iopoll.h>
-+
-+#include "vfio_platform_private.h"
-+
-+#define TRCA_CTRLSTS_OFFSET		0x000
-+#define EVCA_CTRLSTS_OFFSET		0x000
-+
-+#define CH_CONTROL_MASK		GENMASK(7, 0)
-+#define CH_STATE_MASK			GENMASK(7, 0)
-+#define CH_STATE_BIT_POS		0x8
-+
-+#define HIDMA_CH_STATE(val)	\
-+	((val >> CH_STATE_BIT_POS) & CH_STATE_MASK)
-+
-+#define EVCA_IRQ_EN_OFFSET		0x110
-+
-+#define CH_RESET			9
-+#define CH_DISABLED			0
-+
-+int vfio_platform_qcomhidma_reset(struct vfio_platform_device *vdev)
-+{
-+	struct vfio_platform_region *trreg;
-+	struct vfio_platform_region *evreg;
-+	u32 val;
-+	int ret;
-+
-+	if (vdev->num_regions != 2)
-+		return -ENODEV;
-+
-+	trreg = &vdev->regions[0];
-+	if (!trreg->ioaddr) {
-+		trreg->ioaddr =
-+			ioremap_nocache(trreg->addr, trreg->size);
-+		if (!trreg->ioaddr)
-+			return -ENOMEM;
-+	}
-+
-+	evreg = &vdev->regions[1];
-+	if (!evreg->ioaddr) {
-+		evreg->ioaddr =
-+			ioremap_nocache(evreg->addr, evreg->size);
-+		if (!evreg->ioaddr)
-+			return -ENOMEM;
-+	}
-+
-+	/* disable IRQ */
-+	writel(0, evreg->ioaddr + EVCA_IRQ_EN_OFFSET);
-+
-+	/* reset both transfer and event channels */
-+	val = readl(trreg->ioaddr + TRCA_CTRLSTS_OFFSET);
-+	val &= ~(CH_CONTROL_MASK << 16);
-+	val |= CH_RESET << 16;
-+	writel(val, trreg->ioaddr + TRCA_CTRLSTS_OFFSET);
-+
-+	ret = readl_poll_timeout(trreg->ioaddr + TRCA_CTRLSTS_OFFSET, val,
-+				 HIDMA_CH_STATE(val) == CH_DISABLED, 1000,
-+				 10000);
-+	if (ret)
-+		return ret;
-+
-+	val = readl(evreg->ioaddr + EVCA_CTRLSTS_OFFSET);
-+	val &= ~(CH_CONTROL_MASK << 16);
-+	val |= CH_RESET << 16;
-+	writel(val, evreg->ioaddr + EVCA_CTRLSTS_OFFSET);
-+
-+	ret = readl_poll_timeout(evreg->ioaddr + EVCA_CTRLSTS_OFFSET, val,
-+				 HIDMA_CH_STATE(val) == CH_DISABLED, 1000,
-+				 10000);
-+	if (ret)
-+		return ret;
-+
-+	pr_info("HIDMA channel reset\n");
-+	return 0;
-+}
-+module_vfio_reset_handler("qcom,hidma-1.0", "QCOM8061",
-+			  vfio_platform_qcomhidma_reset);
-+VFIO_PLATFORM_MODULE_ALIAS("qcom,hidma-1.0");
-+VFIO_PLATFORM_MODULE_ALIAS("QCOM8061");
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("Reset support for Qualcomm Technologies HIDMA device");
--- 
-1.8.2.1
+The SATA bug occurs first on Samsung devices. 
+I bought a HDD to test this by my self and check if it's possible to fix. 
+There are some 'hidden' registers to tweak to PATA controller, the 
+names can be found in the PATA header from the original sources.
+No avail !
+So I asked Paulius sometime ago about this and the PATA/SATA mux, he has 
+also no clue for fixing this.
+
+> As to the numbers I think that people like me (or others trying out OpenWrt)
+> usually don't go to the forums, so number of questions there doesn't tell much
+> (but even there latest messages are from last month, so not dead at all).
+> Maybe number of downloads from downloads.openwrt.org can tell more but I would
+> guess that actual users would rather compile it themselves.
+
+The support thread on the german board is very long, so most of the 
+questions are answered there. The experienced don't need this, so the 
+numbers *are* wrong.
+
+And I'm using two of the NAS boxes for backup and another for kernel work
+
+> So I vote for not killing it at least until it's supported by kernel.
+> 
+
+ACK !!
+
+Hans Ulli
