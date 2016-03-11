@@ -1,95 +1,33 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Fri, 11 Mar 2016 10:09:49 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <CADhT+wd=vcph2y_OxkGNO5EwHvN=kBy-BrfZHmNjZHww4LxmTg@mail.gmail.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>	<56DD7172.4000707@suse.de>	<2714888.1DdqvJZ8cb@diego>	<56DD7593.5060003@suse.de>	<56DD8176.2080603@st.com>	<56DD8FBE.9010200@suse.de>	<56DD99A4.5030004@st.com>	<56DDA26C.3050301@suse.de>	<56DDA3D5.3090209@st.com>	<56DDB749.1020808@suse.de>	<CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>	<56DE7E1D.5070508@st.com>	<CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>	<CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>	<56DFE55B.2090806@st.com>	<56DFE64B.8060606@st.com>	<CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>	<56DFF253.9050208@st.com>	<56DFFA9E.7060602@st.com>	<CAAObsKBUzBXcamEyup44N1bYUzGr_ZZTsYcD5x3PXb-2E00cGA@mail.gmail.com>	<56E033C8.40506@st.com>	<56E038CE.606@st.com>	<CADhT+wcMpzA_Coj8Z5OQZsc3bF3a7yOmsbazQMPtcdUWkJSuCA@mail.gmail.com>	<56E13AAB.2080900@st.com>
- <CADhT+wd=vcph2y_OxkGNO5EwHvN=kBy-BrfZHmNjZHww4LxmTg@mail.gmail.com>
-Message-ID: <56E28B5D.6000708@st.com>
+From: anna-maria@linutronix.de (Anna-Maria Gleixner)
+Date: Fri, 11 Mar 2016 10:19:55 +0100
+Subject: [PATCH] arm/bL_switcher: Use global define for masking hotplug
+ transition switch action argument
+Message-ID: <1457687995-40417-1-git-send-email-anna-maria@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/10/2016 5:47 PM, Dinh Nguyen wrote:
-> On Thu, Mar 10, 2016 at 3:13 AM, Giuseppe CAVALLARO
-> <peppe.cavallaro@st.com> wrote:
->> On 3/9/2016 5:31 PM, Dinh Nguyen wrote:
->>>
->>> On Wed, Mar 9, 2016 at 8:53 AM, Giuseppe CAVALLARO
->>> <peppe.cavallaro@st.com> wrote:
->>>>
->>>> Hi Tomeu, Dinh, Andreas
->>>>
->>>> I need a sum and help from you to go ahead on the
->>>> tx timeout.
->>>>
->>>> The "stmmac: MDIO fixes" seems to be the candidate to
->>>> fix the phy connection and I will send the V2 asap (Andreas' comment).
->>>>
->>>> So, supposing the probe is ok and phy is connected,
->>>> I need your input ...
->>>>
->>>>    Tomeu: after revering the 0e80bdc9a72d (stmmac: first frame
->>>>           prep at the end of xmit routine) the network is
->>>>           not stable and there is a timeout after a while.
->>>>           The box has 3.50 with normal desc settings.
->>>>
->>>>    Dinh: the network is ok, I wonder if you can share a boot
->>>>          log just to understand if the normal or enhanced
->>>>          descriptors are used.
->>>>
->>>
->>> Here it is:
->>
->> ...
->>>
->>> [    0.850523] stmmac - user ID: 0x10, Synopsys ID: 0x37
->>> [    0.855570]  Ring mode enabled
->>> [    0.858611]  DMA HW capability register supported
->>> [    0.863128]  Enhanced/Alternate descriptors
->>> [    0.867482]  Enabled extended descriptors
->>> [    0.871482]  RX Checksum Offload Engine supported (type 2)
->>> [    0.876948]  TX Checksum insertion supported
->>> [    0.881204]  Enable RX Mitigation via HW Watchdog Timer
->>> [    0.886863] socfpga-dwmac ff702000.ethernet eth0: No MDIO subnode found
->>> [    0.899090] libphy: stmmac: probed
->>> [    0.902484] eth0: PHY ID 00221611 at 4 IRQ POLL (stmmac-0:04) active
->>
->>
->> Thx Dinh, so you are using the Enhanced/Alternate descriptors
->> I am debugging on my side on a setup with normal descriptors, I let you
->> know
->>
->
-> Doesn't the printout "Enhanced/Alternate descriptors"  mean that I'm using
-> Enhanced/Alternate descriptors?
+The action argument of the hotplug transition switch case is masked
+with '0xf' to map CPU_XXX_FROZEN hotplug transition on corresponding
+non frozen hotplug transitions. There is a global define
+CPU_TASKS_FROZEN used as mask for frozen hotplug transitions.
 
-yes this means that you have the Databook 3.70a and, from the HW
-capability register, the driver will use the Enhanced/Alternate
-descriptors. This is the same HW I am using on my side where the
-stmmac is working fine.
+Use '~CPU_TASKS_FROZEN' instead of '0xf'.
 
-In the case where it is failing on net-next, although on Databook 3.50a,
-the HW  capability register says that there is no enhanced descriptors
-and the driver uses the normal ones.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
+---
+ arch/arm/common/bL_switcher.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tomeu, I kindly ask you to try the patch attached. I found a bug on Tx
-path for normal descriptors. Please let me know if this help.
-Also let me know if we actually need to revert the 0e80bdc9a72d.
-
-I am trying to find some HW where test the normal descriptors to
-speed-up the tests on my side directly.
-
-Let me know and thx in advance.
-
-Regards,
-Peppe
-
->
-> Dinh
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-stmmac-fix-tx-prepare-for-normal-desc.patch
-Type: text/x-patch
-Size: 1221 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160311/5f65d1f1/attachment.bin>
+--- a/arch/arm/common/bL_switcher.c
++++ b/arch/arm/common/bL_switcher.c
+@@ -762,7 +762,7 @@ static int bL_switcher_hotplug_callback(
+ {
+ 	if (bL_switcher_active) {
+ 		int pairing = bL_switcher_cpu_pairing[(unsigned long)hcpu];
+-		switch (action & 0xf) {
++		switch (action & ~CPU_TASKS_FROZEN) {
+ 		case CPU_UP_PREPARE:
+ 		case CPU_DOWN_PREPARE:
+ 			if (pairing == -1)
