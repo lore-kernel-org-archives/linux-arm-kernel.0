@@ -1,36 +1,60 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 11 Mar 2016 11:52:22 +0100
-Subject: [PATCH v2 1/5] dmaengine: sun6i: Fix the access of the IRQ register
+Date: Fri, 11 Mar 2016 11:55:54 +0100
+Subject: [PATCH v2 2/5] dmaengine: sun6i: Fix impossible settings of burst and
+ bus width
 In-Reply-To: <cover.1457695169.git.moinejf@free.fr>
 References: <cover.1457695169.git.moinejf@free.fr>
-Message-ID: <868960845251b3a80579f78c38a4018022da42bc.1457695169.git.moinejf@free.fr>
+Message-ID: <8b05ebb302962a3009a357ea5f2ad7f245190e72.1457695169.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ register number is computed, but this number was not used
-and the register was the one indexed by the channel index instead.
-Then, only the first DMA channel was working.
+In the commit 1f9cd915b64bb95f (dmaengine: sun6i: Fix memcpy operation),
+the signed values returned by convert_burst() and convert_buswidth()
+were stored in an unsigned value.
+Then, these values were considered as errors when non null.
+
+As a result, DMA transfers were rejected when the burst or buswidth
+had values different from 1, as 8 for the burst or 4 for the bus width.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/dma/sun6i-dma.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/sun6i-dma.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 2db12e4..2ec320d 100644
+index 2ec320d..3579ee7 100644
 --- a/drivers/dma/sun6i-dma.c
 +++ b/drivers/dma/sun6i-dma.c
-@@ -381,9 +381,9 @@ static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
- 	irq_reg = pchan->idx / DMA_IRQ_CHAN_NR;
- 	irq_offset = pchan->idx % DMA_IRQ_CHAN_NR;
+@@ -281,25 +281,25 @@ static inline int sun6i_dma_cfg_lli(struct sun6i_dma_lli *lli,
+ 				    dma_addr_t dst, u32 len,
+ 				    struct dma_slave_config *config)
+ {
+-	u8 src_width, dst_width, src_burst, dst_burst;
++	s8 src_width, dst_width, src_burst, dst_burst;
  
--	irq_val = readl(sdev->base + DMA_IRQ_EN(irq_offset));
-+	irq_val = readl(sdev->base + DMA_IRQ_EN(irq_reg));
- 	irq_val |= DMA_IRQ_QUEUE << (irq_offset * DMA_IRQ_CHAN_WIDTH);
--	writel(irq_val, sdev->base + DMA_IRQ_EN(irq_offset));
-+	writel(irq_val, sdev->base + DMA_IRQ_EN(irq_reg));
+ 	if (!config)
+ 		return -EINVAL;
  
- 	writel(pchan->desc->p_lli, pchan->base + DMA_CHAN_LLI_ADDR);
- 	writel(DMA_CHAN_ENABLE_START, pchan->base + DMA_CHAN_ENABLE);
+ 	src_burst = convert_burst(config->src_maxburst);
+-	if (src_burst)
++	if (src_burst < 0)
+ 		return src_burst;
+ 
+ 	dst_burst = convert_burst(config->dst_maxburst);
+-	if (dst_burst)
++	if (dst_burst < 0)
+ 		return dst_burst;
+ 
+ 	src_width = convert_buswidth(config->src_addr_width);
+-	if (src_width)
++	if (src_width < 0)
+ 		return src_width;
+ 
+ 	dst_width = convert_buswidth(config->dst_addr_width);
+-	if (dst_width)
++	if (dst_width < 0)
+ 		return dst_width;
+ 
+ 	lli->cfg = DMA_CHAN_CFG_SRC_BURST(src_burst) |
 -- 
 2.7.3
