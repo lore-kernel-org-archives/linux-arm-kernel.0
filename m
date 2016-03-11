@@ -1,59 +1,73 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 11 Mar 2016 21:46:04 +0300
-Subject: [PATCH 0/6] arc_emac: fixes the emac issues oand cleanup emac
- drivers
-In-Reply-To: <56E2DAC4.4020105@gmail.com>
-References: <1457693731-6966-1-git-send-email-wxt@rock-chips.com>
- <56E2CC39.6050907@cogentembedded.com> <56E2DAC4.4020105@gmail.com>
-Message-ID: <56E3126C.7000100@cogentembedded.com>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 11 Mar 2016 10:55:05 -0800
+Subject: [PATCH v2] bsp: add SoC driver to brcmstb
+In-Reply-To: <1457721579-9646-1-git-send-email-justinpopo6@gmail.com>
+References: <1457721579-9646-1-git-send-email-justinpopo6@gmail.com>
+Message-ID: <1457722505.4654.8.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, 2016-03-11 at 10:39 -0800, Justin Chen wrote:
+> From: Justin Chen <justin.chen@broadcom.com>
+> 
+> Value of soc_dev_attributes:
+> family = chip family id
+> soc_id = product id
+> revision = product revision
+[]
+> diff --git a/drivers/soc/brcmstb/common.c b/drivers/soc/brcmstb/common.c
+[]
+> +static int __init brcmstb_soc_device_init(void)
+> +{
+> +	struct soc_device_attribute *soc_dev_attr;
+> +	struct soc_device *soc_dev;
+> +	struct device_node *sun_top_ctrl;
+> +	void __iomem *sun_top_ctrl_base;
+> +
+> +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
+> +	if (!sun_top_ctrl)
+> +		return -ENODEV;
+> +
+> +	sun_top_ctrl_base = of_iomap(sun_top_ctrl, 0);
+> +	if (!sun_top_ctrl_base)
+> +		return -ENODEV;
+> +
+> +	family_id = readl(sun_top_ctrl_base);
+> +	product_id = readl(sun_top_ctrl_base + 0x4);
+> +
+> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> +	if (!soc_dev_attr)
+> +		return -ENOMEM;
+> +
+> +	soc_dev_attr->family = kasprintf(GFP_KERNEL, "%x",
+> +					family_id >> 28 ?
+> +					family_id >> 16 : family_id >> 8);
+> +	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%x",
+> +					product_id >> 28 ?
+> +					product_id >> 16 : product_id >> 8);
+> +	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c%d",
+> +				????(char)(((product_id & 0xff) >> 4) + 65),
+> +				?????product_id & 0xf);
 
-On 03/11/2016 05:48 PM, Caesar Wang wrote:
+This might be easier to read as:
 
-[...]
+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c%d"
+					   ((product_id & 0xf0) >> 4) + 'A',
+					   product_id & 0xf);
+> +
+> +	soc_dev = soc_device_register(soc_dev_attr);
+> +	if (IS_ERR(soc_dev)) {
+> +		kfree(soc_dev_attr->family);
+> +		kfree(soc_dev_attr->soc_id);
+> +		kfree(soc_dev_attr->revision);
+> +		kfree(soc_dev_attr);
+> +		return -1;
 
->>> Hi Rob, David:
->>> PATCH[1/6-2/6]: ====>
->>> net: arc_emac: make the rockchip emac document more compatible
->>> net: arc_emac: add phy-reset-* are optional for device tree
->>>
->>> The patches change the rockchip emac document for more compatible and
->>> Add the phy-reset-* property for document.
->>>
->>> This patch adds the following property for arc_emac.
->>>
->>> phy-reset-* include the following:
->>> 1) phy-reset-gpios:
->>> The phy-reset-gpios is an optional property for arc emac device tree boot.
->>> Change the binding document to match the driver code.
->>>
->>> 2) phy-reset-duration:
->>> Different boards may require different phy reset duration. Add property
->>> phy-reset-duration for device tree probe, so that the boards that need
->>> a longer reset duration can specify it in their device tree.
->>>
->>> 3) phy-reset-active-high:
->>> We need that for a custom hardware that needs the reverse reset sequence.
->>
->>    Why not infer this from the "phy-reset-gpios" prop?
->
-> See:
-> https://patchwork.kernel.org/patch/8564511/
- >
-> phy-reset-active-high : If present then the reset sequence using the GPIO
->   specified in the "phy-reset-gpios" property is reversed (H=reset state,
->   L=operation state).
+Mixing GENERIC_ERRNO types and fixed values seems odd.
+Is -EPERM the correct return here?  Maybe -ENODEV?
 
-    Referring to your own suggested bindings isn't an answer. If the driver 
-that you're copying from here (fec) had a reason to handle the GPIO sense with 
-the help of an extra prop (legacy code), it doesn't mean your new driver needs 
-to mimic this as well, AFAIU...
-
-> Thanks,
->
-> Caesar
-
-MBR, Sergei
+> +	}
+> +
+> +	return 0;
+> +}
+> +arch_initcall(brcmstb_soc_device_init);
