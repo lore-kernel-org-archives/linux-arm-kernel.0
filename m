@@ -1,31 +1,60 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 11 Mar 2016 21:31:04 +0800
-Subject: [PATCH 07/14] hw_random: exynos: use __maybe_unused to hide pm
- functions
-In-Reply-To: <1456934350-1389172-8-git-send-email-arnd@arndb.de>
-References: <1456934350-1389172-1-git-send-email-arnd@arndb.de>
- <1456934350-1389172-8-git-send-email-arnd@arndb.de>
-Message-ID: <20160311133104.GB24332@gondor.apana.org.au>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 11 Mar 2016 16:46:33 +0300
+Subject: [PATCH 0/6] arc_emac: fixes the emac issues oand cleanup emac
+ drivers
+In-Reply-To: <1457693731-6966-1-git-send-email-wxt@rock-chips.com>
+References: <1457693731-6966-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <56E2CC39.6050907@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 04:58:59PM +0100, Arnd Bergmann wrote:
-> The exynos random driver uses #ifdef to check for CONFIG_PM, but
-> then uses SIMPLE_DEV_PM_OPS, which leaves the references out when
-> CONFIG_PM_SLEEP is not defined, so we get a warning with
-> PM=y && PM_SLEEP=n:
-> 
-> drivers/char/hw_random/exynos-rng.c:166:12: error: 'exynos_rng_suspend' defined but not used [-Werror=unused-function]
-> drivers/char/hw_random/exynos-rng.c:171:12: error: 'exynos_rng_resume' defined but not used [-Werror=unused-function]
-> 
-> This removes the incorrect #ifdef and instead uses a __maybe_unused
-> annotation to let the compiler know it can silently drop
-> the function definition.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hello.
 
-Applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On 3/11/2016 1:55 PM, Caesar Wang wrote:
+
+> This series patches are based on kernel 4.5-rc7+ version.
+> Linux version 4.5.0-rc7-next-20160310+ (wxt at nb) (...) #23 SMP Fri Mar 11 15:55:53
+
+[...]
+
+> 1) This series has 6 patches: (1--->6)
+> net: arc_emac: make the rockchip emac document more compatible
+> net: arc_emac: add phy-reset-* are optional for device tree
+
+    I'm not seeing these patches on netdev...
+
+> net: arc_emac: support the phy reset for emac driver
+> net: arc: trivial: cleanup the emac driver
+> clk: rockchip: rk3036: fix and add node id for emac clock
+> ARM: dts: rockchip: add support emac for RK3036
+>
+> 2) This series patches have the following decriptions:
+
+    Descriptions.
+
+> Hi Rob, David:
+> PATCH[1/6-2/6]: ====>
+> net: arc_emac: make the rockchip emac document more compatible
+> net: arc_emac: add phy-reset-* are optional for device tree
+>
+> The patches change the rockchip emac document for more compatible and
+> Add the phy-reset-* property for document.
+>
+> This patch adds the following property for arc_emac.
+>
+> phy-reset-* include the following:
+> 1) phy-reset-gpios:
+> The phy-reset-gpios is an optional property for arc emac device tree boot.
+> Change the binding document to match the driver code.
+>
+> 2) phy-reset-duration:
+> Different boards may require different phy reset duration. Add property
+> phy-reset-duration for device tree probe, so that the boards that need
+> a longer reset duration can specify it in their device tree.
+>
+> 3) phy-reset-active-high:
+> We need that for a custom hardware that needs the reverse reset sequence.
+
+    Why not infer this from the "phy-reset-gpios" prop?
+
+MBR, Sergei
