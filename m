@@ -1,35 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 11 Mar 2016 22:35:16 +0100
-Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
-In-Reply-To: <56E330E4.9090800@gmail.com>
-References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
- <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
- <20160311173125.GI3153@lunn.ch>
- <56E30332.7060003@caviumnetworks.com>
- <20160311180030.GB19277@lunn.ch>
- <56E30DDF.5040506@caviumnetworks.com>
- <20160311190627.GC19277@lunn.ch> <56E31E7A.6080905@gmail.com>
- <56E330E4.9090800@gmail.com>
-Message-ID: <20160311213516.GE19277@lunn.ch>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 11 Mar 2016 16:49:50 -0500
+Subject: [PATCH V15 0/4] dma: add Qualcomm Technologies HIDMA driver
+Message-ID: <1457732994-11175-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> For this phy, we have:
-> 
->   compatible = "cortina,cs4223-slice";
+dma: add Qualcomm Technologies HIDMA driver
 
-That actually means something else is happening, i think.
+The Qualcomm Technologies HIDMA device has been designed
+to support virtualization technology. The driver has been
+divided into two to follow the hardware design.
 
-of_mdiobus_register() looks at the children, and decides if each child
-is a phy or an mdio device, by calling of_mdiobus_child_is_phy().
-Since this compatible string is not in whitelist_phys[], it will
-return false. of_mdiobus_register() will then do a
-of_mdiobus_register_device(). This compatible means it is an MDIO
-device, not a PHY. So when you later call of_phy_find_device() it is
-always going to return NULL, because there is no PHY there, only an
-MDIO device.
+1. HIDMA Management driver
+2. HIDMA Channel driver
 
-How usable is the hardware without a PHY driver? Is a better solution
-that your write a very minimal PHY driver?
+Each HIDMA HW consists of multiple channels. These channels
+share some set of common parameters. These parameters are
+initialized by the management driver during power up.
+Same management driver is used for monitoring the execution
+of the channels. Management driver can change the performance
+behavior dynamically such as bandwidth allocation and
+prioritization in the future.
 
-     Andrew
+The management driver is executed in host context and
+is the main management entity for all channels provided by
+the device.
+
+------------------------
+What's new
+------------------------
+- Coding style corrections.
+- Correct OF node lookup.
+
+------------------------
+Git repos
+------------------------
+QEMU Support
+https://www.codeaurora.org/cgit/quic/qemu/qemu/log/?h=v2.5.0-sriov
+
+------------------------
+History of Changes
+------------------------
+dma: qcom_hidma: add support for object hierarchy
+Changes from V14: (https://lkml.org/lkml/2016/2/4/1089)
+* use correct node (child) to read dma attribute.
+
+dma: qcom_hidma: implement lower level hardware interface
+Changes from V14: (https://lkml.org/lkml/2016/2/4/1086)
+* renamed constants as HIDMA_xyz
+
+dma: qcom_hidma: add support for object hierarchy
+Changes from V14: (https://lkml.org/lkml/2016/2/4/1089)
+* renamed constants as HIDMA_xyz
+
+Sinan Kaya (4):
+  dma: qcom_hidma: implement lower level hardware interface
+  dma: qcom_hidma: add debugfs hooks
+  dma: qcom_hidma: add support for object hierarchy
+  dma: qcom_hidma: read the channel id from HW
+
+ Documentation/ABI/testing/sysfs-platform-hidma     |   9 +
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |   3 -
+ drivers/dma/qcom/*Backtrace*                       |   4 +
+ drivers/dma/qcom/Makefile                          |   2 +
+ drivers/dma/qcom/hidma.c                           |  81 +-
+ drivers/dma/qcom/hidma.h                           |  20 +-
+ drivers/dma/qcom/hidma_dbg.c                       | 219 +++++
+ drivers/dma/qcom/hidma_ll.c                        | 918 +++++++++++++++++++++
+ drivers/dma/qcom/hidma_mgmt.c                      | 111 ++-
+ 9 files changed, 1313 insertions(+), 54 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma
+ create mode 100644 drivers/dma/qcom/*Backtrace*
+ create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ create mode 100644 drivers/dma/qcom/hidma_ll.c
+
+-- 
+1.8.2.1
