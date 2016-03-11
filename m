@@ -1,87 +1,56 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 11 Mar 2016 09:51:49 -0800
-Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <56E2CC42.5070406@arm.com>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1457404974-1800-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160308073847.GA15520@infradead.org>
- <20160310160522.GB1111@bigcity.dyn.berto.se>
- <CAPcyv4gO4EZnBuVKXT8+gsMhbHJzuK7sfr0uRcjVdJP-nUUz4A@mail.gmail.com>
- <56E2CC42.5070406@arm.com>
-Message-ID: <CAPcyv4irvir8kmVwfgLMP0WJaycYycxT1sa3Ttv0VeGkyijezQ@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 11 Mar 2016 18:52:54 +0100
+Subject: [PATCH 0/8] EFI framebuffer support for ARM and arm64
+In-Reply-To: <CAKv+Gu8imCVQ+8QM+txqXNgs54p2Uv3FMkQEMNoCkB8JJcaZUw@mail.gmail.com>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <56E19CD1.6080409@redhat.com>
+ <CAKv+Gu8imCVQ+8QM+txqXNgs54p2Uv3FMkQEMNoCkB8JJcaZUw@mail.gmail.com>
+Message-ID: <56E305F6.5070402@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 5:46 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Dan,
->
->
-> On 11/03/16 06:47, Dan Williams wrote:
->>
->> On Thu, Mar 10, 2016 at 8:05 AM, Niklas S??derlund
->> <niklas.soderlund@ragnatech.se> wrote:
+On 10.03.16 17:23, Ard Biesheuvel wrote:
+> (+ Laszlo)
+> 
+> On 10 March 2016 at 23:12, Mark Langsdorf <mlangsdo@redhat.com> wrote:
+>> On 03/09/2016 11:40 PM, Ard Biesheuvel wrote:
 >>>
->>> Hi Christoph,
+>>> This series adds support to ARM and arm64 for using the kernel's EFI
+>>> framebuffer driver to drive EFI Graphics Output Protocol (GOP) based
+>>> framebuffers.
 >>>
->>> On 2016-03-07 23:38:47 -0800, Christoph Hellwig wrote:
->>>>
->>>> Please add some documentation on where/how this should be used.  It's
->>>> not a very obvious interface.
->>>
->>>
->>> Good idea, I have added the following to Documentation/DMA-API.txt and
->>> folded it in to this patch. Do you feel it's adequate and do you know
->>> anywhere else I should add documentation?
->>>
->>> diff --git a/Documentation/DMA-API.txt b/Documentation/DMA-API.txt
->>> index 45ef3f2..248556a 100644
->>> --- a/Documentation/DMA-API.txt
->>> +++ b/Documentation/DMA-API.txt
->>> @@ -277,14 +277,29 @@ and <size> parameters are provided to do partial
->>> page mapping, it is
->>>   recommended that you never use these unless you really know what the
->>>   cache width is.
->>>
->>> +dma_addr_t
->>> +dma_map_resource(struct device *dev, phys_addr_t phys_addr, size_t size,
->>> +                enum dma_data_direction dir, struct dma_attrs *attrs)
->>> +
->>> +Maps a MMIO region so it can be accessed by the device and returns the
->>> +DMA address of the memory. API should only be used to map device MMIO,
->>> +mapping of RAM is not permitted.
->>> +
+>>> This involves refactoring some of the existing x86 code so it can be
+>>> reused
+>>> by ARM and arm64, and wiring it up both in the UEFI stub and in the core
+>>> kernel into the existing UEFI infrastructure for ARM and arm64.
 >>
 >>
->> I think it is confusing to use the dma_ prefix for this peer-to-peer
->> mmio functionality.  dma_addr_t is a device's view of host memory.
->> Something like bus_addr_t bus_map_resource().  Doesn't this routine
->> also need the source device in addition to the target device?  The
->> resource address is from the perspective of the host cpu, it may be a
->> different address space in the view of two devices relative to each
->> other.
->
->
-> Hmm, the trouble with that is that when the DMA master is behind an IOMMU,
-> the address space as seen by the device is dynamic and whatever we decide it
-> to be, so there is no distinction between a "DMA" address and a "bus"
-> address.
->
-> In practice the dmaengine API has clearly worked for however long with slave
-> MMIO addresses being a dma_addr_t, and it doesn't look like anyone objected
-> to the change to phys_addr_t in -next either. If nothing is using bus_addr_t
-> anyway, what's the right thing to do? Looking up through higher abstraction
-> layers, we have the likes of struct snd_dmaengine_dai_dma_data also
-> expecting the slave address to be a dma_addr_t, leading to things like the
-> direct casting in bcm2835_i2s_probe() for the non-IOMMU dma != phys != bus
-> case that could also be cleaned up with this proposed interface.
->
+>> Given that I have access to a variety of different ARM64 UEFI
+>> implementations, how would I go about testing this code? Do I
+>> need a specific UEFI implementation and are there any special
+>> command line arguments I should pass to the kernel?
+>>
+> 
+> I have tested this myself on QEMU and FVP Base, which are both
+> software models. On bare metal, it would involve a system with a
+> graphics card that the firmware knows how to drive, and I am honestly
+> not sure if any such combinations currently exist, other than the ARM
+> development platforms such as Juno which have an embedded-style (i.e.,
+> non-PCI) graphics controller that the firmware knows how to drive out
+> of the box.
+> 
+> The code itself is smart enough to figure which (if any) of the
+> available handles carrying the GOP protocol is the one that is
+> attached to ConOut, and so there is nothing required to enable this
+> other than building it into the kernel and running it on a system with
+> a firmware supported screen attached.
+> 
 
-So the "bus_addr_t" reaction was prompted by the recent activity of
-RDMA developers looking to re-use the devm_memremap_pages() api.  That
-enabling is looking at how to setup peer-to-peer PCI-E cycles for an
-RDMA device to deliver data to another local device without taking a
-round trip through host memory.
+How does this deal with caches? Does the GOP driver access the frame
+buffer as cached or as uncached memory? I suppose it's always uncached?
 
-I understand the history of the dmaengine-slave implementation, but it
-seems we're getting to point where we need a less overloaded
-identifier than "dma" for the case of devices talking to each other.
+I'm mostly curious because I'd like to implement support for GOP in
+U-Boot soon.
+
+
+Alex
