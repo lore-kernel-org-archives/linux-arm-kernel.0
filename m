@@ -1,52 +1,67 @@
-From: tilman@imap.cc (Tilman Schmidt)
-Date: Fri, 11 Mar 2016 21:04:11 +0100
-Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
-In-Reply-To: <56E1A39F.1010005@linux-pingi.de>
-References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
- <1456945629-1793533-2-git-send-email-arnd@arndb.de>
- <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
- <1457108303.2651.112.camel@tiscali.nl> <56DADA57.9010200@imap.cc>
- <1457340486.2737.19.camel@tiscali.nl> <56E09F4A.8010202@imap.cc>
- <56E15211.7080206@linux-pingi.de> <1457614704.2478.11.camel@tiscali.nl>
- <56E1A39F.1010005@linux-pingi.de>
-Message-ID: <56E324BB.1050709@imap.cc>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 11 Mar 2016 21:12:31 +0100
+Subject: [PATCH 2/2] regulator: axp20x: Fix axp22x ldo_io registration error
+ on cold boot
+In-Reply-To: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
+References: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1457727151-16392-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 10.03.2016 um 17:41 schrieb isdn at linux-pingi.de:
-> Am 10.03.2016 um 13:58 schrieb Paul Bolle:
->> On do, 2016-03-10 at 11:53 +0100, isdn at linux-pingi.de wrote:
->>> mISDN with CAPI support works just fine with pppd and pppdcapiplugin
->>> and the CAPI works for all mISDN HW.
->>
->> In the mainline tree the mISDN and CAPI stacks are effectively separate.
+The maximum supported voltage for ldo_io# is 3.3V, but on cold
+boot the selector comes up at 0x1f, which maps to 3.8V.
 
-Correct.
+This causes _regulator_get_voltage() to fail with -EINVAL which
+causes regulator registration to fail when constrains are used:
 
-> Since 2012 mISDN has a cAPI20 interface, pure in userspace.
+[    1.467788] vcc-touchscreen: failed to get the current voltage(-22)
+[    1.474209] axp20x-regulator axp20x-regulator: Failed to register ldo_io1
+[    1.483363] axp20x-regulator: probe of axp20x-regulator failed with error -22
 
-To expand: The documented interface for CAPI 2.0 applications is the
-shared library libcapi20.so. Originally that library just interfaced to
-the kernel CAPI subsystem through /dev/capi20. Later it was extended to
-support different access paths to ISDN devices:
-- via /dev/capi20 and kernel CAPI as before
-- over the network and a remote CAPI server running rcapid
-- over the network to FRITZ!Box router via AVM's CAPI-over-TCP service
-- last but not least, via the mISDNcapid daemon and mISDN
+This commits makes axp20x_probe fix-up the selector values in
+the chip before registering regulators avoiding the above errors.
 
-Of course this cuts off anything that doesn't pass through libcapi20.so,
-including applications that (against the standard) access /dev/capi20
-directly but also the capidrv.ko i4l compatibility shim.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/regulator/axp20x-regulator.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 0c0e7a3..679018c 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -345,6 +345,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		.driver_data = axp20x,
+ 	};
+ 	int ret, i, nregulators;
++	unsigned int reg, sel;
+ 	u32 workmode;
+ 	const char *axp22x_dc1_name = axp22x_regulators[AXP22X_DCDC1].name;
+ 	const char *axp22x_dc5_name = axp22x_regulators[AXP22X_DCDC5].name;
+@@ -359,6 +360,24 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	case AXP223_ID:
+ 		regulators = axp22x_regulators;
+ 		nregulators = AXP22X_REG_ID_MAX;
++		/*
++		 * On cold boot ldo_io# sel is 0x1f which is out of spec,
++		 * fix this up here to avoid _regulator_get_voltage returning
++		 * -EINVAL when applying constraints.
++		 */
++		for (reg = AXP22X_LDO_IO0_V_OUT;
++		     reg <= AXP22X_LDO_IO1_V_OUT; reg += 2) {
++			ret = regmap_read(axp20x->regmap, reg, &sel);
++			if (ret)
++				return ret;
++			sel &= 0x1f;
++			if (sel > 0x1a) {
++				ret = regmap_update_bits(axp20x->regmap, reg,
++							 0x1f, 0x1a);
++				if (ret)
++					return ret;
++			}
++		}
+ 		break;
+ 	default:
+ 		dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
 -- 
-Tilman Schmidt                              E-Mail: tilman at imap.cc
-Bonn, Germany
-Nous, on a des fleurs et des bougies pour nous prot?ger.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160311/ff423f9a/attachment.sig>
+2.7.2
