@@ -1,71 +1,50 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Mar 2016 12:12:27 +0530
-Subject: [PATCH 2/5] dmaengine: sun6i: Fix impossible settings of burst
- and bus width
-In-Reply-To: <caa86759ff67df73c10fc3738eac5de58d582cc1.1457606136.git.moinejf@free.fr>
+Date: Fri, 11 Mar 2016 12:17:15 +0530
+Subject: [PATCH 4/5] dmaengine: sun6i: Set default values to burst and
+ bus width
+In-Reply-To: <7f5fc4733c8145fe146bd2a7e0d8febfddf2fe6b.1457606136.git.moinejf@free.fr>
 References: <cover.1457606136.git.moinejf@free.fr>
- <caa86759ff67df73c10fc3738eac5de58d582cc1.1457606136.git.moinejf@free.fr>
-Message-ID: <20160311064227.GR11154@localhost>
+ <7f5fc4733c8145fe146bd2a7e0d8febfddf2fe6b.1457606136.git.moinejf@free.fr>
+Message-ID: <20160311064715.GS11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 10:27:37AM +0100, Jean-Francois Moine wrote:
-> In the commit 1f9cd915b64bb95f "dmaengine: sun6i: Fix memcpy operation",
-> the signed values returned by convert_burst() and convert_buswidth()
-> were stored in an unsigned value.
-> Then, these values were considered as errors when non null.
-> As a result, setting burst or buswidth to values different from 1 was
-> making the DMA transfers to be rejected.
+On Thu, Mar 10, 2016 at 11:07:53AM +0100, Jean-Francois Moine wrote:
+> When defining the DMA transfer, the sound PCM DMA engine sets only
+> the burst and bus width values on the DMA side.
+> This was making the audio transfers to be rejected because of invalid
+> values on the memory side.
 
-A value of 0 for burst does not make sense. Frr buswidth this in undefined.
-So what are we gaining from 0 value and how is it fixing something which is
-passed as wrong argument?
+I think there is a misunderstanding of the API. The slave configuration set
+thru dma_slave_config is only intended for peripheral and not for memory.
+
+In memory case you need to assume values based on system. DMA to memory is
+usually done for max throughput and these parameters do not make sense
+there.
 
 
 > 
 > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
->  drivers/dma/sun6i-dma.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+>  drivers/dma/sun6i-dma.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
 > 
 > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index 2ec320d..3579ee7 100644
+> index 7c98c0d..c27d572 100644
 > --- a/drivers/dma/sun6i-dma.c
 > +++ b/drivers/dma/sun6i-dma.c
-> @@ -281,25 +281,25 @@ static inline int sun6i_dma_cfg_lli(struct sun6i_dma_lli *lli,
->  				    dma_addr_t dst, u32 len,
->  				    struct dma_slave_config *config)
->  {
-> -	u8 src_width, dst_width, src_burst, dst_burst;
-> +	s8 src_width, dst_width, src_burst, dst_burst;
->  
+> @@ -288,19 +288,31 @@ static inline int sun6i_dma_cfg_lli(struct sun6i_dma_lli *lli,
 >  	if (!config)
 >  		return -EINVAL;
 >  
->  	src_burst = convert_burst(config->src_maxburst);
-> -	if (src_burst)
-> +	if (src_burst < 0)
->  		return src_burst;
->  
->  	dst_burst = convert_burst(config->dst_maxburst);
-> -	if (dst_burst)
-> +	if (dst_burst < 0)
->  		return dst_burst;
->  
->  	src_width = convert_buswidth(config->src_addr_width);
-> -	if (src_width)
-> +	if (src_width < 0)
->  		return src_width;
->  
->  	dst_width = convert_buswidth(config->dst_addr_width);
-> -	if (dst_width)
-> +	if (dst_width < 0)
->  		return dst_width;
->  
->  	lli->cfg = DMA_CHAN_CFG_SRC_BURST(src_burst) |
-> -- 
-> 2.7.2
-> 
+> -	src_burst = convert_burst(config->src_maxburst);
+> +	if (config->src_maxburst == 0)
+> +		src_burst = convert_burst(config->dst_maxburst);
+> +	else
+> +		src_burst = convert_burst(config->src_maxburst);
+
+No 0 is error for the transfer direction and don't assume default for
+peripheral, that is just wrong
 
 -- 
 ~Vinod
