@@ -1,37 +1,35 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Fri, 11 Mar 2016 07:48:39 +0100
-Subject: [OpenWrt-Devel] ARMv4 (not v4t) marked obsolete in gcc-6
-In-Reply-To: <alpine.LNX.2.00.1603110638190.12310@T520.work>
-References: <201603101013.04618.arnd@arndb.de>
- <alpine.LNX.2.00.1603110638190.12310@T520.work>
-Message-ID: <56E26A47.9040608@openwrt.org>
+From: phil@nwl.cc (Phil Sutter)
+Date: Fri, 11 Mar 2016 07:58:16 +0100
+Subject: [PATCH] ARM: mvebu: fix overlap of Crypto SRAM with PCIe memory
+ window
+In-Reply-To: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160311065630.F01576739A@mail.nwl.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/03/2016 06:44, Hans Ulli Kroll wrote:
-> Hi
->>
->> * Gemini: officially supported in OpenWRT today, with the latest compiler. This one
->>   will likely cause the most issues for actual users. It would be helpful to get
->>   some numbers about users or downloads here, to see whether it can be dropped
->>   in a future OpenWRT release or if it might be possible to leave this on
->>   gcc-6.x when the other platforms move on to gcc-7+
-> 
-> I don't have any numbers from the OPenWRT people.
-> For the NAS BOXes itself, I get one/two support questions a month on the 
-> german based forum.
-> I think most people know about the SATA bug, which makes the platform 
-> unreliable for some SATA drives.
-> y
-> Hans Ulli
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
 Hi,
 
-We have several active users. Roman has done a great job to constantly
-maintain and update the target. We have been including gemini in our
-releases for years thanks to Romans effort. It would be a shame to to
-see support being dropped, even if there are few yet active users.
+On Tue, Mar 08, 2016 at 04:59:57PM +0100, Thomas Petazzoni wrote:
+> When the Crypto SRAM mappings were added to the Device Tree files
+> describing the Armada XP boards in commit c466d997bb16 ("ARM: mvebu:
+> define crypto SRAM ranges for all armada-xp boards"), the fact that
+> those mappings were overlaping with the PCIe memory aperture was
+> overlooked. Due to this, we currently have for all Armada XP platforms
+> a situation that looks like this:
 
-	John
+This patch fixes the issues for me, at least with proprietary U-Boot
+underneath (I checked, they were still present with upstream kernel).
+Thanks a lot!
+
+Cheers, Phil
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iEYEARECAAYFAlbibIYACgkQnMPprxY1hCc2GACgmj9bNXnF6QDvCVk2Q5+R/gB2
+3e0AoIhosGwE22VnZ1Le8S6X0JRjeVfR
+=w853
+-----END PGP SIGNATURE-----
