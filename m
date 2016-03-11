@@ -1,74 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 11 Mar 2016 19:00:30 +0100
-Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
-In-Reply-To: <56E30332.7060003@caviumnetworks.com>
-References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
- <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
- <20160311173125.GI3153@lunn.ch>
- <56E30332.7060003@caviumnetworks.com>
-Message-ID: <20160311180030.GB19277@lunn.ch>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 11 Mar 2016 18:07:10 +0000
+Subject: [PATCH v11 1/9] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <1457501543-24197-2-git-send-email-dave.long@linaro.org>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-2-git-send-email-dave.long@linaro.org>
+Message-ID: <56E3094E.5010906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 09:41:06AM -0800, David Daney wrote:
-> On 03/11/2016 09:31 AM, Andrew Lunn wrote:
-> >>+		phy_np = of_parse_phandle(node, "phy-handle", 0);
-> >>+		/* If there is no phy or defective firmware presents
-> >>+		 * this cortina phy, for which there is no driver
-> >>+		 * support, ignore it.
-> >>+		 */
-> >>+		if (phy_np &&
-> >>+		    !of_device_is_compatible(phy_np, "cortina,cs4223-slice")) {
-> >
-> >Hi David
-> >
-> >What is a cortina,cs4223-slice,
+Hi David,
+
+On 09/03/16 05:32, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
 > 
-> It is 1/4 of:
+> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
 > 
-> https://www.inphi.com/products/cs4223.php
-> 
-> >and why does it need to be handled differently?
-> >
-> 
-> $ ls drivers/net/phy/*cortina*
-> ls: cannot access drivers/net/phy/*cortina*: No such file or directory
-> 
-> For this configuration of thunder_bgx.c, the use of a Linux PHY
-> driver is optional.
-> 
-> The firmware should probably not specify a PHY here, but it does so
-> we ignore it so we don't wait around forever for the non-existent
-> driver to bind.
- 
-Hi David
+> Signed-off-by: David A. Long <dave.long@linaro.org>
 
-I don't see why it should wait around forever. I have boards with
-Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
-driver still loads, because the generic PHY driver is used instead.
-Why does this not work here?
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index ff7f132..efebf0f 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
 
-Also, Documentation/devicetree/bindings/net/phy.txt says:
+[ ... SNIP ... ]
 
- compatible: Compatible list, may contain
-  "ethernet-phy-ieee802.3-c22" or "ethernet-phy-ieee802.3-c45" for
-  PHYs that implement IEEE802.3 clause 22 or IEEE802.3 clause 45
-  specifications. If neither of these are specified, the default is to
-  assume clause 22.
+> +/**
+> + * regs_within_kernel_stack() - check the address in the stack
+> + * @regs:      pt_regs which contains kernel stack pointer.
+> + * @addr:      address which is checked.
+> + *
+> + * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
+> + * If @addr is within the kernel stack, it returns true. If not, returns false.
+> + */
+> +bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
+> +{
+> +	return ((addr & ~(THREAD_SIZE - 1))  ==
+> +		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
 
-  If the phy's identifier is known then the list may contain an entry
-  of the form: "ethernet-phy-idAAAA.BBBB" where
-     AAAA - The value of the 16 bit Phy Identifier 1 register as
-            4 hex digits. This is the chip vendor OUI bits 3:18
-     BBBB - The value of the 16 bit Phy Identifier 2 register as
-            4 hex digits. This is the chip vendor OUI bits 19:24,
-            followed by 10 bits of a vendor specific ID.
+I'm not sure where this is called from, but if kernel_stack_pointer(regs) could
+ever point into an irq_stack you will get the wrong result.
 
-  The compatible list should not contain other values than those
-  listed here.
+arch/arm64/include/asm/irq.h has 'on_irq_stack(sp, cpu)' which should help,
+although you will need to check the bounds of the irq_stack separately.
 
-So having "cortina,cs4223-slice" in the compatible string goes against
-the binding. To make this work, you probably need to extend the
-whitelist_phys list in of_mdio.c.
 
-       Andrew
+The horrible details...
+
+>From arch/arm64/kernel/irq.c:20
+> /* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned. */
+> DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack)
+> __aligned(16);
+
+This was because per-cpu variables can be at-most page aligned.
+6cdf9c7ca687 ("arm64: Store struct thread_info in sp_el0") changed
+current_thread_info() to work on these weirdly aligned irq_stacks.
+
+
+Thanks,
+
+James
