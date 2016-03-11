@@ -1,35 +1,77 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 11 Mar 2016 21:12:30 +0100
-Subject: [PATCH 1/2] regulator: axp20x: Fix axp22x ldo_io voltage ranges
-Message-ID: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 11 Mar 2016 12:16:15 -0800
+Subject: [PATCH] arm64: dts: vulcan: Update PCI ranges
+In-Reply-To: <1456645037-12978-1-git-send-email-jchandra@broadcom.com>
+References: <56D200F5.7010505@broadcom.com>
+ <1456645037-12978-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <56E3278F.5090200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The minium voltage of 1800mV is a copy and paste error from the axp20x
-regulator info. The correct minimum voltage for the ldo_io regulators
-on the axp22x is 700mV.
+On 27/02/16 23:37, Jayachandran C wrote:
+> The PCI memory windows available in vulcan.dtsi are limited to 128MB
+> for 32-bit BARs, and 4GB for 64-bit BARs. Given the memory mapped IO
+> space available in arm64, these windows can be increased substantially
+> to support more use cases.
+> 
+> The change increases the 32-bit window to 256MB and the 64-bit window
+> to 128 GB. The firmware on vulcan boards will use these ranges as well.
+> 
+> PCI IO windows are not supported on Vulcan, so remove them instead of
+> keeping an unused value.
+> 
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+> 
+> This is an update to the patch with subject
+> "arm64: Broadcom Vulcan support"
+> I had sent earlier, please fold it into that patch if possible
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/regulator/axp20x-regulator.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Arnd, I do not have any other Broadcom ARM64 DT changes for 4.6 to be
+sent at the moment, do you mind taking this patch directly?
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 40cd894..0c0e7a3 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -215,10 +215,10 @@ static const struct regulator_desc axp22x_regulators[] = {
- 		 AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
- 	AXP_DESC(AXP22X, ELDO3, "eldo3", "eldoin", 700, 3300, 100,
- 		 AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
--	AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 1800, 3300, 100,
-+	AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
- 		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
- 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
--	AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 1800, 3300, 100,
-+	AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
- 		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
- 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
- 	AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtc_ldo", "ips", 3000),
+Feel free to add my:
+
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+
+Thanks!
+
+> 
+> Thanks,
+> JC.
+> 
+> 
+>  arch/arm64/boot/dts/broadcom/vulcan.dtsi | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/broadcom/vulcan.dtsi b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+> index c49b5a8..85820e2 100644
+> --- a/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+> @@ -108,12 +108,15 @@
+>  		reg = <0x0 0x30000000  0x0 0x10000000>;
+>  		reg-names = "PCI ECAM";
+>  
+> -			  /* IO 0x4000_0000 - 0x4001_0000 */
+> -		ranges = <0x01000000 0 0x40000000 0 0x40000000 0 0x00010000
+> -			  /* MEM 0x4800_0000 - 0x5000_0000 */
+> -			  0x02000000 0 0x48000000 0 0x48000000 0 0x08000000
+> -			  /* MEM64 pref 0x6_0000_0000 - 0x7_0000_0000 */
+> -			  0x43000000 6 0x00000000 6 0x00000000 1 0x00000000>;
+> +		/*
+> +		 * PCI ranges:
+> +		 *   IO		no supported
+> +		 *   MEM        0x4000_0000 - 0x6000_0000
+> +		 *   MEM64 pref 0x40_0000_0000 - 0x60_0000_0000
+> +		 */
+> +		ranges =
+> +		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
+> +		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
+>  		interrupt-map-mask = <0 0 0 7>;
+>  		interrupt-map =
+>  		      /* addr  pin  ic   icaddr  icintr */
+> 
+
+
 -- 
-2.7.2
+Florian
