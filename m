@@ -1,68 +1,63 @@
 From: huangdaode@hisilicon.com (Daode Huang)
-Date: Fri, 11 Mar 2016 17:10:41 +0800
-Subject: [PATCH V2 net 1/6] net: hns: bug fix about the overflow of mss
+Date: Fri, 11 Mar 2016 17:10:42 +0800
+Subject: [PATCH V2 net 2/6] net: hns: fixes the hw interrupt bug in using napi
 In-Reply-To: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
 References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <1457687446-109867-2-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <1457687446-109867-3-git-send-email-huangdaode@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When set MTU to the minimum value 68, there are increasing number
-of error packets occur, which is caused by the overflowed value of
-mss. This patch fix the bug.
+In V1 chip, common_poll should check and clean fbd pkts, because it
+can not pend irq to clean them if there is no new pkt comes in.
+But V2 chip hw fixes this bug, and will pend irq itself to do this.
+So, for V2 chip, we set ring_data->fini_process to NULL.
 
 Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Sheng Li <lisheng011@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_enet.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-index 3f77ff7..9d46d57 100644
+index 9d46d57..6250a42 100644
 --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
 +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-@@ -48,7 +48,6 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
- 	struct iphdr *iphdr;
- 	struct ipv6hdr *ipv6hdr;
- 	struct sk_buff *skb;
--	int skb_tmp_len;
- 	__be16 protocol;
- 	u8 bn_pid = 0;
- 	u8 rrcfv = 0;
-@@ -90,13 +89,13 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
- 				hnae_set_bit(rrcfv, HNSV2_TXD_L4CS_B, 1);
+@@ -946,8 +946,8 @@ static int hns_nic_common_poll(struct napi_struct *napi, int budget)
+ 		napi_complete(napi);
+ 		ring_data->ring->q->handle->dev->ops->toggle_ring_irq(
+ 			ring_data->ring, 0);
+-
+-		ring_data->fini_process(ring_data);
++		if (ring_data->fini_process)
++			ring_data->fini_process(ring_data);
+ 		return 0;
+ 	}
  
- 				/* check for tcp/udp header */
--				if (iphdr->protocol == IPPROTO_TCP) {
-+				if (iphdr->protocol == IPPROTO_TCP &&
-+				    skb_is_gso(skb)) {
- 					hnae_set_bit(tvsvsn,
- 						     HNSV2_TXD_TSE_B, 1);
--					skb_tmp_len = SKB_TMP_LEN(skb);
- 					l4_len = tcp_hdrlen(skb);
--					mss = mtu - skb_tmp_len - ETH_FCS_LEN;
--					paylen = skb->len - skb_tmp_len;
-+					mss = skb_shinfo(skb)->gso_size;
-+					paylen = skb->len - SKB_TMP_LEN(skb);
- 				}
- 			} else if (skb->protocol == htons(ETH_P_IPV6)) {
- 				hnae_set_bit(tvsvsn, HNSV2_TXD_IPV6_B, 1);
-@@ -104,13 +103,13 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
- 				hnae_set_bit(rrcfv, HNSV2_TXD_L4CS_B, 1);
+@@ -1710,6 +1710,7 @@ static int hns_nic_init_ring_data(struct hns_nic_priv *priv)
+ {
+ 	struct hnae_handle *h = priv->ae_handle;
+ 	struct hns_nic_ring_data *rd;
++	bool is_ver1 = AE_IS_VER1(priv->enet_ver);
+ 	int i;
  
- 				/* check for tcp/udp header */
--				if (ipv6hdr->nexthdr == IPPROTO_TCP) {
-+				if (ipv6hdr->nexthdr == IPPROTO_TCP &&
-+				    skb_is_gso(skb) && skb_is_gso_v6(skb)) {
- 					hnae_set_bit(tvsvsn,
- 						     HNSV2_TXD_TSE_B, 1);
--					skb_tmp_len = SKB_TMP_LEN(skb);
- 					l4_len = tcp_hdrlen(skb);
--					mss = mtu - skb_tmp_len - ETH_FCS_LEN;
--					paylen = skb->len - skb_tmp_len;
-+					mss = skb_shinfo(skb)->gso_size;
-+					paylen = skb->len - SKB_TMP_LEN(skb);
- 				}
- 			}
- 			desc->tx.ip_offset = ip_offset;
+ 	if (h->q_num > NIC_MAX_Q_PER_VF) {
+@@ -1727,7 +1728,7 @@ static int hns_nic_init_ring_data(struct hns_nic_priv *priv)
+ 		rd->queue_index = i;
+ 		rd->ring = &h->qs[i]->tx_ring;
+ 		rd->poll_one = hns_nic_tx_poll_one;
+-		rd->fini_process = hns_nic_tx_fini_pro;
++		rd->fini_process = is_ver1 ? hns_nic_tx_fini_pro : NULL;
+ 
+ 		netif_napi_add(priv->netdev, &rd->napi,
+ 			       hns_nic_common_poll, NIC_TX_CLEAN_MAX_NUM);
+@@ -1739,7 +1740,7 @@ static int hns_nic_init_ring_data(struct hns_nic_priv *priv)
+ 		rd->ring = &h->qs[i - h->q_num]->rx_ring;
+ 		rd->poll_one = hns_nic_rx_poll_one;
+ 		rd->ex_process = hns_nic_rx_up_pro;
+-		rd->fini_process = hns_nic_rx_fini_pro;
++		rd->fini_process = is_ver1 ? hns_nic_rx_fini_pro : NULL;
+ 
+ 		netif_napi_add(priv->netdev, &rd->napi,
+ 			       hns_nic_common_poll, NIC_RX_CLEAN_MAX_NUM);
 -- 
 1.9.1
