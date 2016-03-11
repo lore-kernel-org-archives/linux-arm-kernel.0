@@ -1,93 +1,64 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Fri, 11 Mar 2016 22:48:36 +0800
-Subject: [PATCH 0/6] arc_emac: fixes the emac issues oand cleanup emac
- drivers
-In-Reply-To: <56E2CC39.6050907@cogentembedded.com>
-References: <1457693731-6966-1-git-send-email-wxt@rock-chips.com>
- <56E2CC39.6050907@cogentembedded.com>
-Message-ID: <56E2DAC4.4020105@gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 11 Mar 2016 11:55:58 -0300
+Subject: [PATCH 2/2] [media] exynos4-is: FIMC port parse should fail if
+ there's no endpoint
+In-Reply-To: <56E2C206.6020103@samsung.com>
+References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
+ <1457122813-12791-3-git-send-email-javier@osg.samsung.com>
+ <56E2C206.6020103@samsung.com>
+Message-ID: <CABxcv=nteCTgaN9t33vOovXoHarMXf_knxjTUfV+G36iQs8AGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hello Sylwester,
 
-? 2016?03?11? 21:46, Sergei Shtylyov ??:
-> Hello.
->
-> On 3/11/2016 1:55 PM, Caesar Wang wrote:
->
->> This series patches are based on kernel 4.5-rc7+ version.
->> Linux version 4.5.0-rc7-next-20160310+ (wxt at nb) (...) #23 SMP Fri Mar 
->> 11 15:55:53
->
-> [...]
->
->> 1) This series has 6 patches: (1--->6)
->> net: arc_emac: make the rockchip emac document more compatible
->> net: arc_emac: add phy-reset-* are optional for device tree
->
->    I'm not seeing these patches on netdev...
-
-Sent by the patman tool.
-
-LKML:
-https://patchwork.kernel.org/patch/8564501/
-https://patchwork.kernel.org/patch/8564511/
-
->
->> net: arc_emac: support the phy reset for emac driver
->> net: arc: trivial: cleanup the emac driver
->> clk: rockchip: rk3036: fix and add node id for emac clock
->> ARM: dts: rockchip: add support emac for RK3036
+On Fri, Mar 11, 2016 at 10:03 AM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> On 03/04/2016 09:20 PM, Javier Martinez Canillas wrote:
+>> The fimc_md_parse_port_node() function return 0 if an endpoint node is
+>> not found but according to Documentation/devicetree/bindings/graph.txt,
+>> a port must always have at least one enpoint.
 >>
->> 2) This series patches have the following decriptions:
+>> So return an -EINVAL errno code to the caller instead, so it knows that
+>> the port node parse failed due an invalid Device Tree description.
 >
->    Descriptions.
+> I don't think it is forbidden to have a port node in device tree
+> containing no endpoint nodes. Empty port node means only that,
+> for example, a subsystem has a port/bus for connecting external
+> devices but nothing is actually connected to it.
 >
->> Hi Rob, David:
->> PATCH[1/6-2/6]: ====>
->> net: arc_emac: make the rockchip emac document more compatible
->> net: arc_emac: add phy-reset-* are optional for device tree
->>
->> The patches change the rockchip emac document for more compatible and
->> Add the phy-reset-* property for document.
->>
->> This patch adds the following property for arc_emac.
->>
->> phy-reset-* include the following:
->> 1) phy-reset-gpios:
->> The phy-reset-gpios is an optional property for arc emac device tree 
->> boot.
->> Change the binding document to match the driver code.
->>
->> 2) phy-reset-duration:
->> Different boards may require different phy reset duration. Add property
->> phy-reset-duration for device tree probe, so that the boards that need
->> a longer reset duration can specify it in their device tree.
->>
->> 3) phy-reset-active-high:
->> We need that for a custom hardware that needs the reverse reset 
->> sequence.
+
+That's not what I understood by reading both
+Documentation/devicetree/bindings/media/video-interfaces.txt and
+Documentation/devicetree/bindings/graph.txt but maybe these are not
+that clear about it or I just failed to parse the english.
+
+> In case of Exynos CSIS it might not be so useful to have an empty
+> port node specified in some top level *.dtsi file and only
+> the endpoints specified in a board specific dts file. Nevertheless,
+> I wouldn't be saying in general a port node must always have some
+> endpoint node defined.
 >
->    Why not infer this from the "phy-reset-gpios" prop?
 
-See:
-https://patchwork.kernel.org/patch/8564511/
+Ok, but if that is valid then I believe that at the very least
+Documentation/devicetree/bindings/media/samsung-fimc.txt should
+explicitly mention which (sub)nodes are optional and which are
+required so the DT parsing logic could follow what's documented there.
 
-phy-reset-active-high : If present then the reset sequence using the GPIO
-  specified in the "phy-reset-gpios" property is reversed (H=reset state,
-  L=operation state).
-
-
-Thanks,
-
-Caesar
-
+> I could apply this patch as it doesn't do any harm considering
+> existing dts files in the kernel tree (arch/arm/boot/dts/
+> exynos4412-trats2.dts), but the commit description would need to
+> be changed.
 >
-> MBR, Sergei
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+I don't mind if you want to change the commit message but if those
+nodes are really optional then a follow-up should be to update the DT
+binding docs to make that clear IMHO.
+
+> --
+> Thanks,
+> Sylwester
+> --
+
+Best regards,
+Javier
