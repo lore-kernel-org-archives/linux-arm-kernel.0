@@ -1,155 +1,74 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 11 Mar 2016 11:37:54 +0000
-Subject: [PATCH v14 12/20] arm64/kexec: Add core kexec support
-In-Reply-To: <cdab8a2001a9f8beb605bfcd565201c37dad78e6.1457135058.git.geoff@infradead.org>
-References: <cover.1457135058.git.geoff@infradead.org>
- <cdab8a2001a9f8beb605bfcd565201c37dad78e6.1457135058.git.geoff@infradead.org>
-Message-ID: <56E2AE12.4020604@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 11 Mar 2016 19:28:18 +0800
+Subject: [PATCH 4/6] net: arc: trivial: cleanup the emac driver
+In-Reply-To: <1457693731-6966-5-git-send-email-wxt@rock-chips.com>
+Message-ID: <201603111932.Q2YJVZSM%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi Caesar,
 
-On 04/03/16 23:51, Geoff Levand wrote:
-> Add three new files, kexec.h, machine_kexec.c and relocate_kernel.S to the
-> arm64 architecture that add support for the kexec re-boot mechanism
-> (CONFIG_KEXEC) on arm64 platforms.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
+[auto build test WARNING on next-20160311]
+[also build test WARNING on v4.5-rc7]
+[cannot apply to rockchip/for-next net-next/master v4.5-rc7 v4.5-rc6 v4.5-rc5]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> new file mode 100644
-> index 0000000..6fd0f0c
-> --- /dev/null
-> +++ b/arch/arm64/kernel/machine_kexec.c
+url:    https://github.com/0day-ci/linux/commits/Caesar-Wang/net-arc_emac-make-the-rockchip-emac-document-more-compatible/20160311-190611
+config: alpha-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=alpha 
 
-[ ... snip ... ]
+All warnings (new ones prefixed by >>):
 
-> +/**
-> + * kexec_list_flush - Helper to flush the kimage list to PoC.
-> + */
-> +static void kexec_list_flush(struct kimage *kimage)
-> +{
-> +	kimage_entry_t *entry;
-> +	unsigned int flag;
-> +
-> +	for (entry = &kimage->head, flag = 0; flag != IND_DONE; entry++) {
-> +		void *addr = kmap(phys_to_page(*entry & PAGE_MASK));
+   drivers/net/ethernet/arc/emac_main.c: In function 'arc_emac_open':
+>> drivers/net/ethernet/arc/emac_main.c:468:7: warning: overflow in implicit constant conversion [-Woverflow]
+          (RX_BD_NUM << 24) | /* RX BD table length */
+          ^
 
-Isn't kmap() only needed for highmem? All memory should be accessible via the
-linear map, so this could just be a call to phys_to_virt(), without the
-intermediate page step.
+vim +468 drivers/net/ethernet/arc/emac_main.c
 
+e4f2379d Alexey Brodkin    2013-06-24  452  	/* Clean Tx BD's */
+e4f2379d Alexey Brodkin    2013-06-24  453  	memset(priv->txbd, 0, TX_RING_SZ);
+e4f2379d Alexey Brodkin    2013-06-24  454  
+e4f2379d Alexey Brodkin    2013-06-24  455  	/* Initialize logical address filter */
+e4f2379d Alexey Brodkin    2013-06-24  456  	arc_reg_set(priv, R_LAFL, 0);
+e4f2379d Alexey Brodkin    2013-06-24  457  	arc_reg_set(priv, R_LAFH, 0);
+e4f2379d Alexey Brodkin    2013-06-24  458  
+e4f2379d Alexey Brodkin    2013-06-24  459  	/* Set BD ring pointers for device side */
+e4f2379d Alexey Brodkin    2013-06-24  460  	arc_reg_set(priv, R_RX_RING, (unsigned int)priv->rxbd_dma);
+e4f2379d Alexey Brodkin    2013-06-24  461  	arc_reg_set(priv, R_TX_RING, (unsigned int)priv->txbd_dma);
+e4f2379d Alexey Brodkin    2013-06-24  462  
+e4f2379d Alexey Brodkin    2013-06-24  463  	/* Enable interrupts */
+7ce7679d Beniamino Galvani 2014-09-10  464  	arc_reg_set(priv, R_ENABLE, RXINT_MASK | TXINT_MASK | ERR_MASK);
+e4f2379d Alexey Brodkin    2013-06-24  465  
+e4f2379d Alexey Brodkin    2013-06-24  466  	/* Set CONTROL */
+e4f2379d Alexey Brodkin    2013-06-24  467  	arc_reg_set(priv, R_CTRL,
+e4f2379d Alexey Brodkin    2013-06-24 @468  		    (RX_BD_NUM << 24) |	/* RX BD table length */
+e4f2379d Alexey Brodkin    2013-06-24  469  		    (TX_BD_NUM << 16) |	/* TX BD table length */
+e4f2379d Alexey Brodkin    2013-06-24  470  		    TXRN_MASK | RXRN_MASK);
+e4f2379d Alexey Brodkin    2013-06-24  471  
+e4f2379d Alexey Brodkin    2013-06-24  472  	napi_enable(&priv->napi);
+e4f2379d Alexey Brodkin    2013-06-24  473  
+e4f2379d Alexey Brodkin    2013-06-24  474  	/* Enable EMAC */
+e4f2379d Alexey Brodkin    2013-06-24  475  	arc_reg_or(priv, R_CTRL, EN_MASK);
+e4f2379d Alexey Brodkin    2013-06-24  476  
 
-> +
-> +		flag = *entry & IND_FLAGS;
-> +
-> +		switch (flag) {
-> +		case IND_INDIRECTION:
-> +			entry = (kimage_entry_t *)addr - 1;
-> +			__flush_dcache_area(addr, PAGE_SIZE);
-> +			break;
-> +		case IND_DESTINATION:
-> +			break;
-> +		case IND_SOURCE:
-> +			__flush_dcache_area(addr, PAGE_SIZE);
-> +			break;
-> +		case IND_DONE:
-> +			break;
-> +		default:
-> +			BUG();
-> +		}
-> +		kunmap(addr);
-> +	}
-> +}
-> +
-> +/**
-> + * kexec_segment_flush - Helper to flush the kimage segments to PoC.
-> + */
-> +static void kexec_segment_flush(const struct kimage *kimage)
-> +{
-> +	unsigned long i;
-> +
-> +	pr_devel("%s:\n", __func__);
-> +
-> +	for (i = 0; i < kimage->nr_segments; i++) {
-> +		pr_devel("  segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages\n",
-> +			i,
-> +			kimage->segment[i].mem,
-> +			kimage->segment[i].mem + kimage->segment[i].memsz,
-> +			kimage->segment[i].memsz,
-> +			kimage->segment[i].memsz /  PAGE_SIZE);
-> +
-> +		__flush_dcache_area(phys_to_virt(kimage->segment[i].mem),
-> +			kimage->segment[i].memsz);
-> +	}
-> +}
-> +
-> +/**
-> + * machine_kexec - Do the kexec reboot.
-> + *
-> + * Called from the core kexec code for a sys_reboot with LINUX_REBOOT_CMD_KEXEC.
-> + */
-> +void machine_kexec(struct kimage *kimage)
-> +{
-> +	phys_addr_t reboot_code_buffer_phys;
-> +	void *reboot_code_buffer;
-> +
-> +	BUG_ON(num_online_cpus() > 1);
-> +
-> +	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
-> +	reboot_code_buffer = kmap(kimage->control_code_page);
+:::::: The code at line 468 was first introduced by commit
+:::::: e4f2379db6c6823c5d4a4c2c912df00c65de51d7 ethernet/arc/arc_emac - Add new driver
 
-page_address()?
+:::::: TO: Alexey Brodkin <Alexey.Brodkin@synopsys.com>
+:::::: CC: David S. Miller <davem@davemloft.net>
 
-
-> +
-> +	/*
-> +	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
-> +	 * after the kernel is shut down.
-> +	 */
-> +	memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
-> +		arm64_relocate_new_kernel_size);
-> +
-> +	/* Flush the reboot_code_buffer in preparation for its execution. */
-> +	__flush_dcache_area(reboot_code_buffer, arm64_relocate_new_kernel_size);
-> +	flush_icache_range((uintptr_t)reboot_code_buffer,
-> +		arm64_relocate_new_kernel_size);
-> +
-> +	/* Flush the kimage list. */
-> +	kexec_list_flush(kimage);
-> +
-> +	/* Flush the new image if already in place. */
-> +	if (kimage->head & IND_DONE)
-> +		kexec_segment_flush(kimage);
-> +
-> +	pr_info("Bye!\n");
-> +
-> +	/* Disable all DAIF exceptions. */
-> +	asm volatile ("msr daifset, #0xf" : : : "memory");
-> +
-> +	cpu_install_idmap();
-> +
-> +	/*
-> +	 * cpu_soft_restart will shutdown the MMU, disable data caches, then
-> +	 * transfer control to the reboot_code_buffer which contains a copy of
-> +	 * the arm64_relocate_new_kernel routine.  arm64_relocate_new_kernel
-> +	 * uses physical addressing to relocate the new image to its final
-> +	 * position and transfers control to the image entry point when the
-> +	 * relocation is complete.
-> +	 */
-> +
-> +	cpu_soft_restart(is_hyp_mode_available(),
-> +		reboot_code_buffer_phys, kimage->head, kimage_start, 0);
-> +
-> +	BUG(); /* Should never get here. */
-> +}
-> +
-> +void machine_crash_shutdown(struct pt_regs *regs)
-> +{
-> +	/* Empty routine needed to avoid build errors. */
-> +}
-
-Thanks!
-
-James
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45778 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160311/05ee75f7/attachment-0001.obj>
