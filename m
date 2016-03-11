@@ -1,101 +1,77 @@
 From: huangdaode@hisilicon.com (Daode Huang)
-Date: Fri, 11 Mar 2016 17:10:46 +0800
-Subject: [PATCH V2 net 6/6] net: hns: bug fix of getting hilink status
+Date: Fri, 11 Mar 2016 17:10:43 +0800
+Subject: [PATCH V2 net 3/6] net: hns: fixed portid bug in sending manage pkt
 In-Reply-To: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
 References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <1457687446-109867-7-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <1457687446-109867-4-git-send-email-huangdaode@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some differences in hilink status defination between
-v1 and v2 chips.
-for v1 chip, all ports connected to the same hilink share the same
-hilink status register bit.
-but for v2, all ports have separately hilink status register bit. And
-the register addr is also changed.
-So this patch fixes the bug.
+In V2 chip, when sending mamagement packets, the driver should
+config the port id to BD descs.
 
 Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
 Signed-off-by: Sheng Li <lisheng011@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 41 ++++++++++++----------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  2 ++
- 2 files changed, 24 insertions(+), 19 deletions(-)
+ v2: add space after /* and before */.
+---
+drivers/net/ethernet/hisilicon/hns/hnae.h         | 3 +++
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c | 1 +
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c     | 6 +++++-
+ 3 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-index 607c3be..8c32ff6 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c
-@@ -240,35 +240,38 @@ void hns_ppe_com_srst(struct ppe_common_cb *ppe_common, u32 val)
- /**
-  * hns_mac_get_sds_mode - get phy ifterface form serdes mode
-  * @mac_cb: mac control block
-- * retuen phy interface
-+ * return phy interface
-  */
- phy_interface_t hns_mac_get_phy_if(struct hns_mac_cb *mac_cb)
- {
--	u32 hilink3_mode;
--	u32 hilink4_mode;
-+	u32 reg, mode, shift;
- 	void __iomem *sys_ctl_vaddr = mac_cb->sys_ctl_vaddr;
--	int dev_id = mac_cb->mac_id;
-+	int mac_id = mac_cb->mac_id;
- 	phy_interface_t phy_if = PHY_INTERFACE_MODE_NA;
-+	bool is_ver1 = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver);
+diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.h b/drivers/net/ethernet/hisilicon/hns/hnae.h
+index 1cbcb9f..37d0cce 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hnae.h
++++ b/drivers/net/ethernet/hisilicon/hns/hnae.h
+@@ -147,6 +147,8 @@ enum hnae_led_state {
  
--	hilink3_mode = dsaf_read_reg(sys_ctl_vaddr, HNS_MAC_HILINK3_REG);
--	hilink4_mode = dsaf_read_reg(sys_ctl_vaddr, HNS_MAC_HILINK4_REG);
--	if (dev_id >= 0 && dev_id <= 3) {
--		if (hilink4_mode == 0)
--			phy_if = PHY_INTERFACE_MODE_SGMII;
--		else
-+	/* for hip05 soc, port6,7 only support ge mode */
-+	if (is_ver1 && (mac_id >= 6 && mac_id <= 7)) {
-+		phy_if = PHY_INTERFACE_MODE_SGMII;
-+	} else	if (mac_id >= 0 && mac_id <= 3) {
-+		reg = is_ver1 ? HNS_MAC_HILINK4_REG : HNS_MAC_HILINK4V2_REG;
-+		mode = dsaf_read_reg(sys_ctl_vaddr, reg);
-+		/* mac_id 0, 1, 2, 3 ---> hilink4 lane 0, 1, 2, 3 */
-+		shift = is_ver1 ? 0 : mac_id;
-+		if (dsaf_get_bit(mode, shift))
- 			phy_if = PHY_INTERFACE_MODE_XGMII;
--	} else if (dev_id >= 4 && dev_id <= 5) {
--		if (hilink3_mode == 0)
--			phy_if = PHY_INTERFACE_MODE_SGMII;
- 		else
-+			phy_if = PHY_INTERFACE_MODE_SGMII;
-+	} else if (mac_id >= 4 && mac_id <= 7) {
-+		reg = is_ver1 ? HNS_MAC_HILINK3_REG : HNS_MAC_HILINK3V2_REG;
-+		mode = dsaf_read_reg(sys_ctl_vaddr, reg);
-+		/* mac_id 4, 5, 6, 7 ---> hilink3 lane 2, 3, 0, 1 */
-+		shift = is_ver1 ? 0 : (mac_id <= 5 ? mac_id - 2 : mac_id - 6);
-+		if (dsaf_get_bit(mode, shift))
- 			phy_if = PHY_INTERFACE_MODE_XGMII;
--	} else {
--		phy_if = PHY_INTERFACE_MODE_SGMII;
-+		else
-+			phy_if = PHY_INTERFACE_MODE_SGMII;
- 	}
--
--	dev_dbg(mac_cb->dev,
--		"hilink3_mode=%d, hilink4_mode=%d dev_id=%d, phy_if=%d\n",
--		hilink3_mode, hilink4_mode, dev_id, phy_if);
- 	return phy_if;
- }
+ #define HNSV2_TXD_BUFNUM_S 0
+ #define HNSV2_TXD_BUFNUM_M (0x7 << HNSV2_TXD_BUFNUM_S)
++#define HNSV2_TXD_PORTID_S	4
++#define HNSV2_TXD_PORTID_M	(0X7 << HNSV2_TXD_PORTID_S)
+ #define HNSV2_TXD_RI_B   1
+ #define HNSV2_TXD_L4CS_B   2
+ #define HNSV2_TXD_L3CS_B   3
+@@ -516,6 +518,7 @@ struct hnae_handle {
+ 	int q_num;
+ 	int vf_id;
+ 	u32 eport_id;
++	u32 dport_id;	/* v2 tx bd should fill the dport_id */
+ 	enum hnae_port_type port_type;
+ 	struct list_head node;    /* list to hnae_ae_dev->handle_list */
+ 	struct hnae_buf_ops *bops; /* operation for the buffer */
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+index d4f92ed..90352d6 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+@@ -175,6 +175,7 @@ struct hnae_handle *hns_ae_get_handle(struct hnae_ae_dev *dev,
+ 	ae_handle->phy_node = vf_cb->mac_cb->phy_node;
+ 	ae_handle->if_support = vf_cb->mac_cb->if_support;
+ 	ae_handle->port_type = vf_cb->mac_cb->mac_type;
++	ae_handle->dport_id = port_idx;
  
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-index bf62687..e2206f9 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-@@ -103,6 +103,8 @@
- /*serdes offset**/
- #define HNS_MAC_HILINK3_REG DSAF_SUB_SC_HILINK3_CRG_CTRL0_REG
- #define HNS_MAC_HILINK4_REG DSAF_SUB_SC_HILINK4_CRG_CTRL0_REG
-+#define HNS_MAC_HILINK3V2_REG DSAF_SUB_SC_HILINK3_CRG_CTRL1_REG
-+#define HNS_MAC_HILINK4V2_REG DSAF_SUB_SC_HILINK4_CRG_CTRL1_REG
- #define HNS_MAC_LANE0_CTLEDFE_REG 0x000BFFCCULL
- #define HNS_MAC_LANE1_CTLEDFE_REG 0x000BFFBCULL
- #define HNS_MAC_LANE2_CTLEDFE_REG 0x000BFFACULL
+ 	return ae_handle;
+ vf_id_err:
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+index 6250a42..cb16b50 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+@@ -65,10 +65,14 @@ static void fill_v2_desc(struct hnae_ring *ring, void *priv,
+ 	desc->addr = cpu_to_le64(dma);
+ 	desc->tx.send_size = cpu_to_le16((u16)size);
+ 
+-	/*config bd buffer end */
++	/* config bd buffer end */
+ 	hnae_set_bit(rrcfv, HNSV2_TXD_VLD_B, 1);
+ 	hnae_set_field(bn_pid, HNSV2_TXD_BUFNUM_M, 0, buf_num - 1);
+ 
++	/* fill port_id in the tx bd for sending management pkts */
++	hnae_set_field(bn_pid, HNSV2_TXD_PORTID_M,
++		       HNSV2_TXD_PORTID_S, ring->q->handle->dport_id);
++
+ 	if (type == DESC_TYPE_SKB) {
+ 		skb = (struct sk_buff *)priv;
+ 
 -- 
 1.9.1
