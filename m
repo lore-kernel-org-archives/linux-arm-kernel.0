@@ -1,43 +1,36 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 11 Mar 2016 15:58:19 -0600
-Subject: [PATCH v12] [PATCH] PCI: Xilinx-NWL-PCIe: Adding support for
- Xilinx NWL PCIe Host Controller
-In-Reply-To: <1457281934-32068-1-git-send-email-bharatku@xilinx.com>
-References: <1457281934-32068-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <20160311215819.GB16257@localhost>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 11 Mar 2016 16:59:23 -0500
+Subject: [PATCH V14 5/9] dma: qcom_hidma: implement lower level hardware
+ interface
+In-Reply-To: <56E31CA5.6040106@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
+ <20160311020650.GG11154@localhost> <56E2EC1C.6040107@codeaurora.org>
+ <20160311163221.GC13211@localhost> <56E2F5EA.10207@codeaurora.org>
+ <56E31CA5.6040106@codeaurora.org>
+Message-ID: <56E33FBB.2000401@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bharat,
+Vinod,
 
-I forgot I still have one question here:
+On 3/11/2016 2:29 PM, Sinan Kaya wrote:
+> I have done the renaming. This is all left for me to post a follow up.
 
-On Sun, Mar 06, 2016 at 10:02:14PM +0530, Bharat Kumar Gogada wrote:
-> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+I just posted v15 (forgot to put v15 on 4/4).
 
-> +static bool nwl_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
-> +{
-> +	struct nwl_pcie *pcie = bus->sysdata;
-> +
-> +	/* Check link,before accessing downstream ports */
-> +	if (bus->number != pcie->root_busno) {
-> +		if (!nwl_pcie_link_up(pcie))
-> +			return false;
-> +	}
+http://www.spinics.net/lists/arm-kernel/msg490282.html
 
-This seems racy.  What if we check, and the link is up, but the link
-goes down before we actually complete the config access?
+I wanted to get v15 out before the end of the week with the macro renames. 
+Let me know which lines need corrections.
 
-I'm suggesting that this check for the link being up might be
-superfluous.
+There is also a single line change for the object hierarchy patch. The code 
+was looking up DMA attributes (OF:dma-coherent) from the wrong place.
 
-The hardware should do something reasonable with the config access if
-it can't send it down the link.
+Thanks and have a good weekend,
+Sinan
 
-> +
-> +	/* Only one device down on each root port */
-> +	if (bus->number == pcie->root_busno && devfn > 0)
-> +		return false;
-> +
-> +	return true;
-> +}
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
