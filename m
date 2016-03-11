@@ -1,38 +1,27 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 11 Mar 2016 14:03:02 +0100
-Subject: [PATCH 2/2] [media] exynos4-is: FIMC port parse should fail if
- there's no endpoint
-In-Reply-To: <1457122813-12791-3-git-send-email-javier@osg.samsung.com>
+Date: Fri, 11 Mar 2016 14:09:00 +0100
+Subject: [PATCH 0/2] [media] exynos4-is: Trivial fixes for DT port/endpoint
+ parse logic
+In-Reply-To: <56DD9086.7070903@osg.samsung.com>
 References: <1457122813-12791-1-git-send-email-javier@osg.samsung.com>
- <1457122813-12791-3-git-send-email-javier@osg.samsung.com>
-Message-ID: <56E2C206.6020103@samsung.com>
+ <CAJKOXPfOpqU2fGsNNaB6n_iuq2r-8z3TCSsqkncPbvkK2344Tg@mail.gmail.com>
+ <56DD48C1.8010004@samsung.com> <56DD9086.7070903@osg.samsung.com>
+Message-ID: <56E2C36C.6030709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2016 09:20 PM, Javier Martinez Canillas wrote:
-> The fimc_md_parse_port_node() function return 0 if an endpoint node is
-> not found but according to Documentation/devicetree/bindings/graph.txt,
-> a port must always have at least one enpoint.
+On 03/07/2016 03:30 PM, Javier Martinez Canillas wrote:
+> Thanks, I just noticed another similar issue in the driver now and is
+> that fimc_is_parse_sensor_config() uses the same struct device_node *
+> for looking up the I2C sensor, port and endpoint and thus not doing a
+> of_node_put() for all the nodes on the error path.
 > 
-> So return an -EINVAL errno code to the caller instead, so it knows that
-> the port node parse failed due an invalid Device Tree description.
+> I think the right fix is to have a separate struct device_node * for
+> each so their reference counter can be incremented and decremented.
 
-I don't think it is forbidden to have a port node in device tree
-containing no endpoint nodes. Empty port node means only that,
-for example, a subsystem has a port/bus for connecting external
-devices but nothing is actually connected to it.
-
-In case of Exynos CSIS it might not be so useful to have an empty
-port node specified in some top level *.dtsi file and only
-the endpoints specified in a board specific dts file. Nevertheless,
-I wouldn't be saying in general a port node must always have some
-endpoint node defined.
-
-I could apply this patch as it doesn't do any harm considering
-existing dts files in the kernel tree (arch/arm/boot/dts/
-exynos4412-trats2.dts), but the commit description would need to
-be changed.
+Yes, the node reference count is indeed not handled very well there,
+feel free to submit a patch to fix that bug.
 
 -- 
-Thanks,
+Regards,
 Sylwester
