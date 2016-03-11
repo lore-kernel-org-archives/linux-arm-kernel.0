@@ -1,84 +1,150 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 11 Mar 2016 09:53:10 -0800
-Subject: [PATCH v2 2/3] phy: mdio-octeon: Refactor into two files/modules
+Date: Fri, 11 Mar 2016 09:53:11 -0800
+Subject: [PATCH v2 3/3] phy: mdio-thunder: Add driver for Cavium Thunder SoC
+ MDIO buses.
 In-Reply-To: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1457718791-6505-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1457718791-6505-4-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-A follow-on patch uses PCI probing to find the Thunder MDIO hardware.
-In preparation for this, split out the common code into a new file
-mdio-cavium.c, which will be used by both the existing OCTEON driver,
-and the new Thunder PCI based driver.
+The Cavium Thunder SoCs have multiple MIDO buses that are part of a
+single PCI device.  To model this in the device tree we call the PCI
+parent device a "cavium,thunder-8890-mdio-nexus", it has several
+children, one for each MDIO bus.
 
-As part of the refactoring simplify the struct cavium_mdiobus by
-removing fields that are only ever used in the probe function and can
-just as well be local variables.
-
-Use readq/writeq in preference to readq_relaxed/writeq_relaxed as the
-relaxed form was an optimization for an early chip revision, and the
-MDIO drivers are not performance bottlenecks that need optimization in
-the first place.
+The MDIO bus hardware is identical to that found in the OCTEON SoCs,
+so we use that code for things that are not part of the PCI driver
+probe/remove
 
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/net/phy/Kconfig       |  11 +-
- drivers/net/phy/Makefile      |   1 +
- drivers/net/phy/mdio-cavium.c | 149 ++++++++++++++++++++++
- drivers/net/phy/mdio-cavium.h | 119 ++++++++++++++++++
- drivers/net/phy/mdio-octeon.c | 280 +++---------------------------------------
- 5 files changed, 292 insertions(+), 268 deletions(-)
- create mode 100644 drivers/net/phy/mdio-cavium.c
- create mode 100644 drivers/net/phy/mdio-cavium.h
+ .../devicetree/bindings/net/cavium-mdio.txt        |  61 +++++++-
+ drivers/net/phy/Kconfig                            |  11 ++
+ drivers/net/phy/Makefile                           |   1 +
+ drivers/net/phy/mdio-thunder.c                     | 154 +++++++++++++++++++++
+ 4 files changed, 225 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/net/phy/mdio-thunder.c
 
+diff --git a/Documentation/devicetree/bindings/net/cavium-mdio.txt b/Documentation/devicetree/bindings/net/cavium-mdio.txt
+index 04cb749..020df08 100644
+--- a/Documentation/devicetree/bindings/net/cavium-mdio.txt
++++ b/Documentation/devicetree/bindings/net/cavium-mdio.txt
+@@ -1,9 +1,12 @@
+ * System Management Interface (SMI) / MDIO
+ 
+ Properties:
+-- compatible: "cavium,octeon-3860-mdio"
++- compatible: One of:
+ 
+-  Compatibility with all cn3XXX, cn5XXX and cn6XXX SOCs.
++   "cavium,octeon-3860-mdio": Compatibility with all cn3XXX, cn5XXX
++                       and cn6XXX SOCs.
++
++   "cavium,thunder-8890-mdio": Compatibility with all cn8XXX SOCs.
+ 
+ - reg: The base address of the MDIO bus controller register bank.
+ 
+@@ -25,3 +28,57 @@ Example:
+ 			reg = <0>;
+ 		};
+ 	};
++
++
++* System Management Interface (SMI) / MDIO Nexus
++
++  Several mdio buses may be gathered as children of a single PCI
++  device, this PCI device is the nexus of the buses.
++
++Properties:
++
++- compatible: "cavium,thunder-8890-mdio-nexus";
++
++- reg: The PCI device and function numbers of the nexus device.
++
++- #address-cells: Must be <2>.
++
++- #size-cells: Must be <2>.
++
++- ranges: As needed for mapping of the MDIO bus device registers.
++
++- assigned-addresses: As needed for mapping of the MDIO bus device registers.
++
++Example:
++
++        mdio-nexus at 1,3 {
++                compatible = "cavium,thunder-8890-mdio-nexus";
++                #address-cells = <2>;
++                #size-cells = <2>;
++                reg = <0x0b00 0 0 0 0>; /* DEVFN = 0x0b (1:3) */
++                assigned-addresses = <0x03000000 0x87e0 0x05000000 0x0 0x800000>;
++                ranges = <0x87e0 0x05000000 0x03000000 0x87e0 0x05000000 0x0 0x800000>;
++
++                mdio0 at 87e0,05003800 {
++                        compatible = "cavium,thunder-8890-mdio";
++                        #address-cells = <1>;
++                        #size-cells = <0>;
++                        reg = <0x87e0 0x05003800 0x0 0x30>;
++
++                        ethernet-phy at 0 {
++                                ...
++                                reg = <0>;
++                        };
++                };
++                mdio0 at 87e0,05003880 {
++                        compatible = "cavium,thunder-8890-mdio";
++                        #address-cells = <1>;
++                        #size-cells = <0>;
++                        reg = <0x87e0 0x05003880 0x0 0x30>;
++
++                        ethernet-phy at 0 {
++                                ...
++                                reg = <0>;
++                        };
++                };
++        };
 diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-index f0a7702..40faec9 100644
+index 40faec9..075a4cc 100644
 --- a/drivers/net/phy/Kconfig
 +++ b/drivers/net/phy/Kconfig
-@@ -183,15 +183,18 @@ config MDIO_GPIO
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called mdio-gpio.
+@@ -196,6 +196,17 @@ config MDIO_OCTEON
+ 	  buses. It is required by the Octeon and ThunderX ethernet device
+ 	  drivers on some systems.
  
-+config MDIO_CAVIUM
-+	tristate
-+
- config MDIO_OCTEON
--	tristate "Support for MDIO buses on Octeon and ThunderX SOCs"
-+	tristate "Support for MDIO buses on Octeon and some ThunderX SOCs"
- 	depends on 64BIT
- 	depends on HAS_IOMEM
++config MDIO_THUNDER
++	tristate "Support for MDIO buses on on ThunderX SOCs"
++	depends on 64BIT
++	depends on PCI
 +	select MDIO_CAVIUM
- 	help
--
- 	  This module provides a driver for the Octeon and ThunderX MDIO
--	  busses. It is required by the Octeon and ThunderX ethernet device
--	  drivers.
-+	  buses. It is required by the Octeon and ThunderX ethernet device
-+	  drivers on some systems.
- 
++	help
++	  This driver supports the MDIO interfaces found on Cavium
++	  ThunderX SoCs when the MDIO bus device appears on as a PCI
++	  device.
++
++
  config MDIO_SUN4I
  	tristate "Allwinner sun4i MDIO interface support"
+ 	depends on ARCH_SUNXI
 diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
-index 680e88f9..041b3d9 100644
+index 041b3d9..fcdbb92 100644
 --- a/drivers/net/phy/Makefile
 +++ b/drivers/net/phy/Makefile
 @@ -31,6 +31,7 @@ obj-$(CONFIG_DP83867_PHY)	+= dp83867.o
  obj-$(CONFIG_STE10XP)		+= ste10Xp.o
  obj-$(CONFIG_MICREL_PHY)	+= micrel.o
  obj-$(CONFIG_MDIO_OCTEON)	+= mdio-octeon.o
-+obj-$(CONFIG_MDIO_CAVIUM)	+= mdio-cavium.o
++obj-$(CONFIG_MDIO_THUNDER)	+= mdio-thunder.o
+ obj-$(CONFIG_MDIO_CAVIUM)	+= mdio-cavium.o
  obj-$(CONFIG_MICREL_KS8995MA)	+= spi_ks8995.o
  obj-$(CONFIG_AT803X_PHY)	+= at803x.o
- obj-$(CONFIG_AMD_PHY)		+= amd.o
-diff --git a/drivers/net/phy/mdio-cavium.c b/drivers/net/phy/mdio-cavium.c
+diff --git a/drivers/net/phy/mdio-thunder.c b/drivers/net/phy/mdio-thunder.c
 new file mode 100644
-index 0000000..e796ee1
+index 0000000..5646169
 --- /dev/null
-+++ b/drivers/net/phy/mdio-cavium.c
-@@ -0,0 +1,149 @@
++++ b/drivers/net/phy/mdio-thunder.c
+@@ -0,0 +1,154 @@
 +/*
 + * This file is subject to the terms and conditions of the GNU General Public
 + * License.  See the file "COPYING" in the main directory of this archive
@@ -87,628 +153,151 @@ index 0000000..e796ee1
 + * Copyright (C) 2009-2016 Cavium, Inc.
 + */
 +
-+#include <linux/delay.h>
++#include <linux/of_address.h>
++#include <linux/of_mdio.h>
 +#include <linux/module.h>
++#include <linux/gfp.h>
 +#include <linux/phy.h>
 +#include <linux/io.h>
++#include <linux/acpi.h>
++#include <linux/pci.h>
 +
 +#include "mdio-cavium.h"
 +
-+static void cavium_mdiobus_set_mode(struct cavium_mdiobus *p,
-+				    enum cavium_mdiobus_mode m)
++struct thunder_mdiobus_nexus {
++	void __iomem *bar0;
++	struct cavium_mdiobus *buses[4];
++};
++
++static int thunder_mdiobus_pci_probe(struct pci_dev *pdev,
++				     const struct pci_device_id *ent)
 +{
-+	union cvmx_smix_clk smi_clk;
++	struct device_node *node;
++	struct fwnode_handle *fwn;
++	struct thunder_mdiobus_nexus *nexus;
++	int err;
++	int i;
 +
-+	if (m == p->mode)
-+		return;
++	nexus = devm_kzalloc(&pdev->dev, sizeof(*nexus), GFP_KERNEL);
++	if (!nexus)
++		return -ENOMEM;
 +
-+	smi_clk.u64 = oct_mdio_readq(p->register_base + SMI_CLK);
-+	smi_clk.s.mode = (m == C45) ? 1 : 0;
-+	smi_clk.s.preamble = 1;
-+	oct_mdio_writeq(smi_clk.u64, p->register_base + SMI_CLK);
-+	p->mode = m;
-+}
++	pci_set_drvdata(pdev, nexus);
 +
-+static int cavium_mdiobus_c45_addr(struct cavium_mdiobus *p,
-+				   int phy_id, int regnum)
-+{
-+	union cvmx_smix_cmd smi_cmd;
-+	union cvmx_smix_wr_dat smi_wr;
-+	int timeout = 1000;
-+
-+	cavium_mdiobus_set_mode(p, C45);
-+
-+	smi_wr.u64 = 0;
-+	smi_wr.s.dat = regnum & 0xffff;
-+	oct_mdio_writeq(smi_wr.u64, p->register_base + SMI_WR_DAT);
-+
-+	regnum = (regnum >> 16) & 0x1f;
-+
-+	smi_cmd.u64 = 0;
-+	smi_cmd.s.phy_op = 0; /* MDIO_CLAUSE_45_ADDRESS */
-+	smi_cmd.s.phy_adr = phy_id;
-+	smi_cmd.s.reg_adr = regnum;
-+	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
-+
-+	do {
-+		/* Wait 1000 clocks so we don't saturate the RSL bus
-+		 * doing reads.
-+		 */
-+		__delay(1000);
-+		smi_wr.u64 = oct_mdio_readq(p->register_base + SMI_WR_DAT);
-+	} while (smi_wr.s.pending && --timeout);
-+
-+	if (timeout <= 0)
-+		return -EIO;
-+	return 0;
-+}
-+
-+int cavium_mdiobus_read(struct mii_bus *bus, int phy_id, int regnum)
-+{
-+	struct cavium_mdiobus *p = bus->priv;
-+	union cvmx_smix_cmd smi_cmd;
-+	union cvmx_smix_rd_dat smi_rd;
-+	unsigned int op = 1; /* MDIO_CLAUSE_22_READ */
-+	int timeout = 1000;
-+
-+	if (regnum & MII_ADDR_C45) {
-+		int r = cavium_mdiobus_c45_addr(p, phy_id, regnum);
-+
-+		if (r < 0)
-+			return r;
-+
-+		regnum = (regnum >> 16) & 0x1f;
-+		op = 3; /* MDIO_CLAUSE_45_READ */
-+	} else {
-+		cavium_mdiobus_set_mode(p, C22);
++	err = pcim_enable_device(pdev);
++	if (err) {
++		dev_err(&pdev->dev, "Failed to enable PCI device\n");
++		pci_set_drvdata(pdev, NULL);
++		return err;
 +	}
 +
-+	smi_cmd.u64 = 0;
-+	smi_cmd.s.phy_op = op;
-+	smi_cmd.s.phy_adr = phy_id;
-+	smi_cmd.s.reg_adr = regnum;
-+	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
-+
-+	do {
-+		/* Wait 1000 clocks so we don't saturate the RSL bus
-+		 * doing reads.
-+		 */
-+		__delay(1000);
-+		smi_rd.u64 = oct_mdio_readq(p->register_base + SMI_RD_DAT);
-+	} while (smi_rd.s.pending && --timeout);
-+
-+	if (smi_rd.s.val)
-+		return smi_rd.s.dat;
-+	else
-+		return -EIO;
-+}
-+EXPORT_SYMBOL(cavium_mdiobus_read);
-+
-+int cavium_mdiobus_write(struct mii_bus *bus, int phy_id, int regnum, u16 val)
-+{
-+	struct cavium_mdiobus *p = bus->priv;
-+	union cvmx_smix_cmd smi_cmd;
-+	union cvmx_smix_wr_dat smi_wr;
-+	unsigned int op = 0; /* MDIO_CLAUSE_22_WRITE */
-+	int timeout = 1000;
-+
-+	if (regnum & MII_ADDR_C45) {
-+		int r = cavium_mdiobus_c45_addr(p, phy_id, regnum);
-+
-+		if (r < 0)
-+			return r;
-+
-+		regnum = (regnum >> 16) & 0x1f;
-+		op = 1; /* MDIO_CLAUSE_45_WRITE */
-+	} else {
-+		cavium_mdiobus_set_mode(p, C22);
++	err = pci_request_regions(pdev, KBUILD_MODNAME);
++	if (err) {
++		dev_err(&pdev->dev, "pci_request_regions failed\n");
++		goto err_disable_device;
 +	}
 +
-+	smi_wr.u64 = 0;
-+	smi_wr.s.dat = val;
-+	oct_mdio_writeq(smi_wr.u64, p->register_base + SMI_WR_DAT);
++	nexus->bar0 = pcim_iomap(pdev, 0, pci_resource_len(pdev, 0));
++	if (!nexus->bar0) {
++		err = -ENOMEM;
++		goto err_release_regions;
++	}
 +
-+	smi_cmd.u64 = 0;
-+	smi_cmd.s.phy_op = op;
-+	smi_cmd.s.phy_adr = phy_id;
-+	smi_cmd.s.reg_adr = regnum;
-+	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
++	i = 0;
++	device_for_each_child_node(&pdev->dev, fwn) {
++		struct resource r;
++		struct mii_bus *mii_bus;
++		struct cavium_mdiobus *bus;
++		union cvmx_smix_en smi_en;
 +
-+	do {
-+		/* Wait 1000 clocks so we don't saturate the RSL bus
-+		 * doing reads.
++		/* If it is not an OF node we cannot handle it yet, so
++		 * exit the loop.
 +		 */
-+		__delay(1000);
-+		smi_wr.u64 = oct_mdio_readq(p->register_base + SMI_WR_DAT);
-+	} while (smi_wr.s.pending && --timeout);
++		node = to_of_node(fwn);
++		if (!node)
++			break;
 +
-+	if (timeout <= 0)
-+		return -EIO;
++		err = of_address_to_resource(node, 0, &r);
++		if (err) {
++			dev_err(&pdev->dev,
++				"Couldn't translate address for \"%s\"\n",
++				node->name);
++			break;
++		}
 +
++		mii_bus = devm_mdiobus_alloc_size(&pdev->dev, sizeof(*bus));
++		if (!mii_bus)
++			break;
++		bus = mii_bus->priv;
++		bus->mii_bus = mii_bus;
++
++		nexus->buses[i] = bus;
++		i++;
++
++		bus->register_base = (u64)nexus->bar0 +
++			r.start - pci_resource_start(pdev, 0);
++
++		smi_en.u64 = 0;
++		smi_en.s.en = 1;
++		oct_mdio_writeq(smi_en.u64, bus->register_base + SMI_EN);
++		bus->mii_bus->name = KBUILD_MODNAME;
++		snprintf(bus->mii_bus->id, MII_BUS_ID_SIZE, "%llx", r.start);
++		bus->mii_bus->parent = &pdev->dev;
++		bus->mii_bus->read = cavium_mdiobus_read;
++		bus->mii_bus->write = cavium_mdiobus_write;
++
++		err = of_mdiobus_register(bus->mii_bus, node);
++		if (err)
++			dev_err(&pdev->dev, "of_mdiobus_register failed\n");
++
++		dev_info(&pdev->dev, "Added bus at %llx\n", r.start);
++		if (i >= ARRAY_SIZE(nexus->buses))
++			break;
++	}
 +	return 0;
++
++err_release_regions:
++	pci_release_regions(pdev);
++
++err_disable_device:
++	pci_set_drvdata(pdev, NULL);
++	return err;
 +}
-+EXPORT_SYMBOL(cavium_mdiobus_write);
-diff --git a/drivers/net/phy/mdio-cavium.h b/drivers/net/phy/mdio-cavium.h
-new file mode 100644
-index 0000000..4bccd45
---- /dev/null
-+++ b/drivers/net/phy/mdio-cavium.h
-@@ -0,0 +1,119 @@
-+/*
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ *
-+ * Copyright (C) 2009-2016 Cavium, Inc.
-+ */
 +
-+enum cavium_mdiobus_mode {
-+	UNINIT = 0,
-+	C22,
-+	C45
-+};
-+
-+#define SMI_CMD		0x0
-+#define SMI_WR_DAT	0x8
-+#define SMI_RD_DAT	0x10
-+#define SMI_CLK		0x18
-+#define SMI_EN		0x20
-+
-+#ifdef __BIG_ENDIAN_BITFIELD
-+#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
-+	field;					\
-+	more
-+
-+#else
-+#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
-+	more					\
-+	field;
-+
-+#endif
-+
-+union cvmx_smix_clk {
-+	u64 u64;
-+	struct cvmx_smix_clk_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_25_63:39,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 mode:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_21_23:3,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 sample_hi:5,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 sample_mode:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_14_14:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 clk_idle:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 preamble:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 sample:4,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 phase:8,
-+	  ;))))))))))
-+	} s;
-+};
-+
-+union cvmx_smix_cmd {
-+	u64 u64;
-+	struct cvmx_smix_cmd_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 phy_op:2,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_13_15:3,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 phy_adr:5,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_5_7:3,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reg_adr:5,
-+	  ;))))))
-+	} s;
-+};
-+
-+union cvmx_smix_en {
-+	u64 u64;
-+	struct cvmx_smix_en_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_1_63:63,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 en:1,
-+	  ;))
-+	} s;
-+};
-+
-+union cvmx_smix_rd_dat {
-+	u64 u64;
-+	struct cvmx_smix_rd_dat_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 pending:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 val:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 dat:16,
-+	  ;))))
-+	} s;
-+};
-+
-+union cvmx_smix_wr_dat {
-+	u64 u64;
-+	struct cvmx_smix_wr_dat_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 pending:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 val:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 dat:16,
-+	  ;))))
-+	} s;
-+};
-+
-+struct cavium_mdiobus {
-+	struct mii_bus *mii_bus;
-+	u64 register_base;
-+	enum cavium_mdiobus_mode mode;
-+};
-+
-+#ifdef CONFIG_CAVIUM_OCTEON_SOC
-+
-+#include <asm/octeon/octeon.h>
-+
-+static inline void oct_mdio_writeq(u64 val, u64 addr)
++static void thunder_mdiobus_pci_remove(struct pci_dev *pdev)
 +{
-+	cvmx_write_csr(addr, val);
++	int i;
++	struct thunder_mdiobus_nexus *nexus = pci_get_drvdata(pdev);
++
++	for (i = 0; i < ARRAY_SIZE(nexus->buses); i++) {
++		struct cavium_mdiobus *bus = nexus->buses[i];
++
++		if (!bus)
++			continue;
++
++		mdiobus_unregister(bus->mii_bus);
++		mdiobus_free(bus->mii_bus);
++		oct_mdio_writeq(0, bus->register_base + SMI_EN);
++	}
++	pci_set_drvdata(pdev, NULL);
 +}
 +
-+static inline u64 oct_mdio_readq(u64 addr)
-+{
-+	return cvmx_read_csr(addr);
-+}
-+#else
-+#define oct_mdio_writeq(val, addr)	writeq(val, (void *)addr)
-+#define oct_mdio_readq(addr)		readq((void *)addr)
-+#endif
++static const struct pci_device_id thunder_mdiobus_id_table[] = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xa02b) },
++	{ 0, } /* End of table. */
++};
++MODULE_DEVICE_TABLE(pci, thunder_mdiobus_id_table);
 +
-+int cavium_mdiobus_read(struct mii_bus *bus, int phy_id, int regnum);
-+int cavium_mdiobus_write(struct mii_bus *bus, int phy_id, int regnum, u16 val);
-diff --git a/drivers/net/phy/mdio-octeon.c b/drivers/net/phy/mdio-octeon.c
-index 47d4f2f..ab6914f 100644
---- a/drivers/net/phy/mdio-octeon.c
-+++ b/drivers/net/phy/mdio-octeon.c
-@@ -3,272 +3,26 @@
-  * License.  See the file "COPYING" in the main directory of this archive
-  * for more details.
-  *
-- * Copyright (C) 2009-2012 Cavium, Inc.
-+ * Copyright (C) 2009-2015 Cavium, Inc.
-  */
- 
- #include <linux/platform_device.h>
- #include <linux/of_address.h>
- #include <linux/of_mdio.h>
--#include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/gfp.h>
- #include <linux/phy.h>
- #include <linux/io.h>
- 
--#ifdef CONFIG_CAVIUM_OCTEON_SOC
--#include <asm/octeon/octeon.h>
--#endif
--
--#define DRV_VERSION "1.1"
--#define DRV_DESCRIPTION "Cavium Networks Octeon/ThunderX SMI/MDIO driver"
--
--#define SMI_CMD		0x0
--#define SMI_WR_DAT	0x8
--#define SMI_RD_DAT	0x10
--#define SMI_CLK		0x18
--#define SMI_EN		0x20
--
--#ifdef __BIG_ENDIAN_BITFIELD
--#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
--	field;					\
--	more
--
--#else
--#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
--	more					\
--	field;
--
--#endif
--
--union cvmx_smix_clk {
--	u64 u64;
--	struct cvmx_smix_clk_s {
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_25_63:39,
--	  OCT_MDIO_BITFIELD_FIELD(u64 mode:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_21_23:3,
--	  OCT_MDIO_BITFIELD_FIELD(u64 sample_hi:5,
--	  OCT_MDIO_BITFIELD_FIELD(u64 sample_mode:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_14_14:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 clk_idle:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 preamble:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 sample:4,
--	  OCT_MDIO_BITFIELD_FIELD(u64 phase:8,
--	  ;))))))))))
--	} s;
--};
--
--union cvmx_smix_cmd {
--	u64 u64;
--	struct cvmx_smix_cmd_s {
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
--	  OCT_MDIO_BITFIELD_FIELD(u64 phy_op:2,
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_13_15:3,
--	  OCT_MDIO_BITFIELD_FIELD(u64 phy_adr:5,
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_5_7:3,
--	  OCT_MDIO_BITFIELD_FIELD(u64 reg_adr:5,
--	  ;))))))
--	} s;
--};
--
--union cvmx_smix_en {
--	u64 u64;
--	struct cvmx_smix_en_s {
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_1_63:63,
--	  OCT_MDIO_BITFIELD_FIELD(u64 en:1,
--	  ;))
--	} s;
--};
--
--union cvmx_smix_rd_dat {
--	u64 u64;
--	struct cvmx_smix_rd_dat_s {
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
--	  OCT_MDIO_BITFIELD_FIELD(u64 pending:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 val:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 dat:16,
--	  ;))))
--	} s;
--};
--
--union cvmx_smix_wr_dat {
--	u64 u64;
--	struct cvmx_smix_wr_dat_s {
--	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
--	  OCT_MDIO_BITFIELD_FIELD(u64 pending:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 val:1,
--	  OCT_MDIO_BITFIELD_FIELD(u64 dat:16,
--	  ;))))
--	} s;
--};
--
--enum octeon_mdiobus_mode {
--	UNINIT = 0,
--	C22,
--	C45
--};
--
--struct octeon_mdiobus {
--	struct mii_bus *mii_bus;
--	u64 register_base;
--	resource_size_t mdio_phys;
--	resource_size_t regsize;
--	enum octeon_mdiobus_mode mode;
--};
--
--#ifdef CONFIG_CAVIUM_OCTEON_SOC
--static void oct_mdio_writeq(u64 val, u64 addr)
--{
--	cvmx_write_csr(addr, val);
--}
--
--static u64 oct_mdio_readq(u64 addr)
--{
--	return cvmx_read_csr(addr);
--}
--#else
--#define oct_mdio_writeq(val, addr)	writeq_relaxed(val, (void *)addr)
--#define oct_mdio_readq(addr)		readq_relaxed((void *)addr)
--#endif
--
--static void octeon_mdiobus_set_mode(struct octeon_mdiobus *p,
--				    enum octeon_mdiobus_mode m)
--{
--	union cvmx_smix_clk smi_clk;
--
--	if (m == p->mode)
--		return;
--
--	smi_clk.u64 = oct_mdio_readq(p->register_base + SMI_CLK);
--	smi_clk.s.mode = (m == C45) ? 1 : 0;
--	smi_clk.s.preamble = 1;
--	oct_mdio_writeq(smi_clk.u64, p->register_base + SMI_CLK);
--	p->mode = m;
--}
--
--static int octeon_mdiobus_c45_addr(struct octeon_mdiobus *p,
--				   int phy_id, int regnum)
--{
--	union cvmx_smix_cmd smi_cmd;
--	union cvmx_smix_wr_dat smi_wr;
--	int timeout = 1000;
--
--	octeon_mdiobus_set_mode(p, C45);
--
--	smi_wr.u64 = 0;
--	smi_wr.s.dat = regnum & 0xffff;
--	oct_mdio_writeq(smi_wr.u64, p->register_base + SMI_WR_DAT);
--
--	regnum = (regnum >> 16) & 0x1f;
--
--	smi_cmd.u64 = 0;
--	smi_cmd.s.phy_op = 0; /* MDIO_CLAUSE_45_ADDRESS */
--	smi_cmd.s.phy_adr = phy_id;
--	smi_cmd.s.reg_adr = regnum;
--	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
--
--	do {
--		/* Wait 1000 clocks so we don't saturate the RSL bus
--		 * doing reads.
--		 */
--		__delay(1000);
--		smi_wr.u64 = oct_mdio_readq(p->register_base + SMI_WR_DAT);
--	} while (smi_wr.s.pending && --timeout);
--
--	if (timeout <= 0)
--		return -EIO;
--	return 0;
--}
--
--static int octeon_mdiobus_read(struct mii_bus *bus, int phy_id, int regnum)
--{
--	struct octeon_mdiobus *p = bus->priv;
--	union cvmx_smix_cmd smi_cmd;
--	union cvmx_smix_rd_dat smi_rd;
--	unsigned int op = 1; /* MDIO_CLAUSE_22_READ */
--	int timeout = 1000;
--
--	if (regnum & MII_ADDR_C45) {
--		int r = octeon_mdiobus_c45_addr(p, phy_id, regnum);
--		if (r < 0)
--			return r;
--
--		regnum = (regnum >> 16) & 0x1f;
--		op = 3; /* MDIO_CLAUSE_45_READ */
--	} else {
--		octeon_mdiobus_set_mode(p, C22);
--	}
--
--
--	smi_cmd.u64 = 0;
--	smi_cmd.s.phy_op = op;
--	smi_cmd.s.phy_adr = phy_id;
--	smi_cmd.s.reg_adr = regnum;
--	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
--
--	do {
--		/* Wait 1000 clocks so we don't saturate the RSL bus
--		 * doing reads.
--		 */
--		__delay(1000);
--		smi_rd.u64 = oct_mdio_readq(p->register_base + SMI_RD_DAT);
--	} while (smi_rd.s.pending && --timeout);
--
--	if (smi_rd.s.val)
--		return smi_rd.s.dat;
--	else
--		return -EIO;
--}
--
--static int octeon_mdiobus_write(struct mii_bus *bus, int phy_id,
--				int regnum, u16 val)
--{
--	struct octeon_mdiobus *p = bus->priv;
--	union cvmx_smix_cmd smi_cmd;
--	union cvmx_smix_wr_dat smi_wr;
--	unsigned int op = 0; /* MDIO_CLAUSE_22_WRITE */
--	int timeout = 1000;
--
--
--	if (regnum & MII_ADDR_C45) {
--		int r = octeon_mdiobus_c45_addr(p, phy_id, regnum);
--		if (r < 0)
--			return r;
--
--		regnum = (regnum >> 16) & 0x1f;
--		op = 1; /* MDIO_CLAUSE_45_WRITE */
--	} else {
--		octeon_mdiobus_set_mode(p, C22);
--	}
--
--	smi_wr.u64 = 0;
--	smi_wr.s.dat = val;
--	oct_mdio_writeq(smi_wr.u64, p->register_base + SMI_WR_DAT);
--
--	smi_cmd.u64 = 0;
--	smi_cmd.s.phy_op = op;
--	smi_cmd.s.phy_adr = phy_id;
--	smi_cmd.s.reg_adr = regnum;
--	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
--
--	do {
--		/* Wait 1000 clocks so we don't saturate the RSL bus
--		 * doing reads.
--		 */
--		__delay(1000);
--		smi_wr.u64 = oct_mdio_readq(p->register_base + SMI_WR_DAT);
--	} while (smi_wr.s.pending && --timeout);
--
--	if (timeout <= 0)
--		return -EIO;
--
--	return 0;
--}
-+#include "mdio-cavium.h"
- 
- static int octeon_mdiobus_probe(struct platform_device *pdev)
- {
--	struct octeon_mdiobus *bus;
-+	struct cavium_mdiobus *bus;
- 	struct mii_bus *mii_bus;
- 	struct resource *res_mem;
-+	resource_size_t mdio_phys;
-+	resource_size_t regsize;
- 	union cvmx_smix_en smi_en;
- 	int err = -ENOENT;
- 
-@@ -284,17 +38,17 @@ static int octeon_mdiobus_probe(struct platform_device *pdev)
- 
- 	bus = mii_bus->priv;
- 	bus->mii_bus = mii_bus;
--	bus->mdio_phys = res_mem->start;
--	bus->regsize = resource_size(res_mem);
-+	mdio_phys = res_mem->start;
-+	regsize = resource_size(res_mem);
- 
--	if (!devm_request_mem_region(&pdev->dev, bus->mdio_phys, bus->regsize,
-+	if (!devm_request_mem_region(&pdev->dev, mdio_phys, regsize,
- 				     res_mem->name)) {
- 		dev_err(&pdev->dev, "request_mem_region failed\n");
- 		return -ENXIO;
- 	}
- 
- 	bus->register_base =
--		(u64)devm_ioremap(&pdev->dev, bus->mdio_phys, bus->regsize);
-+		(u64)devm_ioremap(&pdev->dev, mdio_phys, regsize);
- 	if (!bus->register_base) {
- 		dev_err(&pdev->dev, "dev_ioremap failed\n");
- 		return -ENOMEM;
-@@ -304,13 +58,12 @@ static int octeon_mdiobus_probe(struct platform_device *pdev)
- 	smi_en.s.en = 1;
- 	oct_mdio_writeq(smi_en.u64, bus->register_base + SMI_EN);
- 
--	bus->mii_bus->priv = bus;
--	bus->mii_bus->name = "mdio-octeon";
-+	bus->mii_bus->name = KBUILD_MODNAME;
- 	snprintf(bus->mii_bus->id, MII_BUS_ID_SIZE, "%llx", bus->register_base);
- 	bus->mii_bus->parent = &pdev->dev;
- 
--	bus->mii_bus->read = octeon_mdiobus_read;
--	bus->mii_bus->write = octeon_mdiobus_write;
-+	bus->mii_bus->read = cavium_mdiobus_read;
-+	bus->mii_bus->write = cavium_mdiobus_write;
- 
- 	platform_set_drvdata(pdev, bus);
- 
-@@ -318,7 +71,7 @@ static int octeon_mdiobus_probe(struct platform_device *pdev)
- 	if (err)
- 		goto fail_register;
- 
--	dev_info(&pdev->dev, "Version " DRV_VERSION "\n");
-+	dev_info(&pdev->dev, "Probed\n");
- 
- 	return 0;
- fail_register:
-@@ -330,7 +83,7 @@ fail_register:
- 
- static int octeon_mdiobus_remove(struct platform_device *pdev)
- {
--	struct octeon_mdiobus *bus;
-+	struct cavium_mdiobus *bus;
- 	union cvmx_smix_en smi_en;
- 
- 	bus = platform_get_drvdata(pdev);
-@@ -352,7 +105,7 @@ MODULE_DEVICE_TABLE(of, octeon_mdiobus_match);
- 
- static struct platform_driver octeon_mdiobus_driver = {
- 	.driver = {
--		.name		= "mdio-octeon",
-+		.name		= KBUILD_MODNAME,
- 		.of_match_table = octeon_mdiobus_match,
- 	},
- 	.probe		= octeon_mdiobus_probe,
-@@ -367,7 +120,6 @@ EXPORT_SYMBOL(octeon_mdiobus_force_mod_depencency);
- 
- module_platform_driver(octeon_mdiobus_driver);
- 
--MODULE_DESCRIPTION(DRV_DESCRIPTION);
--MODULE_VERSION(DRV_VERSION);
-+MODULE_DESCRIPTION("Cavium OCTEON MDIO bus driver");
- MODULE_AUTHOR("David Daney");
- MODULE_LICENSE("GPL");
++static struct pci_driver thunder_mdiobus_driver = {
++	.name = KBUILD_MODNAME,
++	.id_table = thunder_mdiobus_id_table,
++	.probe = thunder_mdiobus_pci_probe,
++	.remove = thunder_mdiobus_pci_remove,
++};
++
++module_pci_driver(thunder_mdiobus_driver);
++
++MODULE_DESCRIPTION("Cavium ThunderX MDIO bus driver");
++MODULE_LICENSE("GPL");
 -- 
 1.7.11.7
