@@ -1,39 +1,29 @@
-From: khalasa@piap.pl (Krzysztof Halasa)
-Date: Fri, 11 Mar 2016 12:32:14 +0100
-Subject: [PATCH] CNS3xxx: Fix PCI cns3xxx_write_config()
-Message-ID: <m360wtjlmp.fsf@t19.piap.pl>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 11 Mar 2016 12:19:29 +0100
+Subject: [PATCH v2 0/5] dmaengine: sun6i: Fixes and upgrade for audio transfers
+Message-ID: <cover.1457695169.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "where" offset was added twice, fix it.
+This patch series contains the required fixes and changes to the sun6i
+DMA driver for audio streaming.
+These ones have been tested in a Allwinner H3 (Orange PI 2).
 
-Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-Fixes: 498a92d42596 ("ARM: cns3xxx: pci: avoid potential stack overflow")
+Changes since v1 (comments from Vinod Koul and Sergei Shtylyov - thanks)
+- typo fixes
+- change some comments
+- better handling of burst and bus width
+- remove useless code in the cyclic capability patch
 
-diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
-index 47905a5..318394e 100644
---- a/arch/arm/mach-cns3xxx/pcie.c
-+++ b/arch/arm/mach-cns3xxx/pcie.c
-@@ -220,13 +220,13 @@ static void cns3xxx_write_config(struct cns3xxx_pcie *cnspci,
- 	u32 mask = (0x1ull << (size * 8)) - 1;
- 	int shift = (where % 4) * 8;
- 
--	v = readl_relaxed(base + (where & 0xffc));
-+	v = readl_relaxed(base);
- 
- 	v &= ~(mask << shift);
- 	v |= (val & mask) << shift;
- 
--	writel_relaxed(v, base + (where & 0xffc));
--	readl_relaxed(base + (where & 0xffc));
-+	writel_relaxed(v, base);
-+	readl_relaxed(base);
- }
- 
- static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+Jean-Francois Moine (5):
+  dmaengine: sun6i: Fix the access of the IRQ register
+  dmaengine: sun6i: Fix impossible settings of burst and bus width
+  dmaengine: sun6i: Add 4 as a possible burst value
+  dmaengine: sun6i: Set system values to memory burst and bus width
+  dmaengine: sun6i: Add cyclic capability
+
+ drivers/dma/sun6i-dma.c | 160 +++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 146 insertions(+), 14 deletions(-)
 
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+2.7.3
