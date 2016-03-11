@@ -1,123 +1,116 @@
-From: yankejian@huawei.com (Kejian Yan)
-Date: Fri, 11 Mar 2016 11:25:46 +0800
-Subject: [PATCH v3 net-next 1/2] net: hns: fix return value of the function
- about rss
-In-Reply-To: <1457666747-244953-1-git-send-email-yankejian@huawei.com>
-References: <1457666747-244953-1-git-send-email-yankejian@huawei.com>
-Message-ID: <1457666747-244953-2-git-send-email-yankejian@huawei.com>
+From: Okaya@codeaurora.org (Okaya at codeaurora.org)
+Date: Fri, 11 Mar 2016 03:08:29 -0000
+Subject: [PATCH V14 5/9] dma: qcom_hidma: implement lower level hardware
+ interface
+In-Reply-To: <20160311020650.GG11154@localhost>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
+ <20160311020650.GG11154@localhost>
+Message-ID: <ed5ddb6d334bdc5b4ac1ec8315eb9aea.squirrel@us.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both .get_rxfh and .get_rxfh are always return 0, it should return result
-from hardware when getting or setting rss. And the rss function should
-return the correct data type.
+> On Thu, Feb 04, 2016 at 11:34:36PM -0500, Sinan Kaya wrote:
+>
+>> +
+>> +#define EVRE_SIZE			16	/* each EVRE is 16 bytes */
+>> +
+>> +#define TRCA_CTRLSTS_OFFSET		0x000
+>> +#define TRCA_RING_LOW_OFFSET		0x008
+>> +#define TRCA_RING_HIGH_OFFSET		0x00C
+>> +#define TRCA_RING_LEN_OFFSET		0x010
+>> +#define TRCA_READ_PTR_OFFSET		0x018
+>> +#define TRCA_WRITE_PTR_OFFSET		0x020
+>> +#define TRCA_DOORBELL_OFFSET		0x400
+>> +
+>> +#define EVCA_CTRLSTS_OFFSET		0x000
+>> +#define EVCA_INTCTRL_OFFSET		0x004
+>> +#define EVCA_RING_LOW_OFFSET		0x008
+>> +#define EVCA_RING_HIGH_OFFSET		0x00C
+>> +#define EVCA_RING_LEN_OFFSET		0x010
+>> +#define EVCA_READ_PTR_OFFSET		0x018
+>> +#define EVCA_WRITE_PTR_OFFSET		0x020
+>> +#define EVCA_DOORBELL_OFFSET		0x400
+>> +
+>> +#define EVCA_IRQ_STAT_OFFSET		0x100
+>> +#define EVCA_IRQ_CLR_OFFSET		0x108
+>> +#define EVCA_IRQ_EN_OFFSET		0x110
+>> +
+>> +#define EVRE_CFG_IDX			0
+>> +#define EVRE_LEN_IDX			1
+>> +#define EVRE_DEST_LOW_IDX		2
+>> +#define EVRE_DEST_HI_IDX		3
+>> +
+>> +#define EVRE_ERRINFO_BIT_POS		24
+>> +#define EVRE_CODE_BIT_POS		28
+>> +
+>> +#define EVRE_ERRINFO_MASK		GENMASK(3, 0)
+>> +#define EVRE_CODE_MASK			GENMASK(3, 0)
+>
+> These are rest here are not namespace properly...
+>
+>> +static int hidma_ll_enable(struct hidma_lldev *lldev)
+>> +{
+>> +	u32 val;
+>> +	int ret;
+>> +
+>> +	val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
+>> +	val &= ~(CH_CONTROL_MASK << 16);
+>> +	val |= CH_ENABLE << 16;
+>> +	writel(val, lldev->evca + EVCA_CTRLSTS_OFFSET);
+>> +
+>> +	ret = readl_poll_timeout(lldev->evca + EVCA_CTRLSTS_OFFSET, val,
+>> +				 (HIDMA_CH_STATE(val) == CH_ENABLED) ||
+>> +				 (HIDMA_CH_STATE(val) == CH_RUNNING), 1000,
+>> +				 10000);
+>> +	if (ret) {
+>> +		dev_err(lldev->dev, "event channel did not get enabled\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
+>> +	val &= ~(CH_CONTROL_MASK << 16);
+>> +	val |= CH_ENABLE << 16;
+>> +	writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
+>> +
+>> +	ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
+>> +				 (HIDMA_CH_STATE(val) == CH_ENABLED) ||
+>> +				 (HIDMA_CH_STATE(val) == CH_RUNNING), 1000,
+>> +				 10000);
+>
+> first arg for readl_poll_timeout is accessor fn to do read, which doesnt
+> seem to be here... so what did i miss?
+>
 
-Signed-off-by: Kejian Yan <yankejian@huawei.com>
----
-change log:
-PATCH v3:
- - This patch removes unused variable 'ret' to fix the build warning
+First argument is the address to read.
 
-PATCH v2:
- - This patch fixes the comments provided by Andy Shevchenko <Andy Shevchenko>
+#define readl_poll_timeout(addr, val, cond, delay_us, timeout_us) \
+         readx_poll_timeout(readl, addr, val, cond, delay_us, timeout_us)
 
- Link: https://lkml.org/lkml/2016/3/10/266
 
-PATCH v1:
- - first submit
-
- Link: https://lkml.org/lkml/2016/3/9/978
----
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c |  2 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |  2 +-
- drivers/net/ethernet/hisilicon/hns/hns_ethtool.c  | 14 ++++----------
- 3 files changed, 6 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-index d4f92ed..d07db1f 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
-@@ -799,7 +799,7 @@ static int hns_ae_set_rss(struct hnae_handle *handle, const u32 *indir,
- 
- 	/* set the RSS Hash Key if specififed by the user */
- 	if (key)
--		hns_ppe_set_rss_key(ppe_cb, (int *)key);
-+		hns_ppe_set_rss_key(ppe_cb, (u32 *)key);
- 
- 	/* update the shadow RSS table with user specified qids */
- 	memcpy(ppe_cb->rss_indir_table, indir, HNS_PPEV2_RSS_IND_TBL_SIZE);
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-index f302ef9..811ef35 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-@@ -27,7 +27,7 @@ void hns_ppe_set_tso_enable(struct hns_ppe_cb *ppe_cb, u32 value)
- void hns_ppe_set_rss_key(struct hns_ppe_cb *ppe_cb,
- 			 const u32 rss_key[HNS_PPEV2_RSS_KEY_NUM])
- {
--	int key_item = 0;
-+	u32 key_item = 0;
- 
- 	for (key_item = 0; key_item < HNS_PPEV2_RSS_KEY_NUM; key_item++)
- 		dsaf_write_dev(ppe_cb, PPEV2_RSS_KEY_REG + key_item * 0x4,
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c b/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
-index 3c4a3bc..01b65eb 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_ethtool.c
-@@ -1178,7 +1178,7 @@ hns_get_rss_key_size(struct net_device *netdev)
- 	if (AE_IS_VER1(priv->enet_ver)) {
- 		netdev_err(netdev,
- 			   "RSS feature is not supported on this hardware\n");
--		return -EOPNOTSUPP;
-+		return (u32)-EOPNOTSUPP;
- 	}
- 
- 	ops = priv->ae_handle->dev->ops;
-@@ -1197,7 +1197,7 @@ hns_get_rss_indir_size(struct net_device *netdev)
- 	if (AE_IS_VER1(priv->enet_ver)) {
- 		netdev_err(netdev,
- 			   "RSS feature is not supported on this hardware\n");
--		return -EOPNOTSUPP;
-+		return (u32)-EOPNOTSUPP;
- 	}
- 
- 	ops = priv->ae_handle->dev->ops;
-@@ -1211,7 +1211,6 @@ hns_get_rss(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
- {
- 	struct hns_nic_priv *priv = netdev_priv(netdev);
- 	struct hnae_ae_ops *ops;
--	int ret;
- 
- 	if (AE_IS_VER1(priv->enet_ver)) {
- 		netdev_err(netdev,
-@@ -1224,9 +1223,7 @@ hns_get_rss(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
- 	if (!indir)
- 		return 0;
- 
--	ret = ops->get_rss(priv->ae_handle, indir, key, hfunc);
--
--	return 0;
-+	return ops->get_rss(priv->ae_handle, indir, key, hfunc);
- }
- 
- static int
-@@ -1235,7 +1232,6 @@ hns_set_rss(struct net_device *netdev, const u32 *indir, const u8 *key,
- {
- 	struct hns_nic_priv *priv = netdev_priv(netdev);
- 	struct hnae_ae_ops *ops;
--	int ret;
- 
- 	if (AE_IS_VER1(priv->enet_ver)) {
- 		netdev_err(netdev,
-@@ -1252,9 +1248,7 @@ hns_set_rss(struct net_device *netdev, const u32 *indir, const u8 *key,
- 	if (!indir)
- 		return 0;
- 
--	ret = ops->set_rss(priv->ae_handle, indir, key, hfunc);
--
--	return 0;
-+	return ops->set_rss(priv->ae_handle, indir, key, hfunc);
- }
- 
- static struct ethtool_ops hns_ethtool_ops = {
--- 
-1.9.1
+>
+>> +void hidma_ll_queue_request(struct hidma_lldev *lldev, u32 tre_ch)
+>> +{
+>> +	struct hidma_tre *tre;
+>> +	unsigned long flags;
+>> +
+>> +	tre = &lldev->trepool[tre_ch];
+>> +
+>> +	/* copy the TRE into its location in the TRE ring */
+>> +	spin_lock_irqsave(&lldev->lock, flags);
+>> +	tre->tre_index = lldev->tre_write_offset / TRE_SIZE;
+>> +	lldev->pending_tre_list[tre->tre_index] = tre;
+>> +	memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+>> +	       TRE_SIZE);
+>> +	lldev->tx_status_list[tre->idx].err_code = 0;
+>> +	lldev->tx_status_list[tre->idx].err_info = 0;
+>> +	tre->queued = 1;
+>> +	lldev->pending_tre_count++;
+>> +	lldev->tre_write_offset = (lldev->tre_write_offset + TRE_SIZE)
+>> +	    % lldev->tre_ring_size;
+>
+> These and above one should be right justfied per coding style
+>
+> --
+> ~Vinod
+>
