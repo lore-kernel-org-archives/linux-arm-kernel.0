@@ -1,39 +1,34 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 11 Mar 2016 12:51:55 +0900
-Subject: [PATCH 2/5] dt-bindings: gk20a: Document iommus property
+Date: Fri, 11 Mar 2016 12:51:57 +0900
+Subject: [PATCH 4/5] arm64: tegra210: Add pllg_ref clock to GM20B
 In-Reply-To: <1457668318-2821-1-git-send-email-acourbot@nvidia.com>
 References: <1457668318-2821-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1457668318-2821-3-git-send-email-acourbot@nvidia.com>
+Message-ID: <1457668318-2821-5-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GK20A can optionally make use of an IOMMU.
+This clock is required for the GPU to operate.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-index 914f0ff4020e..1e3748337319 100644
---- a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-+++ b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-@@ -24,6 +24,9 @@ Required properties:
- - reset-names: Must include the following entries:
-   - gpu
- 
-+Optional properties:
-+- iommus: A reference to the IOMMU. See ../iommu/iommu.txt for details.
-+
- Example:
- 
- 	gpu at 0,57000000 {
-@@ -39,5 +42,6 @@ Example:
- 		clock-names = "gpu", "pwr";
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+index 362c269946ff..0c51ac3b0f56 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+@@ -309,8 +309,9 @@
+ 			     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "stall", "nonstall";
+ 		clocks = <&tegra_car TEGRA210_CLK_GPU>,
+-			 <&tegra_car TEGRA210_CLK_PLL_P_OUT5>;
+-		clock-names = "gpu", "pwr";
++			 <&tegra_car TEGRA210_CLK_PLL_P_OUT5>,
++			 <&tegra_car TEGRA210_CLK_PLL_G_REF>;
++		clock-names = "gpu", "pwr", "pllg_ref";
  		resets = <&tegra_car 184>;
  		reset-names = "gpu";
-+		iommus = <&mc TEGRA_SWGROUP_GPU>;
  		status = "disabled";
- 	};
 -- 
 2.7.2
