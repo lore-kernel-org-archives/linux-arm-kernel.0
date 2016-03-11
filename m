@@ -1,64 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 12 Mar 2016 01:24:36 +0700
-Subject: [PATCH 0/8] EFI framebuffer support for ARM and arm64
-In-Reply-To: <56E305F6.5070402@suse.de>
-References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
- <56E19CD1.6080409@redhat.com>
- <CAKv+Gu8imCVQ+8QM+txqXNgs54p2Uv3FMkQEMNoCkB8JJcaZUw@mail.gmail.com>
- <56E305F6.5070402@suse.de>
-Message-ID: <CAKv+Gu9nc19T2t95kdT4PGYLjRdfDxKbHWiPSeC8hE7L=zr3tg@mail.gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 11 Mar 2016 10:26:39 -0800
+Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
+In-Reply-To: <20160311180030.GB19277@lunn.ch>
+References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160311173125.GI3153@lunn.ch> <56E30332.7060003@caviumnetworks.com>
+ <20160311180030.GB19277@lunn.ch>
+Message-ID: <56E30DDF.5040506@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 March 2016 at 00:52, Alexander Graf <agraf@suse.de> wrote:
-> On 10.03.16 17:23, Ard Biesheuvel wrote:
->> (+ Laszlo)
->>
->> On 10 March 2016 at 23:12, Mark Langsdorf <mlangsdo@redhat.com> wrote:
->>> On 03/09/2016 11:40 PM, Ard Biesheuvel wrote:
->>>>
->>>> This series adds support to ARM and arm64 for using the kernel's EFI
->>>> framebuffer driver to drive EFI Graphics Output Protocol (GOP) based
->>>> framebuffers.
->>>>
->>>> This involves refactoring some of the existing x86 code so it can be
->>>> reused
->>>> by ARM and arm64, and wiring it up both in the UEFI stub and in the core
->>>> kernel into the existing UEFI infrastructure for ARM and arm64.
+On 03/11/2016 10:00 AM, Andrew Lunn wrote:
+> On Fri, Mar 11, 2016 at 09:41:06AM -0800, David Daney wrote:
+>> On 03/11/2016 09:31 AM, Andrew Lunn wrote:
+>>>> +		phy_np = of_parse_phandle(node, "phy-handle", 0);
+>>>> +		/* If there is no phy or defective firmware presents
+>>>> +		 * this cortina phy, for which there is no driver
+>>>> +		 * support, ignore it.
+>>>> +		 */
+>>>> +		if (phy_np &&
+>>>> +		    !of_device_is_compatible(phy_np, "cortina,cs4223-slice")) {
 >>>
+>>> Hi David
 >>>
->>> Given that I have access to a variety of different ARM64 UEFI
->>> implementations, how would I go about testing this code? Do I
->>> need a specific UEFI implementation and are there any special
->>> command line arguments I should pass to the kernel?
+>>> What is a cortina,cs4223-slice,
+>>
+>> It is 1/4 of:
+>>
+>> https://www.inphi.com/products/cs4223.php
+>>
+>>> and why does it need to be handled differently?
 >>>
 >>
->> I have tested this myself on QEMU and FVP Base, which are both
->> software models. On bare metal, it would involve a system with a
->> graphics card that the firmware knows how to drive, and I am honestly
->> not sure if any such combinations currently exist, other than the ARM
->> development platforms such as Juno which have an embedded-style (i.e.,
->> non-PCI) graphics controller that the firmware knows how to drive out
->> of the box.
+>> $ ls drivers/net/phy/*cortina*
+>> ls: cannot access drivers/net/phy/*cortina*: No such file or directory
 >>
->> The code itself is smart enough to figure which (if any) of the
->> available handles carrying the GOP protocol is the one that is
->> attached to ConOut, and so there is nothing required to enable this
->> other than building it into the kernel and running it on a system with
->> a firmware supported screen attached.
+>> For this configuration of thunder_bgx.c, the use of a Linux PHY
+>> driver is optional.
 >>
+>> The firmware should probably not specify a PHY here, but it does so
+>> we ignore it so we don't wait around forever for the non-existent
+>> driver to bind.
 >
-> How does this deal with caches? Does the GOP driver access the frame
-> buffer as cached or as uncached memory? I suppose it's always uncached?
+> Hi David
 >
+> I don't see why it should wait around forever. I have boards with
+> Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
+> driver still loads, because the generic PHY driver is used instead.
+> Why does this not work here?
 
-efifb uses ioremap_wt(), so uncached. And we're even worse off than we
-are with VGA-PCI since PCI at least has a quirks mechanism.
+As I said before, there is no driver for the device, so 
+of_phy_find_device() will always return NULL.
 
-> I'm mostly curious because I'd like to implement support for GOP in
-> U-Boot soon.
+It appears that the architects of the cs4223 were not familiar with the 
+various IEEE specifications for PHYs, so unsurprisingly, the device 
+cannot be handled by any standards compliant generic drivers.
+
+The Marvell PHY architects, on the other hand, seem to have designed 
+their devices with a keen eye for following the standards.  So, also 
+unsurprisingly, the Marvell devices work perfectly with the generic drivers.
+
 >
+> Also, Documentation/devicetree/bindings/net/phy.txt says:
+>
+>   compatible: Compatible list, may contain
+>    "ethernet-phy-ieee802.3-c22" or "ethernet-phy-ieee802.3-c45" for
+>    PHYs that implement IEEE802.3 clause 22 or IEEE802.3 clause 45
+>    specifications. If neither of these are specified, the default is to
+>    assume clause 22.
+>
+>    If the phy's identifier is known then the list may contain an entry
+>    of the form: "ethernet-phy-idAAAA.BBBB" where
+>       AAAA - The value of the 16 bit Phy Identifier 1 register as
+>              4 hex digits. This is the chip vendor OUI bits 3:18
+>       BBBB - The value of the 16 bit Phy Identifier 2 register as
+>              4 hex digits. This is the chip vendor OUI bits 19:24,
+>              followed by 10 bits of a vendor specific ID.
+>
+>    The compatible list should not contain other values than those
+>    listed here.
+>
+> So having "cortina,cs4223-slice" in the compatible string goes against
+> the binding.
 
-OK. On most real ARM hardware, I wouldn't expect this to be a problem.
-But it will break QEMU's VGA under KVM in the same way as before, I
-think.
+Yes, you are probably correct.  That is why the comment in the patch 
+explains the strategy of ignoring this node that is not complaint with 
+the binding document.
+
+
+> To make this work, you probably need to extend the
+> whitelist_phys list in of_mdio.c.
+
+That wouldn't work.  There is no driver for the PHY, putting it on a 
+white list doesn't solve the missing driver problem.
