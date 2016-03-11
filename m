@@ -1,102 +1,71 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 11 Mar 2016 14:29:41 -0500
-Subject: [PATCH V14 5/9] dma: qcom_hidma: implement lower level hardware
- interface
-In-Reply-To: <56E2F5EA.10207@codeaurora.org>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
- <20160311020650.GG11154@localhost> <56E2EC1C.6040107@codeaurora.org>
- <20160311163221.GC13211@localhost> <56E2F5EA.10207@codeaurora.org>
-Message-ID: <56E31CA5.6040106@codeaurora.org>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 11 Mar 2016 11:34:24 -0800
+Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
+In-Reply-To: <20160311190627.GC19277@lunn.ch>
+References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160311173125.GI3153@lunn.ch> <56E30332.7060003@caviumnetworks.com>
+ <20160311180030.GB19277@lunn.ch> <56E30DDF.5040506@caviumnetworks.com>
+ <20160311190627.GC19277@lunn.ch>
+Message-ID: <56E31DC0.5020402@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/11/2016 11:44 AM, Sinan Kaya wrote:
-> On 3/11/2016 11:32 AM, Vinod Koul wrote:
->>>>> memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
->>>>>>>> +	       TRE_SIZE);
->> This one
+On 03/11/2016 11:06 AM, Andrew Lunn wrote:
+>>> I don't see why it should wait around forever. I have boards with
+>>> Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
+>>> driver still loads, because the generic PHY driver is used instead.
+>>> Why does this not work here?
 >>
->>>>>>>> +	lldev->tx_status_list[tre->idx].err_code = 0;
->>>>>>>> +	lldev->tx_status_list[tre->idx].err_info = 0;
->>>>>>>> +	tre->queued = 1;
->>>>>>>> +	lldev->pending_tre_count++;
->>>>
->>>> Is this the only one without alignment? I couldn't understand what you mean by 
->>>> above one?
->> quoting Coding Style:
->>
->> Statements longer than 80 columns will be broken into sensible chunks, unless
->> exceeding 80 columns significantly increases readability and does not hide
->> information. 
-> 
->> "Descendants are always substantially shorter than the parent and
->> are placed substantially to the right."
->>
->>
-> 
-> Sorry for my poor English. I never got this rule. 
-> 
-> Which one is a "substantially" right? Can you give me an example?
-> 
-> I need to understand how you'd write this to satisfy the above rule.
-> 
-> like this:
-> 
-> memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
->        TRE_SIZE);
-> 
-> or
-> 
-> memcpy(lldev->tre_ring + lldev->tre_write_offset,
->        &tre->tre_local[0], TRE_SIZE);
-> 
-> or
-> 
-> memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
-> 							   TRE_SIZE);
-> 
-> or
-> 
-> memcpy(lldev->tre_ring + lldev->tre_write_offset,
-> 	&tre->tre_local[0], 
-> 	TRE_SIZE);
-> 
-so, I looked at other examples in drivers/dma/dw/core.c file...
+>> As I said before, there is no driver for the device, so
+>> of_phy_find_device() will always return NULL.
+>
+> I'm not yet convinced this is true.
 
-I'm seeing two different patterns in the code. One pattern is to align
-the next line to the first character of the first line like I did based
-on the previous review comments.
+Which part don't you believe?  Is it:
 
-	mem_width = min_t(unsigned int,
-                          data_width, dwc_fast_ffs(mem | len));
+   - there is no driver for the device.
 
-The second example places an extra tab like this.
+or
 
-	list_add_tail(&desc->desc_node,
-			&first->tx_list);
+   - for PHYs with no driver, of_phy_find_device() will return NULL
 
+> I really do expect that the
+> generic PHY driver will bind to it. It might then go horribly wrong,
+> because it is not standard compliant, but that is a different issue.
+>
 
-Based on this example: this is how I'm changing the second one
+At a higher level, the way we handle either of:
 
-+       lldev->tre_write_offset = (lldev->tre_write_offset + HIDMA_TRE_SIZE)
-+                                       % lldev->tre_ring_size;
-+
+   - Lack of a driver.
 
-I'm still not sure what you want to do with this:
+   - "Horribly wrong" driver
 
-Is this what you want to do ?
-        memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
--              HIDMA_TRE_SIZE);
-+               HIDMA_TRE_SIZE);
+is the same, we cannot use a PHY driver.
 
-I also got flagged before that HIDMA_TRE_SIZE does not start from the first 
-character.
+> The generic driver should probably have a black list for such devices.
+> This is a PHY issue, not an MDIO issue, and the problem should be
+> solved in the PHY layer, not in one MDIO driver.
 
-I have done the renaming. This is all left for me to post a follow up.
+This isn't an MDIO driver patch.  This is more about handling a 
+defective device tree in the only driver (a non-MDIO driver) that will 
+ever see such a device tree node.
 
+>
+> We should also consider what happens when somebody actually writes a
+> driver for this PHY.   Are you not going to use it?
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Easy to answer: We remove the "&& !of_device_is_compatible(phy_np, 
+"cortina,cs4223-slice")" clause from this driver.
+
+>
+> Before this patchset, you did not special case this compatible
+> string. So at the very least, you need to split this into a separate
+> patch, so the maintainers can ACK/NACK it, independent of the other
+> change it is embedded in.
+>
+
+I can, and will, do that.
+
+Thanks,
+David Daney
