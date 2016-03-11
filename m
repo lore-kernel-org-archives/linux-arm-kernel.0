@@ -1,95 +1,55 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 11 Mar 2016 10:26:39 -0800
-Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
-In-Reply-To: <20160311180030.GB19277@lunn.ch>
-References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
- <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
- <20160311173125.GI3153@lunn.ch> <56E30332.7060003@caviumnetworks.com>
- <20160311180030.GB19277@lunn.ch>
-Message-ID: <56E30DDF.5040506@caviumnetworks.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 12 Mar 2016 02:35:37 +0800
+Subject: [PATCH V2 3/3] vfio, platform: add QTI HIDMA reset driver
+In-Reply-To: <1457715275-11925-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <201603120252.yf2ZbKlU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2016 10:00 AM, Andrew Lunn wrote:
-> On Fri, Mar 11, 2016 at 09:41:06AM -0800, David Daney wrote:
->> On 03/11/2016 09:31 AM, Andrew Lunn wrote:
->>>> +		phy_np = of_parse_phandle(node, "phy-handle", 0);
->>>> +		/* If there is no phy or defective firmware presents
->>>> +		 * this cortina phy, for which there is no driver
->>>> +		 * support, ignore it.
->>>> +		 */
->>>> +		if (phy_np &&
->>>> +		    !of_device_is_compatible(phy_np, "cortina,cs4223-slice")) {
->>>
->>> Hi David
->>>
->>> What is a cortina,cs4223-slice,
->>
->> It is 1/4 of:
->>
->> https://www.inphi.com/products/cs4223.php
->>
->>> and why does it need to be handled differently?
->>>
->>
->> $ ls drivers/net/phy/*cortina*
->> ls: cannot access drivers/net/phy/*cortina*: No such file or directory
->>
->> For this configuration of thunder_bgx.c, the use of a Linux PHY
->> driver is optional.
->>
->> The firmware should probably not specify a PHY here, but it does so
->> we ignore it so we don't wait around forever for the non-existent
->> driver to bind.
->
-> Hi David
->
-> I don't see why it should wait around forever. I have boards with
-> Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
-> driver still loads, because the generic PHY driver is used instead.
-> Why does this not work here?
+Hi Sinan,
 
-As I said before, there is no driver for the device, so 
-of_phy_find_device() will always return NULL.
+[auto build test ERROR on vfio/next]
+[also build test ERROR on v4.5-rc7 next-20160311]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-It appears that the architects of the cs4223 were not familiar with the 
-various IEEE specifications for PHYs, so unsurprisingly, the device 
-cannot be handled by any standards compliant generic drivers.
+url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/vfio-platform-add-HIDMA-and-ACPI-support/20160312-005737
+base:   https://github.com/awilliam/linux-vfio.git next
+config: arm-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-The Marvell PHY architects, on the other hand, seem to have designed 
-their devices with a keen eye for following the standards.  So, also 
-unsurprisingly, the Marvell devices work perfectly with the generic drivers.
+All errors (new ones prefixed by >>):
 
->
-> Also, Documentation/devicetree/bindings/net/phy.txt says:
->
->   compatible: Compatible list, may contain
->    "ethernet-phy-ieee802.3-c22" or "ethernet-phy-ieee802.3-c45" for
->    PHYs that implement IEEE802.3 clause 22 or IEEE802.3 clause 45
->    specifications. If neither of these are specified, the default is to
->    assume clause 22.
->
->    If the phy's identifier is known then the list may contain an entry
->    of the form: "ethernet-phy-idAAAA.BBBB" where
->       AAAA - The value of the 16 bit Phy Identifier 1 register as
->              4 hex digits. This is the chip vendor OUI bits 3:18
->       BBBB - The value of the 16 bit Phy Identifier 2 register as
->              4 hex digits. This is the chip vendor OUI bits 19:24,
->              followed by 10 bits of a vendor specific ID.
->
->    The compatible list should not contain other values than those
->    listed here.
->
-> So having "cortina,cs4223-slice" in the compatible string goes against
-> the binding.
+>> drivers/vfio/platform/reset/vfio_platform_qcomhidma.c:97:28: error: expected declaration specifiers or '...' before string constant
+    VFIO_PLATFORM_MODULE_ALIAS("qcom,hidma-1.0");
+                               ^
+   drivers/vfio/platform/reset/vfio_platform_qcomhidma.c:98:28: error: expected declaration specifiers or '...' before string constant
+    VFIO_PLATFORM_MODULE_ALIAS("QCOM8061");
+                               ^
 
-Yes, you are probably correct.  That is why the comment in the patch 
-explains the strategy of ignoring this node that is not complaint with 
-the binding document.
+vim +97 drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
 
+    91	
+    92		pr_info("HIDMA channel reset\n");
+    93		return 0;
+    94	}
+    95	module_vfio_reset_handler("qcom,hidma-1.0", "QCOM8061",
+    96				  vfio_platform_qcomhidma_reset);
+  > 97	VFIO_PLATFORM_MODULE_ALIAS("qcom,hidma-1.0");
+    98	VFIO_PLATFORM_MODULE_ALIAS("QCOM8061");
+    99	
+   100	MODULE_LICENSE("GPL v2");
 
-> To make this work, you probably need to extend the
-> whitelist_phys list in of_mdio.c.
-
-That wouldn't work.  There is no driver for the PHY, putting it on a 
-white list doesn't solve the missing driver problem.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 56252 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160312/d0f56960/attachment-0001.obj>
