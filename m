@@ -1,109 +1,85 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Fri, 11 Mar 2016 11:54:24 +0100
-Subject: [RFC PATCH 1/7] arm64/perf: Basic uncore counter support for
- Cavium ThunderX
-In-Reply-To: <20160212173658.GD20262@leverpostej>
-References: <cover.1455295032.git.jglauber@cavium.com>
- <8bd93a25e069ed6428bc6c21fc53270962ccafcc.1455295032.git.jglauber@cavium.com>
- <20160212173658.GD20262@leverpostej>
-Message-ID: <20160311105423.GA4442@wintermute>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Mar 2016 11:55:49 +0100
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160311100902.GY11154@localhost>
+References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160307145429.GG11154@localhost>
+ <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
+ <20160309120627.67612b1d@bbrezillon>
+ <20160311062607.GP11154@localhost>
+ <20160311104552.23e06a16@bbrezillon>
+ <20160311100902.GY11154@localhost>
+Message-ID: <20160311105549.GZ8418@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 12, 2016 at 05:36:59PM +0000, Mark Rutland wrote:
-> On Fri, Feb 12, 2016 at 05:55:06PM +0100, Jan Glauber wrote:
-
-[...]
-
-> > +int thunder_uncore_event_init(struct perf_event *event)
-> > +{
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +	struct thunder_uncore *uncore;
-> > +
-> > +	if (event->attr.type != event->pmu->type)
-> > +		return -ENOENT;
-> > +
-> > +	/* we do not support sampling */
-> > +	if (is_sampling_event(event))
-> > +		return -EINVAL;
-> > +
-> > +	/* counters do not have these bits */
-> > +	if (event->attr.exclude_user	||
-> > +	    event->attr.exclude_kernel	||
-> > +	    event->attr.exclude_host	||
-> > +	    event->attr.exclude_guest	||
-> > +	    event->attr.exclude_hv	||
-> > +	    event->attr.exclude_idle)
-> > +		return -EINVAL;
+On Fri, Mar 11, 2016 at 03:39:02PM +0530, Vinod Koul wrote:
+> On Fri, Mar 11, 2016 at 10:45:52AM +0100, Boris Brezillon wrote:
+> > On Fri, 11 Mar 2016 11:56:07 +0530
+> > Vinod Koul <vinod.koul@intel.com> wrote:
+> > 
+> > > On Wed, Mar 09, 2016 at 12:06:27PM +0100, Boris Brezillon wrote:
+> > > > On Tue, 8 Mar 2016 08:25:47 +0530
+> > > > Vinod Koul <vinod.koul@intel.com> wrote:
+> > > > > 
+> > > > > Why does dmaengine need to wait? Can you explain that
+> > > > 
+> > > > I don't have an answer for that one, but when I set WAIT_CYCLES to 1
+> > > > for the NAND use case it does not work. So I guess it is somehow
+> > > > related to how the DRQ line is controlled on the device side...
+> > > 
+> > > Is the WAIT cycle different for different usages or same for all
+> > > usages/channels?
+> > > 
+> > 
+> > In Allwinner BSP they adapt it on a per slave device basis, but since
+> > DMA channels are dynamically allocated, you can't know in advance which
+> > physical channel will be attached to a specific device.
 > 
-> We should _really_ make these features opt-in at the core level. It's
-> crazy that each and every PMU drivers has to explicitly test and reject
-> things it doesn't support.
+> And we have the correct values availble in datasheet for all usages
+
+No, we don't.
+
+If you look at the datasheet in question, page 169.
+https://github.com/allwinner-zh/documents/blob/master/A20/A20_User_Manual_v1.4_20150510.pdf
+
+This is the only documentation we have. And as you can see, it is very
+sparse (and that's an understament).
+
+So we cannot make that assumption, so far the values have been found
+through trial and error for the devices in question.
+
+> > Another option I considered was adding a new cell to the sun4i DT
+> > binding to encode these WAIT_CYCLES and BLOCK_SIZE information. But I'm
+> > not sure adding that to the DT is a good idea (not to mention that it
+> > would break DT ABI again, and given the last discussions on this topic,
+> > I'm not sure it's a good idea :-/).
 > 
+> Yes i was veering towards DT as well. This is a new property so ABI rules
+> wont break as long as driver still works with old properties.
 
-Looking at the exclude_* feature handling in pmu->event_init under
-arch/ shows lots of differences. Just as an example, exclude_idle
-returns sometimes -EINVAL, sometimes -EPERM while other archs
-ignore it and one silently deletes the flag.
+Yeah, we can always default to our current hardcoded value if the
+property is missing. And since no-one is using the engine at the
+moment anyway, so it's not really a big deal.
 
-So it looks hard to me to move the exclude handling into
-perf core while keeping the per-arch differences. And if we
-don't and return an error on the perf_event_open syscall in a newer
-kernel for an exclude bit that was previously ignored it will be a
-user-space regression, right?
+> But this nees to be property for clients and not driver. Client can then
+> program these
 
-Looking only at the uncore drivers (plus drivers/bus/arm-cc*)
-it looks like they all don't support any exclude bits but the
-handling here differs also. The table shows the current behaviour,
-X means the requested exclude flag is refused.
+Yes, totally. The question here is how the clients give that
+information to the driver.
 
-                          user  kernel  host    guest    hv     idle
----------------------------------------------------------------------
-x86 uncore intel        |  X      X                      X       X
-x86 uncore intel snb    |  X      X      X       X       X       X
-x86 uncore intel cqm    |  X      X      X       X       X       X
-x86 uncore intel cstate |  X      X      X       X       X       X
-x86 uncore intel rapl   |  X      X      X       X       X       X
-x86 uncore amd          |  X      X      X       X
-x86 uncore amd iommu    |  X      X      X       X
-x86 uncore amd ibs      |  X      X      X       X       X       X
-arm bus cci             |  X      X      X       X       X       X
-arm bus ccn             |  X      X                      X       X
-----------------------------------------------------------------------
+Maxime
 
-How about simply adding a helper function to include/linux/perf_event.h
-that checks if _any_ of the exclude bits is set? We could then
-simplify the check-for-any exclude flag to:
-
-if (any_exclude_set(event))
-	return -EINVAL;
-
-What's your opinion?
-
-Jan
-
----
-
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index f5c5a3f..0eacdba0 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -849,6 +849,18 @@ static inline bool is_sampling_event(struct perf_event *event)
- 	return event->attr.sample_period != 0;
- }
- 
-+static inline int any_exclude_set(struct perf_event *event)
-+{
-+	if (event->attr.exclude_user	||
-+	    event->attr.exclude_kernel	||
-+	    event->attr.exclude_host	||
-+	    event->attr.exclude_guest	||
-+	    event->attr.exclude_hv	||
-+	    event->attr.exclude_idle)
-+		return 1;
-+	return 0;
-+}
-+
- /*
-  * Return 1 for a software event, 0 for a hardware event
-  */
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160311/10d65c7a/attachment-0001.sig>
