@@ -1,59 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Mar 2016 18:46:07 +0200
-Subject: [PATCH] ARM: OMAP2: Fix up interconnect barrier initialization
- for DRA7
-In-Reply-To: <1457712748-1408-1-git-send-email-nm@ti.com>
-References: <1457712748-1408-1-git-send-email-nm@ti.com>
-Message-ID: <4167118.MBvk7Vsb05@avalon>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri, 11 Mar 2016 08:46:59 -0800
+Subject: [PATCH 0/3] net/phy: Improvements to Cavium Thunder MDIO code.
+Message-ID: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+From: David Daney <david.daney@cavium.com>
 
-Thank you for the patch.
+The firmware on many Cavium Thunder systems configures the MDIO bus
+hardware to be probed as a PCI device.  In order to use the MDIO bus
+drivers in this configuration, we must add PCI probing to the driver.
 
-On Friday 11 March 2016 10:12:28 Nishanth Menon wrote:
-> The following commits:
-> commit 3fa609755c11 ("ARM: omap2: restore OMAP4 barrier behaviour")
-> commit f746929ffdc8 ("Revert "ARM: OMAP4: remove dead kconfig option
-> OMAP4_ERRATA_I688"") and
-> commit ea827ad5ffbb ("ARM: DRA7: Provide proper IO map table")
-> came in around the same time, unfortunately this seem to have missed
-> initializing the barrier for DRA7 platforms - omap5_map_io was reused
-> for dra7 till it was split out by the last patch. barrier_init
-> needs to be hence carried forward as it is valid for DRA7 family of
-> processors as they are for OMAP5.
-> 
-> Fixes: ea827ad5ffbb7 ("ARM: DRA7: Provide proper IO map table")
-> Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+There are two parts to this set of three patches:
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+ 1) Cleanup the PHY probing code in thunder_bgx.c to handle the case
+    where there is no PHY attached to a port, as well as being more
+    robust in the face of driver loading order by use of
+    -EPROBE_DEFER.
 
-> ---
-> 
-> Original thread of report:
-> http://www.spinics.net/lists/dri-devel/msg101246.html
-> 
->  arch/arm/mach-omap2/io.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index 3c87e40650cf..9821be6dfd5e 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -368,6 +368,7 @@ void __init omap5_map_io(void)
->  void __init dra7xx_map_io(void)
->  {
->  	iotable_init(dra7xx_io_desc, ARRAY_SIZE(dra7xx_io_desc));
-> +	omap_barriers_init();
->  }
->  #endif
->  /*
+ 2) Split mdio-octeon.c into two drivers, one with platform probing,
+ and the other with PCI probing.  Common code is shared between the
+ two.
+
+Tested on several different Thunder and OCTEON systems, also compile
+tested on x86_64.
+
+David Daney (3):
+  net: thunderx: Cleanup PHY probing code.
+  phy: mdio-octeon: Refactor into two files/modules
+  phy: mdio-thunder:  Add driver for Cavium Thunder SoC MDIO buses.
+
+ .../devicetree/bindings/net/cavium-mdio.txt        |  61 ++++-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  31 +--
+ drivers/net/phy/Kconfig                            |  22 +-
+ drivers/net/phy/Makefile                           |   2 +
+ drivers/net/phy/mdio-cavium.c                      | 149 +++++++++++
+ drivers/net/phy/mdio-cavium.h                      | 119 +++++++++
+ drivers/net/phy/mdio-octeon.c                      | 280 ++-------------------
+ drivers/net/phy/mdio-thunder.c                     | 154 ++++++++++++
+ 8 files changed, 533 insertions(+), 285 deletions(-)
+ create mode 100644 drivers/net/phy/mdio-cavium.c
+ create mode 100644 drivers/net/phy/mdio-cavium.h
+ create mode 100644 drivers/net/phy/mdio-thunder.c
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.11.7
