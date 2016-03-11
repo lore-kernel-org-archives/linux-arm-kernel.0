@@ -1,101 +1,124 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Fri, 11 Mar 2016 18:07:40 +0100
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
-References: <56D6F008.1050600@huawei.com> <56D79284.3030009@redhat.com>
- <CAAmzW4PUwoVF+F-BpOZUHhH6YHp_Z8VkiUjdBq85vK6AWVkyPg@mail.gmail.com>
- <56D832BD.5080305@huawei.com> <20160304020232.GA12036@js1304-P5Q-DELUXE>
- <20160304043232.GC12036@js1304-P5Q-DELUXE> <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE> <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD38E7.3050107@huawei.com>
- <56DDCB86.4030709@redhat.com> <56DE30CB.7020207@huawei.com>
- <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
-Message-ID: <56E2FB5C.1040602@suse.cz>
+From: john@metanate.com (John Keeping)
+Date: Fri, 11 Mar 2016 17:21:17 +0000
+Subject: [PATCH] drm/rockchip: cancel pending vblanks on close
+Message-ID: <1457716877-427-1-git-send-email-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
-> 2016-03-09 10:23 GMT+09:00 Leizhen (ThunderTown) <thunder.leizhen@huawei.com>:
->>
->> Hi, Joonsoo:
->>         This new patch worked well. Do you plan to upstream it in the near furture?
-> 
-> Of course!
-> But, I should think more because it touches allocator's fastpatch and
-> I'd like to detour.
-> If I fail to think a better solution, I will send it as is, soon.
+When closing the DRM device while a vblank is pending, we access
+file_priv after it has been free'd, which gives:
 
-How about something like this? Just and idea, probably buggy (off-by-one etc.).
-Should keep away cost from <pageblock_order iterations@the expense of the
-relatively fewer >pageblock_order iterations.
+  Unable to handle kernel NULL pointer dereference at virtual address 00000000
+  ...
+  PC is at __list_add+0x5c/0xe8
+  LR is at send_vblank_event+0x54/0x1f0
+  ...
+  [<c02952e8>] (__list_add) from [<c031a7b4>] (send_vblank_event+0x54/0x1f0)
+  [<c031a760>] (send_vblank_event) from [<c031a9c0>] (drm_send_vblank_event+0x70/0x78)
+  [<c031a950>] (drm_send_vblank_event) from [<c031a9f8>] (drm_crtc_send_vblank_event+0x30/0x34)
+  [<c031a9c8>] (drm_crtc_send_vblank_event) from [<c0339ad8>] (vop_isr+0x224/0x28c)
+  [<c03398b4>] (vop_isr) from [<c0081780>] (handle_irq_event_percpu+0x12c/0x3e4)
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index ff1e3cbc8956..b8005a07b2a1 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -685,21 +685,13 @@ static inline void __free_one_page(struct page *page,
- 	unsigned long combined_idx;
- 	unsigned long uninitialized_var(buddy_idx);
- 	struct page *buddy;
--	unsigned int max_order = MAX_ORDER;
-+	unsigned int max_order = pageblock_order + 1;
+This can be triggered somewhat reliably with:
+
+	modetest -M rockchip -v -s ...
+
+Add a preclose hook to the driver so that we can discard any pending
+vblank events when the device is closed.
+
+Signed-off-by: John Keeping <john@metanate.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 22 ++++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 20 ++++++++++++++++++++
+ 3 files changed, 43 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index a0d51cc..1c8a9be 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -251,6 +251,27 @@ static int rockchip_drm_unload(struct drm_device *drm_dev)
+ 	return 0;
+ }
  
- 	VM_BUG_ON(!zone_is_initialized(zone));
- 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
- 
- 	VM_BUG_ON(migratetype == -1);
--	if (is_migrate_isolate(migratetype)) {
--		/*
--		 * We restrict max order of merging to prevent merge
--		 * between freepages on isolate pageblock and normal
--		 * pageblock. Without this, pageblock isolation
--		 * could cause incorrect freepage accounting.
--		 */
--		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
--	} else {
-+	if (likely(!is_migrate_isolate(migratetype))) {
- 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
- 	}
- 
-@@ -708,11 +700,12 @@ static inline void __free_one_page(struct page *page,
- 	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
- 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
- 
-+continue_merging:
- 	while (order < max_order - 1) {
- 		buddy_idx = __find_buddy_index(page_idx, order);
- 		buddy = page + (buddy_idx - page_idx);
- 		if (!page_is_buddy(page, buddy, order))
--			break;
-+			goto done_merging;
- 		/*
- 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
- 		 * merge with it and move up one order.
-@@ -729,6 +722,26 @@ static inline void __free_one_page(struct page *page,
- 		page_idx = combined_idx;
- 		order++;
- 	}
-+	if (max_order < MAX_ORDER) {
-+		if (IS_ENABLED(CONFIG_CMA) &&
-+				unlikely(has_isolate_pageblock(zone))) {
++static void rockchip_drm_crtc_cancel_pending_vblank(struct drm_crtc *crtc,
++						    struct drm_file *file_priv)
++{
++	struct rockchip_drm_private *priv = crtc->dev->dev_private;
++	int pipe = drm_crtc_index(crtc);
 +
-+			int buddy_mt;
++	if (pipe < ROCKCHIP_MAX_CRTC &&
++	    priv->crtc_funcs[pipe] &&
++	    priv->crtc_funcs[pipe]->cancel_pending_vblank)
++		priv->crtc_funcs[pipe]->cancel_pending_vblank(crtc, file_priv);
++}
 +
-+			buddy_idx = __find_buddy_index(page_idx, order);
-+			buddy = page + (buddy_idx - page_idx);
-+			buddy_mt = get_pageblock_migratetype(buddy);
++static void rockchip_drm_preclose(struct drm_device *dev,
++				  struct drm_file *file_priv)
++{
++	struct drm_crtc *crtc;
 +
-+			if (migratetype != buddy_mt &&
-+					(is_migrate_isolate(migratetype) ||
-+					is_migrate_isolate(buddy_mt)))
-+				goto done_merging;
-+		}
-+		max_order++;
-+		goto continue_merging;
++	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
++		rockchip_drm_crtc_cancel_pending_vblank(crtc, file_priv);
++}
++
+ void rockchip_drm_lastclose(struct drm_device *dev)
+ {
+ 	struct rockchip_drm_private *priv = dev->dev_private;
+@@ -281,6 +302,7 @@ static struct drm_driver rockchip_drm_driver = {
+ 				  DRIVER_PRIME | DRIVER_ATOMIC,
+ 	.load			= rockchip_drm_load,
+ 	.unload			= rockchip_drm_unload,
++	.preclose		= rockchip_drm_preclose,
+ 	.lastclose		= rockchip_drm_lastclose,
+ 	.get_vblank_counter	= drm_vblank_no_hw_counter,
+ 	.enable_vblank		= rockchip_drm_crtc_enable_vblank,
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index bb8b076..2b41dd4 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -40,6 +40,7 @@ struct rockchip_crtc_funcs {
+ 	int (*enable_vblank)(struct drm_crtc *crtc);
+ 	void (*disable_vblank)(struct drm_crtc *crtc);
+ 	void (*wait_for_update)(struct drm_crtc *crtc);
++	void (*cancel_pending_vblank)(struct drm_crtc *crtc, struct drm_file *file_priv);
+ };
+ 
+ struct rockchip_atomic_commit {
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 8a5ac57..53dfe21 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -875,10 +875,30 @@ static void vop_crtc_wait_for_update(struct drm_crtc *crtc)
+ 	WARN_ON(!wait_for_completion_timeout(&vop->wait_update_complete, 100));
+ }
+ 
++static void vop_crtc_cancel_pending_vblank(struct drm_crtc *crtc,
++					   struct drm_file *file_priv)
++{
++	struct drm_device *drm = crtc->dev;
++	struct vop *vop = to_vop(crtc);
++	struct drm_pending_vblank_event *e;
++	unsigned long flags;
++
++	spin_lock_irqsave(&drm->event_lock, flags);
++	e = vop->event;
++	if (e && e->base.file_priv == file_priv) {
++		vop->event = NULL;
++
++		e->base.destroy(&e->base);
++		file_priv->event_space += sizeof(e->event);
 +	}
++	spin_unlock_irqrestore(&drm->event_lock, flags);
++}
 +
-+done_merging:
- 	set_page_order(page, order);
+ static const struct rockchip_crtc_funcs private_crtc_funcs = {
+ 	.enable_vblank = vop_crtc_enable_vblank,
+ 	.disable_vblank = vop_crtc_disable_vblank,
+ 	.wait_for_update = vop_crtc_wait_for_update,
++	.cancel_pending_vblank = vop_crtc_cancel_pending_vblank,
+ };
  
- 	/*
+ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
+-- 
+2.7.0.226.gfe986fe
