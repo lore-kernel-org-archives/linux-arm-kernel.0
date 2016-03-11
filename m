@@ -1,50 +1,48 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Mar 2016 12:17:15 +0530
-Subject: [PATCH 4/5] dmaengine: sun6i: Set default values to burst and
- bus width
-In-Reply-To: <7f5fc4733c8145fe146bd2a7e0d8febfddf2fe6b.1457606136.git.moinejf@free.fr>
-References: <cover.1457606136.git.moinejf@free.fr>
- <7f5fc4733c8145fe146bd2a7e0d8febfddf2fe6b.1457606136.git.moinejf@free.fr>
-Message-ID: <20160311064715.GS11154@localhost>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 10 Mar 2016 22:47:10 -0800
+Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
+In-Reply-To: <20160310160522.GB1111@bigcity.dyn.berto.se>
+References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1457404974-1800-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160308073847.GA15520@infradead.org>
+ <20160310160522.GB1111@bigcity.dyn.berto.se>
+Message-ID: <CAPcyv4gO4EZnBuVKXT8+gsMhbHJzuK7sfr0uRcjVdJP-nUUz4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 11:07:53AM +0100, Jean-Francois Moine wrote:
-> When defining the DMA transfer, the sound PCM DMA engine sets only
-> the burst and bus width values on the DMA side.
-> This was making the audio transfers to be rejected because of invalid
-> values on the memory side.
+On Thu, Mar 10, 2016 at 8:05 AM, Niklas S??derlund
+<niklas.soderlund@ragnatech.se> wrote:
+> Hi Christoph,
+>
+> On 2016-03-07 23:38:47 -0800, Christoph Hellwig wrote:
+>> Please add some documentation on where/how this should be used.  It's
+>> not a very obvious interface.
+>
+> Good idea, I have added the following to Documentation/DMA-API.txt and
+> folded it in to this patch. Do you feel it's adequate and do you know
+> anywhere else I should add documentation?
+>
+> diff --git a/Documentation/DMA-API.txt b/Documentation/DMA-API.txt
+> index 45ef3f2..248556a 100644
+> --- a/Documentation/DMA-API.txt
+> +++ b/Documentation/DMA-API.txt
+> @@ -277,14 +277,29 @@ and <size> parameters are provided to do partial page mapping, it is
+>  recommended that you never use these unless you really know what the
+>  cache width is.
+>
+> +dma_addr_t
+> +dma_map_resource(struct device *dev, phys_addr_t phys_addr, size_t size,
+> +                enum dma_data_direction dir, struct dma_attrs *attrs)
+> +
+> +Maps a MMIO region so it can be accessed by the device and returns the
+> +DMA address of the memory. API should only be used to map device MMIO,
+> +mapping of RAM is not permitted.
+> +
 
-I think there is a misunderstanding of the API. The slave configuration set
-thru dma_slave_config is only intended for peripheral and not for memory.
-
-In memory case you need to assume values based on system. DMA to memory is
-usually done for max throughput and these parameters do not make sense
-there.
-
-
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  drivers/dma/sun6i-dma.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index 7c98c0d..c27d572 100644
-> --- a/drivers/dma/sun6i-dma.c
-> +++ b/drivers/dma/sun6i-dma.c
-> @@ -288,19 +288,31 @@ static inline int sun6i_dma_cfg_lli(struct sun6i_dma_lli *lli,
->  	if (!config)
->  		return -EINVAL;
->  
-> -	src_burst = convert_burst(config->src_maxburst);
-> +	if (config->src_maxburst == 0)
-> +		src_burst = convert_burst(config->dst_maxburst);
-> +	else
-> +		src_burst = convert_burst(config->src_maxburst);
-
-No 0 is error for the transfer direction and don't assume default for
-peripheral, that is just wrong
-
--- 
-~Vinod
+I think it is confusing to use the dma_ prefix for this peer-to-peer
+mmio functionality.  dma_addr_t is a device's view of host memory.
+Something like bus_addr_t bus_map_resource().  Doesn't this routine
+also need the source device in addition to the target device?  The
+resource address is from the perspective of the host cpu, it may be a
+different address space in the view of two devices relative to each
+other.
