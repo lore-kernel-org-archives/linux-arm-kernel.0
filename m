@@ -1,56 +1,127 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 11 Mar 2016 11:37:30 -0800
-Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
-In-Reply-To: <20160311190627.GC19277@lunn.ch>
-References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
- <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
- <20160311173125.GI3153@lunn.ch> <56E30332.7060003@caviumnetworks.com>
- <20160311180030.GB19277@lunn.ch> <56E30DDF.5040506@caviumnetworks.com>
- <20160311190627.GC19277@lunn.ch>
-Message-ID: <56E31E7A.6080905@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 11 Mar 2016 10:11:22 -0800
+Subject: [PATCH] ARM: mvebu: fix overlap of Crypto SRAM with PCIe memory
+ window
+In-Reply-To: <87bn6m3309.fsf@free-electrons.com>
+References: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <87bn6m3309.fsf@free-electrons.com>
+Message-ID: <20160311181122.GA12577@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/16 11:06, Andrew Lunn wrote:
->>> I don't see why it should wait around forever. I have boards with
->>> Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
->>> driver still loads, because the generic PHY driver is used instead.
->>> Why does this not work here?
->>
->> As I said before, there is no driver for the device, so
->> of_phy_find_device() will always return NULL.
+On Thu, Mar 10, 2016 at 01:56:38PM +0100, Gregory CLEMENT wrote:
+> Hi Thomas,
+>  
+>  On mar., mars 08 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 > 
-> I'm not yet convinced this is true. I really do expect that the
-> generic PHY driver will bind to it. It might then go horribly wrong,
-> because it is not standard compliant, but that is a different issue.
-
-I concur with Andrew here, unless the PHY is guaranteed to return
-garbage when get_phy_id() is called, there is a good chance that the
-Generic PHY driver will be bound to this PHY device, or this is not
-happening for you for some reason?
-
+> > When the Crypto SRAM mappings were added to the Device Tree files
+> > describing the Armada XP boards in commit c466d997bb16 ("ARM: mvebu:
+> > define crypto SRAM ranges for all armada-xp boards"), the fact that
+> > those mappings were overlaping with the PCIe memory aperture was
+> > overlooked. Due to this, we currently have for all Armada XP platforms
+> > a situation that looks like this:
+> >
+> > Memory mapping on Armada XP boards with internal registers at
+> > 0xf1000000:
+> >
+> >  - 0x00000000 -> 0xf0000000	3.75G 	RAM
+> >  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
+> >  - 0xf1000000 -> 0xf1100000	1M	internal registers
+> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory aperture
+> >  - 0xf8100000 -> 0xf8110000	64KB	Crypto SRAM #0	=> OVERLAPS WITH PCIE !
+> >  - 0xf8110000 -> 0xf8120000	64KB	Crypto SRAM #1	=> OVERLAPS WITH PCIE !
+> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O aperture
+> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> >
+> > The overlap means that when PCIe devices are added, depending on their
+> > memory window needs, they might or might not be mapped into the
+> > physical address space. Indeed, they will not be mapped if the area
+> > allocated in the PCIe memory aperture by the PCI core overlaps with
+> > one of the Crypto SRAM. Typically, a Intel IGB PCIe NIC that needs 8MB
+> > of PCIe memory will see its PCIe memory window allocated from
+> > 0xf80000000 for 8MB, which overlaps with the Crypto SRAM windows. Due
+> > to this, the PCIe window is not created, and any attempt to access the
+> > PCIe window makes the kernel explode:
+> >
+> > [    3.302213] igb: Copyright (c) 2007-2014 Intel Corporation.
+> > [    3.307841] pci 0000:00:09.0: enabling device (0140 -> 0143)
+> > [    3.313539] mvebu_mbus: cannot add window '4:f8', conflicts with another window
+> > [    3.320870] mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0xf8000000-0xf87fffff]: -22
+> > [    3.330811] Unhandled fault: external abort on non-linefetch (0x1008) at 0xf08c0018
+> >
+> > This problem does not occur on Armada 370 boards, because we use the
+> > following memory mapping (for boards that have internal registers at
+> > 0xf1000000):
+> >
+> >  - 0x00000000 -> 0xf0000000	3.75G 	RAM
+> >  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
+> >  - 0xf1000000 -> 0xf1100000	1M	internal registers
+> >  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0 => OK !
+> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
+> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
+> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> >
+> > Obviously, the solution is to align the location of the Crypto SRAM
+> > mappings of Armada XP to be similar with the ones on Armada 370, i.e
+> > have them between the "internal registers" area and the beginning of
+> > the PCIe aperture.
+> >
+> > However, we have a special case with the OpenBlocks AX3-4 platform,
+> > which has a 128 MB NOR flash. Currently, this NOR flash is mapped from
+> > 0xf0000000 to 0xf8000000. This is possible because on OpenBlocks
+> > AX3-4, the internal registers are not at 0xf1000000. And this explains
+> > why the Crypto SRAM mappings were not configured at the same place on
+> > Armada XP.
+> >
+> > Hence, the solution is two-fold:
+> >
+> >  (1) Move the NOR flash mapping on Armada XP OpenBlocks AX3-4 from
+> >      0xe8000000 to 0xf0000000. This frees the 0xf0000000 ->
+> >      0xf80000000 space.
+> >
+> >  (2) Move the Crypto SRAM mappings on Armada XP to be similar to
+> >      Armada 370 (except of course that Armada XP has two Crypto SRAM
+> >      and not one).
+> >
+> > After this patch, the memory mapping on Armada XP boards with
+> > registers at 0xf1 is:
+> >
+> >  - 0x00000000 -> 0xf0000000	3.75G 	RAM
+> >  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
+> >  - 0xf1000000 -> 0xf1100000	1M	internal registers
+> >  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
+> >  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
+> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
+> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
+> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> >
+> > And the memory mapping for the special case of the OpenBlocks AX3-4
+> > (internal registers at 0xd0000000, NOR of 128 MB):
+> >
+> >  - 0x00000000 -> 0xc0000000	3G 	RAM
+> >  - 0xd0000000 -> 0xd1000000	1M	internal registers
+> >  - 0xe800000  -> 0xf0000000	128M	NOR flash
+> >  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
+> >  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
+> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
+> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
+> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
+> >
+> > Fixes: c466d997bb16 ("ARM: mvebu: define crypto SRAM ranges for all armada-xp boards")
+> > Reported-by: Phil Sutter <phil@nwl.cc>
+> > Cc: Phil Sutter <phil@nwl.cc>
+> > Cc: <stable@kernel.org>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> The generic driver should probably have a black list for such devices.
-> This is a PHY issue, not an MDIO issue, and the problem should be
-> solved in the PHY layer, not in one MDIO driver.
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Arnd, Olof,
+> 
+> it would be nice having this fix applied on v4.5-rc. Could you applied
+> this patch directly, or do you want pull request for it?
 
-I considered the possibility once of disabling the generic PHY driver,
-such that systems where the vendor-specific PHY driver is expected to be
-used could utilize that. That does not play well with the fixed PHYs
-using the generic PHY driver though, anyway, I am digressing.
-
-> 
-> We should also consider what happens when somebody actually writes a
-> driver for this PHY. Are you not going to use it?
-> 
-> Before this patchset, you did not special case this compatible
-> string. So at the very least, you need to split this into a separate
-> patch, so the maintainers can ACK/NACK it, independent of the other
-> change it is embedded in.
-> 
->        Andrew
-> 
+Applied to fixes. Are you 150% sure you don't need some bake time on this patch
+to avoid surprises?
 
 
--- 
-Florian
+-Olof
