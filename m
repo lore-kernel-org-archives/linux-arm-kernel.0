@@ -1,29 +1,19 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Mar 2016 11:56:07 +0530
-Subject: [PATCH] dma: sun4i: expose block size and wait cycle
- configuration to DMA users
-In-Reply-To: <20160309120627.67612b1d@bbrezillon>
-References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160307145429.GG11154@localhost>
- <20160307160857.577bb04d@bbrezillon>
- <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
- <20160309120627.67612b1d@bbrezillon>
-Message-ID: <20160311062607.GP11154@localhost>
+Date: Fri, 11 Mar 2016 12:09:56 +0530
+Subject: [PATCH 1/5] dmaengine: sun6i: Fix the access of the IRQ register
+In-Reply-To: <f2fb59f3f06600a50ce95886ad25375eafc937da.1457606136.git.moinejf@free.fr>
+References: <cover.1457606136.git.moinejf@free.fr>
+ <f2fb59f3f06600a50ce95886ad25375eafc937da.1457606136.git.moinejf@free.fr>
+Message-ID: <20160311063956.GQ11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 12:06:27PM +0100, Boris Brezillon wrote:
-> On Tue, 8 Mar 2016 08:25:47 +0530
-> Vinod Koul <vinod.koul@intel.com> wrote:
-> > 
-> > Why does dmaengine need to wait? Can you explain that
-> 
-> I don't have an answer for that one, but when I set WAIT_CYCLES to 1
-> for the NAND use case it does not work. So I guess it is somehow
-> related to how the DRQ line is controlled on the device side...
+On Thu, Mar 10, 2016 at 10:15:22AM +0100, Jean-Francois Moine wrote:
+> The address of the IRQ register is computed, but its value was not
+						^^^^^^^
+it's
 
-Is the WAIT cycle different for different usages or same for all
-usages/channels?
-
+> used and the register access was done by the channel index instead.
+> Then, only the first DMA channel was working.
 -- 
 ~Vinod
