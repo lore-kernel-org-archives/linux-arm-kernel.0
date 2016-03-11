@@ -1,77 +1,107 @@
-From: huangdaode@hisilicon.com (Daode Huang)
-Date: Fri, 11 Mar 2016 09:53:33 +0800
-Subject: [PATCH net 3/6] net: hns: fixed portid bug in sending manage pkt
-In-Reply-To: <56D98F8F.5010700@cogentembedded.com>
-References: <1457053798-93513-1-git-send-email-huangdaode@hisilicon.com>
- <1457053798-93513-4-git-send-email-huangdaode@hisilicon.com>
- <56D98F8F.5010700@cogentembedded.com>
-Message-ID: <56E2251D.905@hisilicon.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 11 Mar 2016 07:36:50 +0530
+Subject: [PATCH V14 5/9] dma: qcom_hidma: implement lower level hardware
+ interface
+In-Reply-To: <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160311020650.GG11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 04, 2016 at 11:34:36PM -0500, Sinan Kaya wrote:
+
+> +
+> +#define EVRE_SIZE			16	/* each EVRE is 16 bytes */
+> +
+> +#define TRCA_CTRLSTS_OFFSET		0x000
+> +#define TRCA_RING_LOW_OFFSET		0x008
+> +#define TRCA_RING_HIGH_OFFSET		0x00C
+> +#define TRCA_RING_LEN_OFFSET		0x010
+> +#define TRCA_READ_PTR_OFFSET		0x018
+> +#define TRCA_WRITE_PTR_OFFSET		0x020
+> +#define TRCA_DOORBELL_OFFSET		0x400
+> +
+> +#define EVCA_CTRLSTS_OFFSET		0x000
+> +#define EVCA_INTCTRL_OFFSET		0x004
+> +#define EVCA_RING_LOW_OFFSET		0x008
+> +#define EVCA_RING_HIGH_OFFSET		0x00C
+> +#define EVCA_RING_LEN_OFFSET		0x010
+> +#define EVCA_READ_PTR_OFFSET		0x018
+> +#define EVCA_WRITE_PTR_OFFSET		0x020
+> +#define EVCA_DOORBELL_OFFSET		0x400
+> +
+> +#define EVCA_IRQ_STAT_OFFSET		0x100
+> +#define EVCA_IRQ_CLR_OFFSET		0x108
+> +#define EVCA_IRQ_EN_OFFSET		0x110
+> +
+> +#define EVRE_CFG_IDX			0
+> +#define EVRE_LEN_IDX			1
+> +#define EVRE_DEST_LOW_IDX		2
+> +#define EVRE_DEST_HI_IDX		3
+> +
+> +#define EVRE_ERRINFO_BIT_POS		24
+> +#define EVRE_CODE_BIT_POS		28
+> +
+> +#define EVRE_ERRINFO_MASK		GENMASK(3, 0)
+> +#define EVRE_CODE_MASK			GENMASK(3, 0)
+
+These are rest here are not namespace properly...
+
+> +static int hidma_ll_enable(struct hidma_lldev *lldev)
+> +{
+> +	u32 val;
+> +	int ret;
+> +
+> +	val = readl(lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +	val &= ~(CH_CONTROL_MASK << 16);
+> +	val |= CH_ENABLE << 16;
+> +	writel(val, lldev->evca + EVCA_CTRLSTS_OFFSET);
+> +
+> +	ret = readl_poll_timeout(lldev->evca + EVCA_CTRLSTS_OFFSET, val,
+> +				 (HIDMA_CH_STATE(val) == CH_ENABLED) ||
+> +				 (HIDMA_CH_STATE(val) == CH_RUNNING), 1000,
+> +				 10000);
+> +	if (ret) {
+> +		dev_err(lldev->dev, "event channel did not get enabled\n");
+> +		return ret;
+> +	}
+> +
+> +	val = readl(lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +	val &= ~(CH_CONTROL_MASK << 16);
+> +	val |= CH_ENABLE << 16;
+> +	writel(val, lldev->trca + TRCA_CTRLSTS_OFFSET);
+> +
+> +	ret = readl_poll_timeout(lldev->trca + TRCA_CTRLSTS_OFFSET, val,
+> +				 (HIDMA_CH_STATE(val) == CH_ENABLED) ||
+> +				 (HIDMA_CH_STATE(val) == CH_RUNNING), 1000,
+> +				 10000);
+
+first arg for readl_poll_timeout is accessor fn to do read, which doesnt
+seem to be here... so what did i miss?
 
 
-On 2016/3/4 21:37, Sergei Shtylyov wrote:
-> Hello.
->
-> On 3/4/2016 4:09 AM, Daode Huang wrote:
->
->> In V2 chip, when sending mamagement packets, the driver should
->> config the port id to BD descs.
->>
->> Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
->> Signed-off-by: Lisheng <lisheng011@huawei.com>
->> ---
->>   drivers/net/ethernet/hisilicon/hns/hnae.h         | 3 +++
->>   drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c | 1 +
->>   drivers/net/ethernet/hisilicon/hns/hns_enet.c     | 4 ++++
->>   3 files changed, 8 insertions(+)
->>
->> diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.h 
->> b/drivers/net/ethernet/hisilicon/hns/hnae.h
->> index 1cbcb9f..11a3f97 100644
->> --- a/drivers/net/ethernet/hisilicon/hns/hnae.h
->> +++ b/drivers/net/ethernet/hisilicon/hns/hnae.h
-> [...]
->> @@ -516,6 +518,7 @@ struct hnae_handle {
->>       int q_num;
->>       int vf_id;
->>       u32 eport_id;
->> +    u32 dport_id;    /*v2 tx bd should fill the dport_id*/
->
->    Please add spaces after /* and before */ (like it's done in other 
-> places in this driver).
->
+> +void hidma_ll_queue_request(struct hidma_lldev *lldev, u32 tre_ch)
+> +{
+> +	struct hidma_tre *tre;
+> +	unsigned long flags;
+> +
+> +	tre = &lldev->trepool[tre_ch];
+> +
+> +	/* copy the TRE into its location in the TRE ring */
+> +	spin_lock_irqsave(&lldev->lock, flags);
+> +	tre->tre_index = lldev->tre_write_offset / TRE_SIZE;
+> +	lldev->pending_tre_list[tre->tre_index] = tre;
+> +	memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+> +	       TRE_SIZE);
+> +	lldev->tx_status_list[tre->idx].err_code = 0;
+> +	lldev->tx_status_list[tre->idx].err_info = 0;
+> +	tre->queued = 1;
+> +	lldev->pending_tre_count++;
+> +	lldev->tre_write_offset = (lldev->tre_write_offset + TRE_SIZE)
+> +	    % lldev->tre_ring_size;
 
-Hi MBR, Sergei,
-Thanks for you comments,
-will change it in next version.
-Daode.
+These and above one should be right justfied per coding style
 
-> [...]
->> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c 
->> b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
->> index 6250a42..b45dcc2 100644
->> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
->> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
->> @@ -69,6 +69,10 @@ static void fill_v2_desc(struct hnae_ring *ring, 
->> void *priv,
->>       hnae_set_bit(rrcfv, HNSV2_TXD_VLD_B, 1);
->>       hnae_set_field(bn_pid, HNSV2_TXD_BUFNUM_M, 0, buf_num - 1);
->>
->> +    /*fill port_id in the tx bd for sending management pkts*/
->
->    Likewise.
->
->> +    hnae_set_field(bn_pid, HNSV2_TXD_PORTID_M,
->> +               HNSV2_TXD_PORTID_S, ring->q->handle->dport_id);
->> +
->>       if (type == DESC_TYPE_SKB) {
->>           skb = (struct sk_buff *)priv;
->>
->
-> MBR, Sergei
->
->
-> .
->
+-- 
+~Vinod
