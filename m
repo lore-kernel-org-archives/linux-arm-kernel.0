@@ -1,40 +1,43 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 11 Mar 2016 13:57:56 -0800
-Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
-In-Reply-To: <20160311213516.GE19277@lunn.ch>
-References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
- <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
- <20160311173125.GI3153@lunn.ch> <56E30332.7060003@caviumnetworks.com>
- <20160311180030.GB19277@lunn.ch> <56E30DDF.5040506@caviumnetworks.com>
- <20160311190627.GC19277@lunn.ch> <56E31E7A.6080905@gmail.com>
- <56E330E4.9090800@gmail.com> <20160311213516.GE19277@lunn.ch>
-Message-ID: <56E33F64.2000208@caviumnetworks.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 11 Mar 2016 15:58:19 -0600
+Subject: [PATCH v12] [PATCH] PCI: Xilinx-NWL-PCIe: Adding support for
+ Xilinx NWL PCIe Host Controller
+In-Reply-To: <1457281934-32068-1-git-send-email-bharatku@xilinx.com>
+References: <1457281934-32068-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <20160311215819.GB16257@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2016 01:35 PM, Andrew Lunn wrote:
-[...]
-> How usable is the hardware without a PHY driver?
+Hi Bharat,
 
-The hardware has always in the past, still does, and probably always 
-will work fine without a PHY driver.  Link up/down are correctly handled.
+I forgot I still have one question here:
 
-> Is a better solution
-> that your write a very minimal PHY driver?
+On Sun, Mar 06, 2016 at 10:02:14PM +0530, Bharat Kumar Gogada wrote:
+> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
 
-No.  Nothing would be gained.
+> +static bool nwl_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
+> +{
+> +	struct nwl_pcie *pcie = bus->sysdata;
+> +
+> +	/* Check link,before accessing downstream ports */
+> +	if (bus->number != pcie->root_busno) {
+> +		if (!nwl_pcie_link_up(pcie))
+> +			return false;
+> +	}
 
-All we are trying to do, is allow for loading of 1G PHY drivers via the 
--EPROBE_DEFER mechanism while continuing to allow the 10G and 40G ports 
-to function without a PHY driver.
+This seems racy.  What if we check, and the link is up, but the link
+goes down before we actually complete the config access?
 
-Specifically, we are *not* attempting to solve the problem of 
-re-architecting the kernel phy_device infrastructure so that it would be 
-possible to write a Cortina PHYs driver.  Nor are we proposing that a 
-Cortina PHY driver be written that would fit into the current 
-infrastructure.
+I'm suggesting that this check for the link being up might be
+superfluous.
 
-To this end, I still think the current patch takes the best approach.
+The hardware should do something reasonable with the config access if
+it can't send it down the link.
 
-Thanks,
-David Daney
+> +
+> +	/* Only one device down on each root port */
+> +	if (bus->number == pcie->root_busno && devfn > 0)
+> +		return false;
+> +
+> +	return true;
+> +}
