@@ -1,131 +1,100 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 11 Mar 2016 12:15:33 +0100
-Subject: [PATCH 5/6] clk: rockchip: rk3036: fix and add node id for emac
- clock
-In-Reply-To: <1457693731-6966-6-git-send-email-wxt@rock-chips.com>
-References: <1457693731-6966-1-git-send-email-wxt@rock-chips.com>
- <1457693731-6966-6-git-send-email-wxt@rock-chips.com>
-Message-ID: <2005499.uduk6By3kM@diego>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 11 Mar 2016 16:51:02 +0530
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160311112631.014b52d7@bbrezillon>
+References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160307145429.GG11154@localhost>
+ <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
+ <20160309111434.521c5ec2@bbrezillon>
+ <20160311062452.GO11154@localhost>
+ <20160311104055.015472e9@bbrezillon>
+ <20160311100607.GX11154@localhost>
+ <20160311112631.014b52d7@bbrezillon>
+Message-ID: <20160311112102.GD11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
-
-Am Freitag, 11. M?rz 2016, 18:55:30 schrieb Caesar Wang:
-> From: zhengxing <zhengxing@rock-chips.com>
+On Fri, Mar 11, 2016 at 11:26:31AM +0100, Boris Brezillon wrote:
+> On Fri, 11 Mar 2016 15:36:07 +0530
+> Vinod Koul <vinod.koul@intel.com> wrote:
 > 
-> In the emac driver, we need to refer HCLK_MAC since there are
-> only 3PLLs (APLL/GPLL/DPLL) on the rk3036, most clocks are under the
-> GPLL, and it is unable to provide the accurate rate for mac_ref which
-> need to 50MHz probability, we should let it under the DPLL and are
-> able to set the freq which integer multiples of 50MHz, so we add these
-> emac node for reference.
+> > On Fri, Mar 11, 2016 at 10:40:55AM +0100, Boris Brezillon wrote:
+> > > On Fri, 11 Mar 2016 11:54:52 +0530
+> > > Vinod Koul <vinod.koul@intel.com> wrote:
+> > > 
+> > > > On Wed, Mar 09, 2016 at 11:14:34AM +0100, Boris Brezillon wrote:
+> > > > > > > > > > + * struct sun4i_dma_chan_config - DMA channel config
+> > > > > > > > > > + *
+> > > > > > > > > > + * @para: contains information about block size and time before checking
+> > > > > > > > > > + *	  DRQ line. This is device specific and only applicable to dedicated
+> > > > > > > > > > + *	  DMA channels
+> > > > > > > > > 
+> > > > > > > > > What information, can you elobrate.. And why can't you use existing
+> > > > > > > > > dma_slave_config for this?
+> > > > > > > > 
+> > > > > > > > Block size is related to the device FIFO size. I guess it allows the
+> > > > > > > > DMA channel to launch a transfer of X bytes without having to check the
+> > > > > > > > DRQ line (the line telling the DMA engine it can transfer more data
+> > > > > > > > to/from the device). The wait cycles information is apparently related
+> > > > > > > > to the number of clks the engine should wait before polling/checking
+> > > > > > > > the DRQ line status between each block transfer. I'm not sure what it
+> > > > > > > > saves to put WAIT_CYCLES() to something != 1, but in their BSP,
+> > > > > > > > Allwinner tweak that depending on the device.
+> > > > > > 
+> > > > > > we already have block size aka src/dst_maxburst, why not use that one.
+> > > > > 
+> > > > > Okay, but then remains the question "how should we choose the real burst
+> > > > > size?". The block size described in Allwinner datasheet is not the
+> > > > > number of words you will transmit without being preempted by other
+> > > > > master -> slave requests, it's the number of bytes that can be
+> > > > > transmitted without checking the DRQ line.
+> > > > > IOW, block_size = burst_size * X
+> > > > 
+> > > > Thats fine, API expects words for this and also a width value. Client shoudl
+> > > > pass both and for programming you should use bytes converted from words and
+> > > > width.
+> > > > 
+> > > 
+> > > Not sure I get what you mean. Are you suggesting to add new fields to
+> > > the dma_slave_config struct to describe this block concept, or should
+> > 
+> > No
+> > 
+> > > we pass it through ->xxx_burstsize, and try to guess the real burstsize?
+> > 
+> > Pass the real burstsize in words
+> > 
+> > > In the latter case, you still haven't answered my question: how should
+> > > we choose the burstsize?
+> > 
+> > From word value convert to bytes and program HW
+> > 
+> > burst(in bytes) = burst (in words ) * buswidth;
+> > 
 > 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-
-I think I mentioned it somewhere before, but I'd like to do this
-differently, like in [0].
-
-That should work in a similar way and at least in my tests the reported
-clock rate seems to be correct. As I said as well I haven't been able to
-make the emac detect a link on my kylin boards, so it would be cool
-if you could test if this different approach works in practice as well.
-
-
-Thanks
-Heiko
-
------- 8< ---------
->From e83a8b19dbf95c40d2c908727c342fbc6b167ea1 Mon Sep 17 00:00:00 2001
-From: Heiko Stuebner <heiko@sntech.de>
-Date: Fri, 19 Feb 2016 21:31:43 +0100
-Subject: [PATCH] clk: rockchip: associate SCLK_MAC_PLL and disable reparenting
- on rk3036
-
-The emac needs constant and very specific rate but the possible PLL-sources
-are very limited, so we expect the PLL source to be set manually on per
-board and don't want it to get changed in an automatic way later.
-So add the necessary clock-id and disable reparenting on set_rate calls.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-rk3036.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
-index 3c742bf..0084c57 100644
---- a/drivers/clk/rockchip/clk-rk3036.c
-+++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -348,7 +348,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
- 			RK2928_CLKSEL_CON(16), 0, 2, MFLAGS, 2, 5, DFLAGS,
- 			RK2928_CLKGATE_CON(10), 5, GFLAGS),
- 
--	COMPOSITE_NOGATE(0, "mac_pll_src", mux_pll_src_3plls_p, 0,
-+	COMPOSITE_NOGATE(SCLK_MACPLL, "mac_pll_src", mux_pll_src_3plls_p, CLK_SET_RATE_NO_REPARENT,
- 			RK2928_CLKSEL_CON(21), 0, 2, MFLAGS, 4, 5, DFLAGS),
- 	MUX(SCLK_MACREF, "mac_clk_ref", mux_mac_p, CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(21), 3, 1, MFLAGS),
-
------- 8< ---------
-
-
-[0] https://github.com/mmind/linux-rockchip/commit/e83a8b19dbf95c40d2c908727c342fbc6b167ea1
-
-
-> ---
 > 
->  drivers/clk/rockchip/clk-rk3036.c      | 9 ++++++---
->  include/dt-bindings/clock/rk3036-cru.h | 2 ++
->  2 files changed, 8 insertions(+), 3 deletions(-)
+> Except, as already explained, the blocksize and burstsize concepts are
+> not exactly the same, and the sunxi engine expect both to be defined.
+> So let's take a real example to illustrate my question:
 > 
-> diff --git a/drivers/clk/rockchip/clk-rk3036.c
-> b/drivers/clk/rockchip/clk-rk3036.c index 0703c8f..27c35fa 100644
-> --- a/drivers/clk/rockchip/clk-rk3036.c
-> +++ b/drivers/clk/rockchip/clk-rk3036.c
-> @@ -348,8 +348,11 @@ static struct rockchip_clk_branch rk3036_clk_branches[]
-> __initdata = { RK2928_CLKSEL_CON(16), 0, 2, MFLAGS, 2, 5, DFLAGS,
->  			RK2928_CLKGATE_CON(10), 5, GFLAGS),
+> For the NAND use case, here is my DMA channel setup:
 > 
-> -	COMPOSITE_NOGATE(0, "mac_pll_src", mux_pll_src_3plls_p, 0,
-> -			RK2928_CLKSEL_CON(21), 0, 2, MFLAGS, 9, 5, DFLAGS),
-> +	MUX(SCLK_MACPLL, "mac_pll_pre", mux_pll_src_3plls_p, 0,
-> +			RK2928_CLKSEL_CON(21), 0, 2, MFLAGS),
-> +	DIV(0, "mac_pll_src", "mac_pll_pre", 0,
-> +			RK2928_CLKSEL_CON(21), 9, 5, DFLAGS),
-> +
->  	MUX(SCLK_MACREF, "mac_clk_ref", mux_mac_p, CLK_SET_RATE_PARENT,
->  			RK2928_CLKSEL_CON(21), 3, 1, MFLAGS),
+> buswidth (or wordsize) = 4 bytes
+> burstsize = 4 words (32 bytes)
+> blocksize = 128 bytes
 > 
-> @@ -408,7 +411,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[]
-> __initdata = { GATE(HCLK_OTG1, "hclk_otg1", "hclk_peri", CLK_IGNORE_UNUSED,
-> RK2928_CLKGATE_CON(7), 3, GFLAGS), GATE(HCLK_I2S, "hclk_i2s", "hclk_peri",
-> 0, RK2928_CLKGATE_CON(7), 2, GFLAGS), GATE(0, "hclk_sfc", "hclk_peri",
-> CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 14, GFLAGS), -	GATE(0,
-> "hclk_mac", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 15,
-> GFLAGS), +	GATE(HCLK_MAC, "hclk_mac", "hclk_peri", 0,
-> RK2928_CLKGATE_CON(3), 5, GFLAGS),
-> 
->  	/* pclk_peri gates */
->  	GATE(0, "pclk_peri_matrix", "pclk_peri", CLK_IGNORE_UNUSED,
-> RK2928_CLKGATE_CON(4), 1, GFLAGS), diff --git
-> a/include/dt-bindings/clock/rk3036-cru.h
-> b/include/dt-bindings/clock/rk3036-cru.h index ebc7a7b..de44109 100644
-> --- a/include/dt-bindings/clock/rk3036-cru.h
-> +++ b/include/dt-bindings/clock/rk3036-cru.h
-> @@ -54,6 +54,7 @@
->  #define SCLK_PVTM_VIDEO		125
->  #define SCLK_MAC		151
->  #define SCLK_MACREF		152
-> +#define SCLK_MACPLL		153
->  #define SCLK_SFC		160
-> 
->  /* aclk gates */
-> @@ -92,6 +93,7 @@
->  #define HCLK_SDMMC		456
->  #define HCLK_SDIO		457
->  #define HCLK_EMMC		459
-> +#define HCLK_MAC		460
->  #define HCLK_I2S		462
->  #define HCLK_LCDC		465
->  #define HCLK_ROM		467
+> Here, you can see that blocksize = 4 * burstsize, and again, burstsize
+> and blocksize are not encoding the same thing. So, assuming we use
+> ->src/dst_burstsize to encode the blocksize in our case, how should we
+> deduce the real burstsize (which still needs to be configured in the
+> engine).
+
+Oh, i was somehow under the impression they are same! Then we can't use
+blocksize here, pls pass burst and width properly.
+
+How is block size calculated?
+
+-- 
+~Vinod
