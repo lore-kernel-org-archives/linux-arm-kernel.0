@@ -1,58 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Mar 2016 08:57:18 +0000
-Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
- interrupt properties
-In-Reply-To: <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
-References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
- <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
-Message-ID: <20160310085714.GA31313@svinekod>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 11 Mar 2016 13:02:18 +0530
+Subject: [PATCH 5/5] dmaengine: sun6i: Add cyclic capability
+In-Reply-To: <350ad364b3e46f53159ff71aa611c432b4c588e0.1457606136.git.moinejf@free.fr>
+References: <cover.1457606136.git.moinejf@free.fr>
+ <350ad364b3e46f53159ff71aa611c432b4c588e0.1457606136.git.moinejf@free.fr>
+Message-ID: <20160311073218.GT11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 10, 2016 at 11:21:34AM +0100, Jean-Francois Moine wrote:
 
-As a general note, please put DT bindings patches before any patches
-implementing them, as per
-Documentation/devicetree/bindings/submitting-patches.txt.
+> +
+> +	if (vchan->cyclic && vchan->phy && vchan->phy->desc)
+> +		return NULL;
 
-That makes it possible to review a series in-order.
+why check for vchan->cyclic? you are setting that at the end!
 
-On Sat, Mar 05, 2016 at 10:52:15AM +0000, kernel at martin.sperl.org wrote:
-> From: Martin Sperl <kernel@martin.sperl.org>
-> 
-> Add binding documentation for the new shared interrupt properties:
-> * brcm,dma-channel-shared-mask
-> * brcm,dma-shared-irq-index
-> 
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> ---
->  Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> index 1396078..f9e84ee 100644
-> --- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> @@ -17,6 +17,10 @@ Required properties:
->  - brcm,dma-channel-mask: Bit mask representing the channels
->  			 not used by the firmware in ascending order,
->  			 i.e. first channel corresponds to LSB.
-> +- brcm,dma-channel-shared-mask: Bit mask representing the channels
-> +				that use a shared interrupt
+> @@ -792,6 +903,11 @@ static void sun6i_dma_issue_pending(struct dma_chan *chan)
+>  	spin_lock_irqsave(&vchan->vc.lock, flags);
+>  
+>  	if (vchan_issue_pending(&vchan->vc)) {
+> +		if (vchan->phy && vchan->cyclic) {
+> +			sun6i_dma_start_desc(vchan);
+> +			goto out;
+> +		}
 
-Generally we don't like masks in DT (though I see this is in keeping with
-another property above). I won't push strongly here.
+Why should this be cyclic specfic, Channel start should be same for all
+channels?
 
-I take it that this is a fixed HW property rather than a software configuration
-option?
+> +static int sun6i_dma_alloc_chan_resources(struct dma_chan *chan)
+> +{
+> +	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
+> +
+> +	vchan->cyclic = false;
 
-> +- brcm,dma-shared-irq-index: index of which of the interrupts mentioned
-> +			     above is the shared interrupt
+why do you need to set this here?
 
-What is the usual order of the interrupts? How are they expected to be parsed
-if this is in the middle of the list, for example?
-
-I think this needs a more thorough description.
-
-Thanks,
-Mark.
+-- 
+~Vinod
