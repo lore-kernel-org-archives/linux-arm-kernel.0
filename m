@@ -1,35 +1,95 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 11 Mar 2016 11:10:09 +0100
-Subject: [PATCH 2/3] ARM: dts: sun5i-a13-empire-electronix-d709: Remove
- mmc2 node
-In-Reply-To: <1457645884-10282-2-git-send-email-hdegoede@redhat.com>
-References: <1457645884-10282-1-git-send-email-hdegoede@redhat.com>
- <1457645884-10282-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160311101009.GX8418@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 11 Mar 2016 11:26:31 +0100
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160311100607.GX11154@localhost>
+References: <1457344771-12946-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160307145429.GG11154@localhost>
+ <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
+ <20160309111434.521c5ec2@bbrezillon>
+ <20160311062452.GO11154@localhost>
+ <20160311104055.015472e9@bbrezillon>
+ <20160311100607.GX11154@localhost>
+Message-ID: <20160311112631.014b52d7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 10:38:03PM +0100, Hans de Goede wrote:
-> The empire-electronix-d709 does not have an emmc, it uses nand, the
-> mmc2 node in the dts comes from a copy and paste error from the
-> inet98fv2 dts, remove it.
-> 
-> While at it also do s/inet98fv2/d709/ to fix some other copy/paste
-> leftovers.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Fri, 11 Mar 2016 15:36:07 +0530
+Vinod Koul <vinod.koul@intel.com> wrote:
 
-Queued for 4.7, thanks!
-Maxime
+> On Fri, Mar 11, 2016 at 10:40:55AM +0100, Boris Brezillon wrote:
+> > On Fri, 11 Mar 2016 11:54:52 +0530
+> > Vinod Koul <vinod.koul@intel.com> wrote:
+> > 
+> > > On Wed, Mar 09, 2016 at 11:14:34AM +0100, Boris Brezillon wrote:
+> > > > > > > > > + * struct sun4i_dma_chan_config - DMA channel config
+> > > > > > > > > + *
+> > > > > > > > > + * @para: contains information about block size and time before checking
+> > > > > > > > > + *	  DRQ line. This is device specific and only applicable to dedicated
+> > > > > > > > > + *	  DMA channels
+> > > > > > > > 
+> > > > > > > > What information, can you elobrate.. And why can't you use existing
+> > > > > > > > dma_slave_config for this?
+> > > > > > > 
+> > > > > > > Block size is related to the device FIFO size. I guess it allows the
+> > > > > > > DMA channel to launch a transfer of X bytes without having to check the
+> > > > > > > DRQ line (the line telling the DMA engine it can transfer more data
+> > > > > > > to/from the device). The wait cycles information is apparently related
+> > > > > > > to the number of clks the engine should wait before polling/checking
+> > > > > > > the DRQ line status between each block transfer. I'm not sure what it
+> > > > > > > saves to put WAIT_CYCLES() to something != 1, but in their BSP,
+> > > > > > > Allwinner tweak that depending on the device.
+> > > > > 
+> > > > > we already have block size aka src/dst_maxburst, why not use that one.
+> > > > 
+> > > > Okay, but then remains the question "how should we choose the real burst
+> > > > size?". The block size described in Allwinner datasheet is not the
+> > > > number of words you will transmit without being preempted by other
+> > > > master -> slave requests, it's the number of bytes that can be
+> > > > transmitted without checking the DRQ line.
+> > > > IOW, block_size = burst_size * X
+> > > 
+> > > Thats fine, API expects words for this and also a width value. Client shoudl
+> > > pass both and for programming you should use bytes converted from words and
+> > > width.
+> > > 
+> > 
+> > Not sure I get what you mean. Are you suggesting to add new fields to
+> > the dma_slave_config struct to describe this block concept, or should
+> 
+> No
+> 
+> > we pass it through ->xxx_burstsize, and try to guess the real burstsize?
+> 
+> Pass the real burstsize in words
+> 
+> > In the latter case, you still haven't answered my question: how should
+> > we choose the burstsize?
+> 
+> From word value convert to bytes and program HW
+> 
+> burst(in bytes) = burst (in words ) * buswidth;
+> 
+
+
+Except, as already explained, the blocksize and burstsize concepts are
+not exactly the same, and the sunxi engine expect both to be defined.
+So let's take a real example to illustrate my question:
+
+For the NAND use case, here is my DMA channel setup:
+
+buswidth (or wordsize) = 4 bytes
+burstsize = 4 words (32 bytes)
+blocksize = 128 bytes
+
+Here, you can see that blocksize = 4 * burstsize, and again, burstsize
+and blocksize are not encoding the same thing. So, assuming we use
+->src/dst_burstsize to encode the blocksize in our case, how should we
+deduce the real burstsize (which still needs to be configured in the
+engine).
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160311/4895e4f3/attachment.sig>
