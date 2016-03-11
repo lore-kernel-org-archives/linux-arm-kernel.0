@@ -1,46 +1,43 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 11 Mar 2016 17:28:21 +0100
-Subject: [PATCH 05/10] exynos4-is: Replace "hweight32(mask) == 1" with
- "is_power_of_2(mask)"
-In-Reply-To: <1449398669-14507-1-git-send-email-zhaoxiu.zeng@gmail.com>
-References: <1449398669-14507-1-git-send-email-zhaoxiu.zeng@gmail.com>
-Message-ID: <56E2F225.3040109@samsung.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 11 Mar 2016 17:28:58 +0100
+Subject: [PATCH v2 3/5] dmaengine: sun6i: Add 4 as a possible burst value
+In-Reply-To: <20160311120601.GD8418@lukather>
+References: <cover.1457695169.git.moinejf@free.fr>
+ <7898ac737e1cce9542de662f1266d94bd451659e.1457695169.git.moinejf@free.fr>
+ <20160311120601.GD8418@lukather>
+Message-ID: <20160311172858.6cffb492a18da7da76e7ed94@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2015 11:44 AM, Zhaoxiu Zeng wrote:
-> From: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
+On Fri, 11 Mar 2016 13:06:01 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-The patch looks OK, but could you also provide a proper commit
-message?
-
-> Signed-off-by: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
-> ---
->  drivers/media/platform/exynos4-is/fimc-is-regs.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> On Fri, Mar 11, 2016 at 12:01:29PM +0100, Jean-Francois Moine wrote:
+> > Some DMA transfers, as for H3 audio, ask for 4 as a burst value.
+	[snip]
+> > @@ -238,6 +238,8 @@ static inline s8 convert_burst(u32 maxburst)
+> >  	switch (maxburst) {
+> >  	case 1:
+> >  		return 0;
+> > +	case 4:
+> > +		return 1;
 > 
-> diff --git a/drivers/media/platform/exynos4-is/fimc-is-regs.c b/drivers/media/platform/exynos4-is/fimc-is-regs.c
-> index cfe4406..ec75a24 100644
-> --- a/drivers/media/platform/exynos4-is/fimc-is-regs.c
-> +++ b/drivers/media/platform/exynos4-is/fimc-is-regs.c
-> @@ -11,6 +11,7 @@
->   * published by the Free Software Foundation.
->   */
->  #include <linux/delay.h>
-> +#include <linux/log2.h>
->  
->  #include "fimc-is.h"
->  #include "fimc-is-command.h"
-> @@ -107,7 +108,7 @@ int fimc_is_hw_get_params(struct fimc_is *is, unsigned int num_args)
->  
->  void fimc_is_hw_set_isp_buf_mask(struct fimc_is *is, unsigned int mask)
->  {
-> -	if (hweight32(mask) == 1) {
-> +	if (is_power_of_2(mask)) {
->  		dev_err(&is->pdev->dev, "%s(): not enough buffers (mask %#x)\n",
->  							__func__, mask);
->  		return;
+> This is true only for the H3.
+> 
+> For the other SoCs that we support, the only valid values are 0 and 2,
+> so we need to reject those values.
+> 
+> We should do that based on the compatible.
+> 
+> The easiest solution would be to expose the available burst sizes in
+> the probe, and just our new one if we match that compatible, and any
+> invalid burst size would be rejected by the framework. Vinod, any
+> objection to that?
+
+Do you think that we should also check if the requested ports are
+valid, i.e. have a list/bitmap of the possible input/output ports per
+SoC, instead of just only the ID of the max port?
 
 -- 
-Thanks,
-Sylwester
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
