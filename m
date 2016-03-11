@@ -1,56 +1,52 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 11 Mar 2016 18:52:54 +0100
-Subject: [PATCH 0/8] EFI framebuffer support for ARM and arm64
-In-Reply-To: <CAKv+Gu8imCVQ+8QM+txqXNgs54p2Uv3FMkQEMNoCkB8JJcaZUw@mail.gmail.com>
-References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
- <56E19CD1.6080409@redhat.com>
- <CAKv+Gu8imCVQ+8QM+txqXNgs54p2Uv3FMkQEMNoCkB8JJcaZUw@mail.gmail.com>
-Message-ID: <56E305F6.5070402@suse.de>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri, 11 Mar 2016 09:53:08 -0800
+Subject: [PATCH v2 0/3] net/phy: Improvements to Cavium Thunder MDIO code.
+Message-ID: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.03.16 17:23, Ard Biesheuvel wrote:
-> (+ Laszlo)
-> 
-> On 10 March 2016 at 23:12, Mark Langsdorf <mlangsdo@redhat.com> wrote:
->> On 03/09/2016 11:40 PM, Ard Biesheuvel wrote:
->>>
->>> This series adds support to ARM and arm64 for using the kernel's EFI
->>> framebuffer driver to drive EFI Graphics Output Protocol (GOP) based
->>> framebuffers.
->>>
->>> This involves refactoring some of the existing x86 code so it can be
->>> reused
->>> by ARM and arm64, and wiring it up both in the UEFI stub and in the core
->>> kernel into the existing UEFI infrastructure for ARM and arm64.
->>
->>
->> Given that I have access to a variety of different ARM64 UEFI
->> implementations, how would I go about testing this code? Do I
->> need a specific UEFI implementation and are there any special
->> command line arguments I should pass to the kernel?
->>
-> 
-> I have tested this myself on QEMU and FVP Base, which are both
-> software models. On bare metal, it would involve a system with a
-> graphics card that the firmware knows how to drive, and I am honestly
-> not sure if any such combinations currently exist, other than the ARM
-> development platforms such as Juno which have an embedded-style (i.e.,
-> non-PCI) graphics controller that the firmware knows how to drive out
-> of the box.
-> 
-> The code itself is smart enough to figure which (if any) of the
-> available handles carrying the GOP protocol is the one that is
-> attached to ConOut, and so there is nothing required to enable this
-> other than building it into the kernel and running it on a system with
-> a firmware supported screen attached.
-> 
+From: David Daney <david.daney@cavium.com>
 
-How does this deal with caches? Does the GOP driver access the frame
-buffer as cached or as uncached memory? I suppose it's always uncached?
+Changes from v1:
 
-I'm mostly curious because I'd like to implement support for GOP in
-U-Boot soon.
+ - In 1/3 Add back check for non-OF objects in bgx_init_of_phy().  It
+   is probably not necessary, but better safe than sorry...
 
+The firmware on many Cavium Thunder systems configures the MDIO bus
+hardware to be probed as a PCI device.  In order to use the MDIO bus
+drivers in this configuration, we must add PCI probing to the driver.
 
-Alex
+There are two parts to this set of three patches:
+
+ 1) Cleanup the PHY probing code in thunder_bgx.c to handle the case
+    where there is no PHY attached to a port, as well as being more
+    robust in the face of driver loading order by use of
+    -EPROBE_DEFER.
+
+ 2) Split mdio-octeon.c into two drivers, one with platform probing,
+ and the other with PCI probing.  Common code is shared between the
+ two.
+
+Tested on several different Thunder and OCTEON systems, also compile
+tested on x86_64.
+
+David Daney (3):
+  net: thunderx: Cleanup PHY probing code.
+  phy: mdio-octeon: Refactor into two files/modules
+  phy: mdio-thunder:  Add driver for Cavium Thunder SoC MDIO buses.
+
+ .../devicetree/bindings/net/cavium-mdio.txt        |  61 ++++-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  29 ++-
+ drivers/net/phy/Kconfig                            |  22 +-
+ drivers/net/phy/Makefile                           |   2 +
+ drivers/net/phy/mdio-cavium.c                      | 149 +++++++++++
+ drivers/net/phy/mdio-cavium.h                      | 119 +++++++++
+ drivers/net/phy/mdio-octeon.c                      | 280 ++-------------------
+ drivers/net/phy/mdio-thunder.c                     | 154 ++++++++++++
+ 8 files changed, 535 insertions(+), 281 deletions(-)
+ create mode 100644 drivers/net/phy/mdio-cavium.c
+ create mode 100644 drivers/net/phy/mdio-cavium.h
+ create mode 100644 drivers/net/phy/mdio-thunder.c
+
+-- 
+1.7.11.7
