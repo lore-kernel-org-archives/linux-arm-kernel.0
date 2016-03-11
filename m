@@ -1,43 +1,67 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 11 Mar 2016 17:28:58 +0100
-Subject: [PATCH v2 3/5] dmaengine: sun6i: Add 4 as a possible burst value
-In-Reply-To: <20160311120601.GD8418@lukather>
-References: <cover.1457695169.git.moinejf@free.fr>
- <7898ac737e1cce9542de662f1266d94bd451659e.1457695169.git.moinejf@free.fr>
- <20160311120601.GD8418@lukather>
-Message-ID: <20160311172858.6cffb492a18da7da76e7ed94@free.fr>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 11 Mar 2016 11:44:26 -0500
+Subject: [PATCH V14 5/9] dma: qcom_hidma: implement lower level hardware
+ interface
+In-Reply-To: <20160311163221.GC13211@localhost>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
+ <20160311020650.GG11154@localhost> <56E2EC1C.6040107@codeaurora.org>
+ <20160311163221.GC13211@localhost>
+Message-ID: <56E2F5EA.10207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Mar 2016 13:06:01 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 3/11/2016 11:32 AM, Vinod Koul wrote:
+>>>> memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+>>>> > >> +	       TRE_SIZE);
+> This one
+> 
+>>>> > >> +	lldev->tx_status_list[tre->idx].err_code = 0;
+>>>> > >> +	lldev->tx_status_list[tre->idx].err_info = 0;
+>>>> > >> +	tre->queued = 1;
+>>>> > >> +	lldev->pending_tre_count++;
+>> > 
+>> > Is this the only one without alignment? I couldn't understand what you mean by 
+>> > above one?
+> quoting Coding Style:
+> 
+> Statements longer than 80 columns will be broken into sensible chunks, unless
+> exceeding 80 columns significantly increases readability and does not hide
+> information. 
 
-> On Fri, Mar 11, 2016 at 12:01:29PM +0100, Jean-Francois Moine wrote:
-> > Some DMA transfers, as for H3 audio, ask for 4 as a burst value.
-	[snip]
-> > @@ -238,6 +238,8 @@ static inline s8 convert_burst(u32 maxburst)
-> >  	switch (maxburst) {
-> >  	case 1:
-> >  		return 0;
-> > +	case 4:
-> > +		return 1;
+> "Descendants are always substantially shorter than the parent and
+> are placed substantially to the right."
 > 
-> This is true only for the H3.
 > 
-> For the other SoCs that we support, the only valid values are 0 and 2,
-> so we need to reject those values.
-> 
-> We should do that based on the compatible.
-> 
-> The easiest solution would be to expose the available burst sizes in
-> the probe, and just our new one if we match that compatible, and any
-> invalid burst size would be rejected by the framework. Vinod, any
-> objection to that?
 
-Do you think that we should also check if the requested ports are
-valid, i.e. have a list/bitmap of the possible input/output ports per
-SoC, instead of just only the ID of the max port?
+Sorry for my poor English. I never got this rule. 
+
+Which one is a "substantially" right? Can you give me an example?
+
+I need to understand how you'd write this to satisfy the above rule.
+
+like this:
+
+memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+       TRE_SIZE);
+
+or
+
+memcpy(lldev->tre_ring + lldev->tre_write_offset,
+       &tre->tre_local[0], TRE_SIZE);
+
+or
+
+memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+							   TRE_SIZE);
+
+or
+
+memcpy(lldev->tre_ring + lldev->tre_write_offset,
+	&tre->tre_local[0], 
+	TRE_SIZE);
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
