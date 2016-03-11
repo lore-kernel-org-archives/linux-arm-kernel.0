@@ -1,127 +1,59 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 11 Mar 2016 10:11:22 -0800
-Subject: [PATCH] ARM: mvebu: fix overlap of Crypto SRAM with PCIe memory
- window
-In-Reply-To: <87bn6m3309.fsf@free-electrons.com>
-References: <1457452797-363-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <87bn6m3309.fsf@free-electrons.com>
-Message-ID: <20160311181122.GA12577@localhost>
+Date: Fri, 11 Mar 2016 11:54:59 -0800
+Subject: [GIT PULL] ARM: SoC: Two more fixes for 4.5
+Message-ID: <20160311195459.GA24769@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 01:56:38PM +0100, Gregory CLEMENT wrote:
-> Hi Thomas,
->  
->  On mar., mars 08 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-> 
-> > When the Crypto SRAM mappings were added to the Device Tree files
-> > describing the Armada XP boards in commit c466d997bb16 ("ARM: mvebu:
-> > define crypto SRAM ranges for all armada-xp boards"), the fact that
-> > those mappings were overlaping with the PCIe memory aperture was
-> > overlooked. Due to this, we currently have for all Armada XP platforms
-> > a situation that looks like this:
-> >
-> > Memory mapping on Armada XP boards with internal registers at
-> > 0xf1000000:
-> >
-> >  - 0x00000000 -> 0xf0000000	3.75G 	RAM
-> >  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
-> >  - 0xf1000000 -> 0xf1100000	1M	internal registers
-> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory aperture
-> >  - 0xf8100000 -> 0xf8110000	64KB	Crypto SRAM #0	=> OVERLAPS WITH PCIE !
-> >  - 0xf8110000 -> 0xf8120000	64KB	Crypto SRAM #1	=> OVERLAPS WITH PCIE !
-> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O aperture
-> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
-> >
-> > The overlap means that when PCIe devices are added, depending on their
-> > memory window needs, they might or might not be mapped into the
-> > physical address space. Indeed, they will not be mapped if the area
-> > allocated in the PCIe memory aperture by the PCI core overlaps with
-> > one of the Crypto SRAM. Typically, a Intel IGB PCIe NIC that needs 8MB
-> > of PCIe memory will see its PCIe memory window allocated from
-> > 0xf80000000 for 8MB, which overlaps with the Crypto SRAM windows. Due
-> > to this, the PCIe window is not created, and any attempt to access the
-> > PCIe window makes the kernel explode:
-> >
-> > [    3.302213] igb: Copyright (c) 2007-2014 Intel Corporation.
-> > [    3.307841] pci 0000:00:09.0: enabling device (0140 -> 0143)
-> > [    3.313539] mvebu_mbus: cannot add window '4:f8', conflicts with another window
-> > [    3.320870] mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0xf8000000-0xf87fffff]: -22
-> > [    3.330811] Unhandled fault: external abort on non-linefetch (0x1008) at 0xf08c0018
-> >
-> > This problem does not occur on Armada 370 boards, because we use the
-> > following memory mapping (for boards that have internal registers at
-> > 0xf1000000):
-> >
-> >  - 0x00000000 -> 0xf0000000	3.75G 	RAM
-> >  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
-> >  - 0xf1000000 -> 0xf1100000	1M	internal registers
-> >  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0 => OK !
-> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
-> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
-> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
-> >
-> > Obviously, the solution is to align the location of the Crypto SRAM
-> > mappings of Armada XP to be similar with the ones on Armada 370, i.e
-> > have them between the "internal registers" area and the beginning of
-> > the PCIe aperture.
-> >
-> > However, we have a special case with the OpenBlocks AX3-4 platform,
-> > which has a 128 MB NOR flash. Currently, this NOR flash is mapped from
-> > 0xf0000000 to 0xf8000000. This is possible because on OpenBlocks
-> > AX3-4, the internal registers are not at 0xf1000000. And this explains
-> > why the Crypto SRAM mappings were not configured at the same place on
-> > Armada XP.
-> >
-> > Hence, the solution is two-fold:
-> >
-> >  (1) Move the NOR flash mapping on Armada XP OpenBlocks AX3-4 from
-> >      0xe8000000 to 0xf0000000. This frees the 0xf0000000 ->
-> >      0xf80000000 space.
-> >
-> >  (2) Move the Crypto SRAM mappings on Armada XP to be similar to
-> >      Armada 370 (except of course that Armada XP has two Crypto SRAM
-> >      and not one).
-> >
-> > After this patch, the memory mapping on Armada XP boards with
-> > registers at 0xf1 is:
-> >
-> >  - 0x00000000 -> 0xf0000000	3.75G 	RAM
-> >  - 0xf0000000 -> 0xf1000000	16M	NOR flashes (AXP GP / AXP DB)
-> >  - 0xf1000000 -> 0xf1100000	1M	internal registers
-> >  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
-> >  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
-> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
-> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
-> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
-> >
-> > And the memory mapping for the special case of the OpenBlocks AX3-4
-> > (internal registers at 0xd0000000, NOR of 128 MB):
-> >
-> >  - 0x00000000 -> 0xc0000000	3G 	RAM
-> >  - 0xd0000000 -> 0xd1000000	1M	internal registers
-> >  - 0xe800000  -> 0xf0000000	128M	NOR flash
-> >  - 0xf1100000 -> 0xf1110000	64KB	Crypto SRAM #0
-> >  - 0xf1110000 -> 0xf1120000	64KB	Crypto SRAM #1
-> >  - 0xf8000000 -> 0xffe0000	126M	PCIe memory
-> >  - 0xffe00000 -> 0xfff00000	1M	PCIe I/O
-> >  - 0xfff0000  -> 0xffffffff	1M	BootROM
-> >
-> > Fixes: c466d997bb16 ("ARM: mvebu: define crypto SRAM ranges for all armada-xp boards")
-> > Reported-by: Phil Sutter <phil@nwl.cc>
-> > Cc: Phil Sutter <phil@nwl.cc>
-> > Cc: <stable@kernel.org>
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Arnd, Olof,
-> 
-> it would be nice having this fix applied on v4.5-rc. Could you applied
-> this patch directly, or do you want pull request for it?
+Hi Linus,
 
-Applied to fixes. Are you 150% sure you don't need some bake time on this patch
-to avoid surprises?
+The following changes since commit f3c87e99f401a0ff0ef941346ec6e790f0fd526e:
 
+  Merge tag 'renesas-dt-fixes2-for-v4.5' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into fixes (2016-03-02 23:24:33 +0100)
 
--Olof
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+
+for you to fetch changes up to d7d5a43c0d16760f25d892bf9329848167a8b8a4:
+
+  ARM: mvebu: fix overlap of Crypto SRAM with PCIe memory window (2016-03-11 11:49:55 -0800)
+
+----------------------------------------------------------------
+ARM: SoC fixes
+
+Two more fixes for 4.5:
+
+ - One is a fix for OMAP that is urgently needed to avoid DRA7xx chips from
+   premature aging, by always keeping the Ethernet clock enabled.
+
+ - The other solves a I/O memory layout issue on Armada, where SROM and PCI
+   memory windows were conflicting in some configurations.
+
+----------------------------------------------------------------
+Lokesh Vutla (1):
+      ARM: OMAP2+: hwmod: Introduce ti,no-idle dt property
+
+Mugunthan V N (1):
+      ARM: dts: dra7: do not gate cpsw clock due to errata i877
+
+Olof Johansson (1):
+      Merge tag 'for-v4.5-rc/omap-critical-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into fixes
+
+Thomas Petazzoni (1):
+      ARM: mvebu: fix overlap of Crypto SRAM with PCIe memory window
+
+ Documentation/devicetree/bindings/arm/omap/omap.txt |  1 +
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts           |  4 ++--
+ arch/arm/boot/dts/armada-xp-db.dts                  |  4 ++--
+ arch/arm/boot/dts/armada-xp-gp.dts                  |  4 ++--
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts     |  4 ++--
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts       |  4 ++--
+ arch/arm/boot/dts/armada-xp-matrix.dts              |  4 ++--
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts      |  4 ++--
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts    |  6 +++---
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts      |  4 ++--
+ arch/arm/boot/dts/dra7.dtsi                         | 10 ++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c                    |  9 ++++++++-
+ arch/arm/mach-omap2/omap_hwmod.h                    |  3 +++
+ 13 files changed, 41 insertions(+), 20 deletions(-)
