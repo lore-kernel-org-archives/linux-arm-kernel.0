@@ -1,40 +1,36 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Mar 2016 13:02:18 +0530
-Subject: [PATCH 5/5] dmaengine: sun6i: Add cyclic capability
-In-Reply-To: <350ad364b3e46f53159ff71aa611c432b4c588e0.1457606136.git.moinejf@free.fr>
-References: <cover.1457606136.git.moinejf@free.fr>
- <350ad364b3e46f53159ff71aa611c432b4c588e0.1457606136.git.moinejf@free.fr>
-Message-ID: <20160311073218.GT11154@localhost>
+Date: Fri, 11 Mar 2016 13:13:28 +0530
+Subject: [PATCH] dmaengine: pl330: Fix some race conditions in residue
+ calculation
+In-Reply-To: <1457452241.2818.128.camel@linaro.org>
+References: <1456319674.2867.15.camel@linaro.org>
+ <20160308041238.GL11154@localhost>
+ <1457433611.2818.83.camel@linaro.org>
+ <20160308141551.GP11154@localhost>
+ <1457452241.2818.128.camel@linaro.org>
+Message-ID: <20160311074328.GU11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 11:21:34AM +0100, Jean-Francois Moine wrote:
+On Tue, Mar 08, 2016 at 03:50:41PM +0000, Jon Medhurst (Tixy) wrote:
 
-> +
-> +	if (vchan->cyclic && vchan->phy && vchan->phy->desc)
-> +		return NULL;
+> > The reside is requested for "a descriptor". For example if you have prepared
+> > two descriptors A and B and submitted them, then you can request status and
+> > reside for A and you need to calculate that for A only and not take into
+> > account status of B
+> 
+> But, in the case of the pl330 driver, A and B may each consist of
+> multiple internal/hidden descriptors. So the residue calculation has to
+> sum up the residue of all these internal/hidden descriptors as well.
+> This is what the current pl330_tx_status() function does, but has bugs.
+> 
+> I've only just managed to clearly understand all the above details
+> whilst writing this email, and this confusion obviously means the code
+> and any commit messages need to explain things better.
 
-why check for vchan->cyclic? you are setting that at the end!
-
-> @@ -792,6 +903,11 @@ static void sun6i_dma_issue_pending(struct dma_chan *chan)
->  	spin_lock_irqsave(&vchan->vc.lock, flags);
->  
->  	if (vchan_issue_pending(&vchan->vc)) {
-> +		if (vchan->phy && vchan->cyclic) {
-> +			sun6i_dma_start_desc(vchan);
-> +			goto out;
-> +		}
-
-Why should this be cyclic specfic, Channel start should be same for all
-channels?
-
-> +static int sun6i_dma_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
-> +
-> +	vchan->cyclic = false;
-
-why do you need to set this here?
+Okay I relooked at the code, the driver is creating descriptor per period,
+so yes while calculating that should be taken into account but only for
+cyclic case and not for rest, as it will break reside values for for them.
 
 -- 
 ~Vinod
