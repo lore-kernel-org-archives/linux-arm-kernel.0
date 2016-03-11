@@ -1,32 +1,32 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 11 Mar 2016 11:35:10 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d4 xplained: don't disable hsmci regulator
-Message-ID: <1457692516-3151-1-git-send-email-ludovic.desroches@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Mar 2016 11:41:54 +0100
+Subject: [PATCH 3/3] ARM: dts: sun5i: Add dts for Difrence DIT4350 tablet
+In-Reply-To: <1457645884-10282-3-git-send-email-hdegoede@redhat.com>
+References: <1457645884-10282-1-git-send-email-hdegoede@redhat.com>
+ <1457645884-10282-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160311104154.GY8418@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabling the hsmci regulator on card detection, the board can reboot
-on sd card insertion. Keeping the regulator always enabled fixes this
-issue.
+On Thu, Mar 10, 2016 at 10:38:04PM +0100, Hans de Goede wrote:
+> The Difrnce dit4350 tablet is a tiny tablet with a 4.3" 16:9 480x272 LCD,
+> A13 SoC, 512M RAM, 4G NAND, solomon systech ssd2532qn6 touchscreen at
+> i2c1 address 0x48, Memsic MXC622X accelerometer at i2c1 address 0x15 and
+> rtl8188etv wifi.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Fixes: 8d545f32bd77 ("ARM: at91/dt: sama5d4 xplained: add regulators for
-v(q)mmc1 supplies")
-Cc: stable at vger.kernel.org #4.3 and later
----
- arch/arm/boot/dts/at91-sama5d4_xplained.dts | 1 +
- 1 file changed, 1 insertion(+)
+Queued, thanks!
+Maxime
 
-diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-index 569026e..da84e65 100644
---- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-@@ -268,5 +268,6 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 		vin-supply = <&vcc_3v3_reg>;
-+		regulator-always-on;
- 	};
- };
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160311/38d429c8/attachment.sig>
