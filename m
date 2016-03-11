@@ -1,40 +1,53 @@
 From: huangdaode@hisilicon.com (Daode Huang)
-Date: Fri, 11 Mar 2016 17:10:40 +0800
-Subject: [PATCH V2 net 0/6] net: hns: hns driver updates
-Message-ID: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
+Date: Fri, 11 Mar 2016 17:10:45 +0800
+Subject: [PATCH V2 net 5/6] net: hns: fixed service-ges setting MAC-addr bug
+In-Reply-To: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
+References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <1457687446-109867-6-git-send-email-huangdaode@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+from: Sheng Li <lisheng011@huawei.com>
 
-This patch series are hisilicon network driver bug fix.
-please merge them to the net repo.
-Thanks
+Service gmacs can not set mac add, this patch will fix the bug.
 
-Daode Huang
+Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+Signed-off-by: Sheng Li <lisheng011@huawei.com>
 ---
-changlog
-v2: some minor change according to 
-    MBR Sergei <sergei.shtylyov@cogentembedded.com> in
-    [patch 3/6] [patch 4/6].
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c | 19 +++++++++----------
+ 1 file changed, 9 insertions(+), 10 deletions(-)
 
-v1: initial version.
-
-Daode Huang (6):
-  net: hns: bug fix about the overflow of mss
-  net: hns: fixes the hw interrupt bug in using napi
-  net: hns: fixed portid bug in sending manage pkt
-  net: hns: adds uc match for debug port
-  net: hns: fixed service-ges setting MAC-addr bug
-  net: hns: bug fix of getting hilink status
-
- drivers/net/ethernet/hisilicon/hns/hnae.h          |  3 ++
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  1 +
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c | 29 +++++++++++----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 41 ++++++++++++----------
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  4 +++
- drivers/net/ethernet/hisilicon/hns/hns_enet.c      | 32 +++++++++--------
- 6 files changed, 70 insertions(+), 40 deletions(-)
-
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
+index 2591a51..eb86178 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c
+@@ -414,18 +414,17 @@ static void hns_gmac_set_mac_addr(void *mac_drv, char *mac_addr)
+ {
+ 	struct mac_driver *drv = (struct mac_driver *)mac_drv;
+ 
+-	if (drv->mac_id >= DSAF_SERVICE_NW_NUM) {
+-		u32 high_val = mac_addr[1] | (mac_addr[0] << 8);
++	u32 high_val = mac_addr[1] | (mac_addr[0] << 8);
+ 
+-		u32 low_val = mac_addr[5] | (mac_addr[4] << 8)
+-			| (mac_addr[3] << 16) | (mac_addr[2] << 24);
++	u32 low_val = mac_addr[5] | (mac_addr[4] << 8)
++		| (mac_addr[3] << 16) | (mac_addr[2] << 24);
+ 
+-		u32 val = dsaf_read_dev(drv, GMAC_STATION_ADDR_HIGH_2_REG);
+-		u32 sta_addr_en = dsaf_get_bit(val, GMAC_ADDR_EN_B);
+-		dsaf_write_dev(drv, GMAC_STATION_ADDR_LOW_2_REG, low_val);
+-		dsaf_write_dev(drv, GMAC_STATION_ADDR_HIGH_2_REG,
+-			       high_val | (sta_addr_en << GMAC_ADDR_EN_B));
+-	}
++	u32 val = dsaf_read_dev(drv, GMAC_STATION_ADDR_HIGH_2_REG);
++	u32 sta_addr_en = dsaf_get_bit(val, GMAC_ADDR_EN_B);
++
++	dsaf_write_dev(drv, GMAC_STATION_ADDR_LOW_2_REG, low_val);
++	dsaf_write_dev(drv, GMAC_STATION_ADDR_HIGH_2_REG,
++		       high_val | (sta_addr_en << GMAC_ADDR_EN_B));
+ }
+ 
+ static int hns_gmac_config_loopback(void *mac_drv, enum hnae_loop loop_mode,
 -- 
 1.9.1
