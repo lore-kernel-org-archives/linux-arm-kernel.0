@@ -1,74 +1,70 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Mar 2016 11:23:56 +0530
-Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
- interrupt properties
-In-Reply-To: <3503D512-7E9C-46E8-91C7-CAD828DD48D1@martin.sperl.org>
-References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
- <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
- <87fuw1yipi.fsf@eliezer.anholt.net>
- <3503D512-7E9C-46E8-91C7-CAD828DD48D1@martin.sperl.org>
-Message-ID: <20160311055356.GM11154@localhost>
+Date: Fri, 11 Mar 2016 11:49:31 +0530
+Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
+In-Reply-To: <20160310160522.GB1111@bigcity.dyn.berto.se>
+References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1457404974-1800-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160308073847.GA15520@infradead.org>
+ <20160310160522.GB1111@bigcity.dyn.berto.se>
+Message-ID: <20160311061931.GN11154@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 12:23:51PM +0100, Martin Sperl wrote:
+On Thu, Mar 10, 2016 at 05:05:23PM +0100, Niklas S??derlund wrote:
+> Hi Christoph,
 > 
-> > On 08.03.2016, at 00:24, Eric Anholt <eric@anholt.net> wrote:
-> > 
-> > kernel at martin.sperl.org writes:
-> > 
-> >> From: Martin Sperl <kernel@martin.sperl.org>
-> >> 
-> >> Add binding documentation for the new shared interrupt properties:
-> >> * brcm,dma-channel-shared-mask
-> >> * brcm,dma-shared-irq-index
-> >> 
-> >> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> >> ---
-> >> Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt | 6 ++++++
-> >> 1 file changed, 6 insertions(+)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> >> index 1396078..f9e84ee 100644
-> >> --- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> >> +++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-> >> @@ -17,6 +17,10 @@ Required properties:
-> >> - brcm,dma-channel-mask: Bit mask representing the channels
-> >> 			 not used by the firmware in ascending order,
-> >> 			 i.e. first channel corresponds to LSB.
-> >> +- brcm,dma-channel-shared-mask: Bit mask representing the channels
-> >> +				that use a shared interrupt
-> >> +- brcm,dma-shared-irq-index: index of which of the interrupts mentioned
-> >> +			     above is the shared interrupt
-> > 
-> > This should be under "Optional properties" since there are appropriate
-> > defaults for the only compatible string listed.
+> On 2016-03-07 23:38:47 -0800, Christoph Hellwig wrote:
+> > Please add some documentation on where/how this should be used.  It's
+> > not a very obvious interface.
 > 
-> Well - IMO it is actually required and the defaults are only for backwards
-> compatibility with older device-trees, but that is easy to change?
-> > 
-> > I still don't think exposing this in the DT is necessary (it's hardware
-> > block internals), but I'm not writing the code so I'm fine with it
-> Actually this was a request by Vinod to make this configurable via the
-> device-tree.
+> Good idea, I have added the following to Documentation/DMA-API.txt and 
+> folded it in to this patch. Do you feel it's adequate and do you know 
+> anywhere else I should add documentation?
+> 
+> diff --git a/Documentation/DMA-API.txt b/Documentation/DMA-API.txt
+> index 45ef3f2..248556a 100644
+> --- a/Documentation/DMA-API.txt
+> +++ b/Documentation/DMA-API.txt
+> @@ -277,14 +277,29 @@ and <size> parameters are provided to do partial page mapping, it is
+>  recommended that you never use these unless you really know what the
+>  cache width is.
+>  
+> +dma_addr_t
+> +dma_map_resource(struct device *dev, phys_addr_t phys_addr, size_t size,
+> +                enum dma_data_direction dir, struct dma_attrs *attrs)
+> +
+> +Maps a MMIO region so it can be accessed by the device and returns the
+> +DMA address of the memory. API should only be used to map device MMIO,
+> +mapping of RAM is not permitted.
+> +
+> +void
+> +dma_unmap_resource(struct device *dev, dma_addr_t addr, size_t size,
+> +                  enum dma_data_direction dir, struct dma_attrs *attrs)
 
-DT needs to provide the hardware details for driver to work across
-generations. Driver needs to get information like this to make decisions and
-not hard code and make driver not scale..
+Using function prototypes in documentation may not be a great idea as you
+are explaining the role of this function and not arguments.
 
+> +
+> +Unmaps the IOMMU region previously mapped. All the parameters passed in
+> +must be identical to those passed in (and returned) by the mapping API.
+> +
+>  int
+>  dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+>  
+> -In some circumstances dma_map_single() and dma_map_page() will fail to create
+> -a mapping. A driver can check for these errors by testing the returned
+> -DMA address with dma_mapping_error(). A non-zero return value means the mapping
+> -could not be created and the driver should take appropriate action (e.g.
+> -reduce current DMA mapping usage or delay and try again later).
+> +In some circumstances dma_map_single(), dma_map_page() and dma_map_resource()
+> +will fail to create a mapping. A driver can check for these errors by testing
+> +the returned DMA address with dma_mapping_error(). A non-zero return value
+> +means the mapping could not be created and the driver should take appropriate
+> +action (e.g.  reduce current DMA mapping usage or delay and try again later).
 > 
-> > either way, really.  Regardless, it would be really good to get the
-> > slave_sg part of the series in, which is really important for the
-> > platform.
-> Yes, then we can bring the DMA implementations for mmc/sdhost forward.
-> 
-> Martin
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> -- 
+> Regards,
+> Niklas S?derlund
 
 -- 
 ~Vinod
