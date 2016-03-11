@@ -1,62 +1,86 @@
-From: roman@advem.lv (Roman Yeryomin)
-Date: Fri, 11 Mar 2016 18:09:05 +0200
-Subject: [OpenWrt-Devel] ARMv4 (not v4t) marked obsolete in gcc-6
-In-Reply-To: <56E26A47.9040608@openwrt.org>
-References: <201603101013.04618.arnd@arndb.de>
- <alpine.LNX.2.00.1603110638190.12310@T520.work>
- <56E26A47.9040608@openwrt.org>
-Message-ID: <3cbff06f821f529e67cf75580ee89732@advem.lv>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Fri, 11 Mar 2016 23:25:13 +0700
+Subject: [PATCH v4 0/4] ACPI: parse the SPCR table
+In-Reply-To: <56D9AE15.106@hurleysoftware.com>
+References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
+ <56D5B5CB.7010702@hurleysoftware.com> <56D8272E.20705@gmail.com>
+ <56D859CC.7010901@hurleysoftware.com> <56D9772B.5000402@linaro.org>
+ <56D9AE15.106@hurleysoftware.com>
+Message-ID: <56E2F169.8030708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-11 08:48, John Crispin wrote:
-> On 11/03/2016 06:44, Hans Ulli Kroll wrote:
->> Hi
->>> 
->>> * Gemini: officially supported in OpenWRT today, with the latest 
->>> compiler. This one
->>>   will likely cause the most issues for actual users. It would be 
->>> helpful to get
->>>   some numbers about users or downloads here, to see whether it can 
->>> be dropped
->>>   in a future OpenWRT release or if it might be possible to leave 
->>> this on
->>>   gcc-6.x when the other platforms move on to gcc-7+
->> 
->> I don't have any numbers from the OPenWRT people.
->> For the NAS BOXes itself, I get one/two support questions a month on 
->> the
->> german based forum.
->> I think most people know about the SATA bug, which makes the platform
->> unreliable for some SATA drives.
->> y
->> Hans Ulli
-> 
-> Hi,
-> 
-> We have several active users. Roman has done a great job to constantly
-> maintain and update the target. We have been including gemini in our
-> releases for years thanks to Romans effort. It would be a shame to to
-> see support being dropped, even if there are few yet active users.
-> 
+Hi Peter,
 
-Thanks, John.
-I'm actively using it as a backup box and know at least several other 
-people. Although it's quite old I can't stop using it, it serves well 
-for me and I don't see any reason to throw it out.
-I've heard of SATA problems but never seen them myself.
-As to the numbers I think that people like me (or others trying out 
-OpenWrt) usually don't go to the forums, so number of questions there 
-doesn't tell much (but even there latest messages are from last month, 
-so not dead at all). Maybe number of downloads from 
-downloads.openwrt.org can tell more but I would guess that actual users 
-would rather compile it themselves.
+You are right, SPCR console should support earlycon.
+I will send next version that will try to follow your recommendations in 
+a week, after I return from vacations.
 
-So I vote for not killing it at least until it's supported by kernel.
+As we discussed with Christopher, "serial: pl011: use SPCR to setup 
+32-bit access" will be dropped.
 
-Actually that reminds me to upgrade to 4.4 and do proper sysupgrade 
-support.
+Thank you
+Aleksey Makarov
 
-
-Regards,
-Roman
+On 04.03.2016 22:47, Peter Hurley wrote:
+> On 03/04/2016 03:53 AM, Aleksey Makarov wrote:
+>>
+>>
+>> On 03/03/2016 06:35 PM, Peter Hurley wrote:
+>>> On 03/03/2016 03:59 AM, Aleksey Makarov wrote:
+>>>>
+>>>>
+>>>> On 03/01/2016 06:31 PM, Peter Hurley wrote:
+>>>>> On 02/29/2016 04:02 AM, Aleksey Makarov wrote:
+>>>>>> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+>>>>>> Console Redirection Table) [2] as a mandatory ACPI table that
+>>>>>> specifies the configuration of serial console.
+>>>>>>
+>>>>>> Introduce a new function acpi_console_check().  At the uart port
+>>>>>> registration, this function checks if the ACPI SPCR table specifies
+>>>>>> its argument of type struct uart_port to be a console
+>>>>>> and if so calls add_preferred_console().
+>>>>>
+>>>>> How will a user enable an earlycon on the same console as the SPCR
+>>>>> console if there is no DBG2 table?
+>>>>
+>>>> ...
+>>>> [    0.000000] earlycon: pl11 at MMIO 0x0000000009000000 (options '')
+>>>> [    0.000000] bootconsole [pl11] enabled
+>>>> ...
+>>>> [    0.000000] Kernel command line:  root=/dev/vda1 rw systemd.show_status=no acpi=force earlycon=pl011,0x9000000
+>>>> ...
+>>>> [    0.318248] ACPI: SPCR: adding preferred console [ttyAMA0]
+>>>> [    0.318736] ARMH0011:00: ttyAMA0 at MMIO 0x9000000 (irq = 5, base_baud = 0) is a SBSA
+>>>> [    0.319502] console [ttyAMA0] enabled
+>>>> [    0.319502] console [ttyAMA0] enabled
+>>>> [    0.319933] bootconsole [pl11] disabled
+>>>> [    0.319933] bootconsole [pl11] disabled
+>>>> ...
+>>>>
+>>>> Why?
+>>>
+>>> That's pretty disingenuous; via command line?
+>>>
+>>> By that measure, none of your patches are required because a user
+>>> can already start both console and earlycon without them.
+>>>
+>>> With the console location specified in the SPCR, earlycon should
+>>> be opt-in on the command-line simply with "earlycon" command-line
+>>> parameter.
+>>
+>> Yes.  That's why we have SPCR *and* DBG2.
+>> DBG2 specifies where we should run earlycon.
+>>
+>>>>> How will a user enable an earlycon on the same console as the SPCR
+>>>>> console if there is no DBG2 table?
+>>
+>> In no way.  You need DBG2 to run earlycon.
+>
+> And that's an entirely arbitrary decision being made by you.
+> Which I think is unnecessarily limited.
+>
+>
+>> (If you don't want to specify it's address etc explicitly)
+>
+>
