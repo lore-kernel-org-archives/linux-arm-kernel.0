@@ -1,51 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Mar 2016 11:16:44 +0000
-Subject: Tons of "no unit name" spam with make dtbs
-In-Reply-To: <CAL_JsqJswSBTf+5Vdv2gg05nUg1008vPeh5MYDO_7WHAc=Dndw@mail.gmail.com>
-References: <20160310180745.GD9329@atomide.com>
- <CAL_JsqJswSBTf+5Vdv2gg05nUg1008vPeh5MYDO_7WHAc=Dndw@mail.gmail.com>
-Message-ID: <20160311111644.GQ5783@n2100.arm.linux.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 11 Mar 2016 13:22:40 +0200
+Subject: [PATCH 2/3] video: fbdev: imxfb: enable lcd regulator in .probe
+In-Reply-To: <1457380425-20244-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1457380425-20244-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <56E2AA80.4050908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 07:23:23PM -0600, Rob Herring wrote:
-> On Thu, Mar 10, 2016 at 12:07 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > Hey Rob,
-> >
-> > I'm seeing tons of dtc spam with make dtbs (about 23k lines
-> > with multi_v7_defconfig!) with commit fa38a82096a1 ("scripts/dtc:
-> > Update to upstream version 53bf130b1cdd").
-> >
-> > Introducing something like this few days with merge window
-> > about to open seems to be in the "a bit intrusive" category
-> > to me :)
-> >
-> > Probably some of these changes should be reverted?
+
+On 07/03/16 21:53, Uwe Kleine-K?nig wrote:
+> This asserts that the display is on after the driver is initialized.
+> Otherwise, depending on how the boot loader handled the display, it is
+> either disabled as the regulator doesn't seem in use, or it stays off.
 > 
-> It is in -next, but I'm not planning to send to Linus this cycle.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/video/fbdev/imxfb.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/video/fbdev/imxfb.c b/drivers/video/fbdev/imxfb.c
+> index c5fcedde2a60..3dd2824e6773 100644
+> --- a/drivers/video/fbdev/imxfb.c
+> +++ b/drivers/video/fbdev/imxfb.c
+> @@ -979,8 +979,17 @@ static int imxfb_probe(struct platform_device *pdev)
+>  	imxfb_enable_controller(fbi);
+>  	fbi->pdev = pdev;
+>  
+> +	if (!IS_ERR(fbi->lcd_pwr)) {
+> +		ret = regulator_enable(fbi->lcd_pwr);
+> +		if (ret)
+> +			goto failed_regulator;
+> +	}
+> +
+>  	return 0;
+>  
+> +failed_regulator:
+> +	imxfb_disable_controller(fbi);
+> +
+>  failed_lcd:
+>  	unregister_framebuffer(info);
 
-Then it shouldn't be in -next.  -next is a tree for integration testing
-and conflict discovery for the upcoming merge window, and should only
-contain code targetted at that merge window.  Here's a reminder of
-sfr's boilerplate which lays this out:
+So I didn't go through the code in detail, but this doesn't look correct
+to me.
 
-  Thanks for adding your subsystem tree as a participant of linux-next.  As
-  you may know, this is not a judgment of your code.  The purpose of
-  linux-next is for integration testing and to lower the impact of
-  conflicts between subsystems in the next merge window.
+Where is the regulator disabled which now gets enabled in probe?
 
-  You will need to ensure that the patches/commits in your tree/series have
-  been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-        Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and
-     * destined for the current or next Linux merge window.
+imxfb_lcd_set_power() handles the regulator enable/disable, so doesn't
+this mean the regulator would always be enabled? You first enable it in
+probe, then imxfb_lcd_set_power() enables it at some point (?), so the
+enable-count is two then.
 
-It seems it doesn't satisfy the last point there.
+To be honest, I've never used 'struct lcd_ops', but I think the enabling
+of the regulator should happen somehow via that. If the regulator needs
+to be enabled at probe time, then the probe should somehow cause
+lcd_ops->set_power to get called.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Why does the regulator need to be enabled at probe? Or are you saying
+imxfb_lcd_set_power() is never called in your case?
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160311/bb4f6137/attachment.sig>
