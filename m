@@ -1,303 +1,533 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 11 Mar 2016 09:53:11 -0800
-Subject: [PATCH v2 3/3] phy: mdio-thunder: Add driver for Cavium Thunder SoC
- MDIO buses.
-In-Reply-To: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1457718791-6505-4-git-send-email-ddaney.cavm@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 11 Mar 2016 11:58:50 -0600
+Subject: [PATCH v3 2/2] PCI: imx6: add initial imx6sx support
+In-Reply-To: <1456411669-4699-3-git-send-email-chf.fritz@googlemail.com>
+References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+ <1456411669-4699-3-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <20160311175850.GA4725@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Hi Christoph (and Lee; there's a question for you below, too),
 
-The Cavium Thunder SoCs have multiple MIDO buses that are part of a
-single PCI device.  To model this in the device tree we call the PCI
-parent device a "cavium,thunder-8890-mdio-nexus", it has several
-children, one for each MDIO bus.
+On Thu, Feb 25, 2016 at 03:47:49PM +0100, Christoph Fritz wrote:
+> This patch adds initial PCIe support for the imx6 SoC derivate imx6sx.
+> PCI_MSI support is untested as its necessary suspend/resume quirk is
+> left out of this patch.
+> This patch is heavily based on patches by Richard Zhu.
+> 
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> ---
+>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+>  drivers/pci/host/pci-imx6.c                        | 130 ++++++++++++++-------
+>  2 files changed, 96 insertions(+), 40 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> index 6fbba53..c4323be 100644
+> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> @@ -4,7 +4,7 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+>  and thus inherits all the common properties defined in designware-pcie.txt.
+>  
+>  Required properties:
+> -- compatible: "fsl,imx6q-pcie"
+> +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie"
+>  - reg: base addresse and length of the pcie controller
 
-The MDIO bus hardware is identical to that found in the OCTEON SoCs,
-so we use that code for things that are not part of the PCI driver
-probe/remove
+I folded in a typo fix for "addresse".
 
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- .../devicetree/bindings/net/cavium-mdio.txt        |  61 +++++++-
- drivers/net/phy/Kconfig                            |  11 ++
- drivers/net/phy/Makefile                           |   1 +
- drivers/net/phy/mdio-thunder.c                     | 154 +++++++++++++++++++++
- 4 files changed, 225 insertions(+), 2 deletions(-)
- create mode 100644 drivers/net/phy/mdio-thunder.c
+>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+>    entry for each entry in the interrupt-names property.
+> @@ -13,6 +13,10 @@ Required properties:
+>  - clock-names: Must include the following additional entries:
+>  	- "pcie_phy"
+>  
+> +Additional required properties for imx6sx-pcie:
+> +- clock names: Must include the following additional entries:
+> +	- "pcie_inbound_axi"
+> +
+>  Example:
+>  
+>  	pcie at 0x01000000 {
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index fe60096..7e634a6 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -35,9 +35,11 @@ struct imx6_pcie {
+>  	struct gpio_desc	*reset_gpio;
+>  	struct clk		*pcie_bus;
+>  	struct clk		*pcie_phy;
+> +	struct clk		*pcie_inbound_axi;
+>  	struct clk		*pcie;
+>  	struct pcie_port	pp;
+>  	struct regmap		*iomuxc_gpr;
+> +	bool			is_imx6sx;
+>  	void __iomem		*mem_base;
+>  };
+>  
+> @@ -214,35 +216,46 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+>  	u32 val, gpr1, gpr12;
+>  
+> -	/*
+> -	 * If the bootloader already enabled the link we need some special
+> -	 * handling to get the core back into a state where it is safe to
+> -	 * touch it for configuration.  As there is no dedicated reset signal
+> -	 * wired up for MX6QDL, we need to manually force LTSSM into "detect"
+> -	 * state before completely disabling LTSSM, which is a prerequisite
+> -	 * for core configuration.
+> -	 *
+> -	 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have a strong
+> -	 * indication that the bootloader activated the link.
+> -	 */
+> -	regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
+> -	regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
+> -
+> -	if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
+> -	    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
+> -		val = readl(pp->dbi_base + PCIE_PL_PFLR);
+> -		val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> -		val |= PCIE_PL_PFLR_FORCE_LINK;
+> -		writel(val, pp->dbi_base + PCIE_PL_PFLR);
+> -
+> +	if (imx6_pcie->is_imx6sx) {
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> -				IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+> -	}
+> +				IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
+> +				IMX6SX_GPR12_PCIE_TEST_POWERDOWN);
+> +		/* Force PCIe PHY reset */
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
+> +					IMX6SX_GPR5_PCIE_BTNRST_RESET,
+> +					IMX6SX_GPR5_PCIE_BTNRST_RESET);
 
-diff --git a/Documentation/devicetree/bindings/net/cavium-mdio.txt b/Documentation/devicetree/bindings/net/cavium-mdio.txt
-index 04cb749..020df08 100644
---- a/Documentation/devicetree/bindings/net/cavium-mdio.txt
-+++ b/Documentation/devicetree/bindings/net/cavium-mdio.txt
-@@ -1,9 +1,12 @@
- * System Management Interface (SMI) / MDIO
+Since there's nothing after the "else" clause, I think it's better to
+return immediately here.  Then we don't have extra diffs that merely
+indent the original function.  I did make this change (I'll attach my
+resulting patch), and that made some other changes to the indented
+code more visible.
+
+> +	} else {
+> +		/*
+> +		 * If the bootloader already enabled the link we need some
+> +		 * special handling to get the core back into a state where
+> +		 * it is safe to touch it for configuration.  As there is no
+> +		 * dedicated reset signal to manually force LTSSM into "detect"
+> +		 * state before completely disabling LTSSM, which is a
+> +		 * prerequisite for core configuration.
+
+For example, you changed this comment, and now the last sentence is no
+longer a sentence.  I don't know if this was an editing mistake or if
+this comment really does need to change.  If it does need to change,
+it needs to stay a sentence.
+
+> +		 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have
+> +		 * a strong indication that the bootloader activated the link.
+> +		 */
+> +		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
+> +		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
+> +
+> +		if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
+> +				(gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
+> +			val = readl(pp->dbi_base + PCIE_PL_PFLR);
+> +			val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> +			val |= PCIE_PL_PFLR_FORCE_LINK;
+> +			writel(val, pp->dbi_base + PCIE_PL_PFLR);
+> +
+> +			regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +				IMX6Q_GPR12_PCIE_CTL_2, 0);
+> +		}
+>  
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +			IMX6Q_GPR1_PCIE_TEST_PD,
+> +			IMX6Q_GPR1_PCIE_TEST_PD);
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0);
+
+And there are subtle changes here (changing "1 << 18" to
+IMX6Q_GPR1_PCIE_TEST_PD, etc.)  These are fine, but should be in a
+separate patch because (a) they're not related to imx6sx and (b) it
+makes them obvious and easy to review.  As it is, they just get snuck
+in under the radar.
+
+> +	}
+>  
+>  	return 0;
+>  }
+> @@ -270,18 +283,30 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  		goto err_pcie;
+>  	}
+>  
+> -	/* power up core phy and enable ref clock */
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> -	/*
+> -	 * the async reset input need ref clock to sync internally,
+> -	 * when the ref clock comes after reset, internal synced
+> -	 * reset time is too short, cannot meet the requirement.
+> -	 * add one ~10us delay here.
+> -	 */
+> -	udelay(10);
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> +	if (imx6_pcie->is_imx6sx) {
+> +		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
+> +		if (ret) {
+> +			dev_err(pp->dev, "unable to enable pcie_axi clock\n");
+> +			goto err_inbound_axi;
+> +		}
+> +
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +			IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
+> +	} else {
+> +		/* power up core phy and enable ref clock */
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +				IMX6Q_GPR1_PCIE_TEST_PD, 0);
+> +		/*
+> +		 * the async reset input need ref clock to sync internally,
+> +		 * when the ref clock comes after reset, internal synced
+> +		 * reset time is too short , cannot meet the requirement.
+> +		 * add one ~10us delay here.
+> +		 */
+> +		udelay(10);
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +			IMX6Q_GPR1_PCIE_REF_CLK_EN,
+> +			IMX6Q_GPR1_PCIE_REF_CLK_EN);
+> +	}
+
+Here again the diff is bigger than necessary because it re-indents the
+original code (and makes another unrelated "1 << 16" to
+IMX6Q_GPR1_PCIE_REF_CLK_EN change).  I'll show a different proposal in
+my patch below.
+
+>  	/* allow the clocks to stabilize */
+>  	usleep_range(200, 500);
+> @@ -292,8 +317,15 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  		msleep(100);
+>  		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
+>  	}
+> +
+> +	if (imx6_pcie->is_imx6sx)
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
+> +			IMX6SX_GPR5_PCIE_BTNRST_RESET, 0);
+> +
+>  	return 0;
+>  
+> +err_inbound_axi:
+> +	clk_disable_unprepare(imx6_pcie->pcie);
+>  err_pcie:
+>  	clk_disable_unprepare(imx6_pcie->pcie_bus);
+>  err_pcie_bus:
+> @@ -307,6 +339,12 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
+>  {
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+>  
+> +	if (imx6_pcie->is_imx6sx) {
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +			IMX6SX_GPR12_PCIE_RX_EQ_MASK,
+> +			IMX6SX_GPR12_PCIE_RX_EQ_2);
+
+I see that you added definitions for IMX6SX_GPR12_PCIE_RX_EQ_MASK and
+IMX6SX_GPR12_PCIE_RX_EQ_2 in the first patch of this series, but doing
+that separately creates a merge problem.  I can't put this change in
+my tree by itself because it won't build.  If Lee applied the first
+patch to a git branch, I guess I could pull that into my tree.  But it
+would be far simpler to just include those new definitions in this
+patch.
+
+> +	}
+> +
+>  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>  			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+>  
+> @@ -571,6 +609,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  	pp = &imx6_pcie->pp;
+>  	pp->dev = &pdev->dev;
+>  
+> +	imx6_pcie->is_imx6sx = of_device_is_compatible(pp->dev->of_node,
+> +					"fsl,imx6sx-pcie");
+> +
+>  	/* Added for PCI abort handling */
+>  	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
+>  		"imprecise external abort");
+> @@ -606,6 +647,16 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  		return PTR_ERR(imx6_pcie->pcie);
+>  	}
+>  
+> +	if (imx6_pcie->is_imx6sx) {
+> +		imx6_pcie->pcie_inbound_axi = devm_clk_get(&pdev->dev,
+> +			"pcie_inbound_axi");
+> +		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
+> +			dev_err(&pdev->dev,
+> +				"pcie_incbound_axi clock missing or invalid\n");
+> +			return PTR_ERR(imx6_pcie->pcie_inbound_axi);
+> +		}
+> +	}
+> +
+>  	/* Grab GPR config register range */
+>  	imx6_pcie->iomuxc_gpr =
+>  		 syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> @@ -632,6 +683,7 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
+>  
+>  static const struct of_device_id imx6_pcie_of_match[] = {
+>  	{ .compatible = "fsl,imx6q-pcie", },
+> +	{ .compatible = "fsl,imx6sx-pcie", },
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
+
+The patches below are what I currently have in my tree, but they're
+not ready for v4.6 (yet).
+
+Note that the second one is very clearly imx6sx-only.  It's obvious
+there are no tweaks to the existing imx6 code, which makes it easier
+to review, backport, bisect, revert, etc.
+
+Obviously, I can't apply these directly.  First we have to:
+
+  - Fix the LTSSM comment
+  - Figure out how to get the IMX6SX_GPR12_PCIE_RX_EQ_MASK definitions
+
+
+commit 78abf60b815a8f28207d029d61f7809647faa43a
+Author: Bjorn Helgaas <bhelgaas@google.com>
+Date:   Fri Mar 11 11:15:36 2016 -0600
+
+    PCI: imx6: Factor out ref clock enable
+    
+    Factor out ref clock enable to make it cleaner to add imx6sx support.  No
+    functional change intended.
+    
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 8c9b389..ecc8537 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -269,6 +269,23 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ 	return 0;
+ }
  
- Properties:
--- compatible: "cavium,octeon-3860-mdio"
-+- compatible: One of:
- 
--  Compatibility with all cn3XXX, cn5XXX and cn6XXX SOCs.
-+   "cavium,octeon-3860-mdio": Compatibility with all cn3XXX, cn5XXX
-+                       and cn6XXX SOCs.
-+
-+   "cavium,thunder-8890-mdio": Compatibility with all cn8XXX SOCs.
- 
- - reg: The base address of the MDIO bus controller register bank.
- 
-@@ -25,3 +28,57 @@ Example:
- 			reg = <0>;
- 		};
- 	};
-+
-+
-+* System Management Interface (SMI) / MDIO Nexus
-+
-+  Several mdio buses may be gathered as children of a single PCI
-+  device, this PCI device is the nexus of the buses.
-+
-+Properties:
-+
-+- compatible: "cavium,thunder-8890-mdio-nexus";
-+
-+- reg: The PCI device and function numbers of the nexus device.
-+
-+- #address-cells: Must be <2>.
-+
-+- #size-cells: Must be <2>.
-+
-+- ranges: As needed for mapping of the MDIO bus device registers.
-+
-+- assigned-addresses: As needed for mapping of the MDIO bus device registers.
-+
-+Example:
-+
-+        mdio-nexus at 1,3 {
-+                compatible = "cavium,thunder-8890-mdio-nexus";
-+                #address-cells = <2>;
-+                #size-cells = <2>;
-+                reg = <0x0b00 0 0 0 0>; /* DEVFN = 0x0b (1:3) */
-+                assigned-addresses = <0x03000000 0x87e0 0x05000000 0x0 0x800000>;
-+                ranges = <0x87e0 0x05000000 0x03000000 0x87e0 0x05000000 0x0 0x800000>;
-+
-+                mdio0 at 87e0,05003800 {
-+                        compatible = "cavium,thunder-8890-mdio";
-+                        #address-cells = <1>;
-+                        #size-cells = <0>;
-+                        reg = <0x87e0 0x05003800 0x0 0x30>;
-+
-+                        ethernet-phy at 0 {
-+                                ...
-+                                reg = <0>;
-+                        };
-+                };
-+                mdio0 at 87e0,05003880 {
-+                        compatible = "cavium,thunder-8890-mdio";
-+                        #address-cells = <1>;
-+                        #size-cells = <0>;
-+                        reg = <0x87e0 0x05003880 0x0 0x30>;
-+
-+                        ethernet-phy at 0 {
-+                                ...
-+                                reg = <0>;
-+                        };
-+                };
-+        };
-diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-index 40faec9..075a4cc 100644
---- a/drivers/net/phy/Kconfig
-+++ b/drivers/net/phy/Kconfig
-@@ -196,6 +196,17 @@ config MDIO_OCTEON
- 	  buses. It is required by the Octeon and ThunderX ethernet device
- 	  drivers on some systems.
- 
-+config MDIO_THUNDER
-+	tristate "Support for MDIO buses on on ThunderX SOCs"
-+	depends on 64BIT
-+	depends on PCI
-+	select MDIO_CAVIUM
-+	help
-+	  This driver supports the MDIO interfaces found on Cavium
-+	  ThunderX SoCs when the MDIO bus device appears on as a PCI
-+	  device.
-+
-+
- config MDIO_SUN4I
- 	tristate "Allwinner sun4i MDIO interface support"
- 	depends on ARCH_SUNXI
-diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
-index 041b3d9..fcdbb92 100644
---- a/drivers/net/phy/Makefile
-+++ b/drivers/net/phy/Makefile
-@@ -31,6 +31,7 @@ obj-$(CONFIG_DP83867_PHY)	+= dp83867.o
- obj-$(CONFIG_STE10XP)		+= ste10Xp.o
- obj-$(CONFIG_MICREL_PHY)	+= micrel.o
- obj-$(CONFIG_MDIO_OCTEON)	+= mdio-octeon.o
-+obj-$(CONFIG_MDIO_THUNDER)	+= mdio-thunder.o
- obj-$(CONFIG_MDIO_CAVIUM)	+= mdio-cavium.o
- obj-$(CONFIG_MICREL_KS8995MA)	+= spi_ks8995.o
- obj-$(CONFIG_AT803X_PHY)	+= at803x.o
-diff --git a/drivers/net/phy/mdio-thunder.c b/drivers/net/phy/mdio-thunder.c
-new file mode 100644
-index 0000000..5646169
---- /dev/null
-+++ b/drivers/net/phy/mdio-thunder.c
-@@ -0,0 +1,154 @@
-+/*
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ *
-+ * Copyright (C) 2009-2016 Cavium, Inc.
-+ */
-+
-+#include <linux/of_address.h>
-+#include <linux/of_mdio.h>
-+#include <linux/module.h>
-+#include <linux/gfp.h>
-+#include <linux/phy.h>
-+#include <linux/io.h>
-+#include <linux/acpi.h>
-+#include <linux/pci.h>
-+
-+#include "mdio-cavium.h"
-+
-+struct thunder_mdiobus_nexus {
-+	void __iomem *bar0;
-+	struct cavium_mdiobus *buses[4];
-+};
-+
-+static int thunder_mdiobus_pci_probe(struct pci_dev *pdev,
-+				     const struct pci_device_id *ent)
++static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
 +{
-+	struct device_node *node;
-+	struct fwnode_handle *fwn;
-+	struct thunder_mdiobus_nexus *nexus;
-+	int err;
-+	int i;
++	/* power up core phy and enable ref clock */
++	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
++			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
++	/*
++	 * the async reset input need ref clock to sync internally,
++	 * when the ref clock comes after reset, internal synced
++	 * reset time is too short, cannot meet the requirement.
++	 * add one ~10us delay here.
++	 */
++	udelay(10);
++	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
++			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
++	return 0;
++}
 +
-+	nexus = devm_kzalloc(&pdev->dev, sizeof(*nexus), GFP_KERNEL);
-+	if (!nexus)
-+		return -ENOMEM;
+ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ {
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+@@ -292,18 +309,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 		goto err_pcie;
+ 	}
+ 
+-	/* power up core phy and enable ref clock */
+-	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+-			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+-	/*
+-	 * the async reset input need ref clock to sync internally,
+-	 * when the ref clock comes after reset, internal synced
+-	 * reset time is too short, cannot meet the requirement.
+-	 * add one ~10us delay here.
+-	 */
+-	udelay(10);
+-	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+-			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
++	ret = imx6_pcie_enable_ref_clk(imx6_pcie);
++	if (ret)
++		dev_err(pp->dev, "unable to enable pcie ref clock\n");
++		goto err_ref_clk;
++	}
+ 
+ 	/* allow the clocks to stabilize */
+ 	usleep_range(200, 500);
+@@ -316,6 +326,8 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	}
+ 	return 0;
+ 
++err_ref_clk:
++	clk_disable_unprepare(imx6_pcie->pcie);
+ err_pcie:
+ 	clk_disable_unprepare(imx6_pcie->pcie_bus);
+ err_pcie_bus:
+
+commit d061033570b7fd22a3ed8c029d4793e5df7324e1
+Author: Christoph Fritz <chf.fritz@googlemail.com>
+Date:   Thu Mar 10 15:04:25 2016 -0600
+
+    PCI: imx6: Add initial imx6sx support
+    
+    Add initial PCIe support for the imx6 SoC derivate imx6sx.  PCI MSI support
+    is untested as the necessary suspend/resume quirk is not included in this
+    patch.
+    
+    This patch is heavily based on patches by Richard Zhu.
+    
+    [bhelgaas: factor out refclk enable, fix adjacent typos in fsl,imx6q-pcie.txt]
+    Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+    Acked-by: Richard Zhu <Richard.Zhu@freescale.com>
+    Acked-by: Lucas Stach <l.stach@pengutronix.de>
+
+diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+index 3be80c6..0561e88 100644
+--- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+@@ -4,8 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+ and thus inherits all the common properties defined in designware-pcie.txt.
+ 
+ Required properties:
+-- compatible: "fsl,imx6q-pcie"
+-- reg: base addresse and length of the pcie controller
++- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie"
++- reg: base address and length of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+ - interrupt-names: Must include the following entries:
+@@ -20,6 +20,10 @@ Optional properties:
+ - fsl,tx-swing-full: Gen2 TX SWING FULL value. Default: 127
+ - fsl,tx-swing-low: TX launch amplitude swing_low value. Default: 127
+ 
++Additional required properties for imx6sx-pcie:
++- clock names: Must include the following additional entries:
++	- "pcie_inbound_axi"
 +
-+	pci_set_drvdata(pdev, nexus);
-+
-+	err = pcim_enable_device(pdev);
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to enable PCI device\n");
-+		pci_set_drvdata(pdev, NULL);
-+		return err;
+ Example:
+ 
+ 	pcie at 0x01000000 {
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index ecc8537..4d6af21 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -35,9 +35,11 @@ struct imx6_pcie {
+ 	struct gpio_desc	*reset_gpio;
+ 	struct clk		*pcie_bus;
+ 	struct clk		*pcie_phy;
++	struct clk		*pcie_inbound_axi;
+ 	struct clk		*pcie;
+ 	struct pcie_port	pp;
+ 	struct regmap		*iomuxc_gpr;
++	bool			is_imx6sx;
+ 	void __iomem		*mem_base;
+ 	u32			tx_deemph_gen1;
+ 	u32			tx_deemph_gen2_3p5db;
+@@ -236,13 +238,23 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+ 	u32 val, gpr1, gpr12;
+ 
++	if (imx6_pcie->is_imx6sx) {
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
++				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN);
++		/* Force PCIe PHY reset */
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
++				   IMX6SX_GPR5_PCIE_BTNRST_RESET,
++				   IMX6SX_GPR5_PCIE_BTNRST_RESET);
++		return 0;
 +	}
 +
-+	err = pci_request_regions(pdev, KBUILD_MODNAME);
-+	if (err) {
-+		dev_err(&pdev->dev, "pci_request_regions failed\n");
-+		goto err_disable_device;
-+	}
-+
-+	nexus->bar0 = pcim_iomap(pdev, 0, pci_resource_len(pdev, 0));
-+	if (!nexus->bar0) {
-+		err = -ENOMEM;
-+		goto err_release_regions;
-+	}
-+
-+	i = 0;
-+	device_for_each_child_node(&pdev->dev, fwn) {
-+		struct resource r;
-+		struct mii_bus *mii_bus;
-+		struct cavium_mdiobus *bus;
-+		union cvmx_smix_en smi_en;
-+
-+		/* If it is not an OF node we cannot handle it yet, so
-+		 * exit the loop.
-+		 */
-+		node = to_of_node(fwn);
-+		if (!node)
-+			break;
-+
-+		err = of_address_to_resource(node, 0, &r);
-+		if (err) {
-+			dev_err(&pdev->dev,
-+				"Couldn't translate address for \"%s\"\n",
-+				node->name);
-+			break;
+ 	/*
+ 	 * If the bootloader already enabled the link we need some special
+ 	 * handling to get the core back into a state where it is safe to
+ 	 * touch it for configuration.  As there is no dedicated reset signal
+-	 * wired up for MX6QDL, we need to manually force LTSSM into "detect"
+-	 * state before completely disabling LTSSM, which is a prerequisite
+-	 * for core configuration.
++	 * to manually force LTSSM into "detect" state before completely
++	 * disabling LTSSM, which is a prerequisite for core configuration.
+ 	 *
+ 	 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have a strong
+ 	 * indication that the bootloader activated the link.
+@@ -271,6 +283,18 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ 
+ static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
+ {
++	if (imx6_pcie->is_imx6sx) {
++		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
++		if (ret) {
++			dev_err(pp->dev, "unable to enable pcie_axi clock\n");
++			return ret;
 +		}
 +
-+		mii_bus = devm_mdiobus_alloc_size(&pdev->dev, sizeof(*bus));
-+		if (!mii_bus)
-+			break;
-+		bus = mii_bus->priv;
-+		bus->mii_bus = mii_bus;
-+
-+		nexus->buses[i] = bus;
-+		i++;
-+
-+		bus->register_base = (u64)nexus->bar0 +
-+			r.start - pci_resource_start(pdev, 0);
-+
-+		smi_en.u64 = 0;
-+		smi_en.s.en = 1;
-+		oct_mdio_writeq(smi_en.u64, bus->register_base + SMI_EN);
-+		bus->mii_bus->name = KBUILD_MODNAME;
-+		snprintf(bus->mii_bus->id, MII_BUS_ID_SIZE, "%llx", r.start);
-+		bus->mii_bus->parent = &pdev->dev;
-+		bus->mii_bus->read = cavium_mdiobus_read;
-+		bus->mii_bus->write = cavium_mdiobus_write;
-+
-+		err = of_mdiobus_register(bus->mii_bus, node);
-+		if (err)
-+			dev_err(&pdev->dev, "of_mdiobus_register failed\n");
-+
-+		dev_info(&pdev->dev, "Added bus at %llx\n", r.start);
-+		if (i >= ARRAY_SIZE(nexus->buses))
-+			break;
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
++		return 0;
 +	}
-+	return 0;
 +
-+err_release_regions:
-+	pci_release_regions(pdev);
+ 	/* power up core phy and enable ref clock */
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+@@ -324,6 +348,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 		msleep(100);
+ 		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
+ 	}
 +
-+err_disable_device:
-+	pci_set_drvdata(pdev, NULL);
-+	return err;
-+}
++	if (imx6_pcie->is_imx6sx)
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
++				   IMX6SX_GPR5_PCIE_BTNRST_RESET, 0);
 +
-+static void thunder_mdiobus_pci_remove(struct pci_dev *pdev)
-+{
-+	int i;
-+	struct thunder_mdiobus_nexus *nexus = pci_get_drvdata(pdev);
-+
-+	for (i = 0; i < ARRAY_SIZE(nexus->buses); i++) {
-+		struct cavium_mdiobus *bus = nexus->buses[i];
-+
-+		if (!bus)
-+			continue;
-+
-+		mdiobus_unregister(bus->mii_bus);
-+		mdiobus_free(bus->mii_bus);
-+		oct_mdio_writeq(0, bus->register_base + SMI_EN);
+ 	return 0;
+ 
+ err_ref_clk:
+@@ -341,6 +370,12 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
+ {
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+ 
++	if (imx6_pcie->is_imx6sx) {
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
++				   IMX6SX_GPR12_PCIE_RX_EQ_MASK,
++				   IMX6SX_GPR12_PCIE_RX_EQ_2);
 +	}
-+	pci_set_drvdata(pdev, NULL);
-+}
 +
-+static const struct pci_device_id thunder_mdiobus_id_table[] = {
-+	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, 0xa02b) },
-+	{ 0, } /* End of table. */
-+};
-+MODULE_DEVICE_TABLE(pci, thunder_mdiobus_id_table);
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+ 			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+ 
+@@ -565,6 +600,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 	pp = &imx6_pcie->pp;
+ 	pp->dev = &pdev->dev;
+ 
++	imx6_pcie->is_imx6sx = of_device_is_compatible(pp->dev->of_node,
++						       "fsl,imx6sx-pcie");
 +
-+static struct pci_driver thunder_mdiobus_driver = {
-+	.name = KBUILD_MODNAME,
-+	.id_table = thunder_mdiobus_id_table,
-+	.probe = thunder_mdiobus_pci_probe,
-+	.remove = thunder_mdiobus_pci_remove,
-+};
+ 	/* Added for PCI abort handling */
+ 	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
+ 		"imprecise external abort");
+@@ -600,6 +638,16 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 		return PTR_ERR(imx6_pcie->pcie);
+ 	}
+ 
++	if (imx6_pcie->is_imx6sx) {
++		imx6_pcie->pcie_inbound_axi = devm_clk_get(&pdev->dev,
++							   "pcie_inbound_axi");
++		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
++			dev_err(&pdev->dev,
++				"pcie_incbound_axi clock missing or invalid\n");
++			return PTR_ERR(imx6_pcie->pcie_inbound_axi);
++		}
++	}
 +
-+module_pci_driver(thunder_mdiobus_driver);
-+
-+MODULE_DESCRIPTION("Cavium ThunderX MDIO bus driver");
-+MODULE_LICENSE("GPL");
--- 
-1.7.11.7
+ 	/* Grab GPR config register range */
+ 	imx6_pcie->iomuxc_gpr =
+ 		 syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+@@ -647,6 +695,7 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
+ 
+ static const struct of_device_id imx6_pcie_of_match[] = {
+ 	{ .compatible = "fsl,imx6q-pcie", },
++	{ .compatible = "fsl,imx6sx-pcie", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
