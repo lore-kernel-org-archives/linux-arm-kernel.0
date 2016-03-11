@@ -1,55 +1,59 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 12 Mar 2016 02:35:37 +0800
-Subject: [PATCH V2 3/3] vfio, platform: add QTI HIDMA reset driver
-In-Reply-To: <1457715275-11925-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <201603120252.yf2ZbKlU%fengguang.wu@intel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 11 Mar 2016 21:46:04 +0300
+Subject: [PATCH 0/6] arc_emac: fixes the emac issues oand cleanup emac
+ drivers
+In-Reply-To: <56E2DAC4.4020105@gmail.com>
+References: <1457693731-6966-1-git-send-email-wxt@rock-chips.com>
+ <56E2CC39.6050907@cogentembedded.com> <56E2DAC4.4020105@gmail.com>
+Message-ID: <56E3126C.7000100@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+Hello.
 
-[auto build test ERROR on vfio/next]
-[also build test ERROR on v4.5-rc7 next-20160311]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On 03/11/2016 05:48 PM, Caesar Wang wrote:
 
-url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/vfio-platform-add-HIDMA-and-ACPI-support/20160312-005737
-base:   https://github.com/awilliam/linux-vfio.git next
-config: arm-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+[...]
 
-All errors (new ones prefixed by >>):
+>>> Hi Rob, David:
+>>> PATCH[1/6-2/6]: ====>
+>>> net: arc_emac: make the rockchip emac document more compatible
+>>> net: arc_emac: add phy-reset-* are optional for device tree
+>>>
+>>> The patches change the rockchip emac document for more compatible and
+>>> Add the phy-reset-* property for document.
+>>>
+>>> This patch adds the following property for arc_emac.
+>>>
+>>> phy-reset-* include the following:
+>>> 1) phy-reset-gpios:
+>>> The phy-reset-gpios is an optional property for arc emac device tree boot.
+>>> Change the binding document to match the driver code.
+>>>
+>>> 2) phy-reset-duration:
+>>> Different boards may require different phy reset duration. Add property
+>>> phy-reset-duration for device tree probe, so that the boards that need
+>>> a longer reset duration can specify it in their device tree.
+>>>
+>>> 3) phy-reset-active-high:
+>>> We need that for a custom hardware that needs the reverse reset sequence.
+>>
+>>    Why not infer this from the "phy-reset-gpios" prop?
+>
+> See:
+> https://patchwork.kernel.org/patch/8564511/
+ >
+> phy-reset-active-high : If present then the reset sequence using the GPIO
+>   specified in the "phy-reset-gpios" property is reversed (H=reset state,
+>   L=operation state).
 
->> drivers/vfio/platform/reset/vfio_platform_qcomhidma.c:97:28: error: expected declaration specifiers or '...' before string constant
-    VFIO_PLATFORM_MODULE_ALIAS("qcom,hidma-1.0");
-                               ^
-   drivers/vfio/platform/reset/vfio_platform_qcomhidma.c:98:28: error: expected declaration specifiers or '...' before string constant
-    VFIO_PLATFORM_MODULE_ALIAS("QCOM8061");
-                               ^
+    Referring to your own suggested bindings isn't an answer. If the driver 
+that you're copying from here (fec) had a reason to handle the GPIO sense with 
+the help of an extra prop (legacy code), it doesn't mean your new driver needs 
+to mimic this as well, AFAIU...
 
-vim +97 drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
+> Thanks,
+>
+> Caesar
 
-    91	
-    92		pr_info("HIDMA channel reset\n");
-    93		return 0;
-    94	}
-    95	module_vfio_reset_handler("qcom,hidma-1.0", "QCOM8061",
-    96				  vfio_platform_qcomhidma_reset);
-  > 97	VFIO_PLATFORM_MODULE_ALIAS("qcom,hidma-1.0");
-    98	VFIO_PLATFORM_MODULE_ALIAS("QCOM8061");
-    99	
-   100	MODULE_LICENSE("GPL v2");
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 56252 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160312/d0f56960/attachment-0001.obj>
+MBR, Sergei
