@@ -1,61 +1,36 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 11 Mar 2016 12:56:04 -0800
-Subject: [PATCH 1/3] net: thunderx: Cleanup PHY probing code.
-In-Reply-To: <56E31E7A.6080905@gmail.com>
-References: <1457714822-5754-1-git-send-email-ddaney.cavm@gmail.com>
- <1457714822-5754-2-git-send-email-ddaney.cavm@gmail.com>
- <20160311173125.GI3153@lunn.ch> <56E30332.7060003@caviumnetworks.com>
- <20160311180030.GB19277@lunn.ch> <56E30DDF.5040506@caviumnetworks.com>
- <20160311190627.GC19277@lunn.ch> <56E31E7A.6080905@gmail.com>
-Message-ID: <56E330E4.9090800@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 11 Mar 2016 22:01:08 +0100
+Subject: [PATCH 2/3] regulator: axp20x: Handle regulator_register returning
+ ENODEV
+In-Reply-To: <1457730069-31760-1-git-send-email-hdegoede@redhat.com>
+References: <1457730069-31760-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1457730069-31760-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2016 11:37 AM, Florian Fainelli wrote:
-> On 11/03/16 11:06, Andrew Lunn wrote:
->>>> I don't see why it should wait around forever. I have boards with
->>>> Marvell PHYs, yet if i don't build the Marvell driver, the Ethernet
->>>> driver still loads, because the generic PHY driver is used instead.
->>>> Why does this not work here?
->>>
->>> As I said before, there is no driver for the device, so
->>> of_phy_find_device() will always return NULL.
->>
->> I'm not yet convinced this is true. I really do expect that the
->> generic PHY driver will bind to it. It might then go horribly wrong,
->> because it is not standard compliant, but that is a different issue.
->
-> I concur with Andrew here, unless the PHY is guaranteed to return
-> garbage when get_phy_id() is called, there is a good chance that the
-> Generic PHY driver will be bound to this PHY device, or this is not
-> happening for you for some reason?
->
+Handle regulator_register returning ENODEV, this may happen when
+the dts node for the regulator contains "status = disabled" which
+is useful for the ldo_io regulators, to avoid the regulator code
+getting in the way of gpio use of these pins.
 
-get_phy_id() is working a designed.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/regulator/axp20x-regulator.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-For this phy, we have:
-
-   compatible = "cortina,cs4223-slice";
-
-Therefore get_phy_id() is being called with a is_c45 value of false.
-
-get_phy_id() is returning a value of 0, which means that it succeeds, 
-but the returned phy_id is 0xffffffff, which causes get_phy_device() to 
-not create a phy_device, and no driver can be bound.
-
-I know you are all skeptical, but I really think the best thing to do is 
-not try to attach a phy driver when this compatible value is encountered.
-
-It is a defective device tree, and I am attempting to handle it in the 
-specific site where it can cause problems.
-
-We are trying to distinguish between these two cases:
-
-  - of_phy_find_device() returns NULL because driver is not yet bound
-
-  - of_phy_find_device() returns NULL because "cortina,cs4223-slice"
-
-I don't think we need to build some sort of frame work to handle things 
-like this in a general way.
-
-David Daney
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 679018c..4250b1b 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -421,6 +421,9 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 
+ 		rdev = devm_regulator_register(&pdev->dev, desc, &config);
+ 		if (IS_ERR(rdev)) {
++			if (PTR_ERR(rdev) == -ENODEV)
++				continue;
++
+ 			dev_err(&pdev->dev, "Failed to register %s\n",
+ 				regulators[i].name);
+ 
+-- 
+2.7.2
