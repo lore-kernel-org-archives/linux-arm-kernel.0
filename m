@@ -1,25 +1,102 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 11 Mar 2016 14:20:22 -0500 (EST)
-Subject: [PATCH net 3/3] net: mvneta: fix error messages in
- mvneta_port_down function
-In-Reply-To: <1457441826-6100-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1457441826-6100-1-git-send-email-gregory.clement@free-electrons.com>
- <1457441826-6100-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160311.142022.1421480365252928267.davem@davemloft.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 11 Mar 2016 14:29:41 -0500
+Subject: [PATCH V14 5/9] dma: qcom_hidma: implement lower level hardware
+ interface
+In-Reply-To: <56E2F5EA.10207@codeaurora.org>
+References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
+ <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
+ <20160311020650.GG11154@localhost> <56E2EC1C.6040107@codeaurora.org>
+ <20160311163221.GC13211@localhost> <56E2F5EA.10207@codeaurora.org>
+Message-ID: <56E31CA5.6040106@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Tue,  8 Mar 2016 13:57:06 +0100
-
-> From: Dmitri Epshtein <dima@marvell.com>
+On 3/11/2016 11:44 AM, Sinan Kaya wrote:
+> On 3/11/2016 11:32 AM, Vinod Koul wrote:
+>>>>> memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+>>>>>>>> +	       TRE_SIZE);
+>> This one
+>>
+>>>>>>>> +	lldev->tx_status_list[tre->idx].err_code = 0;
+>>>>>>>> +	lldev->tx_status_list[tre->idx].err_info = 0;
+>>>>>>>> +	tre->queued = 1;
+>>>>>>>> +	lldev->pending_tre_count++;
+>>>>
+>>>> Is this the only one without alignment? I couldn't understand what you mean by 
+>>>> above one?
+>> quoting Coding Style:
+>>
+>> Statements longer than 80 columns will be broken into sensible chunks, unless
+>> exceeding 80 columns significantly increases readability and does not hide
+>> information. 
 > 
-> This commit corrects error printing when shutting down the port. Also
-> magic numbers are replaced by existing macros.
+>> "Descendants are always substantially shorter than the parent and
+>> are placed substantially to the right."
+>>
+>>
 > 
-> Signed-off-by: Dmitri Epshtein <dima@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Sorry for my poor English. I never got this rule. 
+> 
+> Which one is a "substantially" right? Can you give me an example?
+> 
+> I need to understand how you'd write this to satisfy the above rule.
+> 
+> like this:
+> 
+> memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+>        TRE_SIZE);
+> 
+> or
+> 
+> memcpy(lldev->tre_ring + lldev->tre_write_offset,
+>        &tre->tre_local[0], TRE_SIZE);
+> 
+> or
+> 
+> memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+> 							   TRE_SIZE);
+> 
+> or
+> 
+> memcpy(lldev->tre_ring + lldev->tre_write_offset,
+> 	&tre->tre_local[0], 
+> 	TRE_SIZE);
+> 
+so, I looked at other examples in drivers/dma/dw/core.c file...
 
-Individual patches should do one thing, rather than several at once.
+I'm seeing two different patterns in the code. One pattern is to align
+the next line to the first character of the first line like I did based
+on the previous review comments.
 
-Please split this up into two changes, thanks.
+	mem_width = min_t(unsigned int,
+                          data_width, dwc_fast_ffs(mem | len));
+
+The second example places an extra tab like this.
+
+	list_add_tail(&desc->desc_node,
+			&first->tx_list);
+
+
+Based on this example: this is how I'm changing the second one
+
++       lldev->tre_write_offset = (lldev->tre_write_offset + HIDMA_TRE_SIZE)
++                                       % lldev->tre_ring_size;
++
+
+I'm still not sure what you want to do with this:
+
+Is this what you want to do ?
+        memcpy(lldev->tre_ring + lldev->tre_write_offset, &tre->tre_local[0],
+-              HIDMA_TRE_SIZE);
++               HIDMA_TRE_SIZE);
+
+I also got flagged before that HIDMA_TRE_SIZE does not start from the first 
+character.
+
+I have done the renaming. This is all left for me to post a follow up.
+
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
