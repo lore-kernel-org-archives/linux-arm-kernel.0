@@ -1,46 +1,179 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 12 Mar 2016 18:44:19 +0100
-Subject: [PATCH net v2 3/4] net: mvneta: fix error messages in
- mvneta_port_down function
-In-Reply-To: <1457804660-8463-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1457804660-8463-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1457804660-8463-4-git-send-email-gregory.clement@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 12 Mar 2016 19:44:57 +0100
+Subject: [PATCH] pinctrl: sunxi: Fix A33 external interrupts not working
+Message-ID: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitri Epshtein <dima@marvell.com>
+pinctrl-sun8i-a33.c (and the dts) declare only 2 interrupt banks,
+where as the closely related a23 has 3 banks. This matches with the
+datasheet for the A33 where only interrupt banks B and G are specified
+where as the A23 has banks A, B and G.
 
-This commit corrects error printing when shutting down the port.
+However the A33 being the A23 derative it is means that the interrupt
+configure/status io-addresses for the 2 banks it has are not changed
+from the A23, iow they have the same address as if bank A was still
+present. Where as the sunxi pinctrl currently tries to use the A23 bank
+A addresses for bank B, since the pinctrl code does not know about the
+removed bank A.
 
-[gregory.clement at free-electrons.com: split initial commit in two
-individual changes]
-Signed-off-by: Dmitri Epshtein <dima@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Add a irq_bank_base parameter and use this where appropriate to take
+the missing bank A into account.
+
+This fixes external interrupts not working on the A33 (tested with
+an i2c touchscreen controller which uses an external interrupt).
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c |  1 +
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c     | 17 ++++++++++-------
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h     | 21 +++++++++++----------
+ 3 files changed, 22 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 2ee05cebea75..58ad36876e8b 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -873,7 +873,7 @@ static void mvneta_port_down(struct mvneta_port *pp)
- 	do {
- 		if (count++ >= MVNETA_RX_DISABLE_TIMEOUT_MSEC) {
- 			netdev_warn(pp->dev,
--				    "TIMEOUT for RX stopped ! rx_queue_cmd: 0x08%x\n",
-+				    "TIMEOUT for RX stopped ! rx_queue_cmd: 0x%08x\n",
- 				    val);
- 			break;
- 		}
-@@ -912,7 +912,7 @@ static void mvneta_port_down(struct mvneta_port *pp)
- 	do {
- 		if (count++ >= MVNETA_TX_FIFO_EMPTY_TIMEOUT) {
- 			netdev_warn(pp->dev,
--				    "TX FIFO empty timeout status=0x08%x\n",
-+				    "TX FIFO empty timeout status=0x%08x\n",
- 				    val);
- 			break;
- 		}
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+index 00265f0..8b381d6 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+@@ -485,6 +485,7 @@ static const struct sunxi_pinctrl_desc sun8i_a33_pinctrl_data = {
+ 	.pins = sun8i_a33_pins,
+ 	.npins = ARRAY_SIZE(sun8i_a33_pins),
+ 	.irq_banks = 2,
++	.irq_bank_base = 1,
+ };
+ 
+ static int sun8i_a33_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 96f64a1..188c11c 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -579,7 +579,7 @@ static void sunxi_pinctrl_irq_release_resources(struct irq_data *d)
+ static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+-	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
++	u32 reg = sunxi_irq_cfg_reg(d->hwirq, pctl->desc->irq_bank_base);
+ 	u8 index = sunxi_irq_cfg_offset(d->hwirq);
+ 	unsigned long flags;
+ 	u32 regval;
+@@ -626,7 +626,8 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
+ static void sunxi_pinctrl_irq_ack(struct irq_data *d)
+ {
+ 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+-	u32 status_reg = sunxi_irq_status_reg(d->hwirq);
++	u32 status_reg = sunxi_irq_status_reg(d->hwirq,
++					      pctl->desc->irq_bank_base);
+ 	u8 status_idx = sunxi_irq_status_offset(d->hwirq);
+ 
+ 	/* Clear the IRQ */
+@@ -636,7 +637,7 @@ static void sunxi_pinctrl_irq_ack(struct irq_data *d)
+ static void sunxi_pinctrl_irq_mask(struct irq_data *d)
+ {
+ 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+-	u32 reg = sunxi_irq_ctrl_reg(d->hwirq);
++	u32 reg = sunxi_irq_ctrl_reg(d->hwirq, pctl->desc->irq_bank_base);
+ 	u8 idx = sunxi_irq_ctrl_offset(d->hwirq);
+ 	unsigned long flags;
+ 	u32 val;
+@@ -653,7 +654,7 @@ static void sunxi_pinctrl_irq_mask(struct irq_data *d)
+ static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
+ {
+ 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+-	u32 reg = sunxi_irq_ctrl_reg(d->hwirq);
++	u32 reg = sunxi_irq_ctrl_reg(d->hwirq, pctl->desc->irq_bank_base);
+ 	u8 idx = sunxi_irq_ctrl_offset(d->hwirq);
+ 	unsigned long flags;
+ 	u32 val;
+@@ -745,7 +746,7 @@ static void sunxi_pinctrl_irq_handler(struct irq_desc *desc)
+ 	if (bank == pctl->desc->irq_banks)
+ 		return;
+ 
+-	reg = sunxi_irq_status_reg_from_bank(bank);
++	reg = sunxi_irq_status_reg_from_bank(bank, pctl->desc->irq_bank_base);
+ 	val = readl(pctl->membase + reg);
+ 
+ 	if (val) {
+@@ -1024,9 +1025,11 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 
+ 	for (i = 0; i < pctl->desc->irq_banks; i++) {
+ 		/* Mask and clear all IRQs before registering a handler */
+-		writel(0, pctl->membase + sunxi_irq_ctrl_reg_from_bank(i));
++		writel(0, pctl->membase + sunxi_irq_ctrl_reg_from_bank(i,
++						pctl->desc->irq_bank_base));
+ 		writel(0xffffffff,
+-			pctl->membase + sunxi_irq_status_reg_from_bank(i));
++		       pctl->membase + sunxi_irq_status_reg_from_bank(i,
++						pctl->desc->irq_bank_base));
+ 
+ 		irq_set_chained_handler_and_data(pctl->irq[i],
+ 						 sunxi_pinctrl_irq_handler,
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index e248e81..0afce1a 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -97,6 +97,7 @@ struct sunxi_pinctrl_desc {
+ 	int				npins;
+ 	unsigned			pin_base;
+ 	unsigned			irq_banks;
++	unsigned			irq_bank_base;
+ 	bool				irq_read_needs_mux;
+ };
+ 
+@@ -233,12 +234,12 @@ static inline u32 sunxi_pull_offset(u16 pin)
+ 	return pin_num * PULL_PINS_BITS;
+ }
+ 
+-static inline u32 sunxi_irq_cfg_reg(u16 irq)
++static inline u32 sunxi_irq_cfg_reg(u16 irq, unsigned bank_base)
+ {
+ 	u8 bank = irq / IRQ_PER_BANK;
+ 	u8 reg = (irq % IRQ_PER_BANK) / IRQ_CFG_IRQ_PER_REG * 0x04;
+ 
+-	return IRQ_CFG_REG + bank * IRQ_MEM_SIZE + reg;
++	return IRQ_CFG_REG + (bank_base + bank) * IRQ_MEM_SIZE + reg;
+ }
+ 
+ static inline u32 sunxi_irq_cfg_offset(u16 irq)
+@@ -247,16 +248,16 @@ static inline u32 sunxi_irq_cfg_offset(u16 irq)
+ 	return irq_num * IRQ_CFG_IRQ_BITS;
+ }
+ 
+-static inline u32 sunxi_irq_ctrl_reg_from_bank(u8 bank)
++static inline u32 sunxi_irq_ctrl_reg_from_bank(u8 bank, unsigned bank_base)
+ {
+-	return IRQ_CTRL_REG + bank * IRQ_MEM_SIZE;
++	return IRQ_CTRL_REG + (bank_base + bank) * IRQ_MEM_SIZE;
+ }
+ 
+-static inline u32 sunxi_irq_ctrl_reg(u16 irq)
++static inline u32 sunxi_irq_ctrl_reg(u16 irq, unsigned bank_base)
+ {
+ 	u8 bank = irq / IRQ_PER_BANK;
+ 
+-	return sunxi_irq_ctrl_reg_from_bank(bank);
++	return sunxi_irq_ctrl_reg_from_bank(bank, bank_base);
+ }
+ 
+ static inline u32 sunxi_irq_ctrl_offset(u16 irq)
+@@ -265,16 +266,16 @@ static inline u32 sunxi_irq_ctrl_offset(u16 irq)
+ 	return irq_num * IRQ_CTRL_IRQ_BITS;
+ }
+ 
+-static inline u32 sunxi_irq_status_reg_from_bank(u8 bank)
++static inline u32 sunxi_irq_status_reg_from_bank(u8 bank, unsigned bank_base)
+ {
+-	return IRQ_STATUS_REG + bank * IRQ_MEM_SIZE;
++	return IRQ_STATUS_REG + (bank_base + bank) * IRQ_MEM_SIZE;
+ }
+ 
+-static inline u32 sunxi_irq_status_reg(u16 irq)
++static inline u32 sunxi_irq_status_reg(u16 irq, unsigned bank_base)
+ {
+ 	u8 bank = irq / IRQ_PER_BANK;
+ 
+-	return sunxi_irq_status_reg_from_bank(bank);
++	return sunxi_irq_status_reg_from_bank(bank, bank_base);
+ }
+ 
+ static inline u32 sunxi_irq_status_offset(u16 irq)
 -- 
-2.5.0
+2.7.2
