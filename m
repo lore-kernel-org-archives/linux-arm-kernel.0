@@ -1,62 +1,47 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 12 Mar 2016 18:44:17 +0100
-Subject: [PATCH net v2 1/4] net: mvneta: Fix spinlock usage
+Date: Sat, 12 Mar 2016 18:44:20 +0100
+Subject: [PATCH net v2 4/4] net: mvneta: replace magic numbers by existing
+ macros
 In-Reply-To: <1457804660-8463-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1457804660-8463-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1457804660-8463-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1457804660-8463-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the previous patch, the spinlock was not initialized. While it didn't
-cause any trouble yet it could be a problem to use it uninitialized.
+From: Dmitri Epshtein <dima@marvell.com>
 
-The most annoying part was the critical section protected by the spinlock
-in mvneta_stop(). Some of the functions could sleep as pointed when
-activated CONFIG_DEBUG_ATOMIC_SLEEP. Actually, in mvneta_stop() we only
-need to protect the is_stopped flagged, indeed the code of the notifier
-for CPU online is protected by the same spinlock, so when we get the
-lock, the notifer work is done.
+Some literal values are actually already defined by macros, so let's use
+them.
 
-Reported-by: Patrick Uiterwijk <patrick@puiterwijk.org>
+[gregory.clement at free-electrons.com: split intial commit in two
+individual changes]
+Signed-off-by: Dmitri Epshtein <dima@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index b0ae69f84493..8dc7df2edff6 100644
+index 58ad36876e8b..225d933259c0 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -3070,17 +3070,17 @@ static int mvneta_stop(struct net_device *dev)
- 	struct mvneta_port *pp = netdev_priv(dev);
+@@ -880,7 +880,7 @@ static void mvneta_port_down(struct mvneta_port *pp)
+ 		mdelay(1);
  
- 	/* Inform that we are stopping so we don't want to setup the
--	 * driver for new CPUs in the notifiers
-+	 * driver for new CPUs in the notifiers. The code of the
-+	 * notifier for CPU online is protected by the same spinlock,
-+	 * so when we get the lock, the notifer work is done.
- 	 */
- 	spin_lock(&pp->lock);
- 	pp->is_stopped = true;
-+	spin_unlock(&pp->lock);
-+
- 	mvneta_stop_dev(pp);
- 	mvneta_mdio_remove(pp);
- 	unregister_cpu_notifier(&pp->cpu_notifier);
--	/* Now that the notifier are unregistered, we can release le
--	 * lock
--	 */
--	spin_unlock(&pp->lock);
- 	on_each_cpu(mvneta_percpu_disable, pp, true);
- 	free_percpu_irq(dev->irq, pp->ports);
- 	mvneta_cleanup_rxqs(pp);
-@@ -3612,6 +3612,7 @@ static int mvneta_probe(struct platform_device *pdev)
- 	dev->ethtool_ops = &mvneta_eth_tool_ops;
+ 		val = mvreg_read(pp, MVNETA_RXQ_CMD);
+-	} while (val & 0xff);
++	} while (val & MVNETA_RXQ_ENABLE_MASK);
  
- 	pp = netdev_priv(dev);
-+	spin_lock_init(&pp->lock);
- 	pp->phy_node = phy_node;
- 	pp->phy_interface = phy_mode;
+ 	/* Stop Tx port activity. Check port Tx activity. Issue stop
+ 	 * command for active channels only
+@@ -905,7 +905,7 @@ static void mvneta_port_down(struct mvneta_port *pp)
+ 		/* Check TX Command reg that all Txqs are stopped */
+ 		val = mvreg_read(pp, MVNETA_TXQ_CMD);
  
+-	} while (val & 0xff);
++	} while (val & MVNETA_TXQ_ENABLE_MASK);
+ 
+ 	/* Double check to verify that TX FIFO is empty */
+ 	count = 0;
 -- 
 2.5.0
