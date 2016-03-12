@@ -1,179 +1,108 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 12 Mar 2016 19:44:57 +0100
-Subject: [PATCH] pinctrl: sunxi: Fix A33 external interrupts not working
-Message-ID: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 12 Mar 2016 21:22:29 +0100
+Subject: [PATCH v6 5/6] dt/bindings: rockchip: modify document of Rockchip
+ power domains
+In-Reply-To: <1457558661-22125-1-git-send-email-zhangqing@rock-chips.com>
+References: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
+ <1457558661-22125-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <3411414.M8tSXDEXFG@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pinctrl-sun8i-a33.c (and the dts) declare only 2 interrupt banks,
-where as the closely related a23 has 3 banks. This matches with the
-datasheet for the A33 where only interrupt banks B and G are specified
-where as the A23 has banks A, B and G.
+Hi Elaine,
 
-However the A33 being the A23 derative it is means that the interrupt
-configure/status io-addresses for the 2 banks it has are not changed
-from the A23, iow they have the same address as if bank A was still
-present. Where as the sunxi pinctrl currently tries to use the A23 bank
-A addresses for bank B, since the pinctrl code does not know about the
-removed bank A.
+Am Donnerstag, 10. M?rz 2016, 05:24:21 schrieb Elaine Zhang:
+> Add binding documentation for the power domains
+> found on Rockchip RK3399 SoCs
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-Add a irq_bank_base parameter and use this where appropriate to take
-the missing bank A into account.
+that already got Acked by Kevin, aka
+Acked-by: Kevin Hilman <khilman@baylibre.com>
 
-This fixes external interrupts not working on the A33 (tested with
-an i2c touchscreen controller which uses an external interrupt).
+When you get things like Acked-by, Reviewed-by, Tested-by tags in one version, 
+please include them into new versions. That way these are preserved and 
+reviewers won't do work twice.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c |  1 +
- drivers/pinctrl/sunxi/pinctrl-sunxi.c     | 17 ++++++++++-------
- drivers/pinctrl/sunxi/pinctrl-sunxi.h     | 21 +++++++++++----------
- 3 files changed, 22 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-index 00265f0..8b381d6 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-@@ -485,6 +485,7 @@ static const struct sunxi_pinctrl_desc sun8i_a33_pinctrl_data = {
- 	.pins = sun8i_a33_pins,
- 	.npins = ARRAY_SIZE(sun8i_a33_pins),
- 	.irq_banks = 2,
-+	.irq_bank_base = 1,
- };
- 
- static int sun8i_a33_pinctrl_probe(struct platform_device *pdev)
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 96f64a1..188c11c 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -579,7 +579,7 @@ static void sunxi_pinctrl_irq_release_resources(struct irq_data *d)
- static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
--	u32 reg = sunxi_irq_cfg_reg(d->hwirq);
-+	u32 reg = sunxi_irq_cfg_reg(d->hwirq, pctl->desc->irq_bank_base);
- 	u8 index = sunxi_irq_cfg_offset(d->hwirq);
- 	unsigned long flags;
- 	u32 regval;
-@@ -626,7 +626,8 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d, unsigned int type)
- static void sunxi_pinctrl_irq_ack(struct irq_data *d)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
--	u32 status_reg = sunxi_irq_status_reg(d->hwirq);
-+	u32 status_reg = sunxi_irq_status_reg(d->hwirq,
-+					      pctl->desc->irq_bank_base);
- 	u8 status_idx = sunxi_irq_status_offset(d->hwirq);
- 
- 	/* Clear the IRQ */
-@@ -636,7 +637,7 @@ static void sunxi_pinctrl_irq_ack(struct irq_data *d)
- static void sunxi_pinctrl_irq_mask(struct irq_data *d)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
--	u32 reg = sunxi_irq_ctrl_reg(d->hwirq);
-+	u32 reg = sunxi_irq_ctrl_reg(d->hwirq, pctl->desc->irq_bank_base);
- 	u8 idx = sunxi_irq_ctrl_offset(d->hwirq);
- 	unsigned long flags;
- 	u32 val;
-@@ -653,7 +654,7 @@ static void sunxi_pinctrl_irq_mask(struct irq_data *d)
- static void sunxi_pinctrl_irq_unmask(struct irq_data *d)
- {
- 	struct sunxi_pinctrl *pctl = irq_data_get_irq_chip_data(d);
--	u32 reg = sunxi_irq_ctrl_reg(d->hwirq);
-+	u32 reg = sunxi_irq_ctrl_reg(d->hwirq, pctl->desc->irq_bank_base);
- 	u8 idx = sunxi_irq_ctrl_offset(d->hwirq);
- 	unsigned long flags;
- 	u32 val;
-@@ -745,7 +746,7 @@ static void sunxi_pinctrl_irq_handler(struct irq_desc *desc)
- 	if (bank == pctl->desc->irq_banks)
- 		return;
- 
--	reg = sunxi_irq_status_reg_from_bank(bank);
-+	reg = sunxi_irq_status_reg_from_bank(bank, pctl->desc->irq_bank_base);
- 	val = readl(pctl->membase + reg);
- 
- 	if (val) {
-@@ -1024,9 +1025,11 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 
- 	for (i = 0; i < pctl->desc->irq_banks; i++) {
- 		/* Mask and clear all IRQs before registering a handler */
--		writel(0, pctl->membase + sunxi_irq_ctrl_reg_from_bank(i));
-+		writel(0, pctl->membase + sunxi_irq_ctrl_reg_from_bank(i,
-+						pctl->desc->irq_bank_base));
- 		writel(0xffffffff,
--			pctl->membase + sunxi_irq_status_reg_from_bank(i));
-+		       pctl->membase + sunxi_irq_status_reg_from_bank(i,
-+						pctl->desc->irq_bank_base));
- 
- 		irq_set_chained_handler_and_data(pctl->irq[i],
- 						 sunxi_pinctrl_irq_handler,
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-index e248e81..0afce1a 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-@@ -97,6 +97,7 @@ struct sunxi_pinctrl_desc {
- 	int				npins;
- 	unsigned			pin_base;
- 	unsigned			irq_banks;
-+	unsigned			irq_bank_base;
- 	bool				irq_read_needs_mux;
- };
- 
-@@ -233,12 +234,12 @@ static inline u32 sunxi_pull_offset(u16 pin)
- 	return pin_num * PULL_PINS_BITS;
- }
- 
--static inline u32 sunxi_irq_cfg_reg(u16 irq)
-+static inline u32 sunxi_irq_cfg_reg(u16 irq, unsigned bank_base)
- {
- 	u8 bank = irq / IRQ_PER_BANK;
- 	u8 reg = (irq % IRQ_PER_BANK) / IRQ_CFG_IRQ_PER_REG * 0x04;
- 
--	return IRQ_CFG_REG + bank * IRQ_MEM_SIZE + reg;
-+	return IRQ_CFG_REG + (bank_base + bank) * IRQ_MEM_SIZE + reg;
- }
- 
- static inline u32 sunxi_irq_cfg_offset(u16 irq)
-@@ -247,16 +248,16 @@ static inline u32 sunxi_irq_cfg_offset(u16 irq)
- 	return irq_num * IRQ_CFG_IRQ_BITS;
- }
- 
--static inline u32 sunxi_irq_ctrl_reg_from_bank(u8 bank)
-+static inline u32 sunxi_irq_ctrl_reg_from_bank(u8 bank, unsigned bank_base)
- {
--	return IRQ_CTRL_REG + bank * IRQ_MEM_SIZE;
-+	return IRQ_CTRL_REG + (bank_base + bank) * IRQ_MEM_SIZE;
- }
- 
--static inline u32 sunxi_irq_ctrl_reg(u16 irq)
-+static inline u32 sunxi_irq_ctrl_reg(u16 irq, unsigned bank_base)
- {
- 	u8 bank = irq / IRQ_PER_BANK;
- 
--	return sunxi_irq_ctrl_reg_from_bank(bank);
-+	return sunxi_irq_ctrl_reg_from_bank(bank, bank_base);
- }
- 
- static inline u32 sunxi_irq_ctrl_offset(u16 irq)
-@@ -265,16 +266,16 @@ static inline u32 sunxi_irq_ctrl_offset(u16 irq)
- 	return irq_num * IRQ_CTRL_IRQ_BITS;
- }
- 
--static inline u32 sunxi_irq_status_reg_from_bank(u8 bank)
-+static inline u32 sunxi_irq_status_reg_from_bank(u8 bank, unsigned bank_base)
- {
--	return IRQ_STATUS_REG + bank * IRQ_MEM_SIZE;
-+	return IRQ_STATUS_REG + (bank_base + bank) * IRQ_MEM_SIZE;
- }
- 
--static inline u32 sunxi_irq_status_reg(u16 irq)
-+static inline u32 sunxi_irq_status_reg(u16 irq, unsigned bank_base)
- {
- 	u8 bank = irq / IRQ_PER_BANK;
- 
--	return sunxi_irq_status_reg_from_bank(bank);
-+	return sunxi_irq_status_reg_from_bank(bank, bank_base);
- }
- 
- static inline u32 sunxi_irq_status_offset(u16 irq)
--- 
-2.7.2
+Heiko
+
+
+> ---
+>  .../bindings/soc/rockchip/power_domain.txt         | 37
+> ++++++++++++++++++++++ 1 file changed, 37 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt index
+> 13dc6a3..98085c8 100644
+> --- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> @@ -7,6 +7,7 @@ Required properties for power domain controller:
+>  - compatible: Should be one of the following.
+>  	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+>  	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
+> +	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
+>  - #power-domain-cells: Number of cells in a power-domain specifier.
+>  	Should be 1 for multiple PM domains.
+>  - #address-cells: Should be 1.
+> @@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
+>  - reg: index of the power domain, should use macros in:
+>  	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+> "include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
+> +	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power
+> domain. - clocks (optional): phandles to clocks which need to be enabled
+> while power domain switches state.
+> 
+> @@ -45,12 +47,41 @@ Example:
+>                  };
+>          };
+> 
+> +Example 2:
+> +		power: power-controller {
+> +			compatible = "rockchip,rk3399-power-controller";
+> +			#power-domain-cells = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			pd_vio {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				reg = <RK3399_PD_VIO>;
+> +
+> +				pd_vo {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <RK3399_PD_VO>;
+> +
+> +					pd_vopb {
+> +						reg = <RK3399_PD_VOPB>;
+> +					};
+> +
+> +					pd_vopl {
+> +						reg = <RK3399_PD_VOPL>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+>  Node of a device using power domains must have a power-domains property,
+>  containing a phandle to the power device node and an index specifying which
+> power domain to use.
+>  The index should use macros in:
+>  	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
+> "include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
+> +	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power
+> domain.
+> 
+>  Example of the node using power domain:
+> 
+> @@ -65,3 +96,9 @@ Example of the node using power domain:
+>                  power-domains = <&power RK3368_PD_GPU_1>;
+>                  /* ... */
+>          };
+> +
+> +	node {
+> +		/* ... */
+> +		power-domains = <&power RK3399_PD_VOPB>;
+> +		/* ... */
+> +	};
