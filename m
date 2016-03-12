@@ -1,42 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 12 Mar 2016 14:26:31 +0900
-Subject: [PATCH 5/5] hwrng: exynos - Disable runtime PM on driver unbind
-In-Reply-To: <1457682562-21219-5-git-send-email-k.kozlowski@samsung.com>
-References: <1457682562-21219-1-git-send-email-k.kozlowski@samsung.com>
- <1457682562-21219-5-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56E3A887.1000807@samsung.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Sat, 12 Mar 2016 08:52:22 +0100
+Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM,
+ Line and Mic inputs
+In-Reply-To: <20160109164832.515d69b0@dayas>
+References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
+ <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
+ <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
+Message-ID: <20160312085222.226d89bf@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 11.03.2016 o 16:49, Krzysztof Kozlowski pisze:
-> Driver enabled runtime PM but did not revert this on removal. Re-binding
-> of a device triggered warning:
-> 	exynos-rng 10830400.rng: Unbalanced pm_runtime_enable!
+Hi,
+
+does anyone know the answer to the questions below?
+
+> The other direction (making two controls which both do the same and update 
+> each other's value) doesn't seem to be easily available. 
+
+> Should I write a _put handler that does it manually?
+
+> (Or should that be handled by alsa-lib mixer modules instead?)
+
+> Is it possible to merge the "Left Mixer" control and respective 
+> "Right Mixer" control into one selem in alsamixer?
 > 
-> Fixes: b329669ea0b5 ("hwrng: exynos - Add support for Exynos random number generator")
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/char/hw_random/exynos-rng.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
-> index 68c349bf66a0..cba1ff538c46 100644
-> --- a/drivers/char/hw_random/exynos-rng.c
-> +++ b/drivers/char/hw_random/exynos-rng.c
-> @@ -154,6 +154,13 @@ static int exynos_rng_probe(struct platform_device *pdev)
->  	return ret;
->  }
->  
-> +static int exynos_rng_remove(struct platform_device *pdev)
-> +{
-> +	pm_runtime_disable(&pdev->dev);
-> +
+> Because alsamixer actually has support for one-sided muting.
 
-This is not sufficient. pm_runtime_dont_use_autosuspend() is also
-necessary here. I will send a v2.
+If that's unknown, I can post v9 without doing the grouping-together of mixer controls and we can use it like that - I don't want the patch to stall indefinitely on mere usability issues...
 
-BTW, no problem if it is too late for taking this for v4.6. If this
-patchset misses merge window I'll resend it later.
-
-Best regards,
-Krzysztof
+Regards,
+    Danny
