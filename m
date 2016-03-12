@@ -1,108 +1,64 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Mar 2016 21:22:29 +0100
-Subject: [PATCH v6 5/6] dt/bindings: rockchip: modify document of Rockchip
- power domains
-In-Reply-To: <1457558661-22125-1-git-send-email-zhangqing@rock-chips.com>
-References: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
- <1457558661-22125-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <3411414.M8tSXDEXFG@diego>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 13 Mar 2016 08:42:21 +0900
+Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
+ (2nd round)
+In-Reply-To: <CAK7LNARSGsyDmSYMPOMUWS+5rYPxV2v1ieWvsAsKfQN0tZnytw@mail.gmail.com>
+References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNARSGsyDmSYMPOMUWS+5rYPxV2v1ieWvsAsKfQN0tZnytw@mail.gmail.com>
+Message-ID: <CAK7LNARJStOBUM7G=8nffXTk_a426o8CRRSX2SL-P0BsH08M7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
-
-Am Donnerstag, 10. M?rz 2016, 05:24:21 schrieb Elaine Zhang:
-> Add binding documentation for the power domains
-> found on Rockchip RK3399 SoCs
-> 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-
-that already got Acked by Kevin, aka
-Acked-by: Kevin Hilman <khilman@baylibre.com>
-
-When you get things like Acked-by, Reviewed-by, Tested-by tags in one version, 
-please include them into new versions. That way these are preserved and 
-reviewers won't do work twice.
+Olof?  Arnd?
 
 
-Heiko
 
 
-> ---
->  .../bindings/soc/rockchip/power_domain.txt         | 37
-> ++++++++++++++++++++++ 1 file changed, 37 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-> b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt index
-> 13dc6a3..98085c8 100644
-> --- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
-> @@ -7,6 +7,7 @@ Required properties for power domain controller:
->  - compatible: Should be one of the following.
->  	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
->  	"rockchip,rk3368-power-controller" - for RK3368 SoCs.
-> +	"rockchip,rk3399-power-controller" - for RK3399 SoCs.
->  - #power-domain-cells: Number of cells in a power-domain specifier.
->  	Should be 1 for multiple PM domains.
->  - #address-cells: Should be 1.
-> @@ -16,6 +17,7 @@ Required properties for power domain sub nodes:
->  - reg: index of the power domain, should use macros in:
->  	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
-> "include/dt-bindings/power/rk3368-power.h" - for RK3368 type power domain.
-> +	"include/dt-bindings/power/rk3399-power.h" - for RK3399 type power
-> domain. - clocks (optional): phandles to clocks which need to be enabled
-> while power domain switches state.
-> 
-> @@ -45,12 +47,41 @@ Example:
->                  };
->          };
-> 
-> +Example 2:
-> +		power: power-controller {
-> +			compatible = "rockchip,rk3399-power-controller";
-> +			#power-domain-cells = <1>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			pd_vio {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <RK3399_PD_VIO>;
-> +
-> +				pd_vo {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <RK3399_PD_VO>;
-> +
-> +					pd_vopb {
-> +						reg = <RK3399_PD_VOPB>;
-> +					};
-> +
-> +					pd_vopl {
-> +						reg = <RK3399_PD_VOPL>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
->  Node of a device using power domains must have a power-domains property,
->  containing a phandle to the power device node and an index specifying which
-> power domain to use.
->  The index should use macros in:
->  	"include/dt-bindings/power/rk3288-power.h" - for rk3288 type power domain.
-> "include/dt-bindings/power/rk3368-power.h" - for rk3368 type power domain.
-> +	"include/dt-bindings/power/rk3399-power.h" - for rk3399 type power
-> domain.
-> 
->  Example of the node using power domain:
-> 
-> @@ -65,3 +96,9 @@ Example of the node using power domain:
->                  power-domains = <&power RK3368_PD_GPU_1>;
->                  /* ... */
->          };
-> +
-> +	node {
-> +		/* ... */
-> +		power-domains = <&power RK3399_PD_VOPB>;
-> +		/* ... */
-> +	};
+2016-03-07 18:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Hi Olof and Arnd,
+>
+>
+> I have two series for 4.6-rc1 that have not been applied yet.
+>
+>  - ARM: uniphier: UniPhier updates for Linux 4.6-rc1 (2nd round)   (this series)
+>  - ARM: dts: uniphier: UniPhier DT updates for Linux 4.6-rc1 (2nd round)
+>
+> I am getting uneasy because it is already -rc7.
+>
+> I hope you will find some time to check them out.
+>
+>
+> 2016-02-26 16:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>> Hi Olof,
+>>
+>> Here is a small patch series for UniPhier SoC updates.
+>>
+>>
+>>
+>> Masahiro Yamada (2):
+>>   ARM: uniphier: add missing of_node_put()
+>>   ARM: uniphier: rework SMP code to support new System Bus binding
+>>
+>>  arch/arm/mach-uniphier/platsmp.c | 26 +++++++++++++++++---------
+>>  1 file changed, 17 insertions(+), 9 deletions(-)
+>>
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Best Regards
+> Masahiro Yamada
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
