@@ -1,19 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 16:09:57 -0800
-Subject: [PATCH] MAINTAINERS: unify email addrs for Kevin Hilman
-In-Reply-To: <1456354656-23179-1-git-send-email-khilman@baylibre.com>
-References: <1456354656-23179-1-git-send-email-khilman@baylibre.com>
-Message-ID: <20160313000957.GB17502@localhost>
+Date: Sat, 12 Mar 2016 16:11:03 -0800
+Subject: [PATCH] ARM: dts: artpec: dual-license on artpec6.dtsi
+In-Reply-To: <1456391516-10561-1-git-send-email-larper@axis.com>
+References: <1456391516-10561-1-git-send-email-larper@axis.com>
+Message-ID: <20160313001103.GC17502@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 24, 2016 at 02:57:36PM -0800, Kevin Hilman wrote:
-> I have a couple different emails in here.  It's time to make them all
-> the same.
+On Thu, Feb 25, 2016 at 10:11:56AM +0100, Lars Persson wrote:
+> Relaxed the license on the dtsi to permit use in other projects.
 > 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> Signed-off-by: Lars Persson <larper@axis.com>
+> ---
+>  arch/arm/boot/dts/artpec6.dtsi | 40 +++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 37 insertions(+), 3 deletions(-)
 
-Merged into next/fixes-non-critical.
+Applied, thanks for following up with this!
 
 
 -Olof
