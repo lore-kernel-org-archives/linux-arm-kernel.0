@@ -1,64 +1,104 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 13 Mar 2016 08:42:21 +0900
-Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
- (2nd round)
-In-Reply-To: <CAK7LNARSGsyDmSYMPOMUWS+5rYPxV2v1ieWvsAsKfQN0tZnytw@mail.gmail.com>
-References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNARSGsyDmSYMPOMUWS+5rYPxV2v1ieWvsAsKfQN0tZnytw@mail.gmail.com>
-Message-ID: <CAK7LNARJStOBUM7G=8nffXTk_a426o8CRRSX2SL-P0BsH08M7A@mail.gmail.com>
+Date: Sun, 13 Mar 2016 09:13:55 +0900
+Subject: [PATCH] kbuild: drop FORCE from PHONY targets
+Message-ID: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof?  Arnd?
+These targets are marked as PHONY.  No need to add FORCE to their
+dependency.
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ Makefile                     | 8 ++++----
+ arch/arm/vdso/Makefile       | 2 +-
+ arch/ia64/Makefile           | 4 ++--
+ arch/x86/entry/vdso/Makefile | 4 ++--
+ 4 files changed, 9 insertions(+), 9 deletions(-)
 
-
-2016-03-07 18:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Olof and Arnd,
->
->
-> I have two series for 4.6-rc1 that have not been applied yet.
->
->  - ARM: uniphier: UniPhier updates for Linux 4.6-rc1 (2nd round)   (this series)
->  - ARM: dts: uniphier: UniPhier DT updates for Linux 4.6-rc1 (2nd round)
->
-> I am getting uneasy because it is already -rc7.
->
-> I hope you will find some time to check them out.
->
->
-> 2016-02-26 16:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> Hi Olof,
->>
->> Here is a small patch series for UniPhier SoC updates.
->>
->>
->>
->> Masahiro Yamada (2):
->>   ARM: uniphier: add missing of_node_put()
->>   ARM: uniphier: rework SMP code to support new System Bus binding
->>
->>  arch/arm/mach-uniphier/platsmp.c | 26 +++++++++++++++++---------
->>  1 file changed, 17 insertions(+), 9 deletions(-)
->>
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> --
-> Best Regards
-> Masahiro Yamada
-
-
-
+diff --git a/Makefile b/Makefile
+index 2d519d2..e3ef6b6 100644
+--- a/Makefile
++++ b/Makefile
+@@ -142,7 +142,7 @@ PHONY += $(MAKECMDGOALS) sub-make
+ $(filter-out _all sub-make $(CURDIR)/Makefile, $(MAKECMDGOALS)) _all: sub-make
+ 	@:
+ 
+-sub-make: FORCE
++sub-make:
+ 	$(Q)$(MAKE) -C $(KBUILD_OUTPUT) KBUILD_SRC=$(CURDIR) \
+ 	-f $(CURDIR)/Makefile $(filter-out _all sub-make,$(MAKECMDGOALS))
+ 
+@@ -989,7 +989,7 @@ prepare1: prepare2 $(version_h) include/generated/utsrelease.h \
+ 
+ archprepare: archheaders archscripts prepare1 scripts_basic
+ 
+-prepare0: archprepare FORCE
++prepare0: archprepare
+ 	$(Q)$(MAKE) $(build)=.
+ 
+ # All the preparing..
+@@ -1034,7 +1034,7 @@ INSTALL_FW_PATH=$(INSTALL_MOD_PATH)/lib/firmware
+ export INSTALL_FW_PATH
+ 
+ PHONY += firmware_install
+-firmware_install: FORCE
++firmware_install:
+ 	@mkdir -p $(objtree)/firmware
+ 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.fwinst obj=firmware __fw_install
+ 
+@@ -1054,7 +1054,7 @@ PHONY += archscripts
+ archscripts:
+ 
+ PHONY += __headers
+-__headers: $(version_h) scripts_basic asm-generic archheaders archscripts FORCE
++__headers: $(version_h) scripts_basic asm-generic archheaders archscripts
+ 	$(Q)$(MAKE) $(build)=scripts build_unifdef
+ 
+ PHONY += headers_install_all
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index 1160434..59a8fa7 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -74,5 +74,5 @@ $(MODLIB)/vdso: FORCE
+ 	@mkdir -p $(MODLIB)/vdso
+ 
+ PHONY += vdso_install
+-vdso_install: $(obj)/vdso.so.dbg $(MODLIB)/vdso FORCE
++vdso_install: $(obj)/vdso.so.dbg $(MODLIB)/vdso
+ 	$(call cmd,vdso_install)
+diff --git a/arch/ia64/Makefile b/arch/ia64/Makefile
+index 970d0bd..648f1ce 100644
+--- a/arch/ia64/Makefile
++++ b/arch/ia64/Makefile
+@@ -95,8 +95,8 @@ define archhelp
+   echo '* unwcheck	- Check vmlinux for invalid unwind info'
+ endef
+ 
+-archprepare: make_nr_irqs_h FORCE
++archprepare: make_nr_irqs_h
+ PHONY += make_nr_irqs_h FORCE
+ 
+-make_nr_irqs_h: FORCE
++make_nr_irqs_h:
+ 	$(Q)$(MAKE) $(build)=arch/ia64/kernel include/generated/nr-irqs.h
+diff --git a/arch/x86/entry/vdso/Makefile b/arch/x86/entry/vdso/Makefile
+index c854541..a81b539 100644
+--- a/arch/x86/entry/vdso/Makefile
++++ b/arch/x86/entry/vdso/Makefile
+@@ -188,10 +188,10 @@ vdso_img_insttargets := $(vdso_img_sodbg:%.dbg=install_%)
+ $(MODLIB)/vdso: FORCE
+ 	@mkdir -p $(MODLIB)/vdso
+ 
+-$(vdso_img_insttargets): install_%: $(obj)/%.dbg $(MODLIB)/vdso FORCE
++$(vdso_img_insttargets): install_%: $(obj)/%.dbg $(MODLIB)/vdso
+ 	$(call cmd,vdso_install)
+ 
+ PHONY += vdso_install $(vdso_img_insttargets)
+-vdso_install: $(vdso_img_insttargets) FORCE
++vdso_install: $(vdso_img_insttargets)
+ 
+ clean-files := vdso32.so vdso32.so.dbg vdso64* vdso-image-*.c vdsox32.so*
 -- 
-Best Regards
-Masahiro Yamada
+1.9.1
