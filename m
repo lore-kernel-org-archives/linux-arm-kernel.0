@@ -1,38 +1,48 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sun, 13 Mar 2016 21:30:34 +0530
-Subject: [PATCH V14 5/9] dma: qcom_hidma: implement lower level hardware
- interface
-In-Reply-To: <56E33FBB.2000401@codeaurora.org>
-References: <1454646882-24369-1-git-send-email-okaya@codeaurora.org>
- <1454646882-24369-6-git-send-email-okaya@codeaurora.org>
- <20160311020650.GG11154@localhost>
- <56E2EC1C.6040107@codeaurora.org>
- <20160311163221.GC13211@localhost> <56E2F5EA.10207@codeaurora.org>
- <56E31CA5.6040106@codeaurora.org> <56E33FBB.2000401@codeaurora.org>
-Message-ID: <20160313160034.GE13211@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 13 Mar 2016 18:02:54 +0100
+Subject: [PATCH] pinctrl: sunxi: Fix A33 external interrupts not working
+In-Reply-To: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
+References: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160313170254.GF8418@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 04:59:23PM -0500, Sinan Kaya wrote:
-> Vinod,
+On Sat, Mar 12, 2016 at 07:44:57PM +0100, Hans de Goede wrote:
+> pinctrl-sun8i-a33.c (and the dts) declare only 2 interrupt banks,
+> where as the closely related a23 has 3 banks. This matches with the
+> datasheet for the A33 where only interrupt banks B and G are specified
+> where as the A23 has banks A, B and G.
 > 
-> On 3/11/2016 2:29 PM, Sinan Kaya wrote:
-> > I have done the renaming. This is all left for me to post a follow up.
+> However the A33 being the A23 derative it is means that the interrupt
+> configure/status io-addresses for the 2 banks it has are not changed
+> from the A23, iow they have the same address as if bank A was still
+> present. Where as the sunxi pinctrl currently tries to use the A23 bank
+> A addresses for bank B, since the pinctrl code does not know about the
+> removed bank A.
 > 
-> I just posted v15 (forgot to put v15 on 4/4).
+> Add a irq_bank_base parameter and use this where appropriate to take
+> the missing bank A into account.
+> 
+> This fixes external interrupts not working on the A33 (tested with
+> an i2c touchscreen controller which uses an external interrupt).
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Don't do that manually!
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-git formt-patch --subject-prefix is for that
+You should send it to stable though.
 
-> 
-> http://www.spinics.net/lists/arm-kernel/msg490282.html
-> 
-> I wanted to get v15 out before the end of the week with the macro renames. 
-> Let me know which lines need corrections.
-> 
-> There is also a single line change for the object hierarchy patch. The code 
-> was looking up DMA attributes (OF:dma-coherent) from the wrong place.
+Thanks!
+Maxime
 
 -- 
-~Vinod
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160313/2d79ded5/attachment.sig>
