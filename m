@@ -1,38 +1,35 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 13 Mar 2016 13:25:05 -0400
-Subject: [PATCH V2 2/3] vfio, platform: make reset driver a requirement
-In-Reply-To: <1457715275-11925-3-git-send-email-okaya@codeaurora.org>
-References: <1457715275-11925-1-git-send-email-okaya@codeaurora.org>
- <1457715275-11925-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <56E5A271.6000408@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 13 Mar 2016 19:16:08 +0100
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <56E00A7E.4080101@semihalf.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <56E00A7E.4080101@semihalf.com>
+Message-ID: <20160313181608.GA15988@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/11/2016 11:54 AM, Sinan Kaya wrote:
-> The code was allowing platform devices to be used without a supporting VFIO
-> reset driver. The hardware can be left in some inconsistent state after a
-> guest machine abort.
+On Wed, Mar 09, 2016 at 12:35:26PM +0100, Tomasz Nowicki wrote:
+> Hi Andre,
 > 
-> The reset driver will put the hardware back to safe state and disable
-> interrupts before returning the control back to the host machine.
+> Forgive me if anybody already asked this question for previous
+> series versions.
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/vfio/platform/vfio_platform_common.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
+> The review is still pending so it is worth to ask. What is your idea
+> for saving and restoring vITS state? I notice device, itte and
+> collection linked lists which are essential for vITS state. Of
+> course it is not feasible to transfer these list to e.g. QEMU using
+> KVM_{GET|SET}_DEVICE_ATTR.
 > 
-I was looking at the code. It looks like this is going to break VFIO AMBA. The
-common implementation is shared with AMBA and platform devices.
+If I recall correctly these items are the ones stored in memory on real
+hardware, and not in hardware registers.
 
-I couldn't see a reset function for AMBA devices.
+We had an idea where userspace asks the kernel vgic to flush its
+internal cache into the memory allocated by the guest driver for the
+vITS data structures and then the state would be transferred across to
+the new VM via the memory transfer mechanism.
 
-Is there anyway to write reset function for it? I have no experience with 
-AMBA devices.
+Only caveat there I think was that we had to decide on a storage format
+in those memory regions, to allow QEMU to understand the state and to
+ensure back/forwards compatibility between KVM versions.
 
-Would you include a reset needed flag and just not require it for AMBA? 
-(I honestly don't like this idea)
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+-Christoffer
