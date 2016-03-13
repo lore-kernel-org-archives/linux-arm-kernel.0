@@ -1,55 +1,53 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 13 Mar 2016 19:19:54 +0100
-Subject: [PATCH v3 3/9] irqchip/gic-v2: Gather ACPI specific data in a
- single structure
-In-Reply-To: <56DFC026.5020909@arm.com>
-References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
- <1457436573-6180-4-git-send-email-julien.grall@arm.com>
- <20160309054710.GI26583@lvm> <56DFC026.5020909@arm.com>
-Message-ID: <20160313181954.GC15988@cbox>
+From: apinski@cavium.com (Andrew Pinski)
+Date: Sun, 13 Mar 2016 12:50:19 -0700
+Subject: [PATCH 1/2] ARM64:VDSO: Improve gettimeofday, don't use udiv
+In-Reply-To: <1457898620-1867-1-git-send-email-apinski@cavium.com>
+References: <1457898620-1867-1-git-send-email-apinski@cavium.com>
+Message-ID: <1457898620-1867-2-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 01:18:14PM +0700, Julien Grall wrote:
-> Hi Christoffer,
-> 
-> On 09/03/2016 12:47, Christoffer Dall wrote:
-> >On Tue, Mar 08, 2016 at 11:29:27AM +0000, Julien Grall wrote:
-> >>For now, there is only one member. More member will be added later.
-> >
-> >questionable commit message
-> 
-> What about:
-> 
-> "The ACPI code requires to use global variables in order to collect
-> information from the tables.
-> 
-> For now only a single global variable is used, but more will be
-> added in a subsequent patch. To make clear they are ACPI specific,
-> gather all the information in a single structure."
-> 
+On many cores, udiv with a large value is slow, expand instead
+the division out to be what GCC would have generated for the
+divide by 1000.
 
-that's better.
+On ThunderX, the speeds up gettimeofday by 5%.
 
-> [...]
-> 
-> >>@@ -1316,7 +1319,7 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
-> >>  		return -EINVAL;
-> >>  	}
-> >>
-> >>-	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
-> >>+	cpu_base = ioremap(acpi_data.cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
-> >>  	if (!cpu_base) {
-> >>  		pr_err("Unable to map GICC registers\n");
-> >>  		return -ENOMEM;
-> >>--
-> >>1.9.1
-> >>
-> >super nit: I would use cpu_phys_base instead of cpu_phy_base, but I'll
-> >leave it up to you.
-> 
-> I will update the commit message, so I will rename the variable too.
-> 
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+---
+ arch/arm64/kernel/vdso/gettimeofday.S |   20 ++++++++++++++++----
+ 1 files changed, 16 insertions(+), 4 deletions(-)
 
-Thanks,
--Christoffer
+diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+index efa79e8..e5caef9 100644
+--- a/arch/arm64/kernel/vdso/gettimeofday.S
++++ b/arch/arm64/kernel/vdso/gettimeofday.S
+@@ -64,10 +64,22 @@ ENTRY(__kernel_gettimeofday)
+ 	bl	__do_get_tspec
+ 	seqcnt_check w9, 1b
+ 
+-	/* Convert ns to us. */
+-	mov	x13, #1000
+-	lsl	x13, x13, x12
+-	udiv	x11, x11, x13
++	/* Undo the shift. */
++        lsr     x11, x11, x12
++
++	/* Convert ns to us (division by 1000 by using multiply high).
++	 * This is how GCC converts the division by 1000 into.
++	 * This is faster than divide on most cores.
++	 */
++        mov     x13, 63439
++        movk    x13, 0xe353, lsl 16
++        lsr     x11, x11, 3
++        movk    x13, 0x9ba5, lsl 32
++        movk    x13, 0x20c4, lsl 48
++	/* x13 = 0x20c49ba5e353f7cf */
++        umulh   x11, x11, x13
++        lsr     x11, x11, 4
++
+ 	stp	x10, x11, [x0, #TVAL_TV_SEC]
+ 2:
+ 	/* If tz is NULL, return 0. */
+-- 
+1.7.2.5
