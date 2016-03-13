@@ -1,59 +1,64 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 17:20:53 -0800
-Subject: [GIT PULL] arm64: dts: vexpress/juno: Updates for v4.6(part 2)
-In-Reply-To: <56DF0274.1060007@arm.com>
-References: <56DF0274.1060007@arm.com>
-Message-ID: <20160313012053.GA24249@localhost>
+Date: Sat, 12 Mar 2016 17:14:45 -0800
+Subject: [GIT PULL 2/2] ARM64: EXYNOS: mach/soc changes for v4.6, 2nd
+In-Reply-To: <56CF97C2.5000305@samsung.com>
+References: <1456445103-23314-1-git-send-email-k.kozlowski@samsung.com>
+ <1456445103-23314-2-git-send-email-k.kozlowski@samsung.com>
+ <56CF97C2.5000305@samsung.com>
+Message-ID: <20160313011445.GK17502@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 04:48:52PM +0000, Sudeep Holla wrote:
-> Hi ARM-SoC team,
+On Fri, Feb 26, 2016 at 09:09:38AM +0900, Krzysztof Kozlowski wrote:
+> On 26.02.2016 09:05, Krzysztof Kozlowski wrote:
+> > Hi Arnd, Kevin and Olof,
+> > 
+> > 
+> > Pull request for v4.6 with ARM64 mach/soc changes.
+> > 
+> > This depends on change in clk tree (removal of ARCH_EXYNOS7) which is
+> > pulled here.
+> > 
+> > 
+> > Kind regards,
+> > Krzysztof
+> > 
+> > 
+> > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Michael Turquette <mturquette@baylibre.com>
+> > 
+> > 
+> > 
+> > The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> > 
+> >   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.6-2
+> > 
+> > for you to fetch changes up to c87b3e970c70d5e27f9eb9acd09c6b5b9d589860:
+> > 
+> >   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2016-02-23 08:49:46 +0900)
 > 
-> Sorry for the late pull request.
-> 
-> There's one update for adding support for SBSA Watchdog to foundation
-> model that caused conflict as it was merged via watchdog tree. I am
-> pulling that now to avoid conflicts and I also have a patch to fix DT
-> warnings that new checks in DTS introduced since last Friday. Please
-> consider pulling this for v4.6
-> 
-> Regards,
-> Sudeep
+> And for easier grepping through history, below is the pull request
+> for Exynos-specific change (no clk commits):
 > 
 > 
-> The following changes since commit 9fd9288ed0899f9e318a97d73e777d6d3357265e:
+> The following changes since commit 85997a7cba7bc1578eb554e88f82023d85fb499a:
 > 
->   arm64: dts: Add HDLCD support on Juno platforms (2016-02-10 10:58:33
-> +0000)
+>   clk: samsung: Don't build ARMv8 clock drivers on ARMv7 (2016-02-22 10:20:24 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/vexpress-for-v4.6/dt-updates-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.6-2
 > 
-> for you to fetch changes up to 6d6acd140ab3d46348ec3a9dbfd386d9ca42b825:
+> for you to fetch changes up to c87b3e970c70d5e27f9eb9acd09c6b5b9d589860:
 > 
->   arm64: dts: juno/vexpress: fix node name unit-address presence warnings
-> (2016-03-08 13:54:27 +0000)
-> 
-> ----------------------------------------------------------------
-> Additional updates for ARM VExpress/Juno platforms
-> 
-> 1. Add support for SBSA Generic Watchdog on foundation models
-> 
-> 2. Fix node name unit-address presence/absence mismatch warnings in
->    all the device trees
-> 
-> ----------------------------------------------------------------
-> Fu Wei (1):
->       arm64: dts: foundation-v8: add SBSA Generic Watchdog device node
-> 
-> Sudeep Holla (1):
->       arm64: dts: juno/vexpress: fix node name unit-address presence
-> warnings
+>   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2016-02-23 08:49:46 +0900)
 
-Merged, thanks.
+Excellent, thanks! Merged into next/arm64.
 
 
 -Olof
