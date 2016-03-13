@@ -1,53 +1,52 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 17:16:04 -0800
-Subject: [GIT PULL] ARM: EXYNOS: SROM driver for v4.6, 2nd try
-In-Reply-To: <2210448.V5gsMerLz6@wuerfel>
-References: <1456825042-23733-1-git-send-email-k.kozlowski@samsung.com>
- <1456825042-23733-3-git-send-email-k.kozlowski@samsung.com>
- <56D77FA6.5070500@samsung.com> <2210448.V5gsMerLz6@wuerfel>
-Message-ID: <20160313011604.GL17502@localhost>
+Date: Sat, 12 Mar 2016 17:26:31 -0800
+Subject: [GIT PULL] arm64: dts: vexpress/juno: Updates for v4.6(part 2)
+In-Reply-To: <56DF0274.1060007@arm.com>
+References: <56DF0274.1060007@arm.com>
+Message-ID: <20160313012631.GA5883@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 02:11:32PM +0100, Arnd Bergmann wrote:
-> On Thursday 03 March 2016 09:04:54 Krzysztof Kozlowski wrote:
-> > On 01.03.2016 18:37, Krzysztof Kozlowski wrote:
-> > > Hi,
-> > > 
-> > > 
-> > > After Olof comments, second pull request with movement of SROM code
-> > > to separate driver - under drivers/memory/samsung (more are planned for
-> > > that directory).
-> > > 
-> > > This depends on (included here):
-> > > 1. tag samsung-dt-srom-4.6: SROM-DT changes, merged already to arm-soc,
-> > > 2. tag samsung-soc-4.6-2: next/soc changes, sent few days ago, not merged yet.
-> > > 
-> > > This may conflict in the future (in linux-next or Linus) around
-> > > drivers/memory/Kconfig with iommu tree. Just add all the changes.
-> > > 
-> > > 
-> > > The diff at the end contains both samsung-soc-4.6-2 and this stuff.
-> > > To make finding changes easier, below you will find difference between
-> > > this tag and samsung-soc-4.6-2:
-> > 
-> > I see you did not pull this yet so can you wait a little bit? Rob
-> > Herring posted some comments on bindings so this might be revisited...
-> > 
-> > This is an unlucky patchset...
+On Tue, Mar 08, 2016 at 04:48:52PM +0000, Sudeep Holla wrote:
+> Hi ARM-SoC team,
 > 
-> It was a bit late last night, and I didn't want to check that the
-> dependencies were correct. I also saw that you had discussed these
-> contents with Olof before, but didn't follow the thread there, so
-> I was hoping that Olof could get back to it and check that his
-> concerns are all addressed before picking it up.
+> Sorry for the late pull request.
+> 
+> There's one update for adding support for SBSA Watchdog to foundation
+> model that caused conflict as it was merged via watchdog tree. I am
+> pulling that now to avoid conflicts and I also have a patch to fix DT
+> warnings that new checks in DTS introduced since last Friday. Please
+> consider pulling this for v4.6
+> 
+> Regards,
+> Sudeep
+> 
+> 
+> The following changes since commit 9fd9288ed0899f9e318a97d73e777d6d3357265e:
+> 
+>   arm64: dts: Add HDLCD support on Juno platforms (2016-02-10 10:58:33
+> +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+> tags/vexpress-for-v4.6/dt-updates-2
+> 
+> for you to fetch changes up to 6d6acd140ab3d46348ec3a9dbfd386d9ca42b825:
+> 
+>   arm64: dts: juno/vexpress: fix node name unit-address presence warnings
+> (2016-03-08 13:54:27 +0000)
+> 
+> ----------------------------------------------------------------
+> Additional updates for ARM VExpress/Juno platforms
+> 
+> 1. Add support for SBSA Generic Watchdog on foundation models
+> 
+> 2. Fix node name unit-address presence/absence mismatch warnings in
+>    all the device trees
 
-Hi,
-
-I've merged the other SoC branches now (that were respun without this SROM
-contents). I think it's safe given the feedback from Rob to wait with this
-driver for the next cycle. That way the dependencies are gone too since they
-will have been merged.
+Argh. I just noticed that I had mismerged your previos patch into next/dt
+instead of next/dt64. So, I've merged this on top of it there as well.
 
 
 -Olof
