@@ -1,25 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 16:16:38 -0800
-Subject: [PATCH v3 1/2] arm64: defconfig: Add Qualcomm sdhci and restart
- functionality
-In-Reply-To: <1456397192-2407-1-git-send-email-georgi.djakov@linaro.org>
-References: <1456397192-2407-1-git-send-email-georgi.djakov@linaro.org>
-Message-ID: <20160313001638.GE17502@localhost>
+Date: Sat, 12 Mar 2016 17:05:52 -0800
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.6 (#2)
+In-Reply-To: <878u27o86i.fsf@free-electrons.com>
+References: <878u27o86i.fsf@free-electrons.com>
+Message-ID: <20160313010552.GH17502@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 25, 2016 at 12:46:31PM +0200, Georgi Djakov wrote:
-> Enable sdhci and restart functionality for devices based on msm8916 platform.
+On Fri, Feb 26, 2016 at 03:30:45PM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
-> Changes since v2:
->  * Move the MMC_BLOCK_MINORS change into a separate patch.
+> Here is the second pull request for dt64 for mvebu for v4.6.
 > 
-> Changes since v1:
->  * Rebased onto arm-soc/next/arm64
+> Gregory
+> 
+> The following changes since commit adbc3695d9e487fa07214140a46b68ac3156fb78:
+> 
+>   arm64: dts: add the Marvell Armada 3700 family and a development board (2016-02-17 16:09:55 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.6-2
+> 
+> for you to fetch changes up to b5ebfad8df1c73df6932d11eeada4caea0ec8f30:
+> 
+>   arm64: dts: marvell: re-order Device Tree nodes for Armada AP806 (2016-02-26 15:17:31 +0100)
+> 
+> ----------------------------------------------------------------
+> mvebu dt64 for 4.6 (part 2)
+> 
+> Add support for the Armada 7K and 8K SoCs and the Armada 8040 DB board
 
-Thanks, applied.
+Seems like this one hadn't been merged yet, done so now.
 
 
 -Olof
