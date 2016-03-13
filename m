@@ -1,171 +1,110 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Mon, 14 Mar 2016 00:31:10 +0100
-Subject: [PATCH v4] PCI: imx6: Add initial imx6sx support
-In-Reply-To: <1457911590.16725.37.camel@googlemail.com>
-References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
- <1456411669-4699-3-git-send-email-chf.fritz@googlemail.com>
- <20160311175850.GA4725@localhost>
- <1457911590.16725.37.camel@googlemail.com>
-Message-ID: <1457911870.16725.42.camel@googlemail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 13 Mar 2016 19:48:52 -0400
+Subject: [PATCH] drivers/tty: make serial/mvebu-uart.c explicitly non-modular
+Message-ID: <1457912932-23724-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial PCIe support for the imx6 SoC derivate imx6sx.  PCI MSI support
-is untested as the necessary suspend/resume quirk is not included in this
-patch.
+The Kconfig currently controlling compilation of this code is:
 
-This patch is heavily based on patches by Richard Zhu.
+drivers/tty/serial/Kconfig:config SERIAL_MVEBU_UART
+drivers/tty/serial/Kconfig:     bool "Marvell EBU serial port support"
 
-[bhelgaas: factor out refclk enable, fix adjacent typos in imx6q-pcie.txt]
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-Acked-by: Richard Zhu <Richard.Zhu@freescale.com>
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
+...meaning that it currently is not being built as a module by anyone.
+
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
+
+We explicitly disallow a driver unbind, since that doesn't have a
+sensible use case anyway, and it allows us to drop the ".remove"
+code for non-modular drivers.
+
+Since the code wasn't using module_init to begin with, the init ordering
+remains unchanged with this commit.
+
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+was (or is now) contained at the top of the file in the comments.
+
+Cc: Wilson Ding <dingwei@marvell.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.com>
+Cc: linux-serial at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 +++-
- drivers/pci/host/pci-imx6.c                        | 53 ++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 2 deletions(-)
+ drivers/tty/serial/mvebu-uart.c | 28 +++-------------------------
+ 1 file changed, 3 insertions(+), 25 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-index 6fbba53..6ee4439 100644
---- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-@@ -4,8 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
- and thus inherits all the common properties defined in designware-pcie.txt.
- 
- Required properties:
--- compatible: "fsl,imx6q-pcie"
--- reg: base addresse and length of the pcie controller
-+- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie"
-+- reg: base address and length of the PCIe controller
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-   entry for each entry in the interrupt-names property.
- - interrupt-names: Must include the following entries:
-@@ -13,6 +13,10 @@ Required properties:
- - clock-names: Must include the following additional entries:
- 	- "pcie_phy"
- 
-+Additional required properties for imx6sx-pcie:
-+- clock names: Must include the following additional entries:
-+	- "pcie_inbound_axi"
-+
- Example:
- 
- 	pcie at 0x01000000 {
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 4e0e47f..fa3a544 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -35,9 +35,11 @@ struct imx6_pcie {
- 	struct gpio_desc	*reset_gpio;
- 	struct clk		*pcie_bus;
- 	struct clk		*pcie_phy;
-+	struct clk		*pcie_inbound_axi;
- 	struct clk		*pcie;
- 	struct pcie_port	pp;
- 	struct regmap		*iomuxc_gpr;
-+	bool			is_imx6sx;
- 	void __iomem		*mem_base;
- };
- 
-@@ -231,6 +233,17 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
- 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
- 	u32 val, gpr1, gpr12;
- 
-+	if (imx6_pcie->is_imx6sx) {
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
-+				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN);
-+		/* Force PCIe PHY reset */
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
-+				   IMX6SX_GPR5_PCIE_BTNRST_RESET,
-+				   IMX6SX_GPR5_PCIE_BTNRST_RESET);
-+		return 0;
-+	}
-+
- 	/*
- 	 * If the bootloader already enabled the link we need some special
- 	 * handling to get the core back into a state where it is safe to
-@@ -266,6 +279,21 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
- 
- static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
- {
-+	struct pcie_port *pp = &imx6_pcie->pp;
-+	int ret;
-+
-+	if (imx6_pcie->is_imx6sx) {
-+		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
-+		if (ret) {
-+			dev_err(pp->dev, "unable to enable pcie_axi clock\n");
-+			return ret;
-+		}
-+
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
-+		return ret;
-+	}
-+
- 	/* power up core phy and enable ref clock */
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
- 			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
-@@ -319,6 +347,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 		msleep(100);
- 		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
- 	}
-+
-+	if (imx6_pcie->is_imx6sx)
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
-+				   IMX6SX_GPR5_PCIE_BTNRST_RESET, 0);
-+
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index 0ff27818bb87..df5f1d9e233c 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -1,5 +1,7 @@
+ /*
+ * ***************************************************************************
++* Marvell Armada-3700 Serial Driver
++* Author: Wilson Ding <dingwei@marvell.com>
+ * Copyright (C) 2015 Marvell International Ltd.
+ * ***************************************************************************
+ * This program is free software: you can redistribute it and/or modify it
+@@ -23,7 +25,6 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/iopoll.h>
+-#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+@@ -594,30 +595,19 @@ static int mvebu_uart_probe(struct platform_device *pdev)
  	return 0;
+ }
  
- err_ref_clk:
-@@ -336,6 +369,12 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
- {
- 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
- 
-+	if (imx6_pcie->is_imx6sx) {
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX6SX_GPR12_PCIE_RX_EQ_MASK,
-+				   IMX6SX_GPR12_PCIE_RX_EQ_2);
-+	}
-+
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
- 			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
- 
-@@ -554,6 +593,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 	pp = &imx6_pcie->pp;
- 	pp->dev = &pdev->dev;
- 
-+	imx6_pcie->is_imx6sx = of_device_is_compatible(pp->dev->of_node,
-+						       "fsl,imx6sx-pcie");
-+
- 	/* Added for PCI abort handling */
- 	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
- 		"imprecise external abort");
-@@ -589,6 +631,16 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 		return PTR_ERR(imx6_pcie->pcie);
- 	}
- 
-+	if (imx6_pcie->is_imx6sx) {
-+		imx6_pcie->pcie_inbound_axi = devm_clk_get(&pdev->dev,
-+							   "pcie_inbound_axi");
-+		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
-+			dev_err(&pdev->dev,
-+				"pcie_incbound_axi clock missing or invalid\n");
-+			return PTR_ERR(imx6_pcie->pcie_inbound_axi);
-+		}
-+	}
-+
- 	/* Grab GPR config register range */
- 	imx6_pcie->iomuxc_gpr =
- 		 syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-@@ -615,6 +667,7 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
- 
- static const struct of_device_id imx6_pcie_of_match[] = {
- 	{ .compatible = "fsl,imx6q-pcie", },
-+	{ .compatible = "fsl,imx6sx-pcie", },
- 	{},
+-static int mvebu_uart_remove(struct platform_device *pdev)
+-{
+-	struct mvebu_uart_data *data = platform_get_drvdata(pdev);
+-
+-	uart_remove_one_port(&mvebu_uart_driver, data->port);
+-	data->port->private_data = NULL;
+-	data->port->mapbase      = 0;
+-	return 0;
+-}
+-
+ /* Match table for of_platform binding */
+ static const struct of_device_id mvebu_uart_of_match[] = {
+ 	{ .compatible = "marvell,armada-3700-uart", },
+ 	{}
  };
- MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
+-MODULE_DEVICE_TABLE(of, mvebu_uart_of_match);
+ 
+ static struct platform_driver mvebu_uart_platform_driver = {
+ 	.probe	= mvebu_uart_probe,
+-	.remove	= mvebu_uart_remove,
+ 	.driver	= {
+ 		.owner	= THIS_MODULE,
+ 		.name  = "mvebu-uart",
+ 		.of_match_table = of_match_ptr(mvebu_uart_of_match),
++		.suppress_bind_attrs = true,
+ 	},
+ };
+ 
+@@ -635,16 +625,4 @@ static int __init mvebu_uart_init(void)
+ 
+ 	return ret;
+ }
+-
+-static void __exit mvebu_uart_exit(void)
+-{
+-	platform_driver_unregister(&mvebu_uart_platform_driver);
+-	uart_unregister_driver(&mvebu_uart_driver);
+-}
+-
+ arch_initcall(mvebu_uart_init);
+-module_exit(mvebu_uart_exit);
+-
+-MODULE_AUTHOR("Wilson Ding <dingwei@marvell.com>");
+-MODULE_DESCRIPTION("Marvell Armada-3700 Serial Driver");
+-MODULE_LICENSE("GPL");
 -- 
-2.1.4
+2.6.1
