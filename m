@@ -1,45 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 17:27:56 -0800
-Subject: [GIT PULL] ARM: dts: vexpress: fixes for v4.6
-In-Reply-To: <56DF027E.3070807@arm.com>
-References: <56DF027E.3070807@arm.com>
-Message-ID: <20160313012756.GB5883@localhost>
+Date: Sat, 12 Mar 2016 17:29:46 -0800
+Subject: [GIT PULL] More RealView DT and misc cleanups
+In-Reply-To: <CACRpkdbm0qQS1mq1xFYrQDt-Q4SfTyx7+2pT+FEJRJGQb1Mmuw@mail.gmail.com>
+References: <CACRpkdbm0qQS1mq1xFYrQDt-Q4SfTyx7+2pT+FEJRJGQb1Mmuw@mail.gmail.com>
+Message-ID: <20160313012946.GC5883@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 04:49:02PM +0000, Sudeep Holla wrote:
-> Hi ARM-SoC team,
+On Thu, Mar 10, 2016 at 12:58:16PM +0700, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Sorry for the late pull request, but these DTC checks were introduced in
-> -next last Friday. Please consider pulling this for v4.6
+> there is nothing controversial or dangerous about these RealView patches,
+> there is mainly upsides like being able to test and run QEMU on RealView
+> DT for v4.6.
 > 
-> Regards,
-> Sudeep
+> I'm sorry this was sitting in my tree, I happened to spend my time with
+> trying to finalize the CLCD changes and delete the board files but that
+> failed.
 > 
-> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> This would be nice to have merged and away from my patch stack, but
+> if it's too late, it's too late, and I'll queue it for v4.7.
 > 
->   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> Anyways: please pull it in.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/vexpress-for-v4.6/armv7-dt-updates
-> 
-> for you to fetch changes up to 929d755dbda796003a2eac981958def545efedf0:
-> 
->   ARM: dts: vexpress: fix node name unit-address presence warnings
-> (2016-03-08 14:52:34 +0000)
-> 
-> ----------------------------------------------------------------
-> Update for ARM VExpress platforms
-> 
-> Just one update to fix node name unit-address presence/absence mismatch
-> warnings in all the Vexpress device trees.
+> Yours,
+> Linus Walleij
 
-These kidn of changes can really wait until the next cycle when they
-come in this late; there's already discussion on whether the dtc uprev
-was the right thing to do or not at this time.
+Hi Linus,
 
-So, I'll hold off on this one since there's no other material in this branch.
+Unforuntately it is quite late but I'd be OK with merging it as a late/ branch
+on best effort agreement (i.e. we might not get it merged).
+
+BUT: Can you please respin the patch subjects?
+
+ARM: realview: code change for review
+and:
+ARM: dts: realview: dt changes for realview stuff
+
+
+Thanks!
+
 
 -Olof
