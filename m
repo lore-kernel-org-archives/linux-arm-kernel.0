@@ -1,29 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 17:40:53 -0800
-Subject: [PATCH v3] ARM, ARM64: dts: drop "arm, amba-bus" in favor of
- "simple-bus"
-In-Reply-To: <1457497605-10079-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1457497605-10079-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160313014053.GF5883@localhost>
+Date: Sat, 12 Mar 2016 17:42:49 -0800
+Subject: Amlogic Meson ARM64 DTS changes for 4.6
+In-Reply-To: <CAOQ7t2YQg01vdBQwQNWiij8A0j1Vr0Zyvj01gw+QZ1L8pSHHkw@mail.gmail.com>
+References: <CAOQ7t2YQg01vdBQwQNWiij8A0j1Vr0Zyvj01gw+QZ1L8pSHHkw@mail.gmail.com>
+Message-ID: <20160313014249.GG5883@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 01:26:45PM +0900, Masahiro Yamada wrote:
-> The compatible string "simple-bus" is well defined in ePAPR, while
-> I see no documentation for the "arm,amba-bus" arnywhere in ePAPR or
-> Documentation/devicetree/.
-> 
-> DT is also used by other projects than Linux kernel.  It is not a
-> good idea to rely on such an unofficial binding.
-> 
-> This commit
->   - replaces "arm,amba-bus" with "simple-bus"
->   - drops "arm,amba-bus" where it is used along with "simple-bus"
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+Hi,
 
-Thanks, applied.
+On Mon, Mar 07, 2016 at 01:21:07PM +0100, Carlo Caione wrote:
+> The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
+> 
+>   Linux 4.5-rc3 (2016-02-07 15:38:30 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/carlocaione/linux-meson.git tags/for-v4.6/gxbb-dt
+> 
+> for you to fetch changes up to cc733bc90636118b20aad8ce7421001b679b338a:
+> 
+>   ARM64: dts: amlogic: Add Tronsmart Vega S95 configs (2016-03-07
+> 11:12:40 +0100)
+> 
+> ----------------------------------------------------------------
+> This series adds initial support for the Amlogic S905 based
+> Tronsmart Vega S95 Pro, Meta and Telos TV boxes.
+> 
+> - Add new DTS to enable support for the boards
+> - Add documentation for compatibles and vendor prefix
+
+It's usually too late in the release cycle for us to merge substantially new
+material. Please try to get the bulk of new code to us by -rc4-5 if you can.
+Incremental pull requests with smaller additions/fixes are fine later as well.
+
+However, I see that this is mostly DT additions so I'll pick it up this time
+around.
+
+Merged, thanks.
 
 
 -Olof
