@@ -1,110 +1,55 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 13 Mar 2016 19:48:52 -0400
-Subject: [PATCH] drivers/tty: make serial/mvebu-uart.c explicitly non-modular
-Message-ID: <1457912932-23724-1-git-send-email-paul.gortmaker@windriver.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Mar 2016 08:51:02 +0900
+Subject: [RFT 1/2] [media] exynos4-is: Add missing endpoint of_node_put on
+ error paths
+In-Reply-To: <56E2BA7D.9050500@samsung.com>
+References: <1453768906-28979-1-git-send-email-k.kozlowski@samsung.com>
+ <56E2BA7D.9050500@samsung.com>
+Message-ID: <56E5FCE6.6060508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+On 11.03.2016 21:30, Sylwester Nawrocki wrote:
+> On 01/26/2016 01:41 AM, Krzysztof Kozlowski wrote:
+>> In fimc_md_parse_port_node() endpoint node is get with of_get_next_child()
+>> but it is not put on error path.
+> 
+> "is get" doesn't sound right to me, how about rephrasing this to:
+> 
+> "In fimc_md_parse_port_node() reference count of the endpoint node
+> "is incremented by of_get_next_child() but it is not decremented
+>  on error path."
+> 
+>> Fixes: 56fa1a6a6a7d ("[media] s5p-fimc: Change the driver directory name to exynos4-is")
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>> Not tested on hardware, only built+static checkers.
+>> ---
+>>  drivers/media/platform/exynos4-is/media-dev.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/media/platform/exynos4-is/media-dev.c 
+>> b/drivers/media/platform/exynos4-is/media-dev.c
+>> index f3b2dd30ec77..de0977479327 100644
+>> --- a/drivers/media/platform/exynos4-is/media-dev.c
+>> +++ b/drivers/media/platform/exynos4-is/media-dev.c
+>> @@ -339,8 +339,10 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+>>  		return 0;
+>>  
+>>  	v4l2_of_parse_endpoint(ep, &endpoint);
+>> -	if (WARN_ON(endpoint.base.port == 0) || index >= FIMC_MAX_SENSORS)
+>> +	if (WARN_ON(endpoint.base.port == 0) || index >= FIMC_MAX_SENSORS) {
+>> +		of_node_put(ep);
+>>  		return -EINVAL;
+>> +	}
+> 
+> Thanks for the patch, it looks correct but it doesn't apply cleanly
+> due to patches already in media master branch [1]. Could you refresh
+> this patch and resend?
+> Also I don't quite like multiple calls to of_node_put(), how about
+> doing something like this instead:
 
-drivers/tty/serial/Kconfig:config SERIAL_MVEBU_UART
-drivers/tty/serial/Kconfig:     bool "Marvell EBU serial port support"
+How about sending your patch then with my reported-by?
 
-...meaning that it currently is not being built as a module by anyone.
-
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.
-
-We explicitly disallow a driver unbind, since that doesn't have a
-sensible use case anyway, and it allows us to drop the ".remove"
-code for non-modular drivers.
-
-Since the code wasn't using module_init to begin with, the init ordering
-remains unchanged with this commit.
-
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-
-We also delete the MODULE_LICENSE tag etc. since all that information
-was (or is now) contained at the top of the file in the comments.
-
-Cc: Wilson Ding <dingwei@marvell.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: linux-serial at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- drivers/tty/serial/mvebu-uart.c | 28 +++-------------------------
- 1 file changed, 3 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index 0ff27818bb87..df5f1d9e233c 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -1,5 +1,7 @@
- /*
- * ***************************************************************************
-+* Marvell Armada-3700 Serial Driver
-+* Author: Wilson Ding <dingwei@marvell.com>
- * Copyright (C) 2015 Marvell International Ltd.
- * ***************************************************************************
- * This program is free software: you can redistribute it and/or modify it
-@@ -23,7 +25,6 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/iopoll.h>
--#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-@@ -594,30 +595,19 @@ static int mvebu_uart_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int mvebu_uart_remove(struct platform_device *pdev)
--{
--	struct mvebu_uart_data *data = platform_get_drvdata(pdev);
--
--	uart_remove_one_port(&mvebu_uart_driver, data->port);
--	data->port->private_data = NULL;
--	data->port->mapbase      = 0;
--	return 0;
--}
--
- /* Match table for of_platform binding */
- static const struct of_device_id mvebu_uart_of_match[] = {
- 	{ .compatible = "marvell,armada-3700-uart", },
- 	{}
- };
--MODULE_DEVICE_TABLE(of, mvebu_uart_of_match);
- 
- static struct platform_driver mvebu_uart_platform_driver = {
- 	.probe	= mvebu_uart_probe,
--	.remove	= mvebu_uart_remove,
- 	.driver	= {
- 		.owner	= THIS_MODULE,
- 		.name  = "mvebu-uart",
- 		.of_match_table = of_match_ptr(mvebu_uart_of_match),
-+		.suppress_bind_attrs = true,
- 	},
- };
- 
-@@ -635,16 +625,4 @@ static int __init mvebu_uart_init(void)
- 
- 	return ret;
- }
--
--static void __exit mvebu_uart_exit(void)
--{
--	platform_driver_unregister(&mvebu_uart_platform_driver);
--	uart_unregister_driver(&mvebu_uart_driver);
--}
--
- arch_initcall(mvebu_uart_init);
--module_exit(mvebu_uart_exit);
--
--MODULE_AUTHOR("Wilson Ding <dingwei@marvell.com>");
--MODULE_DESCRIPTION("Marvell Armada-3700 Serial Driver");
--MODULE_LICENSE("GPL");
--- 
-2.6.1
+Best regards,
+Krzysztof
