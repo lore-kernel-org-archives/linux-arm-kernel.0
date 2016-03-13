@@ -1,17 +1,21 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Sun, 13 Mar 2016 17:07:39 +0800
-Subject: [PATCH v2 6/9] clk: rockchip: associate the rk3036 HCLK_EMAC clock-id
+Date: Sun, 13 Mar 2016 17:07:41 +0800
+Subject: [PATCH v2 8/9] clk: rockchip: associate SCLK_MAC_PLL and disable
+ reparenting on rk3036
 In-Reply-To: <1457860062-5514-1-git-send-email-wxt@rock-chips.com>
 References: <1457860062-5514-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1457860062-5514-7-git-send-email-wxt@rock-chips.com>
+Message-ID: <1457860062-5514-9-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xing Zheng <zhengxing@rock-chips.com>
+From: Heiko Stuebner <heiko@sntech.de>
 
-Associate the new clock id the clock.
+The emac needs constant and very specific rate but the possible PLL-sources
+are very limited, so we expect the PLL source to be set manually on per
+board and don't want it to get changed in an automatic way later.
+So add the necessary clock-id and disable reparenting on set_rate calls.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
 
@@ -21,17 +25,17 @@ Changes in v2: None
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
-index 0703c8f..cc66e5f 100644
+index cc66e5f..7cdb2d6 100644
 --- a/drivers/clk/rockchip/clk-rk3036.c
 +++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -408,7 +408,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
- 	GATE(HCLK_OTG1, "hclk_otg1", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(7), 3, GFLAGS),
- 	GATE(HCLK_I2S, "hclk_i2s", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 2, GFLAGS),
- 	GATE(0, "hclk_sfc", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 14, GFLAGS),
--	GATE(0, "hclk_mac", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 15, GFLAGS),
-+	GATE(HCLK_MAC, "hclk_mac", "hclk_peri", 0, RK2928_CLKGATE_CON(3), 5, GFLAGS),
+@@ -348,7 +348,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
+ 			RK2928_CLKSEL_CON(16), 0, 2, MFLAGS, 2, 5, DFLAGS,
+ 			RK2928_CLKGATE_CON(10), 5, GFLAGS),
  
- 	/* pclk_peri gates */
- 	GATE(0, "pclk_peri_matrix", "pclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 1, GFLAGS),
+-	COMPOSITE_NOGATE(0, "mac_pll_src", mux_pll_src_3plls_p, 0,
++	COMPOSITE_NOGATE(SCLK_MACPLL, "mac_pll_src", mux_pll_src_3plls_p, CLK_SET_RATE_NO_REPARENT,
+ 			RK2928_CLKSEL_CON(21), 0, 2, MFLAGS, 9, 5, DFLAGS),
+ 	MUX(SCLK_MACREF, "mac_clk_ref", mux_mac_p, CLK_SET_RATE_PARENT,
+ 			RK2928_CLKSEL_CON(21), 3, 1, MFLAGS),
 -- 
 1.9.1
