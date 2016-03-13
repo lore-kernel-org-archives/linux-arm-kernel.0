@@ -1,35 +1,55 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 13 Mar 2016 19:16:08 +0100
-Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <56E00A7E.4080101@semihalf.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <56E00A7E.4080101@semihalf.com>
-Message-ID: <20160313181608.GA15988@cbox>
+Date: Sun, 13 Mar 2016 19:19:54 +0100
+Subject: [PATCH v3 3/9] irqchip/gic-v2: Gather ACPI specific data in a
+ single structure
+In-Reply-To: <56DFC026.5020909@arm.com>
+References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
+ <1457436573-6180-4-git-send-email-julien.grall@arm.com>
+ <20160309054710.GI26583@lvm> <56DFC026.5020909@arm.com>
+Message-ID: <20160313181954.GC15988@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 12:35:26PM +0100, Tomasz Nowicki wrote:
-> Hi Andre,
+On Wed, Mar 09, 2016 at 01:18:14PM +0700, Julien Grall wrote:
+> Hi Christoffer,
 > 
-> Forgive me if anybody already asked this question for previous
-> series versions.
+> On 09/03/2016 12:47, Christoffer Dall wrote:
+> >On Tue, Mar 08, 2016 at 11:29:27AM +0000, Julien Grall wrote:
+> >>For now, there is only one member. More member will be added later.
+> >
+> >questionable commit message
 > 
-> The review is still pending so it is worth to ask. What is your idea
-> for saving and restoring vITS state? I notice device, itte and
-> collection linked lists which are essential for vITS state. Of
-> course it is not feasible to transfer these list to e.g. QEMU using
-> KVM_{GET|SET}_DEVICE_ATTR.
+> What about:
 > 
-If I recall correctly these items are the ones stored in memory on real
-hardware, and not in hardware registers.
+> "The ACPI code requires to use global variables in order to collect
+> information from the tables.
+> 
+> For now only a single global variable is used, but more will be
+> added in a subsequent patch. To make clear they are ACPI specific,
+> gather all the information in a single structure."
+> 
 
-We had an idea where userspace asks the kernel vgic to flush its
-internal cache into the memory allocated by the guest driver for the
-vITS data structures and then the state would be transferred across to
-the new VM via the memory transfer mechanism.
+that's better.
 
-Only caveat there I think was that we had to decide on a storage format
-in those memory regions, to allow QEMU to understand the state and to
-ensure back/forwards compatibility between KVM versions.
+> [...]
+> 
+> >>@@ -1316,7 +1319,7 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
+> >>  		return -EINVAL;
+> >>  	}
+> >>
+> >>-	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
+> >>+	cpu_base = ioremap(acpi_data.cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
+> >>  	if (!cpu_base) {
+> >>  		pr_err("Unable to map GICC registers\n");
+> >>  		return -ENOMEM;
+> >>--
+> >>1.9.1
+> >>
+> >super nit: I would use cpu_phys_base instead of cpu_phy_base, but I'll
+> >leave it up to you.
+> 
+> I will update the commit message, so I will rename the variable too.
+> 
 
+Thanks,
 -Christoffer
