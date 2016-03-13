@@ -1,46 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 17:12:10 -0800
-Subject: [GIT PULL 1/2] ARM: EXYNOS: mach/soc changes for v4.6, 2nd
-In-Reply-To: <1456445103-23314-1-git-send-email-k.kozlowski@samsung.com>
-References: <1456445103-23314-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160313011210.GJ17502@localhost>
+Date: Sat, 12 Mar 2016 17:16:04 -0800
+Subject: [GIT PULL] ARM: EXYNOS: SROM driver for v4.6, 2nd try
+In-Reply-To: <2210448.V5gsMerLz6@wuerfel>
+References: <1456825042-23733-1-git-send-email-k.kozlowski@samsung.com>
+ <1456825042-23733-3-git-send-email-k.kozlowski@samsung.com>
+ <56D77FA6.5070500@samsung.com> <2210448.V5gsMerLz6@wuerfel>
+Message-ID: <20160313011604.GL17502@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 09:05:02AM +0900, Krzysztof Kozlowski wrote:
-> Hi Arnd, Kevin and Olof,
+On Thu, Mar 03, 2016 at 02:11:32PM +0100, Arnd Bergmann wrote:
+> On Thursday 03 March 2016 09:04:54 Krzysztof Kozlowski wrote:
+> > On 01.03.2016 18:37, Krzysztof Kozlowski wrote:
+> > > Hi,
+> > > 
+> > > 
+> > > After Olof comments, second pull request with movement of SROM code
+> > > to separate driver - under drivers/memory/samsung (more are planned for
+> > > that directory).
+> > > 
+> > > This depends on (included here):
+> > > 1. tag samsung-dt-srom-4.6: SROM-DT changes, merged already to arm-soc,
+> > > 2. tag samsung-soc-4.6-2: next/soc changes, sent few days ago, not merged yet.
+> > > 
+> > > This may conflict in the future (in linux-next or Linus) around
+> > > drivers/memory/Kconfig with iommu tree. Just add all the changes.
+> > > 
+> > > 
+> > > The diff at the end contains both samsung-soc-4.6-2 and this stuff.
+> > > To make finding changes easier, below you will find difference between
+> > > this tag and samsung-soc-4.6-2:
+> > 
+> > I see you did not pull this yet so can you wait a little bit? Rob
+> > Herring posted some comments on bindings so this might be revisited...
+> > 
+> > This is an unlucky patchset...
 > 
-> 
-> Second pull request for v4.6 with mach/soc changes. This does
-> not contain any external dependencies.
-> 
-> It includes movement of PMU code to separate driver (drivers/soc) but
-> it does not have commits doing the same for the SROM controller driver
-> (that part I will send separately).
-> 
-> 
-> Kind regards,
-> Krzysztof
-> 
-> 
-> Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
-> 
-> 
-> 
-> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-> 
->   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.6-2
+> It was a bit late last night, and I didn't want to check that the
+> dependencies were correct. I also saw that you had discussed these
+> contents with Olof before, but didn't follow the thread there, so
+> I was hoping that Olof could get back to it and check that his
+> concerns are all addressed before picking it up.
 
 Hi,
 
-Apologies for the long latency here.
-
-I should probably merge this into a late/* branch, but for now I've taken it
-into next/soc because I feel guilty. :-)
+I've merged the other SoC branches now (that were respun without this SROM
+contents). I think it's safe given the feedback from Rob to wait with this
+driver for the next cycle. That way the dependencies are gone too since they
+will have been merged.
 
 
 -Olof
