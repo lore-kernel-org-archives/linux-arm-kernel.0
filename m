@@ -1,431 +1,387 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Sun, 13 Mar 2016 18:23:18 -0500
-Subject: [PATCH 4/4] arm64: pmu: add A72 cpu type, support multiple PMU types
-In-Reply-To: <1457911398-22412-1-git-send-email-jeremy.linton@arm.com>
-References: <1457911398-22412-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1457911398-22412-5-git-send-email-jeremy.linton@arm.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Mon, 14 Mar 2016 00:26:30 +0100
+Subject: [PATCH v3 2/2] PCI: imx6: add initial imx6sx support
+In-Reply-To: <20160311175850.GA4725@localhost>
+References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+ <1456411669-4699-3-git-send-email-chf.fritz@googlemail.com>
+ <20160311175850.GA4725@localhost>
+Message-ID: <1457911590.16725.37.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM big/little machines can have PMU's with differing PMU counters.
-ACPI systems should be able to support this as well. Also add support
-for A72 PMU counters.
+Hi Bjorn
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/include/asm/cputype.h |   1 +
- arch/arm64/kernel/perf_event.c   |   1 +
- drivers/perf/arm_pmu.c           |  54 +++++++--
- drivers/perf/arm_pmu_acpi.c      | 229 +++++++++++++++++++++++++++------------
- 4 files changed, 204 insertions(+), 81 deletions(-)
+On Fri, 2016-03-11 at 11:58 -0600, Bjorn Helgaas wrote:
+> Hi Christoph (and Lee; there's a question for you below, too),
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 87e1985..1e40799 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -74,6 +74,7 @@
- 
- #define ARM_CPU_PART_AEM_V8		0xD0F
- #define ARM_CPU_PART_FOUNDATION		0xD00
-+#define ARM_CPU_PART_CORTEX_A72		0xD08
- #define ARM_CPU_PART_CORTEX_A57		0xD07
- #define ARM_CPU_PART_CORTEX_A53		0xD03
- 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 03e0957..b3ea97f 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -904,6 +904,7 @@ static const struct of_device_id armv8_pmu_of_device_ids[] = {
- static const struct pmu_probe_info armv8_pmu_probe_table[] = {
- 	ARMV8_PMU_PART_PROBE(ARM_CPU_PART_CORTEX_A53, armv8_a53_pmu_init),
- 	ARMV8_PMU_PART_PROBE(ARM_CPU_PART_CORTEX_A57, armv8_a57_pmu_init),
-+	ARMV8_PMU_PART_PROBE(ARM_CPU_PART_CORTEX_A72, armv8_a72_pmu_init),
- 	PMU_PROBE(0, 0, armv8_pmuv3_init), /* if all else fails... */
- 	{ /* sentinel value */ }
- };
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 0f33c96..87f975f 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -11,6 +11,7 @@
-  */
- #define pr_fmt(fmt) "hw perfevents: " fmt
- 
-+#include <linux/acpi.h>
- #include <linux/bitmap.h>
- #include <linux/cpumask.h>
- #include <linux/cpu_pm.h>
-@@ -24,6 +25,7 @@
- #include <linux/irq.h>
- #include <linux/irqdesc.h>
- 
-+#include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/irq_regs.h>
- 
-@@ -853,25 +855,51 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
- }
- 
- /*
-- * CPU PMU identification and probing.
-+ * CPU PMU identification and probing. Its possible to have
-+ * multiple CPU types in an ARM machine. Assure that we are
-+ * picking the right PMU types based on the CPU in question
-  */
--static int probe_current_pmu(struct arm_pmu *pmu,
--			     const struct pmu_probe_info *info)
-+static int probe_plat_pmu(struct arm_pmu *pmu,
-+			     const struct pmu_probe_info *info,
-+			     unsigned int pmuid)
- {
--	int cpu = get_cpu();
--	unsigned int cpuid = read_cpuid_id();
- 	int ret = -ENODEV;
-+	int cpu;
-+	int aff_ctr = 0;
-+	struct platform_device *pdev = pmu->plat_device;
-+	int irq = platform_get_irq(pdev, 0);
- 
--	pr_info("probing PMU on CPU %d\n", cpu);
-+	if (irq >= 0 && !irq_is_percpu(irq)) {
-+		pmu->irq_affinity = kcalloc(pdev->num_resources, sizeof(int),
-+					    GFP_KERNEL);
-+		if (!pmu->irq_affinity)
-+			return -ENOMEM;
-+	}
- 
-+	for_each_possible_cpu(cpu) {
-+		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, cpu);
-+		unsigned int cpuid = cinfo->reg_midr;
-+
-+		if (cpuid == pmuid) {
-+			cpumask_set_cpu(cpu, &pmu->supported_cpus);
-+			pr_devel("enable pmu on cpu %d\n", cpu);
-+			if (pmu->irq_affinity) {
-+				pmu->irq_affinity[aff_ctr] = cpu;
-+				aff_ctr++;
-+			}
-+		}
-+	}
-+
-+	pr_debug("probing PMU %X\n", pmuid);
-+	/* find the type of PMU given the CPU */
- 	for (; info->init != NULL; info++) {
--		if ((cpuid & info->mask) != info->cpuid)
-+		if ((pmuid & info->mask) != info->cpuid)
- 			continue;
-+		pr_devel("Found PMU\n");
- 		ret = info->init(pmu);
- 		break;
- 	}
- 
--	put_cpu();
- 	return ret;
- }
- 
-@@ -997,8 +1025,14 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		if (!ret)
- 			ret = init_fn(pmu);
- 	} else {
--		cpumask_setall(&pmu->supported_cpus);
--		ret = probe_current_pmu(pmu, probe_table);
-+		if (acpi_disabled) {
-+			/* use the boot cpu. */
-+			struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, 0);
-+			unsigned int cpuid = cinfo->reg_midr;
-+
-+			ret = probe_plat_pmu(pmu, probe_table, cpuid);
-+		} else
-+			ret = probe_plat_pmu(pmu, probe_table, pdev->id);
- 	}
- 
- 	if (ret) {
-diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-index 722f4ca..793092c 100644
---- a/drivers/perf/arm_pmu_acpi.c
-+++ b/drivers/perf/arm_pmu_acpi.c
-@@ -2,6 +2,7 @@
-  * PMU support
-  *
-  * Copyright (C) 2015 Red Hat Inc.
-+ * Copyright (C) 2016 ARM Ltd.
-  * Author: Mark Salter <msalter@redhat.com>
-  *
-  * This work is licensed under the terms of the GNU GPL, version 2.  See
-@@ -9,21 +10,35 @@
-  *
-  */
- 
-+#define pr_fmt(fmt) "ACPI-PMU: " fmt
- #include <linux/perf/arm_pmu.h>
- #include <linux/platform_device.h>
- #include <linux/acpi.h>
- #include <linux/irq.h>
- #include <linux/irqdesc.h>
- 
-+#include <asm/cpu.h>
-+
- #define PMU_PDEV_NAME "armv8-pmu"
- 
- struct pmu_irq {
--	int gsi;
--	int trigger;
-+	int  gsi;
-+	int  trigger;
-+	bool registered;
-+};
-+
-+struct pmu_types {
-+	int cpu_type;
-+	int cpu_count;
- };
- 
- static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
- 
-+/*
-+ * called from acpi_map_gic_cpu_interface()'s MADT parsing callback during boot
-+ * this routine saves off the GSI's and their trigger state for use when we are
-+ * ready to build the PMU platform device.
-+*/
- void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
- {
- 	pmu_irqs[cpu].gsi = gic->performance_interrupt;
-@@ -31,95 +46,167 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
- 		pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
- 	else
- 		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
-+	pr_info("Assign CPU %d girq %d level %d\n", cpu, pmu_irqs[cpu].gsi,
-+						   pmu_irqs[cpu].trigger);
- }
- 
--#ifndef CONFIG_SMP
--/*
-- * In !SMP case, we parse for boot CPU IRQ here.
-- */
--static int __init acpi_parse_pmu_irqs(struct acpi_subtable_header *header,
--				      const unsigned long end)
--{
--	struct acpi_madt_generic_interrupt *gic;
--
--	gic = (struct acpi_madt_generic_interrupt *)header;
--
--	if (cpu_logical_map(0) == (gic->arm_mpidr & MPIDR_HWID_BITMASK))
--		arm_pmu_parse_acpi(0, gic);
--
--	return 0;
--}
--
--static void __init acpi_parse_boot_cpu(void)
-+/* count number and type of CPU's in system */
-+static void __init arm_pmu_acpi_determine_cpu_types(struct pmu_types *pmus)
- {
--	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
--				      acpi_parse_pmu_irqs, 0);
-+	int i, j;
-+
-+	for_each_possible_cpu(i) {
-+		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
-+
-+		pr_devel("Present CPU %d is a %X\n", i,
-+					       MIDR_PARTNUM(cinfo->reg_midr));
-+		for (j = 0; j < NR_CPUS; j++) {
-+			if (pmus[j].cpu_type == MIDR_PARTNUM(cinfo->reg_midr)) {
-+				pmus[j].cpu_count++;
-+				break;
-+			}
-+			if (pmus[j].cpu_count == 0) {
-+				pmus[j].cpu_type = MIDR_PARTNUM(cinfo->reg_midr);
-+				pmus[j].cpu_count++;
-+				break;
-+			}
-+		}
-+	}
- }
--#else
--#define acpi_parse_boot_cpu() do {} while (0)
--#endif
- 
--static int __init pmu_acpi_init(void)
-+static int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
-+					    int last_cpu_id)
- {
--	struct platform_device *pdev;
--	struct pmu_irq *pirq = pmu_irqs;
--	struct resource	*res, *r;
-+	int i;
- 	int err = -ENOMEM;
--	int i, count, irq;
-+	bool free_gsi = false;
-+	struct platform_device *pdev;
- 
--	if (acpi_disabled)
--		return 0;
-+	if (count) {
-+		pdev = platform_device_alloc(PMU_PDEV_NAME, last_cpu_id);
-+
-+		if (pdev) {
-+			err = platform_device_add_resources(pdev,
-+							    res, count);
-+			if (!err) {
-+				err = platform_device_add(pdev);
-+				if (err) {
-+					pr_warn("Unable to register PMU device\n");
-+					free_gsi = true;
-+				}
-+			} else {
-+				pr_warn("Unable to add resources to device\n");
-+				free_gsi = true;
-+				platform_device_put(pdev);
-+			}
-+		} else {
-+			pr_warn("Unable to allocate platform device\n");
-+			free_gsi = true;
-+		}
-+	}
- 
--	acpi_parse_boot_cpu();
-+	/* unmark (and possibly unregister) registered GSIs */
-+	for_each_possible_cpu(i) {
-+		if (pmu_irqs[i].registered) {
-+			if (free_gsi)
-+				acpi_unregister_gsi(pmu_irqs[i].gsi);
-+			pmu_irqs[i].registered = false;
-+		}
-+	}
- 
--	/* Must have irq for boot boot cpu, at least */
--	if (pirq->gsi == 0)
--		return -EINVAL;
-+	return err;
-+}
- 
--	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
--				ACPI_ACTIVE_HIGH);
-+/*
-+ * For the given cpu/pmu type, walk all known GSIs, register them, and add
-+ * them to the resource structure. Return the number of GSI's contained
-+ * in the res structure, and the id of the last CPU/PMU we added.
-+ */
-+static int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
-+				       struct resource *res, int *last_cpu_id)
-+{
-+	int i, count;
-+	int irq;
-+
-+	pr_info("Setting up %d PMUs for CPU type %X\n", pmus->cpu_count,
-+							pmus->cpu_type);
-+	/* lets group all the PMU's from similar CPU's together */
-+	count = 0;
-+	for_each_possible_cpu(i) {
-+		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
-+
-+		if (pmus->cpu_type == MIDR_PARTNUM(cinfo->reg_midr)) {
-+			pr_devel("Setting up CPU %d\n", i);
-+			if (pmu_irqs[i].gsi == 0)
-+				continue;
-+
-+			irq = acpi_register_gsi(NULL, pmu_irqs[i].gsi,
-+						pmu_irqs[i].trigger,
-+						ACPI_ACTIVE_HIGH);
- 
--	if (irq_is_percpu(irq))
--		count = 1;
--	else
--		for (i = 1, count = 1; i < NR_CPUS; i++)
--			if (pmu_irqs[i].gsi)
--				++count;
-+			res[count].start = res[count].end = irq;
-+			res[count].flags = IORESOURCE_IRQ;
- 
--	pdev = platform_device_alloc(PMU_PDEV_NAME, -1);
--	if (!pdev)
--		goto err_free_gsi;
-+			if (pmu_irqs[i].trigger == ACPI_EDGE_SENSITIVE)
-+				res[count].flags |= IORESOURCE_IRQ_HIGHEDGE;
-+			else
-+				res[count].flags |= IORESOURCE_IRQ_HIGHLEVEL;
- 
--	res = kcalloc(count, sizeof(*res), GFP_KERNEL);
--	if (!res)
--		goto err_free_device;
-+			pmu_irqs[i].registered = true;
-+			count++;
-+			(*last_cpu_id) = cinfo->reg_midr;
- 
--	for (i = 0, r = res; i < count; i++, pirq++, r++) {
--		if (i)
--			irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
--						ACPI_ACTIVE_HIGH);
--		r->start = r->end = irq;
--		r->flags = IORESOURCE_IRQ;
--		if (pirq->trigger == ACPI_EDGE_SENSITIVE)
--			r->flags |= IORESOURCE_IRQ_HIGHEDGE;
--		else
--			r->flags |= IORESOURCE_IRQ_HIGHLEVEL;
-+			if (irq_is_percpu(irq))
-+				pr_debug("PPI detected\n");
-+		}
- 	}
-+	return count;
-+}
- 
--	err = platform_device_add_resources(pdev, res, count);
--	if (!err)
--		err = platform_device_add(pdev);
--	kfree(res);
--	if (!err)
--		return 0;
-+static int __init pmu_acpi_init(void)
-+{
-+	struct resource	*res;
-+	int err = -ENOMEM;
-+	int count;
-+	int j, last_cpu_id;
-+	struct pmu_types *pmus;
- 
--err_free_device:
--	platform_device_put(pdev);
-+	pr_debug("Prepare registration\n");
-+	if (acpi_disabled)
-+		return 0;
- 
--err_free_gsi:
--	for (i = 0; i < count; i++)
--		acpi_unregister_gsi(pmu_irqs[i].gsi);
-+	pmus = kcalloc(NR_CPUS, sizeof(struct pmu_types), GFP_KERNEL);
-+
-+	if (pmus) {
-+		arm_pmu_acpi_determine_cpu_types(pmus);
-+
-+		for (j = 0; pmus[j].cpu_count; j++) {
-+			pr_devel("CPU type %d, count %d\n", pmus[j].cpu_type,
-+				 pmus[j].cpu_count);
-+			res = kcalloc(pmus[j].cpu_count,
-+				      sizeof(struct resource), GFP_KERNEL);
-+
-+			/* for a given PMU type collect all the GSIs. */
-+			if (res) {
-+				count = arm_pmu_acpi_gsi_res(&pmus[j], res,
-+							     &last_cpu_id);
-+				/*
-+				 * register this set of interrupts
-+				 * with a new PMU device
-+				 */
-+				err = arm_pmu_acpi_register_pmu(count,
-+								res,
-+								last_cpu_id);
-+				kfree(res);
-+			} else
-+				pr_warn("PMU unable to allocate interrupt resource space\n");
-+		}
-+
-+		kfree(pmus);
-+	} else
-+		pr_warn("PMU: Unable to allocate pmu count structures\n");
- 
- 	return err;
- }
-+
- arch_initcall(pmu_acpi_init);
--- 
-2.4.3
+Thanks for your review, please see my answers and comments below.
+
+> On Thu, Feb 25, 2016 at 03:47:49PM +0100, Christoph Fritz wrote:
+> > This patch adds initial PCIe support for the imx6 SoC derivate imx6sx.
+> > PCI_MSI support is untested as its necessary suspend/resume quirk is
+> > left out of this patch.
+> > This patch is heavily based on patches by Richard Zhu.
+> > 
+> > Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> > ---
+> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+> >  drivers/pci/host/pci-imx6.c                        | 130 ++++++++++++++-------
+> >  2 files changed, 96 insertions(+), 40 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> > index 6fbba53..c4323be 100644
+> > --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> > +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> > @@ -4,7 +4,7 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+> >  and thus inherits all the common properties defined in designware-pcie.txt.
+> >  
+> >  Required properties:
+> > -- compatible: "fsl,imx6q-pcie"
+> > +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie"
+> >  - reg: base addresse and length of the pcie controller
+> 
+> I folded in a typo fix for "addresse".
+> 
+> >  - interrupts: A list of interrupt outputs of the controller. Must contain an
+> >    entry for each entry in the interrupt-names property.
+> > @@ -13,6 +13,10 @@ Required properties:
+> >  - clock-names: Must include the following additional entries:
+> >  	- "pcie_phy"
+> >  
+> > +Additional required properties for imx6sx-pcie:
+> > +- clock names: Must include the following additional entries:
+> > +	- "pcie_inbound_axi"
+> > +
+> >  Example:
+> >  
+> >  	pcie at 0x01000000 {
+> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> > index fe60096..7e634a6 100644
+> > --- a/drivers/pci/host/pci-imx6.c
+> > +++ b/drivers/pci/host/pci-imx6.c
+> > @@ -35,9 +35,11 @@ struct imx6_pcie {
+> >  	struct gpio_desc	*reset_gpio;
+> >  	struct clk		*pcie_bus;
+> >  	struct clk		*pcie_phy;
+> > +	struct clk		*pcie_inbound_axi;
+> >  	struct clk		*pcie;
+> >  	struct pcie_port	pp;
+> >  	struct regmap		*iomuxc_gpr;
+> > +	bool			is_imx6sx;
+> >  	void __iomem		*mem_base;
+> >  };
+> >  
+> > @@ -214,35 +216,46 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+> >  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> >  	u32 val, gpr1, gpr12;
+> >  
+> > -	/*
+> > -	 * If the bootloader already enabled the link we need some special
+> > -	 * handling to get the core back into a state where it is safe to
+> > -	 * touch it for configuration.  As there is no dedicated reset signal
+> > -	 * wired up for MX6QDL, we need to manually force LTSSM into "detect"
+> > -	 * state before completely disabling LTSSM, which is a prerequisite
+> > -	 * for core configuration.
+
+<snip>
+
+> > +	} else {
+> > +		/*
+> > +		 * If the bootloader already enabled the link we need some
+> > +		 * special handling to get the core back into a state where
+> > +		 * it is safe to touch it for configuration.  As there is no
+> > +		 * dedicated reset signal to manually force LTSSM into "detect"
+> > +		 * state before completely disabling LTSSM, which is a
+> > +		 * prerequisite for core configuration.
+> 
+> For example, you changed this comment, and now the last sentence is no
+> longer a sentence.  I don't know if this was an editing mistake or if
+> this comment really does need to change.  If it does need to change,
+> it needs to stay a sentence.
+
+I suppose Richard's intend was to get rid of the explicit mentioning of
+"MX6QDL".
+Since I don't touch this code I'll drop this change and leave this
+comment as it is.
+
+> 
+> > +		 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have
+> > +		 * a strong indication that the bootloader activated the link.
+> > +		 */
+> > +		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
+> > +		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
+> > +
+> > +		if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
+> > +				(gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
+> > +			val = readl(pp->dbi_base + PCIE_PL_PFLR);
+> > +			val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> > +			val |= PCIE_PL_PFLR_FORCE_LINK;
+> > +			writel(val, pp->dbi_base + PCIE_PL_PFLR);
+> > +
+> > +			regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				IMX6Q_GPR12_PCIE_CTL_2, 0);
+> > +		}
+> >  
+> > -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > -			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+> > -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > +			IMX6Q_GPR1_PCIE_TEST_PD,
+> > +			IMX6Q_GPR1_PCIE_TEST_PD);
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > +			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0);
+> 
+> And there are subtle changes here (changing "1 << 18" to
+> IMX6Q_GPR1_PCIE_TEST_PD, etc.)  These are fine, but should be in a
+> separate patch because (a) they're not related to imx6sx and (b) it
+> makes them obvious and easy to review.  As it is, they just get snuck
+> in under the radar.
+
+OK
+
+> 
+> > +	}
+> >  
+> >  	return 0;
+> >  }
+> > @@ -270,18 +283,30 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+> >  		goto err_pcie;
+> >  	}
+> >  
+> > -	/* power up core phy and enable ref clock */
+> > -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > -			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> > -	/*
+> > -	 * the async reset input need ref clock to sync internally,
+> > -	 * when the ref clock comes after reset, internal synced
+> > -	 * reset time is too short, cannot meet the requirement.
+> > -	 * add one ~10us delay here.
+> > -	 */
+> > -	udelay(10);
+> > -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> > +	if (imx6_pcie->is_imx6sx) {
+> > +		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
+> > +		if (ret) {
+> > +			dev_err(pp->dev, "unable to enable pcie_axi clock\n");
+> > +			goto err_inbound_axi;
+> > +		}
+> > +
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +			IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
+> > +	} else {
+> > +		/* power up core phy and enable ref clock */
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > +				IMX6Q_GPR1_PCIE_TEST_PD, 0);
+> > +		/*
+> > +		 * the async reset input need ref clock to sync internally,
+> > +		 * when the ref clock comes after reset, internal synced
+> > +		 * reset time is too short , cannot meet the requirement.
+> > +		 * add one ~10us delay here.
+> > +		 */
+> > +		udelay(10);
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> > +			IMX6Q_GPR1_PCIE_REF_CLK_EN,
+> > +			IMX6Q_GPR1_PCIE_REF_CLK_EN);
+> > +	}
+> 
+> Here again the diff is bigger than necessary because it re-indents the
+> original code (and makes another unrelated "1 << 16" to
+> IMX6Q_GPR1_PCIE_REF_CLK_EN change).  I'll show a different proposal in
+> my patch below.
+
+OK
+
+> 
+> >  	/* allow the clocks to stabilize */
+> >  	usleep_range(200, 500);
+> > @@ -292,8 +317,15 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+> >  		msleep(100);
+> >  		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
+> >  	}
+> > +
+> > +	if (imx6_pcie->is_imx6sx)
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
+> > +			IMX6SX_GPR5_PCIE_BTNRST_RESET, 0);
+> > +
+> >  	return 0;
+> >  
+> > +err_inbound_axi:
+> > +	clk_disable_unprepare(imx6_pcie->pcie);
+> >  err_pcie:
+> >  	clk_disable_unprepare(imx6_pcie->pcie_bus);
+> >  err_pcie_bus:
+> > @@ -307,6 +339,12 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
+> >  {
+> >  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> >  
+> > +	if (imx6_pcie->is_imx6sx) {
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +			IMX6SX_GPR12_PCIE_RX_EQ_MASK,
+> > +			IMX6SX_GPR12_PCIE_RX_EQ_2);
+> 
+> I see that you added definitions for IMX6SX_GPR12_PCIE_RX_EQ_MASK and
+> IMX6SX_GPR12_PCIE_RX_EQ_2 in the first patch of this series, but doing
+> that separately creates a merge problem.  I can't put this change in
+> my tree by itself because it won't build.  If Lee applied the first
+> patch to a git branch, I guess I could pull that into my tree.  But it
+> would be far simpler to just include those new definitions in this
+> patch.
+
+Sorry, Lee Jones already applied this patch to his public git
+repository:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
+
+Commit id:
+
+ 987480efd6d39447981e96b438cf5a781b756712
+
+currently in branch for-mfd-next
+
+Is it okay for you to pull this commit?
+
+It's also already in linux-next.
+
+<snip>
+
+> The patches below are what I currently have in my tree, but they're
+> not ready for v4.6 (yet).
+> 
+> Note that the second one is very clearly imx6sx-only.  It's obvious
+> there are no tweaks to the existing imx6 code, which makes it easier
+> to review, backport, bisect, revert, etc.
+> 
+> Obviously, I can't apply these directly.  First we have to:
+> 
+>   - Fix the LTSSM comment
+>   - Figure out how to get the IMX6SX_GPR12_PCIE_RX_EQ_MASK definitions
+> 
+> 
+> commit 78abf60b815a8f28207d029d61f7809647faa43a
+> Author: Bjorn Helgaas <bhelgaas@google.com>
+> Date:   Fri Mar 11 11:15:36 2016 -0600
+> 
+>     PCI: imx6: Factor out ref clock enable
+>     
+>     Factor out ref clock enable to make it cleaner to add imx6sx support.  No
+>     functional change intended.
+>     
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 8c9b389..ecc8537 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -269,6 +269,23 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+
+<snip>
+
+> -	udelay(10);
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> +	ret = imx6_pcie_enable_ref_clk(imx6_pcie);
+> +	if (ret)
+
+a '{ ' is missing
+
+> +		dev_err(pp->dev, "unable to enable pcie ref clock\n");
+> +		goto err_ref_clk;
+> +	}
+>  
+>  	/* allow the clocks to stabilize */
+>  	usleep_range(200, 500);
+> @@ -316,6 +326,8 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  	}
+>  	return 0;
+>  
+> +err_ref_clk:
+> +	clk_disable_unprepare(imx6_pcie->pcie);
+>  err_pcie:
+>  	clk_disable_unprepare(imx6_pcie->pcie_bus);
+>  err_pcie_bus:
+> 
+> commit d061033570b7fd22a3ed8c029d4793e5df7324e1
+> Author: Christoph Fritz <chf.fritz@googlemail.com>
+> Date:   Thu Mar 10 15:04:25 2016 -0600
+> 
+>     PCI: imx6: Add initial imx6sx support
+>     
+>     Add initial PCIe support for the imx6 SoC derivate imx6sx.  PCI MSI support
+>     is untested as the necessary suspend/resume quirk is not included in this
+>     patch.
+>     
+>     This patch is heavily based on patches by Richard Zhu.
+>     
+>     [bhelgaas: factor out refclk enable, fix adjacent typos in fsl,imx6q-pcie.txt]
+>     Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+>     Acked-by: Richard Zhu <Richard.Zhu@freescale.com>
+>     Acked-by: Lucas Stach <l.stach@pengutronix.de>
+> 
+
+<snip>
+
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index ecc8537..4d6af21 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -35,9 +35,11 @@ struct imx6_pcie {
+>  	struct gpio_desc	*reset_gpio;
+>  	struct clk		*pcie_bus;
+>  	struct clk		*pcie_phy;
+
+<snip>
+
+>  	/*
+>  	 * If the bootloader already enabled the link we need some special
+>  	 * handling to get the core back into a state where it is safe to
+>  	 * touch it for configuration.  As there is no dedicated reset signal
+> -	 * wired up for MX6QDL, we need to manually force LTSSM into "detect"
+> -	 * state before completely disabling LTSSM, which is a prerequisite
+> -	 * for core configuration.
+> +	 * to manually force LTSSM into "detect" state before completely
+> +	 * disabling LTSSM, which is a prerequisite for core configuration.
+>  	 *
+>  	 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have a strong
+>  	 * indication that the bootloader activated the link.
+> @@ -271,6 +283,18 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  
+>  static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
+>  {
+
+this is missing:
+
+	struct pcie_port *pp = &imx6_pcie->pp;
+	int ret;
+
+
+
+
+> +	if (imx6_pcie->is_imx6sx) {
+> +		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
+> +		if (ret) {
+> +			dev_err(pp->dev, "unable to enable pcie_axi clock\n");
+> +			return ret;
+> +		}
+> +
+> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
+> +		return 0;
+
+then we can use
+
+	return ret;
+
+instead
+> +	}
+> +
+>  	/* power up core phy and enable ref clock */
+>  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+
+<snip>
+
+I'll fix these two patches and send them as follow up to this mail.
+
+ Thanks
+  -- Christoph
