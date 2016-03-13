@@ -1,44 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 12 Mar 2016 17:29:46 -0800
-Subject: [GIT PULL] More RealView DT and misc cleanups
-In-Reply-To: <CACRpkdbm0qQS1mq1xFYrQDt-Q4SfTyx7+2pT+FEJRJGQb1Mmuw@mail.gmail.com>
-References: <CACRpkdbm0qQS1mq1xFYrQDt-Q4SfTyx7+2pT+FEJRJGQb1Mmuw@mail.gmail.com>
-Message-ID: <20160313012946.GC5883@localhost>
+Date: Sat, 12 Mar 2016 17:32:32 -0800
+Subject: [GIT PULL]Hisilicon Hi6220 SoC and Hikey board DT updates for 4.6
+In-Reply-To: <56E1498F.2030107@hisilicon.com>
+References: <56E1498F.2030107@hisilicon.com>
+Message-ID: <20160313013232.GD5883@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 12:58:16PM +0700, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Thu, Mar 10, 2016 at 06:16:47PM +0800, Wei Xu wrote:
+> Hi Arnd, Hi Olof, Hi Kevin,
 > 
-> there is nothing controversial or dangerous about these RealView patches,
-> there is mainly upsides like being able to test and run QEMU on RealView
-> DT for v4.6.
+> Please help to pull the following changes.
+> Thanks!
 > 
-> I'm sorry this was sitting in my tree, I happened to spend my time with
-> trying to finalize the CLCD changes and delete the board files but that
-> failed.
-> 
-> This would be nice to have merged and away from my patch stack, but
-> if it's too late, it's too late, and I'll queue it for v4.7.
-> 
-> Anyways: please pull it in.
-> 
-> Yours,
-> Linus Walleij
+> Best Regards,
+> Wei
 
-Hi Linus,
+Hi Wei,
 
-Unforuntately it is quite late but I'd be OK with merging it as a late/ branch
-on best effort agreement (i.e. we might not get it merged).
+Sending the main pull request for a platform after -rc7 is much too late.
+We will sometimes take incremental smaller updates late in the cycle, but we
+ask for all main material to be present earlier. (We also sometimes make an
+exception if we make a mistake and miss a pull request).
 
-BUT: Can you please respin the patch subjects?
+So, please resend this after -rc1 and we can queue it for 4.7.
 
-ARM: realview: code change for review
-and:
-ARM: dts: realview: dt changes for realview stuff
+Also, see below:
 
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   | 196 ++++++-
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 586 +++++++++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi    | 607 +++++++++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 705 +++++++++++++++++++++++
+>  include/dt-bindings/pinctrl/hisi.h               |  59 ++
+>  5 files changed, 2149 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
+>  create mode 100644 include/dt-bindings/pinctrl/hisi.h
 
-Thanks!
+The pinctrl changes need an Ack from the pinctrl maintainer.
 
 
 -Olof
