@@ -1,48 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 13 Mar 2016 18:02:54 +0100
-Subject: [PATCH] pinctrl: sunxi: Fix A33 external interrupts not working
-In-Reply-To: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
-References: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160313170254.GF8418@lukather>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 13 Mar 2016 13:25:05 -0400
+Subject: [PATCH V2 2/3] vfio, platform: make reset driver a requirement
+In-Reply-To: <1457715275-11925-3-git-send-email-okaya@codeaurora.org>
+References: <1457715275-11925-1-git-send-email-okaya@codeaurora.org>
+ <1457715275-11925-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <56E5A271.6000408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 12, 2016 at 07:44:57PM +0100, Hans de Goede wrote:
-> pinctrl-sun8i-a33.c (and the dts) declare only 2 interrupt banks,
-> where as the closely related a23 has 3 banks. This matches with the
-> datasheet for the A33 where only interrupt banks B and G are specified
-> where as the A23 has banks A, B and G.
+On 3/11/2016 11:54 AM, Sinan Kaya wrote:
+> The code was allowing platform devices to be used without a supporting VFIO
+> reset driver. The hardware can be left in some inconsistent state after a
+> guest machine abort.
 > 
-> However the A33 being the A23 derative it is means that the interrupt
-> configure/status io-addresses for the 2 banks it has are not changed
-> from the A23, iow they have the same address as if bank A was still
-> present. Where as the sunxi pinctrl currently tries to use the A23 bank
-> A addresses for bank B, since the pinctrl code does not know about the
-> removed bank A.
+> The reset driver will put the hardware back to safe state and disable
+> interrupts before returning the control back to the host machine.
 > 
-> Add a irq_bank_base parameter and use this where appropriate to take
-> the missing bank A into account.
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
 > 
-> This fixes external interrupts not working on the A33 (tested with
-> an i2c touchscreen controller which uses an external interrupt).
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+I was looking at the code. It looks like this is going to break VFIO AMBA. The
+common implementation is shared with AMBA and platform devices.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+I couldn't see a reset function for AMBA devices.
 
-You should send it to stable though.
+Is there anyway to write reset function for it? I have no experience with 
+AMBA devices.
 
-Thanks!
-Maxime
+Would you include a reset needed flag and just not require it for AMBA? 
+(I honestly don't like this idea)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160313/2d79ded5/attachment.sig>
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
