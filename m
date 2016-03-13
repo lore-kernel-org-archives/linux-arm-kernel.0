@@ -1,79 +1,46 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Sun, 13 Mar 2016 21:44:59 -0700
-Subject: [PATCH] kbuild: drop FORCE from PHONY targets
-In-Reply-To: <CAK7LNAQOJjcn7Q+s_pKqzUuojMBtOsRNKsmVwDFXvTeU-zvSeQ@mail.gmail.com>
-References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
- <CALCETrVqzidL7SXsCVm8wWrcQMR9dFOLGnDtC-eEYMO4a+yszA@mail.gmail.com>
- <CAK7LNARELkQbhAfBdh9Tx7gVGkpN9gTJzoqJwOF-0CH4zm+wcw@mail.gmail.com>
- <CALCETrVgSUy4ofeBmkZ7TurKvmQVX8C1aj__SLOL6SboQ3S-WA@mail.gmail.com>
- <CAK7LNAQOJjcn7Q+s_pKqzUuojMBtOsRNKsmVwDFXvTeU-zvSeQ@mail.gmail.com>
-Message-ID: <CALCETrU+6sj=reBgPBy7Mq6KYY7BKkVLGwm4XrVzOzb8aU+meg@mail.gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Mon, 14 Mar 2016 06:01:09 +0800
+Subject: [PATCH v2 0/2] MT8173 IOMMU 4GB MODE SUPPORT
+Message-ID: <1457906471-31549-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 13, 2016 at 9:36 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2016-03-14 13:28 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
->> On Sun, Mar 13, 2016 at 9:08 PM, Masahiro Yamada
->> <yamada.masahiro@socionext.com> wrote:
->>>
->>> Hi Andy
->>>
->>> 2016-03-14 9:39 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
->>> > On Mar 12, 2016 4:14 PM, "Masahiro Yamada"
->>> > <yamada.masahiro@socionext.com> wrote:
->>> >>
->>> >> These targets are marked as PHONY.  No need to add FORCE to their
->>> >> dependency.
->>> >
->>> > If this is, in fact, correct, can you update
->>> > Documentation/kbuild/makefiles.txt as well?
->>>
->>> Which line do you want me to update?
->>>
->>
->> All the references to FORCE should probably mention .PHONY as an alternative.
->
-> I do not get your point.
->
-> All the examples in the makefile.txt correctly reference to FORCE.
-> They are not PHONY targets.
-> No need to update.
+This patch-set add MTK 4GB mode support on the Short-Descriptor.
 
-But they could be.  For example:
+Normally, the memory map in mt8173 looks like below:
 
-                $(obj)/image: vmlinux FORCE
-                        $(call if_changed,objcopy)
+Physical addr
+| 1st GB |    ->  HW SRAM and Regs
+|--------
+| 2nd GB |    ->  Dram 1st GB
+|--------
+| 3rd GB |    ->  Dram 2nd GB
+|--------
+| 4th GB |    ->  Dram 3rd GB
+|--------
 
-could be:
+Then if the dram size is 4GB, we have to add bit33 in the physical
+address. We have a "DRAM 4GB mode" toggle bit for this.
+If it is enabled, from CPU's point of view, the dram will
+be shifted to start from PA 0x1_00000000. Then the dram PA is from
+0x1_00000000~0x1_ffffffff.
 
-                 .PHONY: $(obj)/image
-                $(obj)/image: vmlinux
-                        $(call if_changed,objcopy)
+MTK extend the bit9 of the standard pgtable descriptor as the 4GB mode.
+we add a special quirk for this.
 
-I would at least change:
+v2:
+- Rebase on next-20160310.
+- Rename IO_PGTABLE_QUIRK_MTK_4GB_EXT to IO_PGTABLE_QUIRK_ARM_MTK_4GB.
+- Improve the comment of this "4GB mode".
 
-Note: It is a typical mistake to forget the FORCE prerequisite.
+Yong Wu (2):
+  iommu/io-pgtable: Add MTK 4GB mode in Short-descriptor
+  iommu/mediatek: Add 4GB mode support
 
-to:
-
-Note: if-changed is only useful if make executes it, which won't
-happen if it determines that the inputs have not changed since the
-output was built.  This can be avoided by specifying FORCE as a
-prerequisite or by making declaring the output as .PHONY.
-
---Andy
-
->
->
->
->
-> --
-> Best Regards
-> Masahiro Yamada
-
-
+ drivers/iommu/io-pgtable-arm-v7s.c | 13 ++++++++++++-
+ drivers/iommu/io-pgtable.h         |  6 ++++++
+ drivers/iommu/mtk_iommu.c          | 14 +++++++++++---
+ 3 files changed, 29 insertions(+), 4 deletions(-)
 
 -- 
-Andy Lutomirski
-AMA Capital Management, LLC
+1.8.1.1.dirty
