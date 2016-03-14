@@ -1,228 +1,102 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 14 Mar 2016 17:48:01 +0000
-Subject: [PATCH v15 18/20] arm64: kdump: add kdump support
+Date: Mon, 14 Mar 2016 17:48:00 +0000
+Subject: [PATCH v15 02/20] arm64: Cleanup SCTLR flags
 In-Reply-To: <cover.1457977401.git.geoff@infradead.org>
 References: <cover.1457977401.git.geoff@infradead.org>
-Message-ID: <094cfb96a58bfa5d193f57233556f7aad3cb7780.1457977403.git.geoff@infradead.org>
+Message-ID: <f0b21bfc669d89b9b631664e39ebe1929e66bf68.1457977401.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+We currently have macros defining flags for the arm64 sctlr registers in
+both kvm_arm.h and sysreg.h.  To clean things up and simplify move the
+definitions of the SCTLR_EL2 flags from kvm_arm.h to sysreg.h, rename any
+SCTLR_EL1 or SCTLR_EL2 flags that are common to both registers to be
+SCTLR_ELx, with 'x' indicating a common flag, and fixup all files to
+include the proper header or to use the new macro names.
 
-On crash dump kernel, all the information about primary kernel's system
-memory (core image) is available in elf core header.
-The primary kernel will set aside this header with reserve_elfcorehdr()
-at boot time and inform crash dump kernel of its location via a new
-device-tree property, "linux,elfcorehdr".
-
-Please note that all other architectures use traditional "elfcorehdr="
-kernel parameter for this purpose.
-
-Then crash dump kernel will access the primary kernel's memory with
-copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-not reside in linear mapping on crash dump kernel.
-
-We also need our own elfcorehdr_read() here since the header is placed
-within crash dump kernel's usable memory.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+[Restored pgtable-hwdef.h include]
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/Kconfig             | 11 +++++++
- arch/arm64/kernel/Makefile     |  1 +
- arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
- 4 files changed, 137 insertions(+)
- create mode 100644 arch/arm64/kernel/crash_dump.c
+ arch/arm64/include/asm/kvm_arm.h | 11 -----------
+ arch/arm64/include/asm/sysreg.h  | 19 +++++++++++++++----
+ arch/arm64/kvm/hyp-init.S        |  5 +++--
+ 3 files changed, 18 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 3001c51..0780e4c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -613,6 +613,17 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index d201d4b..fbd5dbd 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -83,17 +83,6 @@
+ #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
  
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel"
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec.
-+
-+	  For more details see Documentation/kdump/kdump.txt
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index c0aa90d..804ecd4 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -44,6 +44,7 @@ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
- arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
  
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-new file mode 100644
-index 0000000..2dc54d1
---- /dev/null
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Routines for doing kexec-based kdump
-+ *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/crash_dump.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/uaccess.h>
-+#include <asm/memory.h>
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is in a user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
-+{
-+	void *vaddr;
-+
-+	if (!csize)
-+		return 0;
-+
-+	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-+	if (!vaddr)
-+		return -ENOMEM;
-+
-+	if (userbuf) {
-+		if (copy_to_user(buf, vaddr + offset, csize)) {
-+			iounmap(vaddr);
-+			return -EFAULT;
-+		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+	}
-+
-+	iounmap(vaddr);
-+
-+	return csize;
-+}
-+
-+/**
-+ * elfcorehdr_read - read from ELF core header
-+ * @buf: buffer where the data is placed
-+ * @csize: number of bytes to read
-+ * @ppos: address in the memory
-+ *
-+ * This function reads @count bytes from elf core header which exists
-+ * on crash dump kernel's memory.
-+ */
-+ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-+{
-+	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-+	return count;
-+}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 82527da..f5e21a4 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -35,6 +35,7 @@
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
+-/* Hyp System Control Register (SCTLR_EL2) bits */
+-#define SCTLR_EL2_EE	(1 << 25)
+-#define SCTLR_EL2_WXN	(1 << 19)
+-#define SCTLR_EL2_I	(1 << 12)
+-#define SCTLR_EL2_SA	(1 << 3)
+-#define SCTLR_EL2_C	(1 << 2)
+-#define SCTLR_EL2_A	(1 << 1)
+-#define SCTLR_EL2_M	1
+-#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
+-			 SCTLR_EL2_SA | SCTLR_EL2_I)
+-
+ /* TCR_EL2 Registers bits */
+ #define TCR_EL2_RES1	((1 << 31) | (1 << 23))
+ #define TCR_EL2_TBI	(1 << 20)
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 4aeebec..99dac2f 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -82,10 +82,21 @@
+ #define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
+ 				     (!!x)<<8 | 0x1f)
  
- #include <asm/fixmap.h>
- #include <asm/memory.h>
-@@ -124,6 +125,57 @@ static void __init reserve_crashkernel(void)
- }
- #endif /* CONFIG_KEXEC_CORE */
+-/* SCTLR_EL1 */
+-#define SCTLR_EL1_CP15BEN	(0x1 << 5)
+-#define SCTLR_EL1_SED		(0x1 << 8)
+-#define SCTLR_EL1_SPAN		(0x1 << 23)
++/* Common SCTLR_ELx flags. */
++#define SCTLR_ELx_EE    (1 << 25)
++#define SCTLR_ELx_I	(1 << 12)
++#define SCTLR_ELx_SA	(1 << 3)
++#define SCTLR_ELx_C	(1 << 2)
++#define SCTLR_ELx_A	(1 << 1)
++#define SCTLR_ELx_M	1
++
++#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
++			 SCTLR_ELx_SA | SCTLR_ELx_I)
++
++/* SCTLR_EL1 specific flags. */
++#define SCTLR_EL1_SPAN		(1 << 23)
++#define SCTLR_EL1_SED		(1 << 8)
++#define SCTLR_EL1_CP15BEN	(1 << 5)
  
-+#ifdef CONFIG_CRASH_DUMP
-+static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	const __be32 *reg;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
-+/*
-+ * reserve_elfcorehdr() - reserves memory for elf core header
-+ *
-+ * This function reserves elf core header given in "elfcorehdr=" kernel
-+ * command line parameter. This region contains all the information about
-+ * primary kernel's core image and is used by a dump capture kernel to
-+ * access the system memory on primary kernel.
-+ */
-+static void __init reserve_elfcorehdr(void)
-+{
-+	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
-+
-+	if (!elfcorehdr_size)
-+		return;
-+
-+	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-+		pr_warn("elfcorehdr is overlapped\n");
-+		return;
-+	}
-+
-+	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
-+
-+	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
-+		elfcorehdr_size >> 10, elfcorehdr_addr);
-+}
-+#else
-+static void __init reserve_elfcorehdr(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_CRASH_DUMP */
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -268,6 +320,8 @@ void __init arm64_memblock_init(void)
  
- 	reserve_crashkernel();
+ /* id_aa64isar0 */
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index d073b5a..034d152c 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -21,6 +21,7 @@
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/pgtable-hwdef.h>
++#include <asm/sysreg.h>
  
-+	reserve_elfcorehdr();
-+
- 	early_init_fdt_scan_reserved_mem();
+ 	.text
+ 	.pushsection	.hyp.idmap.text, "ax"
+@@ -116,8 +117,8 @@ __do_hyp_init:
+ 	dsb	sy
  
- 	/* 4GB maximum for 32-bit only capable devices */
+ 	mrs	x4, sctlr_el2
+-	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
+-	ldr	x5, =SCTLR_EL2_FLAGS
++	and	x4, x4, #SCTLR_ELx_EE	// preserve endianness of EL2
++	ldr	x5, =SCTLR_ELx_FLAGS
+ 	orr	x4, x4, x5
+ 	msr	sctlr_el2, x4
+ 	isb
 -- 
 2.5.0
