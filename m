@@ -1,46 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Mar 2016 15:22:25 +0100
-Subject: [PATCH] drm/exynos: fix error handling in exynos_drm_subdrv_open
-Message-ID: <1457965368-3271060-1-git-send-email-arnd@arndb.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 14 Mar 2016 14:36:47 +0000
+Subject: [PATCH] ARM64: tegra: Remove unused #power-domain-cells property
+In-Reply-To: <1457101603-8426-1-git-send-email-jonathanh@nvidia.com>
+References: <1457101603-8426-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <56E6CC7F.4090901@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-6 warns about a pointless loop in exynos_drm_subdrv_open:
 
-drivers/gpu/drm/exynos/exynos_drm_core.c: In function 'exynos_drm_subdrv_open':
-drivers/gpu/drm/exynos/exynos_drm_core.c:104:199: error: self-comparison always evaluates to false [-Werror=tautological-compare]
-  list_for_each_entry_reverse(subdrv, &subdrv->list, list) {
+On 04/03/16 14:26, Jon Hunter wrote:
+> Remove the "#power-domain-cells" property which was incorrectly
+> included by commit e53095857166 ("arm64: tegra: Add Tegra210
+> support").
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> ---
+> 
+> ARM-SOC maintainers, could we get this into to the v4.5-rc cycle?
+> This only appeared since Tegra210 was added for v4.5 and so it
+> would be good to correct this before the final v4.5.
 
-Here, the list_for_each_entry_reverse immediately terminates because
-the subdrv pointer is compared to itself as the loop end condition.
+Did not look like this made v4.5. So Thierry I am not sure if you just
+want to pick this up now?
 
-If we were to take the current subdrv pointer as the start of the
-list (as we would do if list_for_each_entry_reverse() was not a macro),
-we would iterate backwards over the &exynos_drm_subdrv_list anchor,
-which would be even worse.
-
-Instead, we need to use list_for_each_entry_continue_reverse()
-to go back over each subdrv that was successfully opened until
-the first entry.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9084f7b8a577 ("drm/exynos: add subdrv open/close functions")
----
- drivers/gpu/drm/exynos/exynos_drm_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_core.c b/drivers/gpu/drm/exynos/exynos_drm_core.c
-index 7f55ba6771c6..011211e4167d 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_core.c
-@@ -101,7 +101,7 @@ int exynos_drm_subdrv_open(struct drm_device *dev, struct drm_file *file)
- 	return 0;
- 
- err:
--	list_for_each_entry_reverse(subdrv, &subdrv->list, list) {
-+	list_for_each_entry_continue_reverse(subdrv, &exynos_drm_subdrv_list, list) {
- 		if (subdrv->close)
- 			subdrv->close(dev, subdrv->dev, file);
- 	}
--- 
-2.7.0
+Cheers
+Jon
