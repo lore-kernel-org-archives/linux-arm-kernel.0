@@ -1,51 +1,52 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 14 Mar 2016 14:07:22 -0700
-Subject: [PATCH 05/13] input: convert sun4i-ts to use
- devm_thermal_zone_of_sensor_register
-In-Reply-To: <20160309214514.GA18066@dtor-ws>
-References: <1457559336-17652-1-git-send-email-edubezval@gmail.com>
- <1457559336-17652-6-git-send-email-edubezval@gmail.com>
- <20160309214514.GA18066@dtor-ws>
-Message-ID: <20160314210721.GB4740@localhost.localdomain>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 14 Mar 2016 23:23:47 +0100
+Subject: [PATCH 1/2] i2c: rk3x: add support for rk3228
+In-Reply-To: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
+References: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1737352.02BE0tcSEc@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 01:45:14PM -0800, Dmitry Torokhov wrote:
-> On Wed, Mar 09, 2016 at 01:35:27PM -0800, Eduardo Valentin wrote:
-> > This changes the driver to use the devm_ version
-> > of thermal_zone_of_sensor_register and cleans
-> > up the  local points and unregister calls.
-> > 
-> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Chen-Yu Tsai <wens@csie.org>
-> > Cc: Hans de Goede <hdegoede@redhat.com>
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > Cc: Lukasz Majewski <l.majewski@samsung.com>
-> > Cc: Heiko Stuebner <heiko@sntech.de>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Jens Thiele <karme@karme.de>
-> > Cc: linux-input at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+Am Montag, 14. M?rz 2016, 11:09:15 schrieb Yakir Yang:
+> Enable the I2C core for this SoC.
 > 
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Heiko
+
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 4 ++--
+>  drivers/i2c/busses/i2c-rk3x.c                      | 1 +
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 > 
-> I guess it will make sense to merge through your tree unless you want to
-> hold off until after I merge winth mainline (around -rc3) assuming that
-> it even makes into 4.6.
-
-No rush from my side. I would rather get the right review cycles.
-
-The devm_ APIs were sent to 4.6-rc1 (well, right now in Rui's tree, but
-I assume he is sending them).
-
-Thanks for your review.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160314/49ac3d45/attachment.sig>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt index f0d71bc..0b4a85f
+> 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> @@ -6,8 +6,8 @@ RK3xxx SoCs.
+>  Required properties :
+> 
+>   - reg : Offset and length of the register set for the device
+> - - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c" or
+> -		"rockchip,rk3288-i2c".
+> + - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c",
+> +		"rockchip,rk3228-i2c" or "rockchip,rk3288-i2c".
+>   - interrupts : interrupt number
+>   - clocks : parent clock
+> 
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 9096d17..3dcc5f3 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -855,6 +855,7 @@ static struct rk3x_i2c_soc_data soc_data[3] = {
+>  static const struct of_device_id rk3x_i2c_match[] = {
+>  	{ .compatible = "rockchip,rk3066-i2c", .data = (void *)&soc_data[0] },
+>  	{ .compatible = "rockchip,rk3188-i2c", .data = (void *)&soc_data[1] },
+> +	{ .compatible = "rockchip,rk3228-i2c", .data = (void *)&soc_data[2] },
+>  	{ .compatible = "rockchip,rk3288-i2c", .data = (void *)&soc_data[2] },
+>  	{},
+>  };
