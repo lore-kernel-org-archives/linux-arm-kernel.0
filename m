@@ -1,95 +1,76 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Mar 2016 17:43:41 +0900
-Subject: [PATCH 10/10] ARM: dts: Add PPMU node for exynos3250-artik5 module
-In-Reply-To: <56E677B2.3080304@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-12-git-send-email-cw00.choi@samsung.com>
- <56E677B2.3080304@samsung.com>
-Message-ID: <56E679BD.8060808@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 14 Mar 2016 09:44:35 +0100
+Subject: [PATCH v6 net-next 01/10] misc: sram: add optional ioremap
+ without write combining
+In-Reply-To: <1457944745-7634-2-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Mon, 14 Mar 2016 09:38:56 +0100")
+References: <1457944745-7634-1-git-send-email-gregory.clement@free-electrons.com>
+ <1457944745-7634-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <87fuvt1ma4.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 14? 17:34, Krzysztof Kozlowski wrote:
-> On 14.03.2016 11:04, Chanwoo Choi wrote:
->> This patch adds PPMU (Platform Performance Monitoring Unit) Device Tree node
->> for Exynos3250 based ARTIK5 module. The PPMU node is used to get the
->> utilization of DMC0/DMC1/LEFTBUS/RIGHTBUS Block.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
->>  1 file changed, 36 insertions(+)
-> 
-> What is the status with your devfreq patches? Instead of this one, there
-> should be just:
-> 	#include "exynos4412-ppmu-common.dtsi"
-> (squashed into patch 5/10).
+Hi Arnd,
 
-I'm not working the devfreq patches(exynos-bus). Sorry for delay.
-I'll again implement them by using DEVFREQ_NOTIFIER style according to (Myungjoo Ham's comment)
+I forgot to add you in CC for this patch.
+What is your opinion about it?
 
-I drop the this patch on v2 patchset. After implementing the exynos-bus driver,
-I'll send it.
+Gregory
+ 
+ On lun., mars 14 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-Best Regards,
-Chanwoo Choi
+> From: Marcin Wojtas <mw@semihalf.com>
+>
+> Some SRAM users may require non-bufferable access to the memory, which is
+> impossible, because devm_ioremap_wc() is used for setting sram->virt_base.
+>
+> This commit adds optional flag 'no-memory-wc', which allow to choose remap
+> method, using DT property. Documentation is updated accordingly.
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> ---
+>  Documentation/devicetree/bindings/sram/sram.txt | 5 +++++
+>  drivers/misc/sram.c                             | 5 ++++-
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/sram/sram.txt b/Documentation/devicetree/bindings/sram/sram.txt
+> index 42ee9438b771..227e3a341af1 100644
+> --- a/Documentation/devicetree/bindings/sram/sram.txt
+> +++ b/Documentation/devicetree/bindings/sram/sram.txt
+> @@ -25,6 +25,11 @@ Required properties in the sram node:
+>  - ranges : standard definition, should translate from local addresses
+>             within the sram to bus addresses
+>  
+> +Optional properties in the sram node:
+> +
+> +- no-memory-wc : the flag indicating, that SRAM memory region has not to
+> +                 be remapped as write combining. WC is used by default.
+> +
+>  Required properties in the area nodes:
+>  
+>  - reg : iomem address range, relative to the SRAM range
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> index 736dae715dbf..69cdabea9c03 100644
+> --- a/drivers/misc/sram.c
+> +++ b/drivers/misc/sram.c
+> @@ -360,7 +360,10 @@ static int sram_probe(struct platform_device *pdev)
+>  		return -EBUSY;
+>  	}
+>  
+> -	sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
+> +	if (of_property_read_bool(pdev->dev.of_node, "no-memory-wc"))
+> +		sram->virt_base = devm_ioremap(sram->dev, res->start, size);
+> +	else
+> +		sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
+>  	if (IS_ERR(sram->virt_base))
+>  		return PTR_ERR(sram->virt_base);
+>  
+> -- 
+> 2.5.0
+>
 
-> 
-> Best regards,
-> Krzysztof
-> 
->> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> index 673883fda480..995356708b7d 100644
->> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> @@ -321,6 +321,42 @@
->>  	status = "okay";
->>  };
->>  
->> +&ppmu_dmc0 {
->> +	status = "okay";
->> +	events {
->> +		ppmu_dmc0_3: ppmu-event3-dmc0 {
->> +			event-name = "ppmu-event3-dmc0";
->> +		};
->> +	};
->> +};
->> +
->> +&ppmu_dmc1 {
->> +	status = "okay";
->> +	events {
->> +		ppmu_dmc1_3: ppmu-event3-dmc1 {
->> +			event-name = "ppmu-event3-dmc1";
->> +		};
->> +	};
->> +};
->> +
->> +&ppmu_leftbus {
->> +	status = "okay";
->> +	events {
->> +		ppmu_leftbus_3: ppmu-event3-leftbus {
->> +			event-name = "ppmu-event3-leftbus";
->> +		};
->> +	};
->> +};
->> +
->> +&ppmu_rightbus {
->> +	status = "okay";
->> +	events {
->> +		ppmu_rightbus_3: ppmu-event3-rightbus {
->> +			event-name = "ppmu-event3-rightbus";
->> +		};
->> +	};
->> +};
->> +
->>  &tmu {
->>  	status = "okay";
->>  };
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
