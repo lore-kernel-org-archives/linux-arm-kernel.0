@@ -1,52 +1,47 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Mon, 14 Mar 2016 12:27:01 +0800
-Subject: [PATCH v3 net-next 0/2] net: hns: get and set RSS indirection
- table by using ethtool
-In-Reply-To: <1457686918.1347.56.camel@linux.intel.com>
-References: <1457666747-244953-1-git-send-email-yankejian@huawei.com>
- <1457686918.1347.56.camel@linux.intel.com>
-Message-ID: <56E63D95.6080702@huawei.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Sun, 13 Mar 2016 21:28:55 -0700
+Subject: [PATCH] kbuild: drop FORCE from PHONY targets
+In-Reply-To: <CAK7LNARELkQbhAfBdh9Tx7gVGkpN9gTJzoqJwOF-0CH4zm+wcw@mail.gmail.com>
+References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
+ <CALCETrVqzidL7SXsCVm8wWrcQMR9dFOLGnDtC-eEYMO4a+yszA@mail.gmail.com>
+ <CAK7LNARELkQbhAfBdh9Tx7gVGkpN9gTJzoqJwOF-0CH4zm+wcw@mail.gmail.com>
+Message-ID: <CALCETrVgSUy4ofeBmkZ7TurKvmQVX8C1aj__SLOL6SboQ3S-WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/3/11 17:01, Andy Shevchenko wrote:
-> On Fri, 2016-03-11 at 11:25 +0800, Kejian Yan wrote:
->> When we use ethtool to retrieves or configure the receive flow hash 
->> indirection table, ethtool needs to call .get_rxnfc to get the ring
->> number
->> so this patchset implements the .get_rxnfc and fixes the bug that we
->> can
->> not get the tatal table each time.
->>
-> FWIW:
+On Sun, Mar 13, 2016 at 9:08 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 >
-> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Hi Andy,
-I'm sorry for missing it.i will fix it in next submit.
+> Hi Andy
+>
+> 2016-03-14 9:39 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
+> > On Mar 12, 2016 4:14 PM, "Masahiro Yamada"
+> > <yamada.masahiro@socionext.com> wrote:
+> >>
+> >> These targets are marked as PHONY.  No need to add FORCE to their
+> >> dependency.
+> >
+> > If this is, in fact, correct, can you update
+> > Documentation/kbuild/makefiles.txt as well?
+>
+> Which line do you want me to update?
+>
 
-MBR, Kejian
+All the references to FORCE should probably mention .PHONY as an alternative.
 
->> ---
->> change log:
->> PATCH v3:
->>  - This patchset fixes the building warning and error
->>
->> PATCH v2:
->>  - This patchset fixes the comments provided by Andy Shevchenko <Andy
->> Shevchenko>
->>
->> PATCH v1:
->>  - first submit
->>
->> Kejian Yan (2):
->>   net: hns: fix return value of the function about rss
->>   net: hns: fixes a bug of RSS
->>
->>  drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c |  8 ++++---
->>  drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |  2 +-
->>  drivers/net/ethernet/hisilicon/hns/hns_ethtool.c  | 28
->> ++++++++++++++++-------
->>  3 files changed, 26 insertions(+), 12 deletions(-)
->>
+--Andy
+
+>
+>
+>
+>
+> --
+> Best Regards
+> Masahiro Yamada
+
+
+
+
+-- 
+Andy Lutomirski
+AMA Capital Management, LLC
