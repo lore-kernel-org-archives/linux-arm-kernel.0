@@ -1,225 +1,170 @@
-From: masami.hiramatsu.pt@hitachi.com (=?gb2312?B?xr3LydHFy8ggLyBISVJBTUFUVaOsTUFTQU1J?=)
-Date: Mon, 14 Mar 2016 09:41:03 +0000
-Subject: [PATCH v10 1/9] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <1456801047-29014-2-git-send-email-dave.long@linaro.org>
-References: <1456801047-29014-1-git-send-email-dave.long@linaro.org>
- <1456801047-29014-2-git-send-email-dave.long@linaro.org>
-Message-ID: <50399556C9727B4D88A595C8584AAB37B4E47FF4@GSjpTKYDCembx32.service.hitachi.net>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 14 Mar 2016 18:43:36 +0900
+Subject: [PATCH v2] ARM: dts: Add initial pin configuration for
+ exynos3250-rinato
+Message-ID: <1457948616-6730-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: "David A. Long" <dave.long@linaro.org>
->
->Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
->
->Signed-off-by: David A. Long <dave.long@linaro.org>
+This patch adds initial pin configuration using pinctrl subsystem
+to reduce leakage power-consumption of gpio pins in normal state.
+All pins included in this patch are NC (not connected) pin.
 
-Looks good for me.
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+Changes from v1:
+- Add blank line below of gpm1-6 pin setting
+- Add reviewed tag of Krzysztof Kozlowski 
 
-Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 38 +++++++++++++++++
+ arch/arm/boot/dts/exynos3250-rinato.dts   | 71 ++++++++++++++++++++++++++++++-
+ 2 files changed, 107 insertions(+), 2 deletions(-)
 
-Thanks,
-
->---
-> arch/arm64/Kconfig              |   1 +
-> arch/arm64/include/asm/ptrace.h |  31 +++++++++++
-> arch/arm64/kernel/ptrace.c      | 117 ++++++++++++++++++++++++++++++++++++++++
-> 3 files changed, 149 insertions(+)
->
->diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->index 8cc6228..4211b0d 100644
->--- a/arch/arm64/Kconfig
->+++ b/arch/arm64/Kconfig
->@@ -78,6 +78,7 @@ config ARM64
-> 	select HAVE_PERF_EVENTS
-> 	select HAVE_PERF_REGS
-> 	select HAVE_PERF_USER_STACK_DUMP
->+	select HAVE_REGS_AND_STACK_ACCESS_API
-> 	select HAVE_RCU_TABLE_FREE
-> 	select HAVE_SYSCALL_TRACEPOINTS
-> 	select IOMMU_DMA if IOMMU_SUPPORT
->diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
->index e9e5467..7bd6445 100644
->--- a/arch/arm64/include/asm/ptrace.h
->+++ b/arch/arm64/include/asm/ptrace.h
->@@ -118,6 +118,8 @@ struct pt_regs {
-> 	u64 syscallno;
-> };
->
->+#define MAX_REG_OFFSET offsetof(struct user_pt_regs, pstate)
->+
-> #define arch_has_single_step()	(1)
->
-> #ifdef CONFIG_COMPAT
->@@ -146,6 +148,35 @@ struct pt_regs {
-> #define user_stack_pointer(regs) \
-> 	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->
->+extern int regs_query_register_offset(const char *name);
->+extern const char *regs_query_register_name(unsigned int offset);
->+extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
->+extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
->+					       unsigned int n);
->+
->+/**
->+ * regs_get_register() - get register value from its offset
->+ * @regs:	   pt_regs from which register value is gotten
->+ * @offset:    offset number of the register.
->+ *
->+ * regs_get_register returns the value of a register whose offset from @regs.
->+ * The @offset is the offset of the register in struct pt_regs.
->+ * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
->+ */
->+static inline u64 regs_get_register(struct pt_regs *regs,
->+					      unsigned int offset)
->+{
->+	if (unlikely(offset > MAX_REG_OFFSET))
->+		return 0;
->+	return *(u64 *)((u64)regs + offset);
->+}
->+
->+/* Valid only for Kernel mode traps. */
->+static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
->+{
->+	return regs->sp;
->+}
->+
-> static inline unsigned long regs_return_value(struct pt_regs *regs)
-> {
-> 	return regs->regs[0];
->diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->index ff7f132..efebf0f 100644
->--- a/arch/arm64/kernel/ptrace.c
->+++ b/arch/arm64/kernel/ptrace.c
->@@ -48,6 +48,123 @@
-> #define CREATE_TRACE_POINTS
-> #include <trace/events/syscalls.h>
->
->+struct pt_regs_offset {
->+	const char *name;
->+	int offset;
->+};
->+
->+#define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
->+#define REG_OFFSET_END {.name = NULL, .offset = 0}
->+#define	GPR_OFFSET_NAME(r)	\
->+	{.name = "x" #r, .offset = offsetof(struct pt_regs, regs[r])}
->+
->+static const struct pt_regs_offset regoffset_table[] = {
->+	GPR_OFFSET_NAME(0),
->+	GPR_OFFSET_NAME(1),
->+	GPR_OFFSET_NAME(2),
->+	GPR_OFFSET_NAME(3),
->+	GPR_OFFSET_NAME(4),
->+	GPR_OFFSET_NAME(5),
->+	GPR_OFFSET_NAME(6),
->+	GPR_OFFSET_NAME(7),
->+	GPR_OFFSET_NAME(8),
->+	GPR_OFFSET_NAME(9),
->+	GPR_OFFSET_NAME(10),
->+	GPR_OFFSET_NAME(11),
->+	GPR_OFFSET_NAME(12),
->+	GPR_OFFSET_NAME(13),
->+	GPR_OFFSET_NAME(14),
->+	GPR_OFFSET_NAME(15),
->+	GPR_OFFSET_NAME(16),
->+	GPR_OFFSET_NAME(17),
->+	GPR_OFFSET_NAME(18),
->+	GPR_OFFSET_NAME(19),
->+	GPR_OFFSET_NAME(20),
->+	GPR_OFFSET_NAME(21),
->+	GPR_OFFSET_NAME(22),
->+	GPR_OFFSET_NAME(23),
->+	GPR_OFFSET_NAME(24),
->+	GPR_OFFSET_NAME(25),
->+	GPR_OFFSET_NAME(26),
->+	GPR_OFFSET_NAME(27),
->+	GPR_OFFSET_NAME(28),
->+	GPR_OFFSET_NAME(29),
->+	GPR_OFFSET_NAME(30),
->+	{.name = "lr", .offset = offsetof(struct pt_regs, regs[30])},
->+	REG_OFFSET_NAME(sp),
->+	REG_OFFSET_NAME(pc),
->+	REG_OFFSET_NAME(pstate),
->+	REG_OFFSET_END,
->+};
->+
->+/**
->+ * regs_query_register_offset() - query register offset from its name
->+ * @name:	the name of a register
->+ *
->+ * regs_query_register_offset() returns the offset of a register in struct
->+ * pt_regs from its name. If the name is invalid, this returns -EINVAL;
->+ */
->+int regs_query_register_offset(const char *name)
->+{
->+	const struct pt_regs_offset *roff;
->+
->+	for (roff = regoffset_table; roff->name != NULL; roff++)
->+		if (!strcmp(roff->name, name))
->+			return roff->offset;
->+	return -EINVAL;
->+}
->+
->+/**
->+ * regs_query_register_name() - query register name from its offset
->+ * @offset:	the offset of a register in struct pt_regs.
->+ *
->+ * regs_query_register_name() returns the name of a register from its
->+ * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
->+ */
->+const char *regs_query_register_name(unsigned int offset)
->+{
->+	const struct pt_regs_offset *roff;
->+
->+	for (roff = regoffset_table; roff->name != NULL; roff++)
->+		if (roff->offset == offset)
->+			return roff->name;
->+	return NULL;
->+}
->+
->+/**
->+ * regs_within_kernel_stack() - check the address in the stack
->+ * @regs:      pt_regs which contains kernel stack pointer.
->+ * @addr:      address which is checked.
->+ *
->+ * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
->+ * If @addr is within the kernel stack, it returns true. If not, returns false.
->+ */
->+bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
->+{
->+	return ((addr & ~(THREAD_SIZE - 1))  ==
->+		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
->+}
->+
->+/**
->+ * regs_get_kernel_stack_nth() - get Nth entry of the stack
->+ * @regs:	pt_regs which contains kernel stack pointer.
->+ * @n:		stack entry number.
->+ *
->+ * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
->+ * is specified by @regs. If the @n th entry is NOT in the kernel stack,
->+ * this returns 0.
->+ */
->+unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
->+{
->+	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
->+
->+	addr += n;
->+	if (regs_within_kernel_stack(regs, (unsigned long)addr))
->+		return *addr;
->+	else
->+		return 0;
->+}
->+
-> /*
->  * TODO: does not yet catch signals sent when the child dies.
->  * in exit.c or in signal.c.
->--
->2.5.0
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+index 5ab81c39e2c9..ecf79386e891 100644
+--- a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+@@ -16,11 +16,49 @@
+ #define PIN_PULL_DOWN		1
+ #define PIN_PULL_UP		3
+ 
++#define PIN_DRV_LV1		0
++#define PIN_DRV_LV2		2
++#define PIN_DRV_LV3		1
++#define PIN_DRV_LV4		3
++
+ #define PIN_PDN_OUT0		0
+ #define PIN_PDN_OUT1		1
+ #define PIN_PDN_INPUT		2
+ #define PIN_PDN_PREV		3
+ 
++#define PIN_IN(_pin, _pull, _drv)			\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <0>;		\
++		samsung,pin-pud = <PIN_PULL_ ##_pull>;	\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++	}
++
++#define PIN_OUT(_pin, _drv)				\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <1>;		\
++		samsung,pin-pud = <0>;			\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++	}
++
++#define PIN_OUT_SET(_pin, _val, _drv)			\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <1>;		\
++		samsung,pin-pud = <0>;			\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++		samsung,pin-val = <_val>;		\
++	}
++
++#define PIN_CFG(_pin, _sel, _pull, _drv)		\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <_sel>;		\
++		samsung,pin-pud = <PIN_PULL_ ##_pull>;	\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++	}
++
+ #define PIN_SLP(_pin, _mode, _pull)				\
+ 	_pin {							\
+ 		samsung,pins = #_pin;				\
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index 3e64d5dcdd60..a01e61b20385 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -681,7 +681,21 @@
+ 
+ &pinctrl_0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sleep0>;
++	pinctrl-0 = <&initial0 &sleep0>;
++
++	initial0: initial-state {
++		PIN_IN(gpa1-4, DOWN, LV1);
++		PIN_IN(gpa1-5, DOWN, LV1);
++
++		PIN_IN(gpc0-0, DOWN, LV1);
++		PIN_IN(gpc0-1, DOWN, LV1);
++		PIN_IN(gpc0-2, DOWN, LV1);
++		PIN_IN(gpc0-3, DOWN, LV1);
++		PIN_IN(gpc0-4, DOWN, LV1);
++
++		PIN_IN(gpd0-0, DOWN, LV1);
++		PIN_IN(gpd0-1, DOWN, LV1);
++	};
+ 
+ 	sleep0: sleep-state {
+ 		PIN_SLP(gpa0-0, INPUT, DOWN);
+@@ -735,7 +749,60 @@
+ 
+ &pinctrl_1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sleep1>;
++	pinctrl-0 = <&initial1 &sleep1>;
++
++	initial1: initial-state {
++		PIN_IN(gpe0-6, DOWN, LV1);
++		PIN_IN(gpe0-7, DOWN, LV1);
++
++		PIN_IN(gpe1-0, DOWN, LV1);
++		PIN_IN(gpe1-3, DOWN, LV1);
++		PIN_IN(gpe1-4, DOWN, LV1);
++		PIN_IN(gpe1-5, DOWN, LV1);
++		PIN_IN(gpe1-6, DOWN, LV1);
++
++		PIN_IN(gpk2-0, DOWN, LV1);
++		PIN_IN(gpk2-1, DOWN, LV1);
++		PIN_IN(gpk2-2, DOWN, LV1);
++		PIN_IN(gpk2-3, DOWN, LV1);
++		PIN_IN(gpk2-4, DOWN, LV1);
++		PIN_IN(gpk2-5, DOWN, LV1);
++		PIN_IN(gpk2-6, DOWN, LV1);
++
++		PIN_IN(gpm0-0, DOWN, LV1);
++		PIN_IN(gpm0-1, DOWN, LV1);
++		PIN_IN(gpm0-2, DOWN, LV1);
++		PIN_IN(gpm0-3, DOWN, LV1);
++		PIN_IN(gpm0-4, DOWN, LV1);
++		PIN_IN(gpm0-5, DOWN, LV1);
++		PIN_IN(gpm0-6, DOWN, LV1);
++		PIN_IN(gpm0-7, DOWN, LV1);
++
++		PIN_IN(gpm1-0, DOWN, LV1);
++		PIN_IN(gpm1-1, DOWN, LV1);
++		PIN_IN(gpm1-2, DOWN, LV1);
++		PIN_IN(gpm1-3, DOWN, LV1);
++		PIN_IN(gpm1-4, DOWN, LV1);
++		PIN_IN(gpm1-5, DOWN, LV1);
++		PIN_IN(gpm1-6, DOWN, LV1);
++
++		PIN_IN(gpm2-0, DOWN, LV1);
++		PIN_IN(gpm2-1, DOWN, LV1);
++
++		PIN_IN(gpm3-0, DOWN, LV1);
++		PIN_IN(gpm3-1, DOWN, LV1);
++		PIN_IN(gpm3-2, DOWN, LV1);
++		PIN_IN(gpm3-3, DOWN, LV1);
++		PIN_IN(gpm3-4, DOWN, LV1);
++
++		PIN_IN(gpm4-1, DOWN, LV1);
++		PIN_IN(gpm4-2, DOWN, LV1);
++		PIN_IN(gpm4-3, DOWN, LV1);
++		PIN_IN(gpm4-4, DOWN, LV1);
++		PIN_IN(gpm4-5, DOWN, LV1);
++		PIN_IN(gpm4-6, DOWN, LV1);
++		PIN_IN(gpm4-7, DOWN, LV1);
++	};
+ 
+ 	sleep1: sleep-state {
+ 		PIN_SLP(gpe0-0, PREV, NONE);
+-- 
+1.9.1
