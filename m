@@ -1,32 +1,45 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Mon, 14 Mar 2016 09:22:37 +0200
-Subject: [PATCH] media: add GFP flag to media_*() that could get called
- in atomic context
-In-Reply-To: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <20160314072236.GO11084@valkosipuli.retiisi.org.uk>
+From: hare@suse.de (Hannes Reinecke)
+Date: Mon, 14 Mar 2016 08:26:45 +0100
+Subject: [PATCH 05/22] ncr5380: Disable the DMA errata workaround flag by
+ default
+In-Reply-To: <20160314042701.956017683@telegraphics.com.au>
+References: <20160314042700.596192247@telegraphics.com.au>
+ <20160314042701.956017683@telegraphics.com.au>
+Message-ID: <56E667B5.3090708@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
-
-On Sat, Mar 12, 2016 at 06:48:09PM -0700, Shuah Khan wrote:
-> Add GFP flags to media_create_pad_link(), media_create_intf_link(),
-> media_devnode_create(), and media_add_link() that could get called
-> in atomic context to allow callers to pass in the right flags for
-> memory allocation.
+On 03/14/2016 05:27 AM, Finn Thain wrote:
+> The only chip that needs the workarounds enabled is an early NMOS
+> device. That means that the common case is to disable them.
 > 
-> tree-wide driver changes for media_*() GFP flags change:
-> Change drivers to add gfpflags to interffaces, media_create_pad_link(),
-> media_create_intf_link() and media_devnode_create().
+> Unfortunately the sense of the flag is such that it has to be set
+> for the common case.
 > 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> Rename the flag so that zero can be used to mean "no errata workarounds
+> needed". This simplifies the code.
+> 
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> 
+> ---
+>  drivers/scsi/NCR5380.c      |   14 +++++++-------
+>  drivers/scsi/NCR5380.h      |    2 +-
+>  drivers/scsi/arm/cumana_1.c |    2 +-
+>  drivers/scsi/arm/oak.c      |    2 +-
+>  drivers/scsi/dtc.c          |    2 +-
+>  drivers/scsi/g_NCR5380.c    |    8 +-------
+>  drivers/scsi/pas16.c        |    2 +-
+>  drivers/scsi/t128.c         |    2 +-
+>  8 files changed, 14 insertions(+), 20 deletions(-)
+> 
+Reviewed-by: Hannes Reinecke <hare@suse.com>
 
-What's the use case for calling the above functions in an atomic context?
+Cheers,
 
+Hannes
 -- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Dr. Hannes Reinecke		   Teamlead Storage & Networking
+hare at suse.de			               +49 911 74053 688
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
+GF: F. Imend?rffer, J. Smithard, J. Guild, D. Upmanyu, G. Norton
+HRB 21284 (AG N?rnberg)
