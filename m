@@ -1,205 +1,226 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 14 Mar 2016 16:53:08 +0000
-Subject: [RFC PATCH 09/12] kvm-arm: Switch to kvm pagetable helpers
+Date: Mon, 14 Mar 2016 16:53:06 +0000
+Subject: [RFC PATCH 07/12] kvm: arm: Introduce stage2 page table helpers
 In-Reply-To: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
 References: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1457974391-28456-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1457974391-28456-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have kvm wrappers for page table walk, switch
-to using them everywhere. Also, use the explicit page table
-accessor (stage2_ vs hyp), whenever we know we deal only
-with a particular table.
+So far we have used most of the page table helpers for host,
+except for a few kvm_ wrappers. This patch introduces wrappers
+for all the helpers which could potentially differ for underlying
+page table. It also introduces the corresponding stage2 helpers
+for arm32.
+
+This will be plugged in to the core hypervisor code once
+we have the arm64 counter parts implemented. On 32bit ARM,
+we continue to use the host helpers under the hood, except
+for kvm_p.d_addr_end which need to handle 64bit addresses.
+Also converts kvm_p.d_table_empty() to static inline for
+consistency with arm64 versions.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/kvm/mmu.c |   64 ++++++++++++++++++++++++++--------------------------
- 1 file changed, 32 insertions(+), 32 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h        |   95 +++++++++++++++++++++++++++++----
+ arch/arm/include/asm/stage2_pgtable.h |   55 +++++++++++++++++++
+ 2 files changed, 141 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/include/asm/stage2_pgtable.h
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 22b4c99..8568790 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -155,20 +155,20 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 17c6781..e670afa 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -48,6 +48,7 @@
+ #include <linux/hugetlb.h>
+ #include <asm/cacheflush.h>
+ #include <asm/pgalloc.h>
++#include <asm/stage2_pgtable.h>
  
- static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+@@ -141,26 +142,90 @@ static inline int kvm_pud_huge(struct kvm *kvm, pud_t pud)
+ 	return pud_huge(pud);
+ }
+ 
++static inline int kvm_pgd_none(struct kvm *kvm, pgd_t pgd)
++{
++	return pgd_none(pgd);
++}
++
++static inline void kvm_pgd_clear(struct kvm *kvm, pgd_t *pgdp)
++{
++	pgd_clear(pgdp);
++}
++
++static inline int kvm_pgd_present(struct kvm *kvm, pgd_t pgd)
++{
++	return pgd_present(pgd);
++}
++
++static inline void
++kvm_pgd_populate(struct kvm *kvm, struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
++{
++	pgd_populate(mm, pgd, pud);
++}
++
++static inline pud_t *
++kvm_pud_offset(struct kvm *kvm, pgd_t *pgd, phys_addr_t address)
++{
++	return pud_offset(pgd, address);
++}
++
++static inline int kvm_pud_none(struct kvm *kvm, pud_t pud)
++{
++	return pud_none(pud);
++}
++
++static inline void kvm_pud_clear(struct kvm *kvm, pud_t *pudp)
++{
++	pud_clear(pudp);
++}
++
++static inline int kvm_pud_present(struct kvm *kvm, pud_t pud)
++{
++	return pud_present(pud);
++}
+ 
+-/* Open coded p*d_addr_end that can deal with 64bit addresses */
++static inline void kvm_pud_free(struct kvm *kvm, struct mm_struct *mm, pud_t *pudp)
++{
++	pud_free(mm, pudp);
++}
++
++static inline void
++kvm_pud_populate(struct kvm *kvm, struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++{
++	pud_populate(mm, pud, pmd);
++}
++
++static inline pmd_t *
++kvm_pmd_offset(struct kvm *kvm, pud_t *pud, phys_addr_t address)
++{
++	return pmd_offset(pud, address);
++}
++
++static inline void kvm_pmd_free(struct kvm *kvm, struct mm_struct *mm, pmd_t *pmd)
++{
++	pmd_free(mm, pmd);
++}
++
++/*
++ * stage2_p.d_addr_end can handle 64bit address, use them explicitly for
++ * hyp and stage2.
++ */
+ static inline phys_addr_t
+ kvm_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
  {
--	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
--	pgd_clear(pgd);
-+	pud_t *pud_table __maybe_unused = kvm_pud_offset(kvm, pgd, 0);
-+	kvm_pgd_clear(kvm, pgd);
- 	kvm_tlb_flush_vmid_ipa(kvm, addr);
--	pud_free(NULL, pud_table);
-+	kvm_pud_free(kvm, NULL, pud_table);
- 	put_page(virt_to_page(pgd));
+-	phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
+-	return (boundary - 1 < end - 1) ? boundary : end;
++	return stage2_pgd_addr_end(addr, end);
  }
  
- static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+ static inline phys_addr_t
+ kvm_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
  {
--	pmd_t *pmd_table = pmd_offset(pud, 0);
-+	pmd_t *pmd_table = kvm_pmd_offset(kvm, pud, 0);
- 	VM_BUG_ON(kvm_pud_huge(kvm, *pud));
--	pud_clear(pud);
-+	kvm_pud_clear(kvm, pud);
- 	kvm_tlb_flush_vmid_ipa(kvm, addr);
--	pmd_free(NULL, pmd_table);
-+	kvm_pmd_free(kvm, NULL, pmd_table);
- 	put_page(virt_to_page(pud));
+-	return end;
++	return stage2_pud_addr_end(addr, end);
  }
  
-@@ -234,7 +234,7 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
- 	phys_addr_t next, start_addr = addr;
- 	pmd_t *pmd, *start_pmd;
- 
--	start_pmd = pmd = pmd_offset(pud, addr);
-+	start_pmd = pmd = kvm_pmd_offset(kvm, pud, addr);
- 	do {
- 		next = kvm_pmd_addr_end(kvm, addr, end);
- 		if (!pmd_none(*pmd)) {
-@@ -263,14 +263,14 @@ static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
- 	phys_addr_t next, start_addr = addr;
- 	pud_t *pud, *start_pud;
- 
--	start_pud = pud = pud_offset(pgd, addr);
-+	start_pud = pud = kvm_pud_offset(kvm, pgd, addr);
- 	do {
- 		next = kvm_pud_addr_end(kvm, addr, end);
--		if (!pud_none(*pud)) {
-+		if (!kvm_pud_none(kvm, *pud)) {
- 			if (kvm_pud_huge(kvm, *pud)) {
- 				pud_t old_pud = *pud;
- 
--				pud_clear(pud);
-+				kvm_pud_clear(kvm, pud);
- 				kvm_tlb_flush_vmid_ipa(kvm, addr);
- 
- 				kvm_flush_dcache_pud(old_pud);
-@@ -297,7 +297,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 	pgd = pgdp + kvm_pgd_index(kvm, addr);
- 	do {
- 		next = kvm_pgd_addr_end(kvm, addr, end);
--		if (!pgd_none(*pgd))
-+		if (!kvm_pgd_none(kvm, *pgd))
- 			unmap_puds(kvm, pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
-@@ -320,9 +320,9 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
- 	pmd_t *pmd;
- 	phys_addr_t next;
- 
--	pmd = pmd_offset(pud, addr);
-+	pmd = stage2_pmd_offset(pud, addr);
- 	do {
--		next = kvm_pmd_addr_end(kvm, addr, end);
-+		next = stage2_pmd_addr_end(addr, end);
- 		if (!pmd_none(*pmd)) {
- 			if (huge_pmd(*pmd))
- 				kvm_flush_dcache_pmd(*pmd);
-@@ -338,11 +338,11 @@ static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
- 	pud_t *pud;
- 	phys_addr_t next;
- 
--	pud = pud_offset(pgd, addr);
-+	pud = stage2_pud_offset(pgd, addr);
- 	do {
--		next = kvm_pud_addr_end(kvm, addr, end);
--		if (!pud_none(*pud)) {
--			if (kvm_pud_huge(kvm, *pud))
-+		next = stage2_pud_addr_end(addr, end);
-+		if (!stage2_pud_none(*pud)) {
-+			if (stage2_pud_huge(*pud))
- 				kvm_flush_dcache_pud(*pud);
- 			else
- 				stage2_flush_pmds(kvm, pud, addr, next);
-@@ -358,9 +358,9 @@ static void stage2_flush_memslot(struct kvm *kvm,
- 	phys_addr_t next;
- 	pgd_t *pgd;
- 
--	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
-+	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
- 	do {
--		next = kvm_pgd_addr_end(kvm, addr, end);
-+		next = stage2_pgd_addr_end(addr, end);
- 		stage2_flush_puds(kvm, pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
-@@ -803,15 +803,15 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
- 	pud_t *pud;
- 
- 	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
--	if (WARN_ON(pgd_none(*pgd))) {
-+	if (WARN_ON(stage2_pgd_none(*pgd))) {
- 		if (!cache)
- 			return NULL;
- 		pud = mmu_memory_cache_alloc(cache);
--		pgd_populate(NULL, pgd, pud);
-+		stage2_pgd_populate(NULL, pgd, pud);
- 		get_page(virt_to_page(pgd));
- 	}
- 
--	return pud_offset(pgd, addr);
-+	return stage2_pud_offset(pgd, addr);
+ static inline phys_addr_t
+ kvm_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+ {
+-	phys_addr_t boundary = (addr + PMD_SIZE) & PMD_MASK;
+-	return (boundary - 1 < end - 1) ? boundary : end;
++	return stage2_pmd_addr_end(addr, end);
  }
  
- static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-@@ -821,15 +821,15 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
- 	pmd_t *pmd;
- 
- 	pud = stage2_get_pud(kvm, cache, addr);
--	if (pud_none(*pud)) {
-+	if (stage2_pud_none(*pud)) {
- 		if (!cache)
- 			return NULL;
- 		pmd = mmu_memory_cache_alloc(cache);
--		pud_populate(NULL, pud, pmd);
-+		stage2_pud_populate(NULL, pud, pmd);
- 		get_page(virt_to_page(pud));
- 	}
- 
--	return pmd_offset(pud, addr);
-+	return stage2_pmd_offset(pud, addr);
+ static inline phys_addr_t kvm_pgd_index(struct kvm *kvm, phys_addr_t addr)
+@@ -174,9 +239,21 @@ static inline bool kvm_page_empty(void *ptr)
+ 	return page_count(ptr_page) == 1;
  }
  
- static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
-@@ -1037,10 +1037,10 @@ static void stage2_wp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
- 	pmd_t *pmd;
- 	phys_addr_t next;
+-#define kvm_pte_table_empty(kvm, ptep) kvm_page_empty(ptep)
+-#define kvm_pmd_table_empty(kvm, pmdp) kvm_page_empty(pmdp)
+-#define kvm_pud_table_empty(kvm, pudp) (0)
++static inline bool kvm_pte_table_empty(struct kvm *kvm, pte_t *ptep)
++{
++	return kvm_page_empty(ptep);
++}
++
++static inline bool kvm_pmd_table_empty(struct kvm *kvm, pmd_t *pmdp)
++{
++	return kvm_page_empty(pmdp);
++}
++
++static inline bool kvm_pud_table_empty(struct kvm *kvm, pud_t *pudp)
++{
++	return 0;
++}
++
  
--	pmd = pmd_offset(pud, addr);
-+	pmd = stage2_pmd_offset(pud, addr);
- 
- 	do {
--		next = kvm_pmd_addr_end(NULL, addr, end);
-+		next = stage2_pmd_addr_end(addr, end);
- 		if (!pmd_none(*pmd)) {
- 			if (huge_pmd(*pmd)) {
- 				if (!kvm_s2pmd_readonly(pmd))
-@@ -1065,12 +1065,12 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- 	pud_t *pud;
- 	phys_addr_t next;
- 
--	pud = pud_offset(pgd, addr);
-+	pud = stage2_pud_offset(pgd, addr);
- 	do {
--		next = kvm_pud_addr_end(NULL, addr, end);
--		if (!pud_none(*pud)) {
-+		next = stage2_pud_addr_end(addr, end);
-+		if (!stage2_pud_none(*pud)) {
- 			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(kvm_pud_huge(NULL, *pud));
-+			BUG_ON(stage2_pud_huge(*pud));
- 			stage2_wp_pmds(pud, addr, next);
- 		}
- 	} while (pud++, addr = next, addr != end);
-@@ -1100,7 +1100,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
- 			cond_resched_lock(&kvm->mmu_lock);
- 
- 		next = kvm_pgd_addr_end(kvm, addr, end);
--		if (pgd_present(*pgd))
-+		if (stage2_pgd_present(*pgd))
- 			stage2_wp_puds(pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
+ static inline void *kvm_get_hwpgd(struct kvm *kvm)
+ {
+diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
+new file mode 100644
+index 0000000..91c1a63
+--- /dev/null
++++ b/arch/arm/include/asm/stage2_pgtable.h
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (C) 2016 - ARM Ltd
++ *
++ * stage2 page table helpers
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ARM_S2_PGTABLE_H_
++#define __ARM_S2_PGTABLE_H_
++
++#define stage2_pgd_none(pgd)				pgd_none(pgd)
++#define stage2_pgd_clear(pgd)				pgd_clear(pgd)
++#define stage2_pgd_present(pgd)				pgd_present(pgd)
++#define stage2_pgd_populate(mm, pgd, pud)		pgd_populate(mm, pgd, pud)
++#define stage2_pud_offset(pgd, address)			pud_offset(pgd, address)
++#define stage2_pud_free(mm, pud)			pud_free(mm, pud)
++
++#define stage2_pud_none(pud)				pud_none(pud)
++#define stage2_pud_clear(pud)				pud_clear(pud)
++#define stage2_pud_present(pud)				pud_present(pud)
++#define stage2_pud_populate(mm, pud, pmd)		pud_populate(mm, pud, pmd)
++#define stage2_pmd_offset(pud, address)			pmd_offset(pud, address)
++#define stage2_pmd_free(mm, pmd)			pmd_free(mm, pmd)
++
++#define stage2_pud_huge(pud)				pud_huge(pud)
++
++/* Open coded p*d_addr_end that can deal with 64bit addresses */
++static inline phys_addr_t stage2_pgd_addr_end(phys_addr_t addr, phys_addr_t end)
++{
++	phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
++	return (boundary - 1 < end - 1) ? boundary : end;
++}
++
++#define stage2_pud_addr_end(addr, end)		(end)
++
++static inline phys_addr_t stage2_pmd_addr_end(phys_addr_t addr, phys_addr_t end)
++{
++	phys_addr_t boundary = (addr + PMD_SIZE) & PMD_MASK;
++	return (boundary - 1 < end - 1) ? boundary : end;
++}
++
++#define stage2_pgd_index(addr)				pgd_index(addr)
++
++#endif	/* __ARM_S2_PGTABLE_H_ */
 -- 
 1.7.9.5
