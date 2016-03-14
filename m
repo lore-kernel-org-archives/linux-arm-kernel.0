@@ -1,120 +1,73 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Mon, 14 Mar 2016 08:06:16 +0100
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <20160314064925.GA27587@js1304-P5Q-DELUXE>
-References: <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE> <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD38E7.3050107@huawei.com>
- <56DDCB86.4030709@redhat.com> <56DE30CB.7020207@huawei.com>
- <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
- <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
-Message-ID: <56E662E8.700@suse.cz>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Mar 2016 16:06:30 +0900
+Subject: [PATCH 07/10] ARM: dts: Add thermal zone and cpufreq node for
+ exynos3250-artik5 module
+In-Reply-To: <1457921056-21257-9-git-send-email-cw00.choi@samsung.com>
+References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
+ <1457921056-21257-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <56E662F6.4070200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
-> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
->> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
->>
->> How about something like this? Just and idea, probably buggy (off-by-one etc.).
->> Should keep away cost from <pageblock_order iterations@the expense of the
->> relatively fewer >pageblock_order iterations.
->
-> Hmm... I tested this and found that it's code size is a little bit
-> larger than mine. I'm not sure why this happens exactly but I guess it would be
-> related to compiler optimization. In this case, I'm in favor of my
-> implementation because it looks like well abstraction. It adds one
-> unlikely branch to the merge loop but compiler would optimize it to
-> check it once.
+On 14.03.2016 11:04, Chanwoo Choi wrote:
+> This patch enables the CPU frequency scaling for exynos3250-artik5 module
+> and adds the thernal zones with cpu cooling device to prevent the overheat
+> temperature.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
 
-I would be surprised if compiler optimized that to check it once, as 
-order increases with each loop iteration. But maybe it's smart enough to 
-do something like I did by hand? Guess I'll check the disassembly.
+The patch looks good but just squash it with 5/10 unless there is some
+benefit by splitting the features for many patches. The benefit would be
+for example submitting the work partially, in steps, following principle
+release-early-release-often... but this is not the case. You have
+everything ready and tested.
 
->
-> Thanks.
->
->>
->> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->> index ff1e3cbc8956..b8005a07b2a1 100644
->> --- a/mm/page_alloc.c
->> +++ b/mm/page_alloc.c
->> @@ -685,21 +685,13 @@ static inline void __free_one_page(struct page *page,
->>   	unsigned long combined_idx;
->>   	unsigned long uninitialized_var(buddy_idx);
->>   	struct page *buddy;
->> -	unsigned int max_order = MAX_ORDER;
->> +	unsigned int max_order = pageblock_order + 1;
->>
->>   	VM_BUG_ON(!zone_is_initialized(zone));
->>   	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
->>
->>   	VM_BUG_ON(migratetype == -1);
->> -	if (is_migrate_isolate(migratetype)) {
->> -		/*
->> -		 * We restrict max order of merging to prevent merge
->> -		 * between freepages on isolate pageblock and normal
->> -		 * pageblock. Without this, pageblock isolation
->> -		 * could cause incorrect freepage accounting.
->> -		 */
->> -		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
->> -	} else {
->> +	if (likely(!is_migrate_isolate(migratetype))) {
->>   		__mod_zone_freepage_state(zone, 1 << order, migratetype);
->>   	}
->>
->> @@ -708,11 +700,12 @@ static inline void __free_one_page(struct page *page,
->>   	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
->>   	VM_BUG_ON_PAGE(bad_range(zone, page), page);
->>
->> +continue_merging:
->>   	while (order < max_order - 1) {
->>   		buddy_idx = __find_buddy_index(page_idx, order);
->>   		buddy = page + (buddy_idx - page_idx);
->>   		if (!page_is_buddy(page, buddy, order))
->> -			break;
->> +			goto done_merging;
->>   		/*
->>   		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
->>   		 * merge with it and move up one order.
->> @@ -729,6 +722,26 @@ static inline void __free_one_page(struct page *page,
->>   		page_idx = combined_idx;
->>   		order++;
->>   	}
->> +	if (max_order < MAX_ORDER) {
->> +		if (IS_ENABLED(CONFIG_CMA) &&
->> +				unlikely(has_isolate_pageblock(zone))) {
->> +
->> +			int buddy_mt;
->> +
->> +			buddy_idx = __find_buddy_index(page_idx, order);
->> +			buddy = page + (buddy_idx - page_idx);
->> +			buddy_mt = get_pageblock_migratetype(buddy);
->> +
->> +			if (migratetype != buddy_mt &&
->> +					(is_migrate_isolate(migratetype) ||
->> +					is_migrate_isolate(buddy_mt)))
->> +				goto done_merging;
->> +		}
->> +		max_order++;
->> +		goto continue_merging;
->> +	}
->> +
->> +done_merging:
->>   	set_page_order(page, order);
->>
->>   	/*
->>
->> --
->> To unsubscribe, send a message with 'unsubscribe linux-mm' in
->> the body to majordomo at kvack.org.  For more info on Linux MM,
->> see: http://www.linux-mm.org/ .
->> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
->
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
->
+BR,
+Krzysztof
+
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> index 75b291c10cdc..877e4827df83 100644
+> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> @@ -31,6 +31,25 @@
+>  		compatible = "samsung,secure-firmware";
+>  		reg = <0x0205F000 0x1000>;
+>  	};
+> +
+> +	thermal-zones {
+> +		cpu_thermal: cpu-thermal {
+> +			cooling-maps {
+> +				map0 {
+> +					/* Corresponds to 500MHz */
+> +					cooling-device = <&cpu0 5 5>;
+> +				};
+> +				map1 {
+> +					/* Corresponds to 200MHz */
+> +					cooling-device = <&cpu0 8 8>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+>  };
+>  
+>  &i2c_0 {
+> @@ -296,6 +315,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&tmu {
+> +	status = "okay";
+> +};
+> +
+>  &xusbxti {
+>  	clock-frequency = <24000000>;
+>  };
+> 
