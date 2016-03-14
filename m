@@ -1,77 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Mar 2016 07:55:38 +0100
-Subject: [PATCH 1/2] ARM64:VDSO: Improve gettimeofday, don't use udiv
-In-Reply-To: <1457898620-1867-2-git-send-email-apinski@cavium.com>
-References: <1457898620-1867-1-git-send-email-apinski@cavium.com>
- <1457898620-1867-2-git-send-email-apinski@cavium.com>
-Message-ID: <CAKv+Gu90LOYRKWR8svKhqn6T9qQ-A=VB7iP7wM6oz=MyCs7CJA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Mar 2016 15:57:22 +0900
+Subject: [PATCH 06/10] ARM: dts: Add MSHC0 dt node for eMMC device for
+ exynos3250-artik5 module
+In-Reply-To: <1457921056-21257-7-git-send-email-cw00.choi@samsung.com>
+References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
+ <1457921056-21257-7-git-send-email-cw00.choi@samsung.com>
+Message-ID: <56E660D2.9090706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2016 at 20:50, Andrew Pinski <apinski@cavium.com> wrote:
-> On many cores, udiv with a large value is slow, expand instead
-> the division out to be what GCC would have generated for the
-> divide by 1000.
->
-> On ThunderX, the speeds up gettimeofday by 5%.
->
-> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+On 14.03.2016 11:04, Chanwoo Choi wrote:
+> From: Jaehoon Chung <jh80.chung@samsung.com>
+> 
+> This patch adds MSHC (Mobile Storage Host Controller) dt node for Exynos3250
+> SoC. MSHC is an interface between the system and the eMMC device.
+> 
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
->  arch/arm64/kernel/vdso/gettimeofday.S |   20 ++++++++++++++++----
->  1 files changed, 16 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-> index efa79e8..e5caef9 100644
-> --- a/arch/arm64/kernel/vdso/gettimeofday.S
-> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
-> @@ -64,10 +64,22 @@ ENTRY(__kernel_gettimeofday)
->         bl      __do_get_tspec
->         seqcnt_check w9, 1b
->
-> -       /* Convert ns to us. */
-> -       mov     x13, #1000
-> -       lsl     x13, x13, x12
-> -       udiv    x11, x11, x13
-> +       /* Undo the shift. */
-> +        lsr     x11, x11, x12
+>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> index 97d0087efb9f..75b291c10cdc 100644
+> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> @@ -277,6 +277,25 @@
+>  	};
+>  };
+>  
+> +&mshc_0 {
+> +	num-slots = <1>;
+> +	broken-cd;
+> +	non-removable;
+
+Broken or non-removable, not both.
+
+> +	cap-mmc-highspeed;
+> +	desc-num = <4>;
+> +	card-detect-delay = <200>;
+> +	vmmc-supply = <&ldo11_reg>;
+
+Isn't this vqmmc-supply?
+
+BTW, both MMC0 regulators (ldo11, ldo12) are marked as always-on. Why
+they cannot be controlled by XMMC0CDN (just like on Rinato)?
+
+What is the benefit of making this patch separate from "Add
+exynos3250-artik5 dtsi file for ARTIK5 module"? Does the board boot
+properly without this patch?
+
+Best regards,
+Krzysztof
+
+> +	clock-frequency = <100000000>;
+> +	clock-freq-min-max = <400000 100000000>;
+> +	samsung,dw-mshc-ciu-div = <1>;
+> +	samsung,dw-mshc-sdr-timing = <0 1>;
+> +	samsung,dw-mshc-ddr-timing = <1 2>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+> +	bus-width = <8>;
+> +	status = "okay";
+> +};
 > +
-> +       /* Convert ns to us (division by 1000 by using multiply high).
-> +        * This is how GCC converts the division by 1000 into.
-> +        * This is faster than divide on most cores.
-> +        */
-> +        mov     x13, 63439
-
-Please don't mix hex and decimal constants
-
-> +        movk    x13, 0xe353, lsl 16
-> +        lsr     x11, x11, 3
-> +        movk    x13, 0x9ba5, lsl 32
-> +        movk    x13, 0x20c4, lsl 48
-> +       /* x13 = 0x20c49ba5e353f7cf */
-
-Could we clean this up a bit? Something along the lines of
-
-.set m, 0x20c49ba5e353f7cf
-movz x13,#:abs_g3:m
-movk x13, #:abs:g2_nc:m
-movk x13, #:abs_g1_nc:m
-movk x13, #:abs_g0_nc:m
-
-Actually, the movz/movk sequence should probably be implemented as a
-macro in asm/assembler.h, with parameters for the register and the
-symbol name. I think Mark proposed such a patch at some point
-
-> +        umulh   x11, x11, x13
-> +        lsr     x11, x11, 4
-> +
->         stp     x10, x11, [x0, #TVAL_TV_SEC]
->  2:
->         /* If tz is NULL, return 0. */
-> --
-> 1.7.2.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  &xusbxti {
+>  	clock-frequency = <24000000>;
+>  };
+> 
