@@ -1,49 +1,49 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Mar 2016 11:04:11 +0900
-Subject: [PATCH 06/10] ARM: dts: Add MSHC0 dt node for eMMC device for
- exynos3250-artik5 module
+Date: Mon, 14 Mar 2016 11:04:14 +0900
+Subject: [PATCH 08/10] ARM: dts: Add rtc and adc dt node for exynos3250-artik5
+ module
 In-Reply-To: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
 References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1457921056-21257-7-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1457921056-21257-10-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jaehoon Chung <jh80.chung@samsung.com>
+This patch adds the RTC (Real Time Clock) and ADC (Analog Digital Converter)
+Device Tree node for exynos3250-artik5 module. The RTC is used for wakeup
+source and the ADC is used to read the analog data such as battery temperature.
 
-This patch adds MSHC (Mobile Storage Host Controller) dt node for Exynos3250
-SoC. MSHC is an interface between the system and the eMMC device.
+ADC need to connect the some H/W device such as battery. So, this patch just
+adds the default setting (clock, regulator).
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-artik5.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/exynos3250-artik5.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-index 97d0087efb9f..75b291c10cdc 100644
+index 877e4827df83..673883fda480 100644
 --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
 +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-@@ -277,6 +277,25 @@
+@@ -48,6 +48,12 @@
  	};
  };
  
-+&mshc_0 {
-+	num-slots = <1>;
-+	broken-cd;
-+	non-removable;
-+	cap-mmc-highspeed;
-+	desc-num = <4>;
-+	card-detect-delay = <200>;
-+	vmmc-supply = <&ldo11_reg>;
-+	clock-frequency = <100000000>;
-+	clock-freq-min-max = <400000 100000000>;
-+	samsung,dw-mshc-ciu-div = <1>;
-+	samsung,dw-mshc-sdr-timing = <0 1>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+	bus-width = <8>;
++&adc {
++	vdd-supply = <&ldo7_reg>;
++	assigned-clocks = <&cmu CLK_SCLK_TSADC>;
++	assigned-clock-rates = <6000000>;
++};
++
+ &cpu0 {
+ 	cpu0-supply = <&buck2_reg>;
+ };
+@@ -319,6 +325,12 @@
+ 	status = "okay";
+ };
+ 
++&rtc {
++	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
++	clock-names = "rtc", "rtc_src";
 +	status = "okay";
 +};
 +
