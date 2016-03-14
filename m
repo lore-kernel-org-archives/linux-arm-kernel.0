@@ -1,249 +1,164 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 14 Mar 2016 15:26:14 +0900
-Subject: [PATCH] kbuild: drop FORCE from PHONY targets
-In-Reply-To: <CALCETrU+6sj=reBgPBy7Mq6KYY7BKkVLGwm4XrVzOzb8aU+meg@mail.gmail.com>
-References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
- <CALCETrVqzidL7SXsCVm8wWrcQMR9dFOLGnDtC-eEYMO4a+yszA@mail.gmail.com>
- <CAK7LNARELkQbhAfBdh9Tx7gVGkpN9gTJzoqJwOF-0CH4zm+wcw@mail.gmail.com>
- <CALCETrVgSUy4ofeBmkZ7TurKvmQVX8C1aj__SLOL6SboQ3S-WA@mail.gmail.com>
- <CAK7LNAQOJjcn7Q+s_pKqzUuojMBtOsRNKsmVwDFXvTeU-zvSeQ@mail.gmail.com>
- <CALCETrU+6sj=reBgPBy7Mq6KYY7BKkVLGwm4XrVzOzb8aU+meg@mail.gmail.com>
-Message-ID: <CAK7LNATAeMmfwWiZha17mbyWhF6bR5RGjv+gbsQTvL4teoTiPQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Mar 2016 15:42:37 +0900
+Subject: [PATCH 05/10] ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5
+ module
+In-Reply-To: <1457921056-21257-6-git-send-email-cw00.choi@samsung.com>
+References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
+ <1457921056-21257-6-git-send-email-cw00.choi@samsung.com>
+Message-ID: <56E65D5D.8060702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On 14.03.2016 11:04, Chanwoo Choi wrote:
+> This patch adds the support for Device Tree source for Samsung ARTIK5 module[1]
+> based on Exynos3250 SoC. The ARTIK5 module includes the follwoing devices:
+> - Application Processor (Samsung Exynos3250)
+> - WiFi/BT Combo chip (Broadcom4354)
+> - PMIC (Samsung S2MPS14)
+> - eMMC (4GB)
+> - DRAM LPDDR3 (512MB)
+> - Connectors pin (60 Pins x 3 set)
+> 
+> Also, this patch adds the ARTIK5 development board[2] dts file which includes
+> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
+> ethernet port, uart port and so on.
+> 
+> [1] https://www.artik.io/hardware/artik-5
+> [2] http://www.digikey.com/product-search/en?FV=ffecca14
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> ---
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/exynos3250-artik5-devel.dts |  26 +++
+>  arch/arm/boot/dts/exynos3250-artik5.dtsi      | 282 ++++++++++++++++++++++++++
 
+Plus changes in
+Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt.
 
-2016-03-14 13:44 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
-> On Sun, Mar 13, 2016 at 9:36 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> 2016-03-14 13:28 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
->>> On Sun, Mar 13, 2016 at 9:08 PM, Masahiro Yamada
->>> <yamada.masahiro@socionext.com> wrote:
->>>>
->>>> Hi Andy
->>>>
->>>> 2016-03-14 9:39 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
->>>> > On Mar 12, 2016 4:14 PM, "Masahiro Yamada"
->>>> > <yamada.masahiro@socionext.com> wrote:
->>>> >>
->>>> >> These targets are marked as PHONY.  No need to add FORCE to their
->>>> >> dependency.
->>>> >
->>>> > If this is, in fact, correct, can you update
->>>> > Documentation/kbuild/makefiles.txt as well?
->>>>
->>>> Which line do you want me to update?
->>>>
->>>
->>> All the references to FORCE should probably mention .PHONY as an alternative.
->>
->> I do not get your point.
->>
->> All the examples in the makefile.txt correctly reference to FORCE.
->> They are not PHONY targets.
->> No need to update.
->
-> But they could be.  For example:
->
->                 $(obj)/image: vmlinux FORCE
->                         $(call if_changed,objcopy)
->
-> could be:
->
->                  .PHONY: $(obj)/image
->                 $(obj)/image: vmlinux
->                         $(call if_changed,objcopy)
->
-> I would at least change:
->
-> Note: It is a typical mistake to forget the FORCE prerequisite.
->
-> to:
->
-> Note: if-changed is only useful if make executes it, which won't
-> happen if it determines that the inputs have not changed since the
-> output was built.  This can be avoided by specifying FORCE as a
-> prerequisite or by making declaring the output as .PHONY.
->
+>  3 files changed, 309 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos3250-artik5-devel.dts
+>  create mode 100644 arch/arm/boot/dts/exynos3250-artik5.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a4a6d70e8b26..f2de160828e8 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_DIGICOLOR) += \
+>  dtb-$(CONFIG_ARCH_EFM32) += \
+>  	efm32gg-dk3750.dtb
+>  dtb-$(CONFIG_ARCH_EXYNOS3) += \
+> +	exynos3250-artik5-devel.dtb \
+>  	exynos3250-monk.dtb \
+>  	exynos3250-rinato.dtb
+>  dtb-$(CONFIG_ARCH_EXYNOS4) += \
+> diff --git a/arch/arm/boot/dts/exynos3250-artik5-devel.dts b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
+> new file mode 100644
+> index 000000000000..d17c28969118
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
+> @@ -0,0 +1,26 @@
+> +/*
+> + * Samsung's Exynos3250 based ARTIK5 development board device tree source
+> + *
+> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Device tree source file for Samsung's ARTIK5 development board
+> + * which is based on Samsung Exynos3250 SoC.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +#include "exynos3250-artik5.dtsi"
+> +
+> +/ {
+> +	model = "Samsung ARTIK5 development board";
+> +	compatible = "samsung,artik5-devel", "samsung,artik5",
+> +			"samsung,exynos3250", "samsung,exynos3";
+> +};
+> +
+> +&serial_2 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> new file mode 100644
+> index 000000000000..97d0087efb9f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> @@ -0,0 +1,282 @@
+> +/*
+> + * Samsung's Exynos3250 based ARTIK5 module device tree source
+> + *
+> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Device tree source file for Samsung's ARTIK5 module which is based on
+> + * Samsung Exynos3250 SoC.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include "exynos3250.dtsi"
+> +#include <dt-bindings/clock/samsung,s2mps11.h>
+> +
+> +/ {
+> +	compatible = "samsung,artik5", "samsung,exynos3250", "samsung,exynos3";
+> +
+> +
 
+Leave only one blank line.
 
-No. This is absolutely wrong.
-PHONY and FORCE are not interchangeable.
+> +	chosen {
+> +		linux,stdout = &serial_2;
 
-They have different behavior.
-I will show you how they behave differently.
+'stdout-path' should be used (linux,stdout is deprecated).
 
+> +	};
+> +
+> +	memory {
+> +		reg =  <0x40000000 0x1ff00000>;
 
-BTW, Linux 4.5 is out now.
+Just one space after '='.
 
-Let's try a simple experiment on it.
+> +	};
+> +
+> +	firmware at 0205F000 {
+> +		compatible = "samsung,secure-firmware";
+> +		reg = <0x0205F000 0x1000>;
 
+Let stick to one convention of letter case for hex numbers. Lower-case
+maybe, so 0205f000?
 
-The following shows that my source tree is v4.5
+> +	};
+> +};
+> +
+> +&i2c_0 {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	samsung,i2c-sda-delay = <100>;
+> +	samsung,i2c-slave-addr = <0x10>;
+> +	samsung,i2c-max-bus-freq = <100000>;
+> +	status = "okay";
+> +
+> +	s2mps14_pmic at 66 {
+> +		compatible = "samsung,s2mps14-pmic";
+> +		interrupt-parent = <&gpx3>;
+> +		interrupts = <5 0>;
 
-yamada at beagle:~/workspace/linux$ git describe
-v4.5
+IRQ_TYPE_NONE
 
+> +		reg = <0x66>;
+> +		wakeup;
 
+This is not valid property and is ignored. Probably you meant
+'wakeup_source' (which would still be ignored by sec-core driver by the
+way... fixing this is waiting on Exynos mainline todo list :) ).
 
-Example 1)
-
-
-Add the following code to the top Makefile.
-
-Please note "FORCE" is used here.
-
-
-yamada at beagle:~/workspace/linux$ git diff
-diff --git a/Makefile b/Makefile
-index 7b3ecdc..89b7d0d 100644
---- a/Makefile
-+++ b/Makefile
-@@ -914,6 +914,22 @@ export KBUILD_ALLDIRS := $(sort $(filter-out
-arch/%,$(vmlinux-
-
- vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN)
-
-+quiet_cmd_gen_foo = FOO     $@
-+      cmd_gen_foo = (cat $<; echo hello) > $@
-+
-+foo: bar FORCE
-+       $(call if_changed,gen_foo)
-+
-+quiet_cmd_gen_bar = BAR     $@
-+      cmd_gen_bar = (cat $<; echo $(GREETING)) > $@
-+
-+bar: baz FORCE
-+       $(call if_changed,gen_bar)
-+
-+baz:
-+       @touch $@
-+
-+
- # Final link of vmlinux
-       cmd_link-vmlinux = $(CONFIG_SHELL) $< $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux)
- quiet_cmd_link-vmlinux = LINK    $@
-
-
-
-Try the following.
-
-yamada at beagle:~/workspace/linux$ git clean -x -f
-yamada at beagle:~/workspace/linux$ make -s defconfig
-yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
-scripts/kconfig/conf  --silentoldconfig Kconfig
-  BAR     bar
-  FOO     foo
-yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
-make: `foo' is up to date.
-yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
-  BAR     bar
-  FOO     foo
-yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
-make: `foo' is up to date.
-yamada at beagle:~/workspace/linux$ make GREETING=GoodEvening foo
-  BAR     bar
-  FOO     foo
-yamada@beagle:~/workspace/linux$ make GREETING=GoodEvening foo
-make: `foo' is up to date.
-
-
-
-
-Please notice "foo" and "bar" were not rebuilt
-when I gave the same command line as the previous run.
-
-
-When I changed the command line, "bar"  was update
-and "foo" was also updated because "foo" depends on "bar".
-
-
-It means $(call if_changed,...) is working as expected.
-
-
-
-
-
-
-Example 2)
-
-
-Add the following to the top Makefile.
-Please notice that I just replaced "FORCE" with ".PHONY".
-
-
-
-diff --git a/Makefile b/Makefile
-index 7b3ecdc..a0899c3 100644
---- a/Makefile
-+++ b/Makefile
-@@ -914,6 +914,24 @@ export KBUILD_ALLDIRS := $(sort $(filter-out
-arch/%,$(vmlinux-
-
- vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN)
-
-+quiet_cmd_gen_foo = FOO     $@
-+      cmd_gen_foo = (cat $<; echo hello) > $@
-+
-+.PHONY: foo
-+foo: bar
-+       $(call if_changed,gen_foo)
-+
-+quiet_cmd_gen_bar = BAR     $@
-+      cmd_gen_bar = (cat $<; echo $(GREETING)) > $@
-+
-+.PHONY: bar
-+bar: baz
-+       $(call if_changed,gen_bar)
-+
-+baz:
-+       @touch $@
-+
-+
- # Final link of vmlinux
-       cmd_link-vmlinux = $(CONFIG_SHELL) $< $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux)
- quiet_cmd_link-vmlinux = LINK    $@
-
-
-
-Let's try the same thing.
-
-
-
-yamada at beagle:~/workspace/linux$ git clean -x -f
-yamada at beagle:~/workspace/linux$ make -s defconfig
-yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
-scripts/kconfig/conf  --silentoldconfig Kconfig
-  BAR     bar
-  FOO     foo
-yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
-  BAR     bar
-  FOO     foo
-yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
-  BAR     bar
-  FOO     foo
-yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
-  BAR     bar
-  FOO     foo
-yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
-  BAR     bar
-  FOO     foo
-yamada@beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
-  BAR     bar
-  FOO     foo
-
-
-Did you notice the difference?
-
-The "foo" and "bar" are always rebuilt
-regardless the command line is changed or not.
-
-It means $(call if_changed,...) is not working.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Best regards,
+Krzysztof
