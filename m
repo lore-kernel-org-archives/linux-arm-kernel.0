@@ -1,273 +1,179 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Mar 2016 09:38:58 +0100
-Subject: [PATCH v6 net-next 03/10] ARM: dts: armada-38x: enable buffer manager
- support on Armada 38x boards
+Date: Mon, 14 Mar 2016 09:39:04 +0100
+Subject: [PATCH v6 net-next 09/10] net: add a hardware buffer management
+ helper API
 In-Reply-To: <1457944745-7634-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1457944745-7634-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1457944745-7634-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1457944745-7634-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+This basic implementation allows to share code between driver using
+hardware buffer management. As the code is hardware agnostic, there is
+few helpers, most of the optimization brought by the an HW BM has to be
+done at driver level.
 
-Since mvneta driver supports using hardware buffer management (BM), in
-order to use it, board files have to be adjusted accordingly. This commit
-enables BM on:
-* A385-DB-AP - each port has its own pool for long and common pool for
-short packets,
-* A388-ClearFog - same as above,
-* A388-DB - to each port unique 'short' and 'long' pools are mapped,
-* A388-GP - same as above.
-
-Moreover appropriate entry is added to 'soc' node ranges, as well as "okay"
-status for 'bm' and 'bm-bppi' (internal SRAM) nodes.
-
-[gregory.clement at free-electrons.com: add suppport for the ClearFog board]
-
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Tested-by: Sebastian Careba <nitroshift@yahoo.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/armada-385-db-ap.dts              | 20 +++++++++++++++++++-
- arch/arm/boot/dts/armada-388-clearfog.dts           |  6 ++++++
- arch/arm/boot/dts/armada-388-db.dts                 | 17 ++++++++++++++++-
- arch/arm/boot/dts/armada-388-gp.dts                 | 17 ++++++++++++++++-
- arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 15 ++++++++++++++-
- 5 files changed, 71 insertions(+), 4 deletions(-)
+ include/net/hwbm.h | 28 ++++++++++++++++++
+ net/Kconfig        |  3 ++
+ net/core/Makefile  |  1 +
+ net/core/hwbm.c    | 87 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 119 insertions(+)
+ create mode 100644 include/net/hwbm.h
+ create mode 100644 net/core/hwbm.c
 
-diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-index acd5b1519edb..5f9451be21ff 100644
---- a/arch/arm/boot/dts/armada-385-db-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-db-ap.dts
-@@ -61,7 +61,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			spi1: spi at 10680 {
-@@ -138,12 +139,18 @@
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			ethernet at 70000 {
-@@ -157,6 +164,13 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <3>;
-+			};
+diff --git a/include/net/hwbm.h b/include/net/hwbm.h
+new file mode 100644
+index 000000000000..47d08662501b
+--- /dev/null
++++ b/include/net/hwbm.h
+@@ -0,0 +1,28 @@
++#ifndef _HWBM_H
++#define _HWBM_H
 +
-+			bm at c8000 {
-+				status = "okay";
- 			};
++struct hwbm_pool {
++	/* Capacity of the pool */
++	int size;
++	/* Size of the buffers managed */
++	int frag_size;
++	/* Number of buffers currently used by this pool */
++	int buf_num;
++	/* constructor called during alocation */
++	int (*construct)(struct hwbm_pool *bm_pool, void *buf);
++	/* protect acces to the buffer counter*/
++	spinlock_t lock;
++	/* private data */
++	void *priv;
++};
++#ifdef CONFIG_HWBM
++void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf);
++int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp);
++int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp);
++#else
++void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf) {}
++int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp) { return 0; }
++int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp)
++{ return 0; }
++#endif /* CONFIG_HWBM */
++#endif /* _HWBM_H */
+diff --git a/net/Kconfig b/net/Kconfig
+index 10640d5f8bee..e13449870d06 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -253,6 +253,9 @@ config XPS
+ 	depends on SMP
+ 	default y
  
- 			nfc: flash at d0000 {
-@@ -178,6 +192,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
++config HWBM
++       bool
 +
- 		pcie-controller {
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-index c6e180eb3b11..c60206efb583 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-@@ -78,6 +78,9 @@
- 		internal-regs {
- 			ethernet at 30000 {
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <1>;
- 				status = "okay";
- 
- 				fixed-link {
-@@ -88,6 +91,9 @@
- 
- 			ethernet at 34000 {
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <3>;
-+				bm,pool-short = <1>;
- 				status = "okay";
- 
- 				fixed-link {
-diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
-index ff47af57f091..ea93ed727030 100644
---- a/arch/arm/boot/dts/armada-388-db.dts
-+++ b/arch/arm/boot/dts/armada-388-db.dts
-@@ -66,7 +66,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			spi at 10600 {
-@@ -99,6 +100,9 @@
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			usb at 58000 {
-@@ -109,6 +113,9 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 			};
- 
- 			mdio at 72004 {
-@@ -129,6 +136,10 @@
- 				status = "okay";
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
+ config SOCK_CGROUP_DATA
+ 	bool
+ 	default n
+diff --git a/net/core/Makefile b/net/core/Makefile
+index 014422e2561f..d6508c2ddca5 100644
+--- a/net/core/Makefile
++++ b/net/core/Makefile
+@@ -25,4 +25,5 @@ obj-$(CONFIG_CGROUP_NET_PRIO) += netprio_cgroup.o
+ obj-$(CONFIG_CGROUP_NET_CLASSID) += netclassid_cgroup.o
+ obj-$(CONFIG_LWTUNNEL) += lwtunnel.o
+ obj-$(CONFIG_DST_CACHE) += dst_cache.o
++obj-$(CONFIG_HWBM) += hwbm.o
+ obj-$(CONFIG_NET_DEVLINK) += devlink.o
+diff --git a/net/core/hwbm.c b/net/core/hwbm.c
+new file mode 100644
+index 000000000000..941c28486896
+--- /dev/null
++++ b/net/core/hwbm.c
+@@ -0,0 +1,87 @@
++/* Support for hardware buffer manager.
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ */
++#include <linux/kernel.h>
++#include <linux/printk.h>
++#include <linux/skbuff.h>
++#include <net/hwbm.h>
 +
- 			flash at d0000 {
- 				status = "okay";
- 				num-cs = <1>;
-@@ -169,6 +180,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
++void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf)
++{
++	if (likely(bm_pool->frag_size <= PAGE_SIZE))
++		skb_free_frag(buf);
++	else
++		kfree(buf);
++}
++EXPORT_SYMBOL_GPL(hwbm_buf_free);
 +
- 		pcie-controller {
- 			status = "okay";
- 			/*
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index cd316021d6ce..466b01eb1038 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -60,7 +60,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			spi at 10600 {
-@@ -133,6 +134,9 @@
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			/* CON4 */
-@@ -152,6 +156,9 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 			};
- 
- 
-@@ -186,6 +193,10 @@
- 				};
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
++/* Refill processing for HW buffer management */
++int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp)
++{
++	int frag_size = bm_pool->frag_size;
++	void *buf;
 +
- 			sata at e0000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&sata2_pins>, <&sata3_pins>;
-@@ -240,6 +251,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
++	if (likely(frag_size <= PAGE_SIZE))
++		buf = netdev_alloc_frag(frag_size);
++	else
++		buf = kmalloc(frag_size, gfp);
 +
- 		pcie-controller {
- 			status = "okay";
- 			/*
-diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-index 3f792a563c05..8c9842237b60 100644
---- a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-+++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-@@ -58,7 +58,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			ethernet at 70000 {
-@@ -66,6 +67,9 @@
- 				pinctrl-names = "default";
- 				phy = <&phy_dedicated>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 				status = "okay";
- 			};
- 
-@@ -110,6 +114,15 @@
- 				pinctrl-names = "default";
- 				status = "okay";
- 			};
++	if (!buf)
++		return -ENOMEM;
 +
-+			bm at c8000 {
-+				status = "okay";
-+			};
- 		};
++	if (bm_pool->construct)
++		if (bm_pool->construct(bm_pool, buf)) {
++			hwbm_buf_free(bm_pool, buf);
++			return -ENOMEM;
++		}
 +
-+		bm-bppi {
-+			status = "okay";
-+		};
++	return 0;
++}
++EXPORT_SYMBOL_GPL(hwbm_pool_refill);
 +
- 	};
- };
++int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp)
++{
++	int err, i;
++	unsigned long flags;
++
++	spin_lock_irqsave(&bm_pool->lock, flags);
++	if (bm_pool->buf_num == bm_pool->size) {
++		pr_warn("pool already filled\n");
++		return bm_pool->buf_num;
++	}
++
++	if (buf_num + bm_pool->buf_num > bm_pool->size) {
++		pr_warn("cannot allocate %d buffers for pool\n",
++			buf_num);
++		return 0;
++	}
++
++	if ((buf_num + bm_pool->buf_num) < bm_pool->buf_num) {
++		pr_warn("Adding %d buffers to the %d current buffers will overflow\n",
++			buf_num,  bm_pool->buf_num);
++		return 0;
++	}
++
++	for (i = 0; i < buf_num; i++) {
++		err = hwbm_pool_refill(bm_pool, gfp);
++		if (err < 0)
++			break;
++	}
++
++	/* Update BM driver with number of buffers added to pool */
++	bm_pool->buf_num += i;
++
++	pr_debug("hwpm pool: %d of %d buffers added\n", i, buf_num);
++	spin_unlock_irqrestore(&bm_pool->lock, flags);
++
++	return i;
++}
++EXPORT_SYMBOL_GPL(hwbm_pool_add);
 -- 
 2.5.0
