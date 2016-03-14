@@ -1,52 +1,120 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Mar 2016 14:59:41 +0800
-Subject: [PATCH 1/2] regulator: axp20x: Fix axp22x ldo_io voltage ranges
-In-Reply-To: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
-References: <1457727151-16392-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v67vsbH1-Vq_G_C=t3CCBFBaS1RCZc4ggqhoyjj7F_Hgaw@mail.gmail.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Mon, 14 Mar 2016 08:06:16 +0100
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <20160314064925.GA27587@js1304-P5Q-DELUXE>
+References: <56D92595.60709@huawei.com>
+ <20160304063807.GA13317@js1304-P5Q-DELUXE> <56D93ABE.9070406@huawei.com>
+ <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD38E7.3050107@huawei.com>
+ <56DDCB86.4030709@redhat.com> <56DE30CB.7020207@huawei.com>
+ <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
+Message-ID: <56E662E8.700@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 12, 2016 at 4:12 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> The minium voltage of 1800mV is a copy and paste error from the axp20x
-> regulator info. The correct minimum voltage for the ldo_io regulators
-> on the axp22x is 700mV.
+On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
+> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
+>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
+>>
+>> How about something like this? Just and idea, probably buggy (off-by-one etc.).
+>> Should keep away cost from <pageblock_order iterations@the expense of the
+>> relatively fewer >pageblock_order iterations.
 >
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Hmm... I tested this and found that it's code size is a little bit
+> larger than mine. I'm not sure why this happens exactly but I guess it would be
+> related to compiler optimization. In this case, I'm in favor of my
+> implementation because it looks like well abstraction. It adds one
+> unlikely branch to the merge loop but compiler would optimize it to
+> check it once.
 
-Fixes: 1b82b4e4f954 ("regulator: axp20x: Add support for AXP22X regulators")
+I would be surprised if compiler optimized that to check it once, as 
+order increases with each loop iteration. But maybe it's smart enough to 
+do something like I did by hand? Guess I'll check the disassembly.
 
-then
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-Also, this bug has been in since v4.2. Should we mark it for stable?
-
-Regards
-ChenYu
-
-
-> ---
->  drivers/regulator/axp20x-regulator.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> index 40cd894..0c0e7a3 100644
-> --- a/drivers/regulator/axp20x-regulator.c
-> +++ b/drivers/regulator/axp20x-regulator.c
-> @@ -215,10 +215,10 @@ static const struct regulator_desc axp22x_regulators[] = {
->                  AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
->         AXP_DESC(AXP22X, ELDO3, "eldo3", "eldoin", 700, 3300, 100,
->                  AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
-> -       AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 1800, 3300, 100,
-> +       AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
->                     AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
->                     AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
-> -       AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 1800, 3300, 100,
-> +       AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
->                     AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
->                     AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
->         AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtc_ldo", "ips", 3000),
+> Thanks.
+>
+>>
+>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+>> index ff1e3cbc8956..b8005a07b2a1 100644
+>> --- a/mm/page_alloc.c
+>> +++ b/mm/page_alloc.c
+>> @@ -685,21 +685,13 @@ static inline void __free_one_page(struct page *page,
+>>   	unsigned long combined_idx;
+>>   	unsigned long uninitialized_var(buddy_idx);
+>>   	struct page *buddy;
+>> -	unsigned int max_order = MAX_ORDER;
+>> +	unsigned int max_order = pageblock_order + 1;
+>>
+>>   	VM_BUG_ON(!zone_is_initialized(zone));
+>>   	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
+>>
+>>   	VM_BUG_ON(migratetype == -1);
+>> -	if (is_migrate_isolate(migratetype)) {
+>> -		/*
+>> -		 * We restrict max order of merging to prevent merge
+>> -		 * between freepages on isolate pageblock and normal
+>> -		 * pageblock. Without this, pageblock isolation
+>> -		 * could cause incorrect freepage accounting.
+>> -		 */
+>> -		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
+>> -	} else {
+>> +	if (likely(!is_migrate_isolate(migratetype))) {
+>>   		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+>>   	}
+>>
+>> @@ -708,11 +700,12 @@ static inline void __free_one_page(struct page *page,
+>>   	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
+>>   	VM_BUG_ON_PAGE(bad_range(zone, page), page);
+>>
+>> +continue_merging:
+>>   	while (order < max_order - 1) {
+>>   		buddy_idx = __find_buddy_index(page_idx, order);
+>>   		buddy = page + (buddy_idx - page_idx);
+>>   		if (!page_is_buddy(page, buddy, order))
+>> -			break;
+>> +			goto done_merging;
+>>   		/*
+>>   		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
+>>   		 * merge with it and move up one order.
+>> @@ -729,6 +722,26 @@ static inline void __free_one_page(struct page *page,
+>>   		page_idx = combined_idx;
+>>   		order++;
+>>   	}
+>> +	if (max_order < MAX_ORDER) {
+>> +		if (IS_ENABLED(CONFIG_CMA) &&
+>> +				unlikely(has_isolate_pageblock(zone))) {
+>> +
+>> +			int buddy_mt;
+>> +
+>> +			buddy_idx = __find_buddy_index(page_idx, order);
+>> +			buddy = page + (buddy_idx - page_idx);
+>> +			buddy_mt = get_pageblock_migratetype(buddy);
+>> +
+>> +			if (migratetype != buddy_mt &&
+>> +					(is_migrate_isolate(migratetype) ||
+>> +					is_migrate_isolate(buddy_mt)))
+>> +				goto done_merging;
+>> +		}
+>> +		max_order++;
+>> +		goto continue_merging;
+>> +	}
+>> +
+>> +done_merging:
+>>   	set_page_order(page, order);
+>>
+>>   	/*
+>>
+>> --
+>> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+>> the body to majordomo at kvack.org.  For more info on Linux MM,
+>> see: http://www.linux-mm.org/ .
+>> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+>
 > --
-> 2.7.2
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 >
