@@ -1,52 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Mar 2016 07:38:03 +0000
-Subject: [PATCH v11 4/9] arm64: add conditional instruction simulation
- support
-In-Reply-To: <20160314040455.GB6584@dhcppc6.redhat.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-5-git-send-email-dave.long@linaro.org>
- <20160313120903.54b0c8f2@arm.com>
- <20160314040455.GB6584@dhcppc6.redhat.com>
-Message-ID: <20160314073803.22c90d69@arm.com>
+From: hare@suse.de (Hannes Reinecke)
+Date: Mon, 14 Mar 2016 08:38:26 +0100
+Subject: [PATCH 10/22] ncr5380: Merge DMA implementation from
+ atari_NCR5380 core driver
+In-Reply-To: <20160314042703.226339838@telegraphics.com.au>
+References: <20160314042700.596192247@telegraphics.com.au>
+ <20160314042703.226339838@telegraphics.com.au>
+Message-ID: <56E66A72.8090906@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Mar 2016 09:34:55 +0530
-Pratyush Anand <panand@redhat.com> wrote:
-
-Hi Pratyush,
-
-> On 13/03/2016:12:09:03 PM, Marc Zyngier wrote:
-> > On Wed,  9 Mar 2016 00:32:18 -0500
-> > David Long <dave.long@linaro.org> wrote:
-> > 
-> > > +pstate_check_t * const opcode_condition_checks[16] = {
-> > > +	__check_eq, __check_ne, __check_cs, __check_cc,
-> > > +	__check_mi, __check_pl, __check_vs, __check_vc,
-> > > +	__check_hi, __check_ls, __check_ge, __check_lt,
-> > > +	__check_gt, __check_le, __check_al, __check_al
-> > 
-> > The very last entry seems wrong, or is at least the opposite of what
-> > the current code has. It should be something called __check_nv(), and
-> > always return false (condition code NEVER).
+On 03/14/2016 05:27 AM, Finn Thain wrote:
+> Adopt the DMA implementation from atari_NCR5380.c. This means that
+> atari_scsi and sun3_scsi can make use of the NCR5380.c core driver
+> and the atari_NCR5380.c driver fork can be made redundant.
 > 
-> May be __check_nv() name is more appropriate as per definition, but shouldn't it
-> still return true, because TRM says:
-> "The condition code NV exists only to provide a valid disassembly of the 0b1111
-> encoding, otherwise its behavior is identical to AL"
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> 
+> ---
+>  drivers/scsi/NCR5380.c      |  170 +++++++++++++++++++++++++++++++++++---------
+>  drivers/scsi/arm/cumana_1.c |    3 
+>  drivers/scsi/arm/oak.c      |    3 
+>  drivers/scsi/dmx3191d.c     |    1 
+>  drivers/scsi/dtc.c          |    2 
+>  drivers/scsi/dtc.h          |    1 
+>  drivers/scsi/g_NCR5380.c    |    2 
+>  drivers/scsi/g_NCR5380.h    |    1 
+>  drivers/scsi/mac_scsi.c     |    3 
+>  drivers/scsi/pas16.c        |    2 
+>  drivers/scsi/pas16.h        |    1 
+>  drivers/scsi/t128.c         |    2 
+>  drivers/scsi/t128.h         |    1 
+>  13 files changed, 152 insertions(+), 40 deletions(-)
+> 
+Reviewed-by: Hannes Reinecke <hare@suse.com>
 
-Indeed, I missed that. But this interpretation is for the A64
-instruction set, and this array is also used by the new
-arm32_check_condition. The condition code table for A32 seems to
-completely ignore the 0b1111 code (there is simply no entry for it), and
-it is only in the ConditionHolds pseudocode that you can see how this
-is actually special-cased.
+Cheers,
 
-So I'm fine leaving the code as it is, but a comment and a pointer to
-the ARMv8 ARM wouldn't go amiss.
-
-Thanks,
-
-	M.
+Hannes
 -- 
-Jazz is not dead. It just smells funny.
+Dr. Hannes Reinecke		   Teamlead Storage & Networking
+hare at suse.de			               +49 911 74053 688
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
+GF: F. Imend?rffer, J. Smithard, J. Guild, D. Upmanyu, G. Norton
+HRB 21284 (AG N?rnberg)
