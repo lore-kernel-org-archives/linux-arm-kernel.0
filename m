@@ -1,74 +1,23 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Mon, 14 Mar 2016 15:51:01 +0000
-Subject: [PATCH v12] [PATCH] PCI: Xilinx-NWL-PCIe: Adding support for
- Xilinx NWL PCIe Host Controller
-In-Reply-To: <20160311215819.GB16257@localhost>
-References: <1457281934-32068-1-git-send-email-bharatku@xilinx.com>
- <20160311215819.GB16257@localhost>
-Message-ID: <8520D5D51A55D047800579B09414719825889095@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Mar 2016 09:09:45 -0700
+Subject: Regression in next caused by 95026658c46e i2c: do not use internal..
+Message-ID: <20160314160944.GG9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
- 
-> I forgot I still have one question here:
-> 
-> On Sun, Mar 06, 2016 at 10:02:14PM +0530, Bharat Kumar Gogada wrote:
-> > Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
-> 
-> > +static bool nwl_pcie_valid_device(struct pci_bus *bus, unsigned int
-> > +devfn) {
-> > +	struct nwl_pcie *pcie = bus->sysdata;
-> > +
-> > +	/* Check link,before accessing downstream ports */
-> > +	if (bus->number != pcie->root_busno) {
-> > +		if (!nwl_pcie_link_up(pcie))
-> > +			return false;
-> > +	}
-> 
-> This seems racy.  What if we check, and the link is up, but the link goes down
-> before we actually complete the config access?
-> 
-> I'm suggesting that this check for the link being up might be superfluous.
-Without the above check and also if there is no EP then we are getting kernel stack as follows,
-[    2.654105] PCI host bridge /amba/pcie at fd0e0000 ranges:
-[    2.659268]   No bus range found for /amba/pcie at fd0e0000, using [bus 00-ff]
-[    2.666195]   MEM 0xe1000000..0xefffffff -> 0xe1000000
-[    2.671410] nwl-pcie fd0e0000.pcie: PCI host bridge to bus 0000:00
-[    2.677436] pci_bus 0000:00: root bus resource [bus 00-ff]
-[    2.682883] pci_bus 0000:00: root bus resource [mem 0xe1000000-0xefffffff]
-[    2.690031] Unhandled fault: synchronous external abort (0x96000210) at 0xffffff8000200000
-[    2.690036] nwl-pcie fd0e0000.pcie: Slave error
-[    2.702582] Internal error: : 96000210 [#1] SMP
-[    2.707078] Modules linked in:
-[    2.710108] CPU: 3 PID: 1 Comm: swapper/0 Not tainted 4.5.0-rc6+ #5
-[    2.716332] Hardware name: ZynqMP (DT)
-[    2.720659] task: ffffffc0798bed00 ti: ffffffc0798c0000 task.ti: ffffffc0798c0000
-[    2.728102] PC is at pci_generic_config_read+0x38/0x9c
-[    2.733202] LR is at pci_generic_config_read+0x1c/0x9c
-.......
-[    3.322701] [<ffffffc000498b1c>] pci_generic_config_read+0x38/0x9c
-[    3.328842] [<ffffffc000498f54>] pci_bus_read_config_dword+0x80/0xb0
-[    3.335156] [<ffffffc00049abd4>] pci_bus_read_dev_vendor_id+0x30/0x104
-[    3.341643] [<ffffffc00049c5b0>] pci_scan_single_device+0x50/0xc4
-[    3.347698] [<ffffffc00049c674>] pci_scan_slot+0x50/0xe8
-[    3.352974] [<ffffffc00049d530>] pci_scan_child_bus+0x30/0xd8
-[    3.358683] [<ffffffc00049d210>] pci_scan_bridge+0x1fc/0x4ec
-[    3.364306] [<ffffffc00049d58c>] pci_scan_child_bus+0x8c/0xd8
-[    3.370016] [<ffffffc0004b2d9c>] nwl_pcie_probe+0x6c4/0x8e0
-.....
+Hi Sudip & Wolfram,
 
-> The hardware should do something reasonable with the config access if it
-> can't send it down the link.
-When Link is down and H/W gets a ECAM access request for downstream ports, hardware responds by DECERR (decode error) status on AXI Interface.
+Looks like commit 95026658c46e ("i2c: do not use internal data from
+driver core") in Linux next introduced a regression breaking booting
+on most ARM boards according to kernelci.org [0].
 
-So without any EP and without this condition, Linux kernel cannot determine above response from H/W. So the above condition is useful only when no EP is connected.
+Having something like this happen just as the merge window opens is
+not nice. You guys should already know.. The patches in next should
+be sitting there for a few weeks before the merge window so issues
+like this are found out early.
 
-Now even if the link is up initially, but the link goes down before we actually complete the config access, then H/W responds by DECERR, then Linux kernel might throw similar stack. (We haven't observed this condition yet)
+Regards,
 
-It looks like we need a different type of hardware response to get rid of this situation, but it's not easy way. 
-Have you come across this/similar kind of problem anywhere else? 
-Can you suggest if there is any other way to handle this.
+Tony
 
-Thanks
-Bharat
+[0] https://kernelci.org/boot/all/job/next/
