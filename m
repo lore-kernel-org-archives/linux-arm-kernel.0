@@ -1,47 +1,55 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 14 Mar 2016 18:42:29 +0800
-Subject: [PATCH 1/3] usb: core: add power sequence for USB devices
-In-Reply-To: <20160305141011.GA28343@lunn.ch>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
- <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
- <CAL_JsqLYHzb0ABYN_P9ZOEorT6otvn_BPNzuCFhoqwa5M4y-hw@mail.gmail.com>
- <20160304020242.GB30272@shlinux2.ap.freescale.net>
- <20160304022305.GB20597@lunn.ch>
- <20160304023750.GF30272@shlinux2.ap.freescale.net>
- <20160305042854.GW13525@rob-hp-laptop>
- <20160305083347.GA28858@shlinux2.ap.freescale.net>
- <20160305141011.GA28343@lunn.ch>
-Message-ID: <20160314104229.GA2131@shlinux2.ap.freescale.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Mar 2016 11:49:39 +0100
+Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM, Line
+ and Mic inputs
+In-Reply-To: <20160312085222.226d89bf@scratchpost.org>
+References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
+ <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
+ <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
+ <20160312085222.226d89bf@scratchpost.org>
+Message-ID: <20160314104939.GL8418@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 05, 2016 at 03:10:11PM +0100, Andrew Lunn wrote:
-> > So, would you like to accept the generic solution like below:
+On Sat, Mar 12, 2016 at 08:52:22AM +0100, Danny Milosavljevic wrote:
+> Hi,
+> 
+> does anyone know the answer to the questions below?
+> 
+> > The other direction (making two controls which both do the same and update 
+> > each other's value) doesn't seem to be easily available. 
+> 
+> > Should I write a _put handler that does it manually?
+> 
+> > (Or should that be handled by alsa-lib mixer modules instead?)
+> 
+> > Is it possible to merge the "Left Mixer" control and respective 
+> > "Right Mixer" control into one selem in alsamixer?
 > > 
-> > - Create a generic power sequence driver, and it will be probed
-> > according to compatible string at device tree. At its probe,
-> > we can create a power sequence structure, and let this structure
-> > as the private data for this power sequence device.
-> 
-> I'm not sure a separate driver is required. Why not consider it more
-> like pinctrl properties? They are listed in the devices node. Have the
-> bus enumerate code first walk all children and run their on sequence.
-> Bus shutdown would again walk the children and run the off sequence.
-> 
+> > Because alsamixer actually has support for one-sided muting.
 
-The device which needs power sequence may not at platform bus, it may
-be at USB bus, MMC bus, etc.
+Mark, do you know how to do it?
 
->From what I see, A generic pwrseq driver can cover gpio-en, gpio-rst, clock,
-clock-freq, etc, but I find the pwrseq_emmc does something special, like
-request a restart handler. 
+IIRC, in order to have shared controls, you just needed to share the
+controls structure.
 
-Add Ulf, who is the power sequence author for MMC.
+> If that's unknown, I can post v9 without doing the grouping-together
+> of mixer controls and we can use it like that - I don't want the
+> patch to stall indefinitely on mere usability issues...
 
-Hi Ulf, Rob suggested that if we can create some generic things (driver
-or library) for power sequence for all devices, what do you think?
+Unfortunately, that is exposed to the user-space. Once it's in, you
+cannot change it / fix it anymore.
+
+Maxime
 
 -- 
-
-Best Regards,
-Peter Chen
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160314/0a31e144/attachment.sig>
