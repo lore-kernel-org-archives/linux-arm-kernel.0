@@ -1,20 +1,66 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Sun, 13 Mar 2016 17:39:42 -0700
-Subject: [PATCH] kbuild: drop FORCE from PHONY targets
-In-Reply-To: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CALCETrVqzidL7SXsCVm8wWrcQMR9dFOLGnDtC-eEYMO4a+yszA@mail.gmail.com>
+From: huangdaode@hisilicon.com (Daode Huang)
+Date: Mon, 14 Mar 2016 08:45:13 +0800
+Subject: [PATCH net 3/6] net: hns: fixed portid bug in sending manage pkt
+In-Reply-To: <56E2C839.4000700@cogentembedded.com>
+References: <1457053798-93513-1-git-send-email-huangdaode@hisilicon.com>
+ <1457053798-93513-4-git-send-email-huangdaode@hisilicon.com>
+ <56D98F8F.5010700@cogentembedded.com> <56E2251D.905@hisilicon.com>
+ <56E2C839.4000700@cogentembedded.com>
+Message-ID: <56E60999.90703@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mar 12, 2016 4:14 PM, "Masahiro Yamada"
-<yamada.masahiro@socionext.com> wrote:
+
+
+On 2016/3/11 21:29, Sergei Shtylyov wrote:
+> Hello.
 >
-> These targets are marked as PHONY.  No need to add FORCE to their
-> dependency.
+> On 3/11/2016 4:53 AM, Daode Huang wrote:
+>
+>>>> In V2 chip, when sending mamagement packets, the driver should
+>>>> config the port id to BD descs.
+>>>>
+>>>> Signed-off-by: Daode Huang <huangdaode@hisilicon.com>
+>>>> Signed-off-by: Lisheng <lisheng011@huawei.com>
+>>>> ---
+>>>>   drivers/net/ethernet/hisilicon/hns/hnae.h         | 3 +++
+>>>>   drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c | 1 +
+>>>>   drivers/net/ethernet/hisilicon/hns/hns_enet.c     | 4 ++++
+>>>>   3 files changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.h
+>>>> b/drivers/net/ethernet/hisilicon/hns/hnae.h
+>>>> index 1cbcb9f..11a3f97 100644
+>>>> --- a/drivers/net/ethernet/hisilicon/hns/hnae.h
+>>>> +++ b/drivers/net/ethernet/hisilicon/hns/hnae.h
+>>> [...]
+>>>> @@ -516,6 +518,7 @@ struct hnae_handle {
+>>>>       int q_num;
+>>>>       int vf_id;
+>>>>       u32 eport_id;
+>>>> +    u32 dport_id;    /*v2 tx bd should fill the dport_id*/
+>>>
+>>>    Please add spaces after /* and before */ (like it's done in other 
+>>> places
+>>> in this driver).
+>>>
+>>
+>> Hi MBR, Sergei,
+>
+>    Just in case: MBR stands for "my best regards", Sergei is my name. :-)
+hi Sergei,
 
-If this is, in fact, correct, can you update
-Documentation/kbuild/makefiles.txt as well?
+So sorry for my misunderstanding.
+thanks for your reminding.
 
-Thanks,
-Andy
+Best Regards
+Daode.
+
+>
+>> Daode.
+>
+> MBR, Sergei
+>
+>
+> .
+>
