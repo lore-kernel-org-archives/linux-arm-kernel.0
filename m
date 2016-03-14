@@ -1,97 +1,26 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 14 Mar 2016 17:54:41 -0500
-Subject: [PATCH v2 5/5] arm: davinci: remove mmc dma resources
-In-Reply-To: <1457996081-21975-1-git-send-email-david@lechnology.com>
+Date: Mon, 14 Mar 2016 17:54:36 -0500
+Subject: [PATCH v2 0/5] davinci_mmc fixes
+In-Reply-To: <56E6BF7E.7020401@ti.com>
 References: <56E6BF7E.7020401@ti.com>
- <1457996081-21975-1-git-send-email-david@lechnology.com>
-Message-ID: <1457996081-21975-6-git-send-email-david@lechnology.com>
+Message-ID: <1457996081-21975-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The davinci_mmc driver no longer uses platform resources for getting dma
-channels. Instead lookup is now done using dma_slave_map.
+I've updated the patche set based on feedback. This is tested on linux-next with
+LEGO MINDSTORMS EV3 (da850), both with and without device tree enabled.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
+David Lechner (5):
+  mmc: davinci: remove matching string
+  mmc: davinci: fix unwinding in probe
+  mmc: davinci: prepare clock
+  mmc: davinci: don't use dma platform resources
+  arm: davinci: remove mmc dma resources
 
-v2 changes: This is a new patch in v2.
+ arch/arm/mach-davinci/devices-da8xx.c |  20 ------
+ arch/arm/mach-davinci/devices.c       |  16 -----
+ drivers/mmc/host/davinci_mmc.c        | 112 +++++++++++-----------------------
+ 3 files changed, 37 insertions(+), 111 deletions(-)
 
-
- arch/arm/mach-davinci/devices-da8xx.c | 20 --------------------
- arch/arm/mach-davinci/devices.c       | 16 ----------------
- 2 files changed, 36 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 725e693..add3771 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -751,16 +751,6 @@ static struct resource da8xx_mmcsd0_resources[] = {
- 		.end	= IRQ_DA8XX_MMCSDINT0,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	{		/* DMA RX */
--		.start	= DA8XX_DMA_MMCSD0_RX,
--		.end	= DA8XX_DMA_MMCSD0_RX,
--		.flags	= IORESOURCE_DMA,
--	},
--	{		/* DMA TX */
--		.start	= DA8XX_DMA_MMCSD0_TX,
--		.end	= DA8XX_DMA_MMCSD0_TX,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- static struct platform_device da8xx_mmcsd0_device = {
-@@ -788,16 +778,6 @@ static struct resource da850_mmcsd1_resources[] = {
- 		.end	= IRQ_DA850_MMCSDINT0_1,
- 		.flags	= IORESOURCE_IRQ,
- 	},
--	{		/* DMA RX */
--		.start	= DA850_DMA_MMCSD1_RX,
--		.end	= DA850_DMA_MMCSD1_RX,
--		.flags	= IORESOURCE_DMA,
--	},
--	{		/* DMA TX */
--		.start	= DA850_DMA_MMCSD1_TX,
--		.end	= DA850_DMA_MMCSD1_TX,
--		.flags	= IORESOURCE_DMA,
--	},
- };
- 
- static struct platform_device da850_mmcsd1_device = {
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index 6257aa4..67d26c5 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -144,14 +144,6 @@ static struct resource mmcsd0_resources[] = {
- 		.start = IRQ_SDIOINT,
- 		.flags = IORESOURCE_IRQ,
- 	},
--	/* DMA channels: RX, then TX */
--	{
--		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCRXEVT),
--		.flags = IORESOURCE_DMA,
--	}, {
--		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCTXEVT),
--		.flags = IORESOURCE_DMA,
--	},
- };
- 
- static struct platform_device davinci_mmcsd0_device = {
-@@ -181,14 +173,6 @@ static struct resource mmcsd1_resources[] = {
- 		.start = IRQ_DM355_SDIOINT1,
- 		.flags = IORESOURCE_IRQ,
- 	},
--	/* DMA channels: RX, then TX */
--	{
--		.start = EDMA_CTLR_CHAN(0, 30),	/* rx */
--		.flags = IORESOURCE_DMA,
--	}, {
--		.start = EDMA_CTLR_CHAN(0, 31),	/* tx */
--		.flags = IORESOURCE_DMA,
--	},
- };
- 
- static struct platform_device davinci_mmcsd1_device = {
 -- 
 1.9.1
