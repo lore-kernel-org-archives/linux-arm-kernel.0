@@ -1,27 +1,31 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 13 Mar 2016 22:20:11 -0400 (EDT)
-Subject: [PATCH] net: macb: fix default configuration for GMAC on AT91
-In-Reply-To: <1457624672-30666-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1457624672-30666-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20160313.222011.1724698990540701829.davem@davemloft.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 14 Mar 2016 11:29:01 +0900
+Subject: [PATCH 0/2] ARM: dts: r8a7793: add CAN to device tree
+Message-ID: <1457922543-20975-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Thu, 10 Mar 2016 16:44:32 +0100
+Hi,
 
-> On AT91 SoCs, the User Register (USRIO) exposes a switch to configure the
-> "Reduced" or "Traditional" version of the Media Independent Interface
-> (RMII vs. MII or RGMII vs. GMII).
-> As on the older EMAC version, on GMAC, this switch is set by default to the
-> non-reduced type of interface, so use the existing capability and extend it to
-> GMII as well. We then keep the current logic in the macb_init() function.
-> 
-> The capabilities of sama5d2, sama5d4 and sama5d3 GEM interface are updated in
-> the macb_config structure to be able to properly enable them with a traditional
-> interface (GMII or MII).
-> 
-> Reported-by: Romain HENRIET <romain.henriet@l-acoustics.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+this short series adds CAN clocks and nodes to the r8a7794 device tree.
 
-Applied.
+I am not aware of an r8a7794 board that exposes CAN - neither the alt nor
+the silk board appear to - and thus am unsure of a way to test these
+changes.  However, they are based on what is present for the r8a7791 SoC
+and I am unable to find a difference in the SoC documentation.
+
+This series is similar to a similar series I posted for the r8a7793
+in January.
+
+Based on renesas-devel-20160311-v4.5-rc7.
+
+Simon Horman (2):
+  ARM: dts: r8a7794: add CAN clocks to device tree
+  ARM: dts: r8a7794: add CAN nodes to device tree
+
+ arch/arm/boot/dts/r8a7794.dtsi            | 45 +++++++++++++++++++++++++++++--
+ include/dt-bindings/clock/r8a7794-clock.h |  3 +++
+ 2 files changed, 46 insertions(+), 2 deletions(-)
+
+-- 
+2.1.4
