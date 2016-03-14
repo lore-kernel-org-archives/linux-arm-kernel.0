@@ -1,79 +1,57 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 14 Mar 2016 17:48:01 +0000
-Subject: [PATCH v15 16/20] arm64: limit memory regions based on DT property,
- usable-memory
-In-Reply-To: <cover.1457977401.git.geoff@infradead.org>
-References: <cover.1457977401.git.geoff@infradead.org>
-Message-ID: <fea90099fb82ab3869fb204f9e0017c76fbb9a30.1457977403.git.geoff@infradead.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Mar 2016 18:36:22 +0000
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <56E700F4.4060308@arm.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <56E00A7E.4080101@semihalf.com> <20160313181608.GA15988@cbox>
+ <56E69CCA.5070407@arm.com>
+ <CAFEAcA8r5LDbNG0XVnHnsoYcrfcpfnR3FQ_u=-L7Dop1HFVgxw@mail.gmail.com>
+ <56E6FAEB.1090306@arm.com> <56E700F4.4060308@arm.com>
+Message-ID: <56E704A6.7090901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+On 14/03/16 18:20, Andre Przywara wrote:
+> Hi,
+> 
+> On 14/03/16 17:54, Marc Zyngier wrote:
+>> On 14/03/16 17:29, Peter Maydell wrote:
+>>> On 14 March 2016 at 11:13, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>> So I see two ways to fix this:
+>>>> 1.) we find a KVM specific way of letting userland save and restore the
+>>>> ITS tables directly
+>>>> 2.) we implement the BASER<n> registers, but still use our "cache" for
+>>>> normal operations. On demand we would serialize KVM's virtual ITS data
+>>>> structures and put them into the guest's memory, so they could be
+>>>> saved/restored from there.
+>>>
+>>> I feel like we're rehashing a bunch of design choices we talked
+>>> through way back in the last-but-one Connect. I don't suppose
+>>> anybody wrote down our rationales from back then?
+>>>
+>>> (In particular I forget whether we decided the ITS tables were
+>>> large enough to need to allow some sort of before-the-VM-stops
+>>> migration of the data, which would be relatively doable with
+>>> option 2 but painful under option 1.)
+>>
+>> I think only option 2 is valid here, and we must be able to shove most
+>> of the routing information in the device/collection/IT tables. Common HW
+>> seems to use 64bit of data per entry per table, so we should be able to
+>> do the same with KVM.
+> 
+> All right, just skimmed over this and it looks doable.
+> For the collection table we will most likely even get away with 32 bits
+> per entry (compressed MPIDR or even VCPUIDs).
+> Would the IPA of the ITTE suffice for each device table entry?
 
-Crash dump kernel will be run with a limited range of memory as System
-RAM.
+Yup. You can even loose the low 8 bits, as this is guaranteed to be 256
+byte aligned. So for a 48bit IPA and 32bit of EventID, you end up only
+using 45 bits, which leaves quite a few to spare, should we ever want a
+larger IPA. Ideally, this should contain the relevant fields of the MAPD
+command, with similar sizes.
 
-On arm64, we will use a device-tree property under /chosen,
-   linux,usable-memory = <BASE SIZE>
-in order for primary kernel either on uefi or non-uefi (device tree only)
-system to hand over the information about usable memory region to crash
-dump kernel. This property will supercede entries in uefi memory map table
-and "memory" nodes in a device tree.
+Thanks,
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/mm/init.c | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 4edf181..82527da 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -215,8 +215,45 @@ static int __init early_mem(char *p)
- }
- early_param("mem", early_mem);
- 
-+static int __init early_init_dt_scan_usablemem(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	struct memblock_region *usablemem = (struct memblock_region *)data;
-+	const __be32 *reg;
-+	int len;
-+
-+	usablemem->size = 0;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
-+static void __init fdt_enforce_memory_region(void)
-+{
-+	struct memblock_region reg;
-+
-+	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
-+
-+	if (reg.size) {
-+		memblock_remove(0, PAGE_ALIGN(reg.base));
-+		memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
-+				ULLONG_MAX);
-+	}
-+}
-+
- void __init arm64_memblock_init(void)
- {
-+	fdt_enforce_memory_region();
-+
- 	memblock_enforce_memory_limit(memory_limit);
- 
- 	/*
+	M.
 -- 
-2.5.0
+Jazz is not dead. It just smells funny...
