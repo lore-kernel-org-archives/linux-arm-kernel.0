@@ -1,49 +1,29 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 14 Mar 2016 11:33:25 +0100
-Subject: [PATCH] media: add GFP flag to media_*() that could get called in
- atomic context
-In-Reply-To: <20160314071358.27c87dab@recife.lan>
-References: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
- <20160314072236.GO11084@valkosipuli.retiisi.org.uk>
- <20160314071358.27c87dab@recife.lan>
-Message-ID: <s5hmvq14adm.wl-tiwai@suse.de>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Mon, 14 Mar 2016 18:41:46 +0800
+Subject: [PATCH] media: v4l2-compat-ioctl32: fix missing reserved field copy
+ in put_v4l2_create32
+Message-ID: <1457952106-38215-1-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Mar 2016 11:13:58 +0100,
-Mauro Carvalho Chehab wrote:
-> 
-> Em Mon, 14 Mar 2016 09:22:37 +0200
-> Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-> 
-> > Hi Shuah,
-> > 
-> > On Sat, Mar 12, 2016 at 06:48:09PM -0700, Shuah Khan wrote:
-> > > Add GFP flags to media_create_pad_link(), media_create_intf_link(),
-> > > media_devnode_create(), and media_add_link() that could get called
-> > > in atomic context to allow callers to pass in the right flags for
-> > > memory allocation.
-> > > 
-> > > tree-wide driver changes for media_*() GFP flags change:
-> > > Change drivers to add gfpflags to interffaces, media_create_pad_link(),
-> > > media_create_intf_link() and media_devnode_create().
-> > > 
-> > > Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> > > Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>  
-> > 
-> > What's the use case for calling the above functions in an atomic context?
-> > 
-> 
-> ALSA code seems to do a lot of stuff at atomic context. That's what
-> happens on my test machine when au0828 gets probed before
-> snd-usb-audio:
-> 	http://pastebin.com/LEX5LD5K
-> 
-> It seems that ALSA USB probe routine (usb_audio_probe) happens in
-> atomic context.
+Change-Id: Idac449fae5059a3ce255340e6da491f8bd83af7a
+---
+ drivers/media/v4l2-core/v4l2-compat-ioctl32.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-No, usb_audio_probe() doesn't take a lock.  But
-media_device_register_entity() seems taking a spinlock, instead.
-
-
-Takashi
+diff --git a/drivers/media/v4l2-core/v4l2-compat-ioctl32.c b/drivers/media/v4l2-core/v4l2-compat-ioctl32.c
+index f38c076..109f687 100644
+--- a/drivers/media/v4l2-core/v4l2-compat-ioctl32.c
++++ b/drivers/media/v4l2-core/v4l2-compat-ioctl32.c
+@@ -280,7 +280,8 @@ static int put_v4l2_format32(struct v4l2_format *kp, struct v4l2_format32 __user
+ static int put_v4l2_create32(struct v4l2_create_buffers *kp, struct v4l2_create_buffers32 __user *up)
+ {
+ 	if (!access_ok(VERIFY_WRITE, up, sizeof(struct v4l2_create_buffers32)) ||
+-	    copy_to_user(up, kp, offsetof(struct v4l2_create_buffers32, format)))
++	    copy_to_user(up, kp, offsetof(struct v4l2_create_buffers32, format)) ||
++	    copy_to_user(up->reserved, kp->reserved, sizeof(kp->reserved)))
+ 		return -EFAULT;
+ 	return __put_v4l2_format32(&kp->format, &up->format);
+ }
+-- 
+1.7.9.5
