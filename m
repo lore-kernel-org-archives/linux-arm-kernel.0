@@ -1,68 +1,117 @@
-From: majun258@huawei.com (MaJun)
-Date: Mon, 14 Mar 2016 14:45:06 +0800
-Subject: [PATCH v2 1/2] Irq/mbigen:Change the mbigen node definition in dt
- binding file
-In-Reply-To: <1457937907-14008-1-git-send-email-majun258@huawei.com>
-References: <1457937907-14008-1-git-send-email-majun258@huawei.com>
-Message-ID: <1457937907-14008-2-git-send-email-majun258@huawei.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 14 Mar 2016 15:49:26 +0900
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56E2FB5C.1040602@suse.cz>
+References: <56D92595.60709@huawei.com>
+ <20160304063807.GA13317@js1304-P5Q-DELUXE>
+ <56D93ABE.9070406@huawei.com>
+ <20160307043442.GB24602@js1304-P5Q-DELUXE>
+ <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
+ <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz>
+Message-ID: <20160314064925.GA27587@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
+> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
+> > 2016-03-09 10:23 GMT+09:00 Leizhen (ThunderTown) <thunder.leizhen@huawei.com>:
+> >>
+> >> Hi, Joonsoo:
+> >>         This new patch worked well. Do you plan to upstream it in the near furture?
+> > 
+> > Of course!
+> > But, I should think more because it touches allocator's fastpatch and
+> > I'd like to detour.
+> > If I fail to think a better solution, I will send it as is, soon.
+> 
+> How about something like this? Just and idea, probably buggy (off-by-one etc.).
+> Should keep away cost from <pageblock_order iterations@the expense of the
+> relatively fewer >pageblock_order iterations.
 
-For mbigen module, there is a special case that more than one mbigen
-device nodes use the same reg definition in DTS when these devices
-exist in the same mbigen hardware module.
+Hmm... I tested this and found that it's code size is a little bit
+larger than mine. I'm not sure why this happens exactly but I guess it would be
+related to compiler optimization. In this case, I'm in favor of my
+implementation because it looks like well abstraction. It adds one
+unlikely branch to the merge loop but compiler would optimize it to
+check it once.
 
-To fix the mbigen IO remap problem, the mbigen node definition and
-structure are changed based on Mark Rutland's suggestion.
+Thanks.
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- .../interrupt-controller/hisilicon,mbigen-v2.txt   |   22 +++++++++++++++----
- 1 files changed, 17 insertions(+), 5 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-index 720f7c9..3b2f4c4 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-@@ -21,6 +21,8 @@ Mbigen main node required properties:
- - reg: Specifies the base physical address and size of the Mbigen
-   registers.
- 
-+Mbigen sub node required properties:
-+------------------------------------------
- - interrupt controller: Identifies the node as an interrupt controller
- 
- - msi-parent: Specifies the MSI controller this mbigen use.
-@@ -45,13 +47,23 @@ Mbigen main node required properties:
- 
- Examples:
- 
--	mbigen_device_gmac:intc {
-+	mbigen_chip_dsa {
- 			compatible = "hisilicon,mbigen-v2";
- 			reg = <0x0 0xc0080000 0x0 0x10000>;
--			interrupt-controller;
--			msi-parent = <&its_dsa 0x40b1c>;
--			num-pins = <9>;
--			#interrupt-cells = <2>;
-+
-+			mbigen_gmac:intc_gmac {
-+				interrupt-controller;
-+				msi-parent = <&its_dsa 0x40b1c>;
-+				num-pins = <9>;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			mbigen_i2c:intc_i2c {
-+				interrupt-controller;
-+				msi-parent = <&its_dsa 0x40b0e>;
-+				num-pins = <2>;
-+				#interrupt-cells = <2>;
-+			};
- 	};
- 
- Devices connect to mbigen required properties:
--- 
-1.7.1
+> 
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index ff1e3cbc8956..b8005a07b2a1 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -685,21 +685,13 @@ static inline void __free_one_page(struct page *page,
+>  	unsigned long combined_idx;
+>  	unsigned long uninitialized_var(buddy_idx);
+>  	struct page *buddy;
+> -	unsigned int max_order = MAX_ORDER;
+> +	unsigned int max_order = pageblock_order + 1;
+>  
+>  	VM_BUG_ON(!zone_is_initialized(zone));
+>  	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
+>  
+>  	VM_BUG_ON(migratetype == -1);
+> -	if (is_migrate_isolate(migratetype)) {
+> -		/*
+> -		 * We restrict max order of merging to prevent merge
+> -		 * between freepages on isolate pageblock and normal
+> -		 * pageblock. Without this, pageblock isolation
+> -		 * could cause incorrect freepage accounting.
+> -		 */
+> -		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
+> -	} else {
+> +	if (likely(!is_migrate_isolate(migratetype))) {
+>  		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+>  	}
+>  
+> @@ -708,11 +700,12 @@ static inline void __free_one_page(struct page *page,
+>  	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
+>  	VM_BUG_ON_PAGE(bad_range(zone, page), page);
+>  
+> +continue_merging:
+>  	while (order < max_order - 1) {
+>  		buddy_idx = __find_buddy_index(page_idx, order);
+>  		buddy = page + (buddy_idx - page_idx);
+>  		if (!page_is_buddy(page, buddy, order))
+> -			break;
+> +			goto done_merging;
+>  		/*
+>  		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
+>  		 * merge with it and move up one order.
+> @@ -729,6 +722,26 @@ static inline void __free_one_page(struct page *page,
+>  		page_idx = combined_idx;
+>  		order++;
+>  	}
+> +	if (max_order < MAX_ORDER) {
+> +		if (IS_ENABLED(CONFIG_CMA) &&
+> +				unlikely(has_isolate_pageblock(zone))) {
+> +
+> +			int buddy_mt;
+> +
+> +			buddy_idx = __find_buddy_index(page_idx, order);
+> +			buddy = page + (buddy_idx - page_idx);
+> +			buddy_mt = get_pageblock_migratetype(buddy);
+> +
+> +			if (migratetype != buddy_mt &&
+> +					(is_migrate_isolate(migratetype) ||
+> +					is_migrate_isolate(buddy_mt)))
+> +				goto done_merging;
+> +		}
+> +		max_order++;
+> +		goto continue_merging;
+> +	}
+> +
+> +done_merging:
+>  	set_page_order(page, order);
+>  
+>  	/*
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
