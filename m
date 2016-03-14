@@ -1,91 +1,52 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Mar 2016 17:15:21 +0900
-Subject: [PATCH 06/10] ARM: dts: Add MSHC0 dt node for eMMC device for
- exynos3250-artik5 module
-In-Reply-To: <56E660D2.9090706@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-7-git-send-email-cw00.choi@samsung.com>
- <56E660D2.9090706@samsung.com>
-Message-ID: <56E67319.1050502@samsung.com>
+From: lars.persson@axis.com (Lars Persson)
+Date: Mon, 14 Mar 2016 09:19:45 +0100
+Subject: [PATCH] ARM: dts: artpec: update clock bindings in artpec6.dtsi
+In-Reply-To: <20160313001441.GD17502@localhost>
+References: <1456392854-13527-1-git-send-email-larper@axis.com>
+ <20160313001441.GD17502@localhost>
+Message-ID: <56E67421.4030405@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 14? 15:57, Krzysztof Kozlowski wrote:
-> On 14.03.2016 11:04, Chanwoo Choi wrote:
->> From: Jaehoon Chung <jh80.chung@samsung.com>
+
+
+On 03/13/2016 01:14 AM, Olof Johansson wrote:
+> On Thu, Feb 25, 2016 at 10:34:14AM +0100, Lars Persson wrote:
+>> The clock bindings for the main clock controller was changed to an
+>> indexed controller style binding on request of the clk
+>> maintainers. This updates the dtsi to use the new bindings.
 >>
->> This patch adds MSHC (Mobile Storage Host Controller) dt node for Exynos3250
->> SoC. MSHC is an interface between the system and the eMMC device.
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Lars Persson <larper@axis.com>
 >> ---
->>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> index 97d0087efb9f..75b291c10cdc 100644
->> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> @@ -277,6 +277,25 @@
->>  	};
->>  };
->>  
->> +&mshc_0 {
->> +	num-slots = <1>;
->> +	broken-cd;
->> +	non-removable;
-> 
-> Broken or non-removable, not both.
+>> Note: This patch depends on a header file delivered through the clk tree in
+>> "clk: add device tree binding for Artpec-6 clock controller".
+>
+> This is a bit painful for us. It works when we get contents sent as pull
+> requests, since then we can share a branch with the clk header file on it.
+>
+> However, when we apply patches that's harder.
+>
+> I suggest we merge this after both trees have been picked up instead. Please
+> resend after that if we for some reason forget.
+>
+>
+> The alternative is to just use the numerical constants now, and switch to the
+> symbols after the merge window (or in the next release). I'm getting tempted to
+> propose that solution for more and more of these in the future, since it's a
+> somewhat annoying dependency to have (and we often have them).
+>
+> Either way, we're close to the merge window opening, so let's aim to do this
+> patch towards the end. Since it's a new platform, risk for regression doesn't
+> exist, etc.
+>
+>
+> -Olof
+>
 
-I'll remove the 'broken-cd' property.
+Hi
 
-> 
->> +	cap-mmc-highspeed;
->> +	desc-num = <4>;
->> +	card-detect-delay = <200>;
->> +	vmmc-supply = <&ldo11_reg>;
-> 
-> Isn't this vqmmc-supply?
+So let's be flexible :) We will submit a new patch with numerical clock 
+indexes today.
 
-I'll fix it as following by using ldo12_reg:
-	vmmc-supply = <&ldo12_reg>;
 
-> 
-> BTW, both MMC0 regulators (ldo11, ldo12) are marked as always-on. Why
-> they cannot be controlled by XMMC0CDN (just like on Rinato)?
-
-I'll fix it like rinato board to handle the ldo11/ldo12 as following:
-gpk0-2 is XMMC0CDN pin.
-
-                       ldo11_reg: LDO11 {
--                               /* VDD_MMC */
-+                               /* VDD74 ~ VDD75 */
-                                regulator-name = "VLDO11_1.8V";
-                                regulator-min-microvolt = <1800000>;
-                                regulator-max-microvolt = <1800000>;
--                               regulator-always-on;
-+                               samsung,ext-control-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
-                        };
-
-                        ldo12_reg: LDO12 {
-@@ -177,7 +178,7 @@
-                                regulator-name = "VLDO12_2.8V";
-                                regulator-min-microvolt = <2800000>;
-                                regulator-max-microvolt = <2800000>;
--                               regulator-always-on;
-+                               samsung,ext-control-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
-                        };
-
-> 
-> What is the benefit of making this patch separate from "Add
-> exynos3250-artik5 dtsi file for ARTIK5 module"? Does the board boot
-> properly without this patch?
-
-OK. I'll merge it with 5/10 patch.
-
-Best Regards,
-Chanwoo Choi
-
-[snip]
+- Lars
