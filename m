@@ -1,36 +1,39 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Mon, 14 Mar 2016 08:47:16 +0100
-Subject: [PATCH 18/22] ncr5380: Remove DONT_USE_INTR and AUTOPROBE_IRQ
- macros
-In-Reply-To: <20160314042705.346693900@telegraphics.com.au>
-References: <20160314042700.596192247@telegraphics.com.au>
- <20160314042705.346693900@telegraphics.com.au>
-Message-ID: <56E66C84.5050406@suse.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 14 Mar 2016 08:49:50 +0100 (CET)
+Subject: [PATCH v2 1/2] Irq/mbigen:Change the mbigen node definition in
+ dt binding file
+In-Reply-To: <1457937907-14008-2-git-send-email-majun258@huawei.com>
+References: <1457937907-14008-1-git-send-email-majun258@huawei.com>
+ <1457937907-14008-2-git-send-email-majun258@huawei.com>
+Message-ID: <alpine.DEB.2.11.1603140844490.3657@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2016 05:27 AM, Finn Thain wrote:
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
-> 
-> ---
->  drivers/scsi/NCR5380.c   |   12 +-----------
->  drivers/scsi/NCR5380.h   |    4 ----
->  drivers/scsi/arm/oak.c   |    2 --
->  drivers/scsi/dmx3191d.c  |    2 --
->  drivers/scsi/dtc.c       |   12 +++---------
->  drivers/scsi/g_NCR5380.c |    2 --
->  drivers/scsi/pas16.c     |    1 -
->  drivers/scsi/t128.c      |    1 -
->  8 files changed, 4 insertions(+), 32 deletions(-)
-> 
-Reviewed-by: Hannes Reinecke <hare@suse.com>
+Majun,
 
-Cheers,
+On Mon, 14 Mar 2016, MaJun wrote:
 
-Hannes
--- 
-Dr. Hannes Reinecke		   Teamlead Storage & Networking
-hare at suse.de			               +49 911 74053 688
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: F. Imend?rffer, J. Smithard, J. Guild, D. Upmanyu, G. Norton
-HRB 21284 (AG N?rnberg)
+First of all the prefix for irq chip drivers is not "Irq/".
+
+Hint: git log drivers/irqchip 
+
+> From: Ma Jun <majun258@huawei.com>
+> 
+> For mbigen module, there is a special case that more than one mbigen
+> device nodes use the same reg definition in DTS when these devices
+> exist in the same mbigen hardware module.
+
+There is a special case, so what?
+ 
+> To fix the mbigen IO remap problem, the mbigen node definition and
+
+Which problem?
+
+> structure are changed based on Mark Rutland's suggestion.
+
+That's really uselss. Nobody has any idea what Mark suggested and in which way
+it fixes that unspecified problem you are talking about.
+
+Thanks,
+
+	tglx
