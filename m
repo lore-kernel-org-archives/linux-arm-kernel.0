@@ -1,32 +1,30 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 14 Mar 2016 09:34:55 +0530
-Subject: [PATCH v11 4/9] arm64: add conditional instruction simulation
- support
-In-Reply-To: <20160313120903.54b0c8f2@arm.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-5-git-send-email-dave.long@linaro.org>
- <20160313120903.54b0c8f2@arm.com>
-Message-ID: <20160314040455.GB6584@dhcppc6.redhat.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 14 Mar 2016 13:08:16 +0900
+Subject: [PATCH] kbuild: drop FORCE from PHONY targets
+In-Reply-To: <CALCETrVqzidL7SXsCVm8wWrcQMR9dFOLGnDtC-eEYMO4a+yszA@mail.gmail.com>
+References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
+ <CALCETrVqzidL7SXsCVm8wWrcQMR9dFOLGnDtC-eEYMO4a+yszA@mail.gmail.com>
+Message-ID: <CAK7LNARELkQbhAfBdh9Tx7gVGkpN9gTJzoqJwOF-0CH4zm+wcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/2016:12:09:03 PM, Marc Zyngier wrote:
-> On Wed,  9 Mar 2016 00:32:18 -0500
-> David Long <dave.long@linaro.org> wrote:
-> 
-> > +pstate_check_t * const opcode_condition_checks[16] = {
-> > +	__check_eq, __check_ne, __check_cs, __check_cc,
-> > +	__check_mi, __check_pl, __check_vs, __check_vc,
-> > +	__check_hi, __check_ls, __check_ge, __check_lt,
-> > +	__check_gt, __check_le, __check_al, __check_al
-> 
-> The very last entry seems wrong, or is at least the opposite of what
-> the current code has. It should be something called __check_nv(), and
-> always return false (condition code NEVER).
+Hi Andy
 
-May be __check_nv() name is more appropriate as per definition, but shouldn't it
-still return true, because TRM says:
-"The condition code NV exists only to provide a valid disassembly of the 0b1111
-encoding, otherwise its behavior is identical to AL"
+2016-03-14 9:39 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
+> On Mar 12, 2016 4:14 PM, "Masahiro Yamada"
+> <yamada.masahiro@socionext.com> wrote:
+>>
+>> These targets are marked as PHONY.  No need to add FORCE to their
+>> dependency.
+>
+> If this is, in fact, correct, can you update
+> Documentation/kbuild/makefiles.txt as well?
 
-~Pratyush
+Which line do you want me to update?
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
