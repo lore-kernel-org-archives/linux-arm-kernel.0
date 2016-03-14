@@ -1,26 +1,62 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 14 Mar 2016 17:54:36 -0500
-Subject: [PATCH v2 0/5] davinci_mmc fixes
-In-Reply-To: <56E6BF7E.7020401@ti.com>
+Date: Mon, 14 Mar 2016 17:54:39 -0500
+Subject: [PATCH v2 3/5] mmc: davinci: prepare clock
+In-Reply-To: <1457996081-21975-1-git-send-email-david@lechnology.com>
 References: <56E6BF7E.7020401@ti.com>
-Message-ID: <1457996081-21975-1-git-send-email-david@lechnology.com>
+ <1457996081-21975-1-git-send-email-david@lechnology.com>
+Message-ID: <1457996081-21975-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've updated the patche set based on feedback. This is tested on linux-next with
-LEGO MINDSTORMS EV3 (da850), both with and without device tree enabled.
+When trying to use this driver with the common clock framework, enabling
+the clock fails because it was not prepared. This fixes the problem by
+calling clk_prepare and clk_enable in a single function. Ditto for
+clk_disable_unprepare.
 
-David Lechner (5):
-  mmc: davinci: remove matching string
-  mmc: davinci: fix unwinding in probe
-  mmc: davinci: prepare clock
-  mmc: davinci: don't use dma platform resources
-  arm: davinci: remove mmc dma resources
+Signed-off-by: David Lechner <david@lechnology.com>
+---
 
- arch/arm/mach-davinci/devices-da8xx.c |  20 ------
- arch/arm/mach-davinci/devices.c       |  16 -----
- drivers/mmc/host/davinci_mmc.c        | 112 +++++++++++-----------------------
- 3 files changed, 37 insertions(+), 111 deletions(-)
+v2 changes: use clk_disable_unprepare where applicable. 
 
+
+ drivers/mmc/host/davinci_mmc.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+index 6dd9562..8d10a92 100644
+--- a/drivers/mmc/host/davinci_mmc.c
++++ b/drivers/mmc/host/davinci_mmc.c
+@@ -1273,9 +1273,9 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(host->clk);
+ 		goto clk_get_fail;
+ 	}
+-	ret = clk_enable(host->clk);
++	ret = clk_prepare_enable(host->clk);
+ 	if (ret)
+-		goto clk_enable_fail;
++		goto clk_prepare_enable_fail;
+ 
+ 	host->mmc_input_clk = clk_get_rate(host->clk);
+ 
+@@ -1375,8 +1375,8 @@ mmc_add_host_fail:
+ 	mmc_davinci_cpufreq_deregister(host);
+ cpu_freq_fail:
+ 	davinci_release_dma_channels(host);
+-	clk_disable(host->clk);
+-clk_enable_fail:
++	clk_disable_unprepare(host->clk);
++clk_prepare_enable_fail:
+ clk_get_fail:
+ ioremap_fail:
+ 	mmc_free_host(mmc);
+@@ -1391,7 +1391,7 @@ static int __exit davinci_mmcsd_remove(struct platform_device *pdev)
+ 	mmc_remove_host(host->mmc);
+ 	mmc_davinci_cpufreq_deregister(host);
+ 	davinci_release_dma_channels(host);
+-	clk_disable(host->clk);
++	clk_disable_unprepare(host->clk);
+ 	mmc_free_host(host->mmc);
+ 
+ 	return 0;
 -- 
 1.9.1
