@@ -1,45 +1,24 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Mar 2016 17:06:02 +0000
-Subject: [RFC PATCH 04/12] kvm-arm: Rename kvm_pmd_huge to huge_pmd
-In-Reply-To: <1457974391-28456-5-git-send-email-suzuki.poulose@arm.com>
-References: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
- <1457974391-28456-5-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160314170602.GD5920@leverpostej>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 14 Mar 2016 13:06:33 -0400 (EDT)
+Subject: [PATCH 1/3] net: mediatek: use dma_addr_t correctly
+In-Reply-To: <1457964435-2945038-1-git-send-email-arnd@arndb.de>
+References: <1457964435-2945038-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160314.130633.1932883457156537338.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2016 at 04:53:03PM +0000, Suzuki K Poulose wrote:
-> kvm_pmd_huge doesn't have any dependency on the page table
-> where the pmd lives (i.e, hyp vs. stage2). So, rename it to
-> huge_pmd() to make it explicit.
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 14 Mar 2016 15:07:10 +0100
+
+> dma_alloc_coherent() expects a dma_addr_t pointer as its argument,
+> not an 'unsigned int', and gcc correctly warns about broken
+> code in the mtk_init_fq_dma function:
 > 
-> kvm_p.d_* wrappers will be used for helpers which differ
-> across hyp vs stage2.
+> drivers/net/ethernet/mediatek/mtk_eth_soc.c: In function 'mtk_init_fq_dma':
+> drivers/net/ethernet/mediatek/mtk_eth_soc.c:463:13: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
 > 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm/kvm/mmu.c |   18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
+> This changes the type of the local variable to dma_addr_t.
 > 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index a16631c..3b038bb 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -44,7 +44,7 @@ static phys_addr_t hyp_idmap_vector;
->  
->  #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
->  
-> -#define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
-> +#define huge_pmd(_x)		(pmd_huge(_x) || pmd_trans_huge(_x))
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I note that in arch/arm we have pmd_thp_or_huge() for this in
-arch/arm/include/asm/pgtable-{2,3}level.h.
-
-If we're going to rename this, it's probably best to align on that name,
-which will also avoid and confusion as to the difference between
-pmd_huge and huge_pmd.
-
-Similarly, it might best live in pgtable.h if it isn't KVM-specific.
-
-Thanks,
-Mark.
+Applied.
