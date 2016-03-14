@@ -1,69 +1,188 @@
-From: scott.wood@nxp.com (Scott Wood)
-Date: Mon, 14 Mar 2016 17:45:43 +0000
-Subject: [v6, 5/5] mmc: sdhci-of-esdhc: fix host version for
- T4240-R1.0-R2.0
-References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
- <1457518131-11339-6-git-send-email-yangbo.lu@nxp.com>
- <4947024.WeMycs2fID@wuerfel>
- <HE1PR04MB0889CE4742B92461A925B9C4F8880@HE1PR04MB0889.eurprd04.prod.outlook.com>
-Message-ID: <DB5PR0401MB19286B2D23D07F5C60DB799D91880@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 14 Mar 2016 17:48:00 +0000
+Subject: [PATCH v15 03/20] arm64: Convert hcalls to use HVC immediate value
+In-Reply-To: <cover.1457977401.git.geoff@infradead.org>
+References: <cover.1457977401.git.geoff@infradead.org>
+Message-ID: <c23696b455e99b5b111ae559c7998f3c56a664df.1457977402.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2016 02:29 AM, Yangbo Lu wrote:
->> -----Original Message-----
->> From: Arnd Bergmann [mailto:arnd at arndb.de]
->> Sent: Monday, March 14, 2016 6:26 AM
->> To: linuxppc-dev at lists.ozlabs.org
->> Cc: Yangbo Lu; devicetree at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
->> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
->> foundation.org; netdev at vger.kernel.org; linux-mmc at vger.kernel.org;
->> ulf.hansson at linaro.org; Zhao Qiang; Russell King; Bhupesh Sharma; Joerg
->> Roedel; Santosh Shilimkar; Scott Wood; Rob Herring; Claudiu Manoil; Kumar
->> Gala; Yang-Leo Li; Xiaobo Xie
->> Subject: Re: [v6, 5/5] mmc: sdhci-of-esdhc: fix host version for T4240-
->> R1.0-R2.0
->>
->> On Wednesday 09 March 2016 18:08:51 Yangbo Lu wrote:
->>> @@ -567,10 +580,20 @@ static void esdhc_init(struct platform_device
->> *pdev, struct sdhci_host *host)
->>>         struct sdhci_pltfm_host *pltfm_host;
->>>         struct sdhci_esdhc *esdhc;
->>>         u16 host_ver;
->>> +       u32 svr;
->>>
->>>         pltfm_host = sdhci_priv(host);
->>>         esdhc = sdhci_pltfm_priv(pltfm_host);
->>>
->>> +       fsl_guts_init();
->>> +       svr = fsl_guts_get_svr();
->>> +       if (svr) {
->>> +               esdhc->soc_ver = SVR_SOC_VER(svr);
->>> +               esdhc->soc_rev = SVR_REV(svr);
->>> +       } else {
->>> +               dev_err(&pdev->dev, "Failed to get SVR value!\n");
->>> +       }
->>> +
->>
->> This makes the driver non-portable. Better identify the specific
->> workarounds based on the compatible string for this device, or add a
->> boolean DT property for the quirk.
->>
->> 	Arnd
-> 
-> [Lu Yangbo-B47093] Hi Arnd, we did have a discussion about using DTS in v1 before.
-> https://patchwork.kernel.org/patch/6834221/
-> 
-> We don?t have a separate DTS file for each revision of an SOC and if we did, we'd constantly have people using the wrong one.
-> In addition, the device tree is stable ABI and errata are often discovered after device tree are deployed.
-> See the link for details.
-> 
-> So we decide to read SVR from the device-config/guts MMIO block other than using DTS.
-> Thanks.
+The existing arm64 hcall implementations are limited in that they only
+allow for two distinct hcalls; with the x0 register either zero or not
+zero.  Also, the API of the hyp-stub exception vector routines and the
+KVM exception vector routines differ; hyp-stub uses a non-zero value in
+x0 to implement __hyp_set_vectors, whereas KVM uses it to implement
+kvm_call_hyp.
 
-Also note that this driver is already only for fsl-specific hardware,
-and it will still work even if fsl_guts doesn't find anything to bind to
--- it just wouldn't be able to detect errata based on SVR in that case.
+To allow for additional hcalls to be defined and to make the arm64 hcall
+API more consistent across exception vector routines, change the hcall
+implementations to use the 16 bit immediate value of the HVC instruction
+to specify the hcall type.
 
--Scott
+Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
+HVC_SET_VECTORS to be used as hcall type specifiers and convert the
+existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp()
+routines to use these new macros when executing an HVC call.  Also,
+change the corresponding hyp-stub and KVM el1_sync exception vector
+routines to use these new macros.
+
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/include/asm/virt.h  | 27 +++++++++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S   | 32 +++++++++++++++++++++-----------
+ arch/arm64/kvm/hyp.S           |  3 ++-
+ arch/arm64/kvm/hyp/hyp-entry.S |  9 ++++++---
+ 4 files changed, 56 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 7a5df52..eb10368 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -18,6 +18,33 @@
+ #ifndef __ASM__VIRT_H
+ #define __ASM__VIRT_H
+ 
++/*
++ * The arm64 hcall implementation uses the ISS field of the ESR_EL2 register to
++ * specify the hcall type.  The exception handlers are allowed to use registers
++ * x17 and x18 in their implementation.  Any routine issuing an hcall must not
++ * expect these registers to be preserved.
++ */
++
++/*
++ * HVC_CALL_HYP - Execute a hyp routine.
++ */
++
++#define HVC_CALL_HYP 0
++
++/*
++ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
++ */
++
++#define HVC_GET_VECTORS 1
++
++/*
++ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
++ *
++ * @x0: Physical address of the new vector table.
++ */
++
++#define HVC_SET_VECTORS 2
++
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
+ 
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index a272f33..017ab519 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -22,6 +22,7 @@
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/kvm_arm.h>
+ #include <asm/ptrace.h>
+ #include <asm/virt.h>
+ 
+@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
+ 	.align 11
+ 
+ el1_sync:
+-	mrs	x1, esr_el2
+-	lsr	x1, x1, #26
+-	cmp	x1, #0x16
++	mrs	x18, esr_el2
++	lsr	x17, x18, #ESR_ELx_EC_SHIFT
++	and	x18, x18, #ESR_ELx_ISS_MASK
++
++	cmp	x17, #ESR_ELx_EC_HVC64
+ 	b.ne	2f				// Not an HVC trap
+-	cbz	x0, 1f
+-	msr	vbar_el2, x0			// Set vbar_el2
++
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
++	mrs	x0, vbar_el2
+ 	b	2f
+-1:	mrs	x0, vbar_el2			// Return vbar_el2
++
++1:	cmp	x18, #HVC_SET_VECTORS
++	b.ne	2f
++	msr	vbar_el2, x0
++
+ 2:	eret
+ ENDPROC(el1_sync)
+ 
+@@ -100,11 +109,12 @@ ENDPROC(\label)
+  * initialisation entry point.
+  */
+ 
+-ENTRY(__hyp_get_vectors)
+-	mov	x0, xzr
+-	// fall through
+ ENTRY(__hyp_set_vectors)
+-	hvc	#0
++	hvc	#HVC_SET_VECTORS
+ 	ret
+-ENDPROC(__hyp_get_vectors)
+ ENDPROC(__hyp_set_vectors)
++
++ENTRY(__hyp_get_vectors)
++	hvc	#HVC_GET_VECTORS
++	ret
++ENDPROC(__hyp_get_vectors)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 0ccdcbb..a598f9e 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -18,6 +18,7 @@
+ #include <linux/linkage.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/virt.h>
+ 
+ /*
+  * u64 kvm_call_hyp(void *hypfn, ...);
+@@ -38,6 +39,6 @@
+  * arch/arm64/kernel/hyp_stub.S.
+  */
+ ENTRY(kvm_call_hyp)
+-	hvc	#0
++	hvc	#HVC_CALL_HYP
+ 	ret
+ ENDPROC(kvm_call_hyp)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 93e8d983..a1edf77 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -43,6 +43,7 @@ el1_sync:				// Guest trapped into EL2
+ 
+ 	mrs	x1, esr_el2
+ 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
++	and	x0, x1, #ESR_ELx_ISS_MASK
+ 
+ 	cmp	x2, #ESR_ELx_EC_HVC64
+ 	b.ne	el1_trap
+@@ -51,14 +52,16 @@ el1_sync:				// Guest trapped into EL2
+ 	cbnz	x3, el1_trap		// called HVC
+ 
+ 	/* Here, we're pretty sure the host called HVC. */
++	mov	x18, x0
+ 	restore_x0_to_x3
+ 
+-	/* Check for __hyp_get_vectors */
+-	cbnz	x0, 1f
++	cmp	x18, #HVC_GET_VECTORS
++	b.ne	1f
+ 	mrs	x0, vbar_el2
+ 	b	2f
+ 
+-1:	stp	lr, xzr, [sp, #-16]!
++1:     /* Default to HVC_CALL_HYP. */
++	push	lr, xzr
+ 
+ 	/*
+ 	 * Compute the function address in EL2, and shuffle the parameters.
+-- 
+2.5.0
