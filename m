@@ -1,24 +1,25 @@
 From: davem@davemloft.net (David Miller)
-Date: Mon, 14 Mar 2016 13:06:39 -0400 (EDT)
-Subject: [PATCH 2/3] net: mediatek: remove incorrect dma_mask assignment
-In-Reply-To: <1457964435-2945038-2-git-send-email-arnd@arndb.de>
+Date: Mon, 14 Mar 2016 13:06:45 -0400 (EDT)
+Subject: [PATCH 3/3] net: mediatek: check device_reset return code
+In-Reply-To: <1457964435-2945038-3-git-send-email-arnd@arndb.de>
 References: <1457964435-2945038-1-git-send-email-arnd@arndb.de>
- <1457964435-2945038-2-git-send-email-arnd@arndb.de>
-Message-ID: <20160314.130639.328854823799037233.davem@davemloft.net>
+ <1457964435-2945038-3-git-send-email-arnd@arndb.de>
+Message-ID: <20160314.130645.572195280477206552.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 14 Mar 2016 15:07:11 +0100
+Date: Mon, 14 Mar 2016 15:07:12 +0100
 
-> Device drivers should not mess with the DMA mask directly,
-> but instead call dma_set_mask() etc if needed.
+> The device_reset() function may fail, so we have to check
+> its return value, e.g. to make deferred probing work correctly.
+> gcc warns about it because of the warn_unused_result attribute:
 > 
-> In case of the mtk_eth_soc driver, the mask already gets set
-> correctly when the device is created, and setting it again
-> is against the documented API.
+> drivers/net/ethernet/mediatek/mtk_eth_soc.c: In function 'mtk_probe':
+> drivers/net/ethernet/mediatek/mtk_eth_soc.c:1679:2: error: ignoring return value of 'device_reset', declared with attribute warn_unused_result [-Werror=unused-result]
 > 
-> This removes the incorrect setting.
+> This adds the trivial error check to propagate the return value
+> to the generic platform device probe code.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
