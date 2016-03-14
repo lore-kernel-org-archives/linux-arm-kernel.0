@@ -1,37 +1,52 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Mon, 14 Mar 2016 13:21:05 +0100
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: enable CONFIG_REGULATOR_PWM=y
-In-Reply-To: <1457787100-9221-1-git-send-email-andy.yan@kernel-upstream.org>
-References: <1457787029-9168-1-git-send-email-andy.yan@kernel-upstream.org>
- <1457787100-9221-1-git-send-email-andy.yan@kernel-upstream.org>
-Message-ID: <20160314122104.GF22912@ulmo.nvidia.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 14 Mar 2016 20:22:42 +0800
+Subject: [PATCH] media: v4l2-compat-ioctl32: fix missing reserved field
+ copy in put_v4l2_create32
+In-Reply-To: <20160314082859.31340fb6@recife.lan>
+References: <1457952106-38215-1-git-send-email-tiffany.lin@mediatek.com>
+ <20160314082859.31340fb6@recife.lan>
+Message-ID: <1457958162.8737.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 12, 2016 at 08:51:40PM +0800, Andy Yan wrote:
-> Some platform like Rockchip rk3066 use pwm as a regulator to modulate
-> cpu voltage, so pwm regulator should be enabled at system boot time if
-> the system want to run with high frequency.
+On Mon, 2016-03-14 at 08:28 -0300, Mauro Carvalho Chehab wrote:
+> Em Mon, 14 Mar 2016 18:41:46 +0800
+> Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
 > 
-> Signed-off-by: Andy Yan <andy.yan@kernel-upstream.org>
-> ---
+> > Change-Id: Idac449fae5059a3ce255340e6da491f8bd83af7a
 > 
->  arch/arm/configs/multi_v7_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> We don't need change-id at the Kernel, but we do need a proper patch
+> description.
+> 
+Hi Mauro,
 
-This really belongs in patch 1/2. But then the same comments hold true
-and I think you'll need to come up with a proper fix that prevents the
-switch to a higher frequency if don't have the necessary regulator, or
-make the Kconfig symbol bool if all else fails.
+Sorry, I accidentally add change-id in this patch.
+I had remove change-id and add patch description in 
+[PATCH v2] media: v4l2-compat-ioctl32: fix missing reserved field copy
+in put_v4l2_create32
 
-If you make the Kconfig symbol bool I'd expect a really good explanation
-in the commit message as to why it can't be fixed properly.
+best regards,
+Tiffany
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160314/e687abb1/attachment.sig>
+
+> Regards,
+> Mauro
+> 
+> > ---
+> >  drivers/media/v4l2-core/v4l2-compat-ioctl32.c |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/media/v4l2-core/v4l2-compat-ioctl32.c b/drivers/media/v4l2-core/v4l2-compat-ioctl32.c
+> > index f38c076..109f687 100644
+> > --- a/drivers/media/v4l2-core/v4l2-compat-ioctl32.c
+> > +++ b/drivers/media/v4l2-core/v4l2-compat-ioctl32.c
+> > @@ -280,7 +280,8 @@ static int put_v4l2_format32(struct v4l2_format *kp, struct v4l2_format32 __user
+> >  static int put_v4l2_create32(struct v4l2_create_buffers *kp, struct v4l2_create_buffers32 __user *up)
+> >  {
+> >  	if (!access_ok(VERIFY_WRITE, up, sizeof(struct v4l2_create_buffers32)) ||
+> > -	    copy_to_user(up, kp, offsetof(struct v4l2_create_buffers32, format)))
+> > +	    copy_to_user(up, kp, offsetof(struct v4l2_create_buffers32, format)) ||
+> > +	    copy_to_user(up->reserved, kp->reserved, sizeof(kp->reserved)))
+> >  		return -EFAULT;
+> >  	return __put_v4l2_format32(&kp->format, &up->format);
+> >  }
