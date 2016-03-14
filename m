@@ -1,50 +1,32 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Mar 2016 16:22:30 +0900
-Subject: [PATCH 05/10] ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5
- module
-In-Reply-To: <56E660F1.3060407@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-6-git-send-email-cw00.choi@samsung.com>
- <56E65D5D.8060702@samsung.com> <56E660F1.3060407@samsung.com>
-Message-ID: <56E666B6.7060701@samsung.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 14 Mar 2016 09:22:37 +0200
+Subject: [PATCH] media: add GFP flag to media_*() that could get called
+ in atomic context
+In-Reply-To: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
+References: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
+Message-ID: <20160314072236.GO11084@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 14? 15:57, Chanwoo Choi wrote:
-> Hi Krzysztof,
+Hi Shuah,
+
+On Sat, Mar 12, 2016 at 06:48:09PM -0700, Shuah Khan wrote:
+> Add GFP flags to media_create_pad_link(), media_create_intf_link(),
+> media_devnode_create(), and media_add_link() that could get called
+> in atomic context to allow callers to pass in the right flags for
+> memory allocation.
 > 
-> On 2016? 03? 14? 15:42, Krzysztof Kozlowski wrote:
->> On 14.03.2016 11:04, Chanwoo Choi wrote:
->>> This patch adds the support for Device Tree source for Samsung ARTIK5 module[1]
->>> based on Exynos3250 SoC. The ARTIK5 module includes the follwoing devices:
->>> - Application Processor (Samsung Exynos3250)
->>> - WiFi/BT Combo chip (Broadcom4354)
->>> - PMIC (Samsung S2MPS14)
->>> - eMMC (4GB)
->>> - DRAM LPDDR3 (512MB)
->>> - Connectors pin (60 Pins x 3 set)
->>>
->>> Also, this patch adds the ARTIK5 development board[2] dts file which includes
->>> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
->>> ethernet port, uart port and so on.
->>>
->>> [1] https://www.artik.io/hardware/artik-5
->>> [2] http://www.digikey.com/product-search/en?FV=ffecca14
->>>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
->>> ---
->>>  arch/arm/boot/dts/Makefile                    |   1 +
->>>  arch/arm/boot/dts/exynos3250-artik5-devel.dts |  26 +++
->>>  arch/arm/boot/dts/exynos3250-artik5.dtsi      | 282 ++++++++++++++++++++++++++
->>
->> Plus changes in
->> Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt.
+> tree-wide driver changes for media_*() GFP flags change:
+> Change drivers to add gfpflags to interffaces, media_create_pad_link(),
+> media_create_intf_link() and media_devnode_create().
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-OK.
-Also, I'll change the board name from 'artik5-devel' to 'artik5-eval'.
+What's the use case for calling the above functions in an atomic context?
 
-[snip]
+-- 
+Regards,
 
-Best Regards,
-Chanwoo Choi
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
