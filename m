@@ -1,33 +1,47 @@
-From: Michael.Williams@arm.com (Michael Williams)
-Date: Mon, 14 Mar 2016 09:53:08 +0000
-Subject: [RESEND PATCH V4 4/4] coresight-stm: adding driver for CoreSight
- STM component
-In-Reply-To: <1457418835-31417-5-git-send-email-zhang.chunyan@linaro.org>
-References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
- <1457418835-31417-5-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <HE1PR08MB1130236EF28E34442F362F828A880@HE1PR08MB1130.eurprd08.prod.outlook.com>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Mon, 14 Mar 2016 10:57:14 +0100
+Subject: [PATCH v6 net-next 08/10] net: mvneta: bm: add support for
+ hardware buffer management
+In-Reply-To: <1457944745-7634-9-git-send-email-gregory.clement@free-electrons.com>
+References: <1457944745-7634-1-git-send-email-gregory.clement@free-electrons.com>
+ <1457944745-7634-9-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160314105714.1e97b4c1@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Michael Williams <michael.williams@arm.com>
 
-This resend addresses my earlier concerns.
+On Mon, 14 Mar 2016 09:39:03 +0100 Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> -----Original Message-----
-> From: Chunyan Zhang [mailto:zhang.chunyan at linaro.org]
-> Sent: 08 March 2016 06:34
-> To: mathieu.poirier at linaro.org; alexander.shishkin at linux.intel.com
-> Cc: Mike Leach; Michael Williams; Al Grant; tor at ti.com; nicolas.guion at st.com;
-> pratikp at codeaurora.org; zhang.lyra at gmail.com; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-api at vger.kernel.org; linux-doc at vger.kernel.org
-> Subject: [RESEND PATCH V4 4/4] coresight-stm: adding driver for CoreSight STM component
->
-> From: Pratik Patel <pratikp@codeaurora.org>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index b0ae69f84493..2847c0c291de 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+[...]
+> -static void *mvneta_frag_alloc(const struct mvneta_port *pp)
+> +void *mvneta_frag_alloc(unsigned int frag_size)
+>  {
+> -	if (likely(pp->frag_size <= PAGE_SIZE))
+> -		return netdev_alloc_frag(pp->frag_size);
+> +	if (likely(frag_size <= PAGE_SIZE))
+> +		return netdev_alloc_frag(frag_size);
 
-[snip]
+(I know you are modifying existing code here.)
 
-Mike.
---
-Michael Williams  Principal Engineer   ARM Limited
-www.arm.com The Architecture For The Digital World
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Be aware that there is a significant performance advantage of using
+napi_alloc_frag() over netdev_alloc_frag().  You obviously can only use
+the NAPI call, if you indeed are running in NAPI/BH context.
+
+>  	else
+> -		return kmalloc(pp->frag_size, GFP_ATOMIC);
+> +		return kmalloc(frag_size, GFP_ATOMIC);
+>  }
+> +EXPORT_SYMBOL_GPL(mvneta_frag_alloc);
+  
+
+
+-- 
+Best regards,
+  Jesper Dangaard Brouer
+  MSc.CS, Principal Kernel Engineer at Red Hat
+  Author of http://www.iptv-analyzer.org
+  LinkedIn: http://www.linkedin.com/in/brouer
