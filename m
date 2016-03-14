@@ -1,55 +1,182 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Mar 2016 17:48:32 +0900
-Subject: [PATCH 09/10] ARM: dts: Add MSHC2 dt node for SD card for
- exynos3250-artik5-devel board
-In-Reply-To: <56E676EE.8060500@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-11-git-send-email-cw00.choi@samsung.com>
- <56E676EE.8060500@samsung.com>
-Message-ID: <56E67AE0.9060306@samsung.com>
+From: lars.persson@axis.com (Lars Persson)
+Date: Mon, 14 Mar 2016 10:01:43 +0100
+Subject: [PATCH v2] ARM: dts: artpec: update clock bindings in artpec6.dtsi
+Message-ID: <1457946103-13853-1-git-send-email-larper@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 14? 17:31, Krzysztof Kozlowski wrote:
-> On 14.03.2016 11:04, Chanwoo Choi wrote:
->> From: Jaehoon Chung <jh80.chung@samsung.com>
->>
->> This patch adds MSHC (Mobile Storage Host Controller) dt node for
->> Exynos3250 SoC. MSHC is an interface between the system and the SD card
->>
->> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos3250-artik5-devel.dts | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250-artik5-devel.dts b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
->> index d17c28969118..a371baf8536d 100644
->> --- a/arch/arm/boot/dts/exynos3250-artik5-devel.dts
->> +++ b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
->> @@ -21,6 +21,22 @@
->>  			"samsung,exynos3250", "samsung,exynos3";
->>  };
->>  
->> +&mshc_2 {
->> +	num-slots = <1>;
->> +	cap-sd-highspeed;
->> +	disable-wp;
->> +	card-detect-delay = <200>;
->> +	clock-frequency = <100000000>;
->> +	clock-freq-min-max = <400000 100000000>;
->> +	samsung,dw-mshc-ciu-div = <1>;
->> +	samsung,dw-mshc-sdr-timing = <0 1>;
->> +	samsung,dw-mshc-ddr-timing = <1 2>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&sd2_cmd &sd2_clk &sd2_cd &sd2_bus1 &sd2_bus4>;
->> +	bus-width = <4>;
->> +	status = "okay";
-> 
-> vqmmc-supply = ldo3?
+The clock binding for the main clock controller was changed to an
+indexed controller style binding on request of the clk
+maintainers. This updates the dtsi to use the new bindings.
 
-ldo3 is always on state because ldo3 is used for various IP in exynos3250.
-I think that we had better to remain always on state for ldo3.
+Signed-off-by: Lars Persson <larper@axis.com>
+---
+v2: Use numerical clock indexes to enable merge before the clock driver bindings
+are in the tree.
 
-Best Regards,
-Chanwoo Choi
+ arch/arm/boot/dts/artpec6.dtsi | 99 +++++++++---------------------------------
+ 1 file changed, 20 insertions(+), 79 deletions(-)
+
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+index 3043016..3fac4c4 100644
+--- a/arch/arm/boot/dts/artpec6.dtsi
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -91,96 +91,32 @@
+ 		clock-frequency = <50000000>;
+ 	};
+ 
+-	/* PLL1 is used by CPU and some peripherals */
+-	pll1_clk: pll1_clk at f8000000 {
++	eth_phy_ref_clk: eth_phy_ref_clk {
+ 		#clock-cells = <0>;
+-		compatible = "axis,artpec6-pll1-clock";
+-		reg = <0xf8000000 4>;
+-		clocks = <&ext_clk>;
+-	};
+-
+-	cpu_clk: cpu_clk {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <1>;
+-		clock-mult = <1>;
+-		clocks = <&pll1_clk>;
+-		clock-output-names = "cpu_clk";
+-	};
+-
+-	cpu_clkdiv2: cpu_clkdiv2 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <2>;
+-		clock-mult = <1>;
+-		clocks = <&cpu_clk>;
+-	};
+-
+-	cpu_clkdiv4: cpu_clkdiv4 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <4>;
+-		clock-mult = <1>;
+-		clocks = <&cpu_clk>;
+-	};
+-
+-	apb_pclk: apb_pclk {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <8>;
+-		clock-mult = <1>;
+-		clocks = <&cpu_clk>;
+-		clock-output-names = "apb_pclk";
++		compatible = "fixed-clock";
++		clock-frequency = <125000000>;
+ 	};
+ 
+-	/* PLL2 is used by a number of peripherals, including UDL */
+-	pll2: pll2 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <1>;
+-		clock-mult = <24>;
++	clkctrl: clkctrl at 0xf8000000 {
++		#clock-cells = <1>;
++		compatible = "axis,artpec6-clkctrl";
++		reg = <0xf8000000 0x48>;
+ 		clocks = <&ext_clk>;
++		clock-names = "sys_refclk";
+ 	};
+ 
+-	/* PLL2DIV2 is used by the Fractional Clock Divider, for i2s */
+-	pll2div2: pll2div2 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <2>;
+-		clock-mult = <1>;
+-		clocks = <&pll2>;
+-	};
+-
+-	pll2div12: pll2div12 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <12>;
+-		clock-mult = <1>;
+-		clocks = <&pll2>;
+-	};
+-
+-	pll2div24: pll2div24 {
+-		#clock-cells = <0>;
+-		compatible = "fixed-factor-clock";
+-		clock-div = <24>;
+-		clock-mult = <1>;
+-		clocks = <&pll2>;
+-		clock-output-names = "uart_clk";
+-	};
+-
+-
+ 	gtimer at faf00200 {
+ 		compatible = "arm,cortex-a9-global-timer";
+ 		reg = <0xfaf00200 0x20>;
+ 		interrupts = <GIC_PPI 11 0xf01>;
+-		clocks = <&cpu_clkdiv2>;
++		clocks = <&clkctrl 1>;
+ 	};
+ 
+ 	timer at faf00600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0xfaf00600 0x20>;
+ 		interrupts = <GIC_PPI 13 0xf04>;
+-		clocks = <&cpu_clkdiv2>;
++		clocks = <&clkctrl 1>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -220,7 +156,8 @@
+ 
+ 		ethernet: ethernet at f8010000 {
+ 			clock-names = "phy_ref_clk", "apb_pclk";
+-			clocks = <&ext_clk>, <&apb_pclk>;
++			clocks = <&eth_phy_ref_clk>,
++				<&clkctrl 4>;
+ 			compatible = "snps,dwc-qos-ethernet-4.10";
+ 			interrupt-parent = <&intc>;
+ 			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+@@ -238,7 +175,8 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xf8036000 0x1000>;
+ 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&pll2div24>, <&apb_pclk>;
++			clocks = <&clkctrl 13>,
++				<&clkctrl 12>;
+ 			clock-names = "uart_clk", "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -246,7 +184,8 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xf8037000 0x1000>;
+ 			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&pll2div24>, <&apb_pclk>;
++			clocks = <&clkctrl 13>,
++				<&clkctrl 12>;
+ 			clock-names = "uart_clk", "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -254,7 +193,8 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xf8038000 0x1000>;
+ 			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&pll2div24>, <&apb_pclk>;
++			clocks = <&clkctrl 13>,
++				<&clkctrl 12>;
+ 			clock-names = "uart_clk", "apb_pclk";
+ 			status = "disabled";
+ 		};
+@@ -262,7 +202,8 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0xf8039000 0x1000>;
+ 			interrupts = <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&pll2div24>, <&apb_pclk>;
++			clocks = <&clkctrl 13>,
++				<&clkctrl 12>;
+ 			clock-names = "uart_clk", "apb_pclk";
+ 			status = "disabled";
+ 		};
+-- 
+2.1.4
