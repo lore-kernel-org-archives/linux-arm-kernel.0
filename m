@@ -1,44 +1,26 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 14 Mar 2016 17:29:44 +0000
-Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <56E69CCA.5070407@arm.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <56E00A7E.4080101@semihalf.com> <20160313181608.GA15988@cbox>
- <56E69CCA.5070407@arm.com>
-Message-ID: <CAFEAcA8r5LDbNG0XVnHnsoYcrfcpfnR3FQ_u=-L7Dop1HFVgxw@mail.gmail.com>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Mon, 14 Mar 2016 17:35:13 +0000
+Subject: Regression in next caused by 95026658c46e i2c: do not use
+ internal..
+In-Reply-To: <20160314160944.GG9329@atomide.com>
+References: <20160314160944.GG9329@atomide.com>
+Message-ID: <56E6F651.5070409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 March 2016 at 11:13, Andre Przywara <andre.przywara@arm.com> wrote:
-> So I see two ways to fix this:
-> 1.) we find a KVM specific way of letting userland save and restore the
-> ITS tables directly
-> 2.) we implement the BASER<n> registers, but still use our "cache" for
-> normal operations. On demand we would serialize KVM's virtual ITS data
-> structures and put them into the guest's memory, so they could be
-> saved/restored from there.
-
-I feel like we're rehashing a bunch of design choices we talked
-through way back in the last-but-one Connect. I don't suppose
-anybody wrote down our rationales from back then?
-
-(In particular I forget whether we decided the ITS tables were
-large enough to need to allow some sort of before-the-VM-stops
-migration of the data, which would be relatively doable with
-option 2 but painful under option 1.)
-
->> Only caveat there I think was that we had to decide on a storage format
->> in those memory regions, to allow QEMU to understand the state and to
->> ensure back/forwards compatibility between KVM versions.
+On Monday 14 March 2016 04:09 PM, Tony Lindgren wrote:
+> Hi Sudip & Wolfram,
 >
-> Do we need QEMU to actually understand this? Can't we just leave this
-> all to the kernel and QEMU just passes on the data? That would still
-> require some ABI stability between kernel versions in this respect, but
-> it's less problematic than exposing the data format to userland at all.
+> Looks like commit 95026658c46e ("i2c: do not use internal data from
+> driver core") in Linux next introduced a regression breaking booting
+> on most ARM boards according to kernelci.org [0].
+>
+> Having something like this happen just as the merge window opens is
+> not nice. You guys should already know.. The patches in next should
+> be sitting there for a few weeks before the merge window so issues
+> like this are found out early.
 
-This would preclude ever being able to migrate a VM from KVM to
-TCG QEMU, which seems a shame. (That doesn't work right now, but
-I'm a bit wary of shutting the door to it forever.)
+Yes, sorry about the mess.
 
-thanks
--- PMM
+regards
+sudip
