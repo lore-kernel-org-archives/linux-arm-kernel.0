@@ -1,142 +1,141 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Mon, 14 Mar 2016 12:43:46 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <56E28B5D.6000708@st.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <56DD7172.4000707@suse.de> <2714888.1DdqvJZ8cb@diego>
- <56DD7593.5060003@suse.de>
- <56DD8176.2080603@st.com> <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
- <56DDA26C.3050301@suse.de> <56DDA3D5.3090209@st.com>
- <56DDB749.1020808@suse.de>
- <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
- <56DE7E1D.5070508@st.com>
- <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
- <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
- <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
- <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
- <56DFF253.9050208@st.com> <56DFFA9E.7060602@st.com>
- <CAAObsKBUzBXcamEyup44N1bYUzGr_ZZTsYcD5x3PXb-2E00cGA@mail.gmail.com>
- <56E033C8.40506@st.com> <56E038CE.606@st.com>
- <CADhT+wcMpzA_Coj8Z5OQZsc3bF3a7yOmsbazQMPtcdUWkJSuCA@mail.gmail.com>
- <56E13AAB.2080900@st.com>
- <CADhT+wd=vcph2y_OxkGNO5EwHvN=kBy-BrfZHmNjZHww4LxmTg@mail.gmail.com>
- <56E28B5D.6000708@st.com>
-Message-ID: <CAAObsKB-tSCu5KMYk2Zi-oX9zMKEOwwT93sMkiZKiYvtexmHaQ@mail.gmail.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Mon, 14 Mar 2016 08:46:33 -0300
+Subject: [PATCH] media: add GFP flag to media_*() that could get called
+ in atomic context
+In-Reply-To: <20160314105253.GQ11084@valkosipuli.retiisi.org.uk>
+References: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
+ <20160314072236.GO11084@valkosipuli.retiisi.org.uk>
+ <20160314071358.27c87dab@recife.lan>
+ <20160314105253.GQ11084@valkosipuli.retiisi.org.uk>
+Message-ID: <20160314084633.521d3e35@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 March 2016 at 10:09, Giuseppe CAVALLARO <peppe.cavallaro@st.com> wrote:
-> On 3/10/2016 5:47 PM, Dinh Nguyen wrote:
->>
->> On Thu, Mar 10, 2016 at 3:13 AM, Giuseppe CAVALLARO
->> <peppe.cavallaro@st.com> wrote:
->>>
->>> On 3/9/2016 5:31 PM, Dinh Nguyen wrote:
->>>>
->>>>
->>>> On Wed, Mar 9, 2016 at 8:53 AM, Giuseppe CAVALLARO
->>>> <peppe.cavallaro@st.com> wrote:
->>>>>
->>>>>
->>>>> Hi Tomeu, Dinh, Andreas
->>>>>
->>>>> I need a sum and help from you to go ahead on the
->>>>> tx timeout.
->>>>>
->>>>> The "stmmac: MDIO fixes" seems to be the candidate to
->>>>> fix the phy connection and I will send the V2 asap (Andreas' comment).
->>>>>
->>>>> So, supposing the probe is ok and phy is connected,
->>>>> I need your input ...
->>>>>
->>>>>    Tomeu: after revering the 0e80bdc9a72d (stmmac: first frame
->>>>>           prep at the end of xmit routine) the network is
->>>>>           not stable and there is a timeout after a while.
->>>>>           The box has 3.50 with normal desc settings.
->>>>>
->>>>>    Dinh: the network is ok, I wonder if you can share a boot
->>>>>          log just to understand if the normal or enhanced
->>>>>          descriptors are used.
->>>>>
->>>>
->>>> Here it is:
->>>
->>>
->>> ...
->>>>
->>>>
->>>> [    0.850523] stmmac - user ID: 0x10, Synopsys ID: 0x37
->>>> [    0.855570]  Ring mode enabled
->>>> [    0.858611]  DMA HW capability register supported
->>>> [    0.863128]  Enhanced/Alternate descriptors
->>>> [    0.867482]  Enabled extended descriptors
->>>> [    0.871482]  RX Checksum Offload Engine supported (type 2)
->>>> [    0.876948]  TX Checksum insertion supported
->>>> [    0.881204]  Enable RX Mitigation via HW Watchdog Timer
->>>> [    0.886863] socfpga-dwmac ff702000.ethernet eth0: No MDIO subnode
->>>> found
->>>> [    0.899090] libphy: stmmac: probed
->>>> [    0.902484] eth0: PHY ID 00221611 at 4 IRQ POLL (stmmac-0:04) active
->>>
->>>
->>>
->>> Thx Dinh, so you are using the Enhanced/Alternate descriptors
->>> I am debugging on my side on a setup with normal descriptors, I let you
->>> know
->>>
->>
->> Doesn't the printout "Enhanced/Alternate descriptors"  mean that I'm using
->> Enhanced/Alternate descriptors?
->
->
-> yes this means that you have the Databook 3.70a and, from the HW
-> capability register, the driver will use the Enhanced/Alternate
-> descriptors. This is the same HW I am using on my side where the
-> stmmac is working fine.
->
-> In the case where it is failing on net-next, although on Databook 3.50a,
-> the HW  capability register says that there is no enhanced descriptors
-> and the driver uses the normal ones.
->
-> Tomeu, I kindly ask you to try the patch attached. I found a bug on Tx
-> path for normal descriptors. Please let me know if this help.
-> Also let me know if we actually need to revert the 0e80bdc9a72d.
+Em Mon, 14 Mar 2016 12:52:54 +0200
+Sakari Ailus <sakari.ailus@iki.fi> escreveu:
 
-Hi Peppe,
+> Hi Mauro,
+> 
+> On Mon, Mar 14, 2016 at 07:13:58AM -0300, Mauro Carvalho Chehab wrote:
+> > Em Mon, 14 Mar 2016 09:22:37 +0200
+> > Sakari Ailus <sakari.ailus@iki.fi> escreveu:
+> >   
+> > > Hi Shuah,
+> > > 
+> > > On Sat, Mar 12, 2016 at 06:48:09PM -0700, Shuah Khan wrote:  
+> > > > Add GFP flags to media_create_pad_link(), media_create_intf_link(),
+> > > > media_devnode_create(), and media_add_link() that could get called
+> > > > in atomic context to allow callers to pass in the right flags for
+> > > > memory allocation.
+> > > > 
+> > > > tree-wide driver changes for media_*() GFP flags change:
+> > > > Change drivers to add gfpflags to interffaces, media_create_pad_link(),
+> > > > media_create_intf_link() and media_devnode_create().
+> > > > 
+> > > > Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> > > > Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>    
+> > > 
+> > > What's the use case for calling the above functions in an atomic context?
+> > >   
+> > 
+> > ALSA code seems to do a lot of stuff at atomic context. That's what
+> > happens on my test machine when au0828 gets probed before
+> > snd-usb-audio:
+> > 	http://pastebin.com/LEX5LD5K
+> > 
+> > It seems that ALSA USB probe routine (usb_audio_probe) happens in
+> > atomic context.  
+> 
+> usb_audio_probe() grabs a mutex (register_mutex) on its own. It certainly
+> cannot be called in atomic context.
+> 
+> In the above log, what I did notice, though, was that because *we* grab
+> mdev->lock spinlock in media_device_register_entity(), we may not sleep
+> which is what the notify() callback implementation in au0828 driver does
+> (for memory allocation).
 
-with that patch I don't see any difference at all in my setup.
+True. After looking into the code, the problem is that the notify
+callbacks are called with the spinlock hold. I don't see any reason
+to do that.
 
-So to be clear, with these commits on top of next-20160314, I still
-get the hang during boot:
+> Could we instead replace mdev->lock by a mutex?
 
-209afef6f0cd ARM: dts: rockchip: Add mdio node to ethernet node
-2315acc6cf7f Revert "stmmac: first frame prep at the end of xmit routine"
-b5e08e810c63 stmmac: fix tx prepare for normal desc
-37c15a31d850 i2c: immediately mark ourselves as registered
-4342eec3c5a2 Add linux-next specific files for 20160314
+We changed the code to use a spinlock for a reason: this fixed some
+troubles in the past with the code locking (can't remember the problem,
+but this was documented at the kernel logs and at the ML). Yet, the code
+under the spinlock never sleeps, so this is fine.
 
-[   27.521026] WARNING: CPU: 1 PID: 0 at net/sched/sch_generic.c:303
-dev_watchdog+0x284/0x288
-[   27.529460] NETDEV WATCHDOG: eth0 (rk_gmac-dwmac): transmit queue 0 timed out
+Yet, in the future, we'll need to do a review of all the locking schema,
+in order to better support dynamic graph changes.
 
-https://git.collabora.com/cgit/user/tomeu/linux.git/log/?h=broken-eth-on-rock2
+> If there is no pressing need to implement atomic memory allocation I simply
+> wouldn't do it, especially in device initialisation where an allocation
+> failure will lead to probe failure as well.
 
-> I am trying to find some HW where test the normal descriptors to
-> speed-up the tests on my side directly.
+The fix for this issue should be simple. See the enclosed code. Btw.
+it probably makes sense to add some code here to avoid starving the
+stack, as a notify callback could try to create an entity, with,
+in turn, would call the notify callback again.
 
-Maybe get your tree in kernelci.org? I'm not sure if it's currently
-doing any nfsroot boots, though.
+I'll run some tests here to double check if it fixes the issue.
 
-Regards,
+---
 
-Tomeu
+[media] media-device: Don't call notify callbacks holding a spinlock
 
-> Let me know and thx in advance.
->
-> Regards,
-> Peppe
->
->>
->> Dinh
->>
->
+The notify routines may sleep. So, they can't be called in spinlock
+context. Also, they may want to call other media routines that might
+be spinning the spinlock, like creating a link.
+
+This fixes the following bug:
+
+[ 1839.510587] BUG: sleeping function called from invalid context at mm/slub.c:1289
+[ 1839.510881] in_atomic(): 1, irqs_disabled(): 0, pid: 3479, name: modprobe
+[ 1839.511157] 4 locks held by modprobe/3479:
+[ 1839.511415]  #0:  (&dev->mutex){......}, at: [<ffffffff81ce8933>] __driver_attach+0xa3/0x160
+[ 1839.512381]  #1:  (&dev->mutex){......}, at: [<ffffffff81ce8941>] __driver_attach+0xb1/0x160
+[ 1839.512388]  #2:  (register_mutex#5){+.+.+.}, at: [<ffffffffa10596c7>] usb_audio_probe+0x257/0x1c90 [snd_usb_audio]
+[ 1839.512401]  #3:  (&(&mdev->lock)->rlock){+.+.+.}, at: [<ffffffffa0e6051b>] media_device_register_entity+0x1cb/0x700 [media]
+[ 1839.512412] CPU: 2 PID: 3479 Comm: modprobe Not tainted 4.5.0-rc3+ #49
+[ 1839.512415] Hardware name:                  /NUC5i7RYB, BIOS RYBDWi35.86A.0350.2015.0812.1722 08/12/2015
+[ 1839.512417]  0000000000000000 ffff8803b3f6f288 ffffffff81933901 ffff8803c4bae000
+[ 1839.512422]  ffff8803c4bae5c8 ffff8803b3f6f2b0 ffffffff811c6af5 ffff8803c4bae000
+[ 1839.512427]  ffffffff8285d7f6 0000000000000509 ffff8803b3f6f2f0 ffffffff811c6ce5
+[ 1839.512432] Call Trace:
+[ 1839.512436]  [<ffffffff81933901>] dump_stack+0x85/0xc4
+[ 1839.512440]  [<ffffffff811c6af5>] ___might_sleep+0x245/0x3a0
+[ 1839.512443]  [<ffffffff811c6ce5>] __might_sleep+0x95/0x1a0
+[ 1839.512446]  [<ffffffff8155aade>] kmem_cache_alloc_trace+0x20e/0x300
+[ 1839.512451]  [<ffffffffa0e66e3d>] ? media_add_link+0x4d/0x140 [media]
+[ 1839.512455]  [<ffffffffa0e66e3d>] media_add_link+0x4d/0x140 [media]
+[ 1839.512459]  [<ffffffffa0e69931>] media_create_pad_link+0xa1/0x600 [media]
+[ 1839.512463]  [<ffffffffa0fe11b3>] au0828_media_graph_notify+0x173/0x360 [au0828]
+[ 1839.512467]  [<ffffffffa0e68a6a>] ? media_gobj_create+0x1ba/0x480 [media]
+[ 1839.512471]  [<ffffffffa0e606fb>] media_device_register_entity+0x3ab/0x700 [media]
+
+(untested)
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+
+diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
+index 6ba6e8f982fc..fc3c199e5500 100644
+--- a/drivers/media/media-device.c
++++ b/drivers/media/media-device.c
+@@ -587,14 +587,15 @@ int __must_check media_device_register_entity(struct media_device *mdev,
+ 		media_gobj_create(mdev, MEDIA_GRAPH_PAD,
+ 			       &entity->pads[i].graph_obj);
+ 
++	spin_unlock(&mdev->lock);
++
+ 	/* invoke entity_notify callbacks */
+ 	list_for_each_entry_safe(notify, next, &mdev->entity_notify, list) {
+ 		(notify)->notify(entity, notify->notify_data);
+ 	}
+ 
+-	spin_unlock(&mdev->lock);
+-
+ 	mutex_lock(&mdev->graph_mutex);
++
+ 	if (mdev->entity_internal_idx_max
+ 	    >= mdev->pm_count_walk.ent_enum.idx_max) {
+ 		struct media_entity_graph new = { .top = 0 };
