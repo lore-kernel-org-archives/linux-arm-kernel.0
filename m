@@ -1,57 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Mar 2016 18:36:22 +0000
-Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <56E700F4.4060308@arm.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <56E00A7E.4080101@semihalf.com> <20160313181608.GA15988@cbox>
- <56E69CCA.5070407@arm.com>
- <CAFEAcA8r5LDbNG0XVnHnsoYcrfcpfnR3FQ_u=-L7Dop1HFVgxw@mail.gmail.com>
- <56E6FAEB.1090306@arm.com> <56E700F4.4060308@arm.com>
-Message-ID: <56E704A6.7090901@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Mar 2016 19:51:34 +0100
+Subject: [PATCH 1/3] ARM: dts: sun8i: Fix wrong Quad core / a33 compat
+ for sun8i-a23-gt90h-v4
+In-Reply-To: <1457973145-26203-1-git-send-email-hdegoede@redhat.com>
+References: <1457973145-26203-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160314185134.GD30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/16 18:20, Andre Przywara wrote:
-> Hi,
+On Mon, Mar 14, 2016 at 05:32:23PM +0100, Hans de Goede wrote:
+> As the dts file name already implies sun8i-a23-gt90h-v4.dts is for
+> an a23 equipped tablet. I don't know how the "Quad Core" or a33
+> comaptible got in there, likely a copy and paste error.
 > 
-> On 14/03/16 17:54, Marc Zyngier wrote:
->> On 14/03/16 17:29, Peter Maydell wrote:
->>> On 14 March 2016 at 11:13, Andre Przywara <andre.przywara@arm.com> wrote:
->>>> So I see two ways to fix this:
->>>> 1.) we find a KVM specific way of letting userland save and restore the
->>>> ITS tables directly
->>>> 2.) we implement the BASER<n> registers, but still use our "cache" for
->>>> normal operations. On demand we would serialize KVM's virtual ITS data
->>>> structures and put them into the guest's memory, so they could be
->>>> saved/restored from there.
->>>
->>> I feel like we're rehashing a bunch of design choices we talked
->>> through way back in the last-but-one Connect. I don't suppose
->>> anybody wrote down our rationales from back then?
->>>
->>> (In particular I forget whether we decided the ITS tables were
->>> large enough to need to allow some sort of before-the-VM-stops
->>> migration of the data, which would be relatively doable with
->>> option 2 but painful under option 1.)
->>
->> I think only option 2 is valid here, and we must be able to shove most
->> of the routing information in the device/collection/IT tables. Common HW
->> seems to use 64bit of data per entry per table, so we should be able to
->> do the same with KVM.
+> Regardless this commit fixes this, note this is almost
+> purely a cosmetical fix, for all things that matter at the
+> machine compatible level the a23 and a33 are compatible.
 > 
-> All right, just skimmed over this and it looks doable.
-> For the collection table we will most likely even get away with 32 bits
-> per entry (compressed MPIDR or even VCPUIDs).
-> Would the IPA of the ITTE suffice for each device table entry?
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Yup. You can even loose the low 8 bits, as this is guaranteed to be 256
-byte aligned. So for a 48bit IPA and 32bit of EventID, you end up only
-using 45 bits, which leaves quite a few to spare, should we ever want a
-larger IPA. Ideally, this should contain the relevant fields of the MAPD
-command, with similar sizes.
+Applied all three, thanks
 
-Thanks,
+Maxime
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160314/35f2da9f/attachment-0001.sig>
