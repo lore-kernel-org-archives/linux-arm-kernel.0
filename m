@@ -1,68 +1,78 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 14 Mar 2016 11:29:03 +0900
-Subject: [PATCH 2/2] ARM: dts: r8a7794: add CAN nodes to device tree
-In-Reply-To: <1457922543-20975-1-git-send-email-horms+renesas@verge.net.au>
-References: <1457922543-20975-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1457922543-20975-3-git-send-email-horms+renesas@verge.net.au>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 14 Mar 2016 10:39:16 +0800
+Subject: [PATCH v2] drm/rockchip: vop: fix crtc size in plane check
+In-Reply-To: <1457089443-6069-1-git-send-email-john@metanate.com>
+References: <56D8DF39.8020104@rock-chips.com>
+ <1457089443-6069-1-git-send-email-john@metanate.com>
+Message-ID: <56E62454.1070808@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CAN nodes to r8a7794 device tree.
+On 2016?03?04? 19:04, John Keeping wrote:
+> If the geometry of a crtc is changing in an atomic update then we must
+> validate the plane size against the new state of the crtc and not the
+> current size, otherwise if the crtc size is increasing the plane will be
+> cropped at the previous size and will not fill the screen.
+>
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> On Fri, 04 Mar 2016 09:04:57 +0800, Mark yao wrote:
+>> On 2016?02?22? 20:22, John Keeping wrote:
+>>> If the geometry of a crtc is changing in an atomic update then we much
+>> I think "we much validate" should be "we must validate".:-)
+> Yes, here's v2 with that fixed.
+>
+>>> validate the plane size against the new state of the crtc and not the
+>>> current size, otherwise if the crtc size is increasing the plane will be
+>>> cropped at the previous size and will not fill the screen.
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 14 ++++++++------
+>   1 file changed, 8 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index fd37054..82d55bd 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -549,6 +549,7 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
+>   			   struct drm_plane_state *state)
+>   {
+>   	struct drm_crtc *crtc = state->crtc;
+> +	struct drm_crtc_state *crtc_state;
+>   	struct drm_framebuffer *fb = state->fb;
+>   	struct vop_win *vop_win = to_vop_win(plane);
+>   	struct vop_plane_state *vop_plane_state = to_vop_plane_state(state);
+> @@ -563,12 +564,13 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
+>   	int max_scale = win->phy->scl ? FRAC_16_16(8, 1) :
+>   					DRM_PLANE_HELPER_NO_SCALING;
+>   
+> -	crtc = crtc ? crtc : plane->state->crtc;
+> -	/*
+> -	 * Both crtc or plane->state->crtc can be null.
+> -	 */
+>   	if (!crtc || !fb)
+>   		goto out_disable;
+> +
+> +	crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
+> +	if (WARN_ON(!crtc_state))
+> +		return -EINVAL;
+> +
+>   	src->x1 = state->src_x;
+>   	src->y1 = state->src_y;
+>   	src->x2 = state->src_x + state->src_w;
+> @@ -580,8 +582,8 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
+>   
+>   	clip.x1 = 0;
+>   	clip.y1 = 0;
+> -	clip.x2 = crtc->mode.hdisplay;
+> -	clip.y2 = crtc->mode.vdisplay;
+> +	clip.x2 = crtc_state->adjusted_mode.hdisplay;
+> +	clip.y2 = crtc_state->adjusted_mode.vdisplay;
+>   
+>   	ret = drm_plane_helper_check_update(plane, crtc, state->fb,
+>   					    src, dest, &clip,
 
-Based on work by Sergei Shtylyov for the r8a7791 SoC.
+Looks good for me, applied into my drm-fixes.
 
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7794.dtsi            | 22 ++++++++++++++++++++++
- include/dt-bindings/clock/r8a7794-clock.h |  2 ++
- 2 files changed, 24 insertions(+)
+Thanks for the fix.
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index c8742a599330..ab755b754a9e 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -830,6 +830,28 @@
- 		};
- 	};
- 
-+	can0: can at e6e80000 {
-+		compatible = "renesas,can-r8a7794", "renesas,rcar-gen2-can";
-+		reg = <0 0xe6e80000 0 0x1000>;
-+		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_RCAN0>,
-+			 <&cpg_clocks R8A7794_CLK_RCAN>, <&can_clk>;
-+		clock-names = "clkp1", "clkp2", "can_clk";
-+		power-domains = <&cpg_clocks>;
-+		status = "disabled";
-+	};
-+
-+	can1: can at e6e88000 {
-+		compatible = "renesas,can-r8a7794", "renesas,rcar-gen2-can";
-+		reg = <0 0xe6e88000 0 0x1000>;
-+		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp9_clks R8A7794_CLK_RCAN1>,
-+			 <&cpg_clocks R8A7794_CLK_RCAN>, <&can_clk>;
-+		clock-names = "clkp1", "clkp2", "can_clk";
-+		power-domains = <&cpg_clocks>;
-+		status = "disabled";
-+	};
-+
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 222a9dcbabb8..9703fbdb81c8 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -96,6 +96,8 @@
- #define R8A7794_CLK_GPIO2		10
- #define R8A7794_CLK_GPIO1		11
- #define R8A7794_CLK_GPIO0		12
-+#define R8A7794_CLK_RCAN1		15
-+#define R8A7794_CLK_RCAN0		16
- #define R8A7794_CLK_QSPI_MOD		17
- #define R8A7794_CLK_I2C5		25
- #define R8A7794_CLK_I2C4		27
 -- 
-2.1.4
+?ark Yao
