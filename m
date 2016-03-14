@@ -1,88 +1,124 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Mar 2016 16:13:22 +0900
-Subject: [PATCH 07/10] ARM: dts: Add thermal zone and cpufreq node for
- exynos3250-artik5 module
-In-Reply-To: <56E662F6.4070200@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-9-git-send-email-cw00.choi@samsung.com>
- <56E662F6.4070200@samsung.com>
-Message-ID: <56E66492.4070003@samsung.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 14 Mar 2016 16:18:03 +0900
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56E662E8.700@suse.cz>
+References: <56D93ABE.9070406@huawei.com>
+ <20160307043442.GB24602@js1304-P5Q-DELUXE>
+ <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
+ <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz>
+ <20160314064925.GA27587@js1304-P5Q-DELUXE> <56E662E8.700@suse.cz>
+Message-ID: <20160314071803.GA28094@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 14? 16:06, Krzysztof Kozlowski wrote:
-> On 14.03.2016 11:04, Chanwoo Choi wrote:
->> This patch enables the CPU frequency scaling for exynos3250-artik5 module
->> and adds the thernal zones with cpu cooling device to prevent the overheat
->> temperature.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 23 +++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
+On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
+> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
+> >On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
+> >>On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
+> >>
+> >>How about something like this? Just and idea, probably buggy (off-by-one etc.).
+> >>Should keep away cost from <pageblock_order iterations@the expense of the
+> >>relatively fewer >pageblock_order iterations.
+> >
+> >Hmm... I tested this and found that it's code size is a little bit
+> >larger than mine. I'm not sure why this happens exactly but I guess it would be
+> >related to compiler optimization. In this case, I'm in favor of my
+> >implementation because it looks like well abstraction. It adds one
+> >unlikely branch to the merge loop but compiler would optimize it to
+> >check it once.
 > 
-> The patch looks good but just squash it with 5/10 unless there is some
-> benefit by splitting the features for many patches. The benefit would be
-> for example submitting the work partially, in steps, following principle
-> release-early-release-often... but this is not the case. You have
-> everything ready and tested.
+> I would be surprised if compiler optimized that to check it once, as
+> order increases with each loop iteration. But maybe it's smart
+> enough to do something like I did by hand? Guess I'll check the
+> disassembly.
 
-OK. I'll merge this patch with 5/10 patch.
+Okay. I used following slightly optimized version and I need to
+add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
+to yours. Please consider it, too.
 
-Best Regards,
-Chanwoo Choi
+Thanks.
 
-> 
-> BR,
-> Krzysztof
-> 
->>
->> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> index 75b291c10cdc..877e4827df83 100644
->> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> @@ -31,6 +31,25 @@
->>  		compatible = "samsung,secure-firmware";
->>  		reg = <0x0205F000 0x1000>;
->>  	};
->> +
->> +	thermal-zones {
->> +		cpu_thermal: cpu-thermal {
->> +			cooling-maps {
->> +				map0 {
->> +					/* Corresponds to 500MHz */
->> +					cooling-device = <&cpu0 5 5>;
->> +				};
->> +				map1 {
->> +					/* Corresponds to 200MHz */
->> +					cooling-device = <&cpu0 8 8>;
->> +				};
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +&cpu0 {
->> +	cpu0-supply = <&buck2_reg>;
->>  };
->>  
->>  &i2c_0 {
->> @@ -296,6 +315,10 @@
->>  	status = "okay";
->>  };
->>  
->> +&tmu {
->> +	status = "okay";
->> +};
->> +
->>  &xusbxti {
->>  	clock-frequency = <24000000>;
->>  };
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
+------------------------>8------------------------
+>From 36b8ffdaa0e7a8d33fd47a62a35a9e507e3e62e9 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Mon, 14 Mar 2016 15:20:07 +0900
+Subject: [PATCH] mm: fix cma
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+---
+ mm/page_alloc.c | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 0bb933a..f7baa4f 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -627,8 +627,8 @@ static inline void rmv_page_order(struct page *page)
+  *
+  * For recording page's order, we use page_private(page).
+  */
+-static inline int page_is_buddy(struct page *page, struct page *buddy,
+-							unsigned int order)
++static inline int page_is_buddy(struct zone *zone, struct page *page,
++				struct page *buddy, unsigned int order, int mt)
+ {
+ 	if (!pfn_valid_within(page_to_pfn(buddy)))
+ 		return 0;
+@@ -651,6 +651,15 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
+ 		if (page_zone_id(page) != page_zone_id(buddy))
+ 			return 0;
+ 
++		if (unlikely(has_isolate_pageblock(zone) &&
++			order >= pageblock_order)) {
++			int buddy_mt = get_pageblock_migratetype(buddy);
++
++			if (mt != buddy_mt && (is_migrate_isolate(mt) ||
++					is_migrate_isolate(buddy_mt)))
++				return 0;
++		}
++
+ 		VM_BUG_ON_PAGE(page_count(buddy) != 0, buddy);
+ 
+ 		return 1;
+@@ -698,17 +707,8 @@ static inline void __free_one_page(struct page *page,
+ 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
+ 
+ 	VM_BUG_ON(migratetype == -1);
+-	if (is_migrate_isolate(migratetype)) {
+-		/*
+-		 * We restrict max order of merging to prevent merge
+-		 * between freepages on isolate pageblock and normal
+-		 * pageblock. Without this, pageblock isolation
+-		 * could cause incorrect freepage accounting.
+-		 */
+-		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
+-	} else {
++	if (!is_migrate_isolate(migratetype))
+ 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+-	}
+ 
+ 	page_idx = pfn & ((1 << max_order) - 1);
+ 
+@@ -718,7 +718,7 @@ static inline void __free_one_page(struct page *page,
+ 	while (order < max_order - 1) {
+ 		buddy_idx = __find_buddy_index(page_idx, order);
+ 		buddy = page + (buddy_idx - page_idx);
+-		if (!page_is_buddy(page, buddy, order))
++		if (!page_is_buddy(zone, page, buddy, order, migratetype))
+ 			break;
+ 		/*
+ 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
+@@ -752,7 +752,8 @@ static inline void __free_one_page(struct page *page,
+ 		higher_page = page + (combined_idx - page_idx);
+ 		buddy_idx = __find_buddy_index(combined_idx, order + 1);
+ 		higher_buddy = higher_page + (buddy_idx - combined_idx);
+-		if (page_is_buddy(higher_page, higher_buddy, order + 1)) {
++		if (page_is_buddy(zone, higher_page, higher_buddy,
++					order + 1, migratetype)) {
+ 			list_add_tail(&page->lru,
+ 				&zone->free_area[order].free_list[migratetype]);
+ 			goto out;
+-- 
+1.9.1
