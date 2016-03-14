@@ -1,65 +1,259 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 14 Mar 2016 16:12:34 +0900
-Subject: [PATCH 08/10] ARM: dts: Add rtc and adc dt node for
- exynos3250-artik5 module
-In-Reply-To: <1457921056-21257-10-git-send-email-cw00.choi@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-10-git-send-email-cw00.choi@samsung.com>
-Message-ID: <56E66462.9000402@samsung.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 14 Mar 2016 15:12:59 +0800
+Subject: FW: [PATCH v5 0/8] Add MT8173 Video Encoder Driver and VPU Driver
+In-Reply-To: <D706F7FE148A8A429434F78C46336826048E7053@mtkmbs02n1>
+References: <D706F7FE148A8A429434F78C46336826048E7053@mtkmbs02n1>
+Message-ID: <1457939579.32502.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.03.2016 11:04, Chanwoo Choi wrote:
-> This patch adds the RTC (Real Time Clock) and ADC (Analog Digital Converter)
-> Device Tree node for exynos3250-artik5 module. The RTC is used for wakeup
-> source and the ADC is used to read the analog data such as battery temperature.
+
+On Mon, 2016-03-14 at 14:48 +0800, PoChun Lin (???) wrote:
 > 
-> ADC need to connect the some H/W device such as battery. So, this patch just
-> adds the default setting (clock, regulator).
+> -----Original Message-----
+> From: tiffany lin [mailto:tiffany.lin at mediatek.com] 
+> Sent: Wednesday, February 24, 2016 6:53 PM
+> To: Hans Verkuil
+> Cc: Hans Verkuil; daniel.thompson at linaro.org; Rob Herring; Mauro Carvalho Chehab; Matthias Brugger; Daniel Kurtz; Pawel Osciak; Eddie Huang (???); Yingjoe Chen (???); devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org; linux-mediatek at lists.infradead.org; PoChun Lin (???)
+> Subject: Re: [PATCH v5 0/8] Add MT8173 Video Encoder Driver and VPU Driver
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos3250-artik5.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> On Wed, 2016-02-24 at 09:30 +0100, Hans Verkuil wrote:
+> > Hi Tiffany,
+> > 
+> > On 02/24/16 09:23, tiffany lin wrote:
+> > > Hi Hans,
+> > > 
+> > > On Tue, 2016-02-23 at 09:47 +0100, Hans Verkuil wrote:
+> > >> On 02/23/16 09:11, Tiffany Lin wrote:
+> > >>> ==============
+> > >>>  Introduction
+> > >>> ==============
+> > >>>
+> > >>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+> > >>> Mediatek Video Codec is able to handle video encoding of in a range of formats.
+> > >>>
+> > >>> This patch series also include VPU driver. Mediatek Video Codec 
+> > >>> driver rely on VPU driver to load, communicate with VPU.
+> > >>>
+> > >>> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI.
+> > >>> MTK IOMMU[1] and MTK SMI[2] have not yet been merged, but we 
+> > >>> wanted to start discussion about the driver earlier so it could be merged sooner.
+> > >>>
+> > >>> [1]https://patchwork.kernel.org/patch/8335461/
+> > >>> [2]https://patchwork.kernel.org/patch/7596181/
+> > >>
+> > >> <snip>
+> > >>
+> > >>> v4l2-compliance test output:
+> > >>> localhost ~ # /usr/bin/v4l2-compliance -d /dev/video1 Driver Info:
+> > >>>         Driver name   : mtk-vcodec-enc
+> > >>>         Card type     : platform:mt8173
+> > >>>         Bus info      : platform:mt8173
+> > >>>         Driver version: 4.4.0
+> > >>>         Capabilities  : 0x84204000
+> > >>>                 Video Memory-to-Memory Multiplanar
+> > >>>                 Streaming
+> > >>>                 Extended Pix Format
+> > >>>                 Device Capabilities
+> > >>>         Device Caps   : 0x04204000
+> > >>>                 Video Memory-to-Memory Multiplanar
+> > >>>                 Streaming
+> > >>>                 Extended Pix Format
+> > >>>
+> > >>> Compliance test for device /dev/video1 (not using libv4l2):
+> > >>>
+> > >>> Required ioctls:
+> > >>>         test VIDIOC_QUERYCAP: OK
+> > >>>
+> > >>> Allow for multiple opens:
+> > >>>         test second video open: OK
+> > >>>         test VIDIOC_QUERYCAP: OK
+> > >>>         test VIDIOC_G/S_PRIORITY: OK
+> > >>>
+> > >>> Debug ioctls:
+> > >>>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+> > >>>         test VIDIOC_LOG_STATUS: OK (Not Supported)
+> > >>>
+> > >>> Input ioctls:
+> > >>>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+> > >>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> > >>>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+> > >>>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
+> > >>>         test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
+> > >>>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
+> > >>>         Inputs: 0 Audio Inputs: 0 Tuners: 0
+> > >>>
+> > >>> Output ioctls:
+> > >>>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+> > >>>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> > >>>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+> > >>>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+> > >>>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+> > >>>         Outputs: 0 Audio Outputs: 0 Modulators: 0
+> > >>>
+> > >>> Input/Output configuration ioctls:
+> > >>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+> > >>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+> > >>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+> > >>>         test VIDIOC_G/S_EDID: OK (Not Supported)
+> > >>>
+> > >>>         Control ioctls:
+> > >>>                 test VIDIOC_QUERYCTRL/MENU: OK
+> > >>>                 test VIDIOC_G/S_CTRL: OK
+> > >>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+> > >>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+> > >>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> > >>>                 Standard Controls: 12 Private Controls: 0
+> > >>>
+> > >>>         Format ioctls:
+> > >>>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+> > >>>                 test VIDIOC_G/S_PARM: OK
+> > >>>                 test VIDIOC_G_FBUF: OK (Not Supported)
+> > >>>                 test VIDIOC_G_FMT: OK
+> > >>>                 test VIDIOC_TRY_FMT: OK
+> > >>>                 test VIDIOC_S_FMT: OK
+> > >>>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+> > >>>
+> > >>>         Codec ioctls:
+> > >>>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+> > >>>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+> > >>>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+> > >>>
+> > >>>         Buffer ioctls:
+> > >>>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+> > >>>                 test VIDIOC_EXPBUF: OK
+> > >>>
+> > >>> Total: 38, Succeeded: 38, Failed: 0, Warnings: 0
+> > >>
+> > >> Nice!
+> > >>
+> > >> Can you try 'v4l2-compliance -s'? Note that this may not work since 
+> > >> I know that v4l2-compliance doesn't work all that well with codecs, 
+> > >> but I am curious what the output is when you try streaming.
+> > >>
+> > >> Don't bother trying to chase down reported failures, those are 
+> > >> likely from v4l2-compliance itself. It is something I would like to improve, but -ENOTIME.
+> > >>
+> > > 
+> > > When I try to run 'v4l2-compliance -d /dev/video1 -s, I got follow 
+> > > output.
+> > > I use v4.4-rc5 kernel and v4l-utils 1.6 version.
+> > 
+> > Can you compile v4l2-compliance straight from the v4l-utils.git master branch?
+> > Version 1.6 is too old, and for proper compliance testing you should 
+> > always use the master branch. It probably won't matter for this -s 
+> > test, but for the regular test (without -s) it does make a difference.
+> > 
+> > If nothing else, using the master branch will make it easier for me to 
+> > match up the line numbers that v4l2-compliance reports to the actual source.
+> > 
 > 
-> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> index 877e4827df83..673883fda480 100644
-> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> @@ -48,6 +48,12 @@
->  	};
->  };
->  
-> +&adc {
-> +	vdd-supply = <&ldo7_reg>;
-> +	assigned-clocks = <&cmu CLK_SCLK_TSADC>;
-> +	assigned-clock-rates = <6000000>;
-> +};
+> Sorry, our development branch default get "http://linuxtv.org/downloads/v4l-utils/v4l-utils-1.6.0.tar.bz2"
+> I try to change to use master branch.
+> I got following output:
+> 
+> 
+> Streaming ioctls:
+>         test read/write: OK (Not Supported)
+>                 fail: v4l2-test-buffers.cpp(970): ret != EINVAL
+>         test MMAP: FAIL
+>                 warn: v4l2-test-buffers.cpp(278): buf.length=1,
+> vp->length=1024, ff9a42a8/ff9a4270, ff9a4284/ff9a429c/ff9a42a4
+> fail: v4l2-test-buffers.cpp(1032): ret && ret != ENOTTY
+>                 fail: v4l2-test-buffers.cpp(1098): setupUserPtr(node, q)
+>         test USERPTR: FAIL
+>         test DMABUF: Cannot test, specify --expbuf-device
+> 
+> 
+> After change to use master branch, VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF:
+> test FAIL.
+> 
+> I got this error output, do I need to fix this issue. I need to figure out this.
+> 
+>                 warn: v4l2-test-buffers.cpp(467): mmap_valid 1
+> warn: v4l2-test-buffers.cpp(278): buf.length=1, vp->length=1024,
+> ff9a40b8/ff9a4080, ff9a4094/ff9a40ac/ff9a40b4          warn:
+> v4l2-test-buffers.cpp(475): mmap_valid 2          warn:
+> v4l2-test-buffers.cpp(480): userptr_valid 1          warn:
+> v4l2-test-buffers.cpp(278): buf.length=1, vp->length=1024,
+> ff9a40b8/ff9a4080, ff9a4094/ff9a40ac/ff9a40b4          warn:
+> v4l2-test-buffers.cpp(488): userptr_valid 2               warn:
+> v4l2-test-buffers.cpp(493): dmabuf_valid  1          warn:
+> v4l2-test-buffers.cpp(278): buf.length=1, vp->length=1024,
+> ff9a40b8/ff9a4080, ff9a4094/ff9a40ac/ff9a40b4          warn:
+> v4l2-test-buffers.cpp(501): dmabuf_valid  2               warn:
+> v4l2-test-buffers.cpp(278): buf.length=1, vp->length=1024,
+> ff9a40b8/ff9a4080, ff9a4094/ff9a40ac/ff9a40b4             warn:
+> v4l2-test-buffers.cpp(278): buf.length=1, vp->length=1024,
+> ff9a40b8/ff9a4080, ff9a4094/ff9a40ac/ff9a40b4          warn:
+> v4l2-test-buffers.cpp(278): buf.length=1, vp->length=1024,
+> ff9a40b8/ff9a4080, ff9a4094/ff9a40ac/ff9a40b4             fail:
+> v4l2-test-buffers.cpp(564): check_0(crbufs.reserved,
+> sizeof(crbufs.reserved))
+>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: FAIL
+>                 warn: v4l2-test-buffers.cpp(597): ....2         warn:
+> v4l2-test-buffers.cpp(597): ....2         test VIDIOC_EXPBUF: OK
+> 
+> 
 
-No thermistors, status non-okay. What is provided here?
+Hi Hans,
 
-> +
->  &cpu0 {
->  	cpu0-supply = <&buck2_reg>;
->  };
-> @@ -319,6 +325,12 @@
->  	status = "okay";
->  };
->  
-> +&rtc {
-> +	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
-> +	clock-names = "rtc", "rtc_src";
-> +	status = "okay";
-> +};
+After change to use "v4l-utils.git master branch", "V4l2-compliance
+-d /dev/video1" fail on "fail: v4l2-test-buffers.cpp(555):
+check_0(crbufs.reserved, sizeof(crbufs.reserved))".
 
-Same comment as for previous patch - just squash it. Splitting brings no
-benefits and makes it more difficult to see bigger picture.
+Check the source code and found
 
-BR,
-Krzysztof
+	memset(&crbufs, 0xff, sizeof(crbufs));   -> crbufs to 0xff
+        node->g_fmt(crbufs.format, i);
+        crbufs.count = 0;
+        crbufs.memory = m;
+        fail_on_test(doioctl(node, VIDIOC_CREATE_BUFS, &crbufs));   
+        fail_on_test(check_0(crbufs.reserved, sizeof(crbufs.reserved)));
+        fail_on_test(crbufs.index != q.g_buffers());
 
-> +
->  &xusbxti {
->  	clock-frequency = <24000000>;
->  };
+crbufs is initialized to fill with 0xff and after VIDIOC_CREATE_BUFS,
+crbufs.reserved field should be 0x0. But v4l2_m2m_create_bufs and
+vb2_create_bufs do not process reserved filed.
+Do we really need to check reserved filed filled with 0x0? Or we need to
+change vb2_create_bufs to fix this issue?
+
+best regards,
+Tiffany
+
+> best regards,
+> Tiffany
+> 
+> 
+> > Thanks!
+> > 
+> > 	Hans
+> > 
+> > > 
+> > > Streaming ioctls:
+> > >         test read/write: OK (Not Supported)
+> > > fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(332): buf.querybuf(node, i) fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(868): testQueryBuf(node, cur_fmt.type, q.g_buffers())
+> > >         test MMAP: FAIL
+> > > fail: 
+> > > ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp
+> > > (923): ret && ret != ENOTTY
+> > > 
+> > > fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(988): setupUserPtr(node, q)
+> > >         test USERPTR: FAIL
+> > >         test DMABUF: Cannot test, specify --expbuf-device
+> > > 
+> > > best regards,
+> > > Tiffany
+> > > 
+> > >> Regards,
+> > >>
+> > >> 	Hans
+> > > 
+> > > 
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe 
+> > > linux-media" in the body of a message to majordomo at vger.kernel.org 
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > 
+> 
 > 
