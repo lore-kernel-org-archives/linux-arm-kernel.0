@@ -1,19 +1,73 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 14 Mar 2016 20:01:39 +0800
-Subject: NVMEM usage question
-Message-ID: <1457956899.20370.25.camel@mtksdaap41>
+From: a0393675@ti.com (Keerthy)
+Date: Mon, 14 Mar 2016 17:32:03 +0530
+Subject: [PATCH] ARM: dts: dra7: Correct clock tree for sys_32k_ck
+In-Reply-To: <1457956748-597-1-git-send-email-j-keerthy@ti.com>
+References: <1457956748-597-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <56E6A83B.5000908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Mediatek PMIC chip have some spare registers used to store information.
-The value of these registers will exist until user unplug battery or
-battery depletion. One of our usage example is store battery utilization
-in these spare registers. We want to implement NVMEM driver to
-read/write sparse registers, but binding document describe NVMEM is for
-"Non-volatile memory", and for hardware like eeprom, efuse. Since the
-usage here is some kind of "battery backup memory", but not real
-non-volatile memory, is NVMEM driver suitable for this case ?
 
-Eddie
+On Monday 14 March 2016 05:29 PM, Keerthy wrote:
+> This is w.r.t J6/J6eco: 32clk is pseudo (erratum i856) - clock source.
+> Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
+> crystal is not enabled at power up. Instead the CPU falls back to using
+> an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
+> 20MHz on boards so far (which gives an emulated frequency of 32.786KHz)
+
+Missing signed-off. Please ignore this patch.
+
+>
+> Modelling the same in device tree.
+>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+> Errata Document: http://www.ti.com/lit/er/sprz429h/sprz429h.pdf
+> Errata number: i856
+>
+> Tested the debugfs clock tree nodes on DRA7-EVM.
+>
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi | 18 +++++++++++++++++-
+>   1 file changed, 17 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index 357bede..7f1f892 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -98,12 +98,20 @@
+>   		clock-frequency = <32768>;
+>   	};
+>
+> -	sys_32k_ck: sys_32k_ck {
+> +	sys_clk32_crystal_ck: sys_clk32_crystal_ck {
+>   		#clock-cells = <0>;
+>   		compatible = "fixed-clock";
+>   		clock-frequency = <32768>;
+>   	};
+>
+> +	sys_clk32_pseudo_ck: sys_clk32_pseudo_ck {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-factor-clock";
+> +		clocks = <&sys_clkin1>;
+> +		clock-mult = <1>;
+> +		clock-div = <610>;
+> +	};
+> +
+>   	virt_12000000_ck: virt_12000000_ck {
+>   		#clock-cells = <0>;
+>   		compatible = "fixed-clock";
+> @@ -2146,4 +2154,12 @@
+>   		ti,bit-shift = <0>;
+>   		reg = <0x558>;
+>   	};
+> +
+> +	sys_32k_ck: sys_32k_ck {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,mux-clock";
+> +		clocks = <&sys_clk32_crystal_ck>, <&sys_clk32_pseudo_ck>, <&sys_clk32_pseudo_ck>, <&sys_clk32_pseudo_ck>;
+> +		ti,bit-shift = <8>;
+> +		reg = <0x6c4>;
+> +	};
+>   };
+>
