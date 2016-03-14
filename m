@@ -1,26 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 14 Mar 2016 13:06:45 -0400 (EDT)
-Subject: [PATCH 3/3] net: mediatek: check device_reset return code
-In-Reply-To: <1457964435-2945038-3-git-send-email-arnd@arndb.de>
-References: <1457964435-2945038-1-git-send-email-arnd@arndb.de>
- <1457964435-2945038-3-git-send-email-arnd@arndb.de>
-Message-ID: <20160314.130645.572195280477206552.davem@davemloft.net>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 14 Mar 2016 12:09:19 -0500
+Subject: [PATCH 3/4] mmc: davinci: prepare clock
+In-Reply-To: <56E6A66D.1080909@ti.com>
+References: <1457567405-30475-1-git-send-email-david@lechnology.com>
+ <1457567405-30475-4-git-send-email-david@lechnology.com>
+ <56E6A66D.1080909@ti.com>
+Message-ID: <56E6F03F.5060908@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 14 Mar 2016 15:07:12 +0100
-
-> The device_reset() function may fail, so we have to check
-> its return value, e.g. to make deferred probing work correctly.
-> gcc warns about it because of the warn_unused_result attribute:
-> 
-> drivers/net/ethernet/mediatek/mtk_eth_soc.c: In function 'mtk_probe':
-> drivers/net/ethernet/mediatek/mtk_eth_soc.c:1679:2: error: ignoring return value of 'device_reset', declared with attribute warn_unused_result [-Werror=unused-result]
-> 
-> This adds the trivial error check to propagate the return value
-> to the generic platform device probe code.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Applied.
+On 03/14/2016 06:54 AM, Sekhar Nori wrote:
+> On Thursday 10 March 2016 05:20 AM, David Lechner wrote:
+>> When trying to use this driver with the common clock framework, enabling
+>> the clock fails because it was not prepared. This fixes the problem by
+>> calling clk_prepare and clk_enable in a single function.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+> Patch looks good. But I wonder how you hit this issue since we dont use
+> common clock framework on mach-davinci and this driver is not used
+> anywhere else AFAIK.
+>
+> Regards,
+> Sekhar
+>
+Because I am working towards getting the common clock framework working 
+on mach-davinci - at least with da8xx/device tree. :-)
