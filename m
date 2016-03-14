@@ -1,36 +1,45 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 14 Mar 2016 17:22:29 +0000
-Subject: [RFC PATCH 04/12] kvm-arm: Rename kvm_pmd_huge to huge_pmd
-In-Reply-To: <20160314170602.GD5920@leverpostej>
-References: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
- <1457974391-28456-5-git-send-email-suzuki.poulose@arm.com>
- <20160314170602.GD5920@leverpostej>
-Message-ID: <56E6F355.5050804@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Mar 2016 10:26:56 -0700
+Subject: Regression in next caused by 95026658c46e i2c: do not use
+ internal..
+In-Reply-To: <20160314165206.GA16371@katana>
+References: <20160314160944.GG9329@atomide.com> <20160314165206.GA16371@katana>
+Message-ID: <20160314172656.GH9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/16 17:06, Mark Rutland wrote:
-> On Mon, Mar 14, 2016 at 04:53:03PM +0000, Suzuki K Poulose wrote:
->> kvm_pmd_huge doesn't have any dependency on the page table
->> where the pmd lives (i.e, hyp vs. stage2). So, rename it to
->> huge_pmd() to make it explicit.
+* Wolfram Sang <wsa@the-dreams.de> [160314 09:52]:
+> Hi,
+> 
+> > Having something like this happen just as the merge window opens is
+> > not nice. You guys should already know..
+> 
+> I already applied the fix.
 
+OK great thanks!
 
->>   #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
->>
->> -#define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
->> +#define huge_pmd(_x)		(pmd_huge(_x) || pmd_trans_huge(_x))
->
-> I note that in arch/arm we have pmd_thp_or_huge() for this in
-> arch/arm/include/asm/pgtable-{2,3}level.h.
->
-> If we're going to rename this, it's probably best to align on that name,
-> which will also avoid and confusion as to the difference between
-> pmd_huge and huge_pmd.
->
-> Similarly, it might best live in pgtable.h if it isn't KVM-specific.
+> > The patches in next should be sitting there for a few weeks before the
+> > merge window so issues like this are found out early.
+> 
+> I understand this was a major hickup and I am sorry for this. I should
+> have known better.
 
-Thanks for that pointer, will define one for arm64 and use that in kvm.
+Thanks for understanding my suffering :) I've been chasing various
+regressions constantly over past months..  So I've started to keep my
+eye on Linux next hoping to prevent being stuck chasing regressions
+forever..
 
-Cheers
-Suzuki
+> I am not taking 100% of the blame, though: The amount of submissions is
+> rising faster than the amount of non-maintainer review being done (at
+> least in the subsystems I work on). I took a wrong step in trying to
+> handle the gap. I am really sorry about the fuzz, yet I can't deny there
+> is also something inevitable in that to me. That being said, I'll of
+> course try harder to not let this happen again.
+
+Yeah the same applies to may subsystems for sure. Probably a good idea
+to be extra careful about not causing regressions with core subsystem
+changes.
+
+Regards,
+
+Tony
