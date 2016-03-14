@@ -1,47 +1,62 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Mon, 14 Mar 2016 08:28:09 +0100
-Subject: [PATCH 06/22] ncr5380: Remove PSEUDO_DMA macro
-In-Reply-To: <20160314042702.216030077@telegraphics.com.au>
-References: <20160314042700.596192247@telegraphics.com.au>
- <20160314042702.216030077@telegraphics.com.au>
-Message-ID: <56E66809.7090100@suse.de>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Mon, 14 Mar 2016 07:29:26 +0000
+Subject: [v6, 5/5] mmc: sdhci-of-esdhc: fix host version for
+ T4240-R1.0-R2.0
+In-Reply-To: <4947024.WeMycs2fID@wuerfel>
+References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
+ <1457518131-11339-6-git-send-email-yangbo.lu@nxp.com>
+ <4947024.WeMycs2fID@wuerfel>
+Message-ID: <HE1PR04MB0889CE4742B92461A925B9C4F8880@HE1PR04MB0889.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2016 05:27 AM, Finn Thain wrote:
-> For those wrapper drivers which only implement Programmed IO, have
-> NCR5380_dma_xfer_len() evaluate to zero. That allows PDMA to be easily
-> disabled at run-time and so the PSEUDO_DMA macro is no longer needed.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Monday, March 14, 2016 6:26 AM
+> To: linuxppc-dev at lists.ozlabs.org
+> Cc: Yangbo Lu; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> foundation.org; netdev at vger.kernel.org; linux-mmc at vger.kernel.org;
+> ulf.hansson at linaro.org; Zhao Qiang; Russell King; Bhupesh Sharma; Joerg
+> Roedel; Santosh Shilimkar; Scott Wood; Rob Herring; Claudiu Manoil; Kumar
+> Gala; Yang-Leo Li; Xiaobo Xie
+> Subject: Re: [v6, 5/5] mmc: sdhci-of-esdhc: fix host version for T4240-
+> R1.0-R2.0
 > 
-> Also remove the spin counters used for debugging pseudo DMA drivers.
+> On Wednesday 09 March 2016 18:08:51 Yangbo Lu wrote:
+> > @@ -567,10 +580,20 @@ static void esdhc_init(struct platform_device
+> *pdev, struct sdhci_host *host)
+> >         struct sdhci_pltfm_host *pltfm_host;
+> >         struct sdhci_esdhc *esdhc;
+> >         u16 host_ver;
+> > +       u32 svr;
+> >
+> >         pltfm_host = sdhci_priv(host);
+> >         esdhc = sdhci_pltfm_priv(pltfm_host);
+> >
+> > +       fsl_guts_init();
+> > +       svr = fsl_guts_get_svr();
+> > +       if (svr) {
+> > +               esdhc->soc_ver = SVR_SOC_VER(svr);
+> > +               esdhc->soc_rev = SVR_REV(svr);
+> > +       } else {
+> > +               dev_err(&pdev->dev, "Failed to get SVR value!\n");
+> > +       }
+> > +
 > 
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> This makes the driver non-portable. Better identify the specific
+> workarounds based on the compatible string for this device, or add a
+> boolean DT property for the quirk.
 > 
-> ---
->  drivers/scsi/NCR5380.c      |   32 +-------------------------------
->  drivers/scsi/NCR5380.h      |    4 ----
->  drivers/scsi/arm/cumana_1.c |    2 --
->  drivers/scsi/arm/oak.c      |    3 +--
->  drivers/scsi/dmx3191d.c     |    4 ++++
->  drivers/scsi/dtc.c          |    7 -------
->  drivers/scsi/dtc.h          |    2 --
->  drivers/scsi/g_NCR5380.c    |    1 -
->  drivers/scsi/g_NCR5380.h    |    1 -
->  drivers/scsi/mac_scsi.c     |   10 ----------
->  drivers/scsi/pas16.c        |   10 ----------
->  drivers/scsi/pas16.h        |    2 --
->  drivers/scsi/t128.c         |    4 ----
->  drivers/scsi/t128.h         |    2 --
->  14 files changed, 6 insertions(+), 78 deletions(-)
-> 
-Reviewed-by: Hannes Reinecke <hare@suse.com>
+> 	Arnd
 
-Cheers,
+[Lu Yangbo-B47093] Hi Arnd, we did have a discussion about using DTS in v1 before.
+https://patchwork.kernel.org/patch/6834221/
 
-Hannes
--- 
-Dr. Hannes Reinecke		   Teamlead Storage & Networking
-hare at suse.de			               +49 911 74053 688
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: F. Imend?rffer, J. Smithard, J. Guild, D. Upmanyu, G. Norton
-HRB 21284 (AG N?rnberg)
+We don't have a separate DTS file for each revision of an SOC and if we did, we'd constantly have people using the wrong one.
+In addition, the device tree is stable ABI and errata are often discovered after device tree are deployed.
+See the link for details.
+
+So we decide to read SVR from the device-config/guts MMIO block other than using DTS.
+Thanks.
