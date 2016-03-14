@@ -1,49 +1,149 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 14 Mar 2016 16:01:59 +0800
-Subject: [PATCH v3 8/9] clk: rockchip: associate SCLK_MAC_PLL and disable
- reparenting on rk3036
+Date: Mon, 14 Mar 2016 16:02:00 +0800
+Subject: [PATCH v3 9/9] ARM: dts: rockchip: add to support emac for rk3036 SoCs
 In-Reply-To: <1457942520-12859-1-git-send-email-wxt@rock-chips.com>
 References: <1457942520-12859-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1457942520-12859-9-git-send-email-wxt@rock-chips.com>
+Message-ID: <1457942520-12859-10-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heiko Stuebner <heiko@sntech.de>
+From: Xing Zheng <zhengxing@rock-chips.com>
 
-The emac needs constant and very specific rate but the possible PLL-sources
-are very limited, so we expect the PLL source to be set manually on per
-board and don't want it to get changed in an automatic way later.
-So add the necessary clock-id and disable reparenting on set_rate calls.
+This patch adds the emac device node for rk3036 SoCs.
+We need to let mac clock under the DPLL which is able to provide
+the accurate 50MHz what mac_ref need, since that will cause some
+unstable things if the cpufreq is working.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-clk at vger.kernel.org
-
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Cc: linux-rockchip at lists.infradead.org
+Cc: Xing Zheng <zhengxing@rock-chips.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-arm-kernel at lists.infradead.org
+
 ---
 
 Changes in v3:
+- rename reset-gpio to phy-reset-gpios.
+- change the commit.
+- remove the pcfg_output_high, that's really not needed for emac.
 - Add the Cc people.
+- Fixes the 'zhengxing' to 'Xing Zheng'.
 
-Changes in v2: None
+Changes in v2:
+- rename phy-reset-gpio to reset-gpios.
 
- drivers/clk/rockchip/clk-rk3036.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3036-evb.dts   | 14 ++++++++++++++
+ arch/arm/boot/dts/rk3036-kylin.dts | 14 ++++++++++++++
+ arch/arm/boot/dts/rk3036.dtsi      | 39 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 67 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
-index cc66e5f..7cdb2d6 100644
---- a/drivers/clk/rockchip/clk-rk3036.c
-+++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -348,7 +348,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
- 			RK2928_CLKSEL_CON(16), 0, 2, MFLAGS, 2, 5, DFLAGS,
- 			RK2928_CLKGATE_CON(10), 5, GFLAGS),
+diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
+index 28a0336..b3d6ec8 100644
+--- a/arch/arm/boot/dts/rk3036-evb.dts
++++ b/arch/arm/boot/dts/rk3036-evb.dts
+@@ -47,6 +47,20 @@
+ 	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
+ };
  
--	COMPOSITE_NOGATE(0, "mac_pll_src", mux_pll_src_3plls_p, 0,
-+	COMPOSITE_NOGATE(SCLK_MACPLL, "mac_pll_src", mux_pll_src_3plls_p, CLK_SET_RATE_NO_REPARENT,
- 			RK2928_CLKSEL_CON(21), 0, 2, MFLAGS, 9, 5, DFLAGS),
- 	MUX(SCLK_MACREF, "mac_clk_ref", mux_mac_p, CLK_SET_RATE_PARENT,
- 			RK2928_CLKSEL_CON(21), 3, 1, MFLAGS),
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_xfer>, <&emac_mdio>;
++	phy = <&phy0>;
++	phy-reset-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>; /* PHY_RST */
++	phy-reset-duration = <10>; /* millisecond */
++
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
+ &i2c1 {
+ 	status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+index eb9c979..951f15d 100644
+--- a/arch/arm/boot/dts/rk3036-kylin.dts
++++ b/arch/arm/boot/dts/rk3036-kylin.dts
+@@ -112,6 +112,20 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_xfer>, <&emac_mdio>;
++	phy = <&phy0>;
++	phy-reset-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>; /* PHY_RST */
++	phy-reset-duration = <10>; /* millisecond */
++
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
+ &emmc {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index 90faa86..5175a2a 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -223,6 +223,27 @@
+ 		status = "disabled";
+ 	};
+ 
++	emac: ethernet at 10200000 {
++		compatible = "rockchip,rk3036-emac", "snps,arc-emac";
++		reg = <0x10200000 0x4000>;
++		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		rockchip,grf = <&grf>;
++		clocks = <&cru HCLK_MAC>, <&cru SCLK_MACREF>, <&cru SCLK_MAC>;
++		clock-names = "hclk", "macref", "macclk";
++		/*
++		 * Fix the emac parent clock is DPLL instead of APLL.
++		 * since that will cause some unstable things if the cpufreq
++		 * is working. (e.g: the accurate 50MHz what mac_ref need)
++		 */
++		assigned-clocks = <&cru SCLK_MACPLL>;
++		assigned-clock-parents = <&cru PLL_DPLL>;
++		max-speed = <100>;
++		phy-mode = "rmii";
++		status = "disabled";
++	};
++
+ 	sdmmc: dwmmc at 10214000 {
+ 		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
+ 		reg = <0x10214000 0x4000>;
+@@ -628,6 +649,24 @@
+ 			};
+ 		};
+ 
++		emac {
++			emac_xfer: emac-xfer {
++				rockchip,pins = <2 10 RK_FUNC_1 &pcfg_pull_default>, /* crs_dvalid */
++						<2 13 RK_FUNC_1 &pcfg_pull_default>, /* tx_en */
++						<2 14 RK_FUNC_1 &pcfg_pull_default>, /* mac_clk */
++						<2 15 RK_FUNC_1 &pcfg_pull_default>, /* rx_err */
++						<2 16 RK_FUNC_1 &pcfg_pull_default>, /* rxd1 */
++						<2 17 RK_FUNC_1 &pcfg_pull_default>, /* rxd0 */
++						<2 18 RK_FUNC_1 &pcfg_pull_default>, /* txd1 */
++						<2 19 RK_FUNC_1 &pcfg_pull_default>; /* txd0 */
++			};
++
++			emac_mdio: emac-mdio {
++				rockchip,pins = <2 12 RK_FUNC_1 &pcfg_pull_default>, /* mac_md */
++						<2 25 RK_FUNC_1 &pcfg_pull_default>; /* mac_mdclk */
++			};
++		};
++
+ 		i2c0 {
+ 			i2c0_xfer: i2c0-xfer {
+ 				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
 -- 
 1.9.1
