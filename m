@@ -1,36 +1,38 @@
 From: hare@suse.de (Hannes Reinecke)
-Date: Mon, 14 Mar 2016 08:26:45 +0100
-Subject: [PATCH 05/22] ncr5380: Disable the DMA errata workaround flag by
- default
-In-Reply-To: <20160314042701.956017683@telegraphics.com.au>
+Date: Mon, 14 Mar 2016 08:28:09 +0100
+Subject: [PATCH 06/22] ncr5380: Remove PSEUDO_DMA macro
+In-Reply-To: <20160314042702.216030077@telegraphics.com.au>
 References: <20160314042700.596192247@telegraphics.com.au>
- <20160314042701.956017683@telegraphics.com.au>
-Message-ID: <56E667B5.3090708@suse.de>
+ <20160314042702.216030077@telegraphics.com.au>
+Message-ID: <56E66809.7090100@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/14/2016 05:27 AM, Finn Thain wrote:
-> The only chip that needs the workarounds enabled is an early NMOS
-> device. That means that the common case is to disable them.
+> For those wrapper drivers which only implement Programmed IO, have
+> NCR5380_dma_xfer_len() evaluate to zero. That allows PDMA to be easily
+> disabled at run-time and so the PSEUDO_DMA macro is no longer needed.
 > 
-> Unfortunately the sense of the flag is such that it has to be set
-> for the common case.
-> 
-> Rename the flag so that zero can be used to mean "no errata workarounds
-> needed". This simplifies the code.
+> Also remove the spin counters used for debugging pseudo DMA drivers.
 > 
 > Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
 > 
 > ---
->  drivers/scsi/NCR5380.c      |   14 +++++++-------
->  drivers/scsi/NCR5380.h      |    2 +-
->  drivers/scsi/arm/cumana_1.c |    2 +-
->  drivers/scsi/arm/oak.c      |    2 +-
->  drivers/scsi/dtc.c          |    2 +-
->  drivers/scsi/g_NCR5380.c    |    8 +-------
->  drivers/scsi/pas16.c        |    2 +-
->  drivers/scsi/t128.c         |    2 +-
->  8 files changed, 14 insertions(+), 20 deletions(-)
+>  drivers/scsi/NCR5380.c      |   32 +-------------------------------
+>  drivers/scsi/NCR5380.h      |    4 ----
+>  drivers/scsi/arm/cumana_1.c |    2 --
+>  drivers/scsi/arm/oak.c      |    3 +--
+>  drivers/scsi/dmx3191d.c     |    4 ++++
+>  drivers/scsi/dtc.c          |    7 -------
+>  drivers/scsi/dtc.h          |    2 --
+>  drivers/scsi/g_NCR5380.c    |    1 -
+>  drivers/scsi/g_NCR5380.h    |    1 -
+>  drivers/scsi/mac_scsi.c     |   10 ----------
+>  drivers/scsi/pas16.c        |   10 ----------
+>  drivers/scsi/pas16.h        |    2 --
+>  drivers/scsi/t128.c         |    4 ----
+>  drivers/scsi/t128.h         |    2 --
+>  14 files changed, 6 insertions(+), 78 deletions(-)
 > 
 Reviewed-by: Hannes Reinecke <hare@suse.com>
 
