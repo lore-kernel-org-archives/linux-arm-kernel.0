@@ -1,39 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Mar 2016 23:46:55 +0100
-Subject: [PATCH] mailbox: rockchip: avoid 64-bit division
-Message-ID: <1457995629-1480353-1-git-send-email-arnd@arndb.de>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 14 Mar 2016 17:54:37 -0500
+Subject: [PATCH v2 1/5] mmc: davinci: remove matching string
+In-Reply-To: <1457996081-21975-1-git-send-email-david@lechnology.com>
+References: <56E6BF7E.7020401@ti.com>
+ <1457996081-21975-1-git-send-email-david@lechnology.com>
+Message-ID: <1457996081-21975-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added rockchip mailbox driver causes a bug in
-the ARM allyesconfig build because of a division of a resource_size_t
-variable that may be 64 bit wide:
+The string "MMCSDCLK" is not actually used for clock lookup, so can be removed.
 
-drivers/mailbox/built-in.o: In function `rockchip_mbox_probe':
-:(.text+0x6614): undefined reference to `__aeabi_uldivmod'
-
-This adds a cast to size_t, which turns it into a 32-bit division
-in this case. This is safe because we know that we cannot possibly
-map a resource that is longer than what a pointer contains, and
-in practice it will be very short instead.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: David Lechner <david@lechnology.com>
 ---
- drivers/mailbox/rockchip-mailbox.c | 2 +-
+
+v2 changes: none
+
+
+ drivers/mmc/host/davinci_mmc.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mailbox/rockchip-mailbox.c b/drivers/mailbox/rockchip-mailbox.c
-index b79a2871227c..d702a204f5c1 100644
---- a/drivers/mailbox/rockchip-mailbox.c
-+++ b/drivers/mailbox/rockchip-mailbox.c
-@@ -213,7 +213,7 @@ static int rockchip_mbox_probe(struct platform_device *pdev)
- 		return PTR_ERR(mb->mbox_base);
+diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+index 693144e..a294d261 100644
+--- a/drivers/mmc/host/davinci_mmc.c
++++ b/drivers/mmc/host/davinci_mmc.c
+@@ -1271,7 +1271,7 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+ 		goto out;
  
- 	/* Each channel has two buffers for A2B and B2A */
--	mb->buf_size = resource_size(res) / (drv_data->num_chans * 2);
-+	mb->buf_size = (size_t)resource_size(res) / (drv_data->num_chans * 2);
- 
- 	mb->pclk = devm_clk_get(&pdev->dev, "pclk_mailbox");
- 	if (IS_ERR(mb->pclk)) {
+ 	ret = -ENXIO;
+-	host->clk = clk_get(&pdev->dev, "MMCSDCLK");
++	host->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(host->clk)) {
+ 		ret = PTR_ERR(host->clk);
+ 		goto out;
 -- 
-2.7.0
+1.9.1
