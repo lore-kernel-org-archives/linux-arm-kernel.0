@@ -1,149 +1,47 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 14 Mar 2016 16:02:00 +0800
-Subject: [PATCH v3 9/9] ARM: dts: rockchip: add to support emac for rk3036 SoCs
-In-Reply-To: <1457942520-12859-1-git-send-email-wxt@rock-chips.com>
-References: <1457942520-12859-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1457942520-12859-10-git-send-email-wxt@rock-chips.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 14 Mar 2016 16:09:41 +0800
+Subject: [Query]set clk rate must operate its coordinated clock
+In-Reply-To: <20160311165152.4103.82090@quark.deferred.io>
+References: <20160309152420.20de187a@xhacker>
+ <20160311165152.4103.82090@quark.deferred.io>
+Message-ID: <20160314160941.6d558371@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xing Zheng <zhengxing@rock-chips.com>
+Dear Mike,
 
-This patch adds the emac device node for rk3036 SoCs.
-We need to let mac clock under the DPLL which is able to provide
-the accurate 50MHz what mac_ref need, since that will cause some
-unstable things if the cpufreq is working.
+On Fri, 11 Mar 2016 08:51:52 -0800 Michael Turquette wrote:
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Cc: linux-rockchip at lists.infradead.org
-Cc: Xing Zheng <zhengxing@rock-chips.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-arm-kernel at lists.infradead.org
+> Jisheng,
+> 
+> Quoting Jisheng Zhang (2016-03-08 23:24:20)
+> > Dear Stephen, Michael, Sebastian and all, 
+> > 
+> > I have the following clk case which I dunno the elegant solution:
+> > 
+> > 
+> > cpuclk have two parents: cpupll and refclk. When set the cpuclk freq, we
+> > have to set its parent's freq, I.E cpupll freq. But before changing the
+> > cpupll's freq, we should set its refclk as its parent firstly.
+> > 
+> > AFAIK, this is a common case, I have seen such requirement in rockchip, samsung
+> > clk driver. They solve this by notifier, but as pointed out by Michael
+> > in http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351565.html
+> > 
+> > "This is also a hack and it points towards some missing infrastructure in the
+> > clock framework."
+> > 
+> > I also don't like the notifier solution, I believe the elegant solution could
+> > be using the coordinated clock infrastructure. So what's the status of
+> > this infrastructure? I can test, and I can even add some code to make it be
+> > ready to be merged if you guide me ;)  
+> 
+> Thanks for the email. I hope to finish that feature before ELC. I have
+> Cc'd Pi-Cheng Chen from Mediatek who is also interested in coordinated
+> clock rates.
+> 
 
----
+Glad to hear that. I will test the infrastructure once it's sent out.
 
-Changes in v3:
-- rename reset-gpio to phy-reset-gpios.
-- change the commit.
-- remove the pcfg_output_high, that's really not needed for emac.
-- Add the Cc people.
-- Fixes the 'zhengxing' to 'Xing Zheng'.
-
-Changes in v2:
-- rename phy-reset-gpio to reset-gpios.
-
- arch/arm/boot/dts/rk3036-evb.dts   | 14 ++++++++++++++
- arch/arm/boot/dts/rk3036-kylin.dts | 14 ++++++++++++++
- arch/arm/boot/dts/rk3036.dtsi      | 39 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 67 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
-index 28a0336..b3d6ec8 100644
---- a/arch/arm/boot/dts/rk3036-evb.dts
-+++ b/arch/arm/boot/dts/rk3036-evb.dts
-@@ -47,6 +47,20 @@
- 	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>;
-+	phy = <&phy0>;
-+	phy-reset-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>; /* PHY_RST */
-+	phy-reset-duration = <10>; /* millisecond */
-+
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
- &i2c1 {
- 	status = "okay";
- 
-diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
-index eb9c979..951f15d 100644
---- a/arch/arm/boot/dts/rk3036-kylin.dts
-+++ b/arch/arm/boot/dts/rk3036-kylin.dts
-@@ -112,6 +112,20 @@
- 	status = "okay";
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_xfer>, <&emac_mdio>;
-+	phy = <&phy0>;
-+	phy-reset-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>; /* PHY_RST */
-+	phy-reset-duration = <10>; /* millisecond */
-+
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+};
-+
- &emmc {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index 90faa86..5175a2a 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -223,6 +223,27 @@
- 		status = "disabled";
- 	};
- 
-+	emac: ethernet at 10200000 {
-+		compatible = "rockchip,rk3036-emac", "snps,arc-emac";
-+		reg = <0x10200000 0x4000>;
-+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		rockchip,grf = <&grf>;
-+		clocks = <&cru HCLK_MAC>, <&cru SCLK_MACREF>, <&cru SCLK_MAC>;
-+		clock-names = "hclk", "macref", "macclk";
-+		/*
-+		 * Fix the emac parent clock is DPLL instead of APLL.
-+		 * since that will cause some unstable things if the cpufreq
-+		 * is working. (e.g: the accurate 50MHz what mac_ref need)
-+		 */
-+		assigned-clocks = <&cru SCLK_MACPLL>;
-+		assigned-clock-parents = <&cru PLL_DPLL>;
-+		max-speed = <100>;
-+		phy-mode = "rmii";
-+		status = "disabled";
-+	};
-+
- 	sdmmc: dwmmc at 10214000 {
- 		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
- 		reg = <0x10214000 0x4000>;
-@@ -628,6 +649,24 @@
- 			};
- 		};
- 
-+		emac {
-+			emac_xfer: emac-xfer {
-+				rockchip,pins = <2 10 RK_FUNC_1 &pcfg_pull_default>, /* crs_dvalid */
-+						<2 13 RK_FUNC_1 &pcfg_pull_default>, /* tx_en */
-+						<2 14 RK_FUNC_1 &pcfg_pull_default>, /* mac_clk */
-+						<2 15 RK_FUNC_1 &pcfg_pull_default>, /* rx_err */
-+						<2 16 RK_FUNC_1 &pcfg_pull_default>, /* rxd1 */
-+						<2 17 RK_FUNC_1 &pcfg_pull_default>, /* rxd0 */
-+						<2 18 RK_FUNC_1 &pcfg_pull_default>, /* txd1 */
-+						<2 19 RK_FUNC_1 &pcfg_pull_default>; /* txd0 */
-+			};
-+
-+			emac_mdio: emac-mdio {
-+				rockchip,pins = <2 12 RK_FUNC_1 &pcfg_pull_default>, /* mac_md */
-+						<2 25 RK_FUNC_1 &pcfg_pull_default>; /* mac_mdclk */
-+			};
-+		};
-+
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
--- 
-1.9.1
+Thanks,
+Jisheng
