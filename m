@@ -1,141 +1,50 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Mon, 14 Mar 2016 08:46:33 -0300
-Subject: [PATCH] media: add GFP flag to media_*() that could get called
- in atomic context
-In-Reply-To: <20160314105253.GQ11084@valkosipuli.retiisi.org.uk>
-References: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
- <20160314072236.GO11084@valkosipuli.retiisi.org.uk>
- <20160314071358.27c87dab@recife.lan>
- <20160314105253.GQ11084@valkosipuli.retiisi.org.uk>
-Message-ID: <20160314084633.521d3e35@recife.lan>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Mar 2016 12:46:41 +0100
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160311111825.GC11154@localhost>
+References: <20160307145429.GG11154@localhost>
+ <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
+ <20160309120627.67612b1d@bbrezillon>
+ <20160311062607.GP11154@localhost>
+ <20160311104552.23e06a16@bbrezillon>
+ <20160311100902.GY11154@localhost> <20160311105549.GZ8418@lukather>
+ <20160311111825.GC11154@localhost>
+Message-ID: <20160314114641.GC30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 14 Mar 2016 12:52:54 +0200
-Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-
-> Hi Mauro,
-> 
-> On Mon, Mar 14, 2016 at 07:13:58AM -0300, Mauro Carvalho Chehab wrote:
-> > Em Mon, 14 Mar 2016 09:22:37 +0200
-> > Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-> >   
-> > > Hi Shuah,
-> > > 
-> > > On Sat, Mar 12, 2016 at 06:48:09PM -0700, Shuah Khan wrote:  
-> > > > Add GFP flags to media_create_pad_link(), media_create_intf_link(),
-> > > > media_devnode_create(), and media_add_link() that could get called
-> > > > in atomic context to allow callers to pass in the right flags for
-> > > > memory allocation.
-> > > > 
-> > > > tree-wide driver changes for media_*() GFP flags change:
-> > > > Change drivers to add gfpflags to interffaces, media_create_pad_link(),
-> > > > media_create_intf_link() and media_devnode_create().
-> > > > 
-> > > > Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> > > > Suggested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>    
-> > > 
-> > > What's the use case for calling the above functions in an atomic context?
-> > >   
+On Fri, Mar 11, 2016 at 04:48:26PM +0530, Vinod Koul wrote:
+> > > But this nees to be property for clients and not driver. Client can then
+> > > program these
 > > 
-> > ALSA code seems to do a lot of stuff at atomic context. That's what
-> > happens on my test machine when au0828 gets probed before
-> > snd-usb-audio:
-> > 	http://pastebin.com/LEX5LD5K
-> > 
-> > It seems that ALSA USB probe routine (usb_audio_probe) happens in
-> > atomic context.  
+> > Yes, totally. The question here is how the clients give that
+> > information to the driver.
 > 
-> usb_audio_probe() grabs a mutex (register_mutex) on its own. It certainly
-> cannot be called in atomic context.
-> 
-> In the above log, what I did notice, though, was that because *we* grab
-> mdev->lock spinlock in media_device_register_entity(), we may not sleep
-> which is what the notify() callback implementation in au0828 driver does
-> (for memory allocation).
+> For this part am not worried. If we can generalize this then we add to
+> dma_slave_config. Otherwise an exported symbol from driver should be fine.
 
-True. After looking into the code, the problem is that the notify
-callbacks are called with the spinlock hold. I don't see any reason
-to do that.
+It's actually what we would like to avoid.
 
-> Could we instead replace mdev->lock by a mutex?
+We have two potential provider driver that would need such an
+interface, and we have customer drivers that would be able to use any
+of these two, depending on which SoCs we're talking about.
 
-We changed the code to use a spinlock for a reason: this fixed some
-troubles in the past with the code locking (can't remember the problem,
-but this was documented at the kernel logs and at the ML). Yet, the code
-under the spinlock never sleeps, so this is fine.
+Maintaining some logic in each and every driver in that case to know
+which one of this symbol is to be called seems counterproductive and
+painful.
 
-Yet, in the future, we'll need to do a review of all the locking schema,
-in order to better support dynamic graph changes.
+Maxime
 
-> If there is no pressing need to implement atomic memory allocation I simply
-> wouldn't do it, especially in device initialisation where an allocation
-> failure will lead to probe failure as well.
-
-The fix for this issue should be simple. See the enclosed code. Btw.
-it probably makes sense to add some code here to avoid starving the
-stack, as a notify callback could try to create an entity, with,
-in turn, would call the notify callback again.
-
-I'll run some tests here to double check if it fixes the issue.
-
----
-
-[media] media-device: Don't call notify callbacks holding a spinlock
-
-The notify routines may sleep. So, they can't be called in spinlock
-context. Also, they may want to call other media routines that might
-be spinning the spinlock, like creating a link.
-
-This fixes the following bug:
-
-[ 1839.510587] BUG: sleeping function called from invalid context at mm/slub.c:1289
-[ 1839.510881] in_atomic(): 1, irqs_disabled(): 0, pid: 3479, name: modprobe
-[ 1839.511157] 4 locks held by modprobe/3479:
-[ 1839.511415]  #0:  (&dev->mutex){......}, at: [<ffffffff81ce8933>] __driver_attach+0xa3/0x160
-[ 1839.512381]  #1:  (&dev->mutex){......}, at: [<ffffffff81ce8941>] __driver_attach+0xb1/0x160
-[ 1839.512388]  #2:  (register_mutex#5){+.+.+.}, at: [<ffffffffa10596c7>] usb_audio_probe+0x257/0x1c90 [snd_usb_audio]
-[ 1839.512401]  #3:  (&(&mdev->lock)->rlock){+.+.+.}, at: [<ffffffffa0e6051b>] media_device_register_entity+0x1cb/0x700 [media]
-[ 1839.512412] CPU: 2 PID: 3479 Comm: modprobe Not tainted 4.5.0-rc3+ #49
-[ 1839.512415] Hardware name:                  /NUC5i7RYB, BIOS RYBDWi35.86A.0350.2015.0812.1722 08/12/2015
-[ 1839.512417]  0000000000000000 ffff8803b3f6f288 ffffffff81933901 ffff8803c4bae000
-[ 1839.512422]  ffff8803c4bae5c8 ffff8803b3f6f2b0 ffffffff811c6af5 ffff8803c4bae000
-[ 1839.512427]  ffffffff8285d7f6 0000000000000509 ffff8803b3f6f2f0 ffffffff811c6ce5
-[ 1839.512432] Call Trace:
-[ 1839.512436]  [<ffffffff81933901>] dump_stack+0x85/0xc4
-[ 1839.512440]  [<ffffffff811c6af5>] ___might_sleep+0x245/0x3a0
-[ 1839.512443]  [<ffffffff811c6ce5>] __might_sleep+0x95/0x1a0
-[ 1839.512446]  [<ffffffff8155aade>] kmem_cache_alloc_trace+0x20e/0x300
-[ 1839.512451]  [<ffffffffa0e66e3d>] ? media_add_link+0x4d/0x140 [media]
-[ 1839.512455]  [<ffffffffa0e66e3d>] media_add_link+0x4d/0x140 [media]
-[ 1839.512459]  [<ffffffffa0e69931>] media_create_pad_link+0xa1/0x600 [media]
-[ 1839.512463]  [<ffffffffa0fe11b3>] au0828_media_graph_notify+0x173/0x360 [au0828]
-[ 1839.512467]  [<ffffffffa0e68a6a>] ? media_gobj_create+0x1ba/0x480 [media]
-[ 1839.512471]  [<ffffffffa0e606fb>] media_device_register_entity+0x3ab/0x700 [media]
-
-(untested)
-
-Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-
-diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
-index 6ba6e8f982fc..fc3c199e5500 100644
---- a/drivers/media/media-device.c
-+++ b/drivers/media/media-device.c
-@@ -587,14 +587,15 @@ int __must_check media_device_register_entity(struct media_device *mdev,
- 		media_gobj_create(mdev, MEDIA_GRAPH_PAD,
- 			       &entity->pads[i].graph_obj);
- 
-+	spin_unlock(&mdev->lock);
-+
- 	/* invoke entity_notify callbacks */
- 	list_for_each_entry_safe(notify, next, &mdev->entity_notify, list) {
- 		(notify)->notify(entity, notify->notify_data);
- 	}
- 
--	spin_unlock(&mdev->lock);
--
- 	mutex_lock(&mdev->graph_mutex);
-+
- 	if (mdev->entity_internal_idx_max
- 	    >= mdev->pm_count_walk.ent_enum.idx_max) {
- 		struct media_entity_graph new = { .top = 0 };
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160314/040a5e45/attachment.sig>
