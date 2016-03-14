@@ -1,149 +1,114 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 14 Mar 2016 16:53:05 +0000
-Subject: [RFC PATCH 06/12] kvm-arm: Pass kvm parameter for pagetable helpers
+Date: Mon, 14 Mar 2016 16:53:08 +0000
+Subject: [RFC PATCH 09/12] kvm-arm: Switch to kvm pagetable helpers
 In-Reply-To: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
 References: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1457974391-28456-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1457974391-28456-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass 'kvm' to existing kvm_p.d_* page table wrappers to prepare
-them to choose between hyp and stage2 page table. No functional
-changes yet. Also while at it, convert them to static inline
-functions.
+Now that we have kvm wrappers for page table walk, switch
+to using them everywhere. Also, use the explicit page table
+accessor (stage2_ vs hyp), whenever we know we deal only
+with a particular table.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |   38 +++++++++++++++++++++++++++-----------
- arch/arm/kvm/mmu.c               |   34 +++++++++++++++++-----------------
- arch/arm64/include/asm/kvm_mmu.h |   31 ++++++++++++++++++++++++++-----
- 3 files changed, 70 insertions(+), 33 deletions(-)
+ arch/arm/kvm/mmu.c |   64 ++++++++++++++++++++++++++--------------------------
+ 1 file changed, 32 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 4448e77..17c6781 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -45,6 +45,7 @@
- #ifndef __ASSEMBLY__
- 
- #include <linux/highmem.h>
-+#include <linux/hugetlb.h>
- #include <asm/cacheflush.h>
- #include <asm/pgalloc.h>
- 
-@@ -135,22 +136,37 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
- }
- 
--#define kvm_pud_huge(_x)	pud_huge(_x)
-+static inline int kvm_pud_huge(struct kvm *kvm, pud_t pud)
-+{
-+	return pud_huge(pud);
-+}
-+
- 
- /* Open coded p*d_addr_end that can deal with 64bit addresses */
--#define kvm_pgd_addr_end(addr, end)					\
--({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
--	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
--})
-+static inline phys_addr_t
-+kvm_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-+{
-+	phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
-+	return (boundary - 1 < end - 1) ? boundary : end;
-+}
- 
--#define kvm_pud_addr_end(addr,end)		(end)
-+static inline phys_addr_t
-+kvm_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-+{
-+	return end;
-+}
- 
--#define kvm_pmd_addr_end(addr, end)					\
--({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
--	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
--})
-+static inline phys_addr_t
-+kvm_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-+{
-+	phys_addr_t boundary = (addr + PMD_SIZE) & PMD_MASK;
-+	return (boundary - 1 < end - 1) ? boundary : end;
-+}
- 
--#define kvm_pgd_index(addr)			pgd_index(addr)
-+static inline phys_addr_t kvm_pgd_index(struct kvm *kvm, phys_addr_t addr)
-+{
-+	return pgd_index(addr);
-+}
- 
- static inline bool kvm_page_empty(void *ptr)
- {
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index d1e9a71..22b4c99 100644
+index 22b4c99..8568790 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -165,7 +165,7 @@ static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+@@ -155,20 +155,20 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+ 
+ static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+ {
+-	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
+-	pgd_clear(pgd);
++	pud_t *pud_table __maybe_unused = kvm_pud_offset(kvm, pgd, 0);
++	kvm_pgd_clear(kvm, pgd);
+ 	kvm_tlb_flush_vmid_ipa(kvm, addr);
+-	pud_free(NULL, pud_table);
++	kvm_pud_free(kvm, NULL, pud_table);
+ 	put_page(virt_to_page(pgd));
+ }
+ 
  static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
  {
- 	pmd_t *pmd_table = pmd_offset(pud, 0);
--	VM_BUG_ON(pud_huge(*pud));
-+	VM_BUG_ON(kvm_pud_huge(kvm, *pud));
- 	pud_clear(pud);
+-	pmd_t *pmd_table = pmd_offset(pud, 0);
++	pmd_t *pmd_table = kvm_pmd_offset(kvm, pud, 0);
+ 	VM_BUG_ON(kvm_pud_huge(kvm, *pud));
+-	pud_clear(pud);
++	kvm_pud_clear(kvm, pud);
  	kvm_tlb_flush_vmid_ipa(kvm, addr);
- 	pmd_free(NULL, pmd_table);
-@@ -236,7 +236,7 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+-	pmd_free(NULL, pmd_table);
++	kvm_pmd_free(kvm, NULL, pmd_table);
+ 	put_page(virt_to_page(pud));
+ }
  
- 	start_pmd = pmd = pmd_offset(pud, addr);
+@@ -234,7 +234,7 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+ 	phys_addr_t next, start_addr = addr;
+ 	pmd_t *pmd, *start_pmd;
+ 
+-	start_pmd = pmd = pmd_offset(pud, addr);
++	start_pmd = pmd = kvm_pmd_offset(kvm, pud, addr);
  	do {
--		next = kvm_pmd_addr_end(addr, end);
-+		next = kvm_pmd_addr_end(kvm, addr, end);
+ 		next = kvm_pmd_addr_end(kvm, addr, end);
  		if (!pmd_none(*pmd)) {
- 			if (huge_pmd(*pmd)) {
- 				pmd_t old_pmd = *pmd;
-@@ -265,9 +265,9 @@ static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
+@@ -263,14 +263,14 @@ static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
+ 	phys_addr_t next, start_addr = addr;
+ 	pud_t *pud, *start_pud;
  
- 	start_pud = pud = pud_offset(pgd, addr);
+-	start_pud = pud = pud_offset(pgd, addr);
++	start_pud = pud = kvm_pud_offset(kvm, pgd, addr);
  	do {
--		next = kvm_pud_addr_end(addr, end);
-+		next = kvm_pud_addr_end(kvm, addr, end);
- 		if (!pud_none(*pud)) {
--			if (pud_huge(*pud)) {
-+			if (kvm_pud_huge(kvm, *pud)) {
+ 		next = kvm_pud_addr_end(kvm, addr, end);
+-		if (!pud_none(*pud)) {
++		if (!kvm_pud_none(kvm, *pud)) {
+ 			if (kvm_pud_huge(kvm, *pud)) {
  				pud_t old_pud = *pud;
  
- 				pud_clear(pud);
-@@ -294,9 +294,9 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 	phys_addr_t addr = start, end = start + size;
- 	phys_addr_t next;
+-				pud_clear(pud);
++				kvm_pud_clear(kvm, pud);
+ 				kvm_tlb_flush_vmid_ipa(kvm, addr);
  
--	pgd = pgdp + kvm_pgd_index(addr);
-+	pgd = pgdp + kvm_pgd_index(kvm, addr);
+ 				kvm_flush_dcache_pud(old_pud);
+@@ -297,7 +297,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 	pgd = pgdp + kvm_pgd_index(kvm, addr);
  	do {
--		next = kvm_pgd_addr_end(addr, end);
-+		next = kvm_pgd_addr_end(kvm, addr, end);
- 		if (!pgd_none(*pgd))
+ 		next = kvm_pgd_addr_end(kvm, addr, end);
+-		if (!pgd_none(*pgd))
++		if (!kvm_pgd_none(kvm, *pgd))
  			unmap_puds(kvm, pgd, addr, next);
  	} while (pgd++, addr = next, addr != end);
-@@ -322,7 +322,7 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
+ }
+@@ -320,9 +320,9 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
+ 	pmd_t *pmd;
+ 	phys_addr_t next;
  
- 	pmd = pmd_offset(pud, addr);
+-	pmd = pmd_offset(pud, addr);
++	pmd = stage2_pmd_offset(pud, addr);
  	do {
--		next = kvm_pmd_addr_end(addr, end);
-+		next = kvm_pmd_addr_end(kvm, addr, end);
+-		next = kvm_pmd_addr_end(kvm, addr, end);
++		next = stage2_pmd_addr_end(addr, end);
  		if (!pmd_none(*pmd)) {
  			if (huge_pmd(*pmd))
  				kvm_flush_dcache_pmd(*pmd);
-@@ -340,9 +340,9 @@ static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
+@@ -338,11 +338,11 @@ static void stage2_flush_puds(struct kvm *kvm, pgd_t *pgd,
+ 	pud_t *pud;
+ 	phys_addr_t next;
  
- 	pud = pud_offset(pgd, addr);
+-	pud = pud_offset(pgd, addr);
++	pud = stage2_pud_offset(pgd, addr);
  	do {
--		next = kvm_pud_addr_end(addr, end);
-+		next = kvm_pud_addr_end(kvm, addr, end);
- 		if (!pud_none(*pud)) {
--			if (pud_huge(*pud))
-+			if (kvm_pud_huge(kvm, *pud))
+-		next = kvm_pud_addr_end(kvm, addr, end);
+-		if (!pud_none(*pud)) {
+-			if (kvm_pud_huge(kvm, *pud))
++		next = stage2_pud_addr_end(addr, end);
++		if (!stage2_pud_none(*pud)) {
++			if (stage2_pud_huge(*pud))
  				kvm_flush_dcache_pud(*pud);
  			else
  				stage2_flush_pmds(kvm, pud, addr, next);
@@ -151,119 +116,90 @@ index d1e9a71..22b4c99 100644
  	phys_addr_t next;
  	pgd_t *pgd;
  
--	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
-+	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
+-	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
++	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
  	do {
--		next = kvm_pgd_addr_end(addr, end);
-+		next = kvm_pgd_addr_end(kvm, addr, end);
+-		next = kvm_pgd_addr_end(kvm, addr, end);
++		next = stage2_pgd_addr_end(addr, end);
  		stage2_flush_puds(kvm, pgd, addr, next);
  	} while (pgd++, addr = next, addr != end);
  }
-@@ -802,7 +802,7 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
- 	pgd_t *pgd;
+@@ -803,15 +803,15 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
  	pud_t *pud;
  
--	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
-+	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
- 	if (WARN_ON(pgd_none(*pgd))) {
+ 	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
+-	if (WARN_ON(pgd_none(*pgd))) {
++	if (WARN_ON(stage2_pgd_none(*pgd))) {
  		if (!cache)
  			return NULL;
-@@ -1040,7 +1040,7 @@ static void stage2_wp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
- 	pmd = pmd_offset(pud, addr);
+ 		pud = mmu_memory_cache_alloc(cache);
+-		pgd_populate(NULL, pgd, pud);
++		stage2_pgd_populate(NULL, pgd, pud);
+ 		get_page(virt_to_page(pgd));
+ 	}
+ 
+-	return pud_offset(pgd, addr);
++	return stage2_pud_offset(pgd, addr);
+ }
+ 
+ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+@@ -821,15 +821,15 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
+ 	pmd_t *pmd;
+ 
+ 	pud = stage2_get_pud(kvm, cache, addr);
+-	if (pud_none(*pud)) {
++	if (stage2_pud_none(*pud)) {
+ 		if (!cache)
+ 			return NULL;
+ 		pmd = mmu_memory_cache_alloc(cache);
+-		pud_populate(NULL, pud, pmd);
++		stage2_pud_populate(NULL, pud, pmd);
+ 		get_page(virt_to_page(pud));
+ 	}
+ 
+-	return pmd_offset(pud, addr);
++	return stage2_pmd_offset(pud, addr);
+ }
+ 
+ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+@@ -1037,10 +1037,10 @@ static void stage2_wp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+ 	pmd_t *pmd;
+ 	phys_addr_t next;
+ 
+-	pmd = pmd_offset(pud, addr);
++	pmd = stage2_pmd_offset(pud, addr);
  
  	do {
--		next = kvm_pmd_addr_end(addr, end);
-+		next = kvm_pmd_addr_end(NULL, addr, end);
+-		next = kvm_pmd_addr_end(NULL, addr, end);
++		next = stage2_pmd_addr_end(addr, end);
  		if (!pmd_none(*pmd)) {
  			if (huge_pmd(*pmd)) {
  				if (!kvm_s2pmd_readonly(pmd))
-@@ -1067,10 +1067,10 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
+@@ -1065,12 +1065,12 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
+ 	pud_t *pud;
+ 	phys_addr_t next;
  
- 	pud = pud_offset(pgd, addr);
+-	pud = pud_offset(pgd, addr);
++	pud = stage2_pud_offset(pgd, addr);
  	do {
--		next = kvm_pud_addr_end(addr, end);
-+		next = kvm_pud_addr_end(NULL, addr, end);
- 		if (!pud_none(*pud)) {
+-		next = kvm_pud_addr_end(NULL, addr, end);
+-		if (!pud_none(*pud)) {
++		next = stage2_pud_addr_end(addr, end);
++		if (!stage2_pud_none(*pud)) {
  			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(kvm_pud_huge(*pud));
-+			BUG_ON(kvm_pud_huge(NULL, *pud));
+-			BUG_ON(kvm_pud_huge(NULL, *pud));
++			BUG_ON(stage2_pud_huge(*pud));
  			stage2_wp_pmds(pud, addr, next);
  		}
  	} while (pud++, addr = next, addr != end);
-@@ -1087,7 +1087,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
- 	pgd_t *pgd;
- 	phys_addr_t next;
- 
--	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
-+	pgd = kvm->arch.pgd + kvm_pgd_index(kvm, addr);
- 	do {
- 		/*
- 		 * Release kvm_mmu_lock periodically if the memory region is
-@@ -1099,7 +1099,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
- 		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+@@ -1100,7 +1100,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
  			cond_resched_lock(&kvm->mmu_lock);
  
--		next = kvm_pgd_addr_end(addr, end);
-+		next = kvm_pgd_addr_end(kvm, addr, end);
- 		if (pgd_present(*pgd))
+ 		next = kvm_pgd_addr_end(kvm, addr, end);
+-		if (pgd_present(*pgd))
++		if (stage2_pgd_present(*pgd))
  			stage2_wp_puds(pgd, addr, next);
  	} while (pgd++, addr = next, addr != end);
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index a01d87d..416ca23 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -71,6 +71,7 @@
- #include <asm/cacheflush.h>
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
-+#include <linux/hugetlb.h>
- 
- #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
- 
-@@ -141,11 +142,28 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- 	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
  }
- 
--#define kvm_pud_huge(_x)	pud_huge(_x)
-+static inline int kvm_pud_huge(struct kvm *kvm, pud_t pud)
-+{
-+	return pud_huge(pud);
-+}
-+
-+static inline phys_addr_t
-+kvm_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-+{
-+	return	pgd_addr_end(addr, end);
-+}
-+
-+static inline phys_addr_t
-+kvm_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-+{
-+	return	pud_addr_end(addr, end);
-+}
- 
--#define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
--#define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
--#define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
-+static inline phys_addr_t
-+kvm_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-+{
-+	return	pmd_addr_end(addr, end);
-+}
- 
- /*
-  * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
-@@ -161,7 +179,10 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- #endif
- #define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
- 
--#define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
-+static inline phys_addr_t kvm_pgd_index(struct kvm *kvm, phys_addr_t addr)
-+{
-+	return (addr >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1);
-+}
- 
- /*
-  * If we are concatenating first level stage-2 page tables, we would have less
 -- 
 1.7.9.5
