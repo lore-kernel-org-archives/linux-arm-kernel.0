@@ -1,108 +1,61 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Mon, 14 Mar 2016 16:36:15 +0530
-Subject: [PATCH v2 2/2] net: thunderx: Adjust nicvf structure to reduce cache
- misses
-In-Reply-To: <1457953578-7054-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1457953578-7054-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1457953578-7054-3-git-send-email-sunil.kovvuri@gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 14 Mar 2016 11:13:14 +0000
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <20160313181608.GA15988@cbox>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <56E00A7E.4080101@semihalf.com> <20160313181608.GA15988@cbox>
+Message-ID: <56E69CCA.5070407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+Hi,
 
-Adjusted nicvf structure such that all elements used in hot
-path like napi, xmit e.t.c fall into same cache line. This reduced
-no of cache misses and resulted in ~2% increase in no of packets
-handled on a core.
+On 13/03/16 18:16, Christoffer Dall wrote:
+> On Wed, Mar 09, 2016 at 12:35:26PM +0100, Tomasz Nowicki wrote:
+>> Hi Andre,
+>>
+>> Forgive me if anybody already asked this question for previous
+>> series versions.
+>>
+>> The review is still pending so it is worth to ask. What is your idea
+>> for saving and restoring vITS state? I notice device, itte and
+>> collection linked lists which are essential for vITS state. Of
+>> course it is not feasible to transfer these list to e.g. QEMU using
+>> KVM_{GET|SET}_DEVICE_ATTR.
+>>
+> If I recall correctly these items are the ones stored in memory on real
+> hardware, and not in hardware registers.
 
-Also modified elements with :1 notation to boolean, to be
-consistent with other element definitions.
+Potentially, but not necessarily.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h |   52 ++++++++++++++++------------
- 1 files changed, 30 insertions(+), 22 deletions(-)
+> We had an idea where userspace asks the kernel vgic to flush its
+> internal cache into the memory allocated by the guest driver for the
+> vITS data structures and then the state would be transferred across to
+> the new VM via the memory transfer mechanism.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 872b22d..83025bb 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -272,46 +272,54 @@ struct nicvf {
- 	struct nicvf		*pnicvf;
- 	struct net_device	*netdev;
- 	struct pci_dev		*pdev;
-+	void __iomem		*reg_base;
-+	struct queue_set	*qs;
-+	struct nicvf_cq_poll	*napi[8];
- 	u8			vf_id;
--	u8			node;
--	u8			tns_mode:1;
--	u8			sqs_mode:1;
--	u8			loopback_supported:1;
-+	u8			sqs_id;
-+	bool                    sqs_mode;
- 	bool			hw_tso;
--	u16			mtu;
--	struct queue_set	*qs;
-+
-+	/* Receive buffer alloc */
-+	u32			rb_page_offset;
-+	u16			rb_pageref;
-+	bool			rb_alloc_fail;
-+	bool			rb_work_scheduled;
-+	struct page		*rb_page;
-+	struct delayed_work	rbdr_work;
-+	struct tasklet_struct	rbdr_task;
-+
-+	/* Secondary Qset */
-+	u8			sqs_count;
- #define	MAX_SQS_PER_VF_SINGLE_NODE		5
- #define	MAX_SQS_PER_VF				11
--	u8			sqs_id;
--	u8			sqs_count; /* Secondary Qset count */
- 	struct nicvf		*snicvf[MAX_SQS_PER_VF];
-+
-+	/* Queue count */
- 	u8			rx_queues;
- 	u8			tx_queues;
- 	u8			max_queues;
--	void __iomem		*reg_base;
-+
-+	u8			node;
-+	u8			cpi_alg;
-+	u16			mtu;
- 	bool			link_up;
- 	u8			duplex;
- 	u32			speed;
--	struct page		*rb_page;
--	u32			rb_page_offset;
--	u16			rb_pageref;
--	bool			rb_alloc_fail;
--	bool			rb_work_scheduled;
--	struct delayed_work	rbdr_work;
--	struct tasklet_struct	rbdr_task;
--	struct tasklet_struct	qs_err_task;
--	struct tasklet_struct	cq_task;
--	struct nicvf_cq_poll	*napi[8];
-+	bool			tns_mode;
-+	bool			loopback_supported;
- 	struct nicvf_rss_info	rss_info;
--	u8			cpi_alg;
-+	struct tasklet_struct	qs_err_task;
-+	struct work_struct	reset_task;
-+
- 	/* Interrupt coalescing settings */
- 	u32			cq_coalesce_usecs;
--
- 	u32			msg_enable;
-+
-+	/* Stats */
- 	struct nicvf_hw_stats   hw_stats;
- 	struct nicvf_drv_stats  drv_stats;
- 	struct bgx_stats	bgx_stats;
--	struct work_struct	reset_task;
- 
- 	/* MSI-X  */
- 	bool			msix_enabled;
--- 
-1.7.1
+The problem with this idea is that we currently don't use guest memory
+to hold those data structures. As we report 0 on reads for all BASER<n>
+registers, this includes Type=0 for each register, which translates into
+"Unimplemented", so a guest OS would never allocate memory for it.
+Instead we claim to hold all information in our "cache" (aka. host
+memory). This has several advantages, but obviously breaks this
+save/restore approach.
+So I see two ways to fix this:
+1.) we find a KVM specific way of letting userland save and restore the
+ITS tables directly
+2.) we implement the BASER<n> registers, but still use our "cache" for
+normal operations. On demand we would serialize KVM's virtual ITS data
+structures and put them into the guest's memory, so they could be
+saved/restored from there.
+
+> Only caveat there I think was that we had to decide on a storage format
+> in those memory regions, to allow QEMU to understand the state and to
+> ensure back/forwards compatibility between KVM versions.
+
+Do we need QEMU to actually understand this? Can't we just leave this
+all to the kernel and QEMU just passes on the data? That would still
+require some ABI stability between kernel versions in this respect, but
+it's less problematic than exposing the data format to userland at all.
+
+Cheers,
+Andre.
