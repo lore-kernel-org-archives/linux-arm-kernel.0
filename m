@@ -1,39 +1,44 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 14 Mar 2016 10:40:06 +0800
-Subject: [PATCH] drm/rockchip: cancel pending vblanks on close
-In-Reply-To: <1457716877-427-1-git-send-email-john@metanate.com>
-References: <1457716877-427-1-git-send-email-john@metanate.com>
-Message-ID: <56E62486.7050700@rock-chips.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 14 Mar 2016 11:09:15 +0800
+Subject: [PATCH 1/2] i2c: rk3x: add support for rk3228
+Message-ID: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?03?12? 01:21, John Keeping wrote:
-> When closing the DRM device while a vblank is pending, we access
-> file_priv after it has been free'd, which gives:
->
->    Unable to handle kernel NULL pointer dereference at virtual address 00000000
->    ...
->    PC is at __list_add+0x5c/0xe8
->    LR is at send_vblank_event+0x54/0x1f0
->    ...
->    [<c02952e8>] (__list_add) from [<c031a7b4>] (send_vblank_event+0x54/0x1f0)
->    [<c031a760>] (send_vblank_event) from [<c031a9c0>] (drm_send_vblank_event+0x70/0x78)
->    [<c031a950>] (drm_send_vblank_event) from [<c031a9f8>] (drm_crtc_send_vblank_event+0x30/0x34)
->    [<c031a9c8>] (drm_crtc_send_vblank_event) from [<c0339ad8>] (vop_isr+0x224/0x28c)
->    [<c03398b4>] (vop_isr) from [<c0081780>] (handle_irq_event_percpu+0x12c/0x3e4)
->
-> This can be triggered somewhat reliably with:
->
-> 	modetest -M rockchip -v -s ...
->
-> Add a preclose hook to the driver so that we can discard any pending
-> vblank events when the device is closed.
->
-> Signed-off-by: John Keeping <john@metanate.com>
+Enable the I2C core for this SoC.
 
-Looks good for me, applied into my drm-fixes.
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+ Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 4 ++--
+ drivers/i2c/busses/i2c-rk3x.c                      | 1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-Thanks for the fix.
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+index f0d71bc..0b4a85f 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+@@ -6,8 +6,8 @@ RK3xxx SoCs.
+ Required properties :
+ 
+  - reg : Offset and length of the register set for the device
+- - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c" or
+-		"rockchip,rk3288-i2c".
++ - compatible : should be "rockchip,rk3066-i2c", "rockchip,rk3188-i2c",
++		"rockchip,rk3228-i2c" or "rockchip,rk3288-i2c".
+  - interrupts : interrupt number
+  - clocks : parent clock
+ 
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 9096d17..3dcc5f3 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -855,6 +855,7 @@ static struct rk3x_i2c_soc_data soc_data[3] = {
+ static const struct of_device_id rk3x_i2c_match[] = {
+ 	{ .compatible = "rockchip,rk3066-i2c", .data = (void *)&soc_data[0] },
+ 	{ .compatible = "rockchip,rk3188-i2c", .data = (void *)&soc_data[1] },
++	{ .compatible = "rockchip,rk3228-i2c", .data = (void *)&soc_data[2] },
+ 	{ .compatible = "rockchip,rk3288-i2c", .data = (void *)&soc_data[2] },
+ 	{},
+ };
 -- 
-?ark Yao
+1.9.1
