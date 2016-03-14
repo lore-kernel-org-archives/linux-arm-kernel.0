@@ -1,116 +1,32 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 14 Mar 2016 11:11:42 +0800
-Subject: [PATCH 2/2] ARM: dts: rockchip: add i2c nodes RK3228 SoCs
-In-Reply-To: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
-References: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1457925102-30476-1-git-send-email-ykk@rock-chips.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 14 Mar 2016 09:34:55 +0530
+Subject: [PATCH v11 4/9] arm64: add conditional instruction simulation
+ support
+In-Reply-To: <20160313120903.54b0c8f2@arm.com>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-5-git-send-email-dave.long@linaro.org>
+ <20160313120903.54b0c8f2@arm.com>
+Message-ID: <20160314040455.GB6584@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the i2c dt nodes for rk3228 SoCs.
+On 13/03/2016:12:09:03 PM, Marc Zyngier wrote:
+> On Wed,  9 Mar 2016 00:32:18 -0500
+> David Long <dave.long@linaro.org> wrote:
+> 
+> > +pstate_check_t * const opcode_condition_checks[16] = {
+> > +	__check_eq, __check_ne, __check_cs, __check_cc,
+> > +	__check_mi, __check_pl, __check_vs, __check_vc,
+> > +	__check_hi, __check_ls, __check_ge, __check_lt,
+> > +	__check_gt, __check_le, __check_al, __check_al
+> 
+> The very last entry seems wrong, or is at least the opposite of what
+> the current code has. It should be something called __check_nv(), and
+> always return false (condition code NEVER).
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- arch/arm/boot/dts/rk3228.dtsi | 80 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
+May be __check_nv() name is more appropriate as per definition, but shouldn't it
+still return true, because TRM says:
+"The condition code NV exists only to provide a valid disassembly of the 0b1111
+encoding, otherwise its behavior is identical to AL"
 
-diff --git a/arch/arm/boot/dts/rk3228.dtsi b/arch/arm/boot/dts/rk3228.dtsi
-index 119ff12..a159296 100644
---- a/arch/arm/boot/dts/rk3228.dtsi
-+++ b/arch/arm/boot/dts/rk3228.dtsi
-@@ -185,6 +185,58 @@
- 		status = "disabled";
- 	};
- 
-+	i2c0: i2c at 11050000 {
-+		compatible = "rockchip,rk3228-i2c";
-+		reg = <0x11050000 0x1000>;
-+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clock-names = "i2c";
-+		clocks = <&cru PCLK_I2C0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c0_xfer>;
-+		status = "disabled";
-+	};
-+
-+	i2c1: i2c at 11060000 {
-+		compatible = "rockchip,rk3228-i2c";
-+		reg = <0x11060000 0x1000>;
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clock-names = "i2c";
-+		clocks = <&cru PCLK_I2C1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c1_xfer>;
-+		status = "disabled";
-+	};
-+
-+	i2c2: i2c at 11070000 {
-+		compatible = "rockchip,rk3228-i2c";
-+		reg = <0x11070000 0x1000>;
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clock-names = "i2c";
-+		clocks = <&cru PCLK_I2C2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c2_xfer>;
-+		status = "disabled";
-+	};
-+
-+	i2c3: i2c at 11080000 {
-+		compatible = "rockchip,rk3228-i2c";
-+		reg = <0x11080000 0x1000>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clock-names = "i2c";
-+		clocks = <&cru PCLK_I2C3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c3_xfer>;
-+		status = "disabled";
-+	};
-+
- 	pwm0: pwm at 110b0000 {
- 		compatible = "rockchip,rk3288-pwm";
- 		reg = <0x110b0000 0x10>;
-@@ -349,6 +401,34 @@
- 			bias-disable;
- 		};
- 
-+		i2c0 {
-+			i2c0_xfer: i2c0-xfer {
-+				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
-+						<0 1 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		i2c1 {
-+			i2c1_xfer: i2c1-xfer {
-+				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_none>,
-+						<0 3 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		i2c2 {
-+			i2c2_xfer: i2c2-xfer {
-+				rockchip,pins = <2 20 RK_FUNC_1 &pcfg_pull_none>,
-+						<2 21 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		i2c3 {
-+			i2c3_xfer: i2c3-xfer {
-+				rockchip,pins = <0 6 RK_FUNC_1 &pcfg_pull_none>,
-+						<0 7 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		emmc {
- 			emmc_clk: emmc-clk {
- 				rockchip,pins = <2 7 RK_FUNC_2 &pcfg_pull_none>;
--- 
-1.9.1
+~Pratyush
