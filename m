@@ -1,52 +1,55 @@
-From: lars.persson@axis.com (Lars Persson)
-Date: Mon, 14 Mar 2016 09:19:45 +0100
-Subject: [PATCH] ARM: dts: artpec: update clock bindings in artpec6.dtsi
-In-Reply-To: <20160313001441.GD17502@localhost>
-References: <1456392854-13527-1-git-send-email-larper@axis.com>
- <20160313001441.GD17502@localhost>
-Message-ID: <56E67421.4030405@axis.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 14 Mar 2016 17:28:34 +0900
+Subject: [PATCH 04/10] ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
+In-Reply-To: <56E658AE.5070806@samsung.com>
+References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
+ <1457921056-21257-5-git-send-email-cw00.choi@samsung.com>
+ <56E658AE.5070806@samsung.com>
+Message-ID: <56E67632.30602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/13/2016 01:14 AM, Olof Johansson wrote:
-> On Thu, Feb 25, 2016 at 10:34:14AM +0100, Lars Persson wrote:
->> The clock bindings for the main clock controller was changed to an
->> indexed controller style binding on request of the clk
->> maintainers. This updates the dtsi to use the new bindings.
+On 2016? 03? 14? 15:22, Krzysztof Kozlowski wrote:
+> On 14.03.2016 11:04, Chanwoo Choi wrote:
+>> This patch adds the MSHC2 (Mobile Storage Host Controller) Device Tree node for
+>> Exynos3250 SoC.
 >>
->> Signed-off-by: Lars Persson <larper@axis.com>
+>> Cc: Kukjin Kim <kgene@kernel.org>
+>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >> ---
->> Note: This patch depends on a header file delivered through the clk tree in
->> "clk: add device tree binding for Artpec-6 clock controller".
->
-> This is a bit painful for us. It works when we get contents sent as pull
-> requests, since then we can share a branch with the clk header file on it.
->
-> However, when we apply patches that's harder.
->
-> I suggest we merge this after both trees have been picked up instead. Please
-> resend after that if we for some reason forget.
->
->
-> The alternative is to just use the numerical constants now, and switch to the
-> symbols after the merge window (or in the next release). I'm getting tempted to
-> propose that solution for more and more of these in the future, since it's a
-> somewhat annoying dependency to have (and we often have them).
->
-> Either way, we're close to the merge window opening, so let's aim to do this
-> patch towards the end. Since it's a new platform, risk for regression doesn't
-> exist, etc.
->
->
-> -Olof
->
+>>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 35 +++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/exynos3250.dtsi         | 13 ++++++++++++
+>>  2 files changed, 48 insertions(+)
+> 
+> 
+> After looking at your other patch ("ARM: dts: Add initial pin
+> configuration for exynos3250-rinato") I have doubts. The Monk will be
+> affected.
 
-Hi
+You're right. On monk board, this line may be not stable.
 
-So let's be flexible :) We will submit a new patch with numerical clock 
-indexes today.
+> 
+> Here you are configuring all the gpk2 GPIOS for EMMC2 mode. Then on
+> Rinato you are setting it back to default non-used state. However the
+> Monk board will remain with this new configuration... so you would have
+> to add initial-state also for Monk.
 
+OK. I'll do it.
 
-- Lars
+> 
+> But how about doing opposite? Configure here the pins to unused state
+> and enable them only for Artik board?
+> 
+> What do you think?
+
+I think that gpk2-[0~6] pins are fixed for MMC2 device.
+So, it is good to add the pin setting for gpk2-[0~6] to exynos3250-pinctrl.dtsi.
+
+If mmc2 device is not used like rinato and monk board,
+we should add the initial setting as NC (not connected) pin state
+as other patch (ARM: dts: Add initial pin configuration for exynos3250-rinato).
+
+Best Regards,
+Chanwoo Choi
