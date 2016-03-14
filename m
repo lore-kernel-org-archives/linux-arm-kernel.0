@@ -1,26 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Mar 2016 19:51:34 +0100
-Subject: [PATCH 1/3] ARM: dts: sun8i: Fix wrong Quad core / a33 compat
- for sun8i-a23-gt90h-v4
-In-Reply-To: <1457973145-26203-1-git-send-email-hdegoede@redhat.com>
-References: <1457973145-26203-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160314185134.GD30977@lukather>
+Date: Mon, 14 Mar 2016 19:52:43 +0100
+Subject: [linux-sunxi][PATCH 3/5] ARM: dts: sunxi: Add the SPDIF to the
+ A10 and A20
+In-Reply-To: <CAEKpxBm4bs7sNSbDjomdP6XS2ApvfDT-s942DBb3JWv1iOZJ0w@mail.gmail.com>
+References: <1456589909-2428-1-git-send-email-codekipper@gmail.com>
+ <1456589909-2428-4-git-send-email-codekipper@gmail.com>
+ <20160313215043.GJ8418@lukather>
+ <CAEKpxBm4bs7sNSbDjomdP6XS2ApvfDT-s942DBb3JWv1iOZJ0w@mail.gmail.com>
+Message-ID: <20160314185243.GE30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2016 at 05:32:23PM +0100, Hans de Goede wrote:
-> As the dts file name already implies sun8i-a23-gt90h-v4.dts is for
-> an a23 equipped tablet. I don't know how the "Quad Core" or a33
-> comaptible got in there, likely a copy and paste error.
-> 
-> Regardless this commit fixes this, note this is almost
-> purely a cosmetical fix, for all things that matter at the
-> machine compatible level the a23 and a33 are compatible.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Mon, Mar 14, 2016 at 05:29:37PM +0100, Code Kipper wrote:
+> >> +             spdif: spdif at 01c21000 {
+> >> +                     #sound-dai-cells = <0>;
+> >> +                     compatible = "allwinner,sun4i-a10-spdif";
+> >> +                     reg = <0x01c21000 0x40>;
+> >
+> > It only takes 64 bytes?
+>
+> Yep(just like the audio codec!)
+> http://linux-sunxi.org/SPDIF#SUNXI_SPDIF_DEFAULT_VALUES
 
-Applied all three, thanks
+Yet the datasheet says it takes 1k in the memory map.
 
+Please use that value instead.
+
+Thanks!
 Maxime
 
 -- 
@@ -33,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160314/35f2da9f/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160314/8ce1a327/attachment.sig>
