@@ -1,75 +1,62 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 14 Mar 2016 17:48:01 +0000
-Subject: [PATCH v15 20/20] arm64: kdump: update a kernel doc
+Date: Mon, 14 Mar 2016 17:48:00 +0000
+Subject: [PATCH v15 08/20] arm64: Add new asm macro copy_page
 In-Reply-To: <cover.1457977401.git.geoff@infradead.org>
 References: <cover.1457977401.git.geoff@infradead.org>
-Message-ID: <906d185a6451d3349669bcf4b080129dfaa7359f.1457977403.git.geoff@infradead.org>
+Message-ID: <e24c93093330fa44db3bbd12785eed30e8f5b9b0.1457977402.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Kexec and hibernate need to copy pages of memory, but may not have all
+of the kernel mapped, and are unable to call copy_page().
 
-This patch adds arch specific descriptions about kdump usage on arm64
-to kdump.txt.
+Add a simplistic copy_page() macro, that can be inlined in these
+situations. lib/copy_page.S provides a bigger better version, but
+uses more registers.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+[Changed asm label to 9998, added commit message]
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- Documentation/kdump/kdump.txt | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/assembler.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index bc4bd5a..acc4d98 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
- a remote system.
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index ec4e37c..f3854d9 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -24,6 +24,7 @@
+ #define __ASM_ASSEMBLER_H
  
- Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
--s390x and arm architectures.
-+s390x, arm and arm64 architectures.
+ #include <asm/asm-offsets.h>
++#include <asm/page.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+@@ -285,6 +286,24 @@ lr	.req	x30		// link register
+ 	.endm
  
- When the system kernel boots, it reserves a small section of memory for
- the dump-capture kernel. This ensures that ongoing Direct Memory Access
-@@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
- 
-     AUTO_ZRELADDR=y
- 
-+Dump-capture kernel config options (Arch Dependent, arm64)
-+----------------------------------------------------------
+ /*
++ * copy_page - copy src to dest using temp registers t1-t8
++ */
++	.macro copy_page dest:req src:req t1:req t2:req t3:req t4:req t5:req t6:req t7:req t8:req
++9998:	ldp	\t1, \t2, [\src]
++	ldp	\t3, \t4, [\src, #16]
++	ldp	\t5, \t6, [\src, #32]
++	ldp	\t7, \t8, [\src, #48]
++	add	\src, \src, #64
++	stnp	\t1, \t2, [\dest]
++	stnp	\t3, \t4, [\dest, #16]
++	stnp	\t5, \t6, [\dest, #32]
++	stnp	\t7, \t8, [\dest, #48]
++	add	\dest, \dest, #64
++	tst	\src, #(PAGE_SIZE - 1)
++	b.ne	9998b
++	.endm
 +
-+1) Currently, kvm will not be enabled on the dump-capture kernel even
-+   if it is configured.
-+
- Extended crashkernel syntax
- ===========================
- 
-@@ -312,6 +318,8 @@ Boot into System Kernel
-    any space below the alignment point may be overwritten by the dump-capture kernel,
-    which means it is possible that the vmcore is not that precise as expected.
- 
-+   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-+   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
- 
- Load the Dump-capture Kernel
- ============================
-@@ -334,6 +342,8 @@ For s390x:
- 	- Use image or bzImage
- For arm:
- 	- Use zImage
-+For arm64:
-+	- Use vmlinux or Image
- 
- If you are using a uncompressed vmlinux image then use following command
- to load dump-capture kernel.
-@@ -377,6 +387,9 @@ For s390x:
- For arm:
- 	"1 maxcpus=1 reset_devices"
- 
-+For arm64:
-+	"1 maxcpus=1 reset_devices"
-+
- Notes on loading the dump-capture kernel:
- 
- * By default, the ELF headers are stored in ELF64 format to support
++/*
+  * Annotate a function as position independent, i.e., safe to be called before
+  * the kernel virtual mapping is activated.
+  */
 -- 
 2.5.0
