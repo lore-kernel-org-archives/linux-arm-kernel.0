@@ -1,76 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Mar 2016 09:44:35 +0100
-Subject: [PATCH v6 net-next 01/10] misc: sram: add optional ioremap
- without write combining
-In-Reply-To: <1457944745-7634-2-git-send-email-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Mon, 14 Mar 2016 09:38:56 +0100")
-References: <1457944745-7634-1-git-send-email-gregory.clement@free-electrons.com>
- <1457944745-7634-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <87fuvt1ma4.fsf@free-electrons.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 14 Mar 2016 17:48:32 +0900
+Subject: [PATCH 09/10] ARM: dts: Add MSHC2 dt node for SD card for
+ exynos3250-artik5-devel board
+In-Reply-To: <56E676EE.8060500@samsung.com>
+References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
+ <1457921056-21257-11-git-send-email-cw00.choi@samsung.com>
+ <56E676EE.8060500@samsung.com>
+Message-ID: <56E67AE0.9060306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 2016? 03? 14? 17:31, Krzysztof Kozlowski wrote:
+> On 14.03.2016 11:04, Chanwoo Choi wrote:
+>> From: Jaehoon Chung <jh80.chung@samsung.com>
+>>
+>> This patch adds MSHC (Mobile Storage Host Controller) dt node for
+>> Exynos3250 SoC. MSHC is an interface between the system and the SD card
+>>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos3250-artik5-devel.dts | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250-artik5-devel.dts b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
+>> index d17c28969118..a371baf8536d 100644
+>> --- a/arch/arm/boot/dts/exynos3250-artik5-devel.dts
+>> +++ b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
+>> @@ -21,6 +21,22 @@
+>>  			"samsung,exynos3250", "samsung,exynos3";
+>>  };
+>>  
+>> +&mshc_2 {
+>> +	num-slots = <1>;
+>> +	cap-sd-highspeed;
+>> +	disable-wp;
+>> +	card-detect-delay = <200>;
+>> +	clock-frequency = <100000000>;
+>> +	clock-freq-min-max = <400000 100000000>;
+>> +	samsung,dw-mshc-ciu-div = <1>;
+>> +	samsung,dw-mshc-sdr-timing = <0 1>;
+>> +	samsung,dw-mshc-ddr-timing = <1 2>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&sd2_cmd &sd2_clk &sd2_cd &sd2_bus1 &sd2_bus4>;
+>> +	bus-width = <4>;
+>> +	status = "okay";
+> 
+> vqmmc-supply = ldo3?
 
-I forgot to add you in CC for this patch.
-What is your opinion about it?
+ldo3 is always on state because ldo3 is used for various IP in exynos3250.
+I think that we had better to remain always on state for ldo3.
 
-Gregory
- 
- On lun., mars 14 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> From: Marcin Wojtas <mw@semihalf.com>
->
-> Some SRAM users may require non-bufferable access to the memory, which is
-> impossible, because devm_ioremap_wc() is used for setting sram->virt_base.
->
-> This commit adds optional flag 'no-memory-wc', which allow to choose remap
-> method, using DT property. Documentation is updated accordingly.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> ---
->  Documentation/devicetree/bindings/sram/sram.txt | 5 +++++
->  drivers/misc/sram.c                             | 5 ++++-
->  2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/sram/sram.txt b/Documentation/devicetree/bindings/sram/sram.txt
-> index 42ee9438b771..227e3a341af1 100644
-> --- a/Documentation/devicetree/bindings/sram/sram.txt
-> +++ b/Documentation/devicetree/bindings/sram/sram.txt
-> @@ -25,6 +25,11 @@ Required properties in the sram node:
->  - ranges : standard definition, should translate from local addresses
->             within the sram to bus addresses
->  
-> +Optional properties in the sram node:
-> +
-> +- no-memory-wc : the flag indicating, that SRAM memory region has not to
-> +                 be remapped as write combining. WC is used by default.
-> +
->  Required properties in the area nodes:
->  
->  - reg : iomem address range, relative to the SRAM range
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> index 736dae715dbf..69cdabea9c03 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -360,7 +360,10 @@ static int sram_probe(struct platform_device *pdev)
->  		return -EBUSY;
->  	}
->  
-> -	sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
-> +	if (of_property_read_bool(pdev->dev.of_node, "no-memory-wc"))
-> +		sram->virt_base = devm_ioremap(sram->dev, res->start, size);
-> +	else
-> +		sram->virt_base = devm_ioremap_wc(sram->dev, res->start, size);
->  	if (IS_ERR(sram->virt_base))
->  		return PTR_ERR(sram->virt_base);
->  
-> -- 
-> 2.5.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards,
+Chanwoo Choi
