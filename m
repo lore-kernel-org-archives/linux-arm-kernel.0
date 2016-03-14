@@ -1,36 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Mar 2016 15:07:10 +0100
-Subject: [PATCH 1/3] net: mediatek: use dma_addr_t correctly
-Message-ID: <1457964435-2945038-1-git-send-email-arnd@arndb.de>
+Date: Mon, 14 Mar 2016 15:07:11 +0100
+Subject: [PATCH 2/3] net: mediatek: remove incorrect dma_mask assignment
+In-Reply-To: <1457964435-2945038-1-git-send-email-arnd@arndb.de>
+References: <1457964435-2945038-1-git-send-email-arnd@arndb.de>
+Message-ID: <1457964435-2945038-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_alloc_coherent() expects a dma_addr_t pointer as its argument,
-not an 'unsigned int', and gcc correctly warns about broken
-code in the mtk_init_fq_dma function:
+Device drivers should not mess with the DMA mask directly,
+but instead call dma_set_mask() etc if needed.
 
-drivers/net/ethernet/mediatek/mtk_eth_soc.c: In function 'mtk_init_fq_dma':
-drivers/net/ethernet/mediatek/mtk_eth_soc.c:463:13: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
+In case of the mtk_eth_soc driver, the mask already gets set
+correctly when the device is created, and setting it again
+is against the documented API.
 
-This changes the type of the local variable to dma_addr_t.
+This removes the incorrect setting.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/ethernet/mediatek/mtk_eth_soc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-index ba3afa5d4640..3e42204adfe5 100644
+index 3e42204adfe5..87f417712da0 100644
 --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
 +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -453,7 +453,7 @@ static inline void mtk_rx_get_desc(struct mtk_rx_dma *rxd,
- /* the qdma core needs scratch memory to be setup */
- static int mtk_init_fq_dma(struct mtk_eth *eth)
- {
--	unsigned int phy_ring_head, phy_ring_tail;
-+	dma_addr_t phy_ring_head, phy_ring_tail;
- 	int cnt = MTK_DMA_SIZE;
- 	dma_addr_t dma_addr;
- 	int i;
+@@ -1676,9 +1676,6 @@ static int mtk_probe(struct platform_device *pdev)
+ 	struct mtk_eth *eth;
+ 	int err;
+ 
+-	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+-	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+-
+ 	device_reset(&pdev->dev);
+ 
+ 	match = of_match_device(of_mtk_match, &pdev->dev);
 -- 
 2.7.0
