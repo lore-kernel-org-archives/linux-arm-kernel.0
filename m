@@ -1,40 +1,249 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 14 Mar 2016 15:22:38 +0900
-Subject: [PATCH 04/10] ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
-In-Reply-To: <1457921056-21257-5-git-send-email-cw00.choi@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-5-git-send-email-cw00.choi@samsung.com>
-Message-ID: <56E658AE.5070806@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 14 Mar 2016 15:26:14 +0900
+Subject: [PATCH] kbuild: drop FORCE from PHONY targets
+In-Reply-To: <CALCETrU+6sj=reBgPBy7Mq6KYY7BKkVLGwm4XrVzOzb8aU+meg@mail.gmail.com>
+References: <1457828035-30584-1-git-send-email-yamada.masahiro@socionext.com>
+ <CALCETrVqzidL7SXsCVm8wWrcQMR9dFOLGnDtC-eEYMO4a+yszA@mail.gmail.com>
+ <CAK7LNARELkQbhAfBdh9Tx7gVGkpN9gTJzoqJwOF-0CH4zm+wcw@mail.gmail.com>
+ <CALCETrVgSUy4ofeBmkZ7TurKvmQVX8C1aj__SLOL6SboQ3S-WA@mail.gmail.com>
+ <CAK7LNAQOJjcn7Q+s_pKqzUuojMBtOsRNKsmVwDFXvTeU-zvSeQ@mail.gmail.com>
+ <CALCETrU+6sj=reBgPBy7Mq6KYY7BKkVLGwm4XrVzOzb8aU+meg@mail.gmail.com>
+Message-ID: <CAK7LNATAeMmfwWiZha17mbyWhF6bR5RGjv+gbsQTvL4teoTiPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.03.2016 11:04, Chanwoo Choi wrote:
-> This patch adds the MSHC2 (Mobile Storage Host Controller) Device Tree node for
-> Exynos3250 SoC.
-> 
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 35 +++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos3250.dtsi         | 13 ++++++++++++
->  2 files changed, 48 insertions(+)
+Hi Andy,
 
 
-After looking at your other patch ("ARM: dts: Add initial pin
-configuration for exynos3250-rinato") I have doubts. The Monk will be
-affected.
+2016-03-14 13:44 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
+> On Sun, Mar 13, 2016 at 9:36 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> 2016-03-14 13:28 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
+>>> On Sun, Mar 13, 2016 at 9:08 PM, Masahiro Yamada
+>>> <yamada.masahiro@socionext.com> wrote:
+>>>>
+>>>> Hi Andy
+>>>>
+>>>> 2016-03-14 9:39 GMT+09:00 Andy Lutomirski <luto@amacapital.net>:
+>>>> > On Mar 12, 2016 4:14 PM, "Masahiro Yamada"
+>>>> > <yamada.masahiro@socionext.com> wrote:
+>>>> >>
+>>>> >> These targets are marked as PHONY.  No need to add FORCE to their
+>>>> >> dependency.
+>>>> >
+>>>> > If this is, in fact, correct, can you update
+>>>> > Documentation/kbuild/makefiles.txt as well?
+>>>>
+>>>> Which line do you want me to update?
+>>>>
+>>>
+>>> All the references to FORCE should probably mention .PHONY as an alternative.
+>>
+>> I do not get your point.
+>>
+>> All the examples in the makefile.txt correctly reference to FORCE.
+>> They are not PHONY targets.
+>> No need to update.
+>
+> But they could be.  For example:
+>
+>                 $(obj)/image: vmlinux FORCE
+>                         $(call if_changed,objcopy)
+>
+> could be:
+>
+>                  .PHONY: $(obj)/image
+>                 $(obj)/image: vmlinux
+>                         $(call if_changed,objcopy)
+>
+> I would at least change:
+>
+> Note: It is a typical mistake to forget the FORCE prerequisite.
+>
+> to:
+>
+> Note: if-changed is only useful if make executes it, which won't
+> happen if it determines that the inputs have not changed since the
+> output was built.  This can be avoided by specifying FORCE as a
+> prerequisite or by making declaring the output as .PHONY.
+>
 
-Here you are configuring all the gpk2 GPIOS for EMMC2 mode. Then on
-Rinato you are setting it back to default non-used state. However the
-Monk board will remain with this new configuration... so you would have
-to add initial-state also for Monk.
 
-But how about doing opposite? Configure here the pins to unused state
-and enable them only for Artik board?
+No. This is absolutely wrong.
+PHONY and FORCE are not interchangeable.
 
-What do you think?
+They have different behavior.
+I will show you how they behave differently.
 
-Best regards,
-Krzysztof
+
+BTW, Linux 4.5 is out now.
+
+Let's try a simple experiment on it.
+
+
+The following shows that my source tree is v4.5
+
+yamada at beagle:~/workspace/linux$ git describe
+v4.5
+
+
+
+Example 1)
+
+
+Add the following code to the top Makefile.
+
+Please note "FORCE" is used here.
+
+
+yamada at beagle:~/workspace/linux$ git diff
+diff --git a/Makefile b/Makefile
+index 7b3ecdc..89b7d0d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -914,6 +914,22 @@ export KBUILD_ALLDIRS := $(sort $(filter-out
+arch/%,$(vmlinux-
+
+ vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN)
+
++quiet_cmd_gen_foo = FOO     $@
++      cmd_gen_foo = (cat $<; echo hello) > $@
++
++foo: bar FORCE
++       $(call if_changed,gen_foo)
++
++quiet_cmd_gen_bar = BAR     $@
++      cmd_gen_bar = (cat $<; echo $(GREETING)) > $@
++
++bar: baz FORCE
++       $(call if_changed,gen_bar)
++
++baz:
++       @touch $@
++
++
+ # Final link of vmlinux
+       cmd_link-vmlinux = $(CONFIG_SHELL) $< $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux)
+ quiet_cmd_link-vmlinux = LINK    $@
+
+
+
+Try the following.
+
+yamada at beagle:~/workspace/linux$ git clean -x -f
+yamada at beagle:~/workspace/linux$ make -s defconfig
+yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
+scripts/kconfig/conf  --silentoldconfig Kconfig
+  BAR     bar
+  FOO     foo
+yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
+make: `foo' is up to date.
+yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
+  BAR     bar
+  FOO     foo
+yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
+make: `foo' is up to date.
+yamada at beagle:~/workspace/linux$ make GREETING=GoodEvening foo
+  BAR     bar
+  FOO     foo
+yamada@beagle:~/workspace/linux$ make GREETING=GoodEvening foo
+make: `foo' is up to date.
+
+
+
+
+Please notice "foo" and "bar" were not rebuilt
+when I gave the same command line as the previous run.
+
+
+When I changed the command line, "bar"  was update
+and "foo" was also updated because "foo" depends on "bar".
+
+
+It means $(call if_changed,...) is working as expected.
+
+
+
+
+
+
+Example 2)
+
+
+Add the following to the top Makefile.
+Please notice that I just replaced "FORCE" with ".PHONY".
+
+
+
+diff --git a/Makefile b/Makefile
+index 7b3ecdc..a0899c3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -914,6 +914,24 @@ export KBUILD_ALLDIRS := $(sort $(filter-out
+arch/%,$(vmlinux-
+
+ vmlinux-deps := $(KBUILD_LDS) $(KBUILD_VMLINUX_INIT) $(KBUILD_VMLINUX_MAIN)
+
++quiet_cmd_gen_foo = FOO     $@
++      cmd_gen_foo = (cat $<; echo hello) > $@
++
++.PHONY: foo
++foo: bar
++       $(call if_changed,gen_foo)
++
++quiet_cmd_gen_bar = BAR     $@
++      cmd_gen_bar = (cat $<; echo $(GREETING)) > $@
++
++.PHONY: bar
++bar: baz
++       $(call if_changed,gen_bar)
++
++baz:
++       @touch $@
++
++
+ # Final link of vmlinux
+       cmd_link-vmlinux = $(CONFIG_SHELL) $< $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux)
+ quiet_cmd_link-vmlinux = LINK    $@
+
+
+
+Let's try the same thing.
+
+
+
+yamada at beagle:~/workspace/linux$ git clean -x -f
+yamada at beagle:~/workspace/linux$ make -s defconfig
+yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
+scripts/kconfig/conf  --silentoldconfig Kconfig
+  BAR     bar
+  FOO     foo
+yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
+  BAR     bar
+  FOO     foo
+yamada at beagle:~/workspace/linux$ make GREETING=GoodMorning foo
+  BAR     bar
+  FOO     foo
+yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
+  BAR     bar
+  FOO     foo
+yamada at beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
+  BAR     bar
+  FOO     foo
+yamada@beagle:~/workspace/linux$ make GREETING=GoodAfternoon foo
+  BAR     bar
+  FOO     foo
+
+
+Did you notice the difference?
+
+The "foo" and "bar" are always rebuilt
+regardless the command line is changed or not.
+
+It means $(call if_changed,...) is not working.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
