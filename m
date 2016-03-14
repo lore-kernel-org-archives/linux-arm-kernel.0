@@ -1,127 +1,228 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Mon, 14 Mar 2016 17:48:01 +0000
-Subject: [PATCH v15 14/20] arm64/kexec: Add pr_debug output
+Subject: [PATCH v15 18/20] arm64: kdump: add kdump support
 In-Reply-To: <cover.1457977401.git.geoff@infradead.org>
 References: <cover.1457977401.git.geoff@infradead.org>
-Message-ID: <01d394e5cb1277887e7107abfeff85f01c5e706f.1457977403.git.geoff@infradead.org>
+Message-ID: <094cfb96a58bfa5d193f57233556f7aad3cb7780.1457977403.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid in debugging kexec problems or when adding new functionality to kexec add
-a new routine kexec_image_info() and several inline pr_debug statements.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+On crash dump kernel, all the information about primary kernel's system
+memory (core image) is available in elf core header.
+The primary kernel will set aside this header with reserve_elfcorehdr()
+at boot time and inform crash dump kernel of its location via a new
+device-tree property, "linux,elfcorehdr".
+
+Please note that all other architectures use traditional "elfcorehdr="
+kernel parameter for this purpose.
+
+Then crash dump kernel will access the primary kernel's memory with
+copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+not reside in linear mapping on crash dump kernel.
+
+We also need our own elfcorehdr_read() here since the header is placed
+within crash dump kernel's usable memory.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 67 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 65 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig             | 11 +++++++
+ arch/arm64/kernel/Makefile     |  1 +
+ arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
+ 4 files changed, 137 insertions(+)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 6fd0f0c..75f6696 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -11,6 +11,7 @@
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3001c51..0780e4c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -613,6 +613,17 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
  
- #include <linux/highmem.h>
- #include <linux/kexec.h>
-+#include <linux/libfdt_env.h>
- #include <linux/of_fdt.h>
- #include <linux/slab.h>
- #include <linux/uaccess.h>
-@@ -26,6 +27,47 @@ extern const unsigned long arm64_relocate_new_kernel_size;
++config CRASH_DUMP
++	bool "Build kdump crash kernel"
++	help
++	  Generate crash dump after being started by kexec. This should
++	  be normally only set in special crash dump kernels which are
++	  loaded in the main kernel with kexec-tools into a specially
++	  reserved region and then later executed after a crash by
++	  kdump/kexec.
++
++	  For more details see Documentation/kdump/kdump.txt
++
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index c0aa90d..804ecd4 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -44,6 +44,7 @@ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
++arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
  
- static unsigned long kimage_start;
- 
-+/**
-+ * kexec_is_dtb - Helper routine to check the device tree header signature.
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
+new file mode 100644
+index 0000000..2dc54d1
+--- /dev/null
++++ b/arch/arm64/kernel/crash_dump.c
+@@ -0,0 +1,71 @@
++/*
++ * Routines for doing kexec-based kdump
++ *
++ * Copyright (C) 2014 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+static bool kexec_is_dtb(const void *dtb)
-+{
-+	__be32 magic;
 +
-+	if (get_user(magic, (__be32 *)dtb))
-+		return false;
-+
-+	return fdt32_to_cpu(magic) == OF_DT_HEADER;
-+}
++#include <linux/crash_dump.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/memblock.h>
++#include <linux/uaccess.h>
++#include <asm/memory.h>
 +
 +/**
-+ * kexec_image_info - For debugging output.
++ * copy_oldmem_page() - copy one page from old kernel memory
++ * @pfn: page frame number to be copied
++ * @buf: buffer where the copied page is placed
++ * @csize: number of bytes to copy
++ * @offset: offset in bytes into the page
++ * @userbuf: if set, @buf is in a user address space
++ *
++ * This function copies one page from old kernel memory into buffer pointed by
++ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
++ * copied or negative error in case of failure.
 + */
-+#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
-+static void _kexec_image_info(const char *func, int line,
-+	const struct kimage *kimage)
++ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
++			 size_t csize, unsigned long offset,
++			 int userbuf)
 +{
-+	unsigned long i;
++	void *vaddr;
 +
-+	pr_debug("%s:%d:\n", func, line);
-+	pr_debug("  kexec kimage info:\n");
-+	pr_debug("    type:        %d\n", kimage->type);
-+	pr_debug("    start:       %lx\n", kimage->start);
-+	pr_debug("    head:        %lx\n", kimage->head);
-+	pr_debug("    nr_segments: %lu\n", kimage->nr_segments);
++	if (!csize)
++		return 0;
 +
-+	for (i = 0; i < kimage->nr_segments; i++) {
-+		pr_debug("      segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages%s\n",
-+			i,
-+			kimage->segment[i].mem,
-+			kimage->segment[i].mem + kimage->segment[i].memsz,
-+			kimage->segment[i].memsz,
-+			kimage->segment[i].memsz /  PAGE_SIZE,
-+			(kexec_is_dtb(kimage->segment[i].buf) ?
-+				", dtb segment" : ""));
++	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
++	if (!vaddr)
++		return -ENOMEM;
++
++	if (userbuf) {
++		if (copy_to_user(buf, vaddr + offset, csize)) {
++			iounmap(vaddr);
++			return -EFAULT;
++		}
++	} else {
++		memcpy(buf, vaddr + offset, csize);
 +	}
++
++	iounmap(vaddr);
++
++	return csize;
 +}
 +
- void machine_kexec_cleanup(struct kimage *kimage)
- {
- 	/* Empty routine needed to avoid build errors. */
-@@ -39,6 +81,8 @@ void machine_kexec_cleanup(struct kimage *kimage)
- int machine_kexec_prepare(struct kimage *kimage)
- {
- 	kimage_start = kimage->start;
-+	kexec_image_info(kimage);
-+
- 	return 0;
++/**
++ * elfcorehdr_read - read from ELF core header
++ * @buf: buffer where the data is placed
++ * @csize: number of bytes to read
++ * @ppos: address in the memory
++ *
++ * This function reads @count bytes from elf core header which exists
++ * on crash dump kernel's memory.
++ */
++ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
++{
++	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
++	return count;
++}
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 82527da..f5e21a4 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -35,6 +35,7 @@
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
+ #include <linux/kexec.h>
++#include <linux/crash_dump.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
+@@ -124,6 +125,57 @@ static void __init reserve_crashkernel(void)
  }
+ #endif /* CONFIG_KEXEC_CORE */
  
-@@ -81,10 +125,10 @@ static void kexec_segment_flush(const struct kimage *kimage)
- {
- 	unsigned long i;
- 
--	pr_devel("%s:\n", __func__);
-+	pr_debug("%s:\n", __func__);
- 
- 	for (i = 0; i < kimage->nr_segments; i++) {
--		pr_devel("  segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages\n",
-+		pr_debug("  segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages\n",
- 			i,
- 			kimage->segment[i].mem,
- 			kimage->segment[i].mem + kimage->segment[i].memsz,
-@@ -111,6 +155,25 @@ void machine_kexec(struct kimage *kimage)
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 	reboot_code_buffer = kmap(kimage->control_code_page);
- 
-+	kexec_image_info(kimage);
++#ifdef CONFIG_CRASH_DUMP
++static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
++		const char *uname, int depth, void *data)
++{
++	const __be32 *reg;
++	int len;
 +
-+	pr_debug("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
-+		kimage->control_code_page);
-+	pr_debug("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
-+		&reboot_code_buffer_phys);
-+	pr_debug("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
-+		reboot_code_buffer);
-+	pr_debug("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
-+		arm64_relocate_new_kernel);
-+	pr_debug("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
-+		__func__, __LINE__, arm64_relocate_new_kernel_size,
-+		arm64_relocate_new_kernel_size);
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
 +
-+	pr_debug("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
-+		kimage->head);
-+	pr_debug("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
-+		kimage_start);
++	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
++	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
++		return 1;
 +
- 	/*
- 	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
- 	 * after the kernel is shut down.
++	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
++	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
++
++	return 1;
++}
++
++/*
++ * reserve_elfcorehdr() - reserves memory for elf core header
++ *
++ * This function reserves elf core header given in "elfcorehdr=" kernel
++ * command line parameter. This region contains all the information about
++ * primary kernel's core image and is used by a dump capture kernel to
++ * access the system memory on primary kernel.
++ */
++static void __init reserve_elfcorehdr(void)
++{
++	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
++
++	if (!elfcorehdr_size)
++		return;
++
++	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
++		pr_warn("elfcorehdr is overlapped\n");
++		return;
++	}
++
++	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
++
++	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
++		elfcorehdr_size >> 10, elfcorehdr_addr);
++}
++#else
++static void __init reserve_elfcorehdr(void)
++{
++	;
++}
++#endif /* CONFIG_CRASH_DUMP */
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -268,6 +320,8 @@ void __init arm64_memblock_init(void)
+ 
+ 	reserve_crashkernel();
+ 
++	reserve_elfcorehdr();
++
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
 -- 
 2.5.0
