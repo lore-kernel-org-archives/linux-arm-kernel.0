@@ -1,47 +1,91 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 14 Mar 2016 16:09:41 +0800
-Subject: [Query]set clk rate must operate its coordinated clock
-In-Reply-To: <20160311165152.4103.82090@quark.deferred.io>
-References: <20160309152420.20de187a@xhacker>
- <20160311165152.4103.82090@quark.deferred.io>
-Message-ID: <20160314160941.6d558371@xhacker>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 14 Mar 2016 17:15:21 +0900
+Subject: [PATCH 06/10] ARM: dts: Add MSHC0 dt node for eMMC device for
+ exynos3250-artik5 module
+In-Reply-To: <56E660D2.9090706@samsung.com>
+References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
+ <1457921056-21257-7-git-send-email-cw00.choi@samsung.com>
+ <56E660D2.9090706@samsung.com>
+Message-ID: <56E67319.1050502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mike,
-
-On Fri, 11 Mar 2016 08:51:52 -0800 Michael Turquette wrote:
-
-> Jisheng,
+On 2016? 03? 14? 15:57, Krzysztof Kozlowski wrote:
+> On 14.03.2016 11:04, Chanwoo Choi wrote:
+>> From: Jaehoon Chung <jh80.chung@samsung.com>
+>>
+>> This patch adds MSHC (Mobile Storage Host Controller) dt node for Exynos3250
+>> SoC. MSHC is an interface between the system and the eMMC device.
+>>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+>> index 97d0087efb9f..75b291c10cdc 100644
+>> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+>> @@ -277,6 +277,25 @@
+>>  	};
+>>  };
+>>  
+>> +&mshc_0 {
+>> +	num-slots = <1>;
+>> +	broken-cd;
+>> +	non-removable;
 > 
-> Quoting Jisheng Zhang (2016-03-08 23:24:20)
-> > Dear Stephen, Michael, Sebastian and all, 
-> > 
-> > I have the following clk case which I dunno the elegant solution:
-> > 
-> > 
-> > cpuclk have two parents: cpupll and refclk. When set the cpuclk freq, we
-> > have to set its parent's freq, I.E cpupll freq. But before changing the
-> > cpupll's freq, we should set its refclk as its parent firstly.
-> > 
-> > AFAIK, this is a common case, I have seen such requirement in rockchip, samsung
-> > clk driver. They solve this by notifier, but as pointed out by Michael
-> > in http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351565.html
-> > 
-> > "This is also a hack and it points towards some missing infrastructure in the
-> > clock framework."
-> > 
-> > I also don't like the notifier solution, I believe the elegant solution could
-> > be using the coordinated clock infrastructure. So what's the status of
-> > this infrastructure? I can test, and I can even add some code to make it be
-> > ready to be merged if you guide me ;)  
-> 
-> Thanks for the email. I hope to finish that feature before ELC. I have
-> Cc'd Pi-Cheng Chen from Mediatek who is also interested in coordinated
-> clock rates.
-> 
+> Broken or non-removable, not both.
 
-Glad to hear that. I will test the infrastructure once it's sent out.
+I'll remove the 'broken-cd' property.
 
-Thanks,
-Jisheng
+> 
+>> +	cap-mmc-highspeed;
+>> +	desc-num = <4>;
+>> +	card-detect-delay = <200>;
+>> +	vmmc-supply = <&ldo11_reg>;
+> 
+> Isn't this vqmmc-supply?
+
+I'll fix it as following by using ldo12_reg:
+	vmmc-supply = <&ldo12_reg>;
+
+> 
+> BTW, both MMC0 regulators (ldo11, ldo12) are marked as always-on. Why
+> they cannot be controlled by XMMC0CDN (just like on Rinato)?
+
+I'll fix it like rinato board to handle the ldo11/ldo12 as following:
+gpk0-2 is XMMC0CDN pin.
+
+                       ldo11_reg: LDO11 {
+-                               /* VDD_MMC */
++                               /* VDD74 ~ VDD75 */
+                                regulator-name = "VLDO11_1.8V";
+                                regulator-min-microvolt = <1800000>;
+                                regulator-max-microvolt = <1800000>;
+-                               regulator-always-on;
++                               samsung,ext-control-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
+                        };
+
+                        ldo12_reg: LDO12 {
+@@ -177,7 +178,7 @@
+                                regulator-name = "VLDO12_2.8V";
+                                regulator-min-microvolt = <2800000>;
+                                regulator-max-microvolt = <2800000>;
+-                               regulator-always-on;
++                               samsung,ext-control-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
+                        };
+
+> 
+> What is the benefit of making this patch separate from "Add
+> exynos3250-artik5 dtsi file for ARTIK5 module"? Does the board boot
+> properly without this patch?
+
+OK. I'll merge it with 5/10 patch.
+
+Best Regards,
+Chanwoo Choi
+
+[snip]
