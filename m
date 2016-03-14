@@ -1,44 +1,50 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 14 Mar 2016 08:21:22 +0100
-Subject: FW: [PATCH v5 0/8] Add MT8173 Video Encoder Driver and VPU Driver
-In-Reply-To: <1457939579.32502.10.camel@mtksdaap41>
-References: <D706F7FE148A8A429434F78C46336826048E7053@mtkmbs02n1>
- <1457939579.32502.10.camel@mtksdaap41>
-Message-ID: <56E66672.9030307@xs4all.nl>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 14 Mar 2016 16:22:30 +0900
+Subject: [PATCH 05/10] ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5
+ module
+In-Reply-To: <56E660F1.3060407@samsung.com>
+References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
+ <1457921056-21257-6-git-send-email-cw00.choi@samsung.com>
+ <56E65D5D.8060702@samsung.com> <56E660F1.3060407@samsung.com>
+Message-ID: <56E666B6.7060701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2016 08:12 AM, tiffany lin wrote:
-> Hi Hans,
+On 2016? 03? 14? 15:57, Chanwoo Choi wrote:
+> Hi Krzysztof,
 > 
-> After change to use "v4l-utils.git master branch", "V4l2-compliance
-> -d /dev/video1" fail on "fail: v4l2-test-buffers.cpp(555):
-> check_0(crbufs.reserved, sizeof(crbufs.reserved))".
-> 
-> Check the source code and found
-> 
-> 	memset(&crbufs, 0xff, sizeof(crbufs));   -> crbufs to 0xff
->         node->g_fmt(crbufs.format, i);
->         crbufs.count = 0;
->         crbufs.memory = m;
->         fail_on_test(doioctl(node, VIDIOC_CREATE_BUFS, &crbufs));   
->         fail_on_test(check_0(crbufs.reserved, sizeof(crbufs.reserved)));
->         fail_on_test(crbufs.index != q.g_buffers());
-> 
-> crbufs is initialized to fill with 0xff and after VIDIOC_CREATE_BUFS,
-> crbufs.reserved field should be 0x0. But v4l2_m2m_create_bufs and
-> vb2_create_bufs do not process reserved filed.
-> Do we really need to check reserved filed filled with 0x0? Or we need to
-> change vb2_create_bufs to fix this issue?
+> On 2016? 03? 14? 15:42, Krzysztof Kozlowski wrote:
+>> On 14.03.2016 11:04, Chanwoo Choi wrote:
+>>> This patch adds the support for Device Tree source for Samsung ARTIK5 module[1]
+>>> based on Exynos3250 SoC. The ARTIK5 module includes the follwoing devices:
+>>> - Application Processor (Samsung Exynos3250)
+>>> - WiFi/BT Combo chip (Broadcom4354)
+>>> - PMIC (Samsung S2MPS14)
+>>> - eMMC (4GB)
+>>> - DRAM LPDDR3 (512MB)
+>>> - Connectors pin (60 Pins x 3 set)
+>>>
+>>> Also, this patch adds the ARTIK5 development board[2] dts file which includes
+>>> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
+>>> ethernet port, uart port and so on.
+>>>
+>>> [1] https://www.artik.io/hardware/artik-5
+>>> [2] http://www.digikey.com/product-search/en?FV=ffecca14
+>>>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+>>> ---
+>>>  arch/arm/boot/dts/Makefile                    |   1 +
+>>>  arch/arm/boot/dts/exynos3250-artik5-devel.dts |  26 +++
+>>>  arch/arm/boot/dts/exynos3250-artik5.dtsi      | 282 ++++++++++++++++++++++++++
+>>
+>> Plus changes in
+>> Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt.
 
-The reserved field is zeroed in v4l_create_bufs() in v4l2-ioctl.c, so even before
-vb2_create_bufs et al is called.
+OK.
+Also, I'll change the board name from 'artik5-devel' to 'artik5-eval'.
 
-The fact that it is no longer zeroed afterwards suggests that someone is messing
-with the reserved field.
+[snip]
 
-You'll have to do a bit more digging, I'm afraid.
-
-Regards,
-
-	Hans
+Best Regards,
+Chanwoo Choi
