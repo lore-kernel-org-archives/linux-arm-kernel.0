@@ -1,117 +1,44 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 14 Mar 2016 15:49:26 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56E2FB5C.1040602@suse.cz>
-References: <56D92595.60709@huawei.com>
- <20160304063807.GA13317@js1304-P5Q-DELUXE>
- <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE>
- <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
- <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
- <56E2FB5C.1040602@suse.cz>
-Message-ID: <20160314064925.GA27587@js1304-P5Q-DELUXE>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 14 Mar 2016 14:48:48 +0800
+Subject: [PATCH] regulator: axp20x: Fix axp209 ldo4 ranges
+In-Reply-To: <1457792401-28337-1-git-send-email-hdegoede@redhat.com>
+References: <1457792401-28337-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v67RGWn6-bgDXYL37RDvR+MqJRKNtVuqE1p9eLGBqxrgJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
-> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
-> > 2016-03-09 10:23 GMT+09:00 Leizhen (ThunderTown) <thunder.leizhen@huawei.com>:
-> >>
-> >> Hi, Joonsoo:
-> >>         This new patch worked well. Do you plan to upstream it in the near furture?
-> > 
-> > Of course!
-> > But, I should think more because it touches allocator's fastpatch and
-> > I'd like to detour.
-> > If I fail to think a better solution, I will send it as is, soon.
-> 
-> How about something like this? Just and idea, probably buggy (off-by-one etc.).
-> Should keep away cost from <pageblock_order iterations@the expense of the
-> relatively fewer >pageblock_order iterations.
+On Sat, Mar 12, 2016 at 10:20 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> The axp209 ldo4 regulator has a hole at (skips) 2600 mV and 2900 mV, fix
+> its range table to match.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Hmm... I tested this and found that it's code size is a little bit
-larger than mine. I'm not sure why this happens exactly but I guess it would be
-related to compiler optimization. In this case, I'm in favor of my
-implementation because it looks like well abstraction. It adds one
-unlikely branch to the merge loop but compiler would optimize it to
-check it once.
+Fixes: 13d57e64352a ("regulator: axp20x: Use linear voltage ranges for
+AXP20X LDO4")
 
-Thanks.
+then
 
-> 
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index ff1e3cbc8956..b8005a07b2a1 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -685,21 +685,13 @@ static inline void __free_one_page(struct page *page,
->  	unsigned long combined_idx;
->  	unsigned long uninitialized_var(buddy_idx);
->  	struct page *buddy;
-> -	unsigned int max_order = MAX_ORDER;
-> +	unsigned int max_order = pageblock_order + 1;
->  
->  	VM_BUG_ON(!zone_is_initialized(zone));
->  	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
->  
->  	VM_BUG_ON(migratetype == -1);
-> -	if (is_migrate_isolate(migratetype)) {
-> -		/*
-> -		 * We restrict max order of merging to prevent merge
-> -		 * between freepages on isolate pageblock and normal
-> -		 * pageblock. Without this, pageblock isolation
-> -		 * could cause incorrect freepage accounting.
-> -		 */
-> -		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
-> -	} else {
-> +	if (likely(!is_migrate_isolate(migratetype))) {
->  		__mod_zone_freepage_state(zone, 1 << order, migratetype);
->  	}
->  
-> @@ -708,11 +700,12 @@ static inline void __free_one_page(struct page *page,
->  	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
->  	VM_BUG_ON_PAGE(bad_range(zone, page), page);
->  
-> +continue_merging:
->  	while (order < max_order - 1) {
->  		buddy_idx = __find_buddy_index(page_idx, order);
->  		buddy = page + (buddy_idx - page_idx);
->  		if (!page_is_buddy(page, buddy, order))
-> -			break;
-> +			goto done_merging;
->  		/*
->  		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
->  		 * merge with it and move up one order.
-> @@ -729,6 +722,26 @@ static inline void __free_one_page(struct page *page,
->  		page_idx = combined_idx;
->  		order++;
->  	}
-> +	if (max_order < MAX_ORDER) {
-> +		if (IS_ENABLED(CONFIG_CMA) &&
-> +				unlikely(has_isolate_pageblock(zone))) {
-> +
-> +			int buddy_mt;
-> +
-> +			buddy_idx = __find_buddy_index(page_idx, order);
-> +			buddy = page + (buddy_idx - page_idx);
-> +			buddy_mt = get_pageblock_migratetype(buddy);
-> +
-> +			if (migratetype != buddy_mt &&
-> +					(is_migrate_isolate(migratetype) ||
-> +					is_migrate_isolate(buddy_mt)))
-> +				goto done_merging;
-> +		}
-> +		max_order++;
-> +		goto continue_merging;
-> +	}
-> +
-> +done_merging:
->  	set_page_order(page, order);
->  
->  	/*
-> 
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> ---
+>  drivers/regulator/axp20x-regulator.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+> index 4250b1b..500d162 100644
+> --- a/drivers/regulator/axp20x-regulator.c
+> +++ b/drivers/regulator/axp20x-regulator.c
+> @@ -157,7 +157,9 @@ static struct regulator_ops axp20x_ops_sw = {
+>  static const struct regulator_linear_range axp20x_ldo4_ranges[] = {
+>         REGULATOR_LINEAR_RANGE(1250000, 0x0, 0x0, 0),
+>         REGULATOR_LINEAR_RANGE(1300000, 0x1, 0x8, 100000),
+> -       REGULATOR_LINEAR_RANGE(2500000, 0x9, 0xf, 100000),
+> +       REGULATOR_LINEAR_RANGE(2500000, 0x9, 0x9, 0),
+> +       REGULATOR_LINEAR_RANGE(2700000, 0xa, 0xb, 100000),
+> +       REGULATOR_LINEAR_RANGE(3000000, 0xc, 0xf, 100000),
+>  };
+>
+>  static const struct regulator_desc axp20x_regulators[] = {
 > --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 2.7.2
+>
