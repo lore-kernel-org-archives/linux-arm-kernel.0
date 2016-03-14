@@ -1,31 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 14 Mar 2016 15:49:45 -0400 (EDT)
-Subject: [PATCH net v2 0/4] Few mvneta fixes
-In-Reply-To: <1457804660-8463-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1457804660-8463-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160314.154945.1770938851011099663.davem@davemloft.net>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 14 Mar 2016 13:12:53 -0700
+Subject: [PATCH v2 0/3] net/phy: Improvements to Cavium Thunder MDIO code.
+In-Reply-To: <20160314.152751.2108458769066613871.davem@davemloft.net>
+References: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160314.152751.2108458769066613871.davem@davemloft.net>
+Message-ID: <56E71B45.1010805@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Sat, 12 Mar 2016 18:44:16 +0100
+On 03/14/2016 12:27 PM, David Miller wrote:
+> From: David Daney <ddaney.cavm@gmail.com>
+> Date: Fri, 11 Mar 2016 09:53:08 -0800
+>
+>> Changes from v1:
+>>
+>>   - In 1/3 Add back check for non-OF objects in bgx_init_of_phy().  It
+>>     is probably not necessary, but better safe than sorry...
+>>
+>> The firmware on many Cavium Thunder systems configures the MDIO bus
+>> hardware to be probed as a PCI device.  In order to use the MDIO bus
+>> drivers in this configuration, we must add PCI probing to the driver.
+>>
+>> There are two parts to this set of three patches:
+>>
+>>   1) Cleanup the PHY probing code in thunder_bgx.c to handle the case
+>>      where there is no PHY attached to a port, as well as being more
+>>      robust in the face of driver loading order by use of
+>>      -EPROBE_DEFER.
+>>
+>>   2) Split mdio-octeon.c into two drivers, one with platform probing,
+>>   and the other with PCI probing.  Common code is shared between the
+>>   two.
+>>
+>> Tested on several different Thunder and OCTEON systems, also compile
+>> tested on x86_64.
+>
+> Series applied, thanks David.
 
-> In this second version I split the last patch in two parts as
-> requested.
-> 
-> For the record the initial cover letter was:
-> "here is a patch set of few fixes. Without the first one, a kernel
-> configured with debug features ended to hang when the driver is built
-> as a module and is removed. This is quite is annoying for debugging!
-> 
-> The second patch fix a forgotten flag at the initial submission of the
-> driver.
-> 
-> The third patch is only really a cosmetic one so I have no problem to
-> not apply it for 4.5 and wait for 4.6.
-> 
-> I really would like to see the first one applied for 4.5 and for the
-> second I let you judge if it something needed for now or that should
-> wait the next release."
 
-Series applied and patches #1 and #2 queued up for -stable, thanks.
+Thanks, but ... I was going to send another revision.
+
+See: https://lkml.org/lkml/2016/3/11/721
+
+There were a couple of items I wanted to fix.
+
+   1) Missing MODULE_LICENSE() in new common code source file results in 
+taint warnings.
+
+   2) Fix device reference counts for -EPROBE_DEFER case.
+
+
+At this point, I think the best path forward is for me to rebase against 
+net-next and send you a small fixup set to what was merged.
+
+What do you think?
+
+David Daney
