@@ -1,83 +1,233 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Mar 2016 10:29:21 +0000
-Subject: [PATCH v10 11/12] arm64: factor work_pending state machine to C
-In-Reply-To: <56D9E9E7.9000503@mellanox.com>
-References: <1456949376-4910-1-git-send-email-cmetcalf@ezchip.com>
- <1456949376-4910-12-git-send-email-cmetcalf@ezchip.com>
- <20160304163814.GD7886@arm.com> <56D9E9E7.9000503@mellanox.com>
-Message-ID: <20160314102746.GA18083@leverpostej>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Mon, 14 Mar 2016 11:33:18 +0100
+Subject: [PATCH v6 net-next 09/10] net: add a hardware buffer management
+ helper API
+In-Reply-To: <1457944745-7634-10-git-send-email-gregory.clement@free-electrons.com>
+References: <1457944745-7634-1-git-send-email-gregory.clement@free-electrons.com>
+ <1457944745-7634-10-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160314113318.1a10a6b5@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Mar 04, 2016 at 03:02:47PM -0500, Chris Metcalf wrote:
-> On 03/04/2016 11:38 AM, Will Deacon wrote:
-> >Hi Chris,
-> >
-> >On Wed, Mar 02, 2016 at 03:09:35PM -0500, Chris Metcalf wrote:
-> >>Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
-> >>state machine that can be difficult to reason about due to duplicated
-> >>code and a large number of branch targets.
-> >>
-> >>This patch factors the common logic out into the existing
-> >>do_notify_resume function, converting the code to C in the process,
-> >>making the code more legible.
-> >>
-> >>This patch tries to closely mirror the existing behaviour while using
-> >>the usual C control flow primitives. As local_irq_{disable,enable} may
-> >>be instrumented, we balance exception entry (where we will almost most
-> >>likely enable IRQs) with a call to trace_hardirqs_on just before the
-> >>return to userspace.
-> >[...]
-> >
-> >>diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> >>index 1f7f5a2b61bf..966d0d4308f2 100644
-> >>--- a/arch/arm64/kernel/entry.S
-> >>+++ b/arch/arm64/kernel/entry.S
-> >>@@ -674,18 +674,13 @@ ret_fast_syscall_trace:
-> >>   * Ok, we need to do extra processing, enter the slow path.
-> >>   */
-> >>  work_pending:
-> >>-	tbnz	x1, #TIF_NEED_RESCHED, work_resched
-> >>-	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
-> >>  	mov	x0, sp				// 'regs'
-> >>-	enable_irq				// enable interrupts for do_notify_resume()
-> >>  	bl	do_notify_resume
-> >>-	b	ret_to_user
-> >>-work_resched:
-> >>  #ifdef CONFIG_TRACE_IRQFLAGS
-> >>-	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
-> >>+	bl	trace_hardirqs_on		// enabled while in userspace
-> >This doesn't look right to me. We only get here after running
-> >do_notify_resume, which returns with interrupts disabled.
-> >
-> >Do we not instead need to inform the tracing code that interrupts are
-> >disabled prior to calling do_notify_resume?
-> 
-> I think you are right about the trace_hardirqs_off prior to
-> calling into do_notify_resume, given Catalin's recent commit to
-> add it.  I dropped it since I was moving schedule() into C code,
-> but I suspect we'll see the same problem that Catalin saw with
-> CONFIG_TRACE_IRQFLAGS without it.  I'll copy the arch/arm approach
-> and add a trace_hardirqs_off() at the top of do_notify_resume().
-> 
-> The trace_hardirqs_on I was copying from Mark Rutland's earlier patch:
-> 
-> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/467781
-> 
-> I don't know if it's necessary to flag that interrupts are enabled
-> prior to returning to userspace; it may well not be.  Mark, can you
-> comment on what led you to add that trace_hardirqs_on?
+I've not fully understood the hardware support part.
 
->From what I recall, we didn't properly trace enabling IRQs in all the
-asm entry paths from userspace, and doing this made things appear
-balanced to the tracing code (as the existing behaviour of masking IRQs
-in assembly did).
+But I do think this generalization is very interesting work, and would
+like to cooperate. If my use-case can fit into this, where my use-case
+is in the extreme 100Gbit/s area.
 
-It was more expedient / simpler than fixing all the entry assembly to
-update the IRQ tracing state correctly, which I had expected to rework
-if/when moving the rest to C.
+There is some potential for performance improvements, if the API from
+start is designed distinguish between being called from NAPI-context
+(BH-disabled) and outside NAPI context.
 
-Thanks,
-Mark.
+See: netdev_alloc_frag() vs napi_alloc_frag().
+
+Nitpicks inlined below...
+
+
+On Mon, 14 Mar 2016 09:39:04 +0100
+Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> This basic implementation allows to share code between driver using
+> hardware buffer management. As the code is hardware agnostic, there is
+> few helpers, most of the optimization brought by the an HW BM has to be
+> done at driver level.
+> 
+> Tested-by: Sebastian Careba <nitroshift@yahoo.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  include/net/hwbm.h | 28 ++++++++++++++++++
+>  net/Kconfig        |  3 ++
+>  net/core/Makefile  |  1 +
+>  net/core/hwbm.c    | 87 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 119 insertions(+)
+>  create mode 100644 include/net/hwbm.h
+>  create mode 100644 net/core/hwbm.c
+> 
+> diff --git a/include/net/hwbm.h b/include/net/hwbm.h
+> new file mode 100644
+> index 000000000000..47d08662501b
+> --- /dev/null
+> +++ b/include/net/hwbm.h
+> @@ -0,0 +1,28 @@
+> +#ifndef _HWBM_H
+> +#define _HWBM_H
+> +
+> +struct hwbm_pool {
+> +	/* Capacity of the pool */
+> +	int size;
+> +	/* Size of the buffers managed */
+> +	int frag_size;
+> +	/* Number of buffers currently used by this pool */
+> +	int buf_num;
+> +	/* constructor called during alocation */
+
+alocation -> allocation
+
+> +	int (*construct)(struct hwbm_pool *bm_pool, void *buf);
+> +	/* protect acces to the buffer counter*/
+
+acces -> access
+Space after "counter"
+
+> +	spinlock_t lock;
+> +	/* private data */
+> +	void *priv;
+> +};
+> +#ifdef CONFIG_HWBM
+> +void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf);
+> +int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp);
+> +int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp);
+> +#else
+> +void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf) {}
+> +int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp) { return 0; }
+> +int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp)
+> +{ return 0; }
+> +#endif /* CONFIG_HWBM */
+> +#endif /* _HWBM_H */
+> diff --git a/net/Kconfig b/net/Kconfig
+> index 10640d5f8bee..e13449870d06 100644
+> --- a/net/Kconfig
+> +++ b/net/Kconfig
+> @@ -253,6 +253,9 @@ config XPS
+>  	depends on SMP
+>  	default y
+>  
+> +config HWBM
+> +       bool
+> +
+>  config SOCK_CGROUP_DATA
+>  	bool
+>  	default n
+> diff --git a/net/core/Makefile b/net/core/Makefile
+> index 014422e2561f..d6508c2ddca5 100644
+> --- a/net/core/Makefile
+> +++ b/net/core/Makefile
+> @@ -25,4 +25,5 @@ obj-$(CONFIG_CGROUP_NET_PRIO) += netprio_cgroup.o
+>  obj-$(CONFIG_CGROUP_NET_CLASSID) += netclassid_cgroup.o
+>  obj-$(CONFIG_LWTUNNEL) += lwtunnel.o
+>  obj-$(CONFIG_DST_CACHE) += dst_cache.o
+> +obj-$(CONFIG_HWBM) += hwbm.o
+>  obj-$(CONFIG_NET_DEVLINK) += devlink.o
+> diff --git a/net/core/hwbm.c b/net/core/hwbm.c
+> new file mode 100644
+> index 000000000000..941c28486896
+> --- /dev/null
+> +++ b/net/core/hwbm.c
+> @@ -0,0 +1,87 @@
+> +/* Support for hardware buffer manager.
+> + *
+> + * Copyright (C) 2016 Marvell
+> + *
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License as published by
+> + *  the Free Software Foundation; either version 2 of the License, or
+> + *  (at your option) any later version.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/printk.h>
+> +#include <linux/skbuff.h>
+> +#include <net/hwbm.h>
+> +
+> +void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf)
+> +{
+> +	if (likely(bm_pool->frag_size <= PAGE_SIZE))
+> +		skb_free_frag(buf);
+> +	else
+> +		kfree(buf);
+> +}
+> +EXPORT_SYMBOL_GPL(hwbm_buf_free);
+> +
+> +/* Refill processing for HW buffer management */
+> +int hwbm_pool_refill(struct hwbm_pool *bm_pool, gfp_t gfp)
+> +{
+> +	int frag_size = bm_pool->frag_size;
+> +	void *buf;
+> +
+> +	if (likely(frag_size <= PAGE_SIZE))
+> +		buf = netdev_alloc_frag(frag_size);
+
+If we know the NAPI-context, there is a performance potential in
+netdev_alloc_frag() vs napi_alloc_frag().
+
+> +	else
+> +		buf = kmalloc(frag_size, gfp);
+> +
+> +	if (!buf)
+> +		return -ENOMEM;
+> +
+> +	if (bm_pool->construct)
+> +		if (bm_pool->construct(bm_pool, buf)) {
+> +			hwbm_buf_free(bm_pool, buf);
+> +			return -ENOMEM;
+> +		}
+
+Why don't we refill more objects? and do so with a bulk of memory
+objects?  The "refill" name just lead me to believe that the function
+might refill several objects...
+
+Maybe that is the role of hwbm_pool_add() ?
+
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(hwbm_pool_refill);
+> +
+> +int hwbm_pool_add(struct hwbm_pool *bm_pool, unsigned int buf_num, gfp_t gfp)
+> +{
+> +	int err, i;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&bm_pool->lock, flags);
+
+This might be needed, and you take the lock for several objects. But
+the save/restore variant is the most expensive lock we have (at-least
+based on my measurements[1] for Intel).
+
+[1] https://github.com/netoptimizer/prototype-kernel/blob/master/kernel/lib/time_bench_sample.c
+
+> +	if (bm_pool->buf_num == bm_pool->size) {
+> +		pr_warn("pool already filled\n");
+> +		return bm_pool->buf_num;
+> +	}
+> +
+> +	if (buf_num + bm_pool->buf_num > bm_pool->size) {
+> +		pr_warn("cannot allocate %d buffers for pool\n",
+> +			buf_num);
+> +		return 0;
+> +	}
+> +
+> +	if ((buf_num + bm_pool->buf_num) < bm_pool->buf_num) {
+> +		pr_warn("Adding %d buffers to the %d current buffers will overflow\n",
+> +			buf_num,  bm_pool->buf_num);
+> +		return 0;
+> +	}
+> +
+> +	for (i = 0; i < buf_num; i++) {
+> +		err = hwbm_pool_refill(bm_pool, gfp);
+
+I'm thinking why not use some bulk allocation API here...
+
+> +		if (err < 0)
+> +			break;
+> +	}
+> +
+> +	/* Update BM driver with number of buffers added to pool */
+> +	bm_pool->buf_num += i;
+> +
+> +	pr_debug("hwpm pool: %d of %d buffers added\n", i, buf_num);
+> +	spin_unlock_irqrestore(&bm_pool->lock, flags);
+> +
+> +	return i;
+> +}
+> +EXPORT_SYMBOL_GPL(hwbm_pool_add);
+
+
+
+-- 
+Best regards,
+  Jesper Dangaard Brouer
+  MSc.CS, Principal Kernel Engineer at Red Hat
+  Author of http://www.iptv-analyzer.org
+  LinkedIn: http://www.linkedin.com/in/brouer
