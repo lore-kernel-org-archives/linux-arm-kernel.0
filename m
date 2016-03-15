@@ -1,39 +1,38 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Tue, 15 Mar 2016 14:19:58 +1100 (AEDT)
-Subject: [PATCH 09/22] ncr5380: Adopt uniform DMA setup convention
-In-Reply-To: <56E669F6.8070407@suse.de>
-References: <20160314042700.596192247@telegraphics.com.au>
- <20160314042702.976019738@telegraphics.com.au> <56E669F6.8070407@suse.de>
-Message-ID: <alpine.LNX.2.00.1603151313510.9662@nippy.intranet>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 15 Mar 2016 12:18:15 +0800
+Subject: [PATCH v2 7/7] ARM: dts: Add initial gpio setting of MMC2 device
+ for exynos3250-monk
+In-Reply-To: <1458007695-3627-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <201603151221.FDX9rQCr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chanwoo,
 
-On Mon, 14 Mar 2016, Hannes Reinecke wrote:
+[auto build test ERROR on v4.5-rc7]
+[also build test ERROR on next-20160314]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> > @@ -1555,8 +1555,7 @@ static int NCR5380_transfer_dma(struct S
-> >  	NCR5380_read(RESET_PARITY_INTERRUPT_REG);
-> >  	*data = d + c;
-> >  	*count = 0;
-> > -	*phase = NCR5380_read(STATUS_REG) & PHASE_MASK;
-> > -	return foo;
-> > +	return result;
-> >  }
-> >  
-> >  /*
-> 
-> Don't you miss a phase update here?
+url:    https://github.com/0day-ci/linux/commits/Chanwoo-Choi/ARM-dts-Add-new-Exynos3250-based-ARTIK5-module-dtsi-file/20160315-101326
+config: arm-exynos_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-I guess I missed explaining the change in the commit log.
+All errors (new ones prefixed by >>):
 
-The *phase assignment is redundant because after NCR5380_transfer_dma() 
-returns control to NCR5380_information_transfer(), the latter routine then 
-also returns, and so *phase is dead.
+>> Error: arch/arm/boot/dts/exynos3250-monk.dts:564.9-10 syntax error
+   FATAL ERROR: Unable to parse input tree
 
--- 
-
-> 
-> Cheers,
-> 
-> Hannes
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 23852 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160315/e5eb0cdc/attachment-0001.obj>
