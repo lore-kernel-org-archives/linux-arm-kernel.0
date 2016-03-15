@@ -1,57 +1,81 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 15 Mar 2016 09:20:40 -0400
-Subject: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs.
- non-modular distinctions
-In-Reply-To: <CACRpkdYN_qRUa_hscDma_jRAF=2K7_qaGM+f5DNr-NyA3g_NHg@mail.gmail.com>
-References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
- <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
- <CACRpkdYN_qRUa_hscDma_jRAF=2K7_qaGM+f5DNr-NyA3g_NHg@mail.gmail.com>
-Message-ID: <20160315132039.GE23251@windriver.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 15 Mar 2016 14:24:36 +0100
+Subject: [PATCH] spi: imx: only do necessary changes to ECSPIx_CONFIGREG
+Message-ID: <1458048276-31884-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs. non-modular distinctions] On 15/03/2016 (Tue 09:50) Linus Walleij wrote:
+From: Knut Wohlrab <knut.wohlrab@de.bosch.com>
 
-> On Mon, Feb 29, 2016 at 9:48 PM, Paul Gortmaker
-> <paul.gortmaker@windriver.com> wrote:
-> 
-> > Fixups here tend to be more all over the map vs. some of the other
-> > repeated/systematic ones we've seen elsewhere.
-> >
-> > We remove module.h from code that isn't doing anything modular at
-> > all;  if they have __init sections, then replace it with init.h
-> >
-> > A couple drivers have module_exit() code that is essentially orphaned,
-> > and so we remove that.
-> >
-> > There are no module_init replacements, so we have no concerns wrt.
-> > initcall ordering changes as per some of the other cleanups.
-> >
-> > Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-> >
-> > We also delete the MODULE_LICENSE tag etc. since all that information
-> > was (or is now) contained at the top of the file in the comments.
-> >
-> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> > Cc: Thomas Abraham <thomas.ab@samsung.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-samsung-soc at vger.kernel.org
-> > Cc: linux-gpio at vger.kernel.org
-> > Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> 
-> This didn't make it in for v4.6 because noone provided ACKs.
-> 
-> Please resend the outstanding (rebased) demodularization patches
-> after v4.6-rc1 and I will merge them no matter if I get ACKs or not,
-> I will not wait for ACKs any longer than that.
+If the SPI chip select (CS) for a dedicated channel is done manually by
+the used higher device driver, the CS may be active while writing to
+ECSPIx_CONFIGREG. To prevent unwanted clock edges when selecting
+the clock mode,  only do the necessary changes to the i.MX SPI
+configuration register and leave not selected channels untouched.
 
-Sounds good, will do that in ~2 wks.
+To prevent unwanted clock edges on first use, an empty dummy
+transmission shall be done by the initialization procedure of the device
+driver of this channel. This will set the clock mode to the correct state.
 
-Thanks,
-Paul.
---
+Signed-off-by: Knut Wohlrab <knut.wohlrab@de.bosch.com>
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+---
 
-> 
-> Yours,
-> Linus Walleij
+This is regarding the discussion in
+
+http://www.spinics.net/lists/arm-kernel/msg489107.html
+
+and the revert
+
+https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/commit/drivers/spi/spi-imx.c?h=for-linus&id=c34de7168cd201ab757b11bfc7899953948d7753
+
+This version is mainly the same like the reverted one, but making sure
+that the cfg variable isn't just 0.
+
+This patch is against
+
+https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/log/?h=for-linus
+
+commit d00de215041f706
+
+ drivers/spi/spi-imx.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+index e7a19be..b79d70d 100644
+--- a/drivers/spi/spi-imx.c
++++ b/drivers/spi/spi-imx.c
+@@ -333,8 +333,9 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
+ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 		struct spi_imx_config *config)
+ {
+-	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
++	u32 ctrl = MX51_ECSPI_CTRL_ENABLE;
+ 	u32 clk = config->speed_hz, delay, reg;
++	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
+ 
+ 	/*
+ 	 * The hardware seems to have a race condition when changing modes. The
+@@ -358,13 +359,20 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+ 
+ 	if (config->mode & SPI_CPHA)
+ 		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
++	else
++		cfg &= ~MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
+ 
+ 	if (config->mode & SPI_CPOL) {
+ 		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
+ 		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
++	} else {
++		cfg &= ~MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
++		cfg &= ~MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
+ 	}
+ 	if (config->mode & SPI_CS_HIGH)
+ 		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
++	else
++		cfg &= ~MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+ 
+ 	if (spi_imx->usedma)
+ 		ctrl |= MX51_ECSPI_CTRL_SMC;
+-- 
+2.5.0
