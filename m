@@ -1,81 +1,41 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 15 Mar 2016 14:24:36 +0100
-Subject: [PATCH] spi: imx: only do necessary changes to ECSPIx_CONFIGREG
-Message-ID: <1458048276-31884-1-git-send-email-dirk.behme@de.bosch.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 15 Mar 2016 18:55:19 +0530
+Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
+ pinctrl_{register, unregister}
+In-Reply-To: <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>	<CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>	<56D307CC.2050202@nvidia.com>	<56E031CA.9010204@nvidia.com>
+ <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
+Message-ID: <56E80D3F.3090300@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Knut Wohlrab <knut.wohlrab@de.bosch.com>
 
-If the SPI chip select (CS) for a dedicated channel is done manually by
-the used higher device driver, the CS may be active while writing to
-ECSPIx_CONFIGREG. To prevent unwanted clock edges when selecting
-the clock mode,  only do the necessary changes to the i.MX SPI
-configuration register and leave not selected channels untouched.
+On Tuesday 15 March 2016 02:01 PM, Linus Walleij wrote:
+> On Wed, Mar 9, 2016 at 3:23 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+>
+>>> Pushed the change at:
+>>> Branch "devm_pinctrl_register" of
+>>> https://github.com/ldewangan/linux-upstream.git.
+>>>
+>>> Base repo is
+>>> for-next of
+>>> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
+>>>
+>>>
+>>> If required, I can send the V2 version of list with acks.
+>> Let me know if I need to send full series (V2 with collected ack) again or
+>> fine to pull it from above location.
+> Please collect the ACKs on your branch and ask me to pull it after v4.6-rc1.
+> No need to resend the patches.
+>
+> Unfortunately it arrived too late for the merge window, but hey: we got the
+> devm gpiochip in for v4.6.
 
-To prevent unwanted clock edges on first use, an empty dummy
-transmission shall be done by the initialization procedure of the device
-driver of this channel. This will set the clock mode to the correct state.
+Thanks for taking the GPIO patches.
 
-Signed-off-by: Knut Wohlrab <knut.wohlrab@de.bosch.com>
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
----
+Ok, We will do pincontrol post v4.6 and probably, we will have some more 
+chnages for using devm_gpio in pincontrol subsystem  as these APIs will 
+be available  publicly.
 
-This is regarding the discussion in
-
-http://www.spinics.net/lists/arm-kernel/msg489107.html
-
-and the revert
-
-https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/commit/drivers/spi/spi-imx.c?h=for-linus&id=c34de7168cd201ab757b11bfc7899953948d7753
-
-This version is mainly the same like the reverted one, but making sure
-that the cfg variable isn't just 0.
-
-This patch is against
-
-https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/log/?h=for-linus
-
-commit d00de215041f706
-
- drivers/spi/spi-imx.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index e7a19be..b79d70d 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -333,8 +333,9 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
- static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 		struct spi_imx_config *config)
- {
--	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
-+	u32 ctrl = MX51_ECSPI_CTRL_ENABLE;
- 	u32 clk = config->speed_hz, delay, reg;
-+	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
- 
- 	/*
- 	 * The hardware seems to have a race condition when changing modes. The
-@@ -358,13 +359,20 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 
- 	if (config->mode & SPI_CPHA)
- 		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
-+	else
-+		cfg &= ~MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
- 
- 	if (config->mode & SPI_CPOL) {
- 		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
- 		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
-+	} else {
-+		cfg &= ~MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
-+		cfg &= ~MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
- 	}
- 	if (config->mode & SPI_CS_HIGH)
- 		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
-+	else
-+		cfg &= ~MX51_ECSPI_CONFIG_SSBPOL(config->cs);
- 
- 	if (spi_imx->usedma)
- 		ctrl |= MX51_ECSPI_CTRL_SMC;
--- 
-2.5.0
+Thanks,
+Laxman
