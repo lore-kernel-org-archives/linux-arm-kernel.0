@@ -1,81 +1,58 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Tue, 15 Mar 2016 08:23:29 +0100
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <56E6E4B0.8060408@st.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <56DD8FBE.9010200@suse.de> <56DD99A4.5030004@st.com>
- <56DDA26C.3050301@suse.de>
- <56DDA3D5.3090209@st.com> <56DDB749.1020808@suse.de>
- <CADhT+wfO8x4En78g5ixnnwbpaeXJGDo+Q1sOABYsbXzNZy0CPw@mail.gmail.com>
- <56DE7E1D.5070508@st.com>
- <CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>
- <CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>
- <56DFE55B.2090806@st.com> <56DFE64B.8060606@st.com>
- <CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>
- <56DFF253.9050208@st.com> <56DFFA9E.7060602@st.com>
- <CAAObsKBUzBXcamEyup44N1bYUzGr_ZZTsYcD5x3PXb-2E00cGA@mail.gmail.com>
- <56E033C8.40506@st.com> <56E038CE.606@st.com>
- <CADhT+wcMpzA_Coj8Z5OQZsc3bF3a7yOmsbazQMPtcdUWkJSuCA@mail.gmail.com>
- <56E13AAB.2080900@st.com>
- <CADhT+wd=vcph2y_OxkGNO5EwHvN=kBy-BrfZHmNjZHww4LxmTg@mail.gmail.com>
- <56E28B5D.6000708@st.com>
- <CAAObsKB-tSCu5KMYk2Zi-oX9zMKEOwwT93sMkiZKiYvtexmHaQ@mail.gmail.com>
- <56E6E4B0.8060408@st.com>
-Message-ID: <CAAObsKCdk+6HdzFYxRKZbPiaKcfMCLjbpngurat47YvyvSgH-w@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 15 Mar 2016 08:28:42 +0100
+Subject: [PATCH 1/2] ARM: dts: r8a7794: add CAN clocks to device tree
+In-Reply-To: <20160314235659.GA23279@verge.net.au>
+References: <1457922543-20975-1-git-send-email-horms+renesas@verge.net.au>
+ <1457922543-20975-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdUWN9UVsDFxRCH6b+i7ERP5-W5wc6oU+OjYi=VYXS6UCQ@mail.gmail.com>
+ <20160314235659.GA23279@verge.net.au>
+Message-ID: <CAMuHMdVEoj5-ar0bNPB5XH7RtoR-v5bNDuZ87SwNzqvC670E2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 March 2016 at 17:20, Giuseppe CAVALLARO <peppe.cavallaro@st.com> wrote:
-> Hi Tomeu
->
-> On 3/14/2016 12:43 PM, Tomeu Vizoso wrote:
->>
->> Hi Peppe,
->>
->> with that patch I don't see any difference at all in my setup.
->>
->> So to be clear, with these commits on top of next-20160314, I still
->> get the hang during boot:
->>
->> 209afef6f0cd ARM: dts: rockchip: Add mdio node to ethernet node
->> 2315acc6cf7f Revert "stmmac: first frame prep at the end of xmit routine"
->> b5e08e810c63 stmmac: fix tx prepare for normal desc
->> 37c15a31d850 i2c: immediately mark ourselves as registered
->> 4342eec3c5a2 Add linux-next specific files for 20160314
->>
->> [   27.521026] WARNING: CPU: 1 PID: 0 at net/sched/sch_generic.c:303
->> dev_watchdog+0x284/0x288
->> [   27.529460] NETDEV WATCHDOG: eth0 (rk_gmac-dwmac): transmit queue 0
->> timed out
->
->
-> I do not reproduce the WATCHDOG but i am continuing to look at the code
-> to understand if normal descriptor management is ok or not. I keep you
-> informed.
->
-> Just an info, did you test with 2315acc6cf7f included? Just to
-> understand if it is introducing a problem. It works in case of
-> enhanced descriptors are used instead of.
->
->>
->>
->> https://git.collabora.com/cgit/user/tomeu/linux.git/log/?h=broken-eth-on-rock2
->
->
-> thx I will take a look at this
+Hi Simon,
 
-Thanks.
-
-Btw, I have rebased on top of 4.5 this morning and I have noticed that
-88f8b1bb41c6 ("stmmac: Fix 'eth0: No PHY found' regression") got in
-there, so I guess we have now a bunch of boards with broken network on
-that release :(
-
-Regards,
-
-Tomeu
-
-> Regards
-> Peppe
+On Tue, Mar 15, 2016 at 12:56 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Mar 14, 2016 at 10:23:01AM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Mar 14, 2016 at 3:29 AM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>> > --- a/arch/arm/boot/dts/r8a7794.dtsi
+>> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
+>> > @@ -844,6 +844,24 @@
+>> >                         clock-output-names = "extal";
+>> >                 };
+>> >
+>> > +               /* External USB clock - can be overridden by the board */
+>> > +               usb_extal_clk: usb_extal_clk {
+>> > +                       compatible = "fixed-clock";
+>> > +                       #clock-cells = <0>;
+>> > +                       clock-frequency = <48000000>;
+>> > +                       clock-output-names = "usb_extal";
+>>
+>> "clock-output-names" is optional these days, so please drop it.
 >
+> Thanks, I will drop it from this patch.
 >
+> Do we have a plan to remove it from existing nodes?
+> Should I do a sweep of the Renesas DTS files?
+
+That's up to you.
+
+It's more churn, but from the other side, it avoids people copying deprecated
+practices.
+
+> And in particular, should it be removed from cpg_clocks ?
+
+It's not optional for clocks with multiple outputs, cfr. the issues we had with
+cpg_clocks on H3, before the advent of the CPG/MSSR driver.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
