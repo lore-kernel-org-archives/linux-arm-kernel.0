@@ -1,99 +1,160 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Tue, 15 Mar 2016 18:01:26 +0100
-Subject: [OpenWrt-Devel] ARMv4 (not v4t) marked obsolete in gcc-6
-In-Reply-To: <16727306.4g6uRjH7LT@wuerfel>
-References: <201603101013.04618.arnd@arndb.de>
- <3cbff06f821f529e67cf75580ee89732@advem.lv>
- <alpine.LNX.2.00.1603111721340.13469@T420s> <16727306.4g6uRjH7LT@wuerfel>
-Message-ID: <56E83FE6.7040506@openwrt.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 15 Mar 2016 12:05:20 -0500
+Subject: [PATCH V2 2/2] mailbox: Introduce TI message manager driver
+In-Reply-To: <CABb+yY3ZqM1Do5TdYCU_MGzk0dottaASo3qCdeKJ6TbGf2D8+Q@mail.gmail.com>
+References: <1456525452-30638-1-git-send-email-nm@ti.com>
+ <1456525452-30638-3-git-send-email-nm@ti.com>
+ <CABb+yY1hK4T6KAQcqNKF3D_pkLCcDVN=+T18ueV35jXbpLR+kg@mail.gmail.com>
+ <56D987FF.1040607@ti.com>
+ <CABb+yY1a-6V=9C+di7ZdQHDQG_M_jbYshoLqxaLiCZTqM4TfHg@mail.gmail.com>
+ <56DDD41E.2050409@ti.com>
+ <CABb+yY2A35=uG9dk_VHVHbEBUsguw6414KeyQJxxp-Jnsq-0dw@mail.gmail.com>
+ <CAGo_u6pHLDhqoHD-V9xKbKkr6-NpdH+vTUufXQGvoMK7C-yj9Q@mail.gmail.com>
+ <CABb+yY3ZqM1Do5TdYCU_MGzk0dottaASo3qCdeKJ6TbGf2D8+Q@mail.gmail.com>
+Message-ID: <CAGo_u6qwCFXH-sHijZHcC3iBTEAzqrkGf439DC5=7k39PS-+kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 15/03/2016 16:59, Arnd Bergmann wrote:
-> On Friday 11 March 2016 17:56:12 Hans Ulli Kroll wrote:
->> On Fri, 11 Mar 2016, Roman Yeryomin wrote:
->>> On 2016-03-11 08:48, John Crispin wrote:
->>>> On 11/03/2016 06:44, Hans Ulli Kroll wrote:
-> 
->>> As to the numbers I think that people like me (or others trying out OpenWrt)
->>> usually don't go to the forums, so number of questions there doesn't tell much
->>> (but even there latest messages are from last month, so not dead at all).
->>> Maybe number of downloads from downloads.openwrt.org can tell more but I would
->>> guess that actual users would rather compile it themselves.
+On Tue, Mar 15, 2016 at 12:31 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Tue, Mar 8, 2016 at 8:07 PM, Nishanth Menon <nm@ti.com> wrote:
+>> Jassi,
 >>
->> The support thread on the german board is very long, so most of the 
->> questions are answered there. The experienced don't need this, so the 
->> numbers *are* wrong.
->>
->> And I'm using two of the NAS boxes for backup and another for kernel work
->>
->>> So I vote for not killing it at least until it's supported by kernel.
+>> On Tue, Mar 8, 2016 at 1:10 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Tue, Mar 8, 2016 at 2:18 AM, Nishanth Menon <nm@ti.com> wrote:
+>>>> On 03/07/2016 12:31 PM, Jassi Brar wrote:
+>>>>> On Fri, Mar 4, 2016 at 8:05 PM, Nishanth Menon <nm@ti.com> wrote:
+>>>>>>>
+>>>>>>>> +static int ti_msgmgr_send_data(struct mbox_chan *chan, void *data)
+>>>>>>>> +{
+>>>>>>>> +       struct device *dev = chan->mbox->dev;
+>>>>>>>> +       struct ti_msgmgr_inst *inst = dev_get_drvdata(dev);
+>>>>>>>> +       const struct ti_msgmgr_desc *desc;
+>>>>>>>> +       struct ti_queue_inst *qinst = chan->con_priv;
+>>>>>>>> +       int msg_count, num_words, trail_bytes;
+>>>>>>>> +       struct ti_msgmgr_message *message = data;
+>>>>>>>> +       void __iomem *data_reg;
+>>>>>>>> +       u32 *word_data;
+>>>>>>>> +
+>>>>>>>> +       if (WARN_ON(!inst)) {
+>>>>>>>> +               dev_err(dev, "no platform drv data??\n");
+>>>>>>>> +               return -EINVAL;
+>>>>>>>> +       }
+>>>>>>>> +       desc = inst->desc;
+>>>>>>>> +
+>>>>>>>> +       if (desc->max_message_size < message->len) {
+>>>>>>>> +               dev_err(dev, "Queue %s message length %d > max %d\n",
+>>>>>>>> +                       qinst->name, message->len, desc->max_message_size);
+>>>>>>>> +               return -EINVAL;
+>>>>>>>> +       }
+>>>>>>>> +
+>>>>>>>> +       /* Are we able to send this or not? */
+>>>>>>>> +       msg_count = ti_msgmgr_queue_get_num_messages(qinst);
+>>>>>>>> +       if (msg_count >= desc->max_messages) {
+>>>>>>>> +               dev_warn(dev, "Queue %s is full (%d messages)\n", qinst->name,
+>>>>>>>> +                        msg_count);
+>>>>>>>> +               return -EBUSY;
+>>>>>>>> +       }
+>>>>>>> This seems fishy. mailbox api always submit 1 'complete' message to be
+>>>>>>> sent and checks for completion by last_tx_done() before calling
+>>>>>>> send_data() again. Controller drivers are not supposed to queue
+>>>>>>> messages - mailbox core does. So you should never be unable to send a
+>>>>>>> message.
+>>>>>>
+>>>>>>
+>>>>>> OK-> to explain this, few reasons: (queue messages check and usage of
+>>>>>> last_tx_done are kind of intertwined answer..
+>>>>>> a) we need to remember that the message manager has a shared RAM.
+>>>>>> multiple transmitter over other queues can be sharing the same.
+>>>>>> unfortunately, we dont get a threshold kind of interrupt or status that
+>>>>>> I am able to exploit in the current incarnation of the solution. The
+>>>>>> best we can do in the full system is to constrain the number of messages
+>>>>>> that are max pending simultaneously in each of the queue from various
+>>>>>> transmitters in the SoC.
+>>>>>> b) last_tx_done() is checked if TXDONE_BY_POLL, not if TXDONE_BY_ACK
+>>>>>> right? which is how this'd work since txdone_poll is false -> that is
+>>>>>> how we want this mechanism to work once the far end is ready for next
+>>>>>> message, it acks. I do see your point about being tied to protocol - I
+>>>>>> dont like it either.. in fact, I'd prefer that client registration
+>>>>>> mention what kind of handshaking is necessary, but: a) that is not how
+>>>>>> mailbox framework is constructed at the moment(we state txdone_poll at
+>>>>>> mailbox registration, not at client usage) and b) I have no real need
+>>>>>> for multiple clients to users of message manager who actually need
+>>>>>> non-ACK usage - even for the foreseeable future (at least 1 next
+>>>>>> generation of SoC) - if such a need does arise in the future, I will
+>>>>>> have to rework framework and make this capability at the registration
+>>>>>> time of the client - allowing each client path to use different
+>>>>>> mechanisms on hardware such as these that need it.
+>>>>>> c) message manager can actually queue more than one message(depending on
+>>>>>> client capability). Even though, at this point, we are not really
+>>>>>> capable of doing it(again from what I can see for immediate future),
+>>>>>> mailbox framework by checking last_tx_done forces a single message
+>>>>>> sequencing - which is not really exploiting the capability of the
+>>>>>> hardware - in theory, we should be able to queue max num messages, hit
+>>>>>> cpuidle and snooze away while the remote entity chomp away data at it's
+>>>>>> own pace and finally give us a notification back - but again, we can
+>>>>>> argue it is indeed protocol dependent, so setting txdone_poll to false
+>>>>>> actually enables that to be done in user. Again - i have no immediate
+>>>>>> need for any queued multiple transfer needs yet.. even if i need to, in
+>>>>>> the future, it can easily be done by the client by maintaining code as
+>>>>>> is - txdone_poll is false.
+>>>>>>
+>>>>> All I suggest is that the controller does not queue more than 1
+>>>>> message at a time, which means the controller driver allows for
+>>>>> maximum possible resources taken by a message.
+>>>>> The buffering is already done by the core, and if for your 'batch
+>>>>> dispatch' thing the client could simply flush them to remote by
+>>>>> pretending it got the ack (which is no worse than simply sending all
+>>>>> messages to remote without caring if the first was successful or not).
+>>>>
+>>>> Are you suggesting to set txdone_poll is true?
+>>> No.
 >>>
+>>>> the controller is quite
+>>>> capable of queueing more than 1 message at a time. This the reason for
+>>>> letting the client choose the mode of operation - use ack mechanism for
+>>>> operation. client can choose to ignore the buffering in the controller,
+>>>> as you mentioned, but then, why force txdone_poll to true and deny the
+>>>> usage of the queue capability of the hardware?
+>>>>
+>>> irq/poll/ack whatever you use, there is no valid reason to buffer
+>>> messages in the controller driver. Please let me know what usecase you
+>>> have in mind that must have messages buffered in controller driver and
+>>> not core.
 >>
->> ACK !!
-> 
-> Thanks everyone for the input. So if OpenWRT wants to keep the support
-> for the Gemini platform, I see two ways forward:
-> 
-> - have a separate toolchain for target/linux/gemini when the other
->   platforms upgrade to gcc-7. That means no action needed for now,
->   but possibly more work to keep it going in the long run
-> 
-> - make the upstream kernel work with compilers that lack -march=armv4
->   support.
-> 
-> I think we want the second one if at all possible, as it also addresses
-> most of the other affected platforms (not rpc, which requires -march=armv3).
-> 
+>> I am confused, I am _not_ buffering any tx data in the controller
+>> driver - rx data is stored in a temp buffer to send up the stack -
+>> that is just regular practise, right?
+>>
+> right.
+>
+>> In tx, I just check to ensure
+>> that the queue has'nt run out prior to transmission since the hardware
+>> is capable of queueing - ok, in a single transmitter system it is
+>> probably a little overkill, but we would like to function in multiple
+>> producer SoC as well. What am I missing here?
+>>
+> In send_data() you have ...
+>
+> +       /* Are we able to send this or not? */
+> +       msg_count = ti_msgmgr_queue_get_num_messages(qinst);
+> +       if (msg_count >= desc->max_messages) {
+> +               dev_warn(dev, "Queue %s is full (%d messages)\n", qinst->name,
+> +                        msg_count);
+> +               return -EBUSY;
+> +       }
+>
+> That is, you check if there are some messages in the TX-Queue already.
+> I am not sure how you could hit this and if that is legit.
 
-yes please option 2 would be favorable as we try to keep the amount of
-toolchains to a minimum.
-	
-	John
+Alright, i will drop this check since it is causing a lot more
+confusion that that is worth. we can introduce it when we finally do
+hit an issue eventually with multiple processors trying to transmit on
+the same queue manager. that is not a concern at the very immediate
+time, so we should be good to drop.
 
-> The patch below might be enough, passing -march=armv4t whenever -march=armv4
-> is not supported, and passing --fix-v4bx whenever we build for ARMv4:
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 9fb3fee0e908..3c312d37a83a 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -19,6 +19,11 @@ LDFLAGS_vmlinux	+= --be8
->  LDFLAGS_MODULE	+= --be8
->  endif
->  
-> +ifeq ($(CONFIG_CPU_32v4),y)
-> +LDFLAGS_vmlinux	+= $(call ld-option,--fix-v4bx)
-> +LDFLAGS_MODULE	+= $(call ld-option,--fix-v4bx)
-> +endif
-> +
->  ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
->  LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
->  endif
-> @@ -75,7 +80,7 @@ arch-$(CONFIG_CPU_32v6K)	=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6k,
->  endif
->  arch-$(CONFIG_CPU_32v5)		=-D__LINUX_ARM_ARCH__=5 $(call cc-option,-march=armv5te,-march=armv4t)
->  arch-$(CONFIG_CPU_32v4T)	=-D__LINUX_ARM_ARCH__=4 -march=armv4t
-> -arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 -march=armv4
-> +arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 $(call cc-option,-march=armv4,-march=armv4t)
->  arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3
->  
->  # Evaluate arch cc-option calls now
-> @@ -93,8 +98,8 @@ tune-$(CONFIG_CPU_ARM922T)	=-mtune=arm9tdmi
->  tune-$(CONFIG_CPU_ARM925T)	=-mtune=arm9tdmi
->  tune-$(CONFIG_CPU_ARM926T)	=-mtune=arm9tdmi
->  tune-$(CONFIG_CPU_FA526)	=-mtune=arm9tdmi
-> -tune-$(CONFIG_CPU_SA110)	=-mtune=strongarm110
-> -tune-$(CONFIG_CPU_SA1100)	=-mtune=strongarm1100
-> +tune-$(CONFIG_CPU_SA110)	=$(call cc-option,-mtune=strongarm110)
-> +tune-$(CONFIG_CPU_SA1100)	=$(call cc-option,-mtune=strongarm1100)
->  tune-$(CONFIG_CPU_XSCALE)	=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
->  tune-$(CONFIG_CPU_XSC3)		=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
->  tune-$(CONFIG_CPU_FEROCEON)	=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
-> 
-> Does this look reasonable?
-> 
-> 	Arnd
-> 
+please let me know if you are ok with this.
+
+-- 
+---
+Regards,
+Nishanth Menon
