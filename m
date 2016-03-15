@@ -1,50 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 15 Mar 2016 13:17:09 +0700
-Subject: [PATCH v6 0/3] thermal: mediatek: Add cpu dynamic power cooling
- model.
-In-Reply-To: <1458017620.30412.3.camel@mtksdaap41>
-References: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
- <20151217015231.GC3496@ubuntu>
- <1458017620.30412.3.camel@mtksdaap41>
-Message-ID: <20160315061709.GC13831@vireshk-mac-ubuntu>
+From: huangdaode@hisilicon.com (Daode Huang)
+Date: Tue, 15 Mar 2016 14:43:57 +0800
+Subject: [PATCH V2 net 0/6] net: hns: hns driver updates
+In-Reply-To: <20160314.224511.688178587092115078.davem@davemloft.net>
+References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
+ <56E76BB2.5060203@hisilicon.com>
+ <20160314.224511.688178587092115078.davem@davemloft.net>
+Message-ID: <56E7AF2D.4090606@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-03-16, 12:53, dawei chien wrote:
-> On Thu, 2015-12-17 at 09:52 +0800, Viresh Kumar wrote:
-> > On 16-12-15, 21:29, Dawei Chien wrote:
-> > > Use Intelligent Power Allocation (IPA) technical to add dynamic power model
-> > > for binding CPU thermal zone. The power allocator governor allocates power
-> > > budget to control CPU temperature.
-> > >
-> > > Power Allocator governor is able to keep SOC temperature within a defined
-> > > temperature range to avoid SOC overheat and keep it's performance.
-> > > mt8173-cpufreq.c need to register its' own power model with power allocator
-> > > thermal governor, so that power allocator governor can allocates suitable
-> > > power budget to control CPU temperature.
-> > >
-> > > Binding document is refer to this patchset
-> > > https://lkml.org/lkml/2015/11/30/239
-> > >
-> > > Change since V5:
-> > > 1. Remove thermal sensor ID from phandles
-> > 
-> > Though you should have included this in the new version, but still
-> > 
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > 
-> > --
-> > viresh
-> 
-> Hi Viresh,
-> Would you please pull this patch to your tree since following patch
-> already pulled in, thank you.
-> 
-> https://lkml.org/lkml/2015/11/30/239
+hi Dave,
 
-Its Rafael, who is going to apply this one.
+Thanks for your reply, I am so sorry to interrupt your work.
+Yes, the patch set should be reviewed by all the other developers.
+I should not only ask you to review the patch.
 
-Can you please resend it as he may not have it in patchworks?
+I will resend all these patch after 4.6-rc-1 is released.
+Thanks.
 
--- 
-viresh
+Daode.
+
+.
+
+On 2016/3/15 10:45, David Miller wrote:
+> From: Daode Huang <huangdaode@hisilicon.com>
+> Date: Tue, 15 Mar 2016 09:56:02 +0800
+>
+>> Could you please help me to review this patch set?
+> I am not reviewing anything until you guys sort out your submission
+> scheme, and resend these fresh using that central maintainer.
+>
+> I am also not the only person in the world who is supposed to review
+> all of this stuff, other developers need to help with the review
+> process as well.
+>
+> So it is never appropriate to ask me, and only me, to review your
+> work.
+>
+> Thanks.
+>
+> .
+>
