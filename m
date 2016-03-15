@@ -1,34 +1,39 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 15 Mar 2016 11:58:43 +0900
-Subject: [PATCH v2 4/5] arm64: tegra210: Add reference clock to GM20B
-In-Reply-To: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
-References: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1458010724-10945-5-git-send-email-acourbot@nvidia.com>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Tue, 15 Mar 2016 14:19:58 +1100 (AEDT)
+Subject: [PATCH 09/22] ncr5380: Adopt uniform DMA setup convention
+In-Reply-To: <56E669F6.8070407@suse.de>
+References: <20160314042700.596192247@telegraphics.com.au>
+ <20160314042702.976019738@telegraphics.com.au> <56E669F6.8070407@suse.de>
+Message-ID: <alpine.LNX.2.00.1603151313510.9662@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This clock is required for the GPU to operate.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra210.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On Mon, 14 Mar 2016, Hannes Reinecke wrote:
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-index 362c269946ff..04898cb25f0c 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-@@ -309,8 +309,9 @@
- 			     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "stall", "nonstall";
- 		clocks = <&tegra_car TEGRA210_CLK_GPU>,
--			 <&tegra_car TEGRA210_CLK_PLL_P_OUT5>;
--		clock-names = "gpu", "pwr";
-+			 <&tegra_car TEGRA210_CLK_PLL_P_OUT5>,
-+			 <&tegra_car TEGRA210_CLK_PLL_G_REF>;
-+		clock-names = "gpu", "pwr", "ref";
- 		resets = <&tegra_car 184>;
- 		reset-names = "gpu";
- 		status = "disabled";
+> > @@ -1555,8 +1555,7 @@ static int NCR5380_transfer_dma(struct S
+> >  	NCR5380_read(RESET_PARITY_INTERRUPT_REG);
+> >  	*data = d + c;
+> >  	*count = 0;
+> > -	*phase = NCR5380_read(STATUS_REG) & PHASE_MASK;
+> > -	return foo;
+> > +	return result;
+> >  }
+> >  
+> >  /*
+> 
+> Don't you miss a phase update here?
+
+I guess I missed explaining the change in the commit log.
+
+The *phase assignment is redundant because after NCR5380_transfer_dma() 
+returns control to NCR5380_information_transfer(), the latter routine then 
+also returns, and so *phase is dead.
+
 -- 
-2.7.2
+
+> 
+> Cheers,
+> 
+> Hannes
+> 
