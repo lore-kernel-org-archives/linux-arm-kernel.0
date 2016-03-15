@@ -1,70 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Mar 2016 22:34:45 +0100
-Subject: [PATCH] ARM: davinci: only use NVMEM when available
-Message-ID: <1458077705-408437-1-git-send-email-arnd@arndb.de>
+Date: Tue, 15 Mar 2016 22:37:17 +0100
+Subject: [PATCH] iommu: provide of_xlate pointer unconditionally
+Message-ID: <1458077877-474066-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The davinci platform contains code that calls into the nvmem
-subsystem, but that might be a loadable module, causing a
-link error:
+iommu drivers that support the standard DT bindings use a of_xlate
+callback pointer, but that is only part of struct iommu_ops when
+CONFIG_OF_IOMMU is enabled, leading to build errors in randconfig
+builds when that is not provided:
 
-arch/arm/mach-davinci/built-in.o: In function `davinci_get_mac_addr':
-:(.text+0x1088): undefined reference to `nvmem_device_read'
-arch/arm/mach-davinci/built-in.o: In function `read_factory_config':
-:(.text+0x214c): undefined reference to `nvmem_device_read'
+drivers/iommu/mtk_iommu.c:497:2: error: unknown field 'of_xlate' specified in initializer
+  .of_xlate = mtk_iommu_of_xlate,
+  ^
+drivers/iommu/mtk_iommu.c:497:14: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .of_xlate = mtk_iommu_of_xlate,
+              ^~~~~~~~~~~~~~~~~~
+drivers/iommu/mtk_iommu.c:497:14: note: (near initialization for 'mtk_iommu_ops.domain_get_attr')
 
-Also, when NVMEM is completely disabled, the functions fail with
-nonobvious error messages.
-
-This ensures we only call the API functions when the code is actually
-reachable from the board file, and otherwise prints a unique log
-message.
+We can work around it by adding more #ifdefs in each driver, but
+it seems nicer to just allow setting the pointer even if it is
+unused. This makes the driver code look nicer, and it gives better
+compile-time coverage when test building on other architectures.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: bec3c11bad0e ("misc: at24: replace memory_accessor with nvmem_device_read")
+Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
 ---
+ include/linux/iommu.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-Hi Greg,
-
-The commit that introduced this is currently in the char-misc tree,
-please apply this fixup on top if you haven't already sent it to Linus.
-
- arch/arm/mach-davinci/board-mityomapl138.c | 5 +++++
- arch/arm/mach-davinci/common.c             | 5 +++++
- 2 files changed, 10 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index d97c588550ad..bc4e63fa9808 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -121,6 +121,11 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
- 	const char *partnum = NULL;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index a5c539fa5d2b..ef7a6ecd8584 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -195,9 +195,7 @@ struct iommu_ops {
+ 	/* Get the number of windows per domain */
+ 	u32 (*domain_get_windows)(struct iommu_domain *domain);
  
-+	if (!IS_BUILTIN(CONFIG_NVMEM)) {
-+		pr_warn("Factory Config not available without CONFIG_NVMEM\n");
-+		goto bad_config;
-+	}
-+
- 	ret = nvmem_device_read(nvmem, 0, sizeof(factory_config),
- 				&factory_config);
- 	if (ret != sizeof(struct factory_config)) {
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index f55ef2ef2f92..742133b7266a 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -33,6 +33,11 @@ void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context)
- 	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
- 	off_t offset = (off_t)context;
+-#ifdef CONFIG_OF_IOMMU
+ 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+-#endif
  
-+	if (!IS_BUILTIN(CONFIG_NVMEM)) {
-+		pr_warn("Cannot read MAC addr from EEPROM without CONFIG_NVMEM\n");
-+		return;
-+	}
-+
- 	/* Read MAC addr from EEPROM */
- 	if (nvmem_device_read(nvmem, offset, ETH_ALEN, mac_addr) == ETH_ALEN)
- 		pr_info("Read MAC addr from EEPROM: %pM\n", mac_addr);
+ 	unsigned long pgsize_bitmap;
+ 	void *priv;
 -- 
 2.7.0
