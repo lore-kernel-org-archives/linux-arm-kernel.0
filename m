@@ -1,34 +1,33 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 15 Mar 2016 11:58:40 +0900
-Subject: [PATCH v2 1/5] dt-bindings: gk20a: Fix typo in compatible name
+Date: Tue, 15 Mar 2016 11:58:44 +0900
+Subject: [PATCH v2 5/5] arm64: tegra210: Add IOMMU node to GM20B
 In-Reply-To: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
 References: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1458010724-10945-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <1458010724-10945-6-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct compatible name is "nvidia,gk20a".
+Nouveau can take advantage of this declaration to remove the need for
+contiguous memory.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-index 23bfe8e1f7cc..914f0ff4020e 100644
---- a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-+++ b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-@@ -1,9 +1,9 @@
- NVIDIA GK20A Graphics Processing Unit
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+index 04898cb25f0c..478543f74863 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+@@ -314,6 +314,9 @@
+ 		clock-names = "gpu", "pwr", "ref";
+ 		resets = <&tegra_car 184>;
+ 		reset-names = "gpu";
++
++		iommus = <&mc TEGRA_SWGROUP_GPU>;
++
+ 		status = "disabled";
+ 	};
  
- Required properties:
--- compatible: "nvidia,<chip>-<gpu>"
-+- compatible: "nvidia,<gpu>"
-   Currently recognized values:
--  - nvidia,tegra124-gk20a
-+  - nvidia,gk20a
- - reg: Physical base address and length of the controller's registers.
-   Must contain two entries:
-   - first entry for bar0
 -- 
 2.7.2
