@@ -1,73 +1,168 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 15 Mar 2016 16:38:06 +0900
-Subject: [PATCH v3 4/8] ARM: dts: Add UART2 dt node for Exynos3250 SoC
+Date: Tue, 15 Mar 2016 16:38:03 +0900
+Subject: [PATCH v3 1/8] ARM: dts: Add initial pin configuration for
+ exynos3250-rinato
 In-Reply-To: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
 References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1458027490-13787-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1458027490-13787-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dubey <pankaj.dubey@samsung.com>
+This patch adds initial pin configuration using pinctrl subsystem
+to reduce leakage power-consumption of gpio pins in normal state.
+All pins included in this patch are NC (not connected) pin.
 
-This patch add the uart2 devicetree node for Exynos3250 SoC.
-
-Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-pinctrl.dtsi |  7 +++++++
- arch/arm/boot/dts/exynos3250.dtsi         | 12 ++++++++++++
- 2 files changed, 19 insertions(+)
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 38 +++++++++++++++++
+ arch/arm/boot/dts/exynos3250-rinato.dts   | 71 ++++++++++++++++++++++++++++++-
+ 2 files changed, 107 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
-index ecf79386e891..54c587f27265 100644
+index 5ab81c39e2c9..ecf79386e891 100644
 --- a/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
 +++ b/arch/arm/boot/dts/exynos3250-pinctrl.dtsi
-@@ -158,6 +158,13 @@
- 		samsung,pin-drv = <0>;
- 	};
+@@ -16,11 +16,49 @@
+ #define PIN_PULL_DOWN		1
+ #define PIN_PULL_UP		3
  
-+	uart2_data: uart2-data {
-+		samsung,pins = "gpa1-0", "gpa1-1";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
++#define PIN_DRV_LV1		0
++#define PIN_DRV_LV2		2
++#define PIN_DRV_LV3		1
++#define PIN_DRV_LV4		3
++
+ #define PIN_PDN_OUT0		0
+ #define PIN_PDN_OUT1		1
+ #define PIN_PDN_INPUT		2
+ #define PIN_PDN_PREV		3
+ 
++#define PIN_IN(_pin, _pull, _drv)			\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <0>;		\
++		samsung,pin-pud = <PIN_PULL_ ##_pull>;	\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++	}
++
++#define PIN_OUT(_pin, _drv)				\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <1>;		\
++		samsung,pin-pud = <0>;			\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++	}
++
++#define PIN_OUT_SET(_pin, _val, _drv)			\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <1>;		\
++		samsung,pin-pud = <0>;			\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++		samsung,pin-val = <_val>;		\
++	}
++
++#define PIN_CFG(_pin, _sel, _pull, _drv)		\
++	_pin {						\
++		samsung,pins = #_pin;			\
++		samsung,pin-function = <_sel>;		\
++		samsung,pin-pud = <PIN_PULL_ ##_pull>;	\
++		samsung,pin-drv = <PIN_DRV_ ##_drv>;	\
++	}
++
+ #define PIN_SLP(_pin, _mode, _pull)				\
+ 	_pin {							\
+ 		samsung,pins = #_pin;				\
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index 3e64d5dcdd60..a01e61b20385 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -681,7 +681,21 @@
+ 
+ &pinctrl_0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sleep0>;
++	pinctrl-0 = <&initial0 &sleep0>;
++
++	initial0: initial-state {
++		PIN_IN(gpa1-4, DOWN, LV1);
++		PIN_IN(gpa1-5, DOWN, LV1);
++
++		PIN_IN(gpc0-0, DOWN, LV1);
++		PIN_IN(gpc0-1, DOWN, LV1);
++		PIN_IN(gpc0-2, DOWN, LV1);
++		PIN_IN(gpc0-3, DOWN, LV1);
++		PIN_IN(gpc0-4, DOWN, LV1);
++
++		PIN_IN(gpd0-0, DOWN, LV1);
++		PIN_IN(gpd0-1, DOWN, LV1);
 +	};
-+
- 	i2c3_bus: i2c3-bus {
- 		samsung,pins = "gpa1-2", "gpa1-3";
- 		samsung,pin-function = <3>;
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 18e3deffbf48..076677384d20 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -42,6 +42,7 @@
- 		i2c7 = &i2c_7;
- 		serial0 = &serial_0;
- 		serial1 = &serial_1;
-+		serial2 = &serial_2;
- 	};
  
- 	cpus {
-@@ -465,6 +466,17 @@
- 			status = "disabled";
- 		};
+ 	sleep0: sleep-state {
+ 		PIN_SLP(gpa0-0, INPUT, DOWN);
+@@ -735,7 +749,60 @@
  
-+		serial_2: serial at 13820000 {
-+			compatible = "samsung,exynos4210-uart";
-+			reg = <0x13820000 0x100>;
-+			interrupts = <0 111 0>;
-+			clocks = <&cmu CLK_UART2>, <&cmu CLK_SCLK_UART2>;
-+			clock-names = "uart", "clk_uart_baud0";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart2_data>;
-+			status = "disabled";
-+		};
+ &pinctrl_1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sleep1>;
++	pinctrl-0 = <&initial1 &sleep1>;
 +
- 		i2c_0: i2c at 13860000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
++	initial1: initial-state {
++		PIN_IN(gpe0-6, DOWN, LV1);
++		PIN_IN(gpe0-7, DOWN, LV1);
++
++		PIN_IN(gpe1-0, DOWN, LV1);
++		PIN_IN(gpe1-3, DOWN, LV1);
++		PIN_IN(gpe1-4, DOWN, LV1);
++		PIN_IN(gpe1-5, DOWN, LV1);
++		PIN_IN(gpe1-6, DOWN, LV1);
++
++		PIN_IN(gpk2-0, DOWN, LV1);
++		PIN_IN(gpk2-1, DOWN, LV1);
++		PIN_IN(gpk2-2, DOWN, LV1);
++		PIN_IN(gpk2-3, DOWN, LV1);
++		PIN_IN(gpk2-4, DOWN, LV1);
++		PIN_IN(gpk2-5, DOWN, LV1);
++		PIN_IN(gpk2-6, DOWN, LV1);
++
++		PIN_IN(gpm0-0, DOWN, LV1);
++		PIN_IN(gpm0-1, DOWN, LV1);
++		PIN_IN(gpm0-2, DOWN, LV1);
++		PIN_IN(gpm0-3, DOWN, LV1);
++		PIN_IN(gpm0-4, DOWN, LV1);
++		PIN_IN(gpm0-5, DOWN, LV1);
++		PIN_IN(gpm0-6, DOWN, LV1);
++		PIN_IN(gpm0-7, DOWN, LV1);
++
++		PIN_IN(gpm1-0, DOWN, LV1);
++		PIN_IN(gpm1-1, DOWN, LV1);
++		PIN_IN(gpm1-2, DOWN, LV1);
++		PIN_IN(gpm1-3, DOWN, LV1);
++		PIN_IN(gpm1-4, DOWN, LV1);
++		PIN_IN(gpm1-5, DOWN, LV1);
++		PIN_IN(gpm1-6, DOWN, LV1);
++
++		PIN_IN(gpm2-0, DOWN, LV1);
++		PIN_IN(gpm2-1, DOWN, LV1);
++
++		PIN_IN(gpm3-0, DOWN, LV1);
++		PIN_IN(gpm3-1, DOWN, LV1);
++		PIN_IN(gpm3-2, DOWN, LV1);
++		PIN_IN(gpm3-3, DOWN, LV1);
++		PIN_IN(gpm3-4, DOWN, LV1);
++
++		PIN_IN(gpm4-1, DOWN, LV1);
++		PIN_IN(gpm4-2, DOWN, LV1);
++		PIN_IN(gpm4-3, DOWN, LV1);
++		PIN_IN(gpm4-4, DOWN, LV1);
++		PIN_IN(gpm4-5, DOWN, LV1);
++		PIN_IN(gpm4-6, DOWN, LV1);
++		PIN_IN(gpm4-7, DOWN, LV1);
++	};
+ 
+ 	sleep1: sleep-state {
+ 		PIN_SLP(gpe0-0, PREV, NONE);
 -- 
 1.9.1
