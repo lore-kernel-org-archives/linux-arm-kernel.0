@@ -1,44 +1,33 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Tue, 15 Mar 2016 12:53:40 +0800
-Subject: [PATCH v6 0/3] thermal: mediatek: Add cpu dynamic power cooling
- model.
-In-Reply-To: <20151217015231.GC3496@ubuntu>
-References: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
- <20151217015231.GC3496@ubuntu>
-Message-ID: <1458017620.30412.3.camel@mtksdaap41>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 Mar 2016 10:46:16 +0530
+Subject: [PATCH 3/4] mmc: davinci: prepare clock
+In-Reply-To: <56E6F03F.5060908@lechnology.com>
+References: <1457567405-30475-1-git-send-email-david@lechnology.com>
+ <1457567405-30475-4-git-send-email-david@lechnology.com>
+ <56E6A66D.1080909@ti.com> <56E6F03F.5060908@lechnology.com>
+Message-ID: <56E79AA0.9050308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-12-17 at 09:52 +0800, Viresh Kumar wrote:
-> On 16-12-15, 21:29, Dawei Chien wrote:
-> > Use Intelligent Power Allocation (IPA) technical to add dynamic power model
-> > for binding CPU thermal zone. The power allocator governor allocates power
-> > budget to control CPU temperature.
-> >
-> > Power Allocator governor is able to keep SOC temperature within a defined
-> > temperature range to avoid SOC overheat and keep it's performance.
-> > mt8173-cpufreq.c need to register its' own power model with power allocator
-> > thermal governor, so that power allocator governor can allocates suitable
-> > power budget to control CPU temperature.
-> >
-> > Binding document is refer to this patchset
-> > https://lkml.org/lkml/2015/11/30/239
-> >
-> > Change since V5:
-> > 1. Remove thermal sensor ID from phandles
-> 
-> Though you should have included this in the new version, but still
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
-> --
-> viresh
+On Monday 14 March 2016 10:39 PM, David Lechner wrote:
+> On 03/14/2016 06:54 AM, Sekhar Nori wrote:
+>> On Thursday 10 March 2016 05:20 AM, David Lechner wrote:
+>>> When trying to use this driver with the common clock framework, enabling
+>>> the clock fails because it was not prepared. This fixes the problem by
+>>> calling clk_prepare and clk_enable in a single function.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>> Patch looks good. But I wonder how you hit this issue since we dont use
+>> common clock framework on mach-davinci and this driver is not used
+>> anywhere else AFAIK.
+>>
+>> Regards,
+>> Sekhar
+>>
+> Because I am working towards getting the common clock framework working
+> on mach-davinci - at least with da8xx/device tree. :-)
 
-Hi Viresh,
-Would you please pull this patch to your tree since following patch
-already pulled in, thank you.
+Alright, glad to know someone is pursuing this.
 
-https://lkml.org/lkml/2015/11/30/239
-
-BR,
-Dawei
+Thanks,
+Sekhar
