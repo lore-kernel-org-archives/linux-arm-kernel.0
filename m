@@ -1,37 +1,58 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 15 Mar 2016 10:50:23 -0700
-Subject: [PATCH 1/7] dmaengine: xilinx_vdma: Fix checkpatch.pl warnings
-In-Reply-To: <1458062592-27981-2-git-send-email-appanad@xilinx.com>
-References: <1458062592-27981-1-git-send-email-appanad@xilinx.com>
- <1458062592-27981-2-git-send-email-appanad@xilinx.com>
-Message-ID: <CAAtXAHdzgt2uXo4_BV4wbGyAbseF7JcbWf8on-KzmcDWnK+WPw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 15 Mar 2016 19:03:55 +0100
+Subject: [PATCH] arm64: fix KASLR boot-time I-cache maintenance
+In-Reply-To: <1458040977-27558-1-git-send-email-mark.rutland@arm.com>
+References: <1458040977-27558-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu_z=RsdRZyVRTrh1akO9xv7jnSjJRPZMAp4DrML-E4pQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-this patch looks fine to me.
-
-On Tue, Mar 15, 2016 at 10:23 AM, Kedareswara rao Appana
-<appana.durga.rao@xilinx.com> wrote:
-> This patch fixes the below checkpatch.pl warnings.
+On 15 March 2016 at 12:22, Mark Rutland <mark.rutland@arm.com> wrote:
+> Commit f80fb3a3d50843a4 ("arm64: add support for kernel ASLR") missed a
+> DSB necessary to complete I-cache maintenance in the primary boot path,
+> and hence stale instructions may still be present in the I-cache and may
+> be executed until the I-cache maintenance naturally completes.
 >
-> WARNING: void function return statements are not generally useful
-> +       return;
-> +}
+> Since commit 8ec41987436d566f ("arm64: mm: ensure patched kernel text is
+> fetched from PoU"), all CPUs invalidate their I-caches after their MMU
+> is enabled. Prior a CPU's MMU having been enabled, arbitrary lines may
+> have been fetched from the PoC into I-caches. We never patch text
+> expected to be executed with the MMU off. Thus, it is unnecessary to
+> perform broadcast I-cache maintenance in the primary boot path.
 >
-> WARNING: void function return statements are not generally useful
-> +       return;
-> +}
+> This patch reduces the scope of the I-cache maintenance to the local
+> CPU, and adds the missing DSB with similar scope, matching prior
+> maintenance in the primary boot path.
 >
-> WARNING: Missing a blank line after declarations
-> +               u32 errors = status & XILINX_VDMA_DMASR_ALL_ERR_MASK;
-> +               vdma_ctrl_write(chan, XILINX_VDMA_REG_DMASR,
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesehvuel <ard.biesheuvel@linaro.org>
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/head.S | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 >
-Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
-
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-
-Cheers,
-
-Moritz
+> Note: this applies atop of the arm64 for-next/core branch.
+>
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 50c2134..1672ca9 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -766,8 +766,9 @@ __enable_mmu:
+>
+>         msr     sctlr_el1, x19                  // re-enable the MMU
+>         isb
+> -       ic      ialluis                         // flush instructions fetched
+> -       isb                                     // via old mapping
+> +       ic      iallu                           // flush instructions fetched
+> +       dsb     nsh                             // via old mapping
+> +       isb
+>         add     x27, x27, x23                   // relocated __mmap_switched
+>  #endif
+>         br      x27
+> --
+> 1.9.1
+>
