@@ -1,27 +1,28 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Tue, 15 Mar 2016 01:22:54 -0700
-Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <20160311125846.GF1111@bigcity.dyn.berto.se>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1457404974-1800-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160308073847.GA15520@infradead.org>
- <20160310160522.GB1111@bigcity.dyn.berto.se>
- <CAPcyv4gO4EZnBuVKXT8+gsMhbHJzuK7sfr0uRcjVdJP-nUUz4A@mail.gmail.com>
- <20160311111522.GA3450@infradead.org>
- <20160311125846.GF1111@bigcity.dyn.berto.se>
-Message-ID: <20160315082254.GE9136@infradead.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 Mar 2016 13:53:53 +0530
+Subject: [PATCH v2 5/5] arm: davinci: remove mmc dma resources
+In-Reply-To: <1457996081-21975-6-git-send-email-david@lechnology.com>
+References: <56E6BF7E.7020401@ti.com>
+ <1457996081-21975-1-git-send-email-david@lechnology.com>
+ <1457996081-21975-6-git-send-email-david@lechnology.com>
+Message-ID: <56E7C699.9030107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 01:58:46PM +0100, Niklas S?derlund wrote:
-> Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are 
-> the same and no special care is needed. However if you have a IOMMU you 
-> need to map the DMA slave phys_addr_t to a dma_addr_t using something 
-> like this. Is it not very similar to dma_map_single() where one maps 
-> processor virtual memory (instead if MMIO) so that it can be used with 
-> DMA slaves?
+On Tuesday 15 March 2016 04:24 AM, David Lechner wrote:
+> The davinci_mmc driver no longer uses platform resources for getting dma
+> channels. Instead lookup is now done using dma_slave_map.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-It's similar, but I don't think this actually works as a general case
-as there are quite a few places that expect to be able to have a
-struct page for a physical address.  We'd at least need a very careful
-audit for that case.
+I guess this will now be targeted for v4.7. I can apply the patch if I
+get an immutable branch from Ulf post v4.6-rc1 or if Ulf decides to
+apply this, fine with me.
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+BTW, we prefer a captialized "ARM:" in subject prefix. Whoever is
+applying can probably fix it though.
+
+Thanks,
+Sekhar
