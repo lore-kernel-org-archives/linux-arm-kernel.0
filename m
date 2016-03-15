@@ -1,22 +1,55 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Mar 2016 13:43:06 +0530
-Subject: [PATCH v2 0/5] davinci_mmc fixes
-In-Reply-To: <1457996081-21975-1-git-send-email-david@lechnology.com>
-References: <56E6BF7E.7020401@ti.com>
- <1457996081-21975-1-git-send-email-david@lechnology.com>
-Message-ID: <56E7C412.3000004@ti.com>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Tue, 15 Mar 2016 16:10:35 +0800
+Subject: [RESEND][PATCH 1/3] thermal: mediatek: Add cpu dynamic power cooling
+ model.
+In-Reply-To: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
+References: <1458029437-12846-1-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <1458029437-12846-2-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+MT8173 cpufreq driver select of_cpufreq_power_cooling_register registering
+cooling devices with dynamic power coefficient.
 
-On Tuesday 15 March 2016 04:24 AM, David Lechner wrote:
-> I've updated the patche set based on feedback. This is tested on linux-next with
-> LEGO MINDSTORMS EV3 (da850), both with and without device tree enabled.
+Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+This patch is base on patchset:
+https://lkml.org/lkml/2015/11/17/251
+---
+ drivers/cpufreq/mt8173-cpufreq.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-When posting an updated series, please post as a fresh thread. Not as
-reply to the original posting. With the later, there are more chances of
-series being lost.
-
-Thanks,
-Sekhar
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+index 1efba34..d8ad406 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mt8173-cpufreq.c
+@@ -309,17 +309,24 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
+ 	return 0;
+ }
+ 
++#define DYNAMIC_POWER "dynamic-power-coefficient"
++
+ static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
+ {
+ 	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+ 	struct device_node *np = of_node_get(info->cpu_dev->of_node);
++	u32 capacitance = 0;
+ 
+ 	if (WARN_ON(!np))
+ 		return;
+ 
+ 	if (of_find_property(np, "#cooling-cells", NULL)) {
+-		info->cdev = of_cpufreq_cooling_register(np,
+-							 policy->related_cpus);
++		of_property_read_u32(np, DYNAMIC_POWER, &capacitance);
++
++		info->cdev = of_cpufreq_power_cooling_register(np,
++						policy->related_cpus,
++						capacitance,
++						NULL);
+ 
+ 		if (IS_ERR(info->cdev)) {
+ 			dev_err(info->cpu_dev,
+-- 
+1.7.9.5
