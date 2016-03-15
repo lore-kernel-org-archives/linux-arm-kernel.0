@@ -1,83 +1,62 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 15 Mar 2016 14:14:32 +0000
-Subject: Questions about sleep states on ARM Juno R0
-In-Reply-To: <56E80519.1040400@bsc.es>
-References: <56E80519.1040400@bsc.es>
-Message-ID: <CAPKp9uZ28sYvAsz2H2gid=_DStcFrRnVw70mYDkHUAcXJZy9Bw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 15 Mar 2016 15:30:06 +0100
+Subject: [PATCH 11/17] dt-bindings: Add PLX Technology OXNAS pinctrl and
+ gpio bindings
+In-Reply-To: <1457005210-18485-12-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-12-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdYZ5Lm5FkuLmL2ZWTF1jc027d_Jm9AzK3xGS89dostzqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajiv,
+On Thu, Mar 3, 2016 at 12:40 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-On Tue, Mar 15, 2016 at 12:50 PM, nishtala <rajiv.nishtala@bsc.es> wrote:
->
-> In response to the discussion here (https://community.arm.com/thread/9382).
-> I'm continuing my follow-up question.
->
-> Sudeep here says to read the sysfs files to get usage/time to understand the
-> sleep-state residency of the cores/cluster.
->
-> To look at the sysfs files, I wrote a version of a watchdog which
-> essentially prints out the difference in "usage", if
-> it changes in the last 0.01s (it is a LARGE interval relative to update
-> period of sysfs files).
->
-> The questions I have are the following:
-> - When the system is idle, that is, no user initiated tasks are running; I
-> expected the counter for "usage" in CLUSTER_SLEEP_0 to remain constant,
-> because you don't exit
-> until any kernel interrupts occur, and is guaranteed to stay atleast for
-> 3500us while the "time" in the same category to increase.
->
+This is a vert terse zero-line commit message. Atleast describe what you are
+trying to do.
 
-Are you not seeing any increase in interrupt count on that cpu where
-CLUSTER_SLEEP_0 usage is increasing. Also there's not guarantee that
-it will stay in  CLUSTER_SLEEP_0 for 3500us, it can be woken up by interrupts.
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-> However, what I notice is that "usage" ALSO increases, which is something I
-> do not understand.
->
+> +optional properties:
+> +- #gpio-lines: Number of gpio if absent 32.
 
-Check the interrupt count, you must see that also increasing.
+NACK, use ngpio from the gpio.txt document like
+everyone else.
 
-> - When I run an application only on small OR big cores, the counter "usage"
-> for CPU_SLEEP_0 on the other type of core (big/small) still isn't updated.
-> Am I missing something here?
->
+> +Required properties for iomux controller:
+> +- compatible: "plxtech,nas782x-pinctrl" or "plxtech,ox810se-pinctrl"
+> +- plxtech,mux-mask: array of mask (periph per bank) to describe if a pin can be
+> +  configured in this periph mode. All the periph and bank need to be describe.
 
-Is this a question or your observation ? You are assuming that only your
-applications will be running ? It depends also on several background tasks
-that are running.
+Why? Encode this into the driver and select muxmask from
+the compatible string if it is a hardware limitation.
 
-> - Similarly, when I have an application that does only computations on both
-> big AND small cores simultaneously, how come the counter, "usage", for
-> CLUSTER_SLEEP_0 increases?
-> Shouldn't it remain constant?
->
+> +Each column will represent the possible peripheral of the pinctrl
+> +Each line will represent a pio bank
+> +
+> +For example :
+> +Peripheral: 2 ( A and B)
+> +Bank: 2 (A, B and C)
+> +=>
+> +
+> +  /*    A         B     */
+> +  0xffffffff 0xffc00c3b  /* pioA */
+> +  0xffffffff 0x7fff3ccf  /* pioB */
+> +
+> +For each peripheral/bank we will descibe in a u32 if a pin can be
+> +configured in it by putting 1 to the pin bit (1 << pin)
 
-Again, when your application is running doesn't mean it's continuously runs
-from start to end. It will interrupted when it yields the cpu or waits
-on some IO.
-During that short periods the cpus can enter idle states.
+That's just completely hopeless to understand for a DT author.
+Put it into the driver.
 
-> - How come value of "CLUSTER_SLEEP_0" (on a57 cluster) increases when there
-> is actually something running on it. How is it computed?
->
+> +Required properties for pin configuration node:
+> +- plxtech,pins: 4 integers array, represents a group of pins mux and config
+> +  setting. The format is plxtech,pins = <PIN_BANK PIN_BANK_NUM PERIPH CONFIG>.
+> +  The PERIPH 0 means gpio, PERIPH 1 is periph A, PERIPH 2 is periph B...
+> +  PIN_BANK 0 is pioA, PIN_BANK 1 is pioB...
 
-Ditto as above.
+NACK, use the standard binding for "pins" from pinctrl-bindings.txt
 
-[...]
+Also make the driver use the existing helpers for this property.
 
-> WARNING / LEGAL TEXT: This message is intended only for the use of the
-> individual or entity to which it is addressed and may contain
-> information which is privileged, confidential, proprietary, or exempt
-> from disclosure under applicable law. If you are not the intended
-> recipient or the person responsible for delivering the message to the
-> intended recipient, you are strictly prohibited from disclosing,
-> distributing, copying, or in any way using this message. If you have
-> received this communication in error, please notify the sender and
-> destroy and delete any copies you may have received.
->
-
-You need to fix this, please get rid of this disclaimer if you want people to
-respond to you.
+Yours,
+Linus Walleij
