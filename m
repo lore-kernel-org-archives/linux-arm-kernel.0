@@ -1,33 +1,56 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 15 Mar 2016 11:30:24 +0100
-Subject: [PATCH 7/9] ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004 touch
- support
+Date: Tue, 15 Mar 2016 11:30:20 +0100
+Subject: [PATCH 3/9] clk: imx: add ckil clock for i.MX7
 In-Reply-To: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
 References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1458037826-19375-8-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1458037826-19375-4-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those two touch controllers are used by Boundary Devices platforms.
+Add the necessary clock to use the ckil on i.MX7.
 
+Inspired from the following patch:
+https://github.com/boundarydevices/linux-imx6/commit/b80e8271
+
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/imx/clk-imx7d.c             | 3 ++-
+ include/dt-bindings/clock/imx7d-clock.h | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 978c5de..49dd816 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -162,7 +162,9 @@ CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_EGALAX=y
- CONFIG_TOUCHSCREEN_IMX6UL_TSC=y
-+CONFIG_TOUCHSCREEN_EDT_FT5X06=y
- CONFIG_TOUCHSCREEN_MC13783=y
-+CONFIG_TOUCHSCREEN_TSC2004=y
- CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_TOUCHSCREEN_SX8654=y
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index fbb6a8c..7912be8 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -342,7 +342,7 @@ static const char *clko1_sel[] = { "osc", "pll_sys_main_clk",
+ 
+ static const char *clko2_sel[] = { "osc", "pll_sys_main_240m_clk",
+ 	"pll_sys_pfd0_392m_clk", "pll_sys_pfd1_166m_clk", "pll_sys_pfd4_clk",
+-	"pll_audio_main_clk", "pll_video_main_clk", "osc_32k_clk", };
++	"pll_audio_main_clk", "pll_video_main_clk", "ckil", };
+ 
+ static const char *lvds1_sel[] = { "pll_arm_main_clk",
+ 	"pll_sys_main_clk", "pll_sys_pfd0_392m_clk", "pll_sys_pfd1_332m_clk",
+@@ -382,6 +382,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 
+ 	clks[IMX7D_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
+ 	clks[IMX7D_OSC_24M_CLK] = of_clk_get_by_name(ccm_node, "osc");
++	clks[IMX7D_CKIL] = of_clk_get_by_name(ccm_node, "ckil");
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx7d-anatop");
+ 	base = of_iomap(np, 0);
+diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
+index edca8985c..1183347 100644
+--- a/include/dt-bindings/clock/imx7d-clock.h
++++ b/include/dt-bindings/clock/imx7d-clock.h
+@@ -448,5 +448,6 @@
+ #define IMX7D_PLL_DRAM_TEST_DIV		435
+ #define IMX7D_ADC_ROOT_CLK		436
+ #define IMX7D_CLK_ARM			437
+-#define IMX7D_CLK_END			438
++#define IMX7D_CKIL			438
++#define IMX7D_CLK_END			439
+ #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
 -- 
 2.7.0
