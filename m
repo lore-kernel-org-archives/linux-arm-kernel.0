@@ -1,48 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Mar 2016 10:10:32 +0100
-Subject: [PATCH v2 4/4] documentation: Fix pinctrl documentation for
- Meson8 / Meson8b
-In-Reply-To: <1457516519-15319-1-git-send-email-carlo@caione.org>
-References: <20160305042646.GL13525@rob-hp-laptop>
- <1457516519-15319-1-git-send-email-carlo@caione.org>
-Message-ID: <CACRpkda3j7oxL0wawkLy-eHnP6zmfmBgKbm7=gTDH1xqXhKKUQ@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 15 Mar 2016 09:10:22 +0000
+Subject: [PATCH] dmaengine: pl330: Fix some race conditions in residue
+ calculation
+In-Reply-To: <20160311074328.GU11154@localhost>
+References: <1456319674.2867.15.camel@linaro.org>
+ <20160308041238.GL11154@localhost> <1457433611.2818.83.camel@linaro.org>
+ <20160308141551.GP11154@localhost> <1457452241.2818.128.camel@linaro.org>
+ <20160311074328.GU11154@localhost>
+Message-ID: <1458033022.2823.1.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 9, 2016 at 10:41 AM, Carlo Caione <carlo@caione.org> wrote:
+On Fri, 2016-03-11 at 13:13 +0530, Vinod Koul wrote:
+> On Tue, Mar 08, 2016 at 03:50:41PM +0000, Jon Medhurst (Tixy) wrote:
+> 
+> > > The reside is requested for "a descriptor". For example if you have prepared
+> > > two descriptors A and B and submitted them, then you can request status and
+> > > reside for A and you need to calculate that for A only and not take into
+> > > account status of B
+> > 
+> > But, in the case of the pl330 driver, A and B may each consist of
+> > multiple internal/hidden descriptors. So the residue calculation has to
+> > sum up the residue of all these internal/hidden descriptors as well.
+> > This is what the current pl330_tx_status() function does, but has bugs.
+> > 
+> > I've only just managed to clearly understand all the above details
+> > whilst writing this email, and this confusion obviously means the code
+> > and any commit messages need to explain things better.
+> 
+> Okay I relooked at the code, the driver is creating descriptor per period,
+> so yes while calculating that should be taken into account but only for
+> cyclic case and not for rest, as it will break reside values for for them.
 
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Fix pin controller documentation introducing the new compatibles for
-> the pinctrl drivers specific for aobus / cbus.
->
-> This is needed because we have changed the pin controller driver: we
-> have now a single specialized pinctrl driver / compatible for each bus
-> the controller is attached to, instead of one single driver dealing with
-> all the controllers we have on different buses.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
-> Hey Rob,
-> I'm resubmitting a V2 only for this patch since the driver changes have
-> been already taken by Linus.
-(...)
->  Required properties for the root node:
-> - - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
-> + - compatible: one of "amlogic,meson8-cbus-pinctrl"
-> +                     "amlogic,meson8b-cbus-pinctrl"
-> +                     "amlogic,meson8-aobus-pinctrl"
-> +                     "amlogic,meson8b-aobus-pinctrl"
+So not for scatter gather lists passed to pl330_prep_slave_sg? It seems
+to me, that as for the cyclic case, the descriptors used for each
+element in the list are equally internal to the pl330 driver and not
+exposed to users.
 
-I guess I just have to merge this. It (IIUC) turns out that the driver is beta
-and prototypeish and the DT bindings were too early to be etched in stone,
-and any old device trees using it are not really working anyways.
+pl330_tx_submit() only returns the cookie for the last descriptor, how
+do users get the cookies for the other elements so they can pass them to
+pl330_tx_status()?
 
-We prefer that this not happen because we have a serious control issue
-when it comes to bindings, but sometimes it happens anyways. Like
-with divorces and other unfortunate stuff like that.
+To me, the implementation of the pl330 driver looks consistent with the
+APIs I can see in header files and the Documentation directory, namely:
 
-Rob are you OK with this change?
+- dmaengine_prep_* functions prepare a DMA transactions and return
+  a descriptor (struct dma_async_tx_descriptor)
 
-Yours,
-Linus Walleij
+- The transaction is queued for processing by passing that descriptor to
+  dmaengine_submit() which returns 'cookie' (dma_cookie_t)
+
+- The current status of a transaction can be queried by passing it's
+  cookie to dmaengine_tx_status
+
+Now, I've never looked at DMA API's or their working before I started
+investigating the bug I'm trying to fix, so I may very well have missed
+something. 
+
+In fact, the more I look, the more uncertain I am. From
+Documentation/dmaengine/provider.txt it describes:
+
+   * device_tx_status
+     - Should report the bytes left to go over on the given channel
+     - Should only care about the transaction descriptor passed as
+       argument, not the currently active one on a given channel
+     - The tx_state argument might be NULL
+     - Should use dma_set_residue to report it
+     - In the case of a cyclic transfer, it should only take into
+       account the current period.
+
+So that's saying residue for cyclic transfers residue is only for the
+current period?
+
+I tried looking at other DMA drivers for inspiration, and it seems that
+some at least (e.g. drivers/dma/mmp_pdma.c) do things the same way as
+pl330, but that could just be a case of people copying broken code.
+
+-- 
+Tixy
