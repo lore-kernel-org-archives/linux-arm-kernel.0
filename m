@@ -1,68 +1,83 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 15 Mar 2016 13:03:04 +0100
-Subject: [RFC 3/3] iommu: dma-iommu: use common implementation also on ARM
- architecture
-In-Reply-To: <CANqRtoRiZOPhCBo38zVLL6tQB2aBLy3uWWbqJJypxEFDXJwF1Q@mail.gmail.com>
-References: <1455870164-25337-1-git-send-email-m.szyprowski@samsung.com>
- <1455870164-25337-4-git-send-email-m.szyprowski@samsung.com>
- <CANqRtoRiZOPhCBo38zVLL6tQB2aBLy3uWWbqJJypxEFDXJwF1Q@mail.gmail.com>
-Message-ID: <56E7F9F8.6030203@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 15 Mar 2016 13:11:22 +0100
+Subject: [PATCH RESEND] ARM: l2x0: add three special L210 aux control flags
+Message-ID: <1458043882-16881-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This adds support for setting the flag bits "wrap access disable",
+"write allocate override" and "exclusive abort disable" to the L210
+variant from the device tree.
 
-On 2016-03-15 12:18, Magnus Damm wrote:
-> Hi Marek,
->
-> On Fri, Feb 19, 2016 at 5:22 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> This patch replaces ARM-specific IOMMU-based DMA-mapping implementation
->> with generic IOMMU DMA-mapping code shared with ARM64 architecture. The
->> side-effect of this change is a switch from bitmap-based IO address space
->> management to tree-based code. There should be no functional changes
->> for drivers, which rely on initialization from generic arch_setup_dna_ops()
->> interface. Code, which used old arm_iommu_* functions must be updated to
->> new interface.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
-> Thanks for your efforts and my apologies for late comments. Just FYI
-> I'll try your patch (and this series) with the ipmmu-vmsa.c driver on
-> 32-bit ARM and see how it goes. Nice not to have to support multiple
-> interfaces depending on architecture!
+The "write allocate override" bit was used on the Nomadik and
+necessary to properly make use of the L210 cache on that machine
+without sporadic crashes.
 
-Thanks for testing!
+I took this oppportunity to add all three flags so we avoid excess
+patching for each one.
 
-> One question that comes to mind is how to handle features.
->
-> For instance, the 32-bit ARM code supports DMA_ATTR_FORCE_CONTIGUOUS
-> while the shared code in drivers/iommu/dma-iommu.c does not. I assume
-> existing users may rely on such features so from my point of view it
-> probably makes sense to carry over features from the 32-bit ARM code
-> into the shared code before pulling the plug.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/l2c2x0.txt | 10 ++++++++++
+ arch/arm/mm/cache-l2x0.c                         | 18 ++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-Right, this has to be added to common code before merging.
-
-> I also wonder if it is possible to do a step-by-step migration and
-> support both old and new interfaces in the same binary? That may make
-> things easier for multiplatform enablement. So far I've managed to
-> make one IOMMU driver support both 32-bit ARM and 64-bit ARM with some
-> ugly magic, so adjusting 32-bit ARM dma-mapping code to coexist with
-> the shared code in drivers/iommu/dma-iommu.c may also be possible. And
-> probably involving even more ugly magic. =)
-
-Having one IOMMU driver for both 32-bit and 64-bit ARM archs is quite easy
-IF you rely on the iommu core to setup everything. See exynos-iommu driver
-- after my last patches it now works fine on both archs (using arch
-specific interfaces). Most of the magic is done automatically by
-arch_setup_dma_ops().
-
-The real problem is the fact that there are drivers (like DRM) which rely
-on specific dma-mapping functions from ARM architecture, which need to be
-rewritten.
-
-Best regards
+diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+index fe0398c5c77b..975d1ae304d4 100644
+--- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+@@ -74,6 +74,16 @@ Optional properties:
+   or "write through no write allocate" (for writes).
+   On systems where this may cause DMA buffer corruption, this property must be
+   specified to indicate that such transforms are precluded.
++- arm,wrap-access-disable : (L210 only) if this flag is set, wrap accesses
++  requested on slave ports are converted to linear acesses on master ports.
++- arm,write-allocate-override : (L210 only) normally the L210 will use HPROT
++  attributes, setting this bit overrides that behaviour and cause the cache
++  to make all write-through and write-back accesses into read-write-allocate
++  accesses.
++- arm,exclusive-abort-disable : (L210 only) normally the cache controller sends
++  an ERROR response back to exclusive access in a cacheable, shared memory
++  region with the shared override bit set, but setting this flag disables the
++  abort generation and the access is instead treated as cacheable, non-shared.
+ - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+ - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
+ - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 9f9d54271aad..301c3c2dc09f 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1076,6 +1076,24 @@ static void __init l2x0_of_parse(const struct device_node *np,
+ 		val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
+ 	}
+ 
++	/* L210-specific aux control flags */
++	if (of_device_is_compatible(np, "arm,l210-cache")) {
++		if (of_property_read_bool(np, "arm,wrap-access-disable")) {
++			mask &= ~L210_AUX_CTRL_WRAP_DISABLE;
++			val |= L210_AUX_CTRL_WRAP_DISABLE;
++		}
++
++		if (of_property_read_bool(np, "arm,write-allocate-override")) {
++			mask &= ~L210_AUX_CTRL_WA_OVERRIDE;
++			val |= L210_AUX_CTRL_WA_OVERRIDE;
++		}
++
++		if (of_property_read_bool(np, "arm,exclusive-abort-disable")) {
++			mask &= ~L210_AUX_CTRL_EXCLUSIVE_ABORT;
++			val |= L210_AUX_CTRL_EXCLUSIVE_ABORT;
++		}
++	}
++
+ 	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_256K);
+ 	if (ret)
+ 		return;
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.4.3
