@@ -1,63 +1,77 @@
-From: majun258@huawei.com (majun (F))
-Date: Tue, 15 Mar 2016 15:35:47 +0800
-Subject: [PATCH v2 1/2] Irq/mbigen:Change the mbigen node definition in dt
- binding file
-In-Reply-To: <alpine.DEB.2.11.1603140844490.3657@nanos>
-References: <1457937907-14008-1-git-send-email-majun258@huawei.com>
- <1457937907-14008-2-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1603140844490.3657@nanos>
-Message-ID: <56E7BB53.3060705@huawei.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 15 Mar 2016 16:38:02 +0900
+Subject: [PATCH v3 0/8] ARM: dts: Add new Exynos3250-based ARTIK5 module dtsi
+ file
+Message-ID: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas:
-	Thanks for pointing out the problems.
-I'll make detail description about this problem and resend this patch set.
+This patchset add the support for Device Tree source for Samsung ARTIK5 module[1]
+based on Exynos3250 SoC and development board[2]. The ARTIK5 module includes
+the follwoing devices:
+- Application Processor (Samsung Exynos3250)
+- WiFi/BT Combo chip
+- PMIC (Samsung S2MPS14)
+- eMMC (4GB)
+- DRAM LPDDR3 (512MB)
+- Connectors pin (60 Pins x 3 set)
 
+Also, this patchset add the ARTIK5 development board[2] dts file which includes
+the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
+ethernet port, uart port and so on.
 
-? 2016/3/14 15:49, Thomas Gleixner ??:
-> Majun,
-> 
-> On Mon, 14 Mar 2016, MaJun wrote:
-> 
-> First of all the prefix for irq chip drivers is not "Irq/".
-> 
-> Hint: git log drivers/irqchip 
-> 
->> From: Ma Jun <majun258@huawei.com>
->>
->> For mbigen module, there is a special case that more than one mbigen
->> device nodes use the same reg definition in DTS when these devices
->> exist in the same mbigen hardware module.
-> 
-> There is a special case, so what?
->  
+[1] https://www.artik.io/hardware/artik-5
+[2] http://www.digikey.com/product-detail/en/SIP-KITNXB001/1510-1316-ND/5825102
 
-In current driver, the registers would be remapped repeatedly
-and caused error when use the function "devm_ioremap_resource".
+Changes from v2:
+(https://lkml.org/lkml/2016/3/14/910)
+- Add reviewed tag by Krzysztof Kozlowski for all patches
+- Include the separate patch1[3] in patchset because patch5 depend on patch1[3]
+  [3] https://lkml.org/lkml/2016/3/14/245
+- Fix the order issue in exynos3250-artik5.dtsi
+- Use lowercase for hex address in exynos3250-artik5.dtsi
 
-That's the problem I tried to fix.
+Changes from v1:
+(https://lkml.org/lkml/2016/3/13/215)
+- Change the board name from 'artik5-devel' to 'artik5-eval'
+- Merge the patch6/7/8 to patch5
+- Add the new board information to samsung-boards.txt[1]
+  [1] Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+- Fix minor coding style issue and remove 'wakeup' property
+- Remove 'broken-cd' and 'desc-num' property from mshc_0 node
+- Handle the LDO11/LDO12 by using XMMC0CDn pin (GPK0-2 gpio) for MMC device
+  and fix the ldo number of 'vmmc-supply' property.
+- Add the 'vqmmc-supply' property for MSHC2
+- Drop the patch10 for PPMU node
+- Add the new patch to initialize the MMC2 gpio pin on monk board
 
->> To fix the mbigen IO remap problem, the mbigen node definition and
-> 
-> Which problem?
-> 
->> structure are changed based on Mark Rutland's suggestion.
-> 
-> That's really uselss. Nobody has any idea what Mark suggested and in which way
-> it fixes that unspecified problem you are talking about.
-> 
+Chanwoo Choi (5):
+  ARM: dts: Add initial pin configuration for exynos3250-rinato
+  clk: samsung: exynos3250: Add MMC2 clock
+  ARM: dts: Add initial gpio setting of MMC2 device for exynos3250-monk
+  ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
+  ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5 module
 
-Actually, I discussed this problem with Mark in v1.
-He raised some questions and suggestions
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/403691.html
+Jaehoon Chung (1):
+  ARM: dts: Add MSHC2 dt node for SD card for exynos3250-artik5-eval board
 
-Thanks!
-MaJun
+Pankaj Dubey (2):
+  clk: samsung: exynos3250: Add UART2 clock
+  ARM: dts: Add UART2 dt node for Exynos3250 SoC
 
-> Thanks,
-> 
-> 	tglx
-> 
-> .
-> 
+ .../bindings/arm/samsung/samsung-boards.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/exynos3250-artik5-eval.dts       |  43 +++
+ arch/arm/boot/dts/exynos3250-artik5.dtsi           | 334 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos3250-monk.dts              |  12 +-
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi          |  80 +++++
+ arch/arm/boot/dts/exynos3250-rinato.dts            |  71 ++++-
+ arch/arm/boot/dts/exynos3250.dtsi                  |  25 ++
+ drivers/clk/samsung/clk-exynos3250.c               |  15 +
+ include/dt-bindings/clock/exynos3250.h             |  11 +-
+ 10 files changed, 590 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos3250-artik5-eval.dts
+ create mode 100644 arch/arm/boot/dts/exynos3250-artik5.dtsi
+
+-- 
+1.9.1
