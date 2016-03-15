@@ -1,15 +1,16 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 15 Mar 2016 15:04:26 +0100
-Subject: [PATCH v2 7/9] ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004 touch
- support
+Date: Tue, 15 Mar 2016 15:04:28 +0100
+Subject: [PATCH v2 9/9] ARM: imx_v6_v7_defconfig: add CONFIG_RTC_DRV_M41T80
 In-Reply-To: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
 References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
  <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1458050668-26748-8-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1458050668-26748-10-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those two touch controllers are used by Boundary Devices platforms.
+The rv4168 RTC is used by the following platforms:
+- Nitrogen6_MAX (both Quad and Quad Plus versions)
+- Nitrogen7
 
 Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
@@ -18,22 +19,20 @@ Changelog v1 -> v2:
 - none
 
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 978c5de..49dd816 100644
+index 1faafe3..af22ea4 100644
 --- a/arch/arm/configs/imx_v6_v7_defconfig
 +++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -162,7 +162,9 @@ CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_EGALAX=y
- CONFIG_TOUCHSCREEN_IMX6UL_TSC=y
-+CONFIG_TOUCHSCREEN_EDT_FT5X06=y
- CONFIG_TOUCHSCREEN_MC13783=y
-+CONFIG_TOUCHSCREEN_TSC2004=y
- CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_TOUCHSCREEN_SX8654=y
+@@ -316,6 +316,7 @@ CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_ISL1208=y
+ CONFIG_RTC_DRV_PCF8523=y
+ CONFIG_RTC_DRV_PCF8563=y
++CONFIG_RTC_DRV_M41T80=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_RTC_DRV_SNVS=y
 -- 
 2.7.0
