@@ -1,67 +1,106 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 15 Mar 2016 11:08:08 +0900
-Subject: [PATCH v2 0/7] ARM: dts: Add new Exynos3250-based ARTIK5 module dtsi
- file
-Message-ID: <1458007695-3627-1-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 15 Mar 2016 11:08:09 +0900
+Subject: [PATCH v2 1/7] clk: samsung: exynos3250: Add UART2 clock
+In-Reply-To: <1458007695-3627-1-git-send-email-cw00.choi@samsung.com>
+References: <1458007695-3627-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1458007695-3627-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add the support for Device Tree source for Samsung ARTIK5 module[1]
-based on Exynos3250 SoC and development board[2]. The ARTIK5 module includes
-the follwoing devices:
-- Application Processor (Samsung Exynos3250)
-- WiFi/BT Combo chip
-- PMIC (Samsung S2MPS14)
-- eMMC (4GB)
-- DRAM LPDDR3 (512MB)
-- Connectors pin (60 Pins x 3 set)
+From: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Also, this patchset add the ARTIK5 development board[2] dts file which includes
-the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
-ethernet port, uart port and so on.
+This patch add the UART2 clocks (mux, divider, gate) of Exynos3250 SoC.
 
-[1] https://www.artik.io/hardware/artik-5
-[2] http://www.digikey.com/product-detail/en/SIP-KITNXB001/1510-1316-ND/5825102
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos3250.c   | 6 ++++++
+ include/dt-bindings/clock/exynos3250.h | 6 +++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-Changes from v1:
-(https://lkml.org/lkml/2016/3/13/215)
-- Change the board name from 'artik5-devel' to 'artik5-eval'
-- Merge the patch6/7/8 to patch5
-- Add the new board information to samsung-boards.txt[1]
-  [1] Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-- Fix minor coding style issue and remove 'wakeup' property
-- Remove 'broken-cd' and 'desc-num' property from mshc_0 node
-- Handle the LDO11/LDO12 by using XMMC0CDn pin (GPK0-2 gpio) for MMC device
-  and fix the ldo number of 'vmmc-supply' property.
-- Add the 'vqmmc-supply' property for MSHC2
-- Drop the patch10 for PPMU node
-- Add the new patch to initialize the MMC2 gpio pin on monk board
-
-Chanwoo Choi (4):
-  clk: samsung: exynos3250: Add MMC2 clock
-  ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
-  ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5 module
-  ARM: dts: Add initial gpio setting of MMC2 device for exynos3250-monk
-
-Jaehoon Chung (1):
-  ARM: dts: Add MSHC2 dt node for SD card for exynos3250-artik5-eval board
-
-Pankaj Dubey (2):
-  clk: samsung: exynos3250: Add UART2 clock
-  ARM: dts: Add UART2 dt node for Exynos3250 SoC
-
- .../bindings/arm/samsung/samsung-boards.txt        |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/exynos3250-artik5-eval.dts       |  43 +++
- arch/arm/boot/dts/exynos3250-artik5.dtsi           | 334 +++++++++++++++++++++
- arch/arm/boot/dts/exynos3250-monk.dts              |  12 +-
- arch/arm/boot/dts/exynos3250-pinctrl.dtsi          |  42 +++
- arch/arm/boot/dts/exynos3250.dtsi                  |  25 ++
- drivers/clk/samsung/clk-exynos3250.c               |  15 +
- include/dt-bindings/clock/exynos3250.h             |  11 +-
- 9 files changed, 483 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos3250-artik5-eval.dts
- create mode 100644 arch/arm/boot/dts/exynos3250-artik5.dtsi
-
+diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+index fdd41b17a24f..bc60e399d1bc 100644
+--- a/drivers/clk/samsung/clk-exynos3250.c
++++ b/drivers/clk/samsung/clk-exynos3250.c
+@@ -306,6 +306,7 @@ static struct samsung_mux_clock mux_clks[] __initdata = {
+ 	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 4),
+ 
+ 	/* SRC_PERIL0 */
++	MUX(CLK_MOUT_UART2, "mout_uart2", group_sclk_p, SRC_PERIL0, 8, 4),
+ 	MUX(CLK_MOUT_UART1, "mout_uart1", group_sclk_p, SRC_PERIL0, 4, 4),
+ 	MUX(CLK_MOUT_UART0, "mout_uart0", group_sclk_p, SRC_PERIL0, 0, 4),
+ 
+@@ -390,6 +391,7 @@ static struct samsung_div_clock div_clks[] __initdata = {
+ 	DIV(CLK_DIV_MMC0, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
+ 
+ 	/* DIV_PERIL0 */
++	DIV(CLK_DIV_UART2, "div_uart2", "mout_uart2", DIV_PERIL0, 8, 4),
+ 	DIV(CLK_DIV_UART1, "div_uart1", "mout_uart1", DIV_PERIL0, 4, 4),
+ 	DIV(CLK_DIV_UART0, "div_uart0", "mout_uart0", DIV_PERIL0, 0, 4),
+ 
+@@ -552,6 +554,9 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+ 		GATE_SCLK_PERIL, 7, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_SPI0, "sclk_spi0", "div_spi0_pre",
+ 		GATE_SCLK_PERIL, 6, CLK_SET_RATE_PARENT, 0),
++
++	GATE(CLK_SCLK_UART2, "sclk_uart2", "div_uart2",
++		GATE_SCLK_PERIL, 2, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_UART1, "sclk_uart1", "div_uart1",
+ 		GATE_SCLK_PERIL, 1, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_UART0, "sclk_uart0", "div_uart0",
+@@ -649,6 +654,7 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+ 	GATE(CLK_I2C2, "i2c2", "div_aclk_100", GATE_IP_PERIL, 8, 0, 0),
+ 	GATE(CLK_I2C1, "i2c1", "div_aclk_100", GATE_IP_PERIL, 7, 0, 0),
+ 	GATE(CLK_I2C0, "i2c0", "div_aclk_100", GATE_IP_PERIL, 6, 0, 0),
++	GATE(CLK_UART2, "uart2", "div_aclk_100", GATE_IP_PERIL, 2, 0, 0),
+ 	GATE(CLK_UART1, "uart1", "div_aclk_100", GATE_IP_PERIL, 1, 0, 0),
+ 	GATE(CLK_UART0, "uart0", "div_aclk_100", GATE_IP_PERIL, 0, 0, 0),
+ };
+diff --git a/include/dt-bindings/clock/exynos3250.h b/include/dt-bindings/clock/exynos3250.h
+index 63d01c15d2b3..ddb874130d86 100644
+--- a/include/dt-bindings/clock/exynos3250.h
++++ b/include/dt-bindings/clock/exynos3250.h
+@@ -79,6 +79,7 @@
+ #define CLK_MOUT_CORE			58
+ #define CLK_MOUT_APLL			59
+ #define CLK_MOUT_ACLK_266_SUB		60
++#define CLK_MOUT_UART2			61
+ 
+ /* Dividers */
+ #define CLK_DIV_GPL			64
+@@ -127,6 +128,7 @@
+ #define CLK_DIV_CORE			107
+ #define CLK_DIV_HPM			108
+ #define CLK_DIV_COPY			109
++#define CLK_DIV_UART2			110
+ 
+ /* Gates */
+ #define CLK_ASYNC_G3D			128
+@@ -223,6 +225,7 @@
+ #define CLK_BLOCK_MFC			219
+ #define CLK_BLOCK_CAM			220
+ #define CLK_SMIES			221
++#define CLK_UART2			222
+ 
+ /* Special clocks */
+ #define CLK_SCLK_JPEG			224
+@@ -249,12 +252,13 @@
+ #define CLK_SCLK_SPI0			245
+ #define CLK_SCLK_UART1			246
+ #define CLK_SCLK_UART0			247
++#define CLK_SCLK_UART2			248
+ 
+ /*
+  * Total number of clocks of main CMU.
+  * NOTE: Must be equal to last clock ID increased by one.
+  */
+-#define CLK_NR_CLKS			248
++#define CLK_NR_CLKS			249
+ 
+ /*
+  * CMU DMC
 -- 
 1.9.1
