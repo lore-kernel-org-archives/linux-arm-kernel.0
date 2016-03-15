@@ -1,84 +1,52 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 15 Mar 2016 10:46:49 +0900
-Subject: [PATCH 09/10] ARM: dts: Add MSHC2 dt node for SD card for
- exynos3250-artik5-devel board
-In-Reply-To: <56E7692A.1020407@samsung.com>
-References: <1457921056-21257-1-git-send-email-cw00.choi@samsung.com>
- <1457921056-21257-11-git-send-email-cw00.choi@samsung.com>
- <56E676EE.8060500@samsung.com> <56E67AE0.9060306@samsung.com>
- <56E687E6.3070305@samsung.com> <56E690EA.50205@samsung.com>
- <56E7567B.40301@samsung.com> <56E75DC1.7000807@samsung.com>
- <56E7692A.1020407@samsung.com>
-Message-ID: <56E76989.6000008@samsung.com>
+From: huangdaode@hisilicon.com (Daode Huang)
+Date: Tue, 15 Mar 2016 09:56:02 +0800
+Subject: [PATCH V2 net 0/6] net: hns: hns driver updates
+In-Reply-To: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
+References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <56E76BB2.5060203@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 15? 10:45, Chanwoo Choi wrote:
-> On 2016? 03? 15? 09:56, Jaehoon Chung wrote:
->> On 03/15/2016 09:25 AM, Krzysztof Kozlowski wrote:
->>> On 14.03.2016 19:22, Chanwoo Choi wrote:
->>>> On 2016? 03? 14? 18:44, Krzysztof Kozlowski wrote:
->>>>> On 14.03.2016 17:48, Chanwoo Choi wrote:
->>>>>> On 2016? 03? 14? 17:31, Krzysztof Kozlowski wrote:
->>>>>>> On 14.03.2016 11:04, Chanwoo Choi wrote:
->>>>>>>> From: Jaehoon Chung <jh80.chung@samsung.com>
->>>>>>>>
->>>>>>>> This patch adds MSHC (Mobile Storage Host Controller) dt node for
->>>>>>>> Exynos3250 SoC. MSHC is an interface between the system and the SD card
->>>>>>>>
->>>>>>>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->>>>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>>>>> ---
->>>>>>>>  arch/arm/boot/dts/exynos3250-artik5-devel.dts | 16 ++++++++++++++++
->>>>>>>>  1 file changed, 16 insertions(+)
->>>>>>>>
->>>>>>>> diff --git a/arch/arm/boot/dts/exynos3250-artik5-devel.dts b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
->>>>>>>> index d17c28969118..a371baf8536d 100644
->>>>>>>> --- a/arch/arm/boot/dts/exynos3250-artik5-devel.dts
->>>>>>>> +++ b/arch/arm/boot/dts/exynos3250-artik5-devel.dts
->>>>>>>> @@ -21,6 +21,22 @@
->>>>>>>>  			"samsung,exynos3250", "samsung,exynos3";
->>>>>>>>  };
->>>>>>>>  
->>>>>>>> +&mshc_2 {
->>>>>>>> +	num-slots = <1>;
->>>>>>>> +	cap-sd-highspeed;
->>>>>>>> +	disable-wp;
->>>>>>>> +	card-detect-delay = <200>;
->>>>>>>> +	clock-frequency = <100000000>;
->>>>>>>> +	clock-freq-min-max = <400000 100000000>;
->>>>>>>> +	samsung,dw-mshc-ciu-div = <1>;
->>>>>>>> +	samsung,dw-mshc-sdr-timing = <0 1>;
->>>>>>>> +	samsung,dw-mshc-ddr-timing = <1 2>;
->>>>>>>> +	pinctrl-names = "default";
->>>>>>>> +	pinctrl-0 = <&sd2_cmd &sd2_clk &sd2_cd &sd2_bus1 &sd2_bus4>;
->>>>>>>> +	bus-width = <4>;
->>>>>>>> +	status = "okay";
->>>>>>>
->>>>>>> vqmmc-supply = ldo3?
->>>>>>
->>>>>> ldo3 is always on state because ldo3 is used for various IP in exynos3250.
->>>>>> I think that we had better to remain always on state for ldo3.
->>>>>
->>>>> Yes, I wasn't thinking about toggling ldo3 but about taking the
->>>>> regulator here to model the dependencies between components.
->>>>
->>>> Okay. I'll add it as following:
->>>>
->>>> 	vmmc-supply = <&ldo18_reg>;
->>>> 	vqmmc-supply = <&ldo3>;
->>>
->>> ldo18 is not used by mshc2. At least my schematics show that LDO3 goes
->>> to DVDD_MMC2 (on different board revision that would be ldo18 instead of
->>> ldo3, but not both).
-> 
-> ARTIK5 schema document VLDO18 and VLDO3 are connected to DVDD_MMC2_AP.
-> But, I'm not sure what is meaning. So, I'll drop the 'vmmc-supply'
+Hi Dave,
 
-VLDO18 is not connected to DVDD_MMC2_AP. It is NC state.
-Sorry for confusion.
+Could you please help me to review this patch set?
+I am so sorry to send the patches in parallel to you, which increases 
+you workload,
+So next time we will pay more attention to it,  and learn more about 
+kernel patch submitting.
+Thanks.
 
-Best Regards,
-Chanwoo Choi
+MBR, Daode
 
-[snip]
+On 2016/3/11 17:10, Daode Huang wrote:
+> Hi Dave,
+>
+> This patch series are hisilicon network driver bug fix.
+> please merge them to the net repo.
+> Thanks
+>
+> Daode Huang
+> ---
+> changlog
+> v2: some minor change according to
+>      MBR Sergei <sergei.shtylyov@cogentembedded.com> in
+>      [patch 3/6] [patch 4/6].
+>
+> v1: initial version.
+>
+> Daode Huang (6):
+>    net: hns: bug fix about the overflow of mss
+>    net: hns: fixes the hw interrupt bug in using napi
+>    net: hns: fixed portid bug in sending manage pkt
+>    net: hns: adds uc match for debug port
+>    net: hns: fixed service-ges setting MAC-addr bug
+>    net: hns: bug fix of getting hilink status
+>
+>   drivers/net/ethernet/hisilicon/hns/hnae.h          |  3 ++
+>   drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  1 +
+>   drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c | 29 +++++++++++----
+>   drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 41 ++++++++++++----------
+>   drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  4 +++
+>   drivers/net/ethernet/hisilicon/hns/hns_enet.c      | 32 +++++++++--------
+>   6 files changed, 70 insertions(+), 40 deletions(-)
+>
