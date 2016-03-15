@@ -1,102 +1,143 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 16 Mar 2016 11:38:51 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/4] Add AXP209 GPIO driver
-In-Reply-To: <CACRpkdZUJsqCG=dd9XdwxaAHxEHXgrZncH+DqtPYta4a30v87w@mail.gmail.com>
-References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
- <56E0146E.6050102@redhat.com> <20160309152822.GQ8418@lukather>
- <56E044C1.7080300@redhat.com>
- <CACRpkdZUJsqCG=dd9XdwxaAHxEHXgrZncH+DqtPYta4a30v87w@mail.gmail.com>
-Message-ID: <56E937BB.5020706@redhat.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed, 16 Mar 2016 02:45:26 +0800
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
+ rk3399
+Message-ID: <1458067526-11319-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds the necessary data for handling io voltage domains on the rk3399.
+As interesting tidbit, the rk3399 contains two separate iodomain areas.
+One in the regular General Register Files (GRF) and one in PMUGRF in the
+pmu power domain.
 
-On 16-03-16 11:10, Linus Walleij wrote:
-> On Wed, Mar 9, 2016 at 4:44 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> On Wed, Mar 09, 2016 at 01:17:50PM +0100, Hans de Goede wrote:
->
->>> Eventually, yes, it needs both. But they don't even have to be the
->>> same driver, since they provide two different features. The only
->>> reason we have that construct in the pio case is because they share
->>> the same address space, but in the AXP case, the regmap and our mfd
->>> take care of that already.
->>
->> Hmm, so your suggesting to have mfd instantiate 2 platform devices
->> for this, a gpio and a pinctrl device, each with their own
->> driver. Yes that would work, but I'm a bit worried about the 2
->> racing or some such since they both will end up touching
->> bit 0-2 of register 0x90 / 0x92, more-over since they are both
->> touching the exact same bits I've the feeling that this really
->> should be one driver.
->
-> We can put the driver in drivers/pinctrl/pinctrl-axp209.c from day
-> one, add in comments stating that it only implements GPIO
-> for now and that the GPIO portion must call
-> pinctrl_request_gpio() and the pin controller must implement
-> .gpio_request_enable() the day it is added so the GPIOs do
-> not conflict with other use of the pins.
->
-> Requireing a huge slew of upfront code is a bit hard on simple
-> drivers I think.
->
-> Also we have the solution in drivers/mfd/stmpe.c that just add
-> a simple mux code when pins on mixsigs or simple expanders
-> can just mux some two-three different functions, then I think
-> pin control may be a bit too thick overhead. (Not sure where
-> the limit is though.)
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ .../bindings/power/rockchip-io-domain.txt          | 11 ++++
+ drivers/power/avs/rockchip-io-domain.c             | 58 ++++++++++++++++++++++
+ 2 files changed, 69 insertions(+)
+ mode change 100644 => 100755 drivers/power/avs/rockchip-io-domain.c
 
-I actually found out this weekend, that we already have
-a problem here. Regulator on/off is implemented as
-2 mux settings, just like gpio high/low/input are mux settings:
-
-On the axp209 the gpio pin mux bit table looks like this:
-
-000: low output
-001: output (3.3V)
-010: universal input function
-011: low noise LDO5
-100: ADC input
-1XX: floating
-
-And on the axp221 / axp223:
-
-000: output low
-001: output high (3.3V)
-010: input
-011: LDOIO0 off
-100: LDOIO0 on
-1XX: floating
-
-Note the LDOIO0 off / LDOIO0 on being 2 different mux
-settings, and then existing axp20x regulator driver for
-LD05 / LDOIO0 actually already implements regulator on / off
-by changing the mux for both axp209 and axp22x.
-
-This results in the following potentially happening.
-
-0) kernel boots
-
-1) The gpio driver is in use for these pins, sets the pin
-to say output low
-
-2) kernel is ready to start init, calls the regulators
-subsys late_init call, which disables any unused regulators,
-this results in the mux getting set to 7 (axp209) resp
-4 (axp22x), and the gpio is no longer driven low as
-the intend of the driver using the pin was.
-
-So we really need either some coordination here, or a way
-to tell the regulator-driver to not register ldo5 / ldoio#
-at all, so that the regulator-core won't try to turn them
-off changing the mux.
-
-I've submitted a patch series this weekend which allows
-putting "status = disabled" in regulator child-dts-nodes, which
-will then result in not registering a regulator at all,
-which would fix that. But that series has not received any
-feedback yet...
-
-Regards,
-
-Hans
+diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+index b8627e7..c84fb47 100644
+--- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
++++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+@@ -35,6 +35,8 @@ Required properties:
+   - "rockchip,rk3288-io-voltage-domain" for rk3288
+   - "rockchip,rk3368-io-voltage-domain" for rk3368
+   - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
++  - "rockchip,rk3399-io-voltage-domain" for rk3399
++  - "rockchip,rk3399-pmu-io-voltage-domain" for rk3399 pmu-domains
+ - rockchip,grf: phandle to the syscon managing the "general register files"
+ 
+ 
+@@ -79,6 +81,15 @@ Possible supplies for rk3368 pmu-domains:
+ - pmu-supply:    The supply connected to PMUIO_VDD.
+ - vop-supply:    The supply connected to LCDC_VDD.
+ 
++Possible supplies for rk3399:
++- bt656-supply:  The supply connected to APIO2_VDD.
++- audio-supply:  The supply connected to APIO5_VDD.
++- sdmmc-supply:  The supply connected to SDMMC0_VDD.
++- gpio1830       The supply connected to APIO4_VDD.
++
++Possible supplies for rk3399 pmu-domains:
++- pmu1830-supply:The supply connected to PMUIO2_VDD.
++
+ Example:
+ 
+ 	io-domains {
+diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+old mode 100644
+new mode 100755
+index 8099456..8986382
+--- a/drivers/power/avs/rockchip-io-domain.c
++++ b/drivers/power/avs/rockchip-io-domain.c
+@@ -47,6 +47,10 @@
+ #define RK3368_SOC_CON15_FLASH0		BIT(14)
+ #define RK3368_SOC_FLASH_SUPPLY_NUM	2
+ 
++#define RK3399_PMUGRF_CON0		0x180
++#define RK3399_PMUGRF_CON0_VSEL		BIT(8)
++#define RK3399_PMUGRF_VSEL_SUPPLY_NUM	9
++
+ struct rockchip_iodomain;
+ 
+ /**
+@@ -181,6 +185,25 @@ static void rk3368_iodomain_init(struct rockchip_iodomain *iod)
+ 		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
+ }
+ 
++static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
++{
++	int ret;
++	u32 val;
++
++	/* if no pmu io supply we should leave things alone */
++	if (!iod->supplies[RK3399_PMUGRF_VSEL_SUPPLY_NUM].reg)
++		return;
++
++	/*
++	 * set pmu io iodomain to also use this framework
++	 * instead of a special gpio.
++	 */
++	val = RK3399_PMUGRF_CON0_VSEL | (RK3399_PMUGRF_CON0_VSEL << 16);
++	ret = regmap_write(iod->grf, RK3399_PMUGRF_CON0, val);
++	if (ret < 0)
++		dev_warn(iod->dev, "couldn't update pmu io iodomain ctrl\n");
++}
++
+ /*
+  * On the rk3188 the io-domains are handled by a shared register with the
+  * lower 8 bits being still being continuing drive-strength settings.
+@@ -252,6 +275,33 @@ static const struct rockchip_iodomain_soc_data soc_data_rk3368_pmu = {
+ 	},
+ };
+ 
++static const struct rockchip_iodomain_soc_data soc_data_rk3399 = {
++	.grf_offset = 0xe640,
++	.supply_names = {
++		"bt656",		/* APIO2_VDD */
++		"audio",		/* APIO5_VDD */
++		"sdmmc",		/* SDMMC0_VDD */
++		"gpio1830",		/* APIO4_VDD */
++	},
++};
++
++static const struct rockchip_iodomain_soc_data soc_data_rk3399_pmu = {
++	.grf_offset = 0x180,
++	.supply_names = {
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		"pmu1830",		/* PMUIO2_VDD */
++	},
++	.init = rk3399_pmu_iodomain_init,
++};
++
+ static const struct of_device_id rockchip_iodomain_match[] = {
+ 	{
+ 		.compatible = "rockchip,rk3188-io-voltage-domain",
+@@ -269,6 +319,14 @@ static const struct of_device_id rockchip_iodomain_match[] = {
+ 		.compatible = "rockchip,rk3368-pmu-io-voltage-domain",
+ 		.data = (void *)&soc_data_rk3368_pmu
+ 	},
++	{
++		.compatible = "rockchip,rk3399-io-voltage-domain",
++		.data = (void *)&soc_data_rk3399
++	},
++	{
++		.compatible = "rockchip,rk3399-pmu-io-voltage-domain",
++		.data = (void *)&soc_data_rk3399_pmu
++	},
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
+-- 
+1.9.1
