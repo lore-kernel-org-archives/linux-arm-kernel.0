@@ -1,62 +1,107 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 15 Mar 2016 15:04:22 +0100
-Subject: [PATCH v2 3/9] clk: imx: add ckil clock for i.MX7
+Date: Tue, 15 Mar 2016 15:04:24 +0100
+Subject: [PATCH v2 5/9] ARM: dts: imx: add Boundary Devices Nitrogen6_MAX QP
+ board
 In-Reply-To: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
 References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
  <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1458050668-26748-4-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1458050668-26748-6-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary clock to use the ckil on i.MX7.
+Based on i.MX6 Quad Plus with 4GB of RAM.
 
-Inspired from the following patch:
-https://github.com/boundarydevices/linux-imx6/commit/b80e8271
+https://boundarydevices.com/product/nitrogen6max/
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
 
 Changelog v1 -> v2:
-- none
+- Disable pcie for nitrogen6qp_max dts
+  -> required for the board to boot normally
 
 ---
- drivers/clk/imx/clk-imx7d.c             | 3 ++-
- include/dt-bindings/clock/imx7d-clock.h | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/Makefile                 |  1 +
+ arch/arm/boot/dts/imx6qp-nitrogen6_max.dts | 59 ++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qp-nitrogen6_max.dts
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index fbb6a8c..7912be8 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -342,7 +342,7 @@ static const char *clko1_sel[] = { "osc", "pll_sys_main_clk",
- 
- static const char *clko2_sel[] = { "osc", "pll_sys_main_240m_clk",
- 	"pll_sys_pfd0_392m_clk", "pll_sys_pfd1_166m_clk", "pll_sys_pfd4_clk",
--	"pll_audio_main_clk", "pll_video_main_clk", "osc_32k_clk", };
-+	"pll_audio_main_clk", "pll_video_main_clk", "ckil", };
- 
- static const char *lvds1_sel[] = { "pll_arm_main_clk",
- 	"pll_sys_main_clk", "pll_sys_pfd0_392m_clk", "pll_sys_pfd1_332m_clk",
-@@ -382,6 +382,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 
- 	clks[IMX7D_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
- 	clks[IMX7D_OSC_24M_CLK] = of_clk_get_by_name(ccm_node, "osc");
-+	clks[IMX7D_CKIL] = of_clk_get_by_name(ccm_node, "ckil");
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx7d-anatop");
- 	base = of_iomap(np, 0);
-diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
-index edca8985c..1183347 100644
---- a/include/dt-bindings/clock/imx7d-clock.h
-+++ b/include/dt-bindings/clock/imx7d-clock.h
-@@ -448,5 +448,6 @@
- #define IMX7D_PLL_DRAM_TEST_DIV		435
- #define IMX7D_ADC_ROOT_CLK		436
- #define IMX7D_CLK_ARM			437
--#define IMX7D_CLK_END			438
-+#define IMX7D_CKIL			438
-+#define IMX7D_CLK_END			439
- #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index fd67d8d..279ec61 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -356,6 +356,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-udoo.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb \
++	imx6qp-nitrogen6_max.dtb \
+ 	imx6qp-sabreauto.dtb \
+ 	imx6qp-sabresd.dtb
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+diff --git a/arch/arm/boot/dts/imx6qp-nitrogen6_max.dts b/arch/arm/boot/dts/imx6qp-nitrogen6_max.dts
+new file mode 100644
+index 0000000..a39b860
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qp-nitrogen6_max.dts
+@@ -0,0 +1,59 @@
++/*
++ * Copyright 2016 Boundary Devices, Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6qp.dtsi"
++#include "imx6qdl-nitrogen6_max.dtsi"
++
++/ {
++	model = "Boundary Devices i.MX6 Quad Plus Nitrogen6_MAX Board";
++	compatible = "boundary,imx6qp-nitrogen6_max", "fsl,imx6qp";
++};
++
++&pcie {
++	status = "disabled";
++};
++
++&sata {
++	status = "okay";
++};
 -- 
 2.7.0
