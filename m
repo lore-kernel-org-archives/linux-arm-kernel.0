@@ -1,66 +1,66 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 15 Mar 2016 13:50:39 +0000
-Subject: [PATCH v15 03/20] arm64: Convert hcalls to use HVC immediate value
-In-Reply-To: <c23696b455e99b5b111ae559c7998f3c56a664df.1457977402.git.geoff@infradead.org>
-References: <cover.1457977401.git.geoff@infradead.org>
- <c23696b455e99b5b111ae559c7998f3c56a664df.1457977402.git.geoff@infradead.org>
-Message-ID: <20160315135030.GA3701@e103592.cambridge.arm.com>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Tue, 15 Mar 2016 15:04:19 +0100
+Subject: [PATCH v2 0/9] imx: add latest Boundary Devices boards support
+In-Reply-To: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi all,
 
-On Mon, Mar 14, 2016 at 05:48:00PM +0000, Geoff Levand wrote:
-> The existing arm64 hcall implementations are limited in that they only
-> allow for two distinct hcalls; with the x0 register either zero or not
-> zero.  Also, the API of the hyp-stub exception vector routines and the
-> KVM exception vector routines differ; hyp-stub uses a non-zero value in
-> x0 to implement __hyp_set_vectors, whereas KVM uses it to implement
-> kvm_call_hyp.
-> 
-> To allow for additional hcalls to be defined and to make the arm64 hcall
-> API more consistent across exception vector routines, change the hcall
-> implementations to use the 16 bit immediate value of the HVC instruction
-> to specify the hcall type.
+This series adds support for the following Boundary Devices boards:
+- Nitrogen7 (i.MX7)
+- Nitrogen6SX (i.MX6SoloX)
+- Nitrogen6QP_MAX (i.MX6QP)
 
-I'm a bit concerned about namespace pollution on the HVC immediate here.
-Existing users tend allocate a single "random" number to identify the
-API -- Xen and Jailhouse do this for example.
+The first patches add display and CAN support to i.MX7 device tree. Those
+two features have been successfully tested on the Nitrogen7. Also the support
+of CKIL clock has been added in order to use it as slow clock for the WiFi
+module.
 
-If we start using the HVC immediate to select functions, not just APIs,
-the space is going to fill up a lot faster, if we have a multiplex
-multiple APIs through it.
+Then the last 3 patches add some missing configurations in order to fully
+support Boundary platforms using imx_v6_v7_defconfig.
 
-(We don't currently seem to multiplex APIs much here, except that we
-do use HVC for PSCI calls from the guest, and it could be used for
-additional paravirtualised services in the future).
+All the patches have been applied/tested on top of Shawn's 'for-next' branch.
 
-> Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
-> HVC_SET_VECTORS to be used as hcall type specifiers and convert the
-> existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp()
-> routines to use these new macros when executing an HVC call.  Also,
-> change the corresponding hyp-stub and KVM el1_sync exception vector
-> routines to use these new macros.
+Here are some remarks/questions that came during testing:
+- Is the pxp v4l2 driver being worked on for mainline inclusion?
+- Are the ldb modifications for SoloX being worked on for mainline inclusion?
+- Is the WM8960 ASoC machine driver being worked on for mainline inclusion?
+- When booting the Nitrogen7, there's backtrace due to clk_pllv3_prepare, does
+  it happen on the sdb too? Note that it doesn't prevent the board to work.
 
-It would also be preferable to keep the 32-bit and 64-bit APIs the same;
-we should avoid having them different unless there's a clinching
-technical reason...
+Changelog v1 -> v2:
+- Remove lines commented out from nitrogen6sx dts as suggested by Vladimir
+- Disable pcie for nitrogen6qp_max dts
 
+Regards,
+Gary
 
-There may be some historical context for this that I'm missing...
+Gary Bisson (9):
+  ARM: dts: imx7d: add lcdif support
+  ARM: dts: imx7d: add flexcan support
+  clk: imx: add ckil clock for i.MX7
+  ARM: dts: imx: add Boundary Devices Nitrogen7 board
+  ARM: dts: imx: add Boundary Devices Nitrogen6_MAX QP board
+  ARM: dts: imx: add Boundary Devices Nitrogen6_SoloX board
+  ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004 touch support
+  ARM: imx_v6_v7_defconfig: add CONFIG_I2C_MUX_GPIO
+  ARM: imx_v6_v7_defconfig: add CONFIG_RTC_DRV_M41T80
 
-Cheers
----Dave
+ arch/arm/boot/dts/Makefile                 |   3 +
+ arch/arm/boot/dts/imx6qp-nitrogen6_max.dts |  59 +++
+ arch/arm/boot/dts/imx6sx-nitrogen6sx.dts   | 732 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7d-nitrogen7.dts      | 818 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7d.dtsi               |  33 ++
+ arch/arm/configs/imx_v6_v7_defconfig       |   4 +
+ drivers/clk/imx/clk-imx7d.c                |   3 +-
+ include/dt-bindings/clock/imx7d-clock.h    |   3 +-
+ 8 files changed, 1653 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6qp-nitrogen6_max.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
+ create mode 100644 arch/arm/boot/dts/imx7d-nitrogen7.dts
 
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/include/asm/virt.h  | 27 +++++++++++++++++++++++++++
->  arch/arm64/kernel/hyp-stub.S   | 32 +++++++++++++++++++++-----------
->  arch/arm64/kvm/hyp.S           |  3 ++-
->  arch/arm64/kvm/hyp/hyp-entry.S |  9 ++++++---
->  4 files changed, 56 insertions(+), 15 deletions(-)
-> 
-
-[...]
+-- 
+2.7.0
