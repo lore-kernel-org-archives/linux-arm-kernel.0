@@ -1,87 +1,226 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Tue, 15 Mar 2016 14:08:26 +0530
-Subject: [RFC PATCH 0/4] Implement USB device/host switch for Vybrid
-Message-ID: <cover.1458030082.git.maitysanchayan@gmail.com>
+Date: Tue, 15 Mar 2016 14:08:27 +0530
+Subject: [RFC PATCH 1/4] usb: chipidea: Do not rely on OTG while using extcon
+In-Reply-To: <cover.1458030082.git.maitysanchayan@gmail.com>
+References: <cover.1458030082.git.maitysanchayan@gmail.com>
+Message-ID: <a3dc1c8adc4266d36267901ce6e975ddfca09abb.1458030082.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hello Peter,
 
 The existing usage of extcon in Chipidea driver relies on OTG
 registers. In case of SoC with dual role device but not a true
 OTG controller, this does not work. Such SoC's should specify
 the existing CI_HDRC_DUAL_ROLE_NOT_OTG flag and do the role
-switch without checking any of the OTG registers in my opinion.
-This is the case for Vybrid which uses a Chipidea IP but does
-not have a true 5 pin OTG implemented.
+switch without checking any of the OTG registers.
 
-This patch almost reverts most of commit 3ecb3e09b042e70799ff3a1ff464a5ecaa7547d9
-"usb: chipidea: Use extcon framework for VBUS and ID detect".
-We do not rely anymore on emulating an OTG capable controller
-by faking OTG controller reads.
+This patch almost reverts most of commit "usb: chipidea: Use
+extcon framework for VBUS and ID detect". We do not rely
+anymore on emulating an OTG capable controller by faking OTG
+controller reads.
 
-Observations without the following patchset with the current
-implementation.
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ drivers/usb/chipidea/core.c  | 64 ++++++++++++++++++++++++--------------------
+ drivers/usb/chipidea/otg.c   | 39 +--------------------------
+ include/linux/usb/chipidea.h |  2 --
+ 3 files changed, 36 insertions(+), 69 deletions(-)
 
-CONFIG_USB_OTG was kept selected. Just the device tree changes
-done in the fourth patch of this patch were done.
-
-1. Booting with the USB device connected and then disconnecting
-on boot results in "irq 38: nobody cared (try booting with the
-"irqpoll" option)" stack trace.
-
-2. Disconnecting the USB device and reconnecting results in a
-timeout error message coming ci_handle_id_switch --> hw_wait_reg
-while waiting for OTGSC_BSV register field. Why rely on a read
-from OTG register while using extcon?
-
-Also, usb_gadget_vbus_connect seems not to be called, render device
-mode useless (usb_gadget_vbus_connect according to my understanding
-should be called through ci_vbus_notifier -> ci_irq -> ci_otg_work ->
-ci_handle_vbus_change).
-
-3. Once in a while doing the switch from host to device would
-result "ci_hdrc.0 Freeing queued request" but the switch won't
-be successful as expected and I wont get the following message
-
-[  167.298040] ci_hdrc ci_hdrc.0: USB bus 2 deregistered
-[  167.772520] configfs-gadget gadget: high-speed config #1: c
-
-and further our RNDIS client configuration on said USB connection
-won't work. Once in a while I also experience a complete freeze
-if I try to ping the interface after this.
-
-4. With the current "OTG" implementation, should the ci->lock not
-be acquired before calling ci_role_stop or ci_role_start in the
-code path ci_id_notifier -> ci_irq -> otg_workqueue?
-
-Looking at the commit message this extcon was introduced for Qualcomm's
-410 Dragonboard and while I did not look at Dragonboard's or 410's DS,
-requirement seems similar to Vybrid.?
-
-What are your thoughts on this? Or considering the requirement of Qualcomm
-would keeping direct role switch in case of DUAL_ROLE_NOT_OTG flag
-and keeping existing OTG reads would be acceptable? Currently in our tree
-we keep both implementations. The 410 is a 64bit SoC but grepping arch/
-arm64/boot/dts/qcom for an extcon entry I didn't find any.
-
-Regards,
-Sanchayan.
-
-Sanchayan Maity (4):
-  usb: chipidea: Do not rely on OTG while using extcon
-  usb: chipidea: ci_hdrc_imx: Introduce CI_HDRC_DUAL_ROLE_NOT_OTG for Vybrid
-  ARM: dts: vfxxx: Make Vybrid match only on it's own compatible string
-  ARM: dts: vf-colibri: USB device/host switch using extcon gpio
-
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 12 ++++++
- arch/arm/boot/dts/vf-colibri.dtsi         |  7 ++++
- arch/arm/boot/dts/vfxxx.dtsi              |  2 +-
- drivers/usb/chipidea/ci_hdrc_imx.c        |  5 +++
- drivers/usb/chipidea/core.c               | 64 +++++++++++++++++--------------
- drivers/usb/chipidea/otg.c                | 39 +------------------
- include/linux/usb/chipidea.h              |  2 -
- 7 files changed, 61 insertions(+), 70 deletions(-)
-
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 7404064..d29118d 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -607,14 +607,15 @@ static int ci_vbus_notifier(struct notifier_block *nb, unsigned long event,
+ 	struct ci_hdrc_cable *vbus = container_of(nb, struct ci_hdrc_cable, nb);
+ 	struct ci_hdrc *ci = vbus->ci;
+ 
++	pm_runtime_get_sync(ci->dev);
++
+ 	if (event)
+-		vbus->state = true;
++		usb_gadget_vbus_connect(&ci->gadget);
+ 	else
+-		vbus->state = false;
++		usb_gadget_vbus_disconnect(&ci->gadget);
+ 
+-	vbus->changed = true;
++	pm_runtime_put_sync(ci->dev);
+ 
+-	ci_irq(ci->irq, ci);
+ 	return NOTIFY_DONE;
+ }
+ 
+@@ -624,14 +625,19 @@ static int ci_id_notifier(struct notifier_block *nb, unsigned long event,
+ 	struct ci_hdrc_cable *id = container_of(nb, struct ci_hdrc_cable, nb);
+ 	struct ci_hdrc *ci = id->ci;
+ 
+-	if (event)
+-		id->state = false;
+-	else
+-		id->state = true;
++	pm_runtime_get_sync(ci->dev);
++
++	ci_role_stop(ci);
++
++	hw_wait_phy_stable();
++
++	if (ci_role_start(ci, event ? CI_ROLE_HOST : CI_ROLE_GADGET))
++		dev_err(ci->dev,
++			"Can't start %s role\n",
++			event ? "host" : "gadget");
+ 
+-	id->changed = true;
++	pm_runtime_put_sync(ci->dev);
+ 
+-	ci_irq(ci->irq, ci);
+ 	return NOTIFY_DONE;
+ }
+ 
+@@ -738,25 +744,10 @@ static int ci_get_platdata(struct device *dev,
+ 	cable->nb.notifier_call = ci_vbus_notifier;
+ 	cable->edev = ext_vbus;
+ 
+-	if (!IS_ERR(ext_vbus)) {
+-		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB);
+-		if (ret)
+-			cable->state = true;
+-		else
+-			cable->state = false;
+-	}
+-
+ 	cable = &platdata->id_extcon;
+ 	cable->nb.notifier_call = ci_id_notifier;
+ 	cable->edev = ext_id;
+ 
+-	if (!IS_ERR(ext_id)) {
+-		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB_HOST);
+-		if (ret)
+-			cable->state = false;
+-		else
+-			cable->state = true;
+-	}
+ 	return 0;
+ }
+ 
+@@ -896,6 +887,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	void __iomem	*base;
+ 	int		ret;
+ 	enum usb_dr_mode dr_mode;
++	struct ci_hdrc_cable *cable;
+ 
+ 	if (!dev_get_platdata(dev)) {
+ 		dev_err(dev, "platform data missing\n");
+@@ -963,6 +955,12 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 
+ 	ci_get_otg_capable(ci);
+ 
++	ret = ci_extcon_register(ci);
++	if (ret) {
++		dev_err(dev, "extcon registration failed\n");
++		goto deinit_phy;
++	}
++
+ 	dr_mode = ci->platdata->dr_mode;
+ 	/* initialize role(s) before the interrupt is requested */
+ 	if (dr_mode == USB_DR_MODE_OTG || dr_mode == USB_DR_MODE_HOST) {
+@@ -1003,6 +1001,12 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 			 * user can switch it through debugfs.
+ 			 */
+ 			ci->role = CI_ROLE_GADGET;
++			cable = &ci->platdata->id_extcon;
++			if (!IS_ERR(cable->edev)) {
++				if (extcon_get_cable_state(cable->edev,
++						"USB-HOST") == true)
++					ci->role = CI_ROLE_HOST;
++			}
+ 		}
+ 	} else {
+ 		ci->role = ci->roles[CI_ROLE_HOST]
+@@ -1021,6 +1025,12 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 						ci_role(ci)->name);
+ 			goto stop;
+ 		}
++		cable = &ci->platdata->vbus_extcon;
++		if (!IS_ERR(cable->edev)) {
++			if ((ci->role == CI_ROLE_GADGET) &&
++			(extcon_get_cable_state(cable->edev, "USB") == true))
++				usb_gadget_vbus_connect(&ci->gadget);
++		}
+ 	}
+ 
+ 	platform_set_drvdata(pdev, ci);
+@@ -1029,10 +1039,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto stop;
+ 
+-	ret = ci_extcon_register(ci);
+-	if (ret)
+-		goto stop;
+-
+ 	if (ci->supports_runtime_pm) {
+ 		pm_runtime_set_active(&pdev->dev);
+ 		pm_runtime_enable(&pdev->dev);
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index 45f86da..3169c51 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -30,44 +30,7 @@
+  */
+ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+ {
+-	struct ci_hdrc_cable *cable;
+-	u32 val = hw_read(ci, OP_OTGSC, mask);
+-
+-	/*
+-	 * If using extcon framework for VBUS and/or ID signal
+-	 * detection overwrite OTGSC register value
+-	 */
+-	cable = &ci->platdata->vbus_extcon;
+-	if (!IS_ERR(cable->edev)) {
+-		if (cable->changed)
+-			val |= OTGSC_BSVIS;
+-		else
+-			val &= ~OTGSC_BSVIS;
+-
+-		cable->changed = false;
+-
+-		if (cable->state)
+-			val |= OTGSC_BSV;
+-		else
+-			val &= ~OTGSC_BSV;
+-	}
+-
+-	cable = &ci->platdata->id_extcon;
+-	if (!IS_ERR(cable->edev)) {
+-		if (cable->changed)
+-			val |= OTGSC_IDIS;
+-		else
+-			val &= ~OTGSC_IDIS;
+-
+-		cable->changed = false;
+-
+-		if (cable->state)
+-			val |= OTGSC_ID;
+-		else
+-			val &= ~OTGSC_ID;
+-	}
+-
+-	return val;
++	return hw_read(ci, OP_OTGSC, mask);
+ }
+ 
+ /**
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 5dd75fa..f70ab21 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -20,8 +20,6 @@ struct ci_hdrc;
+  * @conn: used for notification registration
+  */
+ struct ci_hdrc_cable {
+-	bool				state;
+-	bool				changed;
+ 	struct extcon_dev		*edev;
+ 	struct ci_hdrc			*ci;
+ 	struct notifier_block		nb;
 -- 
 2.7.3
