@@ -1,72 +1,42 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 15 Mar 2016 11:58:18 +0100
-Subject: [PATCH 6/9] ARM: dts: imx: add Boundary Devices Nitrogen6_SoloX
- board
-In-Reply-To: <56E7E98F.5030902@mentor.com>
-References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
- <1458037826-19375-7-git-send-email-gary.bisson@boundarydevices.com>
- <56E7E98F.5030902@mentor.com>
-Message-ID: <CAAMH-yv28x=XxFVNyrqmP8YuRmd2R6RRhrNL+TSPykjkED5czw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Mar 2016 10:58:02 +0000
+Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM, Line
+ and Mic inputs
+In-Reply-To: <20160314104939.GL8418@lukather>
+References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
+ <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
+ <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
+ <20160312085222.226d89bf@scratchpost.org>
+ <20160314104939.GL8418@lukather>
+Message-ID: <20160315105802.GN2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vladimir, All,
+On Mon, Mar 14, 2016 at 11:49:39AM +0100, Maxime Ripard wrote:
+> On Sat, Mar 12, 2016 at 08:52:22AM +0100, Danny Milosavljevic wrote:
 
-On Tue, Mar 15, 2016 at 11:53 AM, Vladimir Zapolskiy
-<vladimir_zapolskiy@mentor.com> wrote:
-> On 15.03.2016 12:30, Gary Bisson wrote:
->> Based on i.MX6 SoloX with 1GB of RAM.
->>
->> https://boundarydevices.com/product/nit6_solox-imx6/
->>
->> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
->> ---
->>  arch/arm/boot/dts/Makefile               |   1 +
->>  arch/arm/boot/dts/imx6sx-nitrogen6sx.dts | 745 +++++++++++++++++++++++++++++++
->>  2 files changed, 746 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 279ec61..6a2bbc4 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -363,6 +363,7 @@ dtb-$(CONFIG_SOC_IMX6SL) += \
->>       imx6sl-evk.dtb \
->>       imx6sl-warp.dtb
->>  dtb-$(CONFIG_SOC_IMX6SX) += \
->> +     imx6sx-nitrogen6sx.dtb \
->>       imx6sx-sabreauto.dtb \
->>       imx6sx-sdb-reva.dtb \
->>       imx6sx-sdb.dtb
->> diff --git a/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
->> new file mode 100644
->> index 0000000..8440890
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
->> @@ -0,0 +1,745 @@
->
-> [snip]
->
->> +
->> +//&clks {
->> +//   assigned-clocks = <&clks IMX6SX_PLL4_BYPASS_SRC>,
->> +//                     <&clks IMX6SX_PLL4_BYPASS>,
->> +//                     <&clks IMX6SX_CLK_CKO>,
->> +//                     <&clks IMX6SX_CLK_CKO1_SEL>,
->> +//                     <&clks IMX6SX_CLK_PLL4_POST_DIV>;
->> +//   assigned-clock-parents = <&clks IMX6SX_CLK_LVDS2_IN>,
->> +//                            <&clks IMX6SX_PLL4_BYPASS_SRC>,
->> +//                            <&clks IMX6SX_CLK_CKO1>,
->> +//                            <&clks IMX6SX_CLK_CKIL>;
->> +//   assigned-clock-rates = <0>, <0>, <0>, <0>, <24576000>;
->> +//};
->
-> What does // do above?
+> > > The other direction (making two controls which both do the same and update 
+> > > each other's value) doesn't seem to be easily available. 
 
-Oops, sorry it is some left over of my debugging.
+> > > Should I write a _put handler that does it manually?
 
-I also realized my 6qp device tree is missing the disabled pcie. I'll
-submit a v2 shortly.
+> > > (Or should that be handled by alsa-lib mixer modules instead?)
 
-Regards,
-Gary
+> > > Is it possible to merge the "Left Mixer" control and respective 
+> > > "Right Mixer" control into one selem in alsamixer?
+
+> > > Because alsamixer actually has support for one-sided muting.
+
+> Mark, do you know how to do it?
+
+> IIRC, in order to have shared controls, you just needed to share the
+> controls structure.
+
+I'm having a really hard time telling what "it" is here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160315/c785145d/attachment.sig>
