@@ -1,67 +1,47 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 15 Mar 2016 08:45:30 +0000
-Subject: Tegra baseline test results for v4.5
-Message-ID: <56E7CBAA.3040004@nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 15 Mar 2016 09:50:43 +0100
+Subject: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs.
+ non-modular distinctions
+In-Reply-To: <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
+References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
+ <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CACRpkdYN_qRUa_hscDma_jRAF=2K7_qaGM+f5DNr-NyA3g_NHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.5.
-Logs and other details at:
+On Mon, Feb 29, 2016 at 9:48 PM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
 
-    https://nvtb.github.io//linux/test_v4.5/20160314073105/
+> Fixups here tend to be more all over the map vs. some of the other
+> repeated/systematic ones we've seen elsewhere.
+>
+> We remove module.h from code that isn't doing anything modular at
+> all;  if they have __init sections, then replace it with init.h
+>
+> A couple drivers have module_exit() code that is essentially orphaned,
+> and so we remove that.
+>
+> There are no module_init replacements, so we have no concerns wrt.
+> initcall ordering changes as per some of the other cleanups.
+>
+> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+>
+> We also delete the MODULE_LICENSE tag etc. since all that information
+> was (or is now) contained at the top of the file in the comments.
+>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-gpio at vger.kernel.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
+This didn't make it in for v4.6 because noone provided ACKs.
 
-Test summary
-------------
+Please resend the outstanding (rebased) demodularization patches
+after v4.6-rc1 and I will merge them no matter if I get ACKs or not,
+I will not wait for ACKs any longer than that.
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 4): tegra114-dalmore-a04
-    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
-		   tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    FAIL: ( 1/ 4): tegra114-dalmore-a04
-    Pass: ( 3/ 4): tegra124-jetson-tk1, tegra20-trimslice,
-		   tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc7 (f6cede5b49e822ebc41a099fe41ab4989f64e2cb)):
-   text     data      bss    total  kernel
-  +4212   +12288        0   +16500  defconfig
-  +1472        0        0    +1472  multi_v7_defconfig
-  -3224        0        0    -3224  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc7 (f6cede5b49e822ebc41a099fe41ab4989f64e2cb))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .      -4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .       4k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .      -4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .       4k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .      -4k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .       4k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .      -4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .       4k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Yours,
+Linus Walleij
