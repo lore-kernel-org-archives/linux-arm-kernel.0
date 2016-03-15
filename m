@@ -1,50 +1,51 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 15 Mar 2016 20:18:06 +0900
-Subject: [RFC 3/3] iommu: dma-iommu: use common implementation also on ARM
- architecture
-In-Reply-To: <1455870164-25337-4-git-send-email-m.szyprowski@samsung.com>
-References: <1455870164-25337-1-git-send-email-m.szyprowski@samsung.com>
- <1455870164-25337-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CANqRtoRiZOPhCBo38zVLL6tQB2aBLy3uWWbqJJypxEFDXJwF1Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Mar 2016 11:22:57 +0000
+Subject: [PATCH] arm64: fix KASLR boot-time I-cache maintenance
+Message-ID: <1458040977-27558-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Commit f80fb3a3d50843a4 ("arm64: add support for kernel ASLR") missed a
+DSB necessary to complete I-cache maintenance in the primary boot path,
+and hence stale instructions may still be present in the I-cache and may
+be executed until the I-cache maintenance naturally completes.
 
-On Fri, Feb 19, 2016 at 5:22 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> This patch replaces ARM-specific IOMMU-based DMA-mapping implementation
-> with generic IOMMU DMA-mapping code shared with ARM64 architecture. The
-> side-effect of this change is a switch from bitmap-based IO address space
-> management to tree-based code. There should be no functional changes
-> for drivers, which rely on initialization from generic arch_setup_dna_ops()
-> interface. Code, which used old arm_iommu_* functions must be updated to
-> new interface.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
+Since commit 8ec41987436d566f ("arm64: mm: ensure patched kernel text is
+fetched from PoU"), all CPUs invalidate their I-caches after their MMU
+is enabled. Prior a CPU's MMU having been enabled, arbitrary lines may
+have been fetched from the PoC into I-caches. We never patch text
+expected to be executed with the MMU off. Thus, it is unnecessary to
+perform broadcast I-cache maintenance in the primary boot path.
 
-Thanks for your efforts and my apologies for late comments. Just FYI
-I'll try your patch (and this series) with the ipmmu-vmsa.c driver on
-32-bit ARM and see how it goes. Nice not to have to support multiple
-interfaces depending on architecture!
+This patch reduces the scope of the I-cache maintenance to the local
+CPU, and adds the missing DSB with similar scope, matching prior
+maintenance in the primary boot path.
 
-One question that comes to mind is how to handle features.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesehvuel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/head.S | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-For instance, the 32-bit ARM code supports DMA_ATTR_FORCE_CONTIGUOUS
-while the shared code in drivers/iommu/dma-iommu.c does not. I assume
-existing users may rely on such features so from my point of view it
-probably makes sense to carry over features from the 32-bit ARM code
-into the shared code before pulling the plug.
+Note: this applies atop of the arm64 for-next/core branch.
 
-I also wonder if it is possible to do a step-by-step migration and
-support both old and new interfaces in the same binary? That may make
-things easier for multiplatform enablement. So far I've managed to
-make one IOMMU driver support both 32-bit ARM and 64-bit ARM with some
-ugly magic, so adjusting 32-bit ARM dma-mapping code to coexist with
-the shared code in drivers/iommu/dma-iommu.c may also be possible. And
-probably involving even more ugly magic. =)
-
-Cheers,
-
-/ magnus
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 50c2134..1672ca9 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -766,8 +766,9 @@ __enable_mmu:
+ 
+ 	msr	sctlr_el1, x19			// re-enable the MMU
+ 	isb
+-	ic	ialluis				// flush instructions fetched
+-	isb					// via old mapping
++	ic	iallu				// flush instructions fetched
++	dsb	nsh				// via old mapping
++	isb
+ 	add	x27, x27, x23			// relocated __mmap_switched
+ #endif
+ 	br	x27
+-- 
+1.9.1
