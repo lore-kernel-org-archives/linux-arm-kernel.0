@@ -1,43 +1,26 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 15 Mar 2016 11:44:20 +0900
-Subject: [PATCH v2 0/7] ARM: dts: Add new Exynos3250-based ARTIK5 module
- dtsi file
-In-Reply-To: <56E775F6.5060004@samsung.com>
-References: <1458007695-3627-1-git-send-email-cw00.choi@samsung.com>
- <56E774DE.4030200@samsung.com> <56E775F6.5060004@samsung.com>
-Message-ID: <56E77704.2090804@samsung.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 14 Mar 2016 22:45:11 -0400 (EDT)
+Subject: [PATCH V2 net 0/6] net: hns: hns driver updates
+In-Reply-To: <56E76BB2.5060203@hisilicon.com>
+References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
+ <56E76BB2.5060203@hisilicon.com>
+Message-ID: <20160314.224511.688178587092115078.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.03.2016 11:39, Chanwoo Choi wrote:
-> On 2016? 03? 15? 11:35, Krzysztof Kozlowski wrote:
->> On 15.03.2016 11:08, Chanwoo Choi wrote:
->>> This patchset add the support for Device Tree source for Samsung ARTIK5 module[1]
->>> based on Exynos3250 SoC and development board[2]. The ARTIK5 module includes
->>> the follwoing devices:
->>> - Application Processor (Samsung Exynos3250)
->>> - WiFi/BT Combo chip
->>> - PMIC (Samsung S2MPS14)
->>> - eMMC (4GB)
->>> - DRAM LPDDR3 (512MB)
->>> - Connectors pin (60 Pins x 3 set)
->>>
->>> Also, this patchset add the ARTIK5 development board[2] dts file which includes
->>> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
->>> ethernet port, uart port and so on.
->>>
->>> [1] https://www.artik.io/hardware/artik-5
->>> [2] http://www.digikey.com/product-detail/en/SIP-KITNXB001/1510-1316-ND/5825102
->>
->> I guess the rest of patches depend on new clocks, right?
-> 
-> Yes. The new clocks(uart2, mmc2) are used for artik5 module.
-> - uart2 is used for serial log for debug
-> - mmc2 is for external sd card
+From: Daode Huang <huangdaode@hisilicon.com>
+Date: Tue, 15 Mar 2016 09:56:02 +0800
 
-Okay, so an ack from clock folks or a tag to pull would be nice.
+> Could you please help me to review this patch set?
 
-Unfortunately merge window started so probably everything will wait...
+I am not reviewing anything until you guys sort out your submission
+scheme, and resend these fresh using that central maintainer.
 
-BR,
-Krzysztof
+I am also not the only person in the world who is supposed to review
+all of this stuff, other developers need to help with the review
+process as well.
+
+So it is never appropriate to ask me, and only me, to review your
+work.
+
+Thanks.
