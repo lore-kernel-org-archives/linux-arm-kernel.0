@@ -1,47 +1,96 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Mar 2016 09:50:43 +0100
-Subject: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs.
- non-modular distinctions
-In-Reply-To: <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
-References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
- <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CACRpkdYN_qRUa_hscDma_jRAF=2K7_qaGM+f5DNr-NyA3g_NHg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 15 Mar 2016 10:54:04 +0200
+Subject: [PATCH v2 4/5] mmc: davinci: don't use dma platform resources
+In-Reply-To: <1457996081-21975-5-git-send-email-david@lechnology.com>
+References: <56E6BF7E.7020401@ti.com>
+ <1457996081-21975-1-git-send-email-david@lechnology.com>
+ <1457996081-21975-5-git-send-email-david@lechnology.com>
+Message-ID: <56E7CDAC.1090907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 9:48 PM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
+On 03/15/16 00:54, David Lechner wrote:
+> The davinci arch now has dma_slave_map tables for dma resources, so it is
+> no longer necessary to pass dma resources through the platform device.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+> 
+> v2 changes: Remove platform_get_resource completly instead of just ignoring it.
+> 
+> 
+>  drivers/mmc/host/davinci_mmc.c | 19 ++-----------------
+>  1 file changed, 2 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 8d10a92..dc96401 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -202,7 +202,6 @@ struct mmc_davinci_host {
+>  	u32 buffer_bytes_left;
+>  	u32 bytes_left;
+>  
+> -	u32 rxdma, txdma;
+>  	struct dma_chan *dma_tx;
+>  	struct dma_chan *dma_rx;
+>  	bool use_dma;
+> @@ -520,16 +519,14 @@ static int __init davinci_acquire_dma_channels(struct mmc_davinci_host *host)
+>  	dma_cap_set(DMA_SLAVE, mask);
+>  
+>  	host->dma_tx =
+> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
+> -				&host->txdma, mmc_dev(host->mmc), "tx");
+> +		dma_request_slave_channel(mmc_dev(host->mmc), "tx");
 
-> Fixups here tend to be more all over the map vs. some of the other
-> repeated/systematic ones we've seen elsewhere.
->
-> We remove module.h from code that isn't doing anything modular at
-> all;  if they have __init sections, then replace it with init.h
->
-> A couple drivers have module_exit() code that is essentially orphaned,
-> and so we remove that.
->
-> There are no module_init replacements, so we have no concerns wrt.
-> initcall ordering changes as per some of the other cleanups.
->
-> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
->
-> We also delete the MODULE_LICENSE tag etc. since all that information
-> was (or is now) contained at the top of the file in the comments.
->
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-gpio at vger.kernel.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+you would need to use dma_request_chan() to be able to rely on the legacy
+channel mapping.
+I have staged commits for converting all daVinci and OMAP drivers, I'll attach
+the patch I have for davinci-mmc for reference.
+When we convert to use the dma_request_chan() we can handle deferred probing
+also...
 
-This didn't make it in for v4.6 because noone provided ACKs.
 
-Please resend the outstanding (rebased) demodularization patches
-after v4.6-rc1 and I will merge them no matter if I get ACKs or not,
-I will not wait for ACKs any longer than that.
 
-Yours,
-Linus Walleij
+>  	if (!host->dma_tx) {
+>  		dev_err(mmc_dev(host->mmc), "Can't get dma_tx channel\n");
+>  		return -ENODEV;
+>  	}
+>  
+>  	host->dma_rx =
+> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
+> -				&host->rxdma, mmc_dev(host->mmc), "rx");
+> +		dma_request_slave_channel(mmc_dev(host->mmc), "rx");
+>  	if (!host->dma_rx) {
+>  		dev_err(mmc_dev(host->mmc), "Can't get dma_rx channel\n");
+>  		r = -ENODEV;
+> @@ -1251,18 +1248,6 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+>  	host = mmc_priv(mmc);
+>  	host->mmc = mmc;	/* Important */
+>  
+> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> -	if (!r)
+> -		dev_warn(&pdev->dev, "RX DMA resource not specified\n");
+> -	else
+> -		host->rxdma = r->start;
+> -
+> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+> -	if (!r)
+> -		dev_warn(&pdev->dev, "TX DMA resource not specified\n");
+> -	else
+> -		host->txdma = r->start;
+> -
+>  	host->mem_res = mem;
+>  	host->base = devm_ioremap(&pdev->dev, mem->start, mem_size);
+>  	if (!host->base)
+> 
+
+
+-- 
+P?ter
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mmc-davinci_mmc-Use-dma_request_chan-to-requesting-D.patch
+Type: text/x-patch
+Size: 3424 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160315/91afbacb/attachment-0001.bin>
