@@ -1,59 +1,57 @@
-From: rajiv.nishtala@bsc.es (nishtala)
-Date: Tue, 15 Mar 2016 13:50:33 +0100
-Subject: Questions about sleep states on ARM Juno R0
-Message-ID: <56E80519.1040400@bsc.es>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 15 Mar 2016 09:20:40 -0400
+Subject: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs.
+ non-modular distinctions
+In-Reply-To: <CACRpkdYN_qRUa_hscDma_jRAF=2K7_qaGM+f5DNr-NyA3g_NHg@mail.gmail.com>
+References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
+ <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
+ <CACRpkdYN_qRUa_hscDma_jRAF=2K7_qaGM+f5DNr-NyA3g_NHg@mail.gmail.com>
+Message-ID: <20160315132039.GE23251@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[Re: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs. non-modular distinctions] On 15/03/2016 (Tue 09:50) Linus Walleij wrote:
 
-In response to the discussion here 
-(https://community.arm.com/thread/9382). I'm continuing my follow-up 
-question.
+> On Mon, Feb 29, 2016 at 9:48 PM, Paul Gortmaker
+> <paul.gortmaker@windriver.com> wrote:
+> 
+> > Fixups here tend to be more all over the map vs. some of the other
+> > repeated/systematic ones we've seen elsewhere.
+> >
+> > We remove module.h from code that isn't doing anything modular at
+> > all;  if they have __init sections, then replace it with init.h
+> >
+> > A couple drivers have module_exit() code that is essentially orphaned,
+> > and so we remove that.
+> >
+> > There are no module_init replacements, so we have no concerns wrt.
+> > initcall ordering changes as per some of the other cleanups.
+> >
+> > Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+> >
+> > We also delete the MODULE_LICENSE tag etc. since all that information
+> > was (or is now) contained at the top of the file in the comments.
+> >
+> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > Cc: Thomas Abraham <thomas.ab@samsung.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-samsung-soc at vger.kernel.org
+> > Cc: linux-gpio at vger.kernel.org
+> > Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> 
+> This didn't make it in for v4.6 because noone provided ACKs.
+> 
+> Please resend the outstanding (rebased) demodularization patches
+> after v4.6-rc1 and I will merge them no matter if I get ACKs or not,
+> I will not wait for ACKs any longer than that.
 
-Sudeep here says to read the sysfs files to get usage/time to understand 
-the sleep-state residency of the cores/cluster.
+Sounds good, will do that in ~2 wks.
 
-To look at the sysfs files, I wrote a version of a watchdog which 
-essentially prints out the difference in "usage", if
-it changes in the last 0.01s (it is a LARGE interval relative to update 
-period of sysfs files).
+Thanks,
+Paul.
+--
 
-The questions I have are the following:
-- When the system is idle, that is, no user initiated tasks are running; 
-I expected the counter for "usage" in CLUSTER_SLEEP_0 to remain 
-constant, because you don't exit
-until any kernel interrupts occur, and is guaranteed to stay atleast for 
-3500us while the "time" in the same category to increase.
-
-However, what I notice is that "usage" ALSO increases, which is 
-something I do not understand.
-
-- When I run an application only on small OR big cores, the counter 
-"usage" for CPU_SLEEP_0 on the other type of core (big/small) still 
-isn't updated.
-Am I missing something here?
-
-- Similarly, when I have an application that does only computations on 
-both big AND small cores simultaneously, how come the counter, "usage", 
-for CLUSTER_SLEEP_0 increases?
-Shouldn't it remain constant?
-
-- How come value of "CLUSTER_SLEEP_0" (on a57 cluster) increases when 
-there is actually something running on it. How is it computed?
-
-Any help would be highly appreciated.
-
-Best Regards,
-Rajiv Nishtala
-
-WARNING / LEGAL TEXT: This message is intended only for the use of the
-individual or entity to which it is addressed and may contain
-information which is privileged, confidential, proprietary, or exempt
-from disclosure under applicable law. If you are not the intended
-recipient or the person responsible for delivering the message to the
-intended recipient, you are strictly prohibited from disclosing,
-distributing, copying, or in any way using this message. If you have
-received this communication in error, please notify the sender and
-destroy and delete any copies you may have received.
-
-http://www.bsc.es/disclaimer
+> 
+> Yours,
+> Linus Walleij
