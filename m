@@ -1,44 +1,85 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Mar 2016 17:02:32 +0900
-Subject: [PATCH v2 0/2] ARM: dts: r8a7793: add CAN to device tree
-In-Reply-To: <SG2PR06MB10386A43CDCBE656A3ACBE12C3890@SG2PR06MB1038.apcprd06.prod.outlook.com>
-References: <1458001594-632-1-git-send-email-horms+renesas@verge.net.au>
- <SG2PR06MB10386A43CDCBE656A3ACBE12C3890@SG2PR06MB1038.apcprd06.prod.outlook.com>
-Message-ID: <20160315080232.GD6912@verge.net.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 Mar 2016 13:39:05 +0530
+Subject: [PATCH v2 4/5] mmc: davinci: don't use dma platform resources
+In-Reply-To: <1457996081-21975-5-git-send-email-david@lechnology.com>
+References: <56E6BF7E.7020401@ti.com>
+ <1457996081-21975-1-git-send-email-david@lechnology.com>
+ <1457996081-21975-5-git-send-email-david@lechnology.com>
+Message-ID: <56E7C321.5060405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2016 at 07:09:23AM +0000, Ramesh Shanmugasundaram wrote:
-> Hi Simon,
-> 
-> > Subject: [PATCH v2 0/2] ARM: dts: r8a7793: add CAN to device tree
-> 
-> r8a7794?
++ Peter
 
-Yes, my bad.
-
-> > 
-> > Hi,
-> > 
-> > this short series adds CAN clocks and nodes to the r8a7794 device tree.
-> > 
-> > I am not aware of an r8a7794 board that exposes CAN - neither the alt nor
-> > the silk board appear to - and thus am unsure of a way to test these
-> > changes.  However, they are based on what is present for the r8a7791 SoC
-> > and I am unable to find a difference in the SoC documentation.
-> > 
-> > This series is similar to a similar series I posted for the r8a7794 in
-> > January.
-> > 
-> > Based on renesas-devel-20160311-v4.5-rc7.
-> > 
-> > Changes in v2
-> > * Correct clock node names
-> > * Add MSTP9 clocks
-> > * Omit clock-output-names property from new nodes
+On Tuesday 15 March 2016 04:24 AM, David Lechner wrote:
+> The davinci arch now has dma_slave_map tables for dma resources, so it is
+> no longer necessary to pass dma resources through the platform device.
 > 
-> Acked-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> 
-> for this series.
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-Thanks
+Looks good to me.
+
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
+
+> ---
+> 
+> v2 changes: Remove platform_get_resource completly instead of just ignoring it.
+> 
+> 
+>  drivers/mmc/host/davinci_mmc.c | 19 ++-----------------
+>  1 file changed, 2 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 8d10a92..dc96401 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -202,7 +202,6 @@ struct mmc_davinci_host {
+>  	u32 buffer_bytes_left;
+>  	u32 bytes_left;
+>  
+> -	u32 rxdma, txdma;
+>  	struct dma_chan *dma_tx;
+>  	struct dma_chan *dma_rx;
+>  	bool use_dma;
+> @@ -520,16 +519,14 @@ static int __init davinci_acquire_dma_channels(struct mmc_davinci_host *host)
+>  	dma_cap_set(DMA_SLAVE, mask);
+>  
+>  	host->dma_tx =
+> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
+> -				&host->txdma, mmc_dev(host->mmc), "tx");
+> +		dma_request_slave_channel(mmc_dev(host->mmc), "tx");
+>  	if (!host->dma_tx) {
+>  		dev_err(mmc_dev(host->mmc), "Can't get dma_tx channel\n");
+>  		return -ENODEV;
+>  	}
+>  
+>  	host->dma_rx =
+> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
+> -				&host->rxdma, mmc_dev(host->mmc), "rx");
+> +		dma_request_slave_channel(mmc_dev(host->mmc), "rx");
+>  	if (!host->dma_rx) {
+>  		dev_err(mmc_dev(host->mmc), "Can't get dma_rx channel\n");
+>  		r = -ENODEV;
+> @@ -1251,18 +1248,6 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+>  	host = mmc_priv(mmc);
+>  	host->mmc = mmc;	/* Important */
+>  
+> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> -	if (!r)
+> -		dev_warn(&pdev->dev, "RX DMA resource not specified\n");
+> -	else
+> -		host->rxdma = r->start;
+> -
+> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+> -	if (!r)
+> -		dev_warn(&pdev->dev, "TX DMA resource not specified\n");
+> -	else
+> -		host->txdma = r->start;
+> -
+>  	host->mem_res = mem;
+>  	host->base = devm_ioremap(&pdev->dev, mem->start, mem_size);
+>  	if (!host->base)
+> 
