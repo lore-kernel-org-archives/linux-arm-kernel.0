@@ -1,10 +1,10 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Tue, 15 Mar 2016 13:41:38 +0100
-Subject: [PATCHv2 01/31] ARM: dts: r8a7790: Reference both DMA controllers in
- SCIFA nodes
+Date: Tue, 15 Mar 2016 13:41:39 +0100
+Subject: [PATCHv2 02/31] ARM: dts: r8a7790: Reference both DMA controllers in
+ SCIFB nodes
 In-Reply-To: <1458045728-4758-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1458045728-4758-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1458045728-4758-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1458045728-4758-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,41 +19,41 @@ Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
  1 file changed, 9 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 0077de7..7d9ff0b 100644
+index 7d9ff0b..13e8817 100644
 --- a/arch/arm/boot/dts/r8a7790.dtsi
 +++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -633,8 +633,9 @@
- 		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA0>;
+@@ -675,8 +675,9 @@
+ 		interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB0>;
  		clock-names = "fck";
--		dmas = <&dmac0 0x21>, <&dmac0 0x22>;
+-		dmas = <&dmac0 0x3d>, <&dmac0 0x3e>;
 -		dma-names = "tx", "rx";
-+		dmas = <&dmac0 0x21>, <&dmac0 0x22>,
-+		       <&dmac1 0x21>, <&dmac1 0x22>;
++		dmas = <&dmac0 0x3d>, <&dmac0 0x3e>,
++		       <&dmac1 0x3d>, <&dmac1 0x3e>;
 +		dma-names = "tx", "rx", "tx", "rx";
  		power-domains = <&cpg_clocks>;
  		status = "disabled";
  	};
-@@ -646,8 +647,9 @@
- 		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA1>;
+@@ -688,8 +689,9 @@
+ 		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB1>;
  		clock-names = "fck";
--		dmas = <&dmac0 0x25>, <&dmac0 0x26>;
+-		dmas = <&dmac0 0x19>, <&dmac0 0x1a>;
 -		dma-names = "tx", "rx";
-+		dmas = <&dmac0 0x25>, <&dmac0 0x26>,
-+		       <&dmac1 0x25>, <&dmac1 0x26>;
++		dmas = <&dmac0 0x19>, <&dmac0 0x1a>,
++		       <&dmac1 0x19>, <&dmac1 0x1a>;
 +		dma-names = "tx", "rx", "tx", "rx";
  		power-domains = <&cpg_clocks>;
  		status = "disabled";
  	};
-@@ -659,8 +661,9 @@
- 		interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA2>;
+@@ -701,8 +703,9 @@
+ 		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB2>;
  		clock-names = "fck";
--		dmas = <&dmac0 0x27>, <&dmac0 0x28>;
+-		dmas = <&dmac0 0x1d>, <&dmac0 0x1e>;
 -		dma-names = "tx", "rx";
-+		dmas = <&dmac0 0x27>, <&dmac0 0x28>,
-+		       <&dmac1 0x27>, <&dmac1 0x28>;
++		dmas = <&dmac0 0x1d>, <&dmac0 0x1e>,
++		       <&dmac1 0x1d>, <&dmac1 0x1e>;
 +		dma-names = "tx", "rx", "tx", "rx";
  		power-domains = <&cpg_clocks>;
  		status = "disabled";
