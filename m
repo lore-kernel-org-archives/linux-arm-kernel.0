@@ -1,60 +1,51 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 15 Mar 2016 11:30:17 +0100
-Subject: [PATCH 0/9] imx: add latest Boundary Devices boards support
-Message-ID: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+Date: Tue, 15 Mar 2016 11:30:19 +0100
+Subject: [PATCH 2/9] ARM: dts: imx7d: add flexcan support
+In-Reply-To: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1458037826-19375-3-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add the device nodes for the i.MX7 FlexCAN buses.
 
-This series adds support for the following Boundary Devices boards:
-- Nitrogen7 (i.MX7)
-- Nitrogen6SX (i.MX6SoloX)
-- Nitrogen6QP_MAX (i.MX6QP)
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx7d.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-The first patches add display and CAN support to i.MX7 device tree. Those
-two features have been successfully tested on the Nitrogen7. Also the support
-of CKIL clock has been added in order to use it as slow clock for the WiFi
-module.
-
-Then the last 3 patches add some missing configurations in order to fully
-support Boundary platforms using imx_v6_v7_defconfig.
-
-All the patches have been applied/tested on top of Shawn's 'for-next' branch.
-
-Here are some remarks/questions that came during testing:
-- Is the pxp v4l2 driver being worked on for mainline inclusion?
-- Are the ldb modifications for SoloX being worked on for mainline inclusion?
-- Is the WM8960 ASoC machine driver being worked on for mainline inclusion?
-- When booting the Nitrogen7, there's backtrace due to clk_pllv3_prepare, does
-  it happen on the sdb too? Note that it doesn't prevent the board to work.
-
-Regards,
-Gary
-
-Gary Bisson (9):
-  ARM: dts: imx7d: add lcdif support
-  ARM: dts: imx7d: add flexcan support
-  clk: imx: add ckil clock for i.MX7
-  ARM: dts: imx: add Boundary Devices Nitrogen7 board
-  ARM: dts: imx: add Boundary Devices Nitrogen6_MAX QP board
-  ARM: dts: imx: add Boundary Devices Nitrogen6_SoloX board
-  ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004 touch support
-  ARM: imx_v6_v7_defconfig: add CONFIG_I2C_MUX_GPIO
-  ARM: imx_v6_v7_defconfig: add CONFIG_RTC_DRV_M41T80
-
- arch/arm/boot/dts/Makefile                 |   3 +
- arch/arm/boot/dts/imx6qp-nitrogen6_max.dts |  55 ++
- arch/arm/boot/dts/imx6sx-nitrogen6sx.dts   | 745 ++++++++++++++++++++++++++
- arch/arm/boot/dts/imx7d-nitrogen7.dts      | 818 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx7d.dtsi               |  33 ++
- arch/arm/configs/imx_v6_v7_defconfig       |   4 +
- drivers/clk/imx/clk-imx7d.c                |   3 +-
- include/dt-bindings/clock/imx7d-clock.h    |   3 +-
- 8 files changed, 1662 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6qp-nitrogen6_max.dts
- create mode 100644 arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
- create mode 100644 arch/arm/boot/dts/imx7d-nitrogen7.dts
-
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index a768716..c5e47a4 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -930,6 +930,28 @@
+ 				fsl,num-rx-queues=<3>;
+ 				status = "disabled";
+ 			};
++
++			flexcan1: can at 30a00000 {
++				compatible = "fsl,imx7d-flexcan", "fsl,imx6q-flexcan";
++				reg = <0x30a00000 0x10000>;
++				interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_CLK_DUMMY>,
++					<&clks IMX7D_CAN1_ROOT_CLK>;
++				clock-names = "ipg", "per";
++				stop-mode = <&gpr 0x10 1 0x10 17>;
++				status = "disabled";
++			};
++
++			flexcan2: can at 30a10000 {
++				compatible = "fsl,imx7d-flexcan", "fsl,imx6q-flexcan";
++				reg = <0x30a10000 0x10000>;
++				interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_CLK_DUMMY>,
++					<&clks IMX7D_CAN2_ROOT_CLK>;
++				clock-names = "ipg", "per";
++				stop-mode = <&gpr 0x10 2 0x10 18>;
++				status = "disabled";
++			};
+ 		};
+ 	};
+ };
 -- 
 2.7.0
