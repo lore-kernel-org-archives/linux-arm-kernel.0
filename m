@@ -1,49 +1,40 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 15 Mar 2016 11:10:20 +0100
-Subject: [PATCH 8/8] drivers/pinctrl: clean up samsung modular vs.
- non-modular distinctions
-In-Reply-To: <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
-References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
- <1456778924-20730-9-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <56E7DF8C.4030005@samsung.com>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Tue, 15 Mar 2016 11:30:18 +0100
+Subject: [PATCH 1/9] ARM: dts: imx7d: add lcdif support
+In-Reply-To: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1458037826-19375-2-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2016 09:48 PM, Paul Gortmaker wrote:
-> Fixups here tend to be more all over the map vs. some of the other
-> repeated/systematic ones we've seen elsewhere.
-> 
-> We remove module.h from code that isn't doing anything modular at
-> all;  if they have __init sections, then replace it with init.h
-> 
-> A couple drivers have module_exit() code that is essentially orphaned,
-> and so we remove that.
-> 
-> There are no module_init replacements, so we have no concerns wrt.
-> initcall ordering changes as per some of the other cleanups.
-> 
-> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-> 
-> We also delete the MODULE_LICENSE tag etc. since all that information
-> was (or is now) contained at the top of the file in the comments.
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-gpio at vger.kernel.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-exynos.c     |  1 -
->  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 15 +++------------
->  drivers/pinctrl/samsung/pinctrl-s3c24xx.c    |  2 +-
->  drivers/pinctrl/samsung/pinctrl-s3c64xx.c    |  2 +-
->  drivers/pinctrl/samsung/pinctrl-samsung.c    | 12 +-----------
->  5 files changed, 6 insertions(+), 26 deletions(-)
+Add the device node for the i.MX7 eLCDIF interface.
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx7d.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
---
-Thanks,
-Sylwester
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index b5a50e0..a768716 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -608,6 +608,17 @@
+ 				status = "disabled";
+ 			};
+ 
++			lcdif: lcdif at 30730000 {
++				compatible = "fsl,imx7d-lcdif", "fsl,imx28-lcdif";
++				reg = <0x30730000 0x10000>;
++				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_LCDIF_PIXEL_ROOT_CLK>,
++					<&clks IMX7D_CLK_DUMMY>,
++					<&clks IMX7D_CLK_DUMMY>;
++				clock-names = "pix", "axi", "disp_axi";
++				status = "disabled";
++			};
++
+ 			pwm1: pwm at 30660000 {
+ 				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
+ 				reg = <0x30660000 0x10000>;
+-- 
+2.7.0
