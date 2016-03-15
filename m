@@ -1,51 +1,57 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Mar 2016 11:22:57 +0000
-Subject: [PATCH] arm64: fix KASLR boot-time I-cache maintenance
-Message-ID: <1458040977-27558-1-git-send-email-mark.rutland@arm.com>
+Date: Tue, 15 Mar 2016 11:32:21 +0000
+Subject: [PATCH] arm64: drop unused __local_flush_icache_all()
+In-Reply-To: <1458035230-1038-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1458035230-1038-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160315113220.GB19263@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f80fb3a3d50843a4 ("arm64: add support for kernel ASLR") missed a
-DSB necessary to complete I-cache maintenance in the primary boot path,
-and hence stale instructions may still be present in the I-cache and may
-be executed until the I-cache maintenance naturally completes.
+On Tue, Mar 15, 2016 at 05:47:10PM +0800, Kefeng Wang wrote:
+> After commit 65da0a8e34a8 ("arm64: use non-global mappings for UEFI
+> runtime regions"), nobody use __local_flush_icache_all() anymore,
+> so drop it.
+> 
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-Since commit 8ec41987436d566f ("arm64: mm: ensure patched kernel text is
-fetched from PoU"), all CPUs invalidate their I-caches after their MMU
-is enabled. Prior a CPU's MMU having been enabled, arbitrary lines may
-have been fetched from the PoC into I-caches. We never patch text
-expected to be executed with the MMU off. Thus, it is unnecessary to
-perform broadcast I-cache maintenance in the primary boot path.
+The only other user was the old ASID allocator. For the boot and idle
+paths we do the local maintenance in asm. I don't imagine we're likely
+to need this again soon.
 
-This patch reduces the scope of the I-cache maintenance to the local
-CPU, and adds the missing DSB with similar scope, matching prior
-maintenance in the primary boot path.
+So FWIW:
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesehvuel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/head.S | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Note: this applies atop of the arm64 for-next/core branch.
+Mark.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 50c2134..1672ca9 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -766,8 +766,9 @@ __enable_mmu:
- 
- 	msr	sctlr_el1, x19			// re-enable the MMU
- 	isb
--	ic	ialluis				// flush instructions fetched
--	isb					// via old mapping
-+	ic	iallu				// flush instructions fetched
-+	dsb	nsh				// via old mapping
-+	isb
- 	add	x27, x27, x23			// relocated __mmap_switched
- #endif
- 	br	x27
--- 
-1.9.1
+> ---
+>  arch/arm64/include/asm/cacheflush.h | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index 22dda61..c64268d 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -116,13 +116,6 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+>  #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
+>  extern void flush_dcache_page(struct page *);
+>  
+> -static inline void __local_flush_icache_all(void)
+> -{
+> -	asm("ic iallu");
+> -	dsb(nsh);
+> -	isb();
+> -}
+> -
+>  static inline void __flush_icache_all(void)
+>  {
+>  	asm("ic	ialluis");
+> -- 
+> 2.6.0.GIT
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
