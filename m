@@ -1,52 +1,86 @@
-From: huangdaode@hisilicon.com (Daode Huang)
-Date: Tue, 15 Mar 2016 09:56:02 +0800
-Subject: [PATCH V2 net 0/6] net: hns: hns driver updates
-In-Reply-To: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
-References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <56E76BB2.5060203@hisilicon.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 15 Mar 2016 11:01:00 +0900
+Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
+ (2nd round)
+In-Reply-To: <CAK7LNARJStOBUM7G=8nffXTk_a426o8CRRSX2SL-P0BsH08M7A@mail.gmail.com>
+References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNARSGsyDmSYMPOMUWS+5rYPxV2v1ieWvsAsKfQN0tZnytw@mail.gmail.com>
+ <CAK7LNARJStOBUM7G=8nffXTk_a426o8CRRSX2SL-P0BsH08M7A@mail.gmail.com>
+Message-ID: <CAK7LNARW9u=btLwc9Pj3VFx_q_unfWu9gH4sHNC3-9gLd0p=pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Olof, Arnd,
 
-Could you please help me to review this patch set?
-I am so sorry to send the patches in parallel to you, which increases 
-you workload,
-So next time we will pay more attention to it,  and learn more about 
-kernel patch submitting.
-Thanks.
 
-MBR, Daode
+I sent my patches around -rc4 and
+took action soon as requested.
 
-On 2016/3/11 17:10, Daode Huang wrote:
-> Hi Dave,
+But, my series is still not applied due to the long silence on your side.
+
+Please respond!
+
+
+
+
+
+2016-03-13 8:42 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Olof?  Arnd?
 >
-> This patch series are hisilicon network driver bug fix.
-> please merge them to the net repo.
-> Thanks
 >
-> Daode Huang
-> ---
-> changlog
-> v2: some minor change according to
->      MBR Sergei <sergei.shtylyov@cogentembedded.com> in
->      [patch 3/6] [patch 4/6].
 >
-> v1: initial version.
 >
-> Daode Huang (6):
->    net: hns: bug fix about the overflow of mss
->    net: hns: fixes the hw interrupt bug in using napi
->    net: hns: fixed portid bug in sending manage pkt
->    net: hns: adds uc match for debug port
->    net: hns: fixed service-ges setting MAC-addr bug
->    net: hns: bug fix of getting hilink status
+> 2016-03-07 18:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>> Hi Olof and Arnd,
+>>
+>>
+>> I have two series for 4.6-rc1 that have not been applied yet.
+>>
+>>  - ARM: uniphier: UniPhier updates for Linux 4.6-rc1 (2nd round)   (this series)
+>>  - ARM: dts: uniphier: UniPhier DT updates for Linux 4.6-rc1 (2nd round)
+>>
+>> I am getting uneasy because it is already -rc7.
+>>
+>> I hope you will find some time to check them out.
+>>
+>>
+>> 2016-02-26 16:16 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>>> Hi Olof,
+>>>
+>>> Here is a small patch series for UniPhier SoC updates.
+>>>
+>>>
+>>>
+>>> Masahiro Yamada (2):
+>>>   ARM: uniphier: add missing of_node_put()
+>>>   ARM: uniphier: rework SMP code to support new System Bus binding
+>>>
+>>>  arch/arm/mach-uniphier/platsmp.c | 26 +++++++++++++++++---------
+>>>  1 file changed, 17 insertions(+), 9 deletions(-)
+>>>
+>>> --
+>>> 1.9.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+>>
+>> --
+>> Best Regards
+>> Masahiro Yamada
 >
->   drivers/net/ethernet/hisilicon/hns/hnae.h          |  3 ++
->   drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  1 +
->   drivers/net/ethernet/hisilicon/hns/hns_dsaf_gmac.c | 29 +++++++++++----
->   drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c | 41 ++++++++++++----------
->   drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  4 +++
->   drivers/net/ethernet/hisilicon/hns/hns_enet.c      | 32 +++++++++--------
->   6 files changed, 70 insertions(+), 40 deletions(-)
 >
+>
+> --
+> Best Regards
+> Masahiro Yamada
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
