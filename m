@@ -1,97 +1,48 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 15 Mar 2016 10:56:01 +0200
-Subject: [PATCH v2 4/5] mmc: davinci: don't use dma platform resources
-In-Reply-To: <56E7CDAC.1090907@ti.com>
-References: <56E6BF7E.7020401@ti.com>
- <1457996081-21975-1-git-send-email-david@lechnology.com>
- <1457996081-21975-5-git-send-email-david@lechnology.com>
- <56E7CDAC.1090907@ti.com>
-Message-ID: <56E7CE21.7070605@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 15 Mar 2016 10:10:32 +0100
+Subject: [PATCH v2 4/4] documentation: Fix pinctrl documentation for
+ Meson8 / Meson8b
+In-Reply-To: <1457516519-15319-1-git-send-email-carlo@caione.org>
+References: <20160305042646.GL13525@rob-hp-laptop>
+ <1457516519-15319-1-git-send-email-carlo@caione.org>
+Message-ID: <CACRpkda3j7oxL0wawkLy-eHnP6zmfmBgKbm7=gTDH1xqXhKKUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/16 10:54, Peter Ujfalusi wrote:
-> On 03/15/16 00:54, David Lechner wrote:
->> The davinci arch now has dma_slave_map tables for dma resources, so it is
->> no longer necessary to pass dma resources through the platform device.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>
->> v2 changes: Remove platform_get_resource completly instead of just ignoring it.
->>
->>
->>  drivers/mmc/host/davinci_mmc.c | 19 ++-----------------
->>  1 file changed, 2 insertions(+), 17 deletions(-)
->>
->> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
->> index 8d10a92..dc96401 100644
->> --- a/drivers/mmc/host/davinci_mmc.c
->> +++ b/drivers/mmc/host/davinci_mmc.c
->> @@ -202,7 +202,6 @@ struct mmc_davinci_host {
->>  	u32 buffer_bytes_left;
->>  	u32 bytes_left;
->>  
->> -	u32 rxdma, txdma;
->>  	struct dma_chan *dma_tx;
->>  	struct dma_chan *dma_rx;
->>  	bool use_dma;
->> @@ -520,16 +519,14 @@ static int __init davinci_acquire_dma_channels(struct mmc_davinci_host *host)
->>  	dma_cap_set(DMA_SLAVE, mask);
->>  
->>  	host->dma_tx =
->> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
->> -				&host->txdma, mmc_dev(host->mmc), "tx");
->> +		dma_request_slave_channel(mmc_dev(host->mmc), "tx");
-> 
-> you would need to use dma_request_chan() to be able to rely on the legacy
-> channel mapping.
+On Wed, Mar 9, 2016 at 10:41 AM, Carlo Caione <carlo@caione.org> wrote:
 
-In other words: w/o dma_request_chan() legacy boot will not work as you will
-not get the DMA channel.
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Fix pin controller documentation introducing the new compatibles for
+> the pinctrl drivers specific for aobus / cbus.
+>
+> This is needed because we have changed the pin controller driver: we
+> have now a single specialized pinctrl driver / compatible for each bus
+> the controller is attached to, instead of one single driver dealing with
+> all the controllers we have on different buses.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+> Hey Rob,
+> I'm resubmitting a V2 only for this patch since the driver changes have
+> been already taken by Linus.
+(...)
+>  Required properties for the root node:
+> - - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
+> + - compatible: one of "amlogic,meson8-cbus-pinctrl"
+> +                     "amlogic,meson8b-cbus-pinctrl"
+> +                     "amlogic,meson8-aobus-pinctrl"
+> +                     "amlogic,meson8b-aobus-pinctrl"
 
-> I have staged commits for converting all daVinci and OMAP drivers, I'll attach
-> the patch I have for davinci-mmc for reference.
-> When we convert to use the dma_request_chan() we can handle deferred probing
-> also...
-> 
-> 
-> 
->>  	if (!host->dma_tx) {
->>  		dev_err(mmc_dev(host->mmc), "Can't get dma_tx channel\n");
->>  		return -ENODEV;
->>  	}
->>  
->>  	host->dma_rx =
->> -		dma_request_slave_channel_compat(mask, edma_filter_fn,
->> -				&host->rxdma, mmc_dev(host->mmc), "rx");
->> +		dma_request_slave_channel(mmc_dev(host->mmc), "rx");
->>  	if (!host->dma_rx) {
->>  		dev_err(mmc_dev(host->mmc), "Can't get dma_rx channel\n");
->>  		r = -ENODEV;
->> @@ -1251,18 +1248,6 @@ static int __init davinci_mmcsd_probe(struct platform_device *pdev)
->>  	host = mmc_priv(mmc);
->>  	host->mmc = mmc;	/* Important */
->>  
->> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
->> -	if (!r)
->> -		dev_warn(&pdev->dev, "RX DMA resource not specified\n");
->> -	else
->> -		host->rxdma = r->start;
->> -
->> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
->> -	if (!r)
->> -		dev_warn(&pdev->dev, "TX DMA resource not specified\n");
->> -	else
->> -		host->txdma = r->start;
->> -
->>  	host->mem_res = mem;
->>  	host->base = devm_ioremap(&pdev->dev, mem->start, mem_size);
->>  	if (!host->base)
->>
-> 
-> 
+I guess I just have to merge this. It (IIUC) turns out that the driver is beta
+and prototypeish and the DT bindings were too early to be etched in stone,
+and any old device trees using it are not really working anyways.
 
+We prefer that this not happen because we have a serious control issue
+when it comes to bindings, but sometimes it happens anyways. Like
+with divorces and other unfortunate stuff like that.
 
--- 
-P?ter
+Rob are you OK with this change?
+
+Yours,
+Linus Walleij
