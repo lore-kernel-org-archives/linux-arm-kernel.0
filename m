@@ -1,26 +1,26 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 14 Mar 2016 22:45:11 -0400 (EDT)
-Subject: [PATCH V2 net 0/6] net: hns: hns driver updates
-In-Reply-To: <56E76BB2.5060203@hisilicon.com>
-References: <1457687446-109867-1-git-send-email-huangdaode@hisilicon.com>
- <56E76BB2.5060203@hisilicon.com>
-Message-ID: <20160314.224511.688178587092115078.davem@davemloft.net>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Tue, 15 Mar 2016 11:58:39 +0900
+Subject: [PATCH v2 0/5] arm64: tegra: fix DT definitions for GM20B GPU
+Message-ID: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daode Huang <huangdaode@hisilicon.com>
-Date: Tue, 15 Mar 2016 09:56:02 +0800
+Small series that fixes/completes DT bindings for Tegra GPUs and add two
+missing entries required for the Tegra210 GPU to operate properly.
 
-> Could you please help me to review this patch set?
+Changes since v1:
+- Renamed "pllg_ref" clock to "ref" in DT bindings
 
-I am not reviewing anything until you guys sort out your submission
-scheme, and resend these fresh using that central maintainer.
+Alexandre Courbot (5):
+  dt-bindings: gk20a: Fix typo in compatible name
+  dt-bindings: gk20a: Document iommus property
+  dt-bindings: Add documentation for GM20B GPU
+  arm64: tegra210: Add reference clock to GM20B
+  arm64: tegra210: Add IOMMU node to GM20B
 
-I am also not the only person in the world who is supposed to review
-all of this stuff, other developers need to help with the review
-process as well.
+ .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 35 +++++++++++++++++++---
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  8 +++--
+ 2 files changed, 37 insertions(+), 6 deletions(-)
 
-So it is never appropriate to ask me, and only me, to review your
-work.
-
-Thanks.
+-- 
+2.7.2
