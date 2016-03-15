@@ -1,47 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Mar 2016 22:37:17 +0100
-Subject: [PATCH] iommu: provide of_xlate pointer unconditionally
-Message-ID: <1458077877-474066-1-git-send-email-arnd@arndb.de>
+Date: Tue, 15 Mar 2016 23:00:05 +0100
+Subject: [OpenWrt-Devel] ARMv4 (not v4t) marked obsolete in gcc-6
+In-Reply-To: <CAKv+Gu-jHrnpkhE-TzA9FXd_tfm0kLKihXH9SpUcexsqEtmsWQ@mail.gmail.com>
+References: <201603101013.04618.arnd@arndb.de> <16727306.4g6uRjH7LT@wuerfel>
+ <CAKv+Gu-jHrnpkhE-TzA9FXd_tfm0kLKihXH9SpUcexsqEtmsWQ@mail.gmail.com>
+Message-ID: <6978344.h5qhGc4ZP2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iommu drivers that support the standard DT bindings use a of_xlate
-callback pointer, but that is only part of struct iommu_ops when
-CONFIG_OF_IOMMU is enabled, leading to build errors in randconfig
-builds when that is not provided:
+On Tuesday 15 March 2016 21:26:08 Ard Biesheuvel wrote:
+> On 15 March 2016 at 16:59, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 11 March 2016 17:56:12 Hans Ulli Kroll wrote:
+> >> On Fri, 11 Mar 2016, Roman Yeryomin wrote:
+> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > index 9fb3fee0e908..3c312d37a83a 100644
+> > --- a/arch/arm/Makefile
+> > +++ b/arch/arm/Makefile
+> > @@ -19,6 +19,11 @@ LDFLAGS_vmlinux      += --be8
+> >  LDFLAGS_MODULE += --be8
+> >  endif
+> >
+> > +ifeq ($(CONFIG_CPU_32v4),y)
+> > +LDFLAGS_vmlinux        += $(call ld-option,--fix-v4bx)
+> > +LDFLAGS_MODULE += $(call ld-option,--fix-v4bx)
+> 
+> Does this have any effect on partial linking? I would expect the
+> module loader to handle the R_ARM_V4BX relocation in this case
 
-drivers/iommu/mtk_iommu.c:497:2: error: unknown field 'of_xlate' specified in initializer
-  .of_xlate = mtk_iommu_of_xlate,
-  ^
-drivers/iommu/mtk_iommu.c:497:14: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-  .of_xlate = mtk_iommu_of_xlate,
-              ^~~~~~~~~~~~~~~~~~
-drivers/iommu/mtk_iommu.c:497:14: note: (near initialization for 'mtk_iommu_ops.domain_get_attr')
+I have checked that the recursive linking stages don't need it for
+the built-in files, only the final link step for vmlinux does.
 
-We can work around it by adding more #ifdefs in each driver, but
-it seems nicer to just allow setting the pointer even if it is
-unused. This makes the driver code look nicer, and it gives better
-compile-time coverage when test building on other architectures.
+For loadable modules, the loader indeed applies the same fix,
+and apparently also does this on ARMv4T and ARMv5 machines even
+when it's not needed there. I think for consistency it makes
+sense to set the flag for both vmlinux and modules (as we
+do for --be8).
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
----
- include/linux/iommu.h | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a5c539fa5d2b..ef7a6ecd8584 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -195,9 +195,7 @@ struct iommu_ops {
- 	/* Get the number of windows per domain */
- 	u32 (*domain_get_windows)(struct iommu_domain *domain);
- 
--#ifdef CONFIG_OF_IOMMU
- 	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
--#endif
- 
- 	unsigned long pgsize_bitmap;
- 	void *priv;
--- 
-2.7.0
+	Arnd
