@@ -1,156 +1,146 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Mar 2016 12:11:41 +0100
-Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
- rk3399
-In-Reply-To: <1458067526-11319-1-git-send-email-david.wu@rock-chips.com>
-References: <1458067526-11319-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <4748955.K1DVHdsoLd@diego>
+From: bert@a20.net (Bert Lindner)
+Date: Wed, 16 Mar 2016 12:19:25 +0100
+Subject: 4.5.0 on sun7i-a20-olinuxino-lime2: libphy: PHY stmmac-0:ffffffff not
+ found (regression from rc7)
+Message-ID: <56E9413D.9010902@a20.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi,
 
-Am Mittwoch, 16. M?rz 2016, 02:45:26 schrieb David Wu:
-> This adds the necessary data for handling io voltage domains on the rk3399.
-> As interesting tidbit, the rk3399 contains two separate iodomain areas.
-> One in the regular General Register Files (GRF) and one in PMUGRF in the
-> pmu power domain.
-> 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
+Hopefully this is the correct place and way to report this.
 
-looks good, so
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+For the board sun7i-a20-olinuxino-lime2, there seems to be a problem 
+with the eth0 PHY in mainline kernel 4.5.0 that developed since 
+4.5.0-rc7. Ethernet does not work, although eth0 is reported:
 
+root at lime2-079f:~# ip a l eth0
+2: eth0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group 
+default qlen 1000
+     link/ether 02:c9:05:02:07:9f brd ff:ff:ff:ff:ff:ff
 
-Heiko
+  Difference reported in dmesg:
 
-> ---
->  .../bindings/power/rockchip-io-domain.txt          | 11 ++++
->  drivers/power/avs/rockchip-io-domain.c             | 58
-> ++++++++++++++++++++++ 2 files changed, 69 insertions(+)
->  mode change 100644 => 100755 drivers/power/avs/rockchip-io-domain.c
-> 
-> diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-> b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt index
-> b8627e7..c84fb47 100644
-> --- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-> +++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-> @@ -35,6 +35,8 @@ Required properties:
->    - "rockchip,rk3288-io-voltage-domain" for rk3288
->    - "rockchip,rk3368-io-voltage-domain" for rk3368
->    - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
-> +  - "rockchip,rk3399-io-voltage-domain" for rk3399
-> +  - "rockchip,rk3399-pmu-io-voltage-domain" for rk3399 pmu-domains
->  - rockchip,grf: phandle to the syscon managing the "general register files"
-> 
-> 
-> @@ -79,6 +81,15 @@ Possible supplies for rk3368 pmu-domains:
->  - pmu-supply:    The supply connected to PMUIO_VDD.
->  - vop-supply:    The supply connected to LCDC_VDD.
-> 
-> +Possible supplies for rk3399:
-> +- bt656-supply:  The supply connected to APIO2_VDD.
-> +- audio-supply:  The supply connected to APIO5_VDD.
-> +- sdmmc-supply:  The supply connected to SDMMC0_VDD.
-> +- gpio1830       The supply connected to APIO4_VDD.
-> +
-> +Possible supplies for rk3399 pmu-domains:
-> +- pmu1830-supply:The supply connected to PMUIO2_VDD.
-> +
->  Example:
-> 
->  	io-domains {
-> diff --git a/drivers/power/avs/rockchip-io-domain.c
-> b/drivers/power/avs/rockchip-io-domain.c old mode 100644
-> new mode 100755
-> index 8099456..8986382
-> --- a/drivers/power/avs/rockchip-io-domain.c
-> +++ b/drivers/power/avs/rockchip-io-domain.c
-> @@ -47,6 +47,10 @@
->  #define RK3368_SOC_CON15_FLASH0		BIT(14)
->  #define RK3368_SOC_FLASH_SUPPLY_NUM	2
-> 
-> +#define RK3399_PMUGRF_CON0		0x180
-> +#define RK3399_PMUGRF_CON0_VSEL		BIT(8)
-> +#define RK3399_PMUGRF_VSEL_SUPPLY_NUM	9
-> +
->  struct rockchip_iodomain;
-> 
->  /**
-> @@ -181,6 +185,25 @@ static void rk3368_iodomain_init(struct
-> rockchip_iodomain *iod) dev_warn(iod->dev, "couldn't update flash0
-> ctrl\n");
->  }
-> 
-> +static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
-> +{
-> +	int ret;
-> +	u32 val;
-> +
-> +	/* if no pmu io supply we should leave things alone */
-> +	if (!iod->supplies[RK3399_PMUGRF_VSEL_SUPPLY_NUM].reg)
-> +		return;
-> +
-> +	/*
-> +	 * set pmu io iodomain to also use this framework
-> +	 * instead of a special gpio.
-> +	 */
-> +	val = RK3399_PMUGRF_CON0_VSEL | (RK3399_PMUGRF_CON0_VSEL << 16);
-> +	ret = regmap_write(iod->grf, RK3399_PMUGRF_CON0, val);
-> +	if (ret < 0)
-> +		dev_warn(iod->dev, "couldn't update pmu io iodomain ctrl\n");
-> +}
-> +
->  /*
->   * On the rk3188 the io-domains are handled by a shared register with the
->   * lower 8 bits being still being continuing drive-strength settings.
-> @@ -252,6 +275,33 @@ static const struct rockchip_iodomain_soc_data
-> soc_data_rk3368_pmu = { },
->  };
-> 
-> +static const struct rockchip_iodomain_soc_data soc_data_rk3399 = {
-> +	.grf_offset = 0xe640,
-> +	.supply_names = {
-> +		"bt656",		/* APIO2_VDD */
-> +		"audio",		/* APIO5_VDD */
-> +		"sdmmc",		/* SDMMC0_VDD */
-> +		"gpio1830",		/* APIO4_VDD */
-> +	},
-> +};
-> +
-> +static const struct rockchip_iodomain_soc_data soc_data_rk3399_pmu = {
-> +	.grf_offset = 0x180,
-> +	.supply_names = {
-> +		NULL,
-> +		NULL,
-> +		NULL,
-> +		NULL,
-> +		NULL,
-> +		NULL,
-> +		NULL,
-> +		NULL,
-> +		NULL,
-> +		"pmu1830",		/* PMUIO2_VDD */
-> +	},
-> +	.init = rk3399_pmu_iodomain_init,
-> +};
-> +
->  static const struct of_device_id rockchip_iodomain_match[] = {
->  	{
->  		.compatible = "rockchip,rk3188-io-voltage-domain",
-> @@ -269,6 +319,14 @@ static const struct of_device_id
-> rockchip_iodomain_match[] = { .compatible =
-> "rockchip,rk3368-pmu-io-voltage-domain",
->  		.data = (void *)&soc_data_rk3368_pmu
->  	},
-> +	{
-> +		.compatible = "rockchip,rk3399-io-voltage-domain",
-> +		.data = (void *)&soc_data_rk3399
-> +	},
-> +	{
-> +		.compatible = "rockchip,rk3399-pmu-io-voltage-domain",
-> +		.data = (void *)&soc_data_rk3399_pmu
-> +	},
->  	{ /* sentinel */ },
->  };
->  MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
+4.5.0-rc7:
+[    9.379279] NET: Registered protocol family 10
+[   10.217148]  RX IPC Checksum Offload disabled
+[   10.217195]  No MAC Management Counters available
+[   10.217627] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+[   15.206250] sun7i-dwmac 1c50000.ethernet eth0: Link is Up - 
+1Gbps/Full - flow control off
+[   15.206360] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+
+4.5.0:
+[    9.767125] NET: Registered protocol family 10
+[   10.357405] libphy: PHY stmmac-0:ffffffff not found
+[   10.362382] eth0: Could not attach to PHY
+[   10.366557] stmmac_open: Cannot attach to PHY (error: -19)
+
+.config is identical for both, also after make oldconfig, apart from 
+comment with version number. DTB file is also identical between the two 
+versions.
+
+Kernels are compiled on the board itself. /proc/version string:
+Linux version 4.5.0-rc7 (root at lime2-079f) (gcc version 4.9.1 
+(Ubuntu/Linaro 4.9.1-16ubuntu6) ) #1 SMP Mon Mar 7 11:57:25 UTC 2016
+Linux version 4.5.0 (root at lime2-079f) (gcc version 4.9.1 (Ubuntu/Linaro 
+4.9.1-16ubuntu6) ) #1 SMP Tue Mar 15 11:39:01 UTC 2016
+
+Please let me know if more info is needed, if I should post complete 
+.config, test compile with a particular config or patch, etc. Part of 
+.config below.
+
+Best,
+
+     -Bert
+
+grep -i 'mac\|eth\|sun[457]' config-4.5.0-rc7
+CONFIG_MAC_PARTITION=y
+# CONFIG_MACH_SUN4I is not set
+# CONFIG_MACH_SUN5I is not set
+# CONFIG_MACH_SUN6I is not set
+CONFIG_MACH_SUN7I=y
+# CONFIG_MACH_SUN8I is not set
+# CONFIG_MACH_SUN9I is not set
+CONFIG_NETFILTER_XT_MATCH_MAC=m
+CONFIG_IP_SET_BITMAP_IPMAC=m
+CONFIG_IP_SET_HASH_MAC=m
+CONFIG_SCTP_DEFAULT_COOKIE_HMAC_MD5=y
+# CONFIG_SCTP_DEFAULT_COOKIE_HMAC_SHA1 is not set
+# CONFIG_SCTP_DEFAULT_COOKIE_HMAC_NONE is not set
+CONFIG_SCTP_COOKIE_HMAC_MD5=y
+# CONFIG_SCTP_COOKIE_HMAC_SHA1 is not set
+CONFIG_L2TP_ETH=m
+CONFIG_MAC80211=m
+CONFIG_MAC80211_HAS_RC=y
+CONFIG_MAC80211_RC_MINSTREL=y
+CONFIG_MAC80211_RC_MINSTREL_HT=y
+CONFIG_MAC80211_RC_MINSTREL_VHT=y
+CONFIG_MAC80211_RC_DEFAULT_MINSTREL=y
+CONFIG_MAC80211_RC_DEFAULT="minstrel_ht"
+CONFIG_MAC80211_MESH=y
+CONFIG_MAC80211_LEDS=y
+# CONFIG_MAC80211_DEBUGFS is not set
+# CONFIG_MAC80211_MESSAGE_TRACING is not set
+# CONFIG_MAC80211_DEBUG_MENU is not set
+CONFIG_MAC80211_STA_HASH_MAX_SIZE=0
+# CONFIG_ATA_OVER_ETH is not set
+# CONFIG_MACVLAN is not set
+# CONFIG_VETH is not set
+CONFIG_ETHERNET=y
+CONFIG_SUN4I_EMAC=m
+# CONFIG_HIX5HD2_GMAC is not set
+# CONFIG_HIP04_ETH is not set
+# CONFIG_ETHOC is not set
+CONFIG_STMMAC_ETH=y
+CONFIG_STMMAC_PLATFORM=y
+CONFIG_DWMAC_GENERIC=m
+CONFIG_DWMAC_IPQ806X=m
+CONFIG_DWMAC_LPC18XX=m
+CONFIG_DWMAC_MESON=m
+CONFIG_DWMAC_ROCKCHIP=m
+CONFIG_DWMAC_SOCFPGA=m
+CONFIG_DWMAC_STI=m
+CONFIG_DWMAC_SUNXI=y
+# CONFIG_SYNOPSYS_DWC_ETH_QOS is not set
+CONFIG_MDIO_SUN4I=m
+# CONFIG_MDIO_BCM_UNIMAC is not set
+# CONFIG_USB_KAWETH is not set
+CONFIG_USB_NET_CDCETHER=m
+# CONFIG_USB_NET_CX82310_ETH is not set
+# CONFIG_USB_IPHETH is not set
+# CONFIG_BRCMSMAC is not set
+# CONFIG_BRCMFMAC is not set
+# CONFIG_MAC80211_HWSIM is not set
+CONFIG_TOUCHSCREEN_SUN4I=m
+CONFIG_SERIO_SUN4I_PS2=y
+CONFIG_SPI_SUN4I=y
+# CONFIG_PINCTRL_SUN4I_A10 is not set
+# CONFIG_PINCTRL_SUN5I_A10S is not set
+# CONFIG_PINCTRL_SUN5I_A13 is not set
+CONFIG_PINCTRL_SUN7I_A20=y
+# CONFIG_FB_MACMODES is not set
+# CONFIG_USB_ETH is not set
+CONFIG_DMA_SUN4I=y
+# CONFIG_DW_DMAC is not set
+CONFIG_SUN4I_TIMER=y
+CONFIG_SUN5I_HSTIMER=y
+CONFIG_PWM_SUN4I=m
+CONFIG_PHY_SUN4I_USB=y
+CONFIG_NLS_MAC_ROMAN=m
+CONFIG_NLS_MAC_CELTIC=m
+CONFIG_NLS_MAC_CENTEURO=m
+CONFIG_NLS_MAC_CROATIAN=m
+CONFIG_NLS_MAC_CYRILLIC=m
+CONFIG_NLS_MAC_GAELIC=m
+CONFIG_NLS_MAC_GREEK=m
+CONFIG_NLS_MAC_ICELAND=m
+CONFIG_NLS_MAC_INUIT=m
+CONFIG_NLS_MAC_ROMANIAN=m
+CONFIG_NLS_MAC_TURKISH=m
+CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
+CONFIG_CRYPTO_CMAC=m
+CONFIG_CRYPTO_HMAC=y
+# CONFIG_CRYPTO_VMAC is not set
+CONFIG_CRYPTO_DRBG_HMAC=y
+# CONFIG_CRYPTO_DEV_SUN4I_SS is not set
