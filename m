@@ -1,83 +1,128 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 16 Mar 2016 21:54:57 +0200
-Subject: [PATCH 3/3] ARM: dts: am43xx: add support for clkout1 clock
-In-Reply-To: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
-References: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1458158097-21137-4-git-send-email-t-kristo@ti.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 16 Mar 2016 20:10:51 +0000
+Subject: [STLinux Kernel] [PATCH v5 7/7] ARM: STiH407: Move over to using
+ the 'reserved-memory' API for obtaining DMA memory
+In-Reply-To: <20160316165526.GZ13692@x1>
+References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
+ <1452602781-22424-8-git-send-email-lee.jones@linaro.org>
+ <20160316163508.GA8396@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160316165526.GZ13692@x1>
+Message-ID: <20160316201051.GA10042@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clkout1 clock node and its generation tree was missing. Add this based
-on the data on TRM and PRCM functional spec.
+Hi Lee,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Tested-by: Benoit Parrot <bparrot@ti.com>
----
- arch/arm/boot/dts/am43xx-clocks.dtsi |   54 ++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+On Wed, 16 Mar 2016, Lee Jones wrote:
 
-diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-index a38af2b..f16ffb5 100644
---- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-@@ -771,4 +771,58 @@
- 		ti,bit-shift = <8>;
- 		reg = <0x8a68>;
- 	};
-+
-+	clkout1_osc_div_ck: clkout1_osc_div_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&sys_clkin_ck>;
-+		ti,bit-shift = <20>;
-+		ti,max-div = <4>;
-+		reg = <0x4100>;
-+	};
-+
-+	clkout1_src2_mux_ck: clkout1_src2_mux_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&clk_rc32k_ck>, <&sysclk_div>, <&dpll_ddr_m2_ck>,
-+			 <&dpll_per_m2_ck>, <&dpll_disp_m2_ck>,
-+			 <&dpll_mpu_m2_ck>;
-+		reg = <0x4100>;
-+	};
-+
-+	clkout1_src2_pre_div_ck: clkout1_src2_pre_div_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&clkout1_src2_mux_ck>;
-+		ti,bit-shift = <4>;
-+		ti,max-div = <8>;
-+		reg = <0x4100>;
-+	};
-+
-+	clkout1_src2_post_div_ck: clkout1_src2_post_div_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,divider-clock";
-+		clocks = <&clkout1_src2_pre_div_ck>;
-+		ti,bit-shift = <8>;
-+		ti,max-div = <32>;
-+		ti,index-power-of-two;
-+		reg = <0x4100>;
-+	};
-+
-+	clkout1_mux_ck: clkout1_mux_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,mux-clock";
-+		clocks = <&clkout1_osc_div_ck>, <&clk_rc32k_ck>,
-+			 <&clkout1_src2_post_div_ck>, <&dpll_extdev_m2_ck>;
-+		ti,bit-shift = <16>;
-+		reg = <0x4100>;
-+	};
-+
-+	clkout1_ck: clkout1_ck {
-+		#clock-cells = <0>;
-+		compatible = "ti,gate-clock";
-+		clocks = <&clkout1_mux_ck>;
-+		ti,bit-shift = <23>;
-+		reg = <0x4100>;
-+	};
- };
--- 
-1.7.9.5
+> On Wed, 16 Mar 2016, Peter Griffin wrote:
+> 
+> > Hi Lee,
+> > 
+> > On Tue, 12 Jan 2016, Lee Jones wrote:
+> > 
+> > > Doing so saves quite a bit of code in the driver.
+> > > 
+> > > For more information on the 'reserved-memory' bindings see:
+> > > 
+> > >   Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> > > 
+> > > Suggested-by: Suman Anna <s-anna@ti.com>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  arch/arm/boot/dts/stih407-family.dtsi | 46 +++++++++++++++++++++++++++++------
+> > >  1 file changed, 38 insertions(+), 8 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> > > index 15c20b6..27b8efc 100644
+> > > --- a/arch/arm/boot/dts/stih407-family.dtsi
+> > > +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> > > @@ -15,6 +15,36 @@
+> > >  	#address-cells = <1>;
+> > >  	#size-cells = <1>;
+> > >  
+> > > +	reserved-memory {
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <1>;
+> > > +		ranges;
+> > > +
+> > > +		gp0_reserved: rproc at 40000000 {
+> > > +			compatible = "shared-dma-pool";
+> > > +			reg = <0x40000000 0x01000000>;
+> > > +			no-map;
+> > > +		};
+> > > +
+> > > +		gp1_reserved: rproc at 41000000 {
+> > > +			compatible = "shared-dma-pool";
+> > > +			reg = <0x41000000 0x01000000>;
+> > > +			no-map;
+> > > +		};
+> > > +
+> > > +		audio_reserved: rproc at 42000000 {
+> > > +			compatible = "shared-dma-pool";
+> > > +			reg = <0x42000000 0x01000000>;
+> > > +			no-map;
+> > > +		};
+> > > +
+> > > +		dmu_reserved: rproc at 43000000 {
+> > > +			compatible = "shared-dma-pool";
+> > > +			reg = <0x43000000 0x01000000>;
+> > > +			no-map;
+> > > +		};
+> > 
+> > I don't believe these reserved memory ranges are correct for audio_reserved and dmu_reserved.
+> > 
+> > For example my vid_firmware-stih407.elf is linked at 0x41c00000 base address and my
+> > audio_firmware-bd-stih407.elf is linked at 0x40c00000.
+> > 
+> > So with all the st231 rproc nodes enabled I guess it would still work. But
+> > currently I think st231_gp0 is reserving the memory region for st231_audio,
+> > and st231-gp1 is reserving the memory region for st231_dmu.
+> 
+> These addresses are taken from internally tested code. 
+
+Yes I did check the internal kernel, it would appear to be wrong there as
+well. One of the joys of mailing list code review I guess :-)
+
+> I don't have
+> access to the LMI layout documentation (if it even exists) so can't
+> check for myself.
+
+>  Isn't this just DDR anyway? 
+
+Yes it is DDR
+
+> So in theory we can
+> configure each devices' slice where ever we feel is appropriate? 
+
+Nope. The st231 audio and video firmwares are provided by ST as binary blobs and
+aren't AFAIK compiled as position independent code. So the reserved-memory region
+needs to match where the firmware has been linked to run from.
+
+> How
+> is memory allocated to the DMU and Audio drivers?  Do you have scripts
+> which link the aforementioned binaries?
+
+I don't have any scripts, firmware source code or even a st200 toolset.
+
+> 
+> If you think there is an issue, I suggest the best thing to do is ping
+> Ludovic, since he is the author of the original code.
+
+Ok I will ping Ludovic and point him at this thread.
+
+I think maybe the internal kernel rproc driver was only used to reserve memory,
+manage clocks, and co-processor reset / power lines, and multicom actually
+loaded the firmware elf file.
+
+The reason for coming to that conclusion is that if rproc driver was loading the
+firmware I can't see how you would end up with a correctly booted co-processor
+with a reserved-memory node which doesn't match up with where the firmware is linked to
+run from.
+
+Did you manage to boot audio or video co-pro successfully with the dt nodes as
+they currently are in this patch?
+
+regards,
+
+Peter.
