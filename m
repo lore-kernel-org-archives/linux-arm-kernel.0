@@ -1,62 +1,54 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 16 Mar 2016 14:57:34 +0100
-Subject: [PATCH v2 0/9] drm: atmel-hlcdc: various fixes/improvements
-Message-ID: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Wed, 16 Mar 2016 14:57:42 +0100
+Subject: [PATCH v2 8/9] drm: atmel-hlcdc: check display mode validity in
+ crtc->mode_fixup()
+In-Reply-To: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1458136663-21396-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Move the adjusted display mode check into ->mode_fixup().
 
-This series is a collection of fixes and improvements for the
-atmel-hlcdc driver.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-The main feature added here is the support for external RGB -> XXX
-bridges (patch 6 and 7).
-
-The first patch is a fix preventing a potential memory leak.
-Patch 2 is adding support for asynchronous mode setting, which was
-supported before the migration to atomic mode setting.
-
-Patch 3 is just a minor fix to expose the real encoder and connector
-types (we are currently exposing an LVDS encoder/connector, which is
-wrong since the display controller output the pixel stream in raw
-RGB).
-
-Patch 4 is removing useless fields and functions which were left
-when moving to atomic modesetting.
-
-Patch 8 is just a cosmetic patch moving the mode checking code
-from ->atomic_check() to ->mode_fixup().
-
-Patch 9 is increasing HLCDC bandwidth by making use of the two AHB
-interfaces.
-
-Best Regards,
-
-Boris
-
-Changes since v1:
-- Add Nicolas Reviewed/Teste/Acked-by tags
-- Add a patch to increase HLCDC bandwidth by using both AHB interfaces
-
-Boris Brezillon (9):
-  drm: atmel-hlcdc: add a ->cleanup_fb() operation
-  drm: atmel-hlcdc: support asynchronous atomic commit operations
-  drm: atmel-hlcdc: fix connector and encoder types
-  drm: atmel-hlcdc: remove leftovers from atomic mode setting migration
-  drm: atmel-hlcdc: support extended timing ranges on sama5d4 and
-    sama5d2
-  drm: atmel-hlcdc: move output mode selection in CRTC implementation
-  drm: atmel-hlcdc: rework the output code to support drm bridges
-  drm: atmel-hlcdc: check display mode validity in crtc->mode_fixup()
-  drm: atmel-hlcdc: route DMA accesses through AHB interfaces
-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 154 +++++++++++++-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 123 ++++++++++-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  17 ++
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 249 ++++++++++-------------
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  65 +++++-
- 5 files changed, 447 insertions(+), 161 deletions(-)
-
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index 12ec204..cbba029 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -142,11 +142,13 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+ 			   cfg);
+ }
+ 
+-static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *crtc,
++static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *c,
+ 					const struct drm_display_mode *mode,
+ 					struct drm_display_mode *adjusted_mode)
+ {
+-	return true;
++	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
++
++	return atmel_hlcdc_dc_mode_valid(crtc->dc, adjusted_mode) == MODE_OK;
+ }
+ 
+ static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
+@@ -311,12 +313,8 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+ static int atmel_hlcdc_crtc_atomic_check(struct drm_crtc *c,
+ 					 struct drm_crtc_state *s)
+ {
+-	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
+ 	int ret;
+ 
+-	if (atmel_hlcdc_dc_mode_valid(crtc->dc, &s->adjusted_mode) != MODE_OK)
+-		return -EINVAL;
+-
+ 	ret = atmel_hlcdc_crtc_select_output_mode(s);
+ 	if (ret)
+ 		return ret;
 -- 
 2.5.0
