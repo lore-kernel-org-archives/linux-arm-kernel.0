@@ -1,32 +1,36 @@
 From: ashoks@broadcom.com (Ashok Kumar)
-Date: Wed, 16 Mar 2016 06:01:44 -0700
-Subject: [PATCH 0/5] arm64: perf: Broadcom Vulcan PMU support
-Message-ID: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
+Date: Wed, 16 Mar 2016 06:01:49 -0700
+Subject: [PATCH 5/5] Documentation: arm64: pmu: Add Broadcom Vulcan PMU binding
+In-Reply-To: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
+References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
+Message-ID: <1458133309-17045-6-git-send-email-ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Broadcom Vulcan PMU. It supports most of the
-ARMv8 recommended implementation defined events.
+Document the compatible string for Broadcom Vulcan PMU.
+Also arranged the list in alphabetical order.
 
-Added macros for complete ARMv8 recommended implementation defined events.
+Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+---
+ Documentation/devicetree/bindings/arm/pmu.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Cleaned up event naming convention for uniformity.
-
-This patchset is created against linux-next. 
-
-
-Ashok Kumar (5):
-  arm64/perf: Changed events naming convention for uniformity
-  arm64/perf: Define complete ARMv8 recommended implementation defined
-    events
-  arm64/perf: Add Broadcom Vulcan PMU support
-  arm64: dts: Add Broadcom Vulcan PMU in dts
-  Documentation: arm64: pmu: Add Broadcom Vulcan PMU binding
-
- Documentation/devicetree/bindings/arm/pmu.txt |   3 +-
- arch/arm64/boot/dts/broadcom/vulcan.dtsi      |   2 +-
- arch/arm64/kernel/perf_event.c                | 537 +++++++++++++++++++++-----
- 3 files changed, 438 insertions(+), 104 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+index d3999a1..b73a7c7 100644
+--- a/Documentation/devicetree/bindings/arm/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/pmu.txt
+@@ -22,10 +22,11 @@ Required properties:
+ 	"arm,arm11mpcore-pmu"
+ 	"arm,arm1176-pmu"
+ 	"arm,arm1136-pmu"
++	"brcm,vulcan-pmu"
++	"cavium,thunder-pmu"
+ 	"qcom,scorpion-pmu"
+ 	"qcom,scorpion-mp-pmu"
+ 	"qcom,krait-pmu"
+-	"cavium,thunder-pmu"
+ - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+                interrupt (PPI) then 1 interrupt should be specified.
+ 
 -- 
 2.1.0
