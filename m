@@ -1,65 +1,104 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Mar 2016 12:24:56 -0700
-Subject: [PATCH 2/8] dmaengine: bcm2835: remove unnecessary masking of dma
- channels
+Date: Wed, 16 Mar 2016 12:24:57 -0700
+Subject: [PATCH 3/8] dmaengine: bcm2835: add additional defines for
+ DMA-registers
 In-Reply-To: <1458156302-4359-1-git-send-email-eric@anholt.net>
 References: <1458156302-4359-1-git-send-email-eric@anholt.net>
-Message-ID: <1458156302-4359-3-git-send-email-eric@anholt.net>
+Message-ID: <1458156302-4359-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-The original patch contained 3 dma channels that were masked out.
-
-These - as far as research and discussions show - are a
-artefacts remaining from the downstream legacy dma-api.
-
-Right now down-stream still includes a legacy api used only
-in a single (downstream only) driver (bcm2708_fb) that requires
-2D DMA for speedup (DMA-channel 0).
-Formerly the sd-card support driver also was using this legacy
-api (DMA-channel 2), but since has been moved over to use
-dmaengine directly.
-
-The DMA-channel 3 is already masked out in the devicetree in
-the default property "brcm,dma-channel-mask = <0x7f35>;"
-
-So we can remove the whole masking of DMA channels.
+Add additional defines describing the DMA registers
+as well as adding some more documentation to those registers.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/dma/bcm2835-dma.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ drivers/dma/bcm2835-dma.c | 57 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 49 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 2d72fe8..e4ca980 100644
+index e4ca980..a1d851a 100644
 --- a/drivers/dma/bcm2835-dma.c
 +++ b/drivers/dma/bcm2835-dma.c
-@@ -123,9 +123,6 @@ struct bcm2835_desc {
- #define BCM2835_DMA_DATA_TYPE_S32	4
- #define BCM2835_DMA_DATA_TYPE_S128	16
+@@ -97,26 +97,67 @@ struct bcm2835_desc {
  
--#define BCM2835_DMA_BULK_MASK	BIT(0)
--#define BCM2835_DMA_FIQ_MASK	(BIT(2) | BIT(3))
--
- /* Valid only for channels 0 - 14, 15 has its own base address */
- #define BCM2835_DMA_CHAN(n)	((n) << 8) /* Base address */
- #define BCM2835_DMA_CHANIO(base, n) ((base) + BCM2835_DMA_CHAN(n))
-@@ -641,12 +638,6 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
- 		goto err_no_dma;
- 	}
+ #define BCM2835_DMA_CS		0x00
+ #define BCM2835_DMA_ADDR	0x04
++#define BCM2835_DMA_TI		0x08
+ #define BCM2835_DMA_SOURCE_AD	0x0c
+ #define BCM2835_DMA_DEST_AD	0x10
+-#define BCM2835_DMA_NEXTCB	0x1C
++#define BCM2835_DMA_LEN		0x14
++#define BCM2835_DMA_STRIDE	0x18
++#define BCM2835_DMA_NEXTCB	0x1c
++#define BCM2835_DMA_DEBUG	0x20
  
--	/*
--	 * Do not use the FIQ and BULK channels,
--	 * because they are used by the GPU.
--	 */
--	chans_available &= ~(BCM2835_DMA_FIQ_MASK | BCM2835_DMA_BULK_MASK);
+ /* DMA CS Control and Status bits */
+-#define BCM2835_DMA_ACTIVE	BIT(0)
+-#define BCM2835_DMA_INT	BIT(2)
++#define BCM2835_DMA_ACTIVE	BIT(0)  /* activate the DMA */
++#define BCM2835_DMA_END		BIT(1)  /* current CB has ended */
++#define BCM2835_DMA_INT		BIT(2)  /* interrupt status */
++#define BCM2835_DMA_DREQ	BIT(3)  /* DREQ state */
+ #define BCM2835_DMA_ISPAUSED	BIT(4)  /* Pause requested or not active */
+ #define BCM2835_DMA_ISHELD	BIT(5)  /* Is held by DREQ flow control */
+-#define BCM2835_DMA_ERR	BIT(8)
++#define BCM2835_DMA_WAITING_FOR_WRITES BIT(6) /* waiting for last
++					       * AXI-write to ack
++					       */
++#define BCM2835_DMA_ERR		BIT(8)
++#define BCM2835_DMA_PRIORITY(x) ((x & 15) << 16) /* AXI priority */
++#define BCM2835_DMA_PANIC_PRIORITY(x) ((x & 15) << 20) /* panic priority */
++/* current value of TI.BCM2835_DMA_WAIT_RESP */
++#define BCM2835_DMA_WAIT_FOR_WRITES BIT(28)
++#define BCM2835_DMA_DIS_DEBUG	BIT(29) /* disable debug pause signal */
+ #define BCM2835_DMA_ABORT	BIT(30) /* Stop current CB, go to next, WO */
+ #define BCM2835_DMA_RESET	BIT(31) /* WO, self clearing */
+ 
++/* Transfer information bits - also bcm2835_cb.info field */
+ #define BCM2835_DMA_INT_EN	BIT(0)
++#define BCM2835_DMA_TDMODE	BIT(1) /* 2D-Mode */
++#define BCM2835_DMA_WAIT_RESP	BIT(3) /* wait for AXI-write to be acked */
+ #define BCM2835_DMA_D_INC	BIT(4)
+-#define BCM2835_DMA_D_DREQ	BIT(6)
++#define BCM2835_DMA_D_WIDTH	BIT(5) /* 128bit writes if set */
++#define BCM2835_DMA_D_DREQ	BIT(6) /* enable DREQ for destination */
++#define BCM2835_DMA_D_IGNORE	BIT(7) /* ignore destination writes */
+ #define BCM2835_DMA_S_INC	BIT(8)
+-#define BCM2835_DMA_S_DREQ	BIT(10)
 -
- 	for (i = 0; i < pdev->num_resources; i++) {
- 		irq = platform_get_irq(pdev, i);
- 		if (irq < 0)
+-#define BCM2835_DMA_PER_MAP(x)	((x) << 16)
++#define BCM2835_DMA_S_WIDTH	BIT(9) /* 128bit writes if set */
++#define BCM2835_DMA_S_DREQ	BIT(10) /* enable SREQ for source */
++#define BCM2835_DMA_S_IGNORE	BIT(11) /* ignore source reads - read 0 */
++#define BCM2835_DMA_BURST_LENGTH(x) ((x & 15) << 12)
++#define BCM2835_DMA_PER_MAP(x)	((x & 31) << 16) /* REQ source */
++#define BCM2835_DMA_WAIT(x)	((x & 31) << 21) /* add DMA-wait cycles */
++#define BCM2835_DMA_NO_WIDE_BURSTS BIT(26) /* no 2 beat write bursts */
++
++/* debug register bits */
++#define BCM2835_DMA_DEBUG_LAST_NOT_SET_ERR	BIT(0)
++#define BCM2835_DMA_DEBUG_FIFO_ERR		BIT(1)
++#define BCM2835_DMA_DEBUG_READ_ERR		BIT(2)
++#define BCM2835_DMA_DEBUG_OUTSTANDING_WRITES_SHIFT 4
++#define BCM2835_DMA_DEBUG_OUTSTANDING_WRITES_BITS 4
++#define BCM2835_DMA_DEBUG_ID_SHIFT		16
++#define BCM2835_DMA_DEBUG_ID_BITS		9
++#define BCM2835_DMA_DEBUG_STATE_SHIFT		16
++#define BCM2835_DMA_DEBUG_STATE_BITS		9
++#define BCM2835_DMA_DEBUG_VERSION_SHIFT		25
++#define BCM2835_DMA_DEBUG_VERSION_BITS		3
++#define BCM2835_DMA_DEBUG_LITE			BIT(28)
++
++/* shared registers for all dma channels */
++#define BCM2835_DMA_INT_STATUS         0xfe0
++#define BCM2835_DMA_ENABLE             0xff0
+ 
+ #define BCM2835_DMA_DATA_TYPE_S8	1
+ #define BCM2835_DMA_DATA_TYPE_S16	2
 -- 
 2.7.0
