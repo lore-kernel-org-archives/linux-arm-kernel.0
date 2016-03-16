@@ -1,62 +1,72 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Mar 2016 14:06:55 +0100
-Subject: [PATCH 0/8] drm: atmel-hlcdc: various fixes/improvements
-In-Reply-To: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <56E95A6F.5070003@atmel.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 16 Mar 2016 08:06:22 -0500
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <20160316100759.GA18387@arm.com>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+ <20160316100759.GA18387@arm.com>
+Message-ID: <56E95A4E.4050709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/01/2016 11:19, Boris Brezillon a ?crit :
-> Hello,
-> 
-> This series is a collection of fixes and improvements for the
-> atmel-hlcdc driver.
-> 
-> The main feature added here is the support for external RGB -> XXX
-> bridges (patch 6 and 7).
-> 
-> The first patch is a fix preventing a potential memory leak.
-> Patch 2 is adding support for asynchronous mode setting, which was
-> supported before the migration to atomic mode setting.
-> 
-> Patch 3 is just a minor fix to expose the real encoder and connector
-> types (we are currently exposing an LVDS encoder/connector, which is
-> wrong since the display controller output the pixel stream in raw
-> RGB).
-> 
-> Patch 4 is removing useless fields and functions which were left
-> when moving to atomic modesetting.
-> 
-> And patch 8 is just a cosmetic patch moving the mode checking code
-> from ->atomic_check() to ->mode_fixup().
+Will Deacon wrote:
+> [adding Cavium folk and Timur]
+>
+> On Wed, Mar 16, 2016 at 05:32:23PM +0800, Ganesh Mahendran wrote:
+>> Reverts commit 97303480753e ("arm64: Increase the max granular size").
+>>
+>> The commit 97303480753e ("arm64: Increase the max granular size") will
+>> degrade system performente in some cpus.
+>>
+>> We test wifi network throughput with iperf on Qualcomm msm8996 CPU:
+>> ----------------
+>> run on host:
+>>    # iperf -s
+>> run on device:
+>>    # iperf -c <device-ip-addr> -t 100 -i 1
+>> ----------------
+>>
+>> Test result:
+>> ----------------
+>> with commit 97303480753e ("arm64: Increase the max granular size"):
+>>      172MBits/sec
+>>
+>> without commit 97303480753e ("arm64: Increase the max granular size"):
+>>      230MBits/sec
+>> ----------------
+>>
+>> Some module like slab/net will use the L1_CACHE_SHIFT, so if we do not
+>> set the parameter correctly, it may affect the system performance.
+>>
+>> So revert the commit.
+>
+> Unfortunately, the original patch is required to support the 128-byte L1
+> cache lines of Cavium ThunderX, so we can't simply revert it like this.
+> Similarly, the desire for a single, multiplatform kernel image prevents
+> us from reasonably fixing this at compile time to anything other than
+> the expected maximum value.
+>
+> Furthermore, Timur previously said that the change is also required
+> "on our [Qualcomm] silicon", but I'm not sure if this is msm9886 or not:
+>
+> http://lkml.kernel.org/r/CAOZdJXUiRMAguDV+HEJqPg57MyBNqEcTyaH+ya=U93NHb-pdJA at mail.gmail.com
 
-To give more weight to this series, you can also add my:
+I was talking about our server part, the QDF2432.  At the time, I wasn't 
+allowed to mention it by name.
 
-Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> You could look into making ARCH_DMA_MINALIGN a runtime value, but that
+> looks like an uphill struggle to me. Alternatively, we could only warn
+> if the CWG is bigger than L1_CACHE_BYTES *and* we have a non-coherent
+> DMA master, but that doesn't solve any performance issues from having
+> things like locks sharing cachelines, not that I think we ever got any
+> data on that (afaik, we don't pad locks to cacheline boundaries anyway).
+> I'm also not sure what it would mean for PCI NoSnoop transactions.
 
-Bye,
-
-
-> Boris Brezillon (8):
->   drm: atmel-hlcdc: add a ->cleanup_fb() operation
->   drm: atmel-hlcdc: support asynchronous atomic commit operations
->   drm: atmel-hlcdc: fix connector and encoder types
->   drm: atmel-hlcdc: remove leftovers from atomic mode setting migration
->   drm: atmel-hlcdc: support extended timing ranges on sama5d4 and
->     sama5d2
->   drm: atmel-hlcdc: move output mode selection in CRTC implementation
->   drm: atmel-hlcdc: rework the output code to support drm bridges
->   drm: atmel-hlcdc: check display mode validity in crtc->mode_fixup()
-> 
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 148 +++++++++++++-
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 123 ++++++++++-
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  16 ++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 249 ++++++++++-------------
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  22 +-
->  5 files changed, 400 insertions(+), 158 deletions(-)
-> 
+Our internal version of this patch made it a Kconfig option.  Perhaps 
+that would at least be an improvement over just reverting it?  We 
+already have to have our own defconfig for the QDF2432.
 
 
 -- 
-Nicolas Ferre
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
