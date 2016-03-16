@@ -1,31 +1,54 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Wed, 16 Mar 2016 06:01:48 -0700
-Subject: [PATCH 4/5] arm64: dts: Add Broadcom Vulcan PMU in dts
-In-Reply-To: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
-References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <1458133309-17045-5-git-send-email-ashoks@broadcom.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 Mar 2016 14:03:47 +0100
+Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
+ pinctrl_{register, unregister}
+In-Reply-To: <56E80D3F.3090300@nvidia.com>
+References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
+ <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
+ <56D307CC.2050202@nvidia.com> <56E031CA.9010204@nvidia.com>
+ <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
+ <56E80D3F.3090300@nvidia.com>
+Message-ID: <CACRpkdYr8BiVMEU8uvnrXzTLDEcAjrujgJPJVKXAq5E5P=HzFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "brcm,vulcan-pmu" compatible string for Broadcom Vulcan PMU.
+On Tue, Mar 15, 2016 at 2:25 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+> On Tuesday 15 March 2016 02:01 PM, Linus Walleij wrote:
+>> On Wed, Mar 9, 2016 at 3:23 PM, Laxman Dewangan <ldewangan@nvidia.com>
+>> wrote:
+>>
+>>>> Pushed the change at:
+>>>> Branch "devm_pinctrl_register" of
+>>>> https://github.com/ldewangan/linux-upstream.git.
+>>>>
+>>>> Base repo is
+>>>> for-next of
+>>>> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
+>>>>
+>>>>
+>>>> If required, I can send the V2 version of list with acks.
+>>>
+>>> Let me know if I need to send full series (V2 with collected ack) again
+>>> or
+>>> fine to pull it from above location.
+>>
+>> Please collect the ACKs on your branch and ask me to pull it after
+>> v4.6-rc1.
+>> No need to resend the patches.
+>>
+>> Unfortunately it arrived too late for the merge window, but hey: we got
+>> the
+>> devm gpiochip in for v4.6.
+>
+>
+> Thanks for taking the GPIO patches.
+>
+> Ok, We will do pincontrol post v4.6 and probably, we will have some more
+> chnages for using devm_gpio in pincontrol subsystem  as these APIs will be
+> available  publicly.
 
-Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/vulcan.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Awesome, then we get double the reduction in most cases, this
+will look nice. Let's proceed like this.
 
-diff --git a/arch/arm64/boot/dts/broadcom/vulcan.dtsi b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-index 85820e2..34e11a9 100644
---- a/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
-@@ -86,7 +86,7 @@
- 	};
- 
- 	pmu {
--		compatible = "arm,armv8-pmuv3";
-+		compatible = "brcm,vulcan-pmu", "arm,armv8-pmuv3";
- 		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>; /* PMU overflow */
- 	};
- 
--- 
-2.1.0
+Yours,
+Linus Walleij
