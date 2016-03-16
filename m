@@ -1,123 +1,96 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Mar 2016 12:25:00 -0700
-Subject: [PATCH 6/8] dmaengine: bcm2835: limit max length based on channel type
+Date: Wed, 16 Mar 2016 12:25:02 -0700
+Subject: [PATCH 8/8] dmaengine: bcm2835: add dma_memcopy support to bcm2835-dma
 In-Reply-To: <1458156302-4359-1-git-send-email-eric@anholt.net>
 References: <1458156302-4359-1-git-send-email-eric@anholt.net>
-Message-ID: <1458156302-4359-7-git-send-email-eric@anholt.net>
+Message-ID: <1458156302-4359-9-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-The bcm2835 dma system has 2 basic types of dma-channels:
-* "normal" channels
-* "light" channels
+Also added check for an error condition in bcm2835_dma_create_cb_chain
+that showed up during development of this patch.
 
-Lite channels are limited in several aspects:
-* internal data-structure is 128 bit (not 256)
-* does not support BCM2835_DMA_TDMODE (2D)
-* DMA length register is limited to 16 bit.
-  so 0-65535 (not 0-65536 as mentioned in the official datasheet)
-* BCM2835_DMA_S/D_IGNORE are not supported
-
-The detection of the type of mode is implemented by looking at
-the LITE bit in the DEBUG register for each channel.
-This allows automatic detection.
-
-Based on this the maximum block size is set to (64K - 4) or to 1G
-and this limit is honored during generation of control block
-chains. The effect is that when a LITE channel is used more
-control blocks are used to do the same transfer (compared
-to a normal channel).
-
-As there are several sources/target DREQS that are 32 bit wide
-we need to have the transfer to be a multiple of 4 as this would
-break the transfer otherwise.
-
-This is why the limit of (64K - 4) was chosen over the
-alternative of (64K - 4K).
+Tested using dmatest for all enabled channels.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/dma/bcm2835-dma.c | 29 ++++++++++++++++++++++++++---
- 1 file changed, 26 insertions(+), 3 deletions(-)
+ drivers/dma/bcm2835-dma.c | 36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 4db0e23..59c5ef3 100644
+index b46b12f..cc771cd 100644
 --- a/drivers/dma/bcm2835-dma.c
 +++ b/drivers/dma/bcm2835-dma.c
-@@ -81,6 +81,8 @@ struct bcm2835_chan {
+@@ -310,6 +310,9 @@ static struct bcm2835_desc *bcm2835_dma_create_cb_chain(
+ 	struct bcm2835_cb_entry *cb_entry;
+ 	struct bcm2835_dma_cb *control_block;
  
- 	void __iomem *chan_base;
- 	int irq_number;
++	if (!frames)
++		return NULL;
 +
-+	bool is_lite_channel;
- };
- 
- struct bcm2835_desc {
-@@ -169,6 +171,16 @@ struct bcm2835_desc {
- #define BCM2835_DMA_CHAN(n)	((n) << 8) /* Base address */
- #define BCM2835_DMA_CHANIO(base, n) ((base) + BCM2835_DMA_CHAN(n))
- 
-+/* the max dma length for different channels */
-+#define MAX_DMA_LEN SZ_1G
-+#define MAX_LITE_DMA_LEN (SZ_64K - 4)
-+
-+static inline size_t bcm2835_dma_max_frame_length(struct bcm2835_chan *c)
-+{
-+	/* lite and normal channels have different max frame length */
-+	return c->is_lite_channel ? MAX_LITE_DMA_LEN : MAX_DMA_LEN;
-+}
-+
- /* how many frames of max_len size do we need to transfer len bytes */
- static inline size_t bcm2835_dma_frames_for_length(size_t len,
- 						   size_t max_len)
-@@ -217,8 +229,10 @@ static void bcm2835_dma_create_cb_set_length(
- 	size_t *total_len,
- 	u32 finalextrainfo)
- {
--	/* set the length */
--	control_block->length = len;
-+	size_t max_len = bcm2835_dma_max_frame_length(chan);
-+
-+	/* set the length taking lite-channel limitations into account */
-+	control_block->length = min_t(u32, len, max_len);
- 
- 	/* finished if we have no period_length */
- 	if (!period_len)
-@@ -544,6 +558,7 @@ static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
- 	dma_addr_t src, dst;
- 	u32 info = BCM2835_DMA_WAIT_RESP;
- 	u32 extra = BCM2835_DMA_INT_EN;
-+	size_t max_len = bcm2835_dma_max_frame_length(c);
- 	size_t frames;
- 
- 	/* Grab configuration */
-@@ -586,7 +601,10 @@ static struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_cyclic(
- 	}
- 
- 	/* calculate number of frames */
--	frames = DIV_ROUND_UP(buf_len, period_len);
-+	frames = /* number of periods */
-+		 DIV_ROUND_UP(buf_len, period_len) *
-+		 /* number of frames per period */
-+		 bcm2835_dma_frames_for_length(period_len, max_len);
- 
- 	/*
- 	 * allocate the CB chain
-@@ -685,6 +703,11 @@ static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
- 	c->ch = chan_id;
- 	c->irq_number = irq;
- 
-+	/* check in DEBUG register if this is a LITE channel */
-+	if (readl(c->chan_base + BCM2835_DMA_DEBUG) &
-+		BCM2835_DMA_DEBUG_LITE)
-+		c->is_lite_channel = true;
-+
- 	return 0;
+ 	/* allocate and setup the descriptor. */
+ 	d = kzalloc(sizeof(*d) + frames * sizeof(struct bcm2835_cb_entry),
+ 		    gfp);
+@@ -597,6 +600,34 @@ static void bcm2835_dma_issue_pending(struct dma_chan *chan)
+ 	spin_unlock_irqrestore(&c->vc.lock, flags);
  }
  
++struct dma_async_tx_descriptor *bcm2835_dma_prep_dma_memcpy(
++	struct dma_chan *chan, dma_addr_t dst, dma_addr_t src,
++	size_t len, unsigned long flags)
++{
++	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
++	struct bcm2835_desc *d;
++	u32 info = BCM2835_DMA_D_INC | BCM2835_DMA_S_INC;
++	u32 extra = BCM2835_DMA_INT_EN | BCM2835_DMA_WAIT_RESP;
++	size_t max_len = bcm2835_dma_max_frame_length(c);
++	size_t frames;
++
++	/* if src, dst or len is not given return with an error */
++	if (!src || !dst || !len)
++		return NULL;
++
++	/* calculate number of frames */
++	frames = bcm2835_dma_frames_for_length(len, max_len);
++
++	/* allocate the CB chain - this also fills in the pointers */
++	d = bcm2835_dma_create_cb_chain(chan, DMA_MEM_TO_MEM, false,
++					info, extra, frames,
++					src, dst, len, 0, GFP_KERNEL);
++	if (!d)
++		return NULL;
++
++	return vchan_tx_prep(&c->vc, &d->vd, flags);
++}
++
+ static struct dma_async_tx_descriptor *bcm2835_dma_prep_slave_sg(
+ 	struct dma_chan *chan,
+ 	struct scatterlist *sgl, unsigned int sg_len,
+@@ -880,17 +911,20 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 	dma_cap_set(DMA_PRIVATE, od->ddev.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, od->ddev.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, od->ddev.cap_mask);
++	dma_cap_set(DMA_MEMCPY, od->ddev.cap_mask);
+ 	od->ddev.device_alloc_chan_resources = bcm2835_dma_alloc_chan_resources;
+ 	od->ddev.device_free_chan_resources = bcm2835_dma_free_chan_resources;
+ 	od->ddev.device_tx_status = bcm2835_dma_tx_status;
+ 	od->ddev.device_issue_pending = bcm2835_dma_issue_pending;
+ 	od->ddev.device_prep_dma_cyclic = bcm2835_dma_prep_dma_cyclic;
+ 	od->ddev.device_prep_slave_sg = bcm2835_dma_prep_slave_sg;
++	od->ddev.device_prep_dma_memcpy = bcm2835_dma_prep_dma_memcpy;
+ 	od->ddev.device_config = bcm2835_dma_slave_config;
+ 	od->ddev.device_terminate_all = bcm2835_dma_terminate_all;
+ 	od->ddev.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+ 	od->ddev.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	od->ddev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV) |
++			      BIT(DMA_MEM_TO_MEM);
+ 	od->ddev.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+ 	od->ddev.dev = &pdev->dev;
+ 	INIT_LIST_HEAD(&od->ddev.channels);
 -- 
 2.7.0
