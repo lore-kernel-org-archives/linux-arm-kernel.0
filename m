@@ -1,68 +1,126 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 16 Mar 2016 13:14:26 -0500
-Subject: [PATCH 3/5] ARM: davinci: da8xx: add cfgchip2 to resources
-In-Reply-To: <56E99A16.9020709@cogentembedded.com>
-References: <1458081473-8223-1-git-send-email-david@lechnology.com>
- <1458081473-8223-3-git-send-email-david@lechnology.com>
- <56E8906E.7070800@cogentembedded.com> <56E8D720.7000508@lechnology.com>
- <56E8E7C7.70901@lechnology.com> <56E99A16.9020709@cogentembedded.com>
-Message-ID: <56E9A282.7030103@lechnology.com>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Wed, 16 Mar 2016 14:19:58 -0400
+Subject: [PATCH v11 12/13] arm64: factor work_pending state machine to C
+In-Reply-To: <1457734223-26209-13-git-send-email-cmetcalf@mellanox.com>
+References: <1457734223-26209-1-git-send-email-cmetcalf@mellanox.com>
+ <1457734223-26209-13-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <56E9A3CE.2040209@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2016 12:38 PM, Sergei Shtylyov wrote:
-> On 03/16/2016 07:57 AM, David Lechner wrote:
+Just wanted to ping this one part of the patch series that hopefully
+could be picked up in time for the 4.6 rc1 merge window, even if
+the rest of the patch series ends up taking longer to get through.
+Will, does that seem like something worth trying to do?
+
+I'm hoping that the performance issues you saw with Mark's
+original patch are improved with this version, which still tests
+the TIF flags prior to calling out to the loop in C code.
+
+Thanks!
+
+On 03/11/2016 05:10 PM, Chris Metcalf wrote:
+> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+> state machine that can be difficult to reason about due to duplicated
+> code and a large number of branch targets.
 >
->> Also, I am not finding any existing data structure to pass the musb
->> set_mode
->> function to the phy in either usb_phy or usb_otg. Setting the mode
->> (host/peripheral/otg) is done in the same PHY register, so it seems
->> like it
->> should be implemented in the new phy driver as well.
+> This patch factors the common logic out into the existing
+> do_notify_resume function, converting the code to C in the process,
+> making the code more legible.
 >
->     Perhaps we'd have to sacrifice that functionality...
-
-The device I am working on (LEGO MINDSTORMS EV3) has the port wired as 
-peripheral only, so I don't think leaving this out is an option. Leaving 
-it in OTG mode doesn't work because the required electrical connections 
-are just not there.
-
->> I guess I could use a generic phy instead and use phy_set_drvdata() to
->> share
->> data between the phy driver and the musb driver. Does this sound like a
->> reasonable thing to do?
+> This patch tries to closely mirror the existing behaviour while using
+> the usual C control flow primitives. As local_irq_{disable,enable} may
+> be instrumented, we balance exception entry (where we will almost most
+> likely enable IRQs) with a call to trace_hardirqs_on just before the
+> return to userspace.
 >
->     Not sure what you mean, could you elaborate?
+> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+> ---
+>   arch/arm64/kernel/entry.S  | 12 ++++--------
+>   arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
+>   2 files changed, 30 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 1f7f5a2b61bf..966d0d4308f2 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -674,18 +674,13 @@ ret_fast_syscall_trace:
+>    * Ok, we need to do extra processing, enter the slow path.
+>    */
+>   work_pending:
+> -	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+> -	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+>   	mov	x0, sp				// 'regs'
+> -	enable_irq				// enable interrupts for do_notify_resume()
+>   	bl	do_notify_resume
+> -	b	ret_to_user
+> -work_resched:
+>   #ifdef CONFIG_TRACE_IRQFLAGS
+> -	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
+> +	bl	trace_hardirqs_on		// enabled while in userspace
+>   #endif
+> -	bl	schedule
+> -
+> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
+> +	b	finish_ret_to_user
+>   /*
+>    * "slow" syscall return path.
+>    */
+> @@ -694,6 +689,7 @@ ret_to_user:
+>   	ldr	x1, [tsk, #TI_FLAGS]
+>   	and	x2, x1, #_TIF_WORK_MASK
+>   	cbnz	x2, work_pending
+> +finish_ret_to_user:
+>   	enable_step_tsk x1, x2
+>   	kernel_exit 0
+>   ENDPROC(ret_to_user)
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index e18c48cb6db1..1f172f8afe47 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -402,15 +402,31 @@ static void do_signal(struct pt_regs *regs)
+>   asmlinkage void do_notify_resume(struct pt_regs *regs,
+>   				 unsigned int thread_flags)
+>   {
+> -	if (thread_flags & _TIF_SIGPENDING)
+> -		do_signal(regs);
+> -
+> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
+> -		clear_thread_flag(TIF_NOTIFY_RESUME);
+> -		tracehook_notify_resume(regs);
+> -	}
+> -
+> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> -		fpsimd_restore_current_state();
+> +	/*
+> +	 * The assembly code enters us with IRQs off, but it hasn't
+> +	 * informed the tracing code of that for efficiency reasons.
+> +	 * Update the trace code with the current status.
+> +	 */
+> +	trace_hardirqs_off();
+> +	do {
+> +		if (thread_flags & _TIF_NEED_RESCHED) {
+> +			schedule();
+> +		} else {
+> +			local_irq_enable();
+> +
+> +			if (thread_flags & _TIF_SIGPENDING)
+> +				do_signal(regs);
+> +
+> +			if (thread_flags & _TIF_NOTIFY_RESUME) {
+> +				clear_thread_flag(TIF_NOTIFY_RESUME);
+> +				tracehook_notify_resume(regs);
+> +			}
+> +
+> +			if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> +				fpsimd_restore_current_state();
+> +		}
+>   
+> +		local_irq_disable();
+> +		thread_flags = READ_ONCE(current_thread_info()->flags);
+> +	} while (thread_flags & _TIF_WORK_MASK);
+>   }
 
-I found another driver that essentially does what I was trying to 
-explain here. See the sun4i_usb_phy_set_squelch_detect function in 
-drivers/phy/phy-sun4i-usb.c:394[1] as an example. It is called at 
-drivers/usb/musb/sunxi.c:160[2] and :167.
-
-I would move the da8xx_musb_set_mode function from 
-drivers/usb/musb/da8xx.c to the new drivers/phy/phy-da8xx-usb.c and call 
-it in a similar manner to the sunix example I gave.
-
-
----
-
-[1]: drivers/phy/phy-sun4i-usb.c
-
-void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
-{
-struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-
-sun4i_usb_phy_write(phy, PHY_SQUELCH_DETECT, enabled ? 0 : 2, 2);
-}
-EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
-
-
-
-[2]: drivers/usb/musb/sunxi.c
-
-static void sunxi_musb_pre_root_reset_end(struct musb *musb)
-{
-	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-
-	sun4i_usb_phy_set_squelch_detect(glue->phy, false);
-}
+-- 
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
