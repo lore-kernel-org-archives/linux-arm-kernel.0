@@ -1,27 +1,97 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 16 Mar 2016 14:57:21 +0300
-Subject: [PATCH 5/5] usb: musb-da8xx: remove board-specific clock handling
-In-Reply-To: <1458081473-8223-5-git-send-email-david@lechnology.com>
-References: <1458081473-8223-1-git-send-email-david@lechnology.com>
- <1458081473-8223-5-git-send-email-david@lechnology.com>
-Message-ID: <56E94A21.7040601@cogentembedded.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 16 Mar 2016 09:02:21 -0300
+Subject: [PATCH] media: add GFP flag to media_*() that could get called
+ in atomic context
+In-Reply-To: <20160316082834.GX11084@valkosipuli.retiisi.org.uk>
+References: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
+ <20160314072236.GO11084@valkosipuli.retiisi.org.uk>
+ <20160314071358.27c87dab@recife.lan>
+ <20160314105253.GQ11084@valkosipuli.retiisi.org.uk>
+ <20160314084633.521d3e35@recife.lan>
+ <20160314120909.GS11084@valkosipuli.retiisi.org.uk>
+ <20160315125535.775c8cc3@recife.lan>
+ <20160316082834.GX11084@valkosipuli.retiisi.org.uk>
+Message-ID: <20160316090221.02d0a699@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Em Wed, 16 Mar 2016 10:28:35 +0200
+Sakari Ailus <sakari.ailus@iki.fi> escreveu:
 
-On 3/16/2016 1:37 AM, David Lechner wrote:
+> Hi Mauro,
+> 
+> On Tue, Mar 15, 2016 at 12:55:35PM -0300, Mauro Carvalho Chehab wrote:
+> > Em Mon, 14 Mar 2016 14:09:09 +0200
+> > Sakari Ailus <sakari.ailus@iki.fi> escreveu:
+> >   
+> > > Hi Mauro,
+> > > 
 
-> This driver should not have to worry about how the clocks are configured
-> on a system. Added a usb20_phy clock to handle the USB 2.0 PLL clock
-> externally.
->
-> Also changed to using devm_ to simplify code a bit.
+...
 
-    This should preferably be split to another patch. Doing one thing per 
-patch is a rule of thumb.
+> > > Notify callbacks, perhaps not, but the list is still protected by the
+> > > spinlock. It perhaps is not likely that another process would change it but
+> > > I don't think we can rely on that.  
+> > 
+> > I can see only 2 risks protected by the lock:
+> > 
+> > 1) mdev gets freed while an entity is being created. This is a problem
+> >    with the current memory protection schema we're using. I guess the
+> >    only way to fix it is to use kref for mdev/entities/interfaces/links/pads.
+> >    This change doesn't make it better or worse.
+> >    Also, I don't think we have such risk with the current devices.
+> > 
+> > 2) a notifier may be inserted or removed by another driver, while the
+> >    loop is running.
+> > 
+> > To avoid (2), I see 3 alternatives:
+> > 
+> > a) keep the loop as proposed on this patch. As the list is navigated using 
+> > list_for_each_entry_safe(), I guess[1] it should be safe to remove/add
+> > new notify callbacks there while the loop is running by some other process.   
+> 
+> list_for_each_entry_safe() does not protect against concurrent access, only
+> against adding and removing list entries by the same user. List access
+> serialisation is still needed, whether you use _safe() functions or not.
+> 
+> > 
+> > [1] It *is* safe if the change were done inside the loop - but I'm not
+> > 100% sure that it is safe if some other CPU touches the notify list.  
+> 
+> Indeed.
+> 
+> > 
+> > b) Unlock/relock the spinlock every time:
+> > 
+> > 	/* previous code that locks mdev->lock spinlock */
+> > 
+> >  	/* invoke entity_notify callbacks */
+> >  	list_for_each_entry_safe(notify, next, &mdev->entity_notify, list) {
+> > 		spin_unlock(&mdev->lock);
+> >  		(notify)->notify(entity, notify->notify_data);
+> > 		spin_lock(&mdev->lock);
+> >  	}
+> >  
+> > 	spin_unlock(&mdev->lock);
+> > 
+> > c) use a separate lock for the notify list -this seems to be an overkill.
+> > 
+> > d) Protect it with the graph traversal mutex. That sounds the worse idea,
+> >    IMHO, as we'll be abusing the lock.  
+> 
+> I'd simply replace the spinlock with a mutex here. As we want to get rid of
+> the graph mutex anyway in the long run, let's not mix the two as they're
+> well separated now. As long as the mutex users do not sleep (i.e. the
+> notify() callback) the mutex is about as fast to use as the spinlock.
 
-> Signed-off-by: David Lechner <david@lechnology.com>
-[...]
+It could work. I added such patch on an experimental branch, where
+I'm addressing a few troubles with au0828 unbind logic:
+	https://git.linuxtv.org/mchehab/experimental.git/log/?h=au0828-unbind-fixes
 
-MBR, Sergei
+The patch itself is at:
+	https://git.linuxtv.org/mchehab/experimental.git/commit/?h=au0828-unbind-fixes&id=dba4d41bdfa6bb8dc51cb0f692102919b2b7c8b4
+
+At least for au0828, it seems to work fine.
+
+Regards,
+Mauro
