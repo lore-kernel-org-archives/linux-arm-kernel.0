@@ -1,65 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 16 Mar 2016 14:57:49 +0000
-Subject: [PATCH] drm/fb_cma_helper: Implement fb_mmap callback
-Message-ID: <11eb10d95109abc104beb94c0409d49644ea8517.1458140105.git.robin.murphy@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 16 Mar 2016 16:00:27 +0100
+Subject: [PATCH 10/17] pinctrl: Add PLX Technology OXNAS pinctrl and gpio
+ driver
+In-Reply-To: <CACRpkdby7XmbK2ZpwX3zy5J=yr1HRbmfWVab3K0ArcL6wd=oyA@mail.gmail.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-11-git-send-email-narmstrong@baylibre.com>
+ <CACRpkdby7XmbK2ZpwX3zy5J=yr1HRbmfWVab3K0ArcL6wd=oyA@mail.gmail.com>
+Message-ID: <56E9750B.2000800@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the absence of an fb_mmap callback, the fbdev code falls back to a
-naive implementation which relies upon the DMA address being the same
-as the physical address, and the buffer being physically contiguous
-from there. Whilst this often holds for standard CMA allocations via
-the platform's regular DMA ops, if the allocation is provided by an
-IOMMU then such assumptions can fall apart spectacularly.
+On 03/15/2016 03:56 PM, Linus Walleij wrote:
+> On Thu, Mar 3, 2016 at 12:40 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> 
+>> Add pinctrl and gprio control support to PLX Technology OXNAS SoC Family
+> 
+> Be a bit more verbose. Is this MIPS? ARM? How many pins does it have? Etc.
+> 
+>> CC: Ma Haijun <mahaijuns@gmail.com>
+>> CC: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> This driver has some way to go, but let's work on it!
 
-To resolve this, reroute the fb_mmap call to the appropriate DMA API
-implementation, as per the other cma_helper calls.
+Hi Linus,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Thanks a lot for the review.
+This driver was initially forked from the at91 driver by Jean-Christophe PLAGNIOL-VILLARD, I just
+cleaned it up for upstreaming, but yes it must be rewritten.
 
-Hi dri-devel,
+I think I'll reboot over a clean base, could you give a reference driver I should follow ?
+It's a very simple HW, it should be easy.
+> 
+> There will be more review comments but I look forward to v2 as the first
+> step, using more library functions and cutting down the code a bit!
 
-This is an empirical fix for something I tickled via the newly-added
-ARM HDLCD driver on a Juno platform - I have no idea whatsoever about
-how "proper" it is in terms of the DRM infrastructure, so feel free to
-treat this as a bug report rather than an actual patch if appropriate ;)
+These first comments are precious !
 
- drivers/gpu/drm/drm_fb_cma_helper.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Could I post a v2 separately for review ?
 
-diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c b/drivers/gpu/drm/drm_fb_cma_helper.c
-index bb88e3d..117d7ea 100644
---- a/drivers/gpu/drm/drm_fb_cma_helper.c
-+++ b/drivers/gpu/drm/drm_fb_cma_helper.c
-@@ -23,6 +23,7 @@
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_gem_cma_helper.h>
- #include <drm/drm_fb_cma_helper.h>
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
- 
- struct drm_fb_cma {
-@@ -221,6 +222,12 @@ int drm_fb_cma_debugfs_show(struct seq_file *m, void *arg)
- EXPORT_SYMBOL_GPL(drm_fb_cma_debugfs_show);
- #endif
- 
-+static int drm_fb_cma_mmap(struct fb_info *info, struct vm_area_struct *vma)
-+{
-+	return dma_mmap_writecombine(info->device, vma, info->screen_base,
-+				     info->fix.smem_start, info->fix.smem_len);
-+}
-+
- static struct fb_ops drm_fbdev_cma_ops = {
- 	.owner		= THIS_MODULE,
- 	.fb_fillrect	= drm_fb_helper_sys_fillrect,
-@@ -231,6 +238,7 @@ static struct fb_ops drm_fbdev_cma_ops = {
- 	.fb_blank	= drm_fb_helper_blank,
- 	.fb_pan_display	= drm_fb_helper_pan_display,
- 	.fb_setcmap	= drm_fb_helper_setcmap,
-+	.fb_mmap	= drm_fb_cma_mmap,
- };
- 
- static int drm_fbdev_cma_create(struct drm_fb_helper *helper,
--- 
-2.7.3.dirty
+Thanks,
+Neil
+
+> 
+> Yours,
+> Linus Walleij
+> 
