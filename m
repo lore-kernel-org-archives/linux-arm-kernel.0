@@ -1,60 +1,39 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 16 Mar 2016 14:58:09 +0800
-Subject: [PATCH v5 5/5] ARM: at91/dt: sama5d2_xplained: add fast_restart node
-In-Reply-To: <1458111489-23774-1-git-send-email-wenyou.yang@atmel.com>
-References: <1458111489-23774-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1458111489-23774-6-git-send-email-wenyou.yang@atmel.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Wed, 16 Mar 2016 15:35:43 +0800
+Subject: [PATCH v2 all 14/14] Revert "of/platform: export
+ of_default_bus_match_table"
+In-Reply-To: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1458113743-15131-15-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add fast_restart node as a pmc's child node to support fast startup
-signal configuration.
+This reverts commit b80443c2211c7daaabd20fbbe9e7beb3fa3408e0.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+After covering to use helper of_platform_default_populate() to populate
+the default bus, no need to export of_default_bus_match_table anymore.
+
+Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
+ drivers/of/platform.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Changes in v5:
- - due to the DT property expression change, update the fast restart
-   node's property.
-
-Changes in v4:
- - add fast_restart node to the DT file.
-
-Changes in v3: None
-Changes in v2: None
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 21c780f..31df6e8 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -110,6 +110,25 @@
- 		};
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 8d103e4..af98343 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -31,7 +31,6 @@ const struct of_device_id of_default_bus_match_table[] = {
+ #endif /* CONFIG_ARM_AMBA */
+ 	{} /* Empty terminated list */
+ };
+-EXPORT_SYMBOL(of_default_bus_match_table);
  
- 		apb {
-+			pmc: pmc at f0014000 {
-+				pmc_fast_restart {
-+					compatible = "atmel,sama5d2-pmc-fast-startup";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					atmel,wakeup-rtc-timer;
-+
-+					wkpin: input at 0 {
-+						reg = <0>;
-+					};
-+
-+					gmac_wol: input at 10 {
-+						reg = <10>;
-+						atmel,wakeup-active-high;
-+					};
-+				};
-+			};
-+
- 			spi0: spi at f8000000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi0_default>;
+ static int of_dev_node_match(struct device *dev, void *data)
+ {
 -- 
-1.7.9.5
+2.6.0.GIT
