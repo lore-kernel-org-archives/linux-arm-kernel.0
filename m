@@ -1,61 +1,65 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 16 Mar 2016 15:54:50 -0700
-Subject: [PATCH v2 3/3] phy: mdio-thunder: Add driver for Cavium Thunder
- SoC MDIO buses.
-In-Reply-To: <56E9E343.3080207@suse.de>
-References: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
- <1457718791-6505-4-git-send-email-ddaney.cavm@gmail.com>
- <56E9E343.3080207@suse.de>
-Message-ID: <56E9E43A.6000304@caviumnetworks.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Thu, 17 Mar 2016 00:10:53 +0100
+Subject: [PATCH] ARM64: dts: amlogic: Clean up Vega S95 /memory nodes
+Message-ID: <1458169854-26127-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2016 03:50 PM, Andreas F?rber wrote:
-> Hi,
->
-> Am 11.03.2016 um 18:53 schrieb David Daney:
->> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
->> index 40faec9..075a4cc 100644
->> --- a/drivers/net/phy/Kconfig
->> +++ b/drivers/net/phy/Kconfig
->> @@ -196,6 +196,17 @@ config MDIO_OCTEON
->>   	  buses. It is required by the Octeon and ThunderX ethernet device
->>   	  drivers on some systems.
->>
->> +config MDIO_THUNDER
->> +	tristate "Support for MDIO buses on on ThunderX SOCs"
->
-> Double "on", spotted in next-20160316.
->
->> +	depends on 64BIT
->> +	depends on PCI
->> +	select MDIO_CAVIUM
->> +	help
->> +	  This driver supports the MDIO interfaces found on Cavium
->> +	  ThunderX SoCs when the MDIO bus device appears on as a PCI
->> +	  device.
->
-> While at it, this sentence sounds weird. Did you mean s/as/is/? Or is
-> there another verb missing in there?
+Resolve the following warnings from new dtc by adding the unit address:
 
-Should be "... appears as a PCI device."
+    DTC     arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dtb
+  Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+    DTC     arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dtb
+  Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+    DTC     arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dtb
+  Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-davem already merged the patch, so this would have to be fixed as a 
-follow-on patch.
+Fixes: cc733bc90636 ("ARM64: dts: amlogic: Add Tronsmart Vega S95 configs")
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  | 2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   | 2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Since you found this, do you want to send the patch?
-
-Thanks,
-David Daney
-
->
-> Regards,
-> Andreas
->
->> +
->> +
->>   config MDIO_SUN4I
->>   	tristate "Allwinner sun4i MDIO interface support"
->>   	depends on ARCH_SUNXI
-> [snip]
->
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+index 399aff9e7975..62fb4968d680 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+@@ -48,7 +48,7 @@
+ 	compatible = "tronsmart,vega-s95-meta", "tronsmart,vega-s95", "amlogic,meson-gxbb";
+ 	model = "Tronsmart Vega S95 Meta";
+ 
+-	memory {
++	memory at 0 {
+ 		device_type = "memory";
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+index ac5a241b5ec2..9a9663abdf5c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+@@ -48,7 +48,7 @@
+ 	compatible = "tronsmart,vega-s95-pro", "tronsmart,vega-s95", "amlogic,meson-gxbb";
+ 	model = "Tronsmart Vega S95 Pro";
+ 
+-	memory {
++	memory at 0 {
+ 		device_type = "memory";
+ 		reg = <0x0 0x0 0x0 0x40000000>;
+ 	};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+index fff7bfa2aa39..2fe167b2609d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+@@ -48,7 +48,7 @@
+ 	compatible = "tronsmart,vega-s95-telos", "tronsmart,vega-s95", "amlogic,meson-gxbb";
+ 	model = "Tronsmart Vega S95 Telos";
+ 
+-	memory {
++	memory at 0 {
+ 		device_type = "memory";
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+-- 
+2.6.2
