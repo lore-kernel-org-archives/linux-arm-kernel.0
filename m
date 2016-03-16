@@ -1,35 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 Mar 2016 13:05:49 +0100
-Subject: [PATCH] pinctrl: sunxi: Fix A33 external interrupts not working
-In-Reply-To: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
-References: <1457808297-12300-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkdZF-hiwGaHdyORzdj06vqmceZ_5ko1LDYJoCMXC216hTg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 16 Mar 2016 13:07:49 +0100
+Subject: [PATCH v4 2/2] power: reset: at91-shdwc: add new shutdown
+ controller driver
+In-Reply-To: <56E94558.9010506@atmel.com>
+References: <1457624260-30350-1-git-send-email-nicolas.ferre@atmel.com>
+ <1457624260-30350-3-git-send-email-nicolas.ferre@atmel.com>
+ <20160314202205.GA24894@piout.net> <56E94558.9010506@atmel.com>
+Message-ID: <20160316120749.GC20227@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 12, 2016 at 7:44 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+On 16/03/2016 at 12:36:56 +0100, Nicolas Ferre wrote :
+> I don't agree with you on the 2 last ones. In Documentation/CodingStyle,
+> it is said that:
+> 
+> "Chapter 2: Breaking long lines and strings
+> [..]
+> Descendants are always substantially shorter than the parent and
+> are placed substantially to the right."
+> 
+> Together with the 80 column requirement that I also fulfil, I think that
+> my code is well aligned.
+> 
+> So I keep it like this ;-)
+> 
 
-> pinctrl-sun8i-a33.c (and the dts) declare only 2 interrupt banks,
-> where as the closely related a23 has 3 banks. This matches with the
-> datasheet for the A33 where only interrupt banks B and G are specified
-> where as the A23 has banks A, B and G.
->
-> However the A33 being the A23 derative it is means that the interrupt
-> configure/status io-addresses for the 2 banks it has are not changed
-> from the A23, iow they have the same address as if bank A was still
-> present. Where as the sunxi pinctrl currently tries to use the A23 bank
-> A addresses for bank B, since the pinctrl code does not know about the
-> removed bank A.
->
-> Add a irq_bank_base parameter and use this where appropriate to take
-> the missing bank A into account.
->
-> This fixes external interrupts not working on the A33 (tested with
-> an i2c touchscreen controller which uses an external interrupt).
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+checkpatch.pl --strict disagrees with you
 
-Patch applied, tagged for stable.
 
-Yours,
-Linus Walleij
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
