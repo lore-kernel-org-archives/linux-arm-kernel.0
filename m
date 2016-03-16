@@ -1,26 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 Mar 2016 10:57:37 +0100
-Subject: [linux-sunxi] [PATCH 1/4] gpio: Add AXP209 GPIO driver
-In-Reply-To: <87io0v23fz.fsf@dell.be.48ers.dk>
-References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
- <1457520614-32239-2-git-send-email-maxime.ripard@free-electrons.com>
- <87io0v23fz.fsf@dell.be.48ers.dk>
-Message-ID: <CACRpkdY4L4uVAF9er4eD5jn8wsMfdtOoHn3r8qUzYxY3eySSLg@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 16 Mar 2016 17:59:40 +0800
+Subject: [PATCH 1/2] PCI: mvebu: constify mvebu_pcie_pm_ops structure
+In-Reply-To: <1458122381-2280-1-git-send-email-jszhang@marvell.com>
+References: <1458122381-2280-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1458122381-2280-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 9, 2016 at 2:20 PM, Peter Korsgaard <peter@korsgaard.com> wrote:
->>>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+The mvebu_pcie_pm_ops structure is never modified, so declare it as
+const.
 
->  > +    dev_info(&pdev->dev, "AXP209 GPIO driver loaded\n");
->
-> Any reason to be so noisy?
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/pci/host/pci-mvebu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The GPIO maintainer likes boasty drivers.
-
-I don't understand people who are dmesg minimalists, I want to
-have positive indications that things work in there, not just bad news
-about what went wrong.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 53b79c5..6c43cb8 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -1298,7 +1298,7 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+ };
+ MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
+ 
+-static struct dev_pm_ops mvebu_pcie_pm_ops = {
++static const struct dev_pm_ops mvebu_pcie_pm_ops = {
+ 	.suspend_noirq = mvebu_pcie_suspend,
+ 	.resume_noirq = mvebu_pcie_resume,
+ };
+-- 
+2.7.0
