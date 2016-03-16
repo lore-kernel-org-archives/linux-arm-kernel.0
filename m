@@ -1,54 +1,45 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 17 Mar 2016 00:24:45 +0100
-Subject: [PATCH v2 3/3] phy: mdio-thunder: Add driver for Cavium Thunder
- SoC MDIO buses.
-In-Reply-To: <56E9E43A.6000304@caviumnetworks.com>
-References: <1457718791-6505-1-git-send-email-ddaney.cavm@gmail.com>
- <1457718791-6505-4-git-send-email-ddaney.cavm@gmail.com>
- <56E9E343.3080207@suse.de> <56E9E43A.6000304@caviumnetworks.com>
-Message-ID: <56E9EB3D.6050406@suse.de>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 16 Mar 2016 16:26:00 -0700
+Subject: [PATCH] phy: mdio-thunder: Fix some Kconfig typos
+In-Reply-To: <1458170617-31784-1-git-send-email-afaerber@suse.de>
+References: <1458170617-31784-1-git-send-email-afaerber@suse.de>
+Message-ID: <56E9EB88.5000608@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.03.2016 um 23:54 schrieb David Daney:
-> On 03/16/2016 03:50 PM, Andreas F?rber wrote:
->> Am 11.03.2016 um 18:53 schrieb David Daney:
->>> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
->>> index 40faec9..075a4cc 100644
->>> --- a/drivers/net/phy/Kconfig
->>> +++ b/drivers/net/phy/Kconfig
->>> @@ -196,6 +196,17 @@ config MDIO_OCTEON
->>>         buses. It is required by the Octeon and ThunderX ethernet device
->>>         drivers on some systems.
->>>
->>> +config MDIO_THUNDER
->>> +    tristate "Support for MDIO buses on on ThunderX SOCs"
->>
->> Double "on", spotted in next-20160316.
->>
->>> +    depends on 64BIT
->>> +    depends on PCI
->>> +    select MDIO_CAVIUM
->>> +    help
->>> +      This driver supports the MDIO interfaces found on Cavium
->>> +      ThunderX SoCs when the MDIO bus device appears on as a PCI
->>> +      device.
->>
->> While at it, this sentence sounds weird. Did you mean s/as/is/? Or is
->> there another verb missing in there?
-> 
-> Should be "... appears as a PCI device."
-> 
-> davem already merged the patch, so this would have to be fixed as a
-> follow-on patch.
-> 
-> Since you found this, do you want to send the patch?
+On 03/16/2016 04:23 PM, Andreas F?rber wrote:
+> Drop two extra occurrences of "on" in option title and help text.
+>
+> Fixes: 379d7ac7ca31 ("phy: mdio-thunder: Add driver for Cavium Thunder SoC MDIO buses.")
+> Cc: David Daney <david.daney@cavium.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-Done.
+FWIW:
 
-Cheers,
-Andreas
+Acked-by: David Daney <david.daney@cavium.com>
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+> ---
+>   drivers/net/phy/Kconfig | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
+> index 075a4cc175b1..6dad9a9c356c 100644
+> --- a/drivers/net/phy/Kconfig
+> +++ b/drivers/net/phy/Kconfig
+> @@ -197,13 +197,13 @@ config MDIO_OCTEON
+>   	  drivers on some systems.
+>
+>   config MDIO_THUNDER
+> -	tristate "Support for MDIO buses on on ThunderX SOCs"
+> +	tristate "Support for MDIO buses on ThunderX SOCs"
+>   	depends on 64BIT
+>   	depends on PCI
+>   	select MDIO_CAVIUM
+>   	help
+>   	  This driver supports the MDIO interfaces found on Cavium
+> -	  ThunderX SoCs when the MDIO bus device appears on as a PCI
+> +	  ThunderX SoCs when the MDIO bus device appears as a PCI
+>   	  device.
+>
+>
+>
