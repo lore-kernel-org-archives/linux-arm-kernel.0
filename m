@@ -1,97 +1,67 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 16 Mar 2016 09:02:21 -0300
-Subject: [PATCH] media: add GFP flag to media_*() that could get called
- in atomic context
-In-Reply-To: <20160316082834.GX11084@valkosipuli.retiisi.org.uk>
-References: <1457833689-4926-1-git-send-email-shuahkh@osg.samsung.com>
- <20160314072236.GO11084@valkosipuli.retiisi.org.uk>
- <20160314071358.27c87dab@recife.lan>
- <20160314105253.GQ11084@valkosipuli.retiisi.org.uk>
- <20160314084633.521d3e35@recife.lan>
- <20160314120909.GS11084@valkosipuli.retiisi.org.uk>
- <20160315125535.775c8cc3@recife.lan>
- <20160316082834.GX11084@valkosipuli.retiisi.org.uk>
-Message-ID: <20160316090221.02d0a699@recife.lan>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Wed, 16 Mar 2016 13:03:21 +0100
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <CAAmzW4OKQHJ06Bi86jqVFGxqWsW7h_EWeGPAFB9K1aY754C4aQ@mail.gmail.com>
+References: <56D93ABE.9070406@huawei.com>
+ <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD38E7.3050107@huawei.com>
+ <56DDCB86.4030709@redhat.com> <56DE30CB.7020207@huawei.com>
+ <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
+ <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
+ <56E6AED1.6060703@suse.cz>
+ <CAAmzW4OKQHJ06Bi86jqVFGxqWsW7h_EWeGPAFB9K1aY754C4aQ@mail.gmail.com>
+Message-ID: <56E94B89.80706@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, 16 Mar 2016 10:28:35 +0200
-Sakari Ailus <sakari.ailus@iki.fi> escreveu:
+On 03/14/2016 03:10 PM, Joonsoo Kim wrote:
+> 2016-03-14 21:30 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
+>
+> Now I see why this happen. I enabled CONFIG_DEBUG_PAGEALLOC
+> and it makes difference.
+>
+> I tested on x86_64, gcc (Ubuntu 4.8.4-2ubuntu1~14.04.1) 4.8.4.
+>
+> With CONFIG_CMA + CONFIG_DEBUG_PAGEALLOC
+> ./scripts/bloat-o-meter page_alloc_base.o page_alloc_vlastimil_orig.o
+> add/remove: 0/0 grow/shrink: 2/0 up/down: 510/0 (510)
+> function                                     old     new   delta
+> free_one_page                               1050    1334    +284
+> free_pcppages_bulk                          1396    1622    +226
+>
+> ./scripts/bloat-o-meter page_alloc_base.o page_alloc_mine.o
+> add/remove: 0/0 grow/shrink: 2/0 up/down: 351/0 (351)
+> function                                     old     new   delta
+> free_one_page                               1050    1230    +180
+> free_pcppages_bulk                          1396    1567    +171
+>
+>
+> With CONFIG_CMA + !CONFIG_DEBUG_PAGEALLOC
+> (pa_b is base, pa_v is yours and pa_m is mine)
+>
+> ./scripts/bloat-o-meter pa_b.o pa_v.o
+> add/remove: 0/0 grow/shrink: 1/1 up/down: 88/-23 (65)
+> function                                     old     new   delta
+> free_one_page                                761     849     +88
+> free_pcppages_bulk                          1117    1094     -23
+>
+> ./scripts/bloat-o-meter pa_b.o pa_m.o
+> add/remove: 0/0 grow/shrink: 2/0 up/down: 329/0 (329)
+> function                                     old     new   delta
+> free_one_page                                761    1031    +270
+> free_pcppages_bulk                          1117    1176     +59
+>
+> Still, it has difference but less than before.
+> Maybe, we are still using different configuration. Could you
+> check if CONFIG_DEBUG_VM is enabled or not? In my case, it's not
 
-> Hi Mauro,
-> 
-> On Tue, Mar 15, 2016 at 12:55:35PM -0300, Mauro Carvalho Chehab wrote:
-> > Em Mon, 14 Mar 2016 14:09:09 +0200
-> > Sakari Ailus <sakari.ailus@iki.fi> escreveu:
-> >   
-> > > Hi Mauro,
-> > > 
+It's disabled here.
 
-...
+> enabled. And, do you think this bloat isn't acceptable?
 
-> > > Notify callbacks, perhaps not, but the list is still protected by the
-> > > spinlock. It perhaps is not likely that another process would change it but
-> > > I don't think we can rely on that.  
-> > 
-> > I can see only 2 risks protected by the lock:
-> > 
-> > 1) mdev gets freed while an entity is being created. This is a problem
-> >    with the current memory protection schema we're using. I guess the
-> >    only way to fix it is to use kref for mdev/entities/interfaces/links/pads.
-> >    This change doesn't make it better or worse.
-> >    Also, I don't think we have such risk with the current devices.
-> > 
-> > 2) a notifier may be inserted or removed by another driver, while the
-> >    loop is running.
-> > 
-> > To avoid (2), I see 3 alternatives:
-> > 
-> > a) keep the loop as proposed on this patch. As the list is navigated using 
-> > list_for_each_entry_safe(), I guess[1] it should be safe to remove/add
-> > new notify callbacks there while the loop is running by some other process.   
-> 
-> list_for_each_entry_safe() does not protect against concurrent access, only
-> against adding and removing list entries by the same user. List access
-> serialisation is still needed, whether you use _safe() functions or not.
-> 
-> > 
-> > [1] It *is* safe if the change were done inside the loop - but I'm not
-> > 100% sure that it is safe if some other CPU touches the notify list.  
-> 
-> Indeed.
-> 
-> > 
-> > b) Unlock/relock the spinlock every time:
-> > 
-> > 	/* previous code that locks mdev->lock spinlock */
-> > 
-> >  	/* invoke entity_notify callbacks */
-> >  	list_for_each_entry_safe(notify, next, &mdev->entity_notify, list) {
-> > 		spin_unlock(&mdev->lock);
-> >  		(notify)->notify(entity, notify->notify_data);
-> > 		spin_lock(&mdev->lock);
-> >  	}
-> >  
-> > 	spin_unlock(&mdev->lock);
-> > 
-> > c) use a separate lock for the notify list -this seems to be an overkill.
-> > 
-> > d) Protect it with the graph traversal mutex. That sounds the worse idea,
-> >    IMHO, as we'll be abusing the lock.  
-> 
-> I'd simply replace the spinlock with a mutex here. As we want to get rid of
-> the graph mutex anyway in the long run, let's not mix the two as they're
-> well separated now. As long as the mutex users do not sleep (i.e. the
-> notify() callback) the mutex is about as fast to use as the spinlock.
+Well, it is quite significant. But given that Hanjun sees the errors 
+still, it's not the biggest issue now :/
 
-It could work. I added such patch on an experimental branch, where
-I'm addressing a few troubles with au0828 unbind logic:
-	https://git.linuxtv.org/mchehab/experimental.git/log/?h=au0828-unbind-fixes
-
-The patch itself is at:
-	https://git.linuxtv.org/mchehab/experimental.git/commit/?h=au0828-unbind-fixes&id=dba4d41bdfa6bb8dc51cb0f692102919b2b7c8b4
-
-At least for au0828, it seems to work fine.
-
-Regards,
-Mauro
+> Thanks.
+>
