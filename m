@@ -1,78 +1,36 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 15 Mar 2016 18:34:26 -0700
-Subject: [PATCH 5/7] dmaengine: xilinx_vdma: Remove unnecessary axi dma
- device-tree binding doc
-In-Reply-To: <1458062592-27981-6-git-send-email-appanad@xilinx.com>
-References: <1458062592-27981-1-git-send-email-appanad@xilinx.com>
- <1458062592-27981-6-git-send-email-appanad@xilinx.com>
-Message-ID: <CAAtXAHeKd7NjWdPFczDTSN8yLJFPHTorvH+eNrcww7naCViytA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 16 Mar 2016 10:52:54 +0900
+Subject: [PATCH v2 0/2] ARM: dts: r8a7793: add CAN to device tree
+Message-ID: <1458093176-1926-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi there,
+Hi,
 
-On Tue, Mar 15, 2016 at 10:23 AM, Kedareswara rao Appana
-<appana.durga.rao@xilinx.com> wrote:
-> AXI DMA support is added to the existing AXI VDMA driver.
-> The binding doc for AXI DMA should also be updated in the
-> VDMA device-tree binding doc.
->
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
->  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  | 65 ----------------------
->  1 file changed, 65 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
->
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> deleted file mode 100644
-> index 2291c40..0000000
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ /dev/null
-> @@ -1,65 +0,0 @@
-> -Xilinx AXI DMA engine, it does transfers between memory and AXI4 stream
-> -target devices. It can be configured to have one channel or two channels.
-> -If configured as two channels, one is to transmit to the device and another
-> -is to receive from the device.
-> -
-> -Required properties:
-> -- compatible: Should be "xlnx,axi-dma-1.00.a"
-> -- #dma-cells: Should be <1>, see "dmas" property below
-> -- reg: Should contain DMA registers location and length.
-> -- dma-channel child node: Should have atleast one channel and can have upto
-> -       two channels per device. This node specifies the properties of each
-> -       DMA channel (see child node properties below).
+this short series adds CAN clocks and nodes to the r8a7793 device tree.
 
-at least vs atleast, up to vs upto.
-> -
-> -Optional properties:
-> -- xlnx,include-sg: Tells whether configured for Scatter-mode in
-> -       the hardware.
+I am not aware of an r8a7793 board that exposes CAN - the gose
+board does not appear to - and thus am unsure of a way to test these changes.
+However, they are based on what is present for the r8a7791 SoC and
+I am unable to find a difference in the SoC documentation.
 
-How about: 'If present, hardware supports scatter-gather mode'
-> -
-> -Required child node properties:
-> -- compatible: It should be either "xlnx,axi-dma-mm2s-channel" or
-> -       "xlnx,axi-dma-s2mm-channel".
-> -- interrupts: Should contain per channel DMA interrupts.
-> -- xlnx,datawidth: Should contain the stream data width, take values
-> -       {32,64...1024}.
-> -
-> -Option child node properties:
-> -- xlnx,include-dre: Tells whether hardware is configured for Data
-> -       Realignment Engine.
+This series is similar to a series I posted for the r8a7794
+earlier this week.
 
-How about: 'If present, hardware supports Data Realignment Engine'
+Based on renesas-devel-20160315-v4.5
 
-> -
-> -Example:
-> -++++++++
-> -
-> -axi_dma_0: axidma at 40400000 {
-> -       compatible = "xlnx,axi-dma-1.00.a";
-> -       #dma_cells = <1>;
+Changes in v2
+* Correct clock node names
+* Add MSTP9 clocks
+* Omit clock-output-names property from new nodes
+* Use "renesas,rcar-gen2-can" compat string
 
-I think you meant #dma-cells = <1>; here. That caught me while testing ;-)
+Simon Horman (2):
+  ARM: dts: r8a7793: add CAN clocks to device tree
+  ARM: dts: r8a7793: add CAN nodes to device tree
 
-Cheers,
+ arch/arm/boot/dts/r8a7793.dtsi | 49 ++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 45 insertions(+), 4 deletions(-)
 
-Moritz
+-- 
+2.1.4
