@@ -1,321 +1,193 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Mar 2016 09:44:01 +0900
-Subject: [PATCH] ARM: dts: r8a7790: Remove unnecessary clock-output-names
- properties
-Message-ID: <1458089041-22994-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 16 Mar 2016 10:03:09 +0900
+Subject: [PATCH] ARM: dts: lager: use generic pinctrl properties
+Message-ID: <1458090189-25803-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Fixed rate and fixed factor clocks do not require an
-  clock-output-names property.
-* Since 1fae91ec99fb ("clk: shmobile: div6: Extract cpg_div6_register()")
-  Renesas div6 clocks do not require a clock-output-names property.
+Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
+groups properties") renesas pfc drivers accept generic "function", "pins"
+and "groups" properties.
 
-In the above cases there is only one clock output and its name is taken
-from that of the clock node.
-
-Accordingly, remove the unnecessary clock-output-names properties and
-as necessary the nodes.
+This patch updates the lager device tree to use the generic
+rather than renesas-specific properties.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 88 ++++++++++++++----------------------------
- 1 file changed, 28 insertions(+), 60 deletions(-)
+Based on renesas-devel-20160315-v4.5
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 92 ++++++++++++++++++-------------------
+ 1 file changed, 46 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index b71b3e20b6e4..634f7e05ba6b 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1038,20 +1038,18 @@
- 		ranges;
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index aa6ca92a9485..a5828721ab7c 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -314,119 +314,119 @@
+ 	pinctrl-names = "default";
  
- 		/* External root clock */
--		extal_clk: extal_clk {
-+		extal_clk: extal {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			/* This value must be overriden by the board. */
- 			clock-frequency = <0>;
--			clock-output-names = "extal";
- 		};
+ 	du_pins: du {
+-		renesas,groups = "du_rgb666", "du_sync_1", "du_clk_out_0";
+-		renesas,function = "du";
++		groups = "du_rgb666", "du_sync_1", "du_clk_out_0";
++		function = "du";
+ 	};
  
- 		/* External PCIe clock - can be overridden by the board */
--		pcie_bus_clk: pcie_bus_clk {
-+		pcie_bus_clk: pcie_bus {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <100000000>;
--			clock-output-names = "pcie_bus";
- 			status = "disabled";
- 		};
+ 	scif0_pins: serial0 {
+-		renesas,groups = "scif0_data";
+-		renesas,function = "scif0";
++		groups = "scif0_data";
++		function = "scif0";
+ 	};
  
-@@ -1063,19 +1061,16 @@
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "audio_clk_a";
- 		};
- 		audio_clk_b: audio_clk_b {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "audio_clk_b";
- 		};
- 		audio_clk_c: audio_clk_c {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "audio_clk_c";
- 		};
+ 	scif_clk_pins: scif_clk {
+-		renesas,groups = "scif_clk";
+-		renesas,function = "scif_clk";
++		groups = "scif_clk";
++		function = "scif_clk";
+ 	};
  
- 		/* External SCIF clock */
-@@ -1088,11 +1083,10 @@
- 		};
+ 	ether_pins: ether {
+-		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
+-		renesas,function = "eth";
++		groups = "eth_link", "eth_mdio", "eth_rmii";
++		function = "eth";
+ 	};
  
- 		/* External USB clock - can be overridden by the board */
--		usb_extal_clk: usb_extal_clk {
-+		usb_extal_clk: usb_extal {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <48000000>;
--			clock-output-names = "usb_extal";
- 		};
+ 	phy1_pins: phy1 {
+-		renesas,groups = "intc_irq0";
+-		renesas,function = "intc";
++		groups = "intc_irq0";
++		function = "intc";
+ 	};
  
- 		/* External CAN clock */
-@@ -1101,7 +1095,6 @@
- 			#clock-cells = <0>;
- 			/* This value must be overridden by the board. */
- 			clock-frequency = <0>;
--			clock-output-names = "can_clk";
- 			status = "disabled";
- 		};
+ 	scifa1_pins: serial1 {
+-		renesas,groups = "scifa1_data";
+-		renesas,function = "scifa1";
++		groups = "scifa1_data";
++		function = "scifa1";
+ 	};
  
-@@ -1119,201 +1112,176 @@
- 		};
+ 	sdhi0_pins: sd0 {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
+-		renesas,function = "sdhi0";
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
+ 	};
  
- 		/* Variable factor clocks */
--		sd2_clk: sd2_clk at e6150078 {
-+		sd2_clk: sd2 at e6150078 {
- 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150078 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd2";
- 		};
--		sd3_clk: sd3_clk at e615026c {
-+		sd3_clk: sd3 at e615026c {
- 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "sd3";
- 		};
--		mmc0_clk: mmc0_clk at e6150240 {
-+		mmc0_clk: mmc0 at e6150240 {
- 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150240 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "mmc0";
- 		};
--		mmc1_clk: mmc1_clk at e6150244 {
-+		mmc1_clk: mmc1 at e6150244 {
- 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150244 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "mmc1";
- 		};
--		ssp_clk: ssp_clk at e6150248 {
-+		ssp_clk: ssp at e6150248 {
- 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150248 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "ssp";
- 		};
--		ssprs_clk: ssprs_clk at e615024c {
-+		ssprs_clk: ssprs at e615024c {
- 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe615024c 0 4>;
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
--			clock-output-names = "ssprs";
- 		};
+ 	sdhi2_pins: sd2 {
+-		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
+-		renesas,function = "sdhi2";
++		groups = "sdhi2_data4", "sdhi2_ctrl";
++		function = "sdhi2";
+ 	};
  
- 		/* Fixed factor clocks */
--		pll1_div2_clk: pll1_div2_clk {
-+		pll1_div2_clk: pll1_div2 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <2>;
- 			clock-mult = <1>;
--			clock-output-names = "pll1_div2";
- 		};
--		z2_clk: z2_clk {
-+		z2_clk: z2 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <2>;
- 			clock-mult = <1>;
--			clock-output-names = "z2";
- 		};
--		zg_clk: zg_clk {
-+		zg_clk: zg {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <3>;
- 			clock-mult = <1>;
--			clock-output-names = "zg";
- 		};
--		zx_clk: zx_clk {
-+		zx_clk: zx {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <3>;
- 			clock-mult = <1>;
--			clock-output-names = "zx";
- 		};
--		zs_clk: zs_clk {
-+		zs_clk: zs {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <6>;
- 			clock-mult = <1>;
--			clock-output-names = "zs";
- 		};
--		hp_clk: hp_clk {
-+		hp_clk: hp {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <12>;
- 			clock-mult = <1>;
--			clock-output-names = "hp";
- 		};
--		i_clk: i_clk {
-+		i_clk: i {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <2>;
- 			clock-mult = <1>;
--			clock-output-names = "i";
- 		};
--		b_clk: b_clk {
-+		b_clk: b {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <12>;
- 			clock-mult = <1>;
--			clock-output-names = "b";
- 		};
--		p_clk: p_clk {
-+		p_clk: p {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <24>;
- 			clock-mult = <1>;
--			clock-output-names = "p";
- 		};
--		cl_clk: cl_clk {
-+		cl_clk: cl {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <48>;
- 			clock-mult = <1>;
--			clock-output-names = "cl";
- 		};
--		m2_clk: m2_clk {
-+		m2_clk: m2 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <8>;
- 			clock-mult = <1>;
--			clock-output-names = "m2";
- 		};
--		imp_clk: imp_clk {
-+		imp_clk: imp {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <4>;
- 			clock-mult = <1>;
--			clock-output-names = "imp";
- 		};
--		rclk_clk: rclk_clk {
-+		rclk_clk: rclk {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <(48 * 1024)>;
- 			clock-mult = <1>;
--			clock-output-names = "rclk";
- 		};
--		oscclk_clk: oscclk_clk {
-+		oscclk_clk: oscclk {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <(12 * 1024)>;
- 			clock-mult = <1>;
--			clock-output-names = "oscclk";
- 		};
--		zb3_clk: zb3_clk {
-+		zb3_clk: zb3 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL3>;
- 			#clock-cells = <0>;
- 			clock-div = <4>;
- 			clock-mult = <1>;
--			clock-output-names = "zb3";
- 		};
--		zb3d2_clk: zb3d2_clk {
-+		zb3d2_clk: zb3d2 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL3>;
- 			#clock-cells = <0>;
- 			clock-div = <8>;
- 			clock-mult = <1>;
--			clock-output-names = "zb3d2";
- 		};
--		ddr_clk: ddr_clk {
-+		ddr_clk: ddr {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7790_CLK_PLL3>;
- 			#clock-cells = <0>;
- 			clock-div = <8>;
- 			clock-mult = <1>;
--			clock-output-names = "ddr";
- 		};
--		mp_clk: mp_clk {
-+		mp_clk: mp {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-div = <15>;
- 			clock-mult = <1>;
--			clock-output-names = "mp";
- 		};
--		cp_clk: cp_clk {
-+		cp_clk: cp {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&extal_clk>;
- 			#clock-cells = <0>;
- 			clock-div = <2>;
- 			clock-mult = <1>;
--			clock-output-names = "cp";
- 		};
+ 	mmc1_pins: mmc1 {
+-		renesas,groups = "mmc1_data8", "mmc1_ctrl";
+-		renesas,function = "mmc1";
++		groups = "mmc1_data8", "mmc1_ctrl";
++		function = "mmc1";
+ 	};
  
- 		/* Gate clocks */
+ 	qspi_pins: spi0 {
+-		renesas,groups = "qspi_ctrl", "qspi_data4";
+-		renesas,function = "qspi";
++		groups = "qspi_ctrl", "qspi_data4";
++		function = "qspi";
+ 	};
+ 
+ 	msiof1_pins: spi2 {
+-		renesas,groups = "msiof1_clk", "msiof1_sync", "msiof1_rx",
++		groups = "msiof1_clk", "msiof1_sync", "msiof1_rx",
+ 				 "msiof1_tx";
+-		renesas,function = "msiof1";
++		function = "msiof1";
+ 	};
+ 
+ 	i2c0_pins: i2c0 {
+-		renesas,groups = "i2c0";
+-		renesas,function = "i2c0";
++		groups = "i2c0";
++		function = "i2c0";
+ 	};
+ 
+ 	iic0_pins: iic0 {
+-		renesas,groups = "iic0";
+-		renesas,function = "iic0";
++		groups = "iic0";
++		function = "iic0";
+ 	};
+ 
+ 	iic1_pins: iic1 {
+-		renesas,groups = "iic1";
+-		renesas,function = "iic1";
++		groups = "iic1";
++		function = "iic1";
+ 	};
+ 
+ 	iic2_pins: iic2 {
+-		renesas,groups = "iic2";
+-		renesas,function = "iic2";
++		groups = "iic2";
++		function = "iic2";
+ 	};
+ 
+ 	iic3_pins: iic3 {
+-		renesas,groups = "iic3";
+-		renesas,function = "iic3";
++		groups = "iic3";
++		function = "iic3";
+ 	};
+ 
+ 	hsusb_pins: hsusb {
+-		renesas,groups = "usb0_ovc_vbus";
+-		renesas,function = "usb0";
++		groups = "usb0_ovc_vbus";
++		function = "usb0";
+ 	};
+ 
+ 	usb0_pins: usb0 {
+-		renesas,groups = "usb0";
+-		renesas,function = "usb0";
++		groups = "usb0";
++		function = "usb0";
+ 	};
+ 
+ 	usb1_pins: usb1 {
+-		renesas,groups = "usb1";
+-		renesas,function = "usb1";
++		groups = "usb1";
++		function = "usb1";
+ 	};
+ 
+ 	usb2_pins: usb2 {
+-		renesas,groups = "usb2";
+-		renesas,function = "usb2";
++		groups = "usb2";
++		function = "usb2";
+ 	};
+ 
+ 	vin1_pins: vin {
+-		renesas,groups = "vin1_data8", "vin1_clk";
+-		renesas,function = "vin1";
++		groups = "vin1_data8", "vin1_clk";
++		function = "vin1";
+ 	};
+ 
+ 	sound_pins: sound {
+-		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
+-		renesas,function = "ssi";
++		groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
++		function = "ssi";
+ 	};
+ 
+ 	sound_clk_pins: sound_clk {
+-		renesas,groups = "audio_clk_a";
+-		renesas,function = "audio_clk";
++		groups = "audio_clk_a";
++		function = "audio_clk";
+ 	};
+ };
+ 
 -- 
 2.1.4
