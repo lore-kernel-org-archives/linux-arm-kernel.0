@@ -1,54 +1,118 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 16 Mar 2016 14:57:42 +0100
-Subject: [PATCH v2 8/9] drm: atmel-hlcdc: check display mode validity in
- crtc->mode_fixup()
+Date: Wed, 16 Mar 2016 14:57:39 +0100
+Subject: [PATCH v2 5/9] drm: atmel-hlcdc: support extended timing ranges on
+ sama5d4 and sama5d2
 In-Reply-To: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1458136663-21396-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1458136663-21396-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the adjusted display mode check into ->mode_fixup().
+The display timings on old SoCs older than the sama5d4 are quite limited
+and prevent the use of many displays. Add support for extended timing
+ranges on sama5d2 and sama5d4.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 24 ++++++++++++++++++------
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h |  6 ++++++
+ 2 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-index 12ec204..cbba029 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-@@ -142,11 +142,13 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
- 			   cfg);
- }
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+index 851b4a0..70006a3 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+@@ -50,6 +50,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_at91sam9n12 = {
+ 	.min_height = 0,
+ 	.max_width = 1280,
+ 	.max_height = 860,
++	.max_spw = 0x3f,
++	.max_vpw = 0x3f,
++	.max_hpw = 0xff,
+ 	.nlayers = ARRAY_SIZE(atmel_hlcdc_at91sam9n12_layers),
+ 	.layers = atmel_hlcdc_at91sam9n12_layers,
+ };
+@@ -134,6 +137,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_at91sam9x5 = {
+ 	.min_height = 0,
+ 	.max_width = 800,
+ 	.max_height = 600,
++	.max_spw = 0x3f,
++	.max_vpw = 0x3f,
++	.max_hpw = 0xff,
+ 	.nlayers = ARRAY_SIZE(atmel_hlcdc_at91sam9x5_layers),
+ 	.layers = atmel_hlcdc_at91sam9x5_layers,
+ };
+@@ -237,6 +243,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_sama5d3 = {
+ 	.min_height = 0,
+ 	.max_width = 2048,
+ 	.max_height = 2048,
++	.max_spw = 0x3f,
++	.max_vpw = 0x3f,
++	.max_hpw = 0x1ff,
+ 	.nlayers = ARRAY_SIZE(atmel_hlcdc_sama5d3_layers),
+ 	.layers = atmel_hlcdc_sama5d3_layers,
+ };
+@@ -320,6 +329,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_sama5d4 = {
+ 	.min_height = 0,
+ 	.max_width = 2048,
+ 	.max_height = 2048,
++	.max_spw = 0xff,
++	.max_vpw = 0xff,
++	.max_hpw = 0x3ff,
+ 	.nlayers = ARRAY_SIZE(atmel_hlcdc_sama5d4_layers),
+ 	.layers = atmel_hlcdc_sama5d4_layers,
+ };
+@@ -358,19 +370,19 @@ int atmel_hlcdc_dc_mode_valid(struct atmel_hlcdc_dc *dc,
+ 	int hback_porch = mode->htotal - mode->hsync_end;
+ 	int hsync_len = mode->hsync_end - mode->hsync_start;
  
--static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *crtc,
-+static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *c,
- 					const struct drm_display_mode *mode,
- 					struct drm_display_mode *adjusted_mode)
- {
--	return true;
-+	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
-+
-+	return atmel_hlcdc_dc_mode_valid(crtc->dc, adjusted_mode) == MODE_OK;
- }
+-	if (hsync_len > 0x40 || hsync_len < 1)
++	if (hsync_len > dc->desc->max_spw + 1 || hsync_len < 1)
+ 		return MODE_HSYNC;
  
- static void atmel_hlcdc_crtc_disable(struct drm_crtc *c)
-@@ -311,12 +313,8 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
- static int atmel_hlcdc_crtc_atomic_check(struct drm_crtc *c,
- 					 struct drm_crtc_state *s)
- {
--	struct atmel_hlcdc_crtc *crtc = drm_crtc_to_atmel_hlcdc_crtc(c);
- 	int ret;
+-	if (vsync_len > 0x40 || vsync_len < 1)
++	if (vsync_len > dc->desc->max_spw + 1 || vsync_len < 1)
+ 		return MODE_VSYNC;
  
--	if (atmel_hlcdc_dc_mode_valid(crtc->dc, &s->adjusted_mode) != MODE_OK)
--		return -EINVAL;
--
- 	ret = atmel_hlcdc_crtc_select_output_mode(s);
- 	if (ret)
- 		return ret;
+-	if (hfront_porch > 0x200 || hfront_porch < 1 ||
+-	    hback_porch > 0x200 || hback_porch < 1 ||
++	if (hfront_porch > dc->desc->max_hpw + 1 || hfront_porch < 1 ||
++	    hback_porch > dc->desc->max_hpw + 1 || hback_porch < 1 ||
+ 	    mode->hdisplay < 1)
+ 		return MODE_H_ILLEGAL;
+ 
+-	if (vfront_porch > 0x40 || vfront_porch < 1 ||
+-	    vback_porch > 0x40 || vback_porch < 0 ||
++	if (vfront_porch > dc->desc->max_vpw + 1 || vfront_porch < 1 ||
++	    vback_porch > dc->desc->max_vpw || vback_porch < 0 ||
+ 	    mode->vdisplay < 1)
+ 		return MODE_V_ILLEGAL;
+ 
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+index 53b4488..23521ba 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+@@ -50,6 +50,9 @@
+  * @min_height: minimum height supported by the Display Controller
+  * @max_width: maximum width supported by the Display Controller
+  * @max_height: maximum height supported by the Display Controller
++ * @max_spw: maximum vertical/horizontal pulse width
++ * @max_vpw: maximum vertical back/front porch width
++ * @max_hpw: maximum horizontal back/front porch width
+  * @layers: a layer description table describing available layers
+  * @nlayers: layer description table size
+  */
+@@ -58,6 +61,9 @@ struct atmel_hlcdc_dc_desc {
+ 	int min_height;
+ 	int max_width;
+ 	int max_height;
++	int max_spw;
++	int max_vpw;
++	int max_hpw;
+ 	const struct atmel_hlcdc_layer_desc *layers;
+ 	int nlayers;
+ };
 -- 
 2.5.0
