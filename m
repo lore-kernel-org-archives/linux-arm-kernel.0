@@ -1,131 +1,104 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 16 Mar 2016 18:46:50 +0800
-Subject: [PATCH] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <1458124582-2511-1-git-send-email-jszhang@marvell.com>
-References: <1458124582-2511-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160316184650.1a88dba6@xhacker>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 16 Mar 2016 11:58:11 +0100
+Subject: [PATCH v3 6/8] arm64: dts: rockchip: Add power key to GeekBox
+In-Reply-To: <6BD669A2-4971-4702-8742-77C9994AA4E9@gmail.com>
+References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
+ <1457294038-14243-7-git-send-email-afaerber@suse.de>
+ <6BD669A2-4971-4702-8742-77C9994AA4E9@gmail.com>
+Message-ID: <56E93C43.1060500@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
-
-On Wed, 16 Mar 2016 18:36:22 +0800 Jisheng Zhang wrote:
-
-> dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
-> dw_pcie_host_init() also contains some necessary rc setup code.
+Am 11.03.2016 um 00:04 schrieb Julien Chauveau:
+>> Le 6 mars 2016 ? 20:53, Andreas F?rber <afaerber@suse.de> a ?crit :
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>> v2 -> v3:
+>> * Adopted wakeup-source instead of gpio-key,wakeup (Julien)
+>> * Dropped gpio-keys #address-cells and #size-cells properties (Julien)
+>> * Dropped power button reg property (Julien)
+>> * Adopted KEY_POWER (Julien)
+>> * Fixed power button pinctrl pull setting (Julien)
+>>
+>> v2: New
+>>
+>> arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts | 20 ++++++++++++++++++++
+>> 1 file changed, 20 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+>> index 098be3700a6f..7036b49c9206 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+>> @@ -42,6 +42,7 @@
+>>
+>> /dts-v1/;
+>> #include "rk3368.dtsi"
+>> +#include <dt-bindings/input/input.h>
+>>
+>> / {
+>> 	model = "GeekBox";
+>> @@ -70,6 +71,19 @@
+>> 		pinctrl-0 = <&ir_int>;
+>> 	};
+>>
+>> +	keys: gpio-keys {
 > 
-> Another reason: the host may lost power during suspend to ram, the RC
-> need to be re-setup after resume. The rc can't be correctly resumed
-> without the rc setup code in dw_pcie_host_init().
+> I think you don't need the "keys" label, because there?s no phandle that refers to this.
+
+As discussed elsewhere, there are four additional keys on the
+Landingship (you proposed as sub-node names key1-key4).
+I prefer preparing the label now over adding it in a later patch.
+
+>> +		compatible = "gpio-keys";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pwr_key>;
+>> +
+>> +		button at 0 {
 > 
-> So this patch moves the code to dw_pcie_setup_rc() to address the above
-> two issues. After this patch, each pcie designware driver users could
-> call dw_pcie_setup_rc() to re-setup rc when resume back.
+> Here you should use "power" instead of "button at 0".
 
-Some background of this patch: we want to add suspend/resume support to BG4CT
-pcie hosts. The host will lost power when suspend to ram, and reset when resume
-back. So I must re-setup the rc by dw_pcie_setup_rc().
+Done.
 
-Tested on Marvell BG4CT platforms.
-
-Two issues need your help:
-
-1. duplicate PCI_BASE_ADDRESS_0 programming. we first write 4 to
-PCI_BASE_ADDRESS_0 in dw_pcie_setup_rc(), then write 0 to it again in
-dw_pcie_host_init(). Is there any reason to do so? could we remove
-the latter PCI_BASE_ADDRESS_0 programming?
-
-2. could we move the PORT_LOGIC_SPEED_CHANGE bit setting early, I.E with
-something as below:
-
-Thanks,
-Jisheng
-
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 6474f80..b824f6f 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -737,6 +737,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 	/* set link width speed control register */
- 	dw_pcie_readl_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, &val);
- 	val &= ~PORT_LOGIC_LINK_WIDTH_MASK;
-+	val |= PORT_LOGIC_SPEED_CHANGE;
- 	switch (pp->lanes) {
- 	case 1:
- 		val |= PORT_LOGIC_LINK_WIDTH_1_LANES;
-@@ -796,10 +797,6 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 
- 	/* program correct class for RC */
- 	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
--
--	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
--	val |= PORT_LOGIC_SPEED_CHANGE;
--	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
- }
- 
- MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-
-
+>> +			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+>> +			label = "GPIO Power";
+>> +			linux,code = <KEY_POWER>;
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/pci/host/pcie-designware.c | 38 +++++++++++++++++++-------------------
->  1 file changed, 19 insertions(+), 19 deletions(-)
+> According to Documentation/input/event-codes.txt, there?s a special event type for the power button.
+> Should we use it here for that purpose?
 > 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index a4cccd3..6474f80 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -544,25 +544,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	if (pp->ops->host_init)
->  		pp->ops->host_init(pp);
->  
-> -	/*
-> -	 * If the platform provides ->rd_other_conf, it means the platform
-> -	 * uses its own address translation component rather than ATU, so
-> -	 * we should not program the ATU here.
-> -	 */
-> -	if (!pp->ops->rd_other_conf)
-> -		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-> -					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-> -					  pp->mem_bus_addr, pp->mem_size);
-> -
-> -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-> -
-> -	/* program correct class for RC */
-> -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
-> -
-> -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-> -	val |= PORT_LOGIC_SPEED_CHANGE;
-> -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-> -
->  	pp->root_bus_nr = pp->busn->start;
->  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
->  		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
-> @@ -800,6 +781,25 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
->  	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
->  		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
->  	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
-> +
-> +	/*
-> +	 * If the platform provides ->rd_other_conf, it means the platform
-> +	 * uses its own address translation component rather than ATU, so
-> +	 * we should not program the ATU here.
-> +	 */
-> +	if (!pp->ops->rd_other_conf)
-> +		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-> +					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-> +					  pp->mem_bus_addr, pp->mem_size);
-> +
-> +	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-> +
-> +	/* program correct class for RC */
-> +	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
-> +
-> +	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-> +	val |= PORT_LOGIC_SPEED_CHANGE;
-> +	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
->  }
->  
->  MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+> 			linux,input-type = <EV_PWR>
+
+The other RK3368 boards don't, so unless you can give a justification to
+convert all boards yet again and test how this makes a difference, I'd
+rather not do experiments here but leave that to someone who knows what
+they're doing and then do it consistently...
+
+Thanks for the detailed review,
+
+Andreas
+
+>> +			wakeup-source;
+>> +		};
+>> +	};
+>> +
+>> 	leds: gpio-leds {
+>> 		compatible = "gpio-leds";
+>>
+>> @@ -265,6 +279,12 @@
+>> 		};
+>> 	};
+>>
+>> +	keys {
+>> +		pwr_key: pwr-key {
+>> +			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_none>;
+>> +		};
+>> +	};
+>> +
+>> 	pmic {
+>> 		pmic_sleep: pmic-sleep {
+>> 			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
