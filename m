@@ -1,128 +1,80 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 16 Mar 2016 20:10:51 +0000
-Subject: [STLinux Kernel] [PATCH v5 7/7] ARM: STiH407: Move over to using
- the 'reserved-memory' API for obtaining DMA memory
-In-Reply-To: <20160316165526.GZ13692@x1>
-References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
- <1452602781-22424-8-git-send-email-lee.jones@linaro.org>
- <20160316163508.GA8396@griffinp-ThinkPad-X1-Carbon-2nd>
- <20160316165526.GZ13692@x1>
-Message-ID: <20160316201051.GA10042@griffinp-ThinkPad-X1-Carbon-2nd>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 16 Mar 2016 20:51:34 +0000
+Subject: [PATCH] iio: adc: rockchip_saradc: add saradc support for rk3399
+In-Reply-To: <1458063855-4154-1-git-send-email-david.wu@rock-chips.com>
+References: <1458063855-4154-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <56E9C756.10104@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, 16 Mar 2016, Lee Jones wrote:
-
-> On Wed, 16 Mar 2016, Peter Griffin wrote:
+On 15/03/16 17:44, David Wu wrote:
+> The ADC is a 6-channel signal-ended 10-bit Successive
+> Approximation Register (SAR) A/D Converter.
 > 
-> > Hi Lee,
-> > 
-> > On Tue, 12 Jan 2016, Lee Jones wrote:
-> > 
-> > > Doing so saves quite a bit of code in the driver.
-> > > 
-> > > For more information on the 'reserved-memory' bindings see:
-> > > 
-> > >   Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> > > 
-> > > Suggested-by: Suman Anna <s-anna@ti.com>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  arch/arm/boot/dts/stih407-family.dtsi | 46 +++++++++++++++++++++++++++++------
-> > >  1 file changed, 38 insertions(+), 8 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> > > index 15c20b6..27b8efc 100644
-> > > --- a/arch/arm/boot/dts/stih407-family.dtsi
-> > > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> > > @@ -15,6 +15,36 @@
-> > >  	#address-cells = <1>;
-> > >  	#size-cells = <1>;
-> > >  
-> > > +	reserved-memory {
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <1>;
-> > > +		ranges;
-> > > +
-> > > +		gp0_reserved: rproc at 40000000 {
-> > > +			compatible = "shared-dma-pool";
-> > > +			reg = <0x40000000 0x01000000>;
-> > > +			no-map;
-> > > +		};
-> > > +
-> > > +		gp1_reserved: rproc at 41000000 {
-> > > +			compatible = "shared-dma-pool";
-> > > +			reg = <0x41000000 0x01000000>;
-> > > +			no-map;
-> > > +		};
-> > > +
-> > > +		audio_reserved: rproc at 42000000 {
-> > > +			compatible = "shared-dma-pool";
-> > > +			reg = <0x42000000 0x01000000>;
-> > > +			no-map;
-> > > +		};
-> > > +
-> > > +		dmu_reserved: rproc at 43000000 {
-> > > +			compatible = "shared-dma-pool";
-> > > +			reg = <0x43000000 0x01000000>;
-> > > +			no-map;
-> > > +		};
-> > 
-> > I don't believe these reserved memory ranges are correct for audio_reserved and dmu_reserved.
-> > 
-> > For example my vid_firmware-stih407.elf is linked at 0x41c00000 base address and my
-> > audio_firmware-bd-stih407.elf is linked at 0x40c00000.
-> > 
-> > So with all the st231 rproc nodes enabled I guess it would still work. But
-> > currently I think st231_gp0 is reserving the memory region for st231_audio,
-> > and st231-gp1 is reserving the memory region for st231_dmu.
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+Looks straight forward so applied to the togreg branch of iio.git,
+pushed out as testing for the autobuilders to play with it.
+
+Thanks,
+
+Jonathan
+> ---
+>  .../devicetree/bindings/iio/adc/rockchip-saradc.txt   |  6 +++++-
+>  drivers/iio/adc/rockchip_saradc.c                     | 19 +++++++++++++++++++
+>  2 files changed, 24 insertions(+), 1 deletion(-)
 > 
-> These addresses are taken from internally tested code. 
-
-Yes I did check the internal kernel, it would appear to be wrong there as
-well. One of the joys of mailing list code review I guess :-)
-
-> I don't have
-> access to the LMI layout documentation (if it even exists) so can't
-> check for myself.
-
->  Isn't this just DDR anyway? 
-
-Yes it is DDR
-
-> So in theory we can
-> configure each devices' slice where ever we feel is appropriate? 
-
-Nope. The st231 audio and video firmwares are provided by ST as binary blobs and
-aren't AFAIK compiled as position independent code. So the reserved-memory region
-needs to match where the firmware has been linked to run from.
-
-> How
-> is memory allocated to the DMU and Audio drivers?  Do you have scripts
-> which link the aforementioned binaries?
-
-I don't have any scripts, firmware source code or even a st200 toolset.
-
+> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> index a9a5fe1..bf99e2f 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> @@ -1,7 +1,11 @@
+>  Rockchip Successive Approximation Register (SAR) A/D Converter bindings
+>  
+>  Required properties:
+> -- compatible: Should be "rockchip,saradc" or "rockchip,rk3066-tsadc"
+> +- compatible: should be "rockchip,<name>-saradc" or "rockchip,rk3066-tsadc"
+> +   - "rockchip,saradc": for rk3188, rk3288
+> +   - "rockchip,rk3066-tsadc": for rk3036
+> +   - "rockchip,rk3399-saradc": for rk3399
+> +
+>  - reg: physical base address of the controller and length of memory mapped
+>         region.
+>  - interrupts: The interrupt number to the cpu. The interrupt specifier format
+> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+> index 9c311c1..f9ad6c2 100644
+> --- a/drivers/iio/adc/rockchip_saradc.c
+> +++ b/drivers/iio/adc/rockchip_saradc.c
+> @@ -159,6 +159,22 @@ static const struct rockchip_saradc_data rk3066_tsadc_data = {
+>  	.clk_rate = 50000,
+>  };
+>  
+> +static const struct iio_chan_spec rockchip_rk3399_saradc_iio_channels[] = {
+> +	ADC_CHANNEL(0, "adc0"),
+> +	ADC_CHANNEL(1, "adc1"),
+> +	ADC_CHANNEL(2, "adc2"),
+> +	ADC_CHANNEL(3, "adc3"),
+> +	ADC_CHANNEL(4, "adc4"),
+> +	ADC_CHANNEL(5, "adc5"),
+> +};
+> +
+> +static const struct rockchip_saradc_data rk3399_saradc_data = {
+> +	.num_bits = 10,
+> +	.channels = rockchip_rk3399_saradc_iio_channels,
+> +	.num_channels = ARRAY_SIZE(rockchip_rk3399_saradc_iio_channels),
+> +	.clk_rate = 1000000,
+> +};
+> +
+>  static const struct of_device_id rockchip_saradc_match[] = {
+>  	{
+>  		.compatible = "rockchip,saradc",
+> @@ -166,6 +182,9 @@ static const struct of_device_id rockchip_saradc_match[] = {
+>  	}, {
+>  		.compatible = "rockchip,rk3066-tsadc",
+>  		.data = &rk3066_tsadc_data,
+> +	}, {
+> +		.compatible = "rockchip,rk3399-saradc",
+> +		.data = &rk3399_saradc_data,
+>  	},
+>  	{},
+>  };
 > 
-> If you think there is an issue, I suggest the best thing to do is ping
-> Ludovic, since he is the author of the original code.
-
-Ok I will ping Ludovic and point him at this thread.
-
-I think maybe the internal kernel rproc driver was only used to reserve memory,
-manage clocks, and co-processor reset / power lines, and multicom actually
-loaded the firmware elf file.
-
-The reason for coming to that conclusion is that if rproc driver was loading the
-firmware I can't see how you would end up with a correctly booted co-processor
-with a reserved-memory node which doesn't match up with where the firmware is linked to
-run from.
-
-Did you manage to boot audio or video co-pro successfully with the dt nodes as
-they currently are in this patch?
-
-regards,
-
-Peter.
