@@ -1,79 +1,106 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 16 Mar 2016 11:13:56 +0530
-Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
-In-Reply-To: <56E858D8.8030300@arm.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-4-git-send-email-dave.long@linaro.org>
- <56E858D8.8030300@arm.com>
-Message-ID: <20160316054329.GC28915@dhcppc6.redhat.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 16 Mar 2016 06:08:53 +0000
+Subject: [PATCH 5/7] dmaengine: xilinx_vdma: Remove unnecessary axi dma
+ device-tree binding doc
+In-Reply-To: <CAAtXAHeKd7NjWdPFczDTSN8yLJFPHTorvH+eNrcww7naCViytA@mail.gmail.com>
+References: <1458062592-27981-1-git-send-email-appanad@xilinx.com>
+ <1458062592-27981-6-git-send-email-appanad@xilinx.com>
+ <CAAtXAHeKd7NjWdPFczDTSN8yLJFPHTorvH+eNrcww7naCViytA@mail.gmail.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A56D2B1@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/2016:06:47:52 PM, James Morse wrote:
-> Hi David,
+Hi Moritz,
+
+
+> -----Original Message-----
+> From: Moritz Fischer [mailto:moritz.fischer at ettus.com]
+> Sent: Wednesday, March 16, 2016 7:04 AM
+> To: Appana Durga Kedareswara Rao
+> Cc: Dan Williams; Vinod Koul; Michal Simek; Soren Brinkmann; Appana Durga
+> Kedareswara Rao; Laurent Pinchart; Luis de Bethencourt; Anirudha Sarangi;
+> dmaengine at vger.kernel.org; linux-arm-kernel; Linux Kernel Mailing List
+> Subject: Re: [PATCH 5/7] dmaengine: xilinx_vdma: Remove unnecessary axi dma
+> device-tree binding doc
 > 
-> On 09/03/16 05:32, David Long wrote:
-> > From: "David A. Long" <dave.long@linaro.org>
-> > diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-> > index 4699cd7..0ac2131 100644
-> > --- a/arch/arm64/lib/copy_from_user.S
-> > +++ b/arch/arm64/lib/copy_from_user.S
-> > @@ -66,6 +66,7 @@
-> >  	.endm
-> >  
-> >  end	.req	x5
-> > +	.section .kprobes.text,"ax",%progbits
-> >  ENTRY(__copy_from_user)
-> >  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-> >  	    CONFIG_ARM64_PAN)
-> > diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-> > index 7512bbb..e4eb84c 100644
-> > --- a/arch/arm64/lib/copy_to_user.S
-> > +++ b/arch/arm64/lib/copy_to_user.S
-> > @@ -65,6 +65,7 @@
-> >  	.endm
-> >  
-> >  end	.req	x5
-> > +	.section .kprobes.text,"ax",%progbits
-> >  ENTRY(__copy_to_user)
-> >  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-> >  	    CONFIG_ARM64_PAN)
-> > 
+> Hi there,
 > 
-> If I understand this correctly -  you can't kprobe these ldr/str instructions as
-> the fault handler wouldn't find kprobe's out-of line version of the instruction
-> in the exception table... but why only these two functions? (for library
-> functions, we also have clear_user() and copy_in_user()...)
-
-May be not clear_user() because those are inlined, but may be __clear_user().
-
-There can be many other functions (see [1], [2] and can be many more) which need
-to be blacklisted, but I think they can always be added latter on, and atleast
-this aspect should not hinder inclusion of these patches.
-
+> On Tue, Mar 15, 2016 at 10:23 AM, Kedareswara rao Appana
+> <appana.durga.rao@xilinx.com> wrote:
+> > AXI DMA support is added to the existing AXI VDMA driver.
+> > The binding doc for AXI DMA should also be updated in the VDMA
+> > device-tree binding doc.
+> >
+> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > ---
+> >  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  | 65
+> > ----------------------
+> >  1 file changed, 65 deletions(-)
+> >  delete mode 100644
+> > Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> > b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> > deleted file mode 100644
+> > index 2291c40..0000000
+> > --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> > +++ /dev/null
+> > @@ -1,65 +0,0 @@
+> > -Xilinx AXI DMA engine, it does transfers between memory and AXI4
+> > stream -target devices. It can be configured to have one channel or two
+> channels.
+> > -If configured as two channels, one is to transmit to the device and
+> > another -is to receive from the device.
+> > -
+> > -Required properties:
+> > -- compatible: Should be "xlnx,axi-dma-1.00.a"
+> > -- #dma-cells: Should be <1>, see "dmas" property below
+> > -- reg: Should contain DMA registers location and length.
+> > -- dma-channel child node: Should have atleast one channel and can have upto
+> > -       two channels per device. This node specifies the properties of each
+> > -       DMA channel (see child node properties below).
 > 
-> The get_user()/put_user() stuff in uaccess.h gets inlined all over the kernel, I
-> don't think its feasible to put all of these in a separate section.
-
-Yes, It does not seem possible to blacklist  inlined functions. There can be
-some other places like valid kprobable instructions in atomic context, .word
-instruction having data as valid instruction, etc... So, probably its not
-possible to make 100% safe, but yes wherever possible, we should take care.
-
-Infact, other ARCHs are also not completely safe. One can try to instrument
-kprobe on all the symbols in Kallsyms on an x86_64 machine and kernel crashes.
-
+> at least vs atleast, up to vs upto.
+> > -
+> > -Optional properties:
+> > -- xlnx,include-sg: Tells whether configured for Scatter-mode in
+> > -       the hardware.
 > 
-> Is it feasible to search the exception table at runtime instead? If an
-> address-to-be-kprobed appears in the list, we know it could generate exceptions,
-> so we should report that we can't probe this address. That would catch all of
-> the library functions, all the places uaccess.h was inlined, and anything new
-> that gets invented in the future.
+> How about: 'If present, hardware supports scatter-gather mode'
 
-Sorry, probably I could not get it. How can an inlined addresses range be placed
-in exception table or any other code area.
+I am deleting this binding doc as AXI DMA IP support is being added to the 
+Existing VDMA driver.
 
-~Pratyush
+Will fix your comments in the vdma device-tree binding doc.
 
-[1] https://github.com/pratyushanand/linux/commit/855bc4dbb98ceafac4c933e00d203b1cd7ee9ca4
-[2] https://github.com/pratyushanand/linux/commit/8bc586d6f767240e9ffa582f45a9ad11de47ecfb
+Regards,
+Kedar.
+
+> > -
+> > -Required child node properties:
+> > -- compatible: It should be either "xlnx,axi-dma-mm2s-channel" or
+> > -       "xlnx,axi-dma-s2mm-channel".
+> > -- interrupts: Should contain per channel DMA interrupts.
+> > -- xlnx,datawidth: Should contain the stream data width, take values
+> > -       {32,64...1024}.
+> > -
+> > -Option child node properties:
+> > -- xlnx,include-dre: Tells whether hardware is configured for Data
+> > -       Realignment Engine.
+> 
+> How about: 'If present, hardware supports Data Realignment Engine'
+> 
+> > -
+> > -Example:
+> > -++++++++
+> > -
+> > -axi_dma_0: axidma at 40400000 {
+> > -       compatible = "xlnx,axi-dma-1.00.a";
+> > -       #dma_cells = <1>;
+> 
+> I think you meant #dma-cells = <1>; here. That caught me while testing ;-)
+> 
+> Cheers,
+> 
+> Moritz
