@@ -1,50 +1,61 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 16 Mar 2016 11:31:06 -0400
-Subject: [PATCH V2 3/3] scsi: mptxsas: offload IRQ execution
-In-Reply-To: <564187DA.6090508@codeaurora.org>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <1447034266-28003-4-git-send-email-okaya@codeaurora.org>
- <5640481C.9000505@suse.de> <564187DA.6090508@codeaurora.org>
-Message-ID: <56E97C3A.6030307@codeaurora.org>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 16 Mar 2016 15:35:20 +0000
+Subject: [RFC PATCH 02/12] arm64: kvm: Fix {V}TCR_EL2_TG0 mask
+In-Reply-To: <56E973A6.7020004@arm.com>
+References: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
+ <1457974391-28456-3-git-send-email-suzuki.poulose@arm.com>
+ <56E973A6.7020004@arm.com>
+Message-ID: <56E97D38.2010409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2015 12:59 AM, Sinan Kaya wrote:
-> 
-> On 11/9/2015 2:15 AM, Hannes Reinecke wrote:
->> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
->>> The mpt2sas and mpt3sas drivers are spinning forever in
->>> their IRQ handlers if there are a lot of jobs queued up
->>> by the PCIe card. This handler is causing spikes for
->>> the rest of the system and sluggish behavior.
->>>
->>> Marking all MSI interrupts as non-shared and moving the
->>> MSI interrupts to thread context. This relexes the rest
->>> of the system execution.
->>>
->> NACK.
+On 16/03/16 14:54, Marc Zyngier wrote:
+> On 14/03/16 16:53, Suzuki K Poulose wrote:
+>> {V}TCR_EL2_TG0 is a 2bit wide field, where:
 >>
->> If there is a scalability issue when handling interrupts
->> it should be fixed in the driver directly.
+>>   00 - 4K
+>>   01 - 64K
+>>   10 - 16K
 >>
->> Looking at the driver is should be possible to implement
->> a worker thread handling the reply descriptor, and having the
->> interrupt only to fetch the reply descriptor.
+>> But we use only 1 bit, which has worked well so far since
+>> we never cared about 16K. Fix it for 16K support.
+
+
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -99,7 +99,7 @@
+>>   #define TCR_EL2_TBI	(1 << 20)
+>>   #define TCR_EL2_PS	(7 << 16)
+>>   #define TCR_EL2_PS_40B	(2 << 16)
+>> -#define TCR_EL2_TG0	(1 << 14)
+>> +#define TCR_EL2_TG0	(3 << 14)
+>>   #define TCR_EL2_SH0	(3 << 12)
+>>   #define TCR_EL2_ORGN0	(3 << 10)
+>>   #define TCR_EL2_IRGN0	(3 << 8)
+>> @@ -110,7 +110,7 @@
+>>   /* VTCR_EL2 Registers bits */
+>>   #define VTCR_EL2_RES1		(1 << 31)
+>>   #define VTCR_EL2_PS_MASK	(7 << 16)
+>> -#define VTCR_EL2_TG0_MASK	(1 << 14)
+>> +#define VTCR_EL2_TG0_MASK	(3 << 14)
+>>   #define VTCR_EL2_TG0_4K		(0 << 14)
+>>   #define VTCR_EL2_TG0_64K	(1 << 14)
+>>   #define VTCR_EL2_SH0_MASK	(3 << 12)
 >>
-> 
-> Can you go into the detail about which part of the _base_interrupt
-> function needs to be executed in ISR context and which part can be
-> queued up to worker thread?
-> 
-> I'm not familiar with the hardware or the code. That's why, I moved the
-> entire ISR into the thread context.
+>
+> As we already have arch/arm64/include/asm/pgtable-hwdef.h defining
+> TCR_TG0_{4,16,64}K, would it make sense to reuse those and drop the
+> locally defined values? Something like:
+>
+> #define TCR_EL2_TG0_4K	TCR_TG0_4K
+>
+> ?
 
-Hannes or others, any suggestions?
+We could do that for both TCR_EL2 and VTCR_EL2.
 
-Thanks,
-Christopher Covington
+Btw, since this patch doesn't touch any of those fields and fixes an issue,
+I will keep that change separate. I can squash it to the following cleanup
+patch in this series.
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Cheers
+Suzuki
