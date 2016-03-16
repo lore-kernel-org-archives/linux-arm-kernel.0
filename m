@@ -1,106 +1,76 @@
-From: rajiv.nishtala@bsc.es (nishtala)
-Date: Wed, 16 Mar 2016 17:17:21 +0100
-Subject: Questions about sleep states on ARM Juno R0
-In-Reply-To: <CAPKp9uZ28sYvAsz2H2gid=_DStcFrRnVw70mYDkHUAcXJZy9Bw@mail.gmail.com>
-References: <56E80519.1040400@bsc.es>
- <CAPKp9uZ28sYvAsz2H2gid=_DStcFrRnVw70mYDkHUAcXJZy9Bw@mail.gmail.com>
-Message-ID: <56E98711.801@bsc.es>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 16 Mar 2016 16:35:08 +0000
+Subject: [STLinux Kernel] [PATCH v5 7/7] ARM: STiH407: Move over to using
+ the 'reserved-memory' API for obtaining DMA memory
+In-Reply-To: <1452602781-22424-8-git-send-email-lee.jones@linaro.org>
+References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
+ <1452602781-22424-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160316163508.GA8396@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your reply. I have one more question.
+Hi Lee,
 
-I ran a single instance of blackscholes (compute bounded
-application) with 4 threads on 4 small cores at 0.65GHz
-and then I ran it on 1 big core at 0.6GHz.
+On Tue, 12 Jan 2016, Lee Jones wrote:
 
-The power as read from the 4 energy registers shows that the
-1Big core at 0.6GHz consumes as much power as 4 small cores at 0.65GHz.
-Do this power proportionality number make sense?
+> Doing so saves quite a bit of code in the driver.
+> 
+> For more information on the 'reserved-memory' bindings see:
+> 
+>   Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> 
+> Suggested-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 46 +++++++++++++++++++++++++++++------
+>  1 file changed, 38 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 15c20b6..27b8efc 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -15,6 +15,36 @@
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		gp0_reserved: rproc at 40000000 {
+> +			compatible = "shared-dma-pool";
+> +			reg = <0x40000000 0x01000000>;
+> +			no-map;
+> +		};
+> +
+> +		gp1_reserved: rproc at 41000000 {
+> +			compatible = "shared-dma-pool";
+> +			reg = <0x41000000 0x01000000>;
+> +			no-map;
+> +		};
+> +
+> +		audio_reserved: rproc at 42000000 {
+> +			compatible = "shared-dma-pool";
+> +			reg = <0x42000000 0x01000000>;
+> +			no-map;
+> +		};
+> +
+> +		dmu_reserved: rproc at 43000000 {
+> +			compatible = "shared-dma-pool";
+> +			reg = <0x43000000 0x01000000>;
+> +			no-map;
+> +		};
 
-Best Regards,
-Rajiv
+I don't believe these reserved memory ranges are correct for audio_reserved and dmu_reserved.
 
-On Tuesday 15 March 2016 03:14 PM, Sudeep Holla wrote:
-> Hi Rajiv,
->
-> On Tue, Mar 15, 2016 at 12:50 PM, nishtala <rajiv.nishtala@bsc.es> wrote:
->> In response to the discussion here (https://community.arm.com/thread/9382).
->> I'm continuing my follow-up question.
->>
->> Sudeep here says to read the sysfs files to get usage/time to understand the
->> sleep-state residency of the cores/cluster.
->>
->> To look at the sysfs files, I wrote a version of a watchdog which
->> essentially prints out the difference in "usage", if
->> it changes in the last 0.01s (it is a LARGE interval relative to update
->> period of sysfs files).
->>
->> The questions I have are the following:
->> - When the system is idle, that is, no user initiated tasks are running; I
->> expected the counter for "usage" in CLUSTER_SLEEP_0 to remain constant,
->> because you don't exit
->> until any kernel interrupts occur, and is guaranteed to stay atleast for
->> 3500us while the "time" in the same category to increase.
->>
-> Are you not seeing any increase in interrupt count on that cpu where
-> CLUSTER_SLEEP_0 usage is increasing. Also there's not guarantee that
-> it will stay in  CLUSTER_SLEEP_0 for 3500us, it can be woken up by interrupts.
-Yes, the interrupt count is also increasing.
->> However, what I notice is that "usage" ALSO increases, which is something I
->> do not understand.
->>
-> Check the interrupt count, you must see that also increasing.
->
->> - When I run an application only on small OR big cores, the counter "usage"
->> for CPU_SLEEP_0 on the other type of core (big/small) still isn't updated.
->> Am I missing something here?
->>
-> Is this a question or your observation ? You are assuming that only your
-> applications will be running ? It depends also on several background tasks
-> that are running.
-it is a question, but i believe that background tasks are running
->
->> - Similarly, when I have an application that does only computations on both
->> big AND small cores simultaneously, how come the counter, "usage", for
->> CLUSTER_SLEEP_0 increases?
->> Shouldn't it remain constant?
->>
-> Again, when your application is running doesn't mean it's continuously runs
-> from start to end. It will interrupted when it yields the cpu or waits
-> on some IO.
-> During that short periods the cpus can enter idle states.
->
->> - How come value of "CLUSTER_SLEEP_0" (on a57 cluster) increases when there
->> is actually something running on it. How is it computed?
->>
-> Ditto as above.
->
-> [...]
->
->> WARNING / LEGAL TEXT: This message is intended only for the use of the
->> individual or entity to which it is addressed and may contain
->> information which is privileged, confidential, proprietary, or exempt
->> from disclosure under applicable law. If you are not the intended
->> recipient or the person responsible for delivering the message to the
->> intended recipient, you are strictly prohibited from disclosing,
->> distributing, copying, or in any way using this message. If you have
->> received this communication in error, please notify the sender and
->> destroy and delete any copies you may have received.
->>
-> You need to fix this, please get rid of this disclaimer if you want people to
-> respond to you.
-I unticked add signature in my mail client. Hope it works now.
+For example my vid_firmware-stih407.elf is linked at 0x41c00000 base address and my
+audio_firmware-bd-stih407.elf is linked at 0x40c00000.
 
+So with all the st231 rproc nodes enabled I guess it would still work. But
+currently I think st231_gp0 is reserving the memory region for st231_audio,
+and st231-gp1 is reserving the memory region for st231_dmu.
 
-WARNING / LEGAL TEXT: This message is intended only for the use of the
-individual or entity to which it is addressed and may contain
-information which is privileged, confidential, proprietary, or exempt
-from disclosure under applicable law. If you are not the intended
-recipient or the person responsible for delivering the message to the
-intended recipient, you are strictly prohibited from disclosing,
-distributing, copying, or in any way using this message. If you have
-received this communication in error, please notify the sender and
-destroy and delete any copies you may have received.
+regards,
 
-http://www.bsc.es/disclaimer
+Peter.
