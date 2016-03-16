@@ -1,140 +1,585 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 16 Mar 2016 12:41:52 +0100
-Subject: [PATCH v2 1/3] dt-bindings: add multidomain support to i.MX GPC DT
- binding
-Message-ID: <1458128514-9560-1-git-send-email-l.stach@pengutronix.de>
+Date: Wed, 16 Mar 2016 12:41:53 +0100
+Subject: [PATCH v2 2/3] ARM: imx6: rework GPC to support multiple power domains
+In-Reply-To: <1458128514-9560-1-git-send-email-l.stach@pengutronix.de>
+References: <1458128514-9560-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1458128514-9560-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new binding for the Freescale i.MX GPC block, which allows
-to describe multiple power domains in a more natural way. The driver
-will continue to support the old binding for existing DTBs, but new
-features like the additional domains present on i.MX6SX will only be
-usable with the new binding.
+This largely reworks the GPC driver to better accommodate multiple
+power domains. This allows to extend the driver to support more domains
+(like present on i.MX6SX) easily later on.
+
+Compatibility to the old DT bindings is provided to keep the currently
+supported i.MX6 devices working with the same feature level as before.
+New DTs and SoC support should only use the new binding from now on.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
-v2: clarify the number of interrupts (1)
+v2: correct spelling in commit message
 ---
- .../devicetree/bindings/power/fsl,imx-gpc.txt      | 81 ++++++++++++++--------
- 1 file changed, 54 insertions(+), 27 deletions(-)
+ arch/arm/mach-imx/gpc.c | 435 ++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 329 insertions(+), 106 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-index 65cc0345747d..e5b660018d63 100644
---- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-@@ -1,22 +1,41 @@
- Freescale i.MX General Power Controller
- =======================================
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index cfc696b972f3..5d26bc3679b4 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -1,4 +1,5 @@
+ /*
++ * Copyright 2015 Pengutronix, Lucas Stach <kernel@pengutronix.de>
+  * Copyright 2011-2013 Freescale Semiconductor, Inc.
+  * Copyright 2011 Linaro Ltd.
+  *
+@@ -17,9 +18,11 @@
+ #include <linux/irqchip.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_irq.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_domain.h>
++#include <linux/regmap.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include "common.h"
+@@ -27,14 +30,20 @@
  
--The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
--counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
--domains.
-+The i.MX6 General Power Control (GPC) block contains DVFS load tracking
-+counters and Power Gating Control (PGC).
- 
- Required properties:
- - compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
- - reg: should be register base and length as documented in the
-   datasheet
--- interrupts: Should contain GPC interrupt request 1
--- pu-supply: Link to the LDO regulator powering the PU power domain
--- clocks: Clock phandles to devices in the PU power domain that need
--	  to be enabled during domain power-up for reset propagation.
--- #power-domain-cells: Should be 1, see below:
-+- interrupts: Should contain one interrupt specifier for the GPC interrupt
-+- clocks: Must contain an entry for each entry in clock-names.
-+  See Documentation/devicetree/bindings/clocks/clock-bindings.txt for details.
-+- clock-names: Must include the following entries:
-+  - ipg
-+- pgc: a list of child nodes describing the SoC power domains controlled by the
-+  power gating controller.
- 
--The gpc node is a power-controller as documented by the generic power domain
--bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-+The power domains are generic power domain providers as documented in
-+Documentation/devicetree/bindings/power/power_domain.txt. They are described as
-+subnodes of the GPC and should contain the following
+ #define GPC_CNTR		0x000
+ #define GPC_IMR1		0x008
 +
-+Required properties:
-+- reg: the DOMAIN_INDEX as used by the client devices to refer to this
-+  power domain
-+  The following DOMAIN_INDEX values are valid for i.MX6Q:
-+  ARM_DOMAIN     0
-+  PU_DOMAIN      1
-+  The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-+  DISPLAY_DOMAIN 2
++#define GPC_PGC_PDN_OFFS	0x0
++#define GPC_PGC_PUPSCR_OFFS	0x4
++#define GPC_PGC_PDNSCR_OFFS	0x8
++#define GPC_PGC_SW2ISO_SHIFT	0x8
++#define GPC_PGC_SW_SHIFT	0x0
 +
-+- #power-domain-cells: Should be 0
+ #define GPC_PGC_GPU_PDN		0x260
+ #define GPC_PGC_GPU_PUPSCR	0x264
+ #define GPC_PGC_GPU_PDNSCR	0x268
 +
-+Optional properties:
-+- clocks: a number of phandles to clocks that need to be enabled during domain
-+  power-up sequencing to ensure reset propagation into devices located inside
-+  this power domain
-+- domain-supply: a phandle to the regulator powering this domain
+ #define GPC_PGC_CPU_PDN		0x2a0
+ #define GPC_PGC_CPU_PUPSCR	0x2a4
+ #define GPC_PGC_CPU_PDNSCR	0x2a8
+-#define GPC_PGC_SW2ISO_SHIFT	0x8
+-#define GPC_PGC_SW_SHIFT	0x0
  
- Example:
+ #define IMR_NUM			4
+ #define GPC_MAX_IRQS		(IMR_NUM * 32)
+@@ -44,13 +53,6 @@
  
-@@ -25,14 +44,29 @@ Example:
- 		reg = <0x020dc000 0x4000>;
- 		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
--		pu-supply = <&reg_pu>;
--		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
--			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
--			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
--			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
--			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
--			 <&clks IMX6QDL_CLK_VPU_AXI>;
--		#power-domain-cells = <1>;
-+		clocks = <&clks IMX6QDL_CLK_IPG>;
-+		clock-names = "ipg";
-+		
-+		pgc {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			power-domain at 0 {
-+				reg = <0>;
-+				#power-domain-cells = <0>;
-+			};
-+			pd_pu: power-domain at 1 {
-+				reg = <1>;
-+				#power-domain-cells = <0>;
-+				domain-supply = <&reg_pu>;
-+				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-+				         <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-+				         <&clks IMX6QDL_CLK_GPU2D_CORE>,
-+				         <&clks IMX6QDL_CLK_GPU2D_AXI>,
-+				         <&clks IMX6QDL_CLK_OPENVG_AXI>,
-+				         <&clks IMX6QDL_CLK_VPU_AXI>;
-+			};
-+		};
- 	};
+ #define GPC_CLK_MAX		6
  
- 
-@@ -40,20 +74,13 @@ Specifying power domain for IP modules
- ======================================
- 
- IP cores belonging to a power domain should contain a 'power-domains' property
--that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
--the power domain the device belongs to.
-+that is a phandle pointing to the power domain the device belongs to.
- 
- Example of a device that is part of the PU power domain:
- 
- 	vpu: vpu at 02040000 {
- 		reg = <0x02040000 0x3c000>;
- 		/* ... */
--		power-domains = <&gpc 1>;
-+		power-domains = <&pd_pu>;
- 		/* ... */
- 	};
+-struct pu_domain {
+-	struct generic_pm_domain base;
+-	struct regulator *reg;
+-	struct clk *clk[GPC_CLK_MAX];
+-	int num_clks;
+-};
 -
--The following DOMAIN_INDEX values are valid for i.MX6Q:
--ARM_DOMAIN     0
--PU_DOMAIN      1
--The following additional DOMAIN_INDEX value is valid for i.MX6SL:
--DISPLAY_DOMAIN 2
+ static void __iomem *gpc_base;
+ static u32 gpc_wake_irqs[IMR_NUM];
+ static u32 gpc_saved_imrs[IMR_NUM];
+@@ -291,181 +293,402 @@ void __init imx_gpc_check_dt(void)
+ 	}
+ }
+ 
+-static void _imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
++/* PGC (power gating controller) */
++
++struct imx_pm_domain {
++	struct generic_pm_domain base;
++	struct regmap *regmap;
++	struct regulator *supply;
++	struct clk *clk[GPC_CLK_MAX];
++	int num_clks;
++	unsigned int reg_offs;
++	signed char cntr_pdn_bit;
++	unsigned int ipg_rate_mhz;
++};
++
++static inline struct imx_pm_domain *
++to_imx_pm_domain(struct generic_pm_domain *genpd)
++{
++	return container_of(genpd, struct imx_pm_domain, base);
++}
++
++static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+ {
++	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+ 	int iso, iso2sw;
+ 	u32 val;
+ 
+ 	/* Read ISO and ISO2SW power down delays */
+-	val = readl_relaxed(gpc_base + GPC_PGC_GPU_PDNSCR);
++	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+ 	iso = val & 0x3f;
+ 	iso2sw = (val >> 8) & 0x3f;
+ 
+-	/* Gate off PU domain when GPU/VPU when powered down */
+-	writel_relaxed(0x1, gpc_base + GPC_PGC_GPU_PDN);
++	/* Gate off domain when powered down */
++	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
++			   0x1, 0x1);
+ 
+-	/* Request GPC to power down GPU/VPU */
+-	val = readl_relaxed(gpc_base + GPC_CNTR);
+-	val |= GPU_VPU_PDN_REQ;
+-	writel_relaxed(val, gpc_base + GPC_CNTR);
++	/* Request GPC to power down domain */
++	val = BIT(pd->cntr_pdn_bit);
++	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
+ 
+ 	/* Wait ISO + ISO2SW IPG clock cycles */
+-	ndelay((iso + iso2sw) * 1000 / 66);
+-}
+-
+-static int imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
+-{
+-	struct pu_domain *pu = container_of(genpd, struct pu_domain, base);
+-
+-	_imx6q_pm_pu_power_off(genpd);
++	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
+ 
+-	if (pu->reg)
+-		regulator_disable(pu->reg);
++	if (pd->supply)
++		regulator_disable(pd->supply);
+ 
+ 	return 0;
+ }
+ 
+-static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
++static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+ {
+-	struct pu_domain *pu = container_of(genpd, struct pu_domain, base);
++	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+ 	int i, ret, sw, sw2iso;
+ 	u32 val;
+ 
+-	if (pu->reg)
+-		ret = regulator_enable(pu->reg);
+-	if (pu->reg && ret) {
+-		pr_err("%s: failed to enable regulator: %d\n", __func__, ret);
+-		return ret;
++	if (pd->supply) {
++		ret = regulator_enable(pd->supply);
++		if (ret) {
++			pr_err("%s: failed to enable regulator: %d\n",
++			       __func__, ret);
++			return ret;
++		}
+ 	}
+ 
+-	/* Enable reset clocks for all devices in the PU domain */
+-	for (i = 0; i < pu->num_clks; i++)
+-		clk_prepare_enable(pu->clk[i]);
++	/* Enable reset clocks for all devices in the domain */
++	for (i = 0; i < pd->num_clks; i++)
++		clk_prepare_enable(pd->clk[i]);
+ 
+-	/* Gate off PU domain when GPU/VPU when powered down */
+-	writel_relaxed(0x1, gpc_base + GPC_PGC_GPU_PDN);
++	/* Gate off domain when powered down */
++	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
++			   0x1, 0x1);
+ 
+ 	/* Read ISO and ISO2SW power down delays */
+-	val = readl_relaxed(gpc_base + GPC_PGC_GPU_PUPSCR);
++	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+ 	sw = val & 0x3f;
+ 	sw2iso = (val >> 8) & 0x3f;
+ 
+-	/* Request GPC to power up GPU/VPU */
+-	val = readl_relaxed(gpc_base + GPC_CNTR);
+-	val |= GPU_VPU_PUP_REQ;
+-	writel_relaxed(val, gpc_base + GPC_CNTR);
++	/* Request GPC to power up domain */
++	val = BIT(pd->cntr_pdn_bit + 1);
++	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
+ 
+ 	/* Wait ISO + ISO2SW IPG clock cycles */
+-	ndelay((sw + sw2iso) * 1000 / 66);
++	udelay(DIV_ROUND_UP(sw + sw2iso, pd->ipg_rate_mhz));
++
++	/* Disable reset clocks for all devices in the domain */
++	for (i = 0; i < pd->num_clks; i++)
++		clk_disable_unprepare(pd->clk[i]);
+ 
+-	/* Disable reset clocks for all devices in the PU domain */
+-	for (i = 0; i < pu->num_clks; i++)
+-		clk_disable_unprepare(pu->clk[i]);
++	return 0;
++}
++
++static int imx_pgc_parse_dt(struct device *dev, struct imx_pm_domain *domain)
++{
++	int i, ret = 0;
++
++	/* try to get the domain supply regulator */
++	domain->supply = devm_regulator_get_optional(dev, "domain");
++	if (IS_ERR(domain->supply)) {
++		if (PTR_ERR(domain->supply) == -ENODEV)
++			domain->supply = NULL;
++		else
++			return PTR_ERR(domain->supply);
++	}
++
++	/* try to get all clocks needed for reset propagation */
++	for (i = 0; ; i++) {
++		struct clk *clk = of_clk_get(dev->of_node, i);
++		if (IS_ERR(clk))
++			break;
++		if (i >= GPC_CLK_MAX) {
++			dev_err(dev, "more than %d clocks\n", GPC_CLK_MAX);
++			ret = -EINVAL;
++			goto clk_err;
++		}
++		domain->clk[i] = clk;
++	}
++	domain->num_clks = i;
+ 
+ 	return 0;
++
++clk_err:
++	while (i--)
++		clk_put(domain->clk[i]);
++
++	return ret;
+ }
+ 
+-static struct generic_pm_domain imx6q_arm_domain = {
+-	.name = "ARM",
++static int imx_pgc_power_domain_probe(struct platform_device *pdev)
++{
++	struct imx_pm_domain *domain = pdev->dev.platform_data;
++	struct device *dev = &pdev->dev;
++	int ret = 0;
++
++	/* if this PD is associated with a DT node try to parse it */
++	if (dev->of_node) {
++		ret = imx_pgc_parse_dt(dev, domain);
++		if (ret)
++			return ret;
++	}
++
++	/* initially power on the domain */
++	if (domain->base.power_on)
++		domain->base.power_on(&domain->base);
++
++	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
++		pm_genpd_init(&domain->base, NULL, false);
++		ret = of_genpd_add_provider_simple(dev->of_node, &domain->base);
++	}
++
++	return ret;
++}
++
++static const struct platform_device_id imx_pgc_power_domain_id[] = {
++	{ "imx-pgc-power-domain"},
++	{ },
+ };
+ 
+-static struct pu_domain imx6q_pu_domain = {
+-	.base = {
+-		.name = "PU",
+-		.power_off = imx6q_pm_pu_power_off,
+-		.power_on = imx6q_pm_pu_power_on,
+-		.power_off_latency_ns = 25000,
+-		.power_on_latency_ns = 2000000,
++static struct platform_driver imx_pgc_power_domain_driver = {
++	.driver = {
++		.name = "imx-pgc-pd",
++		.suppress_bind_attrs = true,
+ 	},
++	.probe = imx_pgc_power_domain_probe,
++	.id_table = imx_pgc_power_domain_id,
+ };
+ 
+-static struct generic_pm_domain imx6sl_display_domain = {
+-	.name = "DISPLAY",
++static int __init imx_pgc_power_domain_init(void)
++{
++	return platform_driver_register(&imx_pgc_power_domain_driver);
++}
++device_initcall(imx_pgc_power_domain_init);
++
++static struct imx_pm_domain imx_gpc_domains[] = {
++	{
++		.base = {
++			.name = "ARM",
++		},
++	}, {
++		.base = {
++			.name = "PU",
++			.power_off = imx6_pm_domain_power_off,
++			.power_on = imx6_pm_domain_power_on,
++			.power_off_latency_ns = 500000,
++			.power_on_latency_ns = 2000000,
++		},
++		.reg_offs = 0x260,
++		.cntr_pdn_bit = 0,
++	}, {
++		.base = {
++			.name = "DISPLAY",
++			.power_off = imx6_pm_domain_power_off,
++			.power_on = imx6_pm_domain_power_on,
++		},
++		.reg_offs = 0x240,
++		.cntr_pdn_bit = 4,
++	}
+ };
+ 
+-static struct generic_pm_domain *imx_gpc_domains[] = {
+-	&imx6q_arm_domain,
+-	&imx6q_pu_domain.base,
+-	&imx6sl_display_domain,
++struct imx_gpc_dt_data {
++	int num_domains;
+ };
+ 
+-static struct genpd_onecell_data imx_gpc_onecell_data = {
+-	.domains = imx_gpc_domains,
+-	.num_domains = ARRAY_SIZE(imx_gpc_domains),
++static const struct imx_gpc_dt_data imx6q_dt_data = {
++	.num_domains = 2,
++};
++
++static const struct imx_gpc_dt_data imx6sl_dt_data = {
++	.num_domains = 3,
++};
++
++static const struct of_device_id imx_gpc_dt_ids[] = {
++	{ .compatible = "fsl,imx6q-gpc", .data = &imx6q_dt_data },
++	{ .compatible = "fsl,imx6sl-gpc", .data = &imx6sl_dt_data },
++	{ }
+ };
+ 
+-static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
++static bool imx_gpc_readable_reg(struct device *dev, unsigned int reg)
+ {
+-	struct clk *clk;
+-	int i;
++	return (reg % 4 == 0) && (reg <= 0x2ac);
++}
+ 
+-	imx6q_pu_domain.reg = pu_reg;
++static bool imx_gpc_volatile_reg(struct device *dev, unsigned int reg)
++{
++	if (reg == GPC_CNTR)
++		return true;
+ 
+-	for (i = 0; ; i++) {
+-		clk = of_clk_get(dev->of_node, i);
+-		if (IS_ERR(clk))
+-			break;
+-		if (i >= GPC_CLK_MAX) {
+-			dev_err(dev, "more than %d clocks\n", GPC_CLK_MAX);
+-			goto clk_err;
++	return false;
++}
++
++static const struct regmap_config imx_gpc_regmap_config = {
++	.cache_type = REGCACHE_FLAT,
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = 4,
++
++	.readable_reg = imx_gpc_readable_reg,
++	.volatile_reg = imx_gpc_volatile_reg,
++
++	.max_register = 0x2ac,
++};
++
++static struct generic_pm_domain *imx_gpc_onecell_domains[] = {
++	&imx_gpc_domains[0].base,
++	&imx_gpc_domains[1].base,
++};
++
++static struct genpd_onecell_data imx_gpc_onecell_data = {
++	.domains = imx_gpc_onecell_domains,
++	.num_domains = 2,
++};
++
++static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
++{
++	struct imx_pm_domain *domain;
++	int i, ret = 0;
++
++	for (i = 0; i < 2; i++) {
++		int j;
++
++		domain = &imx_gpc_domains[i];
++		domain->regmap = regmap;
++		domain->ipg_rate_mhz = 33;
++
++		if (i == 1) {
++			domain->supply = devm_regulator_get(dev, "pu");
++			if (IS_ERR(domain->supply))
++				return PTR_ERR(domain->supply);;
++
++			for (j = 0; ; j++) {
++				struct clk *clk = of_clk_get(dev->of_node, j);
++				if (IS_ERR(clk))
++					break;
++				if (j >= GPC_CLK_MAX) {
++					dev_err(dev, "more than %d clocks\n",
++						GPC_CLK_MAX);
++					ret = -EINVAL;
++					goto clk_err;
++				}
++				domain->clk[j] = clk;
++			}
++			domain->num_clks = j;
++
++			domain->base.power_on(&domain->base);
+ 		}
+-		imx6q_pu_domain.clk[i] = clk;
+-	}
+-	imx6q_pu_domain.num_clks = i;
+ 
+-	/* Enable power always in case bootloader disabled it. */
+-	imx6q_pm_pu_power_on(&imx6q_pu_domain.base);
++		if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
++			pm_genpd_init(&domain->base, NULL, false);
+ 
+-	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
+-		return 0;
++	}
++
++	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
++		ret = of_genpd_add_provider_onecell(dev->of_node,
++						    &imx_gpc_onecell_data);
+ 
+-	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
+-	return of_genpd_add_provider_onecell(dev->of_node,
+-					     &imx_gpc_onecell_data);
++	return ret;
+ 
+ clk_err:
+ 	while (i--)
+-		clk_put(imx6q_pu_domain.clk[i]);
+-	return -EINVAL;
++		clk_put(domain->clk[i]);
++
++	return ret;
+ }
+ 
+ static int imx_gpc_probe(struct platform_device *pdev)
+ {
+-	struct regulator *pu_reg;
++	const struct of_device_id *of_id =
++			of_match_device(imx_gpc_dt_ids, &pdev->dev);
++	const struct imx_gpc_dt_data *of_id_data = of_id->data;
++	struct device_node *pgc_node;
++	struct regmap *regmap;
++	struct resource *res;
++	void __iomem *base;
+ 	int ret;
+ 
++	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
++
+ 	/* bail out if DT too old and doesn't provide the necessary info */
+-	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells"))
++	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
++	    !pgc_node)
+ 		return 0;
+ 
+-	pu_reg = devm_regulator_get_optional(&pdev->dev, "pu");
+-	if (PTR_ERR(pu_reg) == -ENODEV)
+-		pu_reg = NULL;
+-	if (IS_ERR(pu_reg)) {
+-		ret = PTR_ERR(pu_reg);
+-		dev_err(&pdev->dev, "failed to get pu regulator: %d\n", ret);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
++					   &imx_gpc_regmap_config);
++	if (IS_ERR(regmap)) {
++		ret = PTR_ERR(regmap);
++		dev_err(&pdev->dev, "failed to init regmap: %d\n",
++			ret);
+ 		return ret;
+ 	}
+ 
+-	return imx_gpc_genpd_init(&pdev->dev, pu_reg);
+-}
++	if (!pgc_node) {
++		/* old DT layout is only supported for mx6q aka 2 domains */
++		if (of_id_data->num_domains != 2) {
++			dev_err(&pdev->dev, "could not find pgc DT node\n");
++			return -ENODEV;
++		}
+ 
+-static const struct of_device_id imx_gpc_dt_ids[] = {
+-	{ .compatible = "fsl,imx6q-gpc" },
+-	{ .compatible = "fsl,imx6sl-gpc" },
+-	{ }
+-};
++		ret = imx_gpc_old_dt_init(&pdev->dev, regmap);
++		if (ret)
++			return ret;
++	} else {
++		struct imx_pm_domain *domain;
++		struct platform_device *pd_pdev;
++		struct device_node *np;
++		struct clk *ipg_clk;
++		unsigned int ipg_rate_mhz;
++		int domain_index;
++
++		ipg_clk = devm_clk_get(&pdev->dev, "ipg");
++		if (IS_ERR(ipg_clk))
++			return PTR_ERR(ipg_clk);
++		ipg_rate_mhz = clk_get_rate(ipg_clk) / 1000000;
++
++		for_each_child_of_node(pgc_node, np) {
++			ret = of_property_read_u32(np, "reg", &domain_index);
++			if (ret) {
++				of_node_put(np);
++				return ret;
++			}
++
++			domain = &imx_gpc_domains[domain_index];
++			domain->regmap = regmap;
++			domain->ipg_rate_mhz = ipg_rate_mhz;
++
++			pd_pdev = platform_device_alloc("imx-pgc-power-domain",
++							domain_index);
++			pd_pdev->dev.platform_data = domain;
++			pd_pdev->dev.parent = &pdev->dev;
++			pd_pdev->dev.of_node = np;
++
++			ret = platform_device_add(pd_pdev);
++			if (ret) {
++				platform_device_put(pd_pdev);
++				of_node_put(np);
++				return ret;
++			}
++		}
++	}
++
++	return 0;
++}
+ 
+ static struct platform_driver imx_gpc_driver = {
+ 	.driver = {
+ 		.name = "imx-gpc",
+ 		.of_match_table = imx_gpc_dt_ids,
++		.suppress_bind_attrs = true,
+ 	},
+ 	.probe = imx_gpc_probe,
+ };
+ 
+-static int __init imx_pgc_init(void)
++static int __init imx_gpc_driver_init(void)
+ {
+ 	return platform_driver_register(&imx_gpc_driver);
+ }
+-subsys_initcall(imx_pgc_init);
++device_initcall(imx_gpc_driver_init);
 -- 
 2.7.0
