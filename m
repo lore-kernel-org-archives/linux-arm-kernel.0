@@ -1,58 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Mar 2016 18:20:26 +0000
-Subject: [PATCH v3 2/2] arm64: Mark kernel page ranges contiguous
-In-Reply-To: <20160226172825.GK29125@arm.com>
-References: <1455903983-23910-1-git-send-email-jeremy.linton@arm.com>
- <1455903983-23910-3-git-send-email-jeremy.linton@arm.com>
- <20160225161630.GB16546@arm.com> <56CF683D.30003@arm.com>
- <20160226172825.GK29125@arm.com>
-Message-ID: <20160316182025.GD13423@e104818-lin.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 16 Mar 2016 21:22:14 +0300
+Subject: [PATCH 3/5] ARM: davinci: da8xx: add cfgchip2 to resources
+In-Reply-To: <56E9A282.7030103@lechnology.com>
+References: <1458081473-8223-1-git-send-email-david@lechnology.com>
+ <1458081473-8223-3-git-send-email-david@lechnology.com>
+ <56E8906E.7070800@cogentembedded.com> <56E8D720.7000508@lechnology.com>
+ <56E8E7C7.70901@lechnology.com> <56E99A16.9020709@cogentembedded.com>
+ <56E9A282.7030103@lechnology.com>
+Message-ID: <56E9A456.2000204@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 26, 2016 at 05:28:26PM +0000, Will Deacon wrote:
-> On Thu, Feb 25, 2016 at 02:46:54PM -0600, Jeremy Linton wrote:
-> > On 02/25/2016 10:16 AM, Will Deacon wrote:
-> > >On Fri, Feb 19, 2016 at 11:46:23AM -0600, Jeremy Linton wrote:
-> > >>+static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
-> > >>+{
-> > >>+	int i;
-> > >>+
-> > >>+	pte -= CONT_RANGE_OFFSET(addr);
-> > >>+	for (i = 0; i < CONT_PTES; i++) {
-> > >>+		if (pte_cont(*pte))
-> > >>+			set_pte(pte, pte_mknoncont(*pte));
-> > >>+		pte++;
-> > >>+	}
-> > >>+	flush_tlb_all();
-> > >
-> > >Do you still need this invalidation? I thought the table weren't even
-> > >live at this point?
-> > 
-> > Well it continues to match the calls in alloc_init_p*.
-> 
-> Ok, but if it's not needed (and I don't think it is), then we should
-> remove the invalidation from there too rather than add more of it.
+On 03/16/2016 09:14 PM, David Lechner wrote:
 
-I agree. Talking to Mark R, I think all the create_pgd_mapping code
-should be trimmed of p*d splitting entirely (with some warnings left in
-place).
+>>> Also, I am not finding any existing data structure to pass the musb
+>>> set_mode
+>>> function to the phy in either usb_phy or usb_otg. Setting the mode
+>>> (host/peripheral/otg) is done in the same PHY register, so it seems
+>>> like it
+>>> should be implemented in the new phy driver as well.
+>>
+>>     Perhaps we'd have to sacrifice that functionality...
+>
+> The device I am working on (LEGO MINDSTORMS EV3) has the port wired as
+> peripheral only, so I don't think leaving this out is an option. Leaving it in
+> OTG mode doesn't work because the required electrical connections are just not
+> there.
 
-The efi_create_mapping() case is done on efi_mm anyway with a low
-address and non-active TTBR0_EL1. As Mark suggested, dropping p*d
-splitting should work for this case as well by ignoring the next
-consecutive mapping if it overlaps since it's a linear mapping (possibly
-some permissions may need to be upgraded). In this case, the TLBI would
-be done by efi_create_mapping() or even skipped altogether assuming that
-no page tables are changed (only going from invalid to valid).
+    The set_mode() method doesn't have anything to do with the predefined 
+roles. What CFGCHIP2 setting do is to override the ID input (and also the VBUS 
+level comparator). This is not required for the normal functioning of either 
+host or peripheral AFAIR.
 
-My preference, however, would be for efi_create_mapping() should use a
-different mechanism from create_pgd_mapping (aimed at very early memmap)
-like remap_pfn_range() but I haven't looked in detail on whether this is
-feasible.
+[...]
 
-Once we have this clean-up in place, we can rebase the contiguous PTE
-patches on top and remove unnecessary TLBI.
-
--- 
-Catalin
+MBR, Sergei
