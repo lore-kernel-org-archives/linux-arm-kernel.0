@@ -1,73 +1,1147 @@
 From: jitao.shi@mediatek.com (Jitao Shi)
-Date: Wed, 16 Mar 2016 21:28:04 +0800
-Subject: [PATCH v12 1/2] Documentation: bridge: Add documentation for ps8640
- DT properties
-Message-ID: <1458134885-6748-1-git-send-email-jitao.shi@mediatek.com>
+Date: Wed, 16 Mar 2016 21:28:05 +0800
+Subject: [PATCH v12 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <1458134885-6748-1-git-send-email-jitao.shi@mediatek.com>
+References: <1458134885-6748-1-git-send-email-jitao.shi@mediatek.com>
+Message-ID: <1458134885-6748-2-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for DT properties supported by
-ps8640 DSI-eDP converter.
+This patch adds drm_bridge driver for parade DSI to eDP bridge chip.
 
 Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
 Changes since v11:
- - No change
----
- .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
+ - Remove depends on I2C, add DRM depends
+ - Reuse ps8640_write_bytes() in ps8640_write_byte()
+ - Use timer check for polling like the routines in <linux/iopoll.h>
+ - Fix no drm_connector_unregister/drm_connector_cleanup when ps8640_bridge_attach fail
+ - Check the ps8640 hardware id in ps8640_validate_firmware
+ - Remove fw_version check
+ - Move ps8640_validate_firmware before ps8640_enter_bl
+ - Add ddc_i2c unregister when probe fail and ps8640_remove
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+The following patches are needed to support dsi host through none dsi bus:
+https://patchwork.kernel.org/patch/8289181/ ("drm/dsi: check for CONFIG_OF when defining")
+https://patchwork.kernel.org/patch/8289051/ ("drm/dsi: Use mipi_dsi_device_register_full for DSI device")
+https://patchwork.kernel.org/patch/8289081/ ("drm/dsi: Try to match non-DT DSI devices")
+https://patchwork.kernel.org/patch/8289121/ ("drm/dsi: Add routine to unregister a DSI device")
+https://patchwork.kernel.org/patch/8289091/ ("drm/dsi: Get DSI host by DT device node")
+---
+ drivers/gpu/drm/bridge/Kconfig         |   12 +
+ drivers/gpu/drm/bridge/Makefile        |    1 +
+ drivers/gpu/drm/bridge/parade-ps8640.c | 1073 ++++++++++++++++++++++++++++++++
+ 3 files changed, 1086 insertions(+)
+ create mode 100644 drivers/gpu/drm/bridge/parade-ps8640.c
+
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 27e2022..be6084e 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -40,4 +40,16 @@ config DRM_PARADE_PS8622
+ 	---help---
+ 	  Parade eDP-LVDS bridge chip driver.
+ 
++config DRM_PARADE_PS8640
++	tristate "Parade PS8640 MIPI DSI to eDP Converter"
++	depends on DRM
++	depends on OF
++	select DRM_KMS_HELPER
++	select DRM_MIPI_DSI
++	select DRM_PANEL
++	---help---
++	  Choose this option if you have PS8640 for display
++	  The PS8640 is a high-performance and low-power
++	  MIPI DSI to eDP converter
++
+ endmenu
+diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+index f13c33d..fbe38dc 100644
+--- a/drivers/gpu/drm/bridge/Makefile
++++ b/drivers/gpu/drm/bridge/Makefile
+@@ -4,3 +4,4 @@ obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+ obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+ obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
+ obj-$(CONFIG_DRM_PARADE_PS8622) += parade-ps8622.o
++obj-$(CONFIG_DRM_PARADE_PS8640) += parade-ps8640.o
+diff --git a/drivers/gpu/drm/bridge/parade-ps8640.c b/drivers/gpu/drm/bridge/parade-ps8640.c
 new file mode 100644
-index 0000000..022b33f
+index 0000000..d7700e2
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-@@ -0,0 +1,43 @@
-+ps8640-bridge bindings
++++ b/drivers/gpu/drm/bridge/parade-ps8640.c
+@@ -0,0 +1,1073 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+Required properties:
-+	- compatible: "parade,ps8640"
-+	- reg: first page address of the bridge.
-+	- sleep-gpios: OF device-tree gpio specification for PD pin.
-+	- reset-gpios: OF device-tree gpio specification for reset pin.
-+	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
-+	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
-+	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
-+	- ports: The device node can contain video interface port nodes per
-+		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
-+		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/firmware.h>
++#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/of_graph.h>
++#include <linux/regulator/consumer.h>
++#include <asm/unaligned.h>
++#include <drm/drm_panel.h>
 +
-+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++#include <drmP.h>
++#include <drm_atomic_helper.h>
++#include <drm_crtc_helper.h>
++#include <drm_crtc.h>
++#include <drm_edid.h>
++#include <drm_mipi_dsi.h>
 +
-+Example:
-+	edp-bridge at 18 {
-+		compatible = "parade,ps8640";
-+		reg = <0x18>;
-+		sleep-gpios = <&pio 116 GPIO_ACTIVE_LOW>;
-+		reset-gpios = <&pio 115 GPIO_ACTIVE_LOW>;
-+		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
-+		vdd12-supply = <&ps8640_fixed_1v2>;
-+		vdd33-supply = <&mt6397_vgp2_reg>;
++#define PAGE2_SPI_CFG3		0x82
++#define I2C_TO_SPI_RESET	0x20
++#define PAGE2_ROMADD_BYTE1	0x8e
++#define PAGE2_ROMADD_BYTE2	0x8f
++#define PAGE2_SWSPI_WDATA	0x90
++#define PAGE2_SWSPI_RDATA	0x91
++#define PAGE2_SWSPI_LEN		0x92
++#define PAGE2_SWSPI_CTL		0x93
++#define TRIGGER_NO_READBACK	0x05
++#define TRIGGER_READBACK	0x01
++#define PAGE2_SPI_STATUS	0x9e
++#define PAGE2_GPIO_L		0xa6
++#define PAGE2_GPIO_H		0xa7
++#define PS_GPIO9		BIT(1)
++#define PAGE2_IROM_CTRL		0xb0
++#define IROM_ENABLE		0xc0
++#define IROM_DISABLE		0x80
++#define PAGE2_SW_REST		0xbc
++#define SPI_SW_RESET		BIT(7)
++#define MPU_SW_RESET		BIT(6)
++#define PAGE2_ENCTLSPI_WR	0xda
++#define PAGE2_I2C_BYPASS	0xea
++#define I2C_BYPASS_EN		0xd0
++#define PAGE3_SET_ADD		0xfe
++#define PAGE3_SET_VAL		0xff
++#define VDO_CTL_ADD		0x13
++#define VDO_DIS			0x18
++#define VDO_EN			0x1c
++#define PAGE4_REV_L		0xf0
++#define PAGE4_REV_H		0xf1
++#define PAGE4_CHIP_L		0xf2
++#define PAGE4_CHIP_H		0xf3
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				ps8640_in: endpoint {
-+					remote-endpoint = <&dsi0_out>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				ps8640_out: endpoint {
-+					remote-endpoint = <&panel_in>;
-+				};
-+			};
-+		};
++/* Firmware */
++#define SPI_MAX_RETRY_CNT	8
++#define PS_FW_NAME		"ps864x_fw.bin"
++
++#define FW_CHIP_ID_OFFSET	0
++#define FW_VERSION_OFFSET	2
++#define EDID_I2C_ADDR		0x50
++
++#define WRITE_STATUS_REG_CMD	0x01
++#define READ_STATUS_REG_CMD	0x05
++#define BUSY			BIT(0)
++#define CLEAR_ALL_PROTECT	0x00
++#define BLK_PROTECT_BITS	0x0c
++#define STATUS_REG_PROTECT	BIT(7)
++#define WRITE_ENABLE_CMD	0x06
++#define CHIP_ERASE_CMD		0xc7
++
++#define bridge_to_ps8640(e)	container_of(e, struct ps8640, bridge)
++#define connector_to_ps8640(e)	container_of(e, struct ps8640, connector)
++
++struct ps8640_info {
++	u8 family_id;
++	u8 variant_id;
++	u16 version;
++};
++
++struct ps8640 {
++	struct drm_connector connector;
++	struct drm_bridge bridge;
++	struct edid *edid;
++	struct mipi_dsi_device dsi;
++	struct i2c_client *page[8];
++	struct i2c_client *ddc_i2c;
++	struct regulator_bulk_data supplies[2];
++	struct drm_panel *panel;
++	struct gpio_desc *gpio_rst_n;
++	struct gpio_desc *gpio_slp_n;
++	struct gpio_desc *gpio_mode_sel_n;
++	bool enabled;
++
++	/* firmware file info */
++	bool in_fw_update;
++	struct ps8640_info info;
++};
++
++static const u8 enc_ctrl_code[6] = {0xaa, 0x55, 0x50, 0x41, 0x52, 0x44};
++static const u8 hw_chip_id = {0x00, 0x0a, 0x00, 0x30};
++
++static int ps8640_read(struct i2c_client *client, u8 reg, u8 *data,
++		       u16 data_len)
++{
++	int ret;
++	struct i2c_msg msgs[] = {
++		{
++		 .addr = client->addr,
++		 .flags = 0,
++		 .len = 1,
++		 .buf = &reg,
++		 },
++		{
++		 .addr = client->addr,
++		 .flags = I2C_M_RD,
++		 .len = data_len,
++		 .buf = data,
++		 }
 +	};
++
++	ret = i2c_transfer(client->adapter, msgs, 2);
++
++	if (ret == 2)
++		return 0;
++	if (ret < 0)
++		return ret;
++	else
++		return -EIO;
++}
++
++static int ps8640_write_bytes(struct i2c_client *client, u8 *data,
++			      u16 data_len)
++{
++	int ret;
++	struct i2c_msg msg;
++
++	msg.addr = client->addr;
++	msg.flags = 0;
++	msg.len = data_len;
++	msg.buf = data;
++
++	ret = i2c_transfer(client->adapter, &msg, 1);
++	if (ret == 1)
++		return 0;
++	if (ret < 0)
++		return ret;
++	else
++		return -EIO;
++}
++
++static int ps8640_write_byte(struct i2c_client *client, u8 reg,  u8 data)
++{
++	u8 buf[] = {reg, data};
++
++	return ps8640_write_bytes(client, buf, sizeof(buf));
++}
++
++static void ps8640_get_mcu_fw_version(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[5];
++	u8 fw_ver[2];
++
++	ps8640_read(client, 0x4, fw_ver, 2);
++	ps_bridge->info.version = (fw_ver[0] << 8) | fw_ver[1];
++
++	DRM_INFO_ONCE("ps8640 rom fw version %d.%d\n", fw_ver[0], fw_ver[1]);
++}
++
++static int ps8640_bridge_enable(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[3];
++	u8 vdo_ctrl_buf[3] = {PAGE3_SET_ADD, VDO_CTL_ADD, VDO_EN};
++
++	return ps8640_write_bytes(client, vdo_ctrl_buf, 3);
++}
++
++static int ps8640_bridge_disable(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[3];
++	u8 vdo_ctrl_buf[3] = {PAGE3_SET_ADD, VDO_CTL_ADD, VDO_DIS};
++
++	return ps8640_write_bytes(client, vdo_ctrl_buf, 3);
++}
++
++static void ps8640_pre_enable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	struct i2c_client *client = ps_bridge->page[2];
++	int err;
++	u8 set_vdo_done;
++	ktime_t timeout;
++
++	if (ps_bridge->in_fw_update)
++		return;
++
++	if (ps_bridge->enabled)
++		return;
++
++	err = drm_panel_prepare(ps_bridge->panel);
++	if (err < 0) {
++		DRM_ERROR("failed to prepare panel: %d\n", err);
++		return;
++	}
++
++	err = regulator_bulk_enable(ARRAY_SIZE(ps_bridge->supplies),
++				    ps_bridge->supplies);
++	if (err < 0) {
++		DRM_ERROR("cannot enable regulators %d\n", err);
++		goto err_panel_unprepare;
++	}
++
++	gpiod_set_value(ps_bridge->gpio_slp_n, 1);
++	gpiod_set_value(ps_bridge->gpio_rst_n, 0);
++	usleep_range(2000, 2500);
++	gpiod_set_value(ps_bridge->gpio_rst_n, 1);
++
++	/*
++	 * Wait for the ps8640 embed mcu ready
++	 * First wait 200ms and then check the mcu ready flag every 20ms
++	 */
++	msleep(200);
++
++	timeout = ktime_add_ms(ktime_get(), 200);
++	for (;;) {
++		err = ps8640_read(client, PAGE2_GPIO_H, &set_vdo_done, 1);
++		if (err < 0) {
++			DRM_ERROR("failed read PAGE2_GPIO_H: %d\n", err);
++			goto err_regulators_disable;
++		}
++		if ((set_vdo_done & PS_GPIO9) == PS_GPIO9)
++			break;
++		if (ktime_compare(ktime_get(), timeout) > 0)
++			break;
++		msleep(20);
++	}
++
++	if (ps_bridge->info.version == 0)
++		ps8640_get_mcu_fw_version(ps_bridge);
++	/* Switch access edp panel's edid through i2c */
++	ps8640_write_byte(client, PAGE2_I2C_BYPASS, I2C_BYPASS_EN);
++	ps_bridge->enabled = true;
++
++	return;
++
++err_regulators_disable:
++	regulator_bulk_disable(ARRAY_SIZE(ps_bridge->supplies),
++			       ps_bridge->supplies);
++err_panel_unprepare:
++	drm_panel_unprepare(ps_bridge->panel);
++}
++
++static void ps8640_enable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	int err;
++
++	err = ps8640_bridge_enable(ps_bridge);
++	if (err)
++		DRM_ERROR("failed to enable unmutevideo: %d\n", err);
++
++	err = drm_panel_enable(ps_bridge->panel);
++	if (err < 0)
++		DRM_ERROR("failed to enable panel: %d\n", err);
++}
++
++static void ps8640_disable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	int err;
++
++	err = drm_panel_disable(ps_bridge->panel);
++	if (err < 0)
++		DRM_ERROR("failed to disable panel: %d\n", err);
++
++	err = ps8640_bridge_disable(ps_bridge);
++	if (err < 0)
++		DRM_ERROR("failed to disable bridge: %d\n", err);
++}
++
++static void ps8640_post_disable(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	int err;
++
++	if (ps_bridge->in_fw_update)
++		return;
++
++	if (!ps_bridge->enabled)
++		return;
++
++	ps_bridge->enabled = false;
++
++	gpiod_set_value(ps_bridge->gpio_rst_n, 0);
++	gpiod_set_value(ps_bridge->gpio_slp_n, 0);
++	err = regulator_bulk_disable(ARRAY_SIZE(ps_bridge->supplies),
++				     ps_bridge->supplies);
++	if (err < 0)
++		DRM_ERROR("cannot disable regulators %d\n", err);
++
++	err = drm_panel_unprepare(ps_bridge->panel);
++	if (err)
++		DRM_ERROR("failed to unprepare panel: %d\n", err);
++}
++
++static int ps8640_get_modes(struct drm_connector *connector)
++{
++	struct ps8640 *ps_bridge = connector_to_ps8640(connector);
++	struct device *dev = &ps_bridge->page[0]->dev;
++	u8 *edid;
++	int ret, num_modes = 0;
++	bool power_off;
++
++	if (ps_bridge->edid)
++		return drm_add_edid_modes(connector, ps_bridge->edid);
++
++	power_off = !ps_bridge->enabled;
++	ps8640_pre_enable(&ps_bridge->bridge);
++
++	edid = devm_kmalloc(dev, EDID_LENGTH, GFP_KERNEL);
++	if (!edid) {
++		DRM_ERROR("Failed to allocate EDID\n");
++		return 0;
++	}
++
++	ret = ps8640_read(ps_bridge->ddc_i2c, 0, edid, EDID_LENGTH);
++	if (ret)
++		goto out;
++
++	ps_bridge->edid = (struct edid *)edid;
++	drm_mode_connector_update_edid_property(connector, ps_bridge->edid);
++
++	num_modes = drm_add_edid_modes(connector, ps_bridge->edid);
++
++out:
++	if (power_off)
++		ps8640_post_disable(&ps_bridge->bridge);
++
++	return num_modes;
++}
++
++static struct drm_encoder *ps8640_best_encoder(struct drm_connector *connector)
++{
++	struct ps8640 *ps_bridge = connector_to_ps8640(connector);
++
++	return ps_bridge->bridge.encoder;
++}
++
++static const struct drm_connector_helper_funcs ps8640_connector_helper_funcs = {
++	.get_modes = ps8640_get_modes,
++	.best_encoder = ps8640_best_encoder,
++};
++
++static enum drm_connector_status ps8640_detect(struct drm_connector *connector,
++					       bool force)
++{
++	return connector_status_connected;
++}
++
++static void ps8640_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_unregister(connector);
++	drm_connector_cleanup(connector);
++}
++
++static const struct drm_connector_funcs ps8640_connector_funcs = {
++	.dpms = drm_atomic_helper_connector_dpms,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = ps8640_detect,
++	.destroy = ps8640_connector_destroy,
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++int ps8640_bridge_attach(struct drm_bridge *bridge)
++{
++	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
++	struct device *dev = &ps_bridge->page[0]->dev;
++	struct device_node *np = dev->of_node;
++	struct device_node *port, *in_ep;
++	struct device_node *dsi_node = NULL;
++	struct mipi_dsi_host *host = ps_bridge->dsi.host;
++	int ret;
++
++	ret = drm_connector_init(bridge->dev, &ps_bridge->connector,
++				 &ps8640_connector_funcs,
++				 DRM_MODE_CONNECTOR_eDP);
++
++	if (ret) {
++		DRM_ERROR("Failed to initialize connector with drm: %d\n", ret);
++		return ret;
++	}
++
++	drm_connector_helper_add(&ps_bridge->connector,
++				 &ps8640_connector_helper_funcs);
++	drm_connector_register(&ps_bridge->connector);
++
++	ps_bridge->connector.dpms = DRM_MODE_DPMS_ON;
++	drm_mode_connector_attach_encoder(&ps_bridge->connector,
++					  bridge->encoder);
++
++	if (ps_bridge->panel)
++		drm_panel_attach(ps_bridge->panel, &ps_bridge->connector);
++
++	/* port at 0 is ps8640 dsi input port */
++	port = of_graph_get_port_by_id(np, 0);
++	if (port) {
++		in_ep = of_get_child_by_name(port, "endpoint");
++		of_node_put(port);
++		if (in_ep) {
++			dsi_node = of_graph_get_remote_port_parent(in_ep);
++			of_node_put(in_ep);
++		}
++	}
++	if (dsi_node) {
++		host = of_find_mipi_dsi_host_by_node(dsi_node);
++		of_node_put(dsi_node);
++		if (!host) {
++			ret = -ENODEV;
++			goto err;
++		}
++	}
++
++	ps_bridge->dsi.host = host;
++	ps_bridge->dsi.mode_flags = MIPI_DSI_MODE_VIDEO |
++				     MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
++	ps_bridge->dsi.format = MIPI_DSI_FMT_RGB888;
++	ps_bridge->dsi.lanes = 4;
++	ret = mipi_dsi_attach(&ps_bridge->dsi);
++	if (ret)
++		goto err;
++
++	return 0;
++err:
++	if (ps_bridge->panel)
++		drm_panel_detach(ps_bridge->panel);
++	drm_connector_unregister(&ps_bridge->connector);
++	drm_connector_cleanup(&ps_bridge->connector);
++	return ret;
++}
++
++static const struct drm_bridge_funcs ps8640_bridge_funcs = {
++	.attach = ps8640_bridge_attach,
++	.disable = ps8640_disable,
++	.post_disable = ps8640_post_disable,
++	.pre_enable = ps8640_pre_enable,
++	.enable = ps8640_enable,
++};
++
++/* Firmware Version is returned as Major.Minor.Build */
++static ssize_t ps8640_fw_version_show(struct device *dev,
++				      struct device_attribute *attr, char *buf)
++{
++	struct ps8640 *ps_bridge = dev_get_drvdata(dev);
++	struct ps8640_info *info = &ps_bridge->info;
++
++	return scnprintf(buf, PAGE_SIZE, "%u.%u\n", info->version >> 8,
++			 info->version & 0xff);
++}
++
++/* Hardware Version is returned as FamilyID.VariantID */
++static ssize_t ps8640_hw_version_show(struct device *dev,
++				      struct device_attribute *attr, char *buf)
++{
++	struct ps8640 *ps_bridge = dev_get_drvdata(dev);
++	struct ps8640_info *info = &ps_bridge->info;
++
++	return scnprintf(buf, PAGE_SIZE, "ps%u.%u\n", info->family_id,
++			 info->variant_id);
++}
++
++static int ps8640_spi_send_cmd(struct ps8640 *ps_bridge, u8 *cmd, u8 cmd_len)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	u8 i, buf[3];
++	int ret;
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
++	if (ret)
++		goto err;
++
++	/* write command in write port */
++	for (i = 0; i < cmd_len; i++) {
++		ret = ps8640_write_byte(client, PAGE2_SWSPI_WDATA, cmd[i]);
++		if (ret) {
++			ps8640_write_byte(client, PAGE2_IROM_CTRL,
++					  IROM_DISABLE);
++			goto err;
++		}
++	}
++
++	buf[0] = PAGE2_SWSPI_LEN;
++	buf[1] = cmd_len - 1;
++	buf[2] = TRIGGER_NO_READBACK;
++	ret = ps8640_write_bytes(client, buf, 3);
++	if (ret) {
++		ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++		goto err;
++	}
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++	if (ret)
++		goto err;
++
++	return 0;
++
++err:
++	dev_err(&client->dev, "send command err: %d\n", ret);
++	return ret;
++}
++
++static int ps8640_wait_spi_ready(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	u8 spi_rdy_st;
++	ktime_t timeout;
++
++	timeout = ktime_add_ms(ktime_get(), 200);
++	for (;;) {
++		ps8640_read(client, PAGE2_SPI_STATUS, &spi_rdy_st, 1);
++		if ((spi_rdy_st & 0x0c) != 0x0c)
++			break;
++
++		if (ktime_compare(ktime_get(), timeout) > 0) {
++			dev_err(&client->dev, "wait spi ready timeout\n");
++			return -EBUSY;
++		}
++
++		msleep(20);
++	}
++
++	return 0;
++}
++
++static int ps8640_wait_spi_nobusy(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	u8 spi_status, buf[3];
++	int ret;
++	ktime_t timeout;
++
++	timeout = ktime_add_ms(ktime_get(), 500);
++	for (;;) {
++		/* 0x05 RDSR; Read-Status-Register */
++		ret = ps8640_write_byte(client, PAGE2_SWSPI_WDATA,
++					READ_STATUS_REG_CMD);
++		if (ret)
++			goto err_send_cmd_exit;
++
++		buf[0] = PAGE2_SWSPI_LEN;
++		buf[1] = 0;
++		buf[2] = TRIGGER_READBACK;
++		ret = ps8640_write_bytes(client, buf, 3);
++		if (ret)
++			goto err_send_cmd_exit;
++
++		/* delay for cmd send */
++		usleep_range(300, 500);
++		/* wait for SPI ROM until not busy */
++		ret = ps8640_read(client, PAGE2_SWSPI_RDATA, &spi_status, 1);
++		if (ret)
++			goto err_send_cmd_exit;
++
++		if (!(spi_status & BUSY))
++			break;
++
++		if (ktime_compare(ktime_get(), timeout) > 0) {
++			dev_err(&client->dev, "wait spi no busy timeout: %d\n",
++				ret);
++			return -EBUSY;
++		}
++	}
++
++	return 0;
++
++err_send_cmd_exit:
++	dev_err(&client->dev, "send command err: %d\n", ret);
++	return ret;
++}
++
++static int ps8640_wait_rom_idle(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	int ret;
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
++	if (ret)
++		goto exit;
++
++	ret = ps8640_wait_spi_ready(ps_bridge);
++	if (ret)
++		goto err_spi;
++
++	ret = ps8640_wait_spi_nobusy(ps_bridge);
++	if (ret)
++		goto err_spi;
++
++	ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++	if (ret)
++		goto exit;
++
++	return 0;
++
++err_spi:
++	ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++exit:
++	if (ret)
++		dev_err(&client->dev, "wait ps8640 rom idle fail: %d\n", ret);
++
++	return ret;
++}
++
++static int ps8640_spi_dl_mode(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	int ret;
++
++	/* switch ps8640 mode to spi dl mode */
++	gpiod_set_value(ps_bridge->gpio_mode_sel_n, 0);
++
++	/* reset spi interface */
++	ret = ps8640_write_byte(client, PAGE2_SW_REST,
++				SPI_SW_RESET | MPU_SW_RESET);
++	if (ret)
++		goto exit;
++
++	ret = ps8640_write_byte(client, PAGE2_SW_REST, MPU_SW_RESET);
++	if (ret)
++		goto exit;
++
++exit:
++	if (ret)
++		dev_err(&client->dev, "fail reset spi interface: %d\n", ret);
++
++	return ret;
++}
++
++static int ps8640_rom_prepare(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[2];
++	struct device *dev = &client->dev;
++	u8 i, cmd[2];
++	int ret;
++
++	cmd[0] = WRITE_ENABLE_CMD;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++	if (ret) {
++		dev_err(dev, "failed enable-write-status-register: %d\n", ret);
++		return ret;
++	}
++
++	cmd[0] = WRITE_STATUS_REG_CMD;
++	cmd[1] = CLEAR_ALL_PROTECT;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 2);
++	if (ret) {
++		dev_err(dev, "fail disable all protection: %d\n", ret);
++		return ret;
++	}
++
++	/* wait for SPI module ready */
++	ret = ps8640_wait_rom_idle(ps_bridge);
++	if (ret) {
++		dev_err(dev, "fail wait rom idle: %d\n", ret);
++		return ret;
++	}
++
++	ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
++	for (i = 0; i < 6; i++)
++		ps8640_write_byte(client, PAGE2_ENCTLSPI_WR, enc_ctrl_code[i]);
++	ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
++
++	/* Enable-Write-Status-Register */
++	cmd[0] = WRITE_ENABLE_CMD;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++	if (ret) {
++		dev_err(dev, "fail enable-write-status-register: %d\n", ret);
++		return ret;
++	}
++
++	/* chip erase command */
++	cmd[0] = CHIP_ERASE_CMD;
++	ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++	if (ret) {
++		dev_err(dev, "fail disable all protection: %d\n", ret);
++		return ret;
++	}
++
++	ret = ps8640_wait_rom_idle(ps_bridge);
++	if (ret) {
++		dev_err(dev, "fail wait rom idle: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int ps8640_check_chip_id(struct ps8640 *ps_bridge)
++{
++	struct i2c_client *client = ps_bridge->page[4];
++	u8 buf[4];
++
++	ps8640_read(client, PAGE4_REV_L, buf, 4);
++	return memcmp(buf, hw_chip_id, sizeof(buf));
++}
++
++static int ps8640_validate_firmware(struct ps8640 *ps_bridge,
++				    const struct firmware *fw)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	u16 fw_chip_id;
++
++	/*
++	 * Get the chip_id from the firmware. Make sure that it is the
++	 * right controller to do the firmware and config update.
++	 */
++	fw_chip_id = get_unaligned_le16(fw->data + FW_CHIP_ID_OFFSET);
++
++	if (fw_chip_id != 0x8640 && ps8640_check_chip_id(ps_bridge) == 0) {
++		dev_err(&client->dev,
++			"chip id mismatch: fw 0x%x vs. chip 0x8640\n",
++			fw_chip_id);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int ps8640_write_rom(struct ps8640 *ps_bridge, const struct firmware *fw)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	struct device *dev = &client->dev;
++	struct i2c_client *client2 = ps_bridge->page[2];
++	struct i2c_client *client7 = ps_bridge->page[7];
++	unsigned int pos = 0;
++	u8 buf[257], rom_page_id_buf[3];
++	int ret;
++	u16 cpy_len;
++
++	ps8640_write_byte(client2, PAGE2_SPI_CFG3, I2C_TO_SPI_RESET);
++	msleep(100);
++	ps8640_write_byte(client2, PAGE2_SPI_CFG3, 0x00);
++
++	for (pos = 0; pos < fw->size; pos += cpy_len) {
++		rom_page_id_buf[0] = PAGE2_ROMADD_BYTE1;
++		rom_page_id_buf[1] = pos >> 8;
++		rom_page_id_buf[2] = pos >> 16;
++		ret = ps8640_write_bytes(client2, rom_page_id_buf, 3);
++		if (ret)
++			goto error;
++		cpy_len = fw->size >= 256 + pos ? 256 : fw->size - pos;
++		buf[0] = 0;
++		memcpy(buf + 1, fw->data + pos, cpy_len);
++		ret = ps8640_write_bytes(client7, buf, cpy_len + 1);
++		if (ret)
++			goto error;
++
++		dev_dbg(dev, "fw update completed %u / %zu bytes\n", pos,
++			fw->size);
++	}
++	return 0;
++
++error:
++	dev_err(dev, "failed write extenal flash, %d\n", ret);
++	return ret;
++}
++
++static int ps8640_spi_normal_mode(struct ps8640 *ps_bridge)
++{
++	u8 cmd[2];
++	struct i2c_client *client = ps_bridge->page[2];
++
++	/* Enable-Write-Status-Register */
++	cmd[0] = WRITE_ENABLE_CMD;
++	ps8640_spi_send_cmd(ps_bridge, cmd, 1);
++
++	/* protect BPL/BP0/BP1 */
++	cmd[0] = WRITE_STATUS_REG_CMD;
++	cmd[1] = BLK_PROTECT_BITS | STATUS_REG_PROTECT;
++	ps8640_spi_send_cmd(ps_bridge, cmd, 2);
++
++	/* wait for SPI rom ready */
++	ps8640_wait_rom_idle(ps_bridge);
++
++	/* disable PS8640 mapping function */
++	ps8640_write_byte(client, PAGE2_ENCTLSPI_WR, 0x00);
++
++	gpiod_set_value(ps_bridge->gpio_mode_sel_n, 1);
++	return 0;
++}
++
++static int ps8640_enter_bl(struct ps8640 *ps_bridge)
++{
++	ps_bridge->in_fw_update = true;
++	return ps8640_spi_dl_mode(ps_bridge);
++}
++
++static void ps8640_exit_bl(struct ps8640 *ps_bridge, const struct firmware *fw)
++{
++	ps8640_spi_normal_mode(ps_bridge);
++	ps_bridge->in_fw_update = false;
++}
++
++static int ps8640_load_fw(struct ps8640 *ps_bridge, const struct firmware *fw)
++{
++	struct i2c_client *client = ps_bridge->page[0];
++	struct device *dev = &client->dev;
++	int ret;
++	bool ps8640_status_backup = ps_bridge->enabled;
++
++	ret = ps8640_validate_firmware(ps_bridge, fw);
++	if (ret)
++		return ret;
++
++	if (!ps_bridge->in_fw_update) {
++		if (!ps8640_status_backup)
++			ps8640_pre_enable(&ps_bridge->bridge);
++
++		ret = ps8640_enter_bl(ps_bridge);
++		if (ret)
++			goto exit;
++	}
++
++	ret = ps8640_rom_prepare(ps_bridge);
++	if (ret)
++		goto exit;
++
++	ret = ps8640_write_rom(ps_bridge, fw);
++
++exit:
++	if (ret)
++		dev_err(dev, "Failed to load firmware, %d\n", ret);
++
++	ps8640_exit_bl(ps_bridge, fw);
++	if (!ps8640_status_backup)
++		ps8640_post_disable(&ps_bridge->bridge);
++	return ret;
++}
++
++static ssize_t ps8640_update_fw_store(struct device *dev,
++				      struct device_attribute *attr,
++				      const char *buf, size_t count)
++{
++	struct i2c_client *client = to_i2c_client(dev);
++	struct ps8640 *ps_bridge = i2c_get_clientdata(client);
++	const struct firmware *fw;
++	int error;
++
++	error = request_firmware(&fw, PS_FW_NAME, dev);
++	if (error) {
++		dev_err(dev, "Unable to open firmware %s: %d\n",
++			PS_FW_NAME, error);
++		return error;
++	}
++
++	error = ps8640_load_fw(ps_bridge, fw);
++	if (error)
++		dev_err(dev, "The firmware update failed(%d)\n", error);
++	else
++		dev_info(dev, "The firmware update succeeded\n");
++
++	release_firmware(fw);
++	return error ? error : count;
++}
++
++static DEVICE_ATTR(fw_version, S_IRUGO, ps8640_fw_version_show, NULL);
++static DEVICE_ATTR(hw_version, S_IRUGO, ps8640_hw_version_show, NULL);
++static DEVICE_ATTR(update_fw, S_IWUSR, NULL, ps8640_update_fw_store);
++
++static struct attribute *ps8640_attrs[] = {
++	&dev_attr_fw_version.attr,
++	&dev_attr_hw_version.attr,
++	&dev_attr_update_fw.attr,
++	NULL
++};
++
++static const struct attribute_group ps8640_attr_group = {
++	.attrs = ps8640_attrs,
++};
++
++static void ps8640_remove_sysfs_group(void *data)
++{
++	struct ps8640 *ps_bridge = data;
++
++	sysfs_remove_group(&ps_bridge->page[0]->dev.kobj, &ps8640_attr_group);
++}
++
++static int ps8640_probe(struct i2c_client *client,
++			const struct i2c_device_id *id)
++{
++	struct device *dev = &client->dev;
++	struct ps8640 *ps_bridge;
++	struct device_node *np = dev->of_node;
++	struct device_node *port, *out_ep;
++	struct device_node *panel_node = NULL;
++	int i, ret;
++
++	ps_bridge = devm_kzalloc(dev, sizeof(*ps_bridge), GFP_KERNEL);
++	if (!ps_bridge)
++		return -ENOMEM;
++
++	/* port at 1 is ps8640 output port */
++	port = of_graph_get_port_by_id(np, 1);
++	if (port) {
++		out_ep = of_get_child_by_name(port, "endpoint");
++		of_node_put(port);
++		if (out_ep) {
++			panel_node = of_graph_get_remote_port_parent(out_ep);
++			of_node_put(out_ep);
++		}
++	}
++	if (panel_node) {
++		ps_bridge->panel = of_drm_find_panel(panel_node);
++		of_node_put(panel_node);
++		if (!ps_bridge->panel)
++			return -EPROBE_DEFER;
++	}
++
++	ps_bridge->supplies[0].supply = "vdd33";
++	ps_bridge->supplies[1].supply = "vdd12";
++	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(ps_bridge->supplies),
++				      ps_bridge->supplies);
++	if (ret) {
++		dev_info(dev, "failed to get regulators: %d\n", ret);
++		return ret;
++	}
++
++	ps_bridge->gpio_mode_sel_n = devm_gpiod_get(&client->dev, "mode-sel",
++						    GPIOD_OUT_HIGH);
++	if (IS_ERR(ps_bridge->gpio_mode_sel_n)) {
++		ret = PTR_ERR(ps_bridge->gpio_mode_sel_n);
++		dev_err(dev, "cannot get mode-sel %d\n", ret);
++		return ret;
++	}
++
++	ps_bridge->gpio_slp_n = devm_gpiod_get(&client->dev, "sleep",
++					       GPIOD_OUT_LOW);
++	if (IS_ERR(ps_bridge->gpio_slp_n)) {
++		ret = PTR_ERR(ps_bridge->gpio_slp_n);
++		dev_err(dev, "cannot get sleep: %d\n", ret);
++		return ret;
++	}
++
++	/*
++	 * Request the reset pin low to avoid the bridge being
++	 * initialized prematurely
++	 */
++	ps_bridge->gpio_rst_n = devm_gpiod_get(&client->dev, "reset",
++					       GPIOD_OUT_LOW);
++	if (IS_ERR(ps_bridge->gpio_rst_n)) {
++		ret = PTR_ERR(ps_bridge->gpio_rst_n);
++		dev_err(dev, "cannot get reset: %d\n", ret);
++		return ret;
++	}
++
++	ps_bridge->bridge.funcs = &ps8640_bridge_funcs;
++	ps_bridge->bridge.of_node = dev->of_node;
++	ret = drm_bridge_add(&ps_bridge->bridge);
++	if (ret) {
++		dev_err(dev, "Failed to add bridge: %d\n", ret);
++		return ret;
++	}
++
++	ps_bridge->page[0] = client;
++	ps_bridge->ddc_i2c = i2c_new_dummy(client->adapter, EDID_I2C_ADDR);
++	if (!ps_bridge->ddc_i2c) {
++		dev_err(dev, "failed ddc_i2c dummy device, address%02x\n",
++			EDID_I2C_ADDR);
++		ret = -EBUSY;
++		goto exit_ddc_i2c_dummy;
++	}
++	/*
++	 * ps8640 uses multiple addresses, use dummy devices for them
++	 * page[0]: for DP control
++	 * page[1]: for VIDEO Bridge
++	 * page[2]: for control top
++	 * page[3]: for DSI Link Control1
++	 * page[4]: for MIPI Phy
++	 * page[5]: for VPLL
++	 * page[6]: for DSI Link Control2
++	 * page[7]: for spi rom mapping
++	 */
++	for (i = 1; i < 8; i++) {
++		ps_bridge->page[i] = i2c_new_dummy(client->adapter,
++						   client->addr + i);
++		if (!ps_bridge->page[i]) {
++			dev_err(dev, "failed i2c dummy device, address%02x\n",
++				client->addr + i);
++			ret = -EBUSY;
++			goto exit_dummy;
++		}
++	}
++	i2c_set_clientdata(client, ps_bridge);
++
++	ret = sysfs_create_group(&client->dev.kobj, &ps8640_attr_group);
++	if (ret) {
++		dev_err(dev, "failed to create sysfs entries: %d\n", ret);
++		goto exit_dummy;
++	}
++
++	ret = devm_add_action(dev, ps8640_remove_sysfs_group, ps_bridge);
++	if (ret) {
++		dev_err(dev, "failed to add sysfs cleanup action: %d\n", ret);
++		goto exit_remove_sysfs;
++	}
++	return 0;
++
++exit_remove_sysfs:
++	sysfs_remove_group(&ps_bridge->page[0]->dev.kobj, &ps8640_attr_group);
++exit_dummy:
++	for (i = 1; i < 8; i++)
++		if (ps_bridge->page[i])
++			i2c_unregister_device(ps_bridge->page[i]);
++	i2c_unregister_device(ps_bridge->ddc_i2c);
++exit_ddc_i2c_dummy:
++	drm_bridge_remove(&ps_bridge->bridge);
++	return ret;
++}
++
++static int ps8640_remove(struct i2c_client *client)
++{
++	struct ps8640 *ps_bridge = i2c_get_clientdata(client);
++	int i;
++
++	for (i = 1; i < 8; i++)
++		i2c_unregister_device(ps_bridge->page[i]);
++
++	i2c_unregister_device(ps_bridge->ddc_i2c);
++	drm_bridge_remove(&ps_bridge->bridge);
++
++	return 0;
++}
++
++static const struct i2c_device_id ps8640_i2c_table[] = {
++	{"parade,ps8640", 0},
++	{},
++};
++MODULE_DEVICE_TABLE(i2c, ps8640_i2c_table);
++
++static const struct of_device_id ps8640_match[] = {
++	{ .compatible = "parade,ps8640" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, ps8640_match);
++
++static struct i2c_driver ps8640_driver = {
++	.id_table = ps8640_i2c_table,
++	.probe = ps8640_probe,
++	.remove = ps8640_remove,
++	.driver = {
++		.name = "parade,ps8640",
++		.of_match_table = ps8640_match,
++	},
++};
++module_i2c_driver(ps8640_driver);
++
++MODULE_AUTHOR("Jitao Shi <jitao.shi@mediatek.com>");
++MODULE_AUTHOR("CK Hu <ck.hu@mediatek.com>");
++MODULE_DESCRIPTION("PARADE ps8640 DSI-eDP converter driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.9.5
