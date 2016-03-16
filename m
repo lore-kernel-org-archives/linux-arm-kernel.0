@@ -1,58 +1,131 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 16 Mar 2016 10:47:01 +0000
-Subject: [PATCH] iommu: provide of_xlate pointer unconditionally
-In-Reply-To: <1458077877-474066-1-git-send-email-arnd@arndb.de>
-References: <1458077877-474066-1-git-send-email-arnd@arndb.de>
-Message-ID: <56E939A5.6040905@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 16 Mar 2016 18:46:50 +0800
+Subject: [PATCH] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <1458124582-2511-1-git-send-email-jszhang@marvell.com>
+References: <1458124582-2511-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160316184650.1a88dba6@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/16 21:37, Arnd Bergmann wrote:
-> iommu drivers that support the standard DT bindings use a of_xlate
-> callback pointer, but that is only part of struct iommu_ops when
-> CONFIG_OF_IOMMU is enabled, leading to build errors in randconfig
-> builds when that is not provided:
->
-> drivers/iommu/mtk_iommu.c:497:2: error: unknown field 'of_xlate' specified in initializer
->    .of_xlate = mtk_iommu_of_xlate,
->    ^
-> drivers/iommu/mtk_iommu.c:497:14: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->    .of_xlate = mtk_iommu_of_xlate,
->                ^~~~~~~~~~~~~~~~~~
-> drivers/iommu/mtk_iommu.c:497:14: note: (near initialization for 'mtk_iommu_ops.domain_get_attr')
->
-> We can work around it by adding more #ifdefs in each driver, but
-> it seems nicer to just allow setting the pointer even if it is
-> unused. This makes the driver code look nicer, and it gives better
-> compile-time coverage when test building on other architectures.
+Dear all,
 
-Makes sense. I don't know what the exact plan is for ACPI IORT, but I 
-would imagine that that could also tie in to the same mechanism.
+On Wed, 16 Mar 2016 18:36:22 +0800 Jisheng Zhang wrote:
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 0df4fabe208d ("iommu/mediatek: Add mt8173 IOMMU driver")
+> dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
+> dw_pcie_host_init() also contains some necessary rc setup code.
+> 
+> Another reason: the host may lost power during suspend to ram, the RC
+> need to be re-setup after resume. The rc can't be correctly resumed
+> without the rc setup code in dw_pcie_host_init().
+> 
+> So this patch moves the code to dw_pcie_setup_rc() to address the above
+> two issues. After this patch, each pcie designware driver users could
+> call dw_pcie_setup_rc() to re-setup rc when resume back.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Some background of this patch: we want to add suspend/resume support to BG4CT
+pcie hosts. The host will lost power when suspend to ram, and reset when resume
+back. So I must re-setup the rc by dw_pcie_setup_rc().
 
-FWIW the Exynos IOMMU driver has also been setting .of_xlate 
-unconditionally for a while, but that isn't covered by COMPILE_TEST.
+Tested on Marvell BG4CT platforms.
 
+Two issues need your help:
+
+1. duplicate PCI_BASE_ADDRESS_0 programming. we first write 4 to
+PCI_BASE_ADDRESS_0 in dw_pcie_setup_rc(), then write 0 to it again in
+dw_pcie_host_init(). Is there any reason to do so? could we remove
+the latter PCI_BASE_ADDRESS_0 programming?
+
+2. could we move the PORT_LOGIC_SPEED_CHANGE bit setting early, I.E with
+something as below:
+
+Thanks,
+Jisheng
+
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 6474f80..b824f6f 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -737,6 +737,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+ 	/* set link width speed control register */
+ 	dw_pcie_readl_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, &val);
+ 	val &= ~PORT_LOGIC_LINK_WIDTH_MASK;
++	val |= PORT_LOGIC_SPEED_CHANGE;
+ 	switch (pp->lanes) {
+ 	case 1:
+ 		val |= PORT_LOGIC_LINK_WIDTH_1_LANES;
+@@ -796,10 +797,6 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+ 
+ 	/* program correct class for RC */
+ 	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
+-
+-	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+-	val |= PORT_LOGIC_SPEED_CHANGE;
+-	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+ }
+ 
+ MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+
+
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->   include/linux/iommu.h | 2 --
->   1 file changed, 2 deletions(-)
->
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index a5c539fa5d2b..ef7a6ecd8584 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -195,9 +195,7 @@ struct iommu_ops {
->   	/* Get the number of windows per domain */
->   	u32 (*domain_get_windows)(struct iommu_domain *domain);
->
-> -#ifdef CONFIG_OF_IOMMU
->   	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
-> -#endif
->
->   	unsigned long pgsize_bitmap;
->   	void *priv;
->
+>  drivers/pci/host/pcie-designware.c | 38 +++++++++++++++++++-------------------
+>  1 file changed, 19 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index a4cccd3..6474f80 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -544,25 +544,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  	if (pp->ops->host_init)
+>  		pp->ops->host_init(pp);
+>  
+> -	/*
+> -	 * If the platform provides ->rd_other_conf, it means the platform
+> -	 * uses its own address translation component rather than ATU, so
+> -	 * we should not program the ATU here.
+> -	 */
+> -	if (!pp->ops->rd_other_conf)
+> -		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> -					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> -					  pp->mem_bus_addr, pp->mem_size);
+> -
+> -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> -
+> -	/* program correct class for RC */
+> -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
+> -
+> -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> -	val |= PORT_LOGIC_SPEED_CHANGE;
+> -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> -
+>  	pp->root_bus_nr = pp->busn->start;
+>  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+>  		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
+> @@ -800,6 +781,25 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>  	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+>  		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
+>  	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
+> +
+> +	/*
+> +	 * If the platform provides ->rd_other_conf, it means the platform
+> +	 * uses its own address translation component rather than ATU, so
+> +	 * we should not program the ATU here.
+> +	 */
+> +	if (!pp->ops->rd_other_conf)
+> +		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> +					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> +					  pp->mem_bus_addr, pp->mem_size);
+> +
+> +	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> +
+> +	/* program correct class for RC */
+> +	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
+> +
+> +	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> +	val |= PORT_LOGIC_SPEED_CHANGE;
+> +	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+>  }
+>  
+>  MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
