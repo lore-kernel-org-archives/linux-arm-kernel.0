@@ -1,54 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 Mar 2016 14:03:47 +0100
-Subject: [PATCH 00/50] pinctrl: Add and use devm_ apis for
- pinctrl_{register, unregister}
-In-Reply-To: <56E80D3F.3090300@nvidia.com>
-References: <1456319775-3216-1-git-send-email-ldewangan@nvidia.com>
- <CACRpkdZjv2KZ0AtC9oBytmSdS+=T+kC8PoJVt-RawE8Np8p40w@mail.gmail.com>
- <56D307CC.2050202@nvidia.com> <56E031CA.9010204@nvidia.com>
- <CACRpkdYQL0HUWuz882RRsSu5hLoS5VcVvpm1LeL1aeJkE_Y0tA@mail.gmail.com>
- <56E80D3F.3090300@nvidia.com>
-Message-ID: <CACRpkdYr8BiVMEU8uvnrXzTLDEcAjrujgJPJVKXAq5E5P=HzFQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Mar 2016 14:06:55 +0100
+Subject: [PATCH 0/8] drm: atmel-hlcdc: various fixes/improvements
+In-Reply-To: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <56E95A6F.5070003@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2016 at 2:25 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
-> On Tuesday 15 March 2016 02:01 PM, Linus Walleij wrote:
->> On Wed, Mar 9, 2016 at 3:23 PM, Laxman Dewangan <ldewangan@nvidia.com>
->> wrote:
->>
->>>> Pushed the change at:
->>>> Branch "devm_pinctrl_register" of
->>>> https://github.com/ldewangan/linux-upstream.git.
->>>>
->>>> Base repo is
->>>> for-next of
->>>> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
->>>>
->>>>
->>>> If required, I can send the V2 version of list with acks.
->>>
->>> Let me know if I need to send full series (V2 with collected ack) again
->>> or
->>> fine to pull it from above location.
->>
->> Please collect the ACKs on your branch and ask me to pull it after
->> v4.6-rc1.
->> No need to resend the patches.
->>
->> Unfortunately it arrived too late for the merge window, but hey: we got
->> the
->> devm gpiochip in for v4.6.
->
->
-> Thanks for taking the GPIO patches.
->
-> Ok, We will do pincontrol post v4.6 and probably, we will have some more
-> chnages for using devm_gpio in pincontrol subsystem  as these APIs will be
-> available  publicly.
+Le 06/01/2016 11:19, Boris Brezillon a ?crit :
+> Hello,
+> 
+> This series is a collection of fixes and improvements for the
+> atmel-hlcdc driver.
+> 
+> The main feature added here is the support for external RGB -> XXX
+> bridges (patch 6 and 7).
+> 
+> The first patch is a fix preventing a potential memory leak.
+> Patch 2 is adding support for asynchronous mode setting, which was
+> supported before the migration to atomic mode setting.
+> 
+> Patch 3 is just a minor fix to expose the real encoder and connector
+> types (we are currently exposing an LVDS encoder/connector, which is
+> wrong since the display controller output the pixel stream in raw
+> RGB).
+> 
+> Patch 4 is removing useless fields and functions which were left
+> when moving to atomic modesetting.
+> 
+> And patch 8 is just a cosmetic patch moving the mode checking code
+> from ->atomic_check() to ->mode_fixup().
 
-Awesome, then we get double the reduction in most cases, this
-will look nice. Let's proceed like this.
+To give more weight to this series, you can also add my:
 
-Yours,
-Linus Walleij
+Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Bye,
+
+
+> Boris Brezillon (8):
+>   drm: atmel-hlcdc: add a ->cleanup_fb() operation
+>   drm: atmel-hlcdc: support asynchronous atomic commit operations
+>   drm: atmel-hlcdc: fix connector and encoder types
+>   drm: atmel-hlcdc: remove leftovers from atomic mode setting migration
+>   drm: atmel-hlcdc: support extended timing ranges on sama5d4 and
+>     sama5d2
+>   drm: atmel-hlcdc: move output mode selection in CRTC implementation
+>   drm: atmel-hlcdc: rework the output code to support drm bridges
+>   drm: atmel-hlcdc: check display mode validity in crtc->mode_fixup()
+> 
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 148 +++++++++++++-
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 123 ++++++++++-
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  16 ++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 249 ++++++++++-------------
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  22 +-
+>  5 files changed, 400 insertions(+), 158 deletions(-)
+> 
+
+
+-- 
+Nicolas Ferre
