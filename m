@@ -1,57 +1,55 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 16 Mar 2016 10:27:24 -0400
-Subject: [PATCH V2 2/3] vfio, platform: make reset driver a requirement
-In-Reply-To: <56E8E2CD.3020604@linaro.org>
-References: <1457715275-11925-1-git-send-email-okaya@codeaurora.org>
- <1457715275-11925-3-git-send-email-okaya@codeaurora.org>
- <56E5A271.6000408@codeaurora.org> <56E8E2CD.3020604@linaro.org>
-Message-ID: <56E96D4C.3080008@codeaurora.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 16 Mar 2016 15:30:22 +0100
+Subject: [PATCH v4 01/24] pwm: rcar: make use of pwm_is_enabled()
+In-Reply-To: <1447664207-24370-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160316153022.164105d1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baptiste,
+Hi Thierry,
 
->> I couldn't see a reset function for AMBA devices.
->>
->> Is there anyway to write reset function for it? I have no experience with 
->> AMBA devices.
-> To my knowledge only the PL330 DMA controller (drivers/dma/pl330.c) was
-> passthrough'ed at some point, rather for development purpose than
-> production purpose. This was done by Virtual Open Systems (ask Baptiste
-> for more details). But I don't think this is really used.
+Can you please apply this patch?
+It's completely independent from the rest of the series.
 
-Are you OK with requiring reset driver for AMBA devices too? The PL330 
-driver won't work until a reset driver is submitted for it.
+Thanks,
 
->>
->> Would you include a reset needed flag and just not require it for AMBA? 
->> (I honestly don't like this idea)
->>
-> I think the requirement also makes sense for AMBA.
+Boris
+
+On Mon, 16 Nov 2015 09:56:24 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
+> Commit 5c31252c4a86 ("pwm: Add the pwm_is_enabled() helper") introduced a
+> new function to test whether a PWM device is enabled or not without
+> manipulating PWM internal fields.
+> Hiding this is necessary if we want to smoothly move to the atomic PWM
+> config approach without impacting PWM drivers.
+> Fix this driver to use pwm_is_enabled() instead of directly accessing the
+> ->flags field.
 > 
-> Maybe an option would be to add a module parameter that would allow to
-> use the vfio platform/amba driver without reset module (with explicit
-> opt-in from the user). Maybe this can be done later on.
-
-I can see this flag useful for testing purposes but it should not be used in 
-production.
-
-How about I add a module parameter which is not set by default? When set,
-I don't perform the reset requirement check.
-
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/pwm/pwm-rcar.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> FYI I will not have access to my mailbox until the end of the week.
+> diff --git a/drivers/pwm/pwm-rcar.c b/drivers/pwm/pwm-rcar.c
+> index 6e99a63..70899c9 100644
+> --- a/drivers/pwm/pwm-rcar.c
+> +++ b/drivers/pwm/pwm-rcar.c
+> @@ -157,7 +157,7 @@ static int rcar_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  		return div;
+>  
+>  	/* Let the core driver set pwm->period if disabled and duty_ns == 0 */
+> -	if (!test_bit(PWMF_ENABLED, &pwm->flags) && !duty_ns)
+> +	if (!pwm_is_enabled(pwm) && !duty_ns)
+>  		return 0;
+>  
+>  	rcar_pwm_update(rp, RCAR_PWMCR_SYNC, RCAR_PWMCR_SYNC, RCAR_PWMCR);
 
-OK, no rush.
-
-> 
-> Best Regards
-> 
-> Eric
-> 
 
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
