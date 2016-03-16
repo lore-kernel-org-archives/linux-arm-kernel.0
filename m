@@ -1,35 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 16 Mar 2016 09:45:52 +0100
-Subject: [PATCH v2 1/2] ARM: dts: r8a7793: add CAN clocks to device tree
-In-Reply-To: <1458093176-1926-2-git-send-email-horms+renesas@verge.net.au>
-References: <1458093176-1926-1-git-send-email-horms+renesas@verge.net.au>
- <1458093176-1926-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXzedXoSWW+9qzNGfCVZbhtZkjvbjwd+QxcsuAxPLkpOA@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 16 Mar 2016 10:46:42 +0200
+Subject: [PATCH v2 4/5] mmc: davinci: don't use dma platform resources
+In-Reply-To: <56E842EE.7030301@lechnology.com>
+References: <56E6BF7E.7020401@ti.com>
+ <1457996081-21975-1-git-send-email-david@lechnology.com>
+ <1457996081-21975-5-git-send-email-david@lechnology.com>
+ <56E7CDAC.1090907@ti.com> <56E842EE.7030301@lechnology.com>
+Message-ID: <56E91D72.4030606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 2:52 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> The R-Car CAN controllers can derive the CAN bus clock not only from their
-> peripheral clock input (clkp1) but also from the other internal clock
-> (clkp2) and external clock fed on CAN_CLK pin. Describe those clocks in
-> the device tree along with  the USB_EXTAL clock from which clkp2 is
-> derived.
->
-> Based on work by Sergei Shtylyov for the r8a7791 SoC.
->
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 03/15/16 19:14, David Lechner wrote:
+> On 03/15/2016 03:54 AM, Peter Ujfalusi wrote:
+>> On 03/15/16 00:54, David Lechner wrote:
+>>>
+>>>       host->dma_tx =
+>>> -        dma_request_slave_channel_compat(mask, edma_filter_fn,
+>>> -                &host->txdma, mmc_dev(host->mmc), "tx");
+>>> +        dma_request_slave_channel(mmc_dev(host->mmc), "tx");
+>>
+>> you would need to use dma_request_chan() to be able to rely on the legacy
+>> channel mapping.
+>> I have staged commits for converting all daVinci and OMAP drivers, I'll attach
+>> the patch I have for davinci-mmc for reference.
+>> When we convert to use the dma_request_chan() we can handle deferred probing
+>> also...
+>>
+> 
+> OK. So I should redo this patch on top of the patch you attached?
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Or replace your patch with mine in your series. In my patch I forgot to remove
+the 'u32 rxdma, txdma;' from struct mmc_davinci_host...
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+P?ter
