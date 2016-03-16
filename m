@@ -1,24 +1,21 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 16 Mar 2016 13:27:36 -0500
-Subject: [PATCH 3/5] ARM: davinci: da8xx: add cfgchip2 to resources
-In-Reply-To: <56E9A456.2000204@cogentembedded.com>
-References: <1458081473-8223-1-git-send-email-david@lechnology.com>
- <1458081473-8223-3-git-send-email-david@lechnology.com>
- <56E8906E.7070800@cogentembedded.com> <56E8D720.7000508@lechnology.com>
- <56E8E7C7.70901@lechnology.com> <56E99A16.9020709@cogentembedded.com>
- <56E9A282.7030103@lechnology.com> <56E9A456.2000204@cogentembedded.com>
-Message-ID: <56E9A598.40308@lechnology.com>
+From: scott.wood@nxp.com (Scott Wood)
+Date: Wed, 16 Mar 2016 18:47:34 +0000
+Subject: [PATCH] gpio/ls1043a: Correct ls1043a gpio nodes compatible in
+ dts file
+References: <1457600240-47141-1-git-send-email-Gang.Liu@nxp.com>
+ <1457600240-47141-2-git-send-email-Gang.Liu@nxp.com>
+Message-ID: <DB5PR0401MB192833673541757889C889C1918A0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2016 01:22 PM, Sergei Shtylyov wrote:
->
->     The set_mode() method doesn't have anything to do with the
-> predefined roles. What CFGCHIP2 setting do is to override the ID input
-> (and also the VBUS level comparator). This is not required for the
-> normal functioning of either host or peripheral AFAIR.
->
+On 03/10/2016 03:06 AM, Liu Gang wrote:
+> The ls1043a belongs to the Freescale QorIQ platform, and QorIQ
+> platform's gpio nodes should use compatible "fsl,qoriq-gpio".
 
-OK, so it sounds like I should just remove set_mode from the musb driver 
-completely and make this configurable in the phy driver via platform 
-data or device tree.
+Why?  I don't see any version register anything else in this block that
+could be used to identify potential differences from chip to chip.  At
+the least, both compatibles should be present.
+
+Where is the binding for this?
+
+-Scott
