@@ -1,35 +1,58 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 16 Mar 2016 06:50:45 +0000
-Subject: NVMEM usage question
-In-Reply-To: <1457956899.20370.25.camel@mtksdaap41>
-References: <1457956899.20370.25.camel@mtksdaap41>
-Message-ID: <56E90245.1040203@linaro.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 16 Mar 2016 14:58:04 +0800
+Subject: [PATCH v5 0/5] ARM: at91: pm: add ULP1 mode support
+Message-ID: <1458111489-23774-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ULP1 (Ultra Low-power mode 1) is introduced by SAMA5D2.
 
+In order to achieve the lowest power consumption, in the ULP1 mode,
+all the clocks are shut off, inclusive the embedded 12MHz RC oscillator.
 
-On 14/03/16 12:01, Eddie Huang wrote:
-> Hi,
->
-> Mediatek PMIC chip have some spare registers used to store information.
-> The value of these registers will exist until user unplug battery or
-> battery depletion. One of our usage example is store battery utilization
-> in these spare registers. We want to implement NVMEM driver to
-> read/write sparse registers, but binding document describe NVMEM is for
-> "Non-volatile memory", and for hardware like eeprom, efuse. Since the
-> usage here is some kind of "battery backup memory", but not real
-> non-volatile memory, is NVMEM driver suitable for this case ?
+The fast startup signal is used as a wake up source for ULP1 mode.
+As soon as the wake up event is asserted, the embedded 12MHz RC
+oscillator restarts automatically, which fast startup signal
+to trigger the PMC to wake up the system from the ULP1 mode can be
+configured via DT.
 
-If this battery usage information can be retrieved after full power 
-cycle, then there should be some sort of non volatile memory involved.
+Changes in v5:
+ - to improve the scalability, rework the DT expression part, use
+   the child nodes to describe the wake-up input and its active level.
+ - due to the DT property expression change, update the binding
+   document.
+ - due to the DT property expression change, update the fast restart
+   node's property.
 
-If that's the case then you can use the nvmem.
+Changes in v4:
+ - add Acked-by tag.
+ - add fast_restart node to the DT file.
 
---srini
+Changes in v3:
+ - use 0 and 1, not string, to define the trigger active polarity.
+ - update the property description.
 
+Changes in v2:
+ - fix label pm_exit to ulp_exit.
+ - shorten the pmc-fast-startup property's name.
+ - use the value property, instead of bool property for high
+   or low triggered.
+ - change the property name and property description.
 
->
-> Eddie
->
->
+Wenyou Yang (5):
+  ARM: at91: pm: create a separate procedure for the ULP0 mode
+  ARM: at91: pm: add ULP1 mode support
+  ARM: at91: pm: configure PMC fast startup signals
+  Documentation: atmel-pmc: add DT bindings for fast startup
+  ARM: at91/dt: sama5d2_xplained: add fast_restart node
+
+ .../devicetree/bindings/arm/atmel-pmc.txt          |   52 +++++++
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |   19 +++
+ arch/arm/mach-at91/pm.c                            |   82 +++++++++-
+ arch/arm/mach-at91/pm.h                            |    7 +
+ arch/arm/mach-at91/pm_suspend.S                    |  158 +++++++++++++++++---
+ include/linux/clk/at91_pmc.h                       |   18 +++
+ 6 files changed, 311 insertions(+), 25 deletions(-)
+
+-- 
+1.7.9.5
