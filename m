@@ -1,66 +1,37 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Wed, 16 Mar 2016 19:20:22 +0200
-Subject: [linux-sunxi] [PATCH v4 13/13] ARM: sunxi: Add Kconfig for
- sunxi clocks
-In-Reply-To: <1458144276-31108-14-git-send-email-vishnupatekar0510@gmail.com>
-References: <1458144276-31108-1-git-send-email-vishnupatekar0510@gmail.com>
- <1458144276-31108-14-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1458148822.4849.1.camel@plaes.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 16 Mar 2016 20:38:30 +0300
+Subject: [PATCH 3/5] ARM: davinci: da8xx: add cfgchip2 to resources
+In-Reply-To: <56E8E7C7.70901@lechnology.com>
+References: <1458081473-8223-1-git-send-email-david@lechnology.com>
+ <1458081473-8223-3-git-send-email-david@lechnology.com>
+ <56E8906E.7070800@cogentembedded.com> <56E8D720.7000508@lechnology.com>
+ <56E8E7C7.70901@lechnology.com>
+Message-ID: <56E99A16.9020709@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-03-17 at 00:04 +0800, Vishnu Patekar wrote:
-> This patch adds Kconfig for sunxi clocks.
-> Currently, only sun8i-apb0 and sun9i-cpus clocks are added.
-> It'll help to use common clocks across different SOCs.
-> We can switch to kconfig for other clocks in future.
-> 
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> ---
-> ?drivers/clk/Kconfig????????| 1 +
-> ?drivers/clk/sunxi/Kconfig??| 5 +++++
-> ?drivers/clk/sunxi/Makefile | 4 ++--
-> ?3 files changed, 8 insertions(+), 2 deletions(-)
-> ?create mode 100644 drivers/clk/sunxi/Kconfig
-> 
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index eca8e01..f9f42e6 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -210,3 +210,4 @@ source "drivers/clk/mvebu/Kconfig"
-> ?
-> ?source "drivers/clk/samsung/Kconfig"
-> ?source "drivers/clk/tegra/Kconfig"
-> +source "drivers/clk/sunxi/Kconfig"
+On 03/16/2016 07:57 AM, David Lechner wrote:
 
-Should be in alphabetic order?
+>>>     No, this register is shared b/w MUSB and OHCI. The proper thing to
+>>> do is to write the PHY driver and let it control this shared register.
+>>>
+>> OK. I've started working on this. I am looking at using struct usb_phy,
+>> however, enum usb_phy_type only has USB_PHY_TYPE_UNDEFINED,
+>> USB_PHY_TYPE_USB2, and USB_PHY_TYPE_USB3. Would it be acceptable to use
+>> USB_PHY_TYPE_UNDEFINED for the ohci since it is USB 1.1? Or perhaps I
+>> should use the more generic struct phy for that one?
+>>
+> Also, I am not finding any existing data structure to pass the musb set_mode
+> function to the phy in either usb_phy or usb_otg. Setting the mode
+> (host/peripheral/otg) is done in the same PHY register, so it seems like it
+> should be implemented in the new phy driver as well.
 
-> diff --git a/drivers/clk/sunxi/Kconfig b/drivers/clk/sunxi/Kconfig
-> new file mode 100644
-> index 0000000..3e8ede4
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/Kconfig
-> @@ -0,0 +1,5 @@
-> +config CLK_SUN8I_APB0
-> +	def_bool MACH_SUN9I || MACH_SUN8I
-> +
-> +config CLK_SUN9I_CPUS
-> +	def_bool MACH_SUN9I || MACH_SUN8I
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 3fd7901..38dfca8 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -17,8 +17,8 @@ obj-y += clk-sun9i-core.o
-> ?obj-y += clk-sun9i-mmc.o
-> ?obj-y += clk-usb.o
-> ?
-> -obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
-> -obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
-> +obj-$(CONFIG_CLK_SUN8I_APB0) += clk-sun8i-apb0.o
-> +obj-$(CONFIG_CLK_SUN9I_CPUS) += clk-sun9i-cpus.o
-> ?
-> ?obj-$(CONFIG_MFD_SUN6I_PRCM) += \
-> ?	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
-> --?
-> 1.9.1
-> 
+    Perhaps we'd have to sacrifice that functionality...
+
+> I guess I could use a generic phy instead and use phy_set_drvdata() to share
+> data between the phy driver and the musb driver. Does this sound like a
+> reasonable thing to do?
+
+    Not sure what you mean, could you elaborate?
+
+MBR, Sergei
