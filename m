@@ -1,44 +1,82 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 16 Mar 2016 12:38:19 +0200
-Subject: [PATCH v2 all 12/14] memory: omap-gpmc: use
- of_platform_default_populate() to populate default bus
-In-Reply-To: <1458113743-15131-13-git-send-email-wangkefeng.wang@huawei.com>
-References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
- <1458113743-15131-13-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <56E9379B.1050103@ti.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 16 Mar 2016 18:36:22 +0800
+Subject: [PATCH] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+Message-ID: <1458124582-2511-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/16 09:35, Kefeng Wang wrote:
-> Use helper of_platform_default_populate() in linux/of_platform
-> when possible, instead of calling of_platform_populate() with
-> the default match table.
-> 
-> Cc: Roger Quadros <rogerq@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
+dw_pcie_host_init() also contains some necessary rc setup code.
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+Another reason: the host may lost power during suspend to ram, the RC
+need to be re-setup after resume. The rc can't be correctly resumed
+without the rc setup code in dw_pcie_host_init().
 
-cheers,
--roger
+So this patch moves the code to dw_pcie_setup_rc() to address the above
+two issues. After this patch, each pcie designware driver users could
+call dw_pcie_setup_rc() to re-setup rc when resume back.
 
-> ---
->  drivers/memory/omap-gpmc.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
-> index 6515dfc..455fc73 100644
-> --- a/drivers/memory/omap-gpmc.c
-> +++ b/drivers/memory/omap-gpmc.c
-> @@ -2016,8 +2016,7 @@ no_timings:
->  	/* is child a common bus? */
->  	if (of_match_node(of_default_bus_match_table, child))
->  		/* create children and other common bus children */
-> -		if (of_platform_populate(child, of_default_bus_match_table,
-> -					 NULL, &pdev->dev))
-> +		if (of_platform_default_populate(child, NULL, &pdev->dev))
->  			goto err_child_fail;
->  
->  	return 0;
-> 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/pci/host/pcie-designware.c | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index a4cccd3..6474f80 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -544,25 +544,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	if (pp->ops->host_init)
+ 		pp->ops->host_init(pp);
+ 
+-	/*
+-	 * If the platform provides ->rd_other_conf, it means the platform
+-	 * uses its own address translation component rather than ATU, so
+-	 * we should not program the ATU here.
+-	 */
+-	if (!pp->ops->rd_other_conf)
+-		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+-					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+-					  pp->mem_bus_addr, pp->mem_size);
+-
+-	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+-
+-	/* program correct class for RC */
+-	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
+-
+-	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+-	val |= PORT_LOGIC_SPEED_CHANGE;
+-	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+-
+ 	pp->root_bus_nr = pp->busn->start;
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+ 		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
+@@ -800,6 +781,25 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+ 	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+ 		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
+ 	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
++
++	/*
++	 * If the platform provides ->rd_other_conf, it means the platform
++	 * uses its own address translation component rather than ATU, so
++	 * we should not program the ATU here.
++	 */
++	if (!pp->ops->rd_other_conf)
++		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
++					  PCIE_ATU_TYPE_MEM, pp->mem_base,
++					  pp->mem_bus_addr, pp->mem_size);
++
++	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
++
++	/* program correct class for RC */
++	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
++
++	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
++	val |= PORT_LOGIC_SPEED_CHANGE;
++	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+ }
+ 
+ MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+-- 
+2.7.0
