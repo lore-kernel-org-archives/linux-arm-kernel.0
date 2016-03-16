@@ -1,46 +1,39 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 16 Mar 2016 14:58:38 +0100
-Subject: [PATCH v4 0/8] arm64: rockchip: Initial GeekBox enablement
-Message-ID: <1458136727-32075-1-git-send-email-afaerber@suse.de>
+Date: Wed, 16 Mar 2016 14:58:40 +0100
+Subject: [PATCH v4 2/8] Documentation: devicetree: Add vendor prefix for
+ GeekBuying.com
+In-Reply-To: <1458136727-32075-1-git-send-email-afaerber@suse.de>
+References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
+Message-ID: <1458136727-32075-3-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Use "geekbuying".
 
-This series adds initial support for the RK3368 based GeekBox.
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v3 -> v4: Unchanged
+ 
+ v2 -> v3:
+ * Rebased (ge vs. geekbuying)
 
-v4 does small cleanups and decouples us again from the stmmac discussions v3 kicked off.
+ v2: New (Heiko)
+ 
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-stmmac patches have been proposed to fix GMAC issues in linux-next (and v4.5):
-
-https://patchwork.ozlabs.org/patch/598331/
-https://patchwork.ozlabs.org/patch/598332/
-
-Regards,
-Andreas
-
-Cc: devicetree at vger.kernel.org
-
-Andreas F?rber (8):
-  arm64: dts: rockchip: Clean up /memory nodes
-  Documentation: devicetree: Add vendor prefix for GeekBuying.com
-  Documentation: devicetree: rockchip: Document GeekBox
-  arm64: dts: rockchip: Add GeekBox config
-  arm64: dts: rockchip: Clean up gpio-keys nodes
-  arm64: dts: rockchip: Add power key to GeekBox
-  Documentation: devicetree: rockchip: Document Landingship
-  arm64: dts: rockchip: Add Landingship config
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   9 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm64/boot/dts/rockchip/Makefile              |   2 +
- arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       |   9 +-
- .../dts/rockchip/rk3368-geekbox-landingship.dts    |  57 ++++
- arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    | 319 +++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts        |   9 +-
- 7 files changed, 396 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index a4d3fb5a2407..31465805bffc 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -90,6 +90,7 @@ firefly	Firefly
+ focaltech	FocalTech Systems Co.,Ltd
+ fsl	Freescale Semiconductor
+ ge	General Electric Company
++geekbuying	GeekBuying
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ geniatech	Geniatech, Inc.
 -- 
 2.6.2
