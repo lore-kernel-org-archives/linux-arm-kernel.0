@@ -1,57 +1,27 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 16 Mar 2016 12:53:29 +0100
-Subject: [PATCH v2] Documentation: devicetree: Clean up gpio-keys example
-Message-ID: <1458129209-15449-1-git-send-email-afaerber@suse.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 16 Mar 2016 14:57:21 +0300
+Subject: [PATCH 5/5] usb: musb-da8xx: remove board-specific clock handling
+In-Reply-To: <1458081473-8223-5-git-send-email-david@lechnology.com>
+References: <1458081473-8223-1-git-send-email-david@lechnology.com>
+ <1458081473-8223-5-git-send-email-david@lechnology.com>
+Message-ID: <56E94A21.7040601@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop #address-cells and #size-cells, which are not required by the
-gpio-keys binding documentation, as button sub-nodes are not devices.
+Hello.
 
-Rename sub-nodes to avoid new dtc unit address warnings when copied.
+On 3/16/2016 1:37 AM, David Lechner wrote:
 
-While at it, adopt the dashes convention for the node name.
+> This driver should not have to worry about how the clocks are configured
+> on a system. Added a usb20_phy clock to handle the USB 2.0 PLL clock
+> externally.
+>
+> Also changed to using devm_ to simplify code a bit.
 
-Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
-Cc: Julien Chauveau <chauveau.julien@gmail.com>
-Cc: Javier Martinez Canillas <javier@dowhile0.org>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v1 -> v2:
- * Changed node name from underscore to dash
- * Inserted white lines
- * Renamed sub-nodes (Geert, Julien)
- 
- Documentation/devicetree/bindings/input/gpio-keys.txt | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+    This should preferably be split to another patch. Doing one thing per 
+patch is a rule of thumb.
 
-diff --git a/Documentation/devicetree/bindings/input/gpio-keys.txt b/Documentation/devicetree/bindings/input/gpio-keys.txt
-index 21641236c095..a94940481e55 100644
---- a/Documentation/devicetree/bindings/input/gpio-keys.txt
-+++ b/Documentation/devicetree/bindings/input/gpio-keys.txt
-@@ -32,17 +32,17 @@ Optional subnode-properties:
- 
- Example nodes:
- 
--	gpio_keys {
-+	gpio-keys {
- 			compatible = "gpio-keys";
--			#address-cells = <1>;
--			#size-cells = <0>;
- 			autorepeat;
--			button at 21 {
-+
-+			up {
- 				label = "GPIO Key UP";
- 				linux,code = <103>;
- 				gpios = <&gpio1 0 1>;
- 			};
--			button at 22 {
-+
-+			down {
- 				label = "GPIO Key DOWN";
- 				linux,code = <108>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
--- 
-2.6.2
+> Signed-off-by: David Lechner <david@lechnology.com>
+[...]
+
+MBR, Sergei
