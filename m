@@ -1,18 +1,23 @@
-From: chauveau.julien@gmail.com (Julien Chauveau)
-Date: Wed, 16 Mar 2016 22:55:48 +0100
-Subject: [PATCH v4 6/8] arm64: dts: rockchip: Add power key to GeekBox
-In-Reply-To: <1458136727-32075-7-git-send-email-afaerber@suse.de>
-References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
- <1458136727-32075-7-git-send-email-afaerber@suse.de>
-Message-ID: <93D73017-19FD-46AA-BFDE-5EB788F255A2@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 16 Mar 2016 17:33:14 -0500
+Subject: [PATCH 0/3] ARM: AMx3xx: misc clock fixes
+In-Reply-To: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
+References: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
+Message-ID: <56E9DF2A.2000705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Le 16 mars 2016 ? 14:58, Andreas F?rber <afaerber@suse.de> a ?crit :
+On 03/16/2016 02:54 PM, Tero Kristo wrote:
+> Hi,
 > 
-> Cc: Julien Chauveau <chauveau.julien@gmail.com>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ?
+> These patches add DPLL max rate support on AMx3xx SoCs, and add
+> support for clkout1 clock on AM43xx. Targeted for 4.7 merge window.
 
-Reviewed-by: Julien Chauveau <chauveau.julien@gmail.com>
+
+This series looks good to me:
+Reviewed-by: Nishanth Menon <nm@ti.com>
+
+
+-- 
+Regards,
+Nishanth Menon
