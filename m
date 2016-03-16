@@ -1,40 +1,61 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 16 Mar 2016 22:17:14 +0900
-Subject: [PATCH] MAINTAINERS: pinctrl: samsung: Add two new maintainers
-In-Reply-To: <CACRpkdYckkZ1q_rfMDp8TOoEm5AnAmccpa+gm9d28wJbCLBkaQ@mail.gmail.com>
-References: <1458086521-11220-1-git-send-email-k.kozlowski@samsung.com>
- <CACRpkdYckkZ1q_rfMDp8TOoEm5AnAmccpa+gm9d28wJbCLBkaQ@mail.gmail.com>
-Message-ID: <CA+Ln22EaU+GB8f_Ab9P6Atehm4X7tzFy+dLd5FjSyF4Ck7NRUw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Mar 2016 14:19:48 +0100
+Subject: [PATCH v5 0/2] power: reset: support for Atmel alternative Shutdown
+ Controller
+Message-ID: <1458134390-23847-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-16 22:09 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Wed, Mar 16, 2016 at 1:02 AM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->
->> Extend the list of maintainers for Samsung pinctrl driver with Sylwester
->> and Krzysztof.
->>
->> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->> Tomasz Figa still has the time for this driver (and, as the most recent
->> author, he really knows what is inside!) but sometimes a faster
->> response could be reached from Samsung folks.
->
-> More maintainers are always good.
-> I just want an ACK of trust from Tomasz.
+This is a series to add driver for a new Atmel Shutdown Controller. This new IP
+is extensible and some features will be added later (see the TODO section).
+Its extensible nature led to write a new binding so that wake-up sources can be
+described easily.
 
-Sorry for slacking off, I've been a bit desynchronized lately. :(
+Changes in v5:
+- Instead of the "alternate shdwc" we choose a more specific
+  "sama5d2-compatible shdwc" wording. Change file name, in Kconfig, and the
+  MAINTAINERS file:
+  at91-shdwc.c -> at91-sama5d2_shdwc.c
+  "ATMEL AT91 Alternative Shutdown Controller" -> "ATMEL AT91 SAMA5D2-Compatible
+  Shutdown Controller"
+- fix one indentation mismatch
 
-Sure, let's do it. Actually I was convinced that we already added
-Sylwester to the list at the time I was leaving Samsung.
+Changes in v4:
+- change property to debounce-delay-us so that we can use a generic property
+  and we can have the unit explicitly included it the name according to
+  Documentation/devicetree/bindings/property-units.txt.
+- move to atmel,wakeup-active-high boolean property instead of a "high", "low"
+  string comparison.
+- fix warning found by 0-day robot: large integer implicitly truncated to
+  unsigned type [-Woverflow]
+- move to the property debounce-delay-us
+- move to atmel,wakeup-active-high boolean
+- add entry in MAINTAINERS file
 
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+Changes in v3:
+- get and use slow clock and specify its handler in binding
+- add the slow clock handle as the IP uses it
+- remove useless protection at the beginning of pm_power_off handler
+- allow to compile it as a module
+- add COMPILE_TEST directive in Kconfig
+- update description in file header
 
-Best regards,
-Tomasz
+Changes in v2:
+- add MODULE_DEVICE_TABLE as advised by Sebastian Reichel
+- review indentation and braces to correct errors pointed out by checkpatch
+
+Nicolas Ferre (2):
+  ARM: dts: at91: shdwc binding: add new shutdown controller
+    documentation
+  power: reset: at91-shdwc: add new shutdown controller driver
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |  59 +++++
+ MAINTAINERS                                        |   5 +
+ drivers/power/reset/Kconfig                        |   8 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/at91-sama5d2_shdwc.c           | 282 +++++++++++++++++++++
+ 5 files changed, 355 insertions(+)
+ create mode 100644 drivers/power/reset/at91-sama5d2_shdwc.c
+
+-- 
+2.1.3
