@@ -1,75 +1,53 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Mar 2016 08:47:21 +0530
-Subject: [PATCH 4/7] dmaengine: xilinx_vdma: Add Support for Xilinx AXI
- Direct Memory Access Engine
-In-Reply-To: <1458062592-27981-5-git-send-email-appanad@xilinx.com>
-References: <1458062592-27981-1-git-send-email-appanad@xilinx.com>
- <1458062592-27981-5-git-send-email-appanad@xilinx.com>
-Message-ID: <20160316031721.GO13211@localhost>
+Date: Wed, 16 Mar 2016 08:52:13 +0530
+Subject: [PATCH] dma: sun4i: expose block size and wait cycle
+ configuration to DMA users
+In-Reply-To: <20160314114641.GC30977@lukather>
+References: <20160307160857.577bb04d@bbrezillon>
+ <20160307203024.GD8418@lukather> <20160308025547.GI11154@localhost>
+ <20160309120627.67612b1d@bbrezillon>
+ <20160311062607.GP11154@localhost>
+ <20160311104552.23e06a16@bbrezillon>
+ <20160311100902.GY11154@localhost> <20160311105549.GZ8418@lukather>
+ <20160311111825.GC11154@localhost>
+ <20160314114641.GC30977@lukather>
+Message-ID: <20160316032213.GP13211@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2016 at 10:53:09PM +0530, Kedareswara rao Appana wrote:
-> This patch updates the device-tree binding doc for
-> adding support for AXI DMA.
-
-Binding patch should precced the driver. and the title doesn't tell me its a
-binding patch and might get ignore by folks.
-
-Pls cc device tree ML on these patches. And please read
-Documentation/devicetree/bindings/submitting-patches.txt. Its there for a
-purpose
-
+On Mon, Mar 14, 2016 at 12:46:41PM +0100, Maxime Ripard wrote:
+> On Fri, Mar 11, 2016 at 04:48:26PM +0530, Vinod Koul wrote:
+> > > > But this nees to be property for clients and not driver. Client can then
+> > > > program these
+> > > 
+> > > Yes, totally. The question here is how the clients give that
+> > > information to the driver.
+> > 
+> > For this part am not worried. If we can generalize this then we add to
+> > dma_slave_config. Otherwise an exported symbol from driver should be fine.
 > 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
->  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
+> It's actually what we would like to avoid.
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> index e4c4d47..3d134a5 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> @@ -3,8 +3,13 @@ It can be configured to have one channel or two channels. If configured
->  as two channels, one is to transmit to the video device and another is
->  to receive from the video device.
->  
-> +Xilinx AXI DMA engine, it does transfers between memory and AXI4 stream
-> +target devices. It can be configured to have one channel or two channels.
-> +If configured as two channels, one is to transmit to the device and another
-> +is to receive from the device.
-> +
->  Required properties:
-> -- compatible: Should be "xlnx,axi-vdma-1.00.a"
-> +- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
->  - #dma-cells: Should be <1>, see "dmas" property below
->  - reg: Should contain VDMA registers location and length.
->  - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-> @@ -55,6 +60,21 @@ axi_vdma_0: axivdma at 40030000 {
->  	} ;
->  } ;
->  
-> +axi_dma_0: axidma at 40400000 {
-> +	compatible = "xlnx,axi-dma-1.00.a";
-> +	#dma_cells = <1>;
-> +	reg = < 0x40400000 0x10000 >;
-> +	dma-channel at 40400000 {
-> +		compatible = "xlnx,axi-vdma-mm2s-channel";
-> +		interrupts = < 0 59 4 >;
-> +		xlnx,datawidth = <0x40>;
-> +	} ;
-> +	dma-channel at 40400030 {
-> +		compatible = "xlnx,axi-vdma-s2mm-channel";
-> +		interrupts = < 0 58 4 >;
-> +		xlnx,datawidth = <0x40>;
-> +	} ;
-> +} ;
->  
->  * DMA client
->  
-> -- 
-> 2.1.2
+> We have two potential provider driver that would need such an
+> interface, and we have customer drivers that would be able to use any
+> of these two, depending on which SoCs we're talking about.
 > 
+> Maintaining some logic in each and every driver in that case to know
+> which one of this symbol is to be called seems counterproductive and
+> painful.
+
+You didn't specify which one you want to avoid, and my guess is latter
+choice and not former :)
+
+As I said, if it's something we can use in few examples and describe
+generically I do not mind adding to dma_slave_config
 
 -- 
 ~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160316/ecd11de3/attachment.sig>
