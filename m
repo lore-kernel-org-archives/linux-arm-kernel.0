@@ -1,87 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 16 Mar 2016 19:14:51 -0400
-Subject: [PATCH 1/2] pci: add pci_unmap_iospace function for PCI_IOBASE
-In-Reply-To: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
-References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <56E9E8EB.6040707@codeaurora.org>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Thu, 17 Mar 2016 00:23:37 +0100
+Subject: [PATCH] phy: mdio-thunder: Fix some Kconfig typos
+Message-ID: <1458170617-31784-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
-Any feedback here?
+Drop two extra occurrences of "on" in option title and help text.
 
-On 3/7/2016 5:21 PM, Sinan Kaya wrote:
-> The PCI_IOBASE needs to be released after hotplug removal so that it can be
-> re-added back by the pci_remap_iospace function during insertion.
-> 
-> Adding unmap function to follow IO remap function.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c   | 25 +++++++++++++++++++++++++
->  include/linux/pci.h |  1 +
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 3a516c0..f5faed2 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -26,6 +26,7 @@
->  #include <linux/device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pci_hotplug.h>
-> +#include <linux/vmalloc.h>
->  #include <asm-generic/pci-bridge.h>
->  #include <asm/setup.h>
->  #include <linux/aer.h>
-> @@ -3169,6 +3170,30 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
->  #endif
->  }
->  
-> +/**
-> + *	pci_unmap_iospace - Unmap the memory mapped I/O space
-> + *	@virt_addr: virtual address to be unmapped
-> + *	@size: size of the physical address to be unmapped
-> + *
-> + *	Unmap the CPU virtual address @virt_addr from virtual address space.
-> + *	Only architectures that have memory mapped IO functions defined
-> + *	(and the PCI_IOBASE value defined) should call this function.
-> + */
-> +void  __weak pci_unmap_iospace(struct resource *res)
-> +{
-> +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-> +	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
-> +
-> +	unmap_kernel_range(vaddr, resource_size(res));
-> +#else
-> +	/*
-> +	 * This architecture does not have memory mapped I/O space,
-> +	 * so this function should never be called.
-> +	 */
-> +	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
-> +#endif
-> +}
-> +
->  static void __pci_set_master(struct pci_dev *dev, bool enable)
->  {
->  	u16 old_cmd, cmd;
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 398ae7e..c6e3f0e 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1172,6 +1172,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
->  unsigned long pci_address_to_pio(phys_addr_t addr);
->  phys_addr_t pci_pio_to_address(unsigned long pio);
->  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-> +void pci_unmap_iospace(struct resource *res);
->  
->  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
->  {
-> 
+Fixes: 379d7ac7ca31 ("phy: mdio-thunder: Add driver for Cavium Thunder SoC MDIO buses.")
+Cc: David Daney <david.daney@cavium.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ drivers/net/phy/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Sinan
-
+diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
+index 075a4cc175b1..6dad9a9c356c 100644
+--- a/drivers/net/phy/Kconfig
++++ b/drivers/net/phy/Kconfig
+@@ -197,13 +197,13 @@ config MDIO_OCTEON
+ 	  drivers on some systems.
+ 
+ config MDIO_THUNDER
+-	tristate "Support for MDIO buses on on ThunderX SOCs"
++	tristate "Support for MDIO buses on ThunderX SOCs"
+ 	depends on 64BIT
+ 	depends on PCI
+ 	select MDIO_CAVIUM
+ 	help
+ 	  This driver supports the MDIO interfaces found on Cavium
+-	  ThunderX SoCs when the MDIO bus device appears on as a PCI
++	  ThunderX SoCs when the MDIO bus device appears as a PCI
+ 	  device.
+ 
+ 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.6.2
