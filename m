@@ -1,71 +1,102 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 16 Mar 2016 10:27:22 +0000
-Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
-In-Reply-To: <20160316054329.GC28915@dhcppc6.redhat.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-4-git-send-email-dave.long@linaro.org>
- <56E858D8.8030300@arm.com> <20160316054329.GC28915@dhcppc6.redhat.com>
-Message-ID: <56E9350A.7010909@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 16 Mar 2016 11:38:51 +0100
+Subject: [linux-sunxi] Re: [PATCH 0/4] Add AXP209 GPIO driver
+In-Reply-To: <CACRpkdZUJsqCG=dd9XdwxaAHxEHXgrZncH+DqtPYta4a30v87w@mail.gmail.com>
+References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
+ <56E0146E.6050102@redhat.com> <20160309152822.GQ8418@lukather>
+ <56E044C1.7080300@redhat.com>
+ <CACRpkdZUJsqCG=dd9XdwxaAHxEHXgrZncH+DqtPYta4a30v87w@mail.gmail.com>
+Message-ID: <56E937BB.5020706@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+Hi,
 
-On 16/03/16 05:43, Pratyush Anand wrote:
-> On 15/03/2016:06:47:52 PM, James Morse wrote:
->> If I understand this correctly -  you can't kprobe these ldr/str instructions
->> as the fault handler wouldn't find kprobe's out-of line version of the
->> instruction in the exception table... but why only these two functions? (for
->> library functions, we also have clear_user() and copy_in_user()...)
+On 16-03-16 11:10, Linus Walleij wrote:
+> On Wed, Mar 9, 2016 at 4:44 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> On Wed, Mar 09, 2016 at 01:17:50PM +0100, Hans de Goede wrote:
 >
-> May be not clear_user() because those are inlined, but may be __clear_user().
+>>> Eventually, yes, it needs both. But they don't even have to be the
+>>> same driver, since they provide two different features. The only
+>>> reason we have that construct in the pio case is because they share
+>>> the same address space, but in the AXP case, the regmap and our mfd
+>>> take care of that already.
+>>
+>> Hmm, so your suggesting to have mfd instantiate 2 platform devices
+>> for this, a gpio and a pinctrl device, each with their own
+>> driver. Yes that would work, but I'm a bit worried about the 2
+>> racing or some such since they both will end up touching
+>> bit 0-2 of register 0x90 / 0x92, more-over since they are both
+>> touching the exact same bits I've the feeling that this really
+>> should be one driver.
+>
+> We can put the driver in drivers/pinctrl/pinctrl-axp209.c from day
+> one, add in comments stating that it only implements GPIO
+> for now and that the GPIO portion must call
+> pinctrl_request_gpio() and the pin controller must implement
+> .gpio_request_enable() the day it is added so the GPIOs do
+> not conflict with other use of the pins.
+>
+> Requireing a huge slew of upfront code is a bit hard on simple
+> drivers I think.
+>
+> Also we have the solution in drivers/mfd/stmpe.c that just add
+> a simple mux code when pins on mixsigs or simple expanders
+> can just mux some two-three different functions, then I think
+> pin control may be a bit too thick overhead. (Not sure where
+> the limit is though.)
 
-You're right - the other library functions in that same directory is what I meant..
+I actually found out this weekend, that we already have
+a problem here. Regulator on/off is implemented as
+2 mux settings, just like gpio high/low/input are mux settings:
 
->> Is it feasible to search the exception table at runtime instead? If an
->> address-to-be-kprobed appears in the list, we know it could generate exceptions,
->> so we should report that we can't probe this address. That would catch all of
->> the library functions, all the places uaccess.h was inlined, and anything new
->> that gets invented in the future.
-> 
-> Sorry, probably I could not get it. How can an inlined addresses range be placed
-> in exception table or any other code area.
+On the axp209 the gpio pin mux bit table looks like this:
 
-Ah, not a section or code area, sorry I wasn't clear:
+000: low output
+001: output (3.3V)
+010: universal input function
+011: low noise LDO5
+100: ADC input
+1XX: floating
 
-When a fault happens in the kernel, the fault handler
-(/arch/arm64/mm/fault.c:do_page_fault()) calls search_exception_tables(regs->pc)
-to see if the faulting address has a 'fixup' registered. If it does, the fixup
-causes -EFAULT to be returned, if not it ends up in die().
+And on the axp221 / axp223:
 
-The horrible block of assembler in
-arch/arm64/include/asm/uaccess.h:__get_user_asm() adds the address of the
-instruction that is allowed to fault to the __ex_table section:
->	.section __ex_table,"a"
-> 	.align	3
-> 	.quad	1b, 3b
->	.previous
+000: output low
+001: output high (3.3V)
+010: input
+011: LDOIO0 off
+100: LDOIO0 on
+1XX: floating
 
-Here 1b is the address of the instruction that can fault, and 3b is the fixup
-that moves -EFAULT into the return value.
+Note the LDOIO0 off / LDOIO0 on being 2 different mux
+settings, and then existing axp20x regulator driver for
+LD05 / LDOIO0 actually already implements regulator on / off
+by changing the mux for both axp209 and axp22x.
 
-This works for get_user() and friends which are inlined all over the kernel. It
-even works for modules, as there is an exception table for each module which is
-searched by kernel/module.c:search_module_extables().
+This results in the following potentially happening.
 
-This list of addresses that can fault already exists, there is even an API
-function to check for a given address. Grabbing the nearest vmlinux, there are
-~1300 entries in the __ex_table section, this patch blacklists two of them,
-using search_exception_tables() obviously blacklists them all.
+0) kernel boots
 
+1) The gpio driver is in use for these pins, sets the pin
+to say output low
 
-I've had a quick look at x86 and sparc, it looks like they allowed probed
-instructions to fault, do_page_fault()->kprobes_fault()->kprobe_fault_handler()
-- which uses the original probed address with search_exception_tables() to find
-and run the fixup. I doubt this is needed in an initial version of kprobes,
-(maybe its later in this series - I haven't read all the way through it yet).
+2) kernel is ready to start init, calls the regulators
+subsys late_init call, which disables any unused regulators,
+this results in the mux getting set to 7 (axp209) resp
+4 (axp22x), and the gpio is no longer driven low as
+the intend of the driver using the pin was.
 
+So we really need either some coordination here, or a way
+to tell the regulator-driver to not register ldo5 / ldoio#
+at all, so that the regulator-core won't try to turn them
+off changing the mux.
 
-Thanks,
+I've submitted a patch series this weekend which allows
+putting "status = disabled" in regulator child-dts-nodes, which
+will then result in not registering a regulator at all,
+which would fix that. But that series has not received any
+feedback yet...
 
-James
+Regards,
+
+Hans
