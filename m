@@ -1,21 +1,42 @@
-From: scott.wood@nxp.com (Scott Wood)
-Date: Wed, 16 Mar 2016 18:47:34 +0000
-Subject: [PATCH] gpio/ls1043a: Correct ls1043a gpio nodes compatible in
- dts file
-References: <1457600240-47141-1-git-send-email-Gang.Liu@nxp.com>
- <1457600240-47141-2-git-send-email-Gang.Liu@nxp.com>
-Message-ID: <DB5PR0401MB192833673541757889C889C1918A0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 17 Mar 2016 02:46:39 +0800
+Subject: [PATCH v2 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <201603170242.mBPNtopO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2016 03:06 AM, Liu Gang wrote:
-> The ls1043a belongs to the Freescale QorIQ platform, and QorIQ
-> platform's gpio nodes should use compatible "fsl,qoriq-gpio".
+Hi Chris,
 
-Why?  I don't see any version register anything else in this block that
-could be used to identify potential differences from chip to chip.  At
-the least, both compatibles should be present.
+[auto build test ERROR on tile/master]
+[also build test ERROR on v4.5]
+[cannot apply to next-20160316]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Where is the binding for this?
+url:    https://github.com/0day-ci/linux/commits/Chris-Metcalf/improvements-to-the-nmi_backtrace-code/20160317-010929
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/cmetcalf/linux-tile.git master
+config: xtensa-common_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
--Scott
+All errors (new ones prefixed by >>):
+
+   kernel/built-in.o: In function `SyS_setgroups':
+>> (.text+0x16688): undefined reference to `__cpuidle_text_start'
+   kernel/built-in.o: In function `SyS_setgroups':
+>> (.text+0x1668c): undefined reference to `__cpuidle_text_end'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 9752 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160317/0d784310/attachment-0001.obj>
