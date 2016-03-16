@@ -1,67 +1,296 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Wed, 16 Mar 2016 13:03:21 +0100
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <CAAmzW4OKQHJ06Bi86jqVFGxqWsW7h_EWeGPAFB9K1aY754C4aQ@mail.gmail.com>
-References: <56D93ABE.9070406@huawei.com>
- <20160307043442.GB24602@js1304-P5Q-DELUXE> <56DD38E7.3050107@huawei.com>
- <56DDCB86.4030709@redhat.com> <56DE30CB.7020207@huawei.com>
- <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
- <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
- <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
- <56E6AED1.6060703@suse.cz>
- <CAAmzW4OKQHJ06Bi86jqVFGxqWsW7h_EWeGPAFB9K1aY754C4aQ@mail.gmail.com>
-Message-ID: <56E94B89.80706@suse.cz>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 16 Mar 2016 09:04:06 -0300
+Subject: [PATCH 5/5] [media] media-device: make media_device_cleanup() static
+In-Reply-To: <dba4d41bdfa6bb8dc51cb0f692102919b2b7c8b4.1458129823.git.mchehab@osg.samsung.com>
+References: <dba4d41bdfa6bb8dc51cb0f692102919b2b7c8b4.1458129823.git.mchehab@osg.samsung.com>
+Message-ID: <864cdbedcdde600b09d77bfecb1b828e16e41ac0.1458129823.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2016 03:10 PM, Joonsoo Kim wrote:
-> 2016-03-14 21:30 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
->
-> Now I see why this happen. I enabled CONFIG_DEBUG_PAGEALLOC
-> and it makes difference.
->
-> I tested on x86_64, gcc (Ubuntu 4.8.4-2ubuntu1~14.04.1) 4.8.4.
->
-> With CONFIG_CMA + CONFIG_DEBUG_PAGEALLOC
-> ./scripts/bloat-o-meter page_alloc_base.o page_alloc_vlastimil_orig.o
-> add/remove: 0/0 grow/shrink: 2/0 up/down: 510/0 (510)
-> function                                     old     new   delta
-> free_one_page                               1050    1334    +284
-> free_pcppages_bulk                          1396    1622    +226
->
-> ./scripts/bloat-o-meter page_alloc_base.o page_alloc_mine.o
-> add/remove: 0/0 grow/shrink: 2/0 up/down: 351/0 (351)
-> function                                     old     new   delta
-> free_one_page                               1050    1230    +180
-> free_pcppages_bulk                          1396    1567    +171
->
->
-> With CONFIG_CMA + !CONFIG_DEBUG_PAGEALLOC
-> (pa_b is base, pa_v is yours and pa_m is mine)
->
-> ./scripts/bloat-o-meter pa_b.o pa_v.o
-> add/remove: 0/0 grow/shrink: 1/1 up/down: 88/-23 (65)
-> function                                     old     new   delta
-> free_one_page                                761     849     +88
-> free_pcppages_bulk                          1117    1094     -23
->
-> ./scripts/bloat-o-meter pa_b.o pa_m.o
-> add/remove: 0/0 grow/shrink: 2/0 up/down: 329/0 (329)
-> function                                     old     new   delta
-> free_one_page                                761    1031    +270
-> free_pcppages_bulk                          1117    1176     +59
->
-> Still, it has difference but less than before.
-> Maybe, we are still using different configuration. Could you
-> check if CONFIG_DEBUG_VM is enabled or not? In my case, it's not
+When multiple drivers are sharing the media_device struct,
+one driver cannot know the right moment to cleanup the
+media_device struct, because it can happen only when the
+struct is not used by the other drivers.
 
-It's disabled here.
+So, let's call media_device_cleanup() internally, and
+ensure that media_device_unregister() will do the right thing,
+if the media device is not fully initialized.
 
-> enabled. And, do you think this bloat isn't acceptable?
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ drivers/media/common/siano/smsdvb-main.c      |  1 -
+ drivers/media/media-device.c                  | 13 ++++++-------
+ drivers/media/pci/saa7134/saa7134-core.c      |  1 -
+ drivers/media/platform/exynos4-is/media-dev.c |  3 +--
+ drivers/media/platform/omap3isp/isp.c         |  1 -
+ drivers/media/platform/s3c-camif/camif-core.c |  2 --
+ drivers/media/platform/vsp1/vsp1_drv.c        |  1 -
+ drivers/media/platform/xilinx/xilinx-vipp.c   |  3 +--
+ drivers/media/usb/au0828/au0828-core.c        |  1 -
+ drivers/media/usb/cx231xx/cx231xx-cards.c     |  1 -
+ drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   |  1 -
+ drivers/media/usb/dvb-usb/dvb-usb-dvb.c       |  1 -
+ drivers/media/usb/em28xx/em28xx-cards.c       |  1 -
+ drivers/media/usb/siano/smsusb.c              |  2 +-
+ drivers/media/usb/uvc/uvc_driver.c            |  4 +---
+ include/media/media-device.h                  | 10 ----------
+ 16 files changed, 10 insertions(+), 36 deletions(-)
 
-Well, it is quite significant. But given that Hanjun sees the errors 
-still, it's not the biggest issue now :/
-
-> Thanks.
->
+diff --git a/drivers/media/common/siano/smsdvb-main.c b/drivers/media/common/siano/smsdvb-main.c
+index 9148e14c9d07..711c389c05e3 100644
+--- a/drivers/media/common/siano/smsdvb-main.c
++++ b/drivers/media/common/siano/smsdvb-main.c
+@@ -617,7 +617,6 @@ static void smsdvb_media_device_unregister(struct smsdvb_client_t *client)
+ 	if (!coredev->media_dev)
+ 		return;
+ 	media_device_unregister(coredev->media_dev);
+-	media_device_cleanup(coredev->media_dev);
+ 	kfree(coredev->media_dev);
+ 	coredev->media_dev = NULL;
+ #endif
+diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
+index 38e6c319fe6e..0c7371eeda84 100644
+--- a/drivers/media/media-device.c
++++ b/drivers/media/media-device.c
+@@ -707,14 +707,12 @@ void media_device_init(struct media_device *mdev)
+ }
+ EXPORT_SYMBOL_GPL(media_device_init);
+ 
+-void media_device_cleanup(struct media_device *mdev)
++static void media_device_cleanup(struct media_device *mdev)
+ {
+ 	ida_destroy(&mdev->entity_internal_idx);
+ 	mdev->entity_internal_idx_max = 0;
+ 	media_entity_graph_walk_cleanup(&mdev->pm_count_walk);
+-	mutex_destroy(&mdev->graph_mutex);
+ }
+-EXPORT_SYMBOL_GPL(media_device_cleanup);
+ 
+ int __must_check __media_device_register(struct media_device *mdev,
+ 					 struct module *owner)
+@@ -812,11 +810,12 @@ static void do_media_device_unregister(struct kref *kref)
+ 	}
+ 
+ 	/* Check if mdev devnode was registered */
+-	if (!media_devnode_is_registered(&mdev->devnode))
+-		return;
++	if (media_devnode_is_registered(&mdev->devnode)) {
++		device_remove_file(&mdev->devnode.dev, &dev_attr_model);
++		media_devnode_unregister(&mdev->devnode);
++	}
+ 
+-	device_remove_file(&mdev->devnode.dev, &dev_attr_model);
+-	media_devnode_unregister(&mdev->devnode);
++	media_device_cleanup(mdev);
+ 
+ 	dev_dbg(mdev->dev, "Media device unregistered\n");
+ }
+diff --git a/drivers/media/pci/saa7134/saa7134-core.c b/drivers/media/pci/saa7134/saa7134-core.c
+index c0e1780ec831..213dc71f09eb 100644
+--- a/drivers/media/pci/saa7134/saa7134-core.c
++++ b/drivers/media/pci/saa7134/saa7134-core.c
+@@ -813,7 +813,6 @@ static void saa7134_unregister_media_device(struct saa7134_dev *dev)
+ 	if (!dev->media_dev)
+ 		return;
+ 	media_device_unregister(dev->media_dev);
+-	media_device_cleanup(dev->media_dev);
+ 	kfree(dev->media_dev);
+ 	dev->media_dev = NULL;
+ #endif
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index feb521f28e14..8c106fda7b84 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -1501,7 +1501,7 @@ err_clk:
+ err_m_ent:
+ 	fimc_md_unregister_entities(fmd);
+ err_md:
+-	media_device_cleanup(&fmd->media_dev);
++	media_device_unregister(&fmd->media_dev);
+ 	v4l2_device_unregister(&fmd->v4l2_dev);
+ 	return ret;
+ }
+@@ -1521,7 +1521,6 @@ static int fimc_md_remove(struct platform_device *pdev)
+ 	fimc_md_unregister_entities(fmd);
+ 	fimc_md_pipelines_free(fmd);
+ 	media_device_unregister(&fmd->media_dev);
+-	media_device_cleanup(&fmd->media_dev);
+ 	fimc_md_put_clocks(fmd);
+ 
+ 	return 0;
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index 5d54e2c6c16b..cd67edcad8d3 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -1598,7 +1598,6 @@ static void isp_unregister_entities(struct isp_device *isp)
+ 
+ 	v4l2_device_unregister(&isp->v4l2_dev);
+ 	media_device_unregister(&isp->media_dev);
+-	media_device_cleanup(&isp->media_dev);
+ }
+ 
+ static int isp_link_entity(
+diff --git a/drivers/media/platform/s3c-camif/camif-core.c b/drivers/media/platform/s3c-camif/camif-core.c
+index 0b44b9accf50..0159f98da435 100644
+--- a/drivers/media/platform/s3c-camif/camif-core.c
++++ b/drivers/media/platform/s3c-camif/camif-core.c
+@@ -521,7 +521,6 @@ err_unlock:
+ err_sens:
+ 	v4l2_device_unregister(&camif->v4l2_dev);
+ 	media_device_unregister(&camif->media_dev);
+-	media_device_cleanup(&camif->media_dev);
+ 	camif_unregister_media_entities(camif);
+ err_mdev:
+ 	vb2_dma_contig_cleanup_ctx(camif->alloc_ctx);
+@@ -543,7 +542,6 @@ static int s3c_camif_remove(struct platform_device *pdev)
+ 	struct s3c_camif_plat_data *pdata = &camif->pdata;
+ 
+ 	media_device_unregister(&camif->media_dev);
+-	media_device_cleanup(&camif->media_dev);
+ 	camif_unregister_media_entities(camif);
+ 	v4l2_device_unregister(&camif->v4l2_dev);
+ 
+diff --git a/drivers/media/platform/vsp1/vsp1_drv.c b/drivers/media/platform/vsp1/vsp1_drv.c
+index 25750a0e4631..2faefec89b62 100644
+--- a/drivers/media/platform/vsp1/vsp1_drv.c
++++ b/drivers/media/platform/vsp1/vsp1_drv.c
+@@ -213,7 +213,6 @@ static void vsp1_destroy_entities(struct vsp1_device *vsp1)
+ 
+ 	v4l2_device_unregister(&vsp1->v4l2_dev);
+ 	media_device_unregister(&vsp1->media_dev);
+-	media_device_cleanup(&vsp1->media_dev);
+ 
+ 	if (!vsp1->info->uapi)
+ 		vsp1_drm_cleanup(vsp1);
+diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+index e795a4501e8b..ec4b21c64ef6 100644
+--- a/drivers/media/platform/xilinx/xilinx-vipp.c
++++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+@@ -573,7 +573,6 @@ static void xvip_composite_v4l2_cleanup(struct xvip_composite_device *xdev)
+ {
+ 	v4l2_device_unregister(&xdev->v4l2_dev);
+ 	media_device_unregister(&xdev->media_dev);
+-	media_device_cleanup(&xdev->media_dev);
+ }
+ 
+ static int xvip_composite_v4l2_init(struct xvip_composite_device *xdev)
+@@ -592,7 +591,7 @@ static int xvip_composite_v4l2_init(struct xvip_composite_device *xdev)
+ 	if (ret < 0) {
+ 		dev_err(xdev->dev, "V4L2 device registration failed (%d)\n",
+ 			ret);
+-		media_device_cleanup(&xdev->media_dev);
++		media_device_unregister(&xdev->media_dev);
+ 		return ret;
+ 	}
+ 
+diff --git a/drivers/media/usb/au0828/au0828-core.c b/drivers/media/usb/au0828/au0828-core.c
+index 06da73f1ff22..0a26ffff6f18 100644
+--- a/drivers/media/usb/au0828/au0828-core.c
++++ b/drivers/media/usb/au0828/au0828-core.c
+@@ -158,7 +158,6 @@ static void au0828_unregister_media_device(struct au0828_dev *dev)
+ 	dev->media_dev->disable_source = NULL;
+ 
+ 	media_device_unregister(dev->media_dev);
+-	media_device_cleanup(dev->media_dev);
+ 	dev->media_dev = NULL;
+ #endif
+ }
+diff --git a/drivers/media/usb/cx231xx/cx231xx-cards.c b/drivers/media/usb/cx231xx/cx231xx-cards.c
+index c63248a18823..438fe0761bda 100644
+--- a/drivers/media/usb/cx231xx/cx231xx-cards.c
++++ b/drivers/media/usb/cx231xx/cx231xx-cards.c
+@@ -1172,7 +1172,6 @@ static void cx231xx_unregister_media_device(struct cx231xx *dev)
+ #ifdef CONFIG_MEDIA_CONTROLLER
+ 	if (dev->media_dev) {
+ 		media_device_unregister(dev->media_dev);
+-		media_device_cleanup(dev->media_dev);
+ 		kfree(dev->media_dev);
+ 		dev->media_dev = NULL;
+ 	}
+diff --git a/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c b/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c
+index 3fbb2cd19f5e..238ecb3a510b 100644
+--- a/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c
++++ b/drivers/media/usb/dvb-usb-v2/dvb_usb_core.c
+@@ -438,7 +438,6 @@ static void dvb_usbv2_media_device_unregister(struct dvb_usb_adapter *adap)
+ 		return;
+ 
+ 	media_device_unregister(adap->dvb_adap.mdev);
+-	media_device_cleanup(adap->dvb_adap.mdev);
+ 	kfree(adap->dvb_adap.mdev);
+ 	adap->dvb_adap.mdev = NULL;
+ 
+diff --git a/drivers/media/usb/dvb-usb/dvb-usb-dvb.c b/drivers/media/usb/dvb-usb/dvb-usb-dvb.c
+index 6477b04e95c7..093ca809b5f8 100644
+--- a/drivers/media/usb/dvb-usb/dvb-usb-dvb.c
++++ b/drivers/media/usb/dvb-usb/dvb-usb-dvb.c
+@@ -132,7 +132,6 @@ static void dvb_usb_media_device_unregister(struct dvb_usb_adapter *adap)
+ 		return;
+ 
+ 	media_device_unregister(adap->dvb_adap.mdev);
+-	media_device_cleanup(adap->dvb_adap.mdev);
+ 	kfree(adap->dvb_adap.mdev);
+ 	adap->dvb_adap.mdev = NULL;
+ #endif
+diff --git a/drivers/media/usb/em28xx/em28xx-cards.c b/drivers/media/usb/em28xx/em28xx-cards.c
+index 930e3e3fc948..734ecfb890ff 100644
+--- a/drivers/media/usb/em28xx/em28xx-cards.c
++++ b/drivers/media/usb/em28xx/em28xx-cards.c
+@@ -3091,7 +3091,6 @@ static void em28xx_unregister_media_device(struct em28xx *dev)
+ #ifdef CONFIG_MEDIA_CONTROLLER
+ 	if (dev->media_dev) {
+ 		media_device_unregister(dev->media_dev);
+-		media_device_cleanup(dev->media_dev);
+ 		kfree(dev->media_dev);
+ 		dev->media_dev = NULL;
+ 	}
+diff --git a/drivers/media/usb/siano/smsusb.c b/drivers/media/usb/siano/smsusb.c
+index c2e25876e93b..cbf9a34f2074 100644
+--- a/drivers/media/usb/siano/smsusb.c
++++ b/drivers/media/usb/siano/smsusb.c
+@@ -375,7 +375,7 @@ static void *siano_media_device_register(struct smsusb_device_t *dev,
+ 
+ 	ret = media_device_register(mdev);
+ 	if (ret) {
+-		media_device_cleanup(mdev);
++		media_device_unregister(mdev);
+ 		kfree(mdev);
+ 		return NULL;
+ 	}
+diff --git a/drivers/media/usb/uvc/uvc_driver.c b/drivers/media/usb/uvc/uvc_driver.c
+index 451e84e962e2..dcce75e1aff2 100644
+--- a/drivers/media/usb/uvc/uvc_driver.c
++++ b/drivers/media/usb/uvc/uvc_driver.c
+@@ -1674,9 +1674,7 @@ static void uvc_delete(struct uvc_device *dev)
+ 	if (dev->vdev.dev)
+ 		v4l2_device_unregister(&dev->vdev);
+ #ifdef CONFIG_MEDIA_CONTROLLER
+-	if (media_devnode_is_registered(&dev->mdev.devnode))
+-		media_device_unregister(&dev->mdev);
+-	media_device_cleanup(&dev->mdev);
++	media_device_unregister(&dev->mdev);
+ #endif
+ 
+ 	list_for_each_safe(p, n, &dev->chains) {
+diff --git a/include/media/media-device.h b/include/media/media-device.h
+index 73c16e6e6b6b..9166bff8068e 100644
+--- a/include/media/media-device.h
++++ b/include/media/media-device.h
+@@ -430,16 +430,6 @@ static inline __must_check int media_entity_enum_init(
+ void media_device_init(struct media_device *mdev);
+ 
+ /**
+- * media_device_cleanup() - Cleanups a media device element
+- *
+- * @mdev:	pointer to struct &media_device
+- *
+- * This function that will destroy the graph_mutex that is
+- * initialized in media_device_init().
+- */
+-void media_device_cleanup(struct media_device *mdev);
+-
+-/**
+  * __media_device_register() - Registers a media device element
+  *
+  * @mdev:	pointer to struct &media_device
+-- 
+2.5.0
