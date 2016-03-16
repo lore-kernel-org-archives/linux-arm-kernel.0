@@ -1,41 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 16 Mar 2016 09:02:01 +0900
-Subject: [PATCH] MAINTAINERS: pinctrl: samsung: Add two new maintainers
-Message-ID: <1458086521-11220-1-git-send-email-k.kozlowski@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 Mar 2016 09:06:05 +0900
+Subject: [PATCHv2 00/31] ARM: dts: r8a779[0-4]: Reference both DMA
+ controllers
+In-Reply-To: <1458045728-4758-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1458045728-4758-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <20160316000603.GE6912@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the list of maintainers for Samsung pinctrl driver with Sylwester
-and Krzysztof.
+On Tue, Mar 15, 2016 at 01:41:37PM +0100, Niklas S?derlund wrote:
+> Hi,
+> 
+> R-Car Gen2 have two DMA controllers, which are equivalent. However DMA
+> slaves were tied only to a single DMA controller in .dtsi. This series
+> add references to to both DMA controllers for all nodes that previously
+> only referenced one of them. It also adds dma references to the SDHI
+> nodes for r8a7794 which according to the datasheet should work but I
+> have not access to HW to verify.
+> 
+> Tested on Koelsch (r8a7791) by altering the compatible value of either
+> dmac0 or dmac1 and verifying that the DMA slaves pick the DMA controller
+> that is instantiated.
+> 
+> For your convince the series can be fetched from
+> https://git.ragnatech.se/linux rcar-dmas-dt-2
+> 
+> * Changes since v1
+> - Rebase on top of renesas-devel-20160315-v4.5 and add dmas references
+>   new nodes (r8a7790: scif2 r8a7793: i2c6,i2c7,i2c8).
+> - Correct error in commit message 31/31 (s/QSPI/MMCIF).
+> - Collect Ack and Reviewed tags from Geert.
 
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Thanks Niklas,
 
----
-
-Tomasz Figa still has the time for this driver (and, as the most recent
-author, he really knows what is inside!) but sometimes a faster
-response could be reached from Samsung folks.
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a16644726c08..8bc232400640 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8684,6 +8684,8 @@ F:	drivers/pinctrl/sh-pfc/
- 
- PIN CONTROLLER - SAMSUNG
- M:	Tomasz Figa <tomasz.figa@gmail.com>
-+M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
-+M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
- S:	Maintained
--- 
-2.5.0
+I have queued these up for v4.7.
