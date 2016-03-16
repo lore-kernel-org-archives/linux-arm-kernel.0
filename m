@@ -1,90 +1,161 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 16 Mar 2016 14:57:35 +0100
-Subject: [PATCH v2 1/9] drm: atmel-hlcdc: add a ->cleanup_fb() operation
+Date: Wed, 16 Mar 2016 14:57:36 +0100
+Subject: [PATCH v2 2/9] drm: atmel-hlcdc: support asynchronous atomic commit
+ operations
 In-Reply-To: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1458136663-21396-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1458136663-21396-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a ->cleanup_fb() operation to avoid memory leaks when the atomic
-operation is interrupted after the ->prepare_fb() call.
+drm_atomic_helper_commit() does not support asynchronous commits.
+Replace it by a specific commit function supporting these kind of requests.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Fixes 2389fc1 ("drm: atmel-hlcdc: Atomic mode-setting conversion")
-Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  2 ++
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 22 +++++++++++++++++++---
- 2 files changed, 21 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 94 +++++++++++++++++++++++++++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h |  5 ++
+ 2 files changed, 98 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-index fed517f..ec64140 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-@@ -81,11 +81,13 @@ struct atmel_hlcdc_plane_properties {
-  * @layer: HLCDC layer structure
-  * @properties: pointer to the property definitions structure
-  * @rotation: current rotation status
-+ * @prepared: flagging the plane has prepared for an atomic update
-  */
- struct atmel_hlcdc_plane {
- 	struct drm_plane base;
- 	struct atmel_hlcdc_layer layer;
- 	struct atmel_hlcdc_plane_properties *properties;
-+	bool prepared;
- };
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+index 3d8d164..851b4a0 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+@@ -427,11 +427,102 @@ static void atmel_hlcdc_fb_output_poll_changed(struct drm_device *dev)
+ 	}
+ }
  
- static inline struct atmel_hlcdc_plane *
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-index 1ffe9c3..35027d0 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-@@ -715,11 +715,25 @@ static int atmel_hlcdc_plane_prepare_fb(struct drm_plane *p,
- 					const struct drm_plane_state *new_state)
- {
- 	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
-+	int ret;
- 
--	if (!new_state->fb)
--		return 0;
-+	ret = atmel_hlcdc_layer_update_start(&plane->layer);
-+	if (!ret)
-+		plane->prepared = true;
++struct atmel_hlcdc_dc_commit {
++	struct work_struct work;
++	struct drm_device *dev;
++	struct drm_atomic_state *state;
++};
 +
++static void
++atmel_hlcdc_dc_atomic_complete(struct atmel_hlcdc_dc_commit *commit)
++{
++	struct drm_device *dev = commit->dev;
++	struct atmel_hlcdc_dc *dc = dev->dev_private;
++	struct drm_atomic_state *old_state = commit->state;
++
++	/* Apply the atomic update. */
++	drm_atomic_helper_commit_modeset_disables(dev, old_state);
++	drm_atomic_helper_commit_planes(dev, old_state, false);
++	drm_atomic_helper_commit_modeset_enables(dev, old_state);
++
++	drm_atomic_helper_wait_for_vblanks(dev, old_state);
++
++	drm_atomic_helper_cleanup_planes(dev, old_state);
++
++	drm_atomic_state_free(old_state);
++
++	/* Complete the commit, wake up any waiter. */
++	spin_lock(&dc->commit.wait.lock);
++	dc->commit.pending = false;
++	wake_up_all_locked(&dc->commit.wait);
++	spin_unlock(&dc->commit.wait.lock);
++
++	kfree(commit);
++}
++
++static void atmel_hlcdc_dc_atomic_work(struct work_struct *work)
++{
++	struct atmel_hlcdc_dc_commit *commit =
++		container_of(work, struct atmel_hlcdc_dc_commit, work);
++
++	atmel_hlcdc_dc_atomic_complete(commit);
++}
++
++static int atmel_hlcdc_dc_atomic_commit(struct drm_device *dev,
++					struct drm_atomic_state *state,
++					bool async)
++{
++	struct atmel_hlcdc_dc *dc = dev->dev_private;
++	struct atmel_hlcdc_dc_commit *commit;
++	int ret;
++
++	ret = drm_atomic_helper_prepare_planes(dev, state);
++	if (ret)
++		return ret;
++
++	/* Allocate the commit object. */
++	commit = kzalloc(sizeof(*commit), GFP_KERNEL);
++	if (!commit) {
++		ret = -ENOMEM;
++		goto error;
++	}
++
++	INIT_WORK(&commit->work, atmel_hlcdc_dc_atomic_work);
++	commit->dev = dev;
++	commit->state = state;
++
++	spin_lock(&dc->commit.wait.lock);
++	ret = wait_event_interruptible_locked(dc->commit.wait,
++					      !dc->commit.pending);
++	if (ret == 0)
++		dc->commit.pending = true;
++	spin_unlock(&dc->commit.wait.lock);
++
++	if (ret) {
++		kfree(commit);
++		goto error;
++	}
++
++	/* Swap the state, this is the point of no return. */
++	drm_atomic_helper_swap_state(dev, state);
++
++	if (async)
++		queue_work(dc->wq, &commit->work);
++	else
++		atmel_hlcdc_dc_atomic_complete(commit);
++
++	return 0;
++
++error:
++	drm_atomic_helper_cleanup_planes(dev, state);
 +	return ret;
 +}
 +
-+static void atmel_hlcdc_plane_cleanup_fb(struct drm_plane *p,
-+				const struct drm_plane_state *old_state)
-+{
-+	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
-+
-+	if (!plane->prepared)
-+		return;
+ static const struct drm_mode_config_funcs mode_config_funcs = {
+ 	.fb_create = atmel_hlcdc_fb_create,
+ 	.output_poll_changed = atmel_hlcdc_fb_output_poll_changed,
+ 	.atomic_check = drm_atomic_helper_check,
+-	.atomic_commit = drm_atomic_helper_commit,
++	.atomic_commit = atmel_hlcdc_dc_atomic_commit,
+ };
  
--	return atmel_hlcdc_layer_update_start(&plane->layer);
-+	atmel_hlcdc_layer_update_rollback(&plane->layer);
-+	plane->prepared = false;
- }
+ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
+@@ -509,6 +600,7 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
+ 	if (!dc->wq)
+ 		return -ENOMEM;
  
- static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
-@@ -739,6 +753,7 @@ static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
- 	atmel_hlcdc_plane_update_disc_area(plane, state);
++	init_waitqueue_head(&dc->commit.wait);
+ 	dc->desc = match->data;
+ 	dc->hlcdc = dev_get_drvdata(dev->dev->parent);
+ 	dev->dev_private = dc;
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+index ec64140..53b4488 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+@@ -130,6 +130,7 @@ struct atmel_hlcdc_planes {
+  * @planes: instantiated planes
+  * @layers: active HLCDC layer
+  * @wq: display controller workqueue
++ * @commit: used for async commit handling
+  */
+ struct atmel_hlcdc_dc {
+ 	const struct atmel_hlcdc_dc_desc *desc;
+@@ -139,6 +140,10 @@ struct atmel_hlcdc_dc {
+ 	struct atmel_hlcdc_planes *planes;
+ 	struct atmel_hlcdc_layer *layers[ATMEL_HLCDC_MAX_LAYERS];
+ 	struct workqueue_struct *wq;
++	struct {
++		wait_queue_head_t wait;
++		bool pending;
++	} commit;
+ };
  
- 	atmel_hlcdc_layer_update_commit(&plane->layer);
-+	plane->prepared = false;
- }
- 
- static void atmel_hlcdc_plane_atomic_disable(struct drm_plane *p,
-@@ -844,6 +859,7 @@ static void atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane,
- 
- static struct drm_plane_helper_funcs atmel_hlcdc_layer_plane_helper_funcs = {
- 	.prepare_fb = atmel_hlcdc_plane_prepare_fb,
-+	.cleanup_fb = atmel_hlcdc_plane_cleanup_fb,
- 	.atomic_check = atmel_hlcdc_plane_atomic_check,
- 	.atomic_update = atmel_hlcdc_plane_atomic_update,
- 	.atomic_disable = atmel_hlcdc_plane_atomic_disable,
+ extern struct atmel_hlcdc_formats atmel_hlcdc_plane_rgb_formats;
 -- 
 2.5.0
