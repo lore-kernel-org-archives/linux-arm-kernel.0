@@ -1,98 +1,79 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Mar 2016 14:36:21 +0900
-Subject: [PATCH 2/3] arm64: dts: r8a7795: Add Cortex-A57 CPU cores
-In-Reply-To: <56E8D6C6.2000306@rvc.renesas.com>
-References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
- <1449236333-4410-2-git-send-email-dirk.behme@gmail.com>
- <20151211230751.GD6496@verge.net.au>
- <CANqRtoSeibffbaoVGV7Y_gyuXxCOu+1PmRf3imQ8OKhV6VoAMQ@mail.gmail.com>
- <566FD3EE.8040908@gmail.com> <20160316011901.GB23687@verge.net.au>
- <56E8D6C6.2000306@rvc.renesas.com>
-Message-ID: <20160316053621.GA24138@verge.net.au>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 16 Mar 2016 11:13:56 +0530
+Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
+In-Reply-To: <56E858D8.8030300@arm.com>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-4-git-send-email-dave.long@linaro.org>
+ <56E858D8.8030300@arm.com>
+Message-ID: <20160316054329.GC28915@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 10:45:10AM +0700, Khiem Nguyen wrote:
-> Hi Simon, Dirk, Magnus,
+On 15/03/2016:06:47:52 PM, James Morse wrote:
+> Hi David,
 > 
-> On 3/16/2016 8:19 AM, Simon Horman wrote:
-> >Hi Dirk,
-> >
-> >On Tue, Dec 15, 2015 at 09:48:46AM +0100, Dirk Behme wrote:
-> >>On 15.12.2015 09:38, Magnus Damm wrote:
-> >>>Hi Simon,
-> >>>
-> >>>On Sat, Dec 12, 2015 at 8:07 AM, Simon Horman <horms@verge.net.au> wrote:
-> >>>>On Fri, Dec 04, 2015 at 02:38:52PM +0100, Dirk Behme wrote:
-> >>>>>From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> >>>>>
-> >>>>>Add Cortex-A57 CPU cores to r8a7795 SoC for a total of 4 x Cortex-A57.
-> >>>>>
-> >>>>>Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> >>>>>Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >>>>>Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
-> >>>>
-> >>>>Thanks, I have queued this up for v4.5.
-> >>>
-> >>>Thanks. May I ask if CPU hotplug is known to work?
-> >>
-> >>
-> >>I didn't test that.
-> >
-> >As a follow-up I am wondering if you subsequently observed CPU hotplug
-> >working. My recent testing on v4.5 indicates that it isn't working in my
-> >environment. It would be quite valuable to know if it has ever been known
-> >to work.
-> >
-> >>>Also, which version
-> >>>of the boot loader stack is required?
+> On 09/03/16 05:32, David Long wrote:
+> > From: "David A. Long" <dave.long@linaro.org>
+> > diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+> > index 4699cd7..0ac2131 100644
+> > --- a/arch/arm64/lib/copy_from_user.S
+> > +++ b/arch/arm64/lib/copy_from_user.S
+> > @@ -66,6 +66,7 @@
+> >  	.endm
+> >  
+> >  end	.req	x5
+> > +	.section .kprobes.text,"ax",%progbits
+> >  ENTRY(__copy_from_user)
+> >  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
+> >  	    CONFIG_ARM64_PAN)
+> > diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+> > index 7512bbb..e4eb84c 100644
+> > --- a/arch/arm64/lib/copy_to_user.S
+> > +++ b/arch/arm64/lib/copy_to_user.S
+> > @@ -65,6 +65,7 @@
+> >  	.endm
+> >  
+> >  end	.req	x5
+> > +	.section .kprobes.text,"ax",%progbits
+> >  ENTRY(__copy_to_user)
+> >  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
+> >  	    CONFIG_ARM64_PAN)
+> > 
 > 
-> Yes. CPUHotplug will be supported in boot loader stack released by Dec 2015
-> and later.
+> If I understand this correctly -  you can't kprobe these ldr/str instructions as
+> the fault handler wouldn't find kprobe's out-of line version of the instruction
+> in the exception table... but why only these two functions? (for library
+> functions, we also have clear_user() and copy_in_user()...)
 
-Thanks, that sounds positive.
+May be not clear_user() because those are inlined, but may be __clear_user().
 
-As Dec 2015 has already passed I wonder if a boot loader stack that
-supports CPU Hotplug is currently available. Perhaps internally?
-If so I think it would be good to verify v4.5.
+There can be many other functions (see [1], [2] and can be many more) which need
+to be blacklisted, but I think they can always be added latter on, and atleast
+this aspect should not hinder inclusion of these patches.
 
-> >>I've the U-Boot / boot loader stack from BSP v3.0.2 on the board. I haven't
-> >>tested v3.0.3, yet.
-> >
-> >For reference my environment is as follows:
-> >
-> >
-> >     NOTICE:  BL2: R-Car H3 Loader Rev.1.0.1
-> >     NOTICE:  BL2: DDR1600(rev.0.10)
-> >     NOTICE:  BL2: DRAM Split is 4ch
-> >     NOTICE:  BL2: QoS is Gfx Oriented(rev.0.24A)
-> >     NOTICE:  BL2: v1.1(release):41099f4
-> >     NOTICE:  BL2: Built : 11:47:26, Nov 19 2015
-> >     NOTICE:  BL2: Normal boot
-> >     NOTICE:  BL2: memdrv_block_read dst=0xe630e0b0 src=0x8180000 len=36(0x24)
-> >     NOTICE:  BL2: memdrv_block_read dst=0x43f00000 src=0x8180400 len=3072(0xc00)
-> >     NOTICE:  BL2: memdrv_block_read dst=0x44000000 src=0x81c0000 len=65536(0x10000)
-> >     NOTICE:  BL2: memdrv_block_read dst=0x44100000 src=0x8200000 len=524288(0x80000)
-> >     NOTICE:  BL2: memdrv_block_read dst=0x49000000 src=0x8640000 len=1048576(0x100000)
-> >
-> >     U-Boot 2015.04 (Nov 19 2015 - 11:47:49)
-> >
-> >     CPU: Renesas Electronics CPU rev 1.0
-> >     Board: Salvator-X
-> >     DRAM:  896 MiB
-> >     MMC:   sh-sdhi: 0, sh-sdhi: 1, sh-sdhi: 2
-> >     In:    serial
-> >     Out:   serial
-> >     Err:   serial
-> >     Net:   ravb
-> >--
-> >To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> >the body of a message to majordomo at vger.kernel.org
-> >More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
 > 
+> The get_user()/put_user() stuff in uaccess.h gets inlined all over the kernel, I
+> don't think its feasible to put all of these in a separate section.
+
+Yes, It does not seem possible to blacklist  inlined functions. There can be
+some other places like valid kprobable instructions in atomic context, .word
+instruction having data as valid instruction, etc... So, probably its not
+possible to make 100% safe, but yes wherever possible, we should take care.
+
+Infact, other ARCHs are also not completely safe. One can try to instrument
+kprobe on all the symbols in Kallsyms on an x86_64 machine and kernel crashes.
+
 > 
-> -- 
-> Best regards,
-> KHIEM Nguyen
-> 
+> Is it feasible to search the exception table at runtime instead? If an
+> address-to-be-kprobed appears in the list, we know it could generate exceptions,
+> so we should report that we can't probe this address. That would catch all of
+> the library functions, all the places uaccess.h was inlined, and anything new
+> that gets invented in the future.
+
+Sorry, probably I could not get it. How can an inlined addresses range be placed
+in exception table or any other code area.
+
+~Pratyush
+
+[1] https://github.com/pratyushanand/linux/commit/855bc4dbb98ceafac4c933e00d203b1cd7ee9ca4
+[2] https://github.com/pratyushanand/linux/commit/8bc586d6f767240e9ffa582f45a9ad11de47ecfb
