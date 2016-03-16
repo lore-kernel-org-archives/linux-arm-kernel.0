@@ -1,48 +1,321 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Mar 2016 09:10:26 +0900
-Subject: [PATCH v2 0/2] ARM: dts: r8a7793: add CAN to device tree
-In-Reply-To: <20160315080232.GD6912@verge.net.au>
-References: <1458001594-632-1-git-send-email-horms+renesas@verge.net.au>
- <SG2PR06MB10386A43CDCBE656A3ACBE12C3890@SG2PR06MB1038.apcprd06.prod.outlook.com>
- <20160315080232.GD6912@verge.net.au>
-Message-ID: <20160316001026.GF6912@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 16 Mar 2016 09:44:01 +0900
+Subject: [PATCH] ARM: dts: r8a7790: Remove unnecessary clock-output-names
+ properties
+Message-ID: <1458089041-22994-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2016 at 05:02:32PM +0900, Simon Horman wrote:
-> On Tue, Mar 15, 2016 at 07:09:23AM +0000, Ramesh Shanmugasundaram wrote:
-> > Hi Simon,
-> > 
-> > > Subject: [PATCH v2 0/2] ARM: dts: r8a7793: add CAN to device tree
-> > 
-> > r8a7794?
-> 
-> Yes, my bad.
-> 
-> > > 
-> > > Hi,
-> > > 
-> > > this short series adds CAN clocks and nodes to the r8a7794 device tree.
-> > > 
-> > > I am not aware of an r8a7794 board that exposes CAN - neither the alt nor
-> > > the silk board appear to - and thus am unsure of a way to test these
-> > > changes.  However, they are based on what is present for the r8a7791 SoC
-> > > and I am unable to find a difference in the SoC documentation.
-> > > 
-> > > This series is similar to a similar series I posted for the r8a7794 in
-> > > January.
-> > > 
-> > > Based on renesas-devel-20160311-v4.5-rc7.
-> > > 
-> > > Changes in v2
-> > > * Correct clock node names
-> > > * Add MSTP9 clocks
-> > > * Omit clock-output-names property from new nodes
-> > 
-> > Acked-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> > 
-> > for this series.
-> 
-> Thanks
+* Fixed rate and fixed factor clocks do not require an
+  clock-output-names property.
+* Since 1fae91ec99fb ("clk: shmobile: div6: Extract cpg_div6_register()")
+  Renesas div6 clocks do not require a clock-output-names property.
 
-I have gone ahead and queued up this series.
+In the above cases there is only one clock output and its name is taken
+from that of the clock node.
+
+Accordingly, remove the unnecessary clock-output-names properties and
+as necessary the nodes.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 88 ++++++++++++++----------------------------
+ 1 file changed, 28 insertions(+), 60 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index b71b3e20b6e4..634f7e05ba6b 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1038,20 +1038,18 @@
+ 		ranges;
+ 
+ 		/* External root clock */
+-		extal_clk: extal_clk {
++		extal_clk: extal {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			/* This value must be overriden by the board. */
+ 			clock-frequency = <0>;
+-			clock-output-names = "extal";
+ 		};
+ 
+ 		/* External PCIe clock - can be overridden by the board */
+-		pcie_bus_clk: pcie_bus_clk {
++		pcie_bus_clk: pcie_bus {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			clock-frequency = <100000000>;
+-			clock-output-names = "pcie_bus";
+ 			status = "disabled";
+ 		};
+ 
+@@ -1063,19 +1061,16 @@
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			clock-frequency = <0>;
+-			clock-output-names = "audio_clk_a";
+ 		};
+ 		audio_clk_b: audio_clk_b {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			clock-frequency = <0>;
+-			clock-output-names = "audio_clk_b";
+ 		};
+ 		audio_clk_c: audio_clk_c {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			clock-frequency = <0>;
+-			clock-output-names = "audio_clk_c";
+ 		};
+ 
+ 		/* External SCIF clock */
+@@ -1088,11 +1083,10 @@
+ 		};
+ 
+ 		/* External USB clock - can be overridden by the board */
+-		usb_extal_clk: usb_extal_clk {
++		usb_extal_clk: usb_extal {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			clock-frequency = <48000000>;
+-			clock-output-names = "usb_extal";
+ 		};
+ 
+ 		/* External CAN clock */
+@@ -1101,7 +1095,6 @@
+ 			#clock-cells = <0>;
+ 			/* This value must be overridden by the board. */
+ 			clock-frequency = <0>;
+-			clock-output-names = "can_clk";
+ 			status = "disabled";
+ 		};
+ 
+@@ -1119,201 +1112,176 @@
+ 		};
+ 
+ 		/* Variable factor clocks */
+-		sd2_clk: sd2_clk at e6150078 {
++		sd2_clk: sd2 at e6150078 {
+ 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150078 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "sd2";
+ 		};
+-		sd3_clk: sd3_clk at e615026c {
++		sd3_clk: sd3 at e615026c {
+ 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "sd3";
+ 		};
+-		mmc0_clk: mmc0_clk at e6150240 {
++		mmc0_clk: mmc0 at e6150240 {
+ 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150240 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "mmc0";
+ 		};
+-		mmc1_clk: mmc1_clk at e6150244 {
++		mmc1_clk: mmc1 at e6150244 {
+ 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150244 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "mmc1";
+ 		};
+-		ssp_clk: ssp_clk at e6150248 {
++		ssp_clk: ssp at e6150248 {
+ 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150248 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "ssp";
+ 		};
+-		ssprs_clk: ssprs_clk at e615024c {
++		ssprs_clk: ssprs at e615024c {
+ 			compatible = "renesas,r8a7790-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe615024c 0 4>;
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "ssprs";
+ 		};
+ 
+ 		/* Fixed factor clocks */
+-		pll1_div2_clk: pll1_div2_clk {
++		pll1_div2_clk: pll1_div2 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+-			clock-output-names = "pll1_div2";
+ 		};
+-		z2_clk: z2_clk {
++		z2_clk: z2 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+-			clock-output-names = "z2";
+ 		};
+-		zg_clk: zg_clk {
++		zg_clk: zg {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <3>;
+ 			clock-mult = <1>;
+-			clock-output-names = "zg";
+ 		};
+-		zx_clk: zx_clk {
++		zx_clk: zx {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <3>;
+ 			clock-mult = <1>;
+-			clock-output-names = "zx";
+ 		};
+-		zs_clk: zs_clk {
++		zs_clk: zs {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <6>;
+ 			clock-mult = <1>;
+-			clock-output-names = "zs";
+ 		};
+-		hp_clk: hp_clk {
++		hp_clk: hp {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <12>;
+ 			clock-mult = <1>;
+-			clock-output-names = "hp";
+ 		};
+-		i_clk: i_clk {
++		i_clk: i {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+-			clock-output-names = "i";
+ 		};
+-		b_clk: b_clk {
++		b_clk: b {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <12>;
+ 			clock-mult = <1>;
+-			clock-output-names = "b";
+ 		};
+-		p_clk: p_clk {
++		p_clk: p {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <24>;
+ 			clock-mult = <1>;
+-			clock-output-names = "p";
+ 		};
+-		cl_clk: cl_clk {
++		cl_clk: cl {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <48>;
+ 			clock-mult = <1>;
+-			clock-output-names = "cl";
+ 		};
+-		m2_clk: m2_clk {
++		m2_clk: m2 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <8>;
+ 			clock-mult = <1>;
+-			clock-output-names = "m2";
+ 		};
+-		imp_clk: imp_clk {
++		imp_clk: imp {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <4>;
+ 			clock-mult = <1>;
+-			clock-output-names = "imp";
+ 		};
+-		rclk_clk: rclk_clk {
++		rclk_clk: rclk {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <(48 * 1024)>;
+ 			clock-mult = <1>;
+-			clock-output-names = "rclk";
+ 		};
+-		oscclk_clk: oscclk_clk {
++		oscclk_clk: oscclk {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL1>;
+ 			#clock-cells = <0>;
+ 			clock-div = <(12 * 1024)>;
+ 			clock-mult = <1>;
+-			clock-output-names = "oscclk";
+ 		};
+-		zb3_clk: zb3_clk {
++		zb3_clk: zb3 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL3>;
+ 			#clock-cells = <0>;
+ 			clock-div = <4>;
+ 			clock-mult = <1>;
+-			clock-output-names = "zb3";
+ 		};
+-		zb3d2_clk: zb3d2_clk {
++		zb3d2_clk: zb3d2 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL3>;
+ 			#clock-cells = <0>;
+ 			clock-div = <8>;
+ 			clock-mult = <1>;
+-			clock-output-names = "zb3d2";
+ 		};
+-		ddr_clk: ddr_clk {
++		ddr_clk: ddr {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7790_CLK_PLL3>;
+ 			#clock-cells = <0>;
+ 			clock-div = <8>;
+ 			clock-mult = <1>;
+-			clock-output-names = "ddr";
+ 		};
+-		mp_clk: mp_clk {
++		mp_clk: mp {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&pll1_div2_clk>;
+ 			#clock-cells = <0>;
+ 			clock-div = <15>;
+ 			clock-mult = <1>;
+-			clock-output-names = "mp";
+ 		};
+-		cp_clk: cp_clk {
++		cp_clk: cp {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&extal_clk>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+-			clock-output-names = "cp";
+ 		};
+ 
+ 		/* Gate clocks */
+-- 
+2.1.4
