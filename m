@@ -1,93 +1,57 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 16 Mar 2016 19:40:33 +0800
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-Message-ID: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Wed, 16 Mar 2016 12:53:29 +0100
+Subject: [PATCH v2] Documentation: devicetree: Clean up gpio-keys example
+Message-ID: <1458129209-15449-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
-dw_pcie_host_init() also contains some necessary rc setup code.
+Drop #address-cells and #size-cells, which are not required by the
+gpio-keys binding documentation, as button sub-nodes are not devices.
 
-Another reason: the host may lost power during suspend to ram, the RC
-need to be re-setup after resume. The rc can't be correctly resumed
-without the rc setup code in dw_pcie_host_init().
+Rename sub-nodes to avoid new dtc unit address warnings when copied.
 
-So this patch moves the code to dw_pcie_setup_rc() to address the above
-two issues. After this patch, each pcie designware driver users could
-call dw_pcie_setup_rc() to re-setup rc when resume back.
+While at it, adopt the dashes convention for the node name.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
+Cc: Julien Chauveau <chauveau.julien@gmail.com>
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
-Since v1:
- - fix gcc warning found by lkp, thanks
-
- drivers/pci/host/pcie-designware.c | 39 +++++++++++++++++++-------------------
- 1 file changed, 19 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index a4cccd3..261e4a11 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	struct platform_device *pdev = to_platform_device(pp->dev);
- 	struct pci_bus *bus, *child;
- 	struct resource *cfg_res;
--	u32 val;
- 	int i, ret;
- 	LIST_HEAD(res);
- 	struct resource_entry *win;
-@@ -544,25 +543,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	if (pp->ops->host_init)
- 		pp->ops->host_init(pp);
+ v1 -> v2:
+ * Changed node name from underscore to dash
+ * Inserted white lines
+ * Renamed sub-nodes (Geert, Julien)
  
--	/*
--	 * If the platform provides ->rd_other_conf, it means the platform
--	 * uses its own address translation component rather than ATU, so
--	 * we should not program the ATU here.
--	 */
--	if (!pp->ops->rd_other_conf)
--		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
--					  PCIE_ATU_TYPE_MEM, pp->mem_base,
--					  pp->mem_bus_addr, pp->mem_size);
--
--	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
--
--	/* program correct class for RC */
--	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
--
--	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
--	val |= PORT_LOGIC_SPEED_CHANGE;
--	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
--
- 	pp->root_bus_nr = pp->busn->start;
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
- 		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
-@@ -800,6 +780,25 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
- 		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
- 	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
-+
-+	/*
-+	 * If the platform provides ->rd_other_conf, it means the platform
-+	 * uses its own address translation component rather than ATU, so
-+	 * we should not program the ATU here.
-+	 */
-+	if (!pp->ops->rd_other_conf)
-+		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-+					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-+					  pp->mem_bus_addr, pp->mem_size);
-+
-+	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-+
-+	/* program correct class for RC */
-+	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
-+
-+	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-+	val |= PORT_LOGIC_SPEED_CHANGE;
-+	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
- }
+ Documentation/devicetree/bindings/input/gpio-keys.txt | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/input/gpio-keys.txt b/Documentation/devicetree/bindings/input/gpio-keys.txt
+index 21641236c095..a94940481e55 100644
+--- a/Documentation/devicetree/bindings/input/gpio-keys.txt
++++ b/Documentation/devicetree/bindings/input/gpio-keys.txt
+@@ -32,17 +32,17 @@ Optional subnode-properties:
  
- MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+ Example nodes:
+ 
+-	gpio_keys {
++	gpio-keys {
+ 			compatible = "gpio-keys";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+ 			autorepeat;
+-			button at 21 {
++
++			up {
+ 				label = "GPIO Key UP";
+ 				linux,code = <103>;
+ 				gpios = <&gpio1 0 1>;
+ 			};
+-			button at 22 {
++
++			down {
+ 				label = "GPIO Key DOWN";
+ 				linux,code = <108>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
 -- 
-2.7.0
+2.6.2
