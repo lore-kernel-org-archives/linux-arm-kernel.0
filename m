@@ -1,23 +1,25 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Mar 2016 11:07:24 +0100
-Subject: [PATCH 1/2] PCI: mvebu: constify mvebu_pcie_pm_ops structure
-In-Reply-To: <1458122381-2280-2-git-send-email-jszhang@marvell.com>
+Date: Wed, 16 Mar 2016 11:08:57 +0100
+Subject: [PATCH 2/2] PCI: mvebu: use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS for
+ mvebu_pcie_pm_ops
+In-Reply-To: <1458122381-2280-3-git-send-email-jszhang@marvell.com>
 References: <1458122381-2280-1-git-send-email-jszhang@marvell.com>
- <1458122381-2280-2-git-send-email-jszhang@marvell.com>
-Message-ID: <20160316110724.239fd419@free-electrons.com>
+ <1458122381-2280-3-git-send-email-jszhang@marvell.com>
+Message-ID: <20160316110857.406e0662@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Jisheng Zhang,
 
-On Wed, 16 Mar 2016 17:59:40 +0800, Jisheng Zhang wrote:
-> The mvebu_pcie_pm_ops structure is never modified, so declare it as
-> const.
+On Wed, 16 Mar 2016 17:59:41 +0800, Jisheng Zhang wrote:
+> use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS helper macro for mvebu_pcie_pm_ops.
+> The macro also setups freeze_noirq, thaw_noirq and poweroff_noirq,
+> restore_noirq accordingly.
 > 
 > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  drivers/pci/host/pci-mvebu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/pci/host/pci-mvebu.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
 Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
