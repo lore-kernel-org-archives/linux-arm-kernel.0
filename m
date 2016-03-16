@@ -1,118 +1,120 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 16 Mar 2016 14:57:39 +0100
-Subject: [PATCH v2 5/9] drm: atmel-hlcdc: support extended timing ranges on
- sama5d4 and sama5d2
+Date: Wed, 16 Mar 2016 14:57:43 +0100
+Subject: [PATCH v2 9/9] drm: atmel-hlcdc: route DMA accesses through AHB
+ interfaces
 In-Reply-To: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1458136663-21396-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1458136663-21396-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display timings on old SoCs older than the sama5d4 are quite limited
-and prevent the use of many displays. Add support for extended timing
-ranges on sama5d2 and sama5d4.
+In relation with the actuall bandwidth consumed on a DMA Source interface,
+choose the less used one for a created plane.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 24 ++++++++++++++++++------
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h |  6 ++++++
- 2 files changed, 24 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c  |  6 +++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  1 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 43 +++++++++++++++++++++++--
+ 3 files changed, 47 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index 851b4a0..70006a3 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -50,6 +50,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_at91sam9n12 = {
- 	.min_height = 0,
- 	.max_width = 1280,
- 	.max_height = 860,
-+	.max_spw = 0x3f,
-+	.max_vpw = 0x3f,
-+	.max_hpw = 0xff,
- 	.nlayers = ARRAY_SIZE(atmel_hlcdc_at91sam9n12_layers),
- 	.layers = atmel_hlcdc_at91sam9n12_layers,
- };
-@@ -134,6 +137,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_at91sam9x5 = {
- 	.min_height = 0,
- 	.max_width = 800,
- 	.max_height = 600,
-+	.max_spw = 0x3f,
-+	.max_vpw = 0x3f,
-+	.max_hpw = 0xff,
- 	.nlayers = ARRAY_SIZE(atmel_hlcdc_at91sam9x5_layers),
- 	.layers = atmel_hlcdc_at91sam9x5_layers,
- };
-@@ -237,6 +243,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_sama5d3 = {
- 	.min_height = 0,
- 	.max_width = 2048,
- 	.max_height = 2048,
-+	.max_spw = 0x3f,
-+	.max_vpw = 0x3f,
-+	.max_hpw = 0x1ff,
- 	.nlayers = ARRAY_SIZE(atmel_hlcdc_sama5d3_layers),
- 	.layers = atmel_hlcdc_sama5d3_layers,
- };
-@@ -320,6 +329,9 @@ static const struct atmel_hlcdc_dc_desc atmel_hlcdc_dc_sama5d4 = {
- 	.min_height = 0,
- 	.max_width = 2048,
- 	.max_height = 2048,
-+	.max_spw = 0xff,
-+	.max_vpw = 0xff,
-+	.max_hpw = 0x3ff,
- 	.nlayers = ARRAY_SIZE(atmel_hlcdc_sama5d4_layers),
- 	.layers = atmel_hlcdc_sama5d4_layers,
- };
-@@ -358,19 +370,19 @@ int atmel_hlcdc_dc_mode_valid(struct atmel_hlcdc_dc *dc,
- 	int hback_porch = mode->htotal - mode->hsync_end;
- 	int hsync_len = mode->hsync_end - mode->hsync_start;
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index cbba029..14e74e5 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -319,7 +319,11 @@ static int atmel_hlcdc_crtc_atomic_check(struct drm_crtc *c,
+ 	if (ret)
+ 		return ret;
  
--	if (hsync_len > 0x40 || hsync_len < 1)
-+	if (hsync_len > dc->desc->max_spw + 1 || hsync_len < 1)
- 		return MODE_HSYNC;
+-	return atmel_hlcdc_plane_prepare_disc_area(s);
++	ret = atmel_hlcdc_plane_prepare_disc_area(s);
++	if (ret)
++		return ret;
++
++	return atmel_hlcdc_plane_prepare_ahb_routing(s);
+ }
  
--	if (vsync_len > 0x40 || vsync_len < 1)
-+	if (vsync_len > dc->desc->max_spw + 1 || vsync_len < 1)
- 		return MODE_VSYNC;
- 
--	if (hfront_porch > 0x200 || hfront_porch < 1 ||
--	    hback_porch > 0x200 || hback_porch < 1 ||
-+	if (hfront_porch > dc->desc->max_hpw + 1 || hfront_porch < 1 ||
-+	    hback_porch > dc->desc->max_hpw + 1 || hback_porch < 1 ||
- 	    mode->hdisplay < 1)
- 		return MODE_H_ILLEGAL;
- 
--	if (vfront_porch > 0x40 || vfront_porch < 1 ||
--	    vback_porch > 0x40 || vback_porch < 0 ||
-+	if (vfront_porch > dc->desc->max_vpw + 1 || vfront_porch < 1 ||
-+	    vback_porch > dc->desc->max_vpw || vback_porch < 0 ||
- 	    mode->vdisplay < 1)
- 		return MODE_V_ILLEGAL;
- 
+ static void atmel_hlcdc_crtc_atomic_begin(struct drm_crtc *c,
 diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-index 53b4488..23521ba 100644
+index 302c958..c71a300 100644
 --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
 +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-@@ -50,6 +50,9 @@
-  * @min_height: minimum height supported by the Display Controller
-  * @max_width: maximum width supported by the Display Controller
-  * @max_height: maximum height supported by the Display Controller
-+ * @max_spw: maximum vertical/horizontal pulse width
-+ * @max_vpw: maximum vertical back/front porch width
-+ * @max_hpw: maximum horizontal back/front porch width
-  * @layers: a layer description table describing available layers
-  * @nlayers: layer description table size
-  */
-@@ -58,6 +61,9 @@ struct atmel_hlcdc_dc_desc {
- 	int min_height;
- 	int max_width;
- 	int max_height;
-+	int max_spw;
-+	int max_vpw;
-+	int max_hpw;
- 	const struct atmel_hlcdc_layer_desc *layers;
- 	int nlayers;
- };
+@@ -165,6 +165,7 @@ struct atmel_hlcdc_planes *
+ atmel_hlcdc_create_planes(struct drm_device *dev);
+ 
+ int atmel_hlcdc_plane_prepare_disc_area(struct drm_crtc_state *c_state);
++int atmel_hlcdc_plane_prepare_ahb_routing(struct drm_crtc_state *c_state);
+ 
+ void atmel_hlcdc_crtc_irq(struct drm_crtc *c);
+ 
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index 35027d0..0995eef 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -58,6 +58,8 @@ struct atmel_hlcdc_plane_state {
+ 	int disc_w;
+ 	int disc_h;
+ 
++	int ahb_id;
++
+ 	/* These fields are private and should not be touched */
+ 	int bpp[ATMEL_HLCDC_MAX_PLANES];
+ 	unsigned int offsets[ATMEL_HLCDC_MAX_PLANES];
+@@ -359,8 +361,10 @@ atmel_hlcdc_plane_update_general_settings(struct atmel_hlcdc_plane *plane,
+ 
+ 	atmel_hlcdc_layer_update_cfg(&plane->layer,
+ 				     ATMEL_HLCDC_LAYER_DMA_CFG_ID,
+-				     ATMEL_HLCDC_LAYER_DMA_BLEN_MASK,
+-				     ATMEL_HLCDC_LAYER_DMA_BLEN_INCR16);
++				     ATMEL_HLCDC_LAYER_DMA_BLEN_MASK |
++				     ATMEL_HLCDC_LAYER_DMA_SIF,
++				     ATMEL_HLCDC_LAYER_DMA_BLEN_INCR16 |
++				     state->ahb_id);
+ 
+ 	atmel_hlcdc_layer_update_cfg(&plane->layer, layout->general_config,
+ 				     ATMEL_HLCDC_LAYER_ITER2BL |
+@@ -435,6 +439,41 @@ static void atmel_hlcdc_plane_update_buffers(struct atmel_hlcdc_plane *plane,
+ 	}
+ }
+ 
++int atmel_hlcdc_plane_prepare_ahb_routing(struct drm_crtc_state *c_state)
++{
++	unsigned int ahb_load[2] = { };
++	struct drm_plane *plane;
++
++	drm_atomic_crtc_state_for_each_plane(plane, c_state) {
++		struct atmel_hlcdc_plane_state *plane_state;
++		struct drm_plane_state *plane_s;
++		unsigned int pixels, load = 0;
++		int i;
++
++		plane_s = drm_atomic_get_plane_state(c_state->state, plane);
++		if (IS_ERR(plane_s))
++			return PTR_ERR(plane_s);
++
++		plane_state =
++			drm_plane_state_to_atmel_hlcdc_plane_state(plane_s);
++
++		pixels = (plane_state->src_w * plane_state->src_h) -
++			 (plane_state->disc_w * plane_state->disc_h);
++
++		for (i = 0; i < plane_state->nplanes; i++)
++			load += pixels * plane_state->bpp[i];
++
++		if (ahb_load[0] <= ahb_load[1])
++			plane_state->ahb_id = 0;
++		else
++			plane_state->ahb_id = 1;
++
++		ahb_load[plane_state->ahb_id] += load;
++	}
++
++	return 0;
++}
++
+ int
+ atmel_hlcdc_plane_prepare_disc_area(struct drm_crtc_state *c_state)
+ {
 -- 
 2.5.0
