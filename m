@@ -1,80 +1,78 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 16 Mar 2016 20:51:34 +0000
-Subject: [PATCH] iio: adc: rockchip_saradc: add saradc support for rk3399
-In-Reply-To: <1458063855-4154-1-git-send-email-david.wu@rock-chips.com>
-References: <1458063855-4154-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <56E9C756.10104@kernel.org>
+From: nleeder@codeaurora.org (nleeder at codeaurora.org)
+Date: Wed, 16 Mar 2016 17:39:11 -0400
+Subject: [PATCH 2/4] arm64: pmu: add fallback probe table
+In-Reply-To: <1457911398-22412-3-git-send-email-jeremy.linton@arm.com>
+References: <1457911398-22412-1-git-send-email-jeremy.linton@arm.com>
+ <1457911398-22412-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <ff9785e7ac2e44ca697e9beff38a1335@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/16 17:44, David Wu wrote:
-> The ADC is a 6-channel signal-ended 10-bit Successive
-> Approximation Register (SAR) A/D Converter.
+On 2016-03-13 19:23, Jeremy Linton wrote:
+> From: Mark Salter <msalter@redhat.com>
 > 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-Looks straight forward so applied to the togreg branch of iio.git,
-pushed out as testing for the autobuilders to play with it.
-
-Thanks,
-
-Jonathan
+> In preparation for ACPI support, add a pmu_probe_info table to
+> the arm_pmu_device_probe() call. This table gets used when
+> probing in the absence of a devicetree node for PMU.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
 > ---
->  .../devicetree/bindings/iio/adc/rockchip-saradc.txt   |  6 +++++-
->  drivers/iio/adc/rockchip_saradc.c                     | 19 +++++++++++++++++++
->  2 files changed, 24 insertions(+), 1 deletion(-)
+>  arch/arm64/kernel/perf_event.c | 10 +++++++++-
+>  include/linux/perf/arm_pmu.h   |  3 +++
+>  2 files changed, 12 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> index a9a5fe1..bf99e2f 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> @@ -1,7 +1,11 @@
->  Rockchip Successive Approximation Register (SAR) A/D Converter bindings
->  
->  Required properties:
-> -- compatible: Should be "rockchip,saradc" or "rockchip,rk3066-tsadc"
-> +- compatible: should be "rockchip,<name>-saradc" or "rockchip,rk3066-tsadc"
-> +   - "rockchip,saradc": for rk3188, rk3288
-> +   - "rockchip,rk3066-tsadc": for rk3036
-> +   - "rockchip,rk3399-saradc": for rk3399
-> +
->  - reg: physical base address of the controller and length of memory mapped
->         region.
->  - interrupts: The interrupt number to the cpu. The interrupt specifier format
-> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-> index 9c311c1..f9ad6c2 100644
-> --- a/drivers/iio/adc/rockchip_saradc.c
-> +++ b/drivers/iio/adc/rockchip_saradc.c
-> @@ -159,6 +159,22 @@ static const struct rockchip_saradc_data rk3066_tsadc_data = {
->  	.clk_rate = 50000,
->  };
->  
-> +static const struct iio_chan_spec rockchip_rk3399_saradc_iio_channels[] = {
-> +	ADC_CHANNEL(0, "adc0"),
-> +	ADC_CHANNEL(1, "adc1"),
-> +	ADC_CHANNEL(2, "adc2"),
-> +	ADC_CHANNEL(3, "adc3"),
-> +	ADC_CHANNEL(4, "adc4"),
-> +	ADC_CHANNEL(5, "adc5"),
-> +};
-> +
-> +static const struct rockchip_saradc_data rk3399_saradc_data = {
-> +	.num_bits = 10,
-> +	.channels = rockchip_rk3399_saradc_iio_channels,
-> +	.num_channels = ARRAY_SIZE(rockchip_rk3399_saradc_iio_channels),
-> +	.clk_rate = 1000000,
-> +};
-> +
->  static const struct of_device_id rockchip_saradc_match[] = {
->  	{
->  		.compatible = "rockchip,saradc",
-> @@ -166,6 +182,9 @@ static const struct of_device_id rockchip_saradc_match[] = {
->  	}, {
->  		.compatible = "rockchip,rk3066-tsadc",
->  		.data = &rk3066_tsadc_data,
-> +	}, {
-> +		.compatible = "rockchip,rk3399-saradc",
-> +		.data = &rk3399_saradc_data,
->  	},
+> diff --git a/arch/arm64/kernel/perf_event.c 
+> b/arch/arm64/kernel/perf_event.c
+> index 767c4f6..03e0957 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -901,9 +901,17 @@ static const struct of_device_id
+> armv8_pmu_of_device_ids[] = {
 >  	{},
 >  };
 > 
+> +static const struct pmu_probe_info armv8_pmu_probe_table[] = {
+> +	ARMV8_PMU_PART_PROBE(ARM_CPU_PART_CORTEX_A53, armv8_a53_pmu_init),
+> +	ARMV8_PMU_PART_PROBE(ARM_CPU_PART_CORTEX_A57, armv8_a57_pmu_init),
+> +	PMU_PROBE(0, 0, armv8_pmuv3_init), /* if all else fails... */
+> +	{ /* sentinel value */ }
+> +};
+> +
+>  static int armv8_pmu_device_probe(struct platform_device *pdev)
+>  {
+> -	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids, NULL);
+> +	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
+> +				    armv8_pmu_probe_table);
+>  }
+> 
+>  static struct platform_driver armv8_pmu_driver = {
+> diff --git a/include/linux/perf/arm_pmu.h 
+> b/include/linux/perf/arm_pmu.h
+> index 4196c90..495332f 100644
+> --- a/include/linux/perf/arm_pmu.h
+> +++ b/include/linux/perf/arm_pmu.h
+> @@ -145,6 +145,9 @@ struct pmu_probe_info {
+>  #define XSCALE_PMU_PROBE(_version, _fn) \
+>  	PMU_PROBE(ARM_CPU_IMP_INTEL << 24 | _version, ARM_PMU_XSCALE_MASK, 
+> _fn)
+> 
+> +#define ARMV8_PMU_PART_PROBE(_part, _fn) \
+> +	PMU_PROBE((_part) << MIDR_PARTNUM_SHIFT, MIDR_PARTNUM_MASK, _fn)
+> +
+>  int arm_pmu_device_probe(struct platform_device *pdev,
+>  			 const struct of_device_id *of_table,
+>  			 const struct pmu_probe_info *probe_table);
+
+Hi Jeremy,
+Thanks for pulling these patches together.
+
+Just one comment: MIDR part numbers are not guaranteed unique across 
+implementors, so I'd suggest that ARMV8_PMU_PART_PROBE include the 
+MIDR_IMPLEMENTOR in the cpuid and mask.
+
+Otherwise everything looks good - I successfully used this patchset as a 
+base for getting my pmu driver running with ACPI.
+
+-- Neil
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum, a Linux Foundation Collaborative Project
