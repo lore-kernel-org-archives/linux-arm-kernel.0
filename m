@@ -1,54 +1,68 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 17 Mar 2016 10:58:20 -0700
-Subject: [PATCH 2/8] clk: bcm2835: add missing PLL clock divider
-In-Reply-To: <C5EA56E8-F1A1-453D-A421-3E29853F3127@martin.sperl.org>
-References: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
- <1456760642-2412-3-git-send-email-kernel@martin.sperl.org>
- <87y49hjb4l.fsf@eliezer.anholt.net>
- <C5EA56E8-F1A1-453D-A421-3E29853F3127@martin.sperl.org>
-Message-ID: <8737rpm1fn.fsf@eliezer.anholt.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 13:00:53 -0500
+Subject: [PATCH 5/5] pwm: pwm-tiehrpwm: Update dt binding document to use
+ generic node name
+In-Reply-To: <56EAE014.8070606@ti.com>
+References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
+ <1457380318-15452-6-git-send-email-fcooper@ti.com>
+ <20160317150305.GA27356@rob-hp-laptop> <56EAE014.8070606@ti.com>
+Message-ID: <CAL_Jsq+3vRMezgrA53jPgMZUYR+DAA_886K1Q6YfxV1bPinoQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Sperl <kernel@martin.sperl.org> writes:
+On Thu, Mar 17, 2016 at 11:49 AM, Franklin S Cooper Jr. <fcooper@ti.com> wrote:
+>
+>
+> On 03/17/2016 10:03 AM, Rob Herring wrote:
+>> On Mon, Mar 07, 2016 at 01:51:58PM -0600, Franklin S Cooper Jr wrote:
+>>> Now that the node name has been changed from ehrpwm to pwm the document
+>>> should show this proper usage. Also change the unit address in the example
+>>> from 0 to the proper physical address value that should be used.
+>>>
+>>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+>>> index 9c100b2..20211ed 100644
+>>> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+>>> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+>>> @@ -15,14 +15,14 @@ Optional properties:
+>>>
+>>>  Example:
+>>>
+>>> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
+>>> +ehrpwm0: pwm at 48300200 { /* EHRPWM on am33xx */
+>>>      compatible = "ti,am33xx-ehrpwm";
+>>>      #pwm-cells = <3>;
+>>>      reg = <0x48300200 0x100>;
+>>>      ti,hwmods = "ehrpwm0";
+>>>  };
+>>>
+>>> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
+>>> +ehrpwm0: pwm at 01f00000 { /* EHRPWM on da850 */
+>> No leading 0s, but more importantly the address is wrong.
+>
+> I will remove the leading 0. However, this value was taken
+> from the .dtsi and I just double checked and I see the same
+> value in the datasheet. I believe DA850,OMAP-L138 and AM18x
+> all have the same memory mapping. I'm looking at
+> http://www.ti.com/lit/ds/symlink/am1808.pdf page 233 and the
+> addresses match up what is seen here and in the .dtsi.
+>
+> Can you point me to which document your looking at that
+> shows a different value?
 
->> On 17.03.2016, at 17:57, Eric Anholt <eric@anholt.net> wrote:
->> 
->> 
->> These don't exist on the hardware as far as I've been able to find.  "I
->> found it in a header file somewhere" is not sufficient justification to
->> expose it.
->> 
->> I'm working on getting a series of all of these reviewed and ready, so
->> I'm just dropping these PLLB hunks.
->
-> Fine with that - my test shows that these are not configured by the firmware.
->
-> As for headers: my experience is that these are the better resource
-> compared to all the public available documentation?
->
-> If you remember the ?frac? bit discussion where you said:
->
->   Once again, trusting the docs turns out to be a bad idea.  You're right,
->   the non-MASH clocks *do* have a bit 9 to enable fractional mode.  Sigh.
->
-> Also my understanding is that those headers are still used by the firmware
-> developers, so I guess that these are pretty stable and well maintained
-> (even if the ones available are by now a bit dated).
->
-> They even contain ifdefs for some earlier versions of the chip - 
-> see the dma-channels and their interrupts?
-> I.e: BCM2708A0 which does not have the DMA channels 9 to 15
->
-> So I would not discount all those pieces of information as totally
-> irrelevant.
+Ummm, ...
 
-I'm looking at the hardware source, and at the place where all the other
-PLL dividers are, PLLB only has ARM.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160317/ba579f79/attachment.sig>
+>>>      compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+>>>      #pwm-cells = <3>;
+>>>      reg = <0x300000 0x2000>;
+
+right here.
+
+>>> --
+>>> 2.7.0
+>>>
+>
