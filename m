@@ -1,37 +1,86 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Mar 2016 11:30:17 +0100
-Subject: [PATCH] ARM: davinci: only use NVMEM when available
-In-Reply-To: <56EA8654.5070100@linaro.org>
-References: <1458077705-408437-1-git-send-email-arnd@arndb.de>
- <56EA8654.5070100@linaro.org>
-Message-ID: <2137949.xUV6PQJbIO@wuerfel>
+Date: Thu, 17 Mar 2016 11:38:30 +0100
+Subject: [PATCH] ARM: use --fix-v4bx to allow building ARMv4 with future gcc
+Message-ID: <12678426.5oeMNXL25J@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 March 2016 10:26:28 Srinivas Kandagatla wrote:
-> Thanks for the patch,
-> 
-> On 15/03/16 21:34, Arnd Bergmann wrote:
-> > The davinci platform contains code that calls into the nvmem
-> > subsystem, but that might be a loadable module, causing a
-> > link error:
-> >
-> > arch/arm/mach-davinci/built-in.o: In function `davinci_get_mac_addr':
-> > :(.text+0x1088): undefined reference to `nvmem_device_read'
-> > arch/arm/mach-davinci/built-in.o: In function `read_factory_config':
-> > :(.text+0x214c): undefined reference to `nvmem_device_read'
-> >
-> This fix does not look correct to me.
-> 
-> IMO, This is a issue with incorrect dependencies in the Kconfig, we 
-> should not attempt to fix it in the code, rather fix the kconfig 
-> dependencies in the mach-davnici or the EEPROM_AT24 kconfig itself. one 
-> of them should select the NVMEM.
+gcc-6.0 marks support for ARMv3 and ARMv4 as 'deprecated', meaning
+that this is expected to be removed at some point in the future,
+with gcc-7.0 as the earliest.
 
-Those 'select' statements are an endless source of trouble. The code
-already builds fine if NVMEM is disabled (falling back to inline
-stub calls), or if NVMEM is built-in and AT24 is not present (leading
-to the call failing later), and that seems to be a reasonable fallback
-for users that really don't want those drivers.
+When building the kernel, the difference between ARMv4 and ARMv4T
+is relatively small because the kernel never runs THUMB instructions
+on ARMv4T and does not need any support for interworking.
 
-	Arnd
+For any future compiler that does not support -march=armv4, we now
+fall back to -march=armv4t as the architecture level selection,
+but keep using -march=armv4 by default as long as that is supported
+by the compiler.
+
+Similarly, the -mtune=strongarm110 and -mtune=strongarm1100 options
+will go away at the same time as -march=armv4, so this adds a check
+to see if the compiler supports them, falling back to no -mtune
+option otherwise.
+
+Compiling with -march=armv4t leads the compiler to using 'bx reg'
+instructions instead of 'ld pc,reg'. This is not supported on
+ARMv4 based CPUs, but the linker can work around this by rewriting
+those instructions to the ARMv4 version if we pass --fix-v4bx
+to the linker. This should work with binutils-2.15 (released
+May 2004) or higher, and we can probably assume that anyone using
+gcc-7.x will have a much more recent binutils version as well.
+
+However, in order to still allow users of old toolchains to link
+the kernel, we only pass the option to linkers that support it,
+based on a $(ld-option ...) call. I'm intentionally passing the
+flag to all linker versions here regardless of whether it's needed
+or not, so we can more easily spot any regressions if something
+goes wrong.
+
+For consistency, I'm passing the --fix-v4bx flag for both the
+vmlinux final link and the individual loadable modules.
+The module loader code already interprets the R_ARM_V4BX relocations
+in loadable modules and converts bx instructions into ldr even
+when running on ARMv4T or ARMv5 processors. This is now redundant
+when we pass --fix-v4bx to the linker for building modules, but
+I see no harm in leaving the current implementation and doing both.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 9fb3fee0e908..3c312d37a83a 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -19,6 +19,11 @@ LDFLAGS_vmlinux	+= --be8
+ LDFLAGS_MODULE	+= --be8
+ endif
+ 
++ifeq ($(CONFIG_CPU_32v4),y)
++LDFLAGS_vmlinux	+= $(call ld-option,--fix-v4bx)
++LDFLAGS_MODULE	+= $(call ld-option,--fix-v4bx)
++endif
++
+ ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
+ LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
+ endif
+@@ -75,7 +80,7 @@ arch-$(CONFIG_CPU_32v6K)	=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6k,
+ endif
+ arch-$(CONFIG_CPU_32v5)		=-D__LINUX_ARM_ARCH__=5 $(call cc-option,-march=armv5te,-march=armv4t)
+ arch-$(CONFIG_CPU_32v4T)	=-D__LINUX_ARM_ARCH__=4 -march=armv4t
+-arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 -march=armv4
++arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 $(call cc-option,-march=armv4,-march=armv4t)
+ arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3
+ 
+ # Evaluate arch cc-option calls now
+@@ -93,8 +98,8 @@ tune-$(CONFIG_CPU_ARM922T)	=-mtune=arm9tdmi
+ tune-$(CONFIG_CPU_ARM925T)	=-mtune=arm9tdmi
+ tune-$(CONFIG_CPU_ARM926T)	=-mtune=arm9tdmi
+ tune-$(CONFIG_CPU_FA526)	=-mtune=arm9tdmi
+-tune-$(CONFIG_CPU_SA110)	=-mtune=strongarm110
+-tune-$(CONFIG_CPU_SA1100)	=-mtune=strongarm1100
++tune-$(CONFIG_CPU_SA110)	=$(call cc-option,-mtune=strongarm110)
++tune-$(CONFIG_CPU_SA1100)	=$(call cc-option,-mtune=strongarm1100)
+ tune-$(CONFIG_CPU_XSCALE)	=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
+ tune-$(CONFIG_CPU_XSC3)		=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
+ tune-$(CONFIG_CPU_FEROCEON)	=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
