@@ -1,52 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Mar 2016 18:06:09 +0100
-Subject: [v6,
- 5/5] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <20160317170101.GA21009@rob-hp-laptop>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 12:06:40 -0500
+Subject: [v6, 3/5] dt: move guts devicetree doc out of powerpc directory
+In-Reply-To: <1457518131-11339-4-git-send-email-yangbo.lu@nxp.com>
 References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
- <DB5PR0401MB19286B2D23D07F5C60DB799D91880@DB5PR0401MB1928.eurprd04.prod.outlook.com>
- <20160317170101.GA21009@rob-hp-laptop>
-Message-ID: <3706958.XeRFmKM0K5@wuerfel>
+ <1457518131-11339-4-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <20160317170640.GB21009@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 March 2016 12:01:01 Rob Herring wrote:
-> On Mon, Mar 14, 2016 at 05:45:43PM +0000, Scott Wood wrote:
-
-> > >> This makes the driver non-portable. Better identify the specific
-> > >> workarounds based on the compatible string for this device, or add a
-> > >> boolean DT property for the quirk.
-> > >>
-> > >>    Arnd
-> > > 
-> > > [Lu Yangbo-B47093] Hi Arnd, we did have a discussion about using DTS in v1 before.
-> > > https://patchwork.kernel.org/patch/6834221/
-> > > 
-> > > We don?t have a separate DTS file for each revision of an SOC and if we did, we'd constantly have people using the wrong one.
-> > > In addition, the device tree is stable ABI and errata are often discovered after device tree are deployed.
-> > > See the link for details.
-> > > 
-> > > So we decide to read SVR from the device-config/guts MMIO block other than using DTS.
-> > > Thanks.
-> > 
-> > Also note that this driver is already only for fsl-specific hardware,
-> > and it will still work even if fsl_guts doesn't find anything to bind to
-> > -- it just wouldn't be able to detect errata based on SVR in that case.
+On Wed, Mar 09, 2016 at 06:08:49PM +0800, Yangbo Lu wrote:
+> Move guts devicetree doc to Documentation/devicetree/bindings/soc/fsl/
+> since it's used by not only PowerPC but also ARM. And add a specification
+> for 'little-endian' property.
 > 
-> IIRC, it is the same IP block as i.MX and Arnd's point is this won't 
-> even compile on !PPC. It is things like this that prevent sharing the 
-> driver.
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> ---
+> Changes for v2:
+> 	- None
+> Changes for v3:
+> 	- None
+> Changes for v4:
+> 	- Added this patch
+> Changes for v5:
+> 	- Modified the description for little-endian property
+> Changes for v6:
+> 	- None
+> ---
+>  Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+>  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+> 
+> diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+> similarity index 91%
+> rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+> rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
+> index b71b203..07adca9 100644
+> --- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+> +++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+> @@ -25,6 +25,9 @@ Recommended properties:
+>   - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
+>     registers, for those SOCs that have a PAMU device.
+>  
+> + - little-endian : Indicates that the global utilities block is little
+> +   endian. The default is big endian.
 
-I think the first four patches take care of building for ARM,
-but the problem remains if you want to enable COMPILE_TEST as
-we need for certain automated checking.
+The default is "the native endianness of the system". So absence on an 
+ARM system would be LE. This property is valid for any simple-bus 
+device, so it isn't really required to document per device. You can, but 
+your description had better match the documented behaviour.
 
-> Dealing with Si revs is a common problem. We should have a 
-> common solution. There is soc_device for this purpose.
-
-Exactly. The last time this came up, I think we agreed to implement a
-helper using glob_match() on the soc_device strings. Unfortunately
-this hasn't happened then, but I'd still prefer that over yet another
-vendor-specific way of dealing with the generic issue.
-
-	Arnd
+Rob
