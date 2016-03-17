@@ -1,128 +1,33 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Mar 2016 17:57:00 +0800
-Subject: [PATCH v6 01/17] Xen: ACPI: Hide UART used by Xen
+Date: Thu, 17 Mar 2016 17:57:04 +0800
+Subject: [PATCH v6 05/17] xen: memory : Add new XENMAPSPACE type
+ XENMAPSPACE_dev_mmio
 In-Reply-To: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1458208636-12960-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1458208636-12960-6-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-ACPI 6.0 introduces a new table STAO to list the devices which are used
-by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-UART is used by Xen. So here it hides UART from Dom0.
+Add a new type of Xen map space for Dom0 to map device's MMIO region.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
-CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
-CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
-CC: linux-acpi at vger.kernel.org (open list:ACPI)
----
- drivers/acpi/scan.c | 63 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ include/xen/interface/memory.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 5f28cf7..55ceb69 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
- DEFINE_MUTEX(acpi_device_lock);
- LIST_HEAD(acpi_wakeup_device_list);
- static DEFINE_MUTEX(acpi_hp_context_lock);
-+static u64 spcr_uart_addr;
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index 2ecfe4f..9aa8988 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -160,6 +160,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
+ #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
+ 				    * XENMEM_add_to_physmap_range only.
+ 				    */
++#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
  
- struct acpi_dep_data {
- 	struct list_head node;
-@@ -1453,6 +1454,41 @@ static int acpi_add_single_object(struct acpi_device **child,
- 	return 0;
- }
- 
-+static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
-+					    void *context)
-+{
-+	struct resource *res = context;
-+
-+	if (acpi_dev_resource_memory(ares, res))
-+		return AE_CTRL_TERMINATE;
-+
-+	return AE_OK;
-+}
-+
-+static bool acpi_device_should_be_hidden(acpi_handle handle)
-+{
-+	acpi_status status;
-+	struct resource res;
-+
-+	/* Check if it should ignore the UART device */
-+	if (spcr_uart_addr != 0) {
-+		if (!acpi_has_method(handle, METHOD_NAME__CRS))
-+			return false;
-+
-+		status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-+					     acpi_get_resource_memory, &res);
-+		if (ACPI_FAILURE(status))
-+			return false;
-+
-+		if (res.start == spcr_uart_addr) {
-+			printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
-+			return true;
-+		}
-+	}
-+
-+	return false;
-+}
-+
- static int acpi_bus_type_and_status(acpi_handle handle, int *type,
- 				    unsigned long long *sta)
- {
-@@ -1466,6 +1502,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
- 	switch (acpi_type) {
- 	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
- 	case ACPI_TYPE_DEVICE:
-+		if (acpi_device_should_be_hidden(handle))
-+			return -ENODEV;
-+
- 		*type = ACPI_BUS_TYPE_DEVICE;
- 		status = acpi_bus_get_status_handle(handle, sta);
- 		if (ACPI_FAILURE(status))
-@@ -1919,6 +1958,8 @@ static int acpi_bus_scan_fixed(void)
- int __init acpi_scan_init(void)
- {
- 	int result;
-+	acpi_status status;
-+	struct acpi_table_stao *stao_ptr;
- 
- 	acpi_pci_root_init();
- 	acpi_pci_link_init();
-@@ -1934,6 +1975,28 @@ int __init acpi_scan_init(void)
- 
- 	acpi_scan_add_handler(&generic_device_handler);
- 
-+	/*
-+	 * If there is STAO table, check whether it needs to ignore the UART
-+	 * device in SPCR table.
-+	 */
-+	status = acpi_get_table(ACPI_SIG_STAO, 0,
-+				(struct acpi_table_header **)&stao_ptr);
-+	if (ACPI_SUCCESS(status)) {
-+		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
-+			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
-+
-+		if (stao_ptr->ignore_uart) {
-+			struct acpi_table_spcr *spcr_ptr;
-+
-+			status = acpi_get_table(ACPI_SIG_SPCR, 0,
-+					(struct acpi_table_header **)&spcr_ptr);
-+			if (ACPI_SUCCESS(status))
-+				spcr_uart_addr = spcr_ptr->serial_port.address;
-+			else
-+				printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
-+		}
-+	}
-+
- 	mutex_lock(&acpi_scan_lock);
- 	/*
- 	 * Enumerate devices in the ACPI namespace.
+ /*
+  * Sets the GPFN at which a particular page appears in the specified guest's
 -- 
 2.0.4
