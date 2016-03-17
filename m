@@ -1,68 +1,80 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 17 Mar 2016 11:56:29 -0500
-Subject: [PATCH 4/5] pwm: pwm-tipwmss: Update documentation to use empty
- range property
-In-Reply-To: <20160317150140.GA25775@rob-hp-laptop>
-References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
- <1457380318-15452-5-git-send-email-fcooper@ti.com>
- <20160317150140.GA25775@rob-hp-laptop>
-Message-ID: <56EAE1BD.9040601@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 12:01:01 -0500
+Subject: [v6, 5/5] mmc: sdhci-of-esdhc: fix host version for
+ T4240-R1.0-R2.0
+In-Reply-To: <DB5PR0401MB19286B2D23D07F5C60DB799D91880@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
+ <1457518131-11339-6-git-send-email-yangbo.lu@nxp.com>
+ <4947024.WeMycs2fID@wuerfel>
+ <HE1PR04MB0889CE4742B92461A925B9C4F8880@HE1PR04MB0889.eurprd04.prod.outlook.com>
+ <DB5PR0401MB19286B2D23D07F5C60DB799D91880@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+Message-ID: <20160317170101.GA21009@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 14, 2016 at 05:45:43PM +0000, Scott Wood wrote:
+> On 03/14/2016 02:29 AM, Yangbo Lu wrote:
+> >> -----Original Message-----
+> >> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> >> Sent: Monday, March 14, 2016 6:26 AM
+> >> To: linuxppc-dev at lists.ozlabs.org
+> >> Cc: Yangbo Lu; devicetree at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> >> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> >> foundation.org; netdev at vger.kernel.org; linux-mmc at vger.kernel.org;
+> >> ulf.hansson at linaro.org; Zhao Qiang; Russell King; Bhupesh Sharma; Joerg
+> >> Roedel; Santosh Shilimkar; Scott Wood; Rob Herring; Claudiu Manoil; Kumar
+> >> Gala; Yang-Leo Li; Xiaobo Xie
+> >> Subject: Re: [v6, 5/5] mmc: sdhci-of-esdhc: fix host version for T4240-
+> >> R1.0-R2.0
+> >>
+> >> On Wednesday 09 March 2016 18:08:51 Yangbo Lu wrote:
+> >>> @@ -567,10 +580,20 @@ static void esdhc_init(struct platform_device
+> >> *pdev, struct sdhci_host *host)
+> >>>         struct sdhci_pltfm_host *pltfm_host;
+> >>>         struct sdhci_esdhc *esdhc;
+> >>>         u16 host_ver;
+> >>> +       u32 svr;
+> >>>
+> >>>         pltfm_host = sdhci_priv(host);
+> >>>         esdhc = sdhci_pltfm_priv(pltfm_host);
+> >>>
+> >>> +       fsl_guts_init();
+> >>> +       svr = fsl_guts_get_svr();
+> >>> +       if (svr) {
+> >>> +               esdhc->soc_ver = SVR_SOC_VER(svr);
+> >>> +               esdhc->soc_rev = SVR_REV(svr);
+> >>> +       } else {
+> >>> +               dev_err(&pdev->dev, "Failed to get SVR value!\n");
+> >>> +       }
+> >>> +
+> >>
+> >> This makes the driver non-portable. Better identify the specific
+> >> workarounds based on the compatible string for this device, or add a
+> >> boolean DT property for the quirk.
+> >>
+> >> 	Arnd
+> > 
+> > [Lu Yangbo-B47093] Hi Arnd, we did have a discussion about using DTS in v1 before.
+> > https://patchwork.kernel.org/patch/6834221/
+> > 
+> > We don?t have a separate DTS file for each revision of an SOC and if we did, we'd constantly have people using the wrong one.
+> > In addition, the device tree is stable ABI and errata are often discovered after device tree are deployed.
+> > See the link for details.
+> > 
+> > So we decide to read SVR from the device-config/guts MMIO block other than using DTS.
+> > Thanks.
+> 
+> Also note that this driver is already only for fsl-specific hardware,
+> and it will still work even if fsl_guts doesn't find anything to bind to
+> -- it just wouldn't be able to detect errata based on SVR in that case.
 
+IIRC, it is the same IP block as i.MX and Arnd's point is this won't 
+even compile on !PPC. It is things like this that prevent sharing the 
+driver. Dealing with Si revs is a common problem. We should have a 
+common solution. There is soc_device for this purpose.
 
-On 03/17/2016 10:01 AM, Rob Herring wrote:
-> On Mon, Mar 07, 2016 at 01:51:57PM -0600, Franklin S Cooper Jr wrote:
->> Since the PWMSS and its subdevices (eCAP and ePWM) use the same address
->> space then the range property should be empty. Update the documentation
->> to show the correct usage.
-> Why does it matter? An empty ranges is generally not preferred.
+OTOH, the integration differences may be enough that trying to have a 
+common driver with i.MX would not be worth it.
 
-Someone pointed out that ranges should probably be empty. I
-double checked it with what is in the ePAPR doc and based on
-the definition it should be set to empty. I also checked
-against the am33xx.dtsi and saw that both USB and ethernet
-uses an empty value for ranges.
-
-Can you elaborate on why this isn't preferable?
-
->
->> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->> ---
->>  Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt | 12 ++++--------
->>  1 file changed, 4 insertions(+), 8 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
->> index f7eae77..672fa71 100644
->> --- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
->> +++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
->> @@ -7,11 +7,9 @@ Required properties:
->>  		  Should set to 1.
->>  - size-cells: specify number of u32 entries needed to specify child nodes size
->>  		in reg property. Should set to 1.
->> -- ranges: describes the address mapping of a memory-mapped bus. Should set to
->> -	   physical address map of child's base address, physical address within
->> -	   parent's address  space and length of the address map. For am33xx,
->> -	   3 set of child register maps present, ECAP register space, EQEP
->> -	   register space, EHRPWM register space.
->> +- ranges: describes the address mapping of a memory-mapped bus. Its value
->> +	  should be empty since no address translation is needed between the
->> +	  parent and the child.
->>  
->>  Also child nodes should also populated under PWMSS DT node.
->>  
->> @@ -23,9 +21,7 @@ pwmss0: pwmss at 48300000 {
->>  	#address-cells = <1>;
->>  	#size-cells = <1>;
->>  	status = "disabled";
->> -	ranges = <0x48300100 0x48300100 0x80   /* ECAP */
->> -		  0x48300180 0x48300180 0x80   /* EQEP */
->> -		  0x48300200 0x48300200 0x80>; /* EHRPWM */
->> +	ranges;
->>  
->>  	/* child nodes go here */
->>  };
->> -- 
->> 2.7.0
->>
+Rob
