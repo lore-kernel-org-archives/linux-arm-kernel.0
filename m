@@ -1,39 +1,25 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Mar 2016 10:30:16 +0900
-Subject: [PATCH] ARM: dts: r8a7790: Remove unnecessary clock-output-names
- properties
-In-Reply-To: <CAMuHMdUsHZDGO_SjEt-TDZ1hr=6eXg87AQ_wBS8A1yKTcSPbqw@mail.gmail.com>
-References: <1458089041-22994-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdUsHZDGO_SjEt-TDZ1hr=6eXg87AQ_wBS8A1yKTcSPbqw@mail.gmail.com>
-Message-ID: <20160317013015.GG17728@verge.net.au>
+Date: Thu, 17 Mar 2016 11:09:03 +0900
+Subject: [PATCH v2 0/2] ARM: dts: r8a7793: add CAN to device tree
+In-Reply-To: <1458093176-1926-1-git-send-email-horms+renesas@verge.net.au>
+References: <1458093176-1926-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20160317020903.GA25402@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 09:44:35AM +0100, Geert Uytterhoeven wrote:
-> On Wed, Mar 16, 2016 at 1:44 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > * Fixed rate and fixed factor clocks do not require an
-> >   clock-output-names property.
-> > * Since 1fae91ec99fb ("clk: shmobile: div6: Extract cpg_div6_register()")
-> >   Renesas div6 clocks do not require a clock-output-names property.
+On Wed, Mar 16, 2016 at 10:52:54AM +0900, Simon Horman wrote:
+> Hi,
 > 
-> Are you sure you don't mean its parent, commit 07705583e920fef6
-> ("clk: shmobile: div6: Make clock-output-names optional")? ;-)
+> this short series adds CAN clocks and nodes to the r8a7793 device tree.
 > 
-> > In the above cases there is only one clock output and its name is taken
-> > from that of the clock node.
-> >
-> > Accordingly, remove the unnecessary clock-output-names properties and
-> > as necessary the nodes.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> I am not aware of an r8a7793 board that exposes CAN - the gose
+> board does not appear to - and thus am unsure of a way to test these changes.
+> However, they are based on what is present for the r8a7791 SoC and
+> I am unable to find a difference in the SoC documentation.
 > 
-> With the commit reference fixed:
+> This series is similar to a series I posted for the r8a7794
+> earlier this week.
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Based on renesas-devel-20160315-v4.5
 
-Thanks, I have corrected the commit reference and queued this
-up as a cleanup for v4.7.
-
-I'll go ahead and do a sweep of the reset of the DTS files
-and post patches accordingly.
+I have queued this up for v4.7.
