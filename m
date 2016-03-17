@@ -1,127 +1,148 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 17 Mar 2016 13:28:50 +0200
-Subject: [PATCH v5 6/9] dmaengine: rcar-dmac: group slave configuration
-In-Reply-To: <1457404974-1800-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1457404974-1800-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <5083144.aEzMy68lFX@avalon>
+Date: Thu, 17 Mar 2016 09:19:05 +0200
+Subject: [PATCH 2/7] dmaengine: xilinx_vdma: Add quirks support to
+ differentiate differnet IP cores
+In-Reply-To: <1458062592-27981-3-git-send-email-appanad@xilinx.com>
+References: <1458062592-27981-1-git-send-email-appanad@xilinx.com>
+ <1458062592-27981-3-git-send-email-appanad@xilinx.com>
+Message-ID: <1640685.GKdbz0bkAP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+Hello,
 
-Thank you for the patch.
+On Tuesday 15 March 2016 22:53:07 Kedareswara rao Appana wrote:
+> This patch adds quirks support in the driver to differentiate differnet IP
 
-On Tuesday 08 March 2016 03:42:51 Niklas S?derlund wrote:
-> Group slave address and transfer size in own structs for source and
-> destination. This is in preparation for hooking up the dma-mapping API
-> to the slave addresses.
+s/differnet/different/
+
+(and in the subject line too)
+
+With this series applied the driver will not be vdma-specific anymore. The 
+xilinx_vdma_ prefix will thus be confusing. I'd bite the bullet and apply a 
+global rename to functions that are not shared between the three DMA IP core 
+types before patch 2/7.
+
+> cores.
 > 
-> Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
->  drivers/dma/sh/rcar-dmac.c | 38 ++++++++++++++++++++++----------------
->  1 file changed, 22 insertions(+), 16 deletions(-)
+>  drivers/dma/xilinx/xilinx_vdma.c | 36 ++++++++++++++++++++++++++++++------
+>  1 file changed, 30 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-> index 01cf82f..b3911fe 100644
-> --- a/drivers/dma/sh/rcar-dmac.c
-> +++ b/drivers/dma/sh/rcar-dmac.c
-> @@ -118,14 +118,22 @@ struct rcar_dmac_desc_page {
->  	sizeof(struct rcar_dmac_xfer_chunk))
+> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
+> b/drivers/dma/xilinx/xilinx_vdma.c index 7ab6793..f682bef 100644
+> --- a/drivers/dma/xilinx/xilinx_vdma.c
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
+> @@ -139,6 +139,8 @@
+>  /* Delay loop counter to prevent hardware failure */
+>  #define XILINX_VDMA_LOOP_COUNT		1000000
 > 
->  /*
-> + * struct rcar_dmac_chan_slave - Slave configuration
-> + * @slave_addr: slave memory address
-> + * @xfer_size: size (in bytes) of hardware transfers
-> + */
-> +struct rcar_dmac_chan_slave {
-> +	phys_addr_t slave_addr;
-> +	unsigned int xfer_size;
+> +#define AXIVDMA_SUPPORT		BIT(0)
+> +
+>  /**
+>   * struct xilinx_vdma_desc_hw - Hardware Descriptor
+>   * @next_desc: Next Descriptor Pointer @0x00
+> @@ -240,6 +242,7 @@ struct xilinx_vdma_chan {
+>   * @chan: Driver specific VDMA channel
+>   * @has_sg: Specifies whether Scatter-Gather is present or not
+>   * @flush_on_fsync: Flush on frame sync
+> + * @quirks: Needed for different IP cores
+>   */
+>  struct xilinx_vdma_device {
+>  	void __iomem *regs;
+> @@ -248,6 +251,15 @@ struct xilinx_vdma_device {
+>  	struct xilinx_vdma_chan *chan[XILINX_VDMA_MAX_CHANS_PER_DEVICE];
+>  	bool has_sg;
+>  	u32 flush_on_fsync;
+> +	u32 quirks;
 > +};
 > +
-> +/*
->   * struct rcar_dmac_chan - R-Car Gen2 DMA Controller Channel
->   * @chan: base DMA channel object
->   * @iomem: channel I/O memory base
->   * @index: index of this channel in the controller
-> - * @src_xfer_size: size (in bytes) of hardware transfers on the source side
-> - * @dst_xfer_size: size (in bytes) of hardware transfers on the
-> destination side - * @src_slave_addr: slave source memory address
-> - * @dst_slave_addr: slave destination memory address
-> + * @src: slave memory address and size on the source side
-> + * @dst: slave memory address and size on the destination side
->   * @mid_rid: hardware MID/RID for the DMA client using this channel
->   * @lock: protects the channel CHCR register and the desc members
->   * @desc.free: list of free descriptors
-> @@ -142,10 +150,8 @@ struct rcar_dmac_chan {
->  	void __iomem *iomem;
->  	unsigned int index;
+> +/**
+> + * struct xdma_platform_data - DMA platform structure
+> + * @quirks: quirks for platform specific data.
+> + */
+> +struct xdma_platform_data {
+
+This isn't platform data but device information, I'd rename the structure to 
+xdma_device_info (and update the description accordingly).
+
+> +	u32 quirks;
+
+I don't think you should call this field quirks as it stores the IP core type. 
+Quirks usually refer to non-standard behaviour that requires specific handling 
+in the driver, possibly in the form of work-arounds. I would thus call the 
+field type and document it as "DMA IP core type". Similarly I'd rename 
+AXIVDMA_SUPPORT to XDMA_TYPE_VDMA.
+
+>  };
 > 
-> -	unsigned int src_xfer_size;
-> -	unsigned int dst_xfer_size;
-> -	phys_addr_t src_slave_addr;
-> -	phys_addr_t dst_slave_addr;
-> +	struct rcar_dmac_chan_slave src;
-> +	struct rcar_dmac_chan_slave dst;
->  	int mid_rid;
-> 
->  	spinlock_t lock;
-> @@ -793,13 +799,13 @@ static void rcar_dmac_chan_configure_desc(struct
-> rcar_dmac_chan *chan, case DMA_DEV_TO_MEM:
->  		chcr = RCAR_DMACHCR_DM_INC | RCAR_DMACHCR_SM_FIXED
-> 
->  		     | RCAR_DMACHCR_RS_DMARS;
-> 
-> -		xfer_size = chan->src_xfer_size;
-> +		xfer_size = chan->src.xfer_size;
->  		break;
-> 
->  	case DMA_MEM_TO_DEV:
->  		chcr = RCAR_DMACHCR_DM_FIXED | RCAR_DMACHCR_SM_INC
-> 
->  		     | RCAR_DMACHCR_RS_DMARS;
-> 
-> -		xfer_size = chan->dst_xfer_size;
-> +		xfer_size = chan->dst.xfer_size;
->  		break;
-> 
->  	case DMA_MEM_TO_MEM:
-> @@ -1038,7 +1044,7 @@ rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct
-> scatterlist *sgl, }
-> 
->  	dev_addr = dir == DMA_DEV_TO_MEM
-> -		 ? rchan->src_slave_addr : rchan->dst_slave_addr;
-> +		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
->  	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
->  				      dir, flags, false);
+>  /* Macros */
+> @@ -1239,6 +1251,16 @@ static struct dma_chan *of_dma_xilinx_xlate(struct
+> of_phandle_args *dma_spec, return
+> dma_get_slave_channel(&xdev->chan[chan_id]->common);
 >  }
-> @@ -1093,7 +1099,7 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan,
-> dma_addr_t buf_addr, }
 > 
->  	dev_addr = dir == DMA_DEV_TO_MEM
-> -		 ? rchan->src_slave_addr : rchan->dst_slave_addr;
-> +		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
->  	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
->  				      dir, flags, true);
+> +static const struct xdma_platform_data xvdma_def = {
+> +	.quirks = AXIVDMA_SUPPORT,
+> +};
+> +
+> +static const struct of_device_id xilinx_vdma_of_ids[] = {
+> +	{ .compatible = "xlnx,axi-vdma-1.00.a", .data = &xvdma_def},
+
+Missing space before }, did you run checkpatch ?
+
+As the xdma_platform_data structure contains a single integer, you could store 
+it in the .data field directly.
+
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, xilinx_vdma_of_ids);
+> +
+>  /**
+>   * xilinx_vdma_probe - Driver probe function
+>   * @pdev: Pointer to the platform_device structure
+> @@ -1251,6 +1273,7 @@ static int xilinx_vdma_probe(struct platform_device
+> *pdev) struct xilinx_vdma_device *xdev;
+>  	struct device_node *child;
+>  	struct resource *io;
+> +	const struct of_device_id *match;
+>  	u32 num_frames;
+>  	int i, err;
 > 
-> @@ -1110,10 +1116,10 @@ static int rcar_dmac_device_config(struct dma_chan
-> *chan, * We could lock this, but you shouldn't be configuring the
->  	 * channel, while using it...
->  	 */
-> -	rchan->src_slave_addr = cfg->src_addr;
-> -	rchan->dst_slave_addr = cfg->dst_addr;
-> -	rchan->src_xfer_size = cfg->src_addr_width;
-> -	rchan->dst_xfer_size = cfg->dst_addr_width;
-> +	rchan->src.slave_addr = cfg->src_addr;
-> +	rchan->dst.slave_addr = cfg->dst_addr;
-> +	rchan->src.xfer_size = cfg->src_addr_width;
-> +	rchan->dst.xfer_size = cfg->dst_addr_width;
+> @@ -1259,6 +1282,13 @@ static int xilinx_vdma_probe(struct platform_device
+> *pdev) if (!xdev)
+>  		return -ENOMEM;
 > 
->  	return 0;
+> +	match = of_match_node(xilinx_vdma_of_ids, pdev->dev.of_node);
+
+You can use of_device_get_match_data() to get the data directly.
+
+> +	if (match && match->data) {
+
+I don't think this condition can ever be false.
+
+> +		const struct xdma_platform_data *data = match->data;
+> +
+> +		xdev->quirks = data->quirks;
+> +	}
+> +
+>  	xdev->dev = &pdev->dev;
+> 
+>  	/* Request and map I/O memory */
+> @@ -1356,12 +1386,6 @@ static int xilinx_vdma_remove(struct platform_device
+> *pdev) return 0;
 >  }
+> 
+> -static const struct of_device_id xilinx_vdma_of_ids[] = {
+> -	{ .compatible = "xlnx,axi-vdma-1.00.a",},
+> -	{}
+> -};
+> -MODULE_DEVICE_TABLE(of, xilinx_vdma_of_ids);
+> -
+>  static struct platform_driver xilinx_vdma_driver = {
+>  	.driver = {
+>  		.name = "xilinx-vdma",
 
 -- 
 Regards,
