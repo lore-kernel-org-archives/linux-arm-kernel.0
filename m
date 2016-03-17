@@ -1,76 +1,30 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 17 Mar 2016 16:34:22 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d2: add SFR node
-Message-ID: <1458228862-25582-1-git-send-email-ludovic.desroches@atmel.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Thu, 17 Mar 2016 23:34:18 +0800
+Subject: [PATCH v4 01/13] pinctrl: sunxi: Add A83T R_PIO controller
+In-Reply-To: <CACRpkdaFekCnRKoYQ=Fq1LT0FcH7RobwkLi_G1YfXJAb=4RTHQ@mail.gmail.com>
+References: <1458144276-31108-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1458144276-31108-2-git-send-email-vishnupatekar0510@gmail.com>
+ <CACRpkdaFekCnRKoYQ=Fq1LT0FcH7RobwkLi_G1YfXJAb=4RTHQ@mail.gmail.com>
+Message-ID: <CAEzqOZugVOGarjy9NjDOhwJeU6P26Ch2aX13Tec2N0z2Gb9g7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Hello Linus,
 
-This SFR node is looked up by the I2S controller driver to tune the
-SFR_I2SCLKSEL register.
-
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- Documentation/devicetree/bindings/arm/atmel-at91.txt |  2 +-
- arch/arm/boot/dts/sama5d2.dtsi                       |  5 +++++
- include/linux/mfd/syscon/atmel-sfr.h                 | 18 ++++++++++++++++++
- 3 files changed, 24 insertions(+), 1 deletion(-)
- create mode 100644 include/linux/mfd/syscon/atmel-sfr.h
-
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 7fd64ec..550fd66 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -155,7 +155,7 @@ elsewhere.
- 
- required properties:
- - compatible: Should be "atmel,<chip>-sfr", "syscon".
--  <chip> can be "sama5d3" or "sama5d4".
-+  <chip> can be "sama5d3", "sama5d4" or "sama5d2".
- - reg: Should contain registers location and length
- 
- 	sfr at f0038000 {
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 78996bd..36bb29c 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -973,6 +973,11 @@
- 				status = "disabled";
- 			};
- 
-+			sfr: sfr at f8030000 {
-+				compatible = "atmel,sama5d2-sfr", "syscon";
-+				reg = <0xf8030000 0x98>;
-+			};
-+
- 			flx0: flexcom at f8034000 {
- 				compatible = "atmel,sama5d2-flexcom";
- 				reg = <0xf8034000 0x200>;
-diff --git a/include/linux/mfd/syscon/atmel-sfr.h b/include/linux/mfd/syscon/atmel-sfr.h
-new file mode 100644
-index 0000000..2f9bb98
---- /dev/null
-+++ b/include/linux/mfd/syscon/atmel-sfr.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Atmel SFR (Special Function Registers) register offsets and bit definitions.
-+ *
-+ * Copyright (C) 2016 Atmel
-+ *
-+ * Author: Ludovic Desroches <ludovic.desroches@atmel.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _LINUX_MFD_SYSCON_ATMEL_SFR_H
-+#define _LINUX_MFD_SYSCON_ATMEL_SFR_H
-+
-+#define AT91_SFR_I2SCLKSEL	0x90	/* I2SC Register */
-+
-+#endif /* _LINUX_MFD_SYSCON_ATMEL_SFR_H */
--- 
-2.5.0
+On Thu, Mar 17, 2016 at 10:51 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Wed, Mar 16, 2016 at 5:04 PM, Vishnu Patekar
+> <vishnupatekar0510@gmail.com> wrote:
+>
+>> The A83T has R_PIO pin controller, it's same as A23, execpt A83T
+>> interrupt bit is 6th and A83T has one extra pin PL12.
+>>
+>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>
+> I think I already merged this?
+AFAIK, this one is not yet merged. At least, you did not say it's merged. :)
+>
+> Yours,
+> Linus Walleij
