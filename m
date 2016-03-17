@@ -1,97 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 17 Mar 2016 16:11:37 +0300
-Subject: [PATCH v2 11/11] usb: musb: da8xx: Remove mach code
-In-Reply-To: <1458181615-27782-12-git-send-email-david@lechnology.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-12-git-send-email-david@lechnology.com>
-Message-ID: <56EAAD09.3080600@cogentembedded.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 17 Mar 2016 14:17:16 +0100
+Subject: [PATCH 0/8 v4] bcm2835 DMA slave support
+In-Reply-To: <1458156302-4359-1-git-send-email-eric@anholt.net>
+References: <1458156302-4359-1-git-send-email-eric@anholt.net>
+Message-ID: <56EAAE5C.9060401@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/17/2016 5:26 AM, David Lechner wrote:
-
-> Use the new phy-da8xx-usb driver to take the place of the mach code that
-> pokes CFGCHIP2 in the da8xx musb glue driver.
+On 16.03.2016 20:24, Eric Anholt wrote:
+> Here's the series for DMA slave and memcpy support for 2835, with the
+> DT changes to enable the remaining channels dropped out while that
+> goes through review.  I had to do some minor conflict resolution, but
+> it was pretty mechanical, and I tested again with dmatest on the last
+> patch.
 >
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
+> Martin Sperl (8):
+>    dmaengine: bcm2835: set residue_granularity field
+>    dmaengine: bcm2835: remove unnecessary masking of dma channels
+>    dmaengine: bcm2835: add additional defines for DMA-registers
+>    dmaengine: bcm2835: move cyclic member from bcm2835_chan into
+>      bcm2835_desc
+>    dmaengine: bcm2835: move controlblock chain generation into separate
+>      method
+>    dmaengine: bcm2835: limit max length based on channel type
+>    dmaengine: bcm2835: add slave_sg support to bcm2835-dma
+>    dmaengine: bcm2835: add dma_memcopy support to bcm2835-dma
 >
-> v2 changes: This is part of a previous patch that was split. This version uses
-> the new phy driver instead of a second clock. It also gets rid of more mach
-> code.
->
->
->   drivers/usb/musb/da8xx.c | 126 ++++++++++++-----------------------------------
->   1 file changed, 31 insertions(+), 95 deletions(-)
->
-> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
-> index 50f07a5..1d51711 100644
-> --- a/drivers/usb/musb/da8xx.c
-> +++ b/drivers/usb/musb/da8xx.c
-> @@ -30,13 +30,11 @@
->   #include <linux/clk.h>
->   #include <linux/err.h>
->   #include <linux/io.h>
-> +#include <linux/phy/phy.h>
->   #include <linux/platform_device.h>
->   #include <linux/dma-mapping.h>
->   #include <linux/usb/usb_phy_generic.h>
->
-> -#include <mach/da8xx.h>
-> -#include <linux/platform_data/usb-davinci.h>
+I have successfully tested this modified patch-series
+playing BigBuckBunny on:
+* fb-tft device (fb_st7735r) - via spi-bcm2835 using slave_sg dma
+* I2S Hifiberry DAC (snd_soc_hifiberry_dac) - via bcm2835-i2s using 
+cyclic dma
 
-    I guess we can move this header back into mach/ now?
+Required additional patches to make this work
+(especially I2S support, which is non-working since ):
+* the clock-patchsets:
+  * [PATCH 0/6] clk: bcm2835: fixes clk-bcm2835 driver issues
+     (most are reviewed by Eric)
+  * [PATCH 0/3] reorganize clock initialization and add PCM clock
+     (no reviewed/acked so far)
+* i2s patchset to enable the use of the clock framework
+  * [PATCH V2 0/3] ASOC: bcm2835: move bcm2835-i2s to use clock framework
+     (if I remember correctly Mark Brown has merged the driver patches)
+* out of tree drivers for Hifiberry DAC
+    (I guess I should upstream those...)
 
-[...]
-> @@ -383,31 +335,18 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
->   	return ret;
->   }
->
-> +extern int da8xx_usb20_phy_set_mode(struct phy *phy, enum musb_mode mode);
-> +
-
-    You now need to select your new PHY driver since otherwise the kernel 
-won't build.
-    You can remove "depends on BROKEN" as well since your patch is un-breaking 
-it. :-)
-
-[...]
-> @@ -425,19 +364,24 @@ static int da8xx_musb_init(struct musb *musb)
-[...]
->   	/* Start the on-chip PHY and its PLL. */
-> -	phy_on();
-> +	phy_power_on(glue->phy);
-
-    What about phy_init()?
-
-> @@ -448,9 +392,12 @@ fail:
->
->   static int da8xx_musb_exit(struct musb *musb)
->   {
-> +	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
-> +
->   	del_timer_sync(&otg_workaround);
->
-> -	phy_off();
-> +	phy_power_off(glue->phy);
-
-    phy_exit()?
-
-[...]
-> @@ -503,19 +450,19 @@ static int da8xx_probe(struct platform_device *pdev)
-[...]
->
->   	glue->dev			= &pdev->dev;
->   	pdata->platform_ops		= &da8xx_ops;
->
-> -	glue->phy = usb_phy_generic_register();
-> -	if (IS_ERR(glue->phy)) {
-> -		ret = PTR_ERR(glue->phy);
-> -		goto err5;
-> +	glue->usb_phy = usb_phy_generic_register();
-
-    Hm, do we still need the USB PHY? It does nothing IIRC...
-
-[...]
-
-MBR, Sergei
+Tested-by: Martin Sperl <kernel@martin.sperl.org>
