@@ -1,243 +1,126 @@
-From: yassinjaffer@gmail.com (yassinjaffer at gmail.com)
-Date: Thu, 17 Mar 2016 19:43:42 +1100
-Subject: [PATCH] clk: sunxi: Add CSI (camera's Sensors Interface) module clock
- driver for sun[457]i
-In-Reply-To: <1458204222-31149-1-git-send-email-yassinjaffer@gmail.com>
-References: <1458204222-31149-1-git-send-email-yassinjaffer@gmail.com>
-Message-ID: <1458204222-31149-2-git-send-email-yassinjaffer@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 17 Mar 2016 09:49:42 +0100
+Subject: [PATCH v2 1/9] drm: atmel-hlcdc: add a ->cleanup_fb() operation
+In-Reply-To: <20160316151738.GQ14170@phenom.ffwll.local>
+References: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1458136663-21396-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20160316151738.GQ14170@phenom.ffwll.local>
+Message-ID: <20160317094942.48079e49@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yassin Jaffer <yassinjaffer@gmail.com>
+Hi Daniel,
 
-This patch adds a composite clock type consisting of
-a clock gate, mux, configurable dividers, and a reset control.
+On Wed, 16 Mar 2016 16:17:38 +0100
+Daniel Vetter <daniel@ffwll.ch> wrote:
 
-Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
----
- Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
- drivers/clk/sunxi/Makefile                        |   1 +
- drivers/clk/sunxi/clk-a10-csi.c                   | 188 ++++++++++++++++++++++
- 3 files changed, 190 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-a10-csi.c
+> On Wed, Mar 16, 2016 at 02:57:35PM +0100, Boris Brezillon wrote:
+> > Add a ->cleanup_fb() operation to avoid memory leaks when the atomic
+> > operation is interrupted after the ->prepare_fb() call.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Fixes 2389fc1 ("drm: atmel-hlcdc: Atomic mode-setting conversion")
+> > Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  2 ++
+> >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 22 +++++++++++++++++++---
+> >  2 files changed, 21 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> > index fed517f..ec64140 100644
+> > --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> > +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> > @@ -81,11 +81,13 @@ struct atmel_hlcdc_plane_properties {
+> >   * @layer: HLCDC layer structure
+> >   * @properties: pointer to the property definitions structure
+> >   * @rotation: current rotation status
+> > + * @prepared: flagging the plane has prepared for an atomic update
+> >   */
+> >  struct atmel_hlcdc_plane {
+> >  	struct drm_plane base;
+> >  	struct atmel_hlcdc_layer layer;
+> >  	struct atmel_hlcdc_plane_properties *properties;
+> > +	bool prepared;
+> >  };
+> >  
+> >  static inline struct atmel_hlcdc_plane *
+> > diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> > index 1ffe9c3..35027d0 100644
+> > --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> > +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> > @@ -715,11 +715,25 @@ static int atmel_hlcdc_plane_prepare_fb(struct drm_plane *p,
+> >  					const struct drm_plane_state *new_state)
+> >  {
+> >  	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
+> > +	int ret;
+> >  
+> > -	if (!new_state->fb)
+> > -		return 0;
+> > +	ret = atmel_hlcdc_layer_update_start(&plane->layer);
+> > +	if (!ret)
+> > +		plane->prepared = true;
+> 
+> Atomic helpers will keep track of this for you, and only call ->cleanup_fb
+> on a plane combo where it did (successfully) call ->prepare_fb.
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index e59f57b..c3826f7 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -77,6 +77,7 @@ Required properties:
- 	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
- 	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
- 	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
-+	"allwinner,sun4i-a10-csi-clk" - for the CSI module
- 
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 3fd7901..42ce752 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -7,6 +7,7 @@ obj-y += clk-a10-codec.o
- obj-y += clk-a10-hosc.o
- obj-y += clk-a10-mod1.o
- obj-y += clk-a10-pll2.o
-+obj-y += clk-a10-csi.o
- obj-y += clk-a10-ve.o
- obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
-diff --git a/drivers/clk/sunxi/clk-a10-csi.c b/drivers/clk/sunxi/clk-a10-csi.c
-new file mode 100644
-index 0000000..f17d206
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-csi.c
-@@ -0,0 +1,188 @@
-+/*
-+ * Copyright 2016 Yassin Jaffer
-+ *
-+ * Yassin Jaffer <yassinjaffer@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of_address.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+static DEFINE_SPINLOCK(sun4i_csi_lock);
-+
-+#define SUN4I_CSI_PARENTS       5
-+#define SUN4I_CSI_GATE_BIT      31
-+#define SUN4I_CSI_RESET_BIT     30
-+#define SUN4I_CSI_MUX_SHIFT     24
-+#define SUN4I_CSI_DIV_WIDTH     5
-+#define SUN4I_CSI_DIV_SHIFT     0
-+
-+static u32 sun4i_csi_mux_table[SUN4I_CSI_PARENTS] = {
-+	0x0,
-+	0x1,
-+	0x2,
-+	0x5,
-+	0x6,
-+};
-+
-+struct csi_reset_data {
-+	void __iomem			*reg;
-+	spinlock_t			*lock; /* lock for reset handling */
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+static int sun4i_csi_assert(struct reset_controller_dev *rcdev,
-+			    unsigned long id)
-+{
-+	struct csi_reset_data *data = container_of(rcdev,
-+						  struct csi_reset_data,
-+						  rcdev);
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(data->lock, flags);
-+
-+	reg = readl(data->reg);
-+	writel(reg & ~BIT(SUN4I_CSI_RESET_BIT), data->reg);
-+
-+	spin_unlock_irqrestore(data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sun4i_csi_deassert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct csi_reset_data *data = container_of(rcdev,
-+						  struct csi_reset_data,
-+						  rcdev);
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(data->lock, flags);
-+
-+	reg = readl(data->reg);
-+	writel(reg | BIT(SUN4I_CSI_RESET_BIT), data->reg);
-+
-+	spin_unlock_irqrestore(data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sun4i_csi_of_xlate(struct reset_controller_dev *rcdev,
-+			      const struct of_phandle_args *reset_spec)
-+{
-+	if (WARN_ON(reset_spec->args_count != 0))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static struct reset_control_ops sun4i_csi_reset_ops = {
-+	.assert		= sun4i_csi_assert,
-+	.deassert	= sun4i_csi_deassert,
-+};
-+
-+static void __init sun4i_csi_clk_setup(struct device_node *node)
-+{
-+	const char *parents[SUN4I_CSI_PARENTS];
-+	const char *clk_name = node->name;
-+	struct csi_reset_data *reset_data;
-+	struct clk_divider *div;
-+	struct clk_gate *gate;
-+	struct clk_mux *mux;
-+	void __iomem *reg;
-+	struct clk *clk;
-+	int i = 0;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	i = of_clk_parent_fill(node, parents, SUN4I_CSI_PARENTS);
-+
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		goto err_unmap;
-+
-+	mux->reg = reg;
-+	mux->shift = SUN4I_CSI_MUX_SHIFT;
-+	mux->table = sun4i_csi_mux_table;
-+	mux->lock = &sun4i_csi_lock;
-+
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		goto err_free_mux;
-+
-+	gate->reg = reg;
-+	gate->bit_idx = SUN4I_CSI_GATE_BIT;
-+	gate->lock = &sun4i_csi_lock;
-+
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div)
-+		goto err_free_gate;
-+
-+	div->reg = reg;
-+	div->shift = SUN4I_CSI_DIV_SHIFT;
-+	div->width = SUN4I_CSI_DIV_WIDTH;
-+	div->lock = &sun4i_csi_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name,
-+				     parents, i,
-+				     &mux->hw, &clk_mux_ops,
-+				     &div->hw, &clk_divider_ops,
-+				     &gate->hw, &clk_gate_ops,
-+				     CLK_SET_RATE_PARENT);
-+	if (IS_ERR(clk))
-+		goto err_free_div;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+
-+	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
-+	if (!reset_data)
-+		goto err_free_clk;
-+
-+	reset_data->reg = reg;
-+	reset_data->lock = &sun4i_csi_lock;
-+	reset_data->rcdev.nr_resets = 1;
-+	reset_data->rcdev.ops = &sun4i_csi_reset_ops;
-+	reset_data->rcdev.of_node = node;
-+	reset_data->rcdev.of_xlate = sun4i_csi_of_xlate;
-+	reset_data->rcdev.of_reset_n_cells = 0;
-+
-+	if (reset_controller_register(&reset_data->rcdev))
-+		goto err_free_reset;
-+
-+	return;
-+
-+err_free_reset:
-+	kfree(reset_data);
-+err_free_clk:
-+	clk_unregister(clk);
-+err_free_div:
-+	kfree(div);
-+err_free_gate:
-+	kfree(gate);
-+err_free_mux:
-+	kfree(mux);
-+err_unmap:
-+	iounmap(reg);
-+}
-+
-+CLK_OF_DECLARE(sun4i_csi, "allwinner,sun4i-a10-csi-clk",
-+	       sun4i_csi_clk_setup);
-+
+Hm, it's not exactly encoding the same thing. What I want to do here is
+call atmel_hlcdc_layer_update_rollback() only if the atomic update has
+failed (see below, I set ->prepared back to false in the
+->atomic_update() method). AFAICT, ->cleanup_fb() is also called
+when the whole operation succeed (and in this case I don't want to
+call atmel_hlcdc_layer_update_rollback()).
+
+Let me know if you see a better approach to do that.
+
+Thanks,
+
+Boris
+
+> -Daniel
+> 
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static void atmel_hlcdc_plane_cleanup_fb(struct drm_plane *p,
+> > +				const struct drm_plane_state *old_state)
+> > +{
+> > +	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
+> > +
+> > +	if (!plane->prepared)
+> > +		return;
+> >  
+> > -	return atmel_hlcdc_layer_update_start(&plane->layer);
+> > +	atmel_hlcdc_layer_update_rollback(&plane->layer);
+> > +	plane->prepared = false;
+> >  }
+> >  
+> >  static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
+> > @@ -739,6 +753,7 @@ static void atmel_hlcdc_plane_atomic_update(struct drm_plane *p,
+> >  	atmel_hlcdc_plane_update_disc_area(plane, state);
+> >  
+> >  	atmel_hlcdc_layer_update_commit(&plane->layer);
+> > +	plane->prepared = false;
+> >  }
+> >  
+> >  static void atmel_hlcdc_plane_atomic_disable(struct drm_plane *p,
+> > @@ -844,6 +859,7 @@ static void atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane,
+> >  
+> >  static struct drm_plane_helper_funcs atmel_hlcdc_layer_plane_helper_funcs = {
+> >  	.prepare_fb = atmel_hlcdc_plane_prepare_fb,
+> > +	.cleanup_fb = atmel_hlcdc_plane_cleanup_fb,
+> >  	.atomic_check = atmel_hlcdc_plane_atomic_check,
+> >  	.atomic_update = atmel_hlcdc_plane_atomic_update,
+> >  	.atomic_disable = atmel_hlcdc_plane_atomic_disable,
+> > -- 
+> > 2.5.0
+> > 
+> 
+
+
+
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
