@@ -1,39 +1,91 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 17 Mar 2016 10:07:30 -0500
-Subject: [PATCH v4 0/5] acpi, clocksource, kvm: add GTDT and ARM
- memory-mapped timer support
-In-Reply-To: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
-References: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <56EAC832.6070203@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 10:11:47 -0500
+Subject: [PATCH v5 6/6] ARM: dts: DRA7: Add dt nodes for PWMSS
+In-Reply-To: <1457400224-24797-7-git-send-email-fcooper@ti.com>
+References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
+ <1457400224-24797-7-git-send-email-fcooper@ti.com>
+Message-ID: <20160317151147.GA29802@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
->
-> This patchset:
->      (1)Move some enums and marcos to header file for arm_arch_timer,
->      improve the pr_* code by defining "pr_fmt(fmt)" in arm_arch_timer.c
->
->      (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
->      Parse all kinds of timer in GTDT table of ACPI:arch timer,
->      memory-mapped timer and SBSA Generic Watchdog timer.
->      This driver can help to simplify all the relevant timer drivers,
->      and separate all the ACPI GTDT knowledge from them.
->
->      (3)Simplify ACPI code for arch timer in arm_arch_timer.c
->
->      (4)Add memory-mapped timer support in arm_arch_timer.c
+On Mon, Mar 07, 2016 at 07:23:44PM -0600, Franklin S Cooper Jr wrote:
+> From: Vignesh R <vigneshr@ti.com>
+> 
+> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
+> for dt bindings.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> [fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+> Version 5 changes:
+> Add DT node for eCAP and update eCAP binding documentation
+> 
+> Version 4 changes:
+> Updated link to the latest documentation
+> 
+>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
+>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
+>  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
+>  arch/arm/boot/dts/dra7.dtsi                        | 84 ++++++++++++++++++++++
+>  4 files changed, 116 insertions(+), 1 deletion(-)
 
-The SBSA watchdog driver is already in watchdog-next and will be merged 
-into 4.6.  These five patches are necessary for the watchdog driver to 
-probe on an ACPI system.
 
-I'm guessing since that v4 was posted in the middle of the 4.6 merge 
-window, that these patches won't make it and we'll have to wait until 
-4.7 (at the earliest)?
+> +			ehrpwm1: pwm at 48440200 {
+> +				compatible = "ti,dra7xx-ehrpwm",
+> +					     "ti,am33xx-ehrpwm";
+> +				#pwm-cells = <3>;
+> +				reg = <0x48440200 0x80>;
+> +				clocks = <&ehrpwm1_tbclk>;
+> +				clock-names = "tbclk";
+> +				status = "disabled";
+> +			};
+> +
+> +			ecap1: ecap at 48440100 {
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+This also is a PWM? Then it should also be pwm at ...
+
+> +				compatible = "ti,dra7xx-ecap",
+> +					     "ti,am33xx-ecap";
+> +				#pwm-cells = <3>;
+> +				reg = <0x48440100 0x80>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		epwmss2: epwmss at 48442000 {
+> +			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
+> +			reg = <0x48442000 0x30>;
+> +			ti,hwmods = "epwmss2";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			status = "disabled";
+> +			ranges;
+> +
+> +			ehrpwm2: pwm at 48442200 {
+> +				compatible = "ti,dra7xx-ehrpwm",
+> +					     "ti,am33xx-ehrpwm";
+> +				#pwm-cells = <3>;
+> +				reg = <0x48442200 0x80>;
+> +				clocks = <&ehrpwm2_tbclk>;
+> +				clock-names = "tbclk";
+> +				status = "disabled";
+> +			};
+> +
+> +			ecap2: ecap at 48442100 {
+
+And here.
+
+> +				compatible = "ti,dra7xx-ecap",
+> +					     "ti,am33xx-ecap";
+> +				#pwm-cells = <3>;
+> +				reg = <0x48442100 0x80>;
+> +				status = "disabled";
+> +			};
+> +		};
+>  	};
+>  
+>  	thermal_zones: thermal-zones {
+> -- 
+> 2.7.0
+> 
