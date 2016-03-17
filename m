@@ -1,76 +1,64 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 17 Mar 2016 16:29:39 -0500
-Subject: [PATCH 4/5] pwm: pwm-tipwmss: Update documentation to use empty
- range property
-In-Reply-To: <56EAE1BD.9040601@ti.com>
-References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
- <1457380318-15452-5-git-send-email-fcooper@ti.com>
- <20160317150140.GA25775@rob-hp-laptop> <56EAE1BD.9040601@ti.com>
-Message-ID: <56EB21C3.8000806@ti.com>
+From: pku.leo@gmail.com (Leo Li)
+Date: Thu, 17 Mar 2016 16:33:35 -0500
+Subject: [v6, 3/5] dt: move guts devicetree doc out of powerpc directory
+In-Reply-To: <CAL_JsqL8NkEQx2NoVHSUGYhtNsybCo-yfBCde+_OuMmfwbhYEw@mail.gmail.com>
+References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
+ <1457518131-11339-4-git-send-email-yangbo.lu@nxp.com>
+ <20160317170640.GB21009@rob-hp-laptop> <4107975.rId64mooHz@wuerfel>
+ <CAL_JsqL8NkEQx2NoVHSUGYhtNsybCo-yfBCde+_OuMmfwbhYEw@mail.gmail.com>
+Message-ID: <CADRPPNRPP0cxrJT13OR+dAWuw8m0mr0=VJLY+JyTO=QsB_vVUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/17/2016 11:56 AM, Franklin S Cooper Jr. wrote:
->
-> On 03/17/2016 10:01 AM, Rob Herring wrote:
->> On Mon, Mar 07, 2016 at 01:51:57PM -0600, Franklin S Cooper Jr wrote:
->>> Since the PWMSS and its subdevices (eCAP and ePWM) use the same address
->>> space then the range property should be empty. Update the documentation
->>> to show the correct usage.
->> Why does it matter? An empty ranges is generally not preferred.
-> Someone pointed out that ranges should probably be empty. I
-> double checked it with what is in the ePAPR doc and based on
-> the definition it should be set to empty. I also checked
-> against the am33xx.dtsi and saw that both USB and ethernet
-> uses an empty value for ranges.
->
-> Can you elaborate on why this isn't preferable?
-
-I'm going to drop this patch and the previous patch for now
-that messes with the ranges property. I can resubmit them
-separately later on if that is the route we decide to take.
->
->>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->>> ---
->>>  Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt | 12 ++++--------
->>>  1 file changed, 4 insertions(+), 8 deletions(-)
+On Thu, Mar 17, 2016 at 12:57 PM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Mar 17, 2016 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Thursday 17 March 2016 12:06:40 Rob Herring wrote:
+>>> > diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+>>> > similarity index 91%
+>>> > rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+>>> > rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
+>>> > index b71b203..07adca9 100644
+>>> > --- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+>>> > +++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+>>> > @@ -25,6 +25,9 @@ Recommended properties:
+>>> >   - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
+>>> >     registers, for those SOCs that have a PAMU device.
+>>> >
+>>> > + - little-endian : Indicates that the global utilities block is little
+>>> > +   endian. The default is big endian.
 >>>
->>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
->>> index f7eae77..672fa71 100644
->>> --- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
->>> +++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
->>> @@ -7,11 +7,9 @@ Required properties:
->>>  		  Should set to 1.
->>>  - size-cells: specify number of u32 entries needed to specify child nodes size
->>>  		in reg property. Should set to 1.
->>> -- ranges: describes the address mapping of a memory-mapped bus. Should set to
->>> -	   physical address map of child's base address, physical address within
->>> -	   parent's address  space and length of the address map. For am33xx,
->>> -	   3 set of child register maps present, ECAP register space, EQEP
->>> -	   register space, EHRPWM register space.
->>> +- ranges: describes the address mapping of a memory-mapped bus. Its value
->>> +	  should be empty since no address translation is needed between the
->>> +	  parent and the child.
->>>  
->>>  Also child nodes should also populated under PWMSS DT node.
->>>  
->>> @@ -23,9 +21,7 @@ pwmss0: pwmss at 48300000 {
->>>  	#address-cells = <1>;
->>>  	#size-cells = <1>;
->>>  	status = "disabled";
->>> -	ranges = <0x48300100 0x48300100 0x80   /* ECAP */
->>> -		  0x48300180 0x48300180 0x80   /* EQEP */
->>> -		  0x48300200 0x48300200 0x80>; /* EHRPWM */
->>> +	ranges;
->>>  
->>>  	/* child nodes go here */
->>>  };
->>> -- 
->>> 2.7.0
->>>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> The default is "the native endianness of the system".
+>>
+>> This may be what is currently documented, but not what we are doing
+>> in practice, as there is no "native endianess" for either PowerPC or
+>> ARM -- both allow running big-endian or little-endian kernels and the
+>> device registers are fixed.
+>
+> Notice I said system, not architecture. The way the device registers
+> are fixed is what I mean by native endianness.
+
+I think sometimes it's also hard to define the native endianess of the
+system too.  For whatever reason, we have hardware that having
+big-endian registers on some on-chip devices but using little-endian
+registers on other devices.  Even if all the devices on certain
+hardware use registers of the same endianess, it is also hard for the
+device driver to know what the native endianess really is.
+
+>
+> If the purpose of adding this property now is to support GUTS on the
+> ARM SoCs, then I'd argue using this property is probably wrong. If the
+> PPC systems are designed with BE device registers and ARM systems with
+> LE, then this property is not needed.
+>
+>> I think the property here is fine.
+>
+> Unless you have studied the FSL ARM based SoCs, then there is not
+> enough information here to tell.
+
+Recent FSL ARM SoCs seems to have more weird endianess issue. :( The
+same IP could have registers of different endianess on different ARM
+SoCs.  That why we need to define the endianess explicitly in device
+tree.
+
+Regards,
+Leo
