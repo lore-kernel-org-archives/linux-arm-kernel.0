@@ -1,33 +1,29 @@
-From: hmh@hmh.eng.br (Henrique de Moraes Holschuh)
-Date: Thu, 17 Mar 2016 13:14:12 -0300
-Subject: NVMEM usage question
-In-Reply-To: <1457956899.20370.25.camel@mtksdaap41>
-References: <1457956899.20370.25.camel@mtksdaap41>
-Message-ID: <20160317161412.GA24806@khazad-dum.debian.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Mar 2016 17:14:34 +0100
+Subject: [PATCH] arm64: dma-mapping: fix dma_to_phys API for IOMMU
+ attached devices
+In-Reply-To: <56EAD63E.2010103@codeaurora.org>
+References: <1458229833-4886-1-git-send-email-okaya@codeaurora.org>
+ <56EAD3E2.5070109@arm.com> <56EAD63E.2010103@codeaurora.org>
+Message-ID: <3165610.Gdh8F6ejPI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Mar 2016, Eddie Huang wrote:
+On Thursday 17 March 2016 12:07:26 Sinan Kaya wrote:
+> On 3/17/2016 11:57 AM, Robin Murphy wrote:
+>
+> Let me know which direction I should go. 
 > 
-> Mediatek PMIC chip have some spare registers used to store information.
-> The value of these registers will exist until user unplug battery or
-> battery depletion. One of our usage example is store battery utilization
+> 1. Fix phys_to_dma and keep dma_to_phys as in the patch.
+> 2. Remove both of the API from header file, move it to where it is needed. Rename them as swio_phys_to_dma etc.
 
-i.e. like battery-backed raid caches.
+Use 2.
 
-> in these spare registers. We want to implement NVMEM driver to
-> read/write sparse registers, but binding document describe NVMEM is for
-> "Non-volatile memory", and for hardware like eeprom, efuse. Since the
+It has been a long way to remove all virt_to_bus/bus_to_virt users
+from the common architectures, we are not putting them back under
+a different name.
 
-Users will expect nvmem to not go away on battery drain, so I don't think it
-would be the best fit, semantically speaking.
+Drivers already know the physical address because that is what they
+put into dma_map_*() in the first place.
 
-Unless this is common enough that it would make sense to have a generic
-quasi-non-volatile profile for nvmem, and publish that constraint to
-userspace in a standard way...
-
--- 
-  "One disk to rule them all, One disk to find them. One disk to bring
-  them all and in the darkness grind them. In the Land of Redmond
-  where the shadows lie." -- The Silicon Valley Tarot
-  Henrique Holschuh
+	Arnd
