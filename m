@@ -1,73 +1,177 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu, 17 Mar 2016 15:24:31 +0000
-Subject: [PATCH 1/3] dt/bindings: bcm2835: add interrupt-names property
+Date: Thu, 17 Mar 2016 15:24:32 +0000
+Subject: [PATCH 2/3] dmaengine: bcm2835: use platform_get_irq_byname
 In-Reply-To: <1458228273-15591-1-git-send-email-kernel@martin.sperl.org>
 References: <1458228273-15591-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1458228273-15591-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1458228273-15591-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Added standard interrupt-names property so that
-platform_get_irq_byname() can get used to fetch the
-interrupt corresponding to each dma_channel
-instead of the current platform_get_irq() with
-an assumed ordering of the interrupts.
+Use platform_get_irq_byname to allow for correct mapping of
+interrupts to dma channels.
+
+The currently implemented device tree is unfortunately
+implemented with the wrong assumption, that each dma-channel
+has its own dma channel, but dma-irq 11 is handling
+dma-channel 11-14 and dma-irq 12 is actually a "catch all"
+interrupt.
+
+So here we use the byname variant and require that interrupts
+are explicitly named via the interrupts-name property in the
+device tree.
+
+The use of shared interrupts is also implemented.
+
+As a side-effect this means we can now use dma channels 12, 13 and 14
+in a correct manner - also testing shows that onl using
+channels 11 to 14 for spi and i2s works perfectly (when playing
+some video)
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- .../devicetree/bindings/dma/brcm,bcm2835-dma.txt   | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/dma/bcm2835-dma.c | 77 ++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 63 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-index 1396078..3035654 100644
---- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-@@ -12,6 +12,8 @@ Required properties:
- - reg: Should contain DMA registers location and length.
- - interrupts: Should contain the DMA interrupts associated
- 		to the DMA channels in ascending order.
-+- interrupt-names: Should contain the names of the interrupt
-+		   in the form "dmaXX".
- - #dma-cells: Must be <1>, the cell in the dmas property of the
- 		client device represents the DREQ number.
- - brcm,dma-channel-mask: Bit mask representing the channels
-@@ -34,13 +36,35 @@ dma: dma at 7e007000 {
- 		     <1 24>,
- 		     <1 25>,
- 		     <1 26>,
-+		     /* dma channel 11-14 share one irq */
- 		     <1 27>,
-+		     <1 27>,
-+		     <1 27>,
-+		     <1 27>,
-+		     /* unused shared irq for all channels */
- 		     <1 28>;
-+	interrupt-names = "dma0",
-+			  "dma1",
-+			  "dma2",
-+			  "dma3",
-+			  "dma4",
-+			  "dma5",
-+			  "dma6",
-+			  "dma7",
-+			  "dma8",
-+			  "dma9",
-+			  "dma10",
-+			  "dma11",
-+			  "dma12",
-+			  "dma13",
-+			  "dma14",
-+			  "dma-shared-all";
- 
- 	#dma-cells = <1>;
- 	brcm,dma-channel-mask = <0x7f35>;
- };
- 
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index cc771cd..9740151 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -46,6 +46,9 @@
+
+ #include "virt-dma.h"
+
++#define BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED 14
++#define BCM2835_DMA_CHAN_NAME_SIZE 8
 +
- DMA clients connected to the BCM2835 DMA controller must use the format
- described in the dma.txt file, using a two-cell specifier for each channel.
- 
--- 
+ struct bcm2835_dmadev {
+ 	struct dma_device ddev;
+ 	spinlock_t lock;
+@@ -81,6 +84,7 @@ struct bcm2835_chan {
+
+ 	void __iomem *chan_base;
+ 	int irq_number;
++	unsigned int irq_flags;
+
+ 	bool is_lite_channel;
+ };
+@@ -466,6 +470,15 @@ static irqreturn_t bcm2835_dma_callback(int irq, void *data)
+ 	struct bcm2835_desc *d;
+ 	unsigned long flags;
+
++	/* check the shared interrupt */
++	if (c->irq_flags & IRQF_SHARED) {
++		/* check if the interrupt is enabled */
++		flags = readl(c->chan_base + BCM2835_DMA_CS);
++		/* if not set then we are not the reason for the irq */
++		if (!(flags & BCM2835_DMA_INT))
++			return IRQ_NONE;
++	}
++
+ 	spin_lock_irqsave(&c->vc.lock, flags);
+
+ 	/* Acknowledge interrupt */
+@@ -506,8 +519,8 @@ static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
+ 		return -ENOMEM;
+ 	}
+
+-	return request_irq(c->irq_number,
+-			bcm2835_dma_callback, 0, "DMA IRQ", c);
++	return request_irq(c->irq_number, bcm2835_dma_callback,
++			   c->irq_flags, "DMA IRQ", c);
+ }
+
+ static void bcm2835_dma_free_chan_resources(struct dma_chan *chan)
+@@ -819,7 +832,8 @@ static int bcm2835_dma_terminate_all(struct dma_chan *chan)
+ 	return 0;
+ }
+
+-static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
++static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id,
++				 int irq, unsigned int irq_flags)
+ {
+ 	struct bcm2835_chan *c;
+
+@@ -834,6 +848,7 @@ static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
+ 	c->chan_base = BCM2835_DMA_CHANIO(d->base, chan_id);
+ 	c->ch = chan_id;
+ 	c->irq_number = irq;
++	c->irq_flags = irq_flags;
+
+ 	/* check in DEBUG register if this is a LITE channel */
+ 	if (readl(c->chan_base + BCM2835_DMA_DEBUG) &
+@@ -882,9 +897,11 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	void __iomem *base;
+ 	int rc;
+-	int i;
+-	int irq;
++	int i, j;
++	int irq[BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED + 1];
++	int irq_flags;
+ 	uint32_t chans_available;
++	char chan_name[BCM2835_DMA_CHAN_NAME_SIZE];
+
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+@@ -941,16 +958,48 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 		goto err_no_dma;
+ 	}
+
+-	for (i = 0; i < pdev->num_resources; i++) {
+-		irq = platform_get_irq(pdev, i);
+-		if (irq < 0)
+-			break;
+-
+-		if (chans_available & (1 << i)) {
+-			rc = bcm2835_dma_chan_init(od, i, irq);
+-			if (rc)
+-				goto err_no_dma;
++	/* get irqs for each channel that we support */
++	for (i = 0; i <= BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED; i++) {
++		/* skip masked out channels */
++		if (!(chans_available & (1 << i))) {
++			irq[i] = -1;
++			continue;
+ 		}
++
++		/* get the named irq */
++		snprintf(chan_name, sizeof(chan_name), "dma%i", i);
++		irq[i] = platform_get_irq_byname(pdev, chan_name);
++		if (irq[i] >= 0)
++			continue;
++
++		/* legacy device tree case handling */
++		dev_warn_once(&pdev->dev,
++			      "missing interrupts-names property in device tree - legacy interpretation is used");
++		/*
++		 * in case of channel >= 11
++		 * use the 11th interrupt and that is shared
++		 */
++		irq[i] = platform_get_irq(pdev, i < 11 ? i : 11);
++	}
++
++	/* get irqs for each channel */
++	for (i = 0; i <= BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED; i++) {
++		/* skip channels without irq */
++		if (irq[i] < 0)
++			continue;
++
++		/* check if there are other channels that also use this irq */
++		irq_flags = 0;
++		for (j = 0; j <= BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED; j++)
++			if ((i != j) && (irq[j] == irq[i])) {
++				irq_flags = IRQF_SHARED;
++				break;
++			}
++
++		/* initialize the channel */
++		rc = bcm2835_dma_chan_init(od, i, irq[i], irq_flags);
++		if (rc)
++			goto err_no_dma;
+ 	}
+
+ 	dev_dbg(&pdev->dev, "Initialized %i DMA channels\n", i);
+--
 2.1.4
