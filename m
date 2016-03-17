@@ -1,20 +1,21 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Mar 2016 12:19:47 -0500
-Subject: [PATCH v2 10/18] dt-bindings: Add PLX Technology OXNAS Standard
- Clocks bindings
-In-Reply-To: <1457519060-6038-11-git-send-email-narmstrong@baylibre.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-11-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160317171947.GA3294@rob-hp-laptop>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 17 Mar 2016 12:20:37 -0500
+Subject: [PATCH v4 2/4] ACPI: enable ACPI_SPCR_TABLE on ARM64
+In-Reply-To: <1456747355-15692-3-git-send-email-aleksey.makarov@linaro.org>
+References: <1456747355-15692-1-git-send-email-aleksey.makarov@linaro.org>
+ <1456747355-15692-3-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAOZdJXV1KWyguPw33C+EF12TBDsg5Ds4AX-40gVefkhHwddW2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 11:24:12AM +0100, Neil Armstrong wrote:
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../devicetree/bindings/clock/plxtech,stdclk.txt   | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+On Mon, Feb 29, 2016 at 6:02 AM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> SBBR mentions SPCR as a mandatory ACPI table.
+> So enable it for ARM64
+>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Tested-by: Timur Tabi <timur@codeaurora.org>
+
+I know another version of patch is coming, but I tested this version
+and it works.
