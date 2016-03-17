@@ -1,86 +1,85 @@
 From: majun258@huawei.com (MaJun)
-Date: Thu, 17 Mar 2016 16:34:00 +0800
-Subject: [PATCH v3 1/2] irqchip/mbigen:Change the mbigen node definition in dt
- binding file
+Date: Thu, 17 Mar 2016 16:34:01 +0800
+Subject: [PATCH v3 2/2] irqchip/mbigen:Change the mbigen driver based on the
+ new mbigen node definition.
 In-Reply-To: <1458203641-17172-1-git-send-email-majun258@huawei.com>
 References: <1458203641-17172-1-git-send-email-majun258@huawei.com>
-Message-ID: <1458203641-17172-2-git-send-email-majun258@huawei.com>
+Message-ID: <1458203641-17172-3-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-For mbigen module, there is a special case that more than one mbigen
-device nodes use the same reg definition in DTS when these devices
-exist in the same mbigen hardware module.
+In current mbigen driver, each mbigen device is initialized as a platform device.
+When these devices belong to same mbigen hardware module(chip), they use the
+same register definition in their device node and caused the problem of registers
+remapped repeatedly.
 
-In current mbigen driver, these mbigen devices definition as below:
-mbigen_dev1:intc_dev1 {
-	...
-	reg = <0x0 0xc0080000 0x0 0x10000>;
-	...
-};
-
-mbigen_dev2:intc_dev2 {
-	...
-	reg = <0x0 0xc0080000 0x0 0x10000>;
-	...
-};
-
-On this case, devm_ioremap_resource() returns fail with info
-"can't request region for resource" because of memory region check.
-
-To fix this problem, the mbigen node definition and
-structure are changed as Mark Rutland suggested in v1 patch[1].
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/403691.html
+Now, I try to initialize the mbigen module(chip) as a platform device and remap
+the register once to fix this problem.
 
 Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- .../interrupt-controller/hisilicon,mbigen-v2.txt   |   22 +++++++++++++++----
- 1 files changed, 17 insertions(+), 5 deletions(-)
+ drivers/irqchip/irq-mbigen.c |   30 +++++++++++++++++++++---------
+ 1 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-index 720f7c9..3b2f4c4 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
-@@ -21,6 +21,8 @@ Mbigen main node required properties:
- - reg: Specifies the base physical address and size of the Mbigen
-   registers.
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index 4dd3eb8..4d413bc 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -242,6 +242,8 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct irq_domain *domain;
+ 	u32 num_pins;
++	struct platform_device *child_pdev;
++	struct device_node *np;
  
-+Mbigen sub node required properties:
-+------------------------------------------
- - interrupt controller: Identifies the node as an interrupt controller
+ 	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
+ 	if (!mgn_chip)
+@@ -251,25 +253,35 @@ static int mbigen_device_probe(struct platform_device *pdev)
  
- - msi-parent: Specifies the MSI controller this mbigen use.
-@@ -45,13 +47,23 @@ Mbigen main node required properties:
- 
- Examples:
- 
--	mbigen_device_gmac:intc {
-+	mbigen_chip_dsa {
- 			compatible = "hisilicon,mbigen-v2";
- 			reg = <0x0 0xc0080000 0x0 0x10000>;
--			interrupt-controller;
--			msi-parent = <&its_dsa 0x40b1c>;
--			num-pins = <9>;
--			#interrupt-cells = <2>;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
 +
-+			mbigen_gmac:intc_gmac {
-+				interrupt-controller;
-+				msi-parent = <&its_dsa 0x40b1c>;
-+				num-pins = <9>;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			mbigen_i2c:intc_i2c {
-+				interrupt-controller;
-+				msi-parent = <&its_dsa 0x40b0e>;
-+				num-pins = <2>;
-+				#interrupt-cells = <2>;
-+			};
- 	};
+ 	if (IS_ERR(mgn_chip->base))
+ 		return PTR_ERR(mgn_chip->base);
  
- Devices connect to mbigen required properties:
+-	if (of_property_read_u32(pdev->dev.of_node, "num-pins", &num_pins) < 0) {
+-		dev_err(&pdev->dev, "No num-pins property\n");
+-		return -EINVAL;
+-	}
++	for_each_child_of_node(pdev->dev.of_node, np) {
++		if (!of_property_read_bool(np, "interrupt-controller"))
++			continue;
++
++		child_pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
++		if (IS_ERR(child_pdev))
++			return PTR_ERR(child_pdev);
++
++		if (of_property_read_u32(child_pdev->dev.of_node, "num-pins", &num_pins) < 0) {
++			dev_err(&pdev->dev, "No num-pins property\n");
++			return -EINVAL;
++		}
+ 
+-	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
++		domain = platform_msi_create_device_domain(&child_pdev->dev, num_pins,
+ 							mbigen_write_msg,
+ 							&mbigen_domain_ops,
+ 							mgn_chip);
+ 
+-	if (!domain)
+-		return -ENOMEM;
++		if (!domain)
++			return -ENOMEM;
+ 
+-	platform_set_drvdata(pdev, mgn_chip);
++		dev_info(&child_pdev->dev, "Allocated %d MSIs\n", num_pins);
++	}
+ 
+-	dev_info(&pdev->dev, "Allocated %d MSIs\n", num_pins);
++	platform_set_drvdata(pdev, mgn_chip);
+ 
+ 	return 0;
+ }
 -- 
 1.7.1
