@@ -1,54 +1,44 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Thu, 17 Mar 2016 16:43:48 +0100
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56EA77BC.2090702@huawei.com>
-References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
- <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
- <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
- <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
- <56E92AFC.9050208@huawei.com> <20160317065426.GA10315@js1304-P5Q-DELUXE>
- <56EA77BC.2090702@huawei.com>
-Message-ID: <56EAD0B4.2060807@suse.cz>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Thu, 17 Mar 2016 10:45:59 -0500
+Subject: [PATCH v5 3/6] ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and
+ eCAP hwmod entries
+In-Reply-To: <20160317150619.GA28105@rob-hp-laptop>
+References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
+ <1457400224-24797-4-git-send-email-fcooper@ti.com>
+ <20160317150619.GA28105@rob-hp-laptop>
+Message-ID: <56EAD137.1080502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2016 10:24 AM, Hanjun Guo wrote:
-> On 2016/3/17 14:54, Joonsoo Kim wrote:
->> On Wed, Mar 16, 2016 at 05:44:28PM +0800, Hanjun Guo wrote:
->>> On 2016/3/14 15:18, Joonsoo Kim wrote:
->>>> On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
->>>>> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
->>>>>> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
->>>>>>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
->>>>>>>
->>>>>>> How about something like this? Just and idea, probably buggy (off-by-one etc.).
->>>>>>> Should keep away cost from <pageblock_order iterations@the expense of the
->>>>>>> relatively fewer >pageblock_order iterations.
->>>>>> Hmm... I tested this and found that it's code size is a little bit
->>>>>> larger than mine. I'm not sure why this happens exactly but I guess it would be
->>>>>> related to compiler optimization. In this case, I'm in favor of my
->>>>>> implementation because it looks like well abstraction. It adds one
->>>>>> unlikely branch to the merge loop but compiler would optimize it to
->>>>>> check it once.
->>>>> I would be surprised if compiler optimized that to check it once, as
->>>>> order increases with each loop iteration. But maybe it's smart
->>>>> enough to do something like I did by hand? Guess I'll check the
->>>>> disassembly.
->>>> Okay. I used following slightly optimized version and I need to
->>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
->>>> to yours. Please consider it, too.
->>> Hmm, this one is not work, I still can see the bug is there after applying
->>> this patch, did I miss something?
->> I may find that there is a bug which was introduced by me some time
->> ago. Could you test following change in __free_one_page() on top of
->> Vlastimil's patch?
->>
->> -page_idx = pfn & ((1 << max_order) - 1);
->> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
->
-> I tested Vlastimil's patch + your change with stress for more than half hour, the bug
-> I reported is gone :)
 
-Oh, ok, will try to send proper patch, once I figure out what to write 
-in the changelog :)
+
+On 03/17/2016 10:06 AM, Rob Herring wrote:
+> On Mon, Mar 07, 2016 at 07:23:41PM -0600, Franklin S Cooper Jr wrote:
+>> Devices that utilize the OCP registers and/or PRCM registers and
+>> register bit fields should be modelled using hwmod. Since eQEP, ePWM and
+> s/modelled/modeled/
+
+Will fix.
+>
+>> eCAP don't fall under this category, remove their hwmod entries.
+>>
+>> Instead these clocks simply use the clock that is pass through by its
+>> parent PWMSS. Therefore, PWMSS handles the clock for itself and its
+>> subdevices.
+> Are you breaking compatibility with old DTs here? 
+
+No. The first patch makes sure that the ecap and ehrpwm get
+their clocks from their parent which is all they care about.
+Old dtbs will have hwmod entries for ecap and ehrpwm which
+will end up not doing anything.
+>  
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> ---
+>>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  1 -
+>>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  7 +-
+>>  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
+>>  .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 -----------------
+>>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 ----------------------
+>>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
+>>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 --------------
+>>  7 files changed, 4 insertions(+), 233 deletions(-)
