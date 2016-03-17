@@ -1,25 +1,25 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Mar 2016 11:09:03 +0900
-Subject: [PATCH v2 0/2] ARM: dts: r8a7793: add CAN to device tree
-In-Reply-To: <1458093176-1926-1-git-send-email-horms+renesas@verge.net.au>
-References: <1458093176-1926-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20160317020903.GA25402@verge.net.au>
+Date: Thu, 17 Mar 2016 11:14:05 +0900
+Subject: [PATCH] ARM: dts: lager: use generic pinctrl properties
+In-Reply-To: <CAMuHMdWqTCTF-Oy8iGME8JZsjt+GJMN87_XEH3Uhtxa-ymH2KQ@mail.gmail.com>
+References: <1458090189-25803-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWqTCTF-Oy8iGME8JZsjt+GJMN87_XEH3Uhtxa-ymH2KQ@mail.gmail.com>
+Message-ID: <20160317021404.GH17728@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 10:52:54AM +0900, Simon Horman wrote:
-> Hi,
+On Wed, Mar 16, 2016 at 09:56:24AM +0100, Geert Uytterhoeven wrote:
+> On Wed, Mar 16, 2016 at 2:03 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
+> > groups properties") renesas pfc drivers accept generic "function", "pins"
+> > and "groups" properties.
+> >
+> > This patch updates the lager device tree to use the generic
+> > rather than renesas-specific properties.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> this short series adds CAN clocks and nodes to the r8a7793 device tree.
-> 
-> I am not aware of an r8a7793 board that exposes CAN - the gose
-> board does not appear to - and thus am unsure of a way to test these changes.
-> However, they are based on what is present for the r8a7791 SoC and
-> I am unable to find a difference in the SoC documentation.
-> 
-> This series is similar to a series I posted for the r8a7794
-> earlier this week.
-> 
-> Based on renesas-devel-20160315-v4.5
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I have queued this up for v4.7.
+Thanks, I have queued this up as a cleanup for v4.7.
