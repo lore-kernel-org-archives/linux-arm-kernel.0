@@ -1,27 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Mar 2016 09:46:22 -0500
-Subject: [PATCH v3 7/8] Documentation: devicetree: rockchip: Document
- Landingship
-In-Reply-To: <1457294038-14243-8-git-send-email-afaerber@suse.de>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>
- <1457294038-14243-8-git-send-email-afaerber@suse.de>
-Message-ID: <20160317144622.GA16386@rob-hp-laptop>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Mar 2016 15:49:58 +0100
+Subject: [PATCH 10/17] pinctrl: Add PLX Technology OXNAS pinctrl and gpio
+ driver
+In-Reply-To: <56E9750B.2000800@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457005210-18485-11-git-send-email-narmstrong@baylibre.com>
+ <CACRpkdby7XmbK2ZpwX3zy5J=yr1HRbmfWVab3K0ArcL6wd=oyA@mail.gmail.com>
+ <56E9750B.2000800@baylibre.com>
+Message-ID: <CACRpkdbWZDpM5ctNkU5cRasaATjkoa_zrg_-xgnTpbYRZK2pXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 06, 2016 at 08:53:56PM +0100, Andreas F?rber wrote:
-> Use "geekbuying,geekbox-landingship" compatible string, plus those of
-> the GeekBox module.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v2 -> v3:
->  * Changed compatible string to include geekbox- (Heiko)
->    and clarify that this is for GeekBox module
->  
->  v2: New
->  
->  Documentation/devicetree/bindings/arm/rockchip.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+On Wed, Mar 16, 2016 at 4:00 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> I think I'll reboot over a clean base, could you give a reference driver I should follow ?
+> It's a very simple HW, it should be easy.
+
+I would look at those merged lately, which has pin control
+combined with GPIO and interrupts.
+
+drivers/pinctrl/qcom is good but supports quite a lot of
+subvariants so it may be hard to see what parts you really
+need. But I think of those as a very nice drivers.
+
+Yours,
+Linus Walleij
