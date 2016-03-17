@@ -1,42 +1,55 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Thu, 17 Mar 2016 22:34:58 +0300
-Subject: ARMv4 (not v4t) marked obsolete in gcc-6
-In-Reply-To: <56EAD8C4.2030506@foss.arm.com>
-References: <201603101013.04618.arnd@arndb.de> <56EAD8C4.2030506@foss.arm.com>
-Message-ID: <CALT56yO4mg3AtgASyo64G61w0tiztubyDRi0hSzn7km0jLLnew@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 17 Mar 2016 12:35:27 -0700
+Subject: [PATCH v2 1/5] printk/nmi: Generic solution for safe printk in NMI
+In-Reply-To: <20151204165744.GD20935@pathway.suse.cz>
+References: <1448622572-16900-2-git-send-email-pmladek@suse.com>
+ <201511271919.aEZuZKNe%fengguang.wu@intel.com>
+ <20151127153804.GC2648@pathway.suse.cz>
+ <alpine.LNX.2.00.1512020022460.32500@pobox.suse.cz>
+ <20151204165744.GD20935@pathway.suse.cz>
+Message-ID: <20160317123527.6346bce3284509849d061eaa@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-17 19:18 GMT+03:00 Ramana Radhakrishnan
-<ramana.radhakrishnan@foss.arm.com>:
->
->
->
-> On 10/03/16 09:13, Arnd Bergmann wrote:
->> I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
->> so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
->> we currenly support in the Linux kernel.
->>
->> The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
->> and it will be removed in the following release (gcc-7) one year later, unless someone
->> raises concerns over it.
->
-> Support for armv4 has been deprecated but not yet obsoleted. We'd like to remove support for it in a future release of the compiler which could be as early as GCC 7 depending on the feedback we receive over the coming weeks / months. Removing support for armv4 will allow us to assume interworking by default which helps in cleaning up and simplifying the ARM backend. Further no one is really testing support for anything earlier than v4t really in the GCC community. While we would like to be cautious about removing support for armv4 from the tools, we think 2016 is a good time to start asking questions around removing support for this in the backend of the compiler.
->
-> Folks building the kernel / applications that require armv4 support can continue using the linker option --fix-v4bx which should take care of the fixups. Ideally we would have liked to have removed support for v4 in binutils as well at some point of time in the future, but it appears as though there is a significant community of users who would like to build kernels / other apps for v4 based systems - thus I suspect that support will live for quite a while as it also keeps old assembler code going but ends up simplifying the compiler code base.
->
-> In terms of registering opinions on keeping support for armv4 going, we'd prefer folks to discuss these with posts onto gcc at gcc.gnu.org describing their reasons for the same. There is a maintenance cost on keeping support for this going as there is a quite a bit of special casing for interworking vs non-interworking targets that we would like to clean up in the future once support goes out. At this point of time I haven't seen any good reasons to keep support going for armv4 in the *compiler*, since the linker option is available.
+On Fri, 4 Dec 2015 17:57:44 +0100 Petr Mladek <pmladek@suse.com> wrote:
 
-Removing armv4 support means also removing -mtune support for those
-chips (I'm especially concerned about strongarm1100).
-Would it be possible to remove armv4 support, but leave performance
-settings/tunings intact?
+> On Wed 2015-12-02 00:24:49, Jiri Kosina wrote:
+> > On Fri, 27 Nov 2015, Petr Mladek wrote:
+> > 
+> > > MN10300 has its own implementation for entering and exiting NMI 
+> > > handlers. It does not call nmi_enter() and nmi_exit(). Please, find 
+> > > below an updated patch that adds printk_nmi_enter() and 
+> > > printk_nmi_exit() to the custom entry points. Then we could add HAVE_NMI 
+> > > to arch/mn10300/Kconfig and avoid the above warning.
+> > 
+> > Hmm, so what exactly would go wrong if MN10300 (whatever that architecture 
+> > is) would call nmi_enter() and nmi_exit() at the places where it's 
+> > starting and finishing NMI handler?
+> > 
+> > >From a cursory look, it seems like most (if not all) of the things called 
+> > from nmi_{enter,exit}() would be nops there anyway.
+> 
+> Good point. Max mentioned in the other main that the NMI handler
+> should follow the NMI ruler. I do not why it could not work.
+> In fact, it might improve things, e.g. nmi_enter() blocks
+> recursive NMIs.
+> 
+> I think that it will move it into a separate patch, thought.
+> 
 
-Regarding testing. We have a small community doing system builds for
-SA1100/SA1110 chips,
-if that matters.
+I've sort of lost the plot on this patchset.
 
+I know Daniel had concerns (resolved?).  Sergey lost the ability to
+perform backtraces and has a proposed fix ("printk/nmi: restore
+printk_func in nmi_panic") but that wasn't fully resolved and I didn't
+merge anything.  I'm not sure what Jan's thinking is on it all.
 
--- 
-With best wishes
-Dmitry
+So... I'll retain 
+
+printk-nmi-generic-solution-for-safe-printk-in-nmi.patch
+printk-nmi-use-irq-work-only-when-ready.patch
+printk-nmi-warn-when-some-message-has-been-lost-in-nmi-context.patch
+printk-nmi-increase-the-size-of-nmi-buffer-and-make-it-configurable.patch
+
+in -mm for now.  Perhaps I should drop them all and we start again
+after -rc1?
