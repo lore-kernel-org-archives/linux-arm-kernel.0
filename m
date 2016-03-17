@@ -1,62 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Mar 2016 16:52:55 +0100
-Subject: [PATCH] usb: chipidea: Configure DMA properties and ops from DT
-In-Reply-To: <20160314105108.GB2131@shlinux2.ap.freescale.net>
-References: <1456119133-16114-1-git-send-email-bjorn.andersson@linaro.org>
- <CADRPPNRTXiiVzbqmpX7h_af7Q+qw+-ZB3zDb0855a1U=CmWh-A@mail.gmail.com>
- <20160314105108.GB2131@shlinux2.ap.freescale.net>
-Message-ID: <3240370.XdEELlSA8f@wuerfel>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Thu, 17 Mar 2016 10:53:57 -0500
+Subject: [PATCH v5 6/6] ARM: dts: DRA7: Add dt nodes for PWMSS
+In-Reply-To: <20160317151147.GA29802@rob-hp-laptop>
+References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
+ <1457400224-24797-7-git-send-email-fcooper@ti.com>
+ <20160317151147.GA29802@rob-hp-laptop>
+Message-ID: <56EAD315.1030307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 March 2016 18:51:08 Peter Chen wrote:
-> On Wed, Mar 09, 2016 at 05:16:50PM -0600, Li Yang wrote:
-> > On Tue, Mar 8, 2016 at 9:40 PM, Bjorn Andersson
-> > <bjorn.andersson@linaro.org> wrote:
-> > > On Tue, Mar 8, 2016 at 11:52 AM, Li Yang <leoli@freescale.com> wrote:
-> > >> On Wed, Mar 2, 2016 at 4:59 PM, Li Yang <leoli@freescale.com> wrote:
-> > >>> On Mon, Feb 22, 2016 at 4:07 PM, Bjorn Andersson
-> > >>> <bjorn.andersson@linaro.org> wrote:
-> > >>>> On Mon 22 Feb 02:03 PST 2016, Srinivas Kandagatla wrote:
-> > >
-> > > I had the chance to go through this with Arnd and the verdict is that
-> > > devices not described in DT should not do DMA (or allocate buffers for
-> > > doing DMA).
-> > >
-> > > So I believe the solution is to fall back on Peter's description; the
-> > > chipidea driver is the core driver and the Qualcomm code should just
-> > > be a platform layer.
-> > >
-> > > My suggestion is that we turn the chipidea core into a set of APIs
-> > > that can called by the platform specific pieces. That way we will have
-> > > the chipidea core be the device described in the DT.
-> > 
-> > But like I said, this problem is not just existing for chipidea
-> > driver.  We already found that the dwc3 driver is also suffering from
-> > the same issue.  I don't know how many other drivers are impacted by
-> > this change, but I suspect there will be some. A grep of
-> > platform_device_add() in driver/ directory returns many possible
-> > drivers to be impacted.  As far as I know, the
-> > drivers/net/ethernet/freescale/fman/mac.c is registering child
-> > ethernet devices that definitely will do dma.   If you want to do this
-> > kind of rework to all these drivers, it will be a really big effort.
-> > 
-> 
-> +1
-> 
-> Yes, I think this DMA things should be covered by driver core too.
-> 
 
-I don't think it's a very widespread problem, there are only very few
-developers that intentionally use this method, and some use the
-platform_device_register_full() call to create a device with a known
-mask, which is generally ok for the limited case where the driver
-is only ever going to run on a single platform, but not in the
-more general case that of_dma_configure is designed to handle.
 
-I think we should fix the drivers to consistently use the device
-that was created by the platform (DT or ACPI or board file)
-to pass that into the DMA API, anything else will just cause
-more subtle bugs.
+On 03/17/2016 10:11 AM, Rob Herring wrote:
+> On Mon, Mar 07, 2016 at 07:23:44PM -0600, Franklin S Cooper Jr wrote:
+>> From: Vignesh R <vigneshr@ti.com>
+>>
+>> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
+>> for dt bindings.
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> [fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> ---
+>> Version 5 changes:
+>> Add DT node for eCAP and update eCAP binding documentation
+>>
+>> Version 4 changes:
+>> Updated link to the latest documentation
+>>
+>>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
+>>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
+>>  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
+>>  arch/arm/boot/dts/dra7.dtsi                        | 84 ++++++++++++++++++++++
+>>  4 files changed, 116 insertions(+), 1 deletion(-)
+>
+>> +			ehrpwm1: pwm at 48440200 {
+>> +				compatible = "ti,dra7xx-ehrpwm",
+>> +					     "ti,am33xx-ehrpwm";
+>> +				#pwm-cells = <3>;
+>> +				reg = <0x48440200 0x80>;
+>> +				clocks = <&ehrpwm1_tbclk>;
+>> +				clock-names = "tbclk";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			ecap1: ecap at 48440100 {
+> This also is a PWM? Then it should also be pwm at ...
 
-	Arnd
+The enhanced capture module primary purpose is to measure
+time between external signals which is called capture mode.
+It also has a PWM mode. So I wouldn't recommend generalizing
+the entire node to pwm.
+>
+>> +				compatible = "ti,dra7xx-ecap",
+>> +					     "ti,am33xx-ecap";
+>> +				#pwm-cells = <3>;
+>> +				reg = <0x48440100 0x80>;
+>> +				status = "disabled";
+>> +			};
+>> +		};
+>> +
+>> +		epwmss2: epwmss at 48442000 {
+>> +			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
+>> +			reg = <0x48442000 0x30>;
+>> +			ti,hwmods = "epwmss2";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			status = "disabled";
+>> +			ranges;
+>> +
+>> +			ehrpwm2: pwm at 48442200 {
+>> +				compatible = "ti,dra7xx-ehrpwm",
+>> +					     "ti,am33xx-ehrpwm";
+>> +				#pwm-cells = <3>;
+>> +				reg = <0x48442200 0x80>;
+>> +				clocks = <&ehrpwm2_tbclk>;
+>> +				clock-names = "tbclk";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			ecap2: ecap at 48442100 {
+> And here.
+>
+>> +				compatible = "ti,dra7xx-ecap",
+>> +					     "ti,am33xx-ecap";
+>> +				#pwm-cells = <3>;
+>> +				reg = <0x48442100 0x80>;
+>> +				status = "disabled";
+>> +			};
+>> +		};
+>>  	};
+>>  
+>>  	thermal_zones: thermal-zones {
+>> -- 
+>> 2.7.0
+>>
