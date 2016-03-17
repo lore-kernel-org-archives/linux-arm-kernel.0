@@ -1,43 +1,37 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 17 Mar 2016 18:14:33 +0100
-Subject: [PATCH v5 3/5] ARM: at91: pm: configure PMC fast startup signals
-In-Reply-To: <1458111489-23774-4-git-send-email-wenyou.yang@atmel.com>
-References: <1458111489-23774-1-git-send-email-wenyou.yang@atmel.com>
- <1458111489-23774-4-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160317171433.GD2831@piout.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 12:15:07 -0500
+Subject: [PATCH v2 04/18] dt-bindings: irq: arm,versatile-fpga: add
+ arm,rps-irq compatible string
+In-Reply-To: <1457519060-6038-5-git-send-email-narmstrong@baylibre.com>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
+ <1457519060-6038-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160317171507.GA31679@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/2016 at 14:58:07 +0800, Wenyou Yang wrote :
-> The fast startup signal is used as wake up sources for ULP1 mode.
-> As soon as a fast startup signal is asserted, the embedded 12 MHz
-> RC oscillator restarts automatically.
+On Wed, Mar 09, 2016 at 11:24:06AM +0100, Neil Armstrong wrote:
+> Under the OX810SE, this same controller is used as "Reference Peripheral
+> Specification" Interrupt Controller, so add new compatible string.
 > 
-> This patch is to configure the fast startup signals, which signal
-> is enabled to trigger the PMC to wake up the system from ULP1 mode
-> should be configured via the DT.
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
+> index c9cf605..2fe78d5 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
+> @@ -6,7 +6,7 @@ controllers are OR:ed together and fed to the CPU tile's IRQ input. Each
+>  instance can handle up to 32 interrupts.
+>  
+>  Required properties:
+> -- compatible: "arm,versatile-fpga-irq"
+> +- compatible: "arm,versatile-fpga-irq" or "arm,rps-irq"
 
-I would actually avoid doing that from the PMC driver and do that
-configuration from the aic5 driver. It has all the information you need,
-it knows what kind of level or edge is needed to wake up and what are
-the wakeup interrupts to enable. This will allow you to stop introducing
-a new binding. Also, this will avoid discrepancies between what is
-configured in the DT and what the user really wants (for exemple
-differences between the edge direction configured for the PIOBu in
-userspace versus what is in the device tree or wakeonlan
-activation/deactivation).
+Use a compatible string that reflects the actual implementation not a 
+spec. The current string is a bad example as it already refers to 
+multiple implementations.
 
-You can get the PMC syscon from irq-atmel-aic5.c and then use a table to
-map the hwirq to the offset in PMC_FSMR. Use it in aic5_set_type to set
-the polarity and then in aic5_suspend to enable the wakeup.
-
-Maybe we could even go further and avoid ulp1 if no ulp1 compatbile
-wakeup sources are defined but there are ulp0 wakeup sources.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Rob
