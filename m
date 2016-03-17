@@ -1,200 +1,88 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 17 Mar 2016 10:21:34 +0100
-Subject: [PATCH 1/2] crypto: marvell/cesa - fix memory leak
-Message-ID: <1458206495-11369-1-git-send-email-boris.brezillon@free-electrons.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 17 Mar 2016 17:24:12 +0800
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <20160317065426.GA10315@js1304-P5Q-DELUXE>
+References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
+ <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
+ <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
+ <56E92AFC.9050208@huawei.com> <20160317065426.GA10315@js1304-P5Q-DELUXE>
+Message-ID: <56EA77BC.2090702@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Crypto requests are not guaranteed to be finalized (->final() call),
-and can be freed at any moment, without getting any notification from
-the core. This can lead to memory leaks of the ->cache buffer.
+On 2016/3/17 14:54, Joonsoo Kim wrote:
+> On Wed, Mar 16, 2016 at 05:44:28PM +0800, Hanjun Guo wrote:
+>> On 2016/3/14 15:18, Joonsoo Kim wrote:
+>>> On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
+>>>> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
+>>>>> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
+>>>>>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
+>>>>>>
+>>>>>> How about something like this? Just and idea, probably buggy (off-by-one etc.).
+>>>>>> Should keep away cost from <pageblock_order iterations@the expense of the
+>>>>>> relatively fewer >pageblock_order iterations.
+>>>>> Hmm... I tested this and found that it's code size is a little bit
+>>>>> larger than mine. I'm not sure why this happens exactly but I guess it would be
+>>>>> related to compiler optimization. In this case, I'm in favor of my
+>>>>> implementation because it looks like well abstraction. It adds one
+>>>>> unlikely branch to the merge loop but compiler would optimize it to
+>>>>> check it once.
+>>>> I would be surprised if compiler optimized that to check it once, as
+>>>> order increases with each loop iteration. But maybe it's smart
+>>>> enough to do something like I did by hand? Guess I'll check the
+>>>> disassembly.
+>>> Okay. I used following slightly optimized version and I need to
+>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
+>>> to yours. Please consider it, too.
+>> Hmm, this one is not work, I still can see the bug is there after applying
+>> this patch, did I miss something?
+> I may find that there is a bug which was introduced by me some time
+> ago. Could you test following change in __free_one_page() on top of
+> Vlastimil's patch?
+>
+> -page_idx = pfn & ((1 << max_order) - 1);
+> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
 
-Make this buffer part of the request object, and allocate an extra buffer
-from the DMA cache pool when doing DMA operations.
+I tested Vlastimil's patch + your change with stress for more than half hour, the bug
+I reported is gone :)
 
-As a side effect, this patch also fixes another bug related to cache
-allocation and DMA operations. When the core allocates a new request and
-import an existing state, a cache buffer can be allocated (depending
-on the state). The problem is, at that very moment, we don't know yet
-whether the request will use DMA or not, and since everything is
-likely to be initialized to zero, mv_cesa_ahash_alloc_cache() thinks it
-should allocate a buffer for standard operation. But when
-mv_cesa_ahash_free_cache() is called, req->type has been set to
-CESA_DMA_REQ in the meantime, thus leading to an invalind dma_pool_free()
-call (the buffer passed in argument has not been allocated from the pool).
+I have some questions, Joonsoo, you provided a patch as following:
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/crypto/marvell/cesa.h |  3 +-
- drivers/crypto/marvell/hash.c | 86 +++++++++----------------------------------
- 2 files changed, 20 insertions(+), 69 deletions(-)
-
-diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
-index bd985e7..74071e4 100644
---- a/drivers/crypto/marvell/cesa.h
-+++ b/drivers/crypto/marvell/cesa.h
-@@ -588,6 +588,7 @@ struct mv_cesa_ahash_dma_req {
- 	struct mv_cesa_tdma_req base;
- 	u8 *padding;
- 	dma_addr_t padding_dma;
-+	u8 *cache;
- 	dma_addr_t cache_dma;
- };
+diff --git a/mm/cma.c b/mm/cma.c
+index 3a7a67b..952a8a3 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -448,7 +448,10 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
  
-@@ -609,7 +610,7 @@ struct mv_cesa_ahash_req {
- 		struct mv_cesa_ahash_std_req std;
- 	} req;
- 	struct mv_cesa_op_ctx op_tmpl;
--	u8 *cache;
-+	u8 cache[CESA_MAX_HASH_BLOCK_SIZE];
- 	unsigned int cache_ptr;
- 	u64 len;
- 	int src_nents;
-diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-index 683cca9..f07c1fa 100644
---- a/drivers/crypto/marvell/hash.c
-+++ b/drivers/crypto/marvell/hash.c
-@@ -45,69 +45,25 @@ mv_cesa_ahash_req_iter_next_op(struct mv_cesa_ahash_dma_iter *iter)
- 	return mv_cesa_req_dma_iter_next_op(&iter->base);
- }
+        VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
  
--static inline int mv_cesa_ahash_dma_alloc_cache(struct mv_cesa_ahash_req *creq,
--						gfp_t flags)
-+static inline int
-+mv_cesa_ahash_dma_alloc_cache(struct mv_cesa_ahash_dma_req *req, gfp_t flags)
- {
--	struct mv_cesa_ahash_dma_req *dreq = &creq->req.dma;
--
--	creq->cache = dma_pool_alloc(cesa_dev->dma->cache_pool, flags,
--				     &dreq->cache_dma);
--	if (!creq->cache)
--		return -ENOMEM;
--
--	return 0;
--}
--
--static inline int mv_cesa_ahash_std_alloc_cache(struct mv_cesa_ahash_req *creq,
--						gfp_t flags)
--{
--	creq->cache = kzalloc(CESA_MAX_HASH_BLOCK_SIZE, flags);
--	if (!creq->cache)
-+	req->cache = dma_pool_alloc(cesa_dev->dma->cache_pool, flags,
-+				    &req->cache_dma);
-+	if (!req->cache)
- 		return -ENOMEM;
- 
- 	return 0;
- }
- 
--static int mv_cesa_ahash_alloc_cache(struct ahash_request *req)
--{
--	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
--	gfp_t flags = (req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP) ?
--		      GFP_KERNEL : GFP_ATOMIC;
--	int ret;
--
--	if (creq->cache)
--		return 0;
--
--	if (creq->req.base.type == CESA_DMA_REQ)
--		ret = mv_cesa_ahash_dma_alloc_cache(creq, flags);
--	else
--		ret = mv_cesa_ahash_std_alloc_cache(creq, flags);
--
--	return ret;
--}
--
--static inline void mv_cesa_ahash_dma_free_cache(struct mv_cesa_ahash_req *creq)
--{
--	dma_pool_free(cesa_dev->dma->cache_pool, creq->cache,
--		      creq->req.dma.cache_dma);
--}
--
--static inline void mv_cesa_ahash_std_free_cache(struct mv_cesa_ahash_req *creq)
--{
--	kfree(creq->cache);
--}
--
--static void mv_cesa_ahash_free_cache(struct mv_cesa_ahash_req *creq)
-+static inline void
-+mv_cesa_ahash_dma_free_cache(struct mv_cesa_ahash_dma_req *req)
- {
--	if (!creq->cache)
-+	if (!req->cache)
- 		return;
- 
--	if (creq->req.base.type == CESA_DMA_REQ)
--		mv_cesa_ahash_dma_free_cache(creq);
--	else
--		mv_cesa_ahash_std_free_cache(creq);
--
--	creq->cache = NULL;
-+	dma_pool_free(cesa_dev->dma->cache_pool, req->cache,
-+		      req->cache_dma);
- }
- 
- static int mv_cesa_ahash_dma_alloc_padding(struct mv_cesa_ahash_dma_req *req,
-@@ -146,6 +102,7 @@ static inline void mv_cesa_ahash_dma_cleanup(struct ahash_request *req)
- 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
- 
- 	dma_unmap_sg(cesa_dev->dev, req->src, creq->src_nents, DMA_TO_DEVICE);
-+	mv_cesa_ahash_dma_free_cache(&creq->req.dma);
- 	mv_cesa_dma_cleanup(&creq->req.dma.base);
- }
- 
-@@ -161,8 +118,6 @@ static void mv_cesa_ahash_last_cleanup(struct ahash_request *req)
- {
- 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
- 
--	mv_cesa_ahash_free_cache(creq);
--
- 	if (creq->req.base.type == CESA_DMA_REQ)
- 		mv_cesa_ahash_dma_last_cleanup(req);
- }
-@@ -445,14 +400,6 @@ static inline int mv_cesa_ahash_cra_init(struct crypto_tfm *tfm)
- static int mv_cesa_ahash_cache_req(struct ahash_request *req, bool *cached)
- {
- 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
--	int ret;
--
--	if (((creq->cache_ptr + req->nbytes) & CESA_HASH_BLOCK_SIZE_MSK) &&
--	    !creq->last_req) {
--		ret = mv_cesa_ahash_alloc_cache(req);
--		if (ret)
--			return ret;
--	}
- 
- 	if (creq->cache_ptr + req->nbytes < 64 && !creq->last_req) {
- 		*cached = true;
-@@ -505,10 +452,17 @@ mv_cesa_ahash_dma_add_cache(struct mv_cesa_tdma_chain *chain,
- 			    gfp_t flags)
- {
- 	struct mv_cesa_ahash_dma_req *ahashdreq = &creq->req.dma;
-+	int ret;
- 
- 	if (!creq->cache_ptr)
- 		return 0;
- 
-+	ret = mv_cesa_ahash_dma_alloc_cache(ahashdreq, flags);
-+	if (ret)
-+		return ret;
++ mutex_lock(&cma_mutex);
+        free_contig_range(pfn, count);
++ mutex_unlock(&cma_mutex);
 +
-+	memcpy(ahashdreq->cache, creq->cache, creq->cache_ptr);
-+
- 	return mv_cesa_dma_add_data_transfer(chain,
- 					     CESA_SA_DATA_SRAM_OFFSET,
- 					     ahashdreq->cache_dma,
-@@ -848,10 +802,6 @@ static int mv_cesa_ahash_import(struct ahash_request *req, const void *hash,
- 	if (!cache_ptr)
- 		return 0;
+        cma_clear_bitmap(cma, pfn, count);
+        trace_cma_release(pfn, pages, count);
  
--	ret = mv_cesa_ahash_alloc_cache(req);
--	if (ret)
--		return ret;
--
- 	memcpy(creq->cache, cache, cache_ptr);
- 	creq->cache_ptr = cache_ptr;
- 
--- 
-2.5.0
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 7f32950..68ed5ae 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1559,7 +1559,8 @@ void free_hot_cold_page(struct page *page, bool cold)
+         * excessively into the page allocator
+         */
+        if (migratetype >= MIGRATE_PCPTYPES) {
+-           if (unlikely(is_migrate_isolate(migratetype))) {
++         if (is_migrate_cma(migratetype) ||
++             unlikely(is_migrate_isolate(migratetype))) {
+                        free_one_page(zone, page, pfn, 0, migratetype);
+                        goto out;
+                }
+
+This patch also works to fix the bug, why not just use this one? is there
+any side effects for this patch? maybe there is performance issue as the
+mutex lock is used, any other issues?
+
+Thanks
+Hanjun
