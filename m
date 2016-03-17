@@ -1,35 +1,52 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Mar 2016 10:06:19 -0500
-Subject: [PATCH v5 3/6] ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and
- eCAP hwmod entries
-In-Reply-To: <1457400224-24797-4-git-send-email-fcooper@ti.com>
-References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
- <1457400224-24797-4-git-send-email-fcooper@ti.com>
-Message-ID: <20160317150619.GA28105@rob-hp-laptop>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 17 Mar 2016 15:07:10 +0000
+Subject: [PATCH] MAINTAINERS: Add the stlinux kernel mailing list for the
+ STi drm driver.
+In-Reply-To: <20160317132622.GB13692@x1>
+References: <1458213210-13873-1-git-send-email-peter.griffin@linaro.org>
+ <20160317132622.GB13692@x1>
+Message-ID: <20160317150710.GA26662@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 07:23:41PM -0600, Franklin S Cooper Jr wrote:
-> Devices that utilize the OCP registers and/or PRCM registers and
-> register bit fields should be modelled using hwmod. Since eQEP, ePWM and
+Hi Lee,
 
-s/modelled/modeled/
+On Thu, 17 Mar 2016, Lee Jones wrote:
 
-> eCAP don't fall under this category, remove their hwmod entries.
+> On Thu, 17 Mar 2016, Peter Griffin wrote:
 > 
-> Instead these clocks simply use the clock that is pass through by its
-> parent PWMSS. Therefore, PWMSS handles the clock for itself and its
-> subdevices.
+> > Most drivers for STi are under the ARM/STI Architecture section which
+> > includes this mailing list.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  MAINTAINERS | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 6ee06ea..c541a89 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -3814,6 +3814,7 @@ DRM DRIVERS FOR STI
+> >  M:	Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> >  M:	Vincent Abriou <vincent.abriou@st.com>
+> >  L:	dri-devel at lists.freedesktop.org
+> > +L:	kernel at stlinux.com
+> >  T:	git http://git.linaro.org/people/benjamin.gaignard/kernel.git
+> >  S:	Maintained
+> >  F:	drivers/gpu/drm/sti
+> 
+> Doesn't it make more sense to add drivers/gpu/drm/sti/ to the ARM/STI
+> ARCHITECTURE list of supported files?
 
-Are you breaking compatibility with old DTs here? 
- 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  1 -
->  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  7 +-
->  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
->  .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 -----------------
->  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 ----------------------
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 --------------
->  7 files changed, 4 insertions(+), 233 deletions(-)
+I assumed Vincent and Benjamin deliberately added a new entry because they
+want to be maintainers of this driver (which I think probably makes sense given
+that the display IP is quite complicated).
+
+Not seeing these patches on kernel at stlinux.com list though has caught me out,
+especially recent changes applied to the firmware loading mechanism in drm/sti which
+also need similar changes in c8sectpfe and fdma drivers.
+
+regards,
+
+Peter.
