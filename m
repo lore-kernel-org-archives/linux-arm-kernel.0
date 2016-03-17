@@ -1,47 +1,24 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 17 Mar 2016 09:49:51 -0500
-Subject: [PATCH] Revert "arm64: Increase the max granular size"
-In-Reply-To: <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
-References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
- <20160316100759.GA18387@arm.com> <56E95A4E.4050709@codeaurora.org>
- <20160316141802.GC13423@e104818-lin.cambridge.arm.com>
- <56E97B10.4050401@codeaurora.org>
- <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
-Message-ID: <56EAC40F.1080504@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Mar 2016 15:51:15 +0100
+Subject: [PATCH v4 01/13] pinctrl: sunxi: Add A83T R_PIO controller
+In-Reply-To: <1458144276-31108-2-git-send-email-vishnupatekar0510@gmail.com>
+References: <1458144276-31108-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1458144276-31108-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <CACRpkdaFekCnRKoYQ=Fq1LT0FcH7RobwkLi_G1YfXJAb=4RTHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas wrote:
->> >Yes, that's exactly it.  Ours is an ACPI system, and so we have to have our
->> >own defconfig for now.  We're holding off on pushing our own defconfig
->> >changes (enabling drivers, etc) until ACPI is enabled in
->> >arch/arm64/configs/defconfig.
+On Wed, Mar 16, 2016 at 5:04 PM, Vishnu Patekar
+<vishnupatekar0510@gmail.com> wrote:
 
-> Is there anything that prevents you from providing a dtb/dts for this
-> SoC?
+> The A83T has R_PIO pin controller, it's same as A23, execpt A83T
+> interrupt bit is 6th and A83T has one extra pin PL12.
+>
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-We don't have a boot loader capable of passing a device tree to the 
-kernel.  It's an ARM Server chip.  It doesn't do device tree.  It's 100% 
-ACPI.  We boot with UEFI that configures the system and generates ACPI 
-tables.
+I think I already merged this?
 
-I just want to make this crystal clear, because it comes up every now 
-and then.  The QDF2432 is an ACPI-only SOC with no device tree support 
-whatsoever.  Zero.  Zip.  Nada.  It's not an option.
-
-Keep in mind that on an ACPI system like ours, the boot loader (UEFI in 
-our case) configures the system extensively.  It does a lot of things 
-that the kernel would normally do on a device tree system.  For example, 
-pin control is handled completely by UEFI.  The kernel does not set the 
-pin muxes or GPIO directions.  That means we don't support dynamic pin 
-muxing.  Before the kernel is booted, the GPIO pins are fixed.
-
-We're not going to create an entire device tree from scratch for this 
-chip, and then make the extensive modifications necessary to our boot 
-loader for parsing and modifying that device tree.  That would take 
-months of work, and it would be all throw-away code.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Yours,
+Linus Walleij
