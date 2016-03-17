@@ -1,36 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Mar 2016 18:11:57 +0100
-Subject: [v6, 3/5] dt: move guts devicetree doc out of powerpc directory
-In-Reply-To: <20160317170640.GB21009@rob-hp-laptop>
-References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
- <1457518131-11339-4-git-send-email-yangbo.lu@nxp.com>
- <20160317170640.GB21009@rob-hp-laptop>
-Message-ID: <4107975.rId64mooHz@wuerfel>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 17 Mar 2016 12:14:18 -0500
+Subject: [PATCH v4] irqchip/gicv3-its: Don't allow devices whose ID is
+ outside range
+In-Reply-To: <56EACE85.4090603@arm.com>
+References: <1458227925-21952-1-git-send-email-shankerd@codeaurora.org>
+ <56EACE85.4090603@arm.com>
+Message-ID: <56EAE5EA.2060300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 March 2016 12:06:40 Rob Herring wrote:
-> > diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt b/Documentation/devicetree/bindings/soc/fsl/guts.txt
-> > similarity index 91%
-> > rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
-> > rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
-> > index b71b203..07adca9 100644
-> > --- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
-> > +++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
-> > @@ -25,6 +25,9 @@ Recommended properties:
-> >   - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
-> >     registers, for those SOCs that have a PAMU device.
-> >  
-> > + - little-endian : Indicates that the global utilities block is little
-> > +   endian. The default is big endian.
-> 
-> The default is "the native endianness of the system".
+Hi Marc,
 
-This may be what is currently documented, but not what we are doing
-in practice, as there is no "native endianess" for either PowerPC or
-ARM -- both allow running big-endian or little-endian kernels and the
-device registers are fixed.
+Sorry, absolutely It was my mistake sending the same patch second time.
 
-I think the property here is fine.
+On 03/17/2016 10:34 AM, Marc Zyngier wrote:
+> On 17/03/16 15:18, Shanker Donthineni wrote:
+>> We are not checking whether the requested device identifier fits into
+>> the device table memory or not. The function its_create_device()
+>> assumes that enough memory has been allocated for whole DevID space
+>> (reported by ITS_TYPER.Devbits) during the ITS probe() and continues
+>> to initialize ITS hardware.
+>>
+>> This assumption is not perfect, sometimes we reduce memory size either
+>> because of its size crossing MAX_ORDER-1 or BASERn max size limit. The
+>> MAPD command fails if 'Device ID' is outside of device table range.
+>>
+>> Add a simple validation check to avoid MAPD failures since we are
+>> not handling ITS command errors. This change also helps to return an
+>> error -ENOMEM instead of success to caller.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Is there any difference between this patch and the one you posted on
+> March 10th?
+>
+> Thanks,
+>
+> 	M.
 
-	Arnd
+-- 
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
