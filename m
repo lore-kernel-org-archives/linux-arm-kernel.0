@@ -1,30 +1,24 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 17 Mar 2016 11:13:30 +0000
-Subject: [PATCH] MAINTAINERS: Add the stlinux kernel mailing list for the STi
- drm driver.
-Message-ID: <1458213210-13873-1-git-send-email-peter.griffin@linaro.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 17 Mar 2016 19:13:31 +0800
+Subject: [PATCH] crypto: marvell/cesa - forward devm_ioremap_resource()
+ error code
+In-Reply-To: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160317111331.GB5658@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most drivers for STi are under the ARM/STI Architecture section which
-includes this mailing list.
+On Thu, Mar 17, 2016 at 10:47:10AM +0100, Boris Brezillon wrote:
+> Forward devm_ioremap_resource() error code instead of returning
+> -ENOMEM.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Fixes: f63601fd616a ("crypto: marvell/cesa - add a new driver for Marvell's CESA")
+> Cc: <stable@vger.kernel.org> # 4.2+
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6ee06ea..c541a89 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3814,6 +3814,7 @@ DRM DRIVERS FOR STI
- M:	Benjamin Gaignard <benjamin.gaignard@linaro.org>
- M:	Vincent Abriou <vincent.abriou@st.com>
- L:	dri-devel at lists.freedesktop.org
-+L:	kernel at stlinux.com
- T:	git http://git.linaro.org/people/benjamin.gaignard/kernel.git
- S:	Maintained
- F:	drivers/gpu/drm/sti
+All three patches applied.  Thanks.
 -- 
-1.9.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
