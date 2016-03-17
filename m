@@ -1,44 +1,61 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 17 Mar 2016 10:45:59 -0500
-Subject: [PATCH v5 3/6] ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and
- eCAP hwmod entries
-In-Reply-To: <20160317150619.GA28105@rob-hp-laptop>
-References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
- <1457400224-24797-4-git-send-email-fcooper@ti.com>
- <20160317150619.GA28105@rob-hp-laptop>
-Message-ID: <56EAD137.1080502@ti.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 17 Mar 2016 11:50:29 -0400
+Subject: [PATCH] arm64: dma-mapping: fix dma_to_phys API for IOMMU attached
+ devices
+Message-ID: <1458229833-4886-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch modifies dma_to_phys to call iommu_iova_to_phys to perform dma
+to phys conversions for IOMMU attached devices where dma and physical
+addresses often have distinct values.
 
+Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ arch/arm64/include/asm/dma-mapping.h |  5 +----
+ arch/arm64/mm/dma-mapping.c          | 16 ++++++++++++++++
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
-On 03/17/2016 10:06 AM, Rob Herring wrote:
-> On Mon, Mar 07, 2016 at 07:23:41PM -0600, Franklin S Cooper Jr wrote:
->> Devices that utilize the OCP registers and/or PRCM registers and
->> register bit fields should be modelled using hwmod. Since eQEP, ePWM and
-> s/modelled/modeled/
-
-Will fix.
->
->> eCAP don't fall under this category, remove their hwmod entries.
->>
->> Instead these clocks simply use the clock that is pass through by its
->> parent PWMSS. Therefore, PWMSS handles the clock for itself and its
->> subdevices.
-> Are you breaking compatibility with old DTs here? 
-
-No. The first patch makes sure that the ecap and ehrpwm get
-their clocks from their parent which is all they care about.
-Old dtbs will have hwmod entries for ecap and ehrpwm which
-will end up not doing anything.
->  
->> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->> ---
->>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  1 -
->>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  7 +-
->>  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
->>  .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 -----------------
->>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 ----------------------
->>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
->>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 --------------
->>  7 files changed, 4 insertions(+), 233 deletions(-)
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index ba437f0..a0a486c 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -69,10 +69,7 @@ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+ 	return (dma_addr_t)paddr;
+ }
+ 
+-static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+-{
+-	return (phys_addr_t)dev_addr;
+-}
++phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr);
+ 
+ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+ {
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 331c4ca..8252a92 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -989,3 +989,19 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	dev->archdata.dma_coherent = coherent;
+ 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+ }
++
++phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
++{
++	phys_addr_t phys = (phys_addr_t)dev_addr;
++
++#ifdef CONFIG_IOMMU_DMA
++	struct iommu_domain *domain;
++
++	domain = iommu_get_domain_for_dev(dev);
++	if (domain)
++		phys = iommu_iova_to_phys(domain, dev_addr);
++#endif
++
++	return phys;
++}
++EXPORT_SYMBOL(dma_to_phys);
+-- 
+1.8.2.1
