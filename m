@@ -1,27 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Mar 2016 15:49:58 +0100
-Subject: [PATCH 10/17] pinctrl: Add PLX Technology OXNAS pinctrl and gpio
- driver
-In-Reply-To: <56E9750B.2000800@baylibre.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457005210-18485-11-git-send-email-narmstrong@baylibre.com>
- <CACRpkdby7XmbK2ZpwX3zy5J=yr1HRbmfWVab3K0ArcL6wd=oyA@mail.gmail.com>
- <56E9750B.2000800@baylibre.com>
-Message-ID: <CACRpkdbWZDpM5ctNkU5cRasaATjkoa_zrg_-xgnTpbYRZK2pXw@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 17 Mar 2016 09:49:51 -0500
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+ <20160316100759.GA18387@arm.com> <56E95A4E.4050709@codeaurora.org>
+ <20160316141802.GC13423@e104818-lin.cambridge.arm.com>
+ <56E97B10.4050401@codeaurora.org>
+ <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
+Message-ID: <56EAC40F.1080504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 4:00 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+Catalin Marinas wrote:
+>> >Yes, that's exactly it.  Ours is an ACPI system, and so we have to have our
+>> >own defconfig for now.  We're holding off on pushing our own defconfig
+>> >changes (enabling drivers, etc) until ACPI is enabled in
+>> >arch/arm64/configs/defconfig.
 
-> I think I'll reboot over a clean base, could you give a reference driver I should follow ?
-> It's a very simple HW, it should be easy.
+> Is there anything that prevents you from providing a dtb/dts for this
+> SoC?
 
-I would look at those merged lately, which has pin control
-combined with GPIO and interrupts.
+We don't have a boot loader capable of passing a device tree to the 
+kernel.  It's an ARM Server chip.  It doesn't do device tree.  It's 100% 
+ACPI.  We boot with UEFI that configures the system and generates ACPI 
+tables.
 
-drivers/pinctrl/qcom is good but supports quite a lot of
-subvariants so it may be hard to see what parts you really
-need. But I think of those as a very nice drivers.
+I just want to make this crystal clear, because it comes up every now 
+and then.  The QDF2432 is an ACPI-only SOC with no device tree support 
+whatsoever.  Zero.  Zip.  Nada.  It's not an option.
 
-Yours,
-Linus Walleij
+Keep in mind that on an ACPI system like ours, the boot loader (UEFI in 
+our case) configures the system extensively.  It does a lot of things 
+that the kernel would normally do on a device tree system.  For example, 
+pin control is handled completely by UEFI.  The kernel does not set the 
+pin muxes or GPIO directions.  That means we don't support dynamic pin 
+muxing.  Before the kernel is booted, the GPIO pins are fixed.
+
+We're not going to create an entire device tree from scratch for this 
+chip, and then make the extensive modifications necessary to our boot 
+loader for parsing and modifying that device tree.  That would take 
+months of work, and it would be all throw-away code.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
