@@ -1,20 +1,20 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 17 Mar 2016 09:10:27 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7794: Add IIC nodes
-In-Reply-To: <1458200117-19693-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 17 Mar 2016 09:12:05 +0100
+Subject: [PATCH 1/2] ARM: dts: r8a7794: add IIC clocks
+In-Reply-To: <1458199991-19391-2-git-send-email-horms+renesas@verge.net.au>
 References: <1458199991-19391-1-git-send-email-horms+renesas@verge.net.au>
- <1458200117-19693-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXU62+iyTZa4DbenwMgL_x2yyK=4u5dffO_zL7TDouNSw@mail.gmail.com>
+ <1458199991-19391-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXuFu-mPKnmjaM7DQcni2FiMz99jkrQO4UrWhs14qXAyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 8:35 AM, Simon Horman
+On Thu, Mar 17, 2016 at 8:33 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Add IIC nodes to r8a7794 device tree.
+> Add IIC clocks to r8a7794 device tree.
 >
-> Based on similar work for the r8a7793 by Laurent Pinchart.
+> Based on similar work for the r8a7790 by Wolfram Sang.
 >
-> CC: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> CC: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
