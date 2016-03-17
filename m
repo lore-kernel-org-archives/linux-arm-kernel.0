@@ -1,68 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Mar 2016 08:27:21 +0100
-Subject: [PATCH 1/2] spi: sun4i: add DMA support
-In-Reply-To: <CAOMqctQ5aq0A95ErVVF13f_8JBy0xRw9_FZ3avbYmZUGXp=Svg@mail.gmail.com>
-References: <1456466217-6793-1-git-send-email-plaes@plaes.org>
- <1456466217-6793-2-git-send-email-plaes@plaes.org>
- <20160226122504.GR18327@sirena.org.uk>
- <CAOMqctTz=szSkpk95D_dUJjjpziCKoPv=xRczjfq2Roct-K-OA@mail.gmail.com>
- <20160306214206.GW8418@lukather>
- <CAOMqctQ5aq0A95ErVVF13f_8JBy0xRw9_FZ3avbYmZUGXp=Svg@mail.gmail.com>
-Message-ID: <20160317072721.GJ30977@lukather>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 17 Mar 2016 16:33:09 +0900
+Subject: [PATCH 0/2] ARM: dts: r8a7794: Add IIC nodes
+Message-ID: <1458199991-19391-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 10:01:04AM +0100, Michal Suchanek wrote:
-> Hello,
-> 
-> On 6 March 2016 at 22:42, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Feb 26, 2016 at 01:51:51PM +0100, Michal Suchanek wrote:
-> 
-> >> Besides this non-technical objection there were multiple technical
-> >> objections.
-> >>
-> >> IIRC one was that the driver does not handle the case when the DMA
-> >> channels are not available. As I understand it the channels are
-> >> exclusively reserved for a particular peripherial on sunxi platform so
-> >> this ShoulNotHappen(tm). So it's probably fine for the driver to fail
-> >> probe  when you have broken DT or no DMA engine support for sunxi
-> >> platform.
-> >
-> > There's a quite trivial scenario that would trigger this: if the dma
-> > driver or dmaengine is not enabled / loaded.
-> 
-> There are other trivial scenarios under which the driver will fail
-> like loading wrong DT, not compiling or loading the sunxi pinmux
-> driver, and whatnot.
+Hi,
 
-I don't see what the pinmux has to do with SPI and DMA, and you're
-wrong, the pinmux driver is always compiled in if you enable the sunxi
-support.
+this short series adds IIC nodes to the r8a7794 device tree.
 
-And you're missing the whole point. DMA accesses are optional, pinmux
-and proper machine support are not.
+It is unclear to me how these devices may be tested given
+the boards currently available for the r8a7794 SoC.
 
-> When you misconfigure your kernel it does not work. So long as the
-> driver just fails and does not crash and burn it's normal. Since the
-> driver is pretty much useless without DMA as it is now (63 byte
-> transfer limit) losing the non-DMA functionality when DMA engine is
-> not compiled-in does not seem that terrible.
+Based on renesas-devel-20160317-v4.5
 
-You're mixing two things up: the fact that we can't do more than the
-FIFO length in PIO and that we're missing DMA support. We have patches
-to address both, and there's no depedency between the two.
 
-Maxime
+Simon Horman (2):
+  ARM: dts: r8a7794: add IIC clocks
+  ARM: dts: r8a7794: Add IIC nodes
+
+ arch/arm/boot/dts/r8a7794.dtsi            | 37 ++++++++++++++++++++++++++++---
+ include/dt-bindings/clock/r8a7794-clock.h |  2 ++
+ 2 files changed, 36 insertions(+), 3 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160317/9c5c9cd5/attachment.sig>
+2.1.4
