@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Mar 2016 08:59:21 +0900
-Subject: [PATCH 11/12] ARM: dts: kzm9d: use generic pinctrl properties
+Date: Fri, 18 Mar 2016 08:59:22 +0900
+Subject: [PATCH 12/12] arm64: dts: salvator-x: use generic pinctrl properties
 In-Reply-To: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
 References: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1458259162-15706-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1458259162-15706-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,25 +11,95 @@ Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
 groups properties") renesas pfc drivers accept generic "function", "pins"
 and "groups" properties.
 
-This patch updates the kzm9d device tree to use the generic properties.
+This patch updates the kzm9g device tree to use the generic properties.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 46 +++++++++++-----------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 8c24975e8f9d..a35b851e1cd7 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -105,8 +105,8 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index b992b1a3d956..5165d450c10b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -146,57 +146,57 @@
+ 	pinctrl-names = "default";
  
- &pfc {
- 	uart1_pins: serial at e1030000 {
--		renesas,groups = "uart1_ctrl", "uart1_data";
--		renesas,function = "uart1";
-+		groups = "uart1_ctrl", "uart1_data";
-+		function = "uart1";
+ 	scif1_pins: scif1 {
+-		renesas,groups = "scif1_data_a", "scif1_ctrl";
+-		renesas,function = "scif1";
++		groups = "scif1_data_a", "scif1_ctrl";
++		function = "scif1";
+ 	};
+ 	scif2_pins: scif2 {
+-		renesas,groups = "scif2_data_a";
+-		renesas,function = "scif2";
++		groups = "scif2_data_a";
++		function = "scif2";
+ 	};
+ 	scif_clk_pins: scif_clk {
+-		renesas,groups = "scif_clk_a";
+-		renesas,function = "scif_clk";
++		groups = "scif_clk_a";
++		function = "scif_clk";
+ 	};
+ 
+ 	i2c2_pins: i2c2 {
+-		renesas,groups = "i2c2_a";
+-		renesas,function = "i2c2";
++		groups = "i2c2_a";
++		function = "i2c2";
+ 	};
+ 
+ 	avb_pins: avb {
+-		renesas,groups = "avb_mdc";
+-		renesas,function = "avb";
++		groups = "avb_mdc";
++		function = "avb";
+ 	};
+ 
+ 	sdhi0_pins: sd0 {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
+-		renesas,function = "sdhi0";
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
+ 	};
+ 
+ 	sdhi3_pins: sd3 {
+-		renesas,groups = "sdhi3_data4", "sdhi3_ctrl";
+-		renesas,function = "sdhi3";
++		groups = "sdhi3_data4", "sdhi3_ctrl";
++		function = "sdhi3";
+ 	};
+ 
+ 	sound_pins: sound {
+-		renesas,groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
+-		renesas,function = "ssi";
++		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
++		function = "ssi";
+ 	};
+ 
+ 	sound_clk_pins: sound_clk {
+-		renesas,groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
+-				 "audio_clkout_a", "audio_clkout3_a";
+-		renesas,function = "audio_clk";
++		groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
++			 "audio_clkout_a", "audio_clkout3_a";
++		function = "audio_clk";
+ 	};
+ 
+ 	usb1_pins: usb1 {
+-		renesas,groups = "usb1";
+-		renesas,function = "usb1";
++		groups = "usb1";
++		function = "usb1";
+ 	};
+ 
+ 	usb2_pins: usb2 {
+-		renesas,groups = "usb2";
+-		renesas,function = "usb2";
++		groups = "usb2";
++		function = "usb2";
  	};
  };
  
