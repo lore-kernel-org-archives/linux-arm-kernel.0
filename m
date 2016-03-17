@@ -1,56 +1,77 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Mar 2016 17:57:08 +0800
-Subject: [PATCH v6 09/17] xen/hvm/params: Add a new delivery type for
- event-channel in HVM_PARAM_CALLBACK_IRQ
+Date: Thu, 17 Mar 2016 17:57:02 +0800
+Subject: [PATCH v6 03/17] Xen: xlate: Use page_to_xen_pfn instead of
+ page_to_pfn
 In-Reply-To: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1458208636-12960-10-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1458208636-12960-4-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-This new delivery type which is for ARM shares the same value with
-HVM_PARAM_CALLBACK_TYPE_VECTOR which is for x86.
-
-val[15:8] is flag: val[7:0] is a PPI.
-To the flag, bit 8 stands the interrupt mode is edge(1) or level(0) and
-bit 9 stands the interrupt polarity is active low(1) or high(0).
+Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
+Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
+refer to 4K pages.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- include/xen/interface/hvm/params.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/xen/xlate_mmu.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-index 70ad208..d39db45 100644
---- a/include/xen/interface/hvm/params.h
-+++ b/include/xen/interface/hvm/params.h
-@@ -47,11 +47,24 @@
-  * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
-  */
+diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+index 9692656..28f728b 100644
+--- a/drivers/xen/xlate_mmu.c
++++ b/drivers/xen/xlate_mmu.c
+@@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+ 	void *vaddr;
+ 	int rc;
+ 	unsigned int i;
++	unsigned long nr_pages;
++	xen_pfn_t xen_pfn = 0;
  
-+#if !defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
- #define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
- /*
-  * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
-  * if this delivery method is available.
-  */
-+#else
-+#define HVM_PARAM_CALLBACK_TYPE_PPI      2
-+/*
-+ * val[55:16] needs to be zero.
-+ * val[15:8] is interrupt flag of the PPI used by event-channel:
-+ *  bit 8: the PPI is edge(1) or level(0) triggered
-+ *  bit 9: the PPI is active low(1) or high(0)
-+ * val[7:0] is a PPI number used by event-channel.
-+ * This is only used by ARM/ARM64 and masking/eoi the interrupt associated to
-+ * the notification is handled by the interrupt controller.
-+ */
-+#endif
+ 	BUG_ON(nr_grant_frames == 0);
+-	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
++	nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
++	pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
+ 	if (!pages)
+ 		return -ENOMEM;
  
- #define HVM_PARAM_STORE_PFN    1
- #define HVM_PARAM_STORE_EVTCHN 2
+@@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+ 		kfree(pages);
+ 		return -ENOMEM;
+ 	}
+-	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
++	rc = alloc_xenballooned_pages(nr_pages, pages);
+ 	if (rc) {
+-		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
++		pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
++			nr_pages, rc);
+ 		kfree(pages);
+ 		kfree(pfns);
+ 		return rc;
+ 	}
+-	for (i = 0; i < nr_grant_frames; i++)
+-		pfns[i] = page_to_pfn(pages[i]);
++	for (i = 0; i < nr_grant_frames; i++) {
++		if ((i % XEN_PFN_PER_PAGE) == 0)
++			xen_pfn = page_to_xen_pfn(pages[i / XEN_PFN_PER_PAGE]);
++		pfns[i] = pfn_to_gfn(xen_pfn++);
++	}
+ 
+-	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
++	vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
+ 	if (!vaddr) {
+-		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
+-		free_xenballooned_pages(nr_grant_frames, pages);
++		pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
++			nr_pages, rc);
++		free_xenballooned_pages(nr_pages, pages);
+ 		kfree(pages);
+ 		kfree(pfns);
+ 		return -ENOMEM;
 -- 
 2.0.4
