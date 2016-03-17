@@ -1,97 +1,41 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 17 Mar 2016 10:53:57 -0500
-Subject: [PATCH v5 6/6] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <20160317151147.GA29802@rob-hp-laptop>
-References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
- <1457400224-24797-7-git-send-email-fcooper@ti.com>
- <20160317151147.GA29802@rob-hp-laptop>
-Message-ID: <56EAD315.1030307@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Mar 2016 16:56:33 +0100
+Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
+In-Reply-To: <20160305004336.GG55664@google.com>
+References: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
+ <1457137718.43867.266.camel@infradead.org>
+ <20160305004336.GG55664@google.com>
+Message-ID: <4420020.GISMAEPJsq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 04 March 2016 16:43:36 Brian Norris wrote:
+> On Sat, Mar 05, 2016 at 12:28:38AM +0000, David Woodhouse wrote:
+> > On Fri, 2016-03-04 at 16:22 -0800, Brian Norris wrote:
+> > > 
+> > > ...but, does anyone care about XIP / MTD_XIP then, if the first two
+> > > examples we have both have long-standing build issues?
+> > 
+> > I think there are people trying to make it work on other platforms,
+> > yes.
+> 
+> OK... can we kill the broken platforms though? I'm not confident that my
+> and Arnd's workaround attempts will yield anything more than a pat on
+> our own backs to say "yay, it compiles!" And given the number of
+> practically unused things we're already maintaining in MTD, I'm always
+> happy for an excuse to kill off some of it.
 
+Sorry for the late reply.
 
-On 03/17/2016 10:11 AM, Rob Herring wrote:
-> On Mon, Mar 07, 2016 at 07:23:44PM -0600, Franklin S Cooper Jr wrote:
->> From: Vignesh R <vigneshr@ti.com>
->>
->> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
->> for dt bindings.
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> [fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
->> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->> ---
->> Version 5 changes:
->> Add DT node for eCAP and update eCAP binding documentation
->>
->> Version 4 changes:
->> Updated link to the latest documentation
->>
->>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
->>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
->>  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
->>  arch/arm/boot/dts/dra7.dtsi                        | 84 ++++++++++++++++++++++
->>  4 files changed, 116 insertions(+), 1 deletion(-)
->
->> +			ehrpwm1: pwm at 48440200 {
->> +				compatible = "ti,dra7xx-ehrpwm",
->> +					     "ti,am33xx-ehrpwm";
->> +				#pwm-cells = <3>;
->> +				reg = <0x48440200 0x80>;
->> +				clocks = <&ehrpwm1_tbclk>;
->> +				clock-names = "tbclk";
->> +				status = "disabled";
->> +			};
->> +
->> +			ecap1: ecap at 48440100 {
-> This also is a PWM? Then it should also be pwm at ...
+As the three platforms that use this have all been broken for around
+ten years, it seems reasonable to assume nobody is going to miss the
+current implementation, but I'd leave it up to the individual platform
+maintainers.
 
-The enhanced capture module primary purpose is to measure
-time between external signals which is called capture mode.
-It also has a PWM mode. So I wouldn't recommend generalizing
-the entire node to pwm.
->
->> +				compatible = "ti,dra7xx-ecap",
->> +					     "ti,am33xx-ecap";
->> +				#pwm-cells = <3>;
->> +				reg = <0x48440100 0x80>;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		epwmss2: epwmss at 48442000 {
->> +			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
->> +			reg = <0x48442000 0x30>;
->> +			ti,hwmods = "epwmss2";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			status = "disabled";
->> +			ranges;
->> +
->> +			ehrpwm2: pwm at 48442200 {
->> +				compatible = "ti,dra7xx-ehrpwm",
->> +					     "ti,am33xx-ehrpwm";
->> +				#pwm-cells = <3>;
->> +				reg = <0x48442200 0x80>;
->> +				clocks = <&ehrpwm2_tbclk>;
->> +				clock-names = "tbclk";
->> +				status = "disabled";
->> +			};
->> +
->> +			ecap2: ecap at 48442100 {
-> And here.
->
->> +				compatible = "ti,dra7xx-ecap",
->> +					     "ti,am33xx-ecap";
->> +				#pwm-cells = <3>;
->> +				reg = <0x48442100 0x80>;
->> +				status = "disabled";
->> +			};
->> +		};
->>  	};
->>  
->>  	thermal_zones: thermal-zones {
->> -- 
->> 2.7.0
->>
+If we remove all three, that would also give us more flexibility
+regarding the interface definition for any future users of the feature.
+I think the most likely to use it is the Renesas RZ/A1H platform
+with its 10MB of on-chip SRAM, and this one doesn't work with the
+current method anyway.
+
+	Arnd
