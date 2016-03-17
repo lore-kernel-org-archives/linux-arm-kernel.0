@@ -1,59 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 17 Mar 2016 18:06:10 +0000
-Subject: [PATCH v2 02/18] dt-bindings: timer: sp804: add timer-width
- property
-In-Reply-To: <20160317170926.GA28934@rob-hp-laptop>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-3-git-send-email-narmstrong@baylibre.com>
- <20160317170926.GA28934@rob-hp-laptop>
-Message-ID: <56EAF212.7020700@arm.com>
+From: apinski@caviumnetworks.com (Andrew Pinski)
+Date: Thu, 17 Mar 2016 11:07:00 -0700
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+ <20160316100759.GA18387@arm.com> <56E95A4E.4050709@codeaurora.org>
+ <20160316141802.GC13423@e104818-lin.cambridge.arm.com>
+ <56E97B10.4050401@codeaurora.org>
+ <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
+Message-ID: <56EAF244.2090805@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 3/17/2016 7:27 AM, Catalin Marinas wrote:
+> On Wed, Mar 16, 2016 at 10:26:08AM -0500, Timur Tabi wrote:
+>> Catalin Marinas wrote:
+>>> Why do you need your own defconfig? If it's just on the short term until
+>>> all your code is upstream, that's fine, but this goes against the single
+>>> Image aim. I would like defconfig to cover all supported SoCs (and yes,
+>>> ACPI on by default once we deem it !EXPERT anymore), though at some
+>>> point we may need a server/mobile split (if the generated image is too
+>>> large, maybe more stuff being built as modules).
+>> Yes, that's exactly it.  Ours is an ACPI system, and so we have to have our
+>> own defconfig for now.  We're holding off on pushing our own defconfig
+>> changes (enabling drivers, etc) until ACPI is enabled in
+>> arch/arm64/configs/defconfig.
+> Is there anything that prevents you from providing a dtb/dts for this
+> SoC?
 
-On 17/03/16 17:09, Rob Herring wrote:
-> On Wed, Mar 09, 2016 at 11:24:04AM +0100, Neil Armstrong wrote:
->> Add timer-width optional property to specify a different vendor
->> specific timer counter bit-width.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>   Documentation/devicetree/bindings/timer/arm,sp804.txt | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/timer/arm,sp804.txt b/Documentation/devicetree/bindings/timer/arm,sp804.txt
->> index 5cd8eee7..141e143 100644
->> --- a/Documentation/devicetree/bindings/timer/arm,sp804.txt
->> +++ b/Documentation/devicetree/bindings/timer/arm,sp804.txt
->> @@ -17,6 +17,8 @@ Optional properties:
->>   - arm,sp804-has-irq = <#>: In the case of only 1 timer irq line connected, this
->>   	specifies if the irq connection is for timer 1 or timer 2. A value of 1
->>   	or 2 should be used.
->> +- arm,timer-width: Should contain the width in number of bits of the counter,
->> +	is considered by default 32 but can be changed for vendor variants.
->
-> That would not be an SP804 nor would the vendor be ARM in that case. So
-> add a new compatible string for the vendor that decided to hack up ARM's
-> IP block.
+Note ThunderX's SOC have customers  where some are embedded users 
+(uboot) and server users (UEFI).  The cores always have 128 byte 
+cacheline size.  So please don't make this dependent on ACPI.  Note the 
+defconfig works correctly on T88.
 
-By all accounts this is some ancient reference design[1] which later 
-evolved _into_ the SP804, so that vendor would probably still be ARM ;)
+Thanks,
+Andrew
 
-A separate compatible string would indeed make more sense, though. Both 
-semantically and in terms of letting the driver account for the 
-differences automatically.
 
-Robin.
-
-[1]:http://infocenter.arm.com/help/topic/com.arm.doc.ddi0170a/I350250.html
-
->
-> Rob
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
