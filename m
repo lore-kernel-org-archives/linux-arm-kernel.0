@@ -1,70 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 17 Mar 2016 15:57:22 +0000
-Subject: [PATCH] arm64: dma-mapping: fix dma_to_phys API for IOMMU
- attached devices
-In-Reply-To: <1458229833-4886-1-git-send-email-okaya@codeaurora.org>
-References: <1458229833-4886-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <56EAD3E2.5070109@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Mar 2016 16:03:08 +0000
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <20160317153747.GD11623@e104818-lin.cambridge.arm.com>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+ <20160316100759.GA18387@arm.com> <56E95A4E.4050709@codeaurora.org>
+ <20160316141802.GC13423@e104818-lin.cambridge.arm.com>
+ <56E97B10.4050401@codeaurora.org>
+ <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
+ <56EAC40F.1080504@codeaurora.org>
+ <20160317153747.GD11623@e104818-lin.cambridge.arm.com>
+Message-ID: <56EAD53C.80707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/16 15:50, Sinan Kaya wrote:
-> This patch modifies dma_to_phys to call iommu_iova_to_phys to perform dma
-> to phys conversions for IOMMU attached devices where dma and physical
-> addresses often have distinct values.
+On 17/03/16 15:37, Catalin Marinas wrote:
+> On Thu, Mar 17, 2016 at 09:49:51AM -0500, Timur Tabi wrote:
 
-What's this for? dma_to_phys() is only used by SWIOTLB, and that's 
-mutually exclusive with IOMMU ops.
+[...]
 
-Also, what about phys_to_dma()?
+>> Keep in mind that on an ACPI system like ours, the boot loader (UEFI in our
+>> case) configures the system extensively.  It does a lot of things that the
+>> kernel would normally do on a device tree system.  For example, pin control
+>> is handled completely by UEFI.  The kernel does not set the pin muxes or
+>> GPIO directions.  That means we don't support dynamic pin muxing.  Before
+>> the kernel is booted, the GPIO pins are fixed.
+> 
+> And that's great. But you are mistaken in thinking that DT requires lots
+> of drivers in the kernel and prevents the firmware from doing sane
+> stuff. DT rather gained additional features out of necessity since the
+> firmware was not always doing a proper job at hardware initialisation.
+> A DT-enabled kernel does not impose restrictions on such firmware
+> features. With ACPI, the choice is not as wide and forces vendors to
+> look into their firmware story from a different angle (until they figure
+> the _DSD+PRP0001 out and we end up with DT emulated in ACPI).
 
-Robin.
+Or even worse, perverting the couple of things that were actually OK in
+ACPI by inventing a new layer of broken stuff:
 
-> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->   arch/arm64/include/asm/dma-mapping.h |  5 +----
->   arch/arm64/mm/dma-mapping.c          | 16 ++++++++++++++++
->   2 files changed, 17 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index ba437f0..a0a486c 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -69,10 +69,7 @@ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
->   	return (dma_addr_t)paddr;
->   }
->
-> -static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-> -{
-> -	return (phys_addr_t)dev_addr;
-> -}
-> +phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr);
->
->   static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
->   {
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 331c4ca..8252a92 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -989,3 +989,19 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->   	dev->archdata.dma_coherent = coherent;
->   	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
->   }
-> +
-> +phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-> +{
-> +	phys_addr_t phys = (phys_addr_t)dev_addr;
-> +
-> +#ifdef CONFIG_IOMMU_DMA
-> +	struct iommu_domain *domain;
-> +
-> +	domain = iommu_get_domain_for_dev(dev);
-> +	if (domain)
-> +		phys = iommu_iova_to_phys(domain, dev_addr);
-> +#endif
-> +
-> +	return phys;
-> +}
-> +EXPORT_SYMBOL(dma_to_phys);
->
+http://thread.gmane.org/gmane.linux.ports.arm.msm/17828
+
+Once we've reached that level, _DSD fells all nice and cuddly.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
