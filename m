@@ -1,39 +1,50 @@
-From: apinski@caviumnetworks.com (Andrew Pinski)
-Date: Thu, 17 Mar 2016 11:07:00 -0700
-Subject: [PATCH] Revert "arm64: Increase the max granular size"
-In-Reply-To: <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
-References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
- <20160316100759.GA18387@arm.com> <56E95A4E.4050709@codeaurora.org>
- <20160316141802.GC13423@e104818-lin.cambridge.arm.com>
- <56E97B10.4050401@codeaurora.org>
- <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
-Message-ID: <56EAF244.2090805@caviumnetworks.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 17 Mar 2016 19:09:49 +0100
+Subject: arm: at91: do not disable/enable clocks in a row
+In-Reply-To: <20160309095824.GC10517@linutronix.de>
+References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160118174259.GC12309@linutronix.de>
+ <20160305113553.GB21216@piout.net>
+ <20160308110639.GC21842@linutronix.de>
+ <20160308183910.GD5845@piout.net>
+ <20160309095824.GC10517@linutronix.de>
+Message-ID: <20160317180949.GE2831@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/17/2016 7:27 AM, Catalin Marinas wrote:
-> On Wed, Mar 16, 2016 at 10:26:08AM -0500, Timur Tabi wrote:
->> Catalin Marinas wrote:
->>> Why do you need your own defconfig? If it's just on the short term until
->>> all your code is upstream, that's fine, but this goes against the single
->>> Image aim. I would like defconfig to cover all supported SoCs (and yes,
->>> ACPI on by default once we deem it !EXPERT anymore), though at some
->>> point we may need a server/mobile split (if the generated image is too
->>> large, maybe more stuff being built as modules).
->> Yes, that's exactly it.  Ours is an ACPI system, and so we have to have our
->> own defconfig for now.  We're holding off on pushing our own defconfig
->> changes (enabling drivers, etc) until ACPI is enabled in
->> arch/arm64/configs/defconfig.
-> Is there anything that prevents you from providing a dtb/dts for this
-> SoC?
+On 09/03/2016 at 10:58:24 +0100, Sebastian Andrzej Siewior wrote :
+> * Alexandre Belloni | 2016-03-08 19:39:10 [+0100]:
+> 
+> >Hi,
+> Hi,
+> 
+> >Both are things to work on. In the mean time, I'm using the following
+> >patch:
+> >https://github.com/alexandrebelloni/linux/commit/3a2eae463fce18ae815b887a5c9ca1a657b180ac
+> >
+> >I understood from
+> >http://lkml.iu.edu/hypermail/linux/kernel/1601.2/00941.html that this
+> >was not your preferred course of action.
+> 
+> That was one thing.  What about this:
+> 
+> ---
+> 
+> Currently the driver will disable the clock and enable it one line later
+> if it is switching from periodic mode into one shot.
+> This can be avoided and causes a needless warning on -RT.
+> 
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-Note ThunderX's SOC have customers  where some are embedded users 
-(uboot) and server users (UEFI).  The cores always have 128 byte 
-cacheline size.  So please don't make this dependent on ACPI.  Note the 
-defconfig works correctly on T88.
+I'm fine with that if you don't want to rely on the clock event state
+machine.
 
-Thanks,
-Andrew
+Can you submit it to the mainline with:
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 
->
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
