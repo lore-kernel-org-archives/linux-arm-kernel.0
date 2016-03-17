@@ -1,11 +1,11 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Mar 2016 22:48:49 +0100
-Subject: [PATCH v14 04/17] drm: bridge: analogix/dp: fix some obvious code
+Date: Thu, 17 Mar 2016 22:50 +0100
+Subject: [PATCH v14.1 04/17] drm: bridge: analogix/dp: fix some obvious code
  style
 In-Reply-To: <1455534599-1636-1-git-send-email-ykk@rock-chips.com>
 References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
  <1455534599-1636-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <5288069.sdD3NZfROG@diego>
+Message-ID: <3743656.5lb5B2Ugqa@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
