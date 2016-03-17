@@ -1,37 +1,42 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 17 Mar 2016 19:52:30 +0100
-Subject: [PATCH v2 1/2] regulator: axp20x: Fix axp209 ldo4 ranges
-Message-ID: <1458240751-30281-1-git-send-email-hdegoede@redhat.com>
+Date: Thu, 17 Mar 2016 19:52:31 +0100
+Subject: [PATCH v2 2/2] regulator: axp20x: Fix axp22x ldo_io voltage ranges
+In-Reply-To: <1458240751-30281-1-git-send-email-hdegoede@redhat.com>
+References: <1458240751-30281-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1458240751-30281-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The axp209 ldo4 regulator has a hole at (skips) 2600 mV and 2900 mV, fix
-its range table to match.
+The minium voltage of 1800mV is a copy and paste error from the axp20x
+regulator info. The correct minimum voltage for the ldo_io regulators
+on the axp22x is 700mV.
 
-Fixes: 13d57e64352a ("regulator: axp20x: Use linear voltage ranges for AXP20X LDO4")
+Fixes: 1b82b4e4f954 ("regulator: axp20x: Add support for AXP22X regulators")
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
 Changes in v2:
 -Add Fixes, Acked-by Chen-Yu tags
 ---
- drivers/regulator/axp20x-regulator.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/regulator/axp20x-regulator.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 3f82e87..5041373 100644
+index 5041373..500d162 100644
 --- a/drivers/regulator/axp20x-regulator.c
 +++ b/drivers/regulator/axp20x-regulator.c
-@@ -157,7 +157,9 @@ static struct regulator_ops axp20x_ops_sw = {
- static const struct regulator_linear_range axp20x_ldo4_ranges[] = {
- 	REGULATOR_LINEAR_RANGE(1250000, 0x0, 0x0, 0),
- 	REGULATOR_LINEAR_RANGE(1300000, 0x1, 0x8, 100000),
--	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0xf, 100000),
-+	REGULATOR_LINEAR_RANGE(2500000, 0x9, 0x9, 0),
-+	REGULATOR_LINEAR_RANGE(2700000, 0xa, 0xb, 100000),
-+	REGULATOR_LINEAR_RANGE(3000000, 0xc, 0xf, 100000),
- };
- 
- static const struct regulator_desc axp20x_regulators[] = {
+@@ -217,10 +217,10 @@ static const struct regulator_desc axp22x_regulators[] = {
+ 		 AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
+ 	AXP_DESC(AXP22X, ELDO3, "eldo3", "eldoin", 700, 3300, 100,
+ 		 AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
+-	AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 1800, 3300, 100,
++	AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
+ 		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
+ 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+-	AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 1800, 3300, 100,
++	AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
+ 		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
+ 		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
+ 	AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtc_ldo", "ips", 3000),
 -- 
 2.7.3
