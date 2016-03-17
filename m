@@ -1,97 +1,76 @@
-From: js1304@gmail.com (Joonsoo Kim)
-Date: Fri, 18 Mar 2016 00:31:14 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56EA77BC.2090702@huawei.com>
-References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
- <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
- <56E2FB5C.1040602@suse.cz>
- <20160314064925.GA27587@js1304-P5Q-DELUXE> <56E662E8.700@suse.cz>
- <20160314071803.GA28094@js1304-P5Q-DELUXE>
- <56E92AFC.9050208@huawei.com>
- <20160317065426.GA10315@js1304-P5Q-DELUXE>
- <56EA77BC.2090702@huawei.com>
-Message-ID: <CAAmzW4PVc+v9NVyqrHZqh6qWaJD8hrwNUVSb6G=vZ3eA76J3yQ@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 17 Mar 2016 16:34:22 +0100
+Subject: [PATCH] ARM: at91/dt: sama5d2: add SFR node
+Message-ID: <1458228862-25582-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-17 18:24 GMT+09:00 Hanjun Guo <guohanjun@huawei.com>:
-> On 2016/3/17 14:54, Joonsoo Kim wrote:
->> On Wed, Mar 16, 2016 at 05:44:28PM +0800, Hanjun Guo wrote:
->>> On 2016/3/14 15:18, Joonsoo Kim wrote:
->>>> On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
->>>>> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
->>>>>> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
->>>>>>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
->>>>>>>
->>>>>>> How about something like this? Just and idea, probably buggy (off-by-one etc.).
->>>>>>> Should keep away cost from <pageblock_order iterations@the expense of the
->>>>>>> relatively fewer >pageblock_order iterations.
->>>>>> Hmm... I tested this and found that it's code size is a little bit
->>>>>> larger than mine. I'm not sure why this happens exactly but I guess it would be
->>>>>> related to compiler optimization. In this case, I'm in favor of my
->>>>>> implementation because it looks like well abstraction. It adds one
->>>>>> unlikely branch to the merge loop but compiler would optimize it to
->>>>>> check it once.
->>>>> I would be surprised if compiler optimized that to check it once, as
->>>>> order increases with each loop iteration. But maybe it's smart
->>>>> enough to do something like I did by hand? Guess I'll check the
->>>>> disassembly.
->>>> Okay. I used following slightly optimized version and I need to
->>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
->>>> to yours. Please consider it, too.
->>> Hmm, this one is not work, I still can see the bug is there after applying
->>> this patch, did I miss something?
->> I may find that there is a bug which was introduced by me some time
->> ago. Could you test following change in __free_one_page() on top of
->> Vlastimil's patch?
->>
->> -page_idx = pfn & ((1 << max_order) - 1);
->> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
->
-> I tested Vlastimil's patch + your change with stress for more than half hour, the bug
-> I reported is gone :)
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-Good to hear!
+This SFR node is looked up by the I2S controller driver to tune the
+SFR_I2SCLKSEL register.
 
-> I have some questions, Joonsoo, you provided a patch as following:
->
-> diff --git a/mm/cma.c b/mm/cma.c
-> index 3a7a67b..952a8a3 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -448,7 +448,10 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
->
->         VM_BUG_ON(pfn + count > cma->base_pfn + cma->count);
->
-> + mutex_lock(&cma_mutex);
->         free_contig_range(pfn, count);
-> + mutex_unlock(&cma_mutex);
-> +
->         cma_clear_bitmap(cma, pfn, count);
->         trace_cma_release(pfn, pages, count);
->
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 7f32950..68ed5ae 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -1559,7 +1559,8 @@ void free_hot_cold_page(struct page *page, bool cold)
->          * excessively into the page allocator
->          */
->         if (migratetype >= MIGRATE_PCPTYPES) {
-> -           if (unlikely(is_migrate_isolate(migratetype))) {
-> +         if (is_migrate_cma(migratetype) ||
-> +             unlikely(is_migrate_isolate(migratetype))) {
->                         free_one_page(zone, page, pfn, 0, migratetype);
->                         goto out;
->                 }
->
-> This patch also works to fix the bug, why not just use this one? is there
-> any side effects for this patch? maybe there is performance issue as the
-> mutex lock is used, any other issues?
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ Documentation/devicetree/bindings/arm/atmel-at91.txt |  2 +-
+ arch/arm/boot/dts/sama5d2.dtsi                       |  5 +++++
+ include/linux/mfd/syscon/atmel-sfr.h                 | 18 ++++++++++++++++++
+ 3 files changed, 24 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/mfd/syscon/atmel-sfr.h
 
-The changes in free_hot_cold_page() would cause unacceptable performance
-problem in a big machine, because, with above change,  it takes zone->lock
-whenever freeing one page on CMA region.
-
-Thanks.
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 7fd64ec..550fd66 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -155,7 +155,7 @@ elsewhere.
+ 
+ required properties:
+ - compatible: Should be "atmel,<chip>-sfr", "syscon".
+-  <chip> can be "sama5d3" or "sama5d4".
++  <chip> can be "sama5d3", "sama5d4" or "sama5d2".
+ - reg: Should contain registers location and length
+ 
+ 	sfr at f0038000 {
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 78996bd..36bb29c 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -973,6 +973,11 @@
+ 				status = "disabled";
+ 			};
+ 
++			sfr: sfr at f8030000 {
++				compatible = "atmel,sama5d2-sfr", "syscon";
++				reg = <0xf8030000 0x98>;
++			};
++
+ 			flx0: flexcom at f8034000 {
+ 				compatible = "atmel,sama5d2-flexcom";
+ 				reg = <0xf8034000 0x200>;
+diff --git a/include/linux/mfd/syscon/atmel-sfr.h b/include/linux/mfd/syscon/atmel-sfr.h
+new file mode 100644
+index 0000000..2f9bb98
+--- /dev/null
++++ b/include/linux/mfd/syscon/atmel-sfr.h
+@@ -0,0 +1,18 @@
++/*
++ * Atmel SFR (Special Function Registers) register offsets and bit definitions.
++ *
++ * Copyright (C) 2016 Atmel
++ *
++ * Author: Ludovic Desroches <ludovic.desroches@atmel.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef _LINUX_MFD_SYSCON_ATMEL_SFR_H
++#define _LINUX_MFD_SYSCON_ATMEL_SFR_H
++
++#define AT91_SFR_I2SCLKSEL	0x90	/* I2SC Register */
++
++#endif /* _LINUX_MFD_SYSCON_ATMEL_SFR_H */
+-- 
+2.5.0
