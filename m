@@ -1,28 +1,31 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Thu, 17 Mar 2016 14:19:06 +0000
-Subject: [PATCH v2 all 04/14] arc: use of_platform_default_populate() to
- populate default bus
-References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
- <1458113743-15131-5-git-send-email-wangkefeng.wang@huawei.com>
- <C2D7FE5348E1B147BCA15975FBA23075F4E903CE@us01wembx1.internal.synopsys.com>
- <CAL_JsqJm3AH9Exb7JifA8A4ktFcpLV=76+aC+2AsTYz-W-AZPg@mail.gmail.com>
-Message-ID: <C2D7FE5348E1B147BCA15975FBA23075F4E906A5@us01wembx1.internal.synopsys.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Mar 2016 14:27:16 +0000
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <56E97B10.4050401@codeaurora.org>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+ <20160316100759.GA18387@arm.com> <56E95A4E.4050709@codeaurora.org>
+ <20160316141802.GC13423@e104818-lin.cambridge.arm.com>
+ <56E97B10.4050401@codeaurora.org>
+Message-ID: <20160317142716.GC11623@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 March 2016 06:58 PM, Rob Herring wrote:
->> Perhaps too late - but can't of_platform_default_populate just be a static inline
->> > calling of_platform_populate in the header rather than exporting yet another symbol !
-> The idea is to not export the variable of_default_bus_match_table and
-> export a function instead.
->
-> Rob
+On Wed, Mar 16, 2016 at 10:26:08AM -0500, Timur Tabi wrote:
+> Catalin Marinas wrote:
+> >Why do you need your own defconfig? If it's just on the short term until
+> >all your code is upstream, that's fine, but this goes against the single
+> >Image aim. I would like defconfig to cover all supported SoCs (and yes,
+> >ACPI on by default once we deem it !EXPERT anymore), though at some
+> >point we may need a server/mobile split (if the generated image is too
+> >large, maybe more stuff being built as modules).
+> 
+> Yes, that's exactly it.  Ours is an ACPI system, and so we have to have our
+> own defconfig for now.  We're holding off on pushing our own defconfig
+> changes (enabling drivers, etc) until ACPI is enabled in
+> arch/arm64/configs/defconfig.
 
-Yep I realized this after reading the cover letter of patch which I didn't get !
+Is there anything that prevents you from providing a dtb/dts for this
+SoC?
 
-BTW since I got your attention, could u please take a look at
-http://lists.infradead.org/pipermail/linux-snps-arc/2016-March/000653.html
-and
-http://lists.infradead.org/pipermail/linux-snps-arc/2016-March/000656.html
-
--Vineet
+-- 
+Catalin
