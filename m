@@ -1,55 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Mar 2016 13:26:22 +0000
-Subject: [PATCH] MAINTAINERS: Add the stlinux kernel mailing list for the
- STi drm driver.
-In-Reply-To: <1458213210-13873-1-git-send-email-peter.griffin@linaro.org>
-References: <1458213210-13873-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160317132622.GB13692@x1>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 08:28:18 -0500
+Subject: [PATCH v2 all 04/14] arc: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <C2D7FE5348E1B147BCA15975FBA23075F4E903CE@us01wembx1.internal.synopsys.com>
+References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1458113743-15131-5-git-send-email-wangkefeng.wang@huawei.com>
+ <C2D7FE5348E1B147BCA15975FBA23075F4E903CE@us01wembx1.internal.synopsys.com>
+Message-ID: <CAL_JsqJm3AH9Exb7JifA8A4ktFcpLV=76+aC+2AsTYz-W-AZPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Mar 2016, Peter Griffin wrote:
+On Thu, Mar 17, 2016 at 6:29 AM, Vineet Gupta
+<Vineet.Gupta1@synopsys.com> wrote:
+> On Wednesday 16 March 2016 01:03 PM, Kefeng Wang wrote:
+>> Use helper of_platform_default_populate() in linux/of_platform
+>> when possible, instead of calling of_platform_populate() with
+>> the default match table.
+>>
+>> Acked-by: Vineet Gupta <vgupta@synopsys.com>
+>> Cc: Vineet Gupta <vgupta@synopsys.com>
+>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>
+> Thx Kefeng. I've added this to ARC for-curr for 4.6
+>
+>> ---
+>>  arch/arc/kernel/setup.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arc/kernel/setup.c b/arch/arc/kernel/setup.c
+>> index cdc821d..401f51f 100644
+>> --- a/arch/arc/kernel/setup.c
+>> +++ b/arch/arc/kernel/setup.c
+>> @@ -464,7 +464,7 @@ static int __init customize_machine(void)
+>>        * Traverses flattened DeviceTree - registering platform devices
+>>        * (if any) complete with their resources
+>>        */
+>> -     of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +     of_platform_default_populate(NULL, NULL, NULL);
+>
+> Perhaps too late - but can't of_platform_default_populate just be a static inline
+> calling of_platform_populate in the header rather than exporting yet another symbol !
 
-> Most drivers for STi are under the ARM/STI Architecture section which
-> includes this mailing list.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 6ee06ea..c541a89 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -3814,6 +3814,7 @@ DRM DRIVERS FOR STI
->  M:	Benjamin Gaignard <benjamin.gaignard@linaro.org>
->  M:	Vincent Abriou <vincent.abriou@st.com>
->  L:	dri-devel at lists.freedesktop.org
-> +L:	kernel at stlinux.com
->  T:	git http://git.linaro.org/people/benjamin.gaignard/kernel.git
->  S:	Maintained
->  F:	drivers/gpu/drm/sti
+The idea is to not export the variable of_default_bus_match_table and
+export a function instead.
 
-Doesn't it make more sense to add drivers/gpu/drm/sti/ to the ARM/STI
-ARCHITECTURE list of supported files?
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3a1a569..78201c9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1505,6 +1505,7 @@ F:        arch/arm/mach-sti/
- F:     arch/arm/boot/dts/sti*
- F:     drivers/clocksource/arm_global_timer.c
- F:     drivers/i2c/busses/i2c-st.c
-+F:     drivers/gpu/drm/sti/
- F:     drivers/media/rc/st_rc.c
- F:     drivers/mmc/host/sdhci-st.c
- F:     drivers/phy/phy-miphy28lp.c
-
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Rob
