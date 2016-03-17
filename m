@@ -1,48 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 17 Mar 2016 10:49:34 +0100
-Subject: [PATCH] crypto: marvell/cesa - forward devm_ioremap_resource()
- error code
-In-Reply-To: <1458208031-13463-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
- <1458208031-13463-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160317104934.63e9e396@bbrezillon>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 17 Mar 2016 17:57:03 +0800
+Subject: [PATCH v6 04/17] arm/xen: Use xen_xlate_map_ballooned_pages to setup
+ grant table
+In-Reply-To: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1458208636-12960-5-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the noise, just sent twice the same patch :-/.
-Please ignore this one.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-On Thu, 17 Mar 2016 10:47:11 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Use xen_xlate_map_ballooned_pages to setup grant table. Then it doesn't
+rely on DT or ACPI to pass the start address and size of grant table.
 
-> Forward devm_ioremap_resource() error code instead of returning
-> -ENOMEM.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Fixes: f63601fd616a ("crypto: marvell/cesa - add a new driver for Marvell's CESA")
-> Cc: <stable@vger.kernel.org> # 4.2+
-> ---
->  drivers/crypto/marvell/cesa.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-> index c0656e7..80239ae 100644
-> --- a/drivers/crypto/marvell/cesa.c
-> +++ b/drivers/crypto/marvell/cesa.c
-> @@ -420,7 +420,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
->  	cesa->regs = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(cesa->regs))
-> -		return -ENOMEM;
-> +		return PTR_ERR(cesa->regs);
->  
->  	ret = mv_cesa_dev_dma_init(cesa);
->  	if (ret)
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/enlighten.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
-
-
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 75cd734..d94f726 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -282,18 +282,10 @@ static int __init xen_guest_init(void)
+ {
+ 	struct xen_add_to_physmap xatp;
+ 	struct shared_info *shared_info_page = NULL;
+-	struct resource res;
+-	phys_addr_t grant_frames;
+ 
+ 	if (!xen_domain())
+ 		return 0;
+ 
+-	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
+-		pr_err("Xen grant table base address not found\n");
+-		return -ENODEV;
+-	}
+-	grant_frames = res.start;
+-
+ 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+ 	if (!xen_events_irq) {
+ 		pr_err("Xen event channel interrupt not found\n");
+@@ -328,7 +320,10 @@ static int __init xen_guest_init(void)
+ 	if (xen_vcpu_info == NULL)
+ 		return -ENOMEM;
+ 
+-	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
++	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
++	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
++					  &xen_auto_xlat_grant_frames.vaddr,
++					  xen_auto_xlat_grant_frames.count)) {
+ 		free_percpu(xen_vcpu_info);
+ 		return -ENOMEM;
+ 	}
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.0.4
