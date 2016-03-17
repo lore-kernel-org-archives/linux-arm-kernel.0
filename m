@@ -1,41 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 17 Mar 2016 08:59:11 +0100
-Subject: [PATCH] spi: imx: only do necessary changes to ECSPIx_CONFIGREG
-In-Reply-To: <1458048276-31884-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1458048276-31884-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20160317075911.GV30994@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 17 Mar 2016 09:10:27 +0100
+Subject: [PATCH 2/2] ARM: dts: r8a7794: Add IIC nodes
+In-Reply-To: <1458200117-19693-1-git-send-email-horms+renesas@verge.net.au>
+References: <1458199991-19391-1-git-send-email-horms+renesas@verge.net.au>
+ <1458200117-19693-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXU62+iyTZa4DbenwMgL_x2yyK=4u5dffO_zL7TDouNSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2016 at 02:24:36PM +0100, Dirk Behme wrote:
-> From: Knut Wohlrab <knut.wohlrab@de.bosch.com>
-> 
-> If the SPI chip select (CS) for a dedicated channel is done manually by
-> the used higher device driver, the CS may be active while writing to
-> ECSPIx_CONFIGREG. To prevent unwanted clock edges when selecting
-> the clock mode,  only do the necessary changes to the i.MX SPI
-> configuration register and leave not selected channels untouched.
-> 
-> To prevent unwanted clock edges on first use, an empty dummy
-> transmission shall be done by the initialization procedure of the device
-> driver of this channel. This will set the clock mode to the correct state.
+On Thu, Mar 17, 2016 at 8:35 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add IIC nodes to r8a7794 device tree.
+>
+> Based on similar work for the r8a7793 by Laurent Pinchart.
+>
+> CC: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-The patch does the right thing, so:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Gr{oetje,eeting}s,
 
-Only the above sentence is not clear to me. By device driver you mean
-the SPI slave driver (flash, PMIC), right? Isn't this what
-bitbang->setup_transfer(spi, NULL), called from spi_bitbang_setup() already
-does? spi_bitbang_setup should be called while adding a new SPI slave
-device and the setup_transfer with an empty message should setup the
-config register correctly without involing the slave device driver.
+                        Geert
 
-Sascha
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
