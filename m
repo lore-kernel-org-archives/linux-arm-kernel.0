@@ -1,34 +1,45 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 17 Mar 2016 17:07:40 -0500
-Subject: [PATCH v2 0/3] ARM: am335x/am437x: Correct PWM bindings
-Message-ID: <1458252463-8821-1-git-send-email-fcooper@ti.com>
+Date: Thu, 17 Mar 2016 17:07:43 -0500
+Subject: [PATCH v2 3/3] pwm: pwm-tiehrpwm: Update dt binding document to use
+ generic node name
+In-Reply-To: <1458252463-8821-1-git-send-email-fcooper@ti.com>
+References: <1458252463-8821-1-git-send-email-fcooper@ti.com>
+Message-ID: <1458252463-8821-4-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike the majority of other SOCs the PWM node uses ehrpwm instead of
-the generic pwm node name. This patch series switches to the pwm node
-name and while at it fix some other minor binding documentation issues.
+Now that the node name has been changed from ehrpwm to pwm the document
+should show this proper usage. Also change the unit address in the example
+from 0 to the proper physical address value that should be used.
 
-This patch series also includes a patch to insure ABI compatibility.
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+Version 2 changes:
+Changed the unit address for da850 to match the value in the reg property.
 
-This series was tested on AM335x and AM437x GP evm. I also validated that
-ABI compatibility was maintained.
+ Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-V2 changes:
-Dropped patches related to the ranges property.
-
-Franklin S Cooper Jr (3):
-  clk: ti: am335x/am4372: Add tbclk to pwm node
-  ARM: DTS: da850/am4372/am33xx: Use generic node name for ehrpwm
-  pwm: pwm-tiehrpwm: Update dt binding document to use generic node name
-
- Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt |  4 ++--
- arch/arm/boot/dts/am33xx.dtsi                          |  6 +++---
- arch/arm/boot/dts/am4372.dtsi                          | 12 ++++++------
- arch/arm/boot/dts/da850.dtsi                           |  4 ++--
- drivers/clk/ti/clk-33xx.c                              |  3 +++
- drivers/clk/ti/clk-43xx.c                              |  6 ++++++
- 6 files changed, 22 insertions(+), 13 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+index 9c100b2..0f9ba50 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+@@ -15,14 +15,14 @@ Optional properties:
+ 
+ Example:
+ 
+-ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
++ehrpwm0: pwm at 48300200 { /* EHRPWM on am33xx */
+ 	compatible = "ti,am33xx-ehrpwm";
+ 	#pwm-cells = <3>;
+ 	reg = <0x48300200 0x100>;
+ 	ti,hwmods = "ehrpwm0";
+ };
+ 
+-ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
++ehrpwm0: pwm at 300000 { /* EHRPWM on da850 */
+ 	compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+ 	#pwm-cells = <3>;
+ 	reg = <0x300000 0x2000>;
 -- 
 2.7.0
