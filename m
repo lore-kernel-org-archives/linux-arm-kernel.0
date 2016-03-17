@@ -1,62 +1,58 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Mar 2016 15:00:54 -0500
-Subject: [PATCH 14/18] gpio: vf610: add support for WKPU unit
-In-Reply-To: <1457576219-7971-15-git-send-email-stefan@agner.ch>
-References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
- <1457576219-7971-15-git-send-email-stefan@agner.ch>
-Message-ID: <20160317200054.GA3799@rob-hp-laptop>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 17 Mar 2016 21:09:43 +0100
+Subject: [PATCH] clockevents/drivers/timer-atmel-pit: fix double free_irq
+Message-ID: <1458245383-9859-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 06:16:55PM -0800, Stefan Agner wrote:
-> WKPU unit support within the VF610 GPIO driver. The WKPU unit allows
-> some GPIO to be the wakeup source from lowest power modes LPSTOPx.
-> The relationship between the GPIO banks and the WKPU GPIO numbering
-> can be derived from the device tree property fsl,gpio-wakeup.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  .../devicetree/bindings/gpio/gpio-vf610.txt        |   6 +
->  drivers/gpio/gpio-vf610.c                          | 151 +++++++++++++++++++++
->  2 files changed, 157 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
-> index 436cc99..985ddfd 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
-> @@ -22,6 +22,12 @@ Required properties for GPIO node:
->        4 = active high level-sensitive.
->        8 = active low level-sensitive.
->  
-> +Option properties:
+clockevents_exchange_device() changes the state from detached to shutdown
+and so at that point the IRQ has not yet been requested.
 
-Optional
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
 
-> +- fsl,gpio-wakeup : map GPIOs to WKPU unit, 3 argument cells per phandle
+Hi Sebastian,
 
-phandle to what?
+This patch fixes the last warning for preempt-rt on at91. It applies on
+v4.4.4-rt11. Note that the whome PIT/TCB mess will be fixed in another way in
+the mainline as we are reworking the tcb driver to avoid using the pit when
+booting.
 
-> +      cell 1: First GPIO (relative to the GPIO block)
-> +      cell 2: First GPIO of the WKPU unit
-> +      cell 3: Number of consecutive GPIO's
+ drivers/clocksource/timer-atmel-pit.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-An interrupt-map could work here instead even though I'm guessing you 
-don't make the WKPU an interrupt parent. Your table would look something 
-like this:
-
-<WKPU# <&gpio> GPIO#>
-
-> +
->  Note: Each GPIO port should have an alias correctly numbered in "aliases"
->  node.
->  
-> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-> index 1a022be..650a41a 100644
-> --- a/drivers/gpio/gpio-vf610.c
-> +++ b/drivers/gpio/gpio-vf610.c
-
-The WKPU seems to purely be an interrupt controller. Perhaps you should 
-use stacked irq domain here. Then it would not be tied into the GPIO 
-controller at all.
-
-Rob
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index a7abdb6638cd..7a40f7e88468 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -46,6 +46,7 @@ struct pit_data {
+ 	u32		cycle;
+ 	u32		cnt;
+ 	unsigned int	irq;
++	bool		irq_requested;
+ 	struct clk	*mck;
+ };
+ 
+@@ -96,7 +97,10 @@ static int pit_clkevt_shutdown(struct clock_event_device *dev)
+ 
+ 	/* disable irq, leaving the clocksource active */
+ 	pit_write(data->base, AT91_PIT_MR, (data->cycle - 1) | AT91_PIT_PITEN);
+-	free_irq(data->irq, data);
++	if (data->irq_requested) {
++		free_irq(data->irq, data);
++		data->irq_requested = false;
++	}
+ 	return 0;
+ }
+ 
+@@ -115,6 +119,8 @@ static int pit_clkevt_set_periodic(struct clock_event_device *dev)
+ 	if (ret)
+ 		panic(pr_fmt("Unable to setup IRQ\n"));
+ 
++	data->irq_requested = true;
++
+ 	/* update clocksource counter */
+ 	data->cnt += data->cycle * PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
+ 	pit_write(data->base, AT91_PIT_MR,
+-- 
+2.7.0
