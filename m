@@ -1,48 +1,55 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Thu, 17 Mar 2016 14:17:16 +0100
-Subject: [PATCH 0/8 v4] bcm2835 DMA slave support
-In-Reply-To: <1458156302-4359-1-git-send-email-eric@anholt.net>
-References: <1458156302-4359-1-git-send-email-eric@anholt.net>
-Message-ID: <56EAAE5C.9060401@martin.sperl.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 17 Mar 2016 13:26:22 +0000
+Subject: [PATCH] MAINTAINERS: Add the stlinux kernel mailing list for the
+ STi drm driver.
+In-Reply-To: <1458213210-13873-1-git-send-email-peter.griffin@linaro.org>
+References: <1458213210-13873-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160317132622.GB13692@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.03.2016 20:24, Eric Anholt wrote:
-> Here's the series for DMA slave and memcpy support for 2835, with the
-> DT changes to enable the remaining channels dropped out while that
-> goes through review.  I had to do some minor conflict resolution, but
-> it was pretty mechanical, and I tested again with dmatest on the last
-> patch.
->
-> Martin Sperl (8):
->    dmaengine: bcm2835: set residue_granularity field
->    dmaengine: bcm2835: remove unnecessary masking of dma channels
->    dmaengine: bcm2835: add additional defines for DMA-registers
->    dmaengine: bcm2835: move cyclic member from bcm2835_chan into
->      bcm2835_desc
->    dmaengine: bcm2835: move controlblock chain generation into separate
->      method
->    dmaengine: bcm2835: limit max length based on channel type
->    dmaengine: bcm2835: add slave_sg support to bcm2835-dma
->    dmaengine: bcm2835: add dma_memcopy support to bcm2835-dma
->
-I have successfully tested this modified patch-series
-playing BigBuckBunny on:
-* fb-tft device (fb_st7735r) - via spi-bcm2835 using slave_sg dma
-* I2S Hifiberry DAC (snd_soc_hifiberry_dac) - via bcm2835-i2s using 
-cyclic dma
+On Thu, 17 Mar 2016, Peter Griffin wrote:
 
-Required additional patches to make this work
-(especially I2S support, which is non-working since ):
-* the clock-patchsets:
-  * [PATCH 0/6] clk: bcm2835: fixes clk-bcm2835 driver issues
-     (most are reviewed by Eric)
-  * [PATCH 0/3] reorganize clock initialization and add PCM clock
-     (no reviewed/acked so far)
-* i2s patchset to enable the use of the clock framework
-  * [PATCH V2 0/3] ASOC: bcm2835: move bcm2835-i2s to use clock framework
-     (if I remember correctly Mark Brown has merged the driver patches)
-* out of tree drivers for Hifiberry DAC
-    (I guess I should upstream those...)
+> Most drivers for STi are under the ARM/STI Architecture section which
+> includes this mailing list.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 6ee06ea..c541a89 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -3814,6 +3814,7 @@ DRM DRIVERS FOR STI
+>  M:	Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>  M:	Vincent Abriou <vincent.abriou@st.com>
+>  L:	dri-devel at lists.freedesktop.org
+> +L:	kernel at stlinux.com
+>  T:	git http://git.linaro.org/people/benjamin.gaignard/kernel.git
+>  S:	Maintained
+>  F:	drivers/gpu/drm/sti
 
-Tested-by: Martin Sperl <kernel@martin.sperl.org>
+Doesn't it make more sense to add drivers/gpu/drm/sti/ to the ARM/STI
+ARCHITECTURE list of supported files?
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3a1a569..78201c9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1505,6 +1505,7 @@ F:        arch/arm/mach-sti/
+ F:     arch/arm/boot/dts/sti*
+ F:     drivers/clocksource/arm_global_timer.c
+ F:     drivers/i2c/busses/i2c-st.c
++F:     drivers/gpu/drm/sti/
+ F:     drivers/media/rc/st_rc.c
+ F:     drivers/mmc/host/sdhci-st.c
+ F:     drivers/phy/phy-miphy28lp.c
+
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
