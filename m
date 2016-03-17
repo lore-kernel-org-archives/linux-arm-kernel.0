@@ -1,41 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Mar 2016 16:56:33 +0100
-Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
-In-Reply-To: <20160305004336.GG55664@google.com>
-References: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
- <1457137718.43867.266.camel@infradead.org>
- <20160305004336.GG55664@google.com>
-Message-ID: <4420020.GISMAEPJsq@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 17 Mar 2016 15:57:22 +0000
+Subject: [PATCH] arm64: dma-mapping: fix dma_to_phys API for IOMMU
+ attached devices
+In-Reply-To: <1458229833-4886-1-git-send-email-okaya@codeaurora.org>
+References: <1458229833-4886-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <56EAD3E2.5070109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 March 2016 16:43:36 Brian Norris wrote:
-> On Sat, Mar 05, 2016 at 12:28:38AM +0000, David Woodhouse wrote:
-> > On Fri, 2016-03-04 at 16:22 -0800, Brian Norris wrote:
-> > > 
-> > > ...but, does anyone care about XIP / MTD_XIP then, if the first two
-> > > examples we have both have long-standing build issues?
-> > 
-> > I think there are people trying to make it work on other platforms,
-> > yes.
-> 
-> OK... can we kill the broken platforms though? I'm not confident that my
-> and Arnd's workaround attempts will yield anything more than a pat on
-> our own backs to say "yay, it compiles!" And given the number of
-> practically unused things we're already maintaining in MTD, I'm always
-> happy for an excuse to kill off some of it.
+On 17/03/16 15:50, Sinan Kaya wrote:
+> This patch modifies dma_to_phys to call iommu_iova_to_phys to perform dma
+> to phys conversions for IOMMU attached devices where dma and physical
+> addresses often have distinct values.
 
-Sorry for the late reply.
+What's this for? dma_to_phys() is only used by SWIOTLB, and that's 
+mutually exclusive with IOMMU ops.
 
-As the three platforms that use this have all been broken for around
-ten years, it seems reasonable to assume nobody is going to miss the
-current implementation, but I'd leave it up to the individual platform
-maintainers.
+Also, what about phys_to_dma()?
 
-If we remove all three, that would also give us more flexibility
-regarding the interface definition for any future users of the feature.
-I think the most likely to use it is the Renesas RZ/A1H platform
-with its 10MB of on-chip SRAM, and this one doesn't work with the
-current method anyway.
+Robin.
 
-	Arnd
+> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>   arch/arm64/include/asm/dma-mapping.h |  5 +----
+>   arch/arm64/mm/dma-mapping.c          | 16 ++++++++++++++++
+>   2 files changed, 17 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index ba437f0..a0a486c 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -69,10 +69,7 @@ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+>   	return (dma_addr_t)paddr;
+>   }
+>
+> -static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> -{
+> -	return (phys_addr_t)dev_addr;
+> -}
+> +phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr);
+>
+>   static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+>   {
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 331c4ca..8252a92 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -989,3 +989,19 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   	dev->archdata.dma_coherent = coherent;
+>   	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+>   }
+> +
+> +phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> +{
+> +	phys_addr_t phys = (phys_addr_t)dev_addr;
+> +
+> +#ifdef CONFIG_IOMMU_DMA
+> +	struct iommu_domain *domain;
+> +
+> +	domain = iommu_get_domain_for_dev(dev);
+> +	if (domain)
+> +		phys = iommu_iova_to_phys(domain, dev_addr);
+> +#endif
+> +
+> +	return phys;
+> +}
+> +EXPORT_SYMBOL(dma_to_phys);
+>
