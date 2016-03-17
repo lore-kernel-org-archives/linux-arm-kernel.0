@@ -1,61 +1,75 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Mar 2016 17:57:15 +0800
-Subject: [PATCH v6 16/17] FDT: Add a helper to get the subnode by given name
+Date: Thu, 17 Mar 2016 17:57:12 +0800
+Subject: [PATCH v6 13/17] ARM: Xen: Document UEFI support on Xen ARM virtual
+ platforms
 In-Reply-To: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1458208636-12960-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1458208636-12960-14-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Sometimes it needs to check if there is a subnode of given node in FDT
-by given name. Introduce this helper to get the subnode if it exists.
+Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+scan this to get the UEFI information.
 
-CC: Rob Herring <robh@kernel.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/of/fdt.c       | 13 +++++++++++++
- include/linux/of_fdt.h |  2 ++
- 2 files changed, 15 insertions(+)
+CC: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/xen.txt | 33 +++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 655f79d..09001db 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -645,6 +645,19 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
- }
+diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+index 0f7b9c2..6f83f76 100644
+--- a/Documentation/devicetree/bindings/arm/xen.txt
++++ b/Documentation/devicetree/bindings/arm/xen.txt
+@@ -15,6 +15,26 @@ the following properties:
+ - interrupts: the interrupt used by Xen to inject event notifications.
+   A GIC node is also required.
  
- /**
-+ * of_get_flat_dt_subnode_by_name - get the subnode by given name
-+ *
-+ * @node: the parent node
-+ * @uname: the name of subnode
-+ * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
-+ */
++To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
++under /hypervisor with following parameters:
 +
-+int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
-+{
-+	return fdt_subnode_offset(initial_boot_params, node, uname);
-+}
++________________________________________________________________________________
++Name                      | Size   | Description
++================================================================================
++xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
++			  |	   | Table.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
++			  |	   | map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
++                          |        | pointed to in previous entry.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
++                          |        | memory map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
++--------------------------------------------------------------------------------
+ 
+ Example (assuming #address-cells = <2> and #size-cells = <2>):
+ 
+@@ -22,4 +42,17 @@ hypervisor {
+ 	compatible = "xen,xen-4.3", "xen,xen";
+ 	reg = <0 0xb0000000 0 0x20000>;
+ 	interrupts = <1 15 0xf08>;
++	uefi {
++		xen,uefi-system-table = <0xXXXXXXXX>;
++		xen,uefi-mmap-start = <0xXXXXXXXX>;
++		xen,uefi-mmap-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
++        };
+ };
 +
-+/**
-  * of_get_flat_dt_root - find the root node in the flat blob
-  */
- unsigned long __init of_get_flat_dt_root(void)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index df9ef38..fc28162 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -52,6 +52,8 @@ extern char __dtb_end[];
- extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
- 				     int depth, void *data),
- 			   void *data);
-+extern int of_get_flat_dt_subnode_by_name(unsigned long node,
-+					  const char *uname);
- extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
- 				       int *size);
- extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
++The format and meaning of the "xen,uefi-*" parameters are similar to those in
++Documentation/arm/uefi.txt, which are provided by the regular UEFI stub. However
++they differ because they are provided by the Xen hypervisor, together with a set
++of UEFI runtime services implemented via hypercalls, see
++http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,platform.h.html.
 -- 
 2.0.4
