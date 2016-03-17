@@ -1,14 +1,20 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed, 16 Mar 2016 21:26:35 -0500
-Subject: [PATCH v2 02/11] ARM: davinci: add set_parent callback for mux clocks
+Date: Wed, 16 Mar 2016 21:26:36 -0500
+Subject: [PATCH v2 03/11] ARM: davinci: da850: use clk->set_parent for async3
 In-Reply-To: <1458181615-27782-1-git-send-email-david@lechnology.com>
 References: <1458181615-27782-1-git-send-email-david@lechnology.com>
-Message-ID: <1458181615-27782-3-git-send-email-david@lechnology.com>
+Message-ID: <1458181615-27782-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a set_parent callback that will be used for mux clocks, such as
-the USB PHY muxes and the async3 clock domain mux.
+The da850 family of processors has an async3 clock domain that can be
+muxed to either pll0_sysclk2 or pll1_sysclk2. Now that the davinci clocks
+have a set_parent callback, we can use this to control the async3 mux
+instead of a stand-alone function.
+
+This adds a new async3_clk and sets the appropriate child clocks. The
+default is use to pll1_sysclk2 since it is not affected by processor
+frequency scaling.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
@@ -16,57 +22,187 @@ Signed-off-by: David Lechner <david@lechnology.com>
 v2 changes: This is a new patch in v2.
 
 
- arch/arm/mach-davinci/clock.c | 17 ++++++++++++++++-
- arch/arm/mach-davinci/clock.h |  1 +
- 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index 3424eac6..3143e8b 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -195,6 +195,13 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- 		return -EINVAL;
+ arch/arm/mach-davinci/da850.c | 88 ++++++++++++++++++++-----------------------
+ 1 file changed, 40 insertions(+), 48 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 97d8779..8c8f31e 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -34,9 +34,6 @@
+ #include "clock.h"
+ #include "mux.h"
  
- 	mutex_lock(&clocks_mutex);
-+	if (clk->set_parent) {
-+		int ret = clk->set_parent(clk, parent);
-+		if (ret) {
-+			mutex_unlock(&clocks_mutex);
-+			return ret;
-+		}
-+	}
- 	clk->parent = parent;
- 	list_del_init(&clk->childnode);
- 	list_add(&clk->childnode, &clk->parent->children);
-@@ -224,8 +231,16 @@ int clk_register(struct clk *clk)
- 
- 	mutex_lock(&clocks_mutex);
- 	list_add_tail(&clk->node, &clocks);
--	if (clk->parent)
-+	if (clk->parent) {
-+		if (clk->set_parent) {
-+			int ret = clk->set_parent(clk, clk->parent);
-+			if (ret) {
-+				mutex_unlock(&clocks_mutex);
-+				return ret;
-+			}
-+		}
- 		list_add_tail(&clk->childnode, &clk->parent->children);
-+	}
- 	mutex_unlock(&clocks_mutex);
- 
- 	/* If rate is already set, use it */
-diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
-index 1e4e836..e2a5437 100644
---- a/arch/arm/mach-davinci/clock.h
-+++ b/arch/arm/mach-davinci/clock.h
-@@ -106,6 +106,7 @@ struct clk {
- 	int (*reset) (struct clk *clk, bool reset);
- 	void (*clk_enable) (struct clk *clk);
- 	void (*clk_disable) (struct clk *clk);
-+	int (*set_parent) (struct clk *clk, struct clk *parent);
+-/* SoC specific clock flags */
+-#define DA850_CLK_ASYNC3	BIT(16)
+-
+ #define DA850_PLL1_BASE		0x01e1a000
+ #define DA850_TIMER64P2_BASE	0x01f0c000
+ #define DA850_TIMER64P3_BASE	0x01f0d000
+@@ -161,6 +158,39 @@ static struct clk pll1_sysclk3 = {
+ 	.div_reg	= PLLDIV3,
  };
  
- /* Clock flags: SoC-specific flags start at BIT(16) */
++static int da850_async3_set_parent(struct clk *clk, struct clk *parent)
++{
++	u32 __iomem *cfgchip3;
++	u32 val;
++
++	/*
++	 * Can't use DA8XX_SYSCFG0_VIRT() here since this can be called before
++	 * da8xx_syscfg0_base is initialized.
++	 */
++	cfgchip3 = ioremap(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP3_REG, 4);
++	val = readl(cfgchip3);
++
++	/* Set the USB 1.1 PHY clock mux based on the parent clock. */
++	if (parent == &pll0_sysclk2)
++		val &= ~CFGCHIP3_ASYNC3_CLKSRC;
++	else if (parent == &pll1_sysclk2)
++		val |= CFGCHIP3_ASYNC3_CLKSRC;
++	else {
++		pr_err("Bad parent on async3 clock mux.\n");
++		return -EINVAL;
++	}
++
++	writel(val, cfgchip3);
++
++	return 0;
++}
++
++static struct clk async3_clk = {
++	.name		= "async3",
++	.parent		= &pll1_sysclk2,
++	.set_parent	= da850_async3_set_parent,
++};
++
+ static struct clk i2c0_clk = {
+ 	.name		= "i2c0",
+ 	.parent		= &pll0_aux_clk,
+@@ -234,18 +264,16 @@ static struct clk uart0_clk = {
+ 
+ static struct clk uart1_clk = {
+ 	.name		= "uart1",
+-	.parent		= &pll0_sysclk2,
++	.parent		= &async3_clk,
+ 	.lpsc		= DA8XX_LPSC1_UART1,
+ 	.gpsc		= 1,
+-	.flags		= DA850_CLK_ASYNC3,
+ };
+ 
+ static struct clk uart2_clk = {
+ 	.name		= "uart2",
+-	.parent		= &pll0_sysclk2,
++	.parent		= &async3_clk,
+ 	.lpsc		= DA8XX_LPSC1_UART2,
+ 	.gpsc		= 1,
+-	.flags		= DA850_CLK_ASYNC3,
+ };
+ 
+ static struct clk aintc_clk = {
+@@ -300,10 +328,9 @@ static struct clk emac_clk = {
+ 
+ static struct clk mcasp_clk = {
+ 	.name		= "mcasp",
+-	.parent		= &pll0_sysclk2,
++	.parent		= &async3_clk,
+ 	.lpsc		= DA8XX_LPSC1_McASP0,
+ 	.gpsc		= 1,
+-	.flags		= DA850_CLK_ASYNC3,
+ };
+ 
+ static struct clk lcdc_clk = {
+@@ -355,10 +382,9 @@ static struct clk spi0_clk = {
+ 
+ static struct clk spi1_clk = {
+ 	.name		= "spi1",
+-	.parent		= &pll0_sysclk2,
++	.parent		= &async3_clk,
+ 	.lpsc		= DA8XX_LPSC1_SPI1,
+ 	.gpsc		= 1,
+-	.flags		= DA850_CLK_ASYNC3,
+ };
+ 
+ static struct clk vpif_clk = {
+@@ -386,10 +412,9 @@ static struct clk dsp_clk = {
+ 
+ static struct clk ehrpwm_clk = {
+ 	.name		= "ehrpwm",
+-	.parent		= &pll0_sysclk2,
++	.parent		= &async3_clk,
+ 	.lpsc		= DA8XX_LPSC1_PWM,
+ 	.gpsc		= 1,
+-	.flags		= DA850_CLK_ASYNC3,
+ };
+ 
+ #define DA8XX_EHRPWM_TBCLKSYNC	BIT(12)
+@@ -421,10 +446,9 @@ static struct clk ehrpwm_tbclk = {
+ 
+ static struct clk ecap_clk = {
+ 	.name		= "ecap",
+-	.parent		= &pll0_sysclk2,
++	.parent		= &async3_clk,
+ 	.lpsc		= DA8XX_LPSC1_ECAP,
+ 	.gpsc		= 1,
+-	.flags		= DA850_CLK_ASYNC3,
+ };
+ 
+ static struct clk_lookup da850_clks[] = {
+@@ -442,6 +466,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"pll1_aux",	&pll1_aux_clk),
+ 	CLK(NULL,		"pll1_sysclk2",	&pll1_sysclk2),
+ 	CLK(NULL,		"pll1_sysclk3",	&pll1_sysclk3),
++	CLK(NULL,		"async3",	&async3_clk),
+ 	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
+ 	CLK(NULL,		"timer0",	&timerp64_0_clk),
+ 	CLK("davinci-wdt",	NULL,		&timerp64_1_clk),
+@@ -909,30 +934,6 @@ static struct davinci_timer_info da850_timer_info = {
+ 	.clocksource_id	= T0_TOP,
+ };
+ 
+-static void da850_set_async3_src(int pllnum)
+-{
+-	struct clk *clk, *newparent = pllnum ? &pll1_sysclk2 : &pll0_sysclk2;
+-	struct clk_lookup *c;
+-	unsigned int v;
+-	int ret;
+-
+-	for (c = da850_clks; c->clk; c++) {
+-		clk = c->clk;
+-		if (clk->flags & DA850_CLK_ASYNC3) {
+-			ret = clk_set_parent(clk, newparent);
+-			WARN(ret, "DA850: unable to re-parent clock %s",
+-								clk->name);
+-		}
+-       }
+-
+-	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+-	if (pllnum)
+-		v |= CFGCHIP3_ASYNC3_CLKSRC;
+-	else
+-		v &= ~CFGCHIP3_ASYNC3_CLKSRC;
+-	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+-}
+-
+ #ifdef CONFIG_CPU_FREQ
+ /*
+  * Notes:
+@@ -1328,15 +1329,6 @@ void __init da850_init(void)
+ 	if (WARN(!da8xx_syscfg1_base, "Unable to map syscfg1 module"))
+ 		return;
+ 
+-	/*
+-	 * Move the clock source of Async3 domain to PLL1 SYSCLK2.
+-	 * This helps keeping the peripherals on this domain insulated
+-	 * from CPU frequency changes caused by DVFS. The firmware sets
+-	 * both PLL0 and PLL1 to the same frequency so, there should not
+-	 * be any noticeable change even in non-DVFS use cases.
+-	 */
+-	da850_set_async3_src(1);
+-
+ 	/* Unlock writing to PLL0 registers */
+ 	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP0_REG));
+ 	v &= ~CFGCHIP0_PLL_MASTER_LOCK;
 -- 
 1.9.1
