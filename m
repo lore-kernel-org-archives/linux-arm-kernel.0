@@ -1,48 +1,57 @@
-From: knut.wohlrab@de.bosch.com (Knut Wohlrab)
-Date: Thu, 17 Mar 2016 16:00:30 +0100
-Subject: [PATCH] spi: imx: only do necessary changes to ECSPIx_CONFIGREG
-In-Reply-To: <20160317075911.GV30994@pengutronix.de>
-References: <1458048276-31884-1-git-send-email-dirk.behme@de.bosch.com>
- <20160317075911.GV30994@pengutronix.de>
-Message-ID: <56EAC68E.4040103@de.bosch.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 10:01:40 -0500
+Subject: [PATCH 4/5] pwm: pwm-tipwmss: Update documentation to use empty
+ range property
+In-Reply-To: <1457380318-15452-5-git-send-email-fcooper@ti.com>
+References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
+ <1457380318-15452-5-git-send-email-fcooper@ti.com>
+Message-ID: <20160317150140.GA25775@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03/17/2016 um 08:59 AM schrieb Sascha Hauer:
-> On Tue, Mar 15, 2016 at 02:24:36PM +0100, Dirk Behme wrote:
->> > From: Knut Wohlrab <knut.wohlrab@de.bosch.com>
->> > 
->> > If the SPI chip select (CS) for a dedicated channel is done manually by
->> > the used higher device driver, the CS may be active while writing to
->> > ECSPIx_CONFIGREG. To prevent unwanted clock edges when selecting
->> > the clock mode,  only do the necessary changes to the i.MX SPI
->> > configuration register and leave not selected channels untouched.
->> > 
->> > To prevent unwanted clock edges on first use, an empty dummy
->> > transmission shall be done by the initialization procedure of the device
->> > driver of this channel. This will set the clock mode to the correct state.
-> The patch does the right thing, so:
-> 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Only the above sentence is not clear to me. By device driver you mean
-> the SPI slave driver (flash, PMIC), right? Isn't this what
-> bitbang->setup_transfer(spi, NULL), called from spi_bitbang_setup() already
-> does? spi_bitbang_setup should be called while adding a new SPI slave
-> device and the setup_transfer with an empty message should setup the
-> config register correctly without involing the slave device driver.
-> 
-> Sascha
-> 
-"Higher device driver" is a "historical" protocol stack to unify our
-data transfer via several physical interfaces, here SPI. This driver
-requires own control to the CS signal to start data transfer only if CS
-is acknowledged by the external SPI slave device via GPIO/IRQ. Therefore
-we can not rely on iMX6 SPI controller IP or kernel driver CS/RDY
-functionality. The CS signal is active before the SPI driver is involved
-and if the SPI driver changes the clock polarity, the unwanted clock
-edge is destroying the data transfer.
+On Mon, Mar 07, 2016 at 01:51:57PM -0600, Franklin S Cooper Jr wrote:
+> Since the PWMSS and its subdevices (eCAP and ePWM) use the same address
+> space then the range property should be empty. Update the documentation
+> to show the correct usage.
 
-Thanks and regards
+Why does it matter? An empty ranges is generally not preferred.
 
-Knut
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt | 12 ++++--------
+>  1 file changed, 4 insertions(+), 8 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+> index f7eae77..672fa71 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+> @@ -7,11 +7,9 @@ Required properties:
+>  		  Should set to 1.
+>  - size-cells: specify number of u32 entries needed to specify child nodes size
+>  		in reg property. Should set to 1.
+> -- ranges: describes the address mapping of a memory-mapped bus. Should set to
+> -	   physical address map of child's base address, physical address within
+> -	   parent's address  space and length of the address map. For am33xx,
+> -	   3 set of child register maps present, ECAP register space, EQEP
+> -	   register space, EHRPWM register space.
+> +- ranges: describes the address mapping of a memory-mapped bus. Its value
+> +	  should be empty since no address translation is needed between the
+> +	  parent and the child.
+>  
+>  Also child nodes should also populated under PWMSS DT node.
+>  
+> @@ -23,9 +21,7 @@ pwmss0: pwmss at 48300000 {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+>  	status = "disabled";
+> -	ranges = <0x48300100 0x48300100 0x80   /* ECAP */
+> -		  0x48300180 0x48300180 0x80   /* EQEP */
+> -		  0x48300200 0x48300200 0x80>; /* EHRPWM */
+> +	ranges;
+>  
+>  	/* child nodes go here */
+>  };
+> -- 
+> 2.7.0
+> 
