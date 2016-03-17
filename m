@@ -1,24 +1,24 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 17 Mar 2016 19:13:31 +0800
-Subject: [PATCH] crypto: marvell/cesa - forward devm_ioremap_resource()
- error code
-In-Reply-To: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160317111331.GB5658@gondor.apana.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Mar 2016 12:21:07 +0100
+Subject: [PATCH] ARM: use --fix-v4bx to allow building ARMv4 with future
+ gcc
+In-Reply-To: <20160317104645.GZ19428@n2100.arm.linux.org.uk>
+References: <12678426.5oeMNXL25J@wuerfel>
+ <20160317104645.GZ19428@n2100.arm.linux.org.uk>
+Message-ID: <2066491.QlhNIVNMMC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 10:47:10AM +0100, Boris Brezillon wrote:
-> Forward devm_ioremap_resource() error code instead of returning
-> -ENOMEM.
+On Thursday 17 March 2016 10:46:45 Russell King - ARM Linux wrote:
+> > instructions instead of 'ld pc,reg'. This is not supported on
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Fixes: f63601fd616a ("crypto: marvell/cesa - add a new driver for Marvell's CESA")
-> Cc: <stable@vger.kernel.org> # 4.2+
+> ITYM mov pc, reg
+> 
+> > in loadable modules and converts bx instructions into ldr even
+> 
+> MOV.
+> 
 
-All three patches applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Fixed, thanks.
+
+	Arnd
