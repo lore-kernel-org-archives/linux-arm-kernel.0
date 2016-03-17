@@ -1,139 +1,97 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 17 Mar 2016 13:59:44 +0100
-Subject: [PATCH v6 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <1458208636-12960-2-git-send-email-zhaoshenglong@huawei.com>
-References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
- <1458208636-12960-2-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <CAJZ5v0jw=R4n7qMk4ibZAeC=tkat6O-cgWiQnRb4o02Hy6ehpA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 17 Mar 2016 16:11:37 +0300
+Subject: [PATCH v2 11/11] usb: musb: da8xx: Remove mach code
+In-Reply-To: <1458181615-27782-12-git-send-email-david@lechnology.com>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+ <1458181615-27782-12-git-send-email-david@lechnology.com>
+Message-ID: <56EAAD09.3080600@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 10:57 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 3/17/2016 5:26 AM, David Lechner wrote:
+
+> Use the new phy-da8xx-usb driver to take the place of the mach code that
+> pokes CFGCHIP2 in the da8xx musb glue driver.
 >
-> ACPI 6.0 introduces a new table STAO to list the devices which are used
-> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-> UART is used by Xen. So here it hides UART from Dom0.
->
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Signed-off-by: David Lechner <david@lechnology.com>
 > ---
-> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
-> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
-> CC: linux-acpi at vger.kernel.org (open list:ACPI)
-> ---
->  drivers/acpi/scan.c | 63 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
 >
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index 5f28cf7..55ceb69 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
->  DEFINE_MUTEX(acpi_device_lock);
->  LIST_HEAD(acpi_wakeup_device_list);
->  static DEFINE_MUTEX(acpi_hp_context_lock);
-> +static u64 spcr_uart_addr;
+> v2 changes: This is part of a previous patch that was split. This version uses
+> the new phy driver instead of a second clock. It also gets rid of more mach
+> code.
 >
->  struct acpi_dep_data {
->         struct list_head node;
-> @@ -1453,6 +1454,41 @@ static int acpi_add_single_object(struct acpi_device **child,
->         return 0;
->  }
 >
-> +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
-> +                                           void *context)
-> +{
-> +       struct resource *res = context;
-> +
-> +       if (acpi_dev_resource_memory(ares, res))
-> +               return AE_CTRL_TERMINATE;
-> +
-> +       return AE_OK;
-> +}
-> +
-> +static bool acpi_device_should_be_hidden(acpi_handle handle)
-> +{
-> +       acpi_status status;
-> +       struct resource res;
-> +
-> +       /* Check if it should ignore the UART device */
-> +       if (spcr_uart_addr != 0) {
-> +               if (!acpi_has_method(handle, METHOD_NAME__CRS))
-> +                       return false;
-> +
-> +               status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-> +                                            acpi_get_resource_memory, &res);
-> +               if (ACPI_FAILURE(status))
-> +                       return false;
-> +
-> +               if (res.start == spcr_uart_addr) {
-> +                       printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
-> +                       return true;
-> +               }
-> +       }
-> +
-> +       return false;
-> +}
-> +
->  static int acpi_bus_type_and_status(acpi_handle handle, int *type,
->                                     unsigned long long *sta)
->  {
-> @@ -1466,6 +1502,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
->         switch (acpi_type) {
->         case ACPI_TYPE_ANY:             /* for ACPI_ROOT_OBJECT */
->         case ACPI_TYPE_DEVICE:
-> +               if (acpi_device_should_be_hidden(handle))
-> +                       return -ENODEV;
-> +
->                 *type = ACPI_BUS_TYPE_DEVICE;
->                 status = acpi_bus_get_status_handle(handle, sta);
->                 if (ACPI_FAILURE(status))
-> @@ -1919,6 +1958,8 @@ static int acpi_bus_scan_fixed(void)
->  int __init acpi_scan_init(void)
->  {
->         int result;
-> +       acpi_status status;
-> +       struct acpi_table_stao *stao_ptr;
+>   drivers/usb/musb/da8xx.c | 126 ++++++++++++-----------------------------------
+>   1 file changed, 31 insertions(+), 95 deletions(-)
 >
->         acpi_pci_root_init();
->         acpi_pci_link_init();
-> @@ -1934,6 +1975,28 @@ int __init acpi_scan_init(void)
+> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+> index 50f07a5..1d51711 100644
+> --- a/drivers/usb/musb/da8xx.c
+> +++ b/drivers/usb/musb/da8xx.c
+> @@ -30,13 +30,11 @@
+>   #include <linux/clk.h>
+>   #include <linux/err.h>
+>   #include <linux/io.h>
+> +#include <linux/phy/phy.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/usb/usb_phy_generic.h>
 >
->         acpi_scan_add_handler(&generic_device_handler);
->
-> +       /*
-> +        * If there is STAO table, check whether it needs to ignore the UART
-> +        * device in SPCR table.
-> +        */
-> +       status = acpi_get_table(ACPI_SIG_STAO, 0,
-> +                               (struct acpi_table_header **)&stao_ptr);
-> +       if (ACPI_SUCCESS(status)) {
-> +               if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
-> +                       printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
-> +
-> +               if (stao_ptr->ignore_uart) {
-> +                       struct acpi_table_spcr *spcr_ptr;
-> +
-> +                       status = acpi_get_table(ACPI_SIG_SPCR, 0,
-> +                                       (struct acpi_table_header **)&spcr_ptr);
-> +                       if (ACPI_SUCCESS(status))
-> +                               spcr_uart_addr = spcr_ptr->serial_port.address;
-> +                       else
-> +                               printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
-> +               }
-> +       }
+> -#include <mach/da8xx.h>
+> -#include <linux/platform_data/usb-davinci.h>
 
-I'd put the above part into a separate function and call that from
-here.  You'd be able to reduce the indentation level then slightly
-without using gotos.
+    I guess we can move this header back into mach/ now?
 
-Apart from this minor point the patch is fine by me.
-
+[...]
+> @@ -383,31 +335,18 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
+>   	return ret;
+>   }
+>
+> +extern int da8xx_usb20_phy_set_mode(struct phy *phy, enum musb_mode mode);
 > +
->         mutex_lock(&acpi_scan_lock);
->         /*
->          * Enumerate devices in the ACPI namespace.
-> --
 
-Thanks,
-Rafael
+    You now need to select your new PHY driver since otherwise the kernel 
+won't build.
+    You can remove "depends on BROKEN" as well since your patch is un-breaking 
+it. :-)
+
+[...]
+> @@ -425,19 +364,24 @@ static int da8xx_musb_init(struct musb *musb)
+[...]
+>   	/* Start the on-chip PHY and its PLL. */
+> -	phy_on();
+> +	phy_power_on(glue->phy);
+
+    What about phy_init()?
+
+> @@ -448,9 +392,12 @@ fail:
+>
+>   static int da8xx_musb_exit(struct musb *musb)
+>   {
+> +	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
+> +
+>   	del_timer_sync(&otg_workaround);
+>
+> -	phy_off();
+> +	phy_power_off(glue->phy);
+
+    phy_exit()?
+
+[...]
+> @@ -503,19 +450,19 @@ static int da8xx_probe(struct platform_device *pdev)
+[...]
+>
+>   	glue->dev			= &pdev->dev;
+>   	pdata->platform_ops		= &da8xx_ops;
+>
+> -	glue->phy = usb_phy_generic_register();
+> -	if (IS_ERR(glue->phy)) {
+> -		ret = PTR_ERR(glue->phy);
+> -		goto err5;
+> +	glue->usb_phy = usb_phy_generic_register();
+
+    Hm, do we still need the USB PHY? It does nothing IIRC...
+
+[...]
+
+MBR, Sergei
