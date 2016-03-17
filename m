@@ -1,52 +1,39 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 17 Mar 2016 15:07:10 +0000
-Subject: [PATCH] MAINTAINERS: Add the stlinux kernel mailing list for the
- STi drm driver.
-In-Reply-To: <20160317132622.GB13692@x1>
-References: <1458213210-13873-1-git-send-email-peter.griffin@linaro.org>
- <20160317132622.GB13692@x1>
-Message-ID: <20160317150710.GA26662@griffinp-ThinkPad-X1-Carbon-2nd>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 17 Mar 2016 10:07:30 -0500
+Subject: [PATCH v4 0/5] acpi, clocksource, kvm: add GTDT and ARM
+ memory-mapped timer support
+In-Reply-To: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
+References: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <56EAC832.6070203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+>
+> This patchset:
+>      (1)Move some enums and marcos to header file for arm_arch_timer,
+>      improve the pr_* code by defining "pr_fmt(fmt)" in arm_arch_timer.c
+>
+>      (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
+>      Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>      memory-mapped timer and SBSA Generic Watchdog timer.
+>      This driver can help to simplify all the relevant timer drivers,
+>      and separate all the ACPI GTDT knowledge from them.
+>
+>      (3)Simplify ACPI code for arch timer in arm_arch_timer.c
+>
+>      (4)Add memory-mapped timer support in arm_arch_timer.c
 
-On Thu, 17 Mar 2016, Lee Jones wrote:
+The SBSA watchdog driver is already in watchdog-next and will be merged 
+into 4.6.  These five patches are necessary for the watchdog driver to 
+probe on an ACPI system.
 
-> On Thu, 17 Mar 2016, Peter Griffin wrote:
-> 
-> > Most drivers for STi are under the ARM/STI Architecture section which
-> > includes this mailing list.
-> > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > ---
-> >  MAINTAINERS | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 6ee06ea..c541a89 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -3814,6 +3814,7 @@ DRM DRIVERS FOR STI
-> >  M:	Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> >  M:	Vincent Abriou <vincent.abriou@st.com>
-> >  L:	dri-devel at lists.freedesktop.org
-> > +L:	kernel at stlinux.com
-> >  T:	git http://git.linaro.org/people/benjamin.gaignard/kernel.git
-> >  S:	Maintained
-> >  F:	drivers/gpu/drm/sti
-> 
-> Doesn't it make more sense to add drivers/gpu/drm/sti/ to the ARM/STI
-> ARCHITECTURE list of supported files?
+I'm guessing since that v4 was posted in the middle of the 4.6 merge 
+window, that these patches won't make it and we'll have to wait until 
+4.7 (at the earliest)?
 
-I assumed Vincent and Benjamin deliberately added a new entry because they
-want to be maintainers of this driver (which I think probably makes sense given
-that the display IP is quite complicated).
-
-Not seeing these patches on kernel at stlinux.com list though has caught me out,
-especially recent changes applied to the firmware loading mechanism in drm/sti which
-also need similar changes in c8sectpfe and fdma drivers.
-
-regards,
-
-Peter.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
