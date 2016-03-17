@@ -1,43 +1,62 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 17 Mar 2016 20:55:09 +0100
-Subject: [PATCH 4.4-rt2] fix
- arm-at91-pit-remove-irq-handler-when-clock-is-unused.patch
-In-Reply-To: <alpine.DEB.2.11.1601201158280.3575@nanos>
-References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1452997394-8554-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20160118172522.GB12309@linutronix.de>
- <20160118184247.GQ3367@piout.net>
- <alpine.DEB.2.11.1601201158280.3575@nanos>
-Message-ID: <20160317195509.GF2831@piout.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Mar 2016 15:00:54 -0500
+Subject: [PATCH 14/18] gpio: vf610: add support for WKPU unit
+In-Reply-To: <1457576219-7971-15-git-send-email-stefan@agner.ch>
+References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
+ <1457576219-7971-15-git-send-email-stefan@agner.ch>
+Message-ID: <20160317200054.GA3799@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 20/01/2016 at 12:07:30 +0100, Thomas Gleixner wrote :
-> Well freeing the irq from that context in RT only works because its called
-> before SYSTEM_STATE=RUNNING. So no, this was wrong forever.
+On Wed, Mar 09, 2016 at 06:16:55PM -0800, Stefan Agner wrote:
+> WKPU unit support within the VF610 GPIO driver. The WKPU unit allows
+> some GPIO to be the wakeup source from lowest power modes LPSTOPx.
+> The relationship between the GPIO banks and the WKPU GPIO numbering
+> can be derived from the device tree property fsl,gpio-wakeup.
 > 
-> The issue we are dealing with is that the timer interrupt is shared with the
-> uart. So the timer has IRQ_NO_THREAD set and the uart interrupt gets force
-> threaded. So that results in a failure to request the interrupt for the
-> UART. That's not RT specific, that already happens in mainline if you add
-> 'threadirqs' to the command line.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  .../devicetree/bindings/gpio/gpio-vf610.txt        |   6 +
+>  drivers/gpio/gpio-vf610.c                          | 151 +++++++++++++++++++++
+>  2 files changed, 157 insertions(+)
 > 
-> So until the DT folks come to senses and we get that dummy demux chip done, I
-> came up with the following - completely untested - solution.
-> 
-> The downside of this is, that the timer will be delayed until the uart thread
-> returns, but with the replacement clockevent in place on RT that's a non
-> issue. For mainline it's obviously better than what we have now.
-> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+> index 436cc99..985ddfd 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+> @@ -22,6 +22,12 @@ Required properties for GPIO node:
+>        4 = active high level-sensitive.
+>        8 = active low level-sensitive.
+>  
+> +Option properties:
 
-I've tested it and it seems to work properly on the few platform where I
-can reproduce the issue. What is your plan regarding upstreaming? I
-guess you can split and take the resulting patches through your tree.
+Optional
 
+> +- fsl,gpio-wakeup : map GPIOs to WKPU unit, 3 argument cells per phandle
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+phandle to what?
+
+> +      cell 1: First GPIO (relative to the GPIO block)
+> +      cell 2: First GPIO of the WKPU unit
+> +      cell 3: Number of consecutive GPIO's
+
+An interrupt-map could work here instead even though I'm guessing you 
+don't make the WKPU an interrupt parent. Your table would look something 
+like this:
+
+<WKPU# <&gpio> GPIO#>
+
+> +
+>  Note: Each GPIO port should have an alias correctly numbered in "aliases"
+>  node.
+>  
+> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+> index 1a022be..650a41a 100644
+> --- a/drivers/gpio/gpio-vf610.c
+> +++ b/drivers/gpio/gpio-vf610.c
+
+The WKPU seems to purely be an interrupt controller. Perhaps you should 
+use stacked irq domain here. Then it would not be tied into the GPIO 
+controller at all.
+
+Rob
