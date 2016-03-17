@@ -1,9 +1,7 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Mar 2016 08:59:11 +0900
-Subject: [PATCH 01/12] ARM: dts: ape6evm: use generic pinctrl properties
-In-Reply-To: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-References: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1458259162-15706-2-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 18 Mar 2016 08:59:10 +0900
+Subject: [PATCH 00/12] ARM, arm64: dts: use generic pinctrl properties
+Message-ID: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,55 +9,40 @@ Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
 groups properties") renesas pfc drivers accept generic "function", "pins"
 and "groups" properties.
 
-This patch updates the ape6evm device tree to use the generic properties.
+This series updates the device trees for the boards of Renesas ARM based
+SoCs to use the generic properties. The device tree for the lager board was
+already updated in an earlier patch which is present in
+renesas-devel-20160318-v4.5.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a73a4-ape6evm.dts | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+Based on renesas-devel-20160318-v4.5
 
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index 590257095700..93ace33e3e36 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -189,28 +189,28 @@
- 
- &pfc {
- 	scifa0_pins: serial0 {
--		renesas,groups = "scifa0_data";
--		renesas,function = "scifa0";
-+		groups = "scifa0_data";
-+		function = "scifa0";
- 	};
- 
- 	mmc0_pins: mmc {
--		renesas,groups = "mmc0_data8", "mmc0_ctrl";
--		renesas,function = "mmc0";
-+		groups = "mmc0_data8", "mmc0_ctrl";
-+		function = "mmc0";
- 	};
- 
- 	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
--		renesas,function = "sdhi0";
-+		groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
-+		function = "sdhi0";
- 	};
- 
- 	sdhi1_pins: sd1 {
--		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
--		renesas,function = "sdhi1";
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
- 	};
- 
- 	keyboard_pins: keyboard {
--		renesas,pins = "PORT324", "PORT325", "PORT326", "PORT327",
--			       "PORT328", "PORT329";
-+		pins = "PORT324", "PORT325", "PORT326", "PORT327", "PORT328",
-+		       "PORT329";
- 		bias-pull-up;
- 	};
- };
+Simon Horman (12):
+  ARM: dts: ape6evm: use generic pinctrl properties
+  ARM: dts: armadillo800eva: use generic pinctrl properties
+  ARM: dts: bockw: use generic pinctrl properties
+  ARM: dts: marzen: use generic pinctrl properties
+  ARM: dts: koelsch: use generic pinctrl properties
+  ARM: dts: porter: use generic pinctrl properties
+  ARM: dts: gose: use generic pinctrl properties
+  ARM: dts: alt: use generic pinctrl properties
+  ARM: dts: silk: use generic pinctrl properties
+  ARM: dts: kzm9g: use generic pinctrl properties
+  ARM: dts: kzm9d: use generic pinctrl properties
+  arm64: dts: salvator-x: use generic pinctrl properties
+
+ arch/arm/boot/dts/emev2-kzm9d.dts                  |  4 +-
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts              | 20 +++----
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts      | 34 +++++------
+ arch/arm/boot/dts/r8a7778-bockw.dts                | 40 ++++++-------
+ arch/arm/boot/dts/r8a7779-marzen.dts               | 36 ++++++------
+ arch/arm/boot/dts/r8a7791-koelsch.dts              | 68 +++++++++++-----------
+ arch/arm/boot/dts/r8a7791-porter.dts               | 60 +++++++++----------
+ arch/arm/boot/dts/r8a7793-gose.dts                 | 40 ++++++-------
+ arch/arm/boot/dts/r8a7794-alt.dts                  | 32 +++++-----
+ arch/arm/boot/dts/r8a7794-silk.dts                 | 44 +++++++-------
+ arch/arm/boot/dts/sh73a0-kzm9g.dts                 | 30 +++++-----
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 46 +++++++--------
+ 12 files changed, 227 insertions(+), 227 deletions(-)
+
 -- 
 2.1.4
