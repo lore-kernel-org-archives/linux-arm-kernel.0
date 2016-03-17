@@ -1,52 +1,68 @@
-From: harninder.rai@nxp.com (Harninder Rai)
-Date: Thu, 17 Mar 2016 16:57:53 +0000
-Subject: Help needed with kexec on arm64
-Message-ID: <DB5PR04MB16882EFB355C766842A6887DE68B0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Thu, 17 Mar 2016 11:56:29 -0500
+Subject: [PATCH 4/5] pwm: pwm-tipwmss: Update documentation to use empty
+ range property
+In-Reply-To: <20160317150140.GA25775@rob-hp-laptop>
+References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
+ <1457380318-15452-5-git-send-email-fcooper@ti.com>
+ <20160317150140.GA25775@rob-hp-laptop>
+Message-ID: <56EAE1BD.9040601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Takahiro Akashi/Geoff,
-
-I was trying to run kexec on NXP's ls2085ardb board (based on arm64) but I am facing following issue
-
-root at ls2085ardb:~# kexec -p /run/media/mmcblk0p1/vmlinux
-Memory for crashkernel is not reserved
-Please reserve memory by passing"crashkernel=X at Y" parameter to kernel
-Then try to loading kdump kernel
-
-I am using git://git.kernel.org/pub/scm/linux/kernel/git/geoff/linux-kexec.git commit ae2804a21b4686df02890027e64c11088439854c
-
-I have done the following in bootargs
---------------------------------------------------
-
-dmesg |grep crash -i
-[    0.000000] Reserving 64MB of memory at 2240MB for crashkernel
-[    0.000000] Kernel command line: console=ttyS1,115200 root=/dev/ram0 earlycon=uart8250,mmio,0x21c0600 ramdisk_size=0x200000 default_hugepagesz=2m hugepagesz=2m hugepages=256 crashkernel=64M at 2240M
-
-All the required kernel configs are also enabled
---------------------------------------------------
-
-root at ls2085ardb:~# zcat /proc/config.gz |grep -i sysfs
-# CONFIG_SYSFS_DEPRECATED is not set
-CONFIG_SYSFS_SYSCALL=y
-# CONFIG_GPIO_SYSFS is not set
-CONFIG_RTC_INTF_SYSFS=y
-# CONFIG_DMI_SYSFS is not set
-CONFIG_SYSFS=y
-root at ls2085ardb:~# zcat /proc/config.gz |grep -i kexec
-CONFIG_KEXEC_CORE=y
-CONFIG_KEXEC=y
-root at ls2085ardb:~# zcat /proc/config.gz |grep -i kdump
-root at ls2085ardb:~# zcat /proc/config.gz |grep -i debug_info
-CONFIG_DEBUG_INFO=y
-# CONFIG_DEBUG_INFO_REDUCED is not set
-# CONFIG_DEBUG_INFO_SPLIT is not set
-# CONFIG_DEBUG_INFO_DWARF4 is not set
-root at ls2085ardb:~# zcat /proc/config.gz |grep -i crash
-CONFIG_CRASH_DUMP=y
 
 
-Any pointer in this regard would be much appreciated
+On 03/17/2016 10:01 AM, Rob Herring wrote:
+> On Mon, Mar 07, 2016 at 01:51:57PM -0600, Franklin S Cooper Jr wrote:
+>> Since the PWMSS and its subdevices (eCAP and ePWM) use the same address
+>> space then the range property should be empty. Update the documentation
+>> to show the correct usage.
+> Why does it matter? An empty ranges is generally not preferred.
 
-Thanks and Regards
-Harry++
+Someone pointed out that ranges should probably be empty. I
+double checked it with what is in the ePAPR doc and based on
+the definition it should be set to empty. I also checked
+against the am33xx.dtsi and saw that both USB and ethernet
+uses an empty value for ranges.
+
+Can you elaborate on why this isn't preferable?
+
+>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt | 12 ++++--------
+>>  1 file changed, 4 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+>> index f7eae77..672fa71 100644
+>> --- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+>> +++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+>> @@ -7,11 +7,9 @@ Required properties:
+>>  		  Should set to 1.
+>>  - size-cells: specify number of u32 entries needed to specify child nodes size
+>>  		in reg property. Should set to 1.
+>> -- ranges: describes the address mapping of a memory-mapped bus. Should set to
+>> -	   physical address map of child's base address, physical address within
+>> -	   parent's address  space and length of the address map. For am33xx,
+>> -	   3 set of child register maps present, ECAP register space, EQEP
+>> -	   register space, EHRPWM register space.
+>> +- ranges: describes the address mapping of a memory-mapped bus. Its value
+>> +	  should be empty since no address translation is needed between the
+>> +	  parent and the child.
+>>  
+>>  Also child nodes should also populated under PWMSS DT node.
+>>  
+>> @@ -23,9 +21,7 @@ pwmss0: pwmss at 48300000 {
+>>  	#address-cells = <1>;
+>>  	#size-cells = <1>;
+>>  	status = "disabled";
+>> -	ranges = <0x48300100 0x48300100 0x80   /* ECAP */
+>> -		  0x48300180 0x48300180 0x80   /* EQEP */
+>> -		  0x48300200 0x48300200 0x80>; /* EHRPWM */
+>> +	ranges;
+>>  
+>>  	/* child nodes go here */
+>>  };
+>> -- 
+>> 2.7.0
+>>
