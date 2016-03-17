@@ -1,27 +1,46 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 17 Mar 2016 12:38:12 -0500
-Subject: [PATCH v2 11/11] usb: musb: da8xx: Remove mach code
-In-Reply-To: <56EAAD09.3080600@cogentembedded.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-12-git-send-email-david@lechnology.com>
- <56EAAD09.3080600@cogentembedded.com>
-Message-ID: <56EAEB84.8060005@lechnology.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 17 Mar 2016 22:26:03 +0100
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+Message-ID: <20160317212603.GA16651@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2016 08:11 AM, Sergei Shtylyov wrote:
-> On 3/17/2016 5:26 AM, David Lechner wrote:
->>
->>       glue->dev            = &pdev->dev;
->>       pdata->platform_ops        = &da8xx_ops;
->>
->> -    glue->phy = usb_phy_generic_register();
->> -    if (IS_ERR(glue->phy)) {
->> -        ret = PTR_ERR(glue->phy);
->> -        goto err5;
->> +    glue->usb_phy = usb_phy_generic_register();
->
->     Hm, do we still need the USB PHY? It does nothing IIRC...
->
+Hi!
 
-Unfortunately, yes. It is used in musb_core, etc., mainly for otg->state.
+USB gadget stops working for me on n900, if I merge
+
+usb: gadget: bind UDC by name passed via usb_gadget_driver structure
+
+patch.
+
+commit 2284b29d3d9dd16490909962574d7f3fef83fd97
+Author: Ruslan Bilovol <ruslan.bilovol@gmail.com>
+Date:   Mon Nov 23 09:56:35 2015 +0100
+
+    usb: gadget: bind UDC by name passed via usb_gadget_driver
+    structure
+
+    Introduce new 'udc_name' member to usb_gadget_driver structure.
+        The 'udc_name' is a name of UDC that usb_gadget_driver should
+	    be bound to. If udc_name is NULL, it will be bound to any
+	        available UDC.
+
+    Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+        Signed-off-by: Ruslan Bilovol <ruslan.bilovol@gmail.com>
+	    Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+	        Tested-by: Peter Chen <peter.chen@freescale.com>
+		    Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+
+Patch is obvious enough... if there's someone who sets udc_name to
+NULL. Who is supposed to do that?
+
+(I have patch in my tree to make USB gadget work when it is not
+modular).
+
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
