@@ -1,55 +1,131 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 17 Mar 2016 17:07:41 -0500
-Subject: [PATCH v2 1/3] clk: ti: am335x/am4372: Add tbclk to pwm node
+Date: Thu, 17 Mar 2016 17:07:42 -0500
+Subject: [PATCH v2 2/3] ARM: DTS: da850/am4372/am33xx: Use generic node name
+ for ehrpwm
 In-Reply-To: <1458252463-8821-1-git-send-email-fcooper@ti.com>
 References: <1458252463-8821-1-git-send-email-fcooper@ti.com>
-Message-ID: <1458252463-8821-2-git-send-email-fcooper@ti.com>
+Message-ID: <1458252463-8821-3-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add tblck to the pwm nodes. This insures that the ehrpwm driver has access
-to the time-based clk.
-
-Do not remove similar entries for ehrpwm node. Later patches will switch
-from using ehrpwm node name to pwm. But to maintain ABI compatibility we
-shouldn't remove the old entries.
+When possible generic node names should be used. So change the node name
+from ehrpwm to pwm.
 
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- drivers/clk/ti/clk-33xx.c | 3 +++
- drivers/clk/ti/clk-43xx.c | 6 ++++++
- 2 files changed, 9 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi |  6 +++---
+ arch/arm/boot/dts/am4372.dtsi | 12 ++++++------
+ arch/arm/boot/dts/da850.dtsi  |  4 ++--
+ 3 files changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
-index ef2ec64..0e47d95 100644
---- a/drivers/clk/ti/clk-33xx.c
-+++ b/drivers/clk/ti/clk-33xx.c
-@@ -108,6 +108,9 @@ static struct ti_dt_clk am33xx_clks[] = {
- 	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
- 	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
- 	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
-+	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-+	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-+	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
- 	{ .node_name = NULL },
- };
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 1fafaad..4016254 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -688,7 +688,7 @@
+ 				status = "disabled";
+ 			};
  
-diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-index 097fc90..7255aa8 100644
---- a/drivers/clk/ti/clk-43xx.c
-+++ b/drivers/clk/ti/clk-43xx.c
-@@ -115,6 +115,12 @@ static struct ti_dt_clk am43xx_clks[] = {
- 	DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
- 	DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
- 	DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
-+	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-+	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-+	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
-+	DT_CLK("48306200.pwm", "tbclk", "ehrpwm3_tbclk"),
-+	DT_CLK("48308200.pwm", "tbclk", "ehrpwm4_tbclk"),
-+	DT_CLK("4830a200.pwm", "tbclk", "ehrpwm5_tbclk"),
- 	{ .node_name = NULL },
- };
+-			ehrpwm0: ehrpwm at 48300200 {
++			ehrpwm0: pwm at 48300200 {
+ 				compatible = "ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48300200 0x80>;
+@@ -718,7 +718,7 @@
+ 				status = "disabled";
+ 			};
  
+-			ehrpwm1: ehrpwm at 48302200 {
++			ehrpwm1: pwm at 48302200 {
+ 				compatible = "ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48302200 0x80>;
+@@ -748,7 +748,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			ehrpwm2: ehrpwm at 48304200 {
++			ehrpwm2: pwm at 48304200 {
+ 				compatible = "ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48304200 0x80>;
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 92068fb..33f417c 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -679,7 +679,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			ehrpwm0: ehrpwm at 48300200 {
++			ehrpwm0: pwm at 48300200 {
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48300200 0x80>;
+@@ -705,7 +705,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			ehrpwm1: ehrpwm at 48302200 {
++			ehrpwm1: pwm at 48302200 {
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48302200 0x80>;
+@@ -731,7 +731,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			ehrpwm2: ehrpwm at 48304200 {
++			ehrpwm2: pwm at 48304200 {
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48304200 0x80>;
+@@ -749,7 +749,7 @@
+ 			ti,hwmods = "epwmss3";
+ 			status = "disabled";
+ 
+-			ehrpwm3: ehrpwm at 48306200 {
++			ehrpwm3: pwm at 48306200 {
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48306200 0x80>;
+@@ -767,7 +767,7 @@
+ 			ti,hwmods = "epwmss4";
+ 			status = "disabled";
+ 
+-			ehrpwm4: ehrpwm at 48308200 {
++			ehrpwm4: pwm at 48308200 {
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x48308200 0x80>;
+@@ -785,7 +785,7 @@
+ 			ti,hwmods = "epwmss5";
+ 			status = "disabled";
+ 
+-			ehrpwm5: ehrpwm at 4830a200 {
++			ehrpwm5: pwm at 4830a200 {
+ 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
+ 				#pwm-cells = <3>;
+ 				reg = <0x4830a200 0x80>;
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 226cda7..c3910e2 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -247,13 +247,13 @@
+ 			dma-names = "rx", "tx";
+ 			status = "disabled";
+ 		};
+-		ehrpwm0: ehrpwm at 01f00000 {
++		ehrpwm0: pwm at 01f00000 {
+ 			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+ 			#pwm-cells = <3>;
+ 			reg = <0x300000 0x2000>;
+ 			status = "disabled";
+ 		};
+-		ehrpwm1: ehrpwm at 01f02000 {
++		ehrpwm1: pwm at 01f02000 {
+ 			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
+ 			#pwm-cells = <3>;
+ 			reg = <0x302000 0x2000>;
 -- 
 2.7.0
