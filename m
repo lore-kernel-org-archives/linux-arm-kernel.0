@@ -1,10 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Mar 2016 08:59:12 +0900
-Subject: [PATCH 02/12] ARM: dts: armadillo800eva: use generic pinctrl
- properties
+Date: Fri, 18 Mar 2016 08:59:13 +0900
+Subject: [PATCH 03/12] ARM: dts: bockw: use generic pinctrl properties
 In-Reply-To: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
 References: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1458259162-15706-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1458259162-15706-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,79 +11,90 @@ Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
 groups properties") renesas pfc drivers accept generic "function", "pins"
 and "groups" properties.
 
-This patch updates the armadillo800eva device tree to use the generic
-properties.
+This patch updates the bockw device tree to use the generic properties.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 34 +++++++++++++--------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/r8a7778-bockw.dts | 40 ++++++++++++++++++-------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index c548cabb102f..2c82dab2b6f4 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -228,44 +228,44 @@
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+index 21e3b9dda2da..e0dab1464648 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -130,53 +130,53 @@
  	pinctrl-names = "default";
  
- 	ether_pins: ether {
--		renesas,groups = "gether_mii", "gether_int";
--		renesas,function = "gether";
-+		groups = "gether_mii", "gether_int";
-+		function = "gether";
+ 	scif0_pins: serial0 {
+-		renesas,groups = "scif0_data_a", "scif0_ctrl";
+-		renesas,function = "scif0";
++		groups = "scif0_data_a", "scif0_ctrl";
++		function = "scif0";
  	};
  
- 	scifa1_pins: serial1 {
--		renesas,groups = "scifa1_data";
--		renesas,function = "scifa1";
-+		groups = "scifa1_data";
-+		function = "scifa1";
+ 	scif_clk_pins: scif_clk {
+-		renesas,groups = "scif_clk";
+-		renesas,function = "scif_clk";
++		groups = "scif_clk";
++		function = "scif_clk";
  	};
  
- 	st1232_pins: touchscreen {
--		renesas,groups = "intc_irq10";
--		renesas,function = "intc";
-+		groups = "intc_irq10";
-+		function = "intc";
- 	};
- 
- 	backlight_pins: backlight {
--		renesas,groups = "tpu0_to2_1";
--		renesas,function = "tpu0";
-+		groups = "tpu0_to2_1";
-+		function = "tpu0";
- 	};
- 
- 	mmc0_pins: mmc0 {
--		renesas,groups = "mmc0_data8_1", "mmc0_ctrl_1";
--		renesas,function = "mmc0";
-+		groups = "mmc0_data8_1", "mmc0_ctrl_1";
-+		function = "mmc0";
+ 	mmc_pins: mmc {
+-		renesas,groups = "mmc_data8", "mmc_ctrl";
+-		renesas,function = "mmc";
++		groups = "mmc_data8", "mmc_ctrl";
++		function = "mmc";
  	};
  
  	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
 -		renesas,function = "sdhi0";
-+		groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
++		groups = "sdhi0_data4", "sdhi0_ctrl";
 +		function = "sdhi0";
  	};
- 
- 	fsia_pins: sounda {
--		renesas,groups = "fsia_sclk_in", "fsia_mclk_out",
--				 "fsia_data_in_1", "fsia_data_out_0";
--		renesas,function = "fsia";
-+		groups = "fsia_sclk_in", "fsia_mclk_out",
-+			 "fsia_data_in_1", "fsia_data_out_0";
-+		function = "fsia";
+ 	sdhi0_pup_pins: sd0_pup {
+-		renesas,groups = "sdhi0_cd", "sdhi0_wp";
+-		renesas,function = "sdhi0";
++		groups = "sdhi0_cd", "sdhi0_wp";
++		function = "sdhi0";
+ 		bias-pull-up;
  	};
  
- 	lcd0_pins: lcd0 {
--		renesas,groups = "lcd0_data24_0", "lcd0_lclk_1", "lcd0_sync";
--		renesas,function = "lcd0";
-+		groups = "lcd0_data24_0", "lcd0_lclk_1", "lcd0_sync";
-+		function = "lcd0";
+ 	hspi0_pins: hspi0 {
+-		renesas,groups = "hspi0_a";
+-		renesas,function = "hspi0";
++		groups = "hspi0_a";
++		function = "hspi0";
+ 	};
  
- 		/* DBGMD/LCDC0/FSIA MUX */
- 		gpio-hog;
+ 	usb0_pins: usb0 {
+-		renesas,groups = "usb0";
+-		renesas,function = "usb0";
++		groups = "usb0";
++		function = "usb0";
+ 	};
+ 
+ 	usb1_pins: usb1 {
+-		renesas,groups = "usb1";
+-		renesas,function = "usb1";
++		groups = "usb1";
++		function = "usb1";
+ 	};
+ 
+ 	vin0_pins: vin0 {
+-		renesas,groups = "vin0_data8", "vin0_clk";
+-		renesas,function = "vin0";
++		groups = "vin0_data8", "vin0_clk";
++		function = "vin0";
+ 	};
+ 
+ 	vin1_pins: vin1 {
+-		renesas,groups = "vin1_data8", "vin1_clk";
+-		renesas,function = "vin1";
++		groups = "vin1_data8", "vin1_clk";
++		function = "vin1";
+ 	};
+ };
+ 
 -- 
 2.1.4
