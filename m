@@ -1,48 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Mar 2016 12:57:49 -0500
-Subject: [v6, 3/5] dt: move guts devicetree doc out of powerpc directory
-In-Reply-To: <4107975.rId64mooHz@wuerfel>
-References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
- <1457518131-11339-4-git-send-email-yangbo.lu@nxp.com>
- <20160317170640.GB21009@rob-hp-laptop> <4107975.rId64mooHz@wuerfel>
-Message-ID: <CAL_JsqL8NkEQx2NoVHSUGYhtNsybCo-yfBCde+_OuMmfwbhYEw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 17 Mar 2016 10:58:20 -0700
+Subject: [PATCH 2/8] clk: bcm2835: add missing PLL clock divider
+In-Reply-To: <C5EA56E8-F1A1-453D-A421-3E29853F3127@martin.sperl.org>
+References: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
+ <1456760642-2412-3-git-send-email-kernel@martin.sperl.org>
+ <87y49hjb4l.fsf@eliezer.anholt.net>
+ <C5EA56E8-F1A1-453D-A421-3E29853F3127@martin.sperl.org>
+Message-ID: <8737rpm1fn.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 17 March 2016 12:06:40 Rob Herring wrote:
->> > diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt b/Documentation/devicetree/bindings/soc/fsl/guts.txt
->> > similarity index 91%
->> > rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
->> > rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
->> > index b71b203..07adca9 100644
->> > --- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
->> > +++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
->> > @@ -25,6 +25,9 @@ Recommended properties:
->> >   - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
->> >     registers, for those SOCs that have a PAMU device.
->> >
->> > + - little-endian : Indicates that the global utilities block is little
->> > +   endian. The default is big endian.
->>
->> The default is "the native endianness of the system".
+Martin Sperl <kernel@martin.sperl.org> writes:
+
+>> On 17.03.2016, at 17:57, Eric Anholt <eric@anholt.net> wrote:
+>> 
+>> 
+>> These don't exist on the hardware as far as I've been able to find.  "I
+>> found it in a header file somewhere" is not sufficient justification to
+>> expose it.
+>> 
+>> I'm working on getting a series of all of these reviewed and ready, so
+>> I'm just dropping these PLLB hunks.
 >
-> This may be what is currently documented, but not what we are doing
-> in practice, as there is no "native endianess" for either PowerPC or
-> ARM -- both allow running big-endian or little-endian kernels and the
-> device registers are fixed.
+> Fine with that - my test shows that these are not configured by the firmware.
+>
+> As for headers: my experience is that these are the better resource
+> compared to all the public available documentation?
+>
+> If you remember the ?frac? bit discussion where you said:
+>
+>   Once again, trusting the docs turns out to be a bad idea.  You're right,
+>   the non-MASH clocks *do* have a bit 9 to enable fractional mode.  Sigh.
+>
+> Also my understanding is that those headers are still used by the firmware
+> developers, so I guess that these are pretty stable and well maintained
+> (even if the ones available are by now a bit dated).
+>
+> They even contain ifdefs for some earlier versions of the chip - 
+> see the dma-channels and their interrupts?
+> I.e: BCM2708A0 which does not have the DMA channels 9 to 15
+>
+> So I would not discount all those pieces of information as totally
+> irrelevant.
 
-Notice I said system, not architecture. The way the device registers
-are fixed is what I mean by native endianness.
-
-If the purpose of adding this property now is to support GUTS on the
-ARM SoCs, then I'd argue using this property is probably wrong. If the
-PPC systems are designed with BE device registers and ARM systems with
-LE, then this property is not needed.
-
-> I think the property here is fine.
-
-Unless you have studied the FSL ARM based SoCs, then there is not
-enough information here to tell.
-
-Rob
+I'm looking at the hardware source, and at the place where all the other
+PLL dividers are, PLLB only has ARM.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160317/ba579f79/attachment.sig>
