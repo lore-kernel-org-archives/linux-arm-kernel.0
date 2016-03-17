@@ -1,10 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 17 Mar 2016 13:30:20 +0200
-Subject: [PATCH v5 5/9] dmaengine: rcar-dmac: slave address are physical
-In-Reply-To: <1457404974-1800-6-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Date: Thu, 17 Mar 2016 13:18:36 +0200
+Subject: [PATCH v5 1/9] iommu: Add MMIO mapping type
+In-Reply-To: <1457404974-1800-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1457404974-1800-6-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1661205.m6h487t3oE@avalon>
+ <1457404974-1800-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1602932.Q3715QPPaf@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,36 +12,64 @@ Hi Niklas,
 
 Thank you for the patch.
 
-On Tuesday 08 March 2016 03:42:50 Niklas S?derlund wrote:
-> Slave addresses coming from a client is physical not dma. Store the
-> address using the correct data type. This is in preparation for hooking
-> up the dma-mapping API to the slave addresses.
+On Tuesday 08 March 2016 03:42:46 Niklas S?derlund wrote:
+> From: Robin Murphy <robin.murphy@arm.com>
 > 
+> On some platforms, MMIO regions might need slightly different treatment
+> compared to mapping regular memory; add the notion of MMIO mappings to
+> the IOMMU API's memory type flags, so that callers can let the IOMMU
+> drivers know to do the right thing.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
->  drivers/dma/sh/rcar-dmac.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/iommu/io-pgtable-arm.c | 9 +++++++--
+>  include/linux/iommu.h          | 1 +
+>  2 files changed, 8 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-> index 7820d07..01cf82f 100644
-> --- a/drivers/dma/sh/rcar-dmac.c
-> +++ b/drivers/dma/sh/rcar-dmac.c
-> @@ -144,8 +144,8 @@ struct rcar_dmac_chan {
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 381ca5a..9c19989 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -355,7 +355,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct
+> arm_lpae_io_pgtable *data, if (!(prot & IOMMU_WRITE) && (prot &
+> IOMMU_READ))
+>  			pte |= ARM_LPAE_PTE_AP_RDONLY;
 > 
->  	unsigned int src_xfer_size;
->  	unsigned int dst_xfer_size;
-> -	dma_addr_t src_slave_addr;
-> -	dma_addr_t dst_slave_addr;
-> +	phys_addr_t src_slave_addr;
-> +	phys_addr_t dst_slave_addr;
-
-This moves the cast from phys_addr_t to dma_addr_t from the driver's DMA 
-engine operations to other places. I'm not sure there's much value in doing 
-so. I'd squash this patch with 7/9, the result will be easier to review.
-
->  	int mid_rid;
+> -		if (prot & IOMMU_CACHE)
+> +		if (prot & IOMMU_MMIO)
+> +			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
+> +				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
+> +		else if (prot & IOMMU_CACHE)
+>  			pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
+>  				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
+>  	} else {
+> @@ -364,7 +367,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct
+> arm_lpae_io_pgtable *data, pte |= ARM_LPAE_PTE_HAP_READ;
+>  		if (prot & IOMMU_WRITE)
+>  			pte |= ARM_LPAE_PTE_HAP_WRITE;
+> -		if (prot & IOMMU_CACHE)
+> +		if (prot & IOMMU_MMIO)
+> +			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
+> +		else if (prot & IOMMU_CACHE)
+>  			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
+>  		else
+>  			pte |= ARM_LPAE_PTE_MEMATTR_NC;
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index a5c539f..34b6432 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -30,6 +30,7 @@
+>  #define IOMMU_WRITE	(1 << 1)
+>  #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+>  #define IOMMU_NOEXEC	(1 << 3)
+> +#define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
 > 
->  	spinlock_t lock;
+>  struct iommu_ops;
+>  struct iommu_group;
 
 -- 
 Regards,
