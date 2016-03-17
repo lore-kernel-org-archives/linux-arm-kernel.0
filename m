@@ -1,88 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 17 Mar 2016 15:53:54 +0300
-Subject: [PATCH v2 09/11] usb: ohci-da8xx: Remove code that references mach
-In-Reply-To: <1458181615-27782-10-git-send-email-david@lechnology.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-10-git-send-email-david@lechnology.com>
-Message-ID: <56EAA8E2.7070904@cogentembedded.com>
+From: masami.hiramatsu.pt@hitachi.com (=?gb2312?B?xr3LydHFy8ggLyBISVJBTUFUVaOsTUFTQU1J?=)
+Date: Thu, 17 Mar 2016 12:58:20 +0000
+Subject: [PATCH v11 8/9] arm64: Add kernel return probes support
+ (kretprobes)
+In-Reply-To: <50399556C9727B4D88A595C8584AAB37B4E50431@GSjpTKYDCembx32.service.hitachi.net>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-9-git-send-email-dave.long@linaro.org>
+ <50399556C9727B4D88A595C8584AAB37B4E50431@GSjpTKYDCembx32.service.hitachi.net>
+Message-ID: <50399556C9727B4D88A595C8584AAB37B4E504AA@GSjpTKYDCembx32.service.hitachi.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/17/2016 5:26 AM, David Lechner wrote:
+>From: ???? / HIRAMATU?MASAMI [mailto:masami.hiramatsu.pt at hitachi.com]
+>
+>Hi,
+>
+>>From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>>
+>>The pre-handler of this special 'trampoline' kprobe executes the return
+>>probe handler functions and restores original return address in ELR_EL1.
+>>This way the saved pt_regs still hold the original register context to be
+>>carried back to the probed kernel function.
+>
+>This patch seems not well separated.
+>
+>>diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+>>index bd3f233..13d3333 100644
+>>--- a/arch/arm64/kernel/kprobes.c
+>>+++ b/arch/arm64/kernel/kprobes.c
+>
+>[snip]
+>
+>>+void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+>>+				      struct pt_regs *regs)
+>>+{
+>>+	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
+>>+
+>>+	/* replace return addr (x30) with trampoline */
+>>+	regs->regs[30] = (long)&kretprobe_trampoline;
+>
+>So, where is the kretprobe_trampoline? It seems that function is
+>defined in other patch.
+>
+>>+}
+>>+
+>>+int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+>>+{
+>>+	return 0;
+>> }
+>
+>And what this function is for??
 
-> Including mach/* is frowned upon in device drivers, so get rid of it.
->
-> This replaces usb20_clk and code that pokes CFGCHIP2 with a proper phy
-> driver.
->
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->
-> v2 changes: Uses the new phy driver instead of using a second clock.
->
->
->   drivers/usb/host/ohci-da8xx.c | 90 +++++++++++++++++++++----------------------
->   1 file changed, 44 insertions(+), 46 deletions(-)
->
-> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-> index e5c33bc..c648674 100644
-> --- a/drivers/usb/host/ohci-da8xx.c
-> +++ b/drivers/usb/host/ohci-da8xx.c
-> @@ -15,58 +15,40 @@
->   #include <linux/jiffies.h>
->   #include <linux/platform_device.h>
->   #include <linux/clk.h>
-> -
-> -#include <mach/da8xx.h>
-> +#include <linux/phy/phy.h>
->   #include <linux/platform_data/usb-davinci.h>
->
->   #ifndef CONFIG_ARCH_DAVINCI_DA8XX
->   #error "This file is DA8xx bus glue.  Define CONFIG_ARCH_DAVINCI_DA8XX."
->   #endif
->
-> -#define CFGCHIP2	DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG)
-> -
->   static struct clk *usb11_clk;
-> -static struct clk *usb20_clk;
-> +static struct phy *usb11_phy;
->
->   /* Over-current indicator change bitmask */
->   static volatile u16 ocic_mask;
->
-> -static void ohci_da8xx_clock(int on)
-> +static int ohci_da8xx_enable(void)
->   {
-[...]
-> +	ret = clk_prepare_enable(usb11_clk);
-> +	if (ret)
-> +		return ret;
->
-> -		/* Disable USB 1.1 PHY */
-> -		cfgchip2 &= ~CFGCHIP2_USB1SUSPENDM;
-> +	ret = phy_power_on(usb11_phy);
+Ah, sorry, this was my fault. Yes, this function is required.
+But this implementation also means there is an asm-based trampoline
+function which should be included in this patch.
 
-    Aren't you supposed to call phy_init() first?
+David, could you tell me the repository which I can get the latest
+version of this series? I'd like to see the whole code of kprobes/arm64.
 
-> +	if (ret) {
-> +		clk_disable_unprepare(usb11_clk);
-> +		return ret;
->   	}
-> -	__raw_writel(cfgchip2, CFGCHIP2);
-> +
-> +	return 0;
-> +}
-> +
-> +static void ohci_da8xx_disable(void)
-> +{
-> +	phy_power_off(usb11_phy);
-
-   ... and phy_exit() after that?
-
-> +	clk_disable_unprepare(usb11_clk);
->   }
->
->   /*
-[...]
-
-MBR, Sergei
+Thank you,
