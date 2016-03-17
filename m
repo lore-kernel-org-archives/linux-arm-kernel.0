@@ -1,46 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Mar 2016 12:27:38 -0500
-Subject: [PATCH v2 16/18] dt-bindings: Add OXNAS bindings
-In-Reply-To: <1457519060-6038-17-git-send-email-narmstrong@baylibre.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-17-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160317172738.GA7293@rob-hp-laptop>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 17 Mar 2016 10:27:41 -0700
+Subject: [PATCH 5/8] clk: bcm2835: add the dsi clocks
+In-Reply-To: <1456760642-2412-6-git-send-email-kernel@martin.sperl.org>
+References: <1456760642-2412-1-git-send-email-kernel@martin.sperl.org>
+ <1456760642-2412-6-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87oaadj9pu.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 11:24:18AM +0100, Neil Armstrong wrote:
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/arm/oxnas.txt | 9 +++++++++
->  1 file changed, 9 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/oxnas.txt b/Documentation/devicetree/bindings/arm/oxnas.txt
-> new file mode 100644
-> index 0000000..f6032d2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/oxnas.txt
-> @@ -0,0 +1,9 @@
-> +PLX Technology OXNAS SoCs Family device tree bindings
-> +-------------------------------------------
-> +
-> +Boards with the OX810SE Soc SoC shall have the following properties:
+kernel at martin.sperl.org writes:
 
-s/Soc SoC/SoC/
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> Add the missing dsi clocks using the currently "best known"
+> parent-mux available for these clocks.
 
-> +  Required root node property:
-> +    compatible: "oxsemi,ox810se"
-> +
-> +Board compatible values:
-> +  - "wd,mbwe" (OX810SE)
-
-Seems kind of generic. Only one version?
-
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Having been working on DSI support, there is definitely no point in DSI0
+and DSI1 pixel clocks without their proper parents and this patch would
+just get in the way.  The esc clocks look fine, though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160317/365566ec/attachment.sig>
