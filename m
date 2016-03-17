@@ -1,47 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Mar 2016 13:29:43 +0000
-Subject: [PATCH] ARM: Rockchip: Fix use of plain integer as NULL pointer
-In-Reply-To: <1458213099-13786-1-git-send-email-peter.griffin@linaro.org>
-References: <1458213099-13786-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160317132943.GC13692@x1>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 17 Mar 2016 16:39:24 +0300
+Subject: [PATCH v2 00/11] da8xx USB clocks
+In-Reply-To: <1458181615-27782-1-git-send-email-david@lechnology.com>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+Message-ID: <56EAB38C.9070905@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nit: Subject line doesn't match the preferred format for the sub-arch.
+On 3/17/2016 5:26 AM, David Lechner wrote:
 
-On Thu, 17 Mar 2016, Peter Griffin wrote:
+> OK, ready for round two.
 
-> This fixes the following sparse build warning
-> mach-rockchip/platsmp.c:68:43: Using plain integer as NULL pointer
+    You're quick... :-)
 
-Nit: I would insert a '\n' between your wording and the quoted
-warning.  For added clarity, I usually stick a tab before the quote.
+> I've added a new callback in the davinci clocks so that they can properly
+> handle clock muxing. The clock functions are pretty much the same as in the
+> previous patch set other than clk_set_parent() now works.
+>
+> The next new thing is a phy driver for the CFGCHIP2 register that controls the
+> SoC USB PHY (both USB 1.1 and USB 2.0). The ohci and musb drivers have been
+> updated to use this new phy driver.
 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/mach-rockchip/platsmp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+    Fantastic! At least there's some breakthru on this front.
 
-Patch looks good though:
+[...]
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> index d42a07e..4d827a0 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -65,7 +65,7 @@ static struct reset_control *rockchip_get_core_reset(int cpu)
->  	if (dev)
->  		np = dev->of_node;
->  	else
-> -		np = of_get_cpu_node(cpu, 0);
-> +		np = of_get_cpu_node(cpu, NULL);
->  
->  	return of_reset_control_get(np, NULL);
->  }
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+MBR, Sergei
