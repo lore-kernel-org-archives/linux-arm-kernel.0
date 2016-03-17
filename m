@@ -1,147 +1,69 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Mar 2016 17:57:10 +0800
-Subject: [PATCH v6 11/17] ARM: XEN: Move xen_early_init() before efi_init()
-In-Reply-To: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1458208636-12960-12-git-send-email-zhaoshenglong@huawei.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 17 Mar 2016 18:08:03 +0800
+Subject: [RFC PATCH] arm64: Expose physical/virtual address bits through
+ cpuinfo
+Message-ID: <1458209283-44999-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+AArch64 support six types Physical Address range, permitted values
+in ID_AA64MMFR0_EL1 are:
+0000  32 bits, 4GB.
+0001  36 bits, 64GB.
+0010  40 bits, 1TB.
+0011  42 bits, 4TB.
+0100  44 bits, 16TB.
+0101  48 bits, 256TB.
+All other values are reserved.
 
-Move xen_early_init() before efi_init(), then when calling efi_init()
-could initialize Xen specific UEFI.
+Meanwhile, AArch64 allows 36-bit, 39-bit, 42-bit, 47-bit and 48-bit
+virtual addresses.
 
-Check if it runs on Xen hypervisor through the flat dts.
+Exposing the physical and virtual address bits to userspace through
+procfs like x86, then it is easy to check them from cpuinfo.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm/xen/enlighten.c  | 56 ++++++++++++++++++++++++++++++++++-------------
- arch/arm64/kernel/setup.c |  2 +-
- 2 files changed, 42 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 11 +++++++++++
+ arch/arm64/kernel/cpuinfo.c         |  4 +++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 680aae0..c43617f 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -20,6 +20,7 @@
- #include <linux/irqreturn.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_fdt.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/cpuidle.h>
-@@ -53,8 +54,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
- 
- static __read_mostly unsigned int xen_events_irq;
- 
--static __initdata struct device_node *xen_node;
--
- int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
- 			       unsigned long addr,
- 			       xen_pfn_t *gfn, int nr,
-@@ -238,6 +237,33 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
- 	return IRQ_HANDLED;
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index a5c769b..33a9dc5 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -188,6 +188,17 @@ static inline bool system_supports_mixed_endian_el0(void)
+ 	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
  }
  
-+static __initdata struct {
-+	const char *compat;
-+	const char *prefix;
-+	const char *version;
-+	bool found;
-+} hyper_node = {"xen,xen", "xen,xen-", NULL, false};
-+
-+static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
-+				      int depth, void *data)
++static inline int id_aa64mmfr0_parange_bits(void)
 +{
-+	const void *s = NULL;
-+	int len;
++	/*
++	 * PARange[3:0] allows 0~5, other values are reserved,
++	 * convert to physical address bits with a simple formula.
++	 */
++	u32 parange = read_system_reg(SYS_ID_AA64MMFR0_EL1) & 0xf;
 +
-+	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
-+		return 0;
-+
-+	if (of_flat_dt_is_compatible(node, hyper_node.compat))
-+		hyper_node.found = true;
-+
-+	s = of_get_flat_dt_prop(node, "compatible", &len);
-+	if (strlen(hyper_node.prefix) + 3  < len &&
-+	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
-+		hyper_node.version = s + strlen(hyper_node.prefix);
-+
-+	return 0;
++	return parange < 3 ? 32 + parange * 4 : 42 + (parange - 3) * (parange - 2);
 +}
 +
- /*
-  * see Documentation/devicetree/bindings/arm/xen.txt for the
-  * documentation of the Xen Device Tree format.
-@@ -245,26 +271,18 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
- #define GRANT_TABLE_PHYSADDR 0
- void __init xen_early_init(void)
- {
--	int len;
--	const char *s = NULL;
--	const char *version = NULL;
--	const char *xen_prefix = "xen,xen-";
--
--	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
--	if (!xen_node) {
-+	of_scan_flat_dt(fdt_find_hyper_node, NULL);
-+	if (!hyper_node.found) {
- 		pr_debug("No Xen support\n");
- 		return;
- 	}
--	s = of_get_property(xen_node, "compatible", &len);
--	if (strlen(xen_prefix) + 3  < len &&
--			!strncmp(xen_prefix, s, strlen(xen_prefix)))
--		version = s + strlen(xen_prefix);
--	if (version == NULL) {
-+
-+	if (hyper_node.version == NULL) {
- 		pr_debug("Xen version not found\n");
- 		return;
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 212ae63..f6b49db 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -146,7 +146,9 @@ static int c_show(struct seq_file *m, void *v)
+ 		seq_printf(m, "CPU architecture: 8\n");
+ 		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
+ 		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
+-		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
++		seq_printf(m, "CPU revision\t: %d\n", MIDR_REVISION(midr));
++		seq_printf(m, "address sizes\t: %d bits physical, %d bits virtual\n\n",
++			   id_aa64mmfr0_parange_bits(), VA_BITS);
  	}
  
--	pr_info("Xen %s support found\n", version);
-+	pr_info("Xen %s support found\n", hyper_node.version);
- 
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
-@@ -305,6 +323,14 @@ static void __init xen_acpi_guest_init(void)
- 
- static void __init xen_dt_guest_init(void)
- {
-+	struct device_node *xen_node;
-+
-+	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-+	if (!xen_node) {
-+		pr_err("Xen support was detected before, but it has disappeared\n");
-+		return;
-+	}
-+
- 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
- }
- 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 450987d..6cf5051 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
- 	 */
- 	local_async_enable();
- 
-+	xen_early_init();
- 	efi_init();
- 	arm64_memblock_init();
- 
-@@ -334,7 +335,6 @@ void __init setup_arch(char **cmdline_p)
- 	} else {
- 		psci_acpi_init();
- 	}
--	xen_early_init();
- 
- 	cpu_read_bootcpu_ops();
- 	smp_init_cpus();
+ 	return 0;
 -- 
-2.0.4
+1.7.12.4
