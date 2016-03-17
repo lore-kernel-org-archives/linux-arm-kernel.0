@@ -1,26 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Mar 2016 15:09:40 +0100
-Subject: [PATCH] MAINTAINERS: pinctrl: samsung: Add two new maintainers
-In-Reply-To: <1458086521-11220-1-git-send-email-k.kozlowski@samsung.com>
-References: <1458086521-11220-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CACRpkdaDLeU9P3i_tSOVvB8bina2HYd34rk=zgsBsR=GW-CGXA@mail.gmail.com>
+From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
+Date: Thu, 17 Mar 2016 14:19:06 +0000
+Subject: [PATCH v2 all 04/14] arc: use of_platform_default_populate() to
+ populate default bus
+References: <1458113743-15131-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1458113743-15131-5-git-send-email-wangkefeng.wang@huawei.com>
+ <C2D7FE5348E1B147BCA15975FBA23075F4E903CE@us01wembx1.internal.synopsys.com>
+ <CAL_JsqJm3AH9Exb7JifA8A4ktFcpLV=76+aC+2AsTYz-W-AZPg@mail.gmail.com>
+Message-ID: <C2D7FE5348E1B147BCA15975FBA23075F4E906A5@us01wembx1.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 1:02 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-
-> Extend the list of maintainers for Samsung pinctrl driver with Sylwester
-> and Krzysztof.
+On Thursday 17 March 2016 06:58 PM, Rob Herring wrote:
+>> Perhaps too late - but can't of_platform_default_populate just be a static inline
+>> > calling of_platform_populate in the header rather than exporting yet another symbol !
+> The idea is to not export the variable of_default_bus_match_table and
+> export a function instead.
 >
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Rob
 
-Patch applied with Tomasz ack.
+Yep I realized this after reading the cover letter of patch which I didn't get !
 
-Yours,
-Linus Walleij
+BTW since I got your attention, could u please take a look at
+http://lists.infradead.org/pipermail/linux-snps-arc/2016-March/000653.html
+and
+http://lists.infradead.org/pipermail/linux-snps-arc/2016-March/000656.html
+
+-Vineet
