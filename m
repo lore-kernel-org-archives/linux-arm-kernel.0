@@ -1,57 +1,86 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 17 Mar 2016 09:33:43 +0100
-Subject: [PATCH 0/8] drm: atmel-hlcdc: various fixes/improvements
-In-Reply-To: <CAPM=9tz0rZMwy6JTqzjcSQC+DAPYkjBOiU746C0smyMA0OCGzw@mail.gmail.com>
-References: <1452075569-8545-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160301115551.52f0887b@bbrezillon>
- <CAPM=9tz0rZMwy6JTqzjcSQC+DAPYkjBOiU746C0smyMA0OCGzw@mail.gmail.com>
-Message-ID: <20160317093343.517ba6f5@bbrezillon>
+From: majun258@huawei.com (MaJun)
+Date: Thu, 17 Mar 2016 16:34:00 +0800
+Subject: [PATCH v3 1/2] irqchip/mbigen:Change the mbigen node definition in dt
+ binding file
+In-Reply-To: <1458203641-17172-1-git-send-email-majun258@huawei.com>
+References: <1458203641-17172-1-git-send-email-majun258@huawei.com>
+Message-ID: <1458203641-17172-2-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Mar 2016 12:43:11 +1000
-Dave Airlie <airlied@gmail.com> wrote:
+From: Ma Jun <majun258@huawei.com>
 
-> On 1 March 2016 at 20:55, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > On Wed,  6 Jan 2016 11:19:21 +0100
-> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> >
-> >> Hello,
-> >>
-> >> This series is a collection of fixes and improvements for the
-> >> atmel-hlcdc driver.
-> >>
-> >> The main feature added here is the support for external RGB -> XXX
-> >> bridges (patch 6 and 7).
-> >>
-> >> The first patch is a fix preventing a potential memory leak.
-> >> Patch 2 is adding support for asynchronous mode setting, which was
-> >> supported before the migration to atomic mode setting.
-> >>
-> >> Patch 3 is just a minor fix to expose the real encoder and connector
-> >> types (we are currently exposing an LVDS encoder/connector, which is
-> >> wrong since the display controller output the pixel stream in raw
-> >> RGB).
-> >>
-> >> Patch 4 is removing useless fields and functions which were left
-> >> when moving to atomic modesetting.
-> >>
-> >> And patch 8 is just a cosmetic patch moving the mode checking code
-> >> from ->atomic_check() to ->mode_fixup().
-> >
-> > Dave, Daniel, any comment on this series (AKA ping)?
-> 
-> On internal driver stuff, I'd usually only look on a git pull :-)
+For mbigen module, there is a special case that more than one mbigen
+device nodes use the same reg definition in DTS when these devices
+exist in the same mbigen hardware module.
 
-Yep, Daniel told me that both of you usually don't review internal
-driver changes. I'll send a PR soon (after the merge window of course).
+In current mbigen driver, these mbigen devices definition as below:
+mbigen_dev1:intc_dev1 {
+	...
+	reg = <0x0 0xc0080000 0x0 0x10000>;
+	...
+};
 
-Thanks,
+mbigen_dev2:intc_dev2 {
+	...
+	reg = <0x0 0xc0080000 0x0 0x10000>;
+	...
+};
 
-Boris
+On this case, devm_ioremap_resource() returns fail with info
+"can't request region for resource" because of memory region check.
 
+To fix this problem, the mbigen node definition and
+structure are changed as Mark Rutland suggested in v1 patch[1].
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-February/403691.html
+
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ .../interrupt-controller/hisilicon,mbigen-v2.txt   |   22 +++++++++++++++----
+ 1 files changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+index 720f7c9..3b2f4c4 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
+@@ -21,6 +21,8 @@ Mbigen main node required properties:
+ - reg: Specifies the base physical address and size of the Mbigen
+   registers.
+ 
++Mbigen sub node required properties:
++------------------------------------------
+ - interrupt controller: Identifies the node as an interrupt controller
+ 
+ - msi-parent: Specifies the MSI controller this mbigen use.
+@@ -45,13 +47,23 @@ Mbigen main node required properties:
+ 
+ Examples:
+ 
+-	mbigen_device_gmac:intc {
++	mbigen_chip_dsa {
+ 			compatible = "hisilicon,mbigen-v2";
+ 			reg = <0x0 0xc0080000 0x0 0x10000>;
+-			interrupt-controller;
+-			msi-parent = <&its_dsa 0x40b1c>;
+-			num-pins = <9>;
+-			#interrupt-cells = <2>;
++
++			mbigen_gmac:intc_gmac {
++				interrupt-controller;
++				msi-parent = <&its_dsa 0x40b1c>;
++				num-pins = <9>;
++				#interrupt-cells = <2>;
++			};
++
++			mbigen_i2c:intc_i2c {
++				interrupt-controller;
++				msi-parent = <&its_dsa 0x40b0e>;
++				num-pins = <2>;
++				#interrupt-cells = <2>;
++			};
+ 	};
+ 
+ Devices connect to mbigen required properties:
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.1
