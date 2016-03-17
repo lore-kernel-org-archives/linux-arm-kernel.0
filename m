@@ -1,131 +1,79 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 17 Mar 2016 17:07:42 -0500
-Subject: [PATCH v2 2/3] ARM: DTS: da850/am4372/am33xx: Use generic node name
- for ehrpwm
-In-Reply-To: <1458252463-8821-1-git-send-email-fcooper@ti.com>
-References: <1458252463-8821-1-git-send-email-fcooper@ti.com>
-Message-ID: <1458252463-8821-3-git-send-email-fcooper@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 17 Mar 2016 15:12:24 -0700
+Subject: [PATCH 14/18] gpio: vf610: add support for WKPU unit
+In-Reply-To: <20160317200054.GA3799@rob-hp-laptop>
+References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
+ <1457576219-7971-15-git-send-email-stefan@agner.ch>
+ <20160317200054.GA3799@rob-hp-laptop>
+Message-ID: <752bcc77253ae252c5a9928116b96b44@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When possible generic node names should be used. So change the node name
-from ehrpwm to pwm.
+Hi Rob,
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi |  6 +++---
- arch/arm/boot/dts/am4372.dtsi | 12 ++++++------
- arch/arm/boot/dts/da850.dtsi  |  4 ++--
- 3 files changed, 11 insertions(+), 11 deletions(-)
+On 2016-03-17 13:00, Rob Herring wrote:
+> On Wed, Mar 09, 2016 at 06:16:55PM -0800, Stefan Agner wrote:
+>> WKPU unit support within the VF610 GPIO driver. The WKPU unit allows
+>> some GPIO to be the wakeup source from lowest power modes LPSTOPx.
+>> The relationship between the GPIO banks and the WKPU GPIO numbering
+>> can be derived from the device tree property fsl,gpio-wakeup.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  .../devicetree/bindings/gpio/gpio-vf610.txt        |   6 +
+>>  drivers/gpio/gpio-vf610.c                          | 151 +++++++++++++++++++++
+>>  2 files changed, 157 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+>> index 436cc99..985ddfd 100644
+>> --- a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+>> @@ -22,6 +22,12 @@ Required properties for GPIO node:
+>>        4 = active high level-sensitive.
+>>        8 = active low level-sensitive.
+>>
+>> +Option properties:
+> 
+> Optional
+> 
+>> +- fsl,gpio-wakeup : map GPIOs to WKPU unit, 3 argument cells per phandle
+> 
+> phandle to what?
+> 
+>> +      cell 1: First GPIO (relative to the GPIO block)
+>> +      cell 2: First GPIO of the WKPU unit
+>> +      cell 3: Number of consecutive GPIO's
+> 
+> An interrupt-map could work here instead even though I'm guessing you 
+> don't make the WKPU an interrupt parent. Your table would look something 
+> like this:
+> 
+> <WKPU# <&gpio> GPIO#>
+> 
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 1fafaad..4016254 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -688,7 +688,7 @@
- 				status = "disabled";
- 			};
- 
--			ehrpwm0: ehrpwm at 48300200 {
-+			ehrpwm0: pwm at 48300200 {
- 				compatible = "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48300200 0x80>;
-@@ -718,7 +718,7 @@
- 				status = "disabled";
- 			};
- 
--			ehrpwm1: ehrpwm at 48302200 {
-+			ehrpwm1: pwm at 48302200 {
- 				compatible = "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48302200 0x80>;
-@@ -748,7 +748,7 @@
- 				status = "disabled";
- 			};
- 
--			ehrpwm2: ehrpwm at 48304200 {
-+			ehrpwm2: pwm at 48304200 {
- 				compatible = "ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48304200 0x80>;
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 92068fb..33f417c 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -679,7 +679,7 @@
- 				status = "disabled";
- 			};
- 
--			ehrpwm0: ehrpwm at 48300200 {
-+			ehrpwm0: pwm at 48300200 {
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48300200 0x80>;
-@@ -705,7 +705,7 @@
- 				status = "disabled";
- 			};
- 
--			ehrpwm1: ehrpwm at 48302200 {
-+			ehrpwm1: pwm at 48302200 {
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48302200 0x80>;
-@@ -731,7 +731,7 @@
- 				status = "disabled";
- 			};
- 
--			ehrpwm2: ehrpwm at 48304200 {
-+			ehrpwm2: pwm at 48304200 {
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48304200 0x80>;
-@@ -749,7 +749,7 @@
- 			ti,hwmods = "epwmss3";
- 			status = "disabled";
- 
--			ehrpwm3: ehrpwm at 48306200 {
-+			ehrpwm3: pwm at 48306200 {
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48306200 0x80>;
-@@ -767,7 +767,7 @@
- 			ti,hwmods = "epwmss4";
- 			status = "disabled";
- 
--			ehrpwm4: ehrpwm at 48308200 {
-+			ehrpwm4: pwm at 48308200 {
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x48308200 0x80>;
-@@ -785,7 +785,7 @@
- 			ti,hwmods = "epwmss5";
- 			status = "disabled";
- 
--			ehrpwm5: ehrpwm at 4830a200 {
-+			ehrpwm5: pwm at 4830a200 {
- 				compatible = "ti,am4372-ehrpwm","ti,am33xx-ehrpwm";
- 				#pwm-cells = <3>;
- 				reg = <0x4830a200 0x80>;
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 226cda7..c3910e2 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -247,13 +247,13 @@
- 			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
--		ehrpwm0: ehrpwm at 01f00000 {
-+		ehrpwm0: pwm at 01f00000 {
- 			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x300000 0x2000>;
- 			status = "disabled";
- 		};
--		ehrpwm1: ehrpwm at 01f02000 {
-+		ehrpwm1: pwm at 01f02000 {
- 			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x302000 0x2000>;
--- 
-2.7.0
+Hm, that would need two interrupt parents since the main interrupt for
+the GPIO's would still be GIC...
+
+
+>> +
+>>  Note: Each GPIO port should have an alias correctly numbered in "aliases"
+>>  node.
+>>
+>> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+>> index 1a022be..650a41a 100644
+>> --- a/drivers/gpio/gpio-vf610.c
+>> +++ b/drivers/gpio/gpio-vf610.c
+> 
+> The WKPU seems to purely be an interrupt controller. Perhaps you should 
+> use stacked irq domain here. Then it would not be tied into the GPIO 
+> controller at all.
+
+It actually allows to configure pull-up/downs, that is why I chose to
+implement it as a GPIO controller. Although the pull-up/down part is not
+implemented yet.
+
+But when I think about it, it actually is probably more a pinctrl with
+interrupt capabilities?
+
+--
+Stefan
