@@ -1,86 +1,123 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Mar 2016 11:38:30 +0100
-Subject: [PATCH] ARM: use --fix-v4bx to allow building ARMv4 with future gcc
-Message-ID: <12678426.5oeMNXL25J@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 17 Mar 2016 11:40:42 +0100
+Subject: [PATCH v4 02/13] clk: sunxi: add ahb1 clock for A83T
+In-Reply-To: <1458144276-31108-3-git-send-email-vishnupatekar0510@gmail.com>
+References: <1458144276-31108-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1458144276-31108-3-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <20160317104042.GK30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-6.0 marks support for ARMv3 and ARMv4 as 'deprecated', meaning
-that this is expected to be removed at some point in the future,
-with gcc-7.0 as the earliest.
+On Thu, Mar 17, 2016 at 12:04:25AM +0800, Vishnu Patekar wrote:
+> AHB1 on A83T is similar to ahb1 on A31, except parents are different.
+> clock index 0b1x is PLL6.
+> 
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>  drivers/clk/sunxi/clk-sunxi.c                     | 76 +++++++++++++++++++++++
+>  2 files changed, 77 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 834436f..cba9fe55 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -30,6 +30,7 @@ Required properties:
+>  	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+>  	"allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
+>  	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+> +	"allwinner,sun8i-a83t-ahb1-clk" - for the AHB1 clock on A83T
+>  	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+>  	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>  	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 91de0a0..a7aab65 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -344,6 +344,67 @@ static void sun6i_ahb1_recalc(struct factors_request *req)
+>  	req->rate >>= req->p;
+>  }
+>  
+> +#define SUN8I_A83T_AHB1_PARENT_PLL6	2
+> +/**
+> + * sun8i_a83t_get_ahb_factors() - calculates m, p factors for AHB
+> + * AHB rate is calculated as follows
+> + * rate = parent_rate >> p
+> + *
+> + * if parent is pll6, then
+> + * parent_rate = pll6 rate / (m + 1)
+> + */
+> +
+> +static void sun8i_a83t_get_ahb1_factors(struct factors_request *req)
+> +{
+> +	u8 div, calcp, calcm = 1;
+> +
+> +	/*
+> +	 * clock can only divide, so we will never be able to achieve
+> +	 * frequencies higher than the parent frequency
+> +	 */
+> +	if (req->parent_rate && req->rate > req->parent_rate)
+> +		req->rate = req->parent_rate;
+> +
+> +	div = DIV_ROUND_UP(req->parent_rate, req->rate);
+> +
+> +	/* calculate pre-divider if parent is pll6 */
+> +	if (req->parent_index >= SUN8I_A83T_AHB1_PARENT_PLL6) {
+> +		if (div < 4)
+> +			calcp = 0;
+> +		else if (div / 2 < 4)
+> +			calcp = 1;
+> +		else if (div / 4 < 4)
+> +			calcp = 2;
+> +		else
+> +			calcp = 3;
+> +
+> +		calcm = DIV_ROUND_UP(div, 1 << calcp);
+> +	} else {
+> +		calcp = __roundup_pow_of_two(div);
+> +		calcp = calcp > 3 ? 3 : calcp;
+> +	}
+> +
+> +	req->rate = (req->parent_rate / calcm) >> calcp;
+> +	req->p = calcp;
+> +	req->m = calcm - 1;
+> +}
+> +
+> +/**
+> +* sun8i_a83t_ahb1_recalc() - calculates AHB clock rate from m, p factors and
+> +*			 parent index
+> +*/
+> +static void sun8i_a83t_ahb1_recalc(struct factors_request *req)
+> +{
+> +	req->rate = req->parent_rate;
+> +
+> +/* apply pre-divider first if parent is pll6 */
 
-When building the kernel, the difference between ARMv4 and ARMv4T
-is relatively small because the kernel never runs THUMB instructions
-on ARMv4T and does not need any support for interworking.
+The comment indentation is wrong
 
-For any future compiler that does not support -march=armv4, we now
-fall back to -march=armv4t as the architecture level selection,
-but keep using -march=armv4 by default as long as that is supported
-by the compiler.
+> +	if (req->parent_index >= SUN6I_AHB1_PARENT_PLL6)
 
-Similarly, the -mtune=strongarm110 and -mtune=strongarm1100 options
-will go away at the same time as -march=armv4, so this adds a check
-to see if the compiler supports them, falling back to no -mtune
-option otherwise.
+And this is not the right define you're using.
 
-Compiling with -march=armv4t leads the compiler to using 'bx reg'
-instructions instead of 'ld pc,reg'. This is not supported on
-ARMv4 based CPUs, but the linker can work around this by rewriting
-those instructions to the ARMv4 version if we pass --fix-v4bx
-to the linker. This should work with binutils-2.15 (released
-May 2004) or higher, and we can probably assume that anyone using
-gcc-7.x will have a much more recent binutils version as well.
+I still believe that duplicating the same logic just because of
+different dividers is not the way to go.
 
-However, in order to still allow users of old toolchains to link
-the kernel, we only pass the option to linkers that support it,
-based on a $(ld-option ...) call. I'm intentionally passing the
-flag to all linker versions here regardless of whether it's needed
-or not, so we can more easily spot any regressions if something
-goes wrong.
+You could solve that easily by adding a table for the muxes, and
+associate it with parents and dividers, that you could store in
+clk_factors.
 
-For consistency, I'm passing the --fix-v4bx flag for both the
-vmlinux final link and the individual loadable modules.
-The module loader code already interprets the R_ARM_V4BX relocations
-in loadable modules and converts bx instructions into ldr even
-when running on ARMv4T or ARMv5 processors. This is now redundant
-when we pass --fix-v4bx to the linker for building modules, but
-I see no harm in leaving the current implementation and doing both.
+Maxime
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 9fb3fee0e908..3c312d37a83a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -19,6 +19,11 @@ LDFLAGS_vmlinux	+= --be8
- LDFLAGS_MODULE	+= --be8
- endif
- 
-+ifeq ($(CONFIG_CPU_32v4),y)
-+LDFLAGS_vmlinux	+= $(call ld-option,--fix-v4bx)
-+LDFLAGS_MODULE	+= $(call ld-option,--fix-v4bx)
-+endif
-+
- ifeq ($(CONFIG_ARM_MODULE_PLTS),y)
- LDFLAGS_MODULE	+= -T $(srctree)/arch/arm/kernel/module.lds
- endif
-@@ -75,7 +80,7 @@ arch-$(CONFIG_CPU_32v6K)	=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6k,
- endif
- arch-$(CONFIG_CPU_32v5)		=-D__LINUX_ARM_ARCH__=5 $(call cc-option,-march=armv5te,-march=armv4t)
- arch-$(CONFIG_CPU_32v4T)	=-D__LINUX_ARM_ARCH__=4 -march=armv4t
--arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 -march=armv4
-+arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 $(call cc-option,-march=armv4,-march=armv4t)
- arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3
- 
- # Evaluate arch cc-option calls now
-@@ -93,8 +98,8 @@ tune-$(CONFIG_CPU_ARM922T)	=-mtune=arm9tdmi
- tune-$(CONFIG_CPU_ARM925T)	=-mtune=arm9tdmi
- tune-$(CONFIG_CPU_ARM926T)	=-mtune=arm9tdmi
- tune-$(CONFIG_CPU_FA526)	=-mtune=arm9tdmi
--tune-$(CONFIG_CPU_SA110)	=-mtune=strongarm110
--tune-$(CONFIG_CPU_SA1100)	=-mtune=strongarm1100
-+tune-$(CONFIG_CPU_SA110)	=$(call cc-option,-mtune=strongarm110)
-+tune-$(CONFIG_CPU_SA1100)	=$(call cc-option,-mtune=strongarm1100)
- tune-$(CONFIG_CPU_XSCALE)	=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
- tune-$(CONFIG_CPU_XSC3)		=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
- tune-$(CONFIG_CPU_FEROCEON)	=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160317/1f0bc10d/attachment.sig>
