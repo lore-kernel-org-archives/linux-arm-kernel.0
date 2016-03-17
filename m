@@ -1,60 +1,139 @@
-From: masami.hiramatsu.pt@hitachi.com (=?gb2312?B?xr3LydHFy8ggLyBISVJBTUFUVaOsTUFTQU1J?=)
-Date: Thu, 17 Mar 2016 12:58:20 +0000
-Subject: [PATCH v11 8/9] arm64: Add kernel return probes support
- (kretprobes)
-In-Reply-To: <50399556C9727B4D88A595C8584AAB37B4E50431@GSjpTKYDCembx32.service.hitachi.net>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-9-git-send-email-dave.long@linaro.org>
- <50399556C9727B4D88A595C8584AAB37B4E50431@GSjpTKYDCembx32.service.hitachi.net>
-Message-ID: <50399556C9727B4D88A595C8584AAB37B4E504AA@GSjpTKYDCembx32.service.hitachi.net>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 17 Mar 2016 13:59:44 +0100
+Subject: [PATCH v6 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1458208636-12960-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
+ <1458208636-12960-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CAJZ5v0jw=R4n7qMk4ibZAeC=tkat6O-cgWiQnRb4o02Hy6ehpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: ???? / HIRAMATU?MASAMI [mailto:masami.hiramatsu.pt at hitachi.com]
+On Thu, Mar 17, 2016 at 10:57 AM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 >
->Hi,
+> ACPI 6.0 introduces a new table STAO to list the devices which are used
+> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> UART is used by Xen. So here it hides UART from Dom0.
 >
->>From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->>
->>The pre-handler of this special 'trampoline' kprobe executes the return
->>probe handler functions and restores original return address in ELR_EL1.
->>This way the saved pt_regs still hold the original register context to be
->>carried back to the probed kernel function.
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+> CC: linux-acpi at vger.kernel.org (open list:ACPI)
+> ---
+>  drivers/acpi/scan.c | 63 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
 >
->This patch seems not well separated.
+> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> index 5f28cf7..55ceb69 100644
+> --- a/drivers/acpi/scan.c
+> +++ b/drivers/acpi/scan.c
+> @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+>  DEFINE_MUTEX(acpi_device_lock);
+>  LIST_HEAD(acpi_wakeup_device_list);
+>  static DEFINE_MUTEX(acpi_hp_context_lock);
+> +static u64 spcr_uart_addr;
 >
->>diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
->>index bd3f233..13d3333 100644
->>--- a/arch/arm64/kernel/kprobes.c
->>+++ b/arch/arm64/kernel/kprobes.c
+>  struct acpi_dep_data {
+>         struct list_head node;
+> @@ -1453,6 +1454,41 @@ static int acpi_add_single_object(struct acpi_device **child,
+>         return 0;
+>  }
 >
->[snip]
+> +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
+> +                                           void *context)
+> +{
+> +       struct resource *res = context;
+> +
+> +       if (acpi_dev_resource_memory(ares, res))
+> +               return AE_CTRL_TERMINATE;
+> +
+> +       return AE_OK;
+> +}
+> +
+> +static bool acpi_device_should_be_hidden(acpi_handle handle)
+> +{
+> +       acpi_status status;
+> +       struct resource res;
+> +
+> +       /* Check if it should ignore the UART device */
+> +       if (spcr_uart_addr != 0) {
+> +               if (!acpi_has_method(handle, METHOD_NAME__CRS))
+> +                       return false;
+> +
+> +               status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> +                                            acpi_get_resource_memory, &res);
+> +               if (ACPI_FAILURE(status))
+> +                       return false;
+> +
+> +               if (res.start == spcr_uart_addr) {
+> +                       printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
+> +                       return true;
+> +               }
+> +       }
+> +
+> +       return false;
+> +}
+> +
+>  static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>                                     unsigned long long *sta)
+>  {
+> @@ -1466,6 +1502,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>         switch (acpi_type) {
+>         case ACPI_TYPE_ANY:             /* for ACPI_ROOT_OBJECT */
+>         case ACPI_TYPE_DEVICE:
+> +               if (acpi_device_should_be_hidden(handle))
+> +                       return -ENODEV;
+> +
+>                 *type = ACPI_BUS_TYPE_DEVICE;
+>                 status = acpi_bus_get_status_handle(handle, sta);
+>                 if (ACPI_FAILURE(status))
+> @@ -1919,6 +1958,8 @@ static int acpi_bus_scan_fixed(void)
+>  int __init acpi_scan_init(void)
+>  {
+>         int result;
+> +       acpi_status status;
+> +       struct acpi_table_stao *stao_ptr;
 >
->>+void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
->>+				      struct pt_regs *regs)
->>+{
->>+	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
->>+
->>+	/* replace return addr (x30) with trampoline */
->>+	regs->regs[30] = (long)&kretprobe_trampoline;
+>         acpi_pci_root_init();
+>         acpi_pci_link_init();
+> @@ -1934,6 +1975,28 @@ int __init acpi_scan_init(void)
 >
->So, where is the kretprobe_trampoline? It seems that function is
->defined in other patch.
+>         acpi_scan_add_handler(&generic_device_handler);
 >
->>+}
->>+
->>+int __kprobes arch_trampoline_kprobe(struct kprobe *p)
->>+{
->>+	return 0;
->> }
->
->And what this function is for??
+> +       /*
+> +        * If there is STAO table, check whether it needs to ignore the UART
+> +        * device in SPCR table.
+> +        */
+> +       status = acpi_get_table(ACPI_SIG_STAO, 0,
+> +                               (struct acpi_table_header **)&stao_ptr);
+> +       if (ACPI_SUCCESS(status)) {
+> +               if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
+> +                       printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
+> +
+> +               if (stao_ptr->ignore_uart) {
+> +                       struct acpi_table_spcr *spcr_ptr;
+> +
+> +                       status = acpi_get_table(ACPI_SIG_SPCR, 0,
+> +                                       (struct acpi_table_header **)&spcr_ptr);
+> +                       if (ACPI_SUCCESS(status))
+> +                               spcr_uart_addr = spcr_ptr->serial_port.address;
+> +                       else
+> +                               printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
+> +               }
+> +       }
 
-Ah, sorry, this was my fault. Yes, this function is required.
-But this implementation also means there is an asm-based trampoline
-function which should be included in this patch.
+I'd put the above part into a separate function and call that from
+here.  You'd be able to reduce the indentation level then slightly
+without using gotos.
 
-David, could you tell me the repository which I can get the latest
-version of this series? I'd like to see the whole code of kprobes/arm64.
+Apart from this minor point the patch is fine by me.
 
-Thank you,
+> +
+>         mutex_lock(&acpi_scan_lock);
+>         /*
+>          * Enumerate devices in the ACPI namespace.
+> --
+
+Thanks,
+Rafael
