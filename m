@@ -1,68 +1,37 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 17 Mar 2016 11:31:40 +0000
-Subject: [RFC PATCH] arm64: Expose physical/virtual address bits through
- cpuinfo
-In-Reply-To: <1458209283-44999-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1458209283-44999-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <56EA959C.8080005@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 17 Mar 2016 11:43:08 +0000
+Subject: [PATCH 1/2] spi: sun4i: add DMA support
+In-Reply-To: <CAOMqctQzMhR_bf=rMyROcTAPcrgx2EBqhH+qJL=b-U=iG9ZF4Q@mail.gmail.com>
+References: <1456466217-6793-1-git-send-email-plaes@plaes.org>
+ <1456466217-6793-2-git-send-email-plaes@plaes.org>
+ <20160226122504.GR18327@sirena.org.uk>
+ <CAOMqctTz=szSkpk95D_dUJjjpziCKoPv=xRczjfq2Roct-K-OA@mail.gmail.com>
+ <20160306214206.GW8418@lukather>
+ <CAOMqctQ5aq0A95ErVVF13f_8JBy0xRw9_FZ3avbYmZUGXp=Svg@mail.gmail.com>
+ <20160317072721.GJ30977@lukather>
+ <CAOMqctQzMhR_bf=rMyROcTAPcrgx2EBqhH+qJL=b-U=iG9ZF4Q@mail.gmail.com>
+Message-ID: <20160317114308.GF2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/16 10:08, Kefeng Wang wrote:
-> AArch64 support six types Physical Address range, permitted values
-> in ID_AA64MMFR0_EL1 are:
-> 0000  32 bits, 4GB.
-> 0001  36 bits, 64GB.
-> 0010  40 bits, 1TB.
-> 0011  42 bits, 4TB.
-> 0100  44 bits, 16TB.
-> 0101  48 bits, 256TB.
-> All other values are reserved.
->
-> Meanwhile, AArch64 allows 36-bit, 39-bit, 42-bit, 47-bit and 48-bit
-> virtual addresses.
+On Thu, Mar 17, 2016 at 11:58:05AM +0100, Michal Suchanek wrote:
+> On 17 March 2016 at 08:27, Maxime Ripard
 
-See below..
+> > You're mixing two things up: the fact that we can't do more than the
+> > FIFO length in PIO and that we're missing DMA support. We have patches
+> > to address both, and there's no depedency between the two.
 
->
-> +static inline int id_aa64mmfr0_parange_bits(void)
-> +{
-> +	/*
-> +	 * PARange[3:0] allows 0~5, other values are reserved,
-> +	 * convert to physical address bits with a simple formula.
-> +	 */
-> +	u32 parange = read_system_reg(SYS_ID_AA64MMFR0_EL1) & 0xf;
-> +
-> +	return parange < 3 ? 32 + parange * 4 : 42 + (parange - 3) * (parange - 2);
+> The only thing is that although DMA is optional on pretty much any
+> system you will have DMA available unless you broke your config. You
+> really do want the DMA support when it is available. So there will be
+> nobody testing the non-DMA part and it will be prone to bitrot.
 
-This breaks for 52bit PA support added in ARMv8.2 [1]. It may be a good idea
-to use an array here.
-
-> +}
-> +
->   #endif /* __ASSEMBLY__ */
->
->   #endif
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 212ae63..f6b49db 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -146,7 +146,9 @@ static int c_show(struct seq_file *m, void *v)
->   		seq_printf(m, "CPU architecture: 8\n");
->   		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
->   		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
-> -		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
-> +		seq_printf(m, "CPU revision\t: %d\n", MIDR_REVISION(midr));
-> +		seq_printf(m, "address sizes\t: %d bits physical, %d bits virtual\n\n",
-> +			   id_aa64mmfr0_parange_bits(), VA_BITS);
-
-VA_BITS is an attribute of your running kernel and doesn't have anything to do with what
-the CPU can support. (e.g, it is 48bit on 8.0, 8.1, but could go upto 52 in 8.2)
-
-[1] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
-
-Also, I am not sure if the change above would break userspace parsing the info. Ideally
-it shouldn't , but...
-
-Thanks
-Suzuki
+Well, it might be worth doing PIO for very short transfers even if you
+have DMA - it's quite common for this to perform better.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160317/3e5bc193/attachment.sig>
