@@ -1,63 +1,145 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 17 Mar 2016 11:49:24 -0500
-Subject: [PATCH 5/5] pwm: pwm-tiehrpwm: Update dt binding document to use
- generic node name
-In-Reply-To: <20160317150305.GA27356@rob-hp-laptop>
-References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
- <1457380318-15452-6-git-send-email-fcooper@ti.com>
- <20160317150305.GA27356@rob-hp-laptop>
-Message-ID: <56EAE014.8070606@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 17 Mar 2016 17:54:42 +0100
+Subject: [PATCH v5 2/5] ARM: at91: pm: add ULP1 mode support
+In-Reply-To: <1458111489-23774-3-git-send-email-wenyou.yang@atmel.com>
+References: <1458111489-23774-1-git-send-email-wenyou.yang@atmel.com>
+ <1458111489-23774-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160317165442.GC2831@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 16/03/2016 at 14:58:06 +0800, Wenyou Yang wrote :
+> @@ -497,4 +506,7 @@ void __init sama5_pm_init(void)
+>  	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
+>  	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+>  	at91_pm_init(NULL);
+> +
+> +	if (readl(pmc + AT91_PMC_VERSION) >= SAMA5D2_PMC_VERSION)
+
+I would not use that. Instead, I would create a new function,
+sama5d2_pm_init() and call it from sama5.c with a new
+sama5d2_dt_device_init and a new DT_MACHINE.
+
+> +		at91_pm_data.ulp_mode = ULP1_MODE;
+>  }
+> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+> index 3fcf881..2e76745 100644
+> --- a/arch/arm/mach-at91/pm.h
+> +++ b/arch/arm/mach-at91/pm.h
+> @@ -39,4 +39,11 @@ extern void __iomem *at91_ramc_base[];
+>  
+>  #define	AT91_PM_SLOW_CLOCK	0x01
+>  
+> +#define AT91_PM_ULP_OFFSET	5
+> +#define AT91_PM_ULP_MASK	0x03
+> +#define AT91_PM_ULP(x)		(((x) & AT91_PM_ULP_MASK) << AT91_PM_ULP_OFFSET)
+> +
+> +#define AT91_PM_ULP0_MODE	0x00
+> +#define AT91_PM_ULP1_MODE	0x01
+> +
+>  #endif
+> diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+> index 5fcffdc..f2a5c4b 100644
+> --- a/arch/arm/mach-at91/pm_suspend.S
+> +++ b/arch/arm/mach-at91/pm_suspend.S
+> @@ -41,6 +41,15 @@ tmp2	.req	r5
+>  	.endm
+>  
+>  /*
+> + * Wait for main oscillator selection is done
+> + */
+> +	.macro wait_moscsels
+> +1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+> +	tst	tmp1, #AT91_PMC_MOSCSELS
+> +	beq	1b
+> +	.endm
+> +
+> +/*
+>   * Wait until PLLA has locked.
+>   */
+>  	.macro wait_pllalock
+> @@ -101,6 +110,10 @@ ENTRY(at91_pm_suspend_in_sram)
+>  	and	r0, r0, #AT91_PM_MODE_MASK
+>  	str	r0, .pm_mode
+>  
+> +	lsr	r0, r3, #AT91_PM_ULP_OFFSET
+> +	and	r0, r0, #AT91_PM_ULP_MASK
+> +	str	r0, .ulp_mode
+> +
+>  	/* Active the self-refresh mode */
+>  	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
+>  	bl	at91_sramc_self_refresh
+> @@ -131,6 +144,13 @@ ENTRY(at91_pm_suspend_in_sram)
+>  	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
+>  	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+>  
+> +	ldr	r0, .ulp_mode
+> +	tst	r0, #AT91_PM_ULP1_MODE
+> +	beq	ulp0_mode
+> +
+> +	bl	at91_pm_ulp1_mode
+> +	b	ulp_exit
+> +
+>  ulp0_mode:
+>  	bl	at91_pm_ulp0_mode
+>  	b	ulp_exit
+> @@ -326,6 +346,81 @@ ENTRY(at91_pm_ulp0_mode)
+>  	mov	pc, lr
+>  ENDPROC(at91_pm_ulp0_mode)
+>  
+> +/*
+> + * void at91_pm_ulp1_mode(void)
+> + */
+> +ENTRY(at91_pm_ulp1_mode)
+> +	ldr	pmc, .pmc_base
+> +
+> +	/* Switch the main clock source to 12-MHz RC oscillator */
+> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> +	bic	tmp1, tmp1, #AT91_PMC_MOSCSEL
+> +	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
+> +	orr	tmp1, tmp1, #AT91_PMC_KEY
+> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> +
+> +	wait_moscsels
+> +
+> +	/* Disable the crystal oscillator */
+> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> +	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+> +	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
+> +	orr	tmp1, tmp1, #AT91_PMC_KEY
+> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> +
+> +	/* Switch the master clock source to main clock */
+> +	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
+> +	bic	tmp1, tmp1, #AT91_PMC_CSS
+> +	orr	tmp1, tmp1, #AT91_PMC_CSS_MAIN
+> +	str	tmp1, [pmc, #AT91_PMC_MCKR]
+> +
+> +	wait_mckrdy
+> +
+> +	/* Enter the ULP1 mode by set WAITMODE bit in CKGR_MOR */
+> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> +	orr	tmp1, tmp1, #AT91_PMC_WAITMODE
+> +	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
+> +	orr	tmp1, tmp1, #AT91_PMC_KEY
+> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> +
+> +	wait_mckrdy
+> +
+> +	/* Enable the crystal oscillator */
+> +	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+> +	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+> +	bic	tmp1, tmp1, #AT91_PMC_KEY_MASK
+> +	orr	tmp1, tmp1, #AT91_PMC_KEY
+> +	str	tmp1, [pmc, #AT91_CKGR_MOR]
+> +
+
+This will badly fail on the platforms that don't populate a crystal for
+the main clock or use the bypass. I think wee need to have at least a
+comment or save the previous state and restore it.
 
 
-On 03/17/2016 10:03 AM, Rob Herring wrote:
-> On Mon, Mar 07, 2016 at 01:51:58PM -0600, Franklin S Cooper Jr wrote:
->> Now that the node name has been changed from ehrpwm to pwm the document
->> should show this proper usage. Also change the unit address in the example
->> from 0 to the proper physical address value that should be used.
->>
->> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->> ---
->>  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->> index 9c100b2..20211ed 100644
->> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->> @@ -15,14 +15,14 @@ Optional properties:
->>  
->>  Example:
->>  
->> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
->> +ehrpwm0: pwm at 48300200 { /* EHRPWM on am33xx */
->>  	compatible = "ti,am33xx-ehrpwm";
->>  	#pwm-cells = <3>;
->>  	reg = <0x48300200 0x100>;
->>  	ti,hwmods = "ehrpwm0";
->>  };
->>  
->> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
->> +ehrpwm0: pwm at 01f00000 { /* EHRPWM on da850 */
-> No leading 0s, but more importantly the address is wrong.
-
-I will remove the leading 0. However, this value was taken
-from the .dtsi and I just double checked and I see the same
-value in the datasheet. I believe DA850,OMAP-L138 and AM18x
-all have the same memory mapping. I'm looking at
-http://www.ti.com/lit/ds/symlink/am1808.pdf page 233 and the
-addresses match up what is seen here and in the .dtsi.
-
-Can you point me to which document your looking at that
-shows a different value?
-
-
->
->>  	compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
->>  	#pwm-cells = <3>;
->>  	reg = <0x300000 0x2000>;
->> -- 
->> 2.7.0
->>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
