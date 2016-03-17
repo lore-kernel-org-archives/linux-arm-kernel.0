@@ -1,73 +1,61 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Mar 2016 17:57:06 +0800
-Subject: [PATCH v6 07/17] Xen: ARM: Add support for mapping AMBA device mmio
+Date: Thu, 17 Mar 2016 17:57:15 +0800
+Subject: [PATCH v6 16/17] FDT: Add a helper to get the subnode by given name
 In-Reply-To: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1458208636-12960-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1458208636-12960-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1458208636-12960-17-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a bus_notifier for AMBA bus device in order to map the device
-mmio regions when DOM0 booting with ACPI.
+Sometimes it needs to check if there is a subnode of given node in FDT
+by given name. Introduce this helper to get the subnode if it exists.
 
+CC: Rob Herring <robh@kernel.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ drivers/of/fdt.c       | 13 +++++++++++++
+ include/linux/of_fdt.h |  2 ++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
-index 76e26e5..3854043 100644
---- a/drivers/xen/arm-device.c
-+++ b/drivers/xen/arm-device.c
-@@ -139,3 +139,46 @@ static int __init register_xen_platform_notifier(void)
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 655f79d..09001db 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -645,6 +645,19 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
  }
  
- arch_initcall(register_xen_platform_notifier);
+ /**
++ * of_get_flat_dt_subnode_by_name - get the subnode by given name
++ *
++ * @node: the parent node
++ * @uname: the name of subnode
++ * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
++ */
 +
-+#ifdef CONFIG_ARM_AMBA
-+#include <linux/amba/bus.h>
-+
-+static int xen_amba_notifier(struct notifier_block *nb,
-+			     unsigned long action, void *data)
++int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
 +{
-+	struct amba_device *adev = to_amba_device(data);
-+	int r = 0;
-+
-+	switch (action) {
-+	case BUS_NOTIFY_ADD_DEVICE:
-+		r = xen_map_device_mmio(&adev->res, 1);
-+		break;
-+	case BUS_NOTIFY_DEL_DEVICE:
-+		r = xen_unmap_device_mmio(&adev->res, 1);
-+		break;
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+	if (r)
-+		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
-+			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
-+			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
-+			adev->dev.init_name);
-+
-+	return NOTIFY_OK;
++	return fdt_subnode_offset(initial_boot_params, node, uname);
 +}
 +
-+static struct notifier_block amba_device_nb = {
-+	.notifier_call = xen_amba_notifier,
-+};
-+
-+static int __init register_xen_amba_notifier(void)
-+{
-+	if (!xen_initial_domain() || acpi_disabled)
-+		return 0;
-+
-+	return bus_register_notifier(&amba_bustype, &amba_device_nb);
-+}
-+
-+arch_initcall(register_xen_amba_notifier);
-+#endif
++/**
+  * of_get_flat_dt_root - find the root node in the flat blob
+  */
+ unsigned long __init of_get_flat_dt_root(void)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index df9ef38..fc28162 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -52,6 +52,8 @@ extern char __dtb_end[];
+ extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
+ 				     int depth, void *data),
+ 			   void *data);
++extern int of_get_flat_dt_subnode_by_name(unsigned long node,
++					  const char *uname);
+ extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
+ 				       int *size);
+ extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
 -- 
 2.0.4
