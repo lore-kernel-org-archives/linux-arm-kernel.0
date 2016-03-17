@@ -1,61 +1,80 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 17 Mar 2016 11:50:29 -0400
-Subject: [PATCH] arm64: dma-mapping: fix dma_to_phys API for IOMMU attached
- devices
-Message-ID: <1458229833-4886-1-git-send-email-okaya@codeaurora.org>
+From: js1304@gmail.com (Joonsoo Kim)
+Date: Fri, 18 Mar 2016 00:52:54 +0900
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <56EAD0B4.2060807@suse.cz>
+References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
+ <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz>
+ <20160314064925.GA27587@js1304-P5Q-DELUXE> <56E662E8.700@suse.cz>
+ <20160314071803.GA28094@js1304-P5Q-DELUXE>
+ <56E92AFC.9050208@huawei.com>
+ <20160317065426.GA10315@js1304-P5Q-DELUXE>
+ <56EA77BC.2090702@huawei.com> <56EAD0B4.2060807@suse.cz>
+Message-ID: <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies dma_to_phys to call iommu_iova_to_phys to perform dma
-to phys conversions for IOMMU attached devices where dma and physical
-addresses often have distinct values.
+2016-03-18 0:43 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
+> On 03/17/2016 10:24 AM, Hanjun Guo wrote:
+>>
+>> On 2016/3/17 14:54, Joonsoo Kim wrote:
+>>>
+>>> On Wed, Mar 16, 2016 at 05:44:28PM +0800, Hanjun Guo wrote:
+>>>>
+>>>> On 2016/3/14 15:18, Joonsoo Kim wrote:
+>>>>>
+>>>>> On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
+>>>>>>
+>>>>>> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
+>>>>>>>
+>>>>>>> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
+>>>>>>>>
+>>>>>>>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
+>>>>>>>>
+>>>>>>>> How about something like this? Just and idea, probably buggy
+>>>>>>>> (off-by-one etc.).
+>>>>>>>> Should keep away cost from <pageblock_order iterations@the
+>>>>>>>> expense of the
+>>>>>>>> relatively fewer >pageblock_order iterations.
+>>>>>>>
+>>>>>>> Hmm... I tested this and found that it's code size is a little bit
+>>>>>>> larger than mine. I'm not sure why this happens exactly but I guess
+>>>>>>> it would be
+>>>>>>> related to compiler optimization. In this case, I'm in favor of my
+>>>>>>> implementation because it looks like well abstraction. It adds one
+>>>>>>> unlikely branch to the merge loop but compiler would optimize it to
+>>>>>>> check it once.
+>>>>>>
+>>>>>> I would be surprised if compiler optimized that to check it once, as
+>>>>>> order increases with each loop iteration. But maybe it's smart
+>>>>>> enough to do something like I did by hand? Guess I'll check the
+>>>>>> disassembly.
+>>>>>
+>>>>> Okay. I used following slightly optimized version and I need to
+>>>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
+>>>>> to yours. Please consider it, too.
+>>>>
+>>>> Hmm, this one is not work, I still can see the bug is there after
+>>>> applying
+>>>> this patch, did I miss something?
+>>>
+>>> I may find that there is a bug which was introduced by me some time
+>>> ago. Could you test following change in __free_one_page() on top of
+>>> Vlastimil's patch?
+>>>
+>>> -page_idx = pfn & ((1 << max_order) - 1);
+>>> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
+>>
+>>
+>> I tested Vlastimil's patch + your change with stress for more than half
+>> hour, the bug
+>> I reported is gone :)
+>
+>
+> Oh, ok, will try to send proper patch, once I figure out what to write in
+> the changelog :)
 
-Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- arch/arm64/include/asm/dma-mapping.h |  5 +----
- arch/arm64/mm/dma-mapping.c          | 16 ++++++++++++++++
- 2 files changed, 17 insertions(+), 4 deletions(-)
+Thanks in advance!
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index ba437f0..a0a486c 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -69,10 +69,7 @@ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
- 	return (dma_addr_t)paddr;
- }
- 
--static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
--{
--	return (phys_addr_t)dev_addr;
--}
-+phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr);
- 
- static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
- {
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 331c4ca..8252a92 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -989,3 +989,19 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	dev->archdata.dma_coherent = coherent;
- 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
- }
-+
-+phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-+{
-+	phys_addr_t phys = (phys_addr_t)dev_addr;
-+
-+#ifdef CONFIG_IOMMU_DMA
-+	struct iommu_domain *domain;
-+
-+	domain = iommu_get_domain_for_dev(dev);
-+	if (domain)
-+		phys = iommu_iova_to_phys(domain, dev_addr);
-+#endif
-+
-+	return phys;
-+}
-+EXPORT_SYMBOL(dma_to_phys);
--- 
-1.8.2.1
+Thanks.
