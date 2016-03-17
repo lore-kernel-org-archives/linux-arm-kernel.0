@@ -1,42 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Mar 2016 12:00:41 +0000
-Subject: [PATCH] arm/arm64/irqchip/pci: select PCI_MSI instead of
- depending on it
-In-Reply-To: <1458212069-896315-1-git-send-email-arnd@arndb.de>
-References: <1458212069-896315-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160317120041.GG1184@io.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Mar 2016 11:59:50 +0000
+Subject: [PATCH 1/1] arm64/dma-mapping: remove an unnecessary conversion
+In-Reply-To: <56EA8FB3.2050505@huawei.com>
+References: <1458007931-14432-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160315153757.GF12311@e104818-lin.cambridge.arm.com>
+ <56E8BD51.6010008@huawei.com> <56EA8FB3.2050505@huawei.com>
+Message-ID: <20160317115950.GB11623@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 11:52:49AM +0100, Arnd Bergmann wrote:
-> The PCI_MSI symbol is used inconsistently throughout the tree,
-> with some drivers using 'select' and others using 'depends on',
-> or using conditional selects. This keeps causing problems,
-> and the latest one is a result of ARCH_ALPINE using a 'select'
-> statement to enable its platform specific MSI driver but not
-> enabling MSI support first:
+On Thu, Mar 17, 2016 at 07:06:27PM +0800, Leizhen (ThunderTown) wrote:
+> On 2016/3/16 9:56, Leizhen (ThunderTown) wrote:
+> > On 2016/3/15 23:37, Catalin Marinas wrote:
+> >> On Tue, Mar 15, 2016 at 10:12:11AM +0800, Zhen Lei wrote:
+> >>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> >>> index a6e757c..b2f2834 100644
+> >>> --- a/arch/arm64/mm/dma-mapping.c
+> >>> +++ b/arch/arm64/mm/dma-mapping.c
+> >>> @@ -187,8 +187,6 @@ static void __dma_free(struct device *dev, size_t size,
+> >>>  		       void *vaddr, dma_addr_t dma_handle,
+> >>>  		       struct dma_attrs *attrs)
+> >>>  {
+> >>> -	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+> >>> -
+> >>>  	size = PAGE_ALIGN(size);
+> >>>
+> >>>  	if (!is_device_dma_coherent(dev)) {
+> >>> @@ -196,7 +194,7 @@ static void __dma_free(struct device *dev, size_t size,
+> >>>  			return;
+> >>>  		vunmap(vaddr);
+> >>>  	}
+> >>> -	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
+> >>> +	__dma_free_coherent(dev, size, vaddr, dma_handle, attrs);
+> >>>  }
+> >>
+> >> What happens when !is_device_dma_coherent(dev)? (hint: read two lines
+> >> above __dma_free_coherent).
 > 
-> warning: (ARCH_ALPINE) selects ALPINE_MSI which has unmet direct dependencies (PCI && PCI_MSI)
-> drivers/irqchip/irq-alpine-msi.c:104:15: error: variable 'alpine_msix_domain_info' has initializer but incomplete type
->  static struct msi_domain_info alpine_msix_domain_info = {
->                ^~~~~~~~~~~~~~~
-> drivers/irqchip/irq-alpine-msi.c:105:2: error: unknown field 'flags' specified in initializer
->   .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->   ^
-> drivers/irqchip/irq-alpine-msi.c:105:11: error: 'MSI_FLAG_USE_DEF_DOM_OPS' undeclared here (not in a function)
->   .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->            ^~~~~~~~~~~~~~~~~~~~~~~~
+> Do you afraid "vaddr" maybe modified by these statement?
+> First, it could not be __free_from_pool. Otherwise, the function
+> vunmap(which after it) can not work well. Then, it count not be vunmap
+> too, the parameter is defined as "const void *".
 > 
-> There is little reason to enable PCI support for a platform that
-> uses MSI but then leaving MSI disabled at compile time, so this
-> patch changes the various Kconfig statement relating to PCI_MSI
-> so they all use 'select'.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+> In the call chain:
+> __dma_free_coherent-->__dma_free_coherent-->swiotlb_free_coherent,
+> only swiotlb_free_coherent finally use "vaddr".
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Exactly. So you give swiotlb_free_coherent a vaddr which has been
+unmapped. It doesn't even matter whether it's still mapped since this
+address is passed further to free_pages() which performs a
+virt_to_page(). The latter is *only* valid on linear map addresses (and
+you would actually hit the VM_BUG_ON in free_pages; you can try running
+this with CONFIG_DEBUG_VM enabled and non-coherent DMA).
 
-thanks, Arnd!
+For non-coherent DMA, the vaddr is not part of the linear mapping as it
+has been remapped by __dma_alloc() via dma_common_contiguous_remap(),
+hence for swiotlb freeing we need the actual linear map address (the
+original "ptr" in __dma_alloc()). We can generate it by a
+phys_to_virt(dma_to_phys(dma_handle)).
 
-Jason.
+-- 
+Catalin
