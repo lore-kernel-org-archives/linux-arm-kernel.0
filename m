@@ -1,48 +1,35 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Mar 2016 10:03:05 -0500
-Subject: [PATCH 5/5] pwm: pwm-tiehrpwm: Update dt binding document to use
- generic node name
-In-Reply-To: <1457380318-15452-6-git-send-email-fcooper@ti.com>
-References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
- <1457380318-15452-6-git-send-email-fcooper@ti.com>
-Message-ID: <20160317150305.GA27356@rob-hp-laptop>
+Date: Thu, 17 Mar 2016 10:06:19 -0500
+Subject: [PATCH v5 3/6] ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and
+ eCAP hwmod entries
+In-Reply-To: <1457400224-24797-4-git-send-email-fcooper@ti.com>
+References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
+ <1457400224-24797-4-git-send-email-fcooper@ti.com>
+Message-ID: <20160317150619.GA28105@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 07, 2016 at 01:51:58PM -0600, Franklin S Cooper Jr wrote:
-> Now that the node name has been changed from ehrpwm to pwm the document
-> should show this proper usage. Also change the unit address in the example
-> from 0 to the proper physical address value that should be used.
+On Mon, Mar 07, 2016 at 07:23:41PM -0600, Franklin S Cooper Jr wrote:
+> Devices that utilize the OCP registers and/or PRCM registers and
+> register bit fields should be modelled using hwmod. Since eQEP, ePWM and
+
+s/modelled/modeled/
+
+> eCAP don't fall under this category, remove their hwmod entries.
 > 
+> Instead these clocks simply use the clock that is pass through by its
+> parent PWMSS. Therefore, PWMSS handles the clock for itself and its
+> subdevices.
+
+Are you breaking compatibility with old DTs here? 
+ 
 > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-> index 9c100b2..20211ed 100644
-> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
-> @@ -15,14 +15,14 @@ Optional properties:
->  
->  Example:
->  
-> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
-> +ehrpwm0: pwm at 48300200 { /* EHRPWM on am33xx */
->  	compatible = "ti,am33xx-ehrpwm";
->  	#pwm-cells = <3>;
->  	reg = <0x48300200 0x100>;
->  	ti,hwmods = "ehrpwm0";
->  };
->  
-> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
-> +ehrpwm0: pwm at 01f00000 { /* EHRPWM on da850 */
-
-No leading 0s, but more importantly the address is wrong.
-
->  	compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
->  	#pwm-cells = <3>;
->  	reg = <0x300000 0x2000>;
-> -- 
-> 2.7.0
-> 
+>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  1 -
+>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  7 +-
+>  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
+>  .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 -----------------
+>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 ----------------------
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 --------------
+>  7 files changed, 4 insertions(+), 233 deletions(-)
