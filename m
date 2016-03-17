@@ -1,28 +1,36 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 17 Mar 2016 16:39:24 +0300
-Subject: [PATCH v2 00/11] da8xx USB clocks
-In-Reply-To: <1458181615-27782-1-git-send-email-david@lechnology.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
-Message-ID: <56EAB38C.9070905@cogentembedded.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 17 Mar 2016 14:42:37 +0100
+Subject: [RFC PATCH] ARM: clocksource: make ARM_GLOBAL_TIMER selectable
+In-Reply-To: <56DEAFB7.50105@ti.com>
+References: <1454610017-25499-1-git-send-email-grygorii.strashko@ti.com>
+ <20160204224128.GG4215@xsjsorenbubuntu>
+ <CAAtXAHcV-9gXcZOX8dzUOBZUwj9M=O4MAsMCJNQYAP+os-D7Tg@mail.gmail.com>
+ <20160204233950.GH4215@xsjsorenbubuntu> <56D04D17.6030502@ti.com>
+ <20160226152714.GD3173@xsjsorenbubuntu> <56DEAFB7.50105@ti.com>
+Message-ID: <56EAB44D.7020902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/17/2016 5:26 AM, David Lechner wrote:
-
-> OK, ready for round two.
-
-    You're quick... :-)
-
-> I've added a new callback in the davinci clocks so that they can properly
-> handle clock muxing. The clock functions are pretty much the same as in the
-> previous patch set other than clk_set_parent() now works.
+On 03/08/2016 11:55 AM, Grygorii Strashko wrote:
+> Yeah. Thanks
 >
-> The next new thing is a phy driver for the CFGCHIP2 register that controls the
-> SoC USB PHY (both USB 1.1 and USB 2.0). The ohci and musb drivers have been
-> updated to use this new phy driver.
+> I'll re-send it after 4.6-rc.
+> But What I'm not fully understand is how to get it merged taking into account that
+> it touches few maches & clocksource :(
 
-    Fantastic! At least there's some breakthru on this front.
+This is not a problem. Send it based on timers/core from the tip tree 
+and Cc the maintainers for the maches dir. As soon as they ack the 
+patches, I will merge it through my tree.
 
-[...]
+Thanks
 
-MBR, Sergei
+   -- Daniel
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
