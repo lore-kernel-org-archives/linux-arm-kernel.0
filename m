@@ -1,101 +1,42 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 17 Mar 2016 14:25:53 -0500
-Subject: [PATCH 5/5] pwm: pwm-tiehrpwm: Update dt binding document to use
- generic node name
-In-Reply-To: <CAL_JsqLwpvjMHmEwhouiUR1vs4xG2hOn4AovNv1VaFEaSDpMug@mail.gmail.com>
-References: <1457380318-15452-1-git-send-email-fcooper@ti.com>
- <1457380318-15452-6-git-send-email-fcooper@ti.com>
- <20160317150305.GA27356@rob-hp-laptop> <56EAE014.8070606@ti.com>
- <CAL_Jsq+3vRMezgrA53jPgMZUYR+DAA_886K1Q6YfxV1bPinoQQ@mail.gmail.com>
- <56EAF562.9060408@ti.com>
- <CAL_JsqLwpvjMHmEwhouiUR1vs4xG2hOn4AovNv1VaFEaSDpMug@mail.gmail.com>
-Message-ID: <56EB04C1.3010709@ti.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 17 Mar 2016 22:34:58 +0300
+Subject: ARMv4 (not v4t) marked obsolete in gcc-6
+In-Reply-To: <56EAD8C4.2030506@foss.arm.com>
+References: <201603101013.04618.arnd@arndb.de> <56EAD8C4.2030506@foss.arm.com>
+Message-ID: <CALT56yO4mg3AtgASyo64G61w0tiztubyDRi0hSzn7km0jLLnew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Sekhar
-
-On 03/17/2016 01:56 PM, Rob Herring wrote:
-> On Thu, Mar 17, 2016 at 1:20 PM, Franklin S Cooper Jr. <fcooper@ti.com> wrote:
->>
->> On 03/17/2016 01:00 PM, Rob Herring wrote:
->>> On Thu, Mar 17, 2016 at 11:49 AM, Franklin S Cooper Jr. <fcooper@ti.com> wrote:
->>>> On 03/17/2016 10:03 AM, Rob Herring wrote:
->>>>> On Mon, Mar 07, 2016 at 01:51:58PM -0600, Franklin S Cooper Jr wrote:
->>>>>> Now that the node name has been changed from ehrpwm to pwm the document
->>>>>> should show this proper usage. Also change the unit address in the example
->>>>>> from 0 to the proper physical address value that should be used.
->>>>>>
->>>>>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->>>>>> ---
->>>>>>  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 4 ++--
->>>>>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->>>>>> index 9c100b2..20211ed 100644
->>>>>> --- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->>>>>> +++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
->>>>>> @@ -15,14 +15,14 @@ Optional properties:
->>>>>>
->>>>>>  Example:
->>>>>>
->>>>>> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on am33xx */
->>>>>> +ehrpwm0: pwm at 48300200 { /* EHRPWM on am33xx */
->>>>>>      compatible = "ti,am33xx-ehrpwm";
->>>>>>      #pwm-cells = <3>;
->>>>>>      reg = <0x48300200 0x100>;
->>>>>>      ti,hwmods = "ehrpwm0";
->>>>>>  };
->>>>>>
->>>>>> -ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
->>>>>> +ehrpwm0: pwm at 01f00000 { /* EHRPWM on da850 */
->>>>> No leading 0s, but more importantly the address is wrong.
->>>> I will remove the leading 0. However, this value was taken
->>>> from the .dtsi and I just double checked and I see the same
->>>> value in the datasheet. I believe DA850,OMAP-L138 and AM18x
->>>> all have the same memory mapping. I'm looking at
->>>> http://www.ti.com/lit/ds/symlink/am1808.pdf page 233 and the
->>>> addresses match up what is seen here and in the .dtsi.
->>>>
->>>> Can you point me to which document your looking at that
->>>> shows a different value?
->>> Ummm, ...
->>>
->>>>>>      compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
->>>>>>      #pwm-cells = <3>;
->>>>>>      reg = <0x300000 0x2000>;
->>> right here.
->> So I don't know the history but the SOC node specifies a
->> ranges value of ranges = <0x0 0x01c00000 0x400000>;. It
->> seems that all child nodes of SOC have a reg property then
->> is based on an offset of 0x01c00000. So this is true for
->> UART, rtc, i2c, wdt, mmc, spi etc... So using a base offset
->> of 0x01c00000 + 0x300000 (reg value of the pwm) equals the
->> physical address of the ehrpwm0 register 0x1f00000.
->>
->> For the child nodes within the SOC node, the unit-address is
->> always based on the physical address not based on the offset
->> address.
-> They are all wrong and should be fixed. Unit address should match the
-> reg property unless the bus has defined something different (e.g.
-> PCI).
-
-I added Sekhar to hopefully comment if it would be better to
-try to get the reg properties to use their physical
-addresses or change the unit address to use the offset values.
-
-I don't mind shooting a patch that makes this massive switch
-for all the various peripherals and documentation. However,
-this is a bit beyond this series.  In this series I am not
-setting the unit address or reg address I am simply
-documenting what is currently being used. This patch set is
-a dependency for another patchset to get PWM support for DRA7.
-
-Are you ok with me doing the below?
-I submit a v2 that removes the leading 0 in this patch. This
-way this patchset and my PWMSS support for DRA7 patchset can
-get merged. I can then follow up with another separate
-patchset that insures both the unit address and the value in
-the reg property are aligned.
+2016-03-17 19:18 GMT+03:00 Ramana Radhakrishnan
+<ramana.radhakrishnan@foss.arm.com>:
 >
-> Rob
+>
+>
+> On 10/03/16 09:13, Arnd Bergmann wrote:
+>> I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
+>> so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
+>> we currenly support in the Linux kernel.
+>>
+>> The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
+>> and it will be removed in the following release (gcc-7) one year later, unless someone
+>> raises concerns over it.
+>
+> Support for armv4 has been deprecated but not yet obsoleted. We'd like to remove support for it in a future release of the compiler which could be as early as GCC 7 depending on the feedback we receive over the coming weeks / months. Removing support for armv4 will allow us to assume interworking by default which helps in cleaning up and simplifying the ARM backend. Further no one is really testing support for anything earlier than v4t really in the GCC community. While we would like to be cautious about removing support for armv4 from the tools, we think 2016 is a good time to start asking questions around removing support for this in the backend of the compiler.
+>
+> Folks building the kernel / applications that require armv4 support can continue using the linker option --fix-v4bx which should take care of the fixups. Ideally we would have liked to have removed support for v4 in binutils as well at some point of time in the future, but it appears as though there is a significant community of users who would like to build kernels / other apps for v4 based systems - thus I suspect that support will live for quite a while as it also keeps old assembler code going but ends up simplifying the compiler code base.
+>
+> In terms of registering opinions on keeping support for armv4 going, we'd prefer folks to discuss these with posts onto gcc at gcc.gnu.org describing their reasons for the same. There is a maintenance cost on keeping support for this going as there is a quite a bit of special casing for interworking vs non-interworking targets that we would like to clean up in the future once support goes out. At this point of time I haven't seen any good reasons to keep support going for armv4 in the *compiler*, since the linker option is available.
+
+Removing armv4 support means also removing -mtune support for those
+chips (I'm especially concerned about strongarm1100).
+Would it be possible to remove armv4 support, but leave performance
+settings/tunings intact?
+
+Regarding testing. We have a small community doing system builds for
+SA1100/SA1110 chips,
+if that matters.
+
+
+-- 
+With best wishes
+Dmitry
