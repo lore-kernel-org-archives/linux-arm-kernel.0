@@ -1,8 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 17 Mar 2016 10:47:10 +0100
+Date: Thu, 17 Mar 2016 10:47:11 +0100
 Subject: [PATCH] crypto: marvell/cesa - forward devm_ioremap_resource() error
  code
-Message-ID: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
+In-Reply-To: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1458208031-13463-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1458208031-13463-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
