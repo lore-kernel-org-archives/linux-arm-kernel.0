@@ -1,53 +1,71 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 18 Mar 2016 18:12:20 +0000
-Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
-In-Reply-To: <20160318144325.GB29225@dhcppc6.redhat.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-4-git-send-email-dave.long@linaro.org>
- <56E858D8.8030300@arm.com> <20160316054329.GC28915@dhcppc6.redhat.com>
- <56E9350A.7010909@arm.com> <20160317075726.GA16882@dhcppc6.redhat.com>
- <20160318132902.GA29225@dhcppc6.redhat.com> <56EC0A89.3030606@arm.com>
- <20160318144325.GB29225@dhcppc6.redhat.com>
-Message-ID: <56EC4504.6060702@arm.com>
+From: scott.wood@nxp.com (Scott Wood)
+Date: Fri, 18 Mar 2016 18:16:06 +0000
+Subject: [v6, 3/5] dt: move guts devicetree doc out of powerpc directory
+References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
+ <1457518131-11339-4-git-send-email-yangbo.lu@nxp.com>
+ <20160317170640.GB21009@rob-hp-laptop>
+Message-ID: <HE1PR0401MB1931444381E249E41C45C748918C0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
-
-On 18/03/16 14:43, Pratyush Anand wrote:
-> On 18/03/2016:02:02:49 PM, James Morse wrote:
->> In kernel/entry.S when entered from EL0 we test for TIF_SINGLESTEP in the
->> thread_info flags, and use disable_step_tsk/enable_step_tsk to save/restore the
->> single-step state.
+On 03/17/2016 12:06 PM, Rob Herring wrote:
+> On Wed, Mar 09, 2016 at 06:08:49PM +0800, Yangbo Lu wrote:
+>> Move guts devicetree doc to Documentation/devicetree/bindings/soc/fsl/
+>> since it's used by not only PowerPC but also ARM. And add a specification
+>> for 'little-endian' property.
 >>
->> Could we do this regardless of which EL we came from?
+>> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+>> ---
+>> Changes for v2:
+>> 	- None
+>> Changes for v3:
+>> 	- None
+>> Changes for v4:
+>> 	- Added this patch
+>> Changes for v5:
+>> 	- Modified the description for little-endian property
+>> Changes for v6:
+>> 	- None
+>> ---
+>>  Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+>>
+>> diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+>> similarity index 91%
+>> rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+>> rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
+>> index b71b203..07adca9 100644
+>> --- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+>> +++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+>> @@ -25,6 +25,9 @@ Recommended properties:
+>>   - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
+>>     registers, for those SOCs that have a PAMU device.
+>>  
+>> + - little-endian : Indicates that the global utilities block is little
+>> +   endian. The default is big endian.
 > 
-> Thanks for another idea. I think, we can not do this as it is, because
-> TIF_SINGLESTEP will not be set for kprobe events.
+> The default is "the native endianness of the system". So absence on an 
+> ARM system would be LE.
 
-Hmmm, I see kernel_enable_single_step() doesn't set it, but setup_singlestep()
-in patch 5 could...
+No.  For this binding, the default is big-endian, because that's what
+existed for this device before an endian property was added.
 
-There is probably a good reason its never set for a kernel thread, I will have a
-look at where else it is used.
+"endianness of the system" is not a well-defined concept.
 
+> This property is valid for any simple-bus device, 
 
-> But, we can introduce a
-> variant disable_step_kernel and enable_step_kernel, which can be called in
-> el1_da. 
+Since when does simple-bus mean anything more than that the nodes
+underneath it can be used without bus-specific knowledge?
 
-What about sp/pc misalignment, or undefined instructions?
-Or worse... an irq occurs during your el1_da call (el1_da may re-enable irqs).
-el1_irq doesn't know you were careful not to unmask debug exceptions, it blindly
-turns them back on.
+> so it isn't really required to document per device. You can, but 
+> your description had better match the documented behaviour.
 
-The problem is the 'single step me' bit is still set, save/restoring it will
-save us having to consider every interaction, (and then missing some!).
+Documented where?
 
-It would also mean you don't have to disable interrupts while single stepping in
-patch 5 (comment above kprobes_save_local_irqflag()).
+In fact, Documentation/devicetree/bindings/common-properties.txt
+explicitly says of the endian properties, "If a binding supports these
+properties, then the binding should also specify the default behavior if
+none of these properties are present."
 
-
-Thanks,
-
-James
+-Scott
