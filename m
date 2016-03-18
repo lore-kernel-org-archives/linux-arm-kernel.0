@@ -1,45 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 18 Mar 2016 11:34:40 +0100
-Subject: [PATCH 3/3] ARM: at91/dt: sama5d2: add chipid node
-In-Reply-To: <1458285681-25684-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
- <1458285681-25684-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20160318103440.GC2531@piout.net>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri, 18 Mar 2016 11:38:29 +0100
+Subject: [PATCH v2] ARM: DMA: Fix kzalloc flags in __dma_alloc
+In-Reply-To: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
+References: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <20160318103829.GA15201@lnxrabinv.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/2016 at 08:21:21 +0100, Ludovic Desroches wrote :
-> Add node for chipid device in order to have access to the CIDR and EXID
-> values.
+On Fri, Mar 18, 2016 at 06:28:49PM +0900, Alexandre Courbot wrote:
+> Commit 19e6e5e5392b ("ARM: 8547/1: dma-mapping: store buffer
+> information") allocates a structure meant for internal buffer management
+> with the GFP flags of the buffer itself. This can trigger the following
+> safeguard in the slab/slub allocator:
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
+> 	if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
+> 		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
+> 		BUG();
+> 	}
+> 
+> Fix this by filtering the flags that make the slab allocator unhappy.
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> Cc: Rabin Vincent <rabin@rab.in>
 > ---
->  arch/arm/boot/dts/sama5d2.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 78996bd..173e3d7 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -1193,6 +1193,11 @@
->  				clock-names = "tdes_clk";
->  				status = "okay";
->  			};
-> +
-> +			chipid at fc069000 {
-> +				compatible = "atmel,sama5d2-chipid";
-> +				reg = <0xfc069000 0x8>;
-> +			};
->  		};
->  	};
->  };
-> -- 
-> 2.5.0
-> 
+> Changes since v1:
+> - Filter flags that may cause problem instead of forcing GFP_KERNEL
+>   (and risk sleeping in atomic context), as suggested by Rabin.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: Rabin Vincent <rabin@rab.in>
+
+Thanks.
