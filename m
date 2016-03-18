@@ -1,112 +1,34 @@
-From: xf@rock-chips.com (Feng Xiao)
-Date: Fri, 18 Mar 2016 20:10:04 +0800
-Subject: [PATCH] cpufreq: rockchip: add driver
-Message-ID: <1458303004-26445-1-git-send-email-xf@rock-chips.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Mar 2016 12:22:59 +0000
+Subject: [PATCH v2 1/1] arm64/dma-mapping: reduce an unnecessary
+ conversion for coherent DMA
+In-Reply-To: <1458267967-6332-2-git-send-email-thunder.leizhen@huawei.com>
+References: <1458267967-6332-1-git-send-email-thunder.leizhen@huawei.com>
+ <1458267967-6332-2-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160318122259.GC4645@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver will directly use cpufreq-dt driver as backend.
+On Fri, Mar 18, 2016 at 10:26:07AM +0800, Zhen Lei wrote:
+> 1.For coherent DMA
+>   In swiotlb_alloc_coherent, it directly return vaddr on success, and
+> pass vaddr to free_pages on failure. So, we can directly transparent pass
+> vaddr from __dma_free to swiotlb_free_coherent.
+> 
+> 2.Keep no change for non-coherent DMA.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 
-As there is not a generic devicetree board file(rockchip.c)
-on ARM64 architecture, so remove platform_device_register_simple
-in rockchip.c and add a new cpufreq driver to support for all
-Rockchip SoCs.
+You sent a patch without any real reason like "improved performance",
+just making the code slightly harder to read. Currently it is pretty
+clear to me that phys_to_virt is meant for computing the swiotlb
+address and we ignore the actual vaddr in this context.
 
-Signed-off-by: Feng Xiao <xf@rock-chips.com>
----
- arch/arm/mach-rockchip/rockchip.c  |  1 -
- drivers/cpufreq/Kconfig.arm        | 10 ++++++++++
- drivers/cpufreq/Makefile           |  1 +
- drivers/cpufreq/rockchip-cpufreq.c | 36 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 47 insertions(+), 1 deletion(-)
- create mode 100644 drivers/cpufreq/rockchip-cpufreq.c
+So, I'm not taking this patch (if you want, you can send one just adding
+a comment why vaddr cannot always be passed to the swiotlb API).
 
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 3f07cc5..beb71da 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -74,7 +74,6 @@ static void __init rockchip_dt_init(void)
- {
- 	rockchip_suspend_init();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
- }
- 
- static const char * const rockchip_board_dt_compat[] = {
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 14b1f93..1786315 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -97,6 +97,16 @@ config ARM_OMAP2PLUS_CPUFREQ
- 	depends on ARCH_OMAP2PLUS
- 	default ARCH_OMAP2PLUS
- 
-+config ARM_ROCKCHIP_CPUFREQ
-+	tristate "Rockchip CPUfreq driver"
-+	depends on ARCH_ROCKCHIP && CPUFREQ_DT
-+	select PM_OPP
-+	help
-+	  This adds the CPUFreq driver support for Rockchip SoCs.
-+	  The driver will directly use cpufreq-dt driver as backend.
-+
-+	  If in doubt, say N.
-+
- config ARM_S3C_CPUFREQ
- 	bool
- 	help
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 9e63fb1..91d8bb7 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
- obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
- obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-+obj-$(CONFIG_ARM_ROCKCHIP_CPUFREQ)	+= rockchip-cpufreq.o
- obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
- obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
- obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
-diff --git a/drivers/cpufreq/rockchip-cpufreq.c b/drivers/cpufreq/rockchip-cpufreq.c
-new file mode 100644
-index 0000000..ecbadcd
---- /dev/null
-+++ b/drivers/cpufreq/rockchip-cpufreq.c
-@@ -0,0 +1,36 @@
-+/*
-+ * Rockchip Platforms CPUFreq Support
-+ *
-+ * Copyright (C) 2016 Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * Feng Xiao <xf@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+static int __init rockchip_cpufreq_driver_init(void)
-+{
-+	struct platform_device *pdev;
-+
-+	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+	return PTR_ERR_OR_ZERO(pdev);
-+}
-+module_init(rockchip_cpufreq_driver_init);
-+
-+MODULE_AUTHOR("Feng Xiao <xf@rock-chips.com>");
-+MODULE_DESCRIPTION("Rockchip cpufreq driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-1.9.1
+Catalin
