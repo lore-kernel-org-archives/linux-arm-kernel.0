@@ -1,52 +1,43 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 18 Mar 2016 01:41:06 +0100
-Subject: [PATCH v4 0/5] acpi, clocksource,
- kvm: add GTDT and ARM memory-mapped timer support
-In-Reply-To: <56EAC832.6070203@codeaurora.org>
-References: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
- <56EAC832.6070203@codeaurora.org>
-Message-ID: <2196518.cd4jtVChuo@vostro.rjw.lan>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 17 Mar 2016 17:33:22 -0700
+Subject: [PATCH v2 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <56EB4937.1010404@mellanox.com>
+References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
+ <1458147733-29338-2-git-send-email-cmetcalf@mellanox.com>
+ <20160317193600.GY6344@twins.programming.kicks-ass.net>
+ <20160317225557.GA4287@linux.vnet.ibm.com>
+ <56EB4937.1010404@mellanox.com>
+Message-ID: <20160318003322.GC4287@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 17, 2016 10:07:30 AM Timur Tabi wrote:
-> fu.wei at linaro.org wrote:
-> > From: Fu Wei <fu.wei@linaro.org>
+On Thu, Mar 17, 2016 at 08:17:59PM -0400, Chris Metcalf wrote:
+> On 3/17/2016 6:55 PM, Paul E. McKenney wrote:
+> >The RCU stall-warn stack traces can be ugly, agreed.
 > >
-> > This patchset:
-> >      (1)Move some enums and marcos to header file for arm_arch_timer,
-> >      improve the pr_* code by defining "pr_fmt(fmt)" in arm_arch_timer.c
-> >
-> >      (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
-> >      Parse all kinds of timer in GTDT table of ACPI:arch timer,
-> >      memory-mapped timer and SBSA Generic Watchdog timer.
-> >      This driver can help to simplify all the relevant timer drivers,
-> >      and separate all the ACPI GTDT knowledge from them.
-> >
-> >      (3)Simplify ACPI code for arch timer in arm_arch_timer.c
-> >
-> >      (4)Add memory-mapped timer support in arm_arch_timer.c
+> >That said, RCU used to use NMI-based stack traces, but switched to the
+> >current scheme due to the NMIs having the unfortunate habit of locking
+> >things up, which IIRC often meant no stack traces at all.  If I recall
+> >correctly, one of the problems was self-deadlock in printk().
 > 
-> The SBSA watchdog driver is already in watchdog-next and will be merged 
-> into 4.6.  These five patches are necessary for the watchdog driver to 
-> probe on an ACPI system.
-> 
-> I'm guessing since that v4 was posted in the middle of the 4.6 merge 
-> window, that these patches won't make it and we'll have to wait until 
-> 4.7 (at the earliest)?
+> Steven Rostedt enabled the per_cpu printk func support in June 2014, and
+> the nmi_backtrace code uses it to just capture printk output to percpu
+> buffers, so I think it's going to be a lot more robust than earlier attempts.
 
-First off, the last version I've seen is the v3.  I must have overlooked
-the v4 then, but I don't think it was CCed to linux-acpi (which should
-have happened).
+That would be a very good thing, give or take the "I think" qualifier.
+And assuming that the target CPU is healthy enough to find its way back
+to some place that can dump the per-CPU printk buffer.  I might well
+be overly paranoid, but I have to suspect that the probability of that
+buffer getting dumped is reduced greatly on a CPU that isn't healthy
+enough to respond to RCU, though.
 
-Second, these patches require review from multiple maintainers and (or including)
-people who actually know how the GTDT is supposed to be used.  I haven't
-seen any responses from any of them yet, so the answer to your question is
-"yes".
+But it seems like enabling the experiment might be useful.
 
-I will have a couple of comments for patch [1/6] (in the v3), but it's
-not been a priority due to the apparent overall lack of interest in this
-series.
+"Try enabling the NMI version.  If that doesn't get you your RCU CPU
+stall warning stack trace, try the remote-print variant."
 
-Thanks,
-Rafael
+Or I suppose we could just do both in succession, just in case their
+console was a serial port.  ;-)
+
+							Thanx, Paul
