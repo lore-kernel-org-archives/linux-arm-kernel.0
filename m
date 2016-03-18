@@ -1,30 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Mar 2016 17:49 +0100
-Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
- (2nd round)
-In-Reply-To: <CAK7LNARW9u=btLwc9Pj3VFx_q_unfWu9gH4sHNC3-9gLd0p=pg@mail.gmail.com>
-References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNARJStOBUM7G=8nffXTk_a426o8CRRSX2SL-P0BsH08M7A@mail.gmail.com>
- <CAK7LNARW9u=btLwc9Pj3VFx_q_unfWu9gH4sHNC3-9gLd0p=pg@mail.gmail.com>
-Message-ID: <3064565.apY2TeQbln@wuerfel>
+Date: Fri, 18 Mar 2016 21:25:23 +0100
+Subject: [PATCH v2] mtd: avoid stack overflow in MTD CFI code
+In-Reply-To: <20160318174419.GA70362@google.com>
+References: <1456748436-522413-1-git-send-email-arnd@arndb.de>
+ <2259988.Lj3BC6sPv6@wuerfel> <20160318174419.GA70362@google.com>
+Message-ID: <10357051.EVa2c1MaZl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 March 2016 11:01:00 Masahiro Yamada wrote:
-> Olof, Arnd,
+On Friday 18 March 2016 10:44:19 Brian Norris wrote:
+> On Sat, Mar 05, 2016 at 12:25:24AM +0100, Arnd Bergmann wrote:
+> > On Friday 04 March 2016 13:21:59 Brian Norris wrote:
+> > > 
+> > > Looking a little closer at this... why do we need the changes to
+> > > include/linux/mtd/map.h again? It should be fine to leave these
+> > > definitions as-is, right? They don't contribute to the large stack
+> > > usage, do they?
+> > > 
+> > > Maybe I'm just missing something obvious, so please do enlighten 
+> > > 
+> > 
+> > It's been a while since I created the patch, and the originally
+> > failing configuration currently doesn't produce this (probably
+> > because something else changed). I remember that it was something
+> > rather subtle, but don't exactly remember what happened.
+> > 
+> > I've reverted the patch now, trying to reproduce it on my
+> > randconfig setup, but I might not be able to get back to you
+> > in the next week while I'm traveling.
 > 
+> FWIW, I took a little look at this, and I can reproduce this myself. I
+> can get a large frame size on at least 2 of the 3 functions you report.
+> I think most of the gain you get with this patch is due to the Kconfig
+> change (MTD_COMPLEX_MAPPINGS) because it forces an extra level of
+> indirection. The other changes seem to give a modest decrease in size,
+> though it's less clear why exactly.
 > 
-> I sent my patches around -rc4 and
-> took action soon as requested.
+> Anyway, I think the problem isn't primarily with anything you're
+> touching here exactly, but with the fact that we're putting several
+> copies of the 'map_word' typedef on the stack, and doing assignment to
+> it as if it's a typical variable. But with MAP_WIDTH_32, this is a
+> 32-byte object, and I assume that these (too) long functions are
+> introducing enough complexity that the compiler has to have several
+> copies of them. To properly fix all this, it seems like the code could
+> use some more attention, and not just the superficial changes here.
 > 
-> But, my series is still not applied due to the long silence on your side.
-> 
-> Please respond!
+> Anyway, I'm interested if you have any more thoughts on this. If you
+> still think this is worthwhile, I can probably just take it. (It looks
+> OK, despite the above comments.)
 
-Sorry for all the delays, we screwed this one up, and you did everything
-right. I have put the DT changes into the next/dt2 branch now, and applied
-the two other patches to next/soc directly.
+I'd like to get this fixed in one way or another, but I'm not
+particularly attached to my specific workaround.
 
-Please check that the for-next branch in arm-soc has everything you need now.
+If you don't think anyone will be able to reduce the number of
+map_word instances on the stack, please add my patch so at least
+we get rid of the warning and make it less likely to hit the bug.
+
+An alternative might be to optionally move the map_word_and/clr/or/...
+operations out of line for large sizes of map_word, so we don't
+have all instances on the stack at once.
 
 	Arnd
