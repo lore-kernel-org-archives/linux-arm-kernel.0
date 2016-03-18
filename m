@@ -1,86 +1,44 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 18 Mar 2016 15:20:19 +0100
-Subject: [PATCH 1/3] crypto: marvell/cesa - replace dma_to_phys with
- dma_map_single
-In-Reply-To: <56EC07E9.1000506@codeaurora.org>
-References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
- <20160317225459.GA19428@n2100.arm.linux.org.uk>
- <80402e2f82651814b1411a25b1740288@codeaurora.org>
- <20160317235020.GB19428@n2100.arm.linux.org.uk>
- <20160318103028.4be15b78@bbrezillon> <56EBE5BC.6000000@arm.com>
- <56EC07E9.1000506@codeaurora.org>
-Message-ID: <20160318152019.4db444e5@bbrezillon>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Fri, 18 Mar 2016 16:20:19 +0200
+Subject: [PATCH] [media] media: rename media unregister function
+In-Reply-To: <56EC0DF9.4050601@osg.samsung.com>
+References: <2ffc02c944068b2c8655727238d1542f8328385d.1458306276.git.mchehab@osg.samsung.com>
+ <56EC0A55.3010803@osg.samsung.com> <56EC0CC4.1070309@osg.samsung.com>
+ <56EC0DF9.4050601@osg.samsung.com>
+Message-ID: <56EC0EA3.6010108@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Mar 2016 09:51:37 -0400
-Sinan Kaya <okaya@codeaurora.org> wrote:
+Shuah Khan wrote:
+> On 03/18/2016 08:12 AM, Javier Martinez Canillas wrote:
+>> Hello Shuah,
+>>
+>> On 03/18/2016 11:01 AM, Shuah Khan wrote:
+>>> On 03/18/2016 07:05 AM, Mauro Carvalho Chehab wrote:
+>>>> Now that media_device_unregister() also does a cleanup, rename it
+>>>> to media_device_unregister_cleanup().
+>>>>
+>>>> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+>>>
+>>> I think adding cleanup is redundant. media_device_unregister()
+>>> would imply that there has to be some cleanup releasing resources.
+>>> I wouldn't make this change.
+>>>
+>>
+>> Problem is that there is a media_device_init() and media_device_register(),
+>> so having both unregister and cleanup in this function will make very clear
+>> that a single function is the counter part of the previous two operations.
+>>  
+> 
+> Yes. I realized that this change is motivated by the fact that there is
+> the media_device_init() and we had the counterpart media_device_cleanup()
+> as an exported function. I still think there is no need to make the change
+> to add _cleanup() at the end of media_device_unregister(). It can be handled
+> in API documentation that it does both.
 
-> On 3/18/2016 7:25 AM, Robin Murphy wrote:
-> > On 18/03/16 09:30, Boris Brezillon wrote:
-> >> On Thu, 17 Mar 2016 23:50:20 +0000
-> >> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> >>
-> >>> On Thu, Mar 17, 2016 at 07:17:24PM -0400, okaya at codeaurora.org wrote:
-> >>>> What is the correct way? I don't want to write engine->sram_dma = sram
-> >>>
-> >>> Well, what the driver _is_ wanting to do is to go from a CPU physical
-> >>> address to a device DMA address.  phys_to_dma() looks like the correct
-> >>> thing there to me, but I guess that's just an offset and doesn't take
-> >>> account of any IOMMU that may be in the way.
-> >>>
-> >>> If you have an IOMMU, then the whole phys_to_dma() thing is a total
-> >>> failure as it only does a linear translation, and there are no
-> >>> interfaces in the kernel to take account of an IOMMU in the way.  So,
-> >>> it needs something designed for the job, implemented and discussed by
-> >>> the normal methods of proposing a new cross-arch interface for drivers
-> >>> to use.
-> >>>
-> >>> What I'm certain of, though, is that the change proposed in this patch
-> >>> will break current users of this driver: virt_to_page() on an address
-> >>> returned by ioremap() is completely undefined, and will result in
-> >>> either a kernel oops, or if not poking at memory which isn't a struct
-> >>> page, ultimately resulting in something that isn't SRAM being pointed
-> >>> to by "engine->sram_dma".
-> >>>
-> >>
-> >> Or we could just do
-> >>
-> >>     engine->sram_dma = res->start;
-> >>
-> >> which is pretty much what the SRAM/genalloc code is doing already.
-> > 
-> > As Russell points out this is yet another type of "set up a DMA master to access something other than kernel RAM" - there's already discussion in progress over how to handle this for dmaengine slaves[1], so gathering more use-cases might help distil exactly what the design of not-strictly-DMA-but-so-closely-coupled-it-can't-really-live-anywhere-else needs to be.
-> > 
-> > Robin.
-> > 
-> > [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414422.html
-> > 
-> 
-> Thanks for the link. 
-> 
-> dma_map_resource looks like to be the correct way of doing things. Just from
-> the purist point of view, a driver is not supposed to know the physical address
-> of a DMA address. That kills the intent of using DMA API. When programming descriptors,
-> the DMA addresses should be programmed not physical addresses so that the same 
-> driver can be used in a system with IOMMU. The IOMMU DMA ops will remap the DMA 
-> address to a bus address that is not physical address. All of this operation needs
-> to be isolated from the device driver.
-> 
-> 
-> I don't know the architecture or the driver enough to write this. This is not ideally
-> right but I can do this if Boris you are OK with this. 
-> 
->      engine->sram_dma = res->start;
-
-I don't know.
-
-How about waiting for the 'dma_{map,unmap}_resource' discussion to
-settle down before removing phy_to_dma()/dma_to_phys() APIs (as
-suggested by Robin and Russell)?
-
+I think that's a bad idea. People will only read the documentation when
+something doesn't work. In this case it's easy to miss that.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Sakari Ailus
+sakari.ailus at linux.intel.com
