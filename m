@@ -1,28 +1,44 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Fri, 18 Mar 2016 08:01:57 -0600
-Subject: [PATCH] [media] media: rename media unregister function
-In-Reply-To: <2ffc02c944068b2c8655727238d1542f8328385d.1458306276.git.mchehab@osg.samsung.com>
-References: <2ffc02c944068b2c8655727238d1542f8328385d.1458306276.git.mchehab@osg.samsung.com>
-Message-ID: <56EC0A55.3010803@osg.samsung.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 18 Mar 2016 14:02:49 +0000
+Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
+In-Reply-To: <20160318132902.GA29225@dhcppc6.redhat.com>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-4-git-send-email-dave.long@linaro.org>
+ <56E858D8.8030300@arm.com> <20160316054329.GC28915@dhcppc6.redhat.com>
+ <56E9350A.7010909@arm.com> <20160317075726.GA16882@dhcppc6.redhat.com>
+ <20160318132902.GA29225@dhcppc6.redhat.com>
+Message-ID: <56EC0A89.3030606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2016 07:05 AM, Mauro Carvalho Chehab wrote:
-> Now that media_device_unregister() also does a cleanup, rename it
-> to media_device_unregister_cleanup().
+Hi Pratyush,
+
+On 18/03/16 13:29, Pratyush Anand wrote:
+> Probably, I can see why does not it work. So, when we are single stepping an
+> instruction and page fault occurs, we will come to el1_da in entry.S. Here, we
+> do enable_dbg. As soon as we will do this, we will start receiving single step
+> exception after each instruction (not sure, probably for each alternate
+> instruction). Since, there will not be any matching single step handler for
+> these instructions, so we will see warning "Unexpected kernel single-step
+> exception at EL1". 
 > 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> So, I think, we should 
+> 
+> (1) may be do not enable debug for el1_da, or
+> (2) enable_dbg only when single stepping is not enabled, or
+> (3) or disable single stepping during el1_da execution.
+> 
+> (1) will solve the issue for sure, but not sure if it could be the best choice.
 
-I think adding cleanup is redundant. media_device_unregister()
-would imply that there has to be some cleanup releasing resources.
-I wouldn't make this change.
+A variation on (3):
 
-thanks,
--- Shuah
+In kernel/entry.S when entered from EL0 we test for TIF_SINGLESTEP in the
+thread_info flags, and use disable_step_tsk/enable_step_tsk to save/restore the
+single-step state.
 
--- 
-Shuah Khan
-Sr. Linux Kernel Developer
-Open Source Innovation Group
-Samsung Research America (Silicon Valley)
-shuahkh at osg.samsung.com | (970) 217-8978
+Could we do this regardless of which EL we came from?
+
+
+Thanks,
+
+James
