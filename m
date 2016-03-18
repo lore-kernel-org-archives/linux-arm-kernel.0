@@ -1,224 +1,111 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Mar 2016 12:28:48 +0200
-Subject: [PATCH 2/3] ARM: OMAP3: hwmod data: Merge and remove the McBSP
- sidetone related data
-In-Reply-To: <1458296929-718-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1458296929-718-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1458296929-718-3-git-send-email-peter.ujfalusi@ti.com>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Fri, 18 Mar 2016 18:28:29 +0800
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160225202855.GD16123@yury-N73SV>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <56AB3805.1040308@huawei.com> <20160129170929.GA3543@yury-N73SV>
+ <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
+ <mvm8u29ukqw.fsf@hawking.suse.de> <20160225202855.GD16123@yury-N73SV>
+Message-ID: <56EBD84D.2060009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-McBSP2 and 3 have integrated sidetone block. The sidetone alone can not
-operate, can not be enabled separately from the McBSP it is attached to.
-The sidetone is enabled via McBSP register(s) and it is using the McBSP
-module's iclk as clock. While the sidetone block of McBSP does have it's
-SYSCONFIG registers to enable/disable AUTOIDLE (of McBSP_ICLK) this alone
-does not mean that we should have dedicated hwmod for McBSP internal
-blocks. Note: The AUTOIDLE bit is set after reset and hwmod is not changing
-it in runtime.
-The sidetone can not be enabled separately from McBSP, it can only enabled
-when McBSP is in use.
-Furthermore the sidetone data is specifying the exact same prcm registers
-and bits as the McBSP hwmod it is attached to.
-As one of the main function of the sidetone hwmod data is to convey the
-address and irq number to the main mcbsp hwmod, move them directly to the
-corresponding McBSP's hwmod data.
----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 120 ++++-------------------------
- 1 file changed, 14 insertions(+), 106 deletions(-)
+Hi, Yury
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 9869a75c5d96..317e9b816a02 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1175,13 +1175,10 @@ static struct omap_hwmod_irq_info omap3xxx_mcbsp2_irqs[] = {
- 	{ .name = "common", .irq = 17 + OMAP_INTC_START, },
- 	{ .name = "tx", .irq = 62 + OMAP_INTC_START, },
- 	{ .name = "rx", .irq = 63 + OMAP_INTC_START, },
-+	{ .name = "sidetone", .irq = 4 + OMAP_INTC_START, },
- 	{ .irq = -1 },
- };
- 
--static struct omap_mcbsp_dev_attr omap34xx_mcbsp2_dev_attr = {
--	.sidetone	= "mcbsp2_sidetone",
--};
--
- static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
- 	.name		= "mcbsp2",
- 	.class		= &omap3xxx_mcbsp_hwmod_class,
-@@ -1199,7 +1196,6 @@ static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
- 	},
- 	.opt_clks	= mcbsp234_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
--	.dev_attr	= &omap34xx_mcbsp2_dev_attr,
- };
- 
- /* mcbsp3 */
-@@ -1207,13 +1203,10 @@ static struct omap_hwmod_irq_info omap3xxx_mcbsp3_irqs[] = {
- 	{ .name = "common", .irq = 22 + OMAP_INTC_START, },
- 	{ .name = "tx", .irq = 89 + OMAP_INTC_START, },
- 	{ .name = "rx", .irq = 90 + OMAP_INTC_START, },
-+	{ .name = "sidetone", .irq = 5 + OMAP_INTC_START, },
- 	{ .irq = -1 },
- };
- 
--static struct omap_mcbsp_dev_attr omap34xx_mcbsp3_dev_attr = {
--	.sidetone	= "mcbsp3_sidetone",
--};
--
- static struct omap_hwmod omap3xxx_mcbsp3_hwmod = {
- 	.name		= "mcbsp3",
- 	.class		= &omap3xxx_mcbsp_hwmod_class,
-@@ -1231,7 +1224,6 @@ static struct omap_hwmod omap3xxx_mcbsp3_hwmod = {
- 	},
- 	.opt_clks	= mcbsp234_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
--	.dev_attr	= &omap34xx_mcbsp3_dev_attr,
- };
- 
- /* mcbsp4 */
-@@ -1300,62 +1292,6 @@ static struct omap_hwmod omap3xxx_mcbsp5_hwmod = {
- 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp15_opt_clks),
- };
- 
--/* 'mcbsp sidetone' class */
--static struct omap_hwmod_class_sysconfig omap3xxx_mcbsp_sidetone_sysc = {
--	.sysc_offs	= 0x0010,
--	.sysc_flags	= SYSC_HAS_AUTOIDLE,
--	.sysc_fields	= &omap_hwmod_sysc_type1,
--};
--
--static struct omap_hwmod_class omap3xxx_mcbsp_sidetone_hwmod_class = {
--	.name = "mcbsp_sidetone",
--	.sysc = &omap3xxx_mcbsp_sidetone_sysc,
--};
--
--/* mcbsp2_sidetone */
--static struct omap_hwmod_irq_info omap3xxx_mcbsp2_sidetone_irqs[] = {
--	{ .name = "irq", .irq = 4 + OMAP_INTC_START, },
--	{ .irq = -1 },
--};
--
--static struct omap_hwmod omap3xxx_mcbsp2_sidetone_hwmod = {
--	.name		= "mcbsp2_sidetone",
--	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
--	.mpu_irqs	= omap3xxx_mcbsp2_sidetone_irqs,
--	.main_clk	= "mcbsp2_fck",
--	.prcm		= {
--		.omap2 = {
--			.prcm_reg_id = 1,
--			 .module_bit = OMAP3430_EN_MCBSP2_SHIFT,
--			.module_offs = OMAP3430_PER_MOD,
--			.idlest_reg_id = 1,
--			.idlest_idle_bit = OMAP3430_ST_MCBSP2_SHIFT,
--		},
--	},
--};
--
--/* mcbsp3_sidetone */
--static struct omap_hwmod_irq_info omap3xxx_mcbsp3_sidetone_irqs[] = {
--	{ .name = "irq", .irq = 5 + OMAP_INTC_START, },
--	{ .irq = -1 },
--};
--
--static struct omap_hwmod omap3xxx_mcbsp3_sidetone_hwmod = {
--	.name		= "mcbsp3_sidetone",
--	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
--	.mpu_irqs	= omap3xxx_mcbsp3_sidetone_irqs,
--	.main_clk	= "mcbsp3_fck",
--	.prcm		= {
--		.omap2 = {
--			.prcm_reg_id = 1,
--			.module_bit = OMAP3430_EN_MCBSP3_SHIFT,
--			.module_offs = OMAP3430_PER_MOD,
--			.idlest_reg_id = 1,
--			.idlest_idle_bit = OMAP3430_ST_MCBSP3_SHIFT,
--		},
--	},
--};
--
- /* SR common */
- static struct omap_hwmod_sysc_fields omap34xx_sr_sysc_fields = {
- 	.clkact_shift	= 20,
-@@ -3108,6 +3044,12 @@ static struct omap_hwmod_addr_space omap3xxx_mcbsp2_addrs[] = {
- 		.pa_end		= 0x490220ff,
- 		.flags		= ADDR_TYPE_RT
- 	},
-+	{
-+		.name		= "sidetone",
-+		.pa_start	= 0x49028000,
-+		.pa_end		= 0x490280ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
- 	{ }
- };
- 
-@@ -3127,6 +3069,12 @@ static struct omap_hwmod_addr_space omap3xxx_mcbsp3_addrs[] = {
- 		.pa_end		= 0x490240ff,
- 		.flags		= ADDR_TYPE_RT
- 	},
-+	{
-+		.name		= "sidetone",
-+		.pa_start	= 0x4902A000,
-+		.pa_end		= 0x4902A0ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
- 	{ }
- };
- 
-@@ -3177,44 +3125,6 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__mcbsp5 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--static struct omap_hwmod_addr_space omap3xxx_mcbsp2_sidetone_addrs[] = {
--	{
--		.name		= "sidetone",
--		.pa_start	= 0x49028000,
--		.pa_end		= 0x490280ff,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
--/* l4_per -> mcbsp2_sidetone */
--static struct omap_hwmod_ocp_if omap3xxx_l4_per__mcbsp2_sidetone = {
--	.master		= &omap3xxx_l4_per_hwmod,
--	.slave		= &omap3xxx_mcbsp2_sidetone_hwmod,
--	.clk		= "mcbsp2_ick",
--	.addr		= omap3xxx_mcbsp2_sidetone_addrs,
--	.user		= OCP_USER_MPU,
--};
--
--static struct omap_hwmod_addr_space omap3xxx_mcbsp3_sidetone_addrs[] = {
--	{
--		.name		= "sidetone",
--		.pa_start	= 0x4902A000,
--		.pa_end		= 0x4902A0ff,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
--/* l4_per -> mcbsp3_sidetone */
--static struct omap_hwmod_ocp_if omap3xxx_l4_per__mcbsp3_sidetone = {
--	.master		= &omap3xxx_l4_per_hwmod,
--	.slave		= &omap3xxx_mcbsp3_sidetone_hwmod,
--	.clk		= "mcbsp3_ick",
--	.addr		= omap3xxx_mcbsp3_sidetone_addrs,
--	.user		= OCP_USER_MPU,
--};
--
- /* l4_core -> mailbox */
- static struct omap_hwmod_ocp_if omap3xxx_l4_core__mailbox = {
- 	.master		= &omap3xxx_l4_core_hwmod,
-@@ -3651,8 +3561,6 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
- 	&omap3xxx_l4_per__mcbsp3,
- 	&omap3xxx_l4_per__mcbsp4,
- 	&omap3xxx_l4_core__mcbsp5,
--	&omap3xxx_l4_per__mcbsp2_sidetone,
--	&omap3xxx_l4_per__mcbsp3_sidetone,
- 	&omap34xx_l4_core__mcspi1,
- 	&omap34xx_l4_core__mcspi2,
- 	&omap34xx_l4_core__mcspi3,
--- 
-2.7.3
+We are trying to test ilp32 in our arm64 board. But we got more
+failure compare with you. So, I am wondering if we could align
+the test environment with you. The source code we used:
+
+1.  glibc: the new-api branch of glibc from
+     git at code.huawei.com:gnu/norov_glibc.git.
+
+2.  Kernel: rfc5 from https://github.com/norov/linux.git. Is the
+     rc6 in your branch is the latest one? From the commit message, I
+     do not find any difference. Is it just a rebase?
+
+3.  Toolchain 4.9.3, could you provide the binary of toolchain(both
+     cross and native, gcc, gdb...)? It may be very useful for me or
+     other guys who interested build their own filesystem from
+     buildroot or something.
+
+4.  LTP: master.
+
+For the glibc part, I found that there are 11 patches of ilp32 in top,
+but the original 28 patches of ilp32 is not in the top, there are more
+than 900 patches between them(referece the list below). Are you
+willing rebase all the ilp32 relative patches. It is very useful for
+reviewing and debugging.  I saw andrew request the account in glibc,
+maybe it has already been in processs?).
+
+Regards
+
+Bamvor
+
+ILP32 relative patch in norov's glibc:
+       1 b5c4968 fix stat
+       2 8332b7a fix3
+       3 d16a202 fix statfs
+       4 351b872 fix IPC_64 for msgctl semctl shmctl
+       5 07f8ead fix readdir ????
+       6 4be481a fix lseek
+       7 4231518 fix getdents
+       8 de55857 fstat fix
+       9 5d42904 stat
+      10 3f70665 mmap, stat syscalls
+      11 574af33 Make ilp32 use the compat (old 32bit ABI).
+
+     972 8addb06 [AARCH64] Make lp64 and ilp32 directories.
+     973 bfe0619 [AARCH64] Add typesizes.h for ILP32
+     974 916581b [AARCH64] Fix up ucontext for ILP32
+     975 0f646ee [AARCH64] Add sigstack.h header for ILP32 reasons.
+     976 68e11d8 [AARCH64] Add kernel_sigaction.h for AARCH64 ILP32
+     977 a0087ba [AARCH64] Add ldd-rewrite.sed so that ilp32 ld.so can be found
+     978 0f800d9 [AARCH64] Add ILP32 ld.so to the known interpreter names.
+     979 45d74fd [AARCH64] Add support to ldconfig for ILP32 and libilp32
+     980 9926da9 [AARCH64] Add ILP32 to makefiles
+     981 987b522 [AARCH64] Set up wordsize for ILP32.
+     982 5e34e4c [AARCH64] Add ILP32 support to elf_machine_load_address.
+     983 1ff4dd9 [AARCH64] Reformat inline-asm in elf_machine_load_address.
+     984 f7ff9aa [AARCH64] Syscalls for ILP32 are passed always via 64bit values.
+     985 9316667 [AARCH64] Detect ILP32 in configure scripts.
+     986 ff0dca1 [AARCH64] Use PTR_REG in getcontext.S.
+     987 7c9f1b0 [AARCH64] Use PTR_* in start.S
+     988 ed747ff [AARCH64] Use PTR_* macros in dl-trampoline.S
+     989 71f6986 [AARCH64] Use PTR_REG/PTR_SIZE/PTR_SIZE_LOG in dl-tlsesc.S
+     990 3294b6f [AARCH64] Use PTR_REG in crti.S.
+     991 c8fef18 [AARCH64] Add PTR_REG, PTR_LOG_SIZE, and PTR_SIZE.  Use it in LDST_PCREL and LDST_GLOBAL.
+     992 585197d Add dynamic ILP32 AARCH64 relocations to elf.h
+     993 49f1345 [AARCH64] Add header guards to sysdep.h headers.
+     994 2594068 Allow generic stat and statfs not have padding for 32bit targets
+     995 86f0aa7 Allow some fields of siginfo to be different from the generic one
+     996 fdffbc5 Allow fd_mask type not be an array of long.
+     997 453987a Allow rusage work on a big-endian 32bit-on-64bit target
+     998 70e6485 Add ability for the IPC structures (msqid_ds, semid_ds, shmid_ds, etc.) to have time_t being 64bit
+     999 9ff1730 Allow sigset be an array of a different type
+    1000 dc09040 [AARCH64] Fix utmp struct for compatibility reasons.
+
+
+On 2016/2/26 4:28, Yury Norov wrote:
+> On Thu, Feb 25, 2016 at 11:50:31AM +0100, Andreas Schwab wrote:
+>> Yury Norov <ynorov@caviumnetworks.com> writes:
+>>
+>>> I have new glibc that follows new ABI:
+>>> https://github.com/norov/glibc/tree/new-api
+>>
+>> sysdeps/unix/sysv/linux/aarch64/ilp32/getdents64.c is wrong, struct
+>> dirent64 is not the same as struct dirent.  The file needs to be renamed
+>> to sysdeps/unix/sysv/linux/aarch64/ilp32/getdents.c so that __getdents64
+>> comes from sysdeps/unix/sysv/linux/generic/getdents64.c.
+>>
+>> sysdeps/unix/sysv/linux/aarch64/ilp32/*xstat*.c should not set errno,
+>> INLINE_SYSCALL already does that, and returns -1 on error.
+>>
+>> Andreas.
+>>
+>
+> Thank you. I'll fix it
+>
+>> --
+>> Andreas Schwab, SUSE Labs, schwab at suse.de
+>> GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+>> "And now for something completely different."
