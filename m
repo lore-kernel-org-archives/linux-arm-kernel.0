@@ -1,77 +1,42 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 18 Mar 2016 08:09:26 -0500
-Subject: [PATCH 1/2] arm64: dts: juno/vexpress: fix node name unit-address
- presence warnings
-In-Reply-To: <1458297136.2812.7.camel@linaro.org>
-References: <1457352735-24453-1-git-send-email-sudeep.holla@arm.com>
- <CAL_JsqJeeZ58at95gSRwOMnce_DjDsXVRYH_bMKaX=uDHtZAAA@mail.gmail.com>
- <1458297136.2812.7.camel@linaro.org>
-Message-ID: <CAL_JsqJEA9rVOzD=wC8TJnzm+ou=mnRLrkNU2zgrH402=pm3Tw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 18 Mar 2016 14:11:20 +0100
+Subject: [PATCH v15 1/6] efi: ARM/arm64: ignore DT memory nodes instead of
+ removing them
+In-Reply-To: <20160318125600.GT2619@codeblueprint.co.uk>
+References: <1457481587-8976-1-git-send-email-ddaney.cavm@gmail.com>
+ <1457481587-8976-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160318122609.GS2619@codeblueprint.co.uk>
+ <CAKv+Gu8STa=tF0o1qje6LorYxzBon704Q_O2U=cvigg9v53hZw@mail.gmail.com>
+ <20160318125600.GT2619@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu_6S+ME8MH8DZ32q+hKcRiOqp=nRy6Reryy5v=J7yE2vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 5:32 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Thu, 2016-03-17 at 16:44 -0500, Rob Herring wrote:
->> On Mon, Mar 7, 2016 at 6:12 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> > Commit fa38a82096a1 ("scripts/dtc: Update to upstream version
->> > 53bf130b1cdd") added warnings on node name unit-address presence/absence
->> > mismatch in device trees.
->> >
->> > This patch fixes those warning on all the juno/vexpress platforms where
->> > unit-address is present in node name while the reg/ranges property is
->> > not present.
->> >
->> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> > ---
->> >  arch/arm64/boot/dts/arm/foundation-v8.dtsi         |  2 +-
->> >  arch/arm64/boot/dts/arm/juno-base.dtsi             | 14 +++++-----
->> >  arch/arm64/boot/dts/arm/juno-motherboard.dtsi      | 30 +++++++++++-----------
->> >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts         |  2 +-
->> >  arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi   | 14 +++++-----
->> >  .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 10 ++++----
->> >  6 files changed, 36 insertions(+), 36 deletions(-)
->> >
->> > Hi Rob,
->> >
->> > I am not sure if the intention of commit fa38a82096a1 is to fix even
->> > existing warnings or not. I saw warning with today's -next branch.
+On 18 March 2016 at 13:56, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Fri, 18 Mar, at 01:31:59PM, Ard Biesheuvel wrote:
 >>
->> Yes. I'm dropping it for 4.6 though.
+>> Typically, the UEFI memory map is more restrictive, since it does not
+>> only describe where the memory lives, but also which parts of it the
+>> firmware has claimed for its own use. So if both memory nodes and the
+>> UEFI memory map are available, we must use the latter anyway, and so
+>> it makes sense to ignore the former. Alternatively, we could sanity
+>> check the memory nodes against the memory map, but it is simpler just
+>> to ignore them.
 >>
->> > Let me know.
->> >
->> > Regards,
->> > Sudeep
->> >
->> > diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dtsi b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
->> > index 9314f3943269..ba03c934a861 100644
->> > --- a/arch/arm64/boot/dts/arm/foundation-v8.dtsi
->> > +++ b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
->> > @@ -89,7 +89,7 @@
->> >                              <0 63 4>;
->> >         };
->> >
->> > -       smb {
->> > +       smb at 0,08000000 {
->>
->> Drop the comma and leading zeros. Comma is for distinct fields like
->> bus,dev,func on PCI.
+>> However, that caused some problems in the past, since discovering the
+>> memory nodes occurs before the EFI entry point is invoked, and so it
+>> was decided that we strip the memory nodes rather than ignore them.
 >
-> So what is the correct way of representing 2 cell addresses? Not just
-> those that are logically 64-bit addresses, (which I guess could be just
-> a single number), but things like vexpress motherboard where we have
-> Chip-select and Offset values?
+> Thanks Ard.
+>
+> Once you've stripped the memory nodes as represented in memblock,
+> there's no way for the memory nodes to re-appear in one form or
+> another after that point, right? The EFI memory map is the sole memory
+> layout either via memblock or if it's queried directly?
 
-64-bit address is just a single number.
-2 cells with distinct fields should generally be ...@<cell1>,<cell2>
-
-If you have your own bus type, you can devise whatever you like as
-long as it is reviewed.
-
-> I looked at ePAPR but it just says 'The unit-address must
-> match the first address specified in the reg property of the node.' and
-> lists valid characters for unit address, which includes ,._+-
-
-Yes, we need to clarify this some.
-
-Rob
+Well, the significance of this patch in this series is that the memory
+nodes contain additional properties that describe the NUMA topology,
+which the UEFI memory map does not allow us to do. At some point, we
+may decide to capture this information in a different way (i.e., a
+separate configuration table), but for now, I think this is fine,
+especially since stripping nodes is a bit of a blunt tool.
