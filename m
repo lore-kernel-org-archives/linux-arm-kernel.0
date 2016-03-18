@@ -1,44 +1,219 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 18 Mar 2016 14:02:49 +0000
-Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
-In-Reply-To: <20160318132902.GA29225@dhcppc6.redhat.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-4-git-send-email-dave.long@linaro.org>
- <56E858D8.8030300@arm.com> <20160316054329.GC28915@dhcppc6.redhat.com>
- <56E9350A.7010909@arm.com> <20160317075726.GA16882@dhcppc6.redhat.com>
- <20160318132902.GA29225@dhcppc6.redhat.com>
-Message-ID: <56EC0A89.3030606@arm.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Fri, 18 Mar 2016 15:10:09 +0100
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
+References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
+ <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
+ <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
+ <56E92AFC.9050208@huawei.com> <20160317065426.GA10315@js1304-P5Q-DELUXE>
+ <56EA77BC.2090702@huawei.com> <56EAD0B4.2060807@suse.cz>
+ <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
+Message-ID: <56EC0C41.70503@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
-
-On 18/03/16 13:29, Pratyush Anand wrote:
-> Probably, I can see why does not it work. So, when we are single stepping an
-> instruction and page fault occurs, we will come to el1_da in entry.S. Here, we
-> do enable_dbg. As soon as we will do this, we will start receiving single step
-> exception after each instruction (not sure, probably for each alternate
-> instruction). Since, there will not be any matching single step handler for
-> these instructions, so we will see warning "Unexpected kernel single-step
-> exception at EL1". 
+On 03/17/2016 04:52 PM, Joonsoo Kim wrote:
+> 2016-03-18 0:43 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
+>>>>>>
+>>>>>> Okay. I used following slightly optimized version and I need to
+>>>>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
+>>>>>> to yours. Please consider it, too.
+>>>>>
+>>>>> Hmm, this one is not work, I still can see the bug is there after
+>>>>> applying
+>>>>> this patch, did I miss something?
+>>>>
+>>>> I may find that there is a bug which was introduced by me some time
+>>>> ago. Could you test following change in __free_one_page() on top of
+>>>> Vlastimil's patch?
+>>>>
+>>>> -page_idx = pfn & ((1 << max_order) - 1);
+>>>> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
+>>>
+>>>
+>>> I tested Vlastimil's patch + your change with stress for more than half
+>>> hour, the bug
+>>> I reported is gone :)
+>>
+>>
+>> Oh, ok, will try to send proper patch, once I figure out what to write in
+>> the changelog :)
 > 
-> So, I think, we should 
+> Thanks in advance!
 > 
-> (1) may be do not enable debug for el1_da, or
-> (2) enable_dbg only when single stepping is not enabled, or
-> (3) or disable single stepping during el1_da execution.
-> 
-> (1) will solve the issue for sure, but not sure if it could be the best choice.
 
-A variation on (3):
+OK, here it is. Hanjun can you please retest this, as I'm not sure if you had
+the same code due to the followup one-liner patches in the thread. Lucas, see if
+it helps with your issue as well. Laura and Joonsoo, please also test and review
+and check changelog if my perception of the problem is accurate :)
 
-In kernel/entry.S when entered from EL0 we test for TIF_SINGLESTEP in the
-thread_info flags, and use disable_step_tsk/enable_step_tsk to save/restore the
-single-step state.
+Thanks
 
-Could we do this regardless of which EL we came from?
+----8<----
+From: Vlastimil Babka <vbabka@suse.cz>
+Date: Fri, 18 Mar 2016 14:22:31 +0100
+Subject: [PATCH] mm/page_alloc: prevent merging between isolated and other
+ pageblocks
 
+Hanjun Guo has reported that a CMA stress test causes broken accounting of
+CMA and free pages:
 
-Thanks,
+> Before the test, I got:
+> -bash-4.3# cat /proc/meminfo | grep Cma
+> CmaTotal:         204800 kB
+> CmaFree:          195044 kB
+>
+>
+> After running the test:
+> -bash-4.3# cat /proc/meminfo | grep Cma
+> CmaTotal:         204800 kB
+> CmaFree:         6602584 kB
+>
+> So the freed CMA memory is more than total..
+>
+> Also the the MemFree is more than mem total:
+>
+> -bash-4.3# cat /proc/meminfo
+> MemTotal:       16342016 kB
+> MemFree:        22367268 kB
+> MemAvailable:   22370528 kB
 
-James
+Laura Abbott has confirmed the issue and suspected the freepage accounting
+rewrite around 3.18/4.0 by Joonsoo Kim. Joonsoo had a theory that this is
+caused by unexpected merging between MIGRATE_ISOLATE and MIGRATE_CMA
+pageblocks:
+
+> CMA isolates MAX_ORDER aligned blocks, but, during the process,
+> partialy isolated block exists. If MAX_ORDER is 11 and
+> pageblock_order is 9, two pageblocks make up MAX_ORDER
+> aligned block and I can think following scenario because pageblock
+> (un)isolation would be done one by one.
+>
+> (each character means one pageblock. 'C', 'I' means MIGRATE_CMA,
+> MIGRATE_ISOLATE, respectively.
+>
+> CC -> IC -> II (Isolation)
+> II -> CI -> CC (Un-isolation)
+>
+> If some pages are freed at this intermediate state such as IC or CI,
+> that page could be merged to the other page that is resident on
+> different type of pageblock and it will cause wrong freepage count.
+
+This was supposed to be prevented by CMA operating on MAX_ORDER blocks, but
+since it doesn't hold the zone->lock between pageblocks, a race window does
+exist.
+
+It's also likely that unexpected merging can occur between MIGRATE_ISOLATE
+and non-CMA pageblocks. This should be prevented in __free_one_page() since
+commit 3c605096d315 ("mm/page_alloc: restrict max order of merging on isolated
+pageblock"). However, we only check the migratetype of the pageblock where
+buddy merging has been initiated, not the migratetype of the buddy pageblock
+(or group of pageblocks) which can be MIGRATE_ISOLATE.
+
+Joonsoo has suggested checking for buddy migratetype as part of
+page_is_buddy(), but that would add extra checks in allocator hotpath and
+bloat-o-meter has shown significant code bloat (the function is inline).
+
+This patch reduces the bloat at some expense of more complicated code. The
+buddy-merging while-loop in __free_one_page() is initially bounded to
+pageblock_border and without any migratetype checks. The checks are placed
+outside, bumping the max_order if merging is allowed, and returning to the
+while-loop with a statement which can't be possibly considered harmful.
+
+This fixes the accounting bug and also removes the arguably weird state in the
+original commit 3c605096d315 where buddies could be left unmerged.
+
+Fixes: 3c605096d315 ("mm/page_alloc: restrict max order of merging on isolated pageblock")
+Link: https://lkml.org/lkml/2016/3/2/280
+Reported-by: Hanjun Guo <guohanjun@huawei.com>
+Debugged-by: Laura Abbott <labbott@redhat.com>
+Debugged-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Signed-off-by: Vlastimil Babka <vbabka@suse.cz>
+Cc: <stable@vger.kernel.org> # 3.18+
+---
+ mm/page_alloc.c | 46 +++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 33 insertions(+), 13 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index c46b75d14b6f..112a5d5cec51 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -683,34 +683,28 @@ static inline void __free_one_page(struct page *page,
+ 	unsigned long combined_idx;
+ 	unsigned long uninitialized_var(buddy_idx);
+ 	struct page *buddy;
+-	unsigned int max_order = MAX_ORDER;
++	unsigned int max_order;
++
++	max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
+ 
+ 	VM_BUG_ON(!zone_is_initialized(zone));
+ 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
+ 
+ 	VM_BUG_ON(migratetype == -1);
+-	if (is_migrate_isolate(migratetype)) {
+-		/*
+-		 * We restrict max order of merging to prevent merge
+-		 * between freepages on isolate pageblock and normal
+-		 * pageblock. Without this, pageblock isolation
+-		 * could cause incorrect freepage accounting.
+-		 */
+-		max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
+-	} else {
++	if (likely(!is_migrate_isolate(migratetype)))
+ 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+-	}
+ 
+-	page_idx = pfn & ((1 << max_order) - 1);
++	page_idx = pfn & ((1 << MAX_ORDER) - 1);
+ 
+ 	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
+ 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
+ 
++continue_merging:
+ 	while (order < max_order - 1) {
+ 		buddy_idx = __find_buddy_index(page_idx, order);
+ 		buddy = page + (buddy_idx - page_idx);
+ 		if (!page_is_buddy(page, buddy, order))
+-			break;
++			goto done_merging;
+ 		/*
+ 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
+ 		 * merge with it and move up one order.
+@@ -727,6 +721,32 @@ static inline void __free_one_page(struct page *page,
+ 		page_idx = combined_idx;
+ 		order++;
+ 	}
++	if (max_order < MAX_ORDER) {
++		/* If we are here, it means order is >= pageblock_order.
++		 * We want to prevent merge between freepages on isolate
++		 * pageblock and normal pageblock. Without this, pageblock
++		 * isolation could cause incorrect freepage or CMA accounting.
++		 *
++		 * We don't want to hit this code for the more frequent
++		 * low-order merging.
++		 */
++		if (unlikely(has_isolate_pageblock(zone))) {
++			int buddy_mt;
++
++			buddy_idx = __find_buddy_index(page_idx, order);
++			buddy = page + (buddy_idx - page_idx);
++			buddy_mt = get_pageblock_migratetype(buddy);
++
++			if (migratetype != buddy_mt
++					&& (is_migrate_isolate(migratetype) ||
++						is_migrate_isolate(buddy_mt)))
++				goto done_merging;
++		}
++		max_order++;
++		goto continue_merging;
++	}
++
++done_merging:
+ 	set_page_order(page, order);
+ 
+ 	/*
+-- 
+2.7.2
