@@ -1,54 +1,42 @@
-From: ramana.radhakrishnan@foss.arm.com (Ramana Radhakrishnan)
-Date: Fri, 18 Mar 2016 13:25:43 +0000
-Subject: ARMv4 (not v4t) marked obsolete in gcc-6
-In-Reply-To: <CALT56yO4mg3AtgASyo64G61w0tiztubyDRi0hSzn7km0jLLnew@mail.gmail.com>
-References: <201603101013.04618.arnd@arndb.de> <56EAD8C4.2030506@foss.arm.com>
- <CALT56yO4mg3AtgASyo64G61w0tiztubyDRi0hSzn7km0jLLnew@mail.gmail.com>
-Message-ID: <56EC01D7.2050609@foss.arm.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 18 Mar 2016 18:59:02 +0530
+Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
+In-Reply-To: <20160317075726.GA16882@dhcppc6.redhat.com>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-4-git-send-email-dave.long@linaro.org>
+ <56E858D8.8030300@arm.com>
+ <20160316054329.GC28915@dhcppc6.redhat.com>
+ <56E9350A.7010909@arm.com>
+ <20160317075726.GA16882@dhcppc6.redhat.com>
+Message-ID: <20160318132902.GA29225@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17/03/2016:01:27:26 PM, Pratyush Anand wrote:
+> @David: This patch was added in v9 and fixup_exception() had been dropped in v9.
+> Since, dropping of fixup_exception() also caused to fail some systemtap test
+> cases, so it was added back in v10. I wonder if we really need this patch.
+> May be you can try to run related test case by dropping this patch. 
 
+Had a closer look to the code, and noticed that fixup_exception() does not have
+any role in handling of page fault of copy_to_user(). Then, why do we have the
+problem.
+Probably, I can see why does not it work. So, when we are single stepping an
+instruction and page fault occurs, we will come to el1_da in entry.S. Here, we
+do enable_dbg. As soon as we will do this, we will start receiving single step
+exception after each instruction (not sure, probably for each alternate
+instruction). Since, there will not be any matching single step handler for
+these instructions, so we will see warning "Unexpected kernel single-step
+exception at EL1". 
 
-On 17/03/16 19:34, Dmitry Eremin-Solenikov wrote:
-> 2016-03-17 19:18 GMT+03:00 Ramana Radhakrishnan
-> <ramana.radhakrishnan@foss.arm.com>:
->>
->>
->>
->> On 10/03/16 09:13, Arnd Bergmann wrote:
->>> I've found out that ARMv3 and ARMv4 is now on track to get removed from gcc in the future,
->>> so I'm trying to alert everyone that I have knowledge of using ARMv4 based platforms that
->>> we currenly support in the Linux kernel.
->>>
->>> The architecture has been declared obsolete here: https://gcc.gnu.org/gcc-6/changes.html
->>> and it will be removed in the following release (gcc-7) one year later, unless someone
->>> raises concerns over it.
->>
->> Support for armv4 has been deprecated but not yet obsoleted. We'd like to remove support for it in a future release of the compiler which could be as early as GCC 7 depending on the feedback we receive over the coming weeks / months. Removing support for armv4 will allow us to assume interworking by default which helps in cleaning up and simplifying the ARM backend. Further no one is really testing support for anything earlier than v4t really in the GCC community. While we would like to be cautious about removing support for armv4 from the tools, we think 2016 is a good time to start asking questions around removing support for this in the backend of the compiler.
->>
->> Folks building the kernel / applications that require armv4 support can continue using the linker option --fix-v4bx which should take care of the fixups. Ideally we would have liked to have removed support for v4 in binutils as well at some point of time in the future, but it appears as though there is a significant community of users who would like to build kernels / other apps for v4 based systems - thus I suspect that support will live for quite a while as it also keeps old assembler code going but ends up simplifying the compiler code base.
->>
->> In terms of registering opinions on keeping support for armv4 going, we'd prefer folks to discuss these with posts onto gcc at gcc.gnu.org describing their reasons for the same. There is a maintenance cost on keeping support for this going as there is a quite a bit of special casing for interworking vs non-interworking targets that we would like to clean up in the future once support goes out. At this point of time I haven't seen any good reasons to keep support going for armv4 in the *compiler*, since the linker option is available.
-> 
-> Removing armv4 support means also removing -mtune support for those
-> chips (I'm especially concerned about strongarm1100).
-> Would it be possible to remove armv4 support, but leave performance
-> settings/tunings intact?
+So, I think, we should 
 
-I'm not sure how ugly the end result will be if we went down the route, the simplest egregious hack would be to treat strongarm as v4t but then relying on the linker to fix things up. However ...
+(1) may be do not enable debug for el1_da, or
+(2) enable_dbg only when single stepping is not enabled, or
+(3) or disable single stepping during el1_da execution.
 
-Are you able to compare performance by tuning for arm9 on strongarm as I see that is the closest in terms of tuning to strongarm ? The only differences are in the number of instructions to conditionalize 3 for sa vs 5 for arm9 and the latency of multiplies being 3 rather than 4 in the legacy scheduler.
+(1) will solve the issue for sure, but not sure if it could be the best choice.
 
-> 
-> Regarding testing. We have a small community doing system builds for
-> SA1100/SA1110 chips,
-> if that matters.
+Will, what do you suggest?
 
-Good to know. Thanks for the feedback. 
-
-regards
-Ramana
-
-> 
-> 
+~Pratyush
