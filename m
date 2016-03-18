@@ -1,26 +1,72 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Fri, 18 Mar 2016 09:12:09 +0100
-Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
- engine driver for mvebu_v7_defconfig
-Message-ID: <20160318081209.GA7394@archy.home>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Mar 2016 09:20:03 +0100
+Subject: [PATCH] clockevents/drivers/timer-atmel-pit: fix double free_irq
+In-Reply-To: <1458245383-9859-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1458245383-9859-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <56EBBA33.9080809@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the new driver for Marvell CESA crypto engines on all mvebu v7.
+Le 17/03/2016 21:09, Alexandre Belloni a ?crit :
+> clockevents_exchange_device() changes the state from detached to shutdown
+> and so at that point the IRQ has not yet been requested.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index dc5797a..26a8919 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -155,3 +155,4 @@ CONFIG_MAGIC_SYSRQ=y
- CONFIG_TIMER_STATS=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_DEV_MARVELL_CESA=m
+> ---
+> 
+> Hi Sebastian,
+> 
+> This patch fixes the last warning for preempt-rt on at91. It applies on
+> v4.4.4-rt11. Note that the whome PIT/TCB mess will be fixed in another way in
+> the mainline as we are reworking the tcb driver to avoid using the pit when
+> booting.
+
+Yes, it's the plan!
+
+Thanks Alexandre. Bye.
+
+> 
+>  drivers/clocksource/timer-atmel-pit.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+> index a7abdb6638cd..7a40f7e88468 100644
+> --- a/drivers/clocksource/timer-atmel-pit.c
+> +++ b/drivers/clocksource/timer-atmel-pit.c
+> @@ -46,6 +46,7 @@ struct pit_data {
+>  	u32		cycle;
+>  	u32		cnt;
+>  	unsigned int	irq;
+> +	bool		irq_requested;
+>  	struct clk	*mck;
+>  };
+>  
+> @@ -96,7 +97,10 @@ static int pit_clkevt_shutdown(struct clock_event_device *dev)
+>  
+>  	/* disable irq, leaving the clocksource active */
+>  	pit_write(data->base, AT91_PIT_MR, (data->cycle - 1) | AT91_PIT_PITEN);
+> -	free_irq(data->irq, data);
+> +	if (data->irq_requested) {
+> +		free_irq(data->irq, data);
+> +		data->irq_requested = false;
+> +	}
+>  	return 0;
+>  }
+>  
+> @@ -115,6 +119,8 @@ static int pit_clkevt_set_periodic(struct clock_event_device *dev)
+>  	if (ret)
+>  		panic(pr_fmt("Unable to setup IRQ\n"));
+>  
+> +	data->irq_requested = true;
+> +
+>  	/* update clocksource counter */
+>  	data->cnt += data->cycle * PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
+>  	pit_write(data->base, AT91_PIT_MR,
+> 
+
+
 -- 
-2.7.3
+Nicolas Ferre
