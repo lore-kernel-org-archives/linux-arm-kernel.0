@@ -1,50 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 18 Mar 2016 10:30:28 +0100
-Subject: [PATCH 1/3] crypto: marvell/cesa - replace dma_to_phys with
- dma_map_single
-In-Reply-To: <20160317235020.GB19428@n2100.arm.linux.org.uk>
-References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
- <20160317225459.GA19428@n2100.arm.linux.org.uk>
- <80402e2f82651814b1411a25b1740288@codeaurora.org>
- <20160317235020.GB19428@n2100.arm.linux.org.uk>
-Message-ID: <20160318103028.4be15b78@bbrezillon>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 18 Mar 2016 10:32:19 +0100
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <CAB=otbSfj24nSUe1DyfVBDKD=trCp2-X-S-AcA1D+PTHZuP1Bg@mail.gmail.com>
+References: <20160317212603.GA16651@amd>
+ <CAB=otbSfj24nSUe1DyfVBDKD=trCp2-X-S-AcA1D+PTHZuP1Bg@mail.gmail.com>
+Message-ID: <20160318093219.GA999@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Mar 2016 23:50:20 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi!
 
-> On Thu, Mar 17, 2016 at 07:17:24PM -0400, okaya at codeaurora.org wrote:
-> > What is the correct way? I don't want to write engine->sram_dma = sram
+> On Thu, Mar 17, 2016 at 11:26 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > Hi!
+> >
+> > USB gadget stops working for me on n900, if I merge
 > 
-> Well, what the driver _is_ wanting to do is to go from a CPU physical
-> address to a device DMA address.  phys_to_dma() looks like the correct
-> thing there to me, but I guess that's just an offset and doesn't take
-> account of any IOMMU that may be in the way.
+> Could you please give us more details?
+> Which gadget driver do you use (g_nokia?)
+
+It seems I mis-merged the stuff. Hold on, I'm debugging it some more.
+
+Not g_nokia:
+
+CONFIG_USB_LIBCOMPOSITE=y
+CONFIG_USB_U_ETHER=y
+CONFIG_USB_F_ECM=y
+CONFIG_USB_F_SUBSET=y
+
+
+> > (I have patch in my tree to make USB gadget work when it is not
+> > modular).
 > 
-> If you have an IOMMU, then the whole phys_to_dma() thing is a total
-> failure as it only does a linear translation, and there are no
-> interfaces in the kernel to take account of an IOMMU in the way.  So,
-> it needs something designed for the job, implemented and discussed by
-> the normal methods of proposing a new cross-arch interface for drivers
-> to use.
+> So this can be reproduced only on builtin gadget, right?
 > 
-> What I'm certain of, though, is that the change proposed in this patch
-> will break current users of this driver: virt_to_page() on an address
-> returned by ioremap() is completely undefined, and will result in
-> either a kernel oops, or if not poking at memory which isn't a struct
-> page, ultimately resulting in something that isn't SRAM being pointed
-> to by "engine->sram_dma".
-> 
+> BTW, I have N900 and can try to play with it this weekend if you'll
+> give us more details.
 
-Or we could just do
+Thanks! Let me try to debug it, then I'll post .config.
 
-	engine->sram_dma = res->start;
-
-which is pretty much what the SRAM/genalloc code is doing already.
-
+Best regards,
+									Pavel
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
