@@ -1,79 +1,73 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 Mar 2016 02:40:02 +0100
-Subject: [PATCH 06/10] ARM: dts: rockchip: add rk3288-veyron-jaq backlight and
- panel overrides
+Date: Fri, 18 Mar 2016 02:40:00 +0100
+Subject: [PATCH 04/10] ARM: dts: rockchip: add startup delay to rk3288-veyron
+ panel-regulators
 In-Reply-To: <1458265206-15733-1-git-send-email-heiko@sntech.de>
 References: <1458265206-15733-1-git-send-email-heiko@sntech.de>
-Message-ID: <1458265206-15733-7-git-send-email-heiko@sntech.de>
+Message-ID: <1458265206-15733-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Caesar Wang <wxt@rock-chips.com>
+The panels need a bit of time to actually turn on. If this isn't
+observed, this results in problems when trying talk to the panels
+and thus produces detection errors. 100ms seem to be a safe value
+for the time being.
 
-The panel which jaq uses requires the pwm duty cycle larger than 3%,
-when the backlight status from power off to power on, otherwise the
-backlight will flush, so we modify the second brightness-level to 8,
-and when the backlight from power off to power on the pwm duty cycle
-will larger than 3%.
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3288-veyron-jaq.dts | 42 +++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm/boot/dts/rk3288-veyron-jaq.dts    | 1 +
+ arch/arm/boot/dts/rk3288-veyron-jerry.dts  | 1 +
+ arch/arm/boot/dts/rk3288-veyron-minnie.dts | 1 +
+ arch/arm/boot/dts/rk3288-veyron-speedy.dts | 1 +
+ 4 files changed, 4 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rk3288-veyron-jaq.dts b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-index 2123ac2..3748abf 100644
+index 5c97e31..2123ac2 100644
 --- a/arch/arm/boot/dts/rk3288-veyron-jaq.dts
 +++ b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
-@@ -89,6 +89,48 @@
+@@ -61,6 +61,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&lcd_enable_h>;
+ 		regulator-name = "panel_regulator";
++		startup-delay-us = <100000>;
+ 		vin-supply = <&vcc33_sys>;
  	};
- };
  
-+&backlight {
-+	/* Jaq panel PWM must be >= 3%, so start non-zero brightness at 8 */
-+	brightness-levels = <
-+		  0
-+		  8   9  10  11  12  13  14  15
-+		 16  17  18  19  20  21  22  23
-+		 24  25  26  27  28  29  30  31
-+		 32  33  34  35  36  37  38  39
-+		 40  41  42  43  44  45  46  47
-+		 48  49  50  51  52  53  54  55
-+		 56  57  58  59  60  61  62  63
-+		 64  65  66  67  68  69  70  71
-+		 72  73  74  75  76  77  78  79
-+		 80  81  82  83  84  85  86  87
-+		 88  89  90  91  92  93  94  95
-+		 96  97  98  99 100 101 102 103
-+		104 105 106 107 108 109 110 111
-+		112 113 114 115 116 117 118 119
-+		120 121 122 123 124 125 126 127
-+		128 129 130 131 132 133 134 135
-+		136 137 138 139 140 141 142 143
-+		144 145 146 147 148 149 150 151
-+		152 153 154 155 156 157 158 159
-+		160 161 162 163 164 165 166 167
-+		168 169 170 171 172 173 174 175
-+		176 177 178 179 180 181 182 183
-+		184 185 186 187 188 189 190 191
-+		192 193 194 195 196 197 198 199
-+		200 201 202 203 204 205 206 207
-+		208 209 210 211 212 213 214 215
-+		216 217 218 219 220 221 222 223
-+		224 225 226 227 228 229 230 231
-+		232 233 234 235 236 237 238 239
-+		240 241 242 243 244 245 246 247
-+		248 249 250 251 252 253 254 255>;
-+	power-supply = <&backlight_regulator>;
-+};
-+
-+&panel {
-+	power-supply = <&panel_regulator>;
-+};
-+
- &rk808 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
+diff --git a/arch/arm/boot/dts/rk3288-veyron-jerry.dts b/arch/arm/boot/dts/rk3288-veyron-jerry.dts
+index 60bd6e9..1a9bef1 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-jerry.dts
++++ b/arch/arm/boot/dts/rk3288-veyron-jerry.dts
+@@ -60,6 +60,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&lcd_enable_h>;
+ 		regulator-name = "panel_regulator";
++		startup-delay-us = <100000>;
+ 		vin-supply = <&vcc33_sys>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/rk3288-veyron-minnie.dts b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+index 699beb0..8b16f37 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-minnie.dts
++++ b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+@@ -70,6 +70,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&lcd_enable_h>;
+ 		regulator-name = "panel_regulator";
++		startup-delay-us = <100000>;
+ 		vin-supply = <&vcc33_sys>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/rk3288-veyron-speedy.dts b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
+index b34a7b5..e62cdee 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
++++ b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
+@@ -61,6 +61,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&lcd_enable_h>;
+ 		regulator-name = "panel_regulator";
++		startup-delay-us = <100000>;
+ 		vin-supply = <&vcc33_sys>;
+ 	};
+ 
 -- 
 2.6.4
