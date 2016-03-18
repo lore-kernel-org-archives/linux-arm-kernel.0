@@ -1,81 +1,88 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Mar 2016 16:23:26 +0200
-Subject: [PATCH v2 2/3] ARM: OMAP2+: mcbsp: Prepare the device build code for
- sidetone hwmod removal
-In-Reply-To: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1458311007-19168-3-git-send-email-peter.ujfalusi@ti.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Fri, 18 Mar 2016 14:24:12 +0000
+Subject: [PATCH v4 6/8] arm64, dts: add Juno cpu capacity information
+In-Reply-To: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+Message-ID: <1458311054-13524-7-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The McBSP sidetone hwmods will be removed as they should not exist because
-the sidetone is a sub-block of McBSP and it is the responsibility of the
-McBSP driver to handle it. It has no effect or dependency on PRCM.
-When the sidetone hwmod is removed the oh->dev_attr can not be used to
-determine if the McBSP port has sidetone or not, but we can use the IRQ
-names. If the module has IRQ named as sidetone, the McBSP has it.
+Add Juno cpu capacity bindings information.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jon Medhurst <tixy@linaro.org>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 ---
- arch/arm/mach-omap2/mcbsp.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index b4ac3af1160c..8a3c50fa6a78 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -48,6 +48,23 @@ static int omap3_enable_st_clock(unsigned int id, bool enable)
- 		return omap2_clk_allow_idle(mcbsp_iclks[id]);
- }
+ Changes from v1:
+  - capacity-scale removed
+---
+ arch/arm64/boot/dts/arm/juno.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index dcfcf15..a15c781 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -90,6 +90,7 @@
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			capacity = <1024>;
+ 		};
  
-+static bool omap3_mcbsp_has_st(struct omap_hwmod *oh)
-+{
-+	struct omap_hwmod_irq_info *ohii;
-+	int i = 0;
-+
-+	if (!oh || !oh->mpu_irqs)
-+		return false;
-+
-+	do {
-+		ohii = &oh->mpu_irqs[i++];
-+		if (!strcmp(ohii->name, "sidetone"))
-+			return true;
-+	} while (ohii->irq != -1);
-+
-+	return false;
-+}
-+
- static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- {
- 	int id, count = 1;
-@@ -56,6 +73,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	struct omap_mcbsp_platform_data *pdata = NULL;
- 	struct platform_device *pdev;
- 	char clk_name[11];
-+	bool has_sidetone = false;
+ 		A57_1: cpu at 1 {
+@@ -100,6 +101,7 @@
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			capacity = <1024>;
+ 		};
  
- 	sscanf(oh->name, "mcbsp%d", &id);
+ 		A53_0: cpu at 100 {
+@@ -110,6 +112,7 @@
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			capacity = <447>;
+ 		};
  
-@@ -96,11 +114,19 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	if (oh->dev_attr) {
- 		oh_device[1] = omap_hwmod_lookup((
- 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
-+		count++;
-+
-+		has_sidetone = true;
-+	} else {
-+		has_sidetone = omap3_mcbsp_has_st(oh);
-+	}
-+
-+	if (has_sidetone) {
- 		pdata->enable_st_clock = omap3_enable_st_clock;
- 		sprintf(clk_name, "mcbsp%d_ick", id);
- 		mcbsp_iclks[id] = clk_get(NULL, clk_name);
--		count++;
- 	}
-+
- 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
- 				    sizeof(*pdata));
- 	kfree(pdata);
+ 		A53_1: cpu at 101 {
+@@ -120,6 +123,7 @@
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			capacity = <447>;
+ 		};
+ 
+ 		A53_2: cpu at 102 {
+@@ -130,6 +134,7 @@
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			capacity = <447>;
+ 		};
+ 
+ 		A53_3: cpu at 103 {
+@@ -140,6 +145,7 @@
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++			capacity = <447>;
+ 		};
+ 
+ 		A57_L2: l2-cache0 {
 -- 
-2.7.3
+2.7.0
