@@ -1,100 +1,52 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 18 Mar 2016 14:32:35 +0100
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
-References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
- <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
- <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
- <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
- <56E92AFC.9050208@huawei.com> <20160317065426.GA10315@js1304-P5Q-DELUXE>
- <56EA77BC.2090702@huawei.com> <56EAD0B4.2060807@suse.cz>
- <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
-Message-ID: <1458307955.18134.31.camel@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 18 Mar 2016 14:37:41 +0100
+Subject: [RESEND PATCH v4 0/5] acpi, clocksource: add GTDT and ARM
+ memory-mapped timer support
+In-Reply-To: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
+References: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <56EC04A5.2030106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vlastimil, Joonsoo,
+On 03/18/2016 09:00 AM, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+>
+> This patchset:
+>      (1)Move some enums and marcos to header file for arm_arch_timer,
+>      improve the pr_* code by defining "pr_fmt(fmt)" in arm_arch_timer.c
+>
+>      (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
+>      Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>      memory-mapped timer and SBSA Generic Watchdog timer.
+>      This driver can help to simplify all the relevant timer drivers,
+>      and separate all the ACPI GTDT knowledge from them.
+>
+>      (3)Simplify ACPI code for arch timer in arm_arch_timer.c
+>
+>      (4)Add memory-mapped timer support in arm_arch_timer.c
+>
+> RESEND:
+>     -- Corrected Cc list: added missing mailing lists
 
-Am Freitag, den 18.03.2016, 00:52 +0900 schrieb Joonsoo Kim:
-> 2016-03-18 0:43 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
-> > On 03/17/2016 10:24 AM, Hanjun Guo wrote:
-> >>
-> >> On 2016/3/17 14:54, Joonsoo Kim wrote:
-> >>>
-> >>> On Wed, Mar 16, 2016 at 05:44:28PM +0800, Hanjun Guo wrote:
-> >>>>
-> >>>> On 2016/3/14 15:18, Joonsoo Kim wrote:
-> >>>>>
-> >>>>> On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
-> >>>>>>
-> >>>>>> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
-> >>>>>>>
-> >>>>>>> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
-> >>>>>>>>
-> >>>>>>>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
-> >>>>>>>>
-> >>>>>>>> How about something like this? Just and idea, probably buggy
-> >>>>>>>> (off-by-one etc.).
-> >>>>>>>> Should keep away cost from <pageblock_order iterations@the
-> >>>>>>>> expense of the
-> >>>>>>>> relatively fewer >pageblock_order iterations.
-> >>>>>>>
-> >>>>>>> Hmm... I tested this and found that it's code size is a little bit
-> >>>>>>> larger than mine. I'm not sure why this happens exactly but I guess
-> >>>>>>> it would be
-> >>>>>>> related to compiler optimization. In this case, I'm in favor of my
-> >>>>>>> implementation because it looks like well abstraction. It adds one
-> >>>>>>> unlikely branch to the merge loop but compiler would optimize it to
-> >>>>>>> check it once.
-> >>>>>>
-> >>>>>> I would be surprised if compiler optimized that to check it once, as
-> >>>>>> order increases with each loop iteration. But maybe it's smart
-> >>>>>> enough to do something like I did by hand? Guess I'll check the
-> >>>>>> disassembly.
-> >>>>>
-> >>>>> Okay. I used following slightly optimized version and I need to
-> >>>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
-> >>>>> to yours. Please consider it, too.
-> >>>>
-> >>>> Hmm, this one is not work, I still can see the bug is there after
-> >>>> applying
-> >>>> this patch, did I miss something?
-> >>>
-> >>> I may find that there is a bug which was introduced by me some time
-> >>> ago. Could you test following change in __free_one_page() on top of
-> >>> Vlastimil's patch?
-> >>>
-> >>> -page_idx = pfn & ((1 << max_order) - 1);
-> >>> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
-> >>
-> >>
-> >> I tested Vlastimil's patch + your change with stress for more than half
-> >> hour, the bug
-> >> I reported is gone :)
-> >
-> >
-> > Oh, ok, will try to send proper patch, once I figure out what to write in
-> > the changelog :)
-> 
-> Thanks in advance!
+Hi Fu Wei,
 
-After digging into the "PFN busy" race in CMA (see [1]), I believe we
-should just prevent any buddy merging in isolated ranges. This fixes the
-race I'm seeing without the need to hold the zone lock for extend
-periods of time.
-Also any merging done in an isolated range is likely to be completely
-wasted work, as higher order buddy pages are broken up again into single
-pages in isolate_freepages.
+the whole series is lacking to encapsulate the ACPI code.
 
-If we do that the patch to fix the bug in question for this report would
-boil down to a check if the current pages buddy is isolated and abort
-merging at that point, right? undo_isolate_page_range will then do all
-necessary merging that has been skipped while the range was isolated.
+I believe Marc Zyngier did a first effort to make the ACPI self 
+contained and this series ignore that.
 
-Do you see issues with this approach?
+Please rework the series in the direction no acpi gtdt structure appears 
+in the driver.
 
-Regards,
-Lucas
+Thanks
 
-[1] http://thread.gmane.org/gmane.linux.kernel.mm/148383
+   -- Daniel
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
