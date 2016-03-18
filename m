@@ -1,120 +1,196 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 18 Mar 2016 18:49:18 +0300
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <56EBD84D.2060009@huawei.com>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <56AB3805.1040308@huawei.com> <20160129170929.GA3543@yury-N73SV>
- <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
- <mvm8u29ukqw.fsf@hawking.suse.de>
- <20160225202855.GD16123@yury-N73SV> <56EBD84D.2060009@huawei.com>
-Message-ID: <20160318154918.GA1595@yury-N73SV>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 18 Mar 2016 11:49:54 -0400
+Subject: [PATCH V5 13/15] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <1455630825-27253-14-git-send-email-tn@semihalf.com>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-14-git-send-email-tn@semihalf.com>
+Message-ID: <1458316194.23434.104.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 06:28:29PM +0800, Zhangjian (Bamvor) wrote:
-> Hi, Yury
+On Tue, 2016-02-16 at 14:53 +0100, Tomasz Nowicki wrote:
+> Some platforms may not be fully compliant with generic set of PCI config
+> accessors. For these cases we implement the way to overwrite accessors
+> set prior to PCI buses enumeration. Algorithm traverses available quirk
+> list, matches against <platform ID (DMI), domain, bus number> tuple and
+> returns corresponding accessors. All quirks can be defined using:
+> DECLARE_ACPI_MCFG_FIXUP() and kept self contained. Example,
 > 
-> We are trying to test ilp32 in our arm64 board. But we got more
-> failure compare with you. So, I am wondering if we could align
-> the test environment with you. The source code we used:
+> static const struct dmi_system_id foo_dmi[] = {
+> ????????{
+> ????????????????.ident = "<Platform ident string>",
+> ????????????????.callback = <handler>,
+> ????????????????.matches = {
+> ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+> ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+> ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+> ????????????????},
+> ????????},
+> ????????{ }
+> };
 > 
-
-Hi, I mostly use QEMU but Thunder X CPU works similarly. I also
-noticed that some tests fail sporadically, and some fail only in
-scenario. The current fail list, as for me, is at the bottom.
-
-Below links to my sources.
-
-> 1.  glibc: the new-api branch of glibc from
->     git at code.huawei.com:gnu/norov_glibc.git.
-
-It has few bugfixes:
-https://github.com/norov/glibc/tree/new-api
-
+> static struct pci_ops foo_ecam_pci_ops = {
+> ????????.map_bus = pci_mcfg_dev_base,
+> ????????.read = foo_ecam_config_read,
+> ????????.write = foo_ecam_config_write,
+> };
+> DECLARE_ACPI_MCFG_FIXUP(foo_dmi, NULL, &foo_ecam_pci_ops, <domain_nr>, <bus_nr>);
 > 
-> 2.  Kernel: rfc5 from https://github.com/norov/linux.git. Is the
->     rc6 in your branch is the latest one? From the commit message, I
->     do not find any difference. Is it just a rebase?
-
-https://github.com/norov/linux/tree/pin1
-This branch is v4.5 plus
- - Andrew's Thunder X patches (not mandatory);
- - http://comments.gmane.org/gmane.linux.kernel/2116021
- - http://comments.gmane.org/gmane.linux.kernel/2162853
- - current ILP32 (RFC5 + few fixes)
-
+> More custom (non-DMI) matching can be done via an extra call.
+> Note that there is possibility to assign quirk related private data to
+> root->sysdata which will be available along read/wriate accessor, example:
 > 
-> 3.  Toolchain 4.9.3, could you provide the binary of toolchain(both
->     cross and native, gcc, gdb...)? It may be very useful for me or
->     other guys who interested build their own filesystem from
->     buildroot or something.
-
-I use one Andrew gave me. AFAIK, he's preparing useful package.
-Andrew?
-
-I use this cross-toolchain. Find sys-root under aarch64-thunderx-linux-gnu/
-https://drive.google.com/file/d/0B93nHerV55yNdXBlVTRLNzF0aFE/view?usp=sharing
-
+> static int boo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
+> {
+> ????????return [condition] ? 1 : 0;
+> }
 > 
-> 4.  LTP: master.
-
-Find LTP here:
-https://drive.google.com/file/d/0B93nHerV55yNSTlZX3drRTBCaEU/view?usp=sharing
-
-Notice that I configure it with command:
-echo $(PREFIX)
-        /home/yury/work/toolchain/thunderx-tools/
-./configure --host=aarch64 --prefix=/home/yury/work/ltp/ltp \
-CC=$(PREFIX)/bin/a arch64-thunderx-linux-gnu-gcc \
-AR=$(PREFIX)/bin/aarch64-thunderx-linux-gnu-ar \
-STRIP =$(PREFIX)/bin/aarch64-thunderx-linux-gnu-strip \
-RANLIB=$(PREFIX)/bin/aarch64-thunderx-linux-gnu-ranlib  \
-CFLAGS=-mabi=ilp32 \
-LDFLAGS=-mabi=ilp32 -Wl,--rpath=/root/sys-root/libilp32 \
--Wl,--dynamic-linker=/root/sys-root/libilp32/ld-2.21.90.so
-
-Notice that you don't need to place experimental sys-root to system paths,
-but path is hardcoded to '/root/sys-root'
-
+> int boo_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
+> ??????????????????????????int where, int size, u32 *val)
+> {
+> ????????struct acpi_pci_root *root = bus->sysdata;
+> ????????struct boo_priv_data *boo_data = root->sysdata;
 > 
-> For the glibc part, I found that there are 11 patches of ilp32 in top,
-> but the original 28 patches of ilp32 is not in the top, there are more
-> than 900 patches between them(referece the list below). Are you
-> willing rebase all the ilp32 relative patches. It is very useful for
-> reviewing and debugging.  I saw andrew request the account in glibc,
-> maybe it has already been in processs?).
+> ????????[..]
+> }
 > 
+> static struct pci_ops boo_ecam_pci_ops = {
+> 	.map_bus = pci_mcfg_dev_base,
+> 	.read = boo_ecam_config_read,
+> 	.write = boo_ecam_config_write,
+> };
+> DECLARE_ACPI_MCFG_FIXUP(NULL, boo_match, &boo_ecam_pci_ops, <domain_nr>, <bus_nr>);
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Tested-by: Duc Dang <dhdang@apm.com>
+> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+> ?drivers/acpi/pci_mcfg.c???????????| 32 ++++++++++++++++++++++++++++++--
+> ?include/acpi/acpi_bus.h???????????|??1 +
+> ?include/asm-generic/vmlinux.lds.h |??7 +++++++
+> ?include/linux/pci-acpi.h??????????| 18 ++++++++++++++++++
+> ?4 files changed, 56 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> index 0062257..b343547 100644
+> --- a/drivers/acpi/pci_mcfg.c
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -41,6 +41,29 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+> ?	return PCIBIOS_DEVICE_NOT_FOUND;
+> ?}
+> ?
+> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
+> +extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
+> +
+> +static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
+> +{
+> +	struct pci_mcfg_fixup *f;
+> +	int bus_num = root->secondary.start;
+> +	int domain = root->segment;
+> +
+> +	/*
+> +	?* First match against PCI topology <domain:bus> then use DMI or
+> +	?* custom match handler.
+> +	?*/
+> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+> +		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+> +		????(f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+> +		????(f->system ? dmi_check_system(f->system) : 1 &&
+> +		?????f->match ? f->match(f, root) : 1))
 
-I already told there's mess there, and I'd prefer to make things work
-first and then do cleanup. 
+The parens are not quite right here ^^^^
+If dmi_check_system() returns true, f->match won't get called.
 
-Yury.
+This should be:
+		????(f->system ? dmi_check_system(f->system) : 1) &&
+		? ? ?f->match ? f->match(f, root) : 1)
 
-Total Tests: 787
-Total Skipped Tests: 25
-Total Failures: 24
-
-float_bessel                   FAIL       137
-float_exp_log                  FAIL       137
-float_iperb                    FAIL       137
-float_power                    FAIL       137
-float_trigo                    FAIL       137
-abort01                        FAIL       2
-clone02                        FAIL       4
-fcntl11                        FAIL       4
-fcntl21                        FAIL       4
-kill10                         FAIL       2
-kill11                         FAIL       2
-mmap16                         FAIL       6
-nftw01                         FAIL       1
-nftw6401                       FAIL       1
-open12                         FAIL       2
-pathconf01                     FAIL       1
-profil01                       FAIL       11
-rename11                       FAIL       2
-rmdir02                        FAIL       2
-umount2_01                     FAIL       2
-umount2_02                     FAIL       2
-umount2_03                     FAIL       2
-utime06                        FAIL       2
-mtest06                        FAIL       11
+> +			return f->ops;
+> +	}
+> +	return NULL;
+> +}
+> +
+> ?void __iomem *
+> ?pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
+> ?{
+> @@ -63,10 +86,15 @@ static struct pci_ops default_pci_mcfg_ops = {
+> ?
+> ?struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+> ?{
+> +	struct pci_ops *pci_mcfg_ops_quirk;
+> +
+> ?	/*
+> -	?* TODO: Match against platform specific quirks and return
+> -	?* corresponding PCI config space accessor set.
+> +	?* Match against platform specific quirks and return corresponding
+> +	?* PCI config space accessor set.
+> ?	?*/
+> +	pci_mcfg_ops_quirk = pci_mcfg_check_quirks(root);
+> +	if (pci_mcfg_ops_quirk)
+> +		return pci_mcfg_ops_quirk;
+> ?
+> ?	return &default_pci_mcfg_ops;
+> ?}
+> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+> index 14362a8..0fc6f13 100644
+> --- a/include/acpi/acpi_bus.h
+> +++ b/include/acpi/acpi_bus.h
+> @@ -556,6 +556,7 @@ struct acpi_pci_root {
+> ?	struct pci_bus *bus;
+> ?	u16 segment;
+> ?	struct resource secondary;	/* downstream bus range */
+> +	void *sysdata;
+> ?
+> ?	u32 osc_support_set;	/* _OSC state of support bits */
+> ?	u32 osc_control_set;	/* _OSC state of control bits */
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index c4bd0e2..c93fc97 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -298,6 +298,13 @@
+> ?		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
+> ?	}								\
+> ?									\
+> +	/* ACPI MCFG quirks */						\
+> +	.acpi_fixup????????: AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
+> +		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
+> +		*(.acpi_fixup_mcfg)					\
+> +		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
+> +	}								\
+> +									\
+> ?	/* Built-in firmware blobs */					\
+> ?	.builtin_fw????????: AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
+> ?		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index 93feb04..9e1bedd 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -123,6 +123,24 @@ struct pci_mmcfg_region {
+> ?	bool hot_added;
+> ?};
+> ?
+> +struct pci_mcfg_fixup {
+> +	const struct dmi_system_id *system;
+> +	int (*match)(struct pci_mcfg_fixup *, struct acpi_pci_root *);
+> +	struct pci_ops *ops;
+> +	int domain;
+> +	int bus_num;
+> +};
+> +
+> +#define PCI_MCFG_DOMAIN_ANY	-1
+> +#define PCI_MCFG_BUS_ANY	-1
+> +
+> +/* Designate a routine to fix up buggy MCFG */
+> +#define DECLARE_ACPI_MCFG_FIXUP(system, match, ops, dom, bus)		\
+> +	static const struct pci_mcfg_fixup __mcfg_fixup_##system##dom##bus\
+> +	?__used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
+> +				aligned((sizeof(void *))))) =		\
+> +	{ system, match, ops, dom, bus };
+> +
+> ?extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+> ?extern struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
+> ?							int end, u64 addr);
