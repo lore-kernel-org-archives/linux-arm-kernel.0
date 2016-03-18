@@ -1,38 +1,55 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 17 Mar 2016 20:15:20 -0500
-Subject: [PATCH v3 0/3] ARM: am335x/am437x: Correct PWM bindings
-Message-ID: <1458263723-25770-1-git-send-email-fcooper@ti.com>
+Date: Thu, 17 Mar 2016 20:15:21 -0500
+Subject: [PATCH v3 1/3] clk: ti: am335x/am4372: Add tbclk to pwm node
+In-Reply-To: <1458263723-25770-1-git-send-email-fcooper@ti.com>
+References: <1458263723-25770-1-git-send-email-fcooper@ti.com>
+Message-ID: <1458263723-25770-2-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike the majority of other SOCs the PWM node uses ehrpwm instead of
-the generic pwm node name. This patch series switches to the pwm node
-name and while at it fix some other minor binding documentation issues.
+Add tblck to the pwm nodes. This insures that the ehrpwm driver has access
+to the time-based clk.
 
-This patch series also includes a patch to insure ABI compatibility.
+Do not remove similar entries for ehrpwm node. Later patches will switch
+from using ehrpwm node name to pwm. But to maintain ABI compatibility we
+shouldn't remove the old entries.
 
-This series was tested on AM335x and AM437x GP evm. I also validated that
-ABI compatibility was maintained.
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ drivers/clk/ti/clk-33xx.c | 3 +++
+ drivers/clk/ti/clk-43xx.c | 6 ++++++
+ 2 files changed, 9 insertions(+)
 
-V3 changes:
-Update am335x-shc.dts
-
-V2 changes:
-Dropped patches related to the ranges property.
-
-Franklin S Cooper Jr (3):
-  clk: ti: am335x/am4372: Add tbclk to pwm node
-  ARM: DTS: da850/am4372/am33xx: Use generic node name for ehrpwm
-  pwm: pwm-tiehrpwm: Update dt binding document to use generic node name
-
- Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt |  4 ++--
- arch/arm/boot/dts/am335x-shc.dts                       |  2 +-
- arch/arm/boot/dts/am33xx.dtsi                          |  6 +++---
- arch/arm/boot/dts/am4372.dtsi                          | 12 ++++++------
- arch/arm/boot/dts/da850.dtsi                           |  4 ++--
- drivers/clk/ti/clk-33xx.c                              |  3 +++
- drivers/clk/ti/clk-43xx.c                              |  6 ++++++
- 7 files changed, 23 insertions(+), 14 deletions(-)
-
+diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
+index ef2ec64..0e47d95 100644
+--- a/drivers/clk/ti/clk-33xx.c
++++ b/drivers/clk/ti/clk-33xx.c
+@@ -108,6 +108,9 @@ static struct ti_dt_clk am33xx_clks[] = {
+ 	DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
+ 	DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
+ 	DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
++	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
++	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
++	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
+ 	{ .node_name = NULL },
+ };
+ 
+diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+index 097fc90..7255aa8 100644
+--- a/drivers/clk/ti/clk-43xx.c
++++ b/drivers/clk/ti/clk-43xx.c
+@@ -115,6 +115,12 @@ static struct ti_dt_clk am43xx_clks[] = {
+ 	DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
+ 	DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
+ 	DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
++	DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
++	DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
++	DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
++	DT_CLK("48306200.pwm", "tbclk", "ehrpwm3_tbclk"),
++	DT_CLK("48308200.pwm", "tbclk", "ehrpwm4_tbclk"),
++	DT_CLK("4830a200.pwm", "tbclk", "ehrpwm5_tbclk"),
+ 	{ .node_name = NULL },
+ };
+ 
 -- 
 2.7.0
