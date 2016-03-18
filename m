@@ -1,76 +1,56 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 18 Mar 2016 10:40:29 +0100
-Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <56E700F4.4060308@arm.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <56E00A7E.4080101@semihalf.com> <20160313181608.GA15988@cbox>
- <56E69CCA.5070407@arm.com>
- <CAFEAcA8r5LDbNG0XVnHnsoYcrfcpfnR3FQ_u=-L7Dop1HFVgxw@mail.gmail.com>
- <56E6FAEB.1090306@arm.com> <56E700F4.4060308@arm.com>
-Message-ID: <20160318094029.GC10806@cbox>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 18 Mar 2016 09:40:25 +0000
+Subject: [PATCH v2 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <20160318003322.GC4287@linux.vnet.ibm.com>
+References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
+ <1458147733-29338-2-git-send-email-cmetcalf@mellanox.com>
+ <20160317193600.GY6344@twins.programming.kicks-ass.net>
+ <20160317225557.GA4287@linux.vnet.ibm.com> <56EB4937.1010404@mellanox.com>
+ <20160318003322.GC4287@linux.vnet.ibm.com>
+Message-ID: <56EBCD09.2000400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2016 at 06:20:36PM +0000, Andre Przywara wrote:
-> Hi,
-> 
-> On 14/03/16 17:54, Marc Zyngier wrote:
-> > On 14/03/16 17:29, Peter Maydell wrote:
-> >> On 14 March 2016 at 11:13, Andre Przywara <andre.przywara@arm.com> wrote:
-> >>> So I see two ways to fix this:
-> >>> 1.) we find a KVM specific way of letting userland save and restore the
-> >>> ITS tables directly
-> >>> 2.) we implement the BASER<n> registers, but still use our "cache" for
-> >>> normal operations. On demand we would serialize KVM's virtual ITS data
-> >>> structures and put them into the guest's memory, so they could be
-> >>> saved/restored from there.
-> >>
-> >> I feel like we're rehashing a bunch of design choices we talked
-> >> through way back in the last-but-one Connect. I don't suppose
-> >> anybody wrote down our rationales from back then?
-> >>
-> >> (In particular I forget whether we decided the ITS tables were
-> >> large enough to need to allow some sort of before-the-VM-stops
-> >> migration of the data, which would be relatively doable with
-> >> option 2 but painful under option 1.)
-> > 
-> > I think only option 2 is valid here, and we must be able to shove most
-> > of the routing information in the device/collection/IT tables. Common HW
-> > seems to use 64bit of data per entry per table, so we should be able to
-> > do the same with KVM.
-> 
-> All right, just skimmed over this and it looks doable.
-> For the collection table we will most likely even get away with 32 bits
-> per entry (compressed MPIDR or even VCPUIDs).
-> Would the IPA of the ITTE suffice for each device table entry?
-> 
-> I will work out the details later.
-> 
-> >>>> Only caveat there I think was that we had to decide on a storage format
-> >>>> in those memory regions, to allow QEMU to understand the state and to
-> >>>> ensure back/forwards compatibility between KVM versions.
-> >>>
-> >>> Do we need QEMU to actually understand this? Can't we just leave this
-> >>> all to the kernel and QEMU just passes on the data? That would still
-> >>> require some ABI stability between kernel versions in this respect, but
-> >>> it's less problematic than exposing the data format to userland at all.
-> >>
-> >> This would preclude ever being able to migrate a VM from KVM to
-> >> TCG QEMU, which seems a shame. (That doesn't work right now, but
-> >> I'm a bit wary of shutting the door to it forever.)
-> > 
-> > If the format of the migrated tables becomes ABI for KVM, it also
-> > becomes ABI for userspace (anything that comes out of the kernel *is*
-> > ABI). Andre, can you please explain what you mean?
-> 
-> Well, probably there is not so much difference. I was just wondering if
-> it would be easier to treat that data as an opaque blob.
-> But you are probably right that it would just mean the difference
-> between documenting the format or not.
-> 
+On 18/03/16 00:33, Paul E. McKenney wrote:
+> On Thu, Mar 17, 2016 at 08:17:59PM -0400, Chris Metcalf wrote:
+>> On 3/17/2016 6:55 PM, Paul E. McKenney wrote:
+>>> The RCU stall-warn stack traces can be ugly, agreed.
+>>>
+>>> That said, RCU used to use NMI-based stack traces, but switched to the
+>>> current scheme due to the NMIs having the unfortunate habit of locking
+>>> things up, which IIRC often meant no stack traces at all.  If I recall
+>>> correctly, one of the problems was self-deadlock in printk().
+>>
+>> Steven Rostedt enabled the per_cpu printk func support in June 2014, and
+>> the nmi_backtrace code uses it to just capture printk output to percpu
+>> buffers, so I think it's going to be a lot more robust than earlier attempts.
+>
+> That would be a very good thing, give or take the "I think" qualifier.
+> And assuming that the target CPU is healthy enough to find its way back
+> to some place that can dump the per-CPU printk buffer.  I might well
+> be overly paranoid, but I have to suspect that the probability of that
+> buffer getting dumped is reduced greatly on a CPU that isn't healthy
+> enough to respond to RCU, though.
 
-Even ignoring the migrate-to-TCG case, you cannot treat it as a blob,
-because you want to be able to migrate between KVM on kernel version X
-and version Y.
+The target CPU doesn't dump the buffer. It "just" fields the NMI, stores 
+the backtrace and sets a flag.
 
--Christoffer
+The buffer is dumped to console by the requesting CPU, either when all 
+backtraces have come back or when a timeout is reached.
+
+
+> But it seems like enabling the experiment might be useful.
+>
+> "Try enabling the NMI version.  If that doesn't get you your RCU CPU
+> stall warning stack trace, try the remote-print variant."
+>
+> Or I suppose we could just do both in succession, just in case their
+> console was a serial port.  ;-)
+
+I guess both might be needed but only when the target CPU is dead enough 
+to fail to respond to NMI. In principle, we could exploit the timeout in 
+the NMI backtrace logic and only issue the missing backtraces.
+
+
+Daniel.
