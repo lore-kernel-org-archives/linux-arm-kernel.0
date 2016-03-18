@@ -1,43 +1,81 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Mar 2016 16:23:24 +0200
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-Message-ID: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Fri, 18 Mar 2016 16:23:26 +0200
+Subject: [PATCH v2 2/3] ARM: OMAP2+: mcbsp: Prepare the device build code for
+ sidetone hwmod removal
+In-Reply-To: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1458311007-19168-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The McBSP sidetone hwmods will be removed as they should not exist because
+the sidetone is a sub-block of McBSP and it is the responsibility of the
+McBSP driver to handle it. It has no effect or dependency on PRCM.
+When the sidetone hwmod is removed the oh->dev_attr can not be used to
+determine if the McBSP port has sidetone or not, but we can use the IRQ
+names. If the module has IRQ named as sidetone, the McBSP has it.
 
-Chanes since v1:
-- removed the ASoC patch as Mark has applied it already
-- Added my signed-off to the hwmod patch
-- New patch to handle the case when the sidetone hwmod has been removed for
-  legacy boot.
-
-The series addresses a long standing issue with McBSP2/3 regarding to hwmod
-setup. When booting with DT a warning is printed that mcbsp2/3 is using two
-hwmod.
-The root of the issue is the way how the hwmod data was constructed in the first
-place for OMAP3 McBSP2/3.
-After re-reading the TRM it is clear that the sidetone should not have it's
-own hwmod data as it is not a separate IP, it is part of the McBSP module. It
-can not affect PRCM either since it's SYSCONFIG register's AUTOIDLE bit is only
-sets the autoidle from the internal McBSP_iclk clock to the sidetone block of
-the same McBSP.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (3):
-  ARM: DTS: omap3: Remove mcbsp2/3_sidetone hwmod reference for McBSP2/3
-  ARM: OMAP2+: mcbsp: Prepare the device build code for sidetone hwmod
-    removal
-  ARM: OMAP3: hwmod data: Merge and remove the McBSP sidetone related
-    data
+ arch/arm/mach-omap2/mcbsp.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/omap3.dtsi               |   4 +-
- arch/arm/mach-omap2/mcbsp.c                |  28 ++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 120 ++++-------------------------
- 3 files changed, 43 insertions(+), 109 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+index b4ac3af1160c..8a3c50fa6a78 100644
+--- a/arch/arm/mach-omap2/mcbsp.c
++++ b/arch/arm/mach-omap2/mcbsp.c
+@@ -48,6 +48,23 @@ static int omap3_enable_st_clock(unsigned int id, bool enable)
+ 		return omap2_clk_allow_idle(mcbsp_iclks[id]);
+ }
+ 
++static bool omap3_mcbsp_has_st(struct omap_hwmod *oh)
++{
++	struct omap_hwmod_irq_info *ohii;
++	int i = 0;
++
++	if (!oh || !oh->mpu_irqs)
++		return false;
++
++	do {
++		ohii = &oh->mpu_irqs[i++];
++		if (!strcmp(ohii->name, "sidetone"))
++			return true;
++	} while (ohii->irq != -1);
++
++	return false;
++}
++
+ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+ {
+ 	int id, count = 1;
+@@ -56,6 +73,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+ 	struct omap_mcbsp_platform_data *pdata = NULL;
+ 	struct platform_device *pdev;
+ 	char clk_name[11];
++	bool has_sidetone = false;
+ 
+ 	sscanf(oh->name, "mcbsp%d", &id);
+ 
+@@ -96,11 +114,19 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+ 	if (oh->dev_attr) {
+ 		oh_device[1] = omap_hwmod_lookup((
+ 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
++		count++;
++
++		has_sidetone = true;
++	} else {
++		has_sidetone = omap3_mcbsp_has_st(oh);
++	}
++
++	if (has_sidetone) {
+ 		pdata->enable_st_clock = omap3_enable_st_clock;
+ 		sprintf(clk_name, "mcbsp%d_ick", id);
+ 		mcbsp_iclks[id] = clk_get(NULL, clk_name);
+-		count++;
+ 	}
++
+ 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
+ 				    sizeof(*pdata));
+ 	kfree(pdata);
 -- 
 2.7.3
