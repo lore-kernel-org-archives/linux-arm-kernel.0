@@ -1,196 +1,71 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 18 Mar 2016 11:49:54 -0400
-Subject: [PATCH V5 13/15] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <1455630825-27253-14-git-send-email-tn@semihalf.com>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <1455630825-27253-14-git-send-email-tn@semihalf.com>
-Message-ID: <1458316194.23434.104.camel@redhat.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 18 Mar 2016 16:52:03 +0100
+Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
+ engine driver for mvebu_v7_defconfig
+In-Reply-To: <20160318154500.GJ19428@n2100.arm.linux.org.uk>
+References: <20160318081209.GA7394@archy.home> <20160318131432.GB8005@lunn.ch>
+ <20160318145131.76ffa0e1@free-electrons.com>
+ <87oaab980n.fsf@free-electrons.com>
+ <20160318144639.GH19428@n2100.arm.linux.org.uk>
+ <20160318163518.122505a5@free-electrons.com>
+ <20160318154500.GJ19428@n2100.arm.linux.org.uk>
+Message-ID: <20160318165203.4512ed1d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-02-16 at 14:53 +0100, Tomasz Nowicki wrote:
-> Some platforms may not be fully compliant with generic set of PCI config
-> accessors. For these cases we implement the way to overwrite accessors
-> set prior to PCI buses enumeration. Algorithm traverses available quirk
-> list, matches against <platform ID (DMI), domain, bus number> tuple and
-> returns corresponding accessors. All quirks can be defined using:
-> DECLARE_ACPI_MCFG_FIXUP() and kept self contained. Example,
-> 
-> static const struct dmi_system_id foo_dmi[] = {
-> ????????{
-> ????????????????.ident = "<Platform ident string>",
-> ????????????????.callback = <handler>,
-> ????????????????.matches = {
-> ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
-> ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
-> ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
-> ????????????????},
-> ????????},
-> ????????{ }
-> };
-> 
-> static struct pci_ops foo_ecam_pci_ops = {
-> ????????.map_bus = pci_mcfg_dev_base,
-> ????????.read = foo_ecam_config_read,
-> ????????.write = foo_ecam_config_write,
-> };
-> DECLARE_ACPI_MCFG_FIXUP(foo_dmi, NULL, &foo_ecam_pci_ops, <domain_nr>, <bus_nr>);
-> 
-> More custom (non-DMI) matching can be done via an extra call.
-> Note that there is possibility to assign quirk related private data to
-> root->sysdata which will be available along read/wriate accessor, example:
-> 
-> static int boo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
-> {
-> ????????return [condition] ? 1 : 0;
-> }
-> 
-> int boo_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
-> ??????????????????????????int where, int size, u32 *val)
-> {
-> ????????struct acpi_pci_root *root = bus->sysdata;
-> ????????struct boo_priv_data *boo_data = root->sysdata;
-> 
-> ????????[..]
-> }
-> 
-> static struct pci_ops boo_ecam_pci_ops = {
-> 	.map_bus = pci_mcfg_dev_base,
-> 	.read = boo_ecam_config_read,
-> 	.write = boo_ecam_config_write,
-> };
-> DECLARE_ACPI_MCFG_FIXUP(NULL, boo_match, &boo_ecam_pci_ops, <domain_nr>, <bus_nr>);
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
-> ?drivers/acpi/pci_mcfg.c???????????| 32 ++++++++++++++++++++++++++++++--
-> ?include/acpi/acpi_bus.h???????????|??1 +
-> ?include/asm-generic/vmlinux.lds.h |??7 +++++++
-> ?include/linux/pci-acpi.h??????????| 18 ++++++++++++++++++
-> ?4 files changed, 56 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> index 0062257..b343547 100644
-> --- a/drivers/acpi/pci_mcfg.c
-> +++ b/drivers/acpi/pci_mcfg.c
-> @@ -41,6 +41,29 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
-> ?	return PCIBIOS_DEVICE_NOT_FOUND;
-> ?}
-> ?
-> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
-> +extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
-> +
-> +static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
-> +{
-> +	struct pci_mcfg_fixup *f;
-> +	int bus_num = root->secondary.start;
-> +	int domain = root->segment;
-> +
-> +	/*
-> +	?* First match against PCI topology <domain:bus> then use DMI or
-> +	?* custom match handler.
-> +	?*/
-> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
-> +		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
-> +		????(f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
-> +		????(f->system ? dmi_check_system(f->system) : 1 &&
-> +		?????f->match ? f->match(f, root) : 1))
+Hello,
 
-The parens are not quite right here ^^^^
-If dmi_check_system() returns true, f->match won't get called.
+On Fri, 18 Mar 2016 15:45:00 +0000, Russell King - ARM Linux wrote:
 
-This should be:
-		????(f->system ? dmi_check_system(f->system) : 1) &&
-		? ? ?f->match ? f->match(f, root) : 1)
+> I do seem to be carrying some patches for some time for CESA:
+> 
+> crypto: marvell: rearrange handling for sw padded hashes
+> crypto: marvell: rearrange handling for hw finished hashes
+> crypto: marvell: rearrange last request handling
+> crypto: marvell: avoid adding final operation within loop
+> crypto: marvell: ensure iter.base.op_len is the full op length
+> crypto: marvell: use presence of scatterlist to determine data load
+> crypto: marvell: move mv_cesa_dma_add_frag() calls
+> crypto: marvell: always ensure mid-fragments after first-fragment
+> crypto: marvell: factor out adding an operation and launching it
+> crypto: marvell: factor out first fragment decisions to helper
+> crypto: marvell: const-ify argument to mv_cesa_get_op_cfg()
+> crypto: marvell: ensure template operation is initialised
+> crypto: marvell: fix the bit length endianness
+> crypto: marvell: add flag to determine algorithm endianness
+> crypto: marvell: keep creq->state in CPU endian format at all times
+> crypto: marvell: easier way to get the transform
+> 
+> and the last time I seem to have any comments on them was back in
+> October last year.  I don't remember what status these are, and as I've
+> been concentrating on other areas.  I'll try to remember to send them
+> out after rc1.
 
-> +			return f->ops;
-> +	}
-> +	return NULL;
-> +}
-> +
-> ?void __iomem *
-> ?pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
-> ?{
-> @@ -63,10 +86,15 @@ static struct pci_ops default_pci_mcfg_ops = {
-> ?
-> ?struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
-> ?{
-> +	struct pci_ops *pci_mcfg_ops_quirk;
-> +
-> ?	/*
-> -	?* TODO: Match against platform specific quirks and return
-> -	?* corresponding PCI config space accessor set.
-> +	?* Match against platform specific quirks and return corresponding
-> +	?* PCI config space accessor set.
-> ?	?*/
-> +	pci_mcfg_ops_quirk = pci_mcfg_check_quirks(root);
-> +	if (pci_mcfg_ops_quirk)
-> +		return pci_mcfg_ops_quirk;
-> ?
-> ?	return &default_pci_mcfg_ops;
-> ?}
-> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-> index 14362a8..0fc6f13 100644
-> --- a/include/acpi/acpi_bus.h
-> +++ b/include/acpi/acpi_bus.h
-> @@ -556,6 +556,7 @@ struct acpi_pci_root {
-> ?	struct pci_bus *bus;
-> ?	u16 segment;
-> ?	struct resource secondary;	/* downstream bus range */
-> +	void *sysdata;
-> ?
-> ?	u32 osc_support_set;	/* _OSC state of support bits */
-> ?	u32 osc_control_set;	/* _OSC state of control bits */
-> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> index c4bd0e2..c93fc97 100644
-> --- a/include/asm-generic/vmlinux.lds.h
-> +++ b/include/asm-generic/vmlinux.lds.h
-> @@ -298,6 +298,13 @@
-> ?		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
-> ?	}								\
-> ?									\
-> +	/* ACPI MCFG quirks */						\
-> +	.acpi_fixup????????: AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
-> +		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
-> +		*(.acpi_fixup_mcfg)					\
-> +		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
-> +	}								\
-> +									\
-> ?	/* Built-in firmware blobs */					\
-> ?	.builtin_fw????????: AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
-> ?		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index 93feb04..9e1bedd 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -123,6 +123,24 @@ struct pci_mmcfg_region {
-> ?	bool hot_added;
-> ?};
-> ?
-> +struct pci_mcfg_fixup {
-> +	const struct dmi_system_id *system;
-> +	int (*match)(struct pci_mcfg_fixup *, struct acpi_pci_root *);
-> +	struct pci_ops *ops;
-> +	int domain;
-> +	int bus_num;
-> +};
-> +
-> +#define PCI_MCFG_DOMAIN_ANY	-1
-> +#define PCI_MCFG_BUS_ANY	-1
-> +
-> +/* Designate a routine to fix up buggy MCFG */
-> +#define DECLARE_ACPI_MCFG_FIXUP(system, match, ops, dom, bus)		\
-> +	static const struct pci_mcfg_fixup __mcfg_fixup_##system##dom##bus\
-> +	?__used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
-> +				aligned((sizeof(void *))))) =		\
-> +	{ system, match, ops, dom, bus };
-> +
-> ?extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
-> ?extern struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
-> ?							int end, u64 addr);
+All (or most) of these patches seem to be in mainline already:
+
+ab270e7055e0aa9d4dc3bf419cdfdde340174978 crypto: marvell/cesa - rearrange handling for sw padded hashes
+aee84a7e6ed515f0f217317ff261a15db4bff0bb crypto: marvell/cesa - rearrange handling for hw finished hashes
+58953e15ef015ba9136b7234a7098cf827428999 crypto: marvell/cesa - rearrange last request handling
+e41bbebddec44f7c06585f42686b2a529513fc6a crypto: marvell/cesa - avoid adding final operation within loop
+bd274b10856b91f702fa767114aa7e6ac45b933d crypto: marvell/cesa - ensure iter.base.op_len is the full op length
+d9bba4c3ebbc65b9113624eb1690bed776fb6106 crypto: marvell/cesa - use presence of scatterlist to determine data load
+0971d09a8566abd6640acdbe3fd304e67e257bd3 crypto: marvell/cesa - move mv_cesa_dma_add_frag() calls
+2f396a91d1d01a423fd87b7c6ff71600d06b9c05 crypto: marvell/cesa - always ensure mid-fragments after first-fragment
+9621288673cb2a1805eadf29b92e5bcec6a0e2e5 crypto: marvell/cesa - factor out adding an operation and launching it
+8651791e5403a0e0634b76dee91b102dc4f40385 crypto: marvell/cesa - factor out first fragment decisions to helper
+c439e4eec73373c6d5b7129ece69d67978ada307 crypto: marvell/cesa - const-ify argument to mv_cesa_get_op_cfg()
+d30cb2fa34829161cfa1f847049b3fcfcfeebc93 crypto: marvell/cesa - ensure template operation is initialised
+51954a968bbedcabf2b42fec2ec51386f0dee0c4 crypto: marvell/cesa - fix the bit length endianness
+a9eb678f8addc1bfb80bacc45f6df1108fd1c0d9 crypto: marvell/cesa - add flag to determine algorithm endianness
+4c2b130c8ae79af734e5e57f3662e25ef4d20e8d crypto: marvell/cesa - keep creq->state in CPU endian format at all times
+80754539ec936b0afe8a3c406b7d67612977cc71 crypto: marvell/cesa - easier way to get the transform
+
+They are in mainline since v4.4.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
