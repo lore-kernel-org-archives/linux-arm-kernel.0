@@ -1,42 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 18 Mar 2016 11:59:25 +0100
-Subject: [PATCH 00/12] ARM, arm64: dts: use generic pinctrl properties
-In-Reply-To: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-References: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVpAg8ixL_x94qBS1tkKWjSXdYuvo4EcD7YVU1sZQ4E8w@mail.gmail.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 18 Mar 2016 10:59:39 +0000
+Subject: [PATCH 1/8] efi: make install_configuration_table() boot service
+ usable
+In-Reply-To: <1457588408-19309-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160318105939.GO2619@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Thu, 10 Mar, at 12:40:01PM, Ard Biesheuvel wrote:
+> This patch redeclares efi_boot_services_t::install_configuration_table
+> as a function pointer so that the boot service is callable as a function.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  include/linux/efi.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+ 
+Any chance you could fold this patch into the one that actually uses
+install_configuration_table() on ARM? That way it's clear to see where
+the users are.
 
-On Fri, Mar 18, 2016 at 12:59 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
-> groups properties") renesas pfc drivers accept generic "function", "pins"
-> and "groups" properties.
->
-> This series updates the device trees for the boards of Renesas ARM based
-> SoCs to use the generic properties. The device tree for the lager board was
-> already updated in an earlier patch which is present in
-> renesas-devel-20160318-v4.5.
->
-> Based on renesas-devel-20160318-v4.5
-
-Thanks!
-
-For the whole series:
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Doh, now I have to update all my DT overlays, as you cannot mix new-style
-and old-style properties ;-)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index e747eb08b2be..8ba6eb7863aa 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -283,7 +283,7 @@ typedef struct {
+>  	void *register_protocol_notify;
+>  	void *locate_handle;
+>  	void *locate_device_path;
+> -	void *install_configuration_table;
+> +	efi_status_t (*install_configuration_table)(efi_guid_t *, void *);
+>  	void *load_image;
+>  	void *start_image;
+>  	void *exit;
+> -- 
+> 1.9.1
+> 
