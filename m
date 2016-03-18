@@ -1,230 +1,285 @@
-From: sakar.arora@nxp.com (Sakar Arora)
-Date: Fri, 18 Mar 2016 06:26:47 +0000
-Subject: Linux kernel 4.1 boot on arm64 stuck in cpu_do_idle
-Message-ID: <DB5PR04MB21663013F59C3F0DA1FBFB41F88C0@DB5PR04MB2166.eurprd04.prod.outlook.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Fri, 18 Mar 2016 14:41:09 +0800
+Subject: [PATCH v14 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <56EBA305.8030202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi all,
 
-Trying to boot custom kernel 4.1 using UEFI bootloader. Using debugger it is seen the PC is in the cpu_do_idle function inside proc.S (the stack traces the call to rest_init() function)
+I pick this series up and test on C101PA chromebook, after Heiko update 
+the 3 patches.
 
-It seems that the init process is not getting scheduled. Can somebody suggest a debug strategy for this?
+[v14.1,09/17] drm: rockchip: dp: add rockchip platform dp driver
+[v14.1,04/17] drm: bridge: analogix/dp: fix some obvious code style
+[v14.1,01/17] drm: bridge: analogix/dp: split exynos dp driver to bridge 
+directory
 
-Here are the logs for reference
+C101PA chromebook:
+http://www.amazon.co.uk/10-1-Inch-Chromebook-Rockchip-Integrated-Graphics/dp/B0107N7WT6/ref=lp_758129031_1_4?s=computers&ie=UTF8&qid=1458282912&sr=1-4
 
-[??? 0.000000] Booting Linux on physical CPU 0x0
-[??? 0.000000] Initializing cgroup subsys cpu
-[??? 0.000000] Linux version 4.1.8-00582-g8683bc6-dirty (b45370 at lvd5567) (gcc version 4.8.3 20131202 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC 2013.11) ) #15 SMP PREEMPT Wed Feb 17 12:06:04 IST 2016
-[??? 0.000000] CPU: AArch64 Processor [411fd071] revision 1
-[??? 0.000000] Detected PIPT I-cache on CPU0
-[??? 0.000000] alternatives: enabling workaround for ARM erratum 832075
-[??? 0.000000] alternatives: enabling workaround for ARM erratum 834220
-[??? 0.000000] earlycon: Early serial console at MMIO 0x21c0600 (options '')
-[??? 0.000000] bootconsole [uart0] enabled
-[??? 0.000000] efi: Getting EFI parameters from FDT:
-[??? 0.000000] efi: UEFI not found.
-[??? 0.000000] cma: Reserved 16 MiB at 0x00000000fe400000
-[??? 0.000000] /cpus/cpu at 1: missing enable-method property
-[??? 0.000000] /cpus/cpu at 100: missing enable-method property
-[??? 0.000000] /cpus/cpu at 101: missing enable-method property
-[??? 0.000000] /cpus/cpu at 200: missing enable-method property
-[??? 0.000000] /cpus/cpu at 201: missing enable-method property
-[??? 0.000000] /cpus/cpu at 300: missing enable-method property
-[??? 0.000000] /cpus/cpu at 301: missing enable-method property
-[??? 0.000000] PERCPU: Embedded 16 pages/cpu @ffff80007ffcd000 s27904 r8192 d29440 u65536
-[??? 0.000000] Built 1 zonelists in Zone order, mobility grouping on.? Total pages: 516096
-[??? 0.000000] Kernel command line: console=ttyS1,115200 root=/dev/ram0 earlycon=uart8250,mmio,0x21c0600 ramdisk_size=0x2000000 default_hugepagesz=2m hugepagesz=2m hugepages=256
-[??? 0.000000] PID hash table entries: 4096 (order: 3, 32768 bytes)
-[??? 0.000000] Dentry cache hash table entries: 262144 (order: 9, 2097152 bytes)
-[??? 0.000000] Inode-cache hash table entries: 131072 (order: 8, 1048576 bytes)
-[??? 0.000000] software IO TLB [mem 0xf8800000-0xfc800000] (64MB) mapped at [ffff800078800000-ffff80007c7fffff]
-[??? 0.000000] Memory: 1806596K/2097152K available (5829K kernel code, 456K rwdata, 2512K rodata, 424K init, 205K bss, 274172K reserved, 16384K cma-reserved)
-[??? 0.000000] Virtual kernel memory layout:
-[??? 0.000000]???? vmalloc : 0xffff000000000000 - 0xffff7bffbfff0000?? (126974 GB)
-[??? 0.000000]???? vmemmap : 0xffff7bffc0000000 - 0xffff7fffc0000000?? (? 4096 GB maximum)
-[??? 0.000000]?????????????? 0xffff7bffc2000000 - 0xffff7bffc4000000?? (??? 32 MB actual)
-[??? 0.000000]???? fixed?? : 0xffff7ffffabfd000 - 0xffff7ffffac00000?? (??? 12 KB)
-[??? 0.000000]???? PCI I/O : 0xffff7ffffae00000 - 0xffff7ffffbe00000?? (??? 16 MB)
-[??? 0.000000]???? modules : 0xffff7ffffc000000 - 0xffff800000000000?? (??? 64 MB)
-[??? 0.000000]???? memory? : 0xffff800000000000 - 0xffff800080000000?? (? 2048 MB)
-[??? 0.000000]?????? .init : 0xffff8000008a8000 - 0xffff800000912000?? (?? 424 KB)
-[??? 0.000000]?????? .text : 0xffff800000080000 - 0xffff8000008a7674?? (? 8350 KB)
-[??? 0.000000]?????? .data : 0xffff80000091b000 - 0xffff80000098d200?? (?? 457 KB)
-[??? 0.000000] Preemptible hierarchical RCU implementation.
-[??? 0.000000]? Additional per-CPU info printed with stalls.
-[??? 0.000000]? RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
-[??? 0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
-[??? 0.000000] NR_IRQS:64 nr_irqs:64 0
-[??? 0.000000] ITS: /interrupt-controller at 6000000/gic-its at 6020000
-[??? 0.000000] ITS: allocated 8192 Devices @f8420000 (psz 64K, shr 0)
-[??? 0.000000] ITS: using cache flushing for cmd queue
-[??? 0.000000] GIC: using LPI property table @0x00000000f8430000
-[??? 0.000000] ITS: Allocated 1792 chunks for LPIs
-[??? 0.000000] CPU0: found redistributor 0 region 0:0x0000000006100000
-[??? 0.000000] CPU0: using LPI pending table @0x00000000f8440000
-[??? 0.000000] GIC: using cache flushing for LPI property table
-[??? 0.000000] Architected cp15 timer(s) running at 25.00MHz (phys).
-[??? 0.000000] clocksource arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x5c40939b5, max_idle_ns: 440795202646 ns
-[??? 0.000003] sched_clock: 56 bits at 25MHz, resolution 40ns, wraps every 4398046511100ns
-[??? 0.010844] Console: colour dummy device 80x25
-[??? 0.016787] Calibrating delay loop (skipped), value calculated using timer frequency.. 50.00 BogoMIPS (lpj=250000)
-[??? 0.030633] pid_max: default: 32768 minimum: 301
-[??? 0.036845] Security Framework initialized
-[??? 0.042339] Mount-cache hash table entries: 4096 (order: 3, 32768 bytes)
-[??? 0.051298] Mountpoint-cache hash table entries: 4096 (order: 3, 32768 bytes)
-[??? 0.061180] Initializing cgroup subsys memory
-[??? 0.067017] Initializing cgroup subsys hugetlb
-[??? 0.073083] hw perfevents: enabled with arm/armv8-pmuv3 PMU driver, 7 counters available
-[??? 0.083926] EFI services will not be available.
-[??? 0.143942] Brought up 1 CPUs
-[??? 0.147902] SMP: Total of 1 processors activated.
-[??? 0.154199] CPU: All CPU(s) started at EL2
-[??? 0.159675] alternatives: patching kernel code
-[??? 0.167602] devtmpfs: initialized
-[??? 0.173701] DMI not present or invalid.
-[??? 0.178998] clocksource jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
-[??? 0.192482] pinctrl core: initialized pinctrl subsystem
-[??? 0.200290] NET: Registered protocol family 16
-[??? 0.236357] cpuidle: using governor ladder
-[??? 0.266291] cpuidle: using governor menu
-[??? 0.271604] fsl-mc bus type registered
-[??? 0.276710] MC object device driver fsl_mc_dprc registered
-[??? 0.284134] MC object device driver fsl_mc_allocator registered
-[??? 0.292126] vdso: 2 pages (1 code @ ffff800000921000, 1 data @ ffff800000920000)
-[??? 0.302065] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
-[??? 0.311697] DMA: preallocated 256 KiB pool for atomic allocations
-[??? 0.319960] Serial: AMBA PL011 UART driver
-[??? 0.329368] fsl_mc_bus 80c000000.fsl-mc: Root MC bus device probed
-[??? 0.337743] fsl_mc_bus 80c000000.fsl-mc: Freescale Management Complex Firmware version: 0.0.0
-[??? 0.349283] fsl_mc_dprc dprc.0: ERROR: DPRC version 0.0 not supported
-[??? 0.357923] fsl_mc_dprc dprc.0: MC object device probe callback failed: -524
-[??? 0.367523] fsl_mc_dprc: probe of dprc.0 failed with error -524
-[??? 0.409501] arm-smmu 5000000.iommu: probing hardware configuration...
-[??? 0.418262] arm-smmu 5000000.iommu: SMMUv2 with:
-[??? 0.424451] arm-smmu 5000000.iommu:? stage 1 translation
-[??? 0.431586] arm-smmu 5000000.iommu:? stage 2 translation
-[??? 0.438705] arm-smmu 5000000.iommu:? nested translation
-[??? 0.445827] arm-smmu 5000000.iommu:? coherent table walk
-[??? 0.452948] arm-smmu 5000000.iommu:? stream matching with 128 register groups, mask 0x7fff
-[??? 0.464045] arm-smmu 5000000.iommu:? 64 context banks (0 stage-2 only)
-[??? 0.472799] arm-smmu 5000000.iommu:? Supported page sizes: 0x60211000
-[??? 0.481444] arm-smmu 5000000.iommu:? Stage-1: 48-bit VA -> 48-bit IPA
-[??? 0.490079] arm-smmu 5000000.iommu:? Stage-2: 48-bit IPA -> 48-bit PA
-[??? 0.498735] arm-smmu 5000000.iommu: registered 1 master devices
-[??? 0.507068] vgaarb: loaded
-[??? 0.510902] SCSI subsystem initialized
-[??? 0.516244] usbcore: registered new interface driver usbfs
-[??? 0.523748] usbcore: registered new interface driver hub
-[??? 0.530923] usbcore: registered new device driver usb
-[??? 0.538060] i2c i2c-0: IMX I2C adapter registered
-[??? 0.544355] i2c i2c-0: can't use DMA
-[??? 0.549356] pps_core: LinuxPPS API ver. 1 registered
-[??? 0.556010] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
-[??? 0.568333] PTP clock support registered
-[??? 0.574074] Switched to clocksource arch_sys_counter
-[??? 0.587143] NET: Registered protocol family 2
-[??? 0.593623] TCP established hash table entries: 16384 (order: 5, 131072 bytes)
-[??? 0.603381] TCP bind hash table entries: 16384 (order: 6, 262144 bytes)
-[??? 0.612732] TCP: Hash tables configured (established 16384 bind 16384)
-[??? 0.621572] UDP hash table entries: 1024 (order: 3, 32768 bytes)
-[??? 0.629658] UDP-Lite hash table entries: 1024 (order: 3, 32768 bytes)
-[??? 0.638464] NET: Registered protocol family 1
-[??? 0.644441] RPC: Registered named UNIX socket transport module.
-[??? 0.652376] RPC: Registered udp transport module.
-[??? 0.658692] RPC: Registered tcp transport module.
-[??? 0.664998] RPC: Registered tcp NFSv4.1 backchannel transport module.
-[??? 0.673741] Trying to unpack rootfs image as initramfs...
-[??? 0.681197] rootfs image is not initramfs (no cpio magic); looks like an initrd
-[??? 0.736225] Freeing initrd memory: 29692K (ffff800006300000 - ffff800007fff000)
-[??? 0.746434] kvm [1]: interrupt-controller at c0e0000 IRQ6
-[??? 0.753500] kvm [1]: timer IRQ3
-[??? 0.757738] kvm [1]: Hyp mode initialized successfully
-[??? 0.765892] futex hash table entries: 256 (order: 2, 16384 bytes)
-[??? 0.774359] audit: initializing netlink subsys (disabled)
-[??? 0.781624] audit: type=2000 audit(0.650:1): initialized
-[??? 0.795544] HugeTLB registered 2 MB page size, pre-allocated 256 pages
-[??? 0.804678] VFS: Disk quotas dquot_6.6.0
-[??? 0.809960] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
-[??? 0.819520] NFS: Registering the id_resolver key type
-[??? 0.826373] Key type id_resolver registered
-[??? 0.831974] Key type id_legacy registered
-[??? 0.837504] fuse init (API version 7.23)
-[??? 0.842980] 9p: Installing v9fs 9p2000 file system support
-[??? 0.850834] io scheduler noop registered
-[??? 0.856144] io scheduler cfq registered (default)
-[??? 0.863445] Freescale LS2 console driver
-[??? 0.869129] fsl-ls2-console: device fsl_mc_console registered
-[??? 0.876961] fsl-ls2-console: device fsl_aiop_console registered
-[??? 0.887053] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-[??? 0.897019] msm_serial: driver initialized
-[??? 0.902853] 21c0500.serial: ttyS0 at MMIO 0x21c0500 (irq = 7, base_baud = 16666666) is a 16550A
-[??? 0.914808] console [ttyS1] disabled
-[??? 0.919645] 21c0600.serial: ttyS1 at MMIO 0x21c0600 (irq = 7, base_baud = 16666666) is a 16550A
-[??? 0.950109] console [ttyS1] enabled
-[??? 0.950109] console [ttyS1] enabled
-[??? 0.959457] bootconsole [uart0] disabled
-[??? 0.959457] bootconsole [uart0] disabled
-[??? 0.970382] Unable to detect cache hierarcy from DT for CPU 0
-[??? 0.982171] brd: module loaded
-[??? 0.988798] loop: module loaded
-[??? 0.994153] libphy: Fixed MDIO Bus: probed
-[??? 0.999905] tun: Universal TUN/TAP device driver, 1.6
-[??? 1.006906] tun: (C) 1999-2004 Max Krasnyansky <maxk@qualcomm.com>
-[??? 1.015473] libphy: Freescale XGMAC MDIO Bus: probed
-[??? 1.022461] mdio_bus 8b96000: timeout waiting for operation to complete
-[??? 1.031821] mdio_bus 8b96000: timeout waiting for bus to be free
-[??? 1.040212] mdio_bus 8b96000: timeout waiting for bus to be free
-[??? 1.048601] mdio_bus 8b96000: timeout waiting for bus to be free
-[??? 1.056734] libphy: Freescale XGMAC MDIO Bus: probed
-[??? 1.063720] mdio_bus 8b97000: timeout waiting for bus to be free
-[??? 1.072130] mdio_bus 8b97000: timeout waiting for bus to be free
-[??? 1.080522] mdio_bus 8b97000: timeout waiting for bus to be free
-[??? 1.088909] mdio_bus 8b97000: timeout waiting for bus to be free
-[??? 1.096987] e1000: Intel(R) PRO/1000 Network Driver - version 7.3.21-k8-NAPI
-[??? 1.106421] e1000: Copyright (c) 1999-2006 Intel Corporation.
-[??? 1.114155] e1000e: Intel(R) PRO/1000 Network Driver - 2.3.2-k
-[??? 1.121935] e1000e: Copyright(c) 1999 - 2014 Intel Corporation.
-[??? 1.129909] sky2: driver version 1.30
-[??? 1.135077] VFIO - User Level meta-driver version: 0.3
-[??? 1.142157] vfio_fsl_mc_driver_init: Driver registration fails as no fsl_mc_bus found
-[??? 1.153073] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-[??? 1.161929] ehci-pci: EHCI PCI platform driver
-[??? 1.167944] ehci-platform: EHCI generic platform driver
-[??? 1.175005] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-[??? 1.183259] ohci-pci: OHCI PCI platform driver
-[??? 1.189286] ohci-platform: OHCI generic platform driver
-[??? 1.196392] usbcore: registered new interface driver usb-storage
-[??? 1.204658] mousedev: PS/2 mouse device common for all mice
-[??? 1.212450] i2c /dev entries driver
-[??? 1.314113] pca954x 0-0075: probe failed
-[??? 1.319732] MC object device driver fsl_dpaa2_caam registered
-[??? 1.328034] usbcore: registered new interface driver usbhid
-[??? 1.335691] usbhid: USB HID core driver
-[??? 1.340891] fsl-mc bus not found, restool driver registration failed
-[??? 1.349440] MC object device driver fsl_dpio_drv registered
-[??? 1.357011] MC object device driver fsl_dpaa2_eth registered
-[??? 1.364623] MC object device driver dpaa2_mac registered
-[??? 1.371769] MC object device driver dpaa2_evb registered
-[??? 1.378902] MC object device driver dpaa2_ethsw registered
-[??? 1.386304] MC object device driver fsl_dce_api registered
-[??? 1.393681] MC object device driver dpaa2_rtc registered
-[??? 1.400911] Initializing XFRM netlink socket
-[??? 1.406631] NET: Registered protocol family 17
-[??? 1.412571] NET: Registered protocol family 15
-[??? 1.418554] 8021q: 802.1Q VLAN Support v1.8
-[??? 1.424173] 9pnet: Installing 9P2000 support
-[??? 1.429925] Key type dns_resolver registered
-[??? 1.436033] registered taskstats version 1
-[??? 1.441670] hctosys: unable to open rtc device (rtc0)
-[??? 1.467673] RAMDISK: gzip image found at block 0
-[??? 2.086093] VFS: Mounted root (ext2 filesystem) readonly on device 1:0.
-[??? 2.095098] devtmpfs: mounted
-[??? 2.099336] Freeing unused kernel memory: 424K (ffff8000008a8000 - ffff800000912000)
-[??? 2.109711] Freeing alternatives memory: 24K (ffff800000912000 - ffff800000918000)
-[?? 92.276320] udevd[669]: starting version 182
-[?? 92.556791] random: dd urandom read with 0 bits of entropy available
+So, verified for the rockchip eDp contrller on my github.
+https://github.com/Caesar-github/rockchip/tree/veyron/next-stable-chromeos
 
 
-Thanks
-Sakar
+? 2016?02?15? 19:08, Yakir Yang ??:
+> Hi all,
+>
+>    The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+> share the same IP, so a lot of parts can be re-used. I split the common
+> code into bridge directory, then rk3288 and exynos only need to keep
+> some platform code. Cause I can't find the exact IP name of exynos dp
+> controller, so I decide to name dp core driver with "analogix" which I
+> find in rk3288 eDP TRM
+>
+> But there are still three light registers setting different between
+> exynos and rk3288.
+> 1. RK3288 have five special pll registers which not indicate in exynos
+>     dp controller.
+> 2. The address of DP_PHY_PD(dp phy power manager register) are different
+>     between rk3288 and exynos.
+> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+>     register).
+>
+> Due to Mark Yao have introduced the ATOMIC support to Rockchip drm, so it's
+> okay to use the ATOMIC helpers functions in connector_funcs. No need to splict
+> the connector init to platform driver anymore, and this is the biggest change
+> since version 11.
+>
+> This v14 didn't have lots of new changes which seems not the correct time to
+> upgrade the version number, but I have changed ordering of patches (adding 2
+> more, and removing 2 out). Especially to prevent confusing people, so I updated
+> the whole series.
+>
+> Thanks,
+> - Yakir
+>
+>
+> Changes in v14:
+> - Rebase the new changes in imx-dp driver
+> - Split up this patch into 3 parts, make this easy to review (Heiko)
+> - Remove the Rockchip DP PHY to an separate thread (Heiko)
+>      https://patchwork.kernel.org/patch/8312701/
+>
+> Changes in v13:
+> - Use .enable instead of preprare/commit in encoder_helper_funcs (Heiko)
+> - Fix the missing parameters with drm_encoder_init() helper function. (Heiko)
+>
+> Changes in v12:
+> - Move the connector init to analogix_dp driver, and using ATOMIC helper (Heiko)
+> - Add the ack from Jingoo
+> - Remove the enum link_rate_type struct, using the marcos in drm_dp_helper.h (Jingoo)
+>
+> Changes in v11:
+> - Uses tabs to fix the indentation issues in analogix_dp_core.h (Heiko)
+> - Rename the "analogix,need-force-hpd" to common 'force-hpd' (Rob)
+> - Add the ack from Rob Herring
+> - Revert parts of Gustavo Padovan's changes in commit:
+> 	drm/exynos: do not start enabling DP at bind() phase
+>    Add dp phy poweron function in bind time.
+> - Move the panel prepare from get_modes time to bind time, and move
+>    the panel unprepare from bridge->disable to unbind time. (Heiko)
+>
+> Changes in v10:
+> - Add the ack from Rob Herring
+> - Correct the ROCKCHIP_ANALOGIX_DP indentation in Kconfig to tabs here (Heiko)
+> - Add the ack from Rob Herring
+> - Remove the surplus "plat_data" check. (Heiko)
+> -       switch (dp->plat_data && dp->plat_data->dev_type) {
+> +       switch (dp->plat_data->dev_type) {
+>
+> Changes in v9:
+> - Document more details for 'ports' property.
+>
+> Changes in v8:
+> - Correct the right document path of display-timing.txt (Heiko)
+> - Correct the misspell of 'from' to 'frm'. (Heiko)
+> - Modify the commit subject name. (Heiko)
+>
+> Changes in v7:
+> - Back to use the of_property_read_bool() interfacs to provoid backward
+>    compatibility of "hsync-active-high" "vsync-active-high" "interlaced"
+>    to avoid -EOVERFLOW error (Krzysztof)
+>
+> Changes in v6:
+> - Fix the Kconfig recursive dependency (Javier)
+> - Fix Peach Pit hpd property name error:
+> -       hpd-gpio = <&gpx2 6 0>;
+> +       hpd-gpios = <&gpx2 6 0>;
+>
+> Changes in v5:
+> - Correct the check condition of gpio_is_valid when driver try to get
+>    the "hpd-gpios" DT propery. (Heiko)
+> - Move the platform attach callback in the front of core driver bridge
+>    attch function. Cause once platform failed at attach, core driver should
+>    still failed, so no need to init connector before platform attached (Krzysztof)
+> - Keep code style no changes with the previous exynos_dp_code.c in this
+>    patch, and update commit message about the new export symbol (Krzysztof)
+> - Gather the device type patch (v4 11/16) into this one. (Krzysztof)
+> - leave out the connector registration to analogix platform driver. (Thierry)
+> - Resequence this patch after analogix_dp driver have been split
+>    from exynos_dp code, and rephrase reasonable commit message, and
+>    remove some controversial style (Krzysztof)
+>      -		analogix_dp_write_byte_to_dpcd(
+>      - 				dp, DP_TEST_RESPONSE,
+>      +		analogix_dp_write_byte_to_dpcd(dp,
+>      +				DP_TEST_RESPONSE,
+> 				DP_TEST_EDID_CHECKSUM_WRITE);
+> - Switch video timing type to "u32", so driver could use "of_property_read_u32"
+>    to get the backword timing values. Krzysztof suggest me that driver could use
+>    the "of_property_read_bool" to get backword timing values, but that interfacs
+>    would modify the original drm_display_mode timing directly (whether those
+>    properties exists or not).
+> - Correct the misspell in commit message. (Krzysztof)
+> - Remove the empty line at the end of document, and correct the endpoint
+>    numbers in the example DT node, and remove the regulator iomux setting
+>    in driver code while using the pinctl in devicetree instead. (Heiko)
+> - Add device type declared, cause the previous "platform device type
+>    support (v4 11/16)" already merge into (v5 02/14).
+> - Implement connector registration code. (Thierry)
+> - Split binding doc's from driver changes. (Rob)
+> - Add eDP hotplug pinctrl property. (Heiko)
+>
+> Changes in v4:
+> - Update "analogix,hpd-gpios" to "hpd-gpios" DT propery. (Rob)
+> - Rename "analogix_dp-exynos.c" file name to "exynos_dp.c" (Jingoo)
+> - Create a separate folder for analogix code in bridge/ (Archit)
+> - Update commit message more readable. (Jingoo)
+> - Adjust the order from 05 to 04
+> - Provide backword compatibility with samsung. (Krzysztof)
+> - Split all DTS changes, and provide backward compatibility. Mark old
+>    properties as deprecated but still support them. (Krzysztof)
+> - Update "analogix,hpd-gpio" to "hpd-gpios" prop name. (Rob)
+> - Deprecated some properties which could parsed from Edid/Mode/DPCD. (Thierry)
+>      "analogix,color-space" & "analogix,color-depth"   &
+>      "analogix,link-rate"   & "analogix,lane-count"    &
+>      "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
+>      "vsync-active-high"    & "hsync-active-high"      & "interlaces"
+> - Separate all DTS changes to a separate patch. (Krzysztof)
+> - Remove some deprecated DT properties in rockchip dp document.
+> - Seprate the link-rate and lane-count limit out with the device_type
+>    flag. (Thierry)
+> - Take Jingoo suggest, add commit messages.
+> - Call drm_panel_prepare() in .get_modes function, ensure panel should
+>    power on before driver try to read edid message.
+>
+> Changes in v3:
+> - Move exynos's video_timing code to analogix_dp-exynos platform driver,
+>    add get_modes method to struct analogix_dp_plat_data. (Thierry)
+> - Rename some "samsung*" dts propery to "analogix*". (Heiko)
+> - The link_rate and lane_count shouldn't config to the DT property value
+>    directly, but we can take those as hardware limite. For example, RK3288
+>    only support 4 physical lanes of 2.7/1.62 Gbps/lane, so DT property would
+>    like "link-rate = 0x0a" "lane-count = 4". (Thierry)
+> - Dynamic parse video timing info from struct drm_display_mode and
+>    struct drm_display_info. (Thierry)
+> - Add devicetree binding documents. (Heiko)
+> - Remove sync pol & colorimetry properies from the new analogix dp driver
+>    devicetree binding. (Thierry)
+> - Update the exist exynos dtsi file with the latest DP DT properies.
+> - Leave "sclk_edp_24m" to rockchip dp phy driver which name to "24m",
+>    and leave "sclk_edp" to analogix dp core driver which name to "dp",
+>    and leave "pclk_edp" to rockchip dp platform driver which name to
+>    "pclk". (Thierry & Heiko)
+> - Add devicetree binding document. (Heiko)
+> - Remove "rockchip,panel" DT property, take use of remote point to get panel
+>    node. (Heiko)
+> - Add the new function point dp_platdata->get_modes() init.
+> - Add "analogix,need-force-hpd" to indicate whether driver need foce
+>    hpd when hpd detect failed.
+> - move dp hpd detect to connector detect function.
+> - Add edid modes parse support
+>
+> Changes in v2:
+> - Remove new copyright (Jingoo)
+> - Fix compiled failed due to analogix_dp_device misspell
+> - Improved commit message more readable, and avoid using some
+>    uncommon style like bellow: (Joe Preches)
+>      -  retval = exynos_dp_read_bytes_from_i2c(...
+>    				  ...);
+>      +  retval =
+>      +  exynos_dp_read_bytes_from_i2c(......);
+> - Get panel node with remote-endpoint method, and create devicetree binding
+>    for driver. (Heiko)
+> - Remove the clock enable/disbale with "sclk_edp" & "sclk_edp_24m",
+>    leave those clock to rockchip dp phy driver.
+> - Fix compile failed dut to phy_pd_addr variable misspell error
+>
+> Heiko Stuebner (2):
+>    drm/exynos: dp: rename implementation specific driver part
+>    drm: bridge: analogix/dp: rename register constants
+>
+> Yakir Yang (15):
+>    drm: bridge: analogix/dp: split exynos dp driver to bridge directory
+>    drm: bridge: analogix/dp: fix some obvious code style
+>    drm: bridge: analogix/dp: remove duplicate configuration of link rate
+>      and link count
+>    drm: bridge: analogix/dp: dynamic parse sync_pol & interlace &
+>      dynamic_range
+>    dt-bindings: add document for analogix display port driver
+>    ARM: dts: exynos/dp: remove some properties that deprecated by
+>      analogix_dp driver
+>    drm: rockchip: dp: add rockchip platform dp driver
+>    dt-bindings: add document for rockchip variant of analogix_dp
+>    drm: bridge: analogix/dp: add some rk3288 special registers setting
+>    drm: bridge: analogix/dp: add max link rate and lane count limit for
+>      RK3288
+>    drm: bridge: analogix/dp: try force hpd after plug in lookup failed
+>    drm: bridge: analogix/dp: move hpd detect to connector detect function
+>    drm: bridge: analogix/dp: add edid modes parse in get_modes method
+>    drm: bridge: analogix/dp: add panel prepare/unprepare in
+>      suspend/resume time
+>    drm: bridge: analogix/dp: Fix the possible dead lock in bridge disable
+>      time
+>
+>   .../bindings/display/bridge/analogix_dp.txt        |   52 +
+>   .../bindings/display/exynos/exynos_dp.txt          |   93 +-
+>   .../display/rockchip/analogix_dp-rockchip.txt      |   92 ++
+>   arch/arm/boot/dts/exynos5250-arndale.dts           |    2 -
+>   arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 -
+>   arch/arm/boot/dts/exynos5250-snow-common.dtsi      |    4 +-
+>   arch/arm/boot/dts/exynos5250-spring.dts            |    4 +-
+>   arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+>   arch/arm/boot/dts/exynos5420-smdk5420.dts          |    2 -
+>   arch/arm/boot/dts/exynos5800-peach-pi.dts          |    2 -
+>   drivers/gpu/drm/bridge/Kconfig                     |    2 +
+>   drivers/gpu/drm/bridge/Makefile                    |    1 +
+>   drivers/gpu/drm/bridge/analogix/Kconfig            |    3 +
+>   drivers/gpu/drm/bridge/analogix/Makefile           |    1 +
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 1430 ++++++++++++++++++
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  281 ++++
+>   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 1320 +++++++++++++++++
+>   .../analogix/analogix_dp_reg.h}                    |  270 ++--
+>   drivers/gpu/drm/exynos/Kconfig                     |    3 +-
+>   drivers/gpu/drm/exynos/Makefile                    |    2 +-
+>   drivers/gpu/drm/exynos/exynos_dp.c                 |  324 +++++
+>   drivers/gpu/drm/exynos/exynos_dp_core.c            | 1510 --------------------
+>   drivers/gpu/drm/exynos/exynos_dp_core.h            |  282 ----
+>   drivers/gpu/drm/exynos/exynos_dp_reg.c             | 1263 ----------------
+>   drivers/gpu/drm/rockchip/Kconfig                   |    9 +
+>   drivers/gpu/drm/rockchip/Makefile                  |    1 +
+>   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  384 +++++
+>   include/drm/bridge/analogix_dp.h                   |   41 +
+>   28 files changed, 4115 insertions(+), 3269 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+>   create mode 100644 drivers/gpu/drm/bridge/analogix/Kconfig
+>   create mode 100644 drivers/gpu/drm/bridge/analogix/Makefile
+>   create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>   create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>   create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+>   rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix/analogix_dp_reg.h} (62%)
+>   create mode 100644 drivers/gpu/drm/exynos/exynos_dp.c
+>   delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.c
+>   delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
+>   delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_reg.c
+>   create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>   create mode 100644 include/drm/bridge/analogix_dp.h
+>
+
+
+-- 
+Thanks,
+Caesar
