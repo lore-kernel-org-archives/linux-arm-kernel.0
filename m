@@ -1,67 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 19 Mar 2016 00:00:22 +0800
-Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
-References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
- <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
-Message-ID: <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 Mar 2016 11:10:57 -0500
+Subject: [PATCH 17/18] Documentation: dt: add Vybrid DDR memory
+ controller bindings
+In-Reply-To: <1457576219-7971-18-git-send-email-stefan@agner.ch>
+References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
+ <1457576219-7971-18-git-send-email-stefan@agner.ch>
+Message-ID: <20160318161057.GA31181@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 09, 2016 at 06:16:58PM -0800, Stefan Agner wrote:
+> Add device-tree bindings of Vybrids LPDDR2/DDR3 SDRAM Memory
+> Controller. Access to the device is required to put the memory
+> into self-refresh mode.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  .../bindings/arm/freescale/fsl,vf610-ddrmc.txt     | 23 ++++++++++++++++++++++
 
-On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
-<alexandre.torgue@gmail.com> wrote:
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
->
-> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+Move to bindings/memory-controllers/
+
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
 > new file mode 100644
-> index 0000000..ada2aa4
+> index 0000000..56a71d6
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
-> @@ -0,0 +1,32 @@
-> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
+> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
+> @@ -0,0 +1,23 @@
+> +Freescale Vybrid LPDDR2/DDR3 SDRAM Memory Controller
 > +
-> +This file documents platform glue layer for stmmac.
-> +Please see stmmac.txt for the other unchanged properties.
-> +
-> +The device node has following properties.
+> +The memory controller supports high performance applications for 16-bit or
+> +8-bit DDR2, or LPDDR SDRAM memories.
 > +
 > +Required properties:
-> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
-> +              "snps,dwmac-3.50a" to select IP vesrion.
-
-If you need have sort of hardware glue, then it is not compatible.
-
-ChenYu
-
-> +- clocks: Must contain a phandle for each entry in clock-names.
-> +- clock-names: Should be "stmmaceth" for the host clock.
-> +              Should be "tx-clk" for the MAC TX clock.
-> +              Should be "rx-clk" for the MAC RX clock.
-> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
-> +             encompases the glue register, and the offset of the control register.
-> +Example:
+> +- compatible:	"fsl,vf610-ddrmc"
+> +- reg:		the register range of the DDRMC registers
+> +- clocks:	DDRMC main clock to clock memory and access registers.
+> +- clock-names:	Must contain "ddrc", matching entry in the clocks property.
+> +- fsl,has-cke-reset-pulls:
+> +		States whether pull-down/up are populated on DDR CKE/RESET
+> +		signals to allow using DDR self-refresh modes (see Vybrid
+> +		Hardware Development Guide for details).
 > +
-> +               ethernet0: dwmac at 40028000 {
-> +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
-> +                       status = "disabled";
-> +                       reg = <0x40028000 0x8000>;
-> +                       reg-names = "stmmaceth";
-> +                       interrupts = <0 61 0>, <0 62 0>;
-> +                       interrupt-names = "macirq", "eth_wake_irq";
-> +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
-> +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
-> +                       st,syscon = <&syscfg 0x4>;
-> +                       snps,pbl = <8>;
-> +                       snps,mixed-burst;
-> +                       dma-ranges;
-> +               };
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +Example:
+> +	ddrmc: ddrmc at 400ae000 {
+
+memory-controller at ...
+
+> +		compatible = "fsl,vf610-ddrmc";
+> +		reg = <0x400ae000 0x1000>;
+> +		clocks = <&clks VF610_CLK_DDRMC>;
+> +		clock-names = "ddrc";
+> +		fsl,has-cke-reset-pulls;
+> +	}
+> -- 
+> 2.7.2
+> 
