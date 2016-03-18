@@ -1,23 +1,19 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Mar 2016 15:06:17 -0500
-Subject: [PATCH 4/4] dma: qcom_hidma: read the channel id from HW
-In-Reply-To: <1457732994-11175-5-git-send-email-okaya@codeaurora.org>
-References: <1457732994-11175-1-git-send-email-okaya@codeaurora.org>
- <1457732994-11175-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160318200617.GA28108@rob-hp-laptop>
+Date: Fri, 18 Mar 2016 15:16:00 -0500
+Subject: [PATCH 1/2] i2c: rk3x: add support for rk3228
+In-Reply-To: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
+References: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20160318201600.GA3317@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 04:49:54PM -0500, Sinan Kaya wrote:
-> Removing the flexibility to choose the event channel as there is no real
-> use case right now. We have been using the values in ACPI that match the HW
-> defaults. OS is reading the event-channel from the HW register now.
+On Mon, Mar 14, 2016 at 11:09:15AM +0800, Yakir Yang wrote:
+> Enable the I2C core for this SoC.
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 > ---
->  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  3 --
+>  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 4 ++--
+>  drivers/i2c/busses/i2c-rk3x.c                      | 1 +
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
-
->  drivers/dma/qcom/hidma.c                           | 39 +---------------------
->  2 files changed, 1 insertion(+), 41 deletions(-)
