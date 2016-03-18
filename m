@@ -1,51 +1,30 @@
 From: alexandre.torgue@gmail.com (Alexandre TORGUE)
-Date: Fri, 18 Mar 2016 16:37:06 +0100
-Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+Date: Fri, 18 Mar 2016 16:37:07 +0100
+Subject: [PATCH v5 3/4] net: ethernet: stmmac: add support of Synopsys 3.50a
+ MAC IP
 In-Reply-To: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
 References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
-Message-ID: <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <1458315428-10081-4-git-send-email-alexandre.torgue@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Adds support of Synopsys 3.50a MAC IP in stmmac driver.
+
+Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Tested-by: Maxime Coquelin <maxime.coquelin@st.com>
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
 
-diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
-new file mode 100644
-index 0000000..ada2aa4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
-@@ -0,0 +1,32 @@
-+STMicroelectronics STM32 / MCU DWMAC glue layer controller
-+
-+This file documents platform glue layer for stmmac.
-+Please see stmmac.txt for the other unchanged properties.
-+
-+The device node has following properties.
-+
-+Required properties:
-+- compatible:  Should be "st,stm32-dwmac" to select glue, and
-+	       "snps,dwmac-3.50a" to select IP vesrion.
-+- clocks: Must contain a phandle for each entry in clock-names.
-+- clock-names: Should be "stmmaceth" for the host clock.
-+	       Should be "tx-clk" for the MAC TX clock.
-+	       Should be "rx-clk" for the MAC RX clock.
-+- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
-+	      encompases the glue register, and the offset of the control register.
-+Example:
-+
-+		ethernet0: dwmac at 40028000 {
-+			compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
-+			status = "disabled";
-+			reg = <0x40028000 0x8000>;
-+			reg-names = "stmmaceth";
-+			interrupts = <0 61 0>, <0 62 0>;
-+			interrupt-names = "macirq", "eth_wake_irq";
-+			clock-names = "stmmaceth", "tx-clk", "rx-clk";
-+			clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
-+			st,syscon = <&syscfg 0x4>;
-+			snps,pbl = <8>;
-+			snps,mixed-burst;
-+			dma-ranges;
-+		};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 6a52fa1..6cca626 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -178,6 +178,7 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
+ 	 * once needed on other platforms.
+ 	 */
+ 	if (of_device_is_compatible(np, "st,spear600-gmac") ||
++		of_device_is_compatible(np, "snps,dwmac-3.50a") ||
+ 		of_device_is_compatible(np, "snps,dwmac-3.70a") ||
+ 		of_device_is_compatible(np, "snps,dwmac")) {
+ 		/* Note that the max-frame-size parameter as defined in the
 -- 
 1.9.1
