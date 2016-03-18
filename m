@@ -1,60 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Mar 2016 11:10:57 -0500
-Subject: [PATCH 17/18] Documentation: dt: add Vybrid DDR memory
- controller bindings
-In-Reply-To: <1457576219-7971-18-git-send-email-stefan@agner.ch>
-References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
- <1457576219-7971-18-git-send-email-stefan@agner.ch>
-Message-ID: <20160318161057.GA31181@rob-hp-laptop>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 18 Mar 2016 09:14:07 -0700
+Subject: [PATCH 2/4] pinctrl: amlogic: Make driver independent from
+ two-domain configuration
+In-Reply-To: <CAOQ7t2YjS5nAb3xxpdH-H11+2Y8WeCkxdKJE9yUKzkbVYMYfEw@mail.gmail.com>
+ (Carlo Caione's message of "Thu, 17 Mar 2016 19:15:24 +0100")
+References: <1456869876-19320-1-git-send-email-carlo@caione.org>
+ <1456869876-19320-3-git-send-email-carlo@caione.org>
+ <CAOi56cWN-iPVh6Ace-SXUFoX4POnSyT0OmG8gyqivNpQTo9u4A@mail.gmail.com>
+ <CAOQ7t2Ykgej4uyDLUvuSZyjiJwK1TF4RGYJQhXWubk69d1xA_Q@mail.gmail.com>
+ <7h7fh1t8vu.fsf@baylibre.com>
+ <CAOQ7t2YjS5nAb3xxpdH-H11+2Y8WeCkxdKJE9yUKzkbVYMYfEw@mail.gmail.com>
+Message-ID: <7hzitvsr00.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 06:16:58PM -0800, Stefan Agner wrote:
-> Add device-tree bindings of Vybrids LPDDR2/DDR3 SDRAM Memory
-> Controller. Access to the device is required to put the memory
-> into self-refresh mode.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  .../bindings/arm/freescale/fsl,vf610-ddrmc.txt     | 23 ++++++++++++++++++++++
+Carlo Caione <carlo@caione.org> writes:
 
-Move to bindings/memory-controllers/
+> On Thu, Mar 17, 2016 at 4:35 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>
+>> Do you have an ack now?  or are you still waiting?
+>
+> Still waiting for Rob.
+>
+>>> What's the fastest way to land the DTS changes in mainline at this point?
+>>
+>> When you've collected the acks, send a pull request through arm-soc so
+>> we can get it in via our fixes branch.
+>
+> ok
 
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
-> new file mode 100644
-> index 0000000..56a71d6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-ddrmc.txt
-> @@ -0,0 +1,23 @@
-> +Freescale Vybrid LPDDR2/DDR3 SDRAM Memory Controller
-> +
-> +The memory controller supports high performance applications for 16-bit or
-> +8-bit DDR2, or LPDDR SDRAM memories.
-> +
-> +Required properties:
-> +- compatible:	"fsl,vf610-ddrmc"
-> +- reg:		the register range of the DDRMC registers
-> +- clocks:	DDRMC main clock to clock memory and access registers.
-> +- clock-names:	Must contain "ddrc", matching entry in the clocks property.
-> +- fsl,has-cke-reset-pulls:
-> +		States whether pull-down/up are populated on DDR CKE/RESET
-> +		signals to allow using DDR self-refresh modes (see Vybrid
-> +		Hardware Development Guide for details).
-> +
-> +Example:
-> +	ddrmc: ddrmc at 400ae000 {
+If the Ack is not forthcoming ASAP, you should probably revert the
+change so that mainline/arm-soc/linux-next are not broken.  For future
+reference, it's better to wait until all dependencies can be merged
+together.
 
-memory-controller at ...
-
-> +		compatible = "fsl,vf610-ddrmc";
-> +		reg = <0x400ae000 0x1000>;
-> +		clocks = <&clks VF610_CLK_DDRMC>;
-> +		clock-names = "ddrc";
-> +		fsl,has-cke-reset-pulls;
-> +	}
-> -- 
-> 2.7.2
-> 
+Kevin
