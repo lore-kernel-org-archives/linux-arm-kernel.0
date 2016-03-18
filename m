@@ -1,73 +1,77 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 18 Mar 2016 09:06:06 -0400
-Subject: [PATCH v11 1/9] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <56E3094E.5010906@arm.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-2-git-send-email-dave.long@linaro.org>
- <56E3094E.5010906@arm.com>
-Message-ID: <56EBFD3E.5070600@linaro.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 18 Mar 2016 08:09:26 -0500
+Subject: [PATCH 1/2] arm64: dts: juno/vexpress: fix node name unit-address
+ presence warnings
+In-Reply-To: <1458297136.2812.7.camel@linaro.org>
+References: <1457352735-24453-1-git-send-email-sudeep.holla@arm.com>
+ <CAL_JsqJeeZ58at95gSRwOMnce_DjDsXVRYH_bMKaX=uDHtZAAA@mail.gmail.com>
+ <1458297136.2812.7.camel@linaro.org>
+Message-ID: <CAL_JsqJEA9rVOzD=wC8TJnzm+ou=mnRLrkNU2zgrH402=pm3Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2016 01:07 PM, James Morse wrote:
-> Hi David,
->
-> On 09/03/16 05:32, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
+On Fri, Mar 18, 2016 at 5:32 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Thu, 2016-03-17 at 16:44 -0500, Rob Herring wrote:
+>> On Mon, Mar 7, 2016 at 6:12 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> > Commit fa38a82096a1 ("scripts/dtc: Update to upstream version
+>> > 53bf130b1cdd") added warnings on node name unit-address presence/absence
+>> > mismatch in device trees.
+>> >
+>> > This patch fixes those warning on all the juno/vexpress platforms where
+>> > unit-address is present in node name while the reg/ranges property is
+>> > not present.
+>> >
+>> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> > ---
+>> >  arch/arm64/boot/dts/arm/foundation-v8.dtsi         |  2 +-
+>> >  arch/arm64/boot/dts/arm/juno-base.dtsi             | 14 +++++-----
+>> >  arch/arm64/boot/dts/arm/juno-motherboard.dtsi      | 30 +++++++++++-----------
+>> >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts         |  2 +-
+>> >  arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi   | 14 +++++-----
+>> >  .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 10 ++++----
+>> >  6 files changed, 36 insertions(+), 36 deletions(-)
+>> >
+>> > Hi Rob,
+>> >
+>> > I am not sure if the intention of commit fa38a82096a1 is to fix even
+>> > existing warnings or not. I saw warning with today's -next branch.
 >>
->> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
+>> Yes. I'm dropping it for 4.6 though.
 >>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> > Let me know.
+>> >
+>> > Regards,
+>> > Sudeep
+>> >
+>> > diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dtsi b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+>> > index 9314f3943269..ba03c934a861 100644
+>> > --- a/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+>> > +++ b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
+>> > @@ -89,7 +89,7 @@
+>> >                              <0 63 4>;
+>> >         };
+>> >
+>> > -       smb {
+>> > +       smb at 0,08000000 {
+>>
+>> Drop the comma and leading zeros. Comma is for distinct fields like
+>> bus,dev,func on PCI.
 >
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index ff7f132..efebf0f 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->
-> [ ... SNIP ... ]
->
->> +/**
->> + * regs_within_kernel_stack() - check the address in the stack
->> + * @regs:      pt_regs which contains kernel stack pointer.
->> + * @addr:      address which is checked.
->> + *
->> + * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
->> + * If @addr is within the kernel stack, it returns true. If not, returns false.
->> + */
->> +bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
->> +{
->> +	return ((addr & ~(THREAD_SIZE - 1))  ==
->> +		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
->
-> I'm not sure where this is called from, but if kernel_stack_pointer(regs) could
-> ever point into an irq_stack you will get the wrong result.
->
-> arch/arm64/include/asm/irq.h has 'on_irq_stack(sp, cpu)' which should help,
-> although you will need to check the bounds of the irq_stack separately.
->
->
-> The horrible details...
->
->  From arch/arm64/kernel/irq.c:20
->> /* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned. */
->> DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack)
->> __aligned(16);
->
-> This was because per-cpu variables can be at-most page aligned.
-> 6cdf9c7ca687 ("arm64: Store struct thread_info in sp_el0") changed
-> current_thread_info() to work on these weirdly aligned irq_stacks.
->
->
-> Thanks,
->
-> James
->
->
+> So what is the correct way of representing 2 cell addresses? Not just
+> those that are logically 64-bit addresses, (which I guess could be just
+> a single number), but things like vexpress motherboard where we have
+> Chip-select and Offset values?
 
-It looks like this is ultimately used (currently) only by the 
-arch-independent kprobes tracing code.  But it does seem like this will 
-be recording the wrong data when stack contents are being traced from 
-interrupt routine probes.  I will put a fix in for the next spin.
+64-bit address is just a single number.
+2 cells with distinct fields should generally be ...@<cell1>,<cell2>
 
-Thanks,
--dl
+If you have your own bus type, you can devise whatever you like as
+long as it is reviewed.
+
+> I looked at ePAPR but it just says 'The unit-address must
+> match the first address specified in the reg property of the node.' and
+> lists valid characters for unit address, which includes ,._+-
+
+Yes, we need to clarify this some.
+
+Rob
