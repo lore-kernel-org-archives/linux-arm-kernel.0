@@ -1,38 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Mar 2016 10:56:55 +0000
-Subject: [PATCH] usb: chipidea: Configure DMA properties and ops from DT
-In-Reply-To: <20160318015414.GA30851@shlinux2.ap.freescale.net>
-References: <1456119133-16114-1-git-send-email-bjorn.andersson@linaro.org>
- <CADRPPNRTXiiVzbqmpX7h_af7Q+qw+-ZB3zDb0855a1U=CmWh-A@mail.gmail.com>
- <20160314105108.GB2131@shlinux2.ap.freescale.net>
- <3240370.XdEELlSA8f@wuerfel>
- <20160318015414.GA30851@shlinux2.ap.freescale.net>
-Message-ID: <20160318105655.GE19428@n2100.arm.linux.org.uk>
+Date: Fri, 18 Mar 2016 10:58:33 +0000
+Subject: [PATCH v2] ARM: DMA: Fix kzalloc flags in __dma_alloc
+In-Reply-To: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
+References: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <20160318105833.GF19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 09:54:14AM +0800, Peter Chen wrote:
-> Although I don't know what kinds of bugs it may have, it may be
-> met before, otherwise, why most of platform drivers need to call
-> dma_set_coherent_mask or dma_coerce_mask_and_coherent explicitly
+On Fri, Mar 18, 2016 at 06:28:49PM +0900, Alexandre Courbot wrote:
+> Commit 19e6e5e5392b ("ARM: 8547/1: dma-mapping: store buffer
+> information") allocates a structure meant for internal buffer management
+> with the GFP flags of the buffer itself. This can trigger the following
+> safeguard in the slab/slub allocator:
+> 
+> 	if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
+> 		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
+> 		BUG();
+> 	}
+> 
+> Fix this by filtering the flags that make the slab allocator unhappy.
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> Cc: Rabin Vincent <rabin@rab.in>
 
-See Documentation/DMA-API.txt, specifically the section starting
-
-  Part Ic - DMA addressing limitations
-  ------------------------------------
-
-and also Documentation/DMA-API-HOWTO.txt, the section on
-
-  DMA addressing limitations
-
-which provides further information.
-
-Drivers using DMA should be using dma_set_mask_and_coherent() _or_
-one of dma_set_mask() and dma_set_coherent_mask() depending on which
-types of DMA they wish to perform.  Drivers should not use
-dma_coerce_mask_and_coherent() except in exceptional circumstances:
-that function is more a marker that they or some bus/platform code
-is doing something wrong.
+Looks much better than the original.  Please send it to the patch system,
+thanks.
 
 -- 
 RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
