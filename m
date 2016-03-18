@@ -1,68 +1,178 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 18 Mar 2016 10:32:16 +0000
-Subject: [PATCH 1/2] arm64: dts: juno/vexpress: fix node name
- unit-address presence warnings
-In-Reply-To: <CAL_JsqJeeZ58at95gSRwOMnce_DjDsXVRYH_bMKaX=uDHtZAAA@mail.gmail.com>
-References: <1457352735-24453-1-git-send-email-sudeep.holla@arm.com>
- <CAL_JsqJeeZ58at95gSRwOMnce_DjDsXVRYH_bMKaX=uDHtZAAA@mail.gmail.com>
-Message-ID: <1458297136.2812.7.camel@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 18 Mar 2016 11:34:18 +0100
+Subject: [PATCH 1/3] ARM: at91: use chipid device for soc detection
+In-Reply-To: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20160318103418.GA2531@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-03-17 at 16:44 -0500, Rob Herring wrote:
-> On Mon, Mar 7, 2016 at 6:12 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> > Commit fa38a82096a1 ("scripts/dtc: Update to upstream version
-> > 53bf130b1cdd") added warnings on node name unit-address presence/absence
-> > mismatch in device trees.
-> >
-> > This patch fixes those warning on all the juno/vexpress platforms where
-> > unit-address is present in node name while the reg/ranges property is
-> > not present.
-> >
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > ---
-> >  arch/arm64/boot/dts/arm/foundation-v8.dtsi         |  2 +-
-> >  arch/arm64/boot/dts/arm/juno-base.dtsi             | 14 +++++-----
-> >  arch/arm64/boot/dts/arm/juno-motherboard.dtsi      | 30 +++++++++++-----------
-> >  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts         |  2 +-
-> >  arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi   | 14 +++++-----
-> >  .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 10 ++++----
-> >  6 files changed, 36 insertions(+), 36 deletions(-)
-> >
-> > Hi Rob,
-> >
-> > I am not sure if the intention of commit fa38a82096a1 is to fix even
-> > existing warnings or not. I saw warning with today's -next branch.
+On 18/03/2016 at 08:21:19 +0100, Ludovic Desroches wrote :
+> So far, the CIDR and EXID registers were in the DBGU interface. This device
+> has disappeared with the SAMA5D2 family. These registers are exposed
+> through a new device called chipid.
 > 
-> Yes. I'm dropping it for 4.6 though.
-> 
-> > Let me know.
-> >
-> > Regards,
-> > Sudeep
-> >
-> > diff --git a/arch/arm64/boot/dts/arm/foundation-v8.dtsi b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
-> > index 9314f3943269..ba03c934a861 100644
-> > --- a/arch/arm64/boot/dts/arm/foundation-v8.dtsi
-> > +++ b/arch/arm64/boot/dts/arm/foundation-v8.dtsi
-> > @@ -89,7 +89,7 @@
-> >                              <0 63 4>;
-> >         };
-> >
-> > -       smb {
-> > +       smb at 0,08000000 {
-> 
-> Drop the comma and leading zeros. Comma is for distinct fields like
-> bus,dev,func on PCI.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> [nicolas.ferre at atmel.com: remove useless warnings]
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-So what is the correct way of representing 2 cell addresses? Not just
-those that are logically 64-bit addresses, (which I guess could be just
-a single number), but things like vexpress motherboard where we have
-Chip-select and Offset values?
-
-I looked at ePAPR but it just says 'The unit-address must
-match the first address specified in the reg property of the node.' and
-lists valid characters for unit address, which includes ,._+-
+> ---
+>  .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
+>  arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
+>  2 files changed, 67 insertions(+), 18 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 7fd64ec..0b1fcbf 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -41,6 +41,10 @@ compatible: must be one of:
+>         - "atmel,sama5d43"
+>         - "atmel,sama5d44"
+>  
+> +Chipid required properties:
+> +- compatible: Should be "atmel,sama5d2-chipid"
+> +- reg : Should contain registers location and length
+> +
+>  PIT Timer required properties:
+>  - compatible: Should be "atmel,at91sam9260-pit"
+>  - reg: Should contain registers location and length
+> diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
+> index 54343ff..034d563 100644
+> --- a/arch/arm/mach-at91/soc.c
+> +++ b/arch/arm/mach-at91/soc.c
+> @@ -22,48 +22,93 @@
+>  #include "soc.h"
+>  
+>  #define AT91_DBGU_CIDR			0x40
+> -#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
+> -#define AT91_DBGU_CIDR_EXT		BIT(31)
+> -#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
+>  #define AT91_DBGU_EXID			0x44
+> +#define AT91_CHIPID_CIDR		0x00
+> +#define AT91_CHIPID_EXID		0x04
+> +#define AT91_CIDR_VERSION(x)		((x) & 0x1f)
+> +#define AT91_CIDR_EXT			BIT(31)
+> +#define AT91_CIDR_MATCH_MASK		0x7fffffe0
+>  
+> -struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
+> +int __init at91_get_cidr_exid_from_dbgu(u32 *cidr, u32 *exid)
+>  {
+> -	struct soc_device_attribute *soc_dev_attr;
+> -	const struct at91_soc *soc;
+> -	struct soc_device *soc_dev;
+>  	struct device_node *np;
+>  	void __iomem *regs;
+> -	u32 cidr, exid;
+>  
+>  	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
+>  	if (!np)
+>  		np = of_find_compatible_node(NULL, NULL,
+>  					     "atmel,at91sam9260-dbgu");
+> +	if (!np)
+> +		return -ENODEV;
+>  
+> -	if (!np) {
+> -		pr_warn("Could not find DBGU node");
+> -		return NULL;
+> +	regs = of_iomap(np, 0);
+> +	of_node_put(np);
+> +
+> +	if (!regs) {
+> +		pr_warn("Could not map DBGU iomem range");
+> +		return -ENXIO;
+>  	}
+>  
+> +	*cidr = readl(regs + AT91_DBGU_CIDR);
+> +	*exid = readl(regs + AT91_DBGU_EXID);
+> +
+> +	iounmap(regs);
+> +
+> +	return 0;
+> +}
+> +
+> +int __init at91_get_cidr_exid_from_chipid(u32 *cidr, u32 *exid)
+> +{
+> +	struct device_node *np;
+> +	void __iomem *regs;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-chipid");
+> +	if (!np)
+> +		return -ENODEV;
+> +
+>  	regs = of_iomap(np, 0);
+>  	of_node_put(np);
+>  
+>  	if (!regs) {
+>  		pr_warn("Could not map DBGU iomem range");
+> -		return NULL;
+> +		return -ENXIO;
+>  	}
+>  
+> -	cidr = readl(regs + AT91_DBGU_CIDR);
+> -	exid = readl(regs + AT91_DBGU_EXID);
+> +	*cidr = readl(regs + AT91_CHIPID_CIDR);
+> +	*exid = readl(regs + AT91_CHIPID_EXID);
+>  
+>  	iounmap(regs);
+>  
+> +	return 0;
+> +}
+> +
+> +struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
+> +{
+> +	struct soc_device_attribute *soc_dev_attr;
+> +	const struct at91_soc *soc;
+> +	struct soc_device *soc_dev;
+> +	u32 cidr, exid;
+> +	int ret;
+> +
+> +	/*
+> +	 * With SAMA5D2 and later SoCs, CIDR and EXID registers are no more
+> +	 * in the dbgu device but in the chipid device whose purpose is only
+> +	 * to expose these two registers.
+> +	 */
+> +	ret = at91_get_cidr_exid_from_dbgu(&cidr, &exid);
+> +	if (ret)
+> +		ret = at91_get_cidr_exid_from_chipid(&cidr, &exid);
+> +	if (ret) {
+> +		if (ret == -ENODEV)
+> +			pr_warn("Could not find identification node");
+> +		return NULL;
+> +	}
+> +
+>  	for (soc = socs; soc->name; soc++) {
+> -		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
+> +		if (soc->cidr_match != (cidr & AT91_CIDR_MATCH_MASK))
+>  			continue;
+>  
+> -		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
+> +		if (!(cidr & AT91_CIDR_EXT) || soc->exid_match == exid)
+>  			break;
+>  	}
+>  
+> @@ -79,7 +124,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
+>  	soc_dev_attr->family = soc->family;
+>  	soc_dev_attr->soc_id = soc->name;
+>  	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
+> -					   AT91_DBGU_CIDR_VERSION(cidr));
+> +					   AT91_CIDR_VERSION(cidr));
+>  	soc_dev = soc_device_register(soc_dev_attr);
+>  	if (IS_ERR(soc_dev)) {
+>  		kfree(soc_dev_attr->revision);
+> @@ -91,7 +136,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
+>  	if (soc->family)
+>  		pr_info("Detected SoC family: %s\n", soc->family);
+>  	pr_info("Detected SoC: %s, revision %X\n", soc->name,
+> -		AT91_DBGU_CIDR_VERSION(cidr));
+> +		AT91_CIDR_VERSION(cidr));
+>  
+>  	return soc_dev;
+>  }
+> -- 
+> 2.5.0
+> 
 
 -- 
-Tixy
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
