@@ -1,42 +1,56 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 18 Mar 2016 17:54:57 +0100
-Subject: [PATCH v2 3/5] dmaengine: sun6i: Add 4 as a possible burst value
-In-Reply-To: <20160318150946.GO30977@lukather>
-References: <cover.1457695169.git.moinejf@free.fr>
- <7898ac737e1cce9542de662f1266d94bd451659e.1457695169.git.moinejf@free.fr>
- <20160311120601.GD8418@lukather>
- <20160311172858.6cffb492a18da7da76e7ed94@free.fr>
- <20160318150946.GO30977@lukather>
-Message-ID: <20160318175457.8a7fda7e57551f93fe06e7d2@free.fr>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 18 Mar 2016 09:59:30 -0700
+Subject: [PATCH v2 4/4] documentation: Fix pinctrl documentation for
+ Meson8 / Meson8b
+In-Reply-To: <CACRpkda3j7oxL0wawkLy-eHnP6zmfmBgKbm7=gTDH1xqXhKKUQ@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 15 Mar 2016 10:10:32 +0100")
+References: <20160305042646.GL13525@rob-hp-laptop>
+ <1457516519-15319-1-git-send-email-carlo@caione.org>
+ <CACRpkda3j7oxL0wawkLy-eHnP6zmfmBgKbm7=gTDH1xqXhKKUQ@mail.gmail.com>
+Message-ID: <7h7fgzsowd.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Mar 2016 16:09:46 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-> On Fri, Mar 11, 2016 at 05:28:58PM +0100, Jean-Francois Moine wrote:
-	[snip]
-> > Do you think that we should also check if the requested ports are
-> > valid, i.e. have a list/bitmap of the possible input/output ports per
-> > SoC, instead of just only the ID of the max port?
-> 
-> That would require having a map of the possible endpoints for a given
-> device, which would be quite difficult to accomplish.
-> 
-> I don't think customer drivers have access to that anyway, only the
-> provider driver is parsing the DT to retrieve the ID. And we already
-> trust the DT for so many things it would be a bit pointless to check
-> that.
+> On Wed, Mar 9, 2016 at 10:41 AM, Carlo Caione <carlo@caione.org> wrote:
+>
+>> From: Carlo Caione <carlo@endlessm.com>
+>>
+>> Fix pin controller documentation introducing the new compatibles for
+>> the pinctrl drivers specific for aobus / cbus.
+>>
+>> This is needed because we have changed the pin controller driver: we
+>> have now a single specialized pinctrl driver / compatible for each bus
+>> the controller is attached to, instead of one single driver dealing with
+>> all the controllers we have on different buses.
+>>
+>> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+>> ---
+>> Hey Rob,
+>> I'm resubmitting a V2 only for this patch since the driver changes have
+>> been already taken by Linus.
+> (...)
+>>  Required properties for the root node:
+>> - - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
+>> + - compatible: one of "amlogic,meson8-cbus-pinctrl"
+>> +                     "amlogic,meson8b-cbus-pinctrl"
+>> +                     "amlogic,meson8-aobus-pinctrl"
+>> +                     "amlogic,meson8b-aobus-pinctrl"
+>
+> I guess I just have to merge this. It (IIUC) turns out that the driver is beta
+> and prototypeish and the DT bindings were too early to be etched in stone,
+> and any old device trees using it are not really working anyways.
+>
+> We prefer that this not happen because we have a serious control issue
+> when it comes to bindings, but sometimes it happens anyways. Like
+> with divorces and other unfortunate stuff like that.
+>
+> Rob are you OK with this change?
 
-The ports are already checked against 'nr_max_requests' which is the
-index of the higher port. I think that this check exists because the
-ports are given by the DMA clients.
+Also, FYI, the driver change was merged without the corresponding DT, so
+this broke booting in linux-next, so either we merge the DT/bindings
+(preferred) or we revert the driver change until the DT/bindings are
+sorted out.
 
-If this check is needed, as 'nr_max_requests' is lower than 32, 2 maps
-(in and out) on 32 bits would do the job.
-If this check is not needed (because we trust the DTs), the actual
-check (port <= nr_max_requests) could be removed.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Kevin
