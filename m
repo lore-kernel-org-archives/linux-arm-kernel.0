@@ -1,47 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Mar 2016 16:01:27 -0500
-Subject: [PATCH v3 7/8] ARM: dts: Add exynos3250-artik5 dtsi file for
- ARTIK5 module
-In-Reply-To: <1458027490-13787-8-git-send-email-cw00.choi@samsung.com>
-References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
- <1458027490-13787-8-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160318210127.GA21185@rob-hp-laptop>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Fri, 18 Mar 2016 21:05:37 +0000
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+Message-ID: <DA22064C-45A7-4F79-A433-84054AF182DF@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2016 at 04:38:09PM +0900, Chanwoo Choi wrote:
-> This patch adds the support for Device Tree source for Samsung ARTIK5 module[1]
-> based on Exynos3250 SoC. The ARTIK5 module includes the follwoing devices:
 
-s/follwoing/following/
 
-> - Application Processor (Samsung Exynos3250)
-> - WiFi/BT Combo chip (Broadcom4354)
-> - PMIC (Samsung S2MPS14)
-> - eMMC (4GB)
-> - DRAM LPDDR3 (512MB)
-> - Connectors pin (60 Pins x 3 set)
+
+
+
+On 3/16/16, 2:32 AM, "linux-arm-kernel on behalf of Ganesh Mahendran" <linux-arm-kernel-bounces at lists.infradead.org on behalf of opensource.ganesh@gmail.com> wrote:
+
+>Reverts commit 97303480753e ("arm64: Increase the max granular size").
+>
+>The commit 97303480753e ("arm64: Increase the max granular size") will
+>degrade system performente in some cpus.
+>
+>We test wifi network throughput with iperf on Qualcomm msm8996 CPU:
+>----------------
+>run on host:
+>  # iperf -s
+>run on device:
+>  # iperf -c <device-ip-addr> -t 100 -i 1
+>----------------
+>
+>Test result:
+>----------------
+>with commit 97303480753e ("arm64: Increase the max granular size"):
+>    172MBits/sec
+>
+>without commit 97303480753e ("arm64: Increase the max granular size"):
+>    230MBits/sec
+>----------------
+>
+>Some module like slab/net will use the L1_CACHE_SHIFT, so if we do not
+>set the parameter correctly, it may affect the system performance.
+>
+>So revert the commit.
+
+Is there any explanation why is this so? May be there is an alternative to this, apart from reverting the commit.
+
+Until now it seems L1_CACHE_SHIFT is the max of supported chips. But now we are making it 64byte, is there any reason why not 32. 
+
+Thanks,
+Tirumalesh. 
+>
+>Cc: stable at vger.kernel.org
+>Signed-off-by: Ganesh Mahendran <opensource.ganesh@gmail.com>
+>---
+> arch/arm64/include/asm/cache.h |    2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+>diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+>index 5082b30..bde4499 100644
+>--- a/arch/arm64/include/asm/cache.h
+>+++ b/arch/arm64/include/asm/cache.h
+>@@ -18,7 +18,7 @@
 > 
-> Also, this patch adds the ARTIK5 evaluation board[2] dts file which includes
-> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
-> ethernet port, uart port and so on.
+> #include <asm/cachetype.h>
 > 
-> [1] https://www.artik.io/hardware/artik-5
-> [2] http://www.digikey.com/product-search/en?FV=ffecca14
+>-#define L1_CACHE_SHIFT		7
+>+#define L1_CACHE_SHIFT		6
+> #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  .../bindings/arm/samsung/samsung-boards.txt        |   2 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/exynos3250-artik5-eval.dts       |  26 ++
->  arch/arm/boot/dts/exynos3250-artik5.dtsi           | 334 +++++++++++++++++++++
->  4 files changed, 363 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos3250-artik5-eval.dts
->  create mode 100644 arch/arm/boot/dts/exynos3250-artik5.dtsi
-
-Otherwise,
-
-Acked-by: Rob Herring <robh@kernel.org>
+> /*
+>-- 
+>1.7.9.5
+>
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
