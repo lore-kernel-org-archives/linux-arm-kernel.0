@@ -1,31 +1,52 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 17 Mar 2016 17:28:15 -0700
-Subject: [PATCH v2 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
- methods
-In-Reply-To: <20160317231128.GB6344@twins.programming.kicks-ass.net>
-References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
- <1458147733-29338-2-git-send-email-cmetcalf@mellanox.com>
- <20160317193600.GY6344@twins.programming.kicks-ass.net>
- <20160317225557.GA4287@linux.vnet.ibm.com>
- <20160317231128.GB6344@twins.programming.kicks-ass.net>
-Message-ID: <20160318002815.GB4287@linux.vnet.ibm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 18 Mar 2016 01:41:06 +0100
+Subject: [PATCH v4 0/5] acpi, clocksource,
+ kvm: add GTDT and ARM memory-mapped timer support
+In-Reply-To: <56EAC832.6070203@codeaurora.org>
+References: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
+ <56EAC832.6070203@codeaurora.org>
+Message-ID: <2196518.cd4jtVChuo@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 12:11:28AM +0100, Peter Zijlstra wrote:
-> On Thu, Mar 17, 2016 at 03:55:57PM -0700, Paul E. McKenney wrote:
-> > The RCU stall-warn stack traces can be ugly, agreed.
+On Thursday, March 17, 2016 10:07:30 AM Timur Tabi wrote:
+> fu.wei at linaro.org wrote:
+> > From: Fu Wei <fu.wei@linaro.org>
+> >
+> > This patchset:
+> >      (1)Move some enums and marcos to header file for arm_arch_timer,
+> >      improve the pr_* code by defining "pr_fmt(fmt)" in arm_arch_timer.c
+> >
+> >      (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
+> >      Parse all kinds of timer in GTDT table of ACPI:arch timer,
+> >      memory-mapped timer and SBSA Generic Watchdog timer.
+> >      This driver can help to simplify all the relevant timer drivers,
+> >      and separate all the ACPI GTDT knowledge from them.
+> >
+> >      (3)Simplify ACPI code for arch timer in arm_arch_timer.c
+> >
+> >      (4)Add memory-mapped timer support in arm_arch_timer.c
 > 
-> Ugly isn't the problem, completely random bollocks that puts you on the
-> wrong path was more the problem.
+> The SBSA watchdog driver is already in watchdog-next and will be merged 
+> into 4.6.  These five patches are necessary for the watchdog driver to 
+> probe on an ACPI system.
 > 
-> It uses a stack pointer saved at some random time in the past to start
-> unwinding an active stack from. Completely and utter misery.
+> I'm guessing since that v4 was posted in the middle of the 4.6 merge 
+> window, that these patches won't make it and we'll have to wait until 
+> 4.7 (at the earliest)?
 
-Yep, its accuracy does depend on what is going on, which was also my
-experience with the NMI-based approach's reliablity.
+First off, the last version I've seen is the v3.  I must have overlooked
+the v4 then, but I don't think it was CCed to linux-acpi (which should
+have happened).
 
-Perhaps a boot-time parameter enabling the sysadm to pick the desired
-flavor of poison?
+Second, these patches require review from multiple maintainers and (or including)
+people who actually know how the GTDT is supposed to be used.  I haven't
+seen any responses from any of them yet, so the answer to your question is
+"yes".
 
-							Thanx, Paul
+I will have a couple of comments for patch [1/6] (in the v3), but it's
+not been a priority due to the apparent overall lack of interest in this
+series.
+
+Thanks,
+Rafael
