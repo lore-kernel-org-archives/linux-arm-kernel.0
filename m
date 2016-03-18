@@ -1,32 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Mar 2016 10:58:33 +0000
-Subject: [PATCH v2] ARM: DMA: Fix kzalloc flags in __dma_alloc
-In-Reply-To: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
-References: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20160318105833.GF19428@n2100.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 18 Mar 2016 11:59:25 +0100
+Subject: [PATCH 00/12] ARM, arm64: dts: use generic pinctrl properties
+In-Reply-To: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
+References: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVpAg8ixL_x94qBS1tkKWjSXdYuvo4EcD7YVU1sZQ4E8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 06:28:49PM +0900, Alexandre Courbot wrote:
-> Commit 19e6e5e5392b ("ARM: 8547/1: dma-mapping: store buffer
-> information") allocates a structure meant for internal buffer management
-> with the GFP flags of the buffer itself. This can trigger the following
-> safeguard in the slab/slub allocator:
-> 
-> 	if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
-> 		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
-> 		BUG();
-> 	}
-> 
-> Fix this by filtering the flags that make the slab allocator unhappy.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Cc: Rabin Vincent <rabin@rab.in>
+Hi Simon,
 
-Looks much better than the original.  Please send it to the patch system,
-thanks.
+On Fri, Mar 18, 2016 at 12:59 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
+> groups properties") renesas pfc drivers accept generic "function", "pins"
+> and "groups" properties.
+>
+> This series updates the device trees for the boards of Renesas ARM based
+> SoCs to use the generic properties. The device tree for the lager board was
+> already updated in an earlier patch which is present in
+> renesas-devel-20160318-v4.5.
+>
+> Based on renesas-devel-20160318-v4.5
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks!
+
+For the whole series:
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Doh, now I have to update all my DT overlays, as you cannot mix new-style
+and old-style properties ;-)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
