@@ -1,52 +1,69 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 18 Mar 2016 12:22:27 +0100
-Subject: [PATCH] drm/rockchip: vop: Reset yrgb_mst when re-enabling
-Message-ID: <1458300147-6472-1-git-send-email-tomeu.vizoso@collabora.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 18 Mar 2016 11:25:03 +0000
+Subject: [PATCH 2/8] efi: libstub: move Graphics Output Protocol handling
+ to generic code
+In-Reply-To: <1457588408-19309-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160318112503.GP2619@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the VOP is re-enabled, it will start scanning right away the
-framebuffers that were configured from the last time, even if those have
-been destroyed already. To prevent the VOP from trying to access freed
-memory, reset the registers that hold pointers to framebuffers right
-after we can write to them, but before the VOP is awaken from standby.
+On Thu, 10 Mar, at 12:40:02PM, Ard Biesheuvel wrote:
+> The Graphics Output Protocol code executes in the stub, so create a generic
+> version based on the x86 version in libstub so that we can move all archs
+> to it in subsequent patches. The new source file gop.c is added to the
+> libstub build for all architectures, but is not actually included in any of
+> the final images, since this patch does not wire it up yet.
+> 
+> Note that the generic version uses slightly different ways of casting the
+> protocol methods and some other variables to the correct types, since such
+> method calls are not loosely typed on ARM and arm64 as they are on x86.
+ 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/include/asm/efi.h            |   4 +-
+>  arch/arm64/include/asm/efi.h          |   4 +-
+>  arch/x86/boot/compressed/eboot.h      |  74 ----
+>  arch/x86/include/asm/efi.h            |   5 +
+>  drivers/firmware/efi/libstub/Makefile |   2 +-
+>  drivers/firmware/efi/libstub/gop.c    | 354 ++++++++++++++++++++
+>  include/linux/efi.h                   |  87 ++++-
+>  7 files changed, 451 insertions(+), 79 deletions(-)
+ 
+I can totally appreciate why you did the gop code move in stages, but
+I'd prefer to see the move (deletion from arch/x86 and addition to
+drivers/firmware/efi) done as a single patch.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Link: http://lkml.kernel.org/g/CAAObsKAv+05ih5U+=4kic_NsjGMhfxYheHR8xXXmacZs+p5SHw at mail.gmail.com
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+The reason is that git will produce a very nice diff stat that shows
+the number of lines that were simply moved from one file to another
+without modification.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 5e57f5b2e4b0..0df91c28740b 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -429,6 +429,7 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
- static void vop_enable(struct drm_crtc *crtc)
- {
- 	struct vop *vop = to_vop(crtc);
-+	int i;
- 	int ret;
- 
- 	if (vop->is_enabled)
-@@ -476,6 +477,18 @@ static void vop_enable(struct drm_crtc *crtc)
- 	 */
- 	vop->is_enabled = true;
- 
-+	/*
-+	 * Before turning the VOP completely on, unset the registers
-+	 * containing FB addresses to avoid the HW start scanning old FBs.
-+	 */
-+	for (i = 0; i < vop->data->win_size; i++) {
-+		struct vop_win *vop_win = &vop->win[i];
-+		const struct vop_win_data *win = vop_win->data;
-+
-+		VOP_WIN_SET(vop, win, yrgb_mst, 0x0);
-+		VOP_WIN_SET(vop, win, uv_mst, 0x0);
-+	}
-+
- 	spin_lock(&vop->reg_lock);
- 
- 	VOP_CTRL_SET(vop, standby, 0);
--- 
-2.5.0
+Which makes it much easier to see which lines *did* change.
+
+As a very quick and dirty example (but this is not what I'm suggesting
+you do because it'd be too many changes in one patch) I merged this
+patch with the next one, which produces the following diff stat. The
+important point are the insertions,
+
+ : $ git show --shortstat --summary -C10% e63c02a98c3c
+ :
+ : 8 files changed, 133 insertions(+), 1606 deletions(-)
+ :  copy arch/x86/boot/compressed/eboot.c => drivers/firmware/efi/libstub/gop.c (20%)
+
+> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+> index e0eea72deb87..daebcfe6c35a 100644
+> --- a/arch/arm/include/asm/efi.h
+> +++ b/arch/arm/include/asm/efi.h
+> @@ -59,7 +59,9 @@ void efi_virtmap_unload(void);
+>  
+>  /* arch specific definitions used by the stub code */
+>  
+> -#define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
+> +#define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
+> +#define __efi_call_early(f, ...)	f(__VA_ARGS__)
+> +#define efi_is_64bit()			(0)
+  
+Is there a specific reason that these can't be boolean? I know some
+people hate them, but I've always been a pretty big fan when the
+circumstances are right. Plus it is bool on x86. 
