@@ -1,42 +1,33 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 18 Mar 2016 22:37:25 +0100
-Subject: [PATCH v4 7/8] Documentation: devicetree: rockchip: Document
- Landingship
-In-Reply-To: <20160318213031.GA10729@rob-hp-laptop>
-References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
- <1458136727-32075-8-git-send-email-afaerber@suse.de>
- <20160318213031.GA10729@rob-hp-laptop>
-Message-ID: <56EC7515.1000900@suse.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 18 Mar 2016 23:16:55 +0100
+Subject: [PATCH v1 1/2] dt-bindings: modify document of Rockchip power
+ domains
+In-Reply-To: <7hshznsqs4.fsf@baylibre.com>
+References: <1458285444-31129-1-git-send-email-zhangqing@rock-chips.com>
+ <1458285444-31129-2-git-send-email-zhangqing@rock-chips.com>
+ <7hshznsqs4.fsf@baylibre.com>
+Message-ID: <21140203.EjVS0MZtuq@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 18.03.2016 um 22:30 schrieb Rob Herring:
-> On Wed, Mar 16, 2016 at 02:58:45PM +0100, Andreas F?rber wrote:
->> Use "geekbuying,geekbox-landingship" compatible string, plus those of
->> the GeekBox module.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v3 -> v4: Unchanged
->>  
->>  v2 -> v3:
->>  * Changed compatible string to include geekbox- (Heiko)
->>    and clarify that this is for GeekBox module
->>  
->>  v2: New
->>  
->>  Documentation/devicetree/bindings/arm/rockchip.txt | 5 +++++
->>  1 file changed, 5 insertions(+)
+Am Freitag, 18. M?rz 2016, 09:18:51 schrieb Kevin Hilman:
+> Elaine Zhang <zhangqing@rock-chips.com> writes:
+> > Add qos example for power domain which found on Rockchip SoCs.
+> > These qos register description in TRMs
+> > (rk3036, rk3228, rk3288, rk3366, rk3368, rk3399) looks the same.
 > 
-> Think I already acked v3, but:
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+> This should describe in more detail what "qos" is in this context.  At
+> first glance, it's just a range of registers that lose context that need
+> to be saved/restored.
 
-Yes, you did, but after I had already sent v4.
+I guess that should be something like
 
-Thanks,
-Andreas
+---- 8< ----
+Rockchip SoCs contain quality of service (qos) blocks managing priority, 
+bandwidth, etc of the connection of each domain to the interconnect.
+These blocks loose state when their domain gets disabled and therefore
+need to be saved when disabling and restored when enabling a power-domain.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+These qos blocks also are similar over all currently available Rockchip 
+SoCs.
+---- 8< ----
