@@ -1,36 +1,32 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 18 Mar 2016 12:20:56 +0100
-Subject: [PATCH] ARM: dts: rockchip: Add mdio node to ethernet node
-Message-ID: <1458300056-6174-1-git-send-email-tomeu.vizoso@collabora.com>
+Date: Fri, 18 Mar 2016 12:22:02 +0100
+Subject: [PATCH] drm/rockchip: vop: Don't reject empty modesets
+Message-ID: <1458300123-6397-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So the dwmac device manages to probe again.
+So that when DRM_IOCTL_MODE_SETCRTC is called without a FB nor mode, the
+CRTC gets disabled.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Fixes: 88f8b1bb41c6 ("stmmac: Fix 'eth0: No PHY found' regression")
+Link: http://lkml.kernel.org/g/CAAObsKAv+05ih5U+=4kic_NsjGMhfxYheHR8xXXmacZs+p5SHw at mail.gmail.com
 ---
- arch/arm/boot/dts/rk3288-rock2-som.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-index 1ece66f3e162..4ba7ddecb478 100644
---- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-+++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-@@ -101,6 +101,14 @@
- 	snps,reset-delays-us = <0 10000 30000>;
- 	rx_delay = <0x10>;
- 	tx_delay = <0x30>;
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		ethphy1: ethernet-phy at 1 {
-+			reg = <1>;
-+		};
-+	};
- };
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index fd370548d7d7..5e57f5b2e4b0 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -885,9 +885,6 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
+ {
+ 	struct vop *vop = to_vop(crtc);
  
- &i2c0 {
+-	if (adjusted_mode->htotal == 0 || adjusted_mode->vtotal == 0)
+-		return false;
+-
+ 	adjusted_mode->clock =
+ 		clk_round_rate(vop->dclk, mode->clock * 1000) / 1000;
+ 
 -- 
 2.5.0
