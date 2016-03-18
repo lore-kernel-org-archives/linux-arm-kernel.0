@@ -1,32 +1,114 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 18 Mar 2016 11:38:29 +0100
-Subject: [PATCH v2] ARM: DMA: Fix kzalloc flags in __dma_alloc
-In-Reply-To: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
-References: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20160318103829.GA15201@lnxrabinv.se.axis.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 18 Mar 2016 10:50:07 +0000
+Subject: [PATCH 4/8] efi/x86: efifb: move DMI based quirks handling out
+ of generic code
+In-Reply-To: <1457588408-19309-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160318105007.GM2619@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 06:28:49PM +0900, Alexandre Courbot wrote:
-> Commit 19e6e5e5392b ("ARM: 8547/1: dma-mapping: store buffer
-> information") allocates a structure meant for internal buffer management
-> with the GFP flags of the buffer itself. This can trigger the following
-> safeguard in the slab/slub allocator:
+(Cc'ing efifb maintainer and sysfb_efi.c author)
+
+On Thu, 10 Mar, at 12:40:04PM, Ard Biesheuvel wrote:
+> The efifb quirks handling based on DMI identification of the platform is
+> specific to x86, so move it to x86 arch code.
 > 
-> 	if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
-> 		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
-> 		BUG();
-> 	}
-> 
-> Fix this by filtering the flags that make the slab allocator unhappy.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
-> Changes since v1:
-> - Filter flags that may cause problem instead of forcing GFP_KERNEL
->   (and risk sleeping in atomic context), as suggested by Rabin.
+>  arch/x86/include/asm/efi.h  |  2 ++
+>  arch/x86/kernel/sysfb_efi.c | 15 +++++++++++++++
+>  drivers/video/fbdev/efifb.c | 15 ++++-----------
+>  3 files changed, 21 insertions(+), 11 deletions(-)
+ 
+I've left the patch content intact below. This looks like a worthwhile
+change to me. David, Peter, any comments?
 
-Acked-by: Rabin Vincent <rabin@rab.in>
-
-Thanks.
+> diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+> index 7d5187b66108..790adbc3a64a 100644
+> --- a/arch/x86/include/asm/efi.h
+> +++ b/arch/x86/include/asm/efi.h
+> @@ -154,6 +154,8 @@ static inline bool efi_runtime_supported(void)
+>  extern struct console early_efi_console;
+>  extern void parse_efi_setup(u64 phys_addr, u32 data_len);
+>  
+> +extern void efifb_setup_from_dmi(struct screen_info *si, const char *opt);
+> +
+>  #ifdef CONFIG_EFI_MIXED
+>  extern void efi_thunk_runtime_setup(void);
+>  extern efi_status_t efi_thunk_set_virtual_address_map(
+> diff --git a/arch/x86/kernel/sysfb_efi.c b/arch/x86/kernel/sysfb_efi.c
+> index b285d4e8c68e..e21a8a7ddcff 100644
+> --- a/arch/x86/kernel/sysfb_efi.c
+> +++ b/arch/x86/kernel/sysfb_efi.c
+> @@ -68,6 +68,21 @@ struct efifb_dmi_info efifb_dmi_list[] = {
+>  	[M_UNKNOWN] = { NULL, 0, 0, 0, 0, OVERRIDE_NONE }
+>  };
+>  
+> +void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < M_UNKNOWN; i++) {
+> +		if (efifb_dmi_list[i].base != 0 &&
+> +		    !strcmp(opt, efifb_dmi_list[i].optname)) {
+> +			si->lfb_base = efifb_dmi_list[i].base;
+> +			si->lfb_linelength = efifb_dmi_list[i].stride;
+> +			si->lfb_width = efifb_dmi_list[i].width;
+> +			si->lfb_height = efifb_dmi_list[i].height;
+> +		}
+> +	}
+> +}
+> +
+>  #define choose_value(dmivalue, fwvalue, field, flags) ({	\
+>  		typeof(fwvalue) _ret_ = fwvalue;		\
+>  		if ((flags) & (field))				\
+> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+> index 95d293b7445a..dd594369b8a6 100644
+> --- a/drivers/video/fbdev/efifb.c
+> +++ b/drivers/video/fbdev/efifb.c
+> @@ -8,6 +8,7 @@
+>  
+>  #include <linux/module.h>
+>  #include <linux/kernel.h>
+> +#include <linux/efi.h>
+>  #include <linux/errno.h>
+>  #include <linux/fb.h>
+>  #include <linux/platform_device.h>
+> @@ -15,7 +16,7 @@
+>  #include <linux/dmi.h>
+>  #include <linux/pci.h>
+>  #include <video/vga.h>
+> -#include <asm/sysfb.h>
+> +#include <asm/efi.h>
+>  
+>  static bool request_mem_succeeded = false;
+>  
+> @@ -85,21 +86,13 @@ static struct fb_ops efifb_ops = {
+>  static int efifb_setup(char *options)
+>  {
+>  	char *this_opt;
+> -	int i;
+>  
+>  	if (options && *options) {
+>  		while ((this_opt = strsep(&options, ",")) != NULL) {
+>  			if (!*this_opt) continue;
+>  
+> -			for (i = 0; i < M_UNKNOWN; i++) {
+> -				if (efifb_dmi_list[i].base != 0 &&
+> -				    !strcmp(this_opt, efifb_dmi_list[i].optname)) {
+> -					screen_info.lfb_base = efifb_dmi_list[i].base;
+> -					screen_info.lfb_linelength = efifb_dmi_list[i].stride;
+> -					screen_info.lfb_width = efifb_dmi_list[i].width;
+> -					screen_info.lfb_height = efifb_dmi_list[i].height;
+> -				}
+> -			}
+> +			efifb_setup_from_dmi(&screen_info, this_opt);
+> +
+>  			if (!strncmp(this_opt, "base:", 5))
+>  				screen_info.lfb_base = simple_strtoul(this_opt+5, NULL, 0);
+>  			else if (!strncmp(this_opt, "stride:", 7))
+> -- 
+> 1.9.1
+> 
