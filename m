@@ -1,22 +1,39 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 17 Mar 2016 19:55:34 -0500
-Subject: [PATCH v4 0/5] acpi, clocksource, kvm: add GTDT and ARM
- memory-mapped timer support
-In-Reply-To: <2196518.cd4jtVChuo@vostro.rjw.lan>
-References: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
- <56EAC832.6070203@codeaurora.org> <2196518.cd4jtVChuo@vostro.rjw.lan>
-Message-ID: <56EB5206.4060705@codeaurora.org>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Thu, 17 Mar 2016 20:00:13 -0500
+Subject: [PATCH v2 2/3] ARM: DTS: da850/am4372/am33xx: Use generic node
+ name for ehrpwm
+In-Reply-To: <201603180818.rtawXhxL%fengguang.wu@intel.com>
+References: <1458252463-8821-3-git-send-email-fcooper@ti.com>
+ <201603180818.rtawXhxL%fengguang.wu@intel.com>
+Message-ID: <56EB531D.7050406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
-> I will have a couple of comments for patch [1/6] (in the v3), but it's
-> not been a priority due to the apparent overall lack of interest in this
-> series.
 
-Well, I am very interested in this series, if that counts. :-)
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+On 03/17/2016 07:27 PM, kbuild test robot wrote:
+> Hi Franklin,
+>
+> [auto build test ERROR on pwm/for-next]
+> [also build test ERROR on v4.5 next-20160317]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Franklin-S-Cooper-Jr/clk-ti-am335x-am4372-Add-tbclk-to-pwm-node/20160318-060938
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm for-next
+> config: arm-multi_v7_defconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+>
+> All errors (new ones prefixed by >>):
+>
+>    ERROR (duplicate_label): Duplicate label 'ehrpwm1' on /ocp/epwmss at 48302000/ehrpwm at 48302200 and /ocp/epwmss at 48302000/pwm at 48302200
+
+Ok I see that I missed also updating am335x-shc.dts. I'll
+send a v3
+>>> ERROR: Input tree has errors, aborting (use -f to force output)
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
