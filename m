@@ -1,47 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 18 Mar 2016 10:58:09 +0100
-Subject: [PATCH] arm64/kernel: fix incorrect EL0 check in inv_entry macro
-Message-ID: <1458295089-24447-1-git-send-email-ard.biesheuvel@linaro.org>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 18 Mar 2016 11:03:06 +0100
+Subject: [PATCH v2 1/5] printk/nmi: Generic solution for safe printk in NMI
+In-Reply-To: <20160317123527.6346bce3284509849d061eaa@linux-foundation.org>
+References: <1448622572-16900-2-git-send-email-pmladek@suse.com>
+ <201511271919.aEZuZKNe%fengguang.wu@intel.com>
+ <20151127153804.GC2648@pathway.suse.cz>
+ <alpine.LNX.2.00.1512020022460.32500@pobox.suse.cz>
+ <20151204165744.GD20935@pathway.suse.cz>
+ <20160317123527.6346bce3284509849d061eaa@linux-foundation.org>
+Message-ID: <20160318100306.GB19401@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The implementation of macro inv_entry refers to its 'el' argument without
-the required leading backslash, which results in an undefined symbol
-'el' to be passed into the kernel_entry macro rather than the index of
-the exception level as intended.
+On Thu 2016-03-17 12:35:27, Andrew Morton wrote:
+> On Fri, 4 Dec 2015 17:57:44 +0100 Petr Mladek <pmladek@suse.com> wrote:
+> 
+> > On Wed 2015-12-02 00:24:49, Jiri Kosina wrote:
+> > > On Fri, 27 Nov 2015, Petr Mladek wrote:
+> > > 
+> > > > MN10300 has its own implementation for entering and exiting NMI 
+> > > > handlers. It does not call nmi_enter() and nmi_exit(). Please, find 
+> > > > below an updated patch that adds printk_nmi_enter() and 
+> > > > printk_nmi_exit() to the custom entry points. Then we could add HAVE_NMI 
+> > > > to arch/mn10300/Kconfig and avoid the above warning.
+> > > 
+> > > Hmm, so what exactly would go wrong if MN10300 (whatever that architecture 
+> > > is) would call nmi_enter() and nmi_exit() at the places where it's 
+> > > starting and finishing NMI handler?
+> > > 
+> > > >From a cursory look, it seems like most (if not all) of the things called 
+> > > from nmi_{enter,exit}() would be nops there anyway.
+> > 
+> > Good point. Max mentioned in the other main that the NMI handler
+> > should follow the NMI ruler. I do not why it could not work.
+> > In fact, it might improve things, e.g. nmi_enter() blocks
+> > recursive NMIs.
+> > 
+> > I think that it will move it into a separate patch, thought.
+> > 
+> 
+> I've sort of lost the plot on this patchset.
+> 
+> I know Daniel had concerns (resolved?).  Sergey lost the ability to
+> perform backtraces and has a proposed fix ("printk/nmi: restore
+> printk_func in nmi_panic") but that wasn't fully resolved and I didn't
+> merge anything.  I'm not sure what Jan's thinking is on it all.
+> 
+> So... I'll retain 
+> 
+> printk-nmi-generic-solution-for-safe-printk-in-nmi.patch
+> printk-nmi-use-irq-work-only-when-ready.patch
+> printk-nmi-warn-when-some-message-has-been-lost-in-nmi-context.patch
+> printk-nmi-increase-the-size-of-nmi-buffer-and-make-it-configurable.patch
+> 
+> in -mm for now.  Perhaps I should drop them all and we start again
+> after -rc1?
 
-This undefined symbol strangely enough does not result in build failures,
-although it is visible in vmlinux:
+Please, drop it for now. I'll send an updated version that will better
+handle Daniel's concerns after rc1.
 
-     $ nm -n vmlinux |head
-                      U el
-     0000000000000000 A _kernel_flags_le_hi32
-     0000000000000000 A _kernel_offset_le_hi32
-     0000000000000000 A _kernel_size_le_hi32
-     000000000000000a A _kernel_flags_le_lo32
-     .....
+I thought that it had already been decided. You wanted to remove the patchset
+in favour of "improvements to the nmi_backtrace code" by Chris Metcalf, see
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/482845/focus=483002
 
-However, it does result in incorrect code being generated for invalid
-exceptions taken from EL0, since the argument check in kernel_entry
-assumes EL1 if its argument does not equal '0'.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/entry.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 1f7f5a2b61bf..12e8d2bcb3f9 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -277,7 +277,7 @@ END(vectors)
-  * Invalid mode handlers
-  */
- 	.macro	inv_entry, el, reason, regsize = 64
--	kernel_entry el, \regsize
-+	kernel_entry \el, \regsize
- 	mov	x0, sp
- 	mov	x1, #\reason
- 	mrs	x2, esr_el1
--- 
-2.5.0
+Best Regards,
+Petr
