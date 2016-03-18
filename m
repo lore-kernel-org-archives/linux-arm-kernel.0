@@ -1,39 +1,38 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Thu, 17 Mar 2016 20:00:13 -0500
-Subject: [PATCH v2 2/3] ARM: DTS: da850/am4372/am33xx: Use generic node
- name for ehrpwm
-In-Reply-To: <201603180818.rtawXhxL%fengguang.wu@intel.com>
-References: <1458252463-8821-3-git-send-email-fcooper@ti.com>
- <201603180818.rtawXhxL%fengguang.wu@intel.com>
-Message-ID: <56EB531D.7050406@ti.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Thu, 17 Mar 2016 20:15:20 -0500
+Subject: [PATCH v3 0/3] ARM: am335x/am437x: Correct PWM bindings
+Message-ID: <1458263723-25770-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Unlike the majority of other SOCs the PWM node uses ehrpwm instead of
+the generic pwm node name. This patch series switches to the pwm node
+name and while at it fix some other minor binding documentation issues.
 
+This patch series also includes a patch to insure ABI compatibility.
 
-On 03/17/2016 07:27 PM, kbuild test robot wrote:
-> Hi Franklin,
->
-> [auto build test ERROR on pwm/for-next]
-> [also build test ERROR on v4.5 next-20160317]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Franklin-S-Cooper-Jr/clk-ti-am335x-am4372-Add-tbclk-to-pwm-node/20160318-060938
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm for-next
-> config: arm-multi_v7_defconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
->
-> All errors (new ones prefixed by >>):
->
->    ERROR (duplicate_label): Duplicate label 'ehrpwm1' on /ocp/epwmss at 48302000/ehrpwm at 48302200 and /ocp/epwmss at 48302000/pwm at 48302200
+This series was tested on AM335x and AM437x GP evm. I also validated that
+ABI compatibility was maintained.
 
-Ok I see that I missed also updating am335x-shc.dts. I'll
-send a v3
->>> ERROR: Input tree has errors, aborting (use -f to force output)
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+V3 changes:
+Update am335x-shc.dts
+
+V2 changes:
+Dropped patches related to the ranges property.
+
+Franklin S Cooper Jr (3):
+  clk: ti: am335x/am4372: Add tbclk to pwm node
+  ARM: DTS: da850/am4372/am33xx: Use generic node name for ehrpwm
+  pwm: pwm-tiehrpwm: Update dt binding document to use generic node name
+
+ Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt |  4 ++--
+ arch/arm/boot/dts/am335x-shc.dts                       |  2 +-
+ arch/arm/boot/dts/am33xx.dtsi                          |  6 +++---
+ arch/arm/boot/dts/am4372.dtsi                          | 12 ++++++------
+ arch/arm/boot/dts/da850.dtsi                           |  4 ++--
+ drivers/clk/ti/clk-33xx.c                              |  3 +++
+ drivers/clk/ti/clk-43xx.c                              |  6 ++++++
+ 7 files changed, 23 insertions(+), 14 deletions(-)
+
+-- 
+2.7.0
