@@ -1,43 +1,81 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 18 Mar 2016 14:51:31 +0100
-Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
- engine driver for mvebu_v7_defconfig
-In-Reply-To: <20160318131432.GB8005@lunn.ch>
-References: <20160318081209.GA7394@archy.home> <20160318131432.GB8005@lunn.ch>
-Message-ID: <20160318145131.76ffa0e1@free-electrons.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 18 Mar 2016 09:51:37 -0400
+Subject: [PATCH 1/3] crypto: marvell/cesa - replace dma_to_phys with
+ dma_map_single
+In-Reply-To: <56EBE5BC.6000000@arm.com>
+References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
+ <20160317225459.GA19428@n2100.arm.linux.org.uk>
+ <80402e2f82651814b1411a25b1740288@codeaurora.org>
+ <20160317235020.GB19428@n2100.arm.linux.org.uk>
+ <20160318103028.4be15b78@bbrezillon> <56EBE5BC.6000000@arm.com>
+Message-ID: <56EC07E9.1000506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 18 Mar 2016 14:14:32 +0100, Andrew Lunn wrote:
-
-> Isn't this also applicable to mvebu v5?
+On 3/18/2016 7:25 AM, Robin Murphy wrote:
+> On 18/03/16 09:30, Boris Brezillon wrote:
+>> On Thu, 17 Mar 2016 23:50:20 +0000
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>>
+>>> On Thu, Mar 17, 2016 at 07:17:24PM -0400, okaya at codeaurora.org wrote:
+>>>> What is the correct way? I don't want to write engine->sram_dma = sram
+>>>
+>>> Well, what the driver _is_ wanting to do is to go from a CPU physical
+>>> address to a device DMA address.  phys_to_dma() looks like the correct
+>>> thing there to me, but I guess that's just an offset and doesn't take
+>>> account of any IOMMU that may be in the way.
+>>>
+>>> If you have an IOMMU, then the whole phys_to_dma() thing is a total
+>>> failure as it only does a linear translation, and there are no
+>>> interfaces in the kernel to take account of an IOMMU in the way.  So,
+>>> it needs something designed for the job, implemented and discussed by
+>>> the normal methods of proposing a new cross-arch interface for drivers
+>>> to use.
+>>>
+>>> What I'm certain of, though, is that the change proposed in this patch
+>>> will break current users of this driver: virt_to_page() on an address
+>>> returned by ioremap() is completely undefined, and will result in
+>>> either a kernel oops, or if not poking at memory which isn't a struct
+>>> page, ultimately resulting in something that isn't SRAM being pointed
+>>> to by "engine->sram_dma".
+>>>
+>>
+>> Or we could just do
+>>
+>>     engine->sram_dma = res->start;
+>>
+>> which is pretty much what the SRAM/genalloc code is doing already.
 > 
-> And your change to multi_v7_defconfig could also be applied to
-> multi_v5_defconfig.
+> As Russell points out this is yet another type of "set up a DMA master to access something other than kernel RAM" - there's already discussion in progress over how to handle this for dmaengine slaves[1], so gathering more use-cases might help distil exactly what the design of not-strictly-DMA-but-so-closely-coupled-it-can't-really-live-anywhere-else needs to be.
+> 
+> Robin.
+> 
+> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414422.html
+> 
 
-mvebu_v5 already enables a crypto driver, but it's the old one. So
-there's a decision to be taken here whether we move all the platforms
-to use the new driver or not.
+Thanks for the link. 
 
-The new driver has been tested on the Armada family, and I believe also
-on Kirkwood. However I'm pretty sure it hasn't been tested on Dove and
-Orion.
+dma_map_resource looks like to be the correct way of doing things. Just from
+the purist point of view, a driver is not supposed to know the physical address
+of a DMA address. That kills the intent of using DMA API. When programming descriptors,
+the DMA addresses should be programmed not physical addresses so that the same 
+driver can be used in a system with IOMMU. The IOMMU DMA ops will remap the DMA 
+address to a bus address that is not physical address. All of this operation needs
+to be isolated from the device driver.
 
-Dove is ARMv7 and enabled in mvebu_v7_defconfig, but since neither the
-old nor the new driver were enabled in mvebu_v7_defconfig, we are not
-going to disrupt any existing user here by adding the new driver in the
-defconfig.
 
-Changing mvebu_v5_defconfig, multi_v5_defconfig, orion5x_defconfig and
-dove_defconfig however implies moving those defconfigs away from the
-old driver, and select the new one instead. A more serious change, IMO.
+I don't know the architecture or the driver enough to write this. This is not ideally
+right but I can do this if Boris you are OK with this. 
 
-Best regards,
+     engine->sram_dma = res->start;
 
-Thomas
+Another option is I can write
+
+     engine->sram_dma = swiotlb_dma_to_phys(res->start)
+
+I agree that dma_map_single is not the right thing. 
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
