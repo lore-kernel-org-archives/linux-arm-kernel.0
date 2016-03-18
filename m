@@ -1,66 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 18 Mar 2016 17:47:41 +0100
-Subject: [PATCH v2 9/9] efifb: enable the efi-framebuffer platform driver for
- ARM and arm64
-In-Reply-To: <1458319661-19762-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1458319661-19762-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1458319661-19762-10-git-send-email-ard.biesheuvel@linaro.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 18 Mar 2016 17:54:57 +0100
+Subject: [PATCH v2 3/5] dmaengine: sun6i: Add 4 as a possible burst value
+In-Reply-To: <20160318150946.GO30977@lukather>
+References: <cover.1457695169.git.moinejf@free.fr>
+ <7898ac737e1cce9542de662f1266d94bd451659e.1457695169.git.moinejf@free.fr>
+ <20160311120601.GD8418@lukather>
+ <20160311172858.6cffb492a18da7da76e7ed94@free.fr>
+ <20160318150946.GO30977@lukather>
+Message-ID: <20160318175457.8a7fda7e57551f93fe06e7d2@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allows the efifb driver to be built for ARM and arm64. This simply involves
-updating the Kconfig dependency expression, and supplying dummy versions of
-efifb_setup_from_dmi().
+On Fri, 18 Mar 2016 16:09:46 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/efi.h   | 4 ++++
- arch/arm64/include/asm/efi.h | 4 ++++
- drivers/video/fbdev/Kconfig  | 2 +-
- 3 files changed, 9 insertions(+), 1 deletion(-)
+> On Fri, Mar 11, 2016 at 05:28:58PM +0100, Jean-Francois Moine wrote:
+	[snip]
+> > Do you think that we should also check if the requested ports are
+> > valid, i.e. have a list/bitmap of the possible input/output ports per
+> > SoC, instead of just only the ID of the max port?
+> 
+> That would require having a map of the possible endpoints for a given
+> device, which would be quite difficult to accomplish.
+> 
+> I don't think customer drivers have access to that anyway, only the
+> provider driver is parsing the DT to retrieve the ID. And we already
+> trust the DT for so many things it would be a bit pointless to check
+> that.
 
-diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-index be12877e8609..76ce7adde990 100644
---- a/arch/arm/include/asm/efi.h
-+++ b/arch/arm/include/asm/efi.h
-@@ -66,6 +66,10 @@ void efi_virtmap_unload(void);
- struct screen_info *alloc_screen_info(efi_system_table_t *sys_table_arg);
- void free_screen_info(efi_system_table_t *sys_table, struct screen_info *si);
- 
-+static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
-+{
-+}
-+
- /*
-  * A reasonable upper bound for the uncompressed kernel size is 32 MBytes,
-  * so we will reserve that amount of memory. We have no easy way to tell what
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index ed6c85d3a583..ec43456e3ef1 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -57,6 +57,10 @@ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
- #define alloc_screen_info(x...)		&screen_info
- #define free_screen_info(x...)
- 
-+static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
-+{
-+}
-+
- #define EFI_ALLOC_ALIGN		SZ_64K
- 
- /*
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index 983280e8d93f..e5a391aecde1 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -761,7 +761,7 @@ config FB_VESA
- 
- config FB_EFI
- 	bool "EFI-based Framebuffer Support"
--	depends on (FB = y) && X86 && EFI
-+	depends on (FB = y) && !IA64 && EFI
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
+The ports are already checked against 'nr_max_requests' which is the
+index of the higher port. I think that this check exists because the
+ports are given by the DMA clients.
+
+If this check is needed, as 'nr_max_requests' is lower than 32, 2 maps
+(in and out) on 32 bits would do the job.
+If this check is not needed (because we trust the DTs), the actual
+check (port <= nr_max_requests) could be removed.
+
 -- 
-2.5.0
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
