@@ -1,52 +1,29 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 18 Mar 2016 14:37:41 +0100
-Subject: [RESEND PATCH v4 0/5] acpi, clocksource: add GTDT and ARM
- memory-mapped timer support
-In-Reply-To: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
-References: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <56EC04A5.2030106@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 18 Mar 2016 10:48:13 -0300
+Subject: [PATCH] [media] media: rename media unregister function
+In-Reply-To: <2ffc02c944068b2c8655727238d1542f8328385d.1458306276.git.mchehab@osg.samsung.com>
+References: <2ffc02c944068b2c8655727238d1542f8328385d.1458306276.git.mchehab@osg.samsung.com>
+Message-ID: <56EC071D.5060400@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2016 09:00 AM, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+Hello Mauro,
+
+On 03/18/2016 10:05 AM, Mauro Carvalho Chehab wrote:
+> Now that media_device_unregister() also does a cleanup, rename it
+> to media_device_unregister_cleanup().
 >
-> This patchset:
->      (1)Move some enums and marcos to header file for arm_arch_timer,
->      improve the pr_* code by defining "pr_fmt(fmt)" in arm_arch_timer.c
->
->      (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
->      Parse all kinds of timer in GTDT table of ACPI:arch timer,
->      memory-mapped timer and SBSA Generic Watchdog timer.
->      This driver can help to simplify all the relevant timer drivers,
->      and separate all the ACPI GTDT knowledge from them.
->
->      (3)Simplify ACPI code for arch timer in arm_arch_timer.c
->
->      (4)Add memory-mapped timer support in arm_arch_timer.c
->
-> RESEND:
->     -- Corrected Cc list: added missing mailing lists
 
-Hi Fu Wei,
+I believe there should be a Suggested-by Sakari Ailus tag here.
+ 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-the whole series is lacking to encapsulate the ACPI code.
+The patch looks good and I agree that makes things more clear.
 
-I believe Marc Zyngier did a first effort to make the ACPI self 
-contained and this series ignore that.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Please rework the series in the direction no acpi gtdt structure appears 
-in the driver.
-
-Thanks
-
-   -- Daniel
-
-
-
+Best regards,
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
