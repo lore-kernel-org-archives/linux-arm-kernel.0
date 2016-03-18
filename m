@@ -1,46 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 18 Mar 2016 10:32:48 +0100 (CET)
-Subject: [RESEND PATCH v4 5/5] clocksource: add memory-mapped timer
- support in arm_arch_timer.c
-In-Reply-To: <1458288053-29031-6-git-send-email-fu.wei@linaro.org>
-References: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
- <1458288053-29031-6-git-send-email-fu.wei@linaro.org>
-Message-ID: <alpine.DEB.2.11.1603181031280.3978@nanos>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 18 Mar 2016 10:38:19 +0100
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <CAFEAcA8r5LDbNG0XVnHnsoYcrfcpfnR3FQ_u=-L7Dop1HFVgxw@mail.gmail.com>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <56E00A7E.4080101@semihalf.com> <20160313181608.GA15988@cbox>
+ <56E69CCA.5070407@arm.com>
+ <CAFEAcA8r5LDbNG0XVnHnsoYcrfcpfnR3FQ_u=-L7Dop1HFVgxw@mail.gmail.com>
+Message-ID: <20160318093819.GB10806@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Mar 2016, fu.wei at linaro.org wrote:
-> +static u32 __init arch_timer_mem_cnttidr(struct acpi_gtdt_timer_block *gt_block)
-> +{
-> +	phys_addr_t cntctlbase_phy;
-> +	void __iomem *cntctlbase;
-> +	u32 cnttidr;
-> +
-> +	cntctlbase_phy = (phys_addr_t)gtdt_gt_cntctlbase(gt_block);
-> +	if (!cntctlbase_phy) {
-> +		pr_err("Can't find CNTCTLBase.\n");
-> +		return 0;
-> +	}
-> +
-> +	/*
-> +	 * According to ARMv8 Architecture Reference Manual(ARM),
-> +	 * the size of CNTCTLBase frame of memory-mapped timer
-> +	 * is SZ_4K(Offset 0x000 ? 0xFFF).
-> +	 */
-> +	cntctlbase = ioremap(cntctlbase_phy, SZ_4K);
-> +	if (!cntctlbase) {
-> +		pr_err("Can't map CNTCTLBase\n");
-> +		return 0;
-> +	}
+On Mon, Mar 14, 2016 at 05:29:44PM +0000, Peter Maydell wrote:
+> On 14 March 2016 at 11:13, Andre Przywara <andre.przywara@arm.com> wrote:
+> > So I see two ways to fix this:
+> > 1.) we find a KVM specific way of letting userland save and restore the
+> > ITS tables directly
+> > 2.) we implement the BASER<n> registers, but still use our "cache" for
+> > normal operations. On demand we would serialize KVM's virtual ITS data
+> > structures and put them into the guest's memory, so they could be
+> > saved/restored from there.
+> 
+> I feel like we're rehashing a bunch of design choices we talked
+> through way back in the last-but-one Connect. I don't suppose
+> anybody wrote down our rationales from back then?
 
-Why are you continuing when you can't find a base address or the remap fails?
+Someone (not me) had the task to write it down, I don't recall if that
+happened or not :)
 
-> +	/*
-> +	 * Get Generic Timer Counter-timer Timer ID Register
-> +	 * for Virtual Timer Capability info
-> +	 */
-> +	cnttidr = arch_timer_mem_cnttidr(gt_block);
+> 
+> (In particular I forget whether we decided the ITS tables were
+> large enough to need to allow some sort of before-the-VM-stops
+> migration of the data, which would be relatively doable with
+> option 2 but painful under option 1.)
 
-Thanks,
+I think we concluded that it's not so much data that applying dirty
+bitmaps stuff on there is strictly necessary, but that being able to do
+this was probably a plus, and not very hard to do.
 
-	tglx
+I am quite sure that we dismissed option 1, and were decided on option 2
+though.
+
+-Christoffer
