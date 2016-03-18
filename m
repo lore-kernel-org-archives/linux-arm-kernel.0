@@ -1,34 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Mar 2016 18:48:39 +0100
-Subject: [PATCH] ARM: dts: sun6i: Add serial0 alias and stdout-path to
- a31s-primo81.dts
-In-Reply-To: <CAGb2v67+V1JdaG2ypgj5sXyzxiwZhYC_z_1sye5HpnMvcE_QfA@mail.gmail.com>
-References: <1458137962-27714-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v67+V1JdaG2ypgj5sXyzxiwZhYC_z_1sye5HpnMvcE_QfA@mail.gmail.com>
-Message-ID: <20160318174839.GQ30977@lukather>
+From: sgurrappadi@nvidia.com (Sai Gurrappadi)
+Date: Fri, 18 Mar 2016 10:49:18 -0700
+Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
+In-Reply-To: <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
+References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+ <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
+Message-ID: <56EC3F9E.4050209@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 02:28:03PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Mar 16, 2016 at 10:19 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> > u-boot uses the kernel as the canonical source for its sunxi dts files
-> > and u-boot needs these.
-> >
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+Hi Juri,
 
-Queued, thanks!
-Maxime
+On 03/18/2016 07:24 AM, Juri Lelli wrote:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160318/3e95778f/attachment-0001.sig>
+<snip>
+
+> +
+> +==========================================
+> +2 - CPU capacity definition
+> +==========================================
+> +
+> +CPU capacity is a number that provides the scheduler information about CPUs
+> +heterogeneity. Such heterogeneity can come from micro-architectural differences
+> +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
+> +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
+> +context is about differing performance characteristics; this binding tries to
+> +capture a first-order approximation of the relative performance of CPUs.
+
+Any reason why this capacity number is not dynamically generated based on the
+max frequency for each CPU? The DT property would then instead specify just
+the micro-architectural differences between the CPU types.
+
+-Sai
