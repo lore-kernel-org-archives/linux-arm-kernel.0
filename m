@@ -1,29 +1,29 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Fri, 18 Mar 2016 09:44:54 +0100
-Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
- engine driver for multi_v7_defconfig
-Message-ID: <20160318084454.GA8836@archy.home>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 18 Mar 2016 09:52:30 +0100
+Subject: [PATCH v3 0/2] dmaengine: sun6i: Fixes
+Message-ID: <cover.1458291150.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the new driver for Marvell CESA crypto engines on all ARMv7.
+This patch series replaces part of the previous series
+'dmaengine: sun6i: Fixes and upgrade for audio transfers'.
+It contains only fixes for a normal use of the DMA driver.
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changes since v2
+- Acked-by Maxime Ripard added
+- remove the audio requirements
+Changes since v1 (comments from Vinod Koul and Sergei Shtylyov - thanks)
+- typo fixes
+- change some comments
+- better handling of burst and bus width
+- remove useless code in the cyclic capability patch
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2823490..392e970 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -829,6 +829,7 @@ CONFIG_LOCKUP_DETECTOR=y
- CONFIG_CRYPTO_DEV_TEGRA_AES=y
- CONFIG_CPUFREQ_DT=y
- CONFIG_KEYSTONE_IRQ=y
-+CONFIG_CRYPTO_DEV_MARVELL_CESA=m
- CONFIG_CRYPTO_DEV_SUN4I_SS=m
- CONFIG_CRYPTO_DEV_ROCKCHIP=m
- CONFIG_ARM_CRYPTO=y
+Jean-Francois Moine (2):
+  dmaengine: sun6i: Fix the access of the IRQ register
+  dmaengine: sun6i: Fix impossible settings of burst and bus width
+
+ drivers/dma/sun6i-dma.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
 -- 
-2.7.3
+2.7.4
