@@ -1,101 +1,97 @@
-From: rajesh.bhagat@nxp.com (Rajesh Bhagat)
-Date: Fri, 18 Mar 2016 03:25:41 +0000
-Subject: [PATCH] usb: chipidea: Configure DMA properties and ops from DT
-In-Reply-To: <20160318015414.GA30851@shlinux2.ap.freescale.net>
-References: <1456119133-16114-1-git-send-email-bjorn.andersson@linaro.org>
- <CADRPPNRTXiiVzbqmpX7h_af7Q+qw+-ZB3zDb0855a1U=CmWh-A@mail.gmail.com>
- <20160314105108.GB2131@shlinux2.ap.freescale.net>
- <3240370.XdEELlSA8f@wuerfel>
- <20160318015414.GA30851@shlinux2.ap.freescale.net>
-Message-ID: <HE1PR0401MB20284E774E7A236A260B51F1E38C0@HE1PR0401MB2028.eurprd04.prod.outlook.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Fri, 18 Mar 2016 12:22:28 +0800
+Subject: [PATCH v4 0/5] acpi, clocksource, kvm: add GTDT and ARM
+ memory-mapped timer support
+In-Reply-To: <2196518.cd4jtVChuo@vostro.rjw.lan>
+References: <1458199917-30699-1-git-send-email-fu.wei@linaro.org>
+ <56EAC832.6070203@codeaurora.org>
+ <2196518.cd4jtVChuo@vostro.rjw.lan>
+Message-ID: <CADyBb7snA3oGBiXfAuzsWemhGRQbw78SSUkhAe_6ufa+ajsiHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rafael,
+
+Great thanks for your feedback!
+
+On 18 March 2016 at 08:41, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Thursday, March 17, 2016 10:07:30 AM Timur Tabi wrote:
+>> fu.wei at linaro.org wrote:
+>> > From: Fu Wei <fu.wei@linaro.org>
+>> >
+>> > This patchset:
+>> >      (1)Move some enums and marcos to header file for arm_arch_timer,
+>> >      improve the pr_* code by defining "pr_fmt(fmt)" in arm_arch_timer.c
+>> >
+>> >      (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
+>> >      Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>> >      memory-mapped timer and SBSA Generic Watchdog timer.
+>> >      This driver can help to simplify all the relevant timer drivers,
+>> >      and separate all the ACPI GTDT knowledge from them.
+>> >
+>> >      (3)Simplify ACPI code for arch timer in arm_arch_timer.c
+>> >
+>> >      (4)Add memory-mapped timer support in arm_arch_timer.c
+>>
+>> The SBSA watchdog driver is already in watchdog-next and will be merged
+>> into 4.6.  These five patches are necessary for the watchdog driver to
+>> probe on an ACPI system.
+>>
+>> I'm guessing since that v4 was posted in the middle of the 4.6 merge
+>> window, that these patches won't make it and we'll have to wait until
+>> 4.7 (at the earliest)?
+>
+> First off, the last version I've seen is the v3.  I must have overlooked
+> the v4 then, but I don't think it was CCed to linux-acpi (which should
+> have happened).
+
+Sorry for this, That is my fault. I updated the script of git-send-email for
+sending the v4 patchset, but lost a space between two "--cc". :-(
+
+>
+> Second, these patches require review from multiple maintainers and (or including)
+> people who actually know how the GTDT is supposed to be used.  I haven't
+> seen any responses from any of them yet, so the answer to your question is
+> "yes".
+>
+> I will have a couple of comments for patch [1/6] (in the v3), but it's
+> not been a priority due to the apparent overall lack of interest in this
+> series.
+
+Since this device is a generic  watchdog for ARM server, it is(will be) used
+in a lot of chips. So I think many people are interested in it. They
+haven't  provided
+any feedback, maybe due to my "--cc" mistake, or busy on something
+else now.  :-(
+
+I would like to learn your comments for patch [1/6] , then improve my
+v4, post v5
+ASAP.
+
+This patchset includes GTDT and memory-mapped timer patches, because my
+memory-mapped timer patches depends on GTDT.
+But maybe we can upstream GTDT separately?
+
+any suggestion?
+
+Thanks for your help!
 
 
-> -----Original Message-----
-> From: Peter Chen [mailto:hzpeterchen at gmail.com]
-> Sent: Friday, March 18, 2016 7:24 AM
-> To: Arnd Bergmann <arnd@arndb.de>
-> Cc: Li Yang <leoli@freescale.com>; Bjorn Andersson <bjorn.andersson@linaro.org>;
-> Peter Chen <peter.chen@nxp.com>; Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org>; Rajesh Bhagat <rajesh.bhagat@nxp.com>; linux-
-> usb at vger.kernel.org; lkml <linux-kernel@vger.kernel.org>; Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org>; linux-arm-msm <linux-arm-
-> msm at vger.kernel.org>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] usb: chipidea: Configure DMA properties and ops from DT
-> 
-> On Thu, Mar 17, 2016 at 04:52:55PM +0100, Arnd Bergmann wrote:
-> > On Monday 14 March 2016 18:51:08 Peter Chen wrote:
-> > > On Wed, Mar 09, 2016 at 05:16:50PM -0600, Li Yang wrote:
-> > > > On Tue, Mar 8, 2016 at 9:40 PM, Bjorn Andersson
-> > > > <bjorn.andersson@linaro.org> wrote:
-> > > > > On Tue, Mar 8, 2016 at 11:52 AM, Li Yang <leoli@freescale.com> wrote:
-> > > > >> On Wed, Mar 2, 2016 at 4:59 PM, Li Yang <leoli@freescale.com> wrote:
-> > > > >>> On Mon, Feb 22, 2016 at 4:07 PM, Bjorn Andersson
-> > > > >>> <bjorn.andersson@linaro.org> wrote:
-> > > > >>>> On Mon 22 Feb 02:03 PST 2016, Srinivas Kandagatla wrote:
-> > > > >
-> > > > > I had the chance to go through this with Arnd and the verdict is
-> > > > > that devices not described in DT should not do DMA (or allocate
-> > > > > buffers for doing DMA).
-> > > > >
-> > > > > So I believe the solution is to fall back on Peter's
-> > > > > description; the chipidea driver is the core driver and the
-> > > > > Qualcomm code should just be a platform layer.
-> > > > >
-> > > > > My suggestion is that we turn the chipidea core into a set of
-> > > > > APIs that can called by the platform specific pieces. That way
-> > > > > we will have the chipidea core be the device described in the DT.
-> > > >
-> > > > But like I said, this problem is not just existing for chipidea
-> > > > driver.  We already found that the dwc3 driver is also suffering
-> > > > from the same issue.  I don't know how many other drivers are
-> > > > impacted by this change, but I suspect there will be some. A grep
-> > > > of
-> > > > platform_device_add() in driver/ directory returns many possible
-> > > > drivers to be impacted.  As far as I know, the
-> > > > drivers/net/ethernet/freescale/fman/mac.c is registering child
-> > > > ethernet devices that definitely will do dma.   If you want to do this
-> > > > kind of rework to all these drivers, it will be a really big effort.
-> > > >
-> > >
-> > > +1
-> > >
-> > > Yes, I think this DMA things should be covered by driver core too.
-> > >
-> >
-> > I don't think it's a very widespread problem, there are only very few
-> > developers that intentionally use this method, and some use the
-> > platform_device_register_full() call to create a device with a known
-> > mask, which is generally ok for the limited case where the driver is
-> > only ever going to run on a single platform, but not in the more
-> > general case that of_dma_configure is designed to handle.
-> 
-> Even only for qualcomm platforms, it may be possible have different DMA masks at
-> ARM64 platforms, so we may can't use a fixed value at glue layer driver. So, using
-> of_dma_configure is suitable choice for DT platforms for this case, right?
-> 
-> >
-> > I think we should fix the drivers to consistently use the device that
-> > was created by the platform (DT or ACPI or board file) to pass that
-> > into the DMA API, anything else will just cause more subtle bugs.
-> >
-> 
-> Although I don't know what kinds of bugs it may have, it may be met before,
-> otherwise, why most of platform drivers need to call dma_set_coherent_mask or
-> dma_coerce_mask_and_coherent explicitly
-> 
-> --
-> 
-> Best Regards,
-> Peter Chen
+>
+> Thanks,
+> Rafael
+>
 
-Though chipidea platform drivers are calling functions mentioned by you i.e. dma_set_coherent_mask
-or dma_coerce_mask_and_coherent explicity e.g. in file drivers/usb/chipidea/ci_hdrc_imx.c. 
 
-Still the mentioned error is coming while calling ci_hdrc_add_device which lies in chipidea/core.c. similar is 
-the case with DWC3 driver. 
 
-Best Regards,
-Rajesh Bhagat 
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
