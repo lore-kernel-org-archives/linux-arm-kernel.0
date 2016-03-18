@@ -1,63 +1,82 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 Mar 2016 02:40:04 +0100
-Subject: [PATCH 08/10] ARM: dts: rockchip: override edp hpd handling on
- veyron-pinky and speedy
+Date: Fri, 18 Mar 2016 02:40:03 +0100
+Subject: [PATCH 07/10] ARM: dts: rockchip: add rk3288-veyron-minnie backlight
+ and panel settings
 In-Reply-To: <1458265206-15733-1-git-send-email-heiko@sntech.de>
 References: <1458265206-15733-1-git-send-email-heiko@sntech.de>
-Message-ID: <1458265206-15733-9-git-send-email-heiko@sntech.de>
+Message-ID: <1458265206-15733-8-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pinky boards don't have the hotplug pin connected. So remove the
-hotplug pinctrl setting and enable the force-hpd option, to allow
-them to find the display too.
-
-While on speedy boards, the hotplug pin is connected, judging by comments
-in a chromeos change it seems the "panels HPD voltage is too low to be
-detected", so it also needs the forced hotplug, as we of course also know
-that a display is connected.
+The pwm for Minnie's backlight needs to be above 1%, so adapt the start
+of non-zero brightness accordingly. Minnie is also using a different
+panel, so re-set the compatible property.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3288-veyron-pinky.dts  | 7 +++++++
- arch/arm/boot/dts/rk3288-veyron-speedy.dts | 7 +++++++
- 2 files changed, 14 insertions(+)
+ arch/arm/boot/dts/rk3288-veyron-minnie.dts | 43 ++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron-pinky.dts b/arch/arm/boot/dts/rk3288-veyron-pinky.dts
-index 94b56e3..d44351e 100644
---- a/arch/arm/boot/dts/rk3288-veyron-pinky.dts
-+++ b/arch/arm/boot/dts/rk3288-veyron-pinky.dts
-@@ -65,6 +65,13 @@
- 	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8 &emmc_reset>;
+diff --git a/arch/arm/boot/dts/rk3288-veyron-minnie.dts b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+index 8b16f37..f72d616 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-minnie.dts
++++ b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+@@ -87,6 +87,44 @@
+ 	};
  };
  
-+&edp {
-+	/delete-property/pinctrl-names;
-+	/delete-property/pinctrl-0;
-+
-+	force-hpd;
++&backlight {
++	/* Minnie panel PWM must be >= 1%, so start non-zero brightness at 3 */
++	brightness-levels = <
++			  0   3   4   5   6   7
++			  8   9  10  11  12  13  14  15
++			 16  17  18  19  20  21  22  23
++			 24  25  26  27  28  29  30  31
++			 32  33  34  35  36  37  38  39
++			 40  41  42  43  44  45  46  47
++			 48  49  50  51  52  53  54  55
++			 56  57  58  59  60  61  62  63
++			 64  65  66  67  68  69  70  71
++			 72  73  74  75  76  77  78  79
++			 80  81  82  83  84  85  86  87
++			 88  89  90  91  92  93  94  95
++			 96  97  98  99 100 101 102 103
++			104 105 106 107 108 109 110 111
++			112 113 114 115 116 117 118 119
++			120 121 122 123 124 125 126 127
++			128 129 130 131 132 133 134 135
++			136 137 138 139 140 141 142 143
++			144 145 146 147 148 149 150 151
++			152 153 154 155 156 157 158 159
++			160 161 162 163 164 165 166 167
++			168 169 170 171 172 173 174 175
++			176 177 178 179 180 181 182 183
++			184 185 186 187 188 189 190 191
++			192 193 194 195 196 197 198 199
++			200 201 202 203 204 205 206 207
++			208 209 210 211 212 213 214 215
++			216 217 218 219 220 221 222 223
++			224 225 226 227 228 229 230 231
++			232 233 234 235 236 237 238 239
++			240 241 242 243 244 245 246 247
++			248 249 250 251 252 253 254 255>;
++	power-supply = <&backlight_regulator>;
 +};
 +
- &gpio_keys {
- 	pinctrl-0 = <&pwr_key_h &ap_lid_int_l>;
- 
-diff --git a/arch/arm/boot/dts/rk3288-veyron-speedy.dts b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-index e62cdee..90aa145 100644
---- a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-+++ b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-@@ -97,6 +97,13 @@
- 	temperature = <70000>;
+ &emmc {
+ 	/delete-property/mmc-hs200-1_8v;
+ };
+@@ -136,6 +174,11 @@
+ 	};
  };
  
-+&edp {
-+	/delete-property/pinctrl-names;
-+	/delete-property/pinctrl-0;
-+
-+	force-hpd;
++&panel {
++	compatible = "auo,b101ean01", "simple-panel";
++	power-supply= <&panel_regulator>;
 +};
 +
  &rk808 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pmic_int_l>;
+ 	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
 -- 
 2.6.4
