@@ -1,57 +1,58 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 Mar 2016 11:25:48 +0000
-Subject: [PATCH 1/3] crypto: marvell/cesa - replace dma_to_phys with
- dma_map_single
-In-Reply-To: <20160318103028.4be15b78@bbrezillon>
-References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
- <20160317225459.GA19428@n2100.arm.linux.org.uk>
- <80402e2f82651814b1411a25b1740288@codeaurora.org>
- <20160317235020.GB19428@n2100.arm.linux.org.uk>
- <20160318103028.4be15b78@bbrezillon>
-Message-ID: <56EBE5BC.6000000@arm.com>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Fri, 18 Mar 2016 19:27:11 +0800
+Subject: [RFC v3 0/3] Mediatek MT8173 CMDQ support
+Message-ID: <1458300434-14438-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/16 09:30, Boris Brezillon wrote:
-> On Thu, 17 Mar 2016 23:50:20 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->
->> On Thu, Mar 17, 2016 at 07:17:24PM -0400, okaya at codeaurora.org wrote:
->>> What is the correct way? I don't want to write engine->sram_dma = sram
->>
->> Well, what the driver _is_ wanting to do is to go from a CPU physical
->> address to a device DMA address.  phys_to_dma() looks like the correct
->> thing there to me, but I guess that's just an offset and doesn't take
->> account of any IOMMU that may be in the way.
->>
->> If you have an IOMMU, then the whole phys_to_dma() thing is a total
->> failure as it only does a linear translation, and there are no
->> interfaces in the kernel to take account of an IOMMU in the way.  So,
->> it needs something designed for the job, implemented and discussed by
->> the normal methods of proposing a new cross-arch interface for drivers
->> to use.
->>
->> What I'm certain of, though, is that the change proposed in this patch
->> will break current users of this driver: virt_to_page() on an address
->> returned by ioremap() is completely undefined, and will result in
->> either a kernel oops, or if not poking at memory which isn't a struct
->> page, ultimately resulting in something that isn't SRAM being pointed
->> to by "engine->sram_dma".
->>
->
-> Or we could just do
->
-> 	engine->sram_dma = res->start;
->
-> which is pretty much what the SRAM/genalloc code is doing already.
 
-As Russell points out this is yet another type of "set up a DMA master 
-to access something other than kernel RAM" - there's already discussion 
-in progress over how to handle this for dmaengine slaves[1], so 
-gathering more use-cases might help distil exactly what the design of 
-not-strictly-DMA-but-so-closely-coupled-it-can't-really-live-anywhere-else 
-needs to be.
+Hi,
 
-Robin.
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help read/write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-[1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414422.html
+These patches have a build dependency on top of v4.5-rc1.
+
+Changes since v2:
+ - use cmdq instead of cqctx
+ - document cmdq_code
+ - use cmdq thread base instead of thread id, so remove thread id
+ - remove buffer pool and let linux manage memory
+ - remove task_free_list
+ - merge cmdq_task_exec_async_impl into cmdq_task_exec_async
+ - use list_for_each_entry_safe instead of list_for_each_safe
+ - merge cmdq_dev_init into cmdq_probe
+ - use cmdq record(rec) instead of cmdq handle
+ - use cmdq command instead of cmdq desc
+ - remove unused interfaces
+ - set IRQF_TRIGGER_LOW in device tree
+ - remove event array and related code since client should clear event
+   before wait it
+ - report status to callback function
+ - remove some debug code
+ - remove some protection code, e.g. suspend/resume
+ - rewrite some code to shrink code size
+
+Best regards,
+HS Liao
+
+HS Liao (3):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  CMDQ: Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+
+ .../devicetree/bindings/soc/mediatek/gce.txt       |   34 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |    8 +
+ drivers/soc/mediatek/Kconfig                       |   10 +
+ drivers/soc/mediatek/Makefile                      |    1 +
+ drivers/soc/mediatek/mtk-cmdq.c                    | 1805 ++++++++++++++++++++
+ include/soc/mediatek/cmdq.h                        |  181 ++
+ 6 files changed, 2039 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+ create mode 100644 include/soc/mediatek/cmdq.h
+
+-- 
+1.7.9.5
