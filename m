@@ -1,47 +1,102 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 Mar 2016 02:39:56 +0100
-Subject: [PATCH 00/10] ARM: dts: rockchip: enable edp functionality
-Message-ID: <1458265206-15733-1-git-send-email-heiko@sntech.de>
+Date: Fri, 18 Mar 2016 02:40:01 +0100
+Subject: [PATCH 05/10] ARM: dts: rockchip: add core rk3288-veyron backlight
+ and panel nodes
+In-Reply-To: <1458265206-15733-1-git-send-email-heiko@sntech.de>
+References: <1458265206-15733-1-git-send-email-heiko@sntech.de>
+Message-ID: <1458265206-15733-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the companion series to Yakir's rework of the analogix-dp
-driver used both by Exynos and Rockchip.
+Many Veyron chromebooks share the same panel type, so define the core
+settings for all of them and allow the few runaways to override it later.
 
-These patches have been sitting in my tree for some time, and already
-got tested (and thus refined) by a number of people.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi | 57 +++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-So I'll post them now, to get applied after the driver-side gets
-accepted hopefully soonish.
-
-
-Caesar Wang (1):
-  ARM: dts: rockchip: add rk3288-veyron-jaq backlight and panel
-    overrides
-
-Heiko Stuebner (9):
-  ARM: dts: rockchip: add rk3288 edp-phy node
-  ARM: dts: rockchip: add rk3288 displayport controller node
-  ARM: dts: rockchip: move edp-hpd pin definition into common location
-  ARM: dts: rockchip: add startup delay to rk3288-veyron
-    panel-regulators
-  ARM: dts: rockchip: add core rk3288-veyron backlight and panel nodes
-  ARM: dts: rockchip: add rk3288-veyron-minnie backlight and panel
-    settings
-  ARM: dts: rockchip: override edp hpd handling on veyron-pinky and
-    speedy
-  ARM: dts: rockchip: simple panel and backlight supplies on veyron
-    boards
-  ARM: dts: rockchip: enable the eDP on rk3288 veyron devices
-
- arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi | 100 ++++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-veyron-jaq.dts         |  49 ++++++++++--
- arch/arm/boot/dts/rk3288-veyron-jerry.dts       |   9 +++
- arch/arm/boot/dts/rk3288-veyron-minnie.dts      |  44 +++++++++++
- arch/arm/boot/dts/rk3288-veyron-pinky.dts       |   7 ++
- arch/arm/boot/dts/rk3288-veyron-speedy.dts      |  16 ++++
- arch/arm/boot/dts/rk3288.dtsi                   |  59 ++++++++++++++
- 7 files changed, 278 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
+index 610769d..7563d3d 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
+@@ -54,6 +54,50 @@
+ 		i2c20 = &i2c_tunnel;
+ 	};
+ 
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		brightness-levels = <
++			  0   1   2   3   4   5   6   7
++			  8   9  10  11  12  13  14  15
++			 16  17  18  19  20  21  22  23
++			 24  25  26  27  28  29  30  31
++			 32  33  34  35  36  37  38  39
++			 40  41  42  43  44  45  46  47
++			 48  49  50  51  52  53  54  55
++			 56  57  58  59  60  61  62  63
++			 64  65  66  67  68  69  70  71
++			 72  73  74  75  76  77  78  79
++			 80  81  82  83  84  85  86  87
++			 88  89  90  91  92  93  94  95
++			 96  97  98  99 100 101 102 103
++			104 105 106 107 108 109 110 111
++			112 113 114 115 116 117 118 119
++			120 121 122 123 124 125 126 127
++			128 129 130 131 132 133 134 135
++			136 137 138 139 140 141 142 143
++			144 145 146 147 148 149 150 151
++			152 153 154 155 156 157 158 159
++			160 161 162 163 164 165 166 167
++			168 169 170 171 172 173 174 175
++			176 177 178 179 180 181 182 183
++			184 185 186 187 188 189 190 191
++			192 193 194 195 196 197 198 199
++			200 201 202 203 204 205 206 207
++			208 209 210 211 212 213 214 215
++			216 217 218 219 220 221 222 223
++			224 225 226 227 228 229 230 231
++			232 233 234 235 236 237 238 239
++			240 241 242 243 244 245 246 247
++			248 249 250 251 252 253 254 255>;
++		default-brightness-level = <128>;
++		enable-gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
++		backlight-boot-off;
++		pinctrl-names = "default";
++		pinctrl-0 = <&bl_en>;
++		pwms = <&pwm0 0 1000000 0>;
++		pwm-delay-us = <10000>;
++	};
++
+ 	gpio-charger {
+ 		compatible = "gpio-charger";
+ 		charger-type = "mains";
+@@ -62,6 +106,13 @@
+ 		pinctrl-0 = <&ac_present_ap>;
+ 	};
+ 
++	panel: panel {
++		compatible ="innolux,n116bge", "simple-panel";
++		status = "okay";
++		power-supply = <&vcc33_lcd>;
++		backlight = <&backlight>;
++	};
++
+ 	/* A non-regulated voltage from power supply or battery */
+ 	vccsys: vccsys {
+ 		compatible = "regulator-fixed";
+@@ -184,6 +235,12 @@
+ 		&suspend_l_sleep
+ 	>;
+ 
++	backlight {
++		bl_en: bl-en {
++			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
+ 	buttons {
+ 		ap_lid_int_l: ap-lid-int-l {
+ 			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_up>;
 -- 
 2.6.4
