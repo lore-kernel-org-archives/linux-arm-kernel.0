@@ -1,49 +1,47 @@
-From: yun.hsiang@mediatek.com (yun.hsiang at mediatek.com)
-Date: Fri, 18 Mar 2016 17:49:27 +0800
-Subject: [PATCH] ARM: Handle non-pmd-aligned end of first memblock.
-Message-ID: <1458294567-19308-1-git-send-email-yun.hsiang@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 18 Mar 2016 10:58:09 +0100
+Subject: [PATCH] arm64/kernel: fix incorrect EL0 check in inv_entry macro
+Message-ID: <1458295089-24447-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yun Hsiang <yun.hsiang@mediatek.com>
+The implementation of macro inv_entry refers to its 'el' argument without
+the required leading backslash, which results in an undefined symbol
+'el' to be passed into the kernel_entry macro rather than the index of
+the exception level as intended.
 
-In paging_init(), if the end address of first memblock
-is non-PMD-aligned,we need to create a next-level page table
-for mapping the non-PMD-sized area.
-The memory of this next-level page table will be allocated
-from address of memblock.limit with a top-down order.
-sanity_check_meminfo() will find the address of
-first non-pmd-aligned page in memblock.memory,
-round down the address, and set it to memblock.current_limit.
+This undefined symbol strangely enough does not result in build failures,
+although it is visible in vmlinux:
 
-There is a risk if arm_memblock_init()execute before
-sanity_check_meminfo(). arm_memblock_init() parse the device tree
-and modified memblock if there are no-map node in device tree.
-It might produce a new non-PMD-aligned block. While creating mapping
-to this new non-PMD-aligned block, the page table will be allocated
-from the memblock.limit which is still unmapped.
+     $ nm -n vmlinux |head
+                      U el
+     0000000000000000 A _kernel_flags_le_hi32
+     0000000000000000 A _kernel_offset_le_hi32
+     0000000000000000 A _kernel_size_le_hi32
+     000000000000000a A _kernel_flags_le_lo32
+     .....
 
-Signed-off-by: Yun Hsiang <yun.hsiang@mediatek.com>
+However, it does result in incorrect code being generated for invalid
+exceptions taken from EL0, since the argument check in kernel_entry
+assumes EL1 if its argument does not equal '0'.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/setup.c | 2 +-
+ arch/arm64/kernel/entry.S | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 7d0cba6f..940e4bd 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -1036,11 +1036,11 @@ void __init setup_arch(char **cmdline_p)
- #endif
- 	setup_dma_zone(mdesc);
- 	efi_init();
--	sanity_check_meminfo();
- 	arm_memblock_init(mdesc);
- 
- 	early_ioremap_reset();
- 
-+	sanity_check_meminfo();
- 	paging_init(mdesc);
- 	request_standard_resources(mdesc);
- 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 1f7f5a2b61bf..12e8d2bcb3f9 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -277,7 +277,7 @@ END(vectors)
+  * Invalid mode handlers
+  */
+ 	.macro	inv_entry, el, reason, regsize = 64
+-	kernel_entry el, \regsize
++	kernel_entry \el, \regsize
+ 	mov	x0, sp
+ 	mov	x1, #\reason
+ 	mrs	x2, esr_el1
 -- 
-1.9.1
+2.5.0
