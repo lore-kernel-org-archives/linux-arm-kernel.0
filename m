@@ -1,34 +1,67 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 18 Mar 2016 16:55:26 +0100
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160318154918.GA1595@yury-N73SV>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <56AB3805.1040308@huawei.com> <20160129170929.GA3543@yury-N73SV>
- <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
- <mvm8u29ukqw.fsf@hawking.suse.de> <20160225202855.GD16123@yury-N73SV>
- <56EBD84D.2060009@huawei.com> <20160318154918.GA1595@yury-N73SV>
-Message-ID: <56EC24EE.6020803@suse.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 19 Mar 2016 00:00:22 +0800
+Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
+References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
+ <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
+Message-ID: <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
+<alexandre.torgue@gmail.com> wrote:
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+>
+> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> new file mode 100644
+> index 0000000..ada2aa4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> @@ -0,0 +1,32 @@
+> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
+> +
+> +This file documents platform glue layer for stmmac.
+> +Please see stmmac.txt for the other unchanged properties.
+> +
+> +The device node has following properties.
+> +
+> +Required properties:
+> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
+> +              "snps,dwmac-3.50a" to select IP vesrion.
 
-On 18.03.16 16:49, Yury Norov wrote:
-> On Fri, Mar 18, 2016 at 06:28:29PM +0800, Zhangjian (Bamvor) wrote:
->>
->> For the glibc part, I found that there are 11 patches of ilp32 in top,
->> but the original 28 patches of ilp32 is not in the top, there are more
->> than 900 patches between them(referece the list below). Are you
->> willing rebase all the ilp32 relative patches. It is very useful for
->> reviewing and debugging.  I saw andrew request the account in glibc,
->> maybe it has already been in processs?).
->>
-> 
-> I already told there's mess there, and I'd prefer to make things work
-> first and then do cleanup. 
+If you need have sort of hardware glue, then it is not compatible.
 
-So how is progress going overall? The last submission I've seen is
-already 2 months ago. Are there particular bits holding you up?
+ChenYu
 
-
-Alex
+> +- clocks: Must contain a phandle for each entry in clock-names.
+> +- clock-names: Should be "stmmaceth" for the host clock.
+> +              Should be "tx-clk" for the MAC TX clock.
+> +              Should be "rx-clk" for the MAC RX clock.
+> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
+> +             encompases the glue register, and the offset of the control register.
+> +Example:
+> +
+> +               ethernet0: dwmac at 40028000 {
+> +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
+> +                       status = "disabled";
+> +                       reg = <0x40028000 0x8000>;
+> +                       reg-names = "stmmaceth";
+> +                       interrupts = <0 61 0>, <0 62 0>;
+> +                       interrupt-names = "macirq", "eth_wake_irq";
+> +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
+> +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
+> +                       st,syscon = <&syscfg 0x4>;
+> +                       snps,pbl = <8>;
+> +                       snps,mixed-burst;
+> +                       dma-ranges;
+> +               };
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
