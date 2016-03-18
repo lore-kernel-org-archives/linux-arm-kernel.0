@@ -1,45 +1,73 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 18 Mar 2016 18:28:49 +0900
-Subject: [PATCH v2] ARM: DMA: Fix kzalloc flags in __dma_alloc
-Message-ID: <1458293329-5519-1-git-send-email-acourbot@nvidia.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 18 Mar 2016 10:27:56 +0100 (CET)
+Subject: [RESEND PATCH v4 1/5] clocksource: move some enums and marcos
+ to header file for arm_arch_timer
+In-Reply-To: <1458288053-29031-2-git-send-email-fu.wei@linaro.org>
+References: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
+ <1458288053-29031-2-git-send-email-fu.wei@linaro.org>
+Message-ID: <alpine.DEB.2.11.1603181016560.3978@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 19e6e5e5392b ("ARM: 8547/1: dma-mapping: store buffer
-information") allocates a structure meant for internal buffer management
-with the GFP flags of the buffer itself. This can trigger the following
-safeguard in the slab/slub allocator:
+On Fri, 18 Mar 2016, fu.wei at linaro.org wrote:
 
-	if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
-		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
-		BUG();
-	}
+Subject: clocksource: move some enums and marcos to header file for arm_arch_timer
 
-Fix this by filtering the flags that make the slab allocator unhappy.
+That sucks.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Cc: Rabin Vincent <rabin@rab.in>
----
-Changes since v1:
-- Filter flags that may cause problem instead of forcing GFP_KERNEL
-  (and risk sleeping in atomic context), as suggested by Rabin.
+1) The prefix is crap. It suggests this is about the generic clocksource code
 
- arch/arm/mm/dma-mapping.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+   clocksource/drivers/arm_arch_timer:
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index deac58d5f1f7..c941e93048ad 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -762,7 +762,8 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 	if (!mask)
- 		return NULL;
- 
--	buf = kzalloc(sizeof(*buf), gfp);
-+	buf = kzalloc(sizeof(*buf),
-+		      gfp & ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM));
- 	if (!buf)
- 		return NULL;
- 
--- 
-2.7.3
+   Is the proper prefix
+
+2) Sentences start with upper case letters
+
+3) What exactly are 'marcos' ?
+
+So a useful subject line would be;
+
+clocksource/drivers/arm_arch_timer: Move enums and defines to header file
+   
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> The patch sorts out the code for arm_arch_timer:
+
+What does it sort out? Nothing, AFAICT.
+
+You miss to explain WHY you are doing this. The list below is completely
+useless because one can see that from the patch.
+
+So this wants to be something like this:
+
+To support the arm_arch_timer via ACPI we need to share defines and enums
+between the driver and the ACPI parser code.
+
+Split out the relevant defines and enums into arm_arch_timer.h. No functional
+change.
+
+>     (1)move enum ppi_nr to the header file
+>     (2)move "ARCH_*_TIMER" marcos to the header file
+>     (3)add enum spi_nr in the header file, and use it in the driver
+>     (4)add ARCH_WD_TIMER and ARCH_TIMER_MEM_MAX_FRAME marcos
+
+So this does 3 things at once.
+
+   1) Move existing defines and enums
+
+   2) Add a new enum and convert the driver to use it
+
+   3) Add new defines without using them
+
+So this needs to be seperate
+
+   #1) This patch
+
+   #2) Seperate patch which adds the new enum and converts the places in the
+       driver
+
+   #3) This needs to go into the patch which actually uses the defines.
+
+Thanks,
+
+	tglx
