@@ -1,34 +1,26 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 18 Mar 2016 09:05:52 +0100
-Subject: [PATCH] ARM: DMA: Fix kzalloc flags in __dma_alloc
-In-Reply-To: <1458267146-24451-1-git-send-email-acourbot@nvidia.com>
-References: <1458267146-24451-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20160318080552.GA28076@lnxrabinv.se.axis.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Fri, 18 Mar 2016 09:12:09 +0100
+Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
+ engine driver for mvebu_v7_defconfig
+Message-ID: <20160318081209.GA7394@archy.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 11:12:26AM +0900, Alexandre Courbot wrote:
-> Commit 19e6e5e5392b ("ARM: 8547/1: dma-mapping: store buffer
-> information") allocates a structure meant for internal buffer management
-> with the GFP flags of the buffer itself. This can trigger the following
-> safeguard in the slab/slub allocator:
-> 
-> 	if (unlikely(flags & GFP_SLAB_BUG_MASK)) {
-> 		pr_emerg("gfp: %u\n", flags & GFP_SLAB_BUG_MASK);
-> 		BUG();
-> 	}
-> 
-> Fix this by allocating the structure with GFP_KERNEL, as it is meant to
-> be used by the kernel and not for DMA.
+This enables the new driver for Marvell CESA crypto engines on all mvebu v7.
 
-We can't use GFP_KERNEL here.  The caller may have passed in gfp flags
-which indicate that we can't sleep, and we need to respect that.  What we can
-do is mask out the region specifiers in the gfp flags that we pass to
-kzalloc().  This is what the other architectures do in their dma
-allocation functions:
+Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+---
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-arch/mips/cavium-octeon/dma-octeon.c:   gfp &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
-arch/mips/loongson64/common/dma-swiotlb.c:      gfp &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
-arch/mips/mm/dma-default.c:     gfp &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
-arch/mips/netlogic/common/nlm-dma.c:    gfp &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
-arch/x86/kernel/pci-dma.c:      *gfp &= ~(__GFP_DMA | __GFP_HIGHMEM | __GFP_DMA32);
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index dc5797a..26a8919 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -155,3 +155,4 @@ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_TIMER_STATS=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ CONFIG_DEBUG_USER=y
++CONFIG_CRYPTO_DEV_MARVELL_CESA=m
+-- 
+2.7.3
