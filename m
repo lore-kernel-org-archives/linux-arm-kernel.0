@@ -1,173 +1,79 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 18 Mar 2016 11:34:18 +0100
-Subject: [PATCH 1/3] ARM: at91: use chipid device for soc detection
-In-Reply-To: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Fri, 18 Mar 2016 11:34:28 +0100
+Subject: [PATCH 2/3] ARM: at91/soc: reference the whole sama5d2 family
+In-Reply-To: <1458285681-25684-2-git-send-email-ludovic.desroches@atmel.com>
 References: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20160318103418.GA2531@piout.net>
+ <1458285681-25684-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20160318103428.GB2531@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/2016 at 08:21:19 +0100, Ludovic Desroches wrote :
-> So far, the CIDR and EXID registers were in the DBGU interface. This device
-> has disappeared with the SAMA5D2 family. These registers are exposed
-> through a new device called chipid.
+On 18/03/2016 at 08:21:20 +0100, Ludovic Desroches wrote :
+> Add EXID of all SoCs of the SAMA5D2 family.
 > 
 > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> [nicolas.ferre at atmel.com: remove useless warnings]
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 > ---
->  .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
->  arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
->  2 files changed, 67 insertions(+), 18 deletions(-)
+>  arch/arm/mach-at91/sama5.c | 20 +++++++++++++++++++-
+>  arch/arm/mach-at91/soc.h   | 12 +++++++++++-
+>  2 files changed, 30 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index 7fd64ec..0b1fcbf 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -41,6 +41,10 @@ compatible: must be one of:
->         - "atmel,sama5d43"
->         - "atmel,sama5d44"
->  
-> +Chipid required properties:
-> +- compatible: Should be "atmel,sama5d2-chipid"
-> +- reg : Should contain registers location and length
-> +
->  PIT Timer required properties:
->  - compatible: Should be "atmel,at91sam9260-pit"
->  - reg: Should contain registers location and length
-> diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
-> index 54343ff..034d563 100644
-> --- a/arch/arm/mach-at91/soc.c
-> +++ b/arch/arm/mach-at91/soc.c
-> @@ -22,48 +22,93 @@
+> diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+> index df8fdf1..922b85f 100644
+> --- a/arch/arm/mach-at91/sama5.c
+> +++ b/arch/arm/mach-at91/sama5.c
+> @@ -18,8 +18,26 @@
 >  #include "soc.h"
 >  
->  #define AT91_DBGU_CIDR			0x40
-> -#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
-> -#define AT91_DBGU_CIDR_EXT		BIT(31)
-> -#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
->  #define AT91_DBGU_EXID			0x44
-> +#define AT91_CHIPID_CIDR		0x00
-> +#define AT91_CHIPID_EXID		0x04
-> +#define AT91_CIDR_VERSION(x)		((x) & 0x1f)
-> +#define AT91_CIDR_EXT			BIT(31)
-> +#define AT91_CIDR_MATCH_MASK		0x7fffffe0
+>  static const struct at91_soc sama5_socs[] = {
+> -	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27_EXID_MATCH,
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D21CU_EXID_MATCH,
+> +		 "sama5d21", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D22CU_EXID_MATCH,
+> +		 "sama5d22", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D23CU_EXID_MATCH,
+> +		 "sama5d23", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D24CX_EXID_MATCH,
+> +		 "sama5d24", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D24CU_EXID_MATCH,
+> +		 "sama5d24", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D26CU_EXID_MATCH,
+> +		 "sama5d26", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27CU_EXID_MATCH,
+>  		 "sama5d27", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D27CN_EXID_MATCH,
+> +		 "sama5d27", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28CU_EXID_MATCH,
+> +		 "sama5d28", "sama5d2"),
+> +	AT91_SOC(SAMA5D2_CIDR_MATCH, SAMA5D28CN_EXID_MATCH,
+> +		 "sama5d28", "sama5d2"),
+>  	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D31_EXID_MATCH,
+>  		 "sama5d31", "sama5d3"),
+>  	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D33_EXID_MATCH,
+> diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+> index 8ede0ef..228efde 100644
+> --- a/arch/arm/mach-at91/soc.h
+> +++ b/arch/arm/mach-at91/soc.h
+> @@ -63,7 +63,17 @@ at91_soc_init(const struct at91_soc *socs);
+>  #define AT91SAM9XE512_CIDR_MATCH	0x329aa3a0
 >  
-> -struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
-> +int __init at91_get_cidr_exid_from_dbgu(u32 *cidr, u32 *exid)
->  {
-> -	struct soc_device_attribute *soc_dev_attr;
-> -	const struct at91_soc *soc;
-> -	struct soc_device *soc_dev;
->  	struct device_node *np;
->  	void __iomem *regs;
-> -	u32 cidr, exid;
+>  #define SAMA5D2_CIDR_MATCH		0x0a5c08c0
+> -#define SAMA5D27_EXID_MATCH		0x00000021
+> +#define SAMA5D21CU_EXID_MATCH		0x0000005a
+> +#define SAMA5D22CU_EXID_MATCH		0x00000059
+> +#define SAMA5D22CN_EXID_MATCH		0x00000069
+> +#define SAMA5D23CU_EXID_MATCH		0x00000058
+> +#define SAMA5D24CX_EXID_MATCH		0x00000004
+> +#define SAMA5D24CU_EXID_MATCH		0x00000014
+> +#define SAMA5D26CU_EXID_MATCH		0x00000012
+> +#define SAMA5D27CU_EXID_MATCH		0x00000011
+> +#define SAMA5D27CN_EXID_MATCH		0x00000021
+> +#define SAMA5D28CU_EXID_MATCH		0x00000010
+> +#define SAMA5D28CN_EXID_MATCH		0x00000020
 >  
->  	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
->  	if (!np)
->  		np = of_find_compatible_node(NULL, NULL,
->  					     "atmel,at91sam9260-dbgu");
-> +	if (!np)
-> +		return -ENODEV;
->  
-> -	if (!np) {
-> -		pr_warn("Could not find DBGU node");
-> -		return NULL;
-> +	regs = of_iomap(np, 0);
-> +	of_node_put(np);
-> +
-> +	if (!regs) {
-> +		pr_warn("Could not map DBGU iomem range");
-> +		return -ENXIO;
->  	}
->  
-> +	*cidr = readl(regs + AT91_DBGU_CIDR);
-> +	*exid = readl(regs + AT91_DBGU_EXID);
-> +
-> +	iounmap(regs);
-> +
-> +	return 0;
-> +}
-> +
-> +int __init at91_get_cidr_exid_from_chipid(u32 *cidr, u32 *exid)
-> +{
-> +	struct device_node *np;
-> +	void __iomem *regs;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-chipid");
-> +	if (!np)
-> +		return -ENODEV;
-> +
->  	regs = of_iomap(np, 0);
->  	of_node_put(np);
->  
->  	if (!regs) {
->  		pr_warn("Could not map DBGU iomem range");
-> -		return NULL;
-> +		return -ENXIO;
->  	}
->  
-> -	cidr = readl(regs + AT91_DBGU_CIDR);
-> -	exid = readl(regs + AT91_DBGU_EXID);
-> +	*cidr = readl(regs + AT91_CHIPID_CIDR);
-> +	*exid = readl(regs + AT91_CHIPID_EXID);
->  
->  	iounmap(regs);
->  
-> +	return 0;
-> +}
-> +
-> +struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
-> +{
-> +	struct soc_device_attribute *soc_dev_attr;
-> +	const struct at91_soc *soc;
-> +	struct soc_device *soc_dev;
-> +	u32 cidr, exid;
-> +	int ret;
-> +
-> +	/*
-> +	 * With SAMA5D2 and later SoCs, CIDR and EXID registers are no more
-> +	 * in the dbgu device but in the chipid device whose purpose is only
-> +	 * to expose these two registers.
-> +	 */
-> +	ret = at91_get_cidr_exid_from_dbgu(&cidr, &exid);
-> +	if (ret)
-> +		ret = at91_get_cidr_exid_from_chipid(&cidr, &exid);
-> +	if (ret) {
-> +		if (ret == -ENODEV)
-> +			pr_warn("Could not find identification node");
-> +		return NULL;
-> +	}
-> +
->  	for (soc = socs; soc->name; soc++) {
-> -		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
-> +		if (soc->cidr_match != (cidr & AT91_CIDR_MATCH_MASK))
->  			continue;
->  
-> -		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
-> +		if (!(cidr & AT91_CIDR_EXT) || soc->exid_match == exid)
->  			break;
->  	}
->  
-> @@ -79,7 +124,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
->  	soc_dev_attr->family = soc->family;
->  	soc_dev_attr->soc_id = soc->name;
->  	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
-> -					   AT91_DBGU_CIDR_VERSION(cidr));
-> +					   AT91_CIDR_VERSION(cidr));
->  	soc_dev = soc_device_register(soc_dev_attr);
->  	if (IS_ERR(soc_dev)) {
->  		kfree(soc_dev_attr->revision);
-> @@ -91,7 +136,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
->  	if (soc->family)
->  		pr_info("Detected SoC family: %s\n", soc->family);
->  	pr_info("Detected SoC: %s, revision %X\n", soc->name,
-> -		AT91_DBGU_CIDR_VERSION(cidr));
-> +		AT91_CIDR_VERSION(cidr));
->  
->  	return soc_dev;
->  }
+>  #define SAMA5D3_CIDR_MATCH		0x0a5c07c0
+>  #define SAMA5D31_EXID_MATCH		0x00444300
 > -- 
 > 2.5.0
 > 
