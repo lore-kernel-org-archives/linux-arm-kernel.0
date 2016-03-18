@@ -1,18 +1,43 @@
-From: scott.wood@nxp.com (Scott Wood)
-Date: Fri, 18 Mar 2016 22:54:46 +0000
-Subject: [v6, 2/5] soc: fsl: add GUTS driver for QorIQ platforms
-References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
- <1457518131-11339-3-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <DB5PR0401MB1928302BB0DDE8D9B47E4361918C0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 19 Mar 2016 08:49:00 +0900
+Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
+ (2nd round)
+In-Reply-To: <3064565.apY2TeQbln@wuerfel>
+References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNARJStOBUM7G=8nffXTk_a426o8CRRSX2SL-P0BsH08M7A@mail.gmail.com>
+ <CAK7LNARW9u=btLwc9Pj3VFx_q_unfWu9gH4sHNC3-9gLd0p=pg@mail.gmail.com>
+ <3064565.apY2TeQbln@wuerfel>
+Message-ID: <CAK7LNAT=HuL427P-B5LnetbZ3y667cMoKo+W4i-w-KLfK3a93w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2016 04:18 AM, Yangbo Lu wrote:
-> +#ifdef CONFIG_FSL_GUTS
-> +u32 fsl_guts_get_svr(void);
-> +int fsl_guts_init(void);
-> +#endif
+Hi Arnd,
 
-Don't ifdef prototypes (when not providing a stub alternative).
+2016-03-19 1:49 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 15 March 2016 11:01:00 Masahiro Yamada wrote:
+>> Olof, Arnd,
+>>
+>>
+>> I sent my patches around -rc4 and
+>> took action soon as requested.
+>>
+>> But, my series is still not applied due to the long silence on your side.
+>>
+>> Please respond!
+>
+> Sorry for all the delays, we screwed this one up, and you did everything
+> right. I have put the DT changes into the next/dt2 branch now, and applied
+> the two other patches to next/soc directly.
+>
+> Please check that the for-next branch in arm-soc has everything you need now.
+>
 
--Scott
+I checked both branch and everything is fine.
+
+Thanks you very much!
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
