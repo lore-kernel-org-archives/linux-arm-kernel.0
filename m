@@ -1,107 +1,28 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Mar 2016 08:59:22 +0900
-Subject: [PATCH 12/12] arm64: dts: salvator-x: use generic pinctrl properties
-In-Reply-To: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-References: <1458259162-15706-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1458259162-15706-13-git-send-email-horms+renesas@verge.net.au>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Thu, 17 Mar 2016 20:17:59 -0400
+Subject: [PATCH v2 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <20160317225557.GA4287@linux.vnet.ibm.com>
+References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
+ <1458147733-29338-2-git-send-email-cmetcalf@mellanox.com>
+ <20160317193600.GY6344@twins.programming.kicks-ass.net>
+ <20160317225557.GA4287@linux.vnet.ibm.com>
+Message-ID: <56EB4937.1010404@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
-groups properties") renesas pfc drivers accept generic "function", "pins"
-and "groups" properties.
+On 3/17/2016 6:55 PM, Paul E. McKenney wrote:
+> The RCU stall-warn stack traces can be ugly, agreed.
+>
+> That said, RCU used to use NMI-based stack traces, but switched to the
+> current scheme due to the NMIs having the unfortunate habit of locking
+> things up, which IIRC often meant no stack traces at all.  If I recall
+> correctly, one of the problems was self-deadlock in printk().
 
-This patch updates the kzm9g device tree to use the generic properties.
+Steven Rostedt enabled the per_cpu printk func support in June 2014, and
+the nmi_backtrace code uses it to just capture printk output to percpu
+buffers, so I think it's going to be a lot more robust than earlier attempts.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 46 +++++++++++-----------
- 1 file changed, 23 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index b992b1a3d956..5165d450c10b 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -146,57 +146,57 @@
- 	pinctrl-names = "default";
- 
- 	scif1_pins: scif1 {
--		renesas,groups = "scif1_data_a", "scif1_ctrl";
--		renesas,function = "scif1";
-+		groups = "scif1_data_a", "scif1_ctrl";
-+		function = "scif1";
- 	};
- 	scif2_pins: scif2 {
--		renesas,groups = "scif2_data_a";
--		renesas,function = "scif2";
-+		groups = "scif2_data_a";
-+		function = "scif2";
- 	};
- 	scif_clk_pins: scif_clk {
--		renesas,groups = "scif_clk_a";
--		renesas,function = "scif_clk";
-+		groups = "scif_clk_a";
-+		function = "scif_clk";
- 	};
- 
- 	i2c2_pins: i2c2 {
--		renesas,groups = "i2c2_a";
--		renesas,function = "i2c2";
-+		groups = "i2c2_a";
-+		function = "i2c2";
- 	};
- 
- 	avb_pins: avb {
--		renesas,groups = "avb_mdc";
--		renesas,function = "avb";
-+		groups = "avb_mdc";
-+		function = "avb";
- 	};
- 
- 	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
--		renesas,function = "sdhi0";
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
- 	};
- 
- 	sdhi3_pins: sd3 {
--		renesas,groups = "sdhi3_data4", "sdhi3_ctrl";
--		renesas,function = "sdhi3";
-+		groups = "sdhi3_data4", "sdhi3_ctrl";
-+		function = "sdhi3";
- 	};
- 
- 	sound_pins: sound {
--		renesas,groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
--		renesas,function = "ssi";
-+		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
-+		function = "ssi";
- 	};
- 
- 	sound_clk_pins: sound_clk {
--		renesas,groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
--				 "audio_clkout_a", "audio_clkout3_a";
--		renesas,function = "audio_clk";
-+		groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
-+			 "audio_clkout_a", "audio_clkout3_a";
-+		function = "audio_clk";
- 	};
- 
- 	usb1_pins: usb1 {
--		renesas,groups = "usb1";
--		renesas,function = "usb1";
-+		groups = "usb1";
-+		function = "usb1";
- 	};
- 
- 	usb2_pins: usb2 {
--		renesas,groups = "usb2";
--		renesas,function = "usb2";
-+		groups = "usb2";
-+		function = "usb2";
- 	};
- };
- 
 -- 
-2.1.4
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
