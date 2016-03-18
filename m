@@ -1,76 +1,66 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 18 Mar 2016 17:47:39 +0100
-Subject: [PATCH v2 7/9] efi/arm*: libstub: wire up GOP protocol to struct
- screen_info
+Date: Fri, 18 Mar 2016 17:47:41 +0100
+Subject: [PATCH v2 9/9] efifb: enable the efi-framebuffer platform driver for
+ ARM and arm64
 In-Reply-To: <1458319661-19762-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1458319661-19762-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1458319661-19762-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1458319661-19762-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the code to the ARM and arm64 versions of the UEFI stub to
-populate struct screen_info based on the information received from the
-firmware via the GOP protocol.
+Allows the efifb driver to be built for ARM and arm64. This simply involves
+updating the Kconfig dependency expression, and supplying dummy versions of
+efifb_setup_from_dmi().
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm-stub.c | 23 ++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/include/asm/efi.h   | 4 ++++
+ arch/arm64/include/asm/efi.h | 4 ++++
+ drivers/video/fbdev/Kconfig  | 2 +-
+ 3 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 4deb3e7faa0e..94bd51cfb71e 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -147,6 +147,25 @@ void efi_char16_printk(efi_system_table_t *sys_table_arg,
- 	out->output_string(out, str);
- }
+diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+index be12877e8609..76ce7adde990 100644
+--- a/arch/arm/include/asm/efi.h
++++ b/arch/arm/include/asm/efi.h
+@@ -66,6 +66,10 @@ void efi_virtmap_unload(void);
+ struct screen_info *alloc_screen_info(efi_system_table_t *sys_table_arg);
+ void free_screen_info(efi_system_table_t *sys_table, struct screen_info *si);
  
-+static struct screen_info *setup_graphics(efi_system_table_t *sys_table_arg)
++static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
 +{
-+	efi_guid_t gop_proto = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
-+	efi_status_t status;
-+	unsigned long size;
-+	void **gop_handle = NULL;
-+	struct screen_info *si = NULL;
-+
-+	size = 0;
-+	status = efi_call_early(locate_handle, EFI_LOCATE_BY_PROTOCOL,
-+				&gop_proto, NULL, &size, gop_handle);
-+	if (status == EFI_BUFFER_TOO_SMALL) {
-+		si = alloc_screen_info(sys_table_arg);
-+		if (!si)
-+			return NULL;
-+		efi_setup_gop(sys_table_arg, si, &gop_proto, size);
-+	}
-+	return si;
 +}
++
+ /*
+  * A reasonable upper bound for the uncompressed kernel size is 32 MBytes,
+  * so we will reserve that amount of memory. We have no easy way to tell what
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index ed6c85d3a583..ec43456e3ef1 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -57,6 +57,10 @@ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
+ #define alloc_screen_info(x...)		&screen_info
+ #define free_screen_info(x...)
+ 
++static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
++{
++}
++
+ #define EFI_ALLOC_ALIGN		SZ_64K
  
  /*
-  * This function handles the architcture specific differences between arm and
-@@ -185,6 +204,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	efi_guid_t loaded_image_proto = LOADED_IMAGE_PROTOCOL_GUID;
- 	unsigned long reserve_addr = 0;
- 	unsigned long reserve_size = 0;
-+	struct screen_info *si;
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index 983280e8d93f..e5a391aecde1 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -761,7 +761,7 @@ config FB_VESA
  
- 	/* Check if we were booted by the EFI firmware */
- 	if (sys_table->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
-@@ -233,6 +253,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 			__nokaslr = true;
- 	}
- 
-+	si = setup_graphics(sys_table);
-+
- 	status = handle_kernel_image(sys_table, image_addr, &image_size,
- 				     &reserve_addr,
- 				     &reserve_size,
-@@ -305,6 +327,7 @@ fail_free_image:
- 	efi_free(sys_table, image_size, *image_addr);
- 	efi_free(sys_table, reserve_size, reserve_addr);
- fail_free_cmdline:
-+	free_screen_info(sys_table, si);
- 	efi_free(sys_table, cmdline_size, (unsigned long)cmdline_ptr);
- fail:
- 	return EFI_ERROR;
+ config FB_EFI
+ 	bool "EFI-based Framebuffer Support"
+-	depends on (FB = y) && X86 && EFI
++	depends on (FB = y) && !IA64 && EFI
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
 -- 
 2.5.0
