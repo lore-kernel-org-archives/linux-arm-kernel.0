@@ -1,51 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Mar 2016 14:42:13 -0500
-Subject: [PATCH v2 1/3] Documentation: devicetree: add Freescale RNGC
- binding
-In-Reply-To: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20160318194213.GA10766@rob-hp-laptop>
+Date: Fri, 18 Mar 2016 15:06:17 -0500
+Subject: [PATCH 4/4] dma: qcom_hidma: read the channel id from HW
+In-Reply-To: <1457732994-11175-5-git-send-email-okaya@codeaurora.org>
+References: <1457732994-11175-1-git-send-email-okaya@codeaurora.org>
+ <1457732994-11175-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160318200617.GA28108@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 03:06:38PM +0100, Steffen Trumtrar wrote:
-> Add binding documentation for the Freescale RNGC found on
-> some i.MX2/3/5 SoCs.
+On Fri, Mar 11, 2016 at 04:49:54PM -0500, Sinan Kaya wrote:
+> Removing the flexibility to choose the event channel as there is no real
+> use case right now. We have been using the values in ACPI that match the HW
+> defaults. OS is reading the event-channel from the HW register now.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  Documentation/devicetree/bindings/rng/mxc_rngc.txt | 16 ++++++++++++++++
+>  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  3 --
 
-The MXC name is still not dead?
+Acked-by: Rob Herring <robh@kernel.org>
 
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rng/mxc_rngc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rng/mxc_rngc.txt b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
-> new file mode 100644
-> index 000000000000..e147a6dde40a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rng/mxc_rngc.txt
-> @@ -0,0 +1,16 @@
-> +Freescale RNGC (Random Number Generator Version C)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,imx25-rng"
-
-What about i.MX3/5 compatible strings?
-
-> +- reg : Offset and length of the register set of this block
-> +- interrupts : the interrupt number for the RNG block
-> +- clocks: should contain the RNG clk source
-> +
-> +Example:
-> +
-> +rng at 53fb0000 {
-> +	compatible = "fsl,imx25-rng";
-> +	reg = <0x53fb0000 0x4000>;
-> +	interrupts = <22>;
-> +	clocks = <&trng_clk>;
-> +};
-> -- 
-> 2.7.0
-> 
+>  drivers/dma/qcom/hidma.c                           | 39 +---------------------
+>  2 files changed, 1 insertion(+), 41 deletions(-)
