@@ -1,102 +1,78 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 Mar 2016 02:40:01 +0100
-Subject: [PATCH 05/10] ARM: dts: rockchip: add core rk3288-veyron backlight
- and panel nodes
-In-Reply-To: <1458265206-15733-1-git-send-email-heiko@sntech.de>
-References: <1458265206-15733-1-git-send-email-heiko@sntech.de>
-Message-ID: <1458265206-15733-6-git-send-email-heiko@sntech.de>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 18 Mar 2016 09:54:14 +0800
+Subject: [PATCH] usb: chipidea: Configure DMA properties and ops from DT
+In-Reply-To: <3240370.XdEELlSA8f@wuerfel>
+References: <1456119133-16114-1-git-send-email-bjorn.andersson@linaro.org>
+ <CADRPPNRTXiiVzbqmpX7h_af7Q+qw+-ZB3zDb0855a1U=CmWh-A@mail.gmail.com>
+ <20160314105108.GB2131@shlinux2.ap.freescale.net>
+ <3240370.XdEELlSA8f@wuerfel>
+Message-ID: <20160318015414.GA30851@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Veyron chromebooks share the same panel type, so define the core
-settings for all of them and allow the few runaways to override it later.
+On Thu, Mar 17, 2016 at 04:52:55PM +0100, Arnd Bergmann wrote:
+> On Monday 14 March 2016 18:51:08 Peter Chen wrote:
+> > On Wed, Mar 09, 2016 at 05:16:50PM -0600, Li Yang wrote:
+> > > On Tue, Mar 8, 2016 at 9:40 PM, Bjorn Andersson
+> > > <bjorn.andersson@linaro.org> wrote:
+> > > > On Tue, Mar 8, 2016 at 11:52 AM, Li Yang <leoli@freescale.com> wrote:
+> > > >> On Wed, Mar 2, 2016 at 4:59 PM, Li Yang <leoli@freescale.com> wrote:
+> > > >>> On Mon, Feb 22, 2016 at 4:07 PM, Bjorn Andersson
+> > > >>> <bjorn.andersson@linaro.org> wrote:
+> > > >>>> On Mon 22 Feb 02:03 PST 2016, Srinivas Kandagatla wrote:
+> > > >
+> > > > I had the chance to go through this with Arnd and the verdict is that
+> > > > devices not described in DT should not do DMA (or allocate buffers for
+> > > > doing DMA).
+> > > >
+> > > > So I believe the solution is to fall back on Peter's description; the
+> > > > chipidea driver is the core driver and the Qualcomm code should just
+> > > > be a platform layer.
+> > > >
+> > > > My suggestion is that we turn the chipidea core into a set of APIs
+> > > > that can called by the platform specific pieces. That way we will have
+> > > > the chipidea core be the device described in the DT.
+> > > 
+> > > But like I said, this problem is not just existing for chipidea
+> > > driver.  We already found that the dwc3 driver is also suffering from
+> > > the same issue.  I don't know how many other drivers are impacted by
+> > > this change, but I suspect there will be some. A grep of
+> > > platform_device_add() in driver/ directory returns many possible
+> > > drivers to be impacted.  As far as I know, the
+> > > drivers/net/ethernet/freescale/fman/mac.c is registering child
+> > > ethernet devices that definitely will do dma.   If you want to do this
+> > > kind of rework to all these drivers, it will be a really big effort.
+> > > 
+> > 
+> > +1
+> > 
+> > Yes, I think this DMA things should be covered by driver core too.
+> > 
+> 
+> I don't think it's a very widespread problem, there are only very few
+> developers that intentionally use this method, and some use the
+> platform_device_register_full() call to create a device with a known
+> mask, which is generally ok for the limited case where the driver
+> is only ever going to run on a single platform, but not in the
+> more general case that of_dma_configure is designed to handle.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi | 57 +++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+Even only for qualcomm platforms, it may be possible have different
+DMA masks at ARM64 platforms, so we may can't use a fixed value
+at glue layer driver. So, using of_dma_configure is suitable choice
+for DT platforms for this case, right?
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
-index 610769d..7563d3d 100644
---- a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
-@@ -54,6 +54,50 @@
- 		i2c20 = &i2c_tunnel;
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		brightness-levels = <
-+			  0   1   2   3   4   5   6   7
-+			  8   9  10  11  12  13  14  15
-+			 16  17  18  19  20  21  22  23
-+			 24  25  26  27  28  29  30  31
-+			 32  33  34  35  36  37  38  39
-+			 40  41  42  43  44  45  46  47
-+			 48  49  50  51  52  53  54  55
-+			 56  57  58  59  60  61  62  63
-+			 64  65  66  67  68  69  70  71
-+			 72  73  74  75  76  77  78  79
-+			 80  81  82  83  84  85  86  87
-+			 88  89  90  91  92  93  94  95
-+			 96  97  98  99 100 101 102 103
-+			104 105 106 107 108 109 110 111
-+			112 113 114 115 116 117 118 119
-+			120 121 122 123 124 125 126 127
-+			128 129 130 131 132 133 134 135
-+			136 137 138 139 140 141 142 143
-+			144 145 146 147 148 149 150 151
-+			152 153 154 155 156 157 158 159
-+			160 161 162 163 164 165 166 167
-+			168 169 170 171 172 173 174 175
-+			176 177 178 179 180 181 182 183
-+			184 185 186 187 188 189 190 191
-+			192 193 194 195 196 197 198 199
-+			200 201 202 203 204 205 206 207
-+			208 209 210 211 212 213 214 215
-+			216 217 218 219 220 221 222 223
-+			224 225 226 227 228 229 230 231
-+			232 233 234 235 236 237 238 239
-+			240 241 242 243 244 245 246 247
-+			248 249 250 251 252 253 254 255>;
-+		default-brightness-level = <128>;
-+		enable-gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
-+		backlight-boot-off;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_en>;
-+		pwms = <&pwm0 0 1000000 0>;
-+		pwm-delay-us = <10000>;
-+	};
-+
- 	gpio-charger {
- 		compatible = "gpio-charger";
- 		charger-type = "mains";
-@@ -62,6 +106,13 @@
- 		pinctrl-0 = <&ac_present_ap>;
- 	};
- 
-+	panel: panel {
-+		compatible ="innolux,n116bge", "simple-panel";
-+		status = "okay";
-+		power-supply = <&vcc33_lcd>;
-+		backlight = <&backlight>;
-+	};
-+
- 	/* A non-regulated voltage from power supply or battery */
- 	vccsys: vccsys {
- 		compatible = "regulator-fixed";
-@@ -184,6 +235,12 @@
- 		&suspend_l_sleep
- 	>;
- 
-+	backlight {
-+		bl_en: bl-en {
-+			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	buttons {
- 		ap_lid_int_l: ap-lid-int-l {
- 			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_up>;
+> 
+> I think we should fix the drivers to consistently use the device
+> that was created by the platform (DT or ACPI or board file)
+> to pass that into the DMA API, anything else will just cause
+> more subtle bugs.
+> 
+
+Although I don't know what kinds of bugs it may have, it may be
+met before, otherwise, why most of platform drivers need to call
+dma_set_coherent_mask or dma_coerce_mask_and_coherent explicitly
+
 -- 
-2.6.4
+
+Best Regards,
+Peter Chen
