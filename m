@@ -1,54 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 Mar 2016 17:41:19 +0000
-Subject: [PATCH] arm64: KVM: Turn kvm_ksym_ref into a NOP on VHE
-In-Reply-To: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
-References: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <56EC3DBF.1060600@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 18 Mar 2016 10:44:19 -0700
+Subject: [PATCH v2] mtd: avoid stack overflow in MTD CFI code
+In-Reply-To: <2259988.Lj3BC6sPv6@wuerfel>
+References: <1456748436-522413-1-git-send-email-arnd@arndb.de>
+ <20160304212159.GA55664@google.com> <2259988.Lj3BC6sPv6@wuerfel>
+Message-ID: <20160318174419.GA70362@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Sat, Mar 05, 2016 at 12:25:24AM +0100, Arnd Bergmann wrote:
+> On Friday 04 March 2016 13:21:59 Brian Norris wrote:
+> > 
+> > Looking a little closer at this... why do we need the changes to
+> > include/linux/mtd/map.h again? It should be fine to leave these
+> > definitions as-is, right? They don't contribute to the large stack
+> > usage, do they?
+> > 
+> > Maybe I'm just missing something obvious, so please do enlighten 
+> > 
+> 
+> It's been a while since I created the patch, and the originally
+> failing configuration currently doesn't produce this (probably
+> because something else changed). I remember that it was something
+> rather subtle, but don't exactly remember what happened.
+> 
+> I've reverted the patch now, trying to reproduce it on my
+> randconfig setup, but I might not be able to get back to you
+> in the next week while I'm traveling.
 
-On 18/03/16 17:25, Marc Zyngier wrote:
-> When running with VHE, there is no need to translate kernel pointers
-> to the EL2 memory space, since we're already there (and we have a much
-> saner memory map to start with).
->
-> Unfortunately, kvm_ksym_ref is getting in the way, and the first
-> call into the "hypervisor" section is going to end up in fireworks,
-> since we're now branching into nowhereland. Meh.
->
-> A potential solution is to test if VHE is engaged or not, and only
-> perform the translation in the negative case. With this in place,
-> VHE is able to run again.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm64/include/asm/kvm_asm.h | 8 +++++++-
->   1 file changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index 226f49d..282f907 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -26,7 +26,13 @@
->   #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
->   #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
->
-> -#define kvm_ksym_ref(sym)		phys_to_virt((u64)&sym - kimage_voffset)
-> +#define kvm_ksym_ref(sym)						\
-> +	({								\
-> +		void *val = sym;					\
-> +		if (!is_kernel_in_hyp_mode())				\
-> +			val = phys_to_virt((u64)&sym - kimage_voffset);	\
+FWIW, I took a little look at this, and I can reproduce this myself. I
+can get a large frame size on at least 2 of the 3 functions you report.
+I think most of the gain you get with this patch is due to the Kconfig
+change (MTD_COMPLEX_MAPPINGS) because it forces an extra level of
+indirection. The other changes seem to give a modest decrease in size,
+though it's less clear why exactly.
 
-Is it definitely OK to evaluate sym twice here?
+Anyway, I think the problem isn't primarily with anything you're
+touching here exactly, but with the fact that we're putting several
+copies of the 'map_word' typedef on the stack, and doing assignment to
+it as if it's a typical variable. But with MAP_WIDTH_32, this is a
+32-byte object, and I assume that these (too) long functions are
+introducing enough complexity that the compiler has to have several
+copies of them. To properly fix all this, it seems like the code could
+use some more attention, and not just the superficial changes here.
 
-Robin.
+Anyway, I'm interested if you have any more thoughts on this. If you
+still think this is worthwhile, I can probably just take it. (It looks
+OK, despite the above comments.)
 
-> +		val;							\
-> +	 })
->
->   #ifndef __ASSEMBLY__
->   struct kvm;
->
+Brian
