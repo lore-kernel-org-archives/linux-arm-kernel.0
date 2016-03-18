@@ -1,63 +1,87 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Mar 2016 16:09:46 +0100
-Subject: [PATCH v2 3/5] dmaengine: sun6i: Add 4 as a possible burst value
-In-Reply-To: <20160311172858.6cffb492a18da7da76e7ed94@free.fr>
-References: <cover.1457695169.git.moinejf@free.fr>
- <7898ac737e1cce9542de662f1266d94bd451659e.1457695169.git.moinejf@free.fr>
- <20160311120601.GD8418@lukather>
- <20160311172858.6cffb492a18da7da76e7ed94@free.fr>
-Message-ID: <20160318150946.GO30977@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Mar 2016 15:18:26 +0000
+Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
+ engine driver for mvebu_v7_defconfig
+In-Reply-To: <20160318143059.GD8005@lunn.ch>
+References: <20160318081209.GA7394@archy.home> <20160318131432.GB8005@lunn.ch>
+ <20160318145131.76ffa0e1@free-electrons.com>
+ <20160318143059.GD8005@lunn.ch>
+Message-ID: <20160318151826.GI19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 05:28:58PM +0100, Jean-Francois Moine wrote:
-> On Fri, 11 Mar 2016 13:06:01 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Fri, Mar 18, 2016 at 03:30:59PM +0100, Andrew Lunn wrote:
+> On Fri, Mar 18, 2016 at 02:51:31PM +0100, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > On Fri, 18 Mar 2016 14:14:32 +0100, Andrew Lunn wrote:
+> > 
+> > > Isn't this also applicable to mvebu v5?
+> > > 
+> > > And your change to multi_v7_defconfig could also be applied to
+> > > multi_v5_defconfig.
+> > 
+> > mvebu_v5 already enables a crypto driver, but it's the old one. So
+> > there's a decision to be taken here whether we move all the platforms
+> > to use the new driver or not.
+> > 
+> > The new driver has been tested on the Armada family, and I believe also
+> > on Kirkwood. However I'm pretty sure it hasn't been tested on Dove and
+> > Orion.
 > 
-> > On Fri, Mar 11, 2016 at 12:01:29PM +0100, Jean-Francois Moine wrote:
-> > > Some DMA transfers, as for H3 audio, ask for 4 as a burst value.
-> 	[snip]
-> > > @@ -238,6 +238,8 @@ static inline s8 convert_burst(u32 maxburst)
-> > >  	switch (maxburst) {
-> > >  	case 1:
-> > >  		return 0;
-> > > +	case 4:
-> > > +		return 1;
-> > 
-> > This is true only for the H3.
-> > 
-> > For the other SoCs that we support, the only valid values are 0 and 2,
-> > so we need to reject those values.
-> > 
-> > We should do that based on the compatible.
-> > 
-> > The easiest solution would be to expose the available burst sizes in
-> > the probe, and just our new one if we match that compatible, and any
-> > invalid burst size would be rejected by the framework. Vinod, any
-> > objection to that?
-> 
-> Do you think that we should also check if the requested ports are
-> valid, i.e. have a list/bitmap of the possible input/output ports per
-> SoC, instead of just only the ID of the max port?
+> I don't know crypto to well. Is there a good test case? Something
+> simple to setup and run. I can test on kirkwood and Dove using the
+> hardware i have.
 
-That would require having a map of the possible endpoints for a given
-device, which would be quite difficult to accomplish.
+That's kind of the sticking point for userspace.  As I understand the
+situation, there's been two userspace APIs for crypto - the current
+one, which is network based (af-alg-rr), but performs badly, and
+another (I forget what it's called but it needs kernel patches, but
+is more popular amongst openwrt folk) which I've no experience of.
 
-I don't think customer drivers have access to that anyway, only the
-provider driver is parsing the DT to retrieve the ID. And we already
-trust the DT for so many things it would be a bit pointless to check
-that.
+There's an openssl plugin to talk to the kernel crypto drivers via
+this AF_ALG interface, but you have to hunt around for it and build
+it.  Once built and installed, it needs a bit of configuration:
 
-Maxime
+Towards the top of openssl.cnf:
+
+openssl_conf           = openssl_def
+
+[openssl_def]
+engines                 = engine_section
+
+and further down:
+
+[engine_section]
+af_alg = af_alg_engine
+
+[af_alg_engine]
+# Armada 388:
+#  cbc(des):des-cbc
+#  ecb(aes):des-ecb*
+#  cbc(des3_ede):des-ede3-cbc
+#  ecb(des3_ede):des-ede3-ecb
+#  cbc(des):aes-128-cbc aes-192-cbc aes-256-cbc
+#  ecb(des):aes-128-ecb aes-192-ecb aes-256-ecb
+#CIPHERS=aes-128-cbc aes-192-cbc aes-256-cbc des-cbc des-ede3-cbc
+
+# Armada 388 and Dove can only do md5, sha1 and sha256 in hardware
+DIGESTS=md5 sha256 sha1
+
+# Putting this last means we register the above as the default algorithms
+#default_algorithms     = ALL
+
+I'd suggest for testing purposes, not to put this into the system
+openssl.cnf, but create a copy of that and add the above to that copy.
+Then, run openssl using:
+
+OPENSSL_CONF=/path/to/my/openssl.cnf openssl dgst -md5 FILE
+
+and compare the output with md5sum etc.  strace will confirm whether
+openssl is using the AF_ALG interface (you shoudl see it send()ing the
+data to an accept()'d AF_ALG socket.)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160318/6b12d817/attachment.sig>
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
