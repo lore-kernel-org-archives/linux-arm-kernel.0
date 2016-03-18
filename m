@@ -1,56 +1,32 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 18 Mar 2016 09:59:30 -0700
-Subject: [PATCH v2 4/4] documentation: Fix pinctrl documentation for
- Meson8 / Meson8b
-In-Reply-To: <CACRpkda3j7oxL0wawkLy-eHnP6zmfmBgKbm7=gTDH1xqXhKKUQ@mail.gmail.com>
- (Linus Walleij's message of "Tue, 15 Mar 2016 10:10:32 +0100")
-References: <20160305042646.GL13525@rob-hp-laptop>
- <1457516519-15319-1-git-send-email-carlo@caione.org>
- <CACRpkda3j7oxL0wawkLy-eHnP6zmfmBgKbm7=gTDH1xqXhKKUQ@mail.gmail.com>
-Message-ID: <7h7fgzsowd.fsf@baylibre.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 18 Mar 2016 17:14:24 +0000
+Subject: [PATCH v3 00/16] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <20160318094029.GC10806@cbox>
+References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
+ <56E00A7E.4080101@semihalf.com> <20160313181608.GA15988@cbox>
+ <56E69CCA.5070407@arm.com>
+ <CAFEAcA8r5LDbNG0XVnHnsoYcrfcpfnR3FQ_u=-L7Dop1HFVgxw@mail.gmail.com>
+ <56E6FAEB.1090306@arm.com> <56E700F4.4060308@arm.com>
+ <20160318094029.GC10806@cbox>
+Message-ID: <CAFEAcA95vZD0NvvE5WOKjEdYtebY+gjhDxk+PH5KSG9A8GgRiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On 18 March 2016 at 09:40, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Mon, Mar 14, 2016 at 06:20:36PM +0000, Andre Przywara wrote:
+>> Well, probably there is not so much difference. I was just wondering if
+>> it would be easier to treat that data as an opaque blob.
+>> But you are probably right that it would just mean the difference
+>> between documenting the format or not.
 
-> On Wed, Mar 9, 2016 at 10:41 AM, Carlo Caione <carlo@caione.org> wrote:
->
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Fix pin controller documentation introducing the new compatibles for
->> the pinctrl drivers specific for aobus / cbus.
->>
->> This is needed because we have changed the pin controller driver: we
->> have now a single specialized pinctrl driver / compatible for each bus
->> the controller is attached to, instead of one single driver dealing with
->> all the controllers we have on different buses.
->>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> ---
->> Hey Rob,
->> I'm resubmitting a V2 only for this patch since the driver changes have
->> been already taken by Linus.
-> (...)
->>  Required properties for the root node:
->> - - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
->> + - compatible: one of "amlogic,meson8-cbus-pinctrl"
->> +                     "amlogic,meson8b-cbus-pinctrl"
->> +                     "amlogic,meson8-aobus-pinctrl"
->> +                     "amlogic,meson8b-aobus-pinctrl"
->
-> I guess I just have to merge this. It (IIUC) turns out that the driver is beta
-> and prototypeish and the DT bindings were too early to be etched in stone,
-> and any old device trees using it are not really working anyways.
->
-> We prefer that this not happen because we have a serious control issue
-> when it comes to bindings, but sometimes it happens anyways. Like
-> with divorces and other unfortunate stuff like that.
->
-> Rob are you OK with this change?
+> Even ignoring the migrate-to-TCG case, you cannot treat it as a blob,
+> because you want to be able to migrate between KVM on kernel version X
+> and version Y.
 
-Also, FYI, the driver change was merged without the corresponding DT, so
-this broke booting in linux-next, so either we merge the DT/bindings
-(preferred) or we revert the driver change until the DT/bindings are
-sorted out.
+You could require userspace to treat it as an opaque blob, and
+transparently handle any version-upgrade within the kernel.
+I think having it be documented-to-userspace ABI makes it
+clearer that any format changes are a Big Deal, though.
 
-Kevin
+thanks
+-- PMM
