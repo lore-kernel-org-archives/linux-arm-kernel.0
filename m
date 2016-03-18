@@ -1,42 +1,100 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 18 Mar 2016 18:59:02 +0530
-Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
-In-Reply-To: <20160317075726.GA16882@dhcppc6.redhat.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-4-git-send-email-dave.long@linaro.org>
- <56E858D8.8030300@arm.com>
- <20160316054329.GC28915@dhcppc6.redhat.com>
- <56E9350A.7010909@arm.com>
- <20160317075726.GA16882@dhcppc6.redhat.com>
-Message-ID: <20160318132902.GA29225@dhcppc6.redhat.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 18 Mar 2016 14:32:35 +0100
+Subject: Suspicious error for CMA stress test
+In-Reply-To: <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
+References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
+ <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
+ <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
+ <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
+ <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
+ <56E92AFC.9050208@huawei.com> <20160317065426.GA10315@js1304-P5Q-DELUXE>
+ <56EA77BC.2090702@huawei.com> <56EAD0B4.2060807@suse.cz>
+ <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
+Message-ID: <1458307955.18134.31.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/2016:01:27:26 PM, Pratyush Anand wrote:
-> @David: This patch was added in v9 and fixup_exception() had been dropped in v9.
-> Since, dropping of fixup_exception() also caused to fail some systemtap test
-> cases, so it was added back in v10. I wonder if we really need this patch.
-> May be you can try to run related test case by dropping this patch. 
+Hi Vlastimil, Joonsoo,
 
-Had a closer look to the code, and noticed that fixup_exception() does not have
-any role in handling of page fault of copy_to_user(). Then, why do we have the
-problem.
-Probably, I can see why does not it work. So, when we are single stepping an
-instruction and page fault occurs, we will come to el1_da in entry.S. Here, we
-do enable_dbg. As soon as we will do this, we will start receiving single step
-exception after each instruction (not sure, probably for each alternate
-instruction). Since, there will not be any matching single step handler for
-these instructions, so we will see warning "Unexpected kernel single-step
-exception at EL1". 
+Am Freitag, den 18.03.2016, 00:52 +0900 schrieb Joonsoo Kim:
+> 2016-03-18 0:43 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
+> > On 03/17/2016 10:24 AM, Hanjun Guo wrote:
+> >>
+> >> On 2016/3/17 14:54, Joonsoo Kim wrote:
+> >>>
+> >>> On Wed, Mar 16, 2016 at 05:44:28PM +0800, Hanjun Guo wrote:
+> >>>>
+> >>>> On 2016/3/14 15:18, Joonsoo Kim wrote:
+> >>>>>
+> >>>>> On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
+> >>>>>>
+> >>>>>> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
+> >>>>>>>
+> >>>>>>> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
+> >>>>>>>>
+> >>>>>>>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
+> >>>>>>>>
+> >>>>>>>> How about something like this? Just and idea, probably buggy
+> >>>>>>>> (off-by-one etc.).
+> >>>>>>>> Should keep away cost from <pageblock_order iterations@the
+> >>>>>>>> expense of the
+> >>>>>>>> relatively fewer >pageblock_order iterations.
+> >>>>>>>
+> >>>>>>> Hmm... I tested this and found that it's code size is a little bit
+> >>>>>>> larger than mine. I'm not sure why this happens exactly but I guess
+> >>>>>>> it would be
+> >>>>>>> related to compiler optimization. In this case, I'm in favor of my
+> >>>>>>> implementation because it looks like well abstraction. It adds one
+> >>>>>>> unlikely branch to the merge loop but compiler would optimize it to
+> >>>>>>> check it once.
+> >>>>>>
+> >>>>>> I would be surprised if compiler optimized that to check it once, as
+> >>>>>> order increases with each loop iteration. But maybe it's smart
+> >>>>>> enough to do something like I did by hand? Guess I'll check the
+> >>>>>> disassembly.
+> >>>>>
+> >>>>> Okay. I used following slightly optimized version and I need to
+> >>>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
+> >>>>> to yours. Please consider it, too.
+> >>>>
+> >>>> Hmm, this one is not work, I still can see the bug is there after
+> >>>> applying
+> >>>> this patch, did I miss something?
+> >>>
+> >>> I may find that there is a bug which was introduced by me some time
+> >>> ago. Could you test following change in __free_one_page() on top of
+> >>> Vlastimil's patch?
+> >>>
+> >>> -page_idx = pfn & ((1 << max_order) - 1);
+> >>> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
+> >>
+> >>
+> >> I tested Vlastimil's patch + your change with stress for more than half
+> >> hour, the bug
+> >> I reported is gone :)
+> >
+> >
+> > Oh, ok, will try to send proper patch, once I figure out what to write in
+> > the changelog :)
+> 
+> Thanks in advance!
 
-So, I think, we should 
+After digging into the "PFN busy" race in CMA (see [1]), I believe we
+should just prevent any buddy merging in isolated ranges. This fixes the
+race I'm seeing without the need to hold the zone lock for extend
+periods of time.
+Also any merging done in an isolated range is likely to be completely
+wasted work, as higher order buddy pages are broken up again into single
+pages in isolate_freepages.
 
-(1) may be do not enable debug for el1_da, or
-(2) enable_dbg only when single stepping is not enabled, or
-(3) or disable single stepping during el1_da execution.
+If we do that the patch to fix the bug in question for this report would
+boil down to a check if the current pages buddy is isolated and abort
+merging at that point, right? undo_isolate_page_range will then do all
+necessary merging that has been skipped while the range was isolated.
 
-(1) will solve the issue for sure, but not sure if it could be the best choice.
+Do you see issues with this approach?
 
-Will, what do you suggest?
+Regards,
+Lucas
 
-~Pratyush
+[1] http://thread.gmane.org/gmane.linux.kernel.mm/148383
