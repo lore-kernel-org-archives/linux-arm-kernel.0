@@ -1,86 +1,38 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Fri, 18 Mar 2016 10:08:58 +0000
-Subject: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW protection
-In-Reply-To: <A765B125120D1346A63912DDE6D8B6310BF699D2@NTXXIAMBX02.xacn.micron.com>
-References: <A765B125120D1346A63912DDE6D8B6310BF699D2@NTXXIAMBX02.xacn.micron.com>
-Message-ID: <DB5PR0401MB1912D5517CD6394B7EEE136A948C0@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 18 Mar 2016 10:12:30 +0000
+Subject: [RFC PATCH] arm64: Expose physical/virtual address bits through
+ cpuinfo
+In-Reply-To: <56EB966F.1030609@huawei.com>
+References: <1458209283-44999-1-git-send-email-wangkefeng.wang@huawei.com>
+ <56EA959C.8080005@arm.com> <56EB966F.1030609@huawei.com>
+Message-ID: <56EBD48E.7090406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bean,
+On 18/03/16 05:47, Kefeng Wang wrote:
+>
+>
+> On 2016/3/17 19:31, Suzuki K. Poulose wrote:
+>> On 17/03/16 10:08, Kefeng Wang wrote:
+>>> AArch64 support six types Physical Address range, permitted values
+> [...]
+>>> +static inline int id_aa64mmfr0_parange_bits(void)
+>>
+>> VA_BITS is an attribute of your running kernel and doesn't have anything to do with what
+>> the CPU can support. (e.g, it is 48bit on 8.0, 8.1, but could go upto 52 in 8.2)
+>
+> After check the new id register id_aa64mmfr2 in armv8.2, I think we can use the LVA(larger
+> virtual address) bit of id_aa64mmfr2 to get virtual address bits supported by cpu, what's
+> opinion?
 
-Thanks for your suggestions very much.
-Yes, the flash N25Q128A status register write enable/disable bit is disable in initial state.
-But, This patch aims to clear status register bit[7](write enable/disable bit) to 0, which enables the bit.
-Frankly speaking, I also don't want to add this patch.
-The reason for this is that clear status register bit[7] to 0 is a must to set quad mode to Enhanced Volatile Configuration Register using command SPINOR_OP_WD_EVCR. Otherwise it will output "Micron EVCR Quad bit not clear" in spi-nor.c
-I looked up the datasheet, but I really don't find out any connection between status register bit[7](write enable/disable bit) equals 0 and seting quad mode to Enhanced Volatile Configuration Register.
+Thats the only way to do it.
 
-Just as I want to send the issue to Micron team , could you give me some solutions ?
+>
+> BTW, is it allowed to post patch by me to add more field of id_aa64mmfr2,
 
+Of course. Also, since we use read_system_reg(), the values (pa and va width) won't change
+across the CPUs. Hence, you may avoid multiple extraction routines and reuse the
+results for one iteration.
 
-Thanks 
-Yunhui
-
------Original Message-----
-From: Bean Huo ??? (beanhuo) [mailto:beanhuo at micron.com] 
-Sent: Thursday, March 03, 2016 9:39 PM
-To: Yunhui Cui
-Cc: linux-mtd at lists.infradead.org; dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com; linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
-Subject: Re: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW protection
-
-> From: Yunhui Cui <B56489@freescale.com>
-> To: <dwmw2@infradead.org>, <computersforpeace@gmail.com>,
-> 	<han.xu@freescale.com>
-> Cc: <linux-kernel@vger.kernel.org>, <linux-mtd@lists.infradead.org>,
-> 	<linux-arm-kernel@lists.infradead.org>, <yao.yuan@nxp.com>, Yunhui 
-> Cui
-> 	<yunhui.cui@nxp.com>
-> Subject: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW
-> 	protection
-> Message-ID: <1456988044-37061-4-git-send-email-B56489@freescale.com>
-> Content-Type: text/plain
-> 
-> From: Yunhui Cui <yunhui.cui@nxp.com>
-> 
-> For Micron family ,The status register write enable/disable bit, 
-> provides hardware data protection for the device.
-> When the enable/disable bit is set to 1, the status register 
-> nonvolatile bits become read-only and the WRITE STATUS REGISTER 
-> operation will not execute.
-> 
-> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> ---
->  drivers/mtd/spi-nor/spi-nor.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c 
-> b/drivers/mtd/spi-nor/spi-nor.c index ed0c19c..917f814 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -39,6 +39,7 @@
-> 
->  #define SPI_NOR_MAX_ID_LEN	6
->  #define SPI_NOR_MAX_ADDR_WIDTH	4
-> +#define SPI_NOR_MICRON_WRITE_ENABLE	0x7f
-> 
->  struct flash_info {
->  	char		*name;
-> @@ -1238,6 +1239,14 @@ int spi_nor_scan(struct spi_nor *nor, const 
-> char *name, enum read_mode mode)
->  		write_sr(nor, 0);
->  	}
-> 
-> +	if (JEDEC_MFR(info) == SNOR_MFR_MICRON) {
-> +		ret = read_sr(nor);
-> +		ret &= SPI_NOR_MICRON_WRITE_ENABLE;
-> +
-For Micron the status register write enable/disable bit, its default/factory value is disable.
-Can here first check ,then program?
-> +		write_enable(nor);
-> +		write_sr(nor, ret);
-> +	}
-> +
->  	if (!mtd->name)
->  		mtd->name = dev_name(dev);
->  	mtd->priv = nor;
+Cheers
+Suzuki
