@@ -1,96 +1,59 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 19 Mar 2016 11:48:29 +0100
-Subject: [PATCH v2 1/9] drm: atmel-hlcdc: add a ->cleanup_fb() operation
-In-Reply-To: <20160318175848.GK14170@phenom.ffwll.local>
-References: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
- <1458136663-21396-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160316151738.GQ14170@phenom.ffwll.local>
- <20160317094942.48079e49@bbrezillon>
- <20160318175848.GK14170@phenom.ffwll.local>
-Message-ID: <20160319114829.1e203fed@bbrezillon>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 19 Mar 2016 20:44:00 +0900
+Subject: [PATCH v3 7/8] ARM: dts: Add exynos3250-artik5 dtsi file for
+ ARTIK5 module
+In-Reply-To: <20160318210127.GA21185@rob-hp-laptop>
+References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
+ <1458027490-13787-8-git-send-email-cw00.choi@samsung.com>
+ <20160318210127.GA21185@rob-hp-laptop>
+Message-ID: <CAGTfZH2FCzzJ77e9z7nYgo-S4M77cg3ay4wfOWaN0FTJs5cjZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Mar 2016 18:58:48 +0100
-Daniel Vetter <daniel@ffwll.ch> wrote:
+Hi Rob,
 
-> On Thu, Mar 17, 2016 at 09:49:42AM +0100, Boris Brezillon wrote:
-> > Hi Daniel,
-> > 
-> > On Wed, 16 Mar 2016 16:17:38 +0100
-> > Daniel Vetter <daniel@ffwll.ch> wrote:
-> > 
-> > > On Wed, Mar 16, 2016 at 02:57:35PM +0100, Boris Brezillon wrote:
-> > > > Add a ->cleanup_fb() operation to avoid memory leaks when the atomic
-> > > > operation is interrupted after the ->prepare_fb() call.
-> > > > 
-> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > Fixes 2389fc1 ("drm: atmel-hlcdc: Atomic mode-setting conversion")
-> > > > Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > > Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > > ---
-> > > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  2 ++
-> > > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 22 +++++++++++++++++++---
-> > > >  2 files changed, 21 insertions(+), 3 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> > > > index fed517f..ec64140 100644
-> > > > --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> > > > +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> > > > @@ -81,11 +81,13 @@ struct atmel_hlcdc_plane_properties {
-> > > >   * @layer: HLCDC layer structure
-> > > >   * @properties: pointer to the property definitions structure
-> > > >   * @rotation: current rotation status
-> > > > + * @prepared: flagging the plane has prepared for an atomic update
-> > > >   */
-> > > >  struct atmel_hlcdc_plane {
-> > > >  	struct drm_plane base;
-> > > >  	struct atmel_hlcdc_layer layer;
-> > > >  	struct atmel_hlcdc_plane_properties *properties;
-> > > > +	bool prepared;
-> > > >  };
-> > > >  
-> > > >  static inline struct atmel_hlcdc_plane *
-> > > > diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> > > > index 1ffe9c3..35027d0 100644
-> > > > --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> > > > +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> > > > @@ -715,11 +715,25 @@ static int atmel_hlcdc_plane_prepare_fb(struct drm_plane *p,
-> > > >  					const struct drm_plane_state *new_state)
-> > > >  {
-> > > >  	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
-> > > > +	int ret;
-> > > >  
-> > > > -	if (!new_state->fb)
-> > > > -		return 0;
-> > > > +	ret = atmel_hlcdc_layer_update_start(&plane->layer);
-> > > > +	if (!ret)
-> > > > +		plane->prepared = true;
-> > > 
-> > > Atomic helpers will keep track of this for you, and only call ->cleanup_fb
-> > > on a plane combo where it did (successfully) call ->prepare_fb.
-> > 
-> > Hm, it's not exactly encoding the same thing. What I want to do here is
-> > call atmel_hlcdc_layer_update_rollback() only if the atomic update has
-> > failed (see below, I set ->prepared back to false in the
-> > ->atomic_update() method). AFAICT, ->cleanup_fb() is also called
-> > when the whole operation succeed (and in this case I don't want to
-> > call atmel_hlcdc_layer_update_rollback()).
-> > 
-> > Let me know if you see a better approach to do that.
-> 
-> Ah makes sense. And yeah I guess this is the only approach really. Note
-> that you should put plane_prepared into plane_state though, in case we
-> start to pipeline updates.
+On Sat, Mar 19, 2016 at 6:01 AM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Mar 15, 2016 at 04:38:09PM +0900, Chanwoo Choi wrote:
+>> This patch adds the support for Device Tree source for Samsung ARTIK5 module[1]
+>> based on Exynos3250 SoC. The ARTIK5 module includes the follwoing devices:
+>
+> s/follwoing/following/
 
-Absolutely, I'll move it to the plane state.
+I'll fix it.
 
-Thanks,
+>
+>> - Application Processor (Samsung Exynos3250)
+>> - WiFi/BT Combo chip (Broadcom4354)
+>> - PMIC (Samsung S2MPS14)
+>> - eMMC (4GB)
+>> - DRAM LPDDR3 (512MB)
+>> - Connectors pin (60 Pins x 3 set)
+>>
+>> Also, this patch adds the ARTIK5 evaluation board[2] dts file which includes
+>> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
+>> ethernet port, uart port and so on.
+>>
+>> [1] https://www.artik.io/hardware/artik-5
+>> [2] http://www.digikey.com/product-search/en?FV=ffecca14
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>  .../bindings/arm/samsung/samsung-boards.txt        |   2 +
+>>  arch/arm/boot/dts/Makefile                         |   1 +
+>>  arch/arm/boot/dts/exynos3250-artik5-eval.dts       |  26 ++
+>>  arch/arm/boot/dts/exynos3250-artik5.dtsi           | 334 +++++++++++++++++++++
+>>  4 files changed, 363 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/exynos3250-artik5-eval.dts
+>>  create mode 100644 arch/arm/boot/dts/exynos3250-artik5.dtsi
+>
+> Otherwise,
+>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Boris
+Thanks for your review.
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best Regards,
+Chanwoo Choi
