@@ -1,86 +1,72 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Fri, 18 Mar 2016 19:42:43 -0700
-Subject: [PATCH 2/5] panel-simple: Add the 7" DPI panel from Adafruit.
+Date: Fri, 18 Mar 2016 19:42:44 -0700
+Subject: [PATCH 3/5] drm: Add an encoder and connector type enum for DPI.
 In-Reply-To: <1458355366-7073-1-git-send-email-eric@anholt.net>
 References: <1458355366-7073-1-git-send-email-eric@anholt.net>
-Message-ID: <1458355366-7073-3-git-send-email-eric@anholt.net>
+Message-ID: <1458355366-7073-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a basic TFT panel with a 40-pin FPC connector on it.  The
-specification doesn't define timings, but the Adafruit instructions
-were setting up 800x480 CVT.
+Right now exynos is exposing DPI as a TMDS encoder and VGA connector,
+which seems rather misleading.  This isn't just an internal detail,
+since xrandr actually exposes "VGA" as the output name.  Define some
+new enums so that vc4's DPI can have a more informative name.
+
+I considered other names for the connector as well.  For VC4, the
+Adafruit DPI kippah takes the 28 GPIO pins and routes them to a
+standard-ish 40-pin FPC connector, but "40-pin FPC" doesn't uniquely
+identify an ordering of pins (apparently some other orderings exist),
+doesn't explain things as well for the user (who, if anything, knows
+their product is a DPI kippah/panel combo), and actually doesn't have
+to exist (one could connect the 28 GPIOs directly to something else).
+Simply "DPI" seems like a good compromise name to distinguish from the
+HDMI, DSI, and TV connectors .
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- .../bindings/display/panel/ontat,yx700wv03.txt     |  7 +++++
- drivers/gpu/drm/panel/panel-simple.c               | 33 ++++++++++++++++++++++
- 2 files changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
+ drivers/gpu/drm/drm_crtc.c  | 2 ++
+ include/uapi/drm/drm_mode.h | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt b/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
-new file mode 100644
-index 0000000..3d8a5e0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
-@@ -0,0 +1,7 @@
-+On Tat Industrial Company 7" DPI TFT panel.
-+
-+Required properties:
-+- compatible: should be "ontat,yx700wv03"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index f88a631..6583fdd 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -1176,6 +1176,36 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
- 	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
+index f619121..64bd954 100644
+--- a/drivers/gpu/drm/drm_crtc.c
++++ b/drivers/gpu/drm/drm_crtc.c
+@@ -168,6 +168,7 @@ static struct drm_conn_prop_enum_list drm_connector_enum_list[] = {
+ 	{ DRM_MODE_CONNECTOR_eDP, "eDP" },
+ 	{ DRM_MODE_CONNECTOR_VIRTUAL, "Virtual" },
+ 	{ DRM_MODE_CONNECTOR_DSI, "DSI" },
++	{ DRM_MODE_CONNECTOR_DPI, "DPI" },
  };
  
-+/* 800x480 CVT.  The panel appears to be quite accepting, at least as
-+ * far as pixel clocks, but this is the timing that was being used in
-+ * the Adafruit installation instructions.
-+ */
-+static const struct drm_display_mode ontat_yx700wv03_mode = {
-+	.clock = 29500,
-+	.hdisplay = 800,
-+	.hsync_start = 824,
-+	.hsync_end = 896,
-+	.htotal = 992,
-+	.vdisplay = 480,
-+	.vsync_start = 483,
-+	.vsync_end = 493,
-+	.vtotal = 500,
-+	.vrefresh = 60,
-+};
-+
-+/* Specification at
-+ * https://www.adafruit.com/images/product-files/2406/c3163.pdf
-+ */
-+static const struct panel_desc ontat_yx700wv03 = {
-+	.modes = &ontat_yx700wv03_mode,
-+	.num_modes = 1,
-+	.bpc = 8,
-+	.size = {
-+		.width = 154,
-+		.height = 83,
-+	},
-+};
-+
- static const struct of_device_id platform_of_match[] = {
- 	{
- 		.compatible = "ampire,am800480r3tmqwa1h",
-@@ -1265,6 +1295,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "okaya,rs800480t-7x0gp",
- 		.data = &okaya_rs800480t_7x0gp,
- 	}, {
-+		.compatible = "ontat,yx700wv03",
-+		.data = &ontat_yx700wv03,
-+	}, {
- 		.compatible = "ortustech,com43h4m85ulc",
- 		.data = &ortustech_com43h4m85ulc,
- 	}, {
+ static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
+@@ -179,6 +180,7 @@ static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
+ 	{ DRM_MODE_ENCODER_VIRTUAL, "Virtual" },
+ 	{ DRM_MODE_ENCODER_DSI, "DSI" },
+ 	{ DRM_MODE_ENCODER_DPMST, "DP MST" },
++	{ DRM_MODE_ENCODER_DPI, "DPI" },
+ };
+ 
+ static const struct drm_prop_enum_list drm_subpixel_enum_list[] = {
+diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+index 50adb46..1eb85f7 100644
+--- a/include/uapi/drm/drm_mode.h
++++ b/include/uapi/drm/drm_mode.h
+@@ -202,6 +202,7 @@ struct drm_mode_get_plane_res {
+ #define DRM_MODE_ENCODER_VIRTUAL 5
+ #define DRM_MODE_ENCODER_DSI	6
+ #define DRM_MODE_ENCODER_DPMST	7
++#define DRM_MODE_ENCODER_DPI	8
+ 
+ struct drm_mode_get_encoder {
+ 	__u32 encoder_id;
+@@ -241,6 +242,7 @@ struct drm_mode_get_encoder {
+ #define DRM_MODE_CONNECTOR_eDP		14
+ #define DRM_MODE_CONNECTOR_VIRTUAL      15
+ #define DRM_MODE_CONNECTOR_DSI		16
++#define DRM_MODE_CONNECTOR_DPI		17
+ 
+ struct drm_mode_get_connector {
+ 
 -- 
 2.7.0
