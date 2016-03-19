@@ -1,105 +1,63 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 19 Mar 2016 17:51:24 +0100
-Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM,
- Line and Mic inputs
-In-Reply-To: <20160314104939.GL8418@lukather>
-References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
- <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
- <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
- <20160312085222.226d89bf@scratchpost.org>
- <20160314104939.GL8418@lukather>
-Message-ID: <20160319175124.6bfe3617@scratchpost.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 19 Mar 2016 17:48:14 +0000
+Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
+ engine driver for mvebu_v7_defconfig
+In-Reply-To: <87oaab980n.fsf@free-electrons.com>
+References: <20160318081209.GA7394@archy.home> <20160318131432.GB8005@lunn.ch>
+ <20160318145131.76ffa0e1@free-electrons.com>
+ <87oaab980n.fsf@free-electrons.com>
+Message-ID: <20160319174814.GK1184@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hey all,
 
-> IIRC, in order to have shared controls, you just needed to share the
-> controls structure.
+On Fri, Mar 18, 2016 at 03:26:48PM +0100, Gregory CLEMENT wrote:
+> 
+> (adding Jason Cooper in CC:)
+> 
+> Hi Thomas and Andrew
+>  
+>  On ven., mars 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> 
+> > Hello,
+> >
+> > On Fri, 18 Mar 2016 14:14:32 +0100, Andrew Lunn wrote:
+> >
+> >> Isn't this also applicable to mvebu v5?
+> >> 
+> >> And your change to multi_v7_defconfig could also be applied to
+> >> multi_v5_defconfig.
+> >
+> > mvebu_v5 already enables a crypto driver, but it's the old one. So
+> > there's a decision to be taken here whether we move all the platforms
+> > to use the new driver or not.
+> >
+> > The new driver has been tested on the Armada family, and I believe also
+> > on Kirkwood. However I'm pretty sure it hasn't been tested on Dove and
+> > Orion.
+> >
+> > Dove is ARMv7 and enabled in mvebu_v7_defconfig, but since neither the
+> > old nor the new driver were enabled in mvebu_v7_defconfig, we are not
+> > going to disrupt any existing user here by adding the new driver in the
+> > defconfig.
+> >
+> > Changing mvebu_v5_defconfig, multi_v5_defconfig, orion5x_defconfig and
+> > dove_defconfig however implies moving those defconfigs away from the
+> > old driver, and select the new one instead. A more serious change,
+> > IMO.
+> 
+> 
+> For Dove I don't know if there are users for this module, but for Orion
+> and Kirkwood as they are used in NAS product, I am pretty sure that
+> people use it. I would like to have some feedback about users which have
+> switched to the new driver. I think Jason did it on kirkwood.
 
-Yeah. I did this and it actually works in a way, but in doesn't do all that I want.
+As long as the old driver is still in the tree for fallback, let's go
+ahead and switch the relevant kernel configs over to the new driver.
 
-There are two different kinds of sharing I mean:
+Then, we can deprecate the old driver after a few cycles.
 
-The one kind with the controls structure causes the control to rename itself
-to not state its mixer but there's still just one slider in the end. 
-So instead of "Left Mixer Left XXX" it will just say "Left XXX" if you put it 
-inside Left Mixer and Right Mixer and share the entry - for this hardware, 
-that's of doubtful use.
+thx,
 
-But what I would like to have is that the same Mic Playback Volume (the very 
-same bits) be used for different sliders
-(1) Mic1 Left Channel Playback Volume
-(2) Mic1 Right Channel Playback Volume
-(3) Mic2 Left Channel Playback Volume (!!)
-(4) Mic2 Right Channel Playback Volume
-
-Additionally, Mic1 Playback and Mic2 Playback have two mutes each in the 
-hardware (all separately switchable).
-
-Now if we could make the alsamixer selems look like the following, 
-that would be nice:
-
-Mic1_Playback     Mic2_Playback
-
-  MM                  MM
-  ii                  ii
-  cc                  cc
-
-  PP                  PP
-  ll                  ll
-  aa                  aa
-  yy                  yy
-  bb                  bb
-  aa                  aa
-  cc                  cc
-  kk                  kk
-
-  VV                  VV
-  oo                  oo
-  ll                  ll
-  uu                  uu
-  mm                  mm
-  ee                  ee
-
- [Mm]                [Nn]
-   ^                  ^^-- so are those, separately
-   +-- this one is a different muter :-)
-
-Where the text is the same, it's supposed to signify the same bits 
-in the hardware.
-
-Right now in v8 it's (and that's going to take a lot of horizontal space, 
-sorry - I know E-Mails like this aren't so nice to read):
-
-Mic_Playback_Volume Left_Mic1_Playback_Switch Right_Mic1_Playback_Switch Left_Mic2_Playback_Switch Right_Mic2_Playback_Switch
-
-  MM                  
-  ii                  
-  cc                  
-
-  PP                  
-  ll                  
-  aa                  
-  yy                  
-  bb                  
-  aa                  
-  cc                  
-  kk                  
-
-  VV                  
-  oo                  
-  ll                  
-  uu                  
-  mm                  
-  ee                  
-
-                    [MM]                      [NN]                       [OO]                      [PP]
-                      ^- WTF                   ^- WTF                      ^- WTF                   ^- WTF
-
-(Actually, it's worse - believe it or not, that's how the simplified explanation looks)
-
-> Unfortunately, that is exposed to the user-space. Once it's in, you
-> cannot change it / fix it anymore.
-
-Hmm. Right. Let's get it to work nicely then.
+Jason.
