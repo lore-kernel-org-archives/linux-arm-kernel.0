@@ -1,57 +1,82 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Fri, 18 Mar 2016 21:49:27 -0300
-Subject: [PATCH] [media] media: rename media unregister function
-In-Reply-To: <56EC0EA3.6010108@linux.intel.com>
-References: <2ffc02c944068b2c8655727238d1542f8328385d.1458306276.git.mchehab@osg.samsung.com>
- <56EC0A55.3010803@osg.samsung.com>
- <56EC0CC4.1070309@osg.samsung.com>
- <56EC0DF9.4050601@osg.samsung.com>
- <56EC0EA3.6010108@linux.intel.com>
-Message-ID: <20160318214927.507f715a@recife.lan>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Sat, 19 Mar 2016 09:15:45 +0800
+Subject: [PATCH] drm/rockchip: vop: Reset yrgb_mst when re-enabling
+In-Reply-To: <1458300147-6472-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1458300147-6472-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <56ECA841.40803@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 18 Mar 2016 16:20:19 +0200
-Sakari Ailus <sakari.ailus@linux.intel.com> escreveu:
+On 2016?03?18? 19:22, Tomeu Vizoso wrote:
+> When the VOP is re-enabled, it will start scanning right away the
+> framebuffers that were configured from the last time, even if those have
+> been destroyed already. To prevent the VOP from trying to access freed
+> memory, reset the registers that hold pointers to framebuffers right
+> after we can write to them, but before the VOP is awaken from standby.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Link: http://lkml.kernel.org/g/CAAObsKAv+05ih5U+=4kic_NsjGMhfxYheHR8xXXmacZs+p5SHw at mail.gmail.com
+> ---
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 5e57f5b2e4b0..0df91c28740b 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -429,6 +429,7 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
+>   static void vop_enable(struct drm_crtc *crtc)
+>   {
+>   	struct vop *vop = to_vop(crtc);
+> +	int i;
+>   	int ret;
+>   
+>   	if (vop->is_enabled)
+> @@ -476,6 +477,18 @@ static void vop_enable(struct drm_crtc *crtc)
+>   	 */
+>   	vop->is_enabled = true;
+>   
+> +	/*
+> +	 * Before turning the VOP completely on, unset the registers
+> +	 * containing FB addresses to avoid the HW start scanning old FBs.
+> +	 */
+> +	for (i = 0; i < vop->data->win_size; i++) {
+> +		struct vop_win *vop_win = &vop->win[i];
+> +		const struct vop_win_data *win = vop_win->data;
+> +
+> +		VOP_WIN_SET(vop, win, yrgb_mst, 0x0);
+> +		VOP_WIN_SET(vop, win, uv_mst, 0x0);
+> +	}
+> +
+Hi Tomeu
 
-> Shuah Khan wrote:
-> > On 03/18/2016 08:12 AM, Javier Martinez Canillas wrote:  
-> >> Hello Shuah,
-> >>
-> >> On 03/18/2016 11:01 AM, Shuah Khan wrote:  
-> >>> On 03/18/2016 07:05 AM, Mauro Carvalho Chehab wrote:  
-> >>>> Now that media_device_unregister() also does a cleanup, rename it
-> >>>> to media_device_unregister_cleanup().
-> >>>>
-> >>>> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>  
-> >>>
-> >>> I think adding cleanup is redundant. media_device_unregister()
-> >>> would imply that there has to be some cleanup releasing resources.
-> >>> I wouldn't make this change.
-> >>>  
-> >>
-> >> Problem is that there is a media_device_init() and media_device_register(),
-> >> so having both unregister and cleanup in this function will make very clear
-> >> that a single function is the counter part of the previous two operations.
-> >>    
-> > 
-> > Yes. I realized that this change is motivated by the fact that there is
-> > the media_device_init() and we had the counterpart media_device_cleanup()
-> > as an exported function. I still think there is no need to make the change
-> > to add _cleanup() at the end of media_device_unregister(). It can be handled
-> > in API documentation that it does both.  
-> 
-> I think that's a bad idea. People will only read the documentation when
-> something doesn't work. In this case it's easy to miss that.
+Thanks for your fix.
 
-After thinking about that, I guess the best is to use kref only
-if the media_device_*devres functions are used. With this, we don't
-need to touch at media_device_cleanup().
+Set yrgb_mst and uv_mst is not a good idea, because 0x0 also is a memory 
+buffer address, ddr will access the 0x0 buffer.
+I think you may enable DRM_FBDEV_EMULATION, the 0x0 address is iommu 
+mmaped address for fbdev, so your test can works.
+but if DRM_FBDEV_EMULATION is not define, may be 0x0 address is 
+unmmaped, would get the iommu crash.
 
-Just the patch to the ML:
-	https://patchwork.linuxtv.org/patch/33533/
+I think we can use atomic disable function like this:
+for_each_plane_in_state(old_state, plane, old_plane_state, i) {
+     const struct drm_plane_helper_funcs *funcs;
+     funcs = plane->helper_private;
+     funcs->atomic_disable(plane, old_plane_state);
+}
 
-It was tested with HVR-950Q.
+But I think we'd better find why we need do this hack here.
 
-Regards,
-Mauro
+Does the old FB address is ummaped when crtc disabling? why plane is not 
+disabled?
+
+Thanks.
+
+>   	spin_lock(&vop->reg_lock);
+>   
+>   	VOP_CTRL_SET(vop, standby, 0);
+
+
+-- 
+?ark Yao
