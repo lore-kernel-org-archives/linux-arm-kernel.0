@@ -1,67 +1,103 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 20 Mar 2016 00:57:45 +0100
-Subject: [PATCH 1/2] ARM: socfpga: Add support for HPS LEDs on SoCKit
-Message-ID: <1458431866-9269-1-git-send-email-marex@denx.de>
+Date: Sun, 20 Mar 2016 00:57:46 +0100
+Subject: [PATCH 2/2] ARM: socfpga: Add support for HPS KEYs/SWs on SoCKit
+In-Reply-To: <1458431866-9269-1-git-send-email-marex@denx.de>
+References: <1458431866-9269-1-git-send-email-marex@denx.de>
+Message-ID: <1458431866-9269-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the blue LEDs on the SoCFPGA SoCkit board.
+Add support for the keys and flip-switches on the SoCFPGA SoCkit board.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 32 +++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 62 ++++++++++++++++++++++++++-
+ 1 file changed, 61 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index b61f22f..1461690 100644
+index 1461690..02e22f5 100644
 --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
 +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -39,6 +39,34 @@
- 		ethernet0 = &gmac1;
+@@ -67,6 +67,62 @@
+ 		};
  	};
  
-+	leds {
-+		compatible = "gpio-leds";
++	gpio-keys {
++		compatible = "gpio-keys";
 +
-+		hps_led0 {
-+			label = "hps:blue:led0";
-+			gpios = <&portb 24 0>;	/* HPS_GPIO53 */
-+			linux,default-trigger = "heartbeat";
++		hps_sw0 {
++			label = "hps_sw0";
++			gpios = <&portc 20 0>;	/* HPS_GPI7 */
++			linux,input-type = <5>;	/* EV_SW */
++			linux,code = <0x0>;	/* SW_LID */
 +		};
 +
-+		hps_led1 {
-+			label = "hps:blue:led1";
-+			gpios = <&portb 25 0>;	/* HPS_GPIO54 */
-+			linux,default-trigger = "heartbeat";
++		hps_sw1 {
++			label = "hps_sw1";
++			gpios = <&portc 19 0>;	/* HPS_GPI6 */
++			linux,input-type = <5>;	/* EV_SW */
++			linux,code = <0x5>;	/* SW_DOCK */
 +		};
 +
-+		hps_led2 {
-+			label = "hps:blue:led2";
-+			gpios = <&portb 26 0>;	/* HPS_GPIO55 */
-+			linux,default-trigger = "heartbeat";
++		hps_sw2 {
++			label = "hps_sw2";
++			gpios = <&portc 18 0>;	/* HPS_GPI5 */
++			linux,input-type = <5>;	/* EV_SW */
++			linux,code = <0xa>;	/* SW_KEYPAD_SLIDE */
 +		};
 +
-+		hps_led3 {
-+			label = "hps:blue:led3";
-+			gpios = <&portb 27 0>;	/* HPS_GPIO56 */
-+			linux,default-trigger = "heartbeat";
++		hps_sw3 {
++			label = "hps_sw3";
++			gpios = <&portc 17 0>;	/* HPS_GPI4 */
++			linux,input-type = <5>;	/* EV_SW */
++			linux,code = <0xc>;	/* SW_ROTATE_LOCK */
++		};
++
++		hps_hkey0 {
++			label = "hps_hkey0";
++			gpios = <&portc 21 1>;	/* HPS_GPI8 */
++			linux,code = <187>;	/* KEY_F17 */
++		};
++
++		hps_hkey1 {
++			label = "hps_hkey1";
++			gpios = <&portc 22 1>;	/* HPS_GPI9 */
++			linux,code = <188>;	/* KEY_F18 */
++		};
++
++		hps_hkey2 {
++			label = "hps_hkey2";
++			gpios = <&portc 23 1>;	/* HPS_GPI10 */
++			linux,code = <189>;	/* KEY_F19 */
++		};
++
++		hps_hkey3 {
++			label = "hps_hkey3";
++			gpios = <&portc 24 1>;	/* HPS_GPI11 */
++			linux,code = <190>;	/* KEY_F20 */
 +		};
 +	};
 +
  	regulator_3_3v: vcc3p3-regulator {
  		compatible = "regulator-fixed";
  		regulator-name = "VCC3P3";
-@@ -61,6 +89,10 @@
+@@ -89,11 +145,15 @@
  	rxc-skew-ps = <2000>;
  };
  
-+&gpio1 {	/* GPIO 30..57 */
++&gpio0 {	/* GPIO 0..29 */
 +	status = "okay";
 +};
 +
- &gpio2 {
+ &gpio1 {	/* GPIO 30..57 */
  	status = "okay";
  };
+ 
+-&gpio2 {
++&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
+ 	status = "okay";
+ };
+ 
 -- 
 2.7.0
