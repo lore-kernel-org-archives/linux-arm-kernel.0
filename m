@@ -1,27 +1,21 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 19 Mar 2016 09:04:08 +0100
-Subject: [PATCH v4 1/8] arm64: dts: rockchip: Clean up /memory nodes
-In-Reply-To: <1458136727-32075-2-git-send-email-afaerber@suse.de>
-References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
- <1458136727-32075-2-git-send-email-afaerber@suse.de>
-Message-ID: <2027561.JLzKLXOoFO@phil>
+Date: Sat, 19 Mar 2016 09:31:08 +0100
+Subject: [PATCH v2] ARM: rockchip: Fix use of plain integer as NULL pointer
+In-Reply-To: <1458222191-26023-1-git-send-email-peter.griffin@linaro.org>
+References: <1458222191-26023-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1774724.ZvGCkNYnIY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 16. M?rz 2016, 14:58:39 schrieb Andreas F?rber:
-> A dtc update results in warnings for nodes with reg property but without
-> unit address in the node name, so rename /memory to /memory at 0.
+Am Donnerstag, 17. M?rz 2016, 13:43:11 schrieb Peter Griffin:
+> This fixes the following sparse build warning:
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>      mach-rockchip/platsmp.c:68:43: Using plain integer as NULL pointer
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
-applied to a dts64-fixes branch for 4.6, after changing the commit message to
-----
-A dtc update results in warnings for nodes with reg property but without
-unit address in the node name, so rename /memory to /memory at startaddress
-(memory starts at 0 in the case of the rk3368).
-----
-
-To clarify that the @0 is not arbitary chosen.
+applied to soc32-fixes for 4.6 with Lee's Ack
 
 
+Thanks
 Heiko
