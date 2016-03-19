@@ -1,77 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 19 Mar 2016 18:56:45 -0500
-Subject: [PATCH v2 05/11] dt-bindings: Add bindings for phy-da8xx-usb
-In-Reply-To: <1458181615-27782-6-git-send-email-david@lechnology.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-6-git-send-email-david@lechnology.com>
-Message-ID: <20160319235645.GA14265@rob-hp-laptop>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 20 Mar 2016 00:57:05 +0100
+Subject: [PATCH 2/2] ARM: socfpga: dts: Drop gmac0 from CV dtsi
+In-Reply-To: <1458431825-9159-1-git-send-email-marex@denx.de>
+References: <1458431825-9159-1-git-send-email-marex@denx.de>
+Message-ID: <1458431825-9159-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 09:26:38PM -0500, David Lechner wrote:
-> Device tree binding for new phy-da8xx-usb driver.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
-> 
-> v2 changes: This is new patch in v2.
-> 
-> 
->  .../devicetree/bindings/phy/phy-da8xx-usb.txt      | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt
-> new file mode 100644
-> index 0000000..ed6b710
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt
-> @@ -0,0 +1,34 @@
-> +TI DaVinci DA8XX USB PHY
-> +
-> +Required properties:
-> + - compatible: must be "ti,da830-usbphy".
-> + - #phy-cells: must be 1.
-> + - reg : Address and length of the CFGCHIP2 register.
-> +
-> +This device controls the PHY for both the USB 1.1 OHCI and USB 2.0 OTG
-> +controllers on DA8XX SoCs. Consumers of this device should use index 1 for
+The socfpga_cyclone5.dtsi is included by all DTS files which describe boards
+using the Cyclone V SoC. The Cyclone V SoC has two ethernet controllers and
+different boards use none, one or both of them.
 
-DA8xx
+The /soc/ethernet at ff702000/{} node in socfpga_cyclone5.dtsi unconditionaly
+enabled gmac0 interface, which is clearly wrong for those boards which use
+gmac1 interface instead.
 
-> +the USB 1.1 phy device and index 2 for the USB 2.0 phy device.
-> +
-> +Example:
-> +
-> +	usbphy: usbphy at 1c14184 {
+This patch removes the entire /soc/ethernet at ff702000/{} node from the
+socfpga_cyclone5.dtsi file. This is correct, since all of the board which
+include this file also have correct gmac0 or gmac1 node present in them.
+Minor correction had to be done to EBV SoCrates, which didn't define PHY
+mode explicitly, but inherited it from the socfpga_cyclone5.dtsi .
 
-TI has been doing the unit addresses wrong I've recently found. It 
-should match the reg property, not be the full physical address. Please 
-fix all these in the example.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi         | 5 -----
+ arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 1 +
+ 2 files changed, 1 insertion(+), 5 deletions(-)
 
-> +		compatible = "ti,da830-usbphy";
-> +		#phy-cells = <1>;
-> +		reg = <0x14184 4>;
-> +	};
-> +
-> +	usb11: usb11 at 1e25000 {
-
-usb at ...
-
-> +		compatible = "ti,da830-ohci";
-> +		reg = <0x225000 0x1000>;
-> +		interrupts = <59>;
-> +		phys = <&usbphy 1>;
-> +		phy-names = "usbphy";
-> +	};
-> +
-> +	usb20: usb at 1e00000 {
-> +		compatible = "ti,da830-musb";
-> +		reg = <0x200000 0x1000>;
-> +		interrupts = <58>;
-> +		phys = <&usbphy 2>;
-> +		phy-names = "usbphy";
-> +	};
-> -- 
-> 1.9.1
-> 
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+index 418c19e..a05e3df 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+@@ -38,11 +38,6 @@
+ 			cap-sd-highspeed;
+ 		};
+ 
+-		ethernet at ff702000 {
+-			phy-mode = "rgmii";
+-			status = "okay";
+-		};
+-
+ 		sysmgr at ffd08000 {
+ 			cpu1-start-addr = <0xffd080c4>;
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+index 019dd2f..e1a61f2 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+@@ -36,6 +36,7 @@
+ };
+ 
+ &gmac1 {
++	phy-mode = "rgmii";
+ 	status = "okay";
+ };
+ 
+-- 
+2.7.0
