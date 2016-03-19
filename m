@@ -1,31 +1,67 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 20 Mar 2016 00:57:04 +0100
-Subject: [PATCH 1/2] ARM: socfpga: dts: Drop phy-addr OF property from CV dtsi
-Message-ID: <1458431825-9159-1-git-send-email-marex@denx.de>
+Date: Sun, 20 Mar 2016 00:57:45 +0100
+Subject: [PATCH 1/2] ARM: socfpga: Add support for HPS LEDs on SoCKit
+Message-ID: <1458431866-9269-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy-addr property of stmmac is deprecated and the stmmac driver
-does not use it either. On the contrary, the driver will warn if
-this property is defined. Remove it.
+Add support for the blue LEDs on the SoCFPGA SoCkit board.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/boot/dts/socfpga_cyclone5.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 32 +++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-index 06db951..418c19e 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-@@ -40,7 +40,6 @@
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index b61f22f..1461690 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -39,6 +39,34 @@
+ 		ethernet0 = &gmac1;
+ 	};
  
- 		ethernet at ff702000 {
- 			phy-mode = "rgmii";
--			phy-addr = <0xffffffff>; /* probe for phy addr */
- 			status = "okay";
- 		};
++	leds {
++		compatible = "gpio-leds";
++
++		hps_led0 {
++			label = "hps:blue:led0";
++			gpios = <&portb 24 0>;	/* HPS_GPIO53 */
++			linux,default-trigger = "heartbeat";
++		};
++
++		hps_led1 {
++			label = "hps:blue:led1";
++			gpios = <&portb 25 0>;	/* HPS_GPIO54 */
++			linux,default-trigger = "heartbeat";
++		};
++
++		hps_led2 {
++			label = "hps:blue:led2";
++			gpios = <&portb 26 0>;	/* HPS_GPIO55 */
++			linux,default-trigger = "heartbeat";
++		};
++
++		hps_led3 {
++			label = "hps:blue:led3";
++			gpios = <&portb 27 0>;	/* HPS_GPIO56 */
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
+ 	regulator_3_3v: vcc3p3-regulator {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VCC3P3";
+@@ -61,6 +89,10 @@
+ 	rxc-skew-ps = <2000>;
+ };
  
++&gpio1 {	/* GPIO 30..57 */
++	status = "okay";
++};
++
+ &gpio2 {
+ 	status = "okay";
+ };
 -- 
 2.7.0
