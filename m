@@ -1,103 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 20 Mar 2016 00:57:46 +0100
-Subject: [PATCH 2/2] ARM: socfpga: Add support for HPS KEYs/SWs on SoCKit
-In-Reply-To: <1458431866-9269-1-git-send-email-marex@denx.de>
-References: <1458431866-9269-1-git-send-email-marex@denx.de>
-Message-ID: <1458431866-9269-2-git-send-email-marex@denx.de>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 19 Mar 2016 18:59:05 -0500
+Subject: [PATCH] clk: sunxi: Add CSI (camera's Sensors Interface) module
+ clock driver for sun[457]i
+In-Reply-To: <1458204222-31149-2-git-send-email-yassinjaffer@gmail.com>
+References: <1458204222-31149-1-git-send-email-yassinjaffer@gmail.com>
+ <1458204222-31149-2-git-send-email-yassinjaffer@gmail.com>
+Message-ID: <20160319235905.GA16539@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the keys and flip-switches on the SoCFPGA SoCkit board.
+On Thu, Mar 17, 2016 at 07:43:42PM +1100, yassinjaffer at gmail.com wrote:
+> From: Yassin Jaffer <yassinjaffer@gmail.com>
+> 
+> This patch adds a composite clock type consisting of
+> a clock gate, mux, configurable dividers, and a reset control.
+> 
+> Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 62 ++++++++++++++++++++++++++-
- 1 file changed, 61 insertions(+), 1 deletion(-)
+I wish someone would just add all the sunxi clocks in one pass instead 
+of one by one.
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 1461690..02e22f5 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -67,6 +67,62 @@
- 		};
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		hps_sw0 {
-+			label = "hps_sw0";
-+			gpios = <&portc 20 0>;	/* HPS_GPI7 */
-+			linux,input-type = <5>;	/* EV_SW */
-+			linux,code = <0x0>;	/* SW_LID */
-+		};
-+
-+		hps_sw1 {
-+			label = "hps_sw1";
-+			gpios = <&portc 19 0>;	/* HPS_GPI6 */
-+			linux,input-type = <5>;	/* EV_SW */
-+			linux,code = <0x5>;	/* SW_DOCK */
-+		};
-+
-+		hps_sw2 {
-+			label = "hps_sw2";
-+			gpios = <&portc 18 0>;	/* HPS_GPI5 */
-+			linux,input-type = <5>;	/* EV_SW */
-+			linux,code = <0xa>;	/* SW_KEYPAD_SLIDE */
-+		};
-+
-+		hps_sw3 {
-+			label = "hps_sw3";
-+			gpios = <&portc 17 0>;	/* HPS_GPI4 */
-+			linux,input-type = <5>;	/* EV_SW */
-+			linux,code = <0xc>;	/* SW_ROTATE_LOCK */
-+		};
-+
-+		hps_hkey0 {
-+			label = "hps_hkey0";
-+			gpios = <&portc 21 1>;	/* HPS_GPI8 */
-+			linux,code = <187>;	/* KEY_F17 */
-+		};
-+
-+		hps_hkey1 {
-+			label = "hps_hkey1";
-+			gpios = <&portc 22 1>;	/* HPS_GPI9 */
-+			linux,code = <188>;	/* KEY_F18 */
-+		};
-+
-+		hps_hkey2 {
-+			label = "hps_hkey2";
-+			gpios = <&portc 23 1>;	/* HPS_GPI10 */
-+			linux,code = <189>;	/* KEY_F19 */
-+		};
-+
-+		hps_hkey3 {
-+			label = "hps_hkey3";
-+			gpios = <&portc 24 1>;	/* HPS_GPI11 */
-+			linux,code = <190>;	/* KEY_F20 */
-+		};
-+	};
-+
- 	regulator_3_3v: vcc3p3-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "VCC3P3";
-@@ -89,11 +145,15 @@
- 	rxc-skew-ps = <2000>;
- };
- 
-+&gpio0 {	/* GPIO 0..29 */
-+	status = "okay";
-+};
-+
- &gpio1 {	/* GPIO 30..57 */
- 	status = "okay";
- };
- 
--&gpio2 {
-+&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
- 	status = "okay";
- };
- 
--- 
-2.7.0
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/clk/sunxi/Makefile                        |   1 +
+>  drivers/clk/sunxi/clk-a10-csi.c                   | 188 ++++++++++++++++++++++
+>  3 files changed, 190 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-a10-csi.c
