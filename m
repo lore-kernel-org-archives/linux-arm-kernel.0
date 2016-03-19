@@ -1,75 +1,318 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 19 Mar 2016 15:24:28 +0800
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56EC0C41.70503@suse.cz>
-References: <56DD38E7.3050107@huawei.com> <56DDCB86.4030709@redhat.com>
- <56DE30CB.7020207@huawei.com> <56DF7B28.9060108@huawei.com>
- <CAAmzW4NDJwgq_P33Ru_X0MKXGQEnY5dr_SY1GFutPAqEUAc_rg@mail.gmail.com>
- <56E2FB5C.1040602@suse.cz> <20160314064925.GA27587@js1304-P5Q-DELUXE>
- <56E662E8.700@suse.cz> <20160314071803.GA28094@js1304-P5Q-DELUXE>
- <56E92AFC.9050208@huawei.com> <20160317065426.GA10315@js1304-P5Q-DELUXE>
- <56EA77BC.2090702@huawei.com> <56EAD0B4.2060807@suse.cz>
- <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
- <56EC0C41.70503@suse.cz>
-Message-ID: <56ECFEAC.3010606@huawei.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 19 Mar 2016 08:53:52 +0100
+Subject: [PATCH] ARM: dts: Add dts file for Dserve DSRV9703C tablet
+Message-ID: <1458374032-10077-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/3/18 22:10, Vlastimil Babka wrote:
-> On 03/17/2016 04:52 PM, Joonsoo Kim wrote:
->> 2016-03-18 0:43 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
->>>>>>> Okay. I used following slightly optimized version and I need to
->>>>>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
->>>>>>> to yours. Please consider it, too.
->>>>>> Hmm, this one is not work, I still can see the bug is there after
->>>>>> applying
->>>>>> this patch, did I miss something?
->>>>> I may find that there is a bug which was introduced by me some time
->>>>> ago. Could you test following change in __free_one_page() on top of
->>>>> Vlastimil's patch?
->>>>>
->>>>> -page_idx = pfn & ((1 << max_order) - 1);
->>>>> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
->>>>
->>>> I tested Vlastimil's patch + your change with stress for more than half
->>>> hour, the bug
->>>> I reported is gone :)
->>>
->>> Oh, ok, will try to send proper patch, once I figure out what to write in
->>> the changelog :)
->> Thanks in advance!
->>
-> OK, here it is. Hanjun can you please retest this, as I'm not sure if you had
+The Dserve DSRV9703C is a 9.7" A10 tablet with a 1024x768 ips LCD,
+1G RAM, 4GB flash, a Focaltech FT5406EE8 touchscreen and rtl8188ctv wifi.
 
-I tested this new patch with stress for more than one hour, and it works!
-Since Lucas has comments on it, I'm willing to test further versions if needed.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/Makefile                       |   1 +
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts | 281 +++++++++++++++++++++++
+ 2 files changed, 282 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts
 
-One minor comments below,
-
-> the same code due to the followup one-liner patches in the thread. Lucas, see if
-> it helps with your issue as well. Laura and Joonsoo, please also test and review
-> and check changelog if my perception of the problem is accurate :)
->
-> Thanks
->
-[...]
-> +	if (max_order < MAX_ORDER) {
-> +		/* If we are here, it means order is >= pageblock_order.
-> +		 * We want to prevent merge between freepages on isolate
-> +		 * pageblock and normal pageblock. Without this, pageblock
-> +		 * isolation could cause incorrect freepage or CMA accounting.
-> +		 *
-> +		 * We don't want to hit this code for the more frequent
-> +		 * low-order merging.
-> +		 */
-> +		if (unlikely(has_isolate_pageblock(zone))) {
-
-In the first version of your patch, it's
-
-+		if (IS_ENABLED(CONFIG_CMA) &&
-+				unlikely(has_isolate_pageblock(zone))) {
-
-Why remove the IS_ENABLED(CONFIG_CMA) in the new version?
-
-Thanks
-Hanjun
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a354f7c..31d50a4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -617,6 +617,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-ba10-tvbox.dtb \
+ 	sun4i-a10-chuwi-v7-cw0825.dtb \
+ 	sun4i-a10-cubieboard.dtb \
++	sun4i-a10-dserve-dsrv9703c.dtb \
+ 	sun4i-a10-gemei-g9.dtb \
+ 	sun4i-a10-hackberry.dtb \
+ 	sun4i-a10-hyundai-a7hd.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts b/arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts
+new file mode 100644
+index 0000000..893497e
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts
+@@ -0,0 +1,281 @@
++/*
++ * Copyright 2016 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun4i-a10.dtsi"
++#include "sunxi-common-regulators.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++#include <dt-bindings/pwm/pwm.h>
++
++/ {
++	model = "Dserve DSRV9703C";
++	compatible = "dserve,dsrv9703c", "allwinner,sun4i-a10";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pinctrl-names = "default";
++		pinctrl-0 = <&bl_en_pin_dsrv9703c>;
++		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
++		default-brightness-level = <8>;
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	haptics {
++		compatible = "regulator-haptic";
++		haptic-supply = <&reg_motor>;
++		min-microvolt = <3000000>;
++		max-microvolt = <3000000>;
++	};
++
++	reg_motor: reg_motor {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&motor_pins>;
++		regulator-name = "vcc-motor";
++		regulator-min-microvolt = <3000000>;
++		regulator-max-microvolt = <3000000>;
++		enable-active-high;
++		gpio = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
++	};
++};
++
++&codec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&codec_pa_pin>;
++	allwinner,pa-gpios = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
++	status = "okay";
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupts = <0>;
++	};
++};
++
++#include "axp209.dtsi"
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	/* pull-ups and devices require AXP209 LDO3 */
++	status = "failed";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++
++	ft5406ee8: touchscreen at 38 {
++		compatible = "edt,edt-ft5406";
++		reg = <0x38>;
++		interrupt-parent = <&pio>;
++		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&touchscreen_pins>;
++		reset-gpios = <&pio 1 13 GPIO_ACTIVE_LOW>;
++		touchscreen-size-x = <1024>;
++		touchscreen-size-y = <768>;
++	};
++};
++
++&lradc {
++	vref-supply = <&reg_ldo2>;
++	status = "okay";
++
++	button at 400 {
++		label = "Volume Down";
++		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <400000>;
++	};
++
++	button at 800 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <800000>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&otg_sram {
++	status = "okay";
++};
++
++&pio {
++	bl_en_pin_dsrv9703c: bl_en_pin at 0 {
++		allwinner,pins = "PH7";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	codec_pa_pin: codec_pa_pin at 0 {
++		allwinner,pins = "PH15";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	motor_pins: motor_pins at 0 {
++		allwinner,pins = "PB3";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	touchscreen_pins: touchscreen_pins at 0 {
++		allwinner,pins = "PB13";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PH5";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
++	};
++};
++
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_pins_a>;
++	status = "okay";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1250000>;
++	regulator-max-microvolt = <1250000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb0_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
+-- 
+2.7.3
