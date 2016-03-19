@@ -1,31 +1,41 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Fri, 18 Mar 2016 19:42:42 -0700
-Subject: [PATCH 1/5] of: Add vendor prefix for On Tat Industrial Company.
+Date: Fri, 18 Mar 2016 19:42:46 -0700
+Subject: [PATCH 5/5] ARM: bcm2835: Add the DPI hardware to the device tree.
 In-Reply-To: <1458355366-7073-1-git-send-email-eric@anholt.net>
 References: <1458355366-7073-1-git-send-email-eric@anholt.net>
-Message-ID: <1458355366-7073-2-git-send-email-eric@anholt.net>
+Message-ID: <1458355366-7073-6-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the vendor for a 7" DPI panel sold by Adafruit which I'd like
-to describe in DT.
+It's currently marked disabled, as it's not useful without a panel
+associated with it and the GPIO pins routed to ALT2.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/bcm283x.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 72e2c5a..b35b5f8 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -166,6 +166,7 @@ nxp	NXP Semiconductors
- okaya	Okaya Electric America, Inc.
- olimex	OLIMEX Ltd.
- onnn	ON Semiconductor Corp.
-+ontat	On Tat Industrial Company
- opencores	OpenCores.org
- option	Option NV
- ortustech	Ortus Technology Co., Ltd.
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index bbe4eab..d1e6340 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -166,6 +166,17 @@
+ 			interrupts = <2 14>; /* pwa1 */
+ 		};
+ 
++		dpi: dpi at 7e208000 {
++			compatible = "brcm,bcm2835-dpi";
++			reg = <0x7e208000 0x8c>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>,
++				 <&clocks BCM2835_CLOCK_DPI>;
++			clock-names = "core", "pixel";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		aux: aux at 0x7e215000 {
+ 			compatible = "brcm,bcm2835-aux";
+ 			#clock-cells = <1>;
 -- 
 2.7.0
