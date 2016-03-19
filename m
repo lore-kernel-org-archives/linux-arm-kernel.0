@@ -1,23 +1,62 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 19 Mar 2016 23:18:59 +0800
-Subject: [PATCH] ARM: dts: Add dts file for Dserve DSRV9703C tablet
-In-Reply-To: <1458374032-10077-1-git-send-email-hdegoede@redhat.com>
-References: <1458374032-10077-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v66Hw8_Ckmw0f5GMzP2+73aNbSoOs2MLYu7C85bjUL9huw@mail.gmail.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Sat, 19 Mar 2016 17:13:36 +0100
+Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM,
+ Line and Mic inputs
+In-Reply-To: <20160315105802.GN2566@sirena.org.uk>
+References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
+ <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
+ <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
+ <20160312085222.226d89bf@scratchpost.org>
+ <20160314104939.GL8418@lukather>
+ <20160315105802.GN2566@sirena.org.uk>
+Message-ID: <20160319171336.6e16eb5a@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 19, 2016 at 3:53 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> The Dserve DSRV9703C is a 9.7" A10 tablet with a 1024x768 ips LCD,
-> 1G RAM, 4GB flash, a Focaltech FT5406EE8 touchscreen and rtl8188ctv wifi.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Hi Mark,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+my question is whether it's possible to group together the left and right channel into one selem, and also if it's possible to reuse volumes then. For example:
 
-> ---
->  arch/arm/boot/dts/Makefile                       |   1 +
->  arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts | 281 +++++++++++++++++++++++
->  2 files changed, 282 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts
->
+For sun4i-codec Mic there's right now:
+- Left Mixer Mic1 Playback Switch
+- Left Mixer Mic2 Playback Switch
+- Right Mixer Mic1 Playback Switch
+- Right Mixer Mic2 Playback Switch
+- Mic Playback Volume
+
+If possible, it could also then be collected together as:
+- Mic1 Playback:
+    Left Mixer Mic1 Playback Switch, 
+    Right Mixer Mic1 Playback Switch, 
+    Mic Playback Volume
+- Mic2 Playback:
+    Left Mixer Mic2 Playback Switch, 
+    Right Mixer Mic2 Playback Switch, 
+    Mic Playback Volume [note: there it is again]
+
+... where each outer group (f.e. "- Mic1 Playback:") is a selem (slider with two mutes in alsamixer).
+
+alsamixer has support for seperate left and right channel muting so it would cut down a lot on the number of visible controls.
+
+But as you can see, Mic Playback Volume is also shared.
+
+Is it possible to group them together like this? How?
+
+Right now, while everything technically works, it's overwhelming to use alsamixer with sun4i-codec as a user - you have to *scroll* for quite a while.
+
+Additionally, while I'm at it: 
+
+There's one capture volume right in front of the ADC. Whatever it is you capture, this tells you the gain for the ADC. But for some inputs, there are additional preamps. Right now in the v8 patch we don't distinguish between preamps and ADC gains (because I don't think it's possible), although the user has to kinda distinguish them in his head because for inputs which have preamps only the preamp and the adc gain *together* specify the total gain in the end.
+
+E.g. in the hardware it's
+
+  Mic In -> | Mic Preamp | -> | ADC Gain | -> | ADC |
+
+while in alsamixer it's:
+
+  [Capture Controls:]
+
+  | Mic Preamp |  | Capture Volume | | xyz Preamp | | abc Preamp | | qrs Preamp |
+                    ^--- ADC Gain
+
+Is it possible to somehow distinguish those in alsamixer? Do we want to?
