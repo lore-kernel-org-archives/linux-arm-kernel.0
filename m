@@ -1,65 +1,57 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 18 Mar 2016 16:54:45 -0700
-Subject: [PATCH v2 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
- methods
-In-Reply-To: <56EBCD09.2000400@linaro.org>
-References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
- <1458147733-29338-2-git-send-email-cmetcalf@mellanox.com>
- <20160317193600.GY6344@twins.programming.kicks-ass.net>
- <20160317225557.GA4287@linux.vnet.ibm.com>
- <56EB4937.1010404@mellanox.com>
- <20160318003322.GC4287@linux.vnet.ibm.com>
- <56EBCD09.2000400@linaro.org>
-Message-ID: <20160318235445.GG4287@linux.vnet.ibm.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Fri, 18 Mar 2016 21:49:27 -0300
+Subject: [PATCH] [media] media: rename media unregister function
+In-Reply-To: <56EC0EA3.6010108@linux.intel.com>
+References: <2ffc02c944068b2c8655727238d1542f8328385d.1458306276.git.mchehab@osg.samsung.com>
+ <56EC0A55.3010803@osg.samsung.com>
+ <56EC0CC4.1070309@osg.samsung.com>
+ <56EC0DF9.4050601@osg.samsung.com>
+ <56EC0EA3.6010108@linux.intel.com>
+Message-ID: <20160318214927.507f715a@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 09:40:25AM +0000, Daniel Thompson wrote:
-> On 18/03/16 00:33, Paul E. McKenney wrote:
-> >On Thu, Mar 17, 2016 at 08:17:59PM -0400, Chris Metcalf wrote:
-> >>On 3/17/2016 6:55 PM, Paul E. McKenney wrote:
-> >>>The RCU stall-warn stack traces can be ugly, agreed.
-> >>>
-> >>>That said, RCU used to use NMI-based stack traces, but switched to the
-> >>>current scheme due to the NMIs having the unfortunate habit of locking
-> >>>things up, which IIRC often meant no stack traces at all.  If I recall
-> >>>correctly, one of the problems was self-deadlock in printk().
+Em Fri, 18 Mar 2016 16:20:19 +0200
+Sakari Ailus <sakari.ailus@linux.intel.com> escreveu:
+
+> Shuah Khan wrote:
+> > On 03/18/2016 08:12 AM, Javier Martinez Canillas wrote:  
+> >> Hello Shuah,
 > >>
-> >>Steven Rostedt enabled the per_cpu printk func support in June 2014, and
-> >>the nmi_backtrace code uses it to just capture printk output to percpu
-> >>buffers, so I think it's going to be a lot more robust than earlier attempts.
-> >
-> >That would be a very good thing, give or take the "I think" qualifier.
-> >And assuming that the target CPU is healthy enough to find its way back
-> >to some place that can dump the per-CPU printk buffer.  I might well
-> >be overly paranoid, but I have to suspect that the probability of that
-> >buffer getting dumped is reduced greatly on a CPU that isn't healthy
-> >enough to respond to RCU, though.
+> >> On 03/18/2016 11:01 AM, Shuah Khan wrote:  
+> >>> On 03/18/2016 07:05 AM, Mauro Carvalho Chehab wrote:  
+> >>>> Now that media_device_unregister() also does a cleanup, rename it
+> >>>> to media_device_unregister_cleanup().
+> >>>>
+> >>>> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>  
+> >>>
+> >>> I think adding cleanup is redundant. media_device_unregister()
+> >>> would imply that there has to be some cleanup releasing resources.
+> >>> I wouldn't make this change.
+> >>>  
+> >>
+> >> Problem is that there is a media_device_init() and media_device_register(),
+> >> so having both unregister and cleanup in this function will make very clear
+> >> that a single function is the counter part of the previous two operations.
+> >>    
+> > 
+> > Yes. I realized that this change is motivated by the fact that there is
+> > the media_device_init() and we had the counterpart media_device_cleanup()
+> > as an exported function. I still think there is no need to make the change
+> > to add _cleanup() at the end of media_device_unregister(). It can be handled
+> > in API documentation that it does both.  
 > 
-> The target CPU doesn't dump the buffer. It "just" fields the NMI,
-> stores the backtrace and sets a flag.
-> 
-> The buffer is dumped to console by the requesting CPU, either when
-> all backtraces have come back or when a timeout is reached.
+> I think that's a bad idea. People will only read the documentation when
+> something doesn't work. In this case it's easy to miss that.
 
-That does sound a bit more robust, good!
+After thinking about that, I guess the best is to use kref only
+if the media_device_*devres functions are used. With this, we don't
+need to touch at media_device_cleanup().
 
-> >But it seems like enabling the experiment might be useful.
-> >
-> >"Try enabling the NMI version.  If that doesn't get you your RCU CPU
-> >stall warning stack trace, try the remote-print variant."
-> >
-> >Or I suppose we could just do both in succession, just in case their
-> >console was a serial port.  ;-)
-> 
-> I guess both might be needed but only when the target CPU is dead
-> enough to fail to respond to NMI. In principle, we could exploit the
-> timeout in the NMI backtrace logic and only issue the missing
-> backtraces.
+Just the patch to the ML:
+	https://patchwork.linuxtv.org/patch/33533/
 
-It would be really nice if I could call one function that used the
-best strategy for getting information (including stack trace) about a
-specified CPU.  Ditto for getting information about a specified task,
-which might be running or might be preempted at the time.
+It was tested with HVR-950Q.
 
-							Thanx, Paul
+Regards,
+Mauro
