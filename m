@@ -1,42 +1,35 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 19 Mar 2016 10:13:47 +0100
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun6i: Add serial0 alias and
- stdout-path to a31s-primo81.dts
-In-Reply-To: <20160318174839.GQ30977@lukather>
-References: <1458137962-27714-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v67+V1JdaG2ypgj5sXyzxiwZhYC_z_1sye5HpnMvcE_QfA@mail.gmail.com>
- <20160318174839.GQ30977@lukather>
-Message-ID: <56ED184B.9000609@redhat.com>
+From: tilman@imap.cc (Tilman Schmidt)
+Date: Sat, 19 Mar 2016 11:27:25 +0100
+Subject: [PATCH 2/2] isdn: i4l: move active-isdn drivers to staging
+In-Reply-To: <87lh5udbcv.fsf@gmail.com>
+References: <1456945629-1793533-1-git-send-email-arnd@arndb.de>
+ <1456945629-1793533-2-git-send-email-arnd@arndb.de>
+ <56D7F62E.6050502@linux-pingi.de> <1659125.tHp8H942OG@wuerfel>
+ <87lh5udbcv.fsf@gmail.com>
+Message-ID: <56ED298D.4020100@imap.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am 07.03.2016 um 07:57 schrieb Holger Schurig:
+> I know that in Germany a good amount of land-line telephone line are
+> still using ISDN. [...]
+> Especially company line are using ISDN still, and there are some Linux
+> programs that act on then, e.g. Asterisk and derived PBX software has
+> ISDN support which is actively used.
 
-On 18-03-16 18:48, Maxime Ripard wrote:
-> On Thu, Mar 17, 2016 at 02:28:03PM +0800, Chen-Yu Tsai wrote:
->> On Wed, Mar 16, 2016 at 10:19 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> u-boot uses the kernel as the canonical source for its sunxi dts files
->>> and u-boot needs these.
->>>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
->
-> Queued, thanks!
+AFAIK none of these uses I4L anymore. Asterisk dropped I4L support with
+version 2 if my memory is correct and nowadays uses CAPI, mISDN or its
+own DAHDI interface.
 
-I just got an of-list mail from Karsten Merker that you nacked the addition
-if this during the initial submission, because there are no accessible uart
-test pads on this tablet.
+-- 
+Tilman Schmidt                              E-Mail: tilman at imap.cc
+Bonn, Germany
+Nous, on a des fleurs et des bougies pour nous prot?ger.
 
-In that case the proper fix would be to change the u-boot defconfig to have:
-
-# CONFIG_REQUIRE_SERIAL_CONSOLE is not set
-
-Which will stop u-boot from panicking (with nowhere to print the panic msg)
-when it has no stdout-path.
-
-Can you unqueue this one until we've figured out what the best fix is ?
-
-Thanks & Regards,
-
-Hans
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160319/57f56281/attachment-0001.sig>
