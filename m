@@ -1,118 +1,79 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 20 Mar 2016 17:00:34 +0100
-Subject: [PATCH 6/8] ARM: dts: sun8i: Add leds and switches on Orangepi Plus
- boards
+Date: Sun, 20 Mar 2016 17:00:35 +0100
+Subject: [PATCH 7/8] ARM: dts: sun8i: Add wifi dt node on Orangepi Plus boards
 In-Reply-To: <1458489636-2825-1-git-send-email-hdegoede@redhat.com>
 References: <1458489636-2825-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1458489636-2825-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <1458489636-2825-8-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Adamski <k@japko.eu>
+The Orangepi Plus and Orangepi Plus 2 have a realtek rtl8189etv sdio
+wifi chip. This commit adds a device-tree node to power it up, so
+that the mmc subsys can scan it, and enables the mmc controller which
+is connected to it.
 
-OrangePi Plus board has two leds - green ("pwr") and red ("status")
-and two switches ("sw4" and "sw2"). This patch describes them in
-devicetree.
+Note that this just makes the wifi controller show up as a sdio device.
+In order for it to work a compatible sdio driver is necessary, an out
+of tree driver is available here:
+https://github.com/jwrdegoede/rtl8189ES_linux/
 
-Signed-off-by: Krzysztof Adamski <k@japko.eu>
+Binding the driver is not done through device tree, but through sdio
+vendor- and device-id, so it can safely be enabled in devicetree
+without having a driver upstream yet.
+
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
-Changes in v6 (hdegoede):
--Merge leds and r_leds nodes into one
--Fix led labels to be in <board>:<colour>:<role> form
--Alphabetically sort the added nodes
--Add support for sw2 (this is the small reset-like button)
----
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 63 ++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index a680b1f..a7cdfd0 100644
+index a7cdfd0..f5aa694 100644
 --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
 +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -45,6 +45,7 @@
- #include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
-@@ -59,6 +60,43 @@
- 		stdout-path = "serial0:115200n8";
+@@ -108,6 +108,13 @@
+ 		enable-active-high;
+ 		gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
  	};
- 
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		input-name = "sw4";
 +
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&sw_r_opc>;
-+
-+		sw2 at 0 {
-+			label = "sw2";
-+			linux,code = <BTN_1>;
-+			gpios = <&r_pio 0 4 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		sw4 at 0 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
++		pinctrl-0 = <&wifi_pwrseq_pin_orangepi>;
++		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 WIFI_EN */
 +	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
-+
-+		status_led {
-+			label = "orangepi-plus:red:status";
-+			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		pwr_led {
-+			label = "orangepi-plus:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+
- 	reg_usb3_vbus: usb3-vbus {
- 		compatible = "regulator-fixed";
- 		pinctrl-names = "default";
-@@ -72,6 +110,31 @@
- 	};
  };
  
-+&pio {
-+	leds_opc: led_pins at 0 {
-+		allwinner,pins = "PA15";
+ &pio {
+@@ -156,6 +163,13 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
++
++	wifi_pwrseq_pin_orangepi: wifi_pwrseq_pin at 0 {
++		allwinner,pins = "PL7";
 +		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 +	};
-+};
-+
-+&r_pio {
-+	leds_r_opc: led_pins at 0 {
-+		allwinner,pins = "PL10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	sw_r_opc: key_pins at 0 {
-+		allwinner,pins = "PL03", "PL04";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
- &ehci1 {
+ };
+ 
+ &mmc0 {
+@@ -168,6 +182,16 @@
  	status = "okay";
  };
+ 
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
+ &reg_usb1_vbus {
+ 	gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
 -- 
 2.7.3
