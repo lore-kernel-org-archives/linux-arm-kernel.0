@@ -1,63 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 20 Mar 2016 17:00:36 +0100
-Subject: [PATCH 8/8] ARM: dts: sun8i: Add eMMC dt node on Orangepi Plus boards
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 21 Mar 2016 00:05:08 +0800
+Subject: [PATCH 0/8] ARM: dts: sun8i: Orangepi Plus dts improvements
 In-Reply-To: <1458489636-2825-1-git-send-email-hdegoede@redhat.com>
 References: <1458489636-2825-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1458489636-2825-9-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v65THg3fcdTJvFBCxxbSU_vOWmB9tP4f2QUbPyUU9D=zig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orangepi Plus has a 16GB eMMC, the vcc, the lack of pull-ups and
-the use of the hw-reset pin have all been verified with the board
-schematic.
+Hi,
 
-With this dts node for mmc2, the eMMC runs at the following ios settings:
-clock:          52000000 Hz
-vdd:            21 (3.3 ~ 3.4 V)
-bus mode:       2 (push-pull)
-chip select:    0 (don't care)
-power mode:     2 (on)
-bus width:      3 (8 bits)
-timing spec:    8 (mmc DDR52)
-signal voltage: 0 (3.30 V)
-driver type:    0 (driver type B)
+On Mon, Mar 21, 2016 at 12:00 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi Maxime and Chen-Yu,
+>
+> Here is a series with various improvements for the Orangepi Plus dts.
+> Some (most) of these patches have been submitted before, esp. the USB
+> ones have multiple revisions before. But I lost count of their version,
+> so I'm posting this as a "new" set.
+>
+> About the USB patches, these rely on the patches to add support for
+> multiple-reset controllers to ohci-platform / ehci-platform. These
+> patches are all acked up and will go upstream as soon as v4.6-rc1 is
+> released (they depend on changes which will go into v4.6-rc1).
 
-Note the mmcblk1boot0/boot1 partitions are unused as the BROM will load
-the SPL from 8k from the start of the main blockdev, just as with a
-regular sdcard in mmc0.
+Does this mean you or I can send the Orange Pi PC DTS patch?
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Thanks
+ChenYu
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index f5aa694..7129aff 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -192,6 +192,23 @@
- 	status = "okay";
- };
- 
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&mmc2_8bit_pins {
-+	/* Increase drive strength for DDR modes */
-+	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
-+	/* eMMC is missing pull-ups */
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+};
-+
- &reg_usb1_vbus {
- 	gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
--- 
-2.7.3
+> The old ohci-platform / ehci-platform will only look at the first reset
+> specified in the dt and as such will fail to load with the new dt nodes
+> (because they cannot talk to the controller).
+>
+> I've also included a v6 of Krzysztof Adamski <k@japko.eu> leds / switches
+> patch, fixing the comments you had in your review of v5. I've done this
+> to avoid conflicts with my other patches.
+>
+> Regards,
+>
+> Hans
