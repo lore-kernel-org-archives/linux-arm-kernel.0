@@ -1,73 +1,91 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sun, 20 Mar 2016 15:55:49 +0900
-Subject: [PATCH v2 3/5] dt-bindings: Add documentation for GM20B GPU
-In-Reply-To: <20160318204748.GA20243@rob-hp-laptop>
-References: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
- <1458010724-10945-4-git-send-email-acourbot@nvidia.com>
- <20160318204748.GA20243@rob-hp-laptop>
-Message-ID: <CAAVeFuKQvjb20aEh9_MBnrzEUjKoVc8yQu3a4Ego6Qaqe70M6A@mail.gmail.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Sun, 20 Mar 2016 08:29:51 +0100
+Subject: PCI: imx6: Factor out ref clock enable
+In-Reply-To: <1457911855.16725.41.camel@googlemail.com>
+References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+ <1456411669-4699-3-git-send-email-chf.fritz@googlemail.com>
+ <20160311175850.GA4725@localhost>
+ <1457911590.16725.37.camel@googlemail.com>
+ <1457911855.16725.41.camel@googlemail.com>
+Message-ID: <1458458991.1884.0.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 19, 2016 at 5:47 AM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Mar 15, 2016 at 11:58:42AM +0900, Alexandre Courbot wrote:
->> GM20B's definition is mostly similar to GK20A's, but requires an
->> additional clock.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> ---
->>  .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 27 ++++++++++++++++++++--
->>  1 file changed, 25 insertions(+), 2 deletions(-)
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
-> One nit below.
->
->>
->> diff --git a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
->> index 1e3748337319..d9ad6b87fbbc 100644
->> --- a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
->> +++ b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
->> @@ -1,9 +1,10 @@
->> -NVIDIA GK20A Graphics Processing Unit
->> +NVIDIA Tegra Graphics Processing Units
->>
->>  Required properties:
->>  - compatible: "nvidia,<gpu>"
->>    Currently recognized values:
->>    - nvidia,gk20a
->> +  - nvidia,gm20b
->>  - reg: Physical base address and length of the controller's registers.
->>    Must contain two entries:
->>    - first entry for bar0
->> @@ -19,6 +20,9 @@ Required properties:
->>  - clock-names: Must include the following entries:
->>    - gpu
->>    - pwr
->> +If the compatible string is "nvidia,gm20b", then the following clock
->> +is also required:
->> +  - ref
->>  - resets: Must contain an entry for each entry in reset-names.
->>    See ../reset/reset.txt for details.
->>  - reset-names: Must include the following entries:
->> @@ -27,7 +31,7 @@ Required properties:
->>  Optional properties:
->>  - iommus: A reference to the IOMMU. See ../iommu/iommu.txt for details.
->>
->> -Example:
->> +Example for GK20A:
->>
->>       gpu at 0,57000000 {
->>               compatible = "nvidia,gk20a";
->> @@ -45,3 +49,22 @@ Example:
->>               iommus = <&mc TEGRA_SWGROUP_GPU>;
->>               status = "disabled";
->>       };
->> +
->> +Example for GM20B:
->> +
->> +     gpu at 0,57000000 {
->
-> Drop the comma and leading zero.
 
-Even though this is how it appears in the actual DT?
+*ping*
+
+On Mon, 2016-03-14 at 00:30 +0100, Christoph Fritz wrote:
+> commit dfcc1a16e6954e8ca6cadfc9dd309db6b6ef46b2
+> Author: Bjorn Helgaas <bhelgaas@google.com>
+> Date: Fri, 11 Mar 2016 11:15:36 -0600
+> 
+> Factor out ref clock enable to make it cleaner to add imx6sx support.  No
+> functional change intended.
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> Tested-by: Christoph Fritz <chf.fritz@googlemail.com>
+> ---
+>  drivers/pci/host/pci-imx6.c | 36 ++++++++++++++++++++++++------------
+>  1 file changed, 24 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index bd3f7d0..4e0e47f 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -264,6 +264,23 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  	return 0;
+>  }
+>  
+> +static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
+> +{
+> +	/* power up core phy and enable ref clock */
+> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> +	/*
+> +	 * the async reset input need ref clock to sync internally,
+> +	 * when the ref clock comes after reset, internal synced
+> +	 * reset time is too short, cannot meet the requirement.
+> +	 * add one ~10us delay here.
+> +	 */
+> +	udelay(10);
+> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> +	return 0;
+> +}
+> +
+>  static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  {
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> @@ -287,18 +304,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  		goto err_pcie;
+>  	}
+>  
+> -	/* power up core phy and enable ref clock */
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> -	/*
+> -	 * the async reset input need ref clock to sync internally,
+> -	 * when the ref clock comes after reset, internal synced
+> -	 * reset time is too short, cannot meet the requirement.
+> -	 * add one ~10us delay here.
+> -	 */
+> -	udelay(10);
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> +	ret = imx6_pcie_enable_ref_clk(imx6_pcie);
+> +	if (ret) {
+> +		dev_err(pp->dev, "unable to enable pcie ref clock\n");
+> +		goto err_ref_clk;
+> +	}
+>  
+>  	/* allow the clocks to stabilize */
+>  	usleep_range(200, 500);
+> @@ -311,6 +321,8 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  	}
+>  	return 0;
+>  
+> +err_ref_clk:
+> +	clk_disable_unprepare(imx6_pcie->pcie);
+>  err_pcie:
+>  	clk_disable_unprepare(imx6_pcie->pcie_bus);
+>  err_pcie_bus:
