@@ -1,141 +1,122 @@
-From: lakshmi.sai.krishna.potthuri@xilinx.com (P L Sai Krishna)
-Date: Mon, 21 Mar 2016 17:50:09 +0530
-Subject: [LINUX PATCH 2/2] spi:zynqmp:gqspi: Added separate dummy entry.
-In-Reply-To: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
-References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
-Message-ID: <1458562809-36114-2-git-send-email-lakshmis@xilinx.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 20 Mar 2016 21:21:40 +0100
+Subject: [GIT PULL 0/8] ARM: SoC changes for 4.6
+Message-ID: <10465240.PKeEEAAbCF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sends dummy as a separate entry.
-Break the Address+Cmd+dummy transfer into multiple transfers.
-Address+Cmd as one transfer.
-Dummy cycles as another transfer.
-As per the controller spec, immediate data field of dummy entry
-in the GenFifo represent dummy cycles.
-Bus width for dummy cycles transfer should be same as
-Rx bus width.
+Hi Linus,
 
-Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
----
- drivers/spi/spi-zynqmp-gqspi.c | 57 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 55 insertions(+), 2 deletions(-)
+Here are the arm-soc changes changes for 4.6. Nothing unusual this time, but the
+previous trends continue:
 
-diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
-index aab9b49..9393b1e 100644
---- a/drivers/spi/spi-zynqmp-gqspi.c
-+++ b/drivers/spi/spi-zynqmp-gqspi.c
-@@ -134,6 +134,9 @@
- #define GQSPI_SELECT_MODE_QUADSPI	0x4
- #define GQSPI_DMA_UNALIGN		0x3
- #define GQSPI_DEFAULT_NUM_CS	1	/* Default number of chip selects */
-+#define GQSPI_RX_BUS_WIDTH_QUAD		0x4
-+#define GQSPI_RX_BUS_WIDTH_DUAL		0x2
-+#define GQSPI_RX_BUS_WIDTH_SINGLE	0x1
- 
- enum mode_type {GQSPI_MODE_IO, GQSPI_MODE_DMA};
- 
-@@ -169,6 +172,7 @@ struct zynqmp_qspi {
- 	u32 genfifobus;
- 	u32 dma_rx_bytes;
- 	dma_addr_t dma_addr;
-+	u32 rx_bus_width;
- 	u32 genfifoentry;
- 	enum mode_type mode;
- };
-@@ -541,6 +545,35 @@ static void zynqmp_qspi_filltxfifo(struct zynqmp_qspi *xqspi, int size)
- }
- 
- /**
-+ * zynqmp_qspi_preparedummy:	Prepares the dummy entry
-+ *
-+ * @xqspi:	Pointer to the zynqmp_qspi structure
-+ * @transfer:	It is a pointer to the structure containing transfer data.
-+ * @genfifoentry:	genfifoentry is pointer to the variable in which
-+ *			GENFIFO	mask is returned to calling function
-+ */
-+static void zynqmp_qspi_preparedummy(struct zynqmp_qspi *xqspi,
-+					struct spi_transfer *transfer,
-+					u32 *genfifoentry)
-+{
-+	/* For dummy Tx and Rx are NULL */
-+	*genfifoentry &= ~(GQSPI_GENFIFO_TX | GQSPI_GENFIFO_RX);
-+
-+	/* SPI mode */
-+	*genfifoentry &= ~GQSPI_GENFIFO_MODE_QUADSPI;
-+	if (xqspi->rx_bus_width == GQSPI_RX_BUS_WIDTH_QUAD)
-+		*genfifoentry |= GQSPI_GENFIFO_MODE_QUADSPI;
-+	else if (xqspi->rx_bus_width == GQSPI_RX_BUS_WIDTH_DUAL)
-+		*genfifoentry |= GQSPI_GENFIFO_MODE_DUALSPI;
-+	else
-+		*genfifoentry |= GQSPI_GENFIFO_MODE_SPI;
-+
-+	/* Immediate data */
-+	*genfifoentry &= ~GQSPI_GENFIFO_IMM_DATA_MASK;
-+	*genfifoentry |= transfer->dummy;
-+}
-+
-+/**
-  * zynqmp_qspi_readrxfifo:	Fills the RX FIFO as long as there is room in
-  *				the FIFO.
-  * @xqspi:	Pointer to the zynqmp_qspi structure
-@@ -771,7 +804,7 @@ static void zynqmp_qspi_txrxsetup(struct zynqmp_qspi *xqspi,
- 		*genfifoentry |= GQSPI_GENFIFO_TX;
- 		*genfifoentry |=
- 			zynqmp_qspi_selectspimode(xqspi, transfer->tx_nbits);
--		xqspi->bytes_to_transfer = transfer->len;
-+		xqspi->bytes_to_transfer = transfer->len - (transfer->dummy/8);
- 		if (xqspi->mode == GQSPI_MODE_DMA) {
- 			config_reg = zynqmp_gqspi_read(xqspi,
- 							GQSPI_CONFIG_OFST);
-@@ -832,13 +865,19 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
- 	if (xqspi->mode == GQSPI_MODE_DMA)
- 		transfer_len = xqspi->dma_rx_bytes;
- 	else
--		transfer_len = transfer->len;
-+		transfer_len = transfer->len - (transfer->dummy/8);
- 
- 	xqspi->genfifoentry = genfifoentry;
- 	if ((transfer_len) < GQSPI_GENFIFO_IMM_DATA_MASK) {
- 		genfifoentry &= ~GQSPI_GENFIFO_IMM_DATA_MASK;
- 		genfifoentry |= transfer_len;
- 		zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, genfifoentry);
-+		if (transfer->dummy) {
-+			zynqmp_qspi_preparedummy(xqspi, transfer,
-+					&genfifoentry);
-+			zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST,
-+					genfifoentry);
-+		}
- 	} else {
- 		int tempcount = transfer_len;
- 		u32 exponent = 8;	/* 2^8 = 256 */
-@@ -979,6 +1018,8 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
- 	struct zynqmp_qspi *xqspi;
- 	struct resource *res;
- 	struct device *dev = &pdev->dev;
-+	struct device_node *nc;
-+	u32 rx_bus_width;
- 
- 	master = spi_alloc_master(&pdev->dev, sizeof(*xqspi));
- 	if (!master)
-@@ -1039,6 +1080,18 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
- 		goto clk_dis_all;
- 	}
- 
-+	xqspi->rx_bus_width = GQSPI_RX_BUS_WIDTH_SINGLE;
-+	for_each_available_child_of_node(pdev->dev.of_node, nc) {
-+		ret = of_property_read_u32(nc, "spi-rx-bus-width",
-+					&rx_bus_width);
-+		if (!ret) {
-+			xqspi->rx_bus_width = rx_bus_width;
-+			break;
-+		}
-+	}
-+	if (ret)
-+		dev_err(dev, "rx bus width not found\n");
-+
- 	master->num_chipselect = GQSPI_DEFAULT_NUM_CS;
- 
- 	master->setup = zynqmp_qspi_setup;
--- 
-2.1.2
+* Fewer changes outside of devicetree files as most of the active platforms have
+  very little left in terms of non-driver source code. Overall this mean a total
+  of 786 non-merge changesets, out of which 513 were for DT.
+
+* The non-DT changes tend to be fairly boring, the only ones sticking out
+  size-wise (exynos and lpc32xx) are actually for files that are getting
+  removed from arch/arm/.
+
+* Changes to device tree files are increasing slowly, mainly as we are
+   adding new SoC platforms and board files at an increasing rate
+
+* Most of the changes are for 32-bit platforms, but 64-bit platforms
+  are growing more quickly, now around 20% of the DT changes are for
+  64-bit machines
+
+* While the total number of changes goes down, the number of pull requests
+  we merge is increasing over time (101 for 4.6, plus 76 standalone patches)
+  because we get more platforms that each have their own sub-maintainers.
+
+* 13 new SoC platforms got added this time, a rather high number:
+  artpec6, keystone-k2g, mt7623, a83t, imx6qp, alpine-v2, armada-37xx,
+  armada-7xxx/8xxx, meson-gxbb, msm8996, uniphier-ph1, juno-r2 and vulcan.
+  Most are new SoCs that are related to SoC families, but some are 
+  brandnew.
+
+For overall statistics, here is the dirstat:
+
+   1.0% Documentation/devicetree/bindings/arm/marvell/
+   1.1% Documentation/devicetree/bindings/arm/
+  53.2% arch/arm/boot/dts/
+   0.5% arch/arm/configs/
+   0.1% arch/arm/include/
+   0.2% arch/arm/mach-artpec/
+   0.2% arch/arm/mach-at91/
+   0.6% arch/arm/mach-davinci/
+   8.0% arch/arm/mach-exynos/
+   1.5% arch/arm/mach-imx/
+   4.5% arch/arm/mach-lpc32xx/
+   0.1% arch/arm/mach-omap1/
+   1.5% arch/arm/mach-omap2/
+   0.3% arch/arm/mach-pxa/
+   0.2% arch/arm/mach-s3c64xx/
+   0.3% arch/arm/mach-shmobile/
+   0.1% arch/arm/mach-uniphier/
+   0.1% arch/arm/plat-versatile/
+   2.1% arch/arm/
+  12.1% arch/arm64/boot/dts/
+   4.6% drivers/clk/at91/
+   1.4% drivers/clk/imx/
+   3.2% drivers/soc/samsung/
+   1.4% drivers/
+   3.3% include/dt-bindings/pinctrl/
+   2.2% include/linux/soc/samsung/
+
+We had 171 contributors this time, a fairly typical number. The ones with the 10
+or more patches are
+
+     46 Geert Uytterhoeven
+     44 Simon Horman
+     30 Arnd Bergmann
+     27 Srinivas Kandagatla
+     23 Lothar Wa?mann
+     21 Masahiro Yamada
+     20 Chen-Yu Tsai
+     14 Stefan Agner
+     14 Pankaj Dubey
+     13 Sudeep Holla
+     13 Philipp Zabel
+     13 Linus Walleij
+     12 Vladimir Zapolskiy
+     12 Thomas Petazzoni
+     12 Stephen Boyd
+     12 Caesar Wang
+     11 Roger Quadros
+     11 Laurent Pinchart
+     11 Gregory CLEMENT
+     11 Alexandre Belloni
+     10 Tony Lindgren
+     10 Suravee Suthikulpanit
+     10 Maxime Coquelin
+
+And here is a list of all git trees we pulled from, along with the total
+number of changesets we got from them.
+
+  143 git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas
+  100 git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux
+   90 git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap
+   65 git://git.infradead.org/linux-mvebu
+   49 git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux
+   44 http://github.com/Broadcom/stblinux
+   43 git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip
+   25 git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux
+   22 git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32
+   19 git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux
+   17 https://github.com/mbgg/linux-mediatek
+   17 git://git.pengutronix.de/git/pza/linux
+   17 git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux
+   16 https://github.com/rjarzmik/linux
+   16 git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator
+   11 https://github.com/AppliedMicro/xgene-next
+   11 git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci
+   10 https://github.com/Xilinx/linux-xlnx
+    8 https://github.com/carlocaione/linux-meson
+    8 git://github.com/hisilicon/linux-hisi
+    7 git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91
+    4 git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone
+    3 https://github.com/rogerq/linux
+    2 git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux
+
+	Arnd
