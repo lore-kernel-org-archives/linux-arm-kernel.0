@@ -1,58 +1,72 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 20 Mar 2016 23:40:31 +0800
-Subject: [PATCH v2 1/5] thermal: change "hysteresis" as optional property
-In-Reply-To: <20160309111051.GA3369@e104805>
-References: <1456458227-12950-1-git-send-email-leo.yan@linaro.org>
- <1456458227-12950-2-git-send-email-leo.yan@linaro.org>
- <20160303162942.GA2445@localhost.localdomain>
- <20160304030349.GA11012@leoy-linaro>
- <20160304115752.GA13894@e104805>
- <20160308135743.GC4921@leoy-linaro>
- <20160308205558.GA7010@localhost.localdomain>
- <20160309111051.GA3369@e104805>
-Message-ID: <20160320154031.GA12693@leoy-linaro>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 20 Mar 2016 16:58:38 +0100
+Subject: [PATCH v4 1/5] ARM: dts: LG Optimus Black codename sniper basic
+ support
+In-Reply-To: <20160229215136.GO13417@atomide.com>
+References: <1456663185-14170-1-git-send-email-contact@paulk.fr>
+ <1456663185-14170-2-git-send-email-contact@paulk.fr>
+ <20160229215136.GO13417@atomide.com>
+Message-ID: <1458489518.29161.3.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javi,
+Hi,
 
-Sorry for late response.
-
-On Wed, Mar 09, 2016 at 11:10:52AM +0000, Javi Merino wrote:
-> On Tue, Mar 08, 2016 at 12:55:59PM -0800, Eduardo Valentin wrote:
-> > On Tue, Mar 08, 2016 at 09:57:43PM +0800, Leo Yan wrote:
-
-[...]
-
-> > > > > > > The property "hysteresis" is mandatory for trip points, so if without
-> > > > > > > it the thermal zone cannot register successfully. But "hysteresis" is
-> > > > > > > ignored in the thermal subsystem and only inquired by several thermal
-> > > > > > > sensor drivers.
-> > > > > > 
-> > > > > > If the Linux thermal subsystem has a problem with handling hysteresis, I
-> > > > > > would rather fix Linux code than relaxing the DT binding. Or if you
-> > > > > > still believe hysteresis is really optional, I would prefer to see a
-> > > > > > better justification than "Linux ignores it".
-> > > > 
-> > > > I see it the other way round, Is hysteresis a property that, without
-> > > > it, the thermal code can't configure itself so it fails to create the
-> > > > trip point?  The current code goes "There is no hysteresis for this
-> > > > property, I don't know how to set up this trip point!".  I think we
-> > > > can do better than this.
-> > > 
-> > > Do you agree with Javi's suggestion? If you think it's okay, I will
-> > > move on to send out a new version patch based on Javi's comments.
+Le lundi 29 f?vrier 2016 ? 13:51 -0800, Tony Lindgren a ?crit?:
+> Hi,
+> 
+> * Paul Kocialkowski <contact@paulk.fr> [160228 04:40]:
 > > 
-> > No I don't. This discussion so far has been about Linux code. I still
-> > havent seen an argument explaining why hysteresis has to be optional.
+> > The LG Optimus Black codename sniper is a smartphone that was designed and
+> > manufactured by LG Electronics (LGE) and released back in 2011.
+> > It is using an OMAP3630 SoC, GP version.
+> > 
+> > This adds devicetree support for the device, with only a few basic features
+> > supported, such as debug uart, i2c, internal emmc and external mmc.
+> ...
+> > 
+> > +&i2c1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&i2c1_pins>;
+> > +
+> > +	clock-frequency = <2600000>;
+> > +
+> > +	twl: twl at 48 {
+> > +		reg = <0x48>;
+> > +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> > +		interrupt-parent = <&intc>;
+> > +
+> > +		power {
+> > +			compatible = "ti,twl4030-power";
+> > +			ti,use_poweroff;
+> > +		};
+> > +	};
+> > +};
+> Chances are this devices supports cutting off the voltages and
+> the high frequency oscillator during idle. So you may want to
+> at some point set compatible = "ti,twl4030-power-idle-osc-off"
+> here.
 > 
-> Fair enough.  Looks like I'm holding this driver from being
-> upstreamed, so I'll back off.
-> 
-> Leo, sorry for misguiding you.  Please bring back the hysteresis
-> property you had in v1.
+> Anyways, applying the dts changes into omap-for-v4.6/dt thanks.
 
-Not at all. I will add back hysteresis property and resend new patches.
+It seems that v3 of this patch was merged into your tree instead of v4, which
+contains some improvements over v3.
 
-Thanks,
-Leo Yan
+Should I submit a cleanup patch with the diff or can you use v4 instead (if not
+too late)?
+
+Cheers,
+
+-- 
+Paul Kocialkowski, low-level free software developer on embedded devices
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160320/5208b283/attachment.sig>
