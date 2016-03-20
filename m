@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 20 Mar 2016 21:31:31 +0100
-Subject: [GIT PULL 3/8] ARM: SoC platform updates for v4.6
+Date: Sun, 20 Mar 2016 22:01:09 +0100
+Subject: [GIT PULL 6/8] ARM: 64-bit DT updates for v4.6
 In-Reply-To: <10465240.PKeEEAAbCF@wuerfel>
 References: <10465240.PKeEEAAbCF@wuerfel>
-Message-ID: <9585683.S0JH2Jxiqi@wuerfel>
+Message-ID: <5028094.3vsUWGeG8d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,355 +13,356 @@ The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-dt64
 
-for you to fetch changes up to 307d40c56b0c86315859ee724b51748260f50e65:
+for you to fetch changes up to 8061a17ee3fb3e183873c8be3cfaaa37c41ce679:
 
-  ARM: uniphier: rework SMP code to support new System Bus binding (2016-03-18 17:36:37 +0100)
-
-----------------------------------------------------------------
-ARM: SoC platform updates for v4.6
-
-Newly added support for additional SoCs:
-
-- Axis Artpec-6 SoC family
-- Allwinner A83T SoC
-- NXP i.MX6QP SoC
-- ST Microelectronics stm32f469 microcontroller
-
-New features:
-- SMP support for Mediatek mt7623
-- SMP support for Mediatek mt2701
-- Big-endian support for NXP i.MX
-- DaVinci now uses the new DMA engine dma_slave_map
-- OMAP now uses the new DMA engine dma_slave_map
-- earlyprintk support for palmchip uart on mach-tango
-- delay timer support for orion
-
-Other:
-- Exynos PMU driver moved out to drivers/soc/
-- Various smaller updates for Renesas, Xilinx, PXA, AT91, OMAP, uniphier
+  Merge tag 'for-v4.6/gxbb-dt' of https://github.com/carlocaione/linux-meson into next/dt64 (2016-03-12 17:43:08 -0800)
 
 ----------------------------------------------------------------
-Antoine Tenart (1):
-      ARM: alpine: select the Alpine MSI controller driver
+ARM: 64-bit DT updates for v4.6
 
-Arnd Bergmann (22):
-      ARM: pxa: define clock registers as __iomem
-      ARM: pxa: mark spitz_card_pwr_ctrl as __maybe_unused
-      ARM: pxa: mark unused eseries code as __maybe_unused
-      ARM: pxa: don't select GPIO_SYSFS for MIOA701
-      ARM: pxa: always select one of the two CPU types
-      ARM: pxa: move extern declarations to pm.h
-      ARM: pxa: fix building without IWMMXT
-      ARM: pxa: don't select RFKILL if CONFIG_NET is disabled
-      ARM: s3c24xx: Avoid warning for inb/outb
-      Merge tag 'v4.5-next-soc' of https://github.com/mbgg/linux-mediatek into next/soc
-      Merge tag 'renesas-soc-for-v4.6' of git://git.kernel.org/.../horms/renesas into next/soc
-      Merge tag 'davinci-for-v4.6/edma' of git://git.kernel.org/.../nsekhar/linux-davinci into next/soc
-      Merge tag 'zynq-soc-for-4.6' of https://github.com/Xilinx/linux-xlnx into next/soc
-      Merge tag 'arm-soc/for-4.6/soc' of http://github.com/Broadcom/stblinux into next/soc
-      Merge tag 'arm-soc/for-4.6/maintainers' of http://github.com/Broadcom/stblinux into next/soc
-      ARM: imx: select ARM_CPU_SUSPEND only for imx6
-      Merge tag 'sunxi-core-for-4.6' of https://git.kernel.org/.../mripard/linux into next/soc
-      Merge tag 'pxa-for-4.6' of https://github.com/rjarzmik/linux into next/soc
-      ARM: at91: avoid defining CONFIG_* symbols in source code
-      Merge tag 'imx-soc-4.6' of git://git.kernel.org/.../shawnguo/linux into next/soc
-      Merge tag 'omap-for-v4.6/soc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/soc
-      Merge tag 'stm32-soc-for-v4.6-2' of git://git.kernel.org/.../mcoquelin/stm32 into next/soc
+The arm64 device tree changes make up an increasing portion of
+the overall changes, so they are kept separate from the 32-bit
+devicetree changes and from the other arm64 updates.
 
-Bai Ping (1):
-      ARM: imx: Add msl code support for imx6qp
+Newly added SoCs and boards are:
+ - 96Boards Husky board
+ - AMD Overdrive board
+ - Amlogic S905 SoC and related Tronsmart boxes
+ - Annapurna Labs Alpine family and development board
+ - Broadcom Vulcan servers
+ - Broadcom Northstar 2 SoC
+ - Marvell Armada 3700 family and development board
+ - Qualcomm MSM8996 SoC
 
-Bartlomiej Zolnierkiewicz (2):
-      ARM: EXYNOS: Use generic cpufreq driver for Exynos5420
-      ARM: EXYNOS: Use generic cpufreq driver for Exynos5422/5800
+Additional devices are enabled for existing platforms from
+Applied Micro, Hisilicon, Mediatek, Qualcomm, and Renesas and
+there are a couple of other updates for Rockchip, Xilinx and
+NXP/Freescale.
 
-Dirk Behme (1):
-      ARM: imx: Do L2 errata only if the L2 cache isn't enabled
+----------------------------------------------------------------
+Ai Kyuse (2):
+      arm64: dts: r8a7795: Add SDHI support to dtsi
+      arm64: dts: r8a7795: salvator-x: enable SDHI0 & 3
 
-Fabio Estevam (1):
-      ARM: mx25: Add basic suspend/resume support
+Andreas F?rber (4):
+      Documentation: devicetree: amlogic: Document Meson GXBaby
+      ARM64: dts: Prepare configs for Amlogic Meson GXBaby
+      Documentation: devicetree: amlogic: Document Tronsmart Vega S95 boards
+      ARM64: dts: amlogic: Add Tronsmart Vega S95 configs
 
-Florian Fainelli (2):
-      ARM: BCM63xx: Remove unused pmb_dn variable
-      MAINTAINERS: ARM: BCM63xx: Update git and mailing-lists
+Antoine Tenart (2):
+      arm64: dts: add the Alpine v2 EVP
+      arm64: dts: alpine: add the MSIX node in the Alpine v2 dtsi
 
-Frank Li (2):
-      ARM: imx: select HAVE_ARM_ARCH_TIMER if selected i.MX7D
-      ARM: imx7d: correct chip version information
+Anup Patel (4):
+      arm64: dts: Add SDHCI DT node for NS2
+      arm64: dts: Add ARM SP804 timer DT nodes for NS2
+      dt-bindings: watchdog: Add ARM SP805 DT bindings
+      arm64: dts: Add ARM SP805 watchdog DT node for NS2
 
-Geert Uytterhoeven (6):
-      ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
-      ARM: shmobile: r8a7740: Remove mapping of L2 cache controller registers
-      ARM: shmobile: r8a7740: Remove legacy machine_desc.map_io() callback
-      ARM: shmobile: emev2: Remove legacy machine_desc.map_io() callback
-      ARM: shmobile: emev2: Move declaration of emev2_smp_ops to emev2.h
-      ARM: shmobile: Enable PM and PM_GENERIC_DOMAINS for SoCs with PM Domains
+Arnd Bergmann (9):
+      Merge tag 'v4.5-next-dts64' of https://github.com/mbgg/linux-mediatek into next/dt64
+      Merge tag 'zynqmp-dt-for-4.6' of https://github.com/Xilinx/linux-xlnx into next/dt64
+      Merge tag 'arm-soc/for-4.6/devicetree-arm64' of http://github.com/Broadcom/stblinux into next/dt64
+      Merge tag 'renesas-arm64-dt2-for-v4.6' of git://git.kernel.org/.../horms/renesas into next/dt64
+      Merge tag 'hip05-dt-for-4.6' of git://github.com/hisilicon/linux-hisi into next/dt64
+      Merge tag 'xgene-dts-for-v4.6-part1' of https://github.com/AppliedMicro/xgene-next into next/dt64
+      Merge tag 'xgene-dts-for-v4.6-part2' of https://github.com/AppliedMicro/xgene-next into next/dt64
+      Merge tag 'qcom-arm64-for-4.6' of git://git.kernel.org/.../agross/linux into next/dt64
+      Merge tag 'imx-dt64-4.6' of git://git.kernel.org/.../shawnguo/linux into next/dt64
 
-Geliang Tang (1):
-      ARM: plat-samsung: use to_platform_device()
+Bayi Cheng (1):
+      arm64: dts: mt8173: Add nor flash node
 
-Henry Chen (2):
-      soc: mediatek: PMIC wrap: Clear the vldclr if state machine stay on FSM_VLDCLR state.
-      soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of WDT_SRC_EN
+Brijesh Singh (2):
+      dtb: amd: Fix GICv2 hypervisor and virtual interface sizes
+      dtb: amd: Add KCS device tree node
 
-Jean-Christophe Dubois (1):
-      ARM: imx6: fix cleanup path in imx6q_suspend_init()
+Dirk Behme (2):
+      arm64: dts: r8a7795: pmu: switch to Cortex specific device nodes
+      arm64: dts: r8a7795: Add GIC-400 virtual interfaces
 
-Johannes Berg (2):
-      ARM: imx: use endian-safe readl/readw/writel/writew
-      ARM: imx: enable big endian mode
+Duc Dang (7):
+      arm64: dts: apm: Update GPIO to control power-off on X-Gene v1 platforms
+      arm64: dts: apm: Update GPIO standby controller DT node for X-Gene v2 platforms
+      arm64: dts: apm: Update GPIO to control power-off on X-Gene v2 platforms
+      arm64: dts: apm: mailbox device tree node for APM X-Gene platform.
+      arm64: dts: apm: Add DT node for X-Gene v1 SLIMpro Mailbox I2C Driver
+      arm64: dts: apm: Mailbox device tree node for APM X-Gene v2 platform.
+      arm64: dts: apm: Add DT node for X-Gene v2 SLIMpro Mailbox I2C Driver
 
-John Crispin (1):
-      ARM: mediatek: add MT7623 smp bringup code
+Eddie Huang (1):
+      ARM64: dts: Mediatek: mt8173-evb: fix access MMC fail issue
 
-Josh Cartwright (2):
-      ARM: zynq: initialize slcr mapping earlier
-      ARM: zynq: address L2 cache data corruption
+Geert Uytterhoeven (8):
+      arm64: dts: r8a7795: Complete SYS-DMAC nodes
+      arm64: dts: r8a7795: Add SCIF fallback compatibility strings
+      arm64: dts: r8a7795: Rename the serial port clock to fck
+      arm64: dts: r8a7795: Add BRG support for (H)SCIF
+      arm64: dts: salvator-x: Enable SCIF_CLK frequency and pins
+      arm64: dts: r8a7795: Add L2 cache-controller nodes
+      arm64: dts: r8a7795: Add missing properties to CA57 L2 cache node
+      arm64: dts: r8a7795: Add CA53 L2 cache-controller node
 
-Keerthy (2):
-      ARM: AM43XX: hwmod: Add rtc hwmod
-      ARM: OMAP: DRA7: Make use of omap_revision information for soc_is* calls
+Georgi Djakov (1):
+      arm64: dts: qcom: msm8916: Add RPMCC DT node
 
-Kishon Vijay Abraham I (2):
-      ARM: DRA7: hwmod: Fix OCP2SCP sysconfig
-      ARM: DRA7: hwmod: Add reset data for PCIe
+Gregory CLEMENT (4):
+      Documentation: dt-bindings: Add a new compatible for the Armada 3700
+      Documentation: dt: Tidy up the Marvell related files
+      devicetree: bindings: add DT binding for the Marvell Armada 3700 SoC family
+      arm64: dts: add the Marvell Armada 3700 family and a development board
 
-Krzysztof Kozlowski (1):
-      drivers: soc: samsung: Enable COMPILE_TEST
+Ivan T. Ivanov (1):
+      arm64: dts: qcom: Fix MPP's function used for LED control
 
-Lars Persson (2):
-      arm: initial machine port for artpec-6 SoC
-      ARM: mach-artpec: add entry to MAINTAINERS
+Jayachandran C (1):
+      dt-bindings: Add documentation for Broadcom Vulcan
 
-Lee Jones (1):
-      ARM: stm32: Identify a new SoC - STM32F469
+Kefeng Wang (5):
+      arm64: dts: hip05: Add L2 cache topology
+      arm64: dts: hip05: Use Cortex specific device node for pmu
+      arm64: dts: hip05: Append all gicv3 ITS entries
+      arm64: dts: hip05: Append gpio nodes
+      arm64: dts: hip05: Append power button node for D02 board
 
-Louis Yu (1):
-      ARM: mediatek: add mt2701 smp bringup code
+Lijun Pan (1):
+      arm64: dts: ls2080a: Add quirk for Erratum A009116
 
-Mans Rullgard (1):
-      ARM: debug: add support for Palmchip BK-310x UART
+Loc Ho (1):
+      arm64: dts: apm: Update Merlin DT PCP PLL clock node for v2 hardware
 
-Masahiro Yamada (4):
-      ARM: bcm: use const and __initconst for smp_operations
-      ARM: s3c64xx: use "depends on" instead of "if" after prompt
-      ARM: uniphier: add missing of_node_put()
-      ARM: uniphier: rework SMP code to support new System Bus binding
+Magnus Damm (1):
+      arm64: dts: r8a7795: Add INTC-EX device node
 
 Matthias Brugger (1):
-      soc: mediatek: SCPSYS: use builtin_platform_driver
+      devicetree: bindings: Add vendor prefix for Tronsmart
 
-Maxime Coquelin (2):
-      ARM: Kconfig: Introduce MACH_STM32F429 flag
-      ARM: mach-stm32: Select pinctrl
+Michal Simek (2):
+      ARM64: zynqmp: Keep gpio node alphabetically sorted
+      ARM64: zynqmp: Extract clock information from EP108
 
-Michal Simek (1):
-      ARM: zynq: Move early printk virtual address to vmalloc area
+Olof Johansson (5):
+      Merge tag 'renesas-arm64-dt-for-v4.6' of git://git.kernel.org/.../horms/renesas into next/dt64
+      Merge tag 'v4.6-rockchip-dts64-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/dt64
+      Merge tag 'mvebu-dt64-4.6-1' of git://git.infradead.org/linux-mvebu into next/dt64
+      Merge tag 'mvebu-dt64-4.6-2' of git://git.infradead.org/linux-mvebu into next/dt64
+      Merge tag 'for-v4.6/gxbb-dt' of https://github.com/carlocaione/linux-meson into next/dt64
 
-Olof Johansson (3):
-      Merge tag 'mvebu-drivers-4.6-1' of git://git.infradead.org/linux-mvebu into next/soc
-      Merge tag 'stm32-soc-for-v4.6-1' of git://git.kernel.org/.../mcoquelin/stm32 into next/soc
-      Merge tag 'samsung-soc-4.6-2' of git://git.kernel.org/.../krzk/linux into next/soc
+Quan Nguyen (1):
+      arm64: dts: apm: Update X-Gene standby GPIO controller DTS entries
 
-Pankaj Dubey (12):
-      ARM: EXYNOS: Remove unused static mapping of CMU for exynos5
-      ARM: EXYNOS: Code cleanup in map.h
-      ARM: EXYNOS: Correct header comment in Kconfig file
-      ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
-      ARM: EXYNOS: Split up exynos3250 SoC specific PMU data
-      ARM: EXYNOS: Split up exynos4 SoC specific PMU data
-      ARM: EXYNOS: Split up exynos5250 SoC specific PMU data
-      ARM: EXYNOS: Split up exynos5420 SoC specific PMU data
-      drivers: soc: Add support for Exynos PMU driver
-      MAINTAINERS: Add maintainers entry for drivers/soc/samsung
-      ARM: EXYNOS: Cleanup header files inclusion
-      ARM: SAMSUNG: Remove unused register offset definition
+Rajendra Nayak (1):
+      arm64: dts: msm8996: Add #power-domain-cells property
 
-Peter Ujfalusi (8):
-      ARM: davinci: devices-da8xx: Add dma_slave_map to edma
-      ARM: davinci: dm355: Add dma_slave_map to edma
-      ARM: davinci: dm365: Add dma_slave_map to edma
-      ARM: davinci: dm644x: Add dma_slave_map to edma
-      ARM: davinci: dm646x: Add dma_slave_map to edma
-      ARM: OMAP1: DMA: Provide dma_slave_map to omap-dma
-      ARM: OMAP2+: DMA: Provide dma_slave_map to omap-dma for legacy boot
-      ARM: DRA7: hwmod: Add data for eDMA tpcc, tptc0, tptc1
+Rajesh Bhagat (1):
+      arm64: dts: ls1043a: Add quirk for Erratum A009116
 
-Philipp Zabel (1):
-      ARM: imx: Make reset_control_ops const
+Ray Jui (1):
+      arm64: dts: Add PCIe0 and PCIe4 DT nodes for NS2
 
-Robert Jarzmik (5):
-      ARM: pxa: pxa3xx device-tree support cleanup
-      dma: mmp_pdma: Add the #dma-requests DT property documentation
-      dmaengine: mmp-pdma: add number of requestors
-      ARM: pxa: add the number of DMA requestor lines
-      dmaengine: pxa_dma: fix the maximum requestor line
+Shawn Lin (1):
+      arm64: dts: rockchip: add rk3368 tuning clk for emmc and sdmmc
 
-Russell King (1):
-      ARM: orion: implement ARM delay timer
+Simon Horman (2):
+      arm64: dts: r8a7795: use GIC_* defines
+      arm64: dts: r8a7795: use fallback etheravb compatibility string
 
-Sascha Hauer (1):
-      soc: mediatek: SCPSYS: Fix double enabling of regulators
+Srinivas Kandagatla (15):
+      arm64: dts: apq8016-sbc: Add aliases to spi device.
+      arm64: dts: qcom: remove redundant spi cs pins from pinconf
+      arm64: dts: qcom: add correct drive strenght on cs pins
+      arm64: dts: remove s2 regulator from smd regulators.
+      arm64: dts: qcom: add lable for smd rpm regulators
+      arm64: dts: apq8016-sbc: add regulators support
+      arm64: dts: apq8016-sbc: make 1.8v available on LS expansion
+      arm64: dts: apq8016-sbc: move sdhci node under soc node
+      arm64: dts: apq8016-sbc: Add real regulators and pinctrl for sdhc
+      arm64: dts: qcom: add manual pullup setting to otg.
+      arm64: dts: qcom: apq8016-sbc: add usb support
+      arm64: dts: qcom: add audio pinctrls
+      arm64: dts: qcom: add lpass node
+      arm64: dts: qcom: apq8016-sbc: enable lpass on DB410c
+      arm64: dts: qcom: fix usb digital voltage levels
 
-Sebastian Reichel (1):
-      ARM: OMAP2+: hwmod data: Add SSI data for omap36xx
+Stephen Boyd (6):
+      arm64: dts: Add msm8996 SoC and MTP board support
+      arm64: dts: qcom: Add pm8994, pmi8994, pm8004 PMIC skeletons
+      arm64: dts: qcom: Add pm8994 gpios and MPPs
+      arm64: dts: Rename qcom,gcc node to clock-controller
+      arm64: dts: Add L2 cache node to msm8916
+      ARM64: dts: qcom: Remove size elements from pmic reg properties
 
-Sekhar Nori (1):
-      ARM: DRA7: hwmod: Add custom reset handler for PCIeSS
+Sudeep Holla (1):
+      arm64: dts: rockchip: replace gpio-key,wakeup with wakeup-source property
 
-Tony Lindgren (2):
-      ARM: OMAP2+: Add rtc hwmod configuration for ti81xx
-      Merge tag 'for-v4.6/omap-hwmod-b' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.6/soc
+Suravee Suthikulpanit (10):
+      MAINTAINERS: Adding Maintainers for AMD Seattle Device Tree
+      dtb: amd: Fix DMA ranges in device tree
+      dtb: amd: Fix typo in SPI device nodes
+      dtb: amd: Misc changes for I2C device nodes
+      dtb: amd: Misc changes for SATA device tree nodes
+      dtb: amd: Misc changes for GPIO devices
+      dtb: amd: Add PERF CCN-504 device tree node
+      dtb: amd: Add support for new AMD Overdrive boards
+      dtb: amd: Add support for AMD/Linaro 96Boards Enterprise Edition Server board
+      arm64: dts: amd: Fix-up for ccn504 and kcs nodes
 
-Vishnu Patekar (1):
-      ARM: sunxi: Introduce Allwinner for A83T support
+Thomas Petazzoni (3):
+      arm64: dts: marvell: add Device Tree files for Armada 7K/8K
+      arm64: dts: marvell: update Armada AP806 clock description
+      arm64: dts: marvell: re-order Device Tree nodes for Armada AP806
 
- Documentation/arm/sunxi/README                     |   1 -
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- Documentation/devicetree/bindings/dma/mmp-dma.txt  |   2 +
- MAINTAINERS                                        |  16 +-
- arch/arm/Kconfig                                   |   9 +
- arch/arm/Kconfig.debug                             |   9 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/pxa27x.dtsi                      |   1 +
- arch/arm/boot/dts/pxa3xx.dtsi                      |   1 +
- arch/arm/configs/pxa_defconfig                     |   1 +
- arch/arm/include/debug/at91.S                      |   4 +-
- arch/arm/include/debug/imx.S                       |   3 +
- arch/arm/include/debug/palmchip.S                  |  11 +
- arch/arm/include/debug/zynq.S                      |   4 +-
- arch/arm/mach-alpine/Kconfig                       |   1 +
- arch/arm/mach-artpec/Kconfig                       |  20 +
- arch/arm/mach-artpec/Makefile                      |   1 +
- arch/arm/mach-artpec/board-artpec6.c               |  72 ++
- arch/arm/mach-bcm/bcm63xx_pmb.c                    |   2 -
- arch/arm/mach-bcm/platsmp.c                        |   2 +-
- arch/arm/mach-davinci/devices-da8xx.c              |  46 +
- arch/arm/mach-davinci/dm355.c                      |  20 +
- arch/arm/mach-davinci/dm365.c                      |  22 +
- arch/arm/mach-davinci/dm644x.c                     |  12 +
- arch/arm/mach-davinci/dm646x.c                     |  11 +
- arch/arm/mach-exynos/Kconfig                       |   4 +-
- arch/arm/mach-exynos/Makefile                      |   2 +-
- arch/arm/mach-exynos/common.h                      |   1 -
- arch/arm/mach-exynos/exynos.c                      |  17 +-
- arch/arm/mach-exynos/firmware.c                    |   2 -
- arch/arm/mach-exynos/include/mach/map.h            |  14 +-
- arch/arm/mach-exynos/mcpm-exynos.c                 |   2 +-
- arch/arm/mach-exynos/platsmp.c                     |   3 +-
- arch/arm/mach-exynos/pm.c                          |   8 +-
- arch/arm/mach-exynos/pmu.c                         | 967 ---------------------
- arch/arm/mach-exynos/s5p-dev-mfc.c                 |   1 -
- arch/arm/mach-exynos/suspend.c                     |   4 +-
- arch/arm/mach-imx/3ds_debugboard.c                 |  30 +-
- arch/arm/mach-imx/Kconfig                          |   4 +-
- arch/arm/mach-imx/Makefile                         |   2 +-
- arch/arm/mach-imx/anatop.c                         |  18 +-
- arch/arm/mach-imx/avic.c                           |  30 +-
- arch/arm/mach-imx/common.h                         |   1 +
- arch/arm/mach-imx/cpu-imx27.c                      |   3 +-
- arch/arm/mach-imx/cpu-imx31.c                      |   2 +-
- arch/arm/mach-imx/cpu-imx35.c                      |   2 +-
- arch/arm/mach-imx/cpu.c                            |  16 +-
- arch/arm/mach-imx/epit.c                           |  22 +-
- arch/arm/mach-imx/headsmp.S                        |   2 +
- arch/arm/mach-imx/iomux-imx31.c                    |  12 +-
- arch/arm/mach-imx/iomux-v1.c                       |   4 +-
- arch/arm/mach-imx/iomux-v3.c                       |   6 +-
- arch/arm/mach-imx/mach-armadillo5x0.c              |   4 +-
- arch/arm/mach-imx/mach-imx25.c                     |   1 +
- arch/arm/mach-imx/mach-imx51.c                     |   5 +-
- arch/arm/mach-imx/mach-imx6q.c                     |   8 +-
- arch/arm/mach-imx/mach-mx27ads.c                   |   6 +-
- arch/arm/mach-imx/mach-mx31ads.c                   |  16 +-
- arch/arm/mach-imx/mach-mx31moboard.c               |   2 +-
- arch/arm/mach-imx/mach-qong.c                      |   6 +-
- arch/arm/mach-imx/mxc.h                            |   5 +
- arch/arm/mach-imx/pm-imx25.c                       |  37 +
- arch/arm/mach-imx/pm-imx27.c                       |   4 +-
- arch/arm/mach-imx/pm-imx3.c                        |   4 +-
- arch/arm/mach-imx/pm-imx5.c                        |  26 +-
- arch/arm/mach-imx/pm-imx6.c                        |   8 +-
- arch/arm/mach-imx/src.c                            |   2 +-
- arch/arm/mach-imx/system.c                         |  10 +-
- arch/arm/mach-imx/tzic.c                           |  34 +-
- arch/arm/mach-mediatek/platsmp.c                   |   8 +
- arch/arm/mach-omap1/dma.c                          |  45 +
- arch/arm/mach-omap2/dma.c                          | 117 +++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  13 +-
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  14 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 129 ++-
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  38 +
- arch/arm/mach-omap2/prm7xx.h                       |   1 +
- arch/arm/mach-omap2/soc.h                          |  23 +-
- arch/arm/mach-pxa/Kconfig                          |   3 +-
- arch/arm/mach-pxa/devices.c                        |   3 +-
- arch/arm/mach-pxa/eseries.c                        |   4 +-
- arch/arm/mach-pxa/gumstix.c                        |   6 +-
- arch/arm/mach-pxa/include/mach/pxa2xx-regs.h       |   8 +-
- arch/arm/mach-pxa/include/mach/pxa3xx-regs.h       |   2 +-
- arch/arm/mach-pxa/pm.h                             |   3 +
- arch/arm/mach-pxa/pxa-dt.c                         |  24 -
- arch/arm/mach-pxa/pxa25x.c                         |   2 +-
- arch/arm/mach-pxa/pxa27x.c                         |   8 +-
- arch/arm/mach-pxa/pxa3xx.c                         |  11 +-
- arch/arm/mach-pxa/spitz.c                          |   2 +-
- arch/arm/mach-pxa/zeus.c                           |   2 +-
- arch/arm/mach-s3c24xx/include/mach/io.h            |   2 +-
- arch/arm/mach-s3c24xx/include/mach/map.h           |  11 -
- arch/arm/mach-s3c64xx/Kconfig                      |   3 +-
- arch/arm/mach-shmobile/Kconfig                     |  13 +-
- arch/arm/mach-shmobile/emev2.h                     |   6 +
- arch/arm/mach-shmobile/setup-emev2.c               |  22 +-
- arch/arm/mach-shmobile/setup-r8a7740.c             |  39 +-
- arch/arm/mach-shmobile/smp-emev2.c                 |   2 +
- arch/arm/mach-stm32/board-dt.c                     |   1 +
- arch/arm/mach-sunxi/sunxi.c                        |   1 +
- arch/arm/mach-uniphier/platsmp.c                   |  26 +-
- arch/arm/mach-zynq/common.c                        |   3 +-
- arch/arm/mach-zynq/slcr.c                          |   4 +
- arch/arm/plat-orion/time.c                         |  13 +
- arch/arm/plat-pxa/include/plat/dma.h               |   2 +-
- arch/arm/plat-samsung/adc.c                        |   6 +-
- arch/arm/plat-samsung/include/plat/map-s3c.h       |   4 -
- arch/arm/plat-samsung/include/plat/map-s5p.h       |   5 -
- drivers/clk/pxa/clk-pxa25x.c                       |  12 +-
- drivers/clk/pxa/clk-pxa27x.c                       |  34 +-
- drivers/clk/pxa/clk-pxa3xx.c                       |   3 +-
- drivers/cpufreq/pxa2xx-cpufreq.c                   |   2 +-
- drivers/dma/pxa_dma.c                              |  39 +-
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/mediatek/mtk-pmic-wrap.c               |  41 +-
- drivers/soc/mediatek/mtk-scpsys.c                  |  60 +-
- drivers/soc/samsung/Kconfig                        |  13 +
- drivers/soc/samsung/Makefile                       |   2 +
- drivers/soc/samsung/exynos-pmu.c                   | 141 +++
- drivers/soc/samsung/exynos-pmu.h                   |  44 +
- drivers/soc/samsung/exynos3250-pmu.c               | 175 ++++
- drivers/soc/samsung/exynos4-pmu.c                  | 222 +++++
- drivers/soc/samsung/exynos5250-pmu.c               | 195 +++++
- drivers/soc/samsung/exynos5420-pmu.c               | 280 ++++++
- include/linux/platform_data/mmp_dma.h              |   1 +
- .../linux/soc/samsung}/exynos-pmu.h                |   6 +-
- .../linux/soc/samsung/exynos-regs-pmu.h            |   6 +-
- 129 files changed, 2145 insertions(+), 1392 deletions(-)
- create mode 100644 arch/arm/include/debug/palmchip.S
- create mode 100644 arch/arm/mach-artpec/Kconfig
- create mode 100644 arch/arm/mach-artpec/Makefile
- create mode 100644 arch/arm/mach-artpec/board-artpec6.c
- delete mode 100644 arch/arm/mach-exynos/pmu.c
- create mode 100644 arch/arm/mach-imx/pm-imx25.c
- create mode 100644 arch/arm/mach-shmobile/emev2.h
- create mode 100644 drivers/soc/samsung/Kconfig
- create mode 100644 drivers/soc/samsung/Makefile
- create mode 100644 drivers/soc/samsung/exynos-pmu.c
- create mode 100644 drivers/soc/samsung/exynos-pmu.h
- create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
- create mode 100644 drivers/soc/samsung/exynos4-pmu.c
- create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
- create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
- rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (81%)
- rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (99%)
+Tom Lendacky (1):
+      dtb: amd: Add AMD XGBE device tree file
+
+Yoshihiro Shimoda (7):
+      arm64: dts: r8a7795: Add USB3.0 host device nodes
+      arm64: dts: salvator-x: enable usb3.0 host channel 0
+      arm64: dts: r8a7795: Add USB-DMAC device nodes
+      arm64: dts: r8a7795: add usb2_phy device nodes
+      arm64: dts: r8a7795: add USB2.0 Host (EHCI/OHCI) device nodes
+      arm64: dts: salvator-x: enable usb2_phy of channel 1 and 2
+      arm64: dts: salvator-x: enable USB 2.0 Host of channel 1 and 2
+
+andrew-ct.chen at mediatek.com (1):
+      dts: arm64: Add EFUSE device node
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   7 +
+ .../bindings/arm/bcm/brcm,vulcan-soc.txt           |  10 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ .../arm/{ => marvell}/armada-370-xp-pmsu.txt       |   0
+ .../bindings/arm/{ => marvell}/armada-370-xp.txt   |   0
+ .../bindings/arm/{ => marvell}/armada-375.txt      |   0
+ .../bindings/arm/marvell/armada-37xx.txt           |  16 +
+ .../{ => marvell}/armada-380-mpcore-soc-ctrl.txt   |   0
+ .../bindings/arm/{ => marvell}/armada-38x.txt      |   0
+ .../bindings/arm/{ => marvell}/armada-39x.txt      |   0
+ .../bindings/arm/marvell/armada-7k-8k.txt          |  24 +
+ .../arm/{ => marvell}/armada-cpu-reset.txt         |   0
+ .../arm/{ => marvell}/coherency-fabric.txt         |   0
+ .../bindings/arm/{ => marvell}/kirkwood.txt        |   0
+ .../bindings/arm/{ => marvell}/marvell,berlin.txt  |   0
+ .../bindings/arm/{ => marvell}/marvell,dove.txt    |   0
+ .../arm/{ => marvell}/marvell,kirkwood.txt         |   0
+ .../arm/{ => marvell}/mvebu-cpu-config.txt         |   0
+ .../arm/{ => marvell}/mvebu-system-controller.txt  |   0
+ .../devicetree/bindings/ata/ahci-platform.txt      |   1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ .../devicetree/bindings/watchdog/arm,sp805.txt     |  17 +
+ MAINTAINERS                                        |   8 +
+ arch/arm64/boot/dts/Makefile                       |   2 +
+ arch/arm64/boot/dts/al/Makefile                    |   5 +
+ arch/arm64/boot/dts/al/alpine-v2-evp.dts           |  53 ++
+ arch/arm64/boot/dts/al/alpine-v2.dtsi              | 236 +++++++++
+ arch/arm64/boot/dts/amd/Makefile                   |   4 +-
+ arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts   |  87 ++++
+ arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts   |  91 ++++
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi       | 104 +++-
+ arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi    | 117 +++++
+ arch/arm64/boot/dts/amd/husky.dts                  |  83 ++++
+ arch/arm64/boot/dts/amlogic/Makefile               |   7 +
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |  55 +++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |  55 +++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |  55 +++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  55 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 183 +++++++
+ arch/arm64/boot/dts/apm/apm-merlin.dts             |   3 +-
+ arch/arm64/boot/dts/apm/apm-mustang.dts            |   3 +-
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         |  27 +-
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |  22 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  12 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              | 140 ++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |   3 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   2 +
+ arch/arm64/boot/dts/hisilicon/hip05-d02.dts        |  18 +
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi           |  92 +++-
+ arch/arm64/boot/dts/marvell/Makefile               |   5 +
+ arch/arm64/boot/dts/marvell/armada-371x.dtsi       |  53 ++
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |  86 ++++
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi       |  63 +++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 131 +++++
+ arch/arm64/boot/dts/marvell/armada-7020.dtsi       |  54 +++
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  92 ++++
+ arch/arm64/boot/dts/marvell/armada-7040.dtsi       |  54 +++
+ arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  54 +++
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  54 +++
+ arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |  71 +++
+ arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |  84 ++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 237 +++++++++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   3 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  16 +
+ arch/arm64/boot/dts/qcom/Makefile                  |   1 +
+ .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |   2 +-
+ arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi |  14 +
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          | 170 ++++++-
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi         | 238 ++++++++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  48 +-
+ arch/arm64/boot/dts/qcom/msm8996-mtp.dts           |  21 +
+ arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi          |  30 ++
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 269 +++++++++++
+ arch/arm64/boot/dts/qcom/pm8004.dtsi               |  19 +
+ arch/arm64/boot/dts/qcom/pm8916.dtsi               |  10 +-
+ arch/arm64/boot/dts/qcom/pm8994.dtsi               |  62 +++
+ arch/arm64/boot/dts/qcom/pmi8994.dtsi              |  19 +
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 139 ++++++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 531 +++++++++++++++++----
+ arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       |   2 +-
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        |   2 +-
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  10 +-
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi   |  88 ++++
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts        |   1 +
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |  61 +--
+ 85 files changed, 4200 insertions(+), 193 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,vulcan-soc.txt
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp-pmsu.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-370-xp.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-375.txt (100%)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-380-mpcore-soc-ctrl.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-38x.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-39x.txt (100%)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-7k-8k.txt
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/armada-cpu-reset.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/coherency-fabric.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,berlin.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,dove.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/marvell,kirkwood.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-cpu-config.txt (100%)
+ rename Documentation/devicetree/bindings/arm/{ => marvell}/mvebu-system-controller.txt (100%)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/arm,sp805.txt
+ create mode 100644 arch/arm64/boot/dts/al/Makefile
+ create mode 100644 arch/arm64/boot/dts/al/alpine-v2-evp.dts
+ create mode 100644 arch/arm64/boot/dts/al/alpine-v2.dtsi
+ create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts
+ create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts
+ create mode 100644 arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi
+ create mode 100644 arch/arm64/boot/dts/amd/husky.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/Makefile
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-371x.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-db.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-372x.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-7020.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-7040-db.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-7040.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-8020.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-8040.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pm8004.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pm8994.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pmi8994.dtsi
+ create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
