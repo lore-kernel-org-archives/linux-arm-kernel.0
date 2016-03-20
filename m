@@ -1,22 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 19 Mar 2016 19:45:37 -0500
-Subject: [PATCH 1/3] ARM: at91: use chipid device for soc detection
-In-Reply-To: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20160320004537.GA9151@rob-hp-laptop>
+Date: Sat, 19 Mar 2016 19:58:12 -0500
+Subject: [RFC v3 1/3] dt-bindings: soc: Add documentation for the
+ MediaTek GCE unit
+In-Reply-To: <1458300434-14438-2-git-send-email-hs.liao@mediatek.com>
+References: <1458300434-14438-1-git-send-email-hs.liao@mediatek.com>
+ <1458300434-14438-2-git-send-email-hs.liao@mediatek.com>
+Message-ID: <20160320005812.GA16265@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 08:21:19AM +0100, Ludovic Desroches wrote:
-> So far, the CIDR and EXID registers were in the DBGU interface. This device
-> has disappeared with the SAMA5D2 family. These registers are exposed
-> through a new device called chipid.
+On Fri, Mar 18, 2016 at 07:27:12PM +0800, HS Liao wrote:
+> This adds documentation for the MediaTek Global Command Engine (GCE) unit
+> found in MT8173 SoCs.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> [nicolas.ferre at atmel.com: remove useless warnings]
+> Signed-off-by: HS Liao <hs.liao@mediatek.com>
 > ---
->  .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
->  arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
->  2 files changed, 67 insertions(+), 18 deletions(-)
+>  .../devicetree/bindings/soc/mediatek/gce.txt       |   34 ++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+
+I already acked this. Please add acks when posting subsequent versions.
 
 Acked-by: Rob Herring <robh@kernel.org>
