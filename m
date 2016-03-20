@@ -1,30 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 19 Mar 2016 18:59:05 -0500
-Subject: [PATCH] clk: sunxi: Add CSI (camera's Sensors Interface) module
- clock driver for sun[457]i
-In-Reply-To: <1458204222-31149-2-git-send-email-yassinjaffer@gmail.com>
-References: <1458204222-31149-1-git-send-email-yassinjaffer@gmail.com>
- <1458204222-31149-2-git-send-email-yassinjaffer@gmail.com>
-Message-ID: <20160319235905.GA16539@rob-hp-laptop>
+Date: Sat, 19 Mar 2016 19:17:08 -0500
+Subject: [PATCH 1/3] dt/bindings: bcm2835: add interrupt-names property
+In-Reply-To: <1458228273-15591-2-git-send-email-kernel@martin.sperl.org>
+References: <1458228273-15591-1-git-send-email-kernel@martin.sperl.org>
+ <1458228273-15591-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <20160320001708.GA25749@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 07:43:42PM +1100, yassinjaffer at gmail.com wrote:
-> From: Yassin Jaffer <yassinjaffer@gmail.com>
+On Thu, Mar 17, 2016 at 03:24:31PM +0000, kernel at martin.sperl.org wrote:
+> From: Martin Sperl <kernel@martin.sperl.org>
 > 
-> This patch adds a composite clock type consisting of
-> a clock gate, mux, configurable dividers, and a reset control.
+> Added standard interrupt-names property so that
+> platform_get_irq_byname() can get used to fetch the
+> interrupt corresponding to each dma_channel
+> instead of the current platform_get_irq() with
+> an assumed ordering of the interrupts.
 > 
-> Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 > ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
-
-I wish someone would just add all the sunxi clocks in one pass instead 
-of one by one.
+>  .../devicetree/bindings/dma/brcm,bcm2835-dma.txt   | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
-
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-a10-csi.c                   | 188 ++++++++++++++++++++++
->  3 files changed, 190 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-a10-csi.c
