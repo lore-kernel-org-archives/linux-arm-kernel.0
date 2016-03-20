@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 20 Mar 2016 22:03 +0100
-Subject: [GIT PULL 7/8] ARM: SoC defconfig updates for v4.6
+Date: Sun, 20 Mar 2016 22:04:36 +0100
+Subject: [GIT PULL 8/8] ARM: SoC driver updates for v4.6
 In-Reply-To: <10465240.PKeEEAAbCF@wuerfel>
 References: <10465240.PKeEEAAbCF@wuerfel>
-Message-ID: <3227428.ZJy4YhVovV@wuerfel>
+Message-ID: <3250290.M7sm1Q7PB0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,163 +13,167 @@ The following changes since commit 388f7b1d6e8ca06762e2454d28d6c3c55ad0fe95:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
 
-for you to fetch changes up to fa54ae137a7357310fa47a19fe3ec476b266efea:
+for you to fetch changes up to 33b96d2c9579213cf3f36d7b29841b1e464750c4:
 
-  Merge tag 'stm32-defconfig-for-v4.6-1' of git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32 into next/defconfig (2016-03-02 23:20:32 +0100)
-
-----------------------------------------------------------------
-ARM: SoC defconfig updates for v4.6
-
-As usual, a bunch of commits, mostly adding drivers and other options to
-defconfigs.
-
-The realview_smp_defconfig and realview_defconfig got merged into one,
-so we are now down to 110 files.
-
-For stm32, we have now added a Kconfig fragment, the first such
-file on arch/arm. The purpose here is to have a shared defconfig
-file that works for all boards, while the DRAM offset has to be
-hardwired on NOMMU machines at compile time.
-
-The Exynos defconfig changes depend on changes in the RTC tree,
-so this is pulled in here, but has already been merged into 4.6 now.
+  bus: imx-weim: Take the 'status' property value into account (2016-03-12 17:07:39 -0800)
 
 ----------------------------------------------------------------
-Arnd Bergmann (6):
-      Merge tag 'arm-soc/for-4.6/defconfig' of http://github.com/Broadcom/stblinux into next/defconfig
-      Merge tag 'mvebu-defconfig-4.6-2' of git://git.infradead.org/linux-mvebu into next/defconfig
-      Merge tag 'sunxi-defconfig-for-4.6' of https://git.kernel.org/.../mripard/linux into next/defconfig
-      Merge tag 'imx-defconfig-4.6' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
-      Merge tag 'omap-for-v4.6/defconfig-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
-      Merge tag 'stm32-defconfig-for-v4.6-1' of git://git.kernel.org/.../mcoquelin/stm32 into next/defconfig
+ARM: SoC driver updates for v4.6
 
-Chen-Yu Tsai (6):
-      ARM: sunxi_defconfig: Enable sunxi IR driver
-      ARM: sunxi_defconfig: Enable A10 audio codec driver
-      ARM: sunxi_defconfig: Enable INPUT_EVDEV so axp20x-pek can be used
-      ARM: multi_v7_defconfig: Enable MUSB HDRC driver with Allwinner glue
-      ARM: multi_v7_defconfig: Enable A10 audio codec driver as module
-      ARM: sunxi_defconfig: Enable MUSB HDRC driver with Allwinner glue
+Driver updates for ARM SoCs, these contain various things that touch
+the drivers/ directory but got merged through arm-soc for practical
+reasons:
 
-Daniel Stone (1):
-      ARM: multi_v7_defconfig: Enable BCM283x
+- Rockchip rk3368 gains power domain support
+- Small updates for the ARM spmi driver
+- The Atmel PMC driver saw a larger rework, touching both
+  arch/arm/mach-at91 and drivers/clk/at91
+- All reset controller driver changes alway get merged through
+  arm-soc, though this time the largest change is the addition
+  of a MIPS pistachio reset driver
+- One bugfix for the NXP (formerly Freescale) i.MX weim bus driver
 
-Denis Carikli (1):
-      ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen controller and ADC support.
+----------------------------------------------------------------
+Alexandre Belloni (11):
+      clk: at91: remove IRQ handling and use polling
+      clk: at91: pmc: merge at91_pmc_init in atmel_pmc_probe
+      clk: at91: pmc: move pmc structures to C file
+      ARM: at91: pm: simply call at91_pm_init
+      ARM: at91: pm: find and remap the pmc
+      ARM: at91: pm: move idle functions to pm.c
+      ARM: at91: remove useless includes and function prototypes
+      usb: gadget: atmel: access the PMC using regmap
+      clk: at91: pmc: drop at91_pmc_base
+      clk: at91: pmc: remove useless capacities handling
+      clk: at91: remove useless includes
 
-Dinh Nguyen (1):
-      ARM: socfpga_defconfig: enable support for initramfs/initrd support
+Andre Przywara (1):
+      drivers: sunxi-rsb: fix error output type
 
-Fabio Estevam (3):
-      ARM: imx_v6_v7_defconfig: Select CONFIG_NVMEM_IMX_OCOTP
-      ARM: mxs_defconfig: Select CONFIG_NVMEM_MXS_OCOTP
-      ARM: imx_v6_v7_defconfig: Select CONFIG_CRYPTO_DEV_SAHARA
+Arnd Bergmann (2):
+      Merge tag 'sunxi-drivers-for-4.6' of https://git.kernel.org/.../mripard/linux into next/drivers
+      Merge tag 'gpmc-omap-for-v4.6' of https://github.com/rogerq/linux into next/drivers
 
-Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2016-02-17' into defconfig/next
+Bartlomiej Zolnierkiewicz (1):
+      cpufreq: s5pv210: remove superfluous CONFIG_PM ifdefs
 
-Frank Li (1):
-      ARM: imx_v6_v7_defconfig: enable psci default
+Boris Brezillon (2):
+      clk: at91: make use of syscon to share PMC registers in several drivers
+      clk: at91: make use of syscon/regmap internally
 
-Geert Uytterhoeven (1):
-      ARM: shmobile: defconfig: Do not enable CONFIG_CPU_BPREDICT_DISABLE
+Damien Horsley (2):
+      reset: img: Add pistachio reset controller binding document
+      reset: img: Add Pistachio reset controller driver
 
-Gregory CLEMENT (1):
-      ARM: mvebu: Add USB nop xceiv support in mvebu_v7_defconfig
+Fabio Estevam (1):
+      bus: imx-weim: Take the 'status' property value into account
 
-Jan Luebbe (6):
-      ARM: multi_v5_defconfig: Cleanup multi_v5_defconfig
-      ARM: multi_v5_defconfig: Enable initramfs support
-      ARM: mxs_defconfig: Cleanup mxs_defconfig
-      ARM: mxs_defconfig: Enable initramfs support
-      ARM: imx_v4_v5_defconfig: Cleanup imx_v4_v5_defconfig
-      ARM: imx_v4_v5_defconfig: Enable initramfs support
+Heiko Stuebner (1):
+      Merge branch 'v4.6-shared/pdids' into v4.6-armsoc/drivers
 
-Javier Martinez Canillas (5):
-      ARM: exynos_defconfig: Remove MAX77802 RTC Kconfig symbol
-      ARM: multi_v7_defconfig: Remove MAX77802 RTC Kconfig symbol
-      ARM: omap2plus_defconfig: Enable OMAP IOMMU support
-      ARM: omap2plus_defconfig: Enable ISP support and dependencies
-      ARM: omap2plus_defconfig: Enable TI TVP5150 video decoder support
+Jens Kuske (1):
+      drivers: soc: sunxi: Fix mask generation for SRAM mapping
 
-Krzysztof Kozlowski (3):
-      ARM: exynos_defconfig: Enable NEON, accelerated crypto and cpufreq stats
-      ARM: exynos_defconfig: Enable s5p-secss driver
-      Merge tag 'rtc-max77686-4.6' of git://git.kernel.org/.../abelloni/linux into next/defconfig
+Masahiro Yamada (1):
+      reset: hisilicon: check return value of reset_controller_register()
 
-Lars Persson (1):
-      ARM: multi_v7_defconfig: add MACH_ARTPEC6
+Maxime Ripard (2):
+      reset: Make reset_control_ops const
+      reset: Move DT cell size check to the core
 
-Lee Jones (1):
-      ARM: configs: Add new config fragment to change RAM start point
+Neil Armstrong (2):
+      memory: omap-gpmc: Add support for AAD timings
+      dt-bindings: bus: ti-gpmc: Add AAD timings properties
 
-Linus Walleij (3):
-      ARM: realview: activate SMP on the default defconfig
-      ARM: realview: delete realview-smp_defconfig
-      ARM: realview: enable USB storage in the defconfig
+Olof Johansson (5):
+      Merge tag 'v4.6-rockchip-drivers1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+      Merge tag 'samsung-drivers-4.6' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'scpi-for-v4.6/updates' of git://git.kernel.org/.../sudeep.holla/linux into next/drivers
+      Merge tag 'at91-ab-4.6-drivers' of git://git.kernel.org/.../abelloni/linux into next/drivers
+      Merge tag 'reset-for-4.6' of git://git.pengutronix.de/git/pza/linux into next/drivers
 
-Ludovic Desroches (1):
-      ARM: at91/defconfig: add sama5d2 adc support in sama5_defconfig
+Philipp Zabel (11):
+      reset: remove unnecessary local variable initialization from of_reset_control_get_by_index
+      reset: berlin: drop DT cell size check
+      reset: berlin: Make reset_control_ops const
+      reset: img: Make reset_control_ops const
+      reset: sunxi: Make reset_control_ops const
+      reset: lpc18xx: Make reset_control_ops const
+      reset: ath79: Make reset_control_ops const
+      reset: hi6220: Make reset_control_ops const
+      reset: socfpga: Make reset_control_ops const
+      reset: zynq: Make reset_control_ops const
+      reset: sti: Make reset_control_ops const
 
-Marcin Wojtas (1):
-      ARM: mvebu: enable SRAM support in mvebu_v7_defconfig
+Shawn Lin (1):
+      soc: rockchip: power-domain: fix err handle while probing
 
-Martin Michlmayr (1):
-      ARM: mvebu_v5_defconfig: Enable sound module needed for OpenRD
+Sudeep Holla (4):
+      firmware: arm_scpi: fix send_message and sensor_get_value for big-endian
+      firmware: arm_scpi: decrease Tx timeout to 20ms
+      firmware: arm_scpi: add support for 64-bit sensor values
+      hwmon: (scpi) add energy meter support
 
-Maxime Coquelin (1):
-      ARM: config: Enable GPIO Led driver in stm32_defconfig
+zhangqing (3):
+      dt-bindings: add power-domain header for RK3368 SoCs
+      dt-bindings: modify document of Rockchip power domains
+      soc: rockchip: power-domain: Modify power domain driver for rk3368
 
-Nishanth Menon (1):
-      ARM: omap2plus_defconfig: Enable AT24 eeprom
-
-Olof Johansson (6):
-      Merge tag 'renesas-defconfig-for-v4.6' of git://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'mvebu-defconfig-4.6-1' of git://git.infradead.org/linux-mvebu into next/defconfig
-      Merge tag 'realview-defconfig-redux' of git://git.kernel.org/.../linusw/linux-integrator into next/defconfig
-      Merge tag 'samsung-defconfig-4.6' of git://git.kernel.org/.../krzk/linux into next/defconfig
-      Merge tag 'at91-ab-4.6-defconfig' of git://git.kernel.org/.../abelloni/linux into next/defconfig
-      Merge tag 'socfpga_defconfig_for_v4.6' of git://git.kernel.org/.../dinguyen/linux into next/defconfig
-
-Paul Kocialkowski (2):
-      ARM: omap2plus_defconfig: Enable LP872x regulator support
-      ARM: multi_v7_defconfig: Enable LP872x regulator support
-
-Simon Horman (2):
-      ARM: shmobile: enable XHCI_RCAR in defconfig
-      ARM: multi_v7_defconfig: Enable XHCI_RCAR
-
-Stefan Agner (2):
-      ARM: imx_v6_v7_defconfig: enable useful configurations for Vybrid
-      ARM: multi_v7_defconfig: enable useful configurations for Vybrid
-
-Stefan Wahren (2):
-      ARM: bcm2835_defconfig: Enable RPi firmware driver
-      ARM: bcm2835_defconfig: Enable RPi power domain driver
-
-Stephen Warren (3):
-      ARM: bcm2835_defconfig: rebuild on next-20160205
-      ARM: bcm2835_defconfig: disable DEBUG_LL
-      ARM: bcm2835_defconfig: enable ARMv7 support
-
- arch/arm/configs/bcm2835_defconfig      |  11 ++--
- arch/arm/configs/dram_0x00000000.config |   1 +
- arch/arm/configs/exynos_defconfig       |  10 ++-
- arch/arm/configs/imx_v4_v5_defconfig    |  14 ++---
- arch/arm/configs/imx_v6_v7_defconfig    |  23 ++++---
- arch/arm/configs/multi_v5_defconfig     |   3 +-
- arch/arm/configs/multi_v7_defconfig     |  28 ++++++++-
- arch/arm/configs/mvebu_v5_defconfig     |   1 +
- arch/arm/configs/mvebu_v7_defconfig     |   2 +
- arch/arm/configs/mxs_defconfig          |   7 +--
- arch/arm/configs/omap2plus_defconfig    |  13 +++-
- arch/arm/configs/realview-smp_defconfig | 105 --------------------------------
- arch/arm/configs/realview_defconfig     |   5 ++
- arch/arm/configs/sama5_defconfig        |   1 +
- arch/arm/configs/shmobile_defconfig     |   3 +-
- arch/arm/configs/socfpga_defconfig      |   2 +-
- arch/arm/configs/stm32_defconfig        |   1 +
- arch/arm/configs/sunxi_defconfig        |  13 ++++
- 18 files changed, 105 insertions(+), 138 deletions(-)
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |   5 +
+ .../bindings/reset/img,pistachio-reset.txt         |  55 +++
+ .../bindings/soc/rockchip/power_domain.txt         |  21 +
+ arch/arm/mach-at91/Kconfig                         |   1 +
+ arch/arm/mach-at91/at91rm9200.c                    |   2 -
+ arch/arm/mach-at91/at91sam9.c                      |   2 -
+ arch/arm/mach-at91/generic.h                       |  13 +-
+ arch/arm/mach-at91/pm.c                            |  70 +++-
+ arch/arm/mach-at91/sama5.c                         |   2 +-
+ drivers/bus/imx-weim.c                             |   2 +-
+ drivers/bus/sunxi-rsb.c                            |   4 +-
+ drivers/clk/at91/clk-generated.c                   |  95 +++--
+ drivers/clk/at91/clk-h32mx.c                       |  40 +-
+ drivers/clk/at91/clk-main.c                        | 324 +++++++---------
+ drivers/clk/at91/clk-master.c                      |  94 ++---
+ drivers/clk/at91/clk-peripheral.c                  | 137 ++++---
+ drivers/clk/at91/clk-pll.c                         | 150 ++++----
+ drivers/clk/at91/clk-plldiv.c                      |  44 +--
+ drivers/clk/at91/clk-programmable.c                |  96 ++---
+ drivers/clk/at91/clk-slow.c                        |  35 +-
+ drivers/clk/at91/clk-smd.c                         |  56 +--
+ drivers/clk/at91/clk-system.c                      |  96 ++---
+ drivers/clk/at91/clk-usb.c                         | 123 +++---
+ drivers/clk/at91/clk-utmi.c                        |  80 ++--
+ drivers/clk/at91/pmc.c                             | 426 +--------------------
+ drivers/clk/at91/pmc.h                             |  98 +----
+ drivers/cpufreq/s5pv210-cpufreq.c                  |   2 -
+ drivers/firmware/arm_scpi.c                        |  17 +-
+ drivers/hwmon/scpi-hwmon.c                         |  14 +-
+ drivers/memory/omap-gpmc.c                         |  30 ++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/core.c                               |  10 +-
+ drivers/reset/hisilicon/hi6220_reset.c             |   6 +-
+ drivers/reset/reset-ath79.c                        |   2 +-
+ drivers/reset/reset-berlin.c                       |   5 +-
+ drivers/reset/reset-lpc18xx.c                      |   2 +-
+ drivers/reset/reset-pistachio.c                    | 154 ++++++++
+ drivers/reset/reset-socfpga.c                      |   2 +-
+ drivers/reset/reset-sunxi.c                        |   2 +-
+ drivers/reset/reset-zynq.c                         |   2 +-
+ drivers/reset/sti/reset-syscfg.c                   |   2 +-
+ drivers/soc/rockchip/pm_domains.c                  |  34 ++
+ drivers/soc/sunxi/sunxi_sram.c                     |   5 +-
+ drivers/usb/gadget/udc/atmel_usba_udc.c            |  20 +-
+ drivers/usb/gadget/udc/atmel_usba_udc.h            |   2 +
+ include/dt-bindings/power/rk3368-power.h           |  28 ++
+ include/dt-bindings/reset/pistachio-resets.h       |  36 ++
+ include/linux/clk/at91_pmc.h                       |  12 -
+ include/linux/omap-gpmc.h                          |   5 +
+ include/linux/reset-controller.h                   |   2 +-
+ include/linux/scpi_protocol.h                      |   3 +-
+ 51 files changed, 1138 insertions(+), 1331 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/img,pistachio-reset.txt
+ create mode 100644 drivers/reset/reset-pistachio.c
+ create mode 100644 include/dt-bindings/power/rk3368-power.h
+ create mode 100644 include/dt-bindings/reset/pistachio-resets.h
