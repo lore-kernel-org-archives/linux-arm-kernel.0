@@ -1,25 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Mar 2016 08:27:03 +0100
-Subject: [PATCH v3 1/5] dmaengine: sun6i: Simplify and fix lli setting
-In-Reply-To: <2654a93049f1c7a459e7fb5a4ac112e9d2d30787.1458311540.git.moinejf@free.fr>
+Date: Mon, 21 Mar 2016 08:29:18 +0100
+Subject: [PATCH v3 2/5] dmaengine: sun6i: Add 4 as a possible burst value
+ for the H3
+In-Reply-To: <8485d9976f327cf23e051f64c3a3c5cbff4214a7.1458311540.git.moinejf@free.fr>
 References: <cover.1458311540.git.moinejf@free.fr>
- <2654a93049f1c7a459e7fb5a4ac112e9d2d30787.1458311540.git.moinejf@free.fr>
-Message-ID: <20160321072703.GU30977@lukather>
+ <8485d9976f327cf23e051f64c3a3c5cbff4214a7.1458311540.git.moinejf@free.fr>
+Message-ID: <20160321072918.GV30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 12:50:07PM +0100, Jean-Francois Moine wrote:
-> Checking the DMA config before setting the lli list avoids to do tests
-> inside the setting loop.
-> Also, in case of audio streaming, the sound PCM DMA engine sets only
-> the burst and bus width of the device. Set the lacking memory values
-> to system values while checking the config.
+On Fri, Mar 18, 2016 at 03:12:26PM +0100, Jean-Francois Moine wrote:
+> The H3 accepts 4 as a burst value.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  drivers/dma/sun6i-dma.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index ce1e4d6..9378fda 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -101,6 +101,7 @@ struct sun6i_dma_config {
+>  	u32 nr_max_channels;
+>  	u32 nr_max_requests;
+>  	u32 nr_max_vchans;
+> +	u32 burst_4;
+>  };
+>  
+>  /*
+> @@ -238,6 +239,8 @@ static inline s8 convert_burst(u32 maxburst)
+>  	switch (maxburst) {
+>  	case 1:
+>  		return 0;
+> +	case 4:
+> +		return 1;
+>  	case 8:
+>  		return 2;
+>  	default:
+> @@ -470,6 +473,10 @@ static int set_config(struct sun6i_dma_dev *sdev,
+>  {
+>  	s8 src_width, dst_width, src_burst, dst_burst;
+>  
+> +	if (!sdev->cfg->burst_4 &&
+> +	    (sconfig->src_maxburst == 4 || sconfig->dst_maxburst == 4))
+> +		return -EINVAL;
+> +
 
-You're doing two separate and unrelated things here, please make two
-patches.
-
-Also, you commit title says you fix something, but you never say what
-the issue actually is in the commit log.
+I still believe this should be dealt with at the framework level.
 
 Maxime
 
@@ -33,4 +61,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/d45b98a5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/b12e55d5/attachment.sig>
