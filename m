@@ -1,69 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 21 Mar 2016 16:52:23 +0100
-Subject: [PATCH] cpufreq: rockchip: add driver
-In-Reply-To: <1971421.XfIKeB8O8v@diego>
-References: <1458303004-26445-1-git-send-email-xf@rock-chips.com>
- <56EFF610.6040402@rock-chips.com> <1971421.XfIKeB8O8v@diego>
-Message-ID: <1677635.LBekym086Y@diego>
+From: agustinv@codeaurora.org (agustinv at codeaurora.org)
+Date: Mon, 21 Mar 2016 11:56:59 -0400
+Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <20160321090400.GQ6344@twins.programming.kicks-ass.net>
+References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+ <20160321090400.GQ6344@twins.programming.kicks-ass.net>
+Message-ID: <a3abed24d82e0a90a5b782219fa24d84@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 21. M?rz 2016, 16:13:40 schrieb Heiko St?bner:
-> Hi,
+On 2016-03-21 05:04, Peter Zijlstra wrote:
+> On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
+>> This adds a new dynamic PMU to the Perf Events framework to program
+>> and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
+>> 
+>> The driver supports a distributed cache architecture where the overall
+>> cache is comprised of multiple slices each with its own PMU. The 
+>> driver
+>> aggregates counts across the whole system to provide a global picture
+>> of the metrics selected by the user.
 > 
-> Am Montag, 21. M?rz 2016, 21:24:32 schrieb Feng Xiao:
-> > ? 2016/3/21 17:58, Viresh Kumar ??:
-> > > On 21-03-16, 10:54, Heiko St?bner wrote:
-> > >> I hadn't seen that yet ... nice that cpufreq-dt now also supports
-> > >> clusters :-)
-> > >> 
-> > >> The other part still stands though, as we probably should register the
-> > >> platform-device somewhere else and not in some new special module.
-> > >> 
-> > >> When everything is using cpufreq-dt now, I guess we could just add it
-> > >> to
-> > >> the core rockchip clk-code. Or was there some agreement where this
-> > >> should be done (obviously not the devicetree itself)?
-> > 
-> > Of_clk_init is called early, and platform_device_register_simple should
-> > be called after devices_init, it will be failed to do it from clk-code.
-> > So we need add a new file or add module_init to each clock controller
-> > driver(like clk-rk3368.c, clk-rk3399.c) ?
-> 
-> as Viresh said, it should be ok to do it like your approach creating a
-> module in drivers/cpufreq. But the compatible check is necessary.
-> 
-> Doing it this way also makes it easier to have
+> So is there never a situation where you want to profile just a single
+> slice?
 
-Seem like I forgot the complete my sentence here. This should've been
-
-Doing it this way also makes it easier to have everything go into cpufreq-dt 
-once that whitelist appears that Viresh wrote about. So this might be better 
-than to distribute this stuff around other subsystems, as I originally 
-suggested.
+No, access to each individual slice is determined by hashing based on 
+the target address.
 
 > 
-> > > Yeah, there was a discussion around creating a white or black list of
-> > > platforms that want to create a platform device for cpufreq-dt. That can
-> > > be done in cpufreq-dt.c or a new file, but I haven't worked out on that
-> > > yet.
-> > > 
-> > > You can do it from clk-code or from the driver that was added in this
-> > > thread. Just that you need to match your platform's compatible string
-> > > before doing that.
-> > 
-> > Rockchip-cpufreq.c depends on ARM_ROCKCHIP_CPUFREQ, it will not be
-> > compiled on non-Rockchip platforms.
-> > The driver can support all Rockchip SoCs up to now, add
-> > of_machine_is_compatible may be redundant ?
+> It userspace at all aware of these slices through other means?
+
+Userspace is not aware of the actual topology.
+
 > 
-> Please always keep multiplatform in mind. These days the kernel can be
-> compiled for multiple architectures at the same time, so you can have
-> support for Rockchip, Exynos, Qualcom and whatever in the same kernel
-> image.
-> 
-> Therefore a compile-time check is not enough and you need to check the
-> actually running machine as well.
-> 
-> 
-> Heiko
+> That is; typically we do not aggregate in-kernel like this but simply
+> expose each slice as a separate PMU and let userspace sort things.
+
+My decision of single vs. multiple PMUs was based on reducing the 
+overhead required of retrieving the system-wide counts, which would 
+require multiple system calls in the multiple-PMU case.
