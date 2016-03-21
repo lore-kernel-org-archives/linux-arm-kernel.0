@@ -1,52 +1,63 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 21 Mar 2016 10:44:38 +0200
-Subject: [PATCH 3/3] ASoC: omap-mcbsp: Enable/disable sidetone block auto
- clock gating for omap3
-In-Reply-To: <alpine.DEB.2.02.1603191932240.6629@utopia.booyaka.com>
-References: <1458296929-718-1-git-send-email-peter.ujfalusi@ti.com>
- <1458296929-718-4-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.02.1603191932240.6629@utopia.booyaka.com>
-Message-ID: <56EFB476.70709@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 21 Mar 2016 09:47:13 +0100
+Subject: [PATCH] arm64: KVM: Turn kvm_ksym_ref into a NOP on VHE
+In-Reply-To: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
+References: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAKv+Gu_at5LXa5jxpM7h=ntxdJNNqmbtVE-bWn3SicMMMuT6Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+On 18 March 2016 at 18:25, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> When running with VHE, there is no need to translate kernel pointers
+> to the EL2 memory space, since we're already there (and we have a much
+> saner memory map to start with).
+>
+> Unfortunately, kvm_ksym_ref is getting in the way, and the first
+> call into the "hypervisor" section is going to end up in fireworks,
+> since we're now branching into nowhereland. Meh.
+>
+> A potential solution is to test if VHE is engaged or not, and only
+> perform the translation in the negative case. With this in place,
+> VHE is able to run again.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On 03/19/16 21:37, Paul Walmsley wrote:
-> On Fri, 18 Mar 2016, Peter Ujfalusi wrote:
-> 
->> OMAP3's McBSP2 and McBSP3 module have integrated sidetone block with
->> dedicated SYSCONFIG register. The sidetone is operating from the maain
->> McBSP module's ICLK. For normal operation the sidetone clock auto idle
->> support needs to be disabled when it is activated.
->> Note: This is not enough to avoid choppy sidetone because this AUTOIDLE
->> bit is controlling only the clock auto idle from the McBSP to the sidetone
->> block. If the McBSP_ICLK is idling, the sidetone clock is going to do the
->> same.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> Mark, please drop this patch for the time being, until the SoC integration 
-> issues can be sorted out first.  It's best to wait a little while before 
-> applying patches like these so folks have a chance to comment on their 
-> correctness first.
-> 
-> We used to handle this problem in the OMAP hwmod SoC integration layer 
-> with a flag that forced the interface clock to stay active as long as the 
-> underlying IP blocks were active.  However I can't find that flag right 
-> now in the current data, so maybe it got accidentally or inadvertently 
-> removed at some point in time in the past.  The right way to fix this 
-> would be to add that flag back in, rather than messing with the SoC 
-> integration registers from the McBSP drivers.
+I think you need the & when initializing val, otherwise, it will
+silently refer to the value rather than the address of a void* symbol
+if we ever end up using this macro on one.
 
-I can not recall such a flag. We had both hwmods attached to the given McBSP
-mkodule via dev_attr and we dealt with the McBSP_ICLK autoidle enable/disable
-via callbacks provided to the driver via platform data.
-arch/arm/mach-omap2/mcbsp.c: omap3_enable_st_clock() In there we use
-omap2_clk_deny_idle()/omap2_clk_allow_idle() to make sure that the ICLK is not
-gated when the ST is enabled in the given McBSP module.
-But this only works when we boot in legacy mode. The DT boot is broken in this
-regards as long we have first booted OMAP3 with DT.
+That was the whoie point of the opaque struct type in the original
+patch that introduced this macro, to disallow references lacking the
+&, but unfortunately, that was incompatible with the other VHE
+changes.
 
--- 
-P?ter
+With that fixed
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+> ---
+>  arch/arm64/include/asm/kvm_asm.h | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 226f49d..282f907 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -26,7 +26,13 @@
+>  #define KVM_ARM64_DEBUG_DIRTY_SHIFT    0
+>  #define KVM_ARM64_DEBUG_DIRTY          (1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+>
+> -#define kvm_ksym_ref(sym)              phys_to_virt((u64)&sym - kimage_voffset)
+> +#define kvm_ksym_ref(sym)                                              \
+> +       ({                                                              \
+> +               void *val = sym;                                        \
+> +               if (!is_kernel_in_hyp_mode())                           \
+> +                       val = phys_to_virt((u64)&sym - kimage_voffset); \
+> +               val;                                                    \
+> +        })
+>
+>  #ifndef __ASSEMBLY__
+>  struct kvm;
+> --
+> 2.1.4
+>
