@@ -1,73 +1,119 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Mar 2016 18:01:47 +0000
-Subject: [PATCH] arm64/dma-mapping: Add DMA_ATTR_ALLOC_SINGLE_PAGES support
-In-Reply-To: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
-References: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20160321180147.GR23397@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Mar 2016 19:06:05 +0100
+Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM, Line
+ and Mic inputs
+In-Reply-To: <20160319175124.6bfe3617@scratchpost.org>
+References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
+ <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
+ <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
+ <20160312085222.226d89bf@scratchpost.org>
+ <20160314104939.GL8418@lukather>
+ <20160319175124.6bfe3617@scratchpost.org>
+Message-ID: <20160321180605.GE30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2016 at 02:54:26AM +0800, Yong Wu wrote:
-> Sometimes it is not worth for the iommu allocating big chunks.
-> Here we enable DMA_ATTR_ALLOC_SINGLE_PAGES which could help avoid to
-> allocate big chunks while iommu allocating buffer.
+On Sat, Mar 19, 2016 at 05:51:24PM +0100, Danny Milosavljevic wrote:
+> Hi Maxime,
 > 
-> More information about this attribute, please check Doug's commit[1].
+> > IIRC, in order to have shared controls, you just needed to share the
+> > controls structure.
 > 
-> [1]: https://lkml.org/lkml/2016/1/11/720
+> Yeah. I did this and it actually works in a way, but in doesn't do all that I want.
 > 
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Suggested-by: Douglas Anderson <dianders@chromium.org>
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
+> There are two different kinds of sharing I mean:
 > 
-> Our video drivers may soon use this.
+> The one kind with the controls structure causes the control to rename itself
+> to not state its mixer but there's still just one slider in the end. 
+> So instead of "Left Mixer Left XXX" it will just say "Left XXX" if you put it 
+> inside Left Mixer and Right Mixer and share the entry - for this hardware, 
+> that's of doubtful use.
 > 
->  arch/arm64/mm/dma-mapping.c |  4 ++--
->  drivers/iommu/dma-iommu.c   | 14 ++++++++++----
->  include/linux/dma-iommu.h   |  4 ++--
->  3 files changed, 14 insertions(+), 8 deletions(-)
+> But what I would like to have is that the same Mic Playback Volume (the very 
+> same bits) be used for different sliders
+> (1) Mic1 Left Channel Playback Volume
+> (2) Mic1 Right Channel Playback Volume
+> (3) Mic2 Left Channel Playback Volume (!!)
+> (4) Mic2 Right Channel Playback Volume
 > 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 331c4ca..3225e3ca 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -562,8 +562,8 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  		struct page **pages;
->  		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
->  
-> -		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
-> -					flush_page);
-> +		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, attrs,
-> +					handle, flush_page);
->  		if (!pages)
->  			return NULL;
->  
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 72d6182..3569cb6 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -190,7 +190,8 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
->  	kvfree(pages);
->  }
->  
-> -static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
-> +static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
-> +					     struct dma_attrs *attrs)
->  {
->  	struct page **pages;
->  	unsigned int i = 0, array_size = count * sizeof(*pages);
-> @@ -203,6 +204,10 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
->  	if (!pages)
->  		return NULL;
->  
-> +	/* Go straight to 4K chunks if caller says it's OK. */
-> +	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
-> +		order = 0;
+> Additionally, Mic1 Playback and Mic2 Playback have two mutes each in the 
+> hardware (all separately switchable).
+> 
+> Now if we could make the alsamixer selems look like the following, 
+> that would be nice:
+> 
+> Mic1_Playback     Mic2_Playback
+> 
+>   MM                  MM
+>   ii                  ii
+>   cc                  cc
+> 
+>   PP                  PP
+>   ll                  ll
+>   aa                  aa
+>   yy                  yy
+>   bb                  bb
+>   aa                  aa
+>   cc                  cc
+>   kk                  kk
+> 
+>   VV                  VV
+>   oo                  oo
+>   ll                  ll
+>   uu                  uu
+>   mm                  mm
+>   ee                  ee
+> 
+>  [Mm]                [Nn]
+>    ^                  ^^-- so are those, separately
+>    +-- this one is a different muter :-)
+> 
+> Where the text is the same, it's supposed to signify the same bits 
+> in the hardware.
+> 
+> Right now in v8 it's (and that's going to take a lot of horizontal space, 
+> sorry - I know E-Mails like this aren't so nice to read):
+> 
+> Mic_Playback_Volume Left_Mic1_Playback_Switch Right_Mic1_Playback_Switch Left_Mic2_Playback_Switch Right_Mic2_Playback_Switch
+> 
+>   MM                  
+>   ii                  
+>   cc                  
+> 
+>   PP                  
+>   ll                  
+>   aa                  
+>   yy                  
+>   bb                  
+>   aa                  
+>   cc                  
+>   kk                  
+> 
+>   VV                  
+>   oo                  
+>   ll                  
+>   uu                  
+>   mm                  
+>   ee                  
+> 
+>                     [MM]                      [NN]                       [OO]                      [PP]
+>                       ^- WTF                   ^- WTF                      ^- WTF                   ^- WTF
+> 
+> (Actually, it's worse - believe it or not, that's how the simplified explanation looks)
 
-I have a slight snag with this, in that you don't consult the IOMMU
-pgsize_bitmap at any point, and assume that it can map pages at the
-same granularity as the CPU. The documentation for
-DMA_ATTR_ALLOC_SINGLE_PAGES seems to be weaker than that.
+I don't think you should focus too much on alsamixer, there's other
+tools to modify the configuration.
 
-Will
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/0f90df5b/attachment.sig>
