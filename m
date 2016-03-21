@@ -1,63 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Mar 2016 21:25:23 +0100
-Subject: [PATCH v2] mtd: avoid stack overflow in MTD CFI code
-In-Reply-To: <20160318174419.GA70362@google.com>
-References: <1456748436-522413-1-git-send-email-arnd@arndb.de>
- <2259988.Lj3BC6sPv6@wuerfel> <20160318174419.GA70362@google.com>
-Message-ID: <10357051.EVa2c1MaZl@wuerfel>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 21 Mar 2016 19:58:42 +0800
+Subject: [RFC PATCH] arm64: Expose physical/virtual address bits through
+ cpuinfo
+In-Reply-To: <20160318121325.GB4645@e104818-lin.cambridge.arm.com>
+References: <1458209283-44999-1-git-send-email-wangkefeng.wang@huawei.com>
+ <20160318121325.GB4645@e104818-lin.cambridge.arm.com>
+Message-ID: <56EFE1F2.8080409@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 March 2016 10:44:19 Brian Norris wrote:
-> On Sat, Mar 05, 2016 at 12:25:24AM +0100, Arnd Bergmann wrote:
-> > On Friday 04 March 2016 13:21:59 Brian Norris wrote:
-> > > 
-> > > Looking a little closer at this... why do we need the changes to
-> > > include/linux/mtd/map.h again? It should be fine to leave these
-> > > definitions as-is, right? They don't contribute to the large stack
-> > > usage, do they?
-> > > 
-> > > Maybe I'm just missing something obvious, so please do enlighten 
-> > > 
-> > 
-> > It's been a while since I created the patch, and the originally
-> > failing configuration currently doesn't produce this (probably
-> > because something else changed). I remember that it was something
-> > rather subtle, but don't exactly remember what happened.
-> > 
-> > I've reverted the patch now, trying to reproduce it on my
-> > randconfig setup, but I might not be able to get back to you
-> > in the next week while I'm traveling.
+
+
+On 2016/3/18 20:13, Catalin Marinas wrote:
+> On Thu, Mar 17, 2016 at 06:08:03PM +0800, Kefeng Wang wrote:
+>> AArch64 support six types Physical Address range, permitted values
+>> in ID_AA64MMFR0_EL1 are:
+>> 0000  32 bits, 4GB.
+>> 0001  36 bits, 64GB.
+>> 0010  40 bits, 1TB.
+>> 0011  42 bits, 4TB.
+>> 0100  44 bits, 16TB.
+>> 0101  48 bits, 256TB.
+>> All other values are reserved.
+>>
+>> Meanwhile, AArch64 allows 36-bit, 39-bit, 42-bit, 47-bit and 48-bit
+>> virtual addresses.
+>>
+>> Exposing the physical and virtual address bits to userspace through
+>> procfs like x86, then it is easy to check them from cpuinfo.
 > 
-> FWIW, I took a little look at this, and I can reproduce this myself. I
-> can get a large frame size on at least 2 of the 3 functions you report.
-> I think most of the gain you get with this patch is due to the Kconfig
-> change (MTD_COMPLEX_MAPPINGS) because it forces an extra level of
-> indirection. The other changes seem to give a modest decrease in size,
-> though it's less clear why exactly.
-> 
-> Anyway, I think the problem isn't primarily with anything you're
-> touching here exactly, but with the fact that we're putting several
-> copies of the 'map_word' typedef on the stack, and doing assignment to
-> it as if it's a typical variable. But with MAP_WIDTH_32, this is a
-> 32-byte object, and I assume that these (too) long functions are
-> introducing enough complexity that the compiler has to have several
-> copies of them. To properly fix all this, it seems like the code could
-> use some more attention, and not just the superficial changes here.
-> 
-> Anyway, I'm interested if you have any more thoughts on this. If you
-> still think this is worthwhile, I can probably just take it. (It looks
-> OK, despite the above comments.)
+> So, what does user space need such information for?
 
-I'd like to get this fixed in one way or another, but I'm not
-particularly attached to my specific workaround.
+For now, no user app use this, it just shows the physical/virtual address size
+that is supported by cpu.
 
-If you don't think anyone will be able to reduce the number of
-map_word instances on the stack, please add my patch so at least
-we get rid of the warning and make it less likely to hit the bug.
-
-An alternative might be to optionally move the map_word_and/clr/or/...
-operations out of line for large sizes of map_word, so we don't
-have all instances on the stack at once.
-
-	Arnd
+AArch64 supports several different types of physical/virtual address bits(up to 52bit
+in ARMv8.2 especially), I think it's better to expose it, and cpuinfo is proper space.
