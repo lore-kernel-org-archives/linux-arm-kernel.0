@@ -1,51 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 21 Mar 2016 14:01:19 +0100
-Subject: [PATCH] kvm: arm64: Disable compiler instrumentation for
- hypervisor code
-In-Reply-To: <1458558017-6414-1-git-send-email-catalin.marinas@arm.com>
-References: <1458558017-6414-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160321130119.GB16859@cbox>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 21 Mar 2016 13:07:34 +0000
+Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
+ structure.
+In-Reply-To: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
+References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
+Message-ID: <20160321130734.GS2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 11:00:17AM +0000, Catalin Marinas wrote:
-> With the recent rewrite of the arm64 KVM hypervisor code in C, enabling
-> certain options like KASAN would allow the compiler to generate memory
-> accesses or function calls to addresses not mapped at EL2. This patch
-> disables the compiler instrumentation on the arm64 hypervisor code for
-> gcov-based profiling (GCOV_KERNEL), undefined behaviour sanity checker
-> (UBSAN) and kernel address sanitizer (KASAN).
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Paolo Bonzini <pbonzini@redhat.com>
-> Cc: <stable@vger.kernel.org> # 4.5+
+On Mon, Mar 21, 2016 at 05:50:08PM +0530, P L Sai Krishna wrote:
+> This patch does following things.
+> 1. Added dummy entry in the spi_transfer structure.
+> 2. Assigned dummy cycles to dummy member in the transfer
+> structure during read operation.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Please try to follow the patch submission process covered in
+SubmittingPatches, in particular please use subject lines reflecting the
+style for the subsystem (which helps people identify relevant changes to
+review) and...
 
-Applied, thanks.
--Christoffer
+>  drivers/mtd/devices/m25p80.c | 1 +
+>  include/linux/spi/spi.h      | 2 ++
+>  2 files changed, 3 insertions(+)
 
-> ---
-> 
-> A better fix, at least for KASAN, would be nice but that's a lot more
-> intrusive as we need to map the KASAN shadow into the EL2 space. In the
-> meantime, especially since it needs backporting to 4.5, this patch would
-> solve KASAN getting stuck with KVM (similar to what we do for EFI_STUB).
-> 
->  arch/arm64/kvm/hyp/Makefile | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 826032bc3945..acde4782621a 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -12,3 +12,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
->  obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
->  obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
->  obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
-> +
-> +GCOV_PROFILE	:= n
-> +KASAN_SANITIZE	:= n
-> +UBSAN_SANITIZE	:= n
+...split things up into individual patches, for example here you're
+both adding a new feature and adding a user of that feature in a single
+patch.
+
+> + * @dummy: number of dummy cycles.
+
+This needs to be clearer about what a dummy cycle is and where it gets
+inserted.  We probably also want a better name, just "dummy" makes it
+look like a padding field in the structure.  How about dummy_cycles?
+
+> @@ -752,6 +753,7 @@ struct spi_transfer {
+>  	u8		bits_per_word;
+>  	u16		delay_usecs;
+>  	u32		speed_hz;
+> +	u32		dummy;
+>  
+>  	struct list_head transfer_list;
+>  };
+
+This isn't enough to add the feature - a client driver trying to make
+use of this needs to be able to tell if the cycles are actually going to
+be inserted.  I'd expect to see a capability flag that can be checked
+and some error checking so that if we try to do a transfer with dummy
+cycles and can't support it we don't silently ignore the dummy cycles,
+ideally also something that'll handle multiples of 8 bits with SPI
+controllers that don't otherwise support this feature.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/5991feb1/attachment.sig>
