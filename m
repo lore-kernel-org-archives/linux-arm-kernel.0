@@ -1,21 +1,43 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 21 Mar 2016 11:01:37 -0500
-Subject: Series adding Arria10 L2 Cache EDAC 
-Message-ID: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
+Date: Mon, 21 Mar 2016 11:01:38 -0500
+Subject: [PATCHv3 1/9] EDAC: Altera L2 Kconfig change from select to depends
+ upon.
+In-Reply-To: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
+References: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1458576106-24505-2-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This version refactors how the EDAC is configured for Arria10 since
-the ECC hardware is significantly different than Cyclone5 and Arria5.
-Since all the IRQs are shared, a new probe function based on the 
-xgene codebase was used.
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-[PATCHv3 1/9] EDAC: Altera L2 Kconfig change from select to depends
-[PATCHv3 2/9] EDAC, altera: Move Device structs and defines to
-[PATCHv3 3/9] EDAC, altera: Remove platform device from check_deps()
-[PATCHv3 4/9] EDAC, altera: Abstract ECC Enable Mask in check_deps()
-[PATCHv3 5/9] EDAC, altera: Add register offset for ECC Error Inject
-[PATCHv3 6/9] Documentation: dt: socfpga: Add Altera Arria10 L2
-[PATCHv3 7/9] EDAC, altera: Addition of Arria10 L2 Cache ECC
-[PATCHv3 8/9] ARM: socfpga: Enable Arria10 L2 cache ECC on startup
-[PATCHv3 9/9] ARM: dts: Add Altera Arria10 L2 Cache EDAC devicetree
+Force L2 cache dependency instead of forcing selection of
+L2 cache.
+
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+---
+v2/3 No change
+---
+ drivers/edac/Kconfig |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+index 37755e6..6ca7474 100644
+--- a/drivers/edac/Kconfig
++++ b/drivers/edac/Kconfig
+@@ -378,12 +378,11 @@ config EDAC_ALTERA
+ 
+ config EDAC_ALTERA_L2C
+ 	bool "Altera L2 Cache ECC"
+-	depends on EDAC_ALTERA=y
+-	select CACHE_L2X0
++	depends on EDAC_ALTERA=y && CACHE_L2X0
+ 	help
+ 	  Support for error detection and correction on the
+ 	  Altera L2 cache Memory for Altera SoCs. This option
+-	  requires L2 cache so it will force that selection.
++	  requires L2 cache.
+ 
+ config EDAC_ALTERA_OCRAM
+ 	bool "Altera On-Chip RAM ECC"
+-- 
+1.7.9.5
