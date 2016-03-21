@@ -1,201 +1,31 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Mon, 21 Mar 2016 15:33:26 +0800
-Subject: [PATCH 1/2] serial: amba-pl011: make platform driver generic
-In-Reply-To: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
-References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <CABymUCMq5GBBY7WiCs8763qkOEgSnSQw-TtmiY+6N2xa3YF0=w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Mar 2016 08:33:42 +0100
+Subject: [PATCH v3 3/5] dmaengine: sun6i: Add cyclic capability
+In-Reply-To: <2117b3d4c1e2f59152ef980267e0c71013e57b33.1458311540.git.moinejf@free.fr>
+References: <cover.1458311540.git.moinejf@free.fr>
+ <2117b3d4c1e2f59152ef980267e0c71013e57b33.1458311540.git.moinejf@free.fr>
+Message-ID: <20160321073342.GW30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-14 9:51 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
-> make sbsa uart platform driver more generic so that platform
-> driver code can be reused by ZTE uart platform driver.
->
-> Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> ---
->  drivers/tty/serial/amba-pl011.c | 57 +++++++++++++++++++++++++++--------------
->  1 file changed, 38 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 7c198e0..2d1917e 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -73,6 +73,9 @@
->  #define UART_DR_ERROR          (UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
->  #define UART_DUMMY_DR_RX       (1 << 16)
->
-> +static const struct uart_ops amba_pl011_pops;
-> +static const struct uart_ops sbsa_uart_pops;
-> +
->  static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
->         [REG_DR] = UART01x_DR,
->         [REG_FR] = UART01x_FR,
-> @@ -92,6 +95,7 @@ static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
->  /* There is by now at least one vendor with differing details, so handle it */
->  struct vendor_data {
->         const u16               *reg_offset;
-> +       const struct uart_ops   *uart_pops;
->         unsigned int            ifls;
->         bool                    access_32b;
->         bool                    oversampling;
-> @@ -119,13 +123,20 @@ static struct vendor_data vendor_arm = {
->         .get_fifosize           = get_fifosize_arm,
->  };
->
-> +static unsigned int get_fifosize_sbsa(struct amba_device *dev)
-> +{
-> +       return 32;
-> +}
-> +
->  static struct vendor_data vendor_sbsa = {
->         .reg_offset             = pl011_std_offsets,
-> +       .uart_pops              = &sbsa_uart_pops,
->         .oversampling           = false,
->         .dma_threshold          = false,
->         .cts_event_workaround   = false,
->         .always_enabled         = true,
->         .fixed_options          = true,
-> +       .get_fifosize           = get_fifosize_sbsa,
->  };
->
->  static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
-> @@ -189,6 +200,7 @@ static const u16 pl011_zte_offsets[REG_ARRAY_SIZE] = {
->
->  static struct vendor_data vendor_zte __maybe_unused = {
->         .reg_offset             = pl011_zte_offsets,
-> +       .uart_pops              = &amba_pl011_pops,
->         .access_32b             = true,
->         .ifls                   = UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
->         .get_fifosize           = get_fifosize_arm,
-> @@ -2086,7 +2098,7 @@ static int pl011_verify_port(struct uart_port *port, struct serial_struct *ser)
->         return ret;
->  }
->
-> -static struct uart_ops amba_pl011_pops = {
-> +static const struct uart_ops amba_pl011_pops = {
->         .tx_empty       = pl011_tx_empty,
->         .set_mctrl      = pl011_set_mctrl,
->         .get_mctrl      = pl011_get_mctrl,
-> @@ -2521,10 +2533,12 @@ static int pl011_resume(struct device *dev)
->  #endif
->
->  static SIMPLE_DEV_PM_OPS(pl011_dev_pm_ops, pl011_suspend, pl011_resume);
-> +static const struct of_device_id pl011_uart_plat_of_match[];
->
-> -static int sbsa_uart_probe(struct platform_device *pdev)
-> +static int pl011_uart_plat_probe(struct platform_device *pdev)
->  {
->         struct uart_amba_port *uap;
-> +       struct vendor_data *vendor;
->         struct resource *r;
->         int portnr, ret;
->         int baudrate;
-> @@ -2535,11 +2549,15 @@ static int sbsa_uart_probe(struct platform_device *pdev)
->          */
->         if (pdev->dev.of_node) {
->                 struct device_node *np = pdev->dev.of_node;
-> +               const struct of_device_id *of_id =
-> +                       of_match_device(pl011_uart_plat_of_match, &pdev->dev);
->
->                 ret = of_property_read_u32(np, "current-speed", &baudrate);
->                 if (ret)
->                         return ret;
-> +               vendor = (struct vendor_data *)of_id->data;
->         } else {
-> +               vendor = &vendor_sbsa;
->                 baudrate = 115200;
->         }
->
-> @@ -2552,15 +2570,15 @@ static int sbsa_uart_probe(struct platform_device *pdev)
->         if (!uap)
->                 return -ENOMEM;
->
-> -       uap->reg_offset = vendor_sbsa.reg_offset;
-> -       uap->vendor     = &vendor_sbsa;
-> -       uap->fifosize   = 32;
-> -       uap->port.iotype = vendor_sbsa.access_32b ? UPIO_MEM32 : UPIO_MEM;
-> +       uap->vendor     = vendor;
-> +       uap->reg_offset = vendor->reg_offset;
-> +       uap->fifosize   = vendor->get_fifosize(NULL);
-> +       uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : UPIO_MEM;
->         uap->port.irq   = platform_get_irq(pdev, 0);
-> -       uap->port.ops   = &sbsa_uart_pops;
-> +       uap->port.ops   = vendor->uart_pops;
->         uap->fixed_baud = baudrate;
->
-> -       snprintf(uap->type, sizeof(uap->type), "SBSA");
-> +       snprintf(uap->type, sizeof(uap->type), "PL011 plat");
->
->         r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->
-> @@ -2573,7 +2591,7 @@ static int sbsa_uart_probe(struct platform_device *pdev)
->         return pl011_register_port(uap);
->  }
->
-> -static int sbsa_uart_remove(struct platform_device *pdev)
-> +static int pl011_uart_plat_remove(struct platform_device *pdev)
->  {
->         struct uart_amba_port *uap = platform_get_drvdata(pdev);
->
-> @@ -2582,11 +2600,12 @@ static int sbsa_uart_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> -static const struct of_device_id sbsa_uart_of_match[] = {
-> -       { .compatible = "arm,sbsa-uart", },
-> +static const struct of_device_id pl011_uart_plat_of_match[] = {
-> +       { .compatible = "arm,sbsa-uart", .data = &vendor_sbsa },
-> +       { .compatible = "zte,zx296702-uart", .data = &vendor_zte },
->         {},
->  };
-> -MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
-> +MODULE_DEVICE_TABLE(of, pl011_uart_plat_of_match);
->
->  static const struct acpi_device_id sbsa_uart_acpi_match[] = {
->         { "ARMH0011", 0 },
-> @@ -2594,12 +2613,12 @@ static const struct acpi_device_id sbsa_uart_acpi_match[] = {
->  };
->  MODULE_DEVICE_TABLE(acpi, sbsa_uart_acpi_match);
->
-> -static struct platform_driver arm_sbsa_uart_platform_driver = {
-> -       .probe          = sbsa_uart_probe,
-> -       .remove         = sbsa_uart_remove,
-> +static struct platform_driver pl011_uart_platform_driver = {
-> +       .probe          = pl011_uart_plat_probe,
-> +       .remove         = pl011_uart_plat_remove,
->         .driver = {
-> -               .name   = "sbsa-uart",
-> -               .of_match_table = of_match_ptr(sbsa_uart_of_match),
-> +               .name   = "uart-pl011-plat",
-> +               .of_match_table = of_match_ptr(pl011_uart_plat_of_match),
->                 .acpi_match_table = ACPI_PTR(sbsa_uart_acpi_match),
->         },
->  };
-> @@ -2634,14 +2653,14 @@ static int __init pl011_init(void)
->  {
->         printk(KERN_INFO "Serial: AMBA PL011 UART driver\n");
->
-> -       if (platform_driver_register(&arm_sbsa_uart_platform_driver))
-> +       if (platform_driver_register(&pl011_uart_platform_driver))
->                 pr_warn("could not register SBSA UART platform driver\n");
->         return amba_driver_register(&pl011_driver);
->  }
->
->  static void __exit pl011_exit(void)
->  {
-> -       platform_driver_unregister(&arm_sbsa_uart_platform_driver);
-> +       platform_driver_unregister(&pl011_uart_platform_driver);
->         amba_driver_unregister(&pl011_driver);
->  }
->
-> --
-> 1.9.1
->
+On Fri, Mar 18, 2016 at 03:18:32PM +0100, Jean-Francois Moine wrote:
+> DMA cyclic transfers are required by audio streaming.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 
-Timur & Russell,
-
-Could you help have a quick review on these change and share your
-comments? It is not big change :)
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 Thanks!
-Jun
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/0e0a1055/attachment.sig>
