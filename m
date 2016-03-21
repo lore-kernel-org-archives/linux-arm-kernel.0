@@ -1,21 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 21 Mar 2016 09:12:42 +0100
-Subject: [GIT PULL]Hisilicon Hi6220 SoC and Hikey board DT updates for 4.6
-In-Reply-To: <20160313013232.GD5883@localhost>
-References: <56E1498F.2030107@hisilicon.com> <20160313013232.GD5883@localhost>
-Message-ID: <CACRpkdZUdOCrO+_jqKZqB_Wboq0+syNPfc-ezST=TDbwo+mNrg@mail.gmail.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Mon, 21 Mar 2016 16:10:20 +0800
+Subject: [RFC v3 1/3] dt-bindings: soc: Add documentation for the
+ MediaTek GCE unit
+In-Reply-To: <20160320005812.GA16265@rob-hp-laptop>
+References: <1458300434-14438-1-git-send-email-hs.liao@mediatek.com>
+ <1458300434-14438-2-git-send-email-hs.liao@mediatek.com>
+ <20160320005812.GA16265@rob-hp-laptop>
+Message-ID: <1458547820.12063.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 13, 2016 at 2:32 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Mar 10, 2016 at 06:16:47PM +0800, Wei Xu wrote:
->>  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
->>  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
->>  create mode 100644 include/dt-bindings/pinctrl/hisi.h
->
-> The pinctrl changes need an Ack from the pinctrl maintainer.
+On Sat, 2016-03-19 at 19:58 -0500, Rob Herring wrote:
+> On Fri, Mar 18, 2016 at 07:27:12PM +0800, HS Liao wrote:
+> > This adds documentation for the MediaTek Global Command Engine (GCE) unit
+> > found in MT8173 SoCs.
+> > 
+> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/soc/mediatek/gce.txt       |   34 ++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+> 
+> I already acked this. Please add acks when posting subsequent versions.
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Looks mostly SoC related, but sure I'll go in and have a look.
 
-Yours,
-Linus Walleij
+Hi Rob,
+
+Sorry, I will add acked-by from next version.
+
+Best regards,
+HS Liao
