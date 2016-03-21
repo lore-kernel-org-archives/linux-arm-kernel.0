@@ -1,42 +1,25 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 21 Mar 2016 10:57:56 +0200
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
-References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
-Message-ID: <56EFB794.5010505@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 21 Mar 2016 10:04:00 +0100
+Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20160321090400.GQ6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
-
-On 03/19/16 21:38, Paul Walmsley wrote:
-> On Fri, 18 Mar 2016, Peter Ujfalusi wrote:
+On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
+> This adds a new dynamic PMU to the Perf Events framework to program
+> and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
 > 
->> Hi,
->>
->> Chanes since v1:
->> - removed the ASoC patch as Mark has applied it already
->> - Added my signed-off to the hwmod patch
->> - New patch to handle the case when the sidetone hwmod has been removed for
->>   legacy boot.
->>
->> The series addresses a long standing issue with McBSP2/3 regarding to hwmod
->> setup. When booting with DT a warning is printed that mcbsp2/3 is using two
->> hwmod.
->> The root of the issue is the way how the hwmod data was constructed in the first
->> place for OMAP3 McBSP2/3.
->> After re-reading the TRM it is clear that the sidetone should not have it's
->> own hwmod data as it is not a separate IP, it is part of the McBSP module. It
->> can not affect PRCM either since it's SYSCONFIG register's AUTOIDLE bit is only
->> sets the autoidle from the internal McBSP_iclk clock to the sidetone block of
->> the same McBSP.
-> 
-> NAK, at least without further discussion - see my comments on the v1 0/3 
-> introduction.
+> The driver supports a distributed cache architecture where the overall
+> cache is comprised of multiple slices each with its own PMU. The driver
+> aggregates counts across the whole system to provide a global picture
+> of the metrics selected by the user.
 
-Yes, I could have sent the first series as RFC, but I believe(d) that this is
-the correct way to fix the McBSP sidetone integration.
+So is there never a situation where you want to profile just a single
+slice?
 
--- 
-P?ter
+It userspace at all aware of these slices through other means?
+
+That is; typically we do not aggregate in-kernel like this but simply
+expose each slice as a separate PMU and let userspace sort things.
