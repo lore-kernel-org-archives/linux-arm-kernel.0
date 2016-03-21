@@ -1,91 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 21 Mar 2016 07:40:43 -0500
-Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
-References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
- <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
- <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
-Message-ID: <20160321124043.GA26873@rob-hp-laptop>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 21 Mar 2016 13:42:16 +0100
+Subject: [PATCH] arm64: KVM: Turn kvm_ksym_ref into a NOP on VHE
+In-Reply-To: <56EFEABA.3010604@redhat.com>
+References: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
+ <CAKv+Gu_at5LXa5jxpM7h=ntxdJNNqmbtVE-bWn3SicMMMuT6Dg@mail.gmail.com>
+ <56EFEABA.3010604@redhat.com>
+Message-ID: <20160321124216.GA16859@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 19, 2016 at 12:00:22AM +0800, Chen-Yu Tsai wrote:
-> Hi,
+On Mon, Mar 21, 2016 at 01:36:10PM +0100, Paolo Bonzini wrote:
 > 
-> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
-> <alexandre.torgue@gmail.com> wrote:
-> > Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
-> >
-> > diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
-> > new file mode 100644
-> > index 0000000..ada2aa4
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
-> > @@ -0,0 +1,32 @@
-> > +STMicroelectronics STM32 / MCU DWMAC glue layer controller
-> > +
-> > +This file documents platform glue layer for stmmac.
-> > +Please see stmmac.txt for the other unchanged properties.
-> > +
-> > +The device node has following properties.
-> > +
-> > +Required properties:
-> > +- compatible:  Should be "st,stm32-dwmac" to select glue, and
-> > +              "snps,dwmac-3.50a" to select IP vesrion.
 > 
-> If you need have sort of hardware glue, then it is not compatible.
-
-Hence, the more specific compatible. Having the generic one is still 
-useful.
-
+> On 21/03/2016 09:47, Ard Biesheuvel wrote:
+> > On 18 March 2016 at 18:25, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> When running with VHE, there is no need to translate kernel pointers
+> >> to the EL2 memory space, since we're already there (and we have a much
+> >> saner memory map to start with).
+> >>
+> >> Unfortunately, kvm_ksym_ref is getting in the way, and the first
+> >> call into the "hypervisor" section is going to end up in fireworks,
+> >> since we're now branching into nowhereland. Meh.
+> >>
+> >> A potential solution is to test if VHE is engaged or not, and only
+> >> perform the translation in the negative case. With this in place,
+> >> VHE is able to run again.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > I think you need the & when initializing val, otherwise, it will
+> > silently refer to the value rather than the address of a void* symbol
+> > if we ever end up using this macro on one.
+> > 
+> > That was the whoie point of the opaque struct type in the original
+> > patch that introduced this macro, to disallow references lacking the
+> > &, but unfortunately, that was incompatible with the other VHE
+> > changes.
+> > 
+> > With that fixed
+> > 
+> > Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
-> ChenYu
+> Marc, if you send a v2 I can merge it directly without a pull request.
 > 
-> > +- clocks: Must contain a phandle for each entry in clock-names.
-> > +- clock-names: Should be "stmmaceth" for the host clock.
+Marc is on holiday this week, but I put this (with the fix) on top of
+Linus' master in the kvmarm/master branch:
 
-This doesn't sound like the clock input signal name...
+git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git master
 
-> > +              Should be "tx-clk" for the MAC TX clock.
-> > +              Should be "rx-clk" for the MAC RX clock.
+Do you want to just grab it from there?
 
-How can other DWMAC blocks not have these clocks? The glue can't really 
-add these clocks. It could combine them into one or a new version of 
-DWMAC could have a different number of clock inputs. So if there is 
-variation here, then some of the bindings are probably wrong. I guess 
-the only change I'm suggesting is possibly moving these into common 
-binding doc.
-
-> > +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
-> > +             encompases the glue register, and the offset of the control register.
-> > +Example:
-> > +
-> > +               ethernet0: dwmac at 40028000 {
-
-ethernet at ...
-
-> > +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
-> > +                       status = "disabled";
-> > +                       reg = <0x40028000 0x8000>;
-> > +                       reg-names = "stmmaceth";
-> > +                       interrupts = <0 61 0>, <0 62 0>;
-> > +                       interrupt-names = "macirq", "eth_wake_irq";
-> > +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
-> > +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
-> > +                       st,syscon = <&syscfg 0x4>;
-> > +                       snps,pbl = <8>;
-> > +                       snps,mixed-burst;
-> > +                       dma-ranges;
-> > +               };
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+-Christoffer
