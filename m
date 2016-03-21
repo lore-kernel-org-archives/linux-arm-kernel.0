@@ -1,82 +1,32 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 21 Mar 2016 13:11:35 +0100
-Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <CAGb2v64V_Km+i62L=L3nuzANX1eMhC2eBvKCZuVqEFdWqeTHLg@mail.gmail.com>
-References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
- <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
- <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
- <CAJgp7zxyQGrSSvNszawBQfS+omgKi1i35uW-eDyLdW-jP7oRjg@mail.gmail.com>
- <CAGb2v64V_Km+i62L=L3nuzANX1eMhC2eBvKCZuVqEFdWqeTHLg@mail.gmail.com>
-Message-ID: <CAGhQ9Vzuhj7_Pdq80ij0jFNTPK-3VSFD_2eQCifiQnUdMeKNSg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 21 Mar 2016 12:12:10 +0000
+Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
+In-Reply-To: <20160321114956.GD12319@e106622-lin>
+References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+ <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
+ <56EC3F9E.4050209@nvidia.com> <20160321105330.GB12319@e106622-lin>
+ <CAKfTPtDP3zMR+zbvvqJCBvJ5r44do8NS03wC7pAejxPd0zHTMA@mail.gmail.com>
+ <20160321114956.GD12319@e106622-lin>
+Message-ID: <20160321121210.GQ2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+On Mon, Mar 21, 2016 at 11:49:56AM +0000, Juri Lelli wrote:
 
-On 21 March 2016 at 12:08, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, Mar 21, 2016 at 6:45 PM, Alexandre Torgue
-> <alexandre.torgue@gmail.com> wrote:
->> Hi,
->>
->> 2016-03-18 17:00 GMT+01:00 Chen-Yu Tsai <wens@csie.org>:
->>> Hi,
->>>
->>> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
->>> <alexandre.torgue@gmail.com> wrote:
->>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->>>> new file mode 100644
->>>> index 0000000..ada2aa4
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->>>> @@ -0,0 +1,32 @@
->>>> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
->>>> +
->>>> +This file documents platform glue layer for stmmac.
->>>> +Please see stmmac.txt for the other unchanged properties.
->>>> +
->>>> +The device node has following properties.
->>>> +
->>>> +Required properties:
->>>> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
->>>> +              "snps,dwmac-3.50a" to select IP vesrion.
+> But we'll still need to normalize this w.r.t the highest score we get on
+> a specific platform, right? And while we are at normalizing it, it is
+> probably simpler if we keep the frequency component as part of the
+> number, IMHO. But, maybe keeping the frequency component separate is
+> more acceptable from a DT binding perspective?
 
-s/vesrion/version
-
->>>
->>> If you need have sort of hardware glue, then it is not compatible.
->>>
->>
->> We could have the case where the glue is set by a bootloader.
->> In this case, we will select IP version in compatible and we will use
->> generic dwmac glue to probe stmmac driver.
->
-> It seems most platforms using DWMAC follow this design set by
-> the original stmmac bindings. I'm arguing that the requirement
-> of setting up the glue makes them incompatible.
->
-> What happens when the bootloader didn't setup the glue? And one
-> forgets to build the STM32 driver, only the generic one? The
-> generic driver even matches to some, but not all, version
-> strings.
->
-> Maybe it would've been better if the versioned strings were
-> only used to indicate functionality, and not used to bind
-> the drivers. But the bindings were set some time ago.
-
-Since Alexandre has not added "snps,dwmac-3.50a" to dwmac-generic
-doesn't he use it as you suggest here?
-
-Note that we can not remove all the generic compatible strings from
-dwmac-generic because there is one platform that depend on one of
-them.
-(see arch/arm/boot/dts/exynos5440.dtsi:190)
-
-So we can not remove "snps,dwmac-3.70a" from the dwmac-generic driver
-if we want to keep backwards compatibility with exynos5440. But I
-guess we could remove the others if we want to.
-
-
-regards,
-Joachim Eastwood
+One possible issue with that: if we keep the frequency number as part of
+the core number then that might cause issues for devices with variants
+or system deployment decisions that remove some OPPs from a table.  If
+the top OPP gets removed that would throw off the numbers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/b094a354/attachment.sig>
