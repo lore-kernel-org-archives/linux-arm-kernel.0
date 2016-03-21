@@ -1,74 +1,92 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 21 Mar 2016 08:54:22 +0100
-Subject: [PATCH 2/2] ARM: socfpga: dts: Drop gmac0 from CV dtsi
-In-Reply-To: <1458431825-9159-2-git-send-email-marex@denx.de>
-References: <1458431825-9159-1-git-send-email-marex@denx.de>
- <1458431825-9159-2-git-send-email-marex@denx.de>
-Message-ID: <73wpowl101.fsf@unicorn.hi.pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Mar 2016 08:59:30 +0100
+Subject: [PATCH v7] ARM: dts: sun8i: Add leds and switches on Orangepi
+ Plus boards
+In-Reply-To: <1458500102-11071-1-git-send-email-hdegoede@redhat.com>
+References: <1458500102-11071-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160321075930.GA30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Hi!
+On Sun, Mar 20, 2016 at 07:55:02PM +0100, Hans de Goede wrote:
+> From: Krzysztof Adamski <k@japko.eu>
+> 
+> OrangePi Plus board has two leds - green ("pwr") and red ("status")
+> and two switches ("sw4" and "sw2"). This patch describes them in
+> devicetree.
+> 
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Marek Vasut writes:
+An earlier version has already been sent for 4.6, please base your
+changes on top of this one.
 
-> The socfpga_cyclone5.dtsi is included by all DTS files which describe boards
-> using the Cyclone V SoC. The Cyclone V SoC has two ethernet controllers and
-> different boards use none, one or both of them.
->
-> The /soc/ethernet at ff702000/{} node in socfpga_cyclone5.dtsi unconditionaly
-> enabled gmac0 interface, which is clearly wrong for those boards which use
-> gmac1 interface instead.
->
-> This patch removes the entire /soc/ethernet at ff702000/{} node from the
-> socfpga_cyclone5.dtsi file. This is correct, since all of the board which
-> include this file also have correct gmac0 or gmac1 node present in them.
-> Minor correction had to be done to EBV SoCrates, which didn't define PHY
-> mode explicitly, but inherited it from the socfpga_cyclone5.dtsi .
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+And there's a bunch of things I didn't catch at that time :/
+
 > ---
->  arch/arm/boot/dts/socfpga_cyclone5.dtsi         | 5 -----
->  arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 1 +
->  2 files changed, 1 insertion(+), 5 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-> index 418c19e..a05e3df 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-> @@ -38,11 +38,6 @@
->  			cap-sd-highspeed;
->  		};
+> Changes in v6 (hdegoede):
+> -Merge leds and r_leds nodes into one
+> -Fix led labels to be in <board>:<colour>:<role> form
+> -Alphabetically sort the added nodes
+> -Add support for sw2 (this is the small reset-like button)
+> Changes in v7 (hdegoede):
+> -Use PL3 / PL4 in the pinctrl node, not PL03 / PL04
+> ---
+>  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 63 ++++++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> index a680b1f..9d8c038 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> @@ -45,6 +45,7 @@
+>  #include "sunxi-common-regulators.dtsi"
 >  
-> -		ethernet at ff702000 {
-> -			phy-mode = "rgmii";
-> -			status = "okay";
-> -		};
-> -
->  		sysmgr at ffd08000 {
->  			cpu1-start-addr = <0xffd080c4>;
->  		};
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-> index 019dd2f..e1a61f2 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-> @@ -36,6 +36,7 @@
->  };
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+>  #include <dt-bindings/pinctrl/sun4i-a10.h>
 >  
->  &gmac1 {
-> +	phy-mode = "rgmii";
->  	status = "okay";
->  };
+>  / {
+> @@ -59,6 +60,43 @@
+>  		stdout-path = "serial0:115200n8";
+>  	};
+>  
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		input-name = "sw4";
 
-Looks good to me.
+This is an undocumented (and apparently unused) property
 
-Regards,
-Steffen
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sw_r_opc>;
+> +
+> +		sw2 at 0 {
+
+You shouldn't have a unit-address here
+
+> +			label = "sw2";
+> +			linux,code = <BTN_1>;
+> +			gpios = <&r_pio 0 4 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		sw4 at 0 {
+
+Ditto.
+
+Thanks!
+Maxime
 
 -- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/90d11ec6/attachment-0001.sig>
