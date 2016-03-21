@@ -1,33 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Mar 2016 08:52:43 +0100
-Subject: [PATCH] ARM: dts: Add dts file for Dserve DSRV9703C tablet
-In-Reply-To: <CAGb2v66Hw8_Ckmw0f5GMzP2+73aNbSoOs2MLYu7C85bjUL9huw@mail.gmail.com>
-References: <1458374032-10077-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v66Hw8_Ckmw0f5GMzP2+73aNbSoOs2MLYu7C85bjUL9huw@mail.gmail.com>
-Message-ID: <20160321075243.GZ30977@lukather>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 21 Mar 2016 08:54:22 +0100
+Subject: [PATCH 2/2] ARM: socfpga: dts: Drop gmac0 from CV dtsi
+In-Reply-To: <1458431825-9159-2-git-send-email-marex@denx.de>
+References: <1458431825-9159-1-git-send-email-marex@denx.de>
+ <1458431825-9159-2-git-send-email-marex@denx.de>
+Message-ID: <73wpowl101.fsf@unicorn.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 19, 2016 at 11:18:59PM +0800, Chen-Yu Tsai wrote:
-> On Sat, Mar 19, 2016 at 3:53 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> > The Dserve DSRV9703C is a 9.7" A10 tablet with a 1024x768 ips LCD,
-> > 1G RAM, 4GB flash, a Focaltech FT5406EE8 touchscreen and rtl8188ctv wifi.
-> >
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied, thanks!
-Maxime
+Hi!
+
+Marek Vasut writes:
+
+> The socfpga_cyclone5.dtsi is included by all DTS files which describe boards
+> using the Cyclone V SoC. The Cyclone V SoC has two ethernet controllers and
+> different boards use none, one or both of them.
+>
+> The /soc/ethernet at ff702000/{} node in socfpga_cyclone5.dtsi unconditionaly
+> enabled gmac0 interface, which is clearly wrong for those boards which use
+> gmac1 interface instead.
+>
+> This patch removes the entire /soc/ethernet at ff702000/{} node from the
+> socfpga_cyclone5.dtsi file. This is correct, since all of the board which
+> include this file also have correct gmac0 or gmac1 node present in them.
+> Minor correction had to be done to EBV SoCrates, which didn't define PHY
+> mode explicitly, but inherited it from the socfpga_cyclone5.dtsi .
+>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+> ---
+>  arch/arm/boot/dts/socfpga_cyclone5.dtsi         | 5 -----
+>  arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 1 +
+>  2 files changed, 1 insertion(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> index 418c19e..a05e3df 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
+> @@ -38,11 +38,6 @@
+>  			cap-sd-highspeed;
+>  		};
+>  
+> -		ethernet at ff702000 {
+> -			phy-mode = "rgmii";
+> -			status = "okay";
+> -		};
+> -
+>  		sysmgr at ffd08000 {
+>  			cpu1-start-addr = <0xffd080c4>;
+>  		};
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+> index 019dd2f..e1a61f2 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+> @@ -36,6 +36,7 @@
+>  };
+>  
+>  &gmac1 {
+> +	phy-mode = "rgmii";
+>  	status = "okay";
+>  };
+
+Looks good to me.
+
+Regards,
+Steffen
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/d7842e8d/attachment.sig>
+Pengutronix e.K.                           | Steffen Trumtrar            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
