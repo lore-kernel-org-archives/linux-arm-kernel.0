@@ -1,72 +1,124 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 21 Mar 2016 09:33:51 -0400
-Subject: [PATCH v11 8/9] arm64: Add kernel return probes support
- (kretprobes)
-In-Reply-To: <50399556C9727B4D88A595C8584AAB37B4E504AA@GSjpTKYDCembx32.service.hitachi.net>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-9-git-send-email-dave.long@linaro.org>
- <50399556C9727B4D88A595C8584AAB37B4E50431@GSjpTKYDCembx32.service.hitachi.net>
- <50399556C9727B4D88A595C8584AAB37B4E504AA@GSjpTKYDCembx32.service.hitachi.net>
-Message-ID: <56EFF83F.7040906@linaro.org>
+From: pjones@redhat.com (Peter Jones)
+Date: Mon, 21 Mar 2016 09:42:23 -0400
+Subject: [PATCH 4/8] efi/x86: efifb: move DMI based quirks handling out
+ of generic code
+In-Reply-To: <20160318105007.GM2619@codeblueprint.co.uk>
+References: <1457588408-19309-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1457588408-19309-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20160318105007.GM2619@codeblueprint.co.uk>
+Message-ID: <20160321134222.GA21791@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2016 08:58 AM, ???? / HIRAMATU?MASAMI wrote:
->> From: ???? / HIRAMATU?MASAMI [mailto:masami.hiramatsu.pt at hitachi.com]
->>
->> Hi,
->>
->>> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->>>
->>> The pre-handler of this special 'trampoline' kprobe executes the return
->>> probe handler functions and restores original return address in ELR_EL1.
->>> This way the saved pt_regs still hold the original register context to be
->>> carried back to the probed kernel function.
->>
->> This patch seems not well separated.
->>
->>> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
->>> index bd3f233..13d3333 100644
->>> --- a/arch/arm64/kernel/kprobes.c
->>> +++ b/arch/arm64/kernel/kprobes.c
->>
->> [snip]
->>
->>> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
->>> +				      struct pt_regs *regs)
->>> +{
->>> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
->>> +
->>> +	/* replace return addr (x30) with trampoline */
->>> +	regs->regs[30] = (long)&kretprobe_trampoline;
->>
->> So, where is the kretprobe_trampoline? It seems that function is
->> defined in other patch.
->>
->>> +}
->>> +
->>> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
->>> +{
->>> +	return 0;
->>> }
->>
->> And what this function is for??
->
-> Ah, sorry, this was my fault. Yes, this function is required.
-> But this implementation also means there is an asm-based trampoline
-> function which should be included in this patch.
->
-> David, could you tell me the repository which I can get the latest
-> version of this series? I'd like to see the whole code of kprobes/arm64.
->
-> Thank you,
->
+On Fri, Mar 18, 2016 at 10:50:07AM +0000, Matt Fleming wrote:
+> (Cc'ing efifb maintainer and sysfb_efi.c author)
+> 
+> On Thu, 10 Mar, at 12:40:04PM, Ard Biesheuvel wrote:
+> > The efifb quirks handling based on DMI identification of the platform is
+> > specific to x86, so move it to x86 arch code.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/x86/include/asm/efi.h  |  2 ++
+> >  arch/x86/kernel/sysfb_efi.c | 15 +++++++++++++++
+> >  drivers/video/fbdev/efifb.c | 15 ++++-----------
+> >  3 files changed, 21 insertions(+), 11 deletions(-)
+>  
+> I've left the patch content intact below. This looks like a worthwhile
+> change to me. David, Peter, any comments?
 
-It can be found in:
+It looks right to me as well:
 
-http://git.linaro.org/people/dave.long/linux.git
+Acked-By: Peter Jones <pjones@redhat.com>
 
-...in the kprobes64-v11 branch.
+> 
+> > diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+> > index 7d5187b66108..790adbc3a64a 100644
+> > --- a/arch/x86/include/asm/efi.h
+> > +++ b/arch/x86/include/asm/efi.h
+> > @@ -154,6 +154,8 @@ static inline bool efi_runtime_supported(void)
+> >  extern struct console early_efi_console;
+> >  extern void parse_efi_setup(u64 phys_addr, u32 data_len);
+> >  
+> > +extern void efifb_setup_from_dmi(struct screen_info *si, const char *opt);
+> > +
+> >  #ifdef CONFIG_EFI_MIXED
+> >  extern void efi_thunk_runtime_setup(void);
+> >  extern efi_status_t efi_thunk_set_virtual_address_map(
+> > diff --git a/arch/x86/kernel/sysfb_efi.c b/arch/x86/kernel/sysfb_efi.c
+> > index b285d4e8c68e..e21a8a7ddcff 100644
+> > --- a/arch/x86/kernel/sysfb_efi.c
+> > +++ b/arch/x86/kernel/sysfb_efi.c
+> > @@ -68,6 +68,21 @@ struct efifb_dmi_info efifb_dmi_list[] = {
+> >  	[M_UNKNOWN] = { NULL, 0, 0, 0, 0, OVERRIDE_NONE }
+> >  };
+> >  
+> > +void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
+> > +{
+> > +	int i;
+> > +
+> > +	for (i = 0; i < M_UNKNOWN; i++) {
+> > +		if (efifb_dmi_list[i].base != 0 &&
+> > +		    !strcmp(opt, efifb_dmi_list[i].optname)) {
+> > +			si->lfb_base = efifb_dmi_list[i].base;
+> > +			si->lfb_linelength = efifb_dmi_list[i].stride;
+> > +			si->lfb_width = efifb_dmi_list[i].width;
+> > +			si->lfb_height = efifb_dmi_list[i].height;
+> > +		}
+> > +	}
+> > +}
+> > +
+> >  #define choose_value(dmivalue, fwvalue, field, flags) ({	\
+> >  		typeof(fwvalue) _ret_ = fwvalue;		\
+> >  		if ((flags) & (field))				\
+> > diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+> > index 95d293b7445a..dd594369b8a6 100644
+> > --- a/drivers/video/fbdev/efifb.c
+> > +++ b/drivers/video/fbdev/efifb.c
+> > @@ -8,6 +8,7 @@
+> >  
+> >  #include <linux/module.h>
+> >  #include <linux/kernel.h>
+> > +#include <linux/efi.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/fb.h>
+> >  #include <linux/platform_device.h>
+> > @@ -15,7 +16,7 @@
+> >  #include <linux/dmi.h>
+> >  #include <linux/pci.h>
+> >  #include <video/vga.h>
+> > -#include <asm/sysfb.h>
+> > +#include <asm/efi.h>
+> >  
+> >  static bool request_mem_succeeded = false;
+> >  
+> > @@ -85,21 +86,13 @@ static struct fb_ops efifb_ops = {
+> >  static int efifb_setup(char *options)
+> >  {
+> >  	char *this_opt;
+> > -	int i;
+> >  
+> >  	if (options && *options) {
+> >  		while ((this_opt = strsep(&options, ",")) != NULL) {
+> >  			if (!*this_opt) continue;
+> >  
+> > -			for (i = 0; i < M_UNKNOWN; i++) {
+> > -				if (efifb_dmi_list[i].base != 0 &&
+> > -				    !strcmp(this_opt, efifb_dmi_list[i].optname)) {
+> > -					screen_info.lfb_base = efifb_dmi_list[i].base;
+> > -					screen_info.lfb_linelength = efifb_dmi_list[i].stride;
+> > -					screen_info.lfb_width = efifb_dmi_list[i].width;
+> > -					screen_info.lfb_height = efifb_dmi_list[i].height;
+> > -				}
+> > -			}
+> > +			efifb_setup_from_dmi(&screen_info, this_opt);
+> > +
+> >  			if (!strncmp(this_opt, "base:", 5))
+> >  				screen_info.lfb_base = simple_strtoul(this_opt+5, NULL, 0);
+> >  			else if (!strncmp(this_opt, "stride:", 7))
+> > -- 
+> > 1.9.1
+> > 
 
-Thanks,
--dl
+-- 
+        Peter
