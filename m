@@ -1,57 +1,49 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Mon, 21 Mar 2016 09:47:10 +0200
-Subject: [RESEND PATCH V4 1/4] stm class: provision for statically
- assigned masterIDs
-In-Reply-To: <1457418835-31417-2-git-send-email-zhang.chunyan@linaro.org>
-References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
- <1457418835-31417-2-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <87wpow6znl.fsf@ashishki-desk.ger.corp.intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Mar 2016 08:48:43 +0100
+Subject: [PATCH v3 4/5] dmaengine: sun6i: Simplify some macros
+In-Reply-To: <a25c76bc3c63afc311069366af4970b909d356ef.1458311540.git.moinejf@free.fr>
+References: <cover.1458311540.git.moinejf@free.fr>
+ <a25c76bc3c63afc311069366af4970b909d356ef.1458311540.git.moinejf@free.fr>
+Message-ID: <20160321074843.GX30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+On Fri, Mar 18, 2016 at 03:21:11PM +0100, Jean-Francois Moine wrote:
+> As the max burst and bus width values are now checked, there is
+> no reason to check them again when setting the hardware registers.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  drivers/dma/sun6i-dma.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index 3f73123..643ba4c 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -65,8 +65,8 @@
+>  #define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
+>  #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
+>  #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
+> -#define DMA_CHAN_CFG_SRC_BURST(x)	(((x) & 0x3) << 7)
+> -#define DMA_CHAN_CFG_SRC_WIDTH(x)	(((x) & 0x3) << 9)
+> +#define DMA_CHAN_CFG_SRC_BURST(x)	((x) << 7)
+> +#define DMA_CHAN_CFG_SRC_WIDTH(x)	((x) << 9)
 
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->
-> Some architecture like ARM assign masterIDs at the HW design
-> phase.  Those are therefore unreachable to users, making masterID
-> management in the generic STM core irrelevant.
->
-> In this kind of configuration channels are shared between masters
-> rather than being allocated on a per master basis.
->
-> This patch adds a new 'mshared' flag to struct stm_data that tells the
-> core that this specific STM device doesn't need explicit masterID
-> management.
+Well, you can easily end up with values higher than that. I still
+believe that making sure you only always write what is expected is a
+good thing.
 
-There are two kinds of 'masterIDs' that we're talking about here: the
-ones that turn up in the STP stream and the ones that are accessible to
-trace-side software (sw_start/sw_end). So in this case we want to
-reflect the fact that there is no correlation between the two, because
-hardware assigns STP channels dynamically based on the states of the
-trace/execution environment. And although the trace side software can do
-very little with this information, it does make sense to provide it.
+Maxime
 
-The sw_start==sw_end situation, on the other hand, is a side effect of
-the above and, as I said in one of the previous threads, may not even be
-the case, or at least I don't see why it has to. And when it is the
-case, I don't see the point in handling it differently from
-sw_start<sw_end situation.
-
-> In the core sw_start/end of masterID are set to '1',
-> i.e there is only one masterID to deal with.
-
-Why does this need to be done in the core and why '1'? IOW,
-sw_{start,end} come straight from the driver, this new 'mshared' comes
-straight from the driver, why do we need the core to modify the former
-based on the latter?
-
-> Also this patch depends on [1], so that the number of masterID
-> is '1' too.
-
-It's 7b3bb0e753 in Linus' tree, but I don't see the logical connection
-in the statement above.
-
-Regards,
---
-Alex
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/8f446f4c/attachment.sig>
