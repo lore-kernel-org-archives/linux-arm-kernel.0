@@ -1,42 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Mar 2016 11:00:17 +0000
-Subject: [PATCH] kvm: arm64: Disable compiler instrumentation for hypervisor
- code
-Message-ID: <1458558017-6414-1-git-send-email-catalin.marinas@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 21 Mar 2016 12:00:23 +0100
+Subject: [PATCH] iommu/rockchip: Don't feed NULL res pointers to devres
+Message-ID: <1458558024-6922-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the recent rewrite of the arm64 KVM hypervisor code in C, enabling
-certain options like KASAN would allow the compiler to generate memory
-accesses or function calls to addresses not mapped at EL2. This patch
-disables the compiler instrumentation on the arm64 hypervisor code for
-gcov-based profiling (GCOV_KERNEL), undefined behaviour sanity checker
-(UBSAN) and kernel address sanitizer (KASAN).
+If we do, devres prints a "invalid resource" string in the error
+loglevel.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: <stable@vger.kernel.org> # 4.5+
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
+ drivers/iommu/rockchip-iommu.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-A better fix, at least for KASAN, would be nice but that's a lot more
-intrusive as we need to map the KASAN shadow into the EL2 space. In the
-meantime, especially since it needs backporting to 4.5, this patch would
-solve KASAN getting stuck with KVM (similar to what we do for EFI_STUB).
-
- arch/arm64/kvm/hyp/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 826032bc3945..acde4782621a 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -12,3 +12,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
- obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
- obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
-+
-+GCOV_PROFILE	:= n
-+KASAN_SANITIZE	:= n
-+UBSAN_SANITIZE	:= n
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index a6f593a0a29e..0253ab35c33b 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1049,6 +1049,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 
+ 	for (i = 0; i < pdev->num_resources; i++) {
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res)
++			continue;
+ 		iommu->bases[i] = devm_ioremap_resource(&pdev->dev, res);
+ 		if (IS_ERR(iommu->bases[i]))
+ 			continue;
+-- 
+2.5.0
