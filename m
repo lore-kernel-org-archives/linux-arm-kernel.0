@@ -1,195 +1,77 @@
-From: agustinv@codeaurora.org (agustinv at codeaurora.org)
-Date: Mon, 21 Mar 2016 12:06:57 -0400
-Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
-In-Reply-To: <20160321103507.GB17326@leverpostej>
-References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
- <20160321103507.GB17326@leverpostej>
-Message-ID: <79190bfdf24ac993206e9aa00f0c437b@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Mar 2016 16:08:16 +0000
+Subject: [PATCH 1/2] arm64: Store breakpoint single step state into pstate
+In-Reply-To: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
+References: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
+Message-ID: <20160321160816.GL23397@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-21 06:35, Mark Rutland wrote:
-> On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
->> This adds a new dynamic PMU to the Perf Events framework to program
->> and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
->> 
->> The driver supports a distributed cache architecture where the overall
->> cache is comprised of multiple slices each with its own PMU. The 
->> driver
->> aggregates counts across the whole system to provide a global picture
->> of the metrics selected by the user.
->> 
->> The driver exports formatting and event information to sysfs so it can
->> be used by the perf user space tools with the syntaxes:
->>    perf stat -a -e l3cache/read-miss/
->>    perf stat -a -e l3cache/event=0x21/
->> 
->> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
->> ---
->>  arch/arm64/kernel/Makefile                   |   4 +
->>  arch/arm64/kernel/perf_event_qcom_l3_cache.c | 816 
->> +++++++++++++++++++++++++++
->>  2 files changed, 820 insertions(+)
->>  create mode 100644 arch/arm64/kernel/perf_event_qcom_l3_cache.c
+On Mon, Mar 21, 2016 at 08:37:49AM +0000, He Kuang wrote:
+> From: Wang Nan <wangnan0@huawei.com>
 > 
-> Move this to drivers/bus (where the CCI and CCN PMU drivers live), or
-> drivers/perf (where some common infrastructure lives).
+> Store breakpoint single step state into pstate to fix the
+> recursion issue on ARM64.
 > 
-> This isn't architectural, and isn't CPU-specific, so it has no reason 
-> to
-> live in arch/arm64.
+> Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/include/asm/debug-monitors.h |  9 ++++++
+>  arch/arm64/include/uapi/asm/ptrace.h    | 10 +++++++
+>  arch/arm64/kernel/hw_breakpoint.c       | 49 +++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/signal.c              |  2 ++
+>  4 files changed, 70 insertions(+)
 > 
+> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+> index 279c85b5..b5902e8 100644
+> --- a/arch/arm64/include/asm/debug-monitors.h
+> +++ b/arch/arm64/include/asm/debug-monitors.h
+> @@ -132,11 +132,20 @@ int kernel_active_single_step(void);
+>  
+>  #ifdef CONFIG_HAVE_HW_BREAKPOINT
+>  int reinstall_suspended_bps(struct pt_regs *regs);
+> +u64 signal_single_step_enable_bps(void);
+> +void signal_reinstall_single_step(u64 pstate);
+>  #else
+>  static inline int reinstall_suspended_bps(struct pt_regs *regs)
+>  {
+>  	return -ENODEV;
+>  }
+> +
+> +static inline u64 signal_single_step_enable_bps(void)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline void signal_reinstall_single_step(u64 pstate) { }
+>  #endif
+>  
+>  int aarch32_break_handler(struct pt_regs *regs);
+> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+> index 208db3d..8dbfdac 100644
+> --- a/arch/arm64/include/uapi/asm/ptrace.h
+> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+> @@ -52,6 +52,16 @@
+>  #define PSR_N_BIT	0x80000000
+>  
+>  /*
+> + * pstat in pt_regs and user_pt_regs are 64 bits. The highest 32 bits
+> + * of it can be used by kernel. One user of them is signal handler.
+> + */
+> +#define PSR_LINUX_MASK        0xffffffff00000000UL
+> +#define PSR_LINUX_HW_BP_SS    0x0000000100000000UL    /* Single step and disable breakpoints */
+> +#define PSR_LINUX_HW_WP_SS    0x0000000200000000UL    /* Single step and disable watchpoints */
+> +
+> +#define PSR_LINUX_HW_SS    (PSR_LINUX_HW_BP_SS | PSR_LINUX_HW_WP_SS)
 
-I will move it to drivers/perf. Thanks.
+As I've said before, I'm not at all keen on this approach. We're changing
+a UAPI header to include magic numbers that may or may not conflict with
+the architecture in future in order to fix a problem that doesn't exist
+outside of a contrived test case.
 
->> +static
->> +int qcom_l3_cache__event_init(struct perf_event *event)
->> +{
->> +	struct hw_perf_event *hwc = &event->hw;
->> +
->> +	if (event->attr.type != l3cache_pmu.pmu.type)
->> +		return -ENOENT;
->> +
->> +	/*
->> +	 * There are no per-counter mode filters in the PMU.
->> +	 */
->> +	if (event->attr.exclude_user || event->attr.exclude_kernel ||
->> +	    event->attr.exclude_hv || event->attr.exclude_idle)
->> +		return -EINVAL;
->> +
->> +	hwc->idx = -1;
->> +
->> +	/*
->> +	 * Sampling not supported since these events are not 
->> core-attributable.
->> +	 */
->> +	if (hwc->sample_period)
->> +		return -EINVAL;
->> +
->> +	/*
->> +	 * Task mode not available, we run the counters as system counters,
->> +	 * not attributable to any CPU and therefore cannot attribute 
->> per-task.
->> +	 */
->> +	if (event->cpu < 0)
->> +		return -EINVAL;
->> +
->> +	return 0;
->> +}
-> 
-> Please follow what the other system PMUs do and (forcefully) ensure 
-> that all
-> events share the same CPU in event_init.
-> 
-> Otherwise, events can exist in multiple percpu contexts, and management
-> thereof can race on things line pmu_{enable,disable}.
-> 
-> You'll also want to expose a cpumask to userspace for that, to ensure 
-> that it
-> only opens events on a single CPU.
-> 
-> For an example, see drivers/bus/arm-ccn.c. That also handles migrating
-> events to a new CPU upon hotplug.
+I'd much rather place a restriction on .wakeup_events of the hw_breakpoint
+and simply refuse to initialise things in a way that leads to problems down
+the line. Ptrace and GDB are the primary users of this interface and I'm not
+willing to risk breaking them with these sorts of invasive changes.
 
-Understood. I will look at the CCN implementation as reference,
-
-> 
->> +static
->> +int qcom_l3_cache__event_add(struct perf_event *event, int flags)
->> +{
->> +	struct l3cache_pmu *system = to_l3cache_pmu(event->pmu);
->> +	struct hw_perf_event *hwc = &event->hw;
->> +	int idx;
->> +	int prev_cpu;
->> +	int err = 0;
->> +
->> +	/*
->> +	 * We need to disable the pmu while adding the event, otherwise
->> +	 * the perf tick might kick-in and re-add this event.
->> +	 */
->> +	perf_pmu_disable(event->pmu);
->> +
->> +	/*
->> +	 * This ensures all events are on the same CPU context. No need to 
->> open
->> +	 * these on all CPUs since they are system events. The strategy here 
->> is
->> +	 * to set system->cpu when the first event is created and from that
->> +	 * point on, only events in the same CPU context will be allowed to 
->> be
->> +	 * active. system->cpu will get reset back to -1 when the last event
->> +	 * is deleted, please see qcom_l3_cache__event_del below.
->> +	 */
->> +	prev_cpu = atomic_cmpxchg(&system->cpu, -1, event->cpu);
->> +	if ((event->cpu != prev_cpu) && (prev_cpu != -1)) {
->> +		err = -EAGAIN;
->> +		goto out;
->> +	}
-> 
-> As above, handle this in event_init, as other system PMUs do.
-> 
-> Handling it here is rather late, and unnecessarily fragile.
-
-Understood. I will look at the CCN implementation as reference,
-
-> 
->> +/*
->> + * In some platforms interrupt resources might not come directly from 
->> the GIC,
->> + * but from separate IRQ circuitry that signals a summary IRQ to the 
->> GIC and
->> + * is handled by a secondary IRQ controller. This is problematic 
->> under ACPI boot
->> + * because the ACPI core does not use the Resource Source field on 
->> the Extended
->> + * Interrupt Descriptor, which in theory could be used to specify an 
->> alternative
->> + * IRQ controller.
->> +
->> + * For this reason in these platforms we implement the secondary IRQ 
->> controller
->> + * using the gpiolib and specify the IRQs as GpioInt resources, so 
->> when getting
->> + * an IRQ from the device we first try platform_get_irq and if it 
->> fails we try
->> + * devm_gpiod_get_index/gpiod_to_irq.
->> + */
->> +static
->> +int qcom_l3_cache_pmu_get_slice_irq(struct platform_device *pdev,
->> +				    struct platform_device *sdev)
->> +{
->> +	int virq = platform_get_irq(sdev, 0);
->> +	struct gpio_desc *desc;
->> +
->> +	if (virq >= 0)
->> +		return virq;
->> +
->> +	desc = devm_gpiod_get_index(&sdev->dev, NULL, 0, GPIOD_ASIS);
->> +	if (IS_ERR(desc))
->> +		return -ENOENT;
->> +
->> +	return gpiod_to_irq(desc);
->> +}
->> +
-> 
-> As Marc Zyngier pointed out in another thread, you should represent 
-> your
-> interrupt controller as an interrupt controller rather than pretending 
-> it is a
-> GPIO controller.
-> 
-> Drivers should be able to remain blissfully unaware what the other end 
-> of their
-> interrupt line is wired up to, and shouldn't have to jump through hoops 
-> like
-> the above.
-
-Understood. We need to close the loop with Rafael J. Wysocki w.r.t. ACPI 
-support for multiple regular IRQ controllers similar to DT.
-
-> 
-> Thanks,
-> Mark.
-
-Thanks,
-Agustin
+Will
