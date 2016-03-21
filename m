@@ -1,26 +1,37 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 21 Mar 2016 17:44:40 +0100
-Subject: [RESEND PATCH V7 4/6] i2c: qup: Add bam dma capabilities
-In-Reply-To: <004901d1837a$2df9f620$89ede260$@codeaurora.org>
-References: <1456142895-32646-1-git-send-email-sricharan@codeaurora.org>
- <20160224101949.GB1391@katana>
- <004901d1837a$2df9f620$89ede260$@codeaurora.org>
-Message-ID: <20160321164440.GA1505@katana>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 21 Mar 2016 17:48:44 +0100
+Subject: [PATCH v2 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
+References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
+ <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20160321164843.GD6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> enabled.  I have patch like below to fix it, but wanted to ask you if it
-> would correct to have this in the
-> original patch or should I sent a separate fix ? Sorry for the mess on this.
+The below annotates the two most used idle functions on x86
 
-Once a patch is applied, it is in linux-next, so you need to send
-incremental patches to fix things.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/24b94f75/attachment.sig>
+--- a/arch/x86/kernel/acpi/cstate.c
++++ b/arch/x86/kernel/acpi/cstate.c
+@@ -152,7 +152,7 @@ int acpi_processor_ffh_cstate_probe(unsi
+ }
+ EXPORT_SYMBOL_GPL(acpi_processor_ffh_cstate_probe);
+ 
+-void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
++__cpuidle void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 	struct cstate_entry *percpu_entry;
+--- a/drivers/idle/intel_idle.c
++++ b/drivers/idle/intel_idle.c
+@@ -725,7 +725,7 @@ static struct cpuidle_state avn_cstates[
+  *
+  * Must be called under local_irq_disable().
+  */
+-static int intel_idle(struct cpuidle_device *dev,
++__cpuidle static int intel_idle(struct cpuidle_device *dev,
+ 		struct cpuidle_driver *drv, int index)
+ {
+ 	unsigned long ecx = 1; /* break on interrupt flag */
