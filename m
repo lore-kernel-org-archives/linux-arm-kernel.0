@@ -1,100 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Mar 2016 18:42:39 +0100
-Subject: [PATCH 2/2] arm64: choose memstart_addr based on minimum
- sparsemem section alignment
-In-Reply-To: <1458581924-14462-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1458581924-14462-1-git-send-email-ard.biesheuvel@linaro.org>
- <1458581924-14462-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-15KKjry8+DAK4uSnwTeZzaH-QLgV99F3zsD5sn3thzA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 21 Mar 2016 17:44:37 +0000 (UTC)
+Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <56EFB794.5010505@ti.com>
+References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
+ <56EFB794.5010505@ti.com>
+Message-ID: <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2016 at 18:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This reverts commit 36e5cd6b897e, which was needed in v4.5 and before to
-> ensure the correct alignment of the base of the vmemmap region. However,
-> since commit a7f8de168ace ("arm64: allow kernel Image to be loaded anywhere
-> in physical memory"), the alignment of memstart_addr itself can be freely
-> chosen, which means we can choose it such that additional rounding in the
-> definition of vmemmap is no longer necessary.
->
-> So redefine ARM64_MEMSTART_ALIGN in terms of the minimal alignment required
-> by sparsemem, and drop the redundant rounding in the definition of vmemmap.
->
-> Note that the net result of this change is that we align memstart_addr to
-> 1 GB in all cases, since sparsemem is mandatory on arm64.
+Hi P?ter,
 
-This is not actually true, since the 1 GB alignment on 64k pages is
-only used for sparsemem-vmemmap. Also, this patch is no longer a
-straight revert of the late fix we sent for v4.5, so perhaps it is
-more appropriate to split off the updated definition of
-ARM64_MEMSTART_ALIGN, so that we can put the straight revert on top of
-that?
+On Mon, 21 Mar 2016, Peter Ujfalusi wrote:
+
+> On 03/19/16 21:38, Paul Walmsley wrote:
+> > On Fri, 18 Mar 2016, Peter Ujfalusi wrote:
+> > 
+> >> Hi,
+> >>
+> >> Chanes since v1:
+> >> - removed the ASoC patch as Mark has applied it already
+> >> - Added my signed-off to the hwmod patch
+> >> - New patch to handle the case when the sidetone hwmod has been removed for
+> >>   legacy boot.
+> >>
+> >> The series addresses a long standing issue with McBSP2/3 regarding to hwmod
+> >> setup. When booting with DT a warning is printed that mcbsp2/3 is using two
+> >> hwmod.
+> >> The root of the issue is the way how the hwmod data was constructed in the first
+> >> place for OMAP3 McBSP2/3.
+> >> After re-reading the TRM it is clear that the sidetone should not have it's
+> >> own hwmod data as it is not a separate IP, it is part of the McBSP module. It
+> >> can not affect PRCM either since it's SYSCONFIG register's AUTOIDLE bit is only
+> >> sets the autoidle from the internal McBSP_iclk clock to the sidetone block of
+> >> the same McBSP.
+> > 
+> > NAK, at least without further discussion - see my comments on the v1 0/3 
+> > introduction.
+> 
+> Yes, I could have sent the first series as RFC, but I believe(d) that this is
+> the correct way to fix the McBSP sidetone integration.
+
+Yep not a problem.  You're handling the process correctly.  There's no 
+need to send things as an RFC unless you are unsure. 
+
+What you and I are doing now is exactly how the discussion and review 
+process is supposed to work.
 
 
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/kernel-pgtable.h | 17 +++++++++++++++--
->  arch/arm64/include/asm/pgtable.h        |  5 ++---
->  2 files changed, 17 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-> index 5c6375d8528b..a144ae2953a2 100644
-> --- a/arch/arm64/include/asm/kernel-pgtable.h
-> +++ b/arch/arm64/include/asm/kernel-pgtable.h
-> @@ -19,6 +19,7 @@
->  #ifndef __ASM_KERNEL_PGTABLE_H
->  #define __ASM_KERNEL_PGTABLE_H
->
-> +#include <asm/sparsemem.h>
->
->  /*
->   * The linear mapping and the start of memory are both 2M aligned (per
-> @@ -87,9 +88,21 @@
->   * in the page tables: 32 * PMD_SIZE (16k granule)
->   */
->  #ifdef CONFIG_ARM64_64K_PAGES
-> -#define ARM64_MEMSTART_ALIGN   SZ_512M
-> +#define ARM64_MEMSTART_BITS    29
->  #else
-> -#define ARM64_MEMSTART_ALIGN   SZ_1G
-> +#define ARM64_MEMSTART_BITS    30
-> +#endif
-> +
-> +/*
-> + * sparsemem imposes an additional requirement on the alignment of
-> + * memstart_addr, due to the fact that the base of the vmemmap region
-> + * has a direct correspondence, and needs to appear sufficiently aligned
-> + * in the virtual address space.
-> + */
-> +#if defined(CONFIG_SPARSEMEM_VMEMMAP) && ARM64_MEMSTART_BITS < SECTION_SIZE_BITS
-> +#define ARM64_MEMSTART_ALIGN   (1UL << SECTION_SIZE_BITS)
-> +#else
-> +#define ARM64_MEMSTART_ALIGN   (1UL << ARM64_MEMSTART_BITS)
->  #endif
->
->  #endif /* __ASM_KERNEL_PGTABLE_H */
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 989fef16d461..aa6106ac050c 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -32,14 +32,13 @@
->   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
->   *     fixed mappings and modules
->   */
-> -#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
-> +#define VMEMMAP_SIZE           ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
->
->  #define VMALLOC_START          (MODULES_END)
->  #define VMALLOC_END            (PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
->
->  #define VMEMMAP_START          (VMALLOC_END + SZ_64K)
-> -#define vmemmap                        ((struct page *)VMEMMAP_START - \
-> -                                SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
-> +#define vmemmap                        ((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
->
->  #define FIRST_USER_ADDRESS     0UL
->
-> --
-> 1.9.1
->
+- Paul
