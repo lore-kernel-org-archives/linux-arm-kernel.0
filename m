@@ -1,38 +1,91 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 21 Mar 2016 21:39:31 +0900
-Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
- (2nd round)
-In-Reply-To: <4681837.8bj0oMJutW@wuerfel>
-References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNAT=HuL427P-B5LnetbZ3y667cMoKo+W4i-w-KLfK3a93w@mail.gmail.com>
- <CAK7LNAR3HO92T4bdWaSrK6Tz6Fy8ScL-3ZhFuhHg8=t3vyrEdQ@mail.gmail.com>
- <4681837.8bj0oMJutW@wuerfel>
-Message-ID: <CAK7LNAR_=p4phcse7oS0xjJsVhZ_jZ36su0zYT3LynwYH1jABw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 21 Mar 2016 07:40:43 -0500
+Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
+References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
+ <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
+ <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
+Message-ID: <20160321124043.GA26873@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Sat, Mar 19, 2016 at 12:00:22AM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
+> <alexandre.torgue@gmail.com> wrote:
+> > Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+> >
+> > diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> > new file mode 100644
+> > index 0000000..ada2aa4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+> > @@ -0,0 +1,32 @@
+> > +STMicroelectronics STM32 / MCU DWMAC glue layer controller
+> > +
+> > +This file documents platform glue layer for stmmac.
+> > +Please see stmmac.txt for the other unchanged properties.
+> > +
+> > +The device node has following properties.
+> > +
+> > +Required properties:
+> > +- compatible:  Should be "st,stm32-dwmac" to select glue, and
+> > +              "snps,dwmac-3.50a" to select IP vesrion.
+> 
+> If you need have sort of hardware glue, then it is not compatible.
 
-2016-03-21 18:49 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Monday 21 March 2016 12:59:20 Masahiro Yamada wrote:
->>
->> I thought you'd include DT updates in the pull requests,
->> but you didn't.
->>
->> Why was next/dt2 missed?
->
-> This is the branch that I pulled in some patches last, I'm going to send
-> it in a couple of days, after it has been in linux-next. It should be there
-> in the end.
+Hence, the more specific compatible. Having the generic one is still 
+useful.
 
-I did not know this.
-That'll be great.
+> 
+> ChenYu
+> 
+> > +- clocks: Must contain a phandle for each entry in clock-names.
+> > +- clock-names: Should be "stmmaceth" for the host clock.
 
-Sorry for poking you again and again.
+This doesn't sound like the clock input signal name...
 
+> > +              Should be "tx-clk" for the MAC TX clock.
+> > +              Should be "rx-clk" for the MAC RX clock.
 
+How can other DWMAC blocks not have these clocks? The glue can't really 
+add these clocks. It could combine them into one or a new version of 
+DWMAC could have a different number of clock inputs. So if there is 
+variation here, then some of the bindings are probably wrong. I guess 
+the only change I'm suggesting is possibly moving these into common 
+binding doc.
 
+> > +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
+> > +             encompases the glue register, and the offset of the control register.
+> > +Example:
+> > +
+> > +               ethernet0: dwmac at 40028000 {
 
--- 
-Best Regards
-Masahiro Yamada
+ethernet at ...
+
+> > +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
+> > +                       status = "disabled";
+> > +                       reg = <0x40028000 0x8000>;
+> > +                       reg-names = "stmmaceth";
+> > +                       interrupts = <0 61 0>, <0 62 0>;
+> > +                       interrupt-names = "macirq", "eth_wake_irq";
+> > +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
+> > +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
+> > +                       st,syscon = <&syscfg 0x4>;
+> > +                       snps,pbl = <8>;
+> > +                       snps,mixed-burst;
+> > +                       dma-ranges;
+> > +               };
+> > --
+> > 1.9.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
