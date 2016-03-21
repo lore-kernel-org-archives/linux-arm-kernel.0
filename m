@@ -1,74 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Mar 2016 10:43:48 +0100
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <mvmoaa8dwre.fsf@hawking.suse.de>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <20160318154918.GA1595@yury-N73SV> <mvmoaa8dwre.fsf@hawking.suse.de>
-Message-ID: <6653982.FK62mVSCZO@wuerfel>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 21 Mar 2016 11:49:56 +0000
+Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
+In-Reply-To: <CAKfTPtDP3zMR+zbvvqJCBvJ5r44do8NS03wC7pAejxPd0zHTMA@mail.gmail.com>
+References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+ <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
+ <56EC3F9E.4050209@nvidia.com> <20160321105330.GB12319@e106622-lin>
+ <CAKfTPtDP3zMR+zbvvqJCBvJ5r44do8NS03wC7pAejxPd0zHTMA@mail.gmail.com>
+Message-ID: <20160321114956.GD12319@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 March 2016 10:07:49 Andreas Schwab wrote:
-> This patch may fix a few LTP tests.
+Hi Vincent,
+
+On 21/03/16 12:09, Vincent Guittot wrote:
+> On 21 March 2016 at 11:53, Juri Lelli <juri.lelli@arm.com> wrote:
+> > Hi Sai,
+> >
+> > On 18/03/16 10:49, Sai Gurrappadi wrote:
+> >> Hi Juri,
+> >>
+> >> On 03/18/2016 07:24 AM, Juri Lelli wrote:
+> >>
+> >> <snip>
+> >>
+> >> > +
+> >> > +==========================================
+> >> > +2 - CPU capacity definition
+> >> > +==========================================
+> >> > +
+> >> > +CPU capacity is a number that provides the scheduler information about CPUs
+> >> > +heterogeneity. Such heterogeneity can come from micro-architectural differences
+> >> > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
+> >> > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
+> >> > +context is about differing performance characteristics; this binding tries to
+> >> > +capture a first-order approximation of the relative performance of CPUs.
+> >>
+> >> Any reason why this capacity number is not dynamically generated based on the
+> >> max frequency for each CPU? The DT property would then instead specify just
+> >> the micro-architectural differences between the CPU types.
+> >>
+> >
+> > I'm not sure I clearly understand your question, so I'll try to
+> > reiterate it.
+> >
+> > Are you asking why we don't dynamically profile the system, at boot for
+> > example, to get this number? Or do you ask why this number couldn't be
+> > only describing micro-arch differences (so, if I get it right, we should
+> > then multiply it by max freq to get the capacity of a CPU)?
+> >
+> > We already played with the first option (please refer to v2 and v3), but
+> > we ended up agreeing that dynamic profiling adds overhead to the boot
+> > process (while a DT approach can provide information to speed up boot)
+> > and it is in general not repeatable/reliable (as numbers can vary from
+> > boot to boot for different reasons).
+> >
+> > The second option I think can be feasible, but I'm not sure what we gain
+> > in practice. We will still need to specify a per-platform number, right?
+> 
+> So could we use dt binding like dhrystone = <xyz> (with a unit like
+> DMIPS/Mhz)  which can then be combined with OPP table to gives a
+> 1st-order approximation of each CPU capacity ?
 > 
 
-Thanks for analyzing.
+But we'll still need to normalize this w.r.t the highest score we get on
+a specific platform, right? And while we are at normalizing it, it is
+probably simpler if we keep the frequency component as part of the
+number, IMHO. But, maybe keeping the frequency component separate is
+more acceptable from a DT binding perspective?
 
-> diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
-> index 3631903..d1010db 100644
-> --- a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
-> +++ b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
-> @@ -25,18 +25,29 @@
->  #define __O_NOFOLLOW	0100000
->  #define __O_DIRECT	0200000
->  
-> -#define __O_LARGEFILE	0
-> +#ifdef __ILP32__
-> +# define __O_LARGEFILE	0400000
-> +#else
-> +# define __O_LARGEFILE	0
-> +#endif
->  
+Thanks,
 
-I guess this means I screwed up when I said I'd merged the kernel patch
-that Yury did to fix it, sorry about that.
-
-We need the patch to make all new architecture in the kernel default to
-O_LARGEFILE, and not do this in user space. I'd suggest now to keep the
-patches as part of the ILP32 series after all, to make sure they are
-merged at the point when they are needed.
-
-> +#ifndef __ILP32__
->  # define F_GETLK64	5
->  # define F_SETLK64	6
->  # define F_SETLKW64	7
-> +#endif
->  
->  struct flock
->    {
->      short int l_type;	/* Type of lock: F_RDLCK, F_WRLCK, or F_UNLCK.	*/
->      short int l_whence;	/* Where `l_start' is relative to (like `lseek').  */
-> +#ifndef __USE_FILE_OFFSET64
->      __off_t l_start;	/* Offset where the lock begins.  */
->      __off_t l_len;	/* Size of the locked area; zero means until EOF.  */
-> +#else
-> +    __off64_t l_start;	/* Offset where the lock begins.  */
-> +    __off64_t l_len;	/* Size of the locked area; zero means until EOF.  */
-> +#endif
->      __pid_t l_pid;	/* Process holding the lock.  */
->    };
-
-This looks like there is another bug as well, but I think this is in
-libc, not in the kernel. I'm sure we had discussed this at some point
-but I forgot what the outcome was. Defining 'struct flock' to have a
-32-bit l_start and l_len member cannot be right if the kernel only
-supports 64-bit offsets.
-
-My guess is that the libc should either not define __off_t at all for
-ILP32, and always use __off64_t in struct flock, or __off_t should
-be defined as __kernel_loff_t a.k.a. long long so the #ifdef can be
-avoided.
-
-What exactly do you need to define F_GETLK64 for on LP64?
-
-	Arnd
+- Juri
