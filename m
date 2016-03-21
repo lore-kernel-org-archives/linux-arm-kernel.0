@@ -1,40 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Mar 2016 10:54:07 +0000
-Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
-In-Reply-To: <20160321103507.GB17326@leverpostej>
-References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
- <20160321103507.GB17326@leverpostej>
-Message-ID: <20160321105407.GD23397@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Mar 2016 11:00:17 +0000
+Subject: [PATCH] kvm: arm64: Disable compiler instrumentation for hypervisor
+ code
+Message-ID: <1458558017-6414-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 10:35:08AM +0000, Mark Rutland wrote:
-> On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
-> > This adds a new dynamic PMU to the Perf Events framework to program
-> > and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
-> > 
-> > The driver supports a distributed cache architecture where the overall
-> > cache is comprised of multiple slices each with its own PMU. The driver
-> > aggregates counts across the whole system to provide a global picture
-> > of the metrics selected by the user.
-> > 
-> > The driver exports formatting and event information to sysfs so it can
-> > be used by the perf user space tools with the syntaxes:
-> >    perf stat -a -e l3cache/read-miss/
-> >    perf stat -a -e l3cache/event=0x21/
-> > 
-> > Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
-> > ---
-> >  arch/arm64/kernel/Makefile                   |   4 +
-> >  arch/arm64/kernel/perf_event_qcom_l3_cache.c | 816 +++++++++++++++++++++++++++
-> >  2 files changed, 820 insertions(+)
-> >  create mode 100644 arch/arm64/kernel/perf_event_qcom_l3_cache.c
-> 
-> Move this to drivers/bus (where the CCI and CCN PMU drivers live), or
-> drivers/perf (where some common infrastructure lives).
+With the recent rewrite of the arm64 KVM hypervisor code in C, enabling
+certain options like KASAN would allow the compiler to generate memory
+accesses or function calls to addresses not mapped at EL2. This patch
+disables the compiler instrumentation on the arm64 hypervisor code for
+gcov-based profiling (GCOV_KERNEL), undefined behaviour sanity checker
+(UBSAN) and kernel address sanitizer (KASAN).
 
-Please stick to drivers/perf, as I have a vague plan to move the CCI/CCN
-PMU code out of drivers/bus and into drivers/perf (which didn't exist
-when they were originally upstreamed).
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Paolo Bonzini <pbonzini@redhat.com>
+Cc: <stable@vger.kernel.org> # 4.5+
+---
 
-Will
+A better fix, at least for KASAN, would be nice but that's a lot more
+intrusive as we need to map the KASAN shadow into the EL2 space. In the
+meantime, especially since it needs backporting to 4.5, this patch would
+solve KASAN getting stuck with KVM (similar to what we do for EFI_STUB).
+
+ arch/arm64/kvm/hyp/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 826032bc3945..acde4782621a 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -12,3 +12,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+ obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
+ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+ obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
++
++GCOV_PROFILE	:= n
++KASAN_SANITIZE	:= n
++UBSAN_SANITIZE	:= n
