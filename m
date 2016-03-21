@@ -1,84 +1,24 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 21 Mar 2016 10:08:18 +0000
-Subject: Delete flush cache all in arm64 platform.
-In-Reply-To: <56EFABD3.7060700@hisilicon.com>
-References: <56EFABD3.7060700@hisilicon.com>
-Message-ID: <20160321100818.GA17326@leverpostej>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 21 Mar 2016 15:54:23 +0530
+Subject: [PATCH 2/2] arm64: Fix watchpoint recursion when single-step is
+ wrongly triggered in irq
+In-Reply-To: <1458549470-124791-2-git-send-email-hekuang@huawei.com>
+References: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
+ <1458549470-124791-2-git-send-email-hekuang@huawei.com>
+Message-ID: <20160321102423.GB15150@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding LAKML]
+On 21/03/2016:08:37:50 AM, He Kuang wrote:
+> On arm64, watchpoint handler enables single-step to bypass the next
+> instruction for not recursive enter. If an irq is triggered right
+> after the watchpoint, a single-step will be wrongly triggered in irq
+> handler, which causes the watchpoint address not stepped over and
+> system hang.
 
-On Mon, Mar 21, 2016 at 04:07:47PM +0800, Chen Feng wrote:
-> Hi Mark,
+Does patch [1] resolves this issue as well? I hope it should. Patch[1] has still
+not been sent for review. Your test result will be helpful.
 
-Hi,
+~Pratyush
 
-> With 68234df4ea7939f98431aa81113fbdce10c4a84b
-> arm64: kill flush_cache_all()
-> The documented semantics of flush_cache_all are not possible to provide
-> for arm64 (short of flushing the entire physical address space by VA),
-> and there are currently no users; KVM uses VA maintenance exclusively,
-> cpu_reset is never called, and the only two users outside of arch code
-> cannot be built for arm64.
-> 
-> While cpu_soft_reset and related functions (which call flush_cache_all)
-> were thought to be useful for kexec, their current implementations only
-> serve to mask bugs. For correctness kexec will need to perform
-> maintenance by VA anyway to account for system caches, line migration,
-> and other subtleties of the cache architecture. As the extent of this
-> cache maintenance will be kexec-specific, it should probably live in the
-> kexec code.
-> 
-> This patch removes flush_cache_all, and related unused components,
-> preventing further abuse.
-> 
-> 
-> This patch delete the flush_cache_all interface.
-
-As the patch states, it does so because the documented semantics are
-impossible to provide, as there is no portable mechanism to "flush" all
-caches in the system.
-
-Set/Way operations cannot guarantee that data has been cleaned to the
-PoC (i.e. memory), or invalidated from all levels of cache. Reasons
-include:
-
-* They may race against background behaviour of the CPU (e.g.
-  speculation), which may allocate/evict/migrate lines. Depending on the
-  cache topology, this may "hide" lines from subsequent Set/Way
-  operations.
-
-* They are not broadcast, and do not affect other CPUs. Depending on the
-  implemented cache coherency protocols, other CPUs may be able to
-  acquire dirty lines, or retain lines in shared states, and hence these
-  may not be operated on.
-
-* They do not affect system caches (which respect cache maintenance by
-  VA in ARMv8-A).
-
-The only portable mechanism to perform cache maintenance to all relevant
-caches is by VA.
-
-> But if we use VA to flush cache to do cache-coherency with other
-> master(eg:gpu)
-> 
-> We must iterate over the sg-list to flush by va to pa.
-> 
-> In this way, the iterate of sg-list may cost too much time(sg-table to
-> sg-list) if the sglist is too long. Take a look at the
-> ion_pages_sync_for_device in ion.
-> 
-> The driver(eg: ION) need to use this interface(flush cache all) to
-> *improve the efficiency*.
-
-As above, we cannot use Set/Way operations for this, and cannot provide
-a flush_cache_all interface.
-
-I'm not sure what to suggest regarding improving efficiency.
-
-Is walking the sglist the expensive portion, or is the problem the cost
-of multiple page-size operations (each with their own barriers)?
-
-Thanks,
-Mark.
+[1] https://github.com/pratyushanand/linux/commit/7623c8099ac22eaa00e7e0f52430f7a4bd154652
