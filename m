@@ -1,43 +1,63 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 21 Mar 2016 21:01:02 +0100
-Subject: [linux-sunxi][PATCH v3 4/8] ARM: dts: sun7i: Add the SPDIF clk to the
- A20
+Date: Mon, 21 Mar 2016 21:01:06 +0100
+Subject: [linux-sunxi][PATCH v3 8/8] ARM: dts: sun7i: Add SPDIF to the Itead
+ Ibox
 In-Reply-To: <1458590466-12572-1-git-send-email-codekipper@gmail.com>
 References: <1458590466-12572-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1458590466-12572-5-git-send-email-codekipper@gmail.com>
+Message-ID: <1458590466-12572-9-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Add the SPDIF clock to the A20 dtsi.
+Enable the S/PDIF transmitter that is present on the Itead Ibox.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 0c207d0..108cad4 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -476,6 +476,17 @@
- 			clock-output-names = "ir1";
+diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+index a512581..9542865 100644
+--- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+@@ -65,6 +65,24 @@
+ 			default-state = "on";
  		};
- 
-+		spdif_clk: clk at 01c200c0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200c0 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_8X>,
-+				 <&pll2 SUN4I_A10_PLL2_4X>,
-+				 <&pll2 SUN4I_A10_PLL2_2X>,
-+				 <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "spdif";
+ 	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "On-board SPDIF";
++
++		simple-audio-card,cpu {
++			sound-dai = <&spdif>;
 +		};
 +
- 		keypad_clk: clk at 01c200c4 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-mod0-clk";
++		simple-audio-card,codec {
++			sound-dai = <&spdif_out>;
++		};
++	};
++
++	spdif_out: spdif-out {
++		#sound-dai-cells = <0>;
++		compatible = "linux,spdif-dit";
++	};
+ };
+ 
+ &ahci {
+@@ -131,6 +149,12 @@
+ 	status = "okay";
+ };
+ 
++&spdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spdif_tx_pins_a>;
++	status = "okay";
++};
++
+ &usbphy {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&usb0_id_detect_pin>;
 -- 
 2.7.4
