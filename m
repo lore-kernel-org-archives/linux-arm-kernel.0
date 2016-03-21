@@ -1,67 +1,40 @@
-From: sgurrappadi@nvidia.com (Sai Gurrappadi)
-Date: Mon, 21 Mar 2016 12:20:57 -0700
-Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
-In-Reply-To: <20160321105330.GB12319@e106622-lin>
-References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
- <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
- <56EC3F9E.4050209@nvidia.com> <20160321105330.GB12319@e106622-lin>
-Message-ID: <56F04999.6090902@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Mar 2016 20:33:21 +0100
+Subject: [PATCH 0/2] ARM: uniphier: UniPhier updates for Linux 4.6-rc1
+ (2nd round)
+In-Reply-To: <CAK7LNAR_=p4phcse7oS0xjJsVhZ_jZ36su0zYT3LynwYH1jABw@mail.gmail.com>
+References: <1456470968-7900-1-git-send-email-yamada.masahiro@socionext.com>
+ <4681837.8bj0oMJutW@wuerfel>
+ <CAK7LNAR_=p4phcse7oS0xjJsVhZ_jZ36su0zYT3LynwYH1jABw@mail.gmail.com>
+Message-ID: <9542345.80KhJJ4ttZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 21 March 2016 21:39:31 Masahiro Yamada wrote:
+> Hi Arnd,
+> 
+> 2016-03-21 18:49 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Monday 21 March 2016 12:59:20 Masahiro Yamada wrote:
+> >>
+> >> I thought you'd include DT updates in the pull requests,
+> >> but you didn't.
+> >>
+> >> Why was next/dt2 missed?
+> >
+> > This is the branch that I pulled in some patches last, I'm going to send
+> > it in a couple of days, after it has been in linux-next. It should be there
+> > in the end.
+> 
+> I did not know this.
+> That'll be great.
+> 
+> Sorry for poking you again and again.
 
+Nothing wrong on your end. Generally it's a good idea to remind us if you
+send patches and nothing happens after a week, or you are unsure whether
+we actually did what we said we'd do (as in this case).
 
-On 03/21/2016 03:53 AM, Juri Lelli wrote:
-> Hi Sai,
-> 
-> On 18/03/16 10:49, Sai Gurrappadi wrote:
->> Hi Juri,
->>
->> On 03/18/2016 07:24 AM, Juri Lelli wrote:
->>
->> <snip>
->>
->>> +
->>> +==========================================
->>> +2 - CPU capacity definition
->>> +==========================================
->>> +
->>> +CPU capacity is a number that provides the scheduler information about CPUs
->>> +heterogeneity. Such heterogeneity can come from micro-architectural differences
->>> +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
->>> +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
->>> +context is about differing performance characteristics; this binding tries to
->>> +capture a first-order approximation of the relative performance of CPUs.
->>
->> Any reason why this capacity number is not dynamically generated based on the
->> max frequency for each CPU? The DT property would then instead specify just
->> the micro-architectural differences between the CPU types.
->>
-> 
-> I'm not sure I clearly understand your question, so I'll try to
-> reiterate it.
-> 
-> Are you asking why we don't dynamically profile the system, at boot for
-> example, to get this number? Or do you ask why this number couldn't be
-> only describing micro-arch differences (so, if I get it right, we should
-> then multiply it by max freq to get the capacity of a CPU)?
-> 
-> We already played with the first option (please refer to v2 and v3), but
-> we ended up agreeing that dynamic profiling adds overhead to the boot
-> process (while a DT approach can provide information to speed up boot)
-> and it is in general not repeatable/reliable (as numbers can vary from
-> boot to boot for different reasons).
-> 
-> The second option I think can be feasible, but I'm not sure what we gain
-> in practice. We will still need to specify a per-platform number, right?
+I should really have been clearer in the pull request message about the
+fact that there is still some part missing.
 
-I meant the second bit. We only need some per-platform fudge factor for
-micro-architectural differences. Tying in the Fmax like this statically means
-that we need to manually synchronize DVFS tables and this number which seems
-unnecessary given that the kernel already has this info on boot.
-
-> 
-> Best,
-> 
-> - Juri
-> 
+	Arnd
