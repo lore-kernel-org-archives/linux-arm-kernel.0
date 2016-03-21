@@ -1,58 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 Mar 2016 13:07:34 +0000
-Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
- structure.
-In-Reply-To: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
-References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
-Message-ID: <20160321130734.GS2566@sirena.org.uk>
+From: xf@rock-chips.com (Feng Xiao)
+Date: Mon, 21 Mar 2016 21:24:32 +0800
+Subject: [PATCH] cpufreq: rockchip: add driver
+In-Reply-To: <20160321095855.GE27778@vireshk-i7>
+References: <1458303004-26445-1-git-send-email-xf@rock-chips.com>
+ <1787319.AFAWVqkdk0@diego> <20160321095049.GD27778@vireshk-i7>
+ <1505152.fhSnu3pvDr@diego> <20160321095855.GE27778@vireshk-i7>
+Message-ID: <56EFF610.6040402@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 05:50:08PM +0530, P L Sai Krishna wrote:
-> This patch does following things.
-> 1. Added dummy entry in the spi_transfer structure.
-> 2. Assigned dummy cycles to dummy member in the transfer
-> structure during read operation.
 
-Please try to follow the patch submission process covered in
-SubmittingPatches, in particular please use subject lines reflecting the
-style for the subsystem (which helps people identify relevant changes to
-review) and...
 
->  drivers/mtd/devices/m25p80.c | 1 +
->  include/linux/spi/spi.h      | 2 ++
->  2 files changed, 3 insertions(+)
-
-...split things up into individual patches, for example here you're
-both adding a new feature and adding a user of that feature in a single
-patch.
-
-> + * @dummy: number of dummy cycles.
-
-This needs to be clearer about what a dummy cycle is and where it gets
-inserted.  We probably also want a better name, just "dummy" makes it
-look like a padding field in the structure.  How about dummy_cycles?
-
-> @@ -752,6 +753,7 @@ struct spi_transfer {
->  	u8		bits_per_word;
->  	u16		delay_usecs;
->  	u32		speed_hz;
-> +	u32		dummy;
->  
->  	struct list_head transfer_list;
->  };
-
-This isn't enough to add the feature - a client driver trying to make
-use of this needs to be able to tell if the cycles are actually going to
-be inserted.  I'd expect to see a capability flag that can be checked
-and some error checking so that if we try to do a transfer with dummy
-cycles and can't support it we don't silently ignore the dummy cycles,
-ideally also something that'll handle multiples of 8 bits with SPI
-controllers that don't otherwise support this feature.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/5991feb1/attachment.sig>
+? 2016/3/21 17:58, Viresh Kumar ??:
+> On 21-03-16, 10:54, Heiko St?bner wrote:
+>> I hadn't seen that yet ... nice that cpufreq-dt now also supports clusters :-)
+>>
+>> The other part still stands though, as we probably should register the
+>> platform-device somewhere else and not in some new special module.
+>>
+>> When everything is using cpufreq-dt now, I guess we could just add it to the
+>> core rockchip clk-code. Or was there some agreement where this should be done
+>> (obviously not the devicetree itself)?
+Of_clk_init is called early, and platform_device_register_simple should 
+be called after devices_init, it will be failed to do it from clk-code.
+So we need add a new file or add module_init to each clock controller 
+driver(like clk-rk3368.c, clk-rk3399.c) ?
+> Yeah, there was a discussion around creating a white or black list of platforms
+> that want to create a platform device for cpufreq-dt. That can be done in
+> cpufreq-dt.c or a new file, but I haven't worked out on that yet.
+>
+> You can do it from clk-code or from the driver that was added in this thread.
+> Just that you need to match your platform's compatible string before doing that.
+Rockchip-cpufreq.c depends on ARM_ROCKCHIP_CPUFREQ, it will not be 
+compiled on non-Rockchip platforms.
+The driver can support all Rockchip SoCs up to now, add 
+of_machine_is_compatible may be redundant ?
+>
