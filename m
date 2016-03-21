@@ -1,83 +1,56 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Mon, 21 Mar 2016 09:32:58 +0100
-Subject: [PATCH] ARM: dts: rockchip: Add mdio node to ethernet node
-In-Reply-To: <CAAObsKBXuTw37YJb+Fhq_NgZw2rjPQ14phF1yRG+N2mEu9uBmw@mail.gmail.com>
-References: <1458300056-6174-1-git-send-email-tomeu.vizoso@collabora.com>
- <56EC744F.90308@suse.de>
- <CAAObsKBXuTw37YJb+Fhq_NgZw2rjPQ14phF1yRG+N2mEu9uBmw@mail.gmail.com>
-Message-ID: <CAOf5uw=jUeh0YDQu2SFjMsRzVH-WaXeZoq5mAbAQwD_dwttjnA@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 21 Mar 2016 04:35:13 -0400
+Subject: [PATCH v11 4/9] arm64: add conditional instruction simulation
+ support
+In-Reply-To: <20160314073803.22c90d69@arm.com>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-5-git-send-email-dave.long@linaro.org>
+ <20160313120903.54b0c8f2@arm.com> <20160314040455.GB6584@dhcppc6.redhat.com>
+ <20160314073803.22c90d69@arm.com>
+Message-ID: <56EFB241.80909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, Mar 21, 2016 at 9:23 AM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> On 18 March 2016 at 22:34, Andreas F?rber <afaerber@suse.de> wrote:
->> Am 18.03.2016 um 12:20 schrieb Tomeu Vizoso:
->>> So the dwmac device manages to probe again.
+On 03/14/2016 03:38 AM, Marc Zyngier wrote:
+> On Mon, 14 Mar 2016 09:34:55 +0530
+> Pratyush Anand <panand@redhat.com> wrote:
+>
+> Hi Pratyush,
+>
+>> On 13/03/2016:12:09:03 PM, Marc Zyngier wrote:
+>>> On Wed,  9 Mar 2016 00:32:18 -0500
+>>> David Long <dave.long@linaro.org> wrote:
 >>>
->>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>> Fixes: 88f8b1bb41c6 ("stmmac: Fix 'eth0: No PHY found' regression")
->>> ---
->>>  arch/arm/boot/dts/rk3288-rock2-som.dtsi | 8 ++++++++
->>>  1 file changed, 8 insertions(+)
+>>>> +pstate_check_t * const opcode_condition_checks[16] = {
+>>>> +	__check_eq, __check_ne, __check_cs, __check_cc,
+>>>> +	__check_mi, __check_pl, __check_vs, __check_vc,
+>>>> +	__check_hi, __check_ls, __check_ge, __check_lt,
+>>>> +	__check_gt, __check_le, __check_al, __check_al
 >>>
->>> diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
->>> index 1ece66f3e162..4ba7ddecb478 100644
->>> --- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
->>> +++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
->>> @@ -101,6 +101,14 @@
->>>       snps,reset-delays-us = <0 10000 30000>;
->>>       rx_delay = <0x10>;
->>>       tx_delay = <0x30>;
->>> +     mdio0 {
->>> +             #address-cells = <1>;
->>> +             #size-cells = <0>;
->>> +             compatible = "snps,dwmac-mdio";
->>> +             ethphy1: ethernet-phy at 1 {
->>> +                     reg = <1>;
->>> +             };
->>> +     };
+>>> The very last entry seems wrong, or is at least the opposite of what
+>>> the current code has. It should be something called __check_nv(), and
+>>> always return false (condition code NEVER).
 >>
->> This is a) ugly for lack of white lines in between, b) unnecessary since
->> this is being fixed in the stmmac driver where it will benefit more than
->> just this one SoM.
+>> May be __check_nv() name is more appropriate as per definition, but shouldn't it
+>> still return true, because TRM says:
+>> "The condition code NV exists only to provide a valid disassembly of the 0b1111
+>> encoding, otherwise its behavior is identical to AL"
 >
-> So is this redundant information, or just not necessary with the
-> present kernel driver because of some assumption in its current
-> implementation?
+> Indeed, I missed that. But this interpretation is for the A64
+> instruction set, and this array is also used by the new
+> arm32_check_condition. The condition code table for A32 seems to
+> completely ignore the 0b1111 code (there is simply no entry for it), and
+> it is only in the ConditionHolds pseudocode that you can see how this
+> is actually special-cased.
 >
-
-I have the same fix on my firefly tree. Look likes correct and describe the
-connection
-
-Michael
-
+> So I'm fine leaving the code as it is, but a comment and a pointer to
+> the ARMv8 ARM wouldn't go amiss.
+>
 > Thanks,
 >
-> Tomeu
+> 	M.
 >
->> Regards,
->> Andreas
->>
->>>  };
->>>
->>>  &i2c0 {
->>
->> --
->> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
->> GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
 
+OK.
 
-
--- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+-dl
